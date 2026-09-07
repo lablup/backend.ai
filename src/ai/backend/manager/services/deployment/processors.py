@@ -44,7 +44,6 @@ from ai.backend.manager.services.deployment.actions.access_token.get_access_toke
 )
 from ai.backend.manager.services.deployment.actions.access_token.global_search_access_tokens import (
     GlobalSearchAccessTokensAction,
-    GlobalSearchAccessTokensActionResult,
 )
 from ai.backend.manager.services.deployment.actions.access_token.search_access_tokens import (
     SearchAccessTokensAction,
@@ -125,7 +124,6 @@ from ai.backend.manager.services.deployment.actions.model_revision.get_revision_
 )
 from ai.backend.manager.services.deployment.actions.model_revision.global_search_revisions import (
     GlobalSearchRevisionsAction,
-    GlobalSearchRevisionsActionResult,
 )
 from ai.backend.manager.services.deployment.actions.model_revision.search_revision_resource_slots import (
     SearchRevisionResourceSlotsAction,
@@ -303,10 +301,10 @@ class DeploymentProcessors:
         GlobalSearchReplicasAction, BatchOpsResult[ModelReplicaData]
     ]
     global_search_revisions: GlobalActionProcessor[
-        GlobalSearchRevisionsAction, GlobalSearchRevisionsActionResult
+        GlobalSearchRevisionsAction, BatchOpsResult[ModelRevisionData]
     ]
     global_search_access_tokens: GlobalActionProcessor[
-        GlobalSearchAccessTokensAction, GlobalSearchAccessTokensActionResult
+        GlobalSearchAccessTokensAction, BatchOpsResult[ModelDeploymentAccessTokenData]
     ]
 
     def __init__(
@@ -334,11 +332,9 @@ class DeploymentProcessors:
             LookupAutoScalingRuleDeploymentAction
         )
         self.global_search_replicas = replicas.global_search_ops(GlobalSearchReplicasAction)
-        self.global_search_revisions = group.global_scope(
-            GlobalSearchRevisionsAction, service.global_search_revisions
-        )
-        self.global_search_access_tokens = group.global_scope(
-            GlobalSearchAccessTokensAction, service.global_search_access_tokens
+        self.global_search_revisions = revisions.global_search_ops(GlobalSearchRevisionsAction)
+        self.global_search_access_tokens = access_tokens.global_search_ops(
+            GlobalSearchAccessTokensAction
         )
         # Deployment CRUD
         self.create_deployment = group.scope(CreateDeploymentAction, service.create_deployment)

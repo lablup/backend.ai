@@ -96,10 +96,6 @@ class ArtifactRepository:
             return data
 
     @artifact_repository_resilience.apply()
-    async def list_artifact_revisions(self, artifact_id: uuid.UUID) -> list[ArtifactRevisionData]:
-        return await self._db_source.list_artifact_revisions(artifact_id)
-
-    @artifact_repository_resilience.apply()
     async def upsert_artifacts(
         self,
         artifacts: list[ArtifactData],

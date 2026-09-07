@@ -1326,12 +1326,12 @@ class DeploymentAdapter(BaseAdapter):
         input: AdminSearchRevisionsInput,
     ) -> AdminSearchRevisionsPayload:
         """Search model revisions without scope (admin, all deployments)."""
-        querier = self._build_revision_querier(input)
+        searcher = self._build_revision_searcher(input)
         action_result = await self._processors.deployment.global_search_revisions.run(
-            GlobalSearchRevisionsAction(querier=querier)
+            GlobalSearchRevisionsAction(searcher=searcher)
         )
         return AdminSearchRevisionsPayload(
-            items=[self._revision_data_to_dto(item) for item in action_result.data],
+            items=[self._revision_data_to_dto(item) for item in action_result.items],
             total_count=action_result.total_count,
             has_next_page=action_result.has_next_page,
             has_previous_page=action_result.has_previous_page,
@@ -1479,15 +1479,15 @@ class DeploymentAdapter(BaseAdapter):
         """
         if not revision_ids:
             return []
-        querier = BatchQuerier(
+        searcher = ModelRevisionSearcher(
             pagination=OffsetPagination(limit=len(revision_ids)),
             conditions=[RevisionConditions.by_ids(revision_ids)],
         )
         action_result = await self._processors.deployment.global_search_revisions.run(
-            GlobalSearchRevisionsAction(querier=querier)
+            GlobalSearchRevisionsAction(searcher=searcher)
         )
         revision_map: dict[uuid.UUID, RevisionNode] = {
-            data.id: self._revision_data_to_dto(data) for data in action_result.data
+            data.id: self._revision_data_to_dto(data) for data in action_result.items
         }
         return [revision_map.get(revision_id) for revision_id in revision_ids]
 
@@ -1543,14 +1543,14 @@ class DeploymentAdapter(BaseAdapter):
         """
         if not token_ids:
             return []
-        querier = BatchQuerier(
+        searcher = DeploymentAccessTokenSearcher(
             pagination=OffsetPagination(limit=len(token_ids)),
             conditions=[AccessTokenConditions.by_ids(token_ids)],
         )
         action_result = await self._processors.deployment.global_search_access_tokens.run(
-            GlobalSearchAccessTokensAction(querier=querier)
+            GlobalSearchAccessTokensAction(searcher=searcher)
         )
-        token_map = {data.id: self._access_token_data_to_dto(data) for data in action_result.data}
+        token_map = {data.id: self._access_token_data_to_dto(data) for data in action_result.items}
         return [token_map.get(token_id) for token_id in token_ids]
 
     async def batch_load_auto_scaling_rules_by_ids(
@@ -1842,26 +1842,6 @@ class DeploymentAdapter(BaseAdapter):
                 if sub_conditions:
                     conditions.append(negate_conditions(sub_conditions))
         return conditions
-
-    def _build_revision_querier(self, input: AdminSearchRevisionsInput) -> BatchQuerier:
-        conditions: list[QueryCondition] = []
-        if input.filter:
-            f = input.filter
-            if f.deployment_id is not None:
-                conditions.append(RevisionConditions.by_deployment_id(f.deployment_id))
-            conditions.extend(self._convert_revision_filter(f))
-        orders: list[QueryOrder] = self._convert_revision_orders(input.order) if input.order else []
-        return self._build_querier(
-            conditions=conditions,
-            orders=orders,
-            pagination_spec=_get_revision_pagination_spec(),
-            first=input.first,
-            after=input.after,
-            last=input.last,
-            before=input.before,
-            limit=input.limit,
-            offset=input.offset,
-        )
 
     def _build_revision_searcher(self, input: AdminSearchRevisionsInput) -> ModelRevisionSearcher:
         """The filters and page of a revision search whose deployment the action scopes."""

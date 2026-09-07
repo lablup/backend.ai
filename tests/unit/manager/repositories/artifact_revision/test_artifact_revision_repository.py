@@ -413,22 +413,6 @@ class TestArtifactRevisionRepository:
         assert revision.version == "main"
 
     # =========================================================================
-    # Tests - List
-    # =========================================================================
-
-    async def test_list_artifact_revisions(
-        self,
-        artifact_repository: ArtifactRepository,
-        sample_artifact_id: uuid.UUID,
-        sample_revision_id: uuid.UUID,
-    ) -> None:
-        """Test listing artifact revisions"""
-        revisions = await artifact_repository.list_artifact_revisions(sample_artifact_id)
-
-        assert len(revisions) == 1
-        assert revisions[0].id == sample_revision_id
-
-    # =========================================================================
     # Tests - Search with filtering
     # =========================================================================
 

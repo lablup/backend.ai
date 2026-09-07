@@ -60,10 +60,6 @@ from ai.backend.manager.services.deployment.actions.access_token.delete_access_t
     DeleteAccessTokenAction,
     DeleteAccessTokenActionResult,
 )
-from ai.backend.manager.services.deployment.actions.access_token.global_search_access_tokens import (
-    GlobalSearchAccessTokensAction,
-    GlobalSearchAccessTokensActionResult,
-)
 from ai.backend.manager.services.deployment.actions.auto_scaling_rule.bulk_delete_auto_scaling_rules import (
     BulkDeleteAutoScalingRulesAction,
     BulkDeleteAutoScalingRulesActionResult,
@@ -119,10 +115,6 @@ from ai.backend.manager.services.deployment.actions.get_legacy_deployment_by_id 
 from ai.backend.manager.services.deployment.actions.model_revision.add_model_revision import (
     AddModelRevisionAction,
     AddModelRevisionActionResult,
-)
-from ai.backend.manager.services.deployment.actions.model_revision.global_search_revisions import (
-    GlobalSearchRevisionsAction,
-    GlobalSearchRevisionsActionResult,
 )
 from ai.backend.manager.services.deployment.actions.model_revision.search_revision_resource_slots import (
     SearchRevisionResourceSlotsAction,
@@ -606,18 +598,6 @@ class DeploymentService:
         )
         return AddModelRevisionActionResult(revision=revision_data)
 
-    async def global_search_revisions(
-        self, action: GlobalSearchRevisionsAction
-    ) -> GlobalSearchRevisionsActionResult:
-        """Search revisions across every deployment."""
-        result = await self._deployment_repository.search_revisions(action.querier)
-        return GlobalSearchRevisionsActionResult(
-            data=result.items,
-            total_count=result.total_count,
-            has_next_page=result.has_next_page,
-            has_previous_page=result.has_previous_page,
-        )
-
     async def activate_revision(
         self, action: ActivateRevisionAction
     ) -> ActivateRevisionActionResult:
@@ -959,18 +939,6 @@ class DeploymentService:
     # ========== Replica Operations ==========
 
     # ========== Search Operations ==========
-
-    async def global_search_access_tokens(
-        self, action: GlobalSearchAccessTokensAction
-    ) -> GlobalSearchAccessTokensActionResult:
-        """Search access tokens across every deployment."""
-        result = await self._deployment_repository.search_access_tokens(action.querier)
-        return GlobalSearchAccessTokensActionResult(
-            data=result.items,
-            total_count=result.total_count,
-            has_next_page=result.has_next_page,
-            has_previous_page=result.has_previous_page,
-        )
 
     async def search_auto_scaling_rules(
         self, action: SearchAutoScalingRulesAction

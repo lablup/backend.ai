@@ -81,14 +81,6 @@ class ArtifactDBSource:
                 raise ArtifactRevisionNotFoundError(f"Revision {revision} not found")
             return row.to_dataclass()
 
-    async def list_artifact_revisions(self, artifact_id: uuid.UUID) -> list[ArtifactRevisionData]:
-        async with self._db.begin_readonly_session_read_committed() as db_sess:
-            result = await db_sess.execute(
-                sa.select(ArtifactRevisionRow).where(ArtifactRevisionRow.artifact_id == artifact_id)
-            )
-            rows = list(result.scalars().all())
-            return [row.to_dataclass() for row in rows]
-
     async def associate_artifact_with_storage(
         self,
         artifact_revision_id: uuid.UUID,
