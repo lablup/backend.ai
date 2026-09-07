@@ -1,8 +1,6 @@
 """Binder for RBAC scope association operations.
 
-Bundles N:N mapping row writes and RBAC association writes
-into single types, analogous to how RBACEntityCreator bundles
-entity row creation with RBAC association writes.
+Bundles N:N mapping row writes and RBAC association writes into single types.
 """
 
 from __future__ import annotations

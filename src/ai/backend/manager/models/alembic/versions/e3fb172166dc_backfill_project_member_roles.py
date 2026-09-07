@@ -118,7 +118,7 @@ def _get_permissions_table() -> sa.Table:
 
 
 def _member_role_name(project_id: uuid.UUID) -> str:
-    """Match ProjectMemberRoleSpec.role_name() used by the runtime create path."""
+    """The member role name the runtime create path produced at the time."""
     return f"project-{str(project_id)[:8]}-member"
 
 

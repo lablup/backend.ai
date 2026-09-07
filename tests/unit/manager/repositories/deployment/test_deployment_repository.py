@@ -1465,7 +1465,7 @@ class TestDeploymentRevisionOperations:
                 EndpointRow,
                 ReplicaGroupRow,
                 EntityFieldRow,  # DeploymentRevisionRow relationship dependency
-                AssociationScopesEntitiesRow,  # RBACEntityCreator dependency
+                AssociationScopesEntitiesRow,
                 RuntimeVariantRow,
                 DeploymentRevisionPresetRow,
                 DeploymentRevisionRow,
