@@ -22,7 +22,11 @@ from ai.backend.common.web.session import STORAGE_KEY, extra_config_headers, get
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.web.clients.endpoint_pool import AcquiredEndpoint, HealthyEndpointPool
 from ai.backend.web.config.unified import WebServerUnifiedConfig
-from ai.backend.web.errors import InvalidAPIConfigurationError
+from ai.backend.web.errors import (
+    InvalidAPIConfigurationError,
+    ProxyTargetUnreachableError,
+    UnexpectedProxyError,
+)
 
 from .auth import (
     fill_forwarding_hdrs_to_api_session,
@@ -308,13 +312,7 @@ async def _run_proxy_request(
         )
     except BackendClientError as e:
         log.exception("{}: BackendClientError", log_prefix)
-        raise web.HTTPBadGateway(
-            text=json.dumps({
-                "type": "https://api.backend.ai/probs/bad-gateway",
-                "title": "The proxy target server is inaccessible.",
-            }),
-            content_type="application/problem+json",
-        ) from e
+        raise ProxyTargetUnreachableError() from e
     except ClientConnectionError:
         log.warning(
             "{}: ClientConnectionError - Client disconnected during proxying: method: {}, path: {}",
@@ -330,13 +328,7 @@ async def _run_proxy_request(
         raise
     except Exception as e:
         log.exception("{}: unexpected error", log_prefix)
-        raise web.HTTPInternalServerError(
-            text=json.dumps({
-                "type": "https://api.backend.ai/probs/internal-server-error",
-                "title": "Something has gone wrong.",
-            }),
-            content_type="application/problem+json",
-        ) from e
+        raise UnexpectedProxyError() from e
 
 
 async def web_handler(
@@ -518,13 +510,7 @@ async def web_handler_with_jwt(
         )
     except BackendClientError as e:
         log.exception("web_handler_with_jwt: BackendClientError")
-        raise web.HTTPBadGateway(
-            text=json.dumps({
-                "type": "https://api.backend.ai/probs/bad-gateway",
-                "title": "The proxy target server is inaccessible.",
-            }),
-            content_type="application/problem+json",
-        ) from e
+        raise ProxyTargetUnreachableError() from e
     except ClientConnectionError:
         log.warning(
             "web_handler_with_jwt: ClientConnectionError - Client disconnected during proxying: method: {}, path: {}",
@@ -539,13 +525,7 @@ async def web_handler_with_jwt(
         raise
     except Exception as e:
         log.exception("web_handler_with_jwt: unexpected error")
-        raise web.HTTPInternalServerError(
-            text=json.dumps({
-                "type": "https://api.backend.ai/probs/internal-server-error",
-                "title": "Something has gone wrong.",
-            }),
-            content_type="application/problem+json",
-        ) from e
+        raise UnexpectedProxyError() from e
 
 
 async def apollo_router_handler(
@@ -663,24 +643,12 @@ async def web_plugin_handler(
         )
     except BackendClientError as e:
         log.exception("web_plugin_handler: BackendClientError")
-        raise web.HTTPBadGateway(
-            text=json.dumps({
-                "type": "https://api.backend.ai/probs/bad-gateway",
-                "title": "The proxy target server is inaccessible.",
-            }),
-            content_type="application/problem+json",
-        ) from e
+        raise ProxyTargetUnreachableError() from e
     except web.HTTPException:
         raise
     except Exception as e:
         log.exception("web_plugin_handler: unexpected error")
-        raise web.HTTPInternalServerError(
-            text=json.dumps({
-                "type": "https://api.backend.ai/probs/internal-server-error",
-                "title": "Something has gone wrong.",
-            }),
-            content_type="application/problem+json",
-        ) from e
+        raise UnexpectedProxyError() from e
 
 
 @asynccontextmanager
@@ -798,21 +766,9 @@ async def websocket_handler(
         )
     except BackendClientError as e:
         log.exception("websocket_handler: BackendClientError")
-        raise web.HTTPBadGateway(
-            text=json.dumps({
-                "type": "https://api.backend.ai/probs/bad-gateway",
-                "title": "The proxy target server is inaccessible.",
-            }),
-            content_type="application/problem+json",
-        ) from e
+        raise ProxyTargetUnreachableError() from e
     except web.HTTPException:
         raise
     except Exception as e:
         log.exception("websocket_handler: unexpected error")
-        raise web.HTTPInternalServerError(
-            text=json.dumps({
-                "type": "https://api.backend.ai/probs/internal-server-error",
-                "title": "Something has gone wrong.",
-            }),
-            content_type="application/problem+json",
-        ) from e
+        raise UnexpectedProxyError() from e

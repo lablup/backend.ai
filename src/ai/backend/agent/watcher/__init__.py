@@ -18,6 +18,7 @@ import trafaret as t
 from aiohttp import web
 from setproctitle import setproctitle
 
+from ai.backend.agent.errors.watcher import InvalidWatcherTokenError
 from ai.backend.common import config, utils
 from ai.backend.common import validators as tx
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
@@ -49,7 +50,7 @@ async def auth_middleware(
             log.exception(repr(e))
             raise
     log.info("invalid requested token")
-    raise web.HTTPForbidden()
+    raise InvalidWatcherTokenError()
 
 
 async def handle_status(request: web.Request) -> web.Response:
