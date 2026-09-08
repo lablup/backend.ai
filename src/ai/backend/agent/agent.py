@@ -1095,8 +1095,12 @@ class AbstractAgent[
         # Report commit status
         periodic_tasks.append(ReportKernelCommitStatusTask(self))
 
+        # Built here, started in `start_serving`. The first task on it is the heartbeat, which
+        # runs with no initial delay -- and a heartbeat is on its own enough for the manager to
+        # mark this node ALIVE and schedule work onto it. Starting it from inside `__ainit__`
+        # therefore announces the node while the backend's own start is still ahead of it, and
+        # before there is an RPC server to take the work that follows.
         self._local_cron = LocalCron(periodic_tasks)
-        await self._local_cron.start()
 
         loop = current_loop()
         self.container_lifecycle_handler = loop.create_task(self.process_lifecycle_events())
@@ -1115,13 +1119,18 @@ class AbstractAgent[
         evd.subscribe(DoVolumeUnmountEvent, self, handle_volume_umount, name="ag.volume.umount")
         await self.event_dispatcher.start()
 
-    async def announce_started(self) -> None:
-        """Tell the manager this agent is up, once it actually is.
+    async def start_serving(self) -> None:
+        """Begin telling the manager this node is here, once it can actually take work.
 
-        Called after the whole of `__ainit__` -- this class's and the backend's -- has finished,
-        because this is what makes the node schedulable. Anything that can still fail after it
-        would leave the manager placing work on an agent that is not there.
+        Both halves, and both are announcements: the started event says so outright, and the
+        heartbeat says so by arriving -- the manager marks a node ALIVE on a heartbeat alone. So
+        neither may happen until the whole of `__ainit__` (this class's and the backend's) has
+        finished AND the RPC server is handling calls. Anything before that point marks the node
+        schedulable while the work it would be sent cannot be served, and a failure in between
+        aborts the process before shutdown can take the announcement back.
         """
+        if self._local_cron is not None:
+            await self._local_cron.start()
         await self.anycast_event(AgentStartedEvent(reason="self-started"))
 
     async def _make_message_queue(self, stream_redis_target: RedisTarget) -> AbstractMessageQueue:
