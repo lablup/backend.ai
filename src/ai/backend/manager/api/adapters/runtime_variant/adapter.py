@@ -3,7 +3,6 @@ from __future__ import annotations
 from collections.abc import Sequence
 from uuid import UUID
 
-from ai.backend.common.api_handlers import SENTINEL
 from ai.backend.common.data.entity.runtime_variant import RuntimeVariantID
 from ai.backend.common.dto.manager.v2.runtime_variant.request import (
     CreateRuntimeVariantInput,
@@ -138,13 +137,7 @@ class RuntimeVariantAdapter(BaseAdapter):
             name=OptionalState.update(input.name)
             if input.name is not None
             else OptionalState.nop(),
-            description=(
-                TriState.nop()
-                if input.description is SENTINEL
-                else TriState.nullify()
-                if input.description is None
-                else TriState.update(input.description)
-            ),
+            description=TriState.from_unset(input.description),
         )
         result = await self._processors.runtime_variant.update.run(
             UpdateRuntimeVariantAction(updater=updater)
