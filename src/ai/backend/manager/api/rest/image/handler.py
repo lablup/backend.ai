@@ -29,7 +29,7 @@ from ai.backend.manager.dto.image_request import GetImagePathParam
 from ai.backend.manager.services.image.actions.alias_image import AliasImageByIdAction
 from ai.backend.manager.services.image.actions.dealias_image import DealiasImageAction
 from ai.backend.manager.services.image.actions.forget_image import ForgetImageByIdAction
-from ai.backend.manager.services.image.actions.get_images import GetImageByIdAction
+from ai.backend.manager.services.image.actions.get_images import PublicGetImageByIdAction
 from ai.backend.manager.services.image.actions.purge_images import PurgeImageByIdAction
 from ai.backend.manager.services.image.actions.scan_image import ScanImageAction
 from ai.backend.manager.services.image.actions.search_images import SearchImagesAction
@@ -71,8 +71,8 @@ class ImageHandler:
         ctx: UserContext,
     ) -> APIResponse:
         """Get a single image by ID."""
-        action_result = await self._image.get_image_by_id.run(
-            GetImageByIdAction(image_id=ImageID(path.parsed.image_id), image_status=None)
+        action_result = await self._image.public_get_image_by_id.run(
+            PublicGetImageByIdAction(image_id=ImageID(path.parsed.image_id), image_status=None)
         )
         resp = GetImageResponse(
             item=self._adapter.convert_detailed_to_dto(
