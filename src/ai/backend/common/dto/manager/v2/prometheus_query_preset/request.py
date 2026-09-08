@@ -10,9 +10,10 @@ from uuid import UUID
 
 from pydantic import Field, field_validator
 
-from ai.backend.common.api_handlers import SENTINEL, BaseRequestModel, Sentinel
+from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.dto.clients.prometheus.defs import PROMETHEUS_DURATION_PATTERN
 from ai.backend.common.dto.manager.query import StringFilter, UUIDFilter
+from ai.backend.common.tristate.unset import UNSET, Unset
 
 from .types import OrderDirection, QueryDefinitionOrderField
 
@@ -97,23 +98,19 @@ class ModifyQueryDefinitionInput(BaseRequestModel):
     """Input for modifying a prometheus query definition.
 
     Nullable DB columns (``time_window``, ``description``, ``category_id``) use the
-    ``Sentinel`` pattern so callers can distinguish "leave unchanged" from "clear to null".
+    ``Unset`` pattern so callers can distinguish "leave unchanged" from "clear to null".
     Non-nullable fields use ``None`` to mean "do not update".
     """
 
     name: str | None = Field(default=None, description="Updated human-readable name")
-    description: str | Sentinel | None = Field(
-        default=SENTINEL,
-        description=(
-            "Updated description. Pass SENTINEL (default) to leave unchanged; pass None to clear."
-        ),
+    description: str | None | Unset = Field(
+        default=UNSET,
+        description="Updated description. Omit to leave unchanged; null clears.",
     )
     rank: int | None = Field(default=None, ge=0, description="Updated sort rank")
-    category_id: UUID | Sentinel | None = Field(
-        default=SENTINEL,
-        description=(
-            "Updated category ID. Pass SENTINEL (default) to leave unchanged; pass None to clear."
-        ),
+    category_id: UUID | None | Unset = Field(
+        default=UNSET,
+        description="Updated category ID. Omit to leave unchanged; null clears.",
     )
     metric_name: str | None = Field(default=None, description="Updated Prometheus metric name")
     query_template: str | None = Field(
@@ -122,12 +119,9 @@ class ModifyQueryDefinitionInput(BaseRequestModel):
             "Updated PromQL template with placeholders (${{labels}}, ${{window}}, ${{group_by}})"
         ),
     )
-    time_window: str | Sentinel | None = Field(
-        default=SENTINEL,
-        description=(
-            "Updated default time window. "
-            "Pass SENTINEL (default) to leave unchanged; pass None to clear."
-        ),
+    time_window: str | None | Unset = Field(
+        default=UNSET,
+        description="Updated default time window. Omit to leave unchanged; null clears.",
     )
     options: ModifyQueryDefinitionOptionsInput | None = Field(
         default=None, description="Updated query definition options"
@@ -145,7 +139,7 @@ class ModifyQueryDefinitionInput(BaseRequestModel):
 
     @field_validator("time_window", mode="after")
     @classmethod
-    def _validate_time_window(cls, v: str | Sentinel | None) -> str | Sentinel | None:
+    def _validate_time_window(cls, v: str | Unset | None) -> str | Unset | None:
         if isinstance(v, str) and not re.match(PROMETHEUS_DURATION_PATTERN, v):
             raise ValueError(f"Invalid Prometheus duration format: {v!r}")
         return v

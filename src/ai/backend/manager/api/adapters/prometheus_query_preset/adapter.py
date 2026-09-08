@@ -5,7 +5,6 @@ from __future__ import annotations
 from collections.abc import Sequence
 from uuid import UUID
 
-from ai.backend.common.api_handlers import Sentinel
 from ai.backend.common.data.entity.prometheus_query_preset import PrometheusQueryPresetID
 from ai.backend.common.data.entity.prometheus_query_preset_category import (
     PrometheusQueryPresetCategoryID,
@@ -317,19 +316,11 @@ class PrometheusQueryPresetAdapter(BaseAdapter):
             name=(
                 OptionalState.update(input.name) if input.name is not None else OptionalState.nop()
             ),
-            description=TriState.nop()
-            if isinstance(input.description, Sentinel)
-            else TriState.nullify()
-            if input.description is None
-            else TriState.update(input.description),
+            description=TriState.from_unset(input.description),
             rank=(
                 OptionalState.update(input.rank) if input.rank is not None else OptionalState.nop()
             ),
-            category_id=TriState.nop()
-            if isinstance(input.category_id, Sentinel)
-            else TriState.nullify()
-            if input.category_id is None
-            else TriState.update(PrometheusQueryPresetCategoryID(input.category_id)),
+            category_id=TriState.from_unset(input.category_id).map(PrometheusQueryPresetCategoryID),
             metric_name=(
                 OptionalState.update(input.metric_name)
                 if input.metric_name is not None
@@ -340,11 +331,7 @@ class PrometheusQueryPresetAdapter(BaseAdapter):
                 if input.query_template is not None
                 else OptionalState.nop()
             ),
-            time_window=TriState.nop()
-            if isinstance(input.time_window, Sentinel)
-            else TriState.nullify()
-            if input.time_window is None
-            else TriState.update(input.time_window),
+            time_window=TriState.from_unset(input.time_window),
             filter_labels=(
                 OptionalState.update(input.options.filter_labels)
                 if input.options is not None and input.options.filter_labels is not None

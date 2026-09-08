@@ -7,7 +7,6 @@ from uuid import UUID
 import pytest
 from pydantic import ValidationError
 
-from ai.backend.common.api_handlers import Sentinel
 from ai.backend.common.dto.manager.v2.prometheus_query_preset.request import (
     CreateQueryDefinitionInput,
     CreateQueryDefinitionOptionsInput,
@@ -27,6 +26,7 @@ from ai.backend.common.dto.manager.v2.prometheus_query_preset.types import (
     QueryDefinitionOrderField,
 )
 from ai.backend.common.exception import BackendAISchemaValidationFailed
+from ai.backend.common.tristate.unset import Unset
 
 _SAMPLE_UUID = UUID("550e8400-e29b-41d4-a716-446655440000")
 
@@ -187,17 +187,17 @@ class TestModifyQueryDefinitionOptionsInput:
 class TestModifyQueryDefinitionInput:
     """Tests for ModifyQueryDefinitionInput model."""
 
-    def test_default_time_window_is_sentinel(self) -> None:
+    def test_default_time_window_is_unset(self) -> None:
         inp = ModifyQueryDefinitionInput()
-        assert isinstance(inp.time_window, Sentinel)
+        assert isinstance(inp.time_window, Unset)
 
-    def test_all_fields_default_to_none_or_sentinel(self) -> None:
+    def test_all_fields_default_to_none_or_unset(self) -> None:
         inp = ModifyQueryDefinitionInput()
         assert inp.name is None
         assert inp.metric_name is None
         assert inp.query_template is None
         assert inp.options is None
-        assert isinstance(inp.time_window, Sentinel)
+        assert isinstance(inp.time_window, Unset)
 
     def test_time_window_none_means_clear(self) -> None:
         inp = ModifyQueryDefinitionInput(time_window=None)
