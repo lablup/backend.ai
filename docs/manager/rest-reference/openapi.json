@@ -25836,13 +25836,10 @@
                 "type": "string"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
+            "description": "Description. Omit to leave unchanged; null clears.",
             "title": "Description"
           },
           "rank": {
@@ -25887,13 +25884,10 @@
                 "type": "string"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
+            "description": "Default value. Omit to leave unchanged; null clears.",
             "title": "Default Value"
           },
           "key": {
@@ -25929,13 +25923,10 @@
                 "type": "string"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
+            "description": "UI category group. Omit to leave unchanged; null clears.",
             "title": "Category"
           },
           "display_name": {
@@ -25944,13 +25935,10 @@
                 "type": "string"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
+            "description": "UI display name. Omit to leave unchanged; null clears.",
             "title": "Display Name"
           },
           "ui_option": {
@@ -25959,13 +25947,10 @@
                 "$ref": "#/components/schemas/UIOption"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
+            "description": "UI rendering option. Omit to leave unchanged; null clears.",
             "title": "Ui Option"
           }
         },
