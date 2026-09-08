@@ -555,3 +555,21 @@ needs one record or an etcd transaction.
 R3 unchanged. `tests/dataplane/SCENARIOS.md` still has no result for two-node, restart, failure or
 encryption-wire, and the NIC-failover case this round is about is not even written down there.
 Five rounds of admission gates have each been unit-tested and none has met a real agent.
+
+Twenty-fifth round.
+
+| # | Was | Now |
+|---|-----|-----|
+| C47 | the advert went up in the middle of `__ainit__`, with the socket relay and the network plugin context still to start. A failure there aborts the runtime before `shutdown` is ever called, so an advert matching the current boot stood for the whole freshness window over an agent that never started -- and the manager had already been told the agent is ALIVE | the advert is the LAST thing `__ainit__` does. Nothing that can fail comes after it, and a publish that fails withdraws rather than leaving the previous one standing. It withdraws rather than raising: a node that cannot describe its uplink can still serve single-node sessions, and with no advert it is simply not admitted to a cluster-network one |
+| C47 | shutdown deleted the advert and THEN cancelled the refresh, so a publish already in flight could land after the delete and put a fresh advert back over a node that is going away | deleted, then the publisher stopped and waited for, then deleted again. The first delete shuts the door at once; the second is the one that stays shut |
+| C48 | admission is a read and everything after it is writes -- the subnet, the VNI, the endpoints, the pre-seed. An agent that restarted or withdrew in between had taken back the capability the placement was made on, and the session was still declared READY on it | the READY write is conditional on every advert the session was admitted on, in the same store operation. An advert that moved makes the create fail and roll back like any other |
+
+Still not done. `AsyncEtcd.get_prefix` has no paginated form and there is no bound on session
+count. There is no inspect/repair/quarantine tool for a corrupt root. The agent identity is still
+three keys read separately -- ordering narrows that window, one record or a transaction would
+close it. And the first advert is the last step of the DOCKER agent's init specifically; making it
+the commit point of agent startup generally is a wider change than this branch should carry.
+
+R3 unchanged. `SCENARIOS.md` still has no result for two-node, restart, failure or
+encryption-wire, and neither NIC failover nor a failed agent start appears there at all. Six
+rounds of admission and lifecycle gates have each been unit-tested; none has met a real agent.
