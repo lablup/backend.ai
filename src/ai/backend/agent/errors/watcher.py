@@ -1,7 +1,3 @@
-"""
-Agent watcher-related exceptions.
-"""
-
 from __future__ import annotations
 
 from typing import override
@@ -18,8 +14,6 @@ from ai.backend.common.exception import (
 
 
 class InvalidWatcherTokenError(BackendAIError, web.HTTPForbidden):
-    """Raised when the request does not carry the configured watcher token."""
-
     error_type = "https://api.backend.ai/probs/agent/invalid-watcher-token"
     error_title = "Invalid watcher token."
 
