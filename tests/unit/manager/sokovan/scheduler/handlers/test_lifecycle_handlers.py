@@ -11,8 +11,10 @@ Test Scenarios:
 
 from __future__ import annotations
 
+import copy
 import uuid
 from collections.abc import Callable
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -51,6 +53,11 @@ from ai.backend.manager.views.sokovan.session import (
 # =============================================================================
 # ScheduleSessionsLifecycleHandler Tests (SC-SS-001 ~ SC-SS-005)
 # =============================================================================
+
+
+def replace_kernel_status(kernel: Any) -> Any:
+    """A second kernel of the same session, left in whatever state the first started in."""
+    return copy.deepcopy(kernel)
 
 
 class TestScheduleSessionsLifecycleHandler:
@@ -632,6 +639,48 @@ class TestStartSessionsLifecycleHandler:
         # Verify success reason
         for success in result.successes:
             assert success.reason == "triggered-by-scheduler"
+
+    async def test_a_session_whose_kernels_were_all_reset_is_completed_not_started(
+        self,
+        handler: StartSessionsLifecycleHandler,
+        mock_launcher: AsyncMock,
+        mock_repository: AsyncMock,
+        prepared_session: SessionWithKernels,
+    ) -> None:
+        """The exact half-state: kernels already PENDING and unbound under a session that has not
+        moved. It is finished here, and the launcher never sees it."""
+        for kernel in prepared_session.kernel_infos:
+            kernel.lifecycle.status = KernelStatus.PENDING
+            kernel.resource.agent = None
+
+        result = await handler.execute(ResourceGroupID(uuid.uuid4()), [prepared_session])
+
+        assert [t.session_id for t in result.failures] == [
+            prepared_session.session_info.identity.id
+        ]
+        assert result.failures[0].disposition is FailureDisposition.REPLACE
+        mock_launcher.start_sessions_for_handler.assert_not_awaited()
+
+    async def test_a_session_with_mixed_kernel_statuses_is_skipped(
+        self,
+        handler: StartSessionsLifecycleHandler,
+        mock_launcher: AsyncMock,
+        prepared_session: SessionWithKernels,
+    ) -> None:
+        """The filter returns a session if ANY kernel matches, so a session with one PENDING
+        kernel and others elsewhere arrives here too. Starting it would dispatch to the kernels
+        that still have an agent and rebuild half a session."""
+        session = prepared_session
+        # One kernel reset, the rest left where they were.
+        session.kernel_infos.append(replace_kernel_status(session.kernel_infos[0]))
+        session.kernel_infos[0].lifecycle.status = KernelStatus.PENDING
+        session.kernel_infos[0].resource.agent = None
+
+        result = await handler.execute(ResourceGroupID(uuid.uuid4()), [session])
+
+        assert [t.session_id for t in result.skipped] == [session.session_info.identity.id]
+        assert not result.failures
+        mock_launcher.start_sessions_for_handler.assert_not_awaited()
 
     def test_it_also_selects_a_session_whose_kernels_were_already_reset(self) -> None:
         """The session's move to PENDING and its kernels' reset are two transactions, and the
