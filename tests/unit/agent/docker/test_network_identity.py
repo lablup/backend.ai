@@ -65,6 +65,10 @@ class _AgentStub:
         self.etcd = _RecordingEtcd()
         self.id = "i-abc123"
         self._boot_id = "boot-1"
+        # The run this agent id currently names. Publishing and withdrawing are both conditional
+        # on it: an id restarted quickly has two processes alive at once, and either one writing
+        # over the other's advert is a node that is up but invisible, or gone but advertised.
+        self.etcd.puts["network/agent/i-abc123/boot"] = "boot-1"
         self._vtep_ip = vtep_ip
         self._host_ip = host_ip
         # The interface the data plane was built on. Half of the serving identity: an address that
