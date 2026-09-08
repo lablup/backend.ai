@@ -22588,14 +22588,10 @@
                 "type": "array"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
-            "description": "Updated resource slot limits. Set to null to clear.",
+            "description": "Updated resource slot limits. Omit to leave unchanged.",
             "title": "Total Resource Slots"
           },
           "max_session_lifetime": {
@@ -22630,14 +22626,10 @@
                 "type": "integer"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
-            "description": "Updated max pending sessions. Set to null to clear.",
+            "description": "Updated max pending sessions. Omit to leave unchanged; null clears.",
             "title": "Max Pending Session Count"
           },
           "max_priority": {
@@ -22646,14 +22638,10 @@
                 "type": "integer"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
-            "description": "Updated max priority. Set to null to clear.",
+            "description": "Updated max priority. Omit to leave unchanged; null clears.",
             "title": "Max Priority"
           },
           "max_pending_session_resource_slots": {
@@ -22665,14 +22653,10 @@
                 "type": "array"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
-            "description": "Updated max pending session resource slots. Set to null to clear.",
+            "description": "Updated max pending session resource slots. Omit to leave unchanged; null clears.",
             "title": "Max Pending Session Resource Slots"
           },
           "max_concurrent_sftp_sessions": {
@@ -22723,14 +22707,10 @@
                 "type": "array"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
-            "description": "Updated vfolder host permissions. Set to null to clear.",
+            "description": "Updated vfolder host permissions. Omit to leave unchanged.",
             "title": "Allowed Vfolder Hosts"
           }
         },
@@ -23085,35 +23065,23 @@
                 "type": "integer"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
-            "description": "Updated max vfolder count. Use SENTINEL to clear, null to keep existing.",
+            "description": "Updated max vfolder count. Omit to leave unchanged.",
             "title": "Max Vfolder Count"
           },
           "max_concurrent_logins": {
             "anyOf": [
               {
-                "anyOf": [
-                  {
-                    "type": "integer"
-                  },
-                  {
-                    "$ref": "#/components/schemas/Sentinel"
-                  }
-                ],
-                "ge": 1
+                "ge": 1,
+                "type": "integer"
               },
               {
                 "type": "null"
               }
             ],
-            "default": 1,
-            "description": "Updated maximum number of concurrent authenticated login sessions per user. Set to null to clear (unlimited). Must be >= 1 when set. Distinct from keypair_resource_policies.max_concurrent_sessions which caps compute sessions.",
+            "description": "Updated maximum number of concurrent authenticated login sessions per user. Omit to leave unchanged; null clears (unlimited). Must be >= 1 when set. Distinct from keypair_resource_policies.max_concurrent_sessions which caps compute sessions.",
             "title": "Max Concurrent Logins"
           },
           "max_quota_scope_size": {
@@ -23122,14 +23090,10 @@
                 "$ref": "#/components/schemas/BinarySizeInput"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
-            "description": "Updated max quota scope size. Use SENTINEL to clear, null to keep existing.",
+            "description": "Updated max quota scope size. Omit to leave unchanged.",
             "title": "Max Quota Scope Size"
           },
           "max_session_count_per_model_session": {
@@ -23464,14 +23428,10 @@
                 "type": "integer"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
-            "description": "Updated max vfolder count. Use SENTINEL to clear, null to keep existing.",
+            "description": "Updated max vfolder count. Omit to leave unchanged.",
             "title": "Max Vfolder Count"
           },
           "max_quota_scope_size": {
@@ -23480,14 +23440,10 @@
                 "$ref": "#/components/schemas/BinarySizeInput"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
-            "description": "Updated max quota scope size. Use SENTINEL to clear, null to keep existing.",
+            "description": "Updated max quota scope size. Omit to leave unchanged.",
             "title": "Max Quota Scope Size"
           },
           "max_network_count": {
