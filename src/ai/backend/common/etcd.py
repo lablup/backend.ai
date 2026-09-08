@@ -231,7 +231,7 @@ class AbstractKVStore(ABC):
         val: str,
         *,
         expected: str | None,
-        guards: Mapping[str, str],
+        guards: Mapping[str, str | None],
         scope: ConfigScopes = ConfigScopes.GLOBAL,
         scope_prefix_map: Mapping[ConfigScopes, str] | None = None,
     ) -> bool:
@@ -795,13 +795,15 @@ class AsyncEtcd(AbstractKVStore):
         val: str,
         *,
         expected: str | None,
-        guards: Mapping[str, str],
+        guards: Mapping[str, str | None],
         scope: ConfigScopes = ConfigScopes.GLOBAL,
         scope_prefix_map: Mapping[ConfigScopes, str] | None = None,
     ) -> bool:
         """
         Atomically write ``key`` only if it is in the expected state AND every guard key still
-        holds exactly the bytes given for it.
+        holds exactly the bytes given for it -- or is still ABSENT, where the value given is
+        ``None``. Absence is a condition like any other: a key that has appeared since the caller
+        looked is a change, and often the one that matters.
 
         ``expected`` is the target's own condition: ``None`` means it must not exist yet,
         otherwise it must hold those exact bytes. ``guards`` are keys that are only READ --
@@ -834,13 +836,18 @@ class AsyncEtcd(AbstractKVStore):
             )
         for guard_key, guard_val in guards.items():
             mangled_guard = self._mangle_key(f"{_slash(scope_prefix)}{guard_key}")
-            conditions.append(
-                Compare.value(
-                    mangled_guard.encode(self.encoding),
-                    CompareOp.EQUAL,
-                    guard_val.encode(self.encoding),
+            if guard_val is None:
+                conditions.append(
+                    Compare.create_revision(mangled_guard.encode(self.encoding), CompareOp.EQUAL, 0)
                 )
-            )
+            else:
+                conditions.append(
+                    Compare.value(
+                        mangled_guard.encode(self.encoding),
+                        CompareOp.EQUAL,
+                        guard_val.encode(self.encoding),
+                    )
+                )
 
         async with self.etcd.connect() as communicator:
             result = await communicator.txn(
