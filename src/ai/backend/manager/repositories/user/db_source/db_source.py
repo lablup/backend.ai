@@ -97,12 +97,14 @@ from ai.backend.manager.models.vfolder import (
     VFolderDeletionInfo,
     VFolderRow,
     VFolderStatusSet,
-    vfolder_invitations,
     vfolder_permissions,
     vfolder_status_map,
     vfolders,
 )
-from ai.backend.manager.models.vfolder.purgers import VFolderUserPermissionBatchPurger
+from ai.backend.manager.models.vfolder.purgers import (
+    VFolderInviteeInvitationBatchPurger,
+    VFolderUserPermissionBatchPurger,
+)
 from ai.backend.manager.repositories.base.querier import BatchQuerier, execute_batch_querier
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.ops.v2.share.provider import ShareOpsProvider
@@ -827,11 +829,13 @@ class UserDBSource:
             # Target user will be the new owner, and it does not make sense to have
             # invitation and shared permission for its own folder.
             migrate_vfolder_ids = [item["vid"] for item in migrate_updates]
-            delete_query = sa.delete(vfolder_invitations).where(
-                (vfolder_invitations.c.invitee == target_user_email)
-                & (vfolder_invitations.c.vfolder.in_(migrate_vfolder_ids))
-            )
-            await conn.execute(delete_query)
+            async with self._v2_ops.write_ops() as w:
+                await w.batch_purge_entities_in_global(
+                    VFolderInviteeInvitationBatchPurger(
+                        vfolder_ids=migrate_vfolder_ids,
+                        invitee_email=target_user_email,
+                    )
+                )
             # The target user becomes the owner, so what they held as an invitee goes:
             # the mount row and the share cap alike.
             await self._revoke_shared_vfolders(target_user_uuid, migrate_vfolder_ids)

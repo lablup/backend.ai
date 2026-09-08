@@ -104,7 +104,6 @@ from ai.backend.manager.models.vfolder import (
     get_sessions_by_mounted_folder,
     is_unmanaged,
     query_accessible_vfolders,
-    vfolder_invitations,
     vfolder_permissions,
     vfolder_status_map,
     vfolders,
@@ -119,6 +118,8 @@ from ai.backend.manager.models.vfolder.creators import (
 )
 from ai.backend.manager.models.vfolder.lookups import VFolderMountPermissionLookup
 from ai.backend.manager.models.vfolder.purgers import (
+    VFolderInvitationBatchPurger,
+    VFolderInviteeInvitationBatchPurger,
     VFolderPurger,
     VFolderUserPermissionBatchPurger,
 )
@@ -826,6 +827,10 @@ class VfolderRepository:
 
             if succeeded_ids:
                 # Delete relation rows for succeeded vfolders only.
+                async with self._v2_ops.write_ops() as w:
+                    await w.batch_purge_entities_in_global(
+                        VFolderInvitationBatchPurger(vfolder_ids=succeeded_ids)
+                    )
                 await delete_vfolder_relation_rows(db_conn, self._db.begin_session, succeeded_ids)
 
             result.succeeded = succeeded_data
@@ -2217,18 +2222,15 @@ class VfolderRepository:
 
         # Step 4: Delete related invitations and permissions for new owner
         async def _delete_related_rows() -> None:
-            async with self._db.begin_session() as session:
-                conn = await session.connection()
-                del_query = sa.delete(vfolder_invitations).where(
-                    (vfolder_invitations.c.invitee == user_email)
-                    & (vfolder_invitations.c.vfolder == vfolder_id)
-                )
-                await conn.execute(del_query)
-
             # Also clear what the new owner held from when they were an invitee; the
             # ownership below replaces it uncapped. Their legacy mount row is left
             # standing — accepting a later invitation reads it (BA-5277).
             async with self._v2_ops.write_ops() as w:
+                await w.batch_purge_entities_in_global(
+                    VFolderInviteeInvitationBatchPurger(
+                        vfolder_ids=[vfolder_id], invitee_email=user_email
+                    )
+                )
                 await w.unshare(new_owner_project, [VFolderUUID(vfolder_id)])
 
         await execute_with_retry(_delete_related_rows)
