@@ -19154,14 +19154,10 @@
                 "type": "string"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
-            "description": "Updated role description. Use SENTINEL to clear.",
+            "description": "Updated role description. Omit to leave unchanged; null clears.",
             "title": "Description"
           },
           "status": {
@@ -34749,14 +34745,10 @@
                 "type": "string"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
-            "description": "Updated role description",
+            "description": "Updated role description. Omit to leave unchanged; null clears.",
             "title": "Description"
           }
         },
