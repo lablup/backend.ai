@@ -286,7 +286,12 @@ class OIDCWebAppPlugin(WebappPlugin):
             redirect_uri=str(redirect_uri.with_path("/func/openid/redirect")),
         )
 
-        return web.Response(status=HTTPStatus.FOUND, headers={"Location": uri})
+        return web.Response(
+            status=HTTPStatus.FOUND,
+            headers={"Location": uri},
+            # Legacy body that aiohttp's HTTP*Redirect filled in.
+            text=f"{HTTPStatus.FOUND.value}: {HTTPStatus.FOUND.phrase}",
+        )
 
     async def redirect(self, request: web.Request) -> web.Response:
         root_app = request.app["_root_app"]
@@ -354,6 +359,8 @@ class OIDCWebAppPlugin(WebappPlugin):
         return web.Response(
             status=HTTPStatus.FOUND,
             headers={"Location": str(redirect_uri.update_query({"sToken": token}))},
+            # Legacy body that aiohttp's HTTP*Redirect filled in.
+            text=f"{HTTPStatus.FOUND.value}: {HTTPStatus.FOUND.phrase}",
         )
 
     @override

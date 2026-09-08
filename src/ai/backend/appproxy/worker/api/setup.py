@@ -168,7 +168,10 @@ async def setup(
             redirect_path = jwt_body.get("redirect", "")
             proxy_url = generate_proxy_url(port_config, protocol, circuit, redirect_path)
             response = web.Response(
-                status=HTTPStatus.FOUND, headers={**cors_headers, "Location": proxy_url}
+                status=HTTPStatus.FOUND,
+                headers={**cors_headers, "Location": proxy_url},
+                # Legacy body that aiohttp's HTTP*Redirect filled in.
+                text=f"{HTTPStatus.FOUND.value}: {HTTPStatus.FOUND.phrase}",
             )
             cookie_domain = None
             if circuit.frontend_mode == FrontendMode.WILDCARD_DOMAIN:
@@ -201,6 +204,8 @@ async def setup(
                         **cors_headers,
                         "Location": f"http://localhost:45678/start?{urllib.parse.urlencode(queryparams)}",
                     },
+                    # Legacy body that aiohttp's HTTP*Redirect filled in.
+                    text=f"{HTTPStatus.FOUND.value}: {HTTPStatus.FOUND.phrase}",
                 )
             return PydanticResponse(
                 ProxySetupResponseModel(

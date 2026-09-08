@@ -222,7 +222,13 @@ async def proxy(
             ),
             headers={"Access-Control-Allow-Origin": "*", "Access-Control-Expose-Headers": "*"},
         )
-    return web.Response(status=HTTPStatus.PERMANENT_REDIRECT, headers={"Location": app_url})
+    status = HTTPStatus.PERMANENT_REDIRECT
+    return web.Response(
+        status=status,
+        headers={"Location": app_url},
+        # Legacy body that aiohttp's HTTP*Redirect filled in.
+        text=f"{status.value}: {status.phrase}",
+    )
 
 
 async def init(_app: web.Application) -> None:
