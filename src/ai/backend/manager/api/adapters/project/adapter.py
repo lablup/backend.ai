@@ -5,7 +5,6 @@ from __future__ import annotations
 from collections.abc import Sequence
 from uuid import UUID
 
-from ai.backend.common.api_handlers import Sentinel
 from ai.backend.common.data.entity.domain import DomainID, DomainName
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.role import RoleID
@@ -203,25 +202,13 @@ class ProjectAdapter(BaseAdapter):
             name=(
                 OptionalState.update(input.name) if input.name is not None else OptionalState.nop()
             ),
-            description=(
-                TriState.nop()
-                if isinstance(input.description, Sentinel)
-                else TriState.nullify()
-                if input.description is None
-                else TriState.update(input.description)
-            ),
+            description=TriState.from_unset(input.description),
             is_active=(
                 OptionalState.update(input.is_active)
                 if input.is_active is not None
                 else OptionalState.nop()
             ),
-            integration_name=(
-                TriState.nop()
-                if isinstance(input.integration_name, Sentinel)
-                else TriState.nullify()
-                if input.integration_name is None
-                else TriState.update(input.integration_name)
-            ),
+            integration_name=TriState.from_unset(input.integration_name),
             resource_policy=(
                 OptionalState.update(input.resource_policy)
                 if input.resource_policy is not None
