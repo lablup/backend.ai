@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 import urllib.parse
 from collections.abc import Iterable
+from http import HTTPStatus
 from typing import TYPE_CHECKING, Annotated
 from uuid import UUID
 
@@ -97,7 +98,7 @@ async def add(request: web.Request, params: AddRequestModel) -> PydanticResponse
 @pydantic_api_handler(ProxyRequestModel)
 async def proxy(
     request: web.Request, params: ProxyRequestModel
-) -> PydanticResponse[ProxyResponseModel] | web.HTTPPermanentRedirect:
+) -> PydanticResponse[ProxyResponseModel] | web.Response:
     """
     Assigns worker to host proxy app and starts proxy process.
     When `Accept` HTTP header is set to `application/json` access information to worker will be handed out inside response body;
@@ -221,7 +222,13 @@ async def proxy(
             ),
             headers={"Access-Control-Allow-Origin": "*", "Access-Control-Expose-Headers": "*"},
         )
-    return web.HTTPPermanentRedirect(app_url)
+    status = HTTPStatus.PERMANENT_REDIRECT
+    return web.Response(
+        status=status,
+        headers={"Location": app_url},
+        # Legacy body that aiohttp's HTTP*Redirect filled in.
+        text=f"{status.value}: {status.phrase}",
+    )
 
 
 async def init(_app: web.Application) -> None:
