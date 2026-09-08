@@ -20,11 +20,9 @@ from sqlalchemy.orm import aliased
 
 from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE, ProjectID
 from ai.backend.common.data.entity.role import ROLE_ENTITY_TYPE, RoleID
-from ai.backend.common.data.entity.user import USER_ENTITY_TYPE, UserID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.permission.types import Permission
 from ai.backend.common.exception import InvalidAPIParameters
-from ai.backend.manager.data.permission.types import EntityType as LegacyEntityType
-from ai.backend.manager.data.permission.types import ScopeType as LegacyScopeType
 from ai.backend.manager.data.project.types import UnassignUserFailure
 from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.errors.resource import (
@@ -32,9 +30,6 @@ from ai.backend.manager.errors.resource import (
     ProjectNotFound,
 )
 from ai.backend.manager.models.project import ProjectRow, ProjectType
-from ai.backend.manager.models.rbac_models.association_scopes_entities import (
-    AssociationScopesEntitiesRow,
-)
 from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
 from ai.backend.manager.models.user import UserRow
@@ -218,18 +213,6 @@ class V2RosterWriteOps(V2WriteOps, V2CapOps):
         Taking the roles back is the other half of removal, not the caller's to remember
         (BEP-1076): a role may only be chosen from the project's own, so holding one
         without being on the roster is not a state that arises. What comes back is the
-        roles enrolled in this project that this user holds.
-
-        The legacy scope association goes too. Nothing writes one any more, but what an
-        earlier release wrote is still what the legacy reads answer from, so leaving it
-        would keep a member who left listed there."""
+        roles enrolled in this project that this user holds."""
         await self._disown([project_id], user_id)
         await self._revoke_project_roles(project_id, user_id)
-        await self._sess.execute(
-            sa.delete(AssociationScopesEntitiesRow).where(
-                AssociationScopesEntitiesRow.scope_type == LegacyScopeType(PROJECT_SCOPE_TYPE),
-                AssociationScopesEntitiesRow.scope_id == str(project_id),
-                AssociationScopesEntitiesRow.entity_type == LegacyEntityType(USER_ENTITY_TYPE),
-                AssociationScopesEntitiesRow.entity_id == str(user_id),
-            )
-        )

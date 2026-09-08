@@ -13,6 +13,7 @@ from dataclasses import dataclass, field
 
 import pytest
 import sqlalchemy as sa
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.project import PROJECT_ENTITY_TYPE, PROJECT_SCOPE_TYPE, ProjectID
@@ -74,9 +75,6 @@ from ai.backend.manager.models.virtual_entity.entity_membership_field import (
 )
 from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
 from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
-from ai.backend.manager.repositories.ops.rbac.provider import (
-    RBACOpsProvider,
-)
 from ai.backend.manager.repositories.ops.v2.roster.provider import RosterOpsProvider
 from ai.backend.manager.repositories.permission_controller.db_source.db_source import (
     PermissionDBSource,
@@ -653,13 +651,6 @@ class TestUserRosterEnrollment:
         return PermissionDBSource(db_with_rbac_tables)
 
     @pytest.fixture
-    def ops_provider(
-        self,
-        db_with_rbac_tables: ExtendedAsyncSAEngine,
-    ) -> RBACOpsProvider:
-        return RBACOpsProvider(db_with_rbac_tables)
-
-    @pytest.fixture
     def roster_provider(
         self,
         db_with_rbac_tables: ExtendedAsyncSAEngine,
@@ -811,23 +802,44 @@ class TestUserRosterEnrollment:
 
     async def _enroll_user_in_project(
         self,
-        ops_provider: RBACOpsProvider,
+        db: ExtendedAsyncSAEngine,
         roster_provider: RosterOpsProvider,
         project_scope: ScopeRef,
         user_scope: ScopeRef,
         user_id: UserID,
     ) -> None:
-        async with ops_provider.write_ops() as w:
-            await w.ensure_scope(project_scope)
-            await w.ensure_scope(user_scope)
+        async with db.begin_session() as db_sess:
+            for scope in (project_scope, user_scope):
+                await self._provision_scope(db_sess, scope)
         async with roster_provider.write_ops() as roster:
             await roster.join_member(ProjectID(project_scope.scope_id), user_id)
+
+    async def _provision_scope(self, db_sess: AsyncSession, scope: ScopeRef) -> None:
+        """The node a scope stands as, with the self membership and self binding an
+        entity creation writes for it. Idempotent."""
+        node_id = await db_sess.scalar(
+            sa.select(VirtualEntityRow.id).where(
+                VirtualEntityRow.entity_type == scope.scope_type,
+                VirtualEntityRow.entity_id == scope.scope_id,
+            )
+        )
+        if node_id is not None:
+            return
+        node = VirtualEntityRow(entity_type=scope.scope_type, entity_id=scope.scope_id)
+        db_sess.add(node)
+        await db_sess.flush()
+        db_sess.add(
+            EntityMembershipRow(virtual_entity_id=node.id, member_entity_id=node.id, capped=False)
+        )
+        db_sess.add(
+            ScopeBindingRow(virtual_entity_id=node.id, scope_entity_id=node.id, permission_cap=None)
+        )
+        await db_sess.flush()
 
     async def test_project_grant_does_not_reach_what_the_member_owns(
         self,
         db_with_rbac_tables: ExtendedAsyncSAEngine,
         db_source: PermissionDBSource,
-        ops_provider: RBACOpsProvider,
         roster_provider: RosterOpsProvider,
         ids: VSChainFixture,
     ) -> None:
@@ -838,7 +850,7 @@ class TestUserRosterEnrollment:
         await self._grant_on_project(db_with_rbac_tables, ids, ids.owner_scope_id)
 
         await self._enroll_user_in_project(
-            ops_provider, roster_provider, project_scope, user_scope, ids.user_id
+            db_with_rbac_tables, roster_provider, project_scope, user_scope, ids.user_id
         )
         await self._own_vfolder_in_user_vs(db_with_rbac_tables, ids)
 
@@ -857,7 +869,6 @@ class TestUserRosterEnrollment:
         self,
         db_with_rbac_tables: ExtendedAsyncSAEngine,
         db_source: PermissionDBSource,
-        ops_provider: RBACOpsProvider,
         roster_provider: RosterOpsProvider,
         ids: VSChainFixture,
     ) -> None:
@@ -874,7 +885,7 @@ class TestUserRosterEnrollment:
         )
 
         await self._enroll_user_in_project(
-            ops_provider, roster_provider, project_scope, user_scope, ids.user_id
+            db_with_rbac_tables, roster_provider, project_scope, user_scope, ids.user_id
         )
         await self._enroll_session_in_project_vs(
             db_with_rbac_tables, ids.owner_scope_id, session_id
@@ -924,7 +935,6 @@ class TestUserRosterEnrollment:
         self,
         db_with_rbac_tables: ExtendedAsyncSAEngine,
         db_source: PermissionDBSource,
-        ops_provider: RBACOpsProvider,
         roster_provider: RosterOpsProvider,
         repository: PermissionControllerRepository,
         ids: VSChainFixture,
@@ -944,7 +954,7 @@ class TestUserRosterEnrollment:
             entity_type=PermEntityType.SESSION,
         )
         await self._enroll_user_in_project(
-            ops_provider, roster_provider, project_scope, user_scope, ids.user_id
+            db_with_rbac_tables, roster_provider, project_scope, user_scope, ids.user_id
         )
         await self._put_vfolder_in_project_vs(
             db_with_rbac_tables, ids.owner_scope_id, vfolder_id, cap
@@ -1010,7 +1020,6 @@ class TestUserRosterEnrollment:
         self,
         db_with_rbac_tables: ExtendedAsyncSAEngine,
         db_source: PermissionDBSource,
-        ops_provider: RBACOpsProvider,
         roster_provider: RosterOpsProvider,
         ids: VSChainFixture,
         cap: Permission | None,
@@ -1029,7 +1038,7 @@ class TestUserRosterEnrollment:
             entity_type=PermEntityType.PROJECT,
         )
         await self._enroll_user_in_project(
-            ops_provider, roster_provider, project_scope, user_scope, ids.user_id
+            db_with_rbac_tables, roster_provider, project_scope, user_scope, ids.user_id
         )
         await self._govern_resource_group_from_project(
             db_with_rbac_tables, ids.owner_scope_id, other_project_id, cap
@@ -1047,7 +1056,6 @@ class TestUserRosterEnrollment:
         self,
         db_with_rbac_tables: ExtendedAsyncSAEngine,
         db_source: PermissionDBSource,
-        ops_provider: RBACOpsProvider,
         roster_provider: RosterOpsProvider,
         ids: VSChainFixture,
     ) -> None:
@@ -1065,7 +1073,7 @@ class TestUserRosterEnrollment:
         )
 
         await self._enroll_user_in_project(
-            ops_provider, roster_provider, project_scope, user_scope, ids.user_id
+            db_with_rbac_tables, roster_provider, project_scope, user_scope, ids.user_id
         )
 
         key = OwnCheckKey(user_id=ids.user_id, entity=UserID(ids.user_id))

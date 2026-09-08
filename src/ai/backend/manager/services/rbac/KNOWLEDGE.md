@@ -83,11 +83,11 @@ entity type, shape, operation, gate and backing.
 - A roster write onto a project that is not there is refused for the same reason: an
   edge to nothing is not a state any caller asked for.
 
-## Leaving takes the legacy association with it
+## The roster is the graph and nothing else
 
-- Nothing writes `association_scopes_entities` for a roster any more, but what an
-  earlier release wrote is still what the legacy reads answer from. `_leave` deletes it,
-  so a withdrawn member does not stay listed there until that table retires (BA-7204).
+- A roster place is the graph edge and its caps. `association_scopes_entities` is not
+  written or deleted here: the roster reads answer from the graph, so a row an earlier
+  release wrote is the retirement's to clear (BA-7204), not this path's.
 
 ## A role grant is a roster place as well
 

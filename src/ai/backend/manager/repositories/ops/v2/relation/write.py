@@ -23,7 +23,7 @@ from ai.backend.manager.models.specs.relation import (
     RelationLifecycleUpdater,
     RelationPurger,
 )
-from ai.backend.manager.models.specs.types import IntegrityErrorCheck
+from ai.backend.manager.models.specs.types import IntegrityErrorCheck, PreconditionCheck
 from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
 from ai.backend.manager.models.virtual_entity.entity_membership_cap import (
     EntityMembershipCapRow,
@@ -33,27 +33,6 @@ from ai.backend.manager.repositories.ops.v2.write import V2WriteOps
 
 class V2RelationWriteOps(V2WriteOps):
     """The general write ops plus the relations between existing entities."""
-
-    async def create_relation[TScope: EntityIdentifier, TTarget: EntityIdentifier, TRow: Base](
-        self, creator: RelationCreator[TScope, TTarget, TRow], scope: TScope, target: TTarget
-    ) -> None:
-        """Link the scope to the target: the relation row, the scope governing the
-        target under READ, and READ on the scope added to what the target holds of
-        it. A pair already linked, switched off or not, is a unique violation the spec
-        maps. What the spec refuses runs first, each with its own error."""
-        for check in creator.precondition_checks(scope, target):
-            if (await self._sess.execute(check.finder)).first() is not None:
-                raise check.error
-        await self._insert_row(creator.build_row(scope, target), creator.integrity_error_checks())
-        await self._govern([scope], target, cap=Permission.READ)
-        await self._widen_share(target, scope, {Permission.READ: None})
-
-    async def purge_relation[TScope: EntityIdentifier, TTarget: EntityIdentifier, TRow: Base](
-        self, purger: RelationPurger[TScope, TTarget, TRow], scope: TScope, target: TTarget
-    ) -> bool:
-        """Unlink one pair. Kept for the same caller as :meth:`create_relation`."""
-        await self._validate_conflict_checks(purger.conflict_checks())
-        return await self._purge_one_relation(purger, scope, target)
 
     async def create_relations[TScope: EntityIdentifier, TTarget: EntityIdentifier, TRow: Base](
         self,
@@ -71,6 +50,8 @@ class V2RelationWriteOps(V2WriteOps):
         Both entities are already in the graph: a node is written when the entity is
         created, so one missing is a broken state and not something a relation repairs.
         """
+        for scope, target in pairs:
+            await self._validate_precondition_checks(creator.precondition_checks(scope, target))
         written = [
             await self._insert_relation_row(
                 creator.build_row(scope, target), creator.integrity_error_checks()
@@ -82,6 +63,13 @@ class V2RelationWriteOps(V2WriteOps):
             await self._govern([scope], target, cap=Permission.READ)
             await self._widen_share(target, scope, {Permission.READ: None})
         return written
+
+    async def _validate_precondition_checks(self, checks: Sequence[PreconditionCheck]) -> None:
+        """Refuse the write where the spec named a row that must not be there. What the
+        database cannot state for itself is stated here, each with its own error."""
+        for check in checks:
+            if (await self._sess.execute(check.finder)).first() is not None:
+                raise check.error
 
     async def _insert_relation_row(self, row: Base, checks: Sequence[IntegrityErrorCheck]) -> bool:
         """Insert the relation row unless the pair already stands, answering whether it
@@ -98,25 +86,6 @@ class V2RelationWriteOps(V2WriteOps):
         except sa.exc.IntegrityError as e:
             self._match_integrity_error(self._parse_integrity_error(e), checks)
         return result.first() is not None
-
-    async def delete_relation[TScope: EntityIdentifier, TTarget: EntityIdentifier, TRow: Base](
-        self,
-        updater: RelationLifecycleUpdater[TScope, TTarget, TRow],
-        scope: TScope,
-        target: TTarget,
-    ) -> None:
-        """Switch the relation off: the lifecycle column alone. What each side reads
-        of the other stays, so the relation is still listed and can be switched back."""
-        await self._switch_relation(updater, scope, target)
-
-    async def restore_relation[TScope: EntityIdentifier, TTarget: EntityIdentifier, TRow: Base](
-        self,
-        updater: RelationLifecycleUpdater[TScope, TTarget, TRow],
-        scope: TScope,
-        target: TTarget,
-    ) -> None:
-        """Switch the relation back on: the lifecycle column alone."""
-        await self._switch_relation(updater, scope, target)
 
     async def delete_relations[TScope: EntityIdentifier, TTarget: EntityIdentifier, TRow: Base](
         self,

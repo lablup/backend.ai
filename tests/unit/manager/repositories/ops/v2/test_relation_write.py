@@ -24,6 +24,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
 from ai.backend.common.data.permission.types import Permission
+from ai.backend.manager.errors.common import ObjectNotFound
 from ai.backend.manager.models.base import Base
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.specs.relation import (
@@ -258,6 +259,23 @@ async def _share_cap(
         return cap
 
 
+class _RefusingCreator(_Creator):
+    """Refuses the link while any row already stands, so the check is observable."""
+
+    @override
+    def precondition_checks(
+        self, scope: _ScopeID, target: _TargetID
+    ) -> Sequence[PreconditionCheck]:
+        return (
+            PreconditionCheck(
+                finder=sa.select(RelationTestRow.id).where(
+                    RelationTestRow.scope_id == scope,
+                ),
+                error=ObjectNotFound(object_name="precondition"),
+            ),
+        )
+
+
 class TestCreateRelation:
     async def test_link_writes_the_row_the_govern_and_the_share(
         self,
@@ -292,6 +310,23 @@ class TestCreateRelation:
         assert await _share_cap(database, target, scope) == Permission.UPDATE
         assert await _govern_cap(database, scope, target) is False
 
+    async def test_a_precondition_the_spec_names_turns_the_link_away(
+        self,
+        database: ExtendedAsyncSAEngine,
+        provider: RelationOpsProvider,
+        pair: tuple[_ScopeID, _TargetID],
+    ) -> None:
+        """What the spec declares must not be there is looked for before the insert."""
+        scope, target = pair
+        async with provider.write_ops() as ops:
+            await ops.create_relations(_Creator(), [(scope, target)])
+
+        with pytest.raises(ObjectNotFound):
+            async with provider.write_ops() as ops:
+                await ops.create_relations(_RefusingCreator(), [(scope, _TargetID(uuid.uuid4()))])
+
+        assert await _row_count(database) == 1
+
 
 class TestSwitchRelation:
     async def test_off_and_on_touch_the_row_alone(
@@ -304,14 +339,16 @@ class TestSwitchRelation:
         async with provider.write_ops() as ops:
             await ops.create_relations(_Creator(), [(scope, target)])
         async with provider.write_ops() as ops:
-            await ops.delete_relation(_SwitchOff(), scope, target)
+            switched = await ops.delete_relations(_SwitchOff(), [(scope, target)])
+        assert switched == [True]
 
         assert await _off(database) is True
         assert await _govern_cap(database, scope, target) == Permission.READ
         assert await _share_cap(database, target, scope) == Permission.READ
 
         async with provider.write_ops() as ops:
-            await ops.restore_relation(_SwitchOn(), scope, target)
+            switched = await ops.restore_relations(_SwitchOn(), [(scope, target)])
+        assert switched == [True]
 
         assert await _off(database) is False
 
