@@ -22,7 +22,8 @@ import pytest
 
 import ai.backend.agent.server as agent_server
 from ai.backend.agent.agent import AbstractAgent
-from ai.backend.agent.docker.agent import DockerAgent
+from ai.backend.agent.docker.agent import DockerAgent, DockerKernelCreationContext
+from ai.backend.agent.errors.agent import ContainerCreationError
 from ai.backend.agent.network.caps import withdraw_vtep
 from ai.backend.common.etcd import AbstractKVStore
 
@@ -335,6 +336,69 @@ class TestTheNodeIsAnnouncedOnlyOnceItCanServe:
         server.runtime.stop_serving.assert_awaited_once()
         with pytest.raises(RuntimeError):
             await server.start_serving()
+
+
+class TestAContainerThatIsUpWhenSomethingFails:
+    """A11g. The container is created and started, and only then is the session network attached.
+    Everything from creation onwards has to carry the container's id out with it: a plain
+    exception reached the agent's handler as "kernel failed" with no id, `destroy_kernel` had
+    nothing to act on, and the container went on running with its kernel already gone from the
+    registry."""
+
+    def _context(self) -> Any:
+        ctx = object.__new__(DockerKernelCreationContext)
+        ctx._session_networked = True
+        ctx.internal_data = {}
+        ctx.computers = {}
+        return ctx
+
+    async def test_a_session_network_attach_failure_names_the_container(self) -> None:
+        ctx = self._context()
+
+        async def _refuses(container: Any, cid: str, cluster_info: Any) -> None:
+            raise RuntimeError("the privnet refused this session")
+
+        ctx._attach_session_network = _refuses
+
+        with pytest.raises(RuntimeError, match="privnet refused"):
+            await ctx._provision_started_container(
+                MagicMock(), MagicMock(), "cid-1", cast(Any, {}), MagicMock(allocations={})
+            )
+
+    async def test_an_additional_network_failure_names_the_container(self) -> None:
+        ctx = self._context()
+        ctx._session_networked = False
+
+        async def _refuses(docker: Any, container: Any, names: Any) -> None:
+            raise RuntimeError("that network does not exist")
+
+        ctx._attach_additional_networks = _refuses
+
+        with pytest.raises(RuntimeError, match="does not exist"):
+            await ctx._provision_started_container(
+                MagicMock(), MagicMock(), "cid-1", cast(Any, {}), MagicMock(allocations={})
+            )
+
+    async def test_the_caller_turns_those_into_a_named_container_failure(self) -> None:
+        """The wrapper is what carries the id out, so the handler that destroys the kernel has
+        something to destroy. Driven rather than read: the value of this is that a failure
+        ARRIVES named, not that the source says so."""
+        ctx = self._context()
+
+        async def _refuses(*args: Any, **kwargs: Any) -> None:
+            raise RuntimeError("the privnet refused this session")
+
+        ctx._provision_started_container = _refuses
+        caught: ContainerCreationError | None = None
+        try:
+            await DockerKernelCreationContext._provision_or_name_the_container(
+                cast(Any, ctx), MagicMock(), MagicMock(), "cid-1", cast(Any, {}), MagicMock()
+            )
+        except ContainerCreationError as e:
+            caught = e
+
+        assert caught is not None
+        assert caught.container_id == "cid-1"
 
 
 class TestWithdrawingTheVtep:
