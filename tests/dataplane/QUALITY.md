@@ -608,3 +608,22 @@ R3 unchanged, and the case is now overwhelming: this is the eighth consecutive r
 all in agent identity/readiness lifecycle, and every one of them was invisible to a suite whose
 fake agent never restarts, never heartbeats, never loses a NIC and never withdraws.
 `SCENARIOS.md` still records nothing for two-node, restart, failure or encryption-wire.
+
+Twenty-eighth round. All three findings are mechanisms I added that do not fire on the real path,
+and in two of the three my own test was the reason I could not see it.
+
+| # | Was | Now |
+|---|-----|-----|
+| A11d | the failure map added last round was inert. `_start_single_session` catches every exception, records the error and returns normally, so the gather saw `None` and the map was always empty -- and the handler went on reporting every session as started. My test set the launcher mock's return value, so it exercised the handler and never the thing that was broken | the network-setup failure is returned rather than swallowed, and the launcher test drives the real path with a refusing `_setup_network_configuration`. Only failures BEFORE any kernel is requested are reported: after that some may be running, and the answer is a teardown, not a second placement |
+| A11c | `start_serving` was called from `__ainit__`, which registers RPC handlers; the transport is entered later in `__aenter__`, with an HTTP listener set up between the two. So the node announced itself before it served, and my test compared the positions of two strings in a source file | the announcement happens in `agent_server_ctx`, after `async with agent_server` and the HTTP listener, and is taken back in a `finally`. `start_serving` REFUSES to run before the transport is entered, so the ordering is an invariant that fails rather than a comment |
+| C49 | the readiness fence and the capability record are two writes, and the fence was written second. A manager admitted on the old pair could still pass its READY check on the old fence while the record had already changed | when readiness changes the old fence comes down FIRST, then the record, then the new fence: the worst a reader sees is "not admitting", which is true. When it has not changed -- an ordinary heartbeat -- the fence is not touched at all |
+| — | `tunnel_offload` was in the readiness digest. It is a diagnostic read by running `ethtool`, which fails transiently and answers False when it does, and the overlay works either way -- so a command that did not run would have broken the fence and failed live creates | out of the digest |
+
+NOT done, and I am not going to guess at it: a re-placeable failure still goes through the ordinary
+retry classification, so after the retry budget it becomes TERMINATING rather than PENDING on
+another agent. Making it re-place needs a new signal on `SessionTransitionInfo`, a branch in the
+coordinator's failure classification, and confirmation that the PENDING transition actually
+releases the agent allocation. That is a scheduler change with its own blast radius and it should
+be proposed, not slipped into a network branch.
+
+R3 unchanged. Ninth consecutive round of P1s in agent identity/readiness lifecycle.
