@@ -26,15 +26,14 @@ from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.resource_preset.types import ResourcePresetData
 from ai.backend.manager.errors.common import ObjectNotFound
 from ai.backend.manager.models.resource_preset.creators import ResourcePresetCreator
+from ai.backend.manager.models.resource_preset.updaters import ResourcePresetUpdater
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.registry import AgentRegistry
-from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.resource_preset.db_source.types import (
     PresetAllocatabilityData,
 )
 from ai.backend.manager.repositories.resource_preset.repository import ResourcePresetRepository
 from ai.backend.manager.repositories.resource_preset.types import CheckPresetsResult
-from ai.backend.manager.repositories.resource_preset.updaters import ResourcePresetUpdaterSpec
 from ai.backend.manager.services.resource_preset.actions.check_presets import (
     CheckResourcePresetsAction,
     CheckResourcePresetsActionResult,
@@ -238,12 +237,9 @@ class TestResourcePresetServiceCompatibility:
 
         # Test resource slots update
         action = UpdateResourcePresetAction(
-            preset_id=ResourcePresetID(uuid.uuid4()),
-            updater=Updater(
-                spec=ResourcePresetUpdaterSpec(
-                    resource_slots=OptionalState.update(ResourceSlot({"cpu": "4", "mem": "8G"}))
-                ),
-                pk_value="cpu-small",
+            updater=ResourcePresetUpdater(
+                preset_id=ResourcePresetID(uuid.uuid4()),
+                resource_slots=OptionalState.update(ResourceSlot({"cpu": "4", "mem": "8G"})),
             ),
         )
 
@@ -273,10 +269,8 @@ class TestResourcePresetServiceCompatibility:
         )
 
         action = UpdateResourcePresetAction(
-            preset_id=ResourcePresetID(preset_id),
-            updater=Updater(
-                spec=ResourcePresetUpdaterSpec(name=OptionalState.update("cpu-medium")),
-                pk_value=preset_id,
+            updater=ResourcePresetUpdater(
+                preset_id=ResourcePresetID(preset_id), name=OptionalState.update("cpu-medium")
             ),
         )
 
@@ -539,12 +533,9 @@ class TestResourcePresetServiceCompatibility:
         )
 
         action = UpdateResourcePresetAction(
-            preset_id=ResourcePresetID(uuid.uuid4()),
-            updater=Updater(
-                spec=ResourcePresetUpdaterSpec(
-                    shared_memory=TriState.update(BinarySize(BinarySize.from_str("4G"))),
-                ),
-                pk_value="gpu-standard",
+            updater=ResourcePresetUpdater(
+                preset_id=ResourcePresetID(uuid.uuid4()),
+                shared_memory=TriState.update(BinarySize(BinarySize.from_str("4G"))),
             ),
         )
 
@@ -558,12 +549,9 @@ class TestResourcePresetServiceCompatibility:
     ) -> None:
         """Test modify fails when resource_slots provided without intrinsic slots."""
         action = UpdateResourcePresetAction(
-            preset_id=ResourcePresetID(uuid.uuid4()),
-            updater=Updater(
-                spec=ResourcePresetUpdaterSpec(
-                    resource_slots=OptionalState.update(ResourceSlot({"gpu": "1"}))
-                ),
-                pk_value="existing-preset",
+            updater=ResourcePresetUpdater(
+                preset_id=ResourcePresetID(uuid.uuid4()),
+                resource_slots=OptionalState.update(ResourceSlot({"gpu": "1"})),
             ),
         )
 

@@ -20,8 +20,7 @@ from ai.backend.manager.models.minilang.ordering import ColumnMapType, QueryOrde
 from ai.backend.manager.models.minilang.queryfilter import FieldSpecType, QueryFilterParser
 from ai.backend.manager.models.resource_preset import ResourcePresetRow, resource_presets
 from ai.backend.manager.models.resource_preset.creators import ResourcePresetCreator
-from ai.backend.manager.repositories.base.updater import Updater
-from ai.backend.manager.repositories.resource_preset.updaters import ResourcePresetUpdaterSpec
+from ai.backend.manager.models.resource_preset.updaters import ResourcePresetUpdater
 from ai.backend.manager.services.resource_preset.actions.lookup import (
     LookupResourcePresetAction,
 )
@@ -221,24 +220,21 @@ class ModifyResourcePresetInput(graphene.InputObjectType):  # type: ignore[misc]
         ),
     )
 
-    def to_updater(self, id: UUID | None, name: str | None) -> Updater[ResourcePresetRow]:
+    def to_updater(self, preset_id: ResourcePresetID) -> ResourcePresetUpdater:
         resource_slots = (
             ResourceSlot.from_json(self.resource_slots) if self.resource_slots else Undefined
         )
 
-        pk_value = id if id is not None else (name if name is not None else "")
-        return Updater(
-            spec=ResourcePresetUpdaterSpec(
-                resource_slots=OptionalState[ResourceSlot].from_graphql(resource_slots),
-                name=OptionalState[str].from_graphql(self.name),
-                shared_memory=TriState[BinarySize].from_graphql(
-                    BinarySize.finite_from_str(self.shared_memory)
-                    if self.shared_memory is not Undefined and self.shared_memory is not None
-                    else self.shared_memory
-                ),
-                resource_group_name=TriState[str].from_graphql(self.scaling_group_name),
+        return ResourcePresetUpdater(
+            preset_id=preset_id,
+            resource_slots=OptionalState[ResourceSlot].from_graphql(resource_slots),
+            name=OptionalState[str].from_graphql(self.name),
+            shared_memory=TriState[BinarySize].from_graphql(
+                BinarySize.finite_from_str(self.shared_memory)
+                if self.shared_memory is not Undefined and self.shared_memory is not None
+                else self.shared_memory
             ),
-            pk_value=pk_value,
+            resource_group_name=TriState[str].from_graphql(self.scaling_group_name),
         )
 
 
@@ -308,7 +304,7 @@ class ModifyResourcePreset(graphene.Mutation):  # type: ignore[misc]
 
         preset_id = await _resolve_preset_id(graph_ctx, id, name)
         await graph_ctx.processors.resource_preset.update_preset.run(
-            UpdateResourcePresetAction(preset_id=preset_id, updater=props.to_updater(id, name))
+            UpdateResourcePresetAction(updater=props.to_updater(preset_id))
         )
 
         return cls(True, "success")

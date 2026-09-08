@@ -40,8 +40,7 @@ from ai.backend.manager.models.resource_preset.conditions import ResourcePresetC
 from ai.backend.manager.models.resource_preset.creators import ResourcePresetCreator
 from ai.backend.manager.models.resource_preset.orders import ResourcePresetOrders
 from ai.backend.manager.models.resource_preset.row import ResourcePresetRow
-from ai.backend.manager.repositories.base.updater import Updater
-from ai.backend.manager.repositories.resource_preset.updaters import ResourcePresetUpdaterSpec
+from ai.backend.manager.models.resource_preset.updaters import ResourcePresetUpdater
 from ai.backend.manager.services.resource_preset.actions.create_preset import (
     CreateResourcePresetAction,
 )
@@ -161,7 +160,8 @@ class ResourcePresetAdapter(BaseAdapter):
         input: UpdateResourcePresetInput,
     ) -> UpdateResourcePresetPayload:
         """Update an existing resource preset."""
-        updater_spec = ResourcePresetUpdaterSpec(
+        updater = ResourcePresetUpdater(
+            preset_id=ResourcePresetID(input.id),
             resource_slots=OptionalState.from_unset(input.resource_slots).map(
                 _resource_slot_entries_to_slot
             ),
@@ -171,9 +171,8 @@ class ResourcePresetAdapter(BaseAdapter):
             ),
             resource_group_name=TriState.from_unset(input.resource_group_name),
         )
-        updater = Updater(spec=updater_spec, pk_value=input.id)
         result = await self._resource_preset.update_preset.run(
-            UpdateResourcePresetAction(preset_id=ResourcePresetID(input.id), updater=updater)
+            UpdateResourcePresetAction(updater=updater)
         )
         return UpdateResourcePresetPayload(
             resource_preset=self._data_to_node(result.resource_preset),
