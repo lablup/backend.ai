@@ -5,7 +5,6 @@ from __future__ import annotations
 from collections.abc import Sequence
 from uuid import UUID
 
-from ai.backend.common.api_handlers import Sentinel
 from ai.backend.common.data.entity.notification import (
     NotificationChannelID,
     NotificationRuleID,
@@ -474,11 +473,7 @@ class NotificationAdapter(BaseAdapter):
             name=(
                 OptionalState.update(input.name) if input.name is not None else OptionalState.nop()
             ),
-            description=(
-                TriState[str].nop()
-                if isinstance(input.description, Sentinel)
-                else TriState[str].from_graphql(input.description)
-            ),
+            description=TriState.from_unset(input.description),
             spec=(
                 OptionalState.update(_spec_input_to_domain(input.spec))
                 if input.spec is not None
@@ -501,11 +496,7 @@ class NotificationAdapter(BaseAdapter):
             name=(
                 OptionalState.update(input.name) if input.name is not None else OptionalState.nop()
             ),
-            description=(
-                TriState[str].nop()
-                if isinstance(input.description, Sentinel)
-                else TriState[str].from_graphql(input.description)
-            ),
+            description=TriState.from_unset(input.description),
             message_template=(
                 OptionalState.update(input.message_template)
                 if input.message_template is not None

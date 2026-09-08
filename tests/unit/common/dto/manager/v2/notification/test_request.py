@@ -7,7 +7,6 @@ import uuid
 import pytest
 from pydantic import ValidationError
 
-from ai.backend.common.api_handlers import SENTINEL, Sentinel
 from ai.backend.common.dto.manager.v2.notification.request import (
     CreateNotificationChannelInput,
     CreateNotificationRuleInput,
@@ -30,6 +29,7 @@ from ai.backend.common.dto.manager.v2.notification.types import (
     NotificationRuleTypeDTO as NotificationRuleType,
 )
 from ai.backend.common.exception import BackendAISchemaValidationFailed
+from ai.backend.common.tristate.unset import UNSET, Unset
 
 
 def _make_webhook_spec() -> NotificationChannelSpecInputDTO:
@@ -177,14 +177,14 @@ class TestCreateNotificationChannelInputValidationFailures:
 class TestUpdateNotificationChannelInput:
     """Tests for UpdateNotificationChannelInput model."""
 
-    def test_default_description_is_sentinel(self) -> None:
+    def test_default_description_is_unset(self) -> None:
         inp = UpdateNotificationChannelInput()
-        assert inp.description is SENTINEL
-        assert isinstance(inp.description, Sentinel)
+        assert inp.description is UNSET
+        assert isinstance(inp.description, Unset)
 
-    def test_explicit_sentinel_description(self) -> None:
-        inp = UpdateNotificationChannelInput(description=SENTINEL)
-        assert inp.description is SENTINEL
+    def test_explicit_unset_description(self) -> None:
+        inp = UpdateNotificationChannelInput(description=UNSET)
+        assert inp.description is UNSET
 
     def test_none_description_means_no_change(self) -> None:
         inp = UpdateNotificationChannelInput(description=None)
@@ -348,14 +348,14 @@ class TestCreateNotificationRuleInput:
 class TestUpdateNotificationRuleInput:
     """Tests for UpdateNotificationRuleInput model."""
 
-    def test_default_description_is_sentinel(self) -> None:
+    def test_default_description_is_unset(self) -> None:
         inp = UpdateNotificationRuleInput()
-        assert inp.description is SENTINEL
-        assert isinstance(inp.description, Sentinel)
+        assert inp.description is UNSET
+        assert isinstance(inp.description, Unset)
 
-    def test_explicit_sentinel_description(self) -> None:
-        inp = UpdateNotificationRuleInput(description=SENTINEL)
-        assert inp.description is SENTINEL
+    def test_explicit_unset_description(self) -> None:
+        inp = UpdateNotificationRuleInput(description=UNSET)
+        assert inp.description is UNSET
 
     def test_none_description_means_no_change(self) -> None:
         inp = UpdateNotificationRuleInput(description=None)

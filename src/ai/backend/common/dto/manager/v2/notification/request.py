@@ -9,8 +9,9 @@ from uuid import UUID
 
 from pydantic import Field, field_validator
 
-from ai.backend.common.api_handlers import SENTINEL, BaseRequestModel, Sentinel
+from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.dto.manager.query import StringFilter
+from ai.backend.common.tristate.unset import UNSET, Unset
 
 from .types import (
     NotificationChannelOrderField,
@@ -113,9 +114,9 @@ class UpdateNotificationChannelInput(BaseRequestModel):
     """Input for updating a notification channel."""
 
     name: str | None = Field(default=None, description="Updated channel name")
-    description: str | Sentinel | None = Field(
-        default=SENTINEL,
-        description="Updated channel description. Use SENTINEL to clear.",
+    description: str | None | Unset = Field(
+        default=UNSET,
+        description="Updated channel description. Omit to leave unchanged; null clears.",
     )
     spec: NotificationChannelSpecInputDTO | None = Field(
         default=None, description="Updated channel specification"
@@ -165,9 +166,9 @@ class UpdateNotificationRuleInput(BaseRequestModel):
     """Input for updating a notification rule."""
 
     name: str | None = Field(default=None, description="Updated rule name")
-    description: str | Sentinel | None = Field(
-        default=SENTINEL,
-        description="Updated rule description. Use SENTINEL to clear.",
+    description: str | None | Unset = Field(
+        default=UNSET,
+        description="Updated rule description. Omit to leave unchanged; null clears.",
     )
     message_template: str | None = Field(
         default=None,
