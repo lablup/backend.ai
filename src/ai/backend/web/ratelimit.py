@@ -31,7 +31,7 @@ _RATELIMIT_WINDOW: Final = 60 * 15
 type Handler = Callable[[web.Request], Awaitable[web.StreamResponse]]
 
 
-async def _open_window(request: web.Request) -> RateLimitState | None:
+async def _read_ratelimit_window(request: web.Request) -> RateLimitState | None:
     """The window the manager will count this request in.
 
     None when this server cannot name one: an anonymous caller it can see no address
@@ -55,7 +55,7 @@ def manager_proxy_rate_limited(handler: Handler) -> Handler:
     """Wrap a manager proxy handler so the web server rejects over-limit requests."""
 
     async def rlim_handler(request: web.Request) -> web.StreamResponse:
-        state = await _open_window(request)
+        state = await _read_ratelimit_window(request)
         if state is not None and state.count >= state.limit:
             return web.HTTPTooManyRequests(
                 text=json.dumps({
