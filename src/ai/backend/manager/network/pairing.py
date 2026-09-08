@@ -16,6 +16,7 @@ import json
 import logging
 import time
 from collections.abc import Iterable
+from dataclasses import dataclass
 
 from ai.backend.common.etcd import AbstractKVStore, AsyncEtcd, ConfigScopes
 from ai.backend.common.metrics.metric import CommonMetricRegistry
@@ -127,9 +128,23 @@ async def require_members_can_serve_driver(
             )
 
 
+@dataclass(frozen=True)
+class AdmittedAgent:
+    """One agent's advert, as it stood when the session was admitted on it.
+
+    The raw bytes travel with the decoded record because admission is a read and building the
+    session is a long sequence of writes. Carrying what was read lets the last of those writes be
+    conditional on it -- so an agent that restarted, or withdrew, while its session was being
+    built cannot have that session declared READY over the advert it has already taken back.
+    """
+
+    caps: AgentNetworkCaps
+    raw: str
+
+
 async def require_members_cni_ready(
     etcd: AsyncEtcd, member_agents: Iterable[str]
-) -> dict[str, AgentNetworkCaps]:
+) -> dict[str, AdmittedAgent]:
     """Raise unless every member agent has SAID it can serve this session's data plane.
 
     Fail-closed, unlike `require_members_overlay_ready`, and the difference is the point. That one
@@ -147,7 +162,7 @@ async def require_members_cni_ready(
         the second after admitting on the first is how a session gets pre-seeded with an address
         nobody validated.
     """
-    admitted: dict[str, AgentNetworkCaps] = {}
+    admitted: dict[str, AdmittedAgent] = {}
     for agent_id in member_agents:
         raw = await etcd.get(agent_caps_key(agent_id), scope=ConfigScopes.GLOBAL)
         if raw is None:
@@ -227,7 +242,7 @@ async def require_members_cni_ready(
                 " refused when it arrives. Set container.advertised-host (or bind-host) to a"
                 " routable address this host holds."
             )
-        admitted[agent_id] = caps
+        admitted[agent_id] = AdmittedAgent(caps, raw)
     return admitted
 
 

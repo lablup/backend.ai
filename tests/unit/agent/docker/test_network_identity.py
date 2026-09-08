@@ -8,6 +8,7 @@ happens and the pairing check never fires. These pin the publishing itself.
 
 from __future__ import annotations
 
+import asyncio
 import json
 from types import SimpleNamespace
 from typing import Any, cast
@@ -61,6 +62,9 @@ class _AgentStub:
         # The interface the data plane was built on. Half of the serving identity: an address that
         # moves to another NIC stays usable and stops being what this node builds with.
         self._serving_uplink = "eth-serving"
+        # The refresh task, which shutdown has to stop before it can take the advert away for
+        # good -- a publish already in flight would otherwise put it back.
+        self._network_identity_task: asyncio.Task[None] | None = None
         # Readiness asks the privileged helper whether it is up; None means this node does not
         # use one, which is the case that needs no socket.
         self.local_config = SimpleNamespace(
@@ -186,6 +190,38 @@ class TestTheAdvertIsWithdrawnWhenItCannotBeRenewed:
         stub.etcd.puts["network/agent/i-abc123/caps"] = "{}"
         await _publish(stub)
         assert "network/agent/i-abc123/caps" in stub.etcd.deletes
+
+
+class TestShuttingDownStopsAdvertising:
+    """Deleting the advert and stopping the publisher are two things, and the order was wrong: a
+    refresh already running could finish its publish after the delete and put a fresh advert back
+    over a node that is shutting down -- good for the whole freshness window."""
+
+    async def test_a_refresh_in_flight_cannot_put_the_advert_back(self) -> None:
+        stub = _AgentStub(vtep_ip="192.168.0.112", host_ip="192.168.0.112")
+        publishing = asyncio.Event()
+        release = asyncio.Event()
+
+        async def _slow_refresh() -> None:
+            publishing.set()
+            try:
+                await release.wait()
+            finally:
+                # A publish already in flight lands whether or not the task is cancelled: the
+                # write is at the store, not in this coroutine's control flow.
+                stub.etcd.puts["network/agent/i-abc123/caps"] = "{}"
+
+        stub._network_identity_task = asyncio.create_task(_slow_refresh())
+        await publishing.wait()
+
+        shutting_down = asyncio.create_task(DockerAgent._withdraw_network_identity(cast(Any, stub)))
+        await asyncio.sleep(0)
+        release.set()
+        await shutting_down
+
+        assert "network/agent/i-abc123/caps" not in stub.etcd.puts, (
+            "a refresh in flight put the advert back after shutdown"
+        )
 
 
 class TestWithdrawingTheVtep:

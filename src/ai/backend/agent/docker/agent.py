@@ -1963,8 +1963,11 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
             )
         await self._kernel_recovery_adapter.adapt_recovery_data()
         await super().__ainit__()
-        await self._publish_network_identity()
-        self._network_identity_task = asyncio.create_task(self._publish_network_identity_forever())
+        # The advert is NOT published here. Everything below can still fail, and a failure here
+        # aborts the runtime before `shutdown` is ever called -- so an advert written at this
+        # point would stand for the whole freshness window over an agent that never started. It
+        # goes at the end, as the last thing this does, and anything that fails on the way there
+        # takes it away again.
         try:
             async with Docker() as docker:
                 gwbridge = await docker.networks.get("docker_gwbridge")
@@ -2014,6 +2017,31 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
             allowlist=self.local_config.agent.allow_network_plugins,
             blocklist=self.local_config.agent.block_network_plugins,
         )
+        # Last, and only now. This is what admits the node to a cluster-network session, so it is
+        # the commit point of the whole start: nothing that can fail comes after it.
+        await self._publish_network_identity()
+        self._network_identity_task = asyncio.create_task(self._publish_network_identity_forever())
+
+    async def _withdraw_network_identity(self) -> None:
+        """Stop advertising this node, and make sure nothing puts the advert back.
+
+        Three steps, in this order, because two is not enough. Deleting first shuts the door at
+        once -- while the advert stands a manager may still place work here, and the freshness
+        window would let it for ten minutes after this process is gone. But a refresh already
+        running can finish its publish AFTER that delete and put a fresh advert back over a node
+        that is shutting down. So the publisher is stopped and waited for, and only then is the
+        advert taken away for good.
+        """
+        for step in ("first", "final"):
+            try:
+                await withdraw_caps(self.etcd, str(self.id))
+            except Exception:
+                log.exception("could not withdraw this agent's network capabilities ({})", step)
+            if step == "first" and self._network_identity_task is not None:
+                self._network_identity_task.cancel()
+                with contextlib.suppress(asyncio.CancelledError):
+                    await self._network_identity_task
+                self._network_identity_task = None
 
     async def _publish_network_identity_forever(self) -> None:
         """Keep this node's advertised capabilities honest while it runs.
@@ -2113,22 +2141,16 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
             # An advert this node could not renew must not stand: it is what a manager reads to
             # place work here, and leaving the last one behind is how a node that has stopped
             # being able to say anything keeps being chosen.
+            # Withdrawn, not raised. A node that cannot describe its uplink can still serve
+            # single-node sessions, and refusing to start would take it out entirely over a
+            # diagnostic. With no advert standing it is simply not admitted to a cluster-network
+            # session, which is the answer that matters.
             log.exception("could not publish this agent's network capabilities; withdrawing")
             await withdraw_caps(self.etcd, str(self.id))
 
     @override
     async def shutdown(self, stop_signal: signal.Signals) -> None:
-        # Before anything else is torn down. While this stands, a manager may still admit this
-        # node to a session -- and the freshness window would let it for ten minutes after the
-        # process is gone.
-        try:
-            await withdraw_caps(self.etcd, str(self.id))
-        except Exception:
-            log.exception("could not withdraw this agent's network capabilities")
-        if self._network_identity_task is not None:
-            self._network_identity_task.cancel()
-            with contextlib.suppress(asyncio.CancelledError):
-                await self._network_identity_task
+        await self._withdraw_network_identity()
         # Stop handling agent sock.
         if self.agent_sock_task is not None:
             self.agent_sock_task.cancel()
