@@ -58,6 +58,9 @@ class _AgentStub:
         self._boot_id = "boot-1"
         self._vtep_ip = vtep_ip
         self._host_ip = host_ip
+        # The interface the data plane was built on. Half of the serving identity: an address that
+        # moves to another NIC stays usable and stops being what this node builds with.
+        self._serving_uplink = "eth-serving"
         # Readiness asks the privileged helper whether it is up; None means this node does not
         # use one, which is the case that needs no socket.
         self.local_config = SimpleNamespace(
@@ -67,16 +70,21 @@ class _AgentStub:
         self._session_network = _StubSessionNetwork(vtep_ip)
 
 
-async def _publish(stub: _AgentStub, *, still_usable: bool = True) -> None:
-    """Run one refresh, saying whether the host still holds the advertised address.
+async def _publish(
+    stub: _AgentStub, *, still_usable: bool = True, uplink: str = "eth-serving"
+) -> None:
+    """Run one refresh, saying what the host would answer about the advertised address.
 
-    The refresh re-resolves the VTEP against the live host rather than republishing what startup
-    worked out -- an address can go while the process runs -- so a test has to say what the host
-    would answer.
+    The refresh asks the host afresh -- an address can go, or move to another NIC, while the
+    process runs -- but only ever to decide whether to keep advertising what the serving path
+    holds. ``uplink`` is the interface the host says the address is on now.
     """
-    with mock.patch(
-        "ai.backend.agent.docker.agent.usable_vtep",
-        side_effect=lambda host_ip: host_ip if still_usable else None,
+    with (
+        mock.patch(
+            "ai.backend.agent.docker.agent.usable_vtep",
+            side_effect=lambda host_ip: host_ip if still_usable else None,
+        ),
+        mock.patch("ai.backend.agent.docker.agent.uplink_for_ip", side_effect=lambda ip: uplink),
     ):
         await DockerAgent._publish_network_identity(cast(Any, stub))
 
@@ -91,6 +99,15 @@ class TestAVtepThatWentAway:
     async def test_it_is_retracted_when_the_host_stops_holding_it(self) -> None:
         stub = _AgentStub(vtep_ip="192.168.0.112", host_ip="192.168.0.112")
         await _publish(stub, still_usable=False)
+        assert stub.etcd.deletes == ["network/agent/i-abc123/vtep"]
+        assert json.loads(stub.etcd.puts["network/agent/i-abc123/caps"])["vtep_ip"] is None
+
+    async def test_an_address_that_moved_to_another_nic_is_not_advertised(self) -> None:
+        """The address is still perfectly usable; it is simply not where the data plane is. The
+        vxlan device goes on being created on the interface this process started with, so probing
+        the new NIC and advertising it healthy builds the tunnel somewhere the traffic is not."""
+        stub = _AgentStub(vtep_ip="192.168.0.112", host_ip="192.168.0.112")
+        await _publish(stub, still_usable=True, uplink="eth-somewhere-else")
         assert stub.etcd.deletes == ["network/agent/i-abc123/vtep"]
         assert json.loads(stub.etcd.puts["network/agent/i-abc123/caps"])["vtep_ip"] is None
 
@@ -136,13 +153,39 @@ class TestPublishingTheVtep:
     ) -> None:
         # The caps key is a diagnostic; the VTEP is load-bearing. Describing the uplink must not
         # be able to stop the agent from advertising where its peers can reach it.
-        async def _boom(iface: str) -> Any:
+        async def _boom(iface: str, **kwargs: Any) -> Any:
             raise OSError("ethtool went missing")
 
         monkeypatch.setattr("ai.backend.agent.docker.agent.probe_caps", _boom)
         stub = _AgentStub(vtep_ip="192.168.0.112", host_ip="192.168.0.112")
         await _publish(stub)
         assert stub.etcd.puts["network/agent/i-abc123/vtep"] == "192.168.0.112"
+
+
+class TestTheAdvertIsWithdrawnWhenItCannotBeRenewed:
+    """The capability record is what admits this node to a session, and only a freshness window
+    stands between a stopped agent and a manager still choosing it. So it is written LAST -- after
+    everything in the refresh that can fail -- and taken away when it cannot be renewed."""
+
+    async def test_the_vtep_is_written_before_the_capabilities(self) -> None:
+        stub = _AgentStub(vtep_ip="192.168.0.112", host_ip="192.168.0.112")
+        await _publish(stub)
+        written = list(stub.etcd.puts)
+        assert written.index("network/agent/i-abc123/vtep") < written.index(
+            "network/agent/i-abc123/caps"
+        ), "the advert landed before the things it advertises"
+
+    async def test_a_probe_failure_takes_the_advert_away(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        async def _boom(iface: str, **kwargs: Any) -> Any:
+            raise OSError("ethtool went missing")
+
+        monkeypatch.setattr("ai.backend.agent.docker.agent.probe_caps", _boom)
+        stub = _AgentStub(vtep_ip="192.168.0.112", host_ip="192.168.0.112")
+        stub.etcd.puts["network/agent/i-abc123/caps"] = "{}"
+        await _publish(stub)
+        assert "network/agent/i-abc123/caps" in stub.etcd.deletes
 
 
 class TestWithdrawingTheVtep:

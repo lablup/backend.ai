@@ -170,9 +170,25 @@ async def publish_backend(
     said that the advert standing under its id belongs to a run that is over. Comparing runtime
     names cannot see a docker->docker restart; this can.
     """
-    await etcd.put(agent_backend_key(agent_id), backend, scope=ConfigScopes.GLOBAL)
+    # The boot id FIRST. These are two writes, and the order decides what a manager reading
+    # between them sees: with the backend first, a restart onto the same runtime leaves the old
+    # boot id beside the old advert and the two still agree, so the stale advert is admitted. With
+    # the boot id first, the advert is contradicted from the moment this run starts -- and stays
+    # contradicted if the second write, or the whole start, never happens.
     if boot_id is not None:
         await etcd.put(agent_boot_key(agent_id), boot_id, scope=ConfigScopes.GLOBAL)
+    await etcd.put(agent_backend_key(agent_id), backend, scope=ConfigScopes.GLOBAL)
+
+
+async def withdraw_caps(etcd: AbstractKVStore, agent_id: str) -> None:
+    """Take this agent's capability record away.
+
+    The record is what admits this node to a cluster-network session, and it is durable with only
+    a freshness window standing between a stopped agent and a manager still choosing it. So it is
+    removed when the agent stops, and when a refresh could not renew it: an advert nobody can
+    renew is not one anybody should act on.
+    """
+    await etcd.delete(agent_caps_key(agent_id), scope=ConfigScopes.GLOBAL)
 
 
 async def publish_vtep(etcd: AbstractKVStore, agent_id: str, vtep_ip: str) -> None:

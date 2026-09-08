@@ -537,3 +537,21 @@ R3 unchanged: no real etcd, no two-manager rolling restart, and A11 has never be
 real nodes. Four rounds of admission gates -- capability required, fresh, naming a VTEP, written
 by the running runtime and the running boot -- have each been unit-tested and none has met a real
 agent.
+
+Twenty-fourth round.
+
+| # | Was | Now |
+|---|-----|-----|
+| C45 | the serving identity is the address AND the interface, and only the address was checked. The vxlan device is created on the uplink this process started with, for the life of the process, so the same address failing over to another NIC stays perfectly usable -- and the node probes the new NIC, advertises it healthy, and builds the tunnel on the old one. Outright failure if the old NIC is gone, a silent blackhole if it is merely no longer the path | both halves are compared, and the capability probe runs against the SERVING uplink rather than whichever one holds the address now |
+| C47 | the capability record was written in the middle of the refresh, with the VTEP write still to come -- and that write can raise out of `__ainit__`. A start that never finished left a fresh advert matching the current boot for the whole window, and nothing else says the agent is not there | the advert is written last of everything that can fail, withdrawn when a refresh cannot renew it, and withdrawn on shutdown before anything else is torn down |
+| C47 | `publish_backend` wrote the backend and THEN the boot id, so between the two writes -- or if the second never happened -- a restart onto the same runtime left the old boot id beside the old advert, still agreeing | the boot id goes first, so the advert is contradicted from the moment a run starts and stays contradicted if the rest of the start never happens |
+
+Still not done. `AsyncEtcd.get_prefix` has no paginated form and there is no bound on session
+count. There is no inspect/repair/quarantine tool for a root this branch now preserves
+fail-closed, which is a gap this work opened. And the identity is still three keys read
+separately: the boot-first ordering narrows the window rather than closing it, and closing it
+needs one record or an etcd transaction.
+
+R3 unchanged. `tests/dataplane/SCENARIOS.md` still has no result for two-node, restart, failure or
+encryption-wire, and the NIC-failover case this round is about is not even written down there.
+Five rounds of admission gates have each been unit-tested and none has met a real agent.

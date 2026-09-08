@@ -87,6 +87,7 @@ from ai.backend.agent.network.caps import (
     probe_caps,
     publish_caps,
     publish_vtep,
+    withdraw_caps,
     withdraw_vtep,
 )
 from ai.backend.agent.network.dns import resolve_container_dns
@@ -1925,11 +1926,16 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
         self._host_ip = host_ip
         self._network_identity_task = None
         self._vtep_ip = usable_vtep(host_ip)
+        # The interface the data plane is BUILT on, kept because it is half of what this node
+        # serves with. The vxlan device is created on this uplink for the life of the process, so
+        # an address that stays valid while moving to another NIC -- a failover, a re-cabling --
+        # leaves the node probing one interface and building on another.
+        self._serving_uplink = uplink_for_ip(self._vtep_ip or host_ip)
         self._session_network = build_docker_session_network(
             self.etcd,
             agent_id=str(self.id),
             host_ip=host_ip,
-            uplink=uplink_for_ip(self._vtep_ip or host_ip),
+            uplink=self._serving_uplink,
             privnet_socket=self.local_config.agent.network_privnet_socket,
             local_subnet_layout=container_cfg.local_subnet_layout(),
             agent_state_dir=self.local_config.agent.var_base_path,
@@ -2042,20 +2048,49 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
         # has to be about the serving state, not about the host.
         serving = self._session_network.serving_vtep
         live = usable_vtep(self._host_ip)
-        self._vtep_ip = serving if live == serving else None
-        if live != serving:
+        # BOTH halves of the serving identity. The address alone is not it: the same address can
+        # move to another NIC and stay perfectly usable, while the vxlan device goes on being
+        # created on the interface this process started with -- so the node would probe the new
+        # NIC, advertise it healthy, and build the tunnel on the old one. That fails outright if
+        # the old NIC is gone and blackholes silently if it is merely no longer the path.
+        uplink = uplink_for_ip(live) if live is not None else None
+        intact = live == serving and uplink == self._serving_uplink
+        self._vtep_ip = serving if intact else None
+        if not intact:
             log.warning(
-                "this node's tunnel endpoint has moved ({!r} is what sessions are served on,"
-                " {!r} is what the host holds now); withdrawing from multi-node overlay work"
-                " until this agent is restarted",
+                "this node's overlay identity has moved (serving {!r} on {!r}, host now holds"
+                " {!r} on {!r}); withdrawing from multi-node overlay work until this agent is"
+                " restarted",
                 serving,
+                self._serving_uplink,
                 live,
+                uplink,
+            )
+        # The VTEP key first, then the capabilities. The capability record is what ADMITS this
+        # node to a session, so it is written last of everything this refresh does: anything that
+        # can still fail after it has landed can leave a fresh advert standing over an agent whose
+        # start never finished, and the manager has no way to tell.
+        if self._vtep_ip is not None:
+            await publish_vtep(self.etcd, str(self.id), self._vtep_ip)
+        else:
+            # Retract, not merely skip: the key is durable, so an address published on an earlier
+            # boot would otherwise keep being pre-seeded into peers' FDBs long after this node
+            # stopped holding it -- by which time it may belong to a different host entirely.
+            await withdraw_vtep(self.etcd, str(self.id))
+            log.warning(
+                "no usable VTEP: container.advertised-host/bind-host ({!r}) is not a routable"
+                " unicast IPv4 address held by an interface of this host that is up. Single-node"
+                " sessions work; a multi-node overlay (vxlan) session scheduled here will be"
+                " refused until it is set.",
+                self._host_ip,
             )
         # A diagnostic signal for operators (e.g. VXLAN tunnel offload); best-effort, because a
         # failure to describe the uplink must not stop the agent from serving kernels.
         try:
             caps = await probe_caps(
-                uplink_for_ip(self._vtep_ip or self._host_ip),
+                # The interface sessions are served on, not the one the address is on now: a probe
+                # of the wrong NIC describes a path this node will not use.
+                self._serving_uplink,
                 privnet_socket=self.local_config.agent.network_privnet_socket,
                 # Retried here rather than on a loop of its own: this already runs on a timer,
                 # and the answer it publishes is exactly what the retry changes.
@@ -2075,25 +2110,21 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                 # create-time traceback.
                 log.warning("overlay readiness: {}", problem)
         except Exception:
-            log.exception("could not publish this agent's network capabilities")
-        # Only the validated address is ever published; with none, say so once here, where an
-        # operator can act on it, rather than only at the first vxlan session that gets refused.
-        if self._vtep_ip is not None:
-            await publish_vtep(self.etcd, str(self.id), self._vtep_ip)
-            return
-        # Retract, not merely skip: the key is durable, so an address published on an earlier boot
-        # would otherwise keep being pre-seeded into peers' FDBs long after this node stopped
-        # holding it -- by which time it may belong to a different host entirely.
-        await withdraw_vtep(self.etcd, str(self.id))
-        log.warning(
-            "no usable VTEP: container.advertised-host/bind-host ({!r}) is not a routable unicast"
-            " IPv4 address held by an interface of this host that is up. Single-node sessions work;"
-            " a multi-node overlay (vxlan) session scheduled here will be refused until it is set.",
-            self._host_ip,
-        )
+            # An advert this node could not renew must not stand: it is what a manager reads to
+            # place work here, and leaving the last one behind is how a node that has stopped
+            # being able to say anything keeps being chosen.
+            log.exception("could not publish this agent's network capabilities; withdrawing")
+            await withdraw_caps(self.etcd, str(self.id))
 
     @override
     async def shutdown(self, stop_signal: signal.Signals) -> None:
+        # Before anything else is torn down. While this stands, a manager may still admit this
+        # node to a session -- and the freshness window would let it for ten minutes after the
+        # process is gone.
+        try:
+            await withdraw_caps(self.etcd, str(self.id))
+        except Exception:
+            log.exception("could not withdraw this agent's network capabilities")
         if self._network_identity_task is not None:
             self._network_identity_task.cancel()
             with contextlib.suppress(asyncio.CancelledError):
