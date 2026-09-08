@@ -11,6 +11,9 @@ sources:
   - scripts/generate-graphql-schema.sh
 generated:
   by: claude-code/fable-5
+  at: 2026-08-10
+updated:
+  by: claude-code/fable-5
   at: 2026-09-08
 status: stable
 ---
@@ -35,7 +38,7 @@ where a field is defined exactly one, so the surfaces cannot diverge.
 ## Update fields separate omitted from null with `Unset`
 
 - An update field is `X | None | Unset = Field(default=UNSET)` — omitted = no change, null = clear, value = set.
-- `UNSET` is pydantic `MISSING`, so an omitted field puts nothing on the wire and nothing in the JSON schema.
+- An omitted field puts nothing on the wire and nothing in the JSON schema.
 - Which of null and unset a column honours is the adapter's decision; the rule table lives in the "Update" section of `../../AGENTS.md`, the sentinel's rationale in [`../../../tristate/KNOWLEDGE.md`](../../../tristate/KNOWLEDGE.md).
 - Fields still declared with the legacy `Sentinel` enum are being migrated one domain at a time; do not add new ones.
 
