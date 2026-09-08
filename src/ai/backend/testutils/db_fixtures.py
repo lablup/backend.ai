@@ -13,6 +13,7 @@ import secrets
 import time
 from collections.abc import AsyncIterator, Iterator
 
+import asyncpg
 import pytest
 import sqlalchemy as sa
 
@@ -48,7 +49,7 @@ async def _create_database(addr: HostPortPairModel, dbname: str) -> None:
             try:
                 async with engine.connect() as conn:
                     await conn.execute(sa.text(f'CREATE DATABASE "{dbname}";'))
-            except (ConnectionError, OSError) as e:
+            except (ConnectionError, OSError, asyncpg.exceptions.CannotConnectNowError) as e:
                 if time.monotonic() > deadline:
                     raise RuntimeError(
                         f"postgres at {addr.host}:{addr.port} did not accept a connection "

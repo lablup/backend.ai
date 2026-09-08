@@ -269,7 +269,10 @@ class ContainerPool:
 
 
 def _postgres_ready(container: Any) -> bool:
-    return bool(container.exec_run(["pg_isready", "-U", POSTGRES_USER]).exit_code == 0)
+    # Over TCP: the image's entrypoint first runs an init-only server that listens on the
+    # unix socket alone, and a socket check passes before the real server accepts.
+    result = container.exec_run(["pg_isready", "-h", "127.0.0.1", "-U", POSTGRES_USER])
+    return bool(result.exit_code == 0)
 
 
 def _etcd_ready(container: Any) -> bool:
