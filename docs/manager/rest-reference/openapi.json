@@ -25246,14 +25246,10 @@
                 "type": "string"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
-            "description": "New description.",
+            "description": "Updated description. Omit to leave unchanged; null clears.",
             "title": "Description"
           }
         },
