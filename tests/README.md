@@ -99,6 +99,20 @@ share it.
 `BACKEND_TEST_SHARE_CONTAINERS=0` makes each process start and remove its own containers
 instead.
 
+## Test batches
+
+`tests/component/BUILD` sets `batch_compatibility_tag="component"` for every
+`python_tests` target under it, so Pants runs up to `[test].batch_size` files in one
+pytest process. Files in a batch share one database, etcd namespace and redis, so a
+test must clean up what its fixtures wrote.
+
+| Rule | |
+|---|---|
+| A tag names an infrastructure set | `component` = postgres + etcd + redis; `component-agent` = pulled docker images |
+| Set it once, in the subtree's top `__defaults__` | Never on an individual `python_tests` target |
+| A new tag needs a different infrastructure set | Write the reason in that BUILD file |
+| State leaking between files is a fixture bug | Fix the fixture; do not split the tag or pull the file out of the batch |
+
 ## Test Selection Guide
 
 **When writing a new test, ask yourself:**
