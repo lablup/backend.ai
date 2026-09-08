@@ -24,6 +24,7 @@ from ai.backend.common.configs.etcd import EtcdConfig
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
 from ai.backend.common.metrics.metric import CommonMetricRegistry
 from ai.backend.common.network.keys import (
+    agent_caps_key,
     agent_vtep_key,
     endpoint_key,
     endpoints_prefix,
@@ -44,7 +45,6 @@ from ai.backend.common.network.types import (
     VXLAN_OVERHEAD,
     VXLAN_PORT_MAX,
     VXLAN_PORT_MIN,
-    AgentNetworkCaps,
     GenerationMatch,
     Member,
     NetworkBackendKind,
@@ -73,6 +73,7 @@ from ai.backend.manager.network.ipam import (
     overlay_encryption_key,
 )
 from ai.backend.manager.network.pairing import (
+    AdmittedAgent,
     members_can_encrypt,
     require_members_can_serve_driver,
     require_members_cni_ready,
@@ -860,7 +861,20 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
             # and anyone who had already been handed the half-built record would be holding a
             # subnet and a VNI the pool has since given to somebody else.
             meta[_STATE] = _READY
-            held = await self._publish(etcd, session_id, held, meta)
+            # Conditional on the adverts this session was ADMITTED on, all of them, in the same
+            # store operation that declares it ready. Admission is a read and everything since
+            # has been writes: an agent that restarted or withdrew in between has taken back the
+            # capability the placement was made on, and the manager would otherwise hand back a
+            # network that node then refuses. Rolled back like any other failed create.
+            held = await self._publish(
+                etcd,
+                session_id,
+                held,
+                meta,
+                guards={
+                    agent_caps_key(agent_id): known.raw for agent_id, known in admitted.items()
+                },
+            )
             return NetworkInfo(
                 network_id=session_id, options={**_published(meta), "endpoint_ips": endpoint_ips}
             )
@@ -1241,7 +1255,12 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
         return True
 
     async def _publish(
-        self, etcd: AsyncEtcd, session_id: str, held: str, meta: Mapping[str, Any]
+        self,
+        etcd: AsyncEtcd,
+        session_id: str,
+        held: str,
+        meta: Mapping[str, Any],
+        guards: Mapping[str, str] | None = None,
     ) -> str:
         """Write the session's record, but only over the one this call still holds.
 
@@ -1253,10 +1272,13 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
             SessionRecordContested: the record is no longer this call's.
         """
         raw = json.dumps(dict(meta))
-        if not await etcd.replace(session_meta_key(session_id), held, raw):
+        if not await etcd.compare_and_put(
+            session_meta_key(session_id), raw, expected=held, guards=dict(guards or {})
+        ):
             raise SessionRecordContested(
                 f"session {session_id}'s network record was taken by another manager while this"
-                " create was running; it owns what happens to the session now"
+                " create was running, or a member agent's advert changed under it; whoever holds"
+                " those owns what happens to the session now"
             )
         return raw
 
@@ -1914,7 +1936,7 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
         member_agents: list[str],
         generation: str | None = None,
         held: str | None = None,
-        admitted: Mapping[str, AgentNetworkCaps] | None = None,
+        admitted: Mapping[str, AdmittedAgent] | None = None,
     ) -> None:
         """Publish each member agent's VTEP, but only where no record stands already.
 
@@ -1934,7 +1956,8 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
         etcd = self._require_etcd()
         guards = {session_meta_key(session_id): held} if held else {}
         for agent_id in member_agents:
-            vtep = (admitted or {}).get(agent_id, AgentNetworkCaps(tunnel_offload=False)).vtep_ip
+            known = (admitted or {}).get(agent_id)
+            vtep = known.caps.vtep_ip if known is not None else None
             if not vtep:
                 vtep = await etcd.get(agent_vtep_key(agent_id), scope=ConfigScopes.GLOBAL)
             if not vtep:
@@ -2108,7 +2131,7 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
 
     async def _require_members_cni_capable(
         self, member_agents: list[str]
-    ) -> dict[str, AgentNetworkCaps]:
+    ) -> dict[str, AdmittedAgent]:
         """Refuse a member agent whose backend cannot serve the 'cni' driver.
 
         The symmetric check for 'overlay' lives in OverlayNetworkPlugin; both call the same guard

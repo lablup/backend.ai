@@ -20,7 +20,6 @@ from ai.backend.common.network.keys import member_key, session_ipam_key, session
 from ai.backend.common.network.types import (
     DEFAULT_VXLAN_PORT,
     OVERLAY_ENCRYPTION_PROFILE,
-    AgentNetworkCaps,
     GenerationMatch,
     Member,
     NetworkBackendKind,
@@ -53,6 +52,7 @@ from ai.backend.manager.network.ipam import (
     _claim,
     _prefix_for_hosts,
 )
+from ai.backend.manager.network.pairing import AdmittedAgent
 from ai.backend.manager.plugin.network import NetworkInfo
 
 
@@ -2088,13 +2088,51 @@ class TestTheGuardIsWiredIntoTheRealPath:
         await plugin.create_network(identifier="s1", options=dict(self._OPTIONS))
 
         written = {
-            key: guards for key, guards in etcd.guarded.items() if key.startswith("network/")
+            key: guards
+            for key, guards in etcd.guarded.items()
+            # The session record itself is fenced by the bytes it is written OVER, not by naming
+            # itself as a guard. Its own guards are the member agents' adverts, so that a session
+            # cannot be declared READY over an advert the node has since taken back.
+            if key.startswith("network/") and key != _META_KEY
         }
         unguarded = [key for key, guards in written.items() if _META_KEY not in guards]
         assert written, "nothing went through the guarded write at all"
         assert not unguarded, (
             f"these keys were written without naming the session record: {sorted(unguarded)}"
         )
+
+    async def test_ready_is_declared_over_the_adverts_it_admitted_on(self) -> None:
+        # Admission is a read and everything after it is writes. An agent that restarts or
+        # withdraws in between has taken back the capability the placement was made on.
+        etcd = _RecordsGuards()
+        _encryption_capable(etcd, "a1")
+        plugin = _plugin_with(etcd)
+
+        await plugin.create_network(identifier="s1", options=dict(self._OPTIONS))
+
+        assert "network/agent/a1/caps" in etcd.guarded[_META_KEY]
+
+    async def test_a_member_that_withdrew_mid_create_does_not_get_a_ready_session(self) -> None:
+        etcd = _RecordsGuards()
+        _encryption_capable(etcd, "a1")
+
+        class _WithdrawsBeforeReady(CNINetworkPlugin):
+            @override
+            async def _preseed_members(
+                self,
+                session_id: str,
+                member_agents: list[str],
+                generation: str | None = None,
+                held: str | None = None,
+                admitted: Mapping[str, AdmittedAgent] | None = None,
+            ) -> None:
+                # The agent goes away between admission and the record being declared ready.
+                etcd.store.pop("network/agent/a1/caps", None)
+
+        plugin = _wire(_WithdrawsBeforeReady({}, {}), etcd)
+
+        with pytest.raises(SessionRecordContested):
+            await plugin.create_network(identifier="s1", options=dict(self._OPTIONS))
 
     async def test_the_pool_claims_are_guarded_too(self) -> None:
         etcd = _RecordsGuards()
@@ -4159,7 +4197,7 @@ class TestACreateThatFailedBesideOneThatDidNot:
                 member_agents: list[str],
                 generation: str | None = None,
                 held: str | None = None,
-                admitted: Mapping[str, AgentNetworkCaps] | None = None,
+                admitted: Mapping[str, AdmittedAgent] | None = None,
             ) -> None:
                 reached.set()
                 await asyncio.sleep(0.05)
