@@ -5451,14 +5451,10 @@
                 "type": "array"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
-            "description": "Updated tags. Use SENTINEL to clear.",
+            "description": "Updated tags. Omit to leave unchanged; null clears.",
             "title": "Tags"
           },
           "open_to_public": {
@@ -7284,7 +7280,7 @@
         "type": "object"
       },
       "UpdateAutoScalingRuleInput": {
-        "description": "Input for updating an auto-scaling rule.\n\nFields default to SENTINEL (no change). Set a field to None to clear it.\nFields that cannot be cleared use None to signal no change.",
+        "description": "Input for updating an auto-scaling rule.\n\nFields default to UNSET (no change). Set a field to None to clear it.\nFields that cannot be cleared use None to signal no change.",
         "properties": {
           "id": {
             "description": "ID of the auto-scaling rule to update",
@@ -7327,14 +7323,10 @@
                 "type": "string"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
-            "description": "Updated minimum threshold. SENTINEL = no change, None = clear.",
+            "description": "Updated minimum threshold. Omit to leave unchanged; null clears.",
             "title": "Min Threshold"
           },
           "max_threshold": {
@@ -7347,14 +7339,10 @@
                 "type": "string"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
-            "description": "Updated maximum threshold. SENTINEL = no change, None = clear.",
+            "description": "Updated maximum threshold. Omit to leave unchanged; null clears.",
             "title": "Max Threshold"
           },
           "step_size": {
@@ -7389,14 +7377,10 @@
                 "type": "integer"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
-            "description": "Updated minimum replicas. SENTINEL = no change, None = clear.",
+            "description": "Updated minimum replicas. Omit to leave unchanged; null clears.",
             "title": "Min Replicas"
           },
           "max_replicas": {
@@ -7405,14 +7389,10 @@
                 "type": "integer"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
-            "description": "Updated maximum replicas. SENTINEL = no change, None = clear.",
+            "description": "Updated maximum replicas. Omit to leave unchanged; null clears.",
             "title": "Max Replicas"
           },
           "prometheus_query_preset_id": {
@@ -7422,14 +7402,10 @@
                 "type": "string"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
-            "description": "Updated Prometheus query preset ID. SENTINEL = no change, None = clear.",
+            "description": "Updated Prometheus query preset ID. Omit to leave unchanged; null clears.",
             "title": "Prometheus Query Preset Id"
           }
         },
