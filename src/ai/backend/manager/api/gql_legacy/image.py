@@ -75,7 +75,7 @@ from ai.backend.manager.services.image.actions.forget_image import (
     ForgetImageAction,
     ForgetImageByIdAction,
 )
-from ai.backend.manager.services.image.actions.get_all_images import GetAllImagesAction
+from ai.backend.manager.services.image.actions.get_all_images import PublicGetAllImagesAction
 from ai.backend.manager.services.image.actions.get_image_installed_agents import (
     GetImageInstalledAgentsAction,
 )
@@ -307,8 +307,8 @@ class Image(graphene.ObjectType):  # type: ignore[misc]
             filter_by_statuses = [ImageStatus.ALIVE]
         if types is None:
             types = set()
-        result = await ctx.processors.image.get_all_images.run(
-            GetAllImagesAction(status_filter=filter_by_statuses)
+        result = await ctx.processors.image.public_get_all_images.run(
+            PublicGetAllImagesAction(status_filter=filter_by_statuses)
         )
         all_items = [cls.from_image_with_agent_install_status(img) for img in result.data.values()]
         return [item for item in all_items if item.matches_filter(ctx, types)]

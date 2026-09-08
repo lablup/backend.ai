@@ -41,8 +41,8 @@ from ai.backend.manager.services.image.actions.forget_image import (
     ForgetImageByIdActionResult,
 )
 from ai.backend.manager.services.image.actions.get_all_images import (
-    GetAllImagesAction,
-    GetAllImagesActionResult,
+    PublicGetAllImagesAction,
+    PublicGetAllImagesActionResult,
 )
 from ai.backend.manager.services.image.actions.get_image_installed_agents import (
     GetImageInstalledAgentsAction,
@@ -183,9 +183,11 @@ class ImageService:
         agent_counts_per_image = await self._image_repository.get_image_installed_agents(image_ids)
         return GetImageInstalledAgentsActionResult(data=agent_counts_per_image)
 
-    async def get_all_images(self, action: GetAllImagesAction) -> GetAllImagesActionResult:
+    async def get_all_images(
+        self, action: PublicGetAllImagesAction
+    ) -> PublicGetAllImagesActionResult:
         images = await self._image_repository.get_all_images(status_filter=action.status_filter)
-        return GetAllImagesActionResult(data=images)
+        return PublicGetAllImagesActionResult(data=images)
 
     async def get_image_by_id(self, action: GetImageByIdAction) -> GetImageByIdActionResult:
         user = current_user()
