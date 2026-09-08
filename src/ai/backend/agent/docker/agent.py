@@ -1375,6 +1375,82 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
 
         container_config["HostConfig"]["SecurityOpt"] = [security_opt]
 
+    async def _provision_or_name_the_container(
+        self,
+        docker: Docker,
+        container: DockerContainer,
+        cid: str,
+        cluster_info: ClusterInfo,
+        resource_spec: KernelResourceSpec,
+    ) -> None:
+        """`_provision_started_container`, with every failure named by the container it happened
+        to.
+
+        The container is already up by the time any of that runs, so a failure has to carry its
+        id out: a plain exception reached the agent's handler as "kernel failed" with no id,
+        `destroy_kernel` had nothing to act on, and the container went on running with its kernel
+        already gone from the registry.
+        """
+        try:
+            await self._provision_started_container(
+                docker, container, cid, cluster_info, resource_spec
+            )
+        except ContainerCreationError:
+            raise
+        except Exception as e:
+            raise ContainerCreationError(
+                container_id=cid,
+                message=f"failed after the container was started: {e!r}",
+            ) from e
+
+    async def _provision_started_container(
+        self,
+        docker: Docker,
+        container: DockerContainer,
+        cid: str,
+        cluster_info: ClusterInfo,
+        resource_spec: KernelResourceSpec,
+    ) -> None:
+        """Everything done to a container that is already running.
+
+        Kept together because they share one property: the container exists, so a failure in any
+        of them has to carry its id out to whoever will destroy it. The caller turns anything
+        raised here into a `ContainerCreationError` naming the container.
+        """
+        if self._session_networked:
+            # The container is running but parked: its namespaces exist and its PID is final,
+            # and its command has not started. This is the only window in which the session's
+            # device can be moved in -- after the release the runner immediately binds its REPL
+            # and looks its peers up, and an attach racing that surfaces as a hang at
+            # rendezvous rather than as an error here.
+            await self._attach_session_network(container, cid, cluster_info)
+
+        if self.internal_data.get("sudo_session_enabled", False):
+            exec = await container.exec(
+                [
+                    # file ownership is guaranteed to be set as root:root since command is
+                    # executed on behalf of root user
+                    "sh",
+                    "-c",
+                    'mkdir -p /etc/sudoers.d && echo "work ALL=(ALL:ALL) NOPASSWD:ALL" >'
+                    " /etc/sudoers.d/01-bai-work",
+                ],
+                user="root",
+            )
+            shell_response = await exec.start(detach=True)
+            if shell_response:
+                raise ContainerCreationError(
+                    container_id=cid,
+                    message=f"sudoers provision failed: {shell_response.decode()}",
+                )
+
+        additional_network_names: set[str] = set()
+        for dev_name, device_alloc in resource_spec.allocations.items():
+            n = await self.computers[dev_name].instance.get_docker_networks(device_alloc)
+            additional_network_names |= set(n)
+
+        await self._attach_additional_networks(docker, container, additional_network_names)
+
     async def _attach_additional_networks(
         self,
         docker: Docker,
@@ -1615,6 +1691,13 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                         message="Docker API returned None when creating container",
                     )
                 cid = container._id
+                # Recorded on the kernel object the moment the container exists, and before
+                # anything else can fail. Everything from here to the end of this method can
+                # raise, and the agent's handler destroys a failed kernel by the id it finds
+                # here: set later, as it was, a VXLAN attach that failed left the handler with
+                # nothing to destroy, `destroy_kernel` did nothing, and the container went on
+                # running with its kernel already gone from the registry.
+                kernel_obj.set_container_id(ContainerId(cid))
                 async with AsyncFileWriter(
                     target_filename=self.config_dir / "resource.txt",
                     access_mode="a",
@@ -1653,40 +1736,10 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                     message=f"Unexpected error during container start: {e!r}",
                 ) from e
 
-            if self._session_networked:
-                # The container is running but parked: its namespaces exist and its PID is final,
-                # and its command has not started. This is the only window in which the session's
-                # device can be moved in — after the release the runner immediately binds its REPL
-                # and looks its peers up, and an attach racing that surfaces as a hang at
-                # rendezvous rather than as an error here.
-                await self._attach_session_network(container, cid, cluster_info)
+            await self._provision_or_name_the_container(
+                docker, container, cid, cluster_info, resource_spec
+            )
 
-            if self.internal_data.get("sudo_session_enabled", False):
-                exec = await container.exec(
-                    [
-                        # file ownership is guaranteed to be set as root:root since command is executed on behalf of root user
-                        "sh",
-                        "-c",
-                        'mkdir -p /etc/sudoers.d && echo "work ALL=(ALL:ALL) NOPASSWD:ALL" > /etc/sudoers.d/01-bai-work',
-                    ],
-                    user="root",
-                )
-                shell_response = await exec.start(detach=True)
-                if shell_response:
-                    await _rollback_container_creation()
-                    raise ContainerCreationError(
-                        container_id=cid,
-                        message=f"sudoers provision failed: {shell_response.decode()}",
-                    )
-
-            additional_network_names: set[str] = set()
-            for dev_name, device_alloc in resource_spec.allocations.items():
-                n = await self.computers[dev_name].instance.get_docker_networks(device_alloc)
-                additional_network_names |= set(n)
-
-            await self._attach_additional_networks(docker, container, additional_network_names)
-
-            kernel_obj.set_container_id(ContainerId(cid))
             container_network_info: ContainerNetworkInfo | None = None
             if (mode := cluster_info["network_config"].get("mode")) and mode != "bridge":
                 try:

@@ -1360,6 +1360,23 @@ class ScheduleCoordinator:
 
         session_ids = [s.session_id for s in session_infos]
 
+        # The kernels go back FIRST, before the session is moved. These are two transactions and
+        # they cannot be made one from here, so what is left is choosing which half-done state a
+        # manager that dies between them leaves behind.
+        #
+        # Session first was the dangerous order: a PENDING session whose kernels are still
+        # PREPARED, still bound to their agent and still holding its resources -- and the PENDING
+        # scheduler does not look at kernel status, so it schedules that session again on top of
+        # the allocation it never gave up.
+        #
+        # Kernels first leaves the opposite: kernels PENDING and unbound under a session that has
+        # not moved. Nothing picks that up -- the PENDING scheduler selects PENDING SESSIONS --
+        # so the session stays where it was and its own handler comes round again; a start with no
+        # agent on any kernel is reported as a placement to make again, which is exactly the state
+        # this was heading for. Neither half is atomic; only one of them is safe to be caught in.
+        if transition.kernel == KernelStatus.PENDING:
+            await self._apply_kernel_pending_resets(handler_name, session_ids)
+
         # Session status update
         if transition.session:
             updater = SessionStatusBatchUpdater(
@@ -1391,10 +1408,6 @@ class ScheduleCoordinator:
                 transition.session,
                 scheduling_result.value,
             )
-
-        # Kernel status reset if transitioning to PENDING
-        if transition.kernel == KernelStatus.PENDING:
-            await self._apply_kernel_pending_resets(handler_name, session_ids)
 
     async def _apply_kernel_pending_resets(
         self,

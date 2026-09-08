@@ -662,3 +662,19 @@ it fixes. It wants someone who owns the scheduler repository.
 Startup reconciliation is still awaited, unbounded and unpaginated.
 
 R3 unchanged.
+
+Thirty-first round.
+
+| # | Was | Now |
+|---|-----|-----|
+| A11g | the container is created and started, and the session network is attached AFTER -- but the container id reached the kernel object only once the whole attach had succeeded. So a VXLAN attach that failed raised with no id attached, `destroy_kernel` had nothing to act on, and the container went on running with its kernel already gone from the registry. Last round's `made.clear()` did not reach this: it runs only when `start_container` RETURNS | the id is set on the kernel object the moment the container exists, before anything else can fail, and everything done to a running container is wrapped so its failures arrive named by that container |
+| A11h | the session's PENDING transition and the kernel reset are two DB transactions, and the dangerous order was chosen: a manager dying between them left a PENDING session whose kernels were still PREPARED, still bound and still holding their resources -- and the PENDING scheduler does not look at kernel status, so it scheduled that session again over the allocation it never gave up | the kernels go back FIRST. Caught between the two, what is left is kernels PENDING and unbound under a session that has not moved, which nothing picks up: the PENDING scheduler selects PENDING SESSIONS. The session's own handler comes round again, and a start with no agent on any kernel is now reported as a placement to make again -- which is where it was heading |
+
+That second one is ORDERING, not atomicity, and the difference matters: it makes the half-done
+state a safe one to be caught in, it does not remove it. One transaction across session status,
+history, kernel reset, allocation release and agent unbinding is still the right fix, and it is
+repository work whose boundaries this branch should not be inventing.
+
+Startup reconciliation is still awaited, unbounded and unpaginated.
+
+R3 unchanged.
