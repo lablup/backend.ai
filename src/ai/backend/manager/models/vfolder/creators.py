@@ -14,10 +14,12 @@ from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE, ProjectID
 from ai.backend.common.data.entity.types import EntityIdentifier, ScopeRef
 from ai.backend.common.data.entity.user import USER_SCOPE_TYPE, UserID
 from ai.backend.common.data.entity.vfolder import VFolderUUID
+from ai.backend.common.data.entity.vfolder_invitation import VFolderInvitationID
 from ai.backend.common.data.entity.vfolder_permission import VFolderPermissionID
 from ai.backend.common.types import QuotaScopeID, VFolderUsageMode
 from ai.backend.manager.data.vfolder.types import (
     VFolderData,
+    VFolderInvitationState,
     VFolderMountPermission,
     VFolderOperationStatus,
     VFolderOwnershipType,
@@ -39,12 +41,17 @@ from ai.backend.manager.models.resource_policy import (
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,
 )
-from ai.backend.manager.models.specs.creator import FieldCreator, GuardedEntityCreator
+from ai.backend.manager.models.specs.creator import (
+    EntityCreator,
+    FieldCreator,
+    GuardedEntityCreator,
+)
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck, PreconditionCheck
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.vfolder.row import (
     HARD_DELETED_VFOLDER_STATUSES,
     VFOLDER_NAME_IN_PROJECT_INDEX,
+    VFolderInvitationRow,
     VFolderPermissionRow,
     VFolderRow,
 )
@@ -390,3 +397,43 @@ class VFolderPermissionCreator(
             user=row.user,
             permission=row.permission or VFolderMountPermission.READ_WRITE,
         )
+
+
+@dataclass(kw_only=True)
+class VFolderInvitationCreator(EntityCreator[VFolderInvitationRow, VFolderInvitationID]):
+    """Creator for an invitation to share one vfolder.
+
+    The invitation is created in the vfolder it invites to, which owns and governs it;
+    the invitee acts on it while holding no permission on the folder itself.
+    """
+
+    vfolder_id: VFolderUUID
+    inviter_email: str
+    invitee_email: str
+    permission: VFolderMountPermission
+
+    @override
+    def entity_id(self, row: VFolderInvitationRow) -> EntityIdentifier:
+        return VFolderInvitationID(row.id)
+
+    @override
+    def created_in(self, row: VFolderInvitationRow) -> Collection[EntityIdentifier]:
+        return (VFolderUUID(row.vfolder),)
+
+    @override
+    def integrity_error_checks(self) -> Sequence[IntegrityErrorCheck]:
+        return ()
+
+    @override
+    def build_row(self) -> VFolderInvitationRow:
+        return VFolderInvitationRow(
+            permission=self.permission,
+            vfolder=self.vfolder_id,
+            inviter=self.inviter_email,
+            invitee=self.invitee_email,
+            state=VFolderInvitationState.PENDING,
+        )
+
+    @override
+    def to_data(self, row: VFolderInvitationRow) -> VFolderInvitationID:
+        return VFolderInvitationID(row.id)

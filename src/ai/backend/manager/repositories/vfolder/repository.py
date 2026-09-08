@@ -112,6 +112,7 @@ from ai.backend.manager.models.vfolder.creators import (
     PersonalVFolderCreator,
     ProjectVFolderCreator,
     VFolderBaseCreator,
+    VFolderInvitationCreator,
     VFolderPermissionCreator,
 )
 from ai.backend.manager.models.vfolder.lookups import VFolderMountPermissionLookup
@@ -1399,19 +1400,19 @@ class VfolderRepository:
         Create a VFolder invitation.
         Returns the invitee email on success, None on failure.
         """
-        async with self._db.begin_session() as session:
-            query = sa.insert(VFolderInvitationRow).values(
-                permission=permission,
-                vfolder=vfolder_id,
-                inviter=inviter_email,
-                invitee=invitee_email,
-                state=VFolderInvitationState.PENDING,
-            )
-            try:
-                await session.execute(query)
-                return invitee_email
-            except sa_exc.DataError:
-                return None
+        try:
+            async with self._v2_ops.write_ops() as w:
+                await w.create_entity(
+                    VFolderInvitationCreator(
+                        vfolder_id=VFolderUUID(vfolder_id),
+                        inviter_email=inviter_email,
+                        invitee_email=invitee_email,
+                        permission=permission,
+                    )
+                )
+            return invitee_email
+        except sa_exc.DataError:
+            return None
 
     @vfolder_repository_resilience.apply()
     async def get_invitation_by_id(self, invitation_id: uuid.UUID) -> VFolderInvitationData | None:
