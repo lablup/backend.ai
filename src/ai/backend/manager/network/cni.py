@@ -26,6 +26,7 @@ from ai.backend.common.metrics.metric import CommonMetricRegistry
 from ai.backend.common.network.keys import (
     agent_backend_key,
     agent_boot_key,
+    agent_ready_key,
     agent_vtep_key,
     endpoint_key,
     endpoints_prefix,
@@ -1270,6 +1271,10 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
             for key, value in (
                 (agent_boot_key(agent_id), known.boot_key),
                 (agent_backend_key(agent_id), known.backend_key),
+                # Withdrawal leaves the other two exactly as they were: an agent shutting down,
+                # losing its tunnel endpoint or failing its probe takes back what it can serve
+                # without restarting. This is the only one of the three that sees that happen.
+                (agent_ready_key(agent_id), known.ready_key),
             )
         }
 

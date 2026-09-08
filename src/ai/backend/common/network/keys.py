@@ -27,6 +27,7 @@ __all__ = (
     "agent_caps_key",
     "agent_backend_key",
     "agent_boot_key",
+    "agent_ready_key",
     "agent_vtep_key",
 )
 
@@ -71,6 +72,18 @@ def session_ipam_key(session_id: str, ip: str) -> str:
 
 def agent_caps_key(agent_id: str) -> str:
     return f"network/agent/{agent_id}/caps"
+
+
+def agent_ready_key(agent_id: str) -> str:
+    """Where an agent says WHAT it is currently able to serve, as a value that only changes when
+    that changes.
+
+    Separate from the capability record because that record is also a heartbeat: it carries the
+    time it was written, and the agent rewrites it every minute to say it is still there. A
+    condition on those bytes fails whenever a create straddles a refresh. A condition on this one
+    fails when -- and only when -- the node stops being the node the placement was made on.
+    """
+    return f"network/agent/{agent_id}/ready"
 
 
 def agent_boot_key(agent_id: str) -> str:

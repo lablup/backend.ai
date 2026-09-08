@@ -176,7 +176,7 @@ class SessionLauncher:
         self,
         sessions: list[SessionDataForStart],
         image_configs: dict[UUID, ImageConfigData],
-    ) -> None:
+    ) -> dict[SessionId, str]:
         """
         Start sessions on agents for the given sessions.
 
@@ -188,6 +188,12 @@ class SessionLauncher:
 
         :param sessions: List of sessions with full data for starting
         :param image_configs: Image configurations indexed by image ID
+        :return: the sessions that could NOT be started, and why. The caller has to act on this:
+            a session whose kernels were never asked for has not started, and reporting it as
+            started leaves it sitting in CREATING until something times it out, on an agent it
+            was placed on and cannot run on. A network setup that the agent refuses -- it is not
+            advertising the data plane, or stopped while this was being built -- is exactly that
+            case, and the answer to it is another agent, not a longer wait.
         """
         with RecorderContext[SessionId].shared_phase(
             "trigger_kernel_creation",
@@ -197,18 +203,19 @@ class SessionLauncher:
                 "create_kernels",
                 success_detail="Kernel creation requested",
             ):
-                await self._start_sessions_concurrently(sessions, image_configs)
+                return await self._start_sessions_concurrently(sessions, image_configs)
 
     async def _start_sessions_concurrently(
         self,
         sessions: list[SessionDataForStart],
         image_configs: dict[UUID, ImageConfigData],
-    ) -> None:
+    ) -> dict[SessionId, str]:
         """
         Start multiple sessions concurrently with individual timeouts.
 
         :param sessions: List of sessions to start
         :param image_configs: Image configurations indexed by image ID
+        :return: the sessions that could not be started, and why.
         """
 
         async def start_with_timeout(session: SessionDataForStart) -> None:
@@ -219,6 +226,7 @@ class SessionLauncher:
             *[start_with_timeout(session) for session in sessions],
             return_exceptions=True,
         )
+        failed: dict[SessionId, str] = {}
         for session, result in zip(sessions, results, strict=True):
             if isinstance(result, BaseException):
                 log.warning(
@@ -226,6 +234,8 @@ class SessionLauncher:
                     session.session_id,
                     exc_info=result,
                 )
+                failed[session.session_id] = f"{type(result).__name__}: {result}"
+        return failed
 
     async def _start_single_session(
         self,

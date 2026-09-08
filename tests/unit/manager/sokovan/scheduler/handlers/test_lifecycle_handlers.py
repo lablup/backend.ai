@@ -627,6 +627,29 @@ class TestStartSessionsLifecycleHandler:
         for success in result.successes:
             assert success.reason == "triggered-by-scheduler"
 
+    async def test_a_session_the_launcher_could_not_start_is_a_failure(
+        self,
+        handler: StartSessionsLifecycleHandler,
+        mock_launcher: AsyncMock,
+        mock_repository: AsyncMock,
+        prepared_session: SessionWithKernels,
+        sessions_for_start_factory: Callable[..., SessionsForStartWithImages],
+    ) -> None:
+        """A session whose kernels were never asked for has not started. Reported as a success it
+        moved to CREATING on an agent it cannot run on and sat there until something timed it
+        out; reported as a failure it is retried and then re-placed on another agent."""
+        sessions_for_start = sessions_for_start_factory([prepared_session])
+        mock_repository.search_sessions_with_kernels_and_user.return_value = sessions_for_start
+        failing = prepared_session.session_info.identity.id
+        mock_launcher.start_sessions_for_handler = AsyncMock(
+            return_value={failing: "NetworkBackendMismatch: it is not advertising vxlan"}
+        )
+
+        result = await handler.execute(ResourceGroupID(uuid.uuid4()), [prepared_session])
+
+        assert [t.session_id for t in result.failures] == [failing]
+        assert not result.successes
+
     async def test_empty_session_list_returns_empty(
         self,
         handler: StartSessionsLifecycleHandler,

@@ -18,6 +18,7 @@ from unittest import mock
 
 import pytest
 
+import ai.backend.agent.server as agent_server
 from ai.backend.agent.agent import AbstractAgent
 from ai.backend.agent.docker.agent import DockerAgent
 from ai.backend.agent.network.caps import withdraw_vtep
@@ -228,13 +229,14 @@ class TestShuttingDownStopsAdvertising:
         )
 
 
-class TestTheNodeIsAnnouncedOnlyOnceItIsBuilt:
-    """A11c. The started event marks the node ALIVE and schedulable. Sent from inside
-    `__ainit__`, it went out while the backend still had work to do -- the socket relay, the
-    network plugin context, the advert that admits it to a cluster-network session -- and a
-    failure in any of that aborts the runtime before `shutdown` can withdraw anything."""
+class TestTheNodeIsAnnouncedOnlyOnceItCanServe:
+    """A11c. Two things announce this node: the started event, and the heartbeat -- the manager
+    marks an agent ALIVE on a heartbeat alone. Both used to begin inside `__ainit__`, while the
+    backend still had work to do (the socket relay, the network plugin context, the advert that
+    admits it to a cluster-network session) and before there was an RPC server to take the work
+    that would follow."""
 
-    def test_the_base_agent_does_not_announce_from_ainit(self) -> None:
+    def test_the_base_agent_neither_announces_nor_heartbeats_from_ainit(self) -> None:
         source = (
             pathlib.Path(inspect.getfile(AbstractAgent)).read_text().split("async def __ainit__")[1]
         )
@@ -242,11 +244,23 @@ class TestTheNodeIsAnnouncedOnlyOnceItIsBuilt:
         assert "AgentStartedEvent" not in body, (
             "the node is announced while its backend is still starting"
         )
+        assert "_local_cron.start()" not in body, (
+            "the heartbeat starts while its backend is still starting, and a heartbeat alone"
+            " marks the node ALIVE"
+        )
 
-    def test_the_runtime_announces_after_the_agent_is_built(self) -> None:
-        source = inspect.getsource(AgentRuntime._create_agent)
-        assert "announce_started" in source
-        assert source.index("agent_cls.new") < source.index("announce_started")
+    def test_start_serving_does_both(self) -> None:
+        source = inspect.getsource(AbstractAgent.start_serving)
+        assert "_local_cron.start()" in source
+        assert "AgentStartedEvent" in source
+
+    def test_the_server_starts_serving_after_the_rpc_listener(self) -> None:
+        source = pathlib.Path(inspect.getfile(AgentRuntime)).read_text()
+        assert "async def start_serving" in source
+        server_source = pathlib.Path(inspect.getfile(agent_server)).read_text()
+        assert server_source.index("started handling RPC requests") < server_source.index(
+            "runtime.start_serving()"
+        )
 
 
 class TestWithdrawingTheVtep:

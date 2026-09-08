@@ -393,6 +393,11 @@ class AgentRPCServer(aobject):
 
         log.info("started handling RPC requests at {}", rpc_addr)
 
+        # Only now does this node say it is here. The manager marks an agent ALIVE on a heartbeat
+        # alone and schedules onto it, so announcing before this point offers work to a process
+        # with nothing listening for it.
+        await self.runtime.start_serving()
+
         debug_socket_path = (
             self.local_config.agent_common.ipc_base_path / "agent-registry-snapshot.sock"
         )

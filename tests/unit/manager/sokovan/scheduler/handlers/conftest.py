@@ -353,7 +353,8 @@ def mock_launcher() -> AsyncMock:
     """Mock SessionLauncher for CheckPrecondition and StartSessions handlers."""
     launcher = AsyncMock()
     launcher.trigger_image_pulling = AsyncMock(return_value=None)
-    launcher.start_sessions_for_handler = AsyncMock(return_value=None)
+    # It reports which sessions could NOT be started; nothing failing is an empty mapping.
+    launcher.start_sessions_for_handler = AsyncMock(return_value={})
     return launcher
 
 

@@ -141,13 +141,7 @@ class AgentRuntime:
 
         backend = local_config.agent_common.backend
         agent_cls = get_agent_discovery(backend).get_agent_cls()
-        agent = await agent_cls.new(etcd_view, agent_config, **agent_kwargs)
-        # Last, and only once the agent is fully built. This is what marks the node ALIVE and
-        # schedulable; announcing from inside `__ainit__` marked it so while the backend still had
-        # work to do -- including publishing the capability that admits it to a cluster-network
-        # session -- and a failure in that work aborts this call before `shutdown` can run.
-        await agent.announce_started()
-        return agent
+        return await agent_cls.new(etcd_view, agent_config, **agent_kwargs)
 
     def __init__(
         self,
@@ -180,6 +174,16 @@ class AgentRuntime:
         if self._metadata_server is not None:
             await self._metadata_server.cleanup()
         await self._resource_allocator.__aexit__(*exc_info)
+
+    async def start_serving(self) -> None:
+        """Let every agent start announcing itself, once the process can take work.
+
+        Called by the server after the RPC listener is handling calls -- see
+        `AbstractAgent.start_serving` for why neither the started event nor the heartbeat may
+        happen before that.
+        """
+        for agent in self.get_agents():
+            await agent.start_serving()
 
     def get_agents(self) -> list[AbstractAgent[Any, Any]]:
         return list(self._agents.values())

@@ -591,3 +591,20 @@ R3 unchanged, and this round makes the case louder rather than quieter: the last
 where the unit tests all passed because the fake never heartbeats. `SCENARIOS.md` still has no
 result for two-node, restart, failure or encryption-wire, and nothing for NIC failover, a failed
 agent start, or a create that runs across a capability refresh.
+
+Twenty-seventh round.
+
+| # | Was | Now |
+|---|-----|-----|
+| C49 | moving the READY fence off the capability record fixed the heartbeat problem and lost withdrawal with it: boot and backend are exactly what a withdrawal leaves alone. An agent shutting down, losing its tunnel endpoint or failing its probe takes back what it can serve WITHOUT restarting, so a session was still declared READY on a node that had already said it could not serve one | the agent publishes a readiness digest -- runtime, boot, endpoint, backends, profiles, readiness problems, and no timestamp -- under a key of its own. It moves when what the node can serve moves and stays put when the agent merely says it is still there, which is what a fence needs to be. Admission requires it to agree with the record just read, and READY is conditional on it |
+| A11c | the started event was moved out of `__ainit__` last round, and the heartbeat was not -- it starts on the same line, runs with no initial delay, and a heartbeat alone is enough for the manager to mark the node ALIVE and schedule onto it. Both also happened before the RPC server existed to take the work | `start_serving` starts the cron and announces, and the server calls it after the RPC listener is handling calls |
+| A11d | the launcher swallowed a per-session start failure and the handler reported EVERY session as a success, so a session whose kernels were never asked for went to CREATING on an agent that had refused it and sat there until something timed it out | the launcher reports which sessions did not start, and those become failures -- retried, then re-placed on another agent, which is the answer to a node whose data plane will not take the session |
+
+Still not done. `AsyncEtcd.get_prefix` has no paginated form and there is no bound on session
+count; the startup reconciliation is awaited before the manager serves. There is no
+inspect/repair/quarantine tool for a corrupt root.
+
+R3 unchanged, and the case is now overwhelming: this is the eighth consecutive round whose P1s are
+all in agent identity/readiness lifecycle, and every one of them was invisible to a suite whose
+fake agent never restarts, never heartbeats, never loses a NIC and never withdraws.
+`SCENARIOS.md` still records nothing for two-node, restart, failure or encryption-wire.
