@@ -706,3 +706,34 @@ not finish the job.
 Still ordering rather than atomicity, and the startup reconciliation is still unbounded.
 
 R3 unchanged.
+
+Thirty-fourth round. Asked to model the state machine rather than keep patching edges, which is
+what the last four rounds have been. Both findings fall out of one question asked properly: who
+owns what, in which state, and where does ownership transfer.
+
+**Agent, create-time resource ownership.** The states are: allocated, scratch prepared, container
+created, container started, handed over. The transfer point is CONTAINER CREATION, not container
+start and not the handover -- because `docker start` can be cancelled after the daemon has acted
+on it, so "the start failed" does not mean "nothing is running", and a running container holds its
+devices, its published ports and its scratch alike.
+
+| # | Was | Now |
+|---|-----|-----|
+| A11k | the boundary was drawn per resource and in three different places. Scratch transferred at container creation (last round), ports and devices did not transfer at all -- they were released immediately on a start that failed or was cancelled, so a live container's GPU or port could be handed to the next create, which runs concurrently. And the unwind called `reconstruct_resource_usage` while that container was still up | one boundary for all three. Where a container exists the rollback returns without touching anything and the unwind queues the teardown and nothing else: that path stops the container first, then gives the ports back and rebuilds the allocation maps from what is actually left. Where none exists, the backend's own rollback frees precisely and the rebuild stays as the net under a failure too early for it |
+
+**Manager, what the start handler has been handed.** The filter is coarse by necessity -- the
+repository returns a session if ANY kernel matches -- so `_disposition_of` partitions by what is
+SAFE rather than by what is expected: every kernel where a start begins from (start it), no kernel
+that could hold a container (put the whole session back in the queue -- nothing is running, so
+nothing is lost), any kernel that could (leave it to the passes that own containers).
+
+| # | Was | Now |
+|---|-----|-----|
+| A11h | a mixture was skipped, every tick, forever -- safe but never converging. And "unbound" was `agent is None`, so a PENDING kernel still naming a container read as the safe half-state and was given a new placement | the mixture converges: with nothing dispatched the whole session is requeued, and with anything dispatched it belongs to another pass. A kernel that names a container is never in the safe set, whatever its status says |
+
+Nine cases, one per row of that table, are what the tests assert.
+
+Still ordering rather than atomicity on the manager side, and the startup reconciliation is still
+unbounded.
+
+R3 unchanged.

@@ -1658,22 +1658,29 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
             log.debug("full container config: {!r}", pretty(container_config))
 
         async def _rollback_container_creation(container_exists: bool = False) -> None:
-            """Give back what this create took, for a create with nothing left running.
+            """Give back what this create took -- but only while nothing holds it.
 
-            ``container_exists`` is the one thing that changes the answer. A container's scratch
-            belongs to the container: the kernel's teardown stops it, detaches it and removes its
-            scratch, in that order, and reclaiming it from here cuts across that -- deleting the
-            filesystem of a container that is still up. `docker start` can be cancelled AFTER the
-            daemon has acted on it, which is exactly when that happens. Ports and device
-            allocations are this agent's own bookkeeping and are given back either way.
+            ``container_exists`` decides whether there is anything to give back at all, and the
+            answer is all three or none. A container that exists may be running: it holds the
+            devices named in its own resource spec, it holds the host ports Docker published for
+            it, and its scratch is its filesystem. Reclaiming any of them while it is up hands a
+            live container's GPU or port to the next create -- and `docker start` can be cancelled
+            AFTER the daemon has acted on it, so "the start failed" does not mean "nothing is
+            running".
+
+            Where a container exists, all of it belongs to the kernel's teardown, which stops the
+            container first and then gives the ports back and rebuilds the allocation maps from
+            what is actually left. That teardown is queued by
+            `AbstractAgent._unwind_failed_create`.
             """
-            if not container_exists:
-                await _clean_scratch(
-                    loop,
-                    self.local_config.container.scratch_type,
-                    self.local_config.container.scratch_root,
-                    self.kernel_id,
-                )
+            if container_exists:
+                return
+            await _clean_scratch(
+                loop,
+                self.local_config.container.scratch_type,
+                self.local_config.container.scratch_root,
+                self.kernel_id,
+            )
             self.port_pool.release_many(host_ports)
             async with self.resource_lock:
                 for dev_name, device_alloc in resource_spec.allocations.items():

@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Sequence
-from typing import TYPE_CHECKING, override
+from enum import StrEnum
+from typing import TYPE_CHECKING, Final, override
 
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.types import AccessKey
@@ -28,6 +29,72 @@ if TYPE_CHECKING:
     from ai.backend.manager.sokovan.scheduler.launcher.launcher import SessionLauncher
 
 log = BraceStyleAdapter(logging.getLogger(__name__))
+
+
+class _StartDisposition(StrEnum):
+    """What this handler should do with one session it has been handed."""
+
+    #: Every kernel is where a start begins from. Start it.
+    START = "start"
+    #: No kernel of this session can be holding a container, and they are not all in a state a
+    #: start begins from. Nothing is running, so the whole session goes back in the queue: the
+    #: REPLACE transition resets every kernel to PENDING, unbinds them, and re-schedules.
+    REQUEUE = "requeue"
+    #: A kernel may hold a container -- it is in a status that has one, has been through one, or
+    #: still names one. Not this handler's to judge: the progress and termination passes own it.
+    NOT_OURS = "not_ours"
+
+
+#: Kernel statuses a session can legitimately be STARTED from. Anything outside this set means
+#: the session is not simply waiting to be started.
+_STARTABLE_FROM: Final = frozenset({KernelStatus.PREPARED})
+
+#: Kernel statuses that mean no container of that kernel can exist yet -- nothing has been asked
+#: of an agent for it. A session all of whose kernels are in here has nothing running to lose.
+_BEFORE_ANY_CONTAINER: Final = frozenset({
+    KernelStatus.PENDING,
+    KernelStatus.RESERVED,
+    KernelStatus.SCHEDULED,
+    KernelStatus.PREPARING,
+    KernelStatus.BUILDING,
+    KernelStatus.PREPARED,
+})
+
+
+def _disposition_of(session: SessionWithKernels) -> _StartDisposition:
+    """Which of the three things a session handed to this handler is.
+
+    The handler's kernel filter is coarse -- the repository returns a session if ANY of its
+    kernels matches -- so what arrives here is not only sessions waiting to be started. Two other
+    shapes arrive with them, and telling them apart by what is SAFE rather than by what is
+    expected is what keeps this from acting on a session it does not own:
+
+    - A session whose kernels were reset to PENDING without its own status following. Its move to
+      PENDING and its kernels' reset are two transactions and the kernels go first, so a manager
+      dying between them leaves exactly this. Nothing selects it otherwise: the scheduler wants
+      PENDING SESSIONS. It is finished here.
+    - A session whose kernels disagree. If none of them can hold a container, the same answer
+      applies for the same reason: nothing is running, so the whole thing goes back in the queue
+      and is scheduled cleanly. If any of them can, this handler must not touch it -- rebuilding
+      the kernels that still have an agent would leave a session half old and half new.
+
+    The container test is deliberately the strong one: a status that has a container, a status
+    that has been through one, or a kernel that still names one. A stale container id under a
+    PENDING kernel is precisely the case where "it looks unbound" is wrong.
+    """
+    kernels = session.kernel_infos
+    if not kernels:
+        # Nothing to start and nothing that could be running. Requeue rather than report a
+        # session with no kernels as started, which is what a start of it would amount to.
+        return _StartDisposition.REQUEUE
+    if all(k.lifecycle.status in _STARTABLE_FROM for k in kernels):
+        return _StartDisposition.START
+    if any(
+        k.resource.container_id is not None or k.lifecycle.status not in _BEFORE_ANY_CONTAINER
+        for k in kernels
+    ):
+        return _StartDisposition.NOT_OURS
+    return _StartDisposition.REQUEUE
 
 
 class StartSessionsLifecycleHandler(SessionLifecycleHandler):
@@ -71,11 +138,8 @@ class StartSessionsLifecycleHandler(SessionLifecycleHandler):
         and unbound. Without PENDING in this filter nothing selects that session at all -- the
         scheduler wants PENDING SESSIONS -- and it waits for a person.
 
-        The filter is coarse: the repository returns a session if ANY of its kernels matches. So
-        `execute` decides what it has actually been given, and only a session whose kernels are
-        ALL PENDING and unbound is completed; a mixture is skipped rather than started. Widening
-        this without that check would hand the launcher sessions whose kernels are half in other
-        states, and it would dispatch to the ones that still have an agent.
+        The filter is coarse: the repository returns a session if ANY of its kernels matches, so
+        `_disposition_of` decides what has actually been handed over -- see there.
         """
         return [KernelStatus.PREPARED, KernelStatus.PENDING]
 
@@ -134,53 +198,44 @@ class StartSessionsLifecycleHandler(SessionLifecycleHandler):
         if not sessions:
             return result
 
-        # Sessions whose kernels have ALREADY been reset are not started; they are finished.
-        # See `target_kernel_statuses` for how they arise. They are reported straight to the
-        # coordinator as a placement to make again, and the launcher never sees them -- asking it
-        # to start a session with no agent on any kernel would work, but only by accident.
+        # What each session actually is, before anything is done to it. See `_disposition_of`.
         startable: list[SessionWithKernels] = []
         for session in sessions:
-            kernels = session.kernel_infos
-            if kernels and all(
-                k.lifecycle.status == KernelStatus.PENDING and k.resource.agent is None
-                for k in kernels
-            ):
-                info = session.session_info
-                log.warning(
-                    "session {} has been reset to PENDING kernels without its own status"
-                    " following; completing that transition",
-                    info.identity.id,
-                )
-                result.failures.append(
-                    SessionTransitionInfo(
-                        session_id=info.identity.id,
-                        from_status=info.lifecycle.status,
-                        reason="kernels were reset without the session following",
-                        creation_id=info.identity.creation_id,
-                        access_key=AccessKey(info.metadata.access_key),
-                        disposition=FailureDisposition.REPLACE,
+            info = session.session_info
+            match _disposition_of(session):
+                case _StartDisposition.START:
+                    startable.append(session)
+                case _StartDisposition.REQUEUE:
+                    log.warning(
+                        "session {} cannot be started as it stands and nothing of it is running;"
+                        " putting it back in the queue",
+                        info.identity.id,
                     )
-                )
-                continue
-            if any(k.lifecycle.status == KernelStatus.PENDING for k in kernels):
-                # A mixture. Not the state above and not one to start either: dispatching would
-                # ask agents to create some of the kernels of a session whose others are in
-                # another state entirely. Left for the pass that owns whatever it actually is.
-                log.warning(
-                    "session {} has some kernels PENDING and some not; not starting it",
-                    session.session_info.identity.id,
-                )
-                result.skipped.append(
-                    SessionTransitionInfo(
-                        session_id=session.session_info.identity.id,
-                        from_status=session.session_info.lifecycle.status,
-                        reason="kernel statuses disagree",
-                        creation_id=session.session_info.identity.creation_id,
-                        access_key=AccessKey(session.session_info.metadata.access_key),
+                    result.failures.append(
+                        SessionTransitionInfo(
+                            session_id=info.identity.id,
+                            from_status=info.lifecycle.status,
+                            reason="kernels are not in a state this session can be started from",
+                            creation_id=info.identity.creation_id,
+                            access_key=AccessKey(info.metadata.access_key),
+                            disposition=FailureDisposition.REPLACE,
+                        )
                     )
-                )
-                continue
-            startable.append(session)
+                case _StartDisposition.NOT_OURS:
+                    log.warning(
+                        "session {} has a kernel that may hold a container; leaving it to the"
+                        " pass that owns that",
+                        info.identity.id,
+                    )
+                    result.skipped.append(
+                        SessionTransitionInfo(
+                            session_id=info.identity.id,
+                            from_status=info.lifecycle.status,
+                            reason="a kernel may hold a container",
+                            creation_id=info.identity.creation_id,
+                            access_key=AccessKey(info.metadata.access_key),
+                        )
+                    )
 
         sessions = startable
         if not sessions:

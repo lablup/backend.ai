@@ -425,7 +425,11 @@ class TestACreateThatWasCancelled:
             reconstruct_resource_usage=AsyncMock(),
         )
 
-    async def test_a_container_that_exists_is_destroyed_through_the_lifecycle(self) -> None:
+    async def test_a_container_that_exists_is_destroyed_and_nothing_else_is_touched(self) -> None:
+        """The ownership boundary is container CREATION. A container that exists may be running --
+        `docker start` can be cancelled after the daemon has acted on it -- and a running
+        container holds its devices, its published ports and its scratch. All three go back
+        through its teardown, which stops it first."""
         agent = self._agent("cid-1")
         undone = False
 
@@ -440,6 +444,10 @@ class TestACreateThatWasCancelled:
         agent.inject_container_lifecycle_event.assert_awaited_once()
         assert agent.inject_container_lifecycle_event.await_args.kwargs["container_id"] == "cid-1"
         assert not undone, "the scratch of a running container was deleted from under it"
+        (
+            agent.reconstruct_resource_usage.assert_not_awaited(),
+            ("the allocation maps were rebuilt while a container was still holding its devices"),
+        )
 
     async def test_with_no_container_the_undo_stack_runs(self) -> None:
         agent = self._agent(None)
@@ -454,6 +462,8 @@ class TestACreateThatWasCancelled:
 
         assert undone == ["scratch"]
         agent.inject_container_lifecycle_event.assert_not_awaited()
+        # The net under a failure that happened before the backend's own rollback could run.
+        agent.reconstruct_resource_usage.assert_awaited_once()
 
     async def test_the_cleanup_survives_the_cancellation_that_triggered_it(self) -> None:
         # What is being unwound here is usually a cancellation, and a cleanup cancelled halfway
