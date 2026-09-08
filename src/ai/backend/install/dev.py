@@ -27,6 +27,10 @@ async def install_git_lfs(ctx: Context) -> None:
         "Darwin": ["git-lfs"],
     })
     await ctx.run_shell("git lfs install", stderr=asyncio.subprocess.DEVNULL)
+
+
+async def pull_git_lfs(ctx: Context) -> None:
+    ctx.log_header("Checking out the Git LFS files")
     exit_code = await ctx.run_shell("git lfs pull")
     if exit_code != 0:
         raise PrerequisiteError(
