@@ -10,7 +10,11 @@ from collections.abc import Sequence
 
 from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.manager.models.base import Base
-from ai.backend.manager.models.specs.relation import RelationCreator, RelationPurger
+from ai.backend.manager.models.specs.relation import (
+    RelationCreator,
+    RelationLifecycleUpdater,
+    RelationPurger,
+)
 from ai.backend.manager.repositories.ops.v2.relation.provider import RelationOpsProvider
 
 __all__ = ("RbacRelationRepository",)
@@ -42,3 +46,22 @@ class RbacRelationRepository:
         """Take that reach back. Answers per pair whether it was linked."""
         async with self._ops.write_ops() as w:
             return await w.purge_relations(purger, pairs)
+
+    async def delete[TScope: EntityIdentifier, TTarget: EntityIdentifier, TRow: Base](
+        self,
+        pairs: Sequence[tuple[TScope, TTarget]],
+        updater: RelationLifecycleUpdater[TScope, TTarget, TRow],
+    ) -> list[bool]:
+        """Switch each pair off, leaving what each side reads of the other. Answers per
+        pair whether the row moved."""
+        async with self._ops.write_ops() as w:
+            return await w.delete_relations(updater, pairs)
+
+    async def restore[TScope: EntityIdentifier, TTarget: EntityIdentifier, TRow: Base](
+        self,
+        pairs: Sequence[tuple[TScope, TTarget]],
+        updater: RelationLifecycleUpdater[TScope, TTarget, TRow],
+    ) -> list[bool]:
+        """Switch each pair back on. Answers as :meth:`delete` does."""
+        async with self._ops.write_ops() as w:
+            return await w.restore_relations(updater, pairs)

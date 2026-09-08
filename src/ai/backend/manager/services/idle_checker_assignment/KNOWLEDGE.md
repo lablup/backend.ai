@@ -1,9 +1,9 @@
 ---
 name: idle-checker-assignment-service-shapes
 type: decision-table
-description: idle_checker_assignment knowledge - why a binding is a relation and not an entity, which shape each of the seven actions takes, why the id the API names is resolved by a lookup first, what a permission on a binding has to name, why enabled is the relation lifecycle
+description: idle_checker_assignment knowledge - why a binding is a relation and not an entity, why its writes are the rbac boundary's and only the reads stay here, why the id the API names is resolved by a lookup first, what a permission on a binding has to name, why enabled is the relation lifecycle
 scope: src/ai/backend/manager/services/idle_checker_assignment
-keywords: [CreateIdleCheckerAssignmentAction, EnableIdleCheckerAssignmentAction, DisableIdleCheckerAssignmentAction, PurgeIdleCheckerAssignmentAction, LookupIdleCheckerAssignmentAction, ScopedSearchIdleCheckerAssignmentsAction, IdleCheckerAssignmentCreator, RelationCreator, RelationLifecycleUpdater, relation_group, IDLE_CHECKER_ENTITY_TYPE]
+keywords: [CreateRelationAction, DeleteRelationAction, RestoreRelationAction, PurgeRelationAction, LookupIdleCheckerAssignmentAction, LookupIdleCheckerAssignmentByPairAction, ScopedSearchIdleCheckerAssignmentsAction, IdleCheckerAssignmentCreator, RelationCreator, RelationLifecycleUpdater, relation_group, IDLE_CHECKER_ENTITY_TYPE]
 sources:
   - src/ai/backend/manager/services/idle_checker_assignment
   - src/ai/backend/manager/api/adapters/idle_checker_assignment
@@ -29,26 +29,28 @@ status: draft
 - The scope is the relation's scope and the checker is its target, as a project is the
   scope of a container registry relation. Linking makes the scope govern the checker
   under READ and the checker read the scope.
-- `enabled` is the row's lifecycle column. Switching it is `delete_relation` and
-  `restore_relation`: the row alone changes and both reads stay, so a binding turned
-  off is still listed and can be turned back on. Honouring the off state is the
+- `enabled` is the row's lifecycle column. Switching it is `DeleteRelationAction` and
+  `RestoreRelationAction`: the row alone changes and both reads stay, so a binding
+  turned off is still listed and can be turned back on. Honouring the off state is the
   reconciler's job.
 
 ## The shapes
 
 | Action | Shape | Wiring | Answered for by |
 |--------|-------|--------|-----------------|
-| create, enable, disable, purge | relation | `relation_group().relation` | the scope and the checker, each as itself |
-| lookup | lookup | `group.lookup` | READ on the resolved checker |
+| link, switch off, switch back on, unlink | relation | `services/rbac` | the scope and the checker, each as itself |
+| lookup, lookup by pair | lookup | `group.lookup` | READ on the resolved checker |
 | admin_search | global | `group.global_scope` | the SUPERADMIN gate |
 | scoped_search | scope | `group.scope` | READ on `idle_checker` in every named scope |
 
-- Every wiring is service-backed: the relation ops sit on `V2RelationWriteOps`, which
-  the repository reaches through `RelationOpsProvider`, so no ops action and no
-  `OpsRepository` method was added for it. The registry gained nothing.
-- The four writes go through the concern's `relation_group()`, as `../../actions/AGENTS.md`
-  requires: a relation is answered for by no entity type, and its audit row names
-  none. There is no entity type for the binding at all.
+- The four writes are the rbac boundary's four relation actions, carrying this
+  domain's creator, lifecycle updaters and purger as values. This domain declares no
+  relation action of its own: which relation a run is about travels on the spec, so
+  one wiring per direction serves every relation this system writes.
+- A relation write answers with the pair alone, so the adapter reads the binding back
+  through `lookup_by_pair` to build its payload.
+- The reads and the lookups take the `idle_checker` group and declare that type. A
+  scope reader sees a binding's checker through the READ govern the link wrote.
 - The reads and the lookup are reads of what the relation reaches, the checker, so
   they take the `idle_checker` group and declare that type. A scope reader sees a
   binding's checker through the READ govern the link wrote.
@@ -62,8 +64,8 @@ status: draft
 
 ## The id the API names is resolved first
 
-- The REST and GQL surfaces update and purge by binding id, while the relation ops
-  take the pair. The adapter runs the lookup to turn the id into the pair, then the
+- The REST and GQL surfaces update and purge by binding id, while a relation is named
+  by its pair. The adapter runs the lookup to turn the id into the pair, then the
   relation action.
 - The lookup's resolved entity is the checker, so resolving costs READ on it, which a
   scope reader holds through the scope's govern. A caller who reads the checker

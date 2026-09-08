@@ -22,11 +22,16 @@ from ai.backend.common.data.entity.container_registry import (
     ContainerRegistryID,
 )
 from ai.backend.common.data.entity.domain import DOMAIN_SCOPE_TYPE, DomainID
+from ai.backend.common.data.entity.idle_checker import (
+    IDLE_CHECKER_ENTITY_TYPE,
+    IdleCheckerID,
+)
 from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE, ProjectID
 from ai.backend.common.data.entity.resource_group import (
     RESOURCE_GROUP_SCOPE_TYPE,
     ResourceGroupID,
 )
+from ai.backend.common.data.entity.types import ScopeType
 from ai.backend.common.data.entity.user import USER_SCOPE_TYPE, UserID
 from ai.backend.common.types import AccessKey
 from ai.backend.manager.actions.audit_policy import AuditLogPolicy
@@ -41,6 +46,10 @@ from ai.backend.manager.actions.v2.relation.trigger import RelationActionTrigger
 from ai.backend.manager.models.audit_log.creators import RelationAuditLogCreator
 from ai.backend.manager.models.container_registry.creators import ContainerRegistryProjectCreator
 from ai.backend.manager.models.container_registry.purgers import ContainerRegistryProjectPurger
+from ai.backend.manager.models.idle_checker.updaters import (
+    IdleCheckerAssignmentDisabler,
+    IdleCheckerAssignmentEnabler,
+)
 from ai.backend.manager.models.resource_group.creators import (
     ResourceGroupForDomainRelationCreator,
     ResourceGroupForKeypairRelationCreator,
@@ -54,12 +63,17 @@ from ai.backend.manager.models.resource_group.purgers import (
 from ai.backend.manager.services.rbac.actions.relation.base import RelationPair
 from ai.backend.manager.services.rbac.actions.relation.create import CreateRelationAction
 from ai.backend.manager.services.rbac.actions.relation.purge import PurgeRelationAction
+from ai.backend.manager.services.rbac.actions.relation.switch import (
+    DeleteRelationAction,
+    RestoreRelationAction,
+)
 
 _PROJECT_ID = ProjectID(uuid.uuid4())
 _DOMAIN_ID = DomainID(uuid.uuid4())
 _REGISTRY_ID = ContainerRegistryID(uuid.uuid4())
 _RESOURCE_GROUP_ID = ResourceGroupID(uuid.uuid4())
 _USER_ID = UserID(uuid.uuid4())
+_IDLE_CHECKER_ID = IdleCheckerID(uuid.uuid4())
 _ACCESS_KEY = AccessKey("AKTESTRELATION0001")
 
 
@@ -155,6 +169,28 @@ class TestEveryPairBecomesTheRunsScopes:
                 [
                     (USER_SCOPE_TYPE, _USER_ID),
                     (RESOURCE_GROUP_SCOPE_TYPE, _RESOURCE_GROUP_ID),
+                ],
+            ),
+            (
+                DeleteRelationAction(
+                    pairs=[RelationPair(scope=_PROJECT_ID, target=_IDLE_CHECKER_ID)],
+                    updater=IdleCheckerAssignmentDisabler(),
+                ),
+                ActionOperationType.DELETE,
+                [
+                    (PROJECT_SCOPE_TYPE, _PROJECT_ID),
+                    (ScopeType(IDLE_CHECKER_ENTITY_TYPE), _IDLE_CHECKER_ID),
+                ],
+            ),
+            (
+                RestoreRelationAction(
+                    pairs=[RelationPair(scope=_PROJECT_ID, target=_IDLE_CHECKER_ID)],
+                    updater=IdleCheckerAssignmentEnabler(),
+                ),
+                ActionOperationType.RESTORE,
+                [
+                    (PROJECT_SCOPE_TYPE, _PROJECT_ID),
+                    (ScopeType(IDLE_CHECKER_ENTITY_TYPE), _IDLE_CHECKER_ID),
                 ],
             ),
         ],

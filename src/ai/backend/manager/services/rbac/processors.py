@@ -15,6 +15,12 @@ from ai.backend.manager.services.rbac.actions.relation.purge import (
     PurgeRelationAction,
     PurgeRelationActionResult,
 )
+from ai.backend.manager.services.rbac.actions.relation.switch import (
+    DeleteRelationAction,
+    DeleteRelationActionResult,
+    RestoreRelationAction,
+    RestoreRelationActionResult,
+)
 from ai.backend.manager.services.rbac.actions.roster.join_project import (
     JoinProjectAction,
     JoinProjectActionResult,
@@ -46,6 +52,12 @@ class RbacProcessors:
     purge_relation: RelationActionProcessor[
         PurgeRelationAction[Any, Any, Any], PurgeRelationActionResult[Any, Any]
     ]
+    delete_relation: RelationActionProcessor[
+        DeleteRelationAction[Any, Any, Any], DeleteRelationActionResult[Any, Any]
+    ]
+    restore_relation: RelationActionProcessor[
+        RestoreRelationAction[Any, Any, Any], RestoreRelationActionResult[Any, Any]
+    ]
     join_project: ScopeActionProcessor[JoinProjectAction, JoinProjectActionResult]
     leave_project: ScopeActionProcessor[LeaveProjectAction, LeaveProjectActionResult]
 
@@ -58,5 +70,7 @@ class RbacProcessors:
     ) -> None:
         self.create_relation = group.relation(CreateRelationAction, service.create)
         self.purge_relation = group.relation(PurgeRelationAction, service.purge)
+        self.delete_relation = group.relation(DeleteRelationAction, service.delete)
+        self.restore_relation = group.relation(RestoreRelationAction, service.restore)
         self.join_project = roster_group.scope(JoinProjectAction, roster_service.join)
         self.leave_project = roster_group.scope(LeaveProjectAction, roster_service.leave)

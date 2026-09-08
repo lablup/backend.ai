@@ -23,7 +23,7 @@ from ai.backend.common.data.entity.idle_checker import (
 )
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.types import EntityIdentifier
-from ai.backend.common.data.entity.user import UserID
+from ai.backend.common.data.entity.user import USER_ENTITY_TYPE, UserID
 from ai.backend.common.data.idle_checker.types import (
     CheckerType,
     IdleCheckerSpec,
@@ -91,14 +91,23 @@ from ai.backend.manager.repositories.ops import DBOpsProvider
 from ai.backend.manager.repositories.ops.repository import OpsRepository
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.ops.v2.relation.provider import RelationOpsProvider
+from ai.backend.manager.repositories.ops.v2.roster.provider import RosterOpsProvider
 from ai.backend.manager.repositories.permission_controller.repository import (
     PermissionControllerRepository,
 )
+from ai.backend.manager.repositories.rbac.relation_repository import RbacRelationRepository
+from ai.backend.manager.repositories.rbac.roster_repository import RbacRosterRepository
 from ai.backend.manager.services.idle_checker_assignment.processors import (
     IdleCheckerAssignmentProcessors,
 )
 from ai.backend.manager.services.idle_checker_assignment.service import IdleCheckerAssignmentService
 from ai.backend.manager.services.processors import Processors
+from ai.backend.manager.services.rbac.processors import RbacProcessors
+from ai.backend.manager.services.rbac.service import (
+    RbacRelationService,
+    RbacRoleService,
+    RbacRosterService,
+)
 
 if TYPE_CHECKING:
     from tests.component.conftest import ServerInfo, UserFixtureData, VirtualEntitySeeder
@@ -146,11 +155,12 @@ async def _teardown(conn: sa.ext.asyncio.AsyncConnection, scope: EntityIdentifie
 
 
 @pytest.fixture()
-def idle_checker_assignment_processors(
+def action_registry(
     database_engine: ExtendedAsyncSAEngine,
     config_provider: ManagerConfigProvider,
-) -> IdleCheckerAssignmentProcessors:
-    """Assignment processors with real RBAC validators against the real DB."""
+) -> ProcessorRegistry[Any]:
+    """One registry for every processor these tests wire, with real RBAC validators
+    against the real DB."""
     permission_repo = PermissionControllerRepository(database_engine)
     validators = VirtualEntityRBACValidators(
         scope=VirtualEntityScopeActionRBACValidator(permission_repo, config_provider),
@@ -161,21 +171,48 @@ def idle_checker_assignment_processors(
         atomic_bulk=VirtualEntityAtomicBulkActionRBACValidator(permission_repo, config_provider),
         relation=VirtualEntityRelationActionRBACValidator(permission_repo, config_provider),
     )
-    registry: ProcessorRegistry[Any] = ProcessorRegistry(
+    return ProcessorRegistry(
         ProcessorDependencies(
             monitors=ActionMonitors(),
             validators=validators.to_action_validators(),
             repository=OpsRepository(V2DBOpsProvider(database_engine)),
         )
     )
+
+
+@pytest.fixture()
+def idle_checker_assignment_processors(
+    database_engine: ExtendedAsyncSAEngine,
+    action_registry: ProcessorRegistry[Any],
+) -> IdleCheckerAssignmentProcessors:
+    """The binding reads; its writes are the rbac boundary's."""
     service = IdleCheckerAssignmentService(
         IdleCheckerRepository(DBOpsProvider(database_engine), RelationOpsProvider(database_engine))
     )
-    groups = registry.concern(ConcernMeta(Concern.SESSION))
+    groups = action_registry.concern(ConcernMeta(Concern.SESSION))
     return IdleCheckerAssignmentProcessors(
         groups.group(GroupMeta(IDLE_CHECKER_ENTITY_TYPE)),
-        groups.relation_group(),
         service,
+    )
+
+
+@pytest.fixture()
+def rbac_processors(
+    database_engine: ExtendedAsyncSAEngine,
+    action_registry: ProcessorRegistry[Any],
+) -> RbacProcessors:
+    """The relation writes a binding change runs, checked against both its scopes."""
+    rbac_groups = action_registry.concern(ConcernMeta(Concern.RBAC))
+    return RbacProcessors(
+        rbac_groups.relation_group(),
+        rbac_groups.group(GroupMeta(USER_ENTITY_TYPE)),
+        RbacRelationService(RbacRelationRepository(RelationOpsProvider(database_engine))),
+        RbacRosterService(RbacRosterRepository(RosterOpsProvider(database_engine))),
+        RbacRoleService(
+            PermissionControllerRepository(database_engine),
+            RbacRosterRepository(RosterOpsProvider(database_engine)),
+        ),
+        [],
     )
 
 
@@ -183,10 +220,12 @@ def idle_checker_assignment_processors(
 def server_module_registries(
     route_deps: RouteDeps,
     idle_checker_assignment_processors: IdleCheckerAssignmentProcessors,
+    rbac_processors: RbacProcessors,
 ) -> list[RouteRegistry]:
     """Register v2 idle checker assignment routes for testing."""
     processors = MagicMock(spec=Processors)
     processors.idle_checker_assignment = idle_checker_assignment_processors
+    processors.rbac = rbac_processors
     handler = V2IdleCheckerAssignmentHandler(adapter=IdleCheckerAssignmentAdapter(processors))
     v2_reg = RouteRegistry.create("v2", route_deps.cors_options)
     v2_reg.add_subregistry(register_v2_idle_checker_assignment_routes(handler, route_deps))
@@ -297,13 +336,11 @@ async def assignment_seed(
     repository = IdleCheckerRepository(
         DBOpsProvider(database_engine), RelationOpsProvider(database_engine)
     )
+    relations = RbacRelationRepository(RelationOpsProvider(database_engine))
     assignments: list[IdleCheckerAssignmentData] = []
     for scope in [*provisioned, regular_user_fixture.user_uuid]:
-        assignments.append(
-            await repository.create_assignment(
-                IdleCheckerAssignmentCreator(enabled=True), scope, checker_id
-            )
-        )
+        await relations.create([(scope, checker_id)], IdleCheckerAssignmentCreator(enabled=True))
+        assignments.append(await repository.get_assignment_by_pair(scope, checker_id))
     seed = AssignmentSeedData(
         checker_id=checker_id,
         domain_id=domain_id,

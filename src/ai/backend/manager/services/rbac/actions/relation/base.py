@@ -9,6 +9,7 @@ __all__ = (
     "BaseEntityRelationAction",
     "RelationLinkResult",
     "RelationPair",
+    "RelationSwitchResult",
     "RelationUnlinkResult",
 )
 
@@ -36,6 +37,15 @@ class RelationUnlinkResult[TScope: EntityIdentifier, TTarget: EntityIdentifier]:
 
     pair: RelationPair[TScope, TTarget]
     unlinked: bool
+
+
+@dataclass(frozen=True)
+class RelationSwitchResult[TScope: EntityIdentifier, TTarget: EntityIdentifier]:
+    """Whether the pair stood the other way before this run; switching one that was
+    already this way is silent."""
+
+    pair: RelationPair[TScope, TTarget]
+    switched: bool
 
 
 @dataclass(frozen=True)

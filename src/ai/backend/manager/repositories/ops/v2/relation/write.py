@@ -118,6 +118,23 @@ class V2RelationWriteOps(V2WriteOps):
         """Switch the relation back on: the lifecycle column alone."""
         await self._switch_relation(updater, scope, target)
 
+    async def delete_relations[TScope: EntityIdentifier, TTarget: EntityIdentifier, TRow: Base](
+        self,
+        updater: RelationLifecycleUpdater[TScope, TTarget, TRow],
+        pairs: Sequence[tuple[TScope, TTarget]],
+    ) -> list[bool]:
+        """Switch each pair off, answering per pair, in the order given, whether the row
+        moved. A pair already off, or standing in no relation at all, answers False."""
+        return [await self._switch_relation(updater, scope, target) for scope, target in pairs]
+
+    async def restore_relations[TScope: EntityIdentifier, TTarget: EntityIdentifier, TRow: Base](
+        self,
+        updater: RelationLifecycleUpdater[TScope, TTarget, TRow],
+        pairs: Sequence[tuple[TScope, TTarget]],
+    ) -> list[bool]:
+        """Switch each pair back on, answering as :meth:`delete_relations` does."""
+        return [await self._switch_relation(updater, scope, target) for scope, target in pairs]
+
     async def purge_relations[TScope: EntityIdentifier, TTarget: EntityIdentifier, TRow: Base](
         self,
         purger: RelationPurger[TScope, TTarget, TRow],
@@ -152,11 +169,12 @@ class V2RelationWriteOps(V2WriteOps):
         updater: RelationLifecycleUpdater[TScope, TTarget, TRow],
         scope: TScope,
         target: TTarget,
-    ) -> None:
+    ) -> bool:
         stmt = sa.update(updater.row_class()).values(updater.build_values())
         for condition in updater.conditions(scope, target):
             stmt = stmt.where(condition())
-        await self._sess.execute(stmt)
+        stmt = stmt.returning(next(iter(sa.inspect(updater.row_class()).local_table.primary_key)))
+        return (await self._sess.execute(stmt)).first() is not None
 
     async def _unshare_if_empty(self, scope: EntityIdentifier, entity: EntityIdentifier) -> None:
         await self._sess.execute(

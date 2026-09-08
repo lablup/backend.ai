@@ -25,7 +25,6 @@ from ai.backend.common.types import ResourceSlot, SessionTypes
 from ai.backend.manager.data.idle_checker.types import IdleCheckerAssignmentData, IdleCheckerData
 from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.errors.idle_checker import (
-    IdleCheckerAssignmentAlreadyExists,
     IdleCheckerAssignmentNotFound,
     IdleCheckerAssignmentScopeNotFound,
     IdleCheckerNotFound,
@@ -38,9 +37,14 @@ from ai.backend.manager.models.idle_checker.creators import (
     IdleCheckerAssignmentCreator,
     IdleCheckerCreator,
 )
+from ai.backend.manager.models.idle_checker.purgers import IdleCheckerAssignmentPurger
 from ai.backend.manager.models.idle_checker.row import IdleCheckerBindingRow, IdleCheckerRow
 from ai.backend.manager.models.idle_checker.scopes import IdleCheckerAssignmentOperationScope
 from ai.backend.manager.models.idle_checker.searchers import IdleCheckerAssignmentSearcher
+from ai.backend.manager.models.idle_checker.updaters import (
+    IdleCheckerAssignmentDisabler,
+    IdleCheckerAssignmentEnabler,
+)
 from ai.backend.manager.models.project.row import ProjectRow
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.rbac_models.role import RoleRow
@@ -66,6 +70,7 @@ from ai.backend.manager.repositories.ops import DBOpsProvider
 from ai.backend.manager.repositories.ops.repository import OpsRepository
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.ops.v2.relation.provider import RelationOpsProvider
+from ai.backend.manager.repositories.rbac.relation_repository import RbacRelationRepository
 from ai.backend.testutils.db import with_tables
 
 
@@ -122,6 +127,22 @@ class TestIdleCheckerAssignmentRepository:
     @pytest.fixture
     def repository(self, database: ExtendedAsyncSAEngine) -> IdleCheckerRepository:
         return IdleCheckerRepository(DBOpsProvider(database), RelationOpsProvider(database))
+
+    @pytest.fixture
+    def relations(self, database: ExtendedAsyncSAEngine) -> RbacRelationRepository:
+        return RbacRelationRepository(RelationOpsProvider(database))
+
+    async def _link(
+        self,
+        relations: RbacRelationRepository,
+        repository: IdleCheckerRepository,
+        creator: IdleCheckerAssignmentCreator,
+        scope: EntityIdentifier,
+        checker_id: IdleCheckerID,
+    ) -> IdleCheckerAssignmentData:
+        """Link the pair and read it back, as the adapter does."""
+        await relations.create([(scope, checker_id)], creator)
+        return await repository.get_assignment_by_pair(scope, checker_id)
 
     async def _add_domain(self, database: ExtendedAsyncSAEngine) -> DomainID:
         domain_id = DomainID(uuid.uuid4())
@@ -248,23 +269,29 @@ class TestIdleCheckerAssignmentRepository:
     @pytest.fixture
     async def domain_assignment(
         self,
+        relations: RbacRelationRepository,
         repository: IdleCheckerRepository,
         checker: IdleCheckerData,
         domain_id: DomainID,
     ) -> IdleCheckerAssignmentData:
-        return await repository.create_assignment(
-            IdleCheckerAssignmentCreator(enabled=True), domain_id, checker.id
+        return await self._link(
+            relations, repository, IdleCheckerAssignmentCreator(enabled=True), domain_id, checker.id
         )
 
     async def test_create_links_the_scope_to_the_checker(
         self,
+        relations: RbacRelationRepository,
         database: ExtendedAsyncSAEngine,
         repository: IdleCheckerRepository,
         checker: IdleCheckerData,
         resource_group_id: ResourceGroupID,
     ) -> None:
-        assignment = await repository.create_assignment(
-            IdleCheckerAssignmentCreator(enabled=False), resource_group_id, checker.id
+        assignment = await self._link(
+            relations,
+            repository,
+            IdleCheckerAssignmentCreator(enabled=False),
+            resource_group_id,
+            checker.id,
         )
 
         async with database.begin_readonly_session() as db_sess:
@@ -297,56 +324,74 @@ class TestIdleCheckerAssignmentRepository:
         assert share is not None
         assert share.capped is True
 
-    async def test_create_duplicate_assignment_raises(
+    async def test_linking_an_already_linked_pair_is_silent(
         self,
+        relations: RbacRelationRepository,
         repository: IdleCheckerRepository,
         checker: IdleCheckerData,
         domain_id: DomainID,
         domain_assignment: IdleCheckerAssignmentData,
     ) -> None:
-        with pytest.raises(IdleCheckerAssignmentAlreadyExists):
-            await repository.create_assignment(
-                IdleCheckerAssignmentCreator(enabled=False), domain_id, checker.id
-            )
+        linked = await relations.create(
+            [(domain_id, checker.id)], IdleCheckerAssignmentCreator(enabled=False)
+        )
+
+        assert linked == [False]
 
     async def test_create_assignment_missing_checker_raises(
         self,
+        relations: RbacRelationRepository,
         repository: IdleCheckerRepository,
         domain_id: DomainID,
     ) -> None:
         with pytest.raises(IdleCheckerNotFound):
-            await repository.create_assignment(
-                IdleCheckerAssignmentCreator(enabled=True), domain_id, IdleCheckerID(uuid.uuid4())
+            await self._link(
+                relations,
+                repository,
+                IdleCheckerAssignmentCreator(enabled=True),
+                domain_id,
+                IdleCheckerID(uuid.uuid4()),
             )
 
     async def test_create_assignment_missing_scope_raises(
         self,
+        relations: RbacRelationRepository,
         repository: IdleCheckerRepository,
         checker: IdleCheckerData,
     ) -> None:
         with pytest.raises(IdleCheckerAssignmentScopeNotFound):
-            await repository.create_assignment(
-                IdleCheckerAssignmentCreator(enabled=True), DomainID(uuid.uuid4()), checker.id
+            await self._link(
+                relations,
+                repository,
+                IdleCheckerAssignmentCreator(enabled=True),
+                DomainID(uuid.uuid4()),
+                checker.id,
             )
 
     async def test_create_assignment_on_unsupported_scope_raises(
         self,
+        relations: RbacRelationRepository,
         repository: IdleCheckerRepository,
         checker: IdleCheckerData,
     ) -> None:
         with pytest.raises(IdleCheckerAssignmentScopeNotFound):
-            await repository.create_assignment(
-                IdleCheckerAssignmentCreator(enabled=True), IdleCheckerID(uuid.uuid4()), checker.id
+            await self._link(
+                relations,
+                repository,
+                IdleCheckerAssignmentCreator(enabled=True),
+                IdleCheckerID(uuid.uuid4()),
+                checker.id,
             )
 
     async def test_create_assignment_on_user_scope(
         self,
+        relations: RbacRelationRepository,
         repository: IdleCheckerRepository,
         checker: IdleCheckerData,
         user_id: UserID,
     ) -> None:
-        assignment = await repository.create_assignment(
-            IdleCheckerAssignmentCreator(enabled=True), user_id, checker.id
+        assignment = await self._link(
+            relations, repository, IdleCheckerAssignmentCreator(enabled=True), user_id, checker.id
         )
 
         assert assignment.scope_type is ScopeType.USER
@@ -354,12 +399,17 @@ class TestIdleCheckerAssignmentRepository:
 
     async def test_create_assignment_on_project_scope(
         self,
+        relations: RbacRelationRepository,
         repository: IdleCheckerRepository,
         checker: IdleCheckerData,
         project_id: ProjectID,
     ) -> None:
-        assignment = await repository.create_assignment(
-            IdleCheckerAssignmentCreator(enabled=True), project_id, checker.id
+        assignment = await self._link(
+            relations,
+            repository,
+            IdleCheckerAssignmentCreator(enabled=True),
+            project_id,
+            checker.id,
         )
 
         assert assignment.scope_type is ScopeType.PROJECT
@@ -367,13 +417,15 @@ class TestIdleCheckerAssignmentRepository:
 
     async def test_disable_and_enable_switch_the_row_alone(
         self,
+        relations: RbacRelationRepository,
         database: ExtendedAsyncSAEngine,
         repository: IdleCheckerRepository,
         checker: IdleCheckerData,
         domain_id: DomainID,
         domain_assignment: IdleCheckerAssignmentData,
     ) -> None:
-        disabled = await repository.disable_assignment(domain_id, checker.id)
+        await relations.delete([(domain_id, checker.id)], IdleCheckerAssignmentDisabler())
+        disabled = await repository.get_assignment_by_pair(domain_id, checker.id)
         async with database.begin_readonly_session() as db_sess:
             scope_node = await _node_id(db_sess, domain_id)
             checker_node = await _node_id(db_sess, checker.id)
@@ -383,7 +435,8 @@ class TestIdleCheckerAssignmentRepository:
                     ScopeBindingRow.scope_entity_id == scope_node,
                 )
             )
-        enabled = await repository.enable_assignment(domain_id, checker.id)
+        await relations.restore([(domain_id, checker.id)], IdleCheckerAssignmentEnabler())
+        enabled = await repository.get_assignment_by_pair(domain_id, checker.id)
 
         assert disabled.id == domain_assignment.id
         assert disabled.enabled is False
@@ -391,24 +444,29 @@ class TestIdleCheckerAssignmentRepository:
         assert govern is not None
         assert enabled.enabled is True
 
-    async def test_switch_missing_assignment_raises(
+    async def test_switching_a_pair_that_stands_in_no_relation_is_silent(
         self,
+        relations: RbacRelationRepository,
         repository: IdleCheckerRepository,
         checker: IdleCheckerData,
         domain_id: DomainID,
     ) -> None:
-        with pytest.raises(IdleCheckerAssignmentNotFound):
-            await repository.disable_assignment(domain_id, checker.id)
+        switched = await relations.delete(
+            [(domain_id, checker.id)], IdleCheckerAssignmentDisabler()
+        )
+
+        assert switched == [False]
 
     async def test_purge_assignment_unlinks(
         self,
+        relations: RbacRelationRepository,
         database: ExtendedAsyncSAEngine,
         repository: IdleCheckerRepository,
         checker: IdleCheckerData,
         domain_id: DomainID,
         domain_assignment: IdleCheckerAssignmentData,
     ) -> None:
-        await repository.purge_assignment(domain_id, checker.id)
+        await relations.purge([(domain_id, checker.id)], IdleCheckerAssignmentPurger())
 
         async with database.begin_readonly_session() as db_sess:
             row = await db_sess.get(IdleCheckerBindingRow, domain_assignment.id)
@@ -424,14 +482,16 @@ class TestIdleCheckerAssignmentRepository:
         assert row is None
         assert govern is None
 
-    async def test_purge_missing_assignment_raises(
+    async def test_unlinking_an_unlinked_pair_is_silent(
         self,
+        relations: RbacRelationRepository,
         repository: IdleCheckerRepository,
         checker: IdleCheckerData,
         domain_id: DomainID,
     ) -> None:
-        with pytest.raises(IdleCheckerAssignmentNotFound):
-            await repository.purge_assignment(domain_id, checker.id)
+        unlinked = await relations.purge([(domain_id, checker.id)], IdleCheckerAssignmentPurger())
+
+        assert unlinked == [False]
 
     async def test_get_assignment_by_id(
         self,
@@ -444,13 +504,18 @@ class TestIdleCheckerAssignmentRepository:
 
     async def test_admin_search_filters_by_enabled(
         self,
+        relations: RbacRelationRepository,
         repository: IdleCheckerRepository,
         checker: IdleCheckerData,
         domain_assignment: IdleCheckerAssignmentData,
         resource_group_id: ResourceGroupID,
     ) -> None:
-        disabled_assignment = await repository.create_assignment(
-            IdleCheckerAssignmentCreator(enabled=False), resource_group_id, checker.id
+        disabled_assignment = await self._link(
+            relations,
+            repository,
+            IdleCheckerAssignmentCreator(enabled=False),
+            resource_group_id,
+            checker.id,
         )
 
         result = await repository.admin_search_assignments(
@@ -465,6 +530,7 @@ class TestIdleCheckerAssignmentRepository:
 
     async def test_scoped_search_returns_only_assignments_in_scopes(
         self,
+        relations: RbacRelationRepository,
         repository: IdleCheckerRepository,
         checker: IdleCheckerData,
         domain_assignment: IdleCheckerAssignmentData,
@@ -474,13 +540,15 @@ class TestIdleCheckerAssignmentRepository:
         project_id: ProjectID,
     ) -> None:
         creator = IdleCheckerAssignmentCreator(enabled=True)
-        second_domain_assignment = await repository.create_assignment(
-            creator, second_domain_id, checker.id
+        second_domain_assignment = await self._link(
+            relations, repository, creator, second_domain_id, checker.id
         )
-        resource_group_assignment = await repository.create_assignment(
-            creator, resource_group_id, checker.id
+        resource_group_assignment = await self._link(
+            relations, repository, creator, resource_group_id, checker.id
         )
-        project_assignment = await repository.create_assignment(creator, project_id, checker.id)
+        project_assignment = await self._link(
+            relations, repository, creator, project_id, checker.id
+        )
 
         single_scope_result = await repository.scoped_search_assignments(
             [IdleCheckerAssignmentOperationScope(scope=domain_id)],

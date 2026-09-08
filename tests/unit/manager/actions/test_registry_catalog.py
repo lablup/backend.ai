@@ -376,7 +376,6 @@ def test_every_defined_v2_action_is_wired() -> None:
     )
     IdleCheckerAssignmentProcessors(
         scheduling_history_groups.group(GroupMeta(IDLE_CHECKER_ENTITY_TYPE)),
-        scheduling_history_groups.relation_group(),
         MagicMock(),
     )
     RetentionPolicyProcessors(registry.group(GroupMeta(RETENTION_POLICY_ENTITY_TYPE)))

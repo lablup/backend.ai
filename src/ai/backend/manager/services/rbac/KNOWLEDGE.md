@@ -1,9 +1,9 @@
 ---
 name: rbac-graph-write-boundary
 type: decision-table
-description: rbac service knowledge: why the relations and the project roster are wired here rather than in the domains they are about, what shape each takes, and where the counting and the tolerating live
+description: rbac service knowledge: why the relations, the project roster and the role grants are wired here rather than in the domains they are about, what shape each takes, and where the counting and the tolerating live
 scope: src/ai/backend/manager/services/rbac
-keywords: [RbacRelationService, RbacRosterService, CreateRelationAction, PurgeRelationAction, BaseEntityRelationAction, ProjectRosterAction, EnrollUsersInProjectAction, WithdrawUsersFromProjectAction, RbacRelationRepository, RbacRosterRepository, V2RosterWriteOps]
+keywords: [RbacRelationService, RbacRoleService, RbacRosterService, CreateRelationAction, PurgeRelationAction, DeleteRelationAction, RestoreRelationAction, BaseEntityRelationAction, ProjectRosterAction, JoinProjectAction, LeaveProjectAction, AssignRoleAction, RevokeRoleAction, RbacRelationRepository, RbacRosterRepository, V2RosterWriteOps]
 sources:
   - src/ai/backend/manager/services/rbac
   - src/ai/backend/manager/repositories/rbac
@@ -40,11 +40,15 @@ entity type, shape, operation, gate and backing.
   graph instead: the scope governs the target under READ, the target holds the scope
   under a READ share.
 
-## Two actions cover every relation
+## Four actions cover every relation
 
-- `CreateRelationAction` and `PurgeRelationAction` carry the pairs and the spec that
-  says which relation they are, so one wiring per direction serves the registry, the
-  resource group and whatever comes next.
+- `CreateRelationAction`, `PurgeRelationAction`, `DeleteRelationAction` and
+  `RestoreRelationAction` carry the pairs and the spec that says which relation they
+  are, so one wiring per direction serves the registry, the resource group, the idle
+  checker bindings and whatever comes next.
+- The two lifecycle directions exist for the relations carrying a lifecycle column.
+  Switching one off leaves the row and what each side reads of the other, so a relation
+  switched off is still listed on both sides and can be switched back on.
 - The spec is chosen where the request is read. An adapter holds a registry's projects
   or a resource group's allow list and knows which relation it is looking at; the
   service and the repository never do.
@@ -52,8 +56,9 @@ entity type, shape, operation, gate and backing.
   entity is asked once however many pairs name it, and the answer is per pair.
 - A pair already linked is skipped in ops and answered `False`. Naming one twice is not
   something a caller has to avoid, so no call site catches a duplicate.
-- The audit row records `create_relation` or `purge_relation` and the scopes it named.
-  The pair is what tells one relation from another, not the name.
+- The audit row records the direction — `create_relation`, `purge_relation`,
+  `delete_relation`, `restore_relation` — and the scopes it named. The pair is what
+  tells one relation from another, not the name.
 - What a run of several pairs *means* is still the caller's: the registry's "removing
   where nothing was linked raises" counts what came back.
 
@@ -83,3 +88,13 @@ entity type, shape, operation, gate and backing.
 - Nothing writes `association_scopes_entities` for a roster any more, but what an
   earlier release wrote is still what the legacy reads answer from. `_leave` deletes it,
   so a withdrawn member does not stay listed there until that table retires (BA-7204).
+
+## A role grant is a roster place as well
+
+- Granting a project-scoped role puts the user on that project's list, and taking the
+  last role there back takes them off it. The two writes are one operation, so they sit
+  here beside the roster rather than with the role catalog.
+- What stays with the role catalog is the role itself and its permissions: creating a
+  role, editing it, and reading it are not graph writes.
+- These four are still on the legacy action base. The role domain's move to the v2
+  lineage is under way and they follow it there.

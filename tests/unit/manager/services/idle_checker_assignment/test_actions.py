@@ -5,15 +5,11 @@ import uuid
 import pytest
 
 from ai.backend.common.data.entity.domain import DOMAIN_SCOPE_TYPE, DomainID
-from ai.backend.common.data.entity.idle_checker import IDLE_CHECKER_ENTITY_TYPE, IdleCheckerID
 from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE, ProjectID
-from ai.backend.common.data.entity.types import ScopeRef, ScopeType
+from ai.backend.common.data.entity.types import ScopeRef
 from ai.backend.manager.models.idle_checker.scopes import IdleCheckerAssignmentOperationScope
 from ai.backend.manager.models.idle_checker.searchers import IdleCheckerAssignmentSearcher
 from ai.backend.manager.models.specs.pagination import NoPagination
-from ai.backend.manager.services.idle_checker_assignment.actions.purge import (
-    PurgeIdleCheckerAssignmentAction,
-)
 from ai.backend.manager.services.idle_checker_assignment.actions.scoped_search import (
     ScopedSearchIdleCheckerAssignmentsAction,
 )
@@ -58,16 +54,3 @@ class TestScopedSearchIdleCheckerAssignmentsAction:
             IdleCheckerAssignmentOperationScope(scope=domain_id),
             IdleCheckerAssignmentOperationScope(scope=project_id),
         ]
-
-
-class TestIdleCheckerAssignmentRelationAction:
-    def test_relation_answers_for_both_sides(self) -> None:
-        project_id = ProjectID(uuid.uuid4())
-        checker_id = IdleCheckerID(uuid.uuid4())
-
-        action = PurgeIdleCheckerAssignmentAction(scope=project_id, idle_checker_id=checker_id)
-
-        assert action.scope_targets() == (
-            ScopeRef(scope_type=PROJECT_SCOPE_TYPE, scope_id=project_id),
-            ScopeRef(scope_type=ScopeType(IDLE_CHECKER_ENTITY_TYPE), scope_id=checker_id),
-        )

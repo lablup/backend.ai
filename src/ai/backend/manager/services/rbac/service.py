@@ -13,6 +13,7 @@ from ai.backend.manager.repositories.rbac.relation_repository import RbacRelatio
 from ai.backend.manager.repositories.rbac.roster_repository import RbacRosterRepository
 from ai.backend.manager.services.rbac.actions.relation.base import (
     RelationLinkResult,
+    RelationSwitchResult,
     RelationUnlinkResult,
 )
 from ai.backend.manager.services.rbac.actions.relation.create import (
@@ -22,6 +23,12 @@ from ai.backend.manager.services.rbac.actions.relation.create import (
 from ai.backend.manager.services.rbac.actions.relation.purge import (
     PurgeRelationAction,
     PurgeRelationActionResult,
+)
+from ai.backend.manager.services.rbac.actions.relation.switch import (
+    DeleteRelationAction,
+    DeleteRelationActionResult,
+    RestoreRelationAction,
+    RestoreRelationActionResult,
 )
 from ai.backend.manager.services.rbac.actions.roster.join_project import (
     JoinProjectAction,
@@ -70,6 +77,32 @@ class RbacRelationService:
             results=[
                 RelationUnlinkResult(pair=pair, unlinked=was_linked)
                 for pair, was_linked in zip(action.pairs, unlinked, strict=True)
+            ]
+        )
+
+    async def delete(
+        self, action: DeleteRelationAction[Any, Any, Any]
+    ) -> DeleteRelationActionResult[Any, Any]:
+        switched = await self._repository.delete(
+            [(pair.scope, pair.target) for pair in action.pairs], action.updater
+        )
+        return DeleteRelationActionResult(
+            results=[
+                RelationSwitchResult(pair=pair, switched=moved)
+                for pair, moved in zip(action.pairs, switched, strict=True)
+            ]
+        )
+
+    async def restore(
+        self, action: RestoreRelationAction[Any, Any, Any]
+    ) -> RestoreRelationActionResult[Any, Any]:
+        switched = await self._repository.restore(
+            [(pair.scope, pair.target) for pair in action.pairs], action.updater
+        )
+        return RestoreRelationActionResult(
+            results=[
+                RelationSwitchResult(pair=pair, switched=moved)
+                for pair, moved in zip(action.pairs, switched, strict=True)
             ]
         )
 
