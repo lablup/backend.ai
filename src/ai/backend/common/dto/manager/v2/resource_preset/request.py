@@ -6,13 +6,14 @@ from uuid import UUID
 
 from pydantic import Field
 
-from ai.backend.common.api_handlers import SENTINEL, BaseRequestModel, Sentinel
+from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.dto.manager.query import StringFilter
 from ai.backend.common.dto.manager.v2.common import BinarySizeInput, ResourceSlotEntryInput
 from ai.backend.common.dto.manager.v2.resource_preset.types import (
     ResourcePresetOrderDirection,
     ResourcePresetOrderField,
 )
+from ai.backend.common.tristate.unset import UNSET, Unset
 
 __all__ = (
     "AdminSearchResourcePresetsInput",
@@ -48,13 +49,13 @@ class UpdateResourcePresetInput(BaseRequestModel):
     resource_slots: list[ResourceSlotEntryInput] | None = Field(
         default=None, description="Updated resource slot allocations."
     )
-    shared_memory: BinarySizeInput | Sentinel | None = Field(
-        default=SENTINEL,
-        description="Updated shared memory. Use null to clear.",
+    shared_memory: BinarySizeInput | None | Unset = Field(
+        default=UNSET,
+        description="Updated shared memory. Omit to leave unchanged; null clears.",
     )
-    resource_group_name: str | Sentinel | None = Field(
-        default=SENTINEL,
-        description="Updated resource group name. Use null to make global.",
+    resource_group_name: str | None | Unset = Field(
+        default=UNSET,
+        description="Updated resource group name. Omit to leave unchanged; null makes the preset global.",
     )
 
 

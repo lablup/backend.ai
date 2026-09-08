@@ -6,7 +6,6 @@ from decimal import Decimal
 from typing import Any
 from uuid import UUID
 
-from ai.backend.common.api_handlers import SENTINEL
 from ai.backend.common.data.entity.resource_preset import ResourcePresetID
 from ai.backend.common.dto.manager.v2.common import (
     BinarySizeInput,
@@ -29,6 +28,7 @@ from ai.backend.common.dto.manager.v2.resource_preset.types import (
     ResourcePresetOrderDirection,
     ResourcePresetOrderField,
 )
+from ai.backend.common.tristate.unset import Unset
 from ai.backend.common.types import BinarySize, ResourceSlot
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.api.adapters.base import BaseAdapter
@@ -171,12 +171,7 @@ class ResourcePresetAdapter(BaseAdapter):
         if input.name is not None:
             name_state = OptionalState.update(input.name)
 
-        resource_group_state: TriState[str] = TriState.nop()
-        if input.resource_group_name is not SENTINEL:
-            if input.resource_group_name is None:
-                resource_group_state = TriState.nullify()
-            else:
-                resource_group_state = TriState.update(input.resource_group_name)
+        resource_group_state: TriState[str] = TriState.from_unset(input.resource_group_name)
 
         updater_spec = ResourcePresetUpdaterSpec(
             resource_slots=resource_slots_state,
@@ -271,13 +266,7 @@ class ResourcePresetAdapter(BaseAdapter):
 
 
 def _resolve_shared_memory_for_update(
-    shared_memory: BinarySizeInput | object | None,
+    shared_memory: BinarySizeInput | None | Unset,
 ) -> TriState[BinarySize]:
     """Resolve shared_memory BinarySizeInput for update operations."""
-    if shared_memory is SENTINEL:
-        return TriState.nop()
-    if shared_memory is None:
-        return TriState.nullify()
-    if not isinstance(shared_memory, BinarySizeInput):
-        return TriState.nop()
-    return TriState.update(BinarySize(shared_memory.bytes))
+    return TriState.from_unset(shared_memory).map(lambda v: BinarySize(v.bytes))
