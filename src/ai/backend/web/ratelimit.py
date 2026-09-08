@@ -58,8 +58,8 @@ def manager_proxy_rate_limited(handler: Handler) -> Handler:
     """Wrap a manager proxy handler so the web server rejects over-limit requests."""
 
     async def rlim_handler(request: web.Request) -> web.StreamResponse:
-        state = await _read_ratelimit_window(request)
-        if state is not None and state.count >= state.limit:
+        rlim_window = await _read_ratelimit_window(request)
+        if rlim_window is not None and rlim_window.count >= rlim_window.limit:
             return web.HTTPTooManyRequests(
                 text=json.dumps({
                     "type": "https://api.backend.ai/probs/rate-limit-exceeded",
@@ -67,9 +67,9 @@ def manager_proxy_rate_limited(handler: Handler) -> Handler:
                 }),
                 content_type="application/problem+json",
                 headers={
-                    "X-RateLimit-Limit": str(state.limit),
+                    "X-RateLimit-Limit": str(rlim_window.limit),
                     "X-RateLimit-Remaining": "0",
-                    "X-RateLimit-Reset": str(state.reset_after_seconds),
+                    "X-RateLimit-Reset": str(rlim_window.reset_after_seconds),
                     "X-RateLimit-Window": str(_RATELIMIT_WINDOW),
                 },
             )
