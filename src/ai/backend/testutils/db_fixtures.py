@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import asyncio
 import secrets
+import time
 from collections.abc import AsyncIterator, Iterator
 
 import pytest
@@ -25,6 +26,9 @@ from ai.backend.testutils.bootstrap import (
     POSTGRES_USER,
 )
 
+# The server already answered pg_isready; a longer wait would not change the outcome.
+CONNECT_TIMEOUT = 30.0
+
 
 def _url(addr: HostPortPairModel, dbname: str) -> str:
     return (
@@ -38,12 +42,18 @@ async def _create_database(addr: HostPortPairModel, dbname: str) -> None:
         connect_args=pgsql_connect_opts,
         isolation_level="AUTOCOMMIT",
     )
+    deadline = time.monotonic() + CONNECT_TIMEOUT
     try:
         while True:
             try:
                 async with engine.connect() as conn:
                     await conn.execute(sa.text(f'CREATE DATABASE "{dbname}";'))
-            except (ConnectionError, OSError):
+            except (ConnectionError, OSError) as e:
+                if time.monotonic() > deadline:
+                    raise RuntimeError(
+                        f"postgres at {addr.host}:{addr.port} did not accept a connection "
+                        f"within {CONNECT_TIMEOUT}s: {e!r}"
+                    ) from e
                 await asyncio.sleep(0.1)
                 continue
             break
