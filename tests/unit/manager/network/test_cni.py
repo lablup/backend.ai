@@ -2101,22 +2101,35 @@ class TestTheGuardIsWiredIntoTheRealPath:
             f"these keys were written without naming the session record: {sorted(unguarded)}"
         )
 
-    async def test_ready_is_declared_over_the_adverts_it_admitted_on(self) -> None:
-        # Admission is a read and everything after it is writes. An agent that restarts or
-        # withdraws in between has taken back the capability the placement was made on.
+    async def test_ready_is_declared_over_each_members_identity(self) -> None:
+        # Admission is a read and everything after it is writes. An agent that restarts in
+        # between is not the node the placement was made on.
         etcd = _RecordsGuards()
         _encryption_capable(etcd, "a1")
         plugin = _plugin_with(etcd)
 
         await plugin.create_network(identifier="s1", options=dict(self._OPTIONS))
 
-        assert "network/agent/a1/caps" in etcd.guarded[_META_KEY]
+        assert "network/agent/a1/boot" in etcd.guarded[_META_KEY]
+        assert "network/agent/a1/backend" in etcd.guarded[_META_KEY]
 
-    async def test_a_member_that_withdrew_mid_create_does_not_get_a_ready_session(self) -> None:
+    async def test_it_does_not_guard_on_the_advert_the_agent_keeps_refreshing(self) -> None:
+        """The capability record carries a timestamp the agent rewrites every minute to say it is
+        still there. Guarding on its bytes turns that heartbeat into a fence: any create that
+        happens to straddle a refresh fails, on a cluster where nothing is wrong."""
+        etcd = _RecordsGuards()
+        _encryption_capable(etcd, "a1")
+        plugin = _plugin_with(etcd)
+
+        await plugin.create_network(identifier="s1", options=dict(self._OPTIONS))
+
+        assert "network/agent/a1/caps" not in etcd.guarded[_META_KEY]
+
+    async def test_a_refresh_landing_mid_create_does_not_fail_the_create(self) -> None:
         etcd = _RecordsGuards()
         _encryption_capable(etcd, "a1")
 
-        class _WithdrawsBeforeReady(CNINetworkPlugin):
+        class _RefreshesBeforeReady(CNINetworkPlugin):
             @override
             async def _preseed_members(
                 self,
@@ -2126,10 +2139,61 @@ class TestTheGuardIsWiredIntoTheRealPath:
                 held: str | None = None,
                 admitted: Mapping[str, AdmittedAgent] | None = None,
             ) -> None:
-                # The agent goes away between admission and the record being declared ready.
-                etcd.store.pop("network/agent/a1/caps", None)
+                # The agent's ordinary sixty-second refresh, mid-create.
+                etcd.store["network/agent/a1/caps"] = _caps("a1")
 
-        plugin = _wire(_WithdrawsBeforeReady({}, {}), etcd)
+        plugin = _wire(_RefreshesBeforeReady({}, {}), etcd)
+
+        info = await plugin.create_network(identifier="s1", options=dict(self._OPTIONS))
+
+        assert info.options["subnet"]
+
+    @pytest.mark.parametrize("key", ["boot", "backend"])
+    async def test_a_member_that_restarted_mid_create_does_not_get_a_ready_session(
+        self, key: str
+    ) -> None:
+        etcd = _RecordsGuards()
+        _encryption_capable(etcd, "a1")
+        etcd.store["network/agent/a1/boot"] = "run-1"
+        etcd.store["network/agent/a1/backend"] = "docker"
+        etcd.store["network/agent/a1/caps"] = _caps("a1", boot_id="run-1")
+
+        class _RestartsBeforeReady(CNINetworkPlugin):
+            @override
+            async def _preseed_members(
+                self,
+                session_id: str,
+                member_agents: list[str],
+                generation: str | None = None,
+                held: str | None = None,
+                admitted: Mapping[str, AdmittedAgent] | None = None,
+            ) -> None:
+                etcd.store[f"network/agent/a1/{key}"] = "something-else"
+
+        plugin = _wire(_RestartsBeforeReady({}, {}), etcd)
+
+        with pytest.raises(SessionRecordContested):
+            await plugin.create_network(identifier="s1", options=dict(self._OPTIONS))
+
+    async def test_an_agent_that_gains_a_boot_key_mid_create_is_caught(self) -> None:
+        # An agent with no boot key must still have none: one appearing means it restarted into a
+        # run that publishes them.
+        etcd = _RecordsGuards()
+        _encryption_capable(etcd, "a1")
+
+        class _GainsABootKey(CNINetworkPlugin):
+            @override
+            async def _preseed_members(
+                self,
+                session_id: str,
+                member_agents: list[str],
+                generation: str | None = None,
+                held: str | None = None,
+                admitted: Mapping[str, AdmittedAgent] | None = None,
+            ) -> None:
+                etcd.store["network/agent/a1/boot"] = "run-1"
+
+        plugin = _wire(_GainsABootKey({}, {}), etcd)
 
         with pytest.raises(SessionRecordContested):
             await plugin.create_network(identifier="s1", options=dict(self._OPTIONS))

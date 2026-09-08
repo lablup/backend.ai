@@ -9,15 +9,19 @@ happens and the pairing check never fires. These pin the publishing itself.
 from __future__ import annotations
 
 import asyncio
+import inspect
 import json
+import pathlib
 from types import SimpleNamespace
 from typing import Any, cast
 from unittest import mock
 
 import pytest
 
+from ai.backend.agent.agent import AbstractAgent
 from ai.backend.agent.docker.agent import DockerAgent
 from ai.backend.agent.network.caps import withdraw_vtep
+from ai.backend.agent.runtime import AgentRuntime
 from ai.backend.common.etcd import AbstractKVStore
 
 
@@ -222,6 +226,27 @@ class TestShuttingDownStopsAdvertising:
         assert "network/agent/i-abc123/caps" not in stub.etcd.puts, (
             "a refresh in flight put the advert back after shutdown"
         )
+
+
+class TestTheNodeIsAnnouncedOnlyOnceItIsBuilt:
+    """A11c. The started event marks the node ALIVE and schedulable. Sent from inside
+    `__ainit__`, it went out while the backend still had work to do -- the socket relay, the
+    network plugin context, the advert that admits it to a cluster-network session -- and a
+    failure in any of that aborts the runtime before `shutdown` can withdraw anything."""
+
+    def test_the_base_agent_does_not_announce_from_ainit(self) -> None:
+        source = (
+            pathlib.Path(inspect.getfile(AbstractAgent)).read_text().split("async def __ainit__")[1]
+        )
+        body = source.split("\n    async def ")[0]
+        assert "AgentStartedEvent" not in body, (
+            "the node is announced while its backend is still starting"
+        )
+
+    def test_the_runtime_announces_after_the_agent_is_built(self) -> None:
+        source = inspect.getsource(AgentRuntime._create_agent)
+        assert "announce_started" in source
+        assert source.index("agent_cls.new") < source.index("announce_started")
 
 
 class TestWithdrawingTheVtep:
