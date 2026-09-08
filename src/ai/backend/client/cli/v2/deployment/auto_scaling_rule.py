@@ -221,11 +221,11 @@ def update(
     prometheus_query_preset_id: uuid.UUID | None,
 ) -> None:
     """Update an auto-scaling rule."""
-    from ai.backend.common.api_handlers import SENTINEL
     from ai.backend.common.dto.manager.v2.auto_scaling_rule.request import (
         UpdateAutoScalingRuleInput,
     )
     from ai.backend.common.dto.manager.v2.auto_scaling_rule.types import AutoScalingMetricSource
+    from ai.backend.common.tristate.unset import UNSET
 
     body = UpdateAutoScalingRuleInput(
         id=rule_id,
@@ -240,7 +240,7 @@ def update(
         min_replicas=min_replicas if min_replicas is not None else None,
         max_replicas=max_replicas if max_replicas is not None else None,
         prometheus_query_preset_id=(
-            prometheus_query_preset_id if prometheus_query_preset_id is not None else SENTINEL
+            prometheus_query_preset_id if prometheus_query_preset_id is not None else UNSET
         ),
     )
 

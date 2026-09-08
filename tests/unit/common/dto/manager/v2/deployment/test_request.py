@@ -10,7 +10,6 @@ from typing import Any
 import pytest
 from pydantic import ValidationError
 
-from ai.backend.common.api_handlers import SENTINEL, Sentinel
 from ai.backend.common.data.entity.image import ImageID
 from ai.backend.common.data.entity.runtime_variant import RuntimeVariantID
 from ai.backend.common.data.entity.vfolder import VFolderUUID
@@ -41,6 +40,7 @@ from ai.backend.common.dto.manager.v2.deployment.request import (
 )
 from ai.backend.common.exception import BackendAISchemaValidationFailed
 from ai.backend.common.schema.deployment import IntOrPercent
+from ai.backend.common.tristate.unset import UNSET, Unset
 from ai.backend.common.types import ClusterMode
 
 
@@ -362,13 +362,13 @@ class TestUpdateDeploymentInput:
 
     def test_default_tags_is_sentinel(self) -> None:
         inp = UpdateDeploymentInput()
-        assert inp.tags is SENTINEL
-        assert isinstance(inp.tags, Sentinel)
+        assert inp.tags is UNSET
+        assert isinstance(inp.tags, Unset)
 
     def test_explicit_sentinel_tags_signals_clear(self) -> None:
-        inp = UpdateDeploymentInput(tags=SENTINEL)
-        assert inp.tags is SENTINEL
-        assert isinstance(inp.tags, Sentinel)
+        inp = UpdateDeploymentInput(tags=UNSET)
+        assert inp.tags is UNSET
+        assert isinstance(inp.tags, Unset)
 
     def test_none_tags_means_no_change(self) -> None:
         inp = UpdateDeploymentInput(tags=None)

@@ -8,7 +8,6 @@ from decimal import Decimal
 import pytest
 from pydantic import ValidationError
 
-from ai.backend.common.api_handlers import SENTINEL, Sentinel
 from ai.backend.common.dto.manager.v2.auto_scaling_rule.request import (
     AutoScalingRuleFilter,
     AutoScalingRuleOrder,
@@ -22,6 +21,7 @@ from ai.backend.common.dto.manager.v2.auto_scaling_rule.types import (
     OrderDirection,
 )
 from ai.backend.common.exception import BackendAISchemaValidationFailed
+from ai.backend.common.tristate.unset import UNSET, Unset
 from ai.backend.common.types import AutoScalingMetricSource
 
 
@@ -179,7 +179,7 @@ class TestCreateAutoScalingRuleInput:
 
 
 class TestUpdateAutoScalingRuleInput:
-    """Tests for UpdateAutoScalingRuleInput SENTINEL handling."""
+    """Tests for UpdateAutoScalingRuleInput UNSET handling."""
 
     @pytest.fixture
     def rule_id(self) -> uuid.UUID:
@@ -187,14 +187,14 @@ class TestUpdateAutoScalingRuleInput:
 
     def test_default_sentinel_fields(self, rule_id: uuid.UUID) -> None:
         req = UpdateAutoScalingRuleInput(id=rule_id)
-        assert req.min_threshold is SENTINEL
-        assert isinstance(req.min_threshold, Sentinel)
-        assert req.max_threshold is SENTINEL
-        assert isinstance(req.max_threshold, Sentinel)
-        assert req.min_replicas is SENTINEL
-        assert isinstance(req.min_replicas, Sentinel)
-        assert req.max_replicas is SENTINEL
-        assert isinstance(req.max_replicas, Sentinel)
+        assert req.min_threshold is UNSET
+        assert isinstance(req.min_threshold, Unset)
+        assert req.max_threshold is UNSET
+        assert isinstance(req.max_threshold, Unset)
+        assert req.min_replicas is UNSET
+        assert isinstance(req.min_replicas, Unset)
+        assert req.max_replicas is UNSET
+        assert isinstance(req.max_replicas, Unset)
 
     def test_none_for_non_sentinel_fields_means_no_change(self, rule_id: uuid.UUID) -> None:
         req = UpdateAutoScalingRuleInput(id=rule_id)

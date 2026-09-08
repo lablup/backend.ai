@@ -11,7 +11,7 @@ from uuid import UUID
 
 from pydantic import Field, field_validator
 
-from ai.backend.common.api_handlers import SENTINEL, BaseRequestModel, Sentinel
+from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.config import (
     DEFAULT_SHELL,
     ModelDefinitionDraft,
@@ -50,6 +50,7 @@ from ai.backend.common.dto.manager.v2.deployment_options import DeploymentOption
 from ai.backend.common.dto.manager.v2.entity_label.request import EntityLabelNestedFilter
 from ai.backend.common.dto.manager.v2.resource_slot.types import ResourceOptsDTOInput
 from ai.backend.common.schema.deployment import IntOrPercent
+from ai.backend.common.tristate.unset import UNSET, Unset
 from ai.backend.common.types import (
     AutoScalingMetricSource,
     ClusterMode,
@@ -526,8 +527,8 @@ class UpdateDeploymentInput(BaseRequestModel):
 
     name: str | None = Field(default=None, description="Updated deployment name")
     replica_count: int | None = Field(default=None, ge=0, description="Updated replica count")
-    tags: list[str] | Sentinel | None = Field(
-        default=SENTINEL, description="Updated tags. Use SENTINEL to clear."
+    tags: list[str] | None | Unset = Field(
+        default=UNSET, description="Updated tags. Omit to leave unchanged; null clears."
     )
     open_to_public: bool | None = Field(
         default=None, description="Updated network visibility. None means no change."

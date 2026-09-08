@@ -13,7 +13,6 @@ if TYPE_CHECKING:
     from ai.backend.manager.services.processors import Processors
     from ai.backend.manager.sokovan.deployment.coordinator import DeploymentCoordinator
 
-from ai.backend.common.api_handlers import Sentinel
 from ai.backend.common.config import (
     ModelConfig,
     ModelDefinition,
@@ -360,20 +359,6 @@ from ai.backend.manager.services.deployment.actions.update_deployment import Upd
 from ai.backend.manager.types import OptionalState, TriState
 
 DEFAULT_PAGINATION_LIMIT = 10
-
-
-def _tristate_from_input[T](value: T | Sentinel | None) -> TriState[T]:
-    """Map a DTO-style optional value (Sentinel / None / value) to TriState.
-
-    - ``Sentinel`` → NOP (field was not provided; leave the attribute unchanged)
-    - ``None`` → NULLIFY (field was provided as ``null``; clear the attribute)
-    - otherwise → UPDATE (replace with the given value)
-    """
-    if isinstance(value, Sentinel):
-        return TriState[T].nop()
-    if value is None:
-        return TriState[T].nullify()
-    return TriState[T].update(value)
 
 
 def _model_service_config_to_dto(service: ModelServiceConfig) -> ModelServiceConfigInfoDTO:
@@ -798,9 +783,6 @@ class DeploymentAdapter(BaseAdapter):
         deployment_id: DeploymentID,
     ) -> UpdateDeploymentPayload:
         """Update deployment metadata and configuration."""
-        tag_str: str | None = None
-        if not isinstance(input.tags, Sentinel) and input.tags is not None:
-            tag_str = ",".join(input.tags)
         updater = DeploymentUpdater(
             deployment_id=deployment_id,
             name=(
@@ -808,11 +790,7 @@ class DeploymentAdapter(BaseAdapter):
                 if input.name is not None
                 else OptionalState[str].nop()
             ),
-            tag=(
-                TriState[str].nop()
-                if isinstance(input.tags, Sentinel)
-                else TriState[str].from_graphql(tag_str)
-            ),
+            tag=TriState.from_unset(input.tags).map(lambda tags: ",".join(tags)),
             replica_count=(
                 OptionalState.update(input.replica_count)
                 if input.replica_count is not None
@@ -1065,8 +1043,8 @@ class DeploymentAdapter(BaseAdapter):
                 if input.metric_name is not None
                 else OptionalState.nop()
             ),
-            min_threshold=_tristate_from_input(input.min_threshold),
-            max_threshold=_tristate_from_input(input.max_threshold),
+            min_threshold=TriState.from_unset(input.min_threshold),
+            max_threshold=TriState.from_unset(input.max_threshold),
             step_size=(
                 OptionalState.update(input.step_size)
                 if input.step_size is not None
@@ -1077,9 +1055,9 @@ class DeploymentAdapter(BaseAdapter):
                 if input.time_window is not None
                 else OptionalState.nop()
             ),
-            min_replicas=_tristate_from_input(input.min_replicas),
-            max_replicas=_tristate_from_input(input.max_replicas),
-            prometheus_query_preset_id=_tristate_from_input(input.prometheus_query_preset_id),
+            min_replicas=TriState.from_unset(input.min_replicas),
+            max_replicas=TriState.from_unset(input.max_replicas),
+            prometheus_query_preset_id=TriState.from_unset(input.prometheus_query_preset_id),
         )
         action_result = await self._processors.deployment.update_auto_scaling_rule.run(
             UpdateAutoScalingRuleAction(

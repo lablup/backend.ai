@@ -9,7 +9,8 @@ from uuid import UUID
 
 from pydantic import Field
 
-from ai.backend.common.api_handlers import SENTINEL, BaseRequestModel, Sentinel
+from ai.backend.common.api_handlers import BaseRequestModel
+from ai.backend.common.tristate.unset import UNSET, Unset
 
 from .types import AutoScalingMetricSource, AutoScalingRuleOrderField, OrderDirection
 
@@ -46,7 +47,7 @@ class CreateAutoScalingRuleInput(BaseRequestModel):
 class UpdateAutoScalingRuleInput(BaseRequestModel):
     """Input for updating an auto-scaling rule.
 
-    Fields default to SENTINEL (no change). Set a field to None to clear it.
+    Fields default to UNSET (no change). Set a field to None to clear it.
     Fields that cannot be cleared use None to signal no change.
     """
 
@@ -57,13 +58,13 @@ class UpdateAutoScalingRuleInput(BaseRequestModel):
     metric_name: str | None = Field(
         default=None, description="Updated metric name. None means no change."
     )
-    min_threshold: Decimal | Sentinel | None = Field(
-        default=SENTINEL,
-        description="Updated minimum threshold. SENTINEL = no change, None = clear.",
+    min_threshold: Decimal | None | Unset = Field(
+        default=UNSET,
+        description="Updated minimum threshold. Omit to leave unchanged; null clears.",
     )
-    max_threshold: Decimal | Sentinel | None = Field(
-        default=SENTINEL,
-        description="Updated maximum threshold. SENTINEL = no change, None = clear.",
+    max_threshold: Decimal | None | Unset = Field(
+        default=UNSET,
+        description="Updated maximum threshold. Omit to leave unchanged; null clears.",
     )
     step_size: int | None = Field(
         default=None, description="Updated step size. None means no change."
@@ -71,17 +72,17 @@ class UpdateAutoScalingRuleInput(BaseRequestModel):
     time_window: int | None = Field(
         default=None, description="Updated time window in seconds. None means no change."
     )
-    min_replicas: int | Sentinel | None = Field(
-        default=SENTINEL,
-        description="Updated minimum replicas. SENTINEL = no change, None = clear.",
+    min_replicas: int | None | Unset = Field(
+        default=UNSET,
+        description="Updated minimum replicas. Omit to leave unchanged; null clears.",
     )
-    max_replicas: int | Sentinel | None = Field(
-        default=SENTINEL,
-        description="Updated maximum replicas. SENTINEL = no change, None = clear.",
+    max_replicas: int | None | Unset = Field(
+        default=UNSET,
+        description="Updated maximum replicas. Omit to leave unchanged; null clears.",
     )
-    prometheus_query_preset_id: UUID | Sentinel | None = Field(
-        default=SENTINEL,
-        description="Updated Prometheus query preset ID. SENTINEL = no change, None = clear.",
+    prometheus_query_preset_id: UUID | None | Unset = Field(
+        default=UNSET,
+        description="Updated Prometheus query preset ID. Omit to leave unchanged; null clears.",
     )
 
 
