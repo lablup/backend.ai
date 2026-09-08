@@ -133,22 +133,28 @@ class StartSessionsLifecycleHandler(SessionLifecycleHandler):
 
         # Start kernels on agents via Launcher
         # Note: RecorderContext is handled inside Launcher
-        await self._launcher.start_sessions_for_handler(
+        failed = await self._launcher.start_sessions_for_handler(
             sessions_data.sessions,
             sessions_data.image_configs,
         )
 
-        # Mark all sessions as success for status transition
+        # A session whose kernels were never asked for has not started. Reporting it as started
+        # moved it to CREATING on an agent it cannot run on, where it sat until something timed it
+        # out; reported as a failure it is retried and, once the retry budget is spent, put back
+        # to PENDING for a different agent. That is the answer to a node whose data plane will not
+        # take the session -- it is not advertising it, or it stopped while this was being built.
         for session in sessions:
             session_info = session.session_info
-            result.successes.append(
-                SessionTransitionInfo(
-                    session_id=session_info.identity.id,
-                    from_status=session_info.lifecycle.status,
-                    reason="triggered-by-scheduler",
-                    creation_id=session_info.identity.creation_id,
-                    access_key=AccessKey(session_info.metadata.access_key),
-                )
+            transition = SessionTransitionInfo(
+                session_id=session_info.identity.id,
+                from_status=session_info.lifecycle.status,
+                reason=failed.get(session_info.identity.id, "triggered-by-scheduler"),
+                creation_id=session_info.identity.creation_id,
+                access_key=AccessKey(session_info.metadata.access_key),
             )
+            if session_info.identity.id in failed:
+                result.failures.append(transition)
+            else:
+                result.successes.append(transition)
 
         return result
