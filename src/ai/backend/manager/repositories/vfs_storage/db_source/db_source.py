@@ -65,22 +65,6 @@ class VFSStorageDBSource:
                 raise VFSStorageNotFoundError(f"VFS storage with ID {updater.pk_value} not found.")
             return result.row.to_dataclass()
 
-    async def delete(self, storage_id: uuid.UUID) -> uuid.UUID:
-        """
-        Delete an existing VFS storage configuration from the database.
-        """
-        async with self._db.begin_session() as db_session:
-            delete_query = (
-                sa.delete(VFSStorageRow)
-                .where(VFSStorageRow.id == storage_id)
-                .returning(VFSStorageRow.id)
-            )
-            result = await db_session.execute(delete_query)
-            deleted_id = result.scalar()
-            if deleted_id is None:
-                raise VFSStorageNotFoundError(f"VFS storage with ID {storage_id} not found.")
-            return deleted_id
-
     async def list_vfs_storages(self) -> list[VFSStorageData]:
         """
         List all VFS storage configurations from the database.

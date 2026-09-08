@@ -55,10 +55,6 @@ class VFSStorageRepository:
         return await self._db_source.update(updater)
 
     @vfs_storage_repository_resilience.apply()
-    async def delete(self, storage_id: uuid.UUID) -> uuid.UUID:
-        return await self._db_source.delete(storage_id)
-
-    @vfs_storage_repository_resilience.apply()
     async def list_vfs_storages(self) -> list[VFSStorageData]:
         return await self._db_source.list_vfs_storages()
 

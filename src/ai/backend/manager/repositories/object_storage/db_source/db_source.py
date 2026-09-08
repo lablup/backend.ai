@@ -93,22 +93,6 @@ class ObjectStorageDBSource:
                 )
             return result.row.to_dataclass()
 
-    async def delete(self, storage_id: uuid.UUID) -> uuid.UUID:
-        """
-        Delete an existing object storage configuration from the database.
-        """
-        async with self._db.begin_session() as db_session:
-            delete_query = (
-                sa.delete(ObjectStorageRow)
-                .where(ObjectStorageRow.id == storage_id)
-                .returning(ObjectStorageRow.id)
-            )
-            result = await db_session.execute(delete_query)
-            deleted_id = result.scalar()
-            if deleted_id is None:
-                raise ObjectStorageNotFoundError(f"Object storage with ID {storage_id} not found.")
-            return deleted_id
-
     async def list_object_storages(self) -> list[ObjectStorageData]:
         """
         List all object storage configurations from the database.
