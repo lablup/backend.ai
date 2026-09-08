@@ -244,12 +244,9 @@ async def update_password_no_auth(request: web.Request) -> web.Response:
         log.error("Login: JSON decoding error: {}", e)
         creds = {}
 
-    def _check_params(param_names: list[str]) -> None:
-        for param in param_names:
-            if creds.get(param) is None:
-                raise MissingRequestParameterError(param)
-
-    _check_params(["username", "current_password", "new_password"])
+    for param in ("username", "current_password", "new_password"):
+        if creds.get(param) is None:
+            raise MissingRequestParameterError(param)
 
     result: dict[str, Any] = {
         "data": None,
