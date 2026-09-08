@@ -7,7 +7,6 @@ from uuid import UUID
 
 from strawberry import Info
 
-from ai.backend.common.api_handlers import Sentinel
 from ai.backend.common.contexts.client_ip import current_client_ip
 from ai.backend.common.contexts.user import current_user
 from ai.backend.common.data.entity.domain import DomainID
@@ -19,6 +18,7 @@ from ai.backend.common.dto.manager.v2.user.request import (
 )
 from ai.backend.common.exception import InvalidIpAddressValue, UnreachableError
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
+from ai.backend.common.tristate.unset import Unset
 from ai.backend.common.types import AccessKey, ReadableCIDR
 from ai.backend.manager.api.adapters.user.adapter import UserAdapter
 from ai.backend.manager.api.gql.decorators import (
@@ -295,20 +295,8 @@ async def admin_bulk_update_users_v2(
                 if dto.need_password_change is not None
                 else OptionalState.nop()
             ),
-            full_name=(
-                TriState.nop()
-                if isinstance(dto.full_name, Sentinel)
-                else TriState.nullify()
-                if dto.full_name is None
-                else TriState.update(dto.full_name)
-            ),
-            description=(
-                TriState.nop()
-                if isinstance(dto.description, Sentinel)
-                else TriState.nullify()
-                if dto.description is None
-                else TriState.update(dto.description)
-            ),
+            full_name=TriState.from_unset(dto.full_name),
+            description=TriState.from_unset(dto.description),
             status=(
                 OptionalState.update(UserStatus(dto.status))
                 if dto.status is not None
@@ -324,11 +312,7 @@ async def admin_bulk_update_users_v2(
                 if dto.role is not None
                 else OptionalState.nop()
             ),
-            allowed_client_ip=(
-                TriState.nop()
-                if isinstance(dto.allowed_client_ip, Sentinel)
-                else TriState.from_graphql(dto.allowed_client_ip)
-            ),
+            allowed_client_ip=TriState.from_unset(dto.allowed_client_ip),
             resource_policy=(
                 OptionalState.update(dto.resource_policy)
                 if dto.resource_policy is not None
@@ -339,29 +323,15 @@ async def admin_bulk_update_users_v2(
                 if dto.sudo_session_enabled is not None
                 else OptionalState.nop()
             ),
-            container_uid=(
-                TriState.nop()
-                if isinstance(dto.container_uid, Sentinel)
-                else TriState.from_graphql(dto.container_uid)
-            ),
-            container_main_gid=(
-                TriState.nop()
-                if isinstance(dto.container_main_gid, Sentinel)
-                else TriState.from_graphql(dto.container_main_gid)
-            ),
-            container_gids=(
-                TriState.nop()
-                if isinstance(dto.container_gids, Sentinel)
-                else TriState.from_graphql(dto.container_gids)
-            ),
-            group_ids=(
-                OptionalState.nop()
-                if isinstance(dto.group_ids, Sentinel) or dto.group_ids is None
-                else OptionalState.update([str(gid) for gid in dto.group_ids])
+            container_uid=TriState.from_unset(dto.container_uid),
+            container_main_gid=TriState.from_unset(dto.container_main_gid),
+            container_gids=TriState.from_unset(dto.container_gids),
+            group_ids=OptionalState.from_unset(dto.group_ids).map(
+                lambda gids: [str(gid) for gid in gids]
             ),
         )
 
-        if not isinstance(dto.main_access_key, Sentinel) and dto.main_access_key is not None:
+        if not isinstance(dto.main_access_key, Unset) and dto.main_access_key is not None:
             default_key_switches[UserID(user_item.user_id)] = AccessKey(dto.main_access_key)
         items.append(updater)
 
