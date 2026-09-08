@@ -16231,14 +16231,10 @@
                 "type": "string"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
-            "description": "New group description. Set to null to clear.",
+            "description": "Updated group description. Omit to leave unchanged; null clears.",
             "title": "Description"
           },
           "is_active": {
@@ -16260,14 +16256,10 @@
                 "type": "string"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
-            "description": "New external integration identifier. Set to null to clear.",
+            "description": "Updated external integration identifier. Omit to leave unchanged; null clears.",
             "title": "Integration Name"
           },
           "resource_policy": {
