@@ -8,8 +8,9 @@ from uuid import UUID
 
 from pydantic import Field, field_validator
 
-from ai.backend.common.api_handlers import SENTINEL, BaseRequestModel, Sentinel
+from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.dto.manager.query import DateTimeFilter, StringFilter, UUIDFilter
+from ai.backend.common.tristate.unset import UNSET, Unset
 
 from .types import (
     OperationTypeFilter,
@@ -85,8 +86,8 @@ class UpdateRoleInput(BaseRequestModel):
     """Input for updating a role."""
 
     name: str | None = Field(default=None, description="Updated role name")
-    description: str | Sentinel | None = Field(
-        default=SENTINEL, description="Updated role description. Use SENTINEL to clear."
+    description: str | None | Unset = Field(
+        default=UNSET, description="Updated role description. Omit to leave unchanged; null clears."
     )
     status: RoleStatus | None = Field(default=None, description="Updated role status")
     auto_assign: bool | None = Field(

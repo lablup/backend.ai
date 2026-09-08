@@ -7,7 +7,6 @@ import uuid
 import pytest
 from pydantic import ValidationError
 
-from ai.backend.common.api_handlers import SENTINEL, Sentinel
 from ai.backend.common.data.permission.types import RoleSource, RoleStatus
 from ai.backend.common.dto.manager.v2.rbac.request import (
     CreateRoleInput,
@@ -16,6 +15,7 @@ from ai.backend.common.dto.manager.v2.rbac.request import (
     UpdateRoleInput,
 )
 from ai.backend.common.exception import BackendAISchemaValidationFailed
+from ai.backend.common.tristate.unset import UNSET, Unset
 
 
 class TestCreateRoleInput:
@@ -108,15 +108,15 @@ class TestUpdateRoleInput:
         assert req.description is None
         assert req.status is None
 
-    def test_default_description_is_sentinel(self) -> None:
+    def test_default_description_is_unset(self) -> None:
         req = UpdateRoleInput()
-        assert req.description is SENTINEL
-        assert isinstance(req.description, Sentinel)
+        assert req.description is UNSET
+        assert isinstance(req.description, Unset)
 
-    def test_explicit_sentinel_description_signals_clear(self) -> None:
-        req = UpdateRoleInput(description=SENTINEL)
-        assert req.description is SENTINEL
-        assert isinstance(req.description, Sentinel)
+    def test_explicit_unset_description_signals_no_change(self) -> None:
+        req = UpdateRoleInput(description=UNSET)
+        assert req.description is UNSET
+        assert isinstance(req.description, Unset)
 
     def test_none_description_means_no_change(self) -> None:
         req = UpdateRoleInput(description=None)
@@ -269,7 +269,7 @@ class TestPurgeRoleInputRoundTrip:
 
 
 class TestUpdateRoleInputRoundTrip:
-    """Tests for UpdateRoleInput serialization round-trip (non-SENTINEL values)."""
+    """Tests for UpdateRoleInput serialization round-trip (non-UNSET values)."""
 
     def test_round_trip_with_all_none(self) -> None:
         req = UpdateRoleInput(name=None, description=None, status=None)

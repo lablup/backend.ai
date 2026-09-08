@@ -9,10 +9,11 @@ from uuid import UUID
 
 from pydantic import Field
 
-from ai.backend.common.api_handlers import SENTINEL, BaseRequestModel, Sentinel
+from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.data.permission.types import ScopeType
 from ai.backend.common.dto.manager.defs import DEFAULT_PAGE_LIMIT, MAX_PAGE_LIMIT
 from ai.backend.common.dto.manager.query import StringFilter
+from ai.backend.common.tristate.unset import UNSET, Unset
 
 from .types import (
     AssignedUserOrderField,
@@ -62,8 +63,8 @@ class UpdateRoleRequest(BaseRequestModel):
     name: str | None = Field(default=None, description="Updated role name")
     source: RoleSource | None = Field(default=None, description="Updated role source")
     status: RoleStatus | None = Field(default=None, description="Updated role status")
-    description: str | Sentinel | None = Field(
-        default=SENTINEL, description="Updated role description"
+    description: str | None | Unset = Field(
+        default=UNSET, description="Updated role description. Omit to leave unchanged; null clears."
     )
 
 

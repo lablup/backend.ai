@@ -9,7 +9,6 @@ from datetime import UTC, datetime
 from functools import lru_cache
 from uuid import UUID
 
-from ai.backend.common.api_handlers import SENTINEL
 from ai.backend.common.contexts.user import current_user
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.permission import PermissionID
@@ -1826,16 +1825,11 @@ class RBACAdapter(BaseAdapter):
 
     def _build_updater(self, role_id: UUID, input: UpdateRoleInput) -> RoleUpdater:
         name: OptionalState[str] = OptionalState.nop()
-        description: TriState[str] = TriState.nop()
         auto_assign: OptionalState[bool] = OptionalState.nop()
 
         if input.name is not None:
             name = OptionalState.update(input.name)
-        if input.description is not SENTINEL:
-            if input.description is None:
-                description = TriState.nullify()
-            else:
-                description = TriState.update(str(input.description))
+        description = TriState.from_unset(input.description)
         if input.auto_assign is not None:
             auto_assign = OptionalState.update(input.auto_assign)
 

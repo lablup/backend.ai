@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import uuid
 
-from ai.backend.common.api_handlers import SENTINEL
 from ai.backend.common.data.permission.types import RoleSource, RoleStatus
 from ai.backend.common.dto.manager.v2.rbac.request import (
     CreateRoleInput as CreateRoleInputDTO,
@@ -12,6 +11,7 @@ from ai.backend.common.dto.manager.v2.rbac.request import (
 from ai.backend.common.dto.manager.v2.rbac.request import (
     UpdateRoleInput as UpdateRoleInputDTO,
 )
+from ai.backend.common.tristate.unset import UNSET
 from ai.backend.manager.api.gql.rbac.types.role import (
     CreateRoleInput,
     RoleSourceGQL,
@@ -102,8 +102,8 @@ class TestUpdateRoleInputToPydantic:
         assert isinstance(dto, UpdateRoleInputDTO)
         assert dto.description is None
 
-    def test_description_with_unset_produces_sentinel_in_dto(self) -> None:
-        """UpdateRoleInput with description=UNSET → dto.description is SENTINEL (no change)."""
+    def test_description_with_unset_produces_unset_in_dto(self) -> None:
+        """UpdateRoleInput with description=UNSET → dto.description is UNSET (no change)."""
         role_input = UpdateRoleInput(
             id=uuid.uuid4(),
             # description is omitted (UNSET by default)
@@ -111,7 +111,7 @@ class TestUpdateRoleInputToPydantic:
 
         dto = role_input.to_pydantic()
         assert isinstance(dto, UpdateRoleInputDTO)
-        assert dto.description is SENTINEL
+        assert dto.description is UNSET
 
     def test_description_with_string_produces_string_in_dto(self) -> None:
         """UpdateRoleInput with description="text" → dto.description == "text"."""
@@ -239,7 +239,7 @@ class TestUpdateRoleInputToPydantic:
         dto = role_input.to_pydantic()
         assert isinstance(dto, UpdateRoleInputDTO)
         assert dto.name is None
-        assert dto.description is SENTINEL
+        assert dto.description is UNSET
         assert dto.status is None
         assert dto.auto_assign is None
 
