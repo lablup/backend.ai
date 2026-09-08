@@ -61,7 +61,7 @@ class TestOperationType:
 
 class TestEntityType:
     def test_owner_accessible_entity_types_in_user(self) -> None:
-        """Test that owner_accessible_entity_types_in_user contains resource types."""
+        """Test that owner_accessible_entity_types_in_user contains resource types and KEYPAIR."""
         owner_accessible = EntityType.owner_accessible_entity_types_in_user()
 
         # Should contain all resource types
@@ -69,13 +69,17 @@ class TestEntityType:
         assert EntityType.IMAGE in owner_accessible
         assert EntityType.SESSION in owner_accessible
 
+        # A user owns its own keypairs, so the self role has to carry them even though
+        # KEYPAIR is not a resource type.
+        assert EntityType.KEYPAIR in owner_accessible
+
         # Should NOT contain scope types
         assert EntityType.USER not in owner_accessible
         assert EntityType.PROJECT not in owner_accessible
         assert EntityType.DOMAIN not in owner_accessible
 
-        # Verify it equals _resource_types()
-        assert owner_accessible == EntityType._resource_types()
+        # Verify it equals _resource_types() plus KEYPAIR
+        assert owner_accessible == {*EntityType._resource_types(), EntityType.KEYPAIR}
 
     def test_admin_accessible_entity_types_in_project(self) -> None:
         """Test that admin_accessible_entity_types_in_project contains resource types and USER."""

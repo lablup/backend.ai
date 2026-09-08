@@ -121,6 +121,9 @@ class EntityType(enum.StrEnum):
     MODEL_DEPLOYMENT = "model_deployment"
     MODEL_CARD = "model_card"
 
+    # Not a resource type: a keypair belongs to the user that owns it.
+    KEYPAIR = "keypair"
+
     def to_original(self) -> OriginalEntityType:
         return OriginalEntityType(self.value)
 
@@ -153,8 +156,11 @@ class EntityType(enum.StrEnum):
     def owner_accessible_entity_types_in_user(cls) -> set[EntityType]:
         """
         Returns a set of entity types that are accessible by owner roles in user scope.
+
+        Mirrors the original: ``KEYPAIR`` is not a resource type, but a user owns its own
+        keypairs and the self role has to carry them.
         """
-        return cls._resource_types()
+        return {*cls._resource_types(), cls.KEYPAIR}
 
     @classmethod
     def admin_accessible_entity_types_in_project(cls) -> set[EntityType]:

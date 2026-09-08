@@ -288,8 +288,12 @@ class EntityType(enum.StrEnum):
     def owner_accessible_entity_types_in_user(cls) -> set[EntityType]:
         """
         Returns a set of entity types that are accessible by owner roles in user scope.
+
+        ``KEYPAIR`` is not a resource type, but a user owns its own keypairs and reaches
+        them through ``/auth/ssh-keypair``, so the self role has to carry it. Without it a
+        user created after the keypair RBAC migration holds no grant on its own keypairs.
         """
-        return cls._resource_types()
+        return {*cls._resource_types(), cls.KEYPAIR}
 
     @classmethod
     def admin_accessible_entity_types_in_project(cls) -> set[EntityType]:

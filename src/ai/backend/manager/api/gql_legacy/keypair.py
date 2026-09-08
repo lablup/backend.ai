@@ -9,7 +9,9 @@ import graphene
 import sqlalchemy as sa
 from dateutil.parser import parse as dtparse
 from graphene.types.datetime import DateTime as GQLDateTime
+from sqlalchemy.engine.result import Result
 from sqlalchemy.engine.row import Row
+from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 
 from ai.backend.common.clients.valkey_client.valkey_rate_limit.client import ValkeyRateLimitClient
 from ai.backend.common.defs import REDIS_RATE_LIMIT_DB, RedisRole
@@ -19,6 +21,9 @@ from ai.backend.manager.data.keypair.types import KeyPairCreator, KeyPairData
 from ai.backend.manager.models.keypair import (
     keypairs,
     prepare_new_keypair,
+)
+from ai.backend.manager.models.rbac_models.association_scopes_entities import (
+    keypair_owner_association_stmt,
 )
 
 from .session import ComputeSession
@@ -572,7 +577,18 @@ class CreateKeyPair(graphene.Mutation):  # type: ignore[misc]
             **data,
             user=sa.select(users.c.uuid).where(users.c.email == user_id).as_scalar(),
         )
-        return await simple_db_mutate_returning_item(cls, graph_ctx, insert_query, item_cls=KeyPair)
+
+        async def _bind_to_owner_scope(conn: SAConnection, result: Result[Any]) -> Row[Any]:
+            # This mutation inserts the keypair row directly rather than through
+            # RBACEntityCreator, so the scope edge that resolves the keypair to its owner
+            # has to be written here.
+            row = cast(Row[Any], result.first())
+            await conn.execute(keypair_owner_association_stmt(row.user, row.access_key))
+            return row
+
+        return await simple_db_mutate_returning_item(
+            cls, graph_ctx, insert_query, item_cls=KeyPair, post_func=_bind_to_owner_scope
+        )
 
 
 class ModifyKeyPair(graphene.Mutation):  # type: ignore[misc]
