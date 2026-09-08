@@ -7,7 +7,6 @@ import uuid
 import pytest
 from pydantic import ValidationError
 
-from ai.backend.common.api_handlers import SENTINEL, Sentinel
 from ai.backend.common.dto.manager.query import StringFilter
 from ai.backend.common.dto.manager.v2.user.request import (
     CreateUserInput,
@@ -29,6 +28,7 @@ from ai.backend.common.dto.manager.v2.user.types import (
     UserStatusFilter,
 )
 from ai.backend.common.exception import BackendAISchemaValidationFailed
+from ai.backend.common.tristate.unset import UNSET, Unset
 
 
 class TestCreateUserInput:
@@ -163,21 +163,21 @@ class TestCreateUserInput:
 
 
 class TestUpdateUserInput:
-    """Tests for UpdateUserInput model with SENTINEL fields."""
+    """Tests for UpdateUserInput model with UNSET fields."""
 
-    def test_empty_update_has_sentinel_defaults(self) -> None:
+    def test_empty_update_has_unset_defaults(self) -> None:
         req = UpdateUserInput()
-        assert req.full_name is SENTINEL
-        assert isinstance(req.full_name, Sentinel)
-        assert req.description is SENTINEL
-        assert isinstance(req.description, Sentinel)
-        assert req.group_ids is SENTINEL
-        assert req.allowed_client_ip is SENTINEL
-        assert req.main_access_key is SENTINEL
-        assert req.container_uid is SENTINEL
-        assert req.container_main_gid is SENTINEL
-        assert req.container_gids is SENTINEL
-        assert req.integration_name is SENTINEL
+        assert req.full_name is UNSET
+        assert isinstance(req.full_name, Unset)
+        assert req.description is UNSET
+        assert isinstance(req.description, Unset)
+        assert req.group_ids is UNSET
+        assert req.allowed_client_ip is UNSET
+        assert req.main_access_key is UNSET
+        assert req.container_uid is UNSET
+        assert req.container_main_gid is UNSET
+        assert req.container_gids is UNSET
+        assert req.integration_name is UNSET
 
     def test_non_sentinel_fields_default_to_none(self) -> None:
         req = UpdateUserInput()
@@ -194,9 +194,9 @@ class TestUpdateUserInput:
         req = UpdateUserInput(full_name=None)
         assert req.full_name is None
 
-    def test_explicit_sentinel_full_name(self) -> None:
-        req = UpdateUserInput(full_name=SENTINEL)
-        assert req.full_name is SENTINEL
+    def test_explicit_unset_full_name(self) -> None:
+        req = UpdateUserInput(full_name=UNSET)
+        assert req.full_name is UNSET
 
     def test_string_full_name_update(self) -> None:
         req = UpdateUserInput(full_name="New Name")
@@ -235,9 +235,9 @@ class TestUpdateUserInput:
         req = UpdateUserInput(container_uid=1000)
         assert req.container_uid == 1000
 
-    def test_integration_name_sentinel_default(self) -> None:
+    def test_integration_name_unset_default(self) -> None:
         req = UpdateUserInput()
-        assert req.integration_name is SENTINEL
+        assert req.integration_name is UNSET
 
     def test_integration_name_none_clears(self) -> None:
         req = UpdateUserInput(integration_name=None)

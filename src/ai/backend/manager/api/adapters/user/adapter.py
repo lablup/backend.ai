@@ -7,7 +7,6 @@ from collections.abc import Mapping, Sequence
 from typing import TYPE_CHECKING
 from uuid import UUID
 
-from ai.backend.common.api_handlers import Sentinel
 from ai.backend.common.contexts.user import current_user
 from ai.backend.common.data.entity.domain import DomainID, DomainName
 from ai.backend.common.data.entity.keypair import KeyPairID
@@ -96,6 +95,7 @@ from ai.backend.common.dto.manager.v2.user.types import (
     UserStatus as UserStatusDTO,
 )
 from ai.backend.common.exception import UnreachableError
+from ai.backend.common.tristate.unset import Unset
 from ai.backend.common.types import AccessKey, SecretKey
 from ai.backend.manager.data.common.types import SearchResult
 from ai.backend.manager.data.keypair.types import KeyPairCreator, KeyPairData
@@ -487,20 +487,8 @@ class UserAdapter(BaseAdapter):
                 if input.need_password_change is not None
                 else OptionalState.nop()
             ),
-            full_name=(
-                TriState.nop()
-                if isinstance(input.full_name, Sentinel)
-                else TriState.nullify()
-                if input.full_name is None
-                else TriState.update(input.full_name)
-            ),
-            description=(
-                TriState.nop()
-                if isinstance(input.description, Sentinel)
-                else TriState.nullify()
-                if input.description is None
-                else TriState.update(input.description)
-            ),
+            full_name=TriState.from_unset(input.full_name),
+            description=TriState.from_unset(input.description),
             status=(
                 OptionalState.update(UserStatus(input.status))
                 if input.status is not None
@@ -516,11 +504,7 @@ class UserAdapter(BaseAdapter):
                 if input.role is not None
                 else OptionalState.nop()
             ),
-            allowed_client_ip=(
-                TriState.nop()
-                if isinstance(input.allowed_client_ip, Sentinel)
-                else TriState.from_graphql(input.allowed_client_ip)
-            ),
+            allowed_client_ip=TriState.from_unset(input.allowed_client_ip),
             resource_policy=(
                 OptionalState.update(input.resource_policy)
                 if input.resource_policy is not None
@@ -531,34 +515,16 @@ class UserAdapter(BaseAdapter):
                 if input.sudo_session_enabled is not None
                 else OptionalState.nop()
             ),
-            container_uid=(
-                TriState.nop()
-                if isinstance(input.container_uid, Sentinel)
-                else TriState.from_graphql(input.container_uid)
-            ),
-            container_main_gid=(
-                TriState.nop()
-                if isinstance(input.container_main_gid, Sentinel)
-                else TriState.from_graphql(input.container_main_gid)
-            ),
-            container_gids=(
-                TriState.nop()
-                if isinstance(input.container_gids, Sentinel)
-                else TriState.from_graphql(input.container_gids)
-            ),
-            integration_name=(
-                TriState.nop()
-                if isinstance(input.integration_name, Sentinel)
-                else TriState.from_graphql(input.integration_name)
-            ),
-            group_ids=(
-                OptionalState.nop()
-                if isinstance(input.group_ids, Sentinel) or input.group_ids is None
-                else OptionalState.update([str(gid) for gid in input.group_ids])
+            container_uid=TriState.from_unset(input.container_uid),
+            container_main_gid=TriState.from_unset(input.container_main_gid),
+            container_gids=TriState.from_unset(input.container_gids),
+            integration_name=TriState.from_unset(input.integration_name),
+            group_ids=OptionalState.from_unset(input.group_ids).map(
+                lambda gids: [str(gid) for gid in gids]
             ),
         )
         result = await self._processors.user.update_user.run(UpdateUserAction(updater=updater))
-        if not isinstance(input.main_access_key, Sentinel) and input.main_access_key is not None:
+        if not isinstance(input.main_access_key, Unset) and input.main_access_key is not None:
             await self.switch_default_access_key(UserID(user_id), AccessKey(input.main_access_key))
         return UpdateUserPayload(user=await self._user_node(result.data))
 

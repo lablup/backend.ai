@@ -9,7 +9,7 @@ from uuid import UUID
 
 from pydantic import Field, field_validator
 
-from ai.backend.common.api_handlers import SENTINEL, BaseRequestModel, Sentinel
+from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.dto.manager.defs import DEFAULT_PAGE_LIMIT, MAX_PAGE_LIMIT
 from ai.backend.common.dto.manager.query import (
     ArrayFilter,
@@ -28,6 +28,7 @@ from ai.backend.common.dto.manager.v2.user.types import (
     UserStatus,
     UserStatusFilter,
 )
+from ai.backend.common.tristate.unset import UNSET, Unset
 
 __all__ = (
     "AdminSearchUsersInput",
@@ -122,13 +123,13 @@ class UpdateUserInput(BaseRequestModel):
         default=None,
         description="New password.",
     )
-    full_name: str | Sentinel | None = Field(
-        default=SENTINEL,
-        description="New full display name. Set to null to clear.",
+    full_name: str | None | Unset = Field(
+        default=UNSET,
+        description="Updated full display name. Omit to leave unchanged; null clears.",
     )
-    description: str | Sentinel | None = Field(
-        default=SENTINEL,
-        description="New description. Set to null to clear.",
+    description: str | None | Unset = Field(
+        default=UNSET,
+        description="Updated description. Omit to leave unchanged; null clears.",
     )
     status: UserStatus | None = Field(
         default=None,
@@ -142,13 +143,13 @@ class UpdateUserInput(BaseRequestModel):
         default=None,
         description="New domain assignment.",
     )
-    group_ids: list[UUID] | Sentinel | None = Field(
-        default=SENTINEL,
-        description="New project (group) assignments. Replaces existing assignments. Set to null to clear.",
+    group_ids: list[UUID] | None | Unset = Field(
+        default=UNSET,
+        description="Updated project (group) assignments, replacing the existing ones. Omit to leave unchanged.",
     )
-    allowed_client_ip: list[str] | Sentinel | None = Field(
-        default=SENTINEL,
-        description="New allowed client IP addresses or CIDR ranges. Set to null to allow all.",
+    allowed_client_ip: list[str] | None | Unset = Field(
+        default=UNSET,
+        description="Updated allowed client IP addresses or CIDR ranges. Omit to leave unchanged; null allows all.",
     )
     need_password_change: bool | None = Field(
         default=None,
@@ -162,32 +163,30 @@ class UpdateUserInput(BaseRequestModel):
         default=None,
         description="Enable or disable sudo session capability.",
     )
-    main_access_key: str | Sentinel | None = Field(
-        default=SENTINEL,
-        description="Set the primary API access key. It cannot be cleared; null is ignored.",
+    main_access_key: str | None | Unset = Field(
+        default=UNSET,
+        description="Updated primary API access key. Omit to leave unchanged; it cannot be cleared, so null is ignored.",
     )
-    container_uid: int | Sentinel | None = Field(
-        default=SENTINEL,
-        description="New container user ID. Set to null to clear.",
+    container_uid: int | None | Unset = Field(
+        default=UNSET,
+        description="Updated container user ID. Omit to leave unchanged; null clears.",
     )
-    container_main_gid: int | Sentinel | None = Field(
-        default=SENTINEL,
-        description="New container primary group ID. Set to null to clear.",
+    container_main_gid: int | None | Unset = Field(
+        default=UNSET,
+        description="Updated container primary group ID. Omit to leave unchanged; null clears.",
     )
-    container_gids: list[int] | Sentinel | None = Field(
-        default=SENTINEL,
-        description="New container supplementary group IDs. Set to null to clear.",
+    container_gids: list[int] | None | Unset = Field(
+        default=UNSET,
+        description="Updated container supplementary group IDs. Omit to leave unchanged; null clears.",
     )
-    integration_name: str | Sentinel | None = Field(
-        default=SENTINEL,
-        description="New external integration identifier. Set to null to clear.",
+    integration_name: str | None | Unset = Field(
+        default=UNSET,
+        description="Updated external integration identifier. Omit to leave unchanged; null clears.",
     )
 
     @field_validator("integration_name")
     @classmethod
-    def _validate_integration_name_max_length(
-        cls, v: str | Sentinel | None
-    ) -> str | Sentinel | None:
+    def _validate_integration_name_max_length(cls, v: str | Unset | None) -> str | Unset | None:
         if isinstance(v, str) and len(v) > 512:
             raise ValueError("integration_name must be at most 512 characters")
         return v
