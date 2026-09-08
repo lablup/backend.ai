@@ -26432,13 +26432,10 @@
                 "type": "string"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
+            "description": "Model card author. Omit to leave unchanged; null clears.",
             "title": "Author"
           },
           "title": {
@@ -26447,13 +26444,10 @@
                 "type": "string"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
+            "description": "Model card title. Omit to leave unchanged; null clears.",
             "title": "Title"
           },
           "model_version": {
@@ -26462,13 +26456,10 @@
                 "type": "string"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
+            "description": "Model version. Omit to leave unchanged; null clears.",
             "title": "Model Version"
           },
           "description": {
@@ -26477,13 +26468,10 @@
                 "type": "string"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
+            "description": "Model card description. Omit to leave unchanged; null clears.",
             "title": "Description"
           },
           "task": {
@@ -26492,13 +26480,10 @@
                 "type": "string"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
+            "description": "Task type. Omit to leave unchanged; null clears.",
             "title": "Task"
           },
           "category": {
@@ -26507,13 +26492,10 @@
                 "type": "string"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
+            "description": "Model category. Omit to leave unchanged; null clears.",
             "title": "Category"
           },
           "architecture": {
@@ -26522,13 +26504,10 @@
                 "type": "string"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
+            "description": "Model architecture. Omit to leave unchanged; null clears.",
             "title": "Architecture"
           },
           "framework": {
@@ -26567,13 +26546,10 @@
                 "type": "string"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
+            "description": "Model license. Omit to leave unchanged; null clears.",
             "title": "License"
           },
           "min_resource": {
@@ -26585,13 +26561,10 @@
                 "type": "array"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
+            "description": "Minimum resource requirements. Omit to leave unchanged; null clears.",
             "title": "Min Resource"
           },
           "readme": {
@@ -26600,13 +26573,10 @@
                 "type": "string"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
+            "description": "Model readme. Omit to leave unchanged; null clears.",
             "title": "Readme"
           },
           "access_level": {
@@ -26615,13 +26585,10 @@
                 "$ref": "#/components/schemas/ModelCardAccessLevel"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
+            "description": "Access level. Omit to leave unchanged.",
             "title": "Access Level"
           }
         },
