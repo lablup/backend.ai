@@ -56,7 +56,7 @@ def handler(handler_response: web.Response) -> AsyncMock:
 class _PassThroughCase:
     id: str
     session: dict[str, Any]
-    state: RateLimitState | None = RateLimitState(
+    rlim_window: RateLimitState | None = RateLimitState(
         count=0, limit=_RATE_LIMIT, reset_after_seconds=_RESET
     )
 
@@ -73,7 +73,7 @@ class _PassThroughCase:
         _PassThroughCase(
             id="no-open-window",
             session=_AUTHENTICATED_SESSION,
-            state=None,
+            rlim_window=None,
         ),
     ],
     ids=lambda case: case.id,
@@ -87,7 +87,7 @@ async def test_pass_through_without_rate_limiting(
     handler_response: web.Response,
 ) -> None:
     mocker.patch.object(ratelimit, "get_session", AsyncMock(return_value=case.session))
-    mock_valkey_rate_limit_client.get_user_rate_limit.return_value = case.state
+    mock_valkey_rate_limit_client.get_user_rate_limit.return_value = case.rlim_window
 
     response = await manager_proxy_rate_limited(handler)(proxied_request)
 
