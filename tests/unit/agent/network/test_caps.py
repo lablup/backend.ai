@@ -7,6 +7,7 @@ from ai.backend.agent.network.caps import (
     publish_backend,
     publish_caps,
     publish_vtep,
+    withdraw_caps,
 )
 from ai.backend.agent.network.readiness import Readiness
 from ai.backend.common.etcd import AbstractKVStore
@@ -166,6 +167,54 @@ class TestTheReadinessFenceIsNeverAheadOfTheRecord:
         )
 
         assert etcd.puts["network/agent/i-abc123/ready"] == before
+
+
+class TestTwoRunsOfOneAgentId:
+    """An agent id restarted quickly has two processes alive at once. Whichever of them writes
+    last wins the key, and both outcomes are wrong: the old run's shutdown deleting the new run's
+    advert leaves a node that is up and serving invisible to every placement, and the old run's
+    last refresh landing on top leaves a fresh, correct-looking record describing a process that
+    is going away."""
+
+    async def test_an_older_run_does_not_publish_over_a_newer_one(self) -> None:
+        etcd = _CapturingEtcd()
+        etcd.puts["network/agent/i-abc123/boot"] = "run-2"
+        caps = AgentNetworkCaps(tunnel_offload=False, backends=["vxlan"])
+
+        await publish_caps(
+            cast(AbstractKVStore, etcd), "i-abc123", caps, vtep_ip="10.0.0.1", boot_id="run-1"
+        )
+
+        assert "network/agent/i-abc123/caps" not in etcd.puts
+        assert "network/agent/i-abc123/ready" not in etcd.puts
+
+    async def test_an_older_run_does_not_withdraw_a_newer_ones_advert(self) -> None:
+        etcd = _CapturingEtcd()
+        etcd.puts["network/agent/i-abc123/boot"] = "run-2"
+        caps = AgentNetworkCaps(tunnel_offload=False, backends=["vxlan"])
+        await publish_caps(
+            cast(AbstractKVStore, etcd), "i-abc123", caps, vtep_ip="10.0.0.1", boot_id="run-2"
+        )
+
+        await withdraw_caps(cast(AbstractKVStore, etcd), "i-abc123", boot_id="run-1")
+
+        assert "network/agent/i-abc123/caps" in etcd.puts
+        assert "network/agent/i-abc123/ready" in etcd.puts
+
+    async def test_the_current_run_publishes_and_withdraws_its_own(self) -> None:
+        etcd = _CapturingEtcd()
+        etcd.puts["network/agent/i-abc123/boot"] = "run-2"
+        caps = AgentNetworkCaps(tunnel_offload=False, backends=["vxlan"])
+
+        await publish_caps(
+            cast(AbstractKVStore, etcd), "i-abc123", caps, vtep_ip="10.0.0.1", boot_id="run-2"
+        )
+        assert "network/agent/i-abc123/ready" in etcd.puts
+
+        await withdraw_caps(cast(AbstractKVStore, etcd), "i-abc123", boot_id="run-2")
+
+        assert "network/agent/i-abc123/caps" not in etcd.puts
+        assert "network/agent/i-abc123/ready" not in etcd.puts
 
 
 class TestTheOverlayEncryptionProfile:
