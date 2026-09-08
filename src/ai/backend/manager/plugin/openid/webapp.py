@@ -33,6 +33,7 @@ from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.keypair import KeyPairRow, generate_keypair, generate_ssh_keypair
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
+    keypair_owner_association_stmt,
 )
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -221,6 +222,11 @@ async def create_user_if_not_exists(
             )
             dbsess.add(keypair)
             await dbsess.flush()
+            # Bind the keypair to its owner's scope, as RBACEntityCreator does on the
+            # regular user-creation path.
+            await conn.execute(
+                keypair_owner_association_stmt(user.uuid, keypair_data["access_key"])
+            )
 
             # Associate the user with the default and model-store group, if exists.
             await associate_user_with_group(conn, user, user_info["project"])

@@ -36,6 +36,7 @@ from ai.backend.manager.models.login_session.enums import LoginAttemptResult, Lo
 from ai.backend.manager.models.login_session.row import LoginHistoryRow, LoginSessionRow
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
+    keypair_owner_association_stmt,
 )
 from ai.backend.manager.models.user import (
     UserRole,
@@ -156,6 +157,9 @@ class AuthDBSource:
             keypair_data["user"] = user_row.uuid
             keypair_query = keypairs.insert().values(keypair_data)
             await conn.execute(keypair_query)
+            await conn.execute(
+                keypair_owner_association_stmt(user_row.uuid, keypair_data["access_key"])
+            )
 
             # Create RBAC system role and map user to role
             role_spec = UserSystemRoleSpec(user_id=user_row.uuid)
