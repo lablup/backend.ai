@@ -46,6 +46,8 @@ async def _read_ratelimit_window(request: web.Request) -> RateLimitState | None:
             raise UnreachableError("a request over a socket always has a peer address")
         return await valkey_client.get_ip_rate_limit(client_ip)
     token = session.get("token") or {}
+    # Both login handlers store the user id, but sessions outlive an upgrade in Redis:
+    # one written before they did carries no user id.
     raw_user_id = token.get("user_id")
     if raw_user_id is None:
         return None
