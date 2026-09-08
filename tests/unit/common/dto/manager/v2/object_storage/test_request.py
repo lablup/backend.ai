@@ -7,7 +7,6 @@ import uuid
 import pytest
 from pydantic import ValidationError
 
-from ai.backend.common.api_handlers import SENTINEL, Sentinel
 from ai.backend.common.dto.manager.v2.object_storage.request import (
     CreateObjectStorageInput,
     DeleteObjectStorageInput,
@@ -16,6 +15,7 @@ from ai.backend.common.dto.manager.v2.object_storage.request import (
     UpdateObjectStorageInput,
 )
 from ai.backend.common.exception import BackendAISchemaValidationFailed
+from ai.backend.common.tristate.unset import UNSET, Unset
 
 
 class TestCreateObjectStorageInput:
@@ -105,10 +105,10 @@ class TestCreateObjectStorageInput:
 class TestUpdateObjectStorageInput:
     """Tests for UpdateObjectStorageInput model."""
 
-    def test_default_region_is_sentinel(self) -> None:
+    def test_default_region_is_unset(self) -> None:
         req = UpdateObjectStorageInput(id=uuid.uuid4())
-        assert req.region is SENTINEL
-        assert isinstance(req.region, Sentinel)
+        assert req.region is UNSET
+        assert isinstance(req.region, Unset)
 
     def test_region_none_clears_field(self) -> None:
         req = UpdateObjectStorageInput(id=uuid.uuid4(), region=None)

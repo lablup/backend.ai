@@ -8,12 +8,13 @@ from uuid import UUID
 
 from pydantic import Field, field_validator
 
-from ai.backend.common.api_handlers import SENTINEL, BaseRequestModel, Sentinel
+from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.dto.manager.query import StringFilter
 from ai.backend.common.dto.manager.v2.object_storage.types import (
     ObjectStorageOrderField,
     OrderDirection,
 )
+from ai.backend.common.tristate.unset import UNSET, Unset
 
 __all__ = (
     "AdminSearchObjectStoragesInput",
@@ -55,9 +56,9 @@ class UpdateObjectStorageInput(BaseRequestModel):
     access_key: str | None = Field(default=None, description="Updated access key")
     secret_key: str | None = Field(default=None, description="Updated secret key")
     endpoint: str | None = Field(default=None, description="Updated endpoint URL")
-    region: str | Sentinel | None = Field(
-        default=SENTINEL,
-        description="Updated region. Use SENTINEL (default) for no change, None to clear.",
+    region: str | None | Unset = Field(
+        default=UNSET,
+        description="Updated region. Omit to leave unchanged; null clears.",
     )
 
 

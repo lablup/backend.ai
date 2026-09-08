@@ -94,13 +94,13 @@ def update(
     """Update an existing object storage."""
     from uuid import UUID
 
-    from ai.backend.common.api_handlers import SENTINEL, Sentinel
     from ai.backend.common.dto.manager.v2.object_storage.request import UpdateObjectStorageInput
+    from ai.backend.common.tristate.unset import UNSET, Unset
 
-    # SENTINEL means "no change", None means "clear the field".
-    # When the CLI user does not pass --region, keep SENTINEL (no change).
+    # UNSET means "no change", None means "clear the field".
+    # When the CLI user does not pass --region, keep UNSET (no change).
     # When they pass an empty string, interpret as None (clear).
-    region_value: str | Sentinel | None = SENTINEL
+    region_value: str | None | Unset = UNSET
     if region is not None:
         region_value = region if region else None
 
