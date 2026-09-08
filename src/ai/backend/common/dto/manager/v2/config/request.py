@@ -8,7 +8,8 @@ from uuid import UUID
 
 from pydantic import Field, field_validator
 
-from ai.backend.common.api_handlers import SENTINEL, BaseRequestModel, Sentinel
+from ai.backend.common.api_handlers import BaseRequestModel
+from ai.backend.common.tristate.unset import UNSET, Unset
 
 from .types import MAXIMUM_DOTFILE_SIZE, DotfilePermission, DotfileScope
 
@@ -50,9 +51,9 @@ class UpdateDotfileInput(BaseRequestModel):
     """Input for updating a dotfile."""
 
     path: str = Field(description="Dotfile path")
-    data: str | Sentinel | None = Field(
-        default=SENTINEL,
-        description="Updated dotfile content. Use SENTINEL to clear.",
+    data: str | None | Unset = Field(
+        default=UNSET,
+        description="Updated dotfile content. Omit to leave unchanged; null clears.",
     )
     permission: DotfilePermission | None = Field(
         default=None,
