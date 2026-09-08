@@ -9,8 +9,9 @@ from uuid import UUID
 
 from pydantic import Field, field_validator
 
-from ai.backend.common.api_handlers import SENTINEL, BaseRequestModel, Sentinel
+from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.dto.manager.query import DateTimeFilter, StringFilter, UUIDFilter
+from ai.backend.common.tristate.unset import UNSET, Unset
 
 from .types import ImageOrderField, ImageStatusType, OrderDirection
 
@@ -246,8 +247,9 @@ class UpdateImageInput(BaseRequestModel):
     )
     config_digest: str | None = Field(default=None, description="Updated config digest.")
     labels: dict[str, str] | None = Field(default=None, description="Updated labels dict.")
-    supported_accelerators: str | Sentinel | None = Field(
-        default=SENTINEL, description="Updated accelerator string. Set to null to clear."
+    supported_accelerators: str | None | Unset = Field(
+        default=UNSET,
+        description="Updated accelerator string. Omit to leave unchanged; null clears.",
     )
     resource_limits: dict[str, Any] | None = Field(
         default=None, description="Updated resource limits dict."

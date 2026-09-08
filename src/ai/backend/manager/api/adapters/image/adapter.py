@@ -7,7 +7,6 @@ from collections.abc import Sequence
 from decimal import Decimal
 from functools import lru_cache
 
-from ai.backend.common.api_handlers import Sentinel
 from ai.backend.common.data.entity.artifact_registry import ArtifactRegistryID
 from ai.backend.common.dto.manager.v2.image.request import (
     AdminSearchImageAliasesInput,
@@ -317,13 +316,7 @@ class ImageAdapter(BaseAdapter):
                 if input.labels is not None
                 else OptionalState.nop()
             ),
-            accelerators=(
-                TriState.nop()
-                if isinstance(input.supported_accelerators, Sentinel)
-                else TriState.nullify()
-                if input.supported_accelerators is None
-                else TriState.update(input.supported_accelerators)
-            ),
+            accelerators=TriState.from_unset(input.supported_accelerators),
             resources=(
                 OptionalState.update(input.resource_limits)
                 if input.resource_limits is not None
