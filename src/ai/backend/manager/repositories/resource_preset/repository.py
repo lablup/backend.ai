@@ -26,6 +26,7 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.base.updater import Updater
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 
 from .cache_source.cache_source import ResourcePresetCacheSource
 from .db_source.db_source import ResourcePresetDBSource
@@ -64,8 +65,9 @@ class ResourcePresetRepository:
         db: ExtendedAsyncSAEngine,
         valkey_stat: ValkeyStatClient,
         config_provider: ManagerConfigProvider,
+        v2_ops_provider: V2DBOpsProvider,
     ) -> None:
-        self._db_source = ResourcePresetDBSource(db)
+        self._db_source = ResourcePresetDBSource(db, v2_ops_provider)
         self._cache_source = ResourcePresetCacheSource(valkey_stat)
         self._config_provider = config_provider
 

@@ -51,6 +51,7 @@ from ai.backend.manager.models.virtual_entity.queries import user_scope_membersh
 from ai.backend.manager.repositories.base import BatchQuerier, execute_batch_querier
 from ai.backend.manager.repositories.base.creator import Creator, execute_creator
 from ai.backend.manager.repositories.base.updater import Updater, execute_updater
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.resource_slot.types import (
     add_quantities,
     min_quantities,
@@ -78,12 +79,15 @@ class ResourcePresetDBSource:
     """Database source for resource preset operations."""
 
     _db: ExtendedAsyncSAEngine
+    _v2_ops: V2DBOpsProvider
 
     def __init__(
         self,
         db: ExtendedAsyncSAEngine,
+        v2_ops: V2DBOpsProvider,
     ) -> None:
         self._db = db
+        self._v2_ops = v2_ops
 
     async def create_preset(self, creator: Creator[ResourcePresetRow]) -> ResourcePresetData:
         """

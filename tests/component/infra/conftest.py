@@ -125,7 +125,9 @@ def resource_preset_processors(
     valkey_clients: ValkeyClients,
     processor_registry: ProcessorRegistry[Any],
 ) -> ResourcePresetProcessors:
-    repo = ResourcePresetRepository(database_engine, valkey_clients.stat, config_provider)
+    repo = ResourcePresetRepository(
+        database_engine, valkey_clients.stat, config_provider, V2DBOpsProvider(database_engine)
+    )
     service = ResourcePresetService(repo)
     return ResourcePresetProcessors(
         processor_registry.group(GroupMeta(ResourcePresetEntityType())), service

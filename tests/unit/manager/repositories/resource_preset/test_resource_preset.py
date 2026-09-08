@@ -18,6 +18,7 @@ from ai.backend.manager.models.resource_preset import ResourcePresetRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.base.updater import Updater
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.resource_preset.cache_source.cache_source import (
     ResourcePresetCacheSource,
 )
@@ -69,7 +70,10 @@ class TestResourcePresetRepository:
             return_value={"cpu", "mem", "cuda.device"}
         )
         repo = ResourcePresetRepository(
-            db=mock_db_engine, valkey_stat=MagicMock(), config_provider=mock_config_provider
+            db=mock_db_engine,
+            valkey_stat=MagicMock(),
+            config_provider=mock_config_provider,
+            v2_ops_provider=V2DBOpsProvider(mock_db_engine),
         )
         # Replace internal sources with mocks
         repo._db_source = mock_db_source
