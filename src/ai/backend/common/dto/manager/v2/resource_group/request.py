@@ -10,7 +10,7 @@ from uuid import UUID
 
 from pydantic import Field, field_validator
 
-from ai.backend.common.api_handlers import SENTINEL, BaseRequestModel, Sentinel
+from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.data.entity.resource_group import ResourceGroupName
 from ai.backend.common.dto.manager.query import StringFilter
 from ai.backend.common.dto.manager.v2.deployment_options import DeploymentOptionsInput
@@ -19,6 +19,7 @@ from ai.backend.common.dto.manager.v2.resource_group.types import (
     ResourceGroupOrderField,
 )
 from ai.backend.common.dto.manager.v2.session_options import DefaultSessionOptionsInput
+from ai.backend.common.tristate.unset import UNSET, Unset
 from ai.backend.common.types import PreemptionVictimScope
 
 __all__ = (
@@ -99,9 +100,9 @@ class UpdateResourceGroupInput(BaseRequestModel):
         default=None,
         description="Updated resource group name. Leave null to keep existing value.",
     )
-    description: str | Sentinel | None = Field(
-        default=SENTINEL,
-        description=("Updated description. Use SENTINEL to clear, null to keep existing value."),
+    description: str | None | Unset = Field(
+        default=UNSET,
+        description="Updated description. Omit to leave unchanged; null clears.",
     )
     is_active: bool | None = Field(
         default=None,
@@ -115,30 +116,23 @@ class UpdateResourceGroupInput(BaseRequestModel):
             " that one first. Leave null to keep existing value."
         ),
     )
-    total_resource_slots: dict[str, Any] | Sentinel | None = Field(
-        default=SENTINEL,
+    total_resource_slots: dict[str, Any] | None | Unset = Field(
+        default=UNSET,
+        description="Updated total resource slot limits. Omit to leave unchanged; null clears.",
+    )
+    allowed_vfolder_hosts: dict[str, Any] | None | Unset = Field(
+        default=UNSET,
         description=(
-            "Updated total resource slot limits. Use SENTINEL to clear, null to keep existing value."
+            "Updated allowed vfolder host permissions. Omit to leave unchanged; null clears."
         ),
     )
-    allowed_vfolder_hosts: dict[str, Any] | Sentinel | None = Field(
-        default=SENTINEL,
-        description=(
-            "Updated allowed vfolder host permissions. "
-            "Use SENTINEL to clear, null to keep existing value."
-        ),
+    integration_name: str | None | Unset = Field(
+        default=UNSET,
+        description="Updated external integration ID. Omit to leave unchanged; null clears.",
     )
-    integration_name: str | Sentinel | None = Field(
-        default=SENTINEL,
-        description=(
-            "Updated external integration ID. Use SENTINEL to clear, null to keep existing value."
-        ),
-    )
-    resource_policy: str | Sentinel | None = Field(
-        default=SENTINEL,
-        description=(
-            "Updated resource policy name. Use SENTINEL to clear, null to keep existing value."
-        ),
+    resource_policy: str | None | Unset = Field(
+        default=UNSET,
+        description="Updated resource policy name. Omit to leave unchanged; null clears.",
     )
 
 

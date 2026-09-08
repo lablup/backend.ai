@@ -14,7 +14,6 @@ if TYPE_CHECKING:
     from ai.backend.manager.sokovan.deployment.coordinator import DeploymentCoordinator
     from ai.backend.manager.sokovan.scheduler.coordinator import ScheduleCoordinator
 
-from ai.backend.common.api_handlers import SENTINEL
 from ai.backend.common.data.entity.domain import DomainID, DomainName
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID, ResourceGroupName
@@ -446,15 +445,7 @@ class ResourceGroupAdapter(BaseAdapter):
                 else OptionalState.nop()
             ),
             is_default=OptionalState.from_nullable(input.is_default),
-            description=(
-                TriState.nullify()
-                if input.description is SENTINEL
-                else (
-                    TriState.update(str(input.description))
-                    if input.description is not None
-                    else TriState.nop()
-                )
-            ),
+            description=TriState.from_unset(input.description),
         )
         action_result = await self._processors.resource_group.update_resource_group.run(
             UpdateResourceGroupAction(resource_group_id=updater.resource_group_id, updater=updater)

@@ -7,13 +7,13 @@ import uuid
 import pytest
 from pydantic import ValidationError
 
-from ai.backend.common.api_handlers import SENTINEL, Sentinel
 from ai.backend.common.dto.manager.v2.resource_group.request import (
     CreateResourceGroupInput,
     DeleteResourceGroupInput,
     UpdateResourceGroupInput,
 )
 from ai.backend.common.exception import BackendAISchemaValidationFailed
+from ai.backend.common.tristate.unset import UNSET, Unset
 
 
 class TestCreateResourceGroupInput:
@@ -89,20 +89,20 @@ class TestUpdateResourceGroupInput:
         assert req.name is None
         assert req.is_active is None
 
-    def test_default_sentinel_fields(self) -> None:
+    def test_default_unset_fields(self) -> None:
         req = UpdateResourceGroupInput()
-        assert req.description is SENTINEL
-        assert isinstance(req.description, Sentinel)
-        assert req.total_resource_slots is SENTINEL
-        assert req.allowed_vfolder_hosts is SENTINEL
-        assert req.integration_name is SENTINEL
-        assert req.resource_policy is SENTINEL
+        assert req.description is UNSET
+        assert isinstance(req.description, Unset)
+        assert req.total_resource_slots is UNSET
+        assert req.allowed_vfolder_hosts is UNSET
+        assert req.integration_name is UNSET
+        assert req.resource_policy is UNSET
 
-    def test_sentinel_description_signals_clear(self) -> None:
-        req = UpdateResourceGroupInput(description=SENTINEL)
-        assert req.description is SENTINEL
+    def test_unset_description_means_no_change(self) -> None:
+        req = UpdateResourceGroupInput(description=UNSET)
+        assert req.description is UNSET
 
-    def test_none_description_means_no_change(self) -> None:
+    def test_none_description_signals_clear(self) -> None:
         req = UpdateResourceGroupInput(description=None)
         assert req.description is None
 
