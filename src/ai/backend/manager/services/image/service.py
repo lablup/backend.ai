@@ -13,10 +13,13 @@ from ai.backend.manager.errors.image import ImageAccessForbiddenError, ImageNotF
 from ai.backend.manager.models.image import (
     ImageIdentifier,
 )
+from ai.backend.manager.models.image.conditions import ImageAliasConditions, ImageConditions
 from ai.backend.manager.models.image.creators import ImageAliasCreator
 from ai.backend.manager.models.image.updaters import ImageUpdater
+from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.registry import AgentRegistry
+from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.image.repository import ImageRepository
 from ai.backend.manager.services.image.actions.alias_image import (
     AliasImageAction,
@@ -45,8 +48,8 @@ from ai.backend.manager.services.image.actions.get_all_images import (
     PublicGetAllImagesActionResult,
 )
 from ai.backend.manager.services.image.actions.get_image_installed_agents import (
-    GetImageInstalledAgentsAction,
-    GetImageInstalledAgentsActionResult,
+    PublicGetImageInstalledAgentsAction,
+    PublicGetImageInstalledAgentsActionResult,
 )
 from ai.backend.manager.services.image.actions.get_images import (
     PublicGetImageByIdAction,
@@ -55,6 +58,12 @@ from ai.backend.manager.services.image.actions.get_images import (
     PublicGetImageByIdentifierActionResult,
     PublicGetImagesByCanonicalsAction,
     PublicGetImagesByCanonicalsActionResult,
+)
+from ai.backend.manager.services.image.actions.get_images_by_ids import (
+    PublicGetImageAliasesByIdsAction,
+    PublicGetImageAliasesByIdsActionResult,
+    PublicGetImagesByIdsAction,
+    PublicGetImagesByIdsActionResult,
 )
 from ai.backend.manager.services.image.actions.preload_image import (
     PreloadImageAction,
@@ -177,11 +186,11 @@ class ImageService:
         )
 
     async def get_image_installed_agents(
-        self, action: GetImageInstalledAgentsAction
-    ) -> GetImageInstalledAgentsActionResult:
+        self, action: PublicGetImageInstalledAgentsAction
+    ) -> PublicGetImageInstalledAgentsActionResult:
         image_ids = action.image_ids
         agent_counts_per_image = await self._image_repository.get_image_installed_agents(image_ids)
-        return GetImageInstalledAgentsActionResult(data=agent_counts_per_image)
+        return PublicGetImageInstalledAgentsActionResult(data=agent_counts_per_image)
 
     async def get_all_images(
         self, action: PublicGetAllImagesAction
@@ -410,6 +419,26 @@ class ImageService:
             action.image_canonical, action.architecture
         )
         return ClearImageCustomResourceLimitActionResult(image_data=image_data)
+
+    async def get_images_by_ids(
+        self, action: PublicGetImagesByIdsAction
+    ) -> PublicGetImagesByIdsActionResult:
+        querier = BatchQuerier(
+            pagination=NoPagination(),
+            conditions=[ImageConditions.by_ids(action.image_ids)],
+        )
+        result = await self._image_repository.search_images(querier)
+        return PublicGetImagesByIdsActionResult(data=result.items)
+
+    async def get_image_aliases_by_ids(
+        self, action: PublicGetImageAliasesByIdsAction
+    ) -> PublicGetImageAliasesByIdsActionResult:
+        querier = BatchQuerier(
+            pagination=NoPagination(),
+            conditions=[ImageAliasConditions.by_ids(action.alias_ids)],
+        )
+        result = await self._image_repository.search_aliases(querier)
+        return PublicGetImageAliasesByIdsActionResult(data=result.items)
 
     async def search_images(self, action: SearchImagesAction) -> SearchImagesActionResult:
         """

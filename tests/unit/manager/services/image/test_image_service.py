@@ -59,7 +59,7 @@ from ai.backend.manager.services.image.actions.forget_image import (
     ForgetImageByIdAction,
 )
 from ai.backend.manager.services.image.actions.get_image_installed_agents import (
-    GetImageInstalledAgentsAction,
+    PublicGetImageInstalledAgentsAction,
 )
 from ai.backend.manager.services.image.actions.preload_image import PreloadImageAction
 from ai.backend.manager.services.image.actions.purge_images import (
@@ -1220,7 +1220,7 @@ class TestGetImageInstalledAgents(ImageServiceBaseFixtures):
             return_value={image_data.id: {agent_id_1, agent_id_2}}
         )
 
-        action = GetImageInstalledAgentsAction(image_ids=[image_data.id])
+        action = PublicGetImageInstalledAgentsAction(image_ids=[image_data.id])
 
         result = await image_service.get_image_installed_agents(action)
 
@@ -1238,7 +1238,7 @@ class TestGetImageInstalledAgents(ImageServiceBaseFixtures):
             return_value={image_data.id: set()}
         )
 
-        action = GetImageInstalledAgentsAction(image_ids=[image_data.id])
+        action = PublicGetImageInstalledAgentsAction(image_ids=[image_data.id])
 
         result = await image_service.get_image_installed_agents(action)
 
@@ -1252,7 +1252,7 @@ class TestGetImageInstalledAgents(ImageServiceBaseFixtures):
         """Non-existent image returns empty mapping."""
         mock_image_repository.get_image_installed_agents = AsyncMock(return_value={})
 
-        action = GetImageInstalledAgentsAction(image_ids=[ImageID(uuid.uuid4())])
+        action = PublicGetImageInstalledAgentsAction(image_ids=[ImageID(uuid.uuid4())])
 
         result = await image_service.get_image_installed_agents(action)
 

@@ -32,8 +32,8 @@ from ai.backend.manager.services.image.actions.get_all_images import (
     PublicGetAllImagesActionResult,
 )
 from ai.backend.manager.services.image.actions.get_image_installed_agents import (
-    GetImageInstalledAgentsAction,
-    GetImageInstalledAgentsActionResult,
+    PublicGetImageInstalledAgentsAction,
+    PublicGetImageInstalledAgentsActionResult,
 )
 from ai.backend.manager.services.image.actions.get_images import (
     PublicGetImageByIdAction,
@@ -42,6 +42,12 @@ from ai.backend.manager.services.image.actions.get_images import (
     PublicGetImageByIdentifierActionResult,
     PublicGetImagesByCanonicalsAction,
     PublicGetImagesByCanonicalsActionResult,
+)
+from ai.backend.manager.services.image.actions.get_images_by_ids import (
+    PublicGetImageAliasesByIdsAction,
+    PublicGetImageAliasesByIdsActionResult,
+    PublicGetImagesByIdsAction,
+    PublicGetImagesByIdsActionResult,
 )
 from ai.backend.manager.services.image.actions.preload_image import (
     PreloadImageAction,
@@ -137,11 +143,17 @@ class ImageProcessors:
     public_get_images_by_canonicals: PublicActionProcessor[
         PublicGetImagesByCanonicalsAction, PublicGetImagesByCanonicalsActionResult
     ]
-    get_image_installed_agents: GlobalActionProcessor[
-        GetImageInstalledAgentsAction, GetImageInstalledAgentsActionResult
+    public_get_image_installed_agents: PublicActionProcessor[
+        PublicGetImageInstalledAgentsAction, PublicGetImageInstalledAgentsActionResult
     ]
     public_get_all_images: PublicActionProcessor[
         PublicGetAllImagesAction, PublicGetAllImagesActionResult
+    ]
+    public_get_images_by_ids: PublicActionProcessor[
+        PublicGetImagesByIdsAction, PublicGetImagesByIdsActionResult
+    ]
+    public_get_image_aliases_by_ids: PublicActionProcessor[
+        PublicGetImageAliasesByIdsAction, PublicGetImageAliasesByIdsActionResult
     ]
     search_images: GlobalActionProcessor[SearchImagesAction, SearchImagesActionResult]
     search_aliases: GlobalActionProcessor[SearchAliasesAction, SearchAliasesActionResult]
@@ -154,12 +166,18 @@ class ImageProcessors:
         self.public_get_image_by_identifier = group.public(
             PublicGetImageByIdentifierAction, service.get_image_by_identifier
         )
+        self.public_get_images_by_ids = group.public(
+            PublicGetImagesByIdsAction, service.get_images_by_ids
+        )
+        self.public_get_image_aliases_by_ids = group.public(
+            PublicGetImageAliasesByIdsAction, service.get_image_aliases_by_ids
+        )
         self.public_get_images_by_canonicals = group.public(
             PublicGetImagesByCanonicalsAction, service.get_images_by_canonicals
         )
 
-        self.get_image_installed_agents = group.global_scope(
-            GetImageInstalledAgentsAction, service.get_image_installed_agents
+        self.public_get_image_installed_agents = group.public(
+            PublicGetImageInstalledAgentsAction, service.get_image_installed_agents
         )
         self.forget_image = group.global_scope(ForgetImageAction, service.forget_image)
         self.search_images = group.global_scope(SearchImagesAction, service.search_images)
