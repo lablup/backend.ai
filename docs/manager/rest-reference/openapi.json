@@ -2287,14 +2287,6 @@
         "title": "AdminSearchArtifactsInput",
         "type": "object"
       },
-      "Sentinel": {
-        "description": "A sentinel value to represent an unset value.",
-        "enum": [
-          1
-        ],
-        "title": "Sentinel",
-        "type": "integer"
-      },
       "UpdateArtifactInput": {
         "description": "Input for updating artifact metadata.",
         "properties": {
@@ -2317,14 +2309,10 @@
                 "type": "string"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
-            "description": "Updated description. Use SENTINEL to clear the field; None means no change.",
+            "description": "Updated description. Omit to leave unchanged; null clears.",
             "title": "Description"
           }
         },
@@ -5411,6 +5399,14 @@
         },
         "title": "AdminSearchDeploymentsInput",
         "type": "object"
+      },
+      "Sentinel": {
+        "description": "A sentinel value to represent an unset value.",
+        "enum": [
+          1
+        ],
+        "title": "Sentinel",
+        "type": "integer"
       },
       "UpdateDeploymentInput": {
         "description": "Input for updating a deployment.",
