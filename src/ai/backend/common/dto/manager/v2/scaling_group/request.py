@@ -6,7 +6,8 @@ from __future__ import annotations
 
 from pydantic import Field
 
-from ai.backend.common.api_handlers import SENTINEL, BaseRequestModel, Sentinel
+from ai.backend.common.api_handlers import BaseRequestModel
+from ai.backend.common.tristate.unset import UNSET, Unset
 from ai.backend.common.types import PreemptionOrder, PreemptionVictimScope
 
 from .types import PreemptionMode, SchedulerType
@@ -66,19 +67,17 @@ class UpdateScalingGroupInput(BaseRequestModel):
         default=None,
         description="Whether the scaling group is public. Leave null to keep existing value.",
     )
-    description: str | Sentinel | None = Field(
-        default=SENTINEL,
-        description=(
-            "Human-readable description. Use SENTINEL to clear, null to keep existing value."
-        ),
+    description: str | None | Unset = Field(
+        default=UNSET,
+        description="Human-readable description. Omit to leave unchanged; null clears.",
     )
-    wsproxy_addr: str | Sentinel | None = Field(
-        default=SENTINEL,
-        description="WebSocket proxy address. Use SENTINEL to clear, null to keep existing value.",
+    wsproxy_addr: str | None | Unset = Field(
+        default=UNSET,
+        description="WebSocket proxy address. Omit to leave unchanged; null clears.",
     )
-    wsproxy_api_token: str | Sentinel | None = Field(
-        default=SENTINEL,
-        description="WebSocket proxy API token. Use SENTINEL to clear, null to keep existing value.",
+    wsproxy_api_token: str | None | Unset = Field(
+        default=UNSET,
+        description="WebSocket proxy API token. Omit to leave unchanged; null clears.",
     )
     use_host_network: bool | None = Field(
         default=None,

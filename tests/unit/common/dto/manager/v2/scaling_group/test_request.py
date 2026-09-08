@@ -5,7 +5,6 @@ from __future__ import annotations
 import pytest
 from pydantic import ValidationError
 
-from ai.backend.common.api_handlers import SENTINEL, Sentinel
 from ai.backend.common.dto.manager.v2.scaling_group.request import (
     PreemptionConfigInput,
     UpdateScalingGroupInput,
@@ -15,6 +14,7 @@ from ai.backend.common.dto.manager.v2.scaling_group.types import (
     SchedulerType,
 )
 from ai.backend.common.exception import BackendAISchemaValidationFailed
+from ai.backend.common.tristate.unset import UNSET, Unset
 from ai.backend.common.types import PreemptionOrder
 
 
@@ -96,14 +96,14 @@ class TestUpdateScalingGroupInput:
 
     def test_default_sentinel_fields(self) -> None:
         req = UpdateScalingGroupInput()
-        assert req.description is SENTINEL
-        assert isinstance(req.description, Sentinel)
-        assert req.wsproxy_addr is SENTINEL
-        assert req.wsproxy_api_token is SENTINEL
+        assert req.description is UNSET
+        assert isinstance(req.description, Unset)
+        assert req.wsproxy_addr is UNSET
+        assert req.wsproxy_api_token is UNSET
 
     def test_sentinel_description_signals_clear(self) -> None:
-        req = UpdateScalingGroupInput(description=SENTINEL)
-        assert req.description is SENTINEL
+        req = UpdateScalingGroupInput(description=UNSET)
+        assert req.description is UNSET
 
     def test_none_description_means_no_change(self) -> None:
         req = UpdateScalingGroupInput(description=None)
