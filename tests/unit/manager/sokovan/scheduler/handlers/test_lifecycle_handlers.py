@@ -640,46 +640,80 @@ class TestStartSessionsLifecycleHandler:
         for success in result.successes:
             assert success.reason == "triggered-by-scheduler"
 
-    async def test_a_session_whose_kernels_were_all_reset_is_completed_not_started(
+    @pytest.mark.parametrize(
+        ("statuses", "container_ids", "expected"),
+        [
+            # Every kernel where a start begins from.
+            ([KernelStatus.PREPARED, KernelStatus.PREPARED], [None, None], "start"),
+            # The crash half-state: kernels reset, session did not follow.
+            ([KernelStatus.PENDING, KernelStatus.PENDING], [None, None], "requeue"),
+            # A mixture with nothing dispatched. Nothing is running, so the whole session goes
+            # back in the queue rather than being half rebuilt.
+            ([KernelStatus.PENDING, KernelStatus.PREPARED], [None, None], "requeue"),
+            ([KernelStatus.PENDING, KernelStatus.SCHEDULED], [None, None], "requeue"),
+            # A kernel that may hold a container, by status...
+            ([KernelStatus.PENDING, KernelStatus.RUNNING], [None, None], "not_ours"),
+            ([KernelStatus.PENDING, KernelStatus.CREATING], [None, None], "not_ours"),
+            ([KernelStatus.PENDING, KernelStatus.TERMINATING], [None, None], "not_ours"),
+            ([KernelStatus.PENDING, KernelStatus.TERMINATED], [None, None], "not_ours"),
+            # ...or because it still names one. A stale container id under a PENDING kernel is
+            # exactly the case where "it looks unbound" is wrong.
+            ([KernelStatus.PENDING, KernelStatus.PENDING], [None, "cid-1"], "not_ours"),
+        ],
+    )
+    async def test_what_it_does_with_each_shape_of_session(
         self,
         handler: StartSessionsLifecycleHandler,
         mock_launcher: AsyncMock,
         mock_repository: AsyncMock,
         prepared_session: SessionWithKernels,
+        sessions_for_start_factory: Callable[..., SessionsForStartWithImages],
+        statuses: list[KernelStatus],
+        container_ids: list[str | None],
+        expected: str,
     ) -> None:
-        """The exact half-state: kernels already PENDING and unbound under a session that has not
-        moved. It is finished here, and the launcher never sees it."""
-        for kernel in prepared_session.kernel_infos:
-            kernel.lifecycle.status = KernelStatus.PENDING
-            kernel.resource.agent = None
+        """The handler's kernel filter is coarse -- the repository returns a session if ANY of its
+        kernels matches -- so three shapes arrive here and each wants a different answer."""
+        session = prepared_session
+        while len(session.kernel_infos) < len(statuses):
+            session.kernel_infos.append(copy.deepcopy(session.kernel_infos[0]))
+        for kernel, status, container_id in zip(
+            session.kernel_infos, statuses, container_ids, strict=True
+        ):
+            kernel.lifecycle.status = status
+            kernel.resource.container_id = container_id
+            kernel.resource.agent = None if status == KernelStatus.PENDING else "a1"
+        mock_repository.search_sessions_with_kernels_and_user.return_value = (
+            sessions_for_start_factory([session])
+        )
 
-        result = await handler.execute(ResourceGroupID(uuid.uuid4()), [prepared_session])
+        result = await handler.execute(ResourceGroupID(uuid.uuid4()), [session])
 
-        assert [t.session_id for t in result.failures] == [
-            prepared_session.session_info.identity.id
-        ]
-        assert result.failures[0].disposition is FailureDisposition.REPLACE
-        mock_launcher.start_sessions_for_handler.assert_not_awaited()
+        session_id = session.session_info.identity.id
+        match expected:
+            case "start":
+                assert [t.session_id for t in result.successes] == [session_id]
+                mock_launcher.start_sessions_for_handler.assert_awaited_once()
+            case "requeue":
+                assert [t.session_id for t in result.failures] == [session_id]
+                assert result.failures[0].disposition is FailureDisposition.REPLACE
+                mock_launcher.start_sessions_for_handler.assert_not_awaited()
+            case "not_ours":
+                assert [t.session_id for t in result.skipped] == [session_id]
+                assert not result.failures
+                mock_launcher.start_sessions_for_handler.assert_not_awaited()
 
-    async def test_a_session_with_mixed_kernel_statuses_is_skipped(
+    async def test_a_session_with_no_kernels_is_requeued_not_started(
         self,
         handler: StartSessionsLifecycleHandler,
         mock_launcher: AsyncMock,
         prepared_session: SessionWithKernels,
     ) -> None:
-        """The filter returns a session if ANY kernel matches, so a session with one PENDING
-        kernel and others elsewhere arrives here too. Starting it would dispatch to the kernels
-        that still have an agent and rebuild half a session."""
-        session = prepared_session
-        # One kernel reset, the rest left where they were.
-        session.kernel_infos.append(replace_kernel_status(session.kernel_infos[0]))
-        session.kernel_infos[0].lifecycle.status = KernelStatus.PENDING
-        session.kernel_infos[0].resource.agent = None
+        prepared_session.kernel_infos.clear()
 
-        result = await handler.execute(ResourceGroupID(uuid.uuid4()), [session])
+        result = await handler.execute(ResourceGroupID(uuid.uuid4()), [prepared_session])
 
-        assert [t.session_id for t in result.skipped] == [session.session_info.identity.id]
-        assert not result.failures
+        assert result.failures[0].disposition is FailureDisposition.REPLACE
         mock_launcher.start_sessions_for_handler.assert_not_awaited()
 
     def test_it_also_selects_a_session_whose_kernels_were_already_reset(self) -> None:

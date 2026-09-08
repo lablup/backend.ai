@@ -2638,6 +2638,12 @@ class AbstractAgent[
 
         Both are shielded: what is being unwound here is usually a cancellation, and a cleanup
         cancelled halfway is the leak it exists to prevent.
+
+        The ownership boundary is container CREATION, not container start and not the handover at
+        the end. A container that exists may be running -- `docker start` can be cancelled after
+        the daemon has acted on it -- and a running container holds its devices, its published
+        ports and its scratch. All three go back through its teardown, in the one order that is
+        safe: stop it, then release.
         """
         running = self.kernel_registry.get(kernel_id)
         if running is not None and running.container_id is not None:
@@ -2647,6 +2653,12 @@ class AbstractAgent[
             # This is also the path a cancelled create takes, which no `except Exception`
             # anywhere below reaches: without it the container was left running, its kernel
             # already out of the registry and nothing queued to destroy it.
+            #
+            # And NOTHING else from here. Not the undo stack, and not
+            # `reconstruct_resource_usage`: the teardown this queues gives the ports back and
+            # rebuilds the allocation maps itself, once the container is actually gone. Doing
+            # either now would do it while the container is still up, which is how a device a
+            # live kernel is using gets handed to the next create.
             await asyncio.shield(
                 asyncio.ensure_future(
                     self.inject_container_lifecycle_event(
@@ -2658,17 +2670,20 @@ class AbstractAgent[
                     )
                 )
             )
-        else:
-            for undo in reversed(made):
-                try:
-                    await asyncio.shield(asyncio.ensure_future(undo()))
-                except Exception:
-                    log.exception(
-                        "create_kernel(kernel:{}, session:{}) could not undo what it had already"
-                        " made on this host",
-                        kernel_id,
-                        session_id,
-                    )
+            return
+        for undo in reversed(made):
+            try:
+                await asyncio.shield(asyncio.ensure_future(undo()))
+            except Exception:
+                log.exception(
+                    "create_kernel(kernel:{}, session:{}) could not undo what it had already"
+                    " made on this host",
+                    kernel_id,
+                    session_id,
+                )
+        # No container of this create's exists, so the allocation maps can be rebuilt from the
+        # ones that do. This is the net under a failure that happened before the backend's own
+        # rollback could run -- a scratch that could not be prepared, say.
         await self.reconstruct_resource_usage()
 
     async def create_kernel(
