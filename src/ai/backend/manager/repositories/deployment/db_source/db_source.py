@@ -138,6 +138,7 @@ from ai.backend.manager.models.endpoint import (
     EndpointTokenRow,
 )
 from ai.backend.manager.models.endpoint.creators import DeploymentCreator
+from ai.backend.manager.models.endpoint.purgers import DeploymentPurger
 from ai.backend.manager.models.endpoint.updaters import (
     DeploymentRolloutClearUpdater,
     DeploymentUpdater,
@@ -847,10 +848,9 @@ class DeploymentDBSource:
         self,
         endpoint_id: DeploymentID,
     ) -> bool:
-        """Delete an endpoint and all its routes in a single transaction."""
-        async with self._begin_session_read_committed() as db_sess:
-            # Delete routes first, then endpoint
-            return await self._delete_routes_and_endpoint(db_sess, endpoint_id)
+        """Delete an endpoint; its routes and policy cascade with it."""
+        async with self._reconcile_ops.write_ops() as w:
+            return await w.purge_entity(DeploymentPurger(deployment_id=endpoint_id)) is not None
 
     # AutoScalingRule operations
 
@@ -1362,27 +1362,6 @@ class DeploymentDBSource:
                 )
 
             return discovery_infos
-
-    async def _delete_routes_and_endpoint(
-        self,
-        db_sess: SASession,
-        endpoint_id: DeploymentID,
-    ) -> bool:
-        """Private method to delete routes, policy, and endpoint in a single transaction."""
-        # First delete all routes for this endpoint
-        routes_query = sa.delete(RoutingRow).where(RoutingRow.endpoint == endpoint_id)
-        await db_sess.execute(routes_query)
-
-        # Delete the deployment policy if exists
-        policy_query = sa.delete(DeploymentPolicyRow).where(
-            DeploymentPolicyRow.endpoint == endpoint_id
-        )
-        await db_sess.execute(policy_query)
-
-        # Then delete the endpoint itself
-        endpoint_query = sa.delete(EndpointRow).where(EndpointRow.id == endpoint_id)
-        result = await db_sess.execute(endpoint_query)
-        return cast(CursorResult[Any], result).rowcount > 0
 
     async def _fetch_endpoint_and_routes(
         self,
