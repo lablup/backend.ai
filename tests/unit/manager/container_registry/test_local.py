@@ -10,11 +10,9 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from ai.backend.manager.container_registry.base import (
-    RescanCounts,
     all_updates,
     concurrency_sema,
     progress_reporter,
-    rescan_counts,
 )
 from ai.backend.manager.container_registry.local import LocalRegistry
 
@@ -48,7 +46,6 @@ def scan_context() -> Iterator[None]:
     """Bind the context variables that the scanner writes its results into."""
     tokens = (
         all_updates.set({}),
-        rescan_counts.set(RescanCounts()),
         concurrency_sema.set(AsyncMock()),
         progress_reporter.set(None),
     )
@@ -56,9 +53,8 @@ def scan_context() -> Iterator[None]:
         yield
     finally:
         all_updates.reset(tokens[0])
-        rescan_counts.reset(tokens[1])
-        concurrency_sema.reset(tokens[2])
-        progress_reporter.reset(tokens[3])
+        concurrency_sema.reset(tokens[1])
+        progress_reporter.reset(tokens[2])
 
 
 @pytest.fixture
@@ -112,7 +108,6 @@ class TestScanTagLocal:
         )
 
         updates = all_updates.get()
-        assert rescan_counts.get().skipped == 0, label
         assert len(updates) == 1, label
         (key,) = updates
         assert key.canonical == "local/ngc-pytorch:26.07-py3"
@@ -148,9 +143,18 @@ class TestScanTagLocal:
 
         setattr(registry.db, "begin_readonly_session", _begin_readonly_session)
 
-        await registry._scan_tag_local(
-            _session_returning(DOCKER_29_INSPECT), {}, "ngc-pytorch", "26.07-py3"
-        )
+        # The skip is only observable through the progress reporter on this branch.
+        reporter = MagicMock()
+        reporter.update = AsyncMock()
+        reporter_token = progress_reporter.set(reporter)
+        try:
+            await registry._scan_tag_local(
+                _session_returning(DOCKER_29_INSPECT), {}, "ngc-pytorch", "26.07-py3"
+            )
+        finally:
+            progress_reporter.reset(reporter_token)
 
         assert all_updates.get() == {}
-        assert rescan_counts.get().skipped == 1
+        reporter.update.assert_awaited_once_with(
+            1, message="Skipped ngc-pytorch:26.07-py3 (already synchronized from a remote registry)"
+        )
