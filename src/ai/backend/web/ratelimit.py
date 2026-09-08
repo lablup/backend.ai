@@ -44,14 +44,14 @@ async def _read_ratelimit_window(request: web.Request) -> RateLimitState | None:
         client_ip = get_client_ip(request)
         if client_ip is None:
             raise UnreachableError("a request over a socket always has a peer address")
-        return await valkey_client.get_ip_rate_limit(client_ip)
+        return await valkey_client.get_ip_rlim_window(client_ip)
     token = session.get("token") or {}
     # Both login handlers store the user id, but sessions outlive an upgrade in Redis:
     # one written before they did carries no user id.
     raw_user_id = token.get("user_id")
     if raw_user_id is None:
         return None
-    return await valkey_client.get_user_rate_limit(UserID(uuid.UUID(raw_user_id)))
+    return await valkey_client.get_user_rlim_window(UserID(uuid.UUID(raw_user_id)))
 
 
 def manager_proxy_rate_limited(handler: Handler) -> Handler:

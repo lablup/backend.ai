@@ -206,7 +206,7 @@ class KeyPair(graphene.ObjectType):  # type: ignore[misc]
             human_readable_name="ratelimit",
         )
         try:
-            rlim_window = await valkey_client.get_user_rate_limit(UserID(self.user))
+            rlim_window = await valkey_client.get_user_rlim_window(UserID(self.user))
             return rlim_window.count if rlim_window is not None else 0
         finally:
             await valkey_client.close()
