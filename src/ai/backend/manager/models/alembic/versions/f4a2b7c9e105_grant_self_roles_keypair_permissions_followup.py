@@ -19,19 +19,20 @@ from alembic import op
 # revision identifiers, used by Alembic.
 revision = "f4a2b7c9e105"
 down_revision = "b93d1c47af52"
-# Part of: NEXT_RELEASE_VERSION
+# Part of: 26.8.4 (backport), 26.9.0 (main)
 branch_labels = None
 depends_on = None
 
-# A role its holder carries on that same holder's user scope: the self role. Derived
-# from the permissions the role already holds, so both the data-migrated roles
-# (``role_user_<username>``) and the runtime ones (``user-<id8>``) match.
+# A system role its holder carries on that same holder's user scope: the self role.
+# Custom roles are left out: one may be assigned to several people, so a keypair grant
+# on it would reach everyone holding it rather than the scope's owner.
 _SELF_ROLES = """
     SELECT DISTINCT p.role_id, p.scope_id
     FROM permissions p
     JOIN user_roles ur ON ur.role_id = p.role_id AND ur.user_id::text = p.scope_id
     JOIN roles r ON r.id = p.role_id
     WHERE p.scope_type = 'user'
+      AND r.source = 'system'
       AND r.status = 'active'
 """
 
