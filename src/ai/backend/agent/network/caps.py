@@ -146,6 +146,20 @@ async def publish_caps(
     session it is given. Written as one value, so the manager can never pair a backend with
     capabilities that were not published together.
     """
+    if boot_id is not None:
+        booted = await etcd.get(agent_boot_key(agent_id), scope=ConfigScopes.GLOBAL)
+        if booted != boot_id:
+            # A later run of this agent id owns these keys now. An agent id restarted quickly
+            # enough has two processes alive at once for a moment, and the old one's last refresh
+            # would otherwise land on top of the new one's advert -- a fresh, correct-looking
+            # record describing a process that is going away.
+            log.warning(
+                "not publishing network capabilities: this run ({}) is no longer the one this"
+                " agent id names ({})",
+                boot_id,
+                booted,
+            )
+            return
     published = dataclasses.replace(caps, backend=backend, vtep_ip=vtep_ip, boot_id=boot_id)
     digest = published.readiness_digest()
     record = json.dumps({**dataclasses.asdict(published), "updated_at": time.time()})
@@ -189,14 +203,29 @@ async def publish_backend(
     await etcd.put(agent_backend_key(agent_id), backend, scope=ConfigScopes.GLOBAL)
 
 
-async def withdraw_caps(etcd: AbstractKVStore, agent_id: str) -> None:
+async def withdraw_caps(etcd: AbstractKVStore, agent_id: str, boot_id: str | None = None) -> None:
     """Take this agent's capability record away.
 
     The record is what admits this node to a cluster-network session, and it is durable with only
     a freshness window standing between a stopped agent and a manager still choosing it. So it is
     removed when the agent stops, and when a refresh could not renew it: an advert nobody can
     renew is not one anybody should act on.
+
+    ``boot_id`` makes it this RUN's advert that is taken away and not whatever stands there. An
+    agent id restarted quickly has two processes alive at once, and the old one's shutdown would
+    otherwise delete the new one's advert -- leaving a node that is up and serving invisible to
+    every placement until its next refresh.
     """
+    if boot_id is not None:
+        booted = await etcd.get(agent_boot_key(agent_id), scope=ConfigScopes.GLOBAL)
+        if booted != boot_id:
+            log.info(
+                "not withdrawing network capabilities: they belong to a later run ({}) of this"
+                " agent id, not this one ({})",
+                booted,
+                boot_id,
+            )
+            return
     # The fence first. A create in flight is conditional on it, so removing it is what stops one
     # from being declared READY on a node that has just stopped being able to serve it; the
     # capability record only stops the NEXT placement.

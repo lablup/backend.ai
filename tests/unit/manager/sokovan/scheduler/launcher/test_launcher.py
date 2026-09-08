@@ -18,6 +18,7 @@ import pytest
 from ai.backend.manager.errors.network import NetworkBackendMismatch
 from ai.backend.manager.sokovan.recorder import RecorderContext
 from ai.backend.manager.sokovan.scheduler.launcher.launcher import SessionLauncher
+from ai.backend.manager.sokovan.scheduler.results import FailureDisposition
 from ai.backend.manager.views.sokovan.config import NetworkSetup
 from ai.backend.manager.views.sokovan.image import ImageConfigData
 from ai.backend.manager.views.sokovan.lifecycle import (
@@ -296,7 +297,10 @@ class TestWhatTheLauncherReportsAsUnstarted:
             )
 
         assert session_for_start_single_kernel.session_id in failed
-        assert "NetworkBackendMismatch" in failed[session_for_start_single_kernel.session_id]
+        failure = failed[session_for_start_single_kernel.session_id]
+        assert "NetworkBackendMismatch" in failure.reason
+        # Nothing was asked of any agent, so this placement is given up and made again elsewhere.
+        assert failure.disposition is FailureDisposition.REPLACE
         # Nothing was asked of any agent, which is what makes this re-placeable.
         mock_agent_client_pool._mock_client.create_kernels.assert_not_awaited()
         mock_repository.update_session_error_info.assert_awaited()
@@ -315,16 +319,16 @@ class TestWhatTheLauncherReportsAsUnstarted:
 
         assert failed == {}
 
-    async def test_a_failure_after_the_kernels_were_requested_is_not_re_placeable(
+    async def test_a_refused_kernel_creation_is_reported_as_a_teardown(
         self,
         launcher: SessionLauncher,
         mock_agent_client_pool: MagicMock,
         session_for_start_single_kernel: SessionDataForStart,
         image_config_default: dict[UUID, ImageConfigData],
     ) -> None:
-        """Once creation has been REQUESTED some of it may be running, so the answer is a teardown
-        and not a second placement. Those keep the old behaviour: the error is recorded and the
-        coordinator's timeout finds it."""
+        """Once creation has been REQUESTED some of it may be running, so there is no second
+        placement to make. But it is not a session that started either: reported as one it sat in
+        CREATING, with kernels missing, until something timed it out."""
         mock_agent_client_pool._mock_client.create_kernels.side_effect = RuntimeError(
             "the agent went away mid-create"
         )
@@ -335,7 +339,8 @@ class TestWhatTheLauncherReportsAsUnstarted:
                 [session_for_start_single_kernel], image_config_default
             )
 
-        assert failed == {}
+        failure = failed[session_for_start_single_kernel.session_id]
+        assert failure.disposition is FailureDisposition.ABANDON
 
 
 class TestSessionLauncherNetworkSetup:

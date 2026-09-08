@@ -138,21 +138,28 @@ class StartSessionsLifecycleHandler(SessionLifecycleHandler):
             sessions_data.image_configs,
         )
 
-        # A session whose kernels were never asked for has not started. Reporting it as started
-        # moved it to CREATING on an agent it cannot run on, where it sat until something timed it
-        # out; reported as a failure it is retried and, once the retry budget is spent, put back
-        # to PENDING for a different agent. That is the answer to a node whose data plane will not
-        # take the session -- it is not advertising it, or it stopped while this was being built.
+        # A session that did not start is not a success, and the two ways of not starting want
+        # opposite things. Nothing asked of any agent -- a node whose data plane refuses the
+        # session -- is a placement to give up and make again elsewhere; that node is now recorded
+        # against the session, so the next one avoids it. Kernels already requested cannot be
+        # placed a second time and are torn down. Both were reported as started, which left the
+        # session in CREATING on a node it was not running on until something timed it out.
         for session in sessions:
             session_info = session.session_info
+            failure = failed.get(session_info.identity.id)
             transition = SessionTransitionInfo(
                 session_id=session_info.identity.id,
                 from_status=session_info.lifecycle.status,
-                reason=failed.get(session_info.identity.id, "triggered-by-scheduler"),
+                reason=failure.reason if failure is not None else "triggered-by-scheduler",
                 creation_id=session_info.identity.creation_id,
                 access_key=AccessKey(session_info.metadata.access_key),
+                # Carried through, because the retry counters cannot work it out: a placement that
+                # will fail identically every time is given up now and made again elsewhere, and
+                # a session whose kernels were already requested somewhere is torn down rather
+                # than placed a second time.
+                disposition=failure.disposition if failure is not None else None,
             )
-            if session_info.identity.id in failed:
+            if failure is not None:
                 result.failures.append(transition)
             else:
                 result.successes.append(transition)
