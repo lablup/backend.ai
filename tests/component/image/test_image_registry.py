@@ -28,7 +28,6 @@ from .conftest import ImageFactoryHelper
 
 class TestImageRescan:
     @pytest.mark.xfail(reason="Requires live container registry", strict=False)
-    @pytest.mark.timeout(10)
     async def test_rescan_returns_response(
         self,
         admin_registry: BackendAIClientRegistry,

@@ -45,8 +45,8 @@ class TestRlimMiddleware:
     def mock_valkey_client(self) -> MagicMock:
         """Mock ValkeyRateLimitClient."""
         client = MagicMock(spec=ValkeyRateLimitClient)
-        client.consume_user_rate_limit = AsyncMock()
-        client.consume_ip_rate_limit = AsyncMock()
+        client.consume_user_rlim_window = AsyncMock()
+        client.consume_ip_rlim_window = AsyncMock()
         return client
 
     @pytest.fixture
@@ -102,10 +102,10 @@ class TestRlimMiddleware:
     ) -> None:
         """The two windows stand apart, so the limit reported says which one governed."""
         # Arrange
-        mock_valkey_client.consume_ip_rate_limit.return_value = RateLimitState(
+        mock_valkey_client.consume_ip_rlim_window.return_value = RateLimitState(
             count=1, limit=_ANONYMOUS_RATELIMIT, reset_after_seconds=_RESET_AFTER_SECONDS
         )
-        mock_valkey_client.consume_user_rate_limit.return_value = RateLimitState(
+        mock_valkey_client.consume_user_rlim_window.return_value = RateLimitState(
             count=1, limit=_RATE_LIMIT, reset_after_seconds=_RESET_AFTER_SECONDS
         )
 
@@ -144,7 +144,7 @@ class TestRlimMiddleware:
     ) -> None:
         """The headers report the window as it stands, whatever limit the request carried."""
         # Arrange
-        mock_valkey_client.consume_user_rate_limit.return_value = RateLimitState(
+        mock_valkey_client.consume_user_rlim_window.return_value = RateLimitState(
             count=case.count, limit=case.limit, reset_after_seconds=_RESET_AFTER_SECONDS
         )
 
@@ -168,7 +168,7 @@ class TestRlimMiddleware:
     ) -> None:
         """One request past the limit is refused, and the quota survives the raise."""
         # Arrange
-        mock_valkey_client.consume_user_rate_limit.return_value = RateLimitState(
+        mock_valkey_client.consume_user_rlim_window.return_value = RateLimitState(
             count=_RATE_LIMIT + 1, limit=_RATE_LIMIT, reset_after_seconds=_RESET_AFTER_SECONDS
         )
 
