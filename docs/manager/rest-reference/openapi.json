@@ -8430,13 +8430,9 @@
                 "type": "string"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
             "title": "Description"
           },
           "rank": {
@@ -8459,13 +8455,9 @@
                 "type": "string"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
             "title": "Image Id"
           },
           "model_definition": {
@@ -8474,13 +8466,9 @@
                 "$ref": "#/components/schemas/PresetModelDefinitionInput"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
             "title": "Model Definition"
           },
           "resource_slots": {
@@ -8545,13 +8533,9 @@
                 "type": "string"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
             "title": "Startup Command"
           },
           "bootstrap_script": {
@@ -8560,13 +8544,9 @@
                 "type": "string"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
             "title": "Bootstrap Script"
           },
           "environ": {
@@ -8605,53 +8585,33 @@
                 "type": "boolean"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
             "title": "Open To Public"
           },
           "replica_count": {
             "anyOf": [
               {
-                "anyOf": [
-                  {
-                    "type": "integer"
-                  },
-                  {
-                    "$ref": "#/components/schemas/Sentinel"
-                  }
-                ],
-                "ge": 0
+                "ge": 0,
+                "type": "integer"
               },
               {
                 "type": "null"
               }
             ],
-            "default": 1,
             "title": "Replica Count"
           },
           "revision_history_limit": {
             "anyOf": [
               {
-                "anyOf": [
-                  {
-                    "type": "integer"
-                  },
-                  {
-                    "$ref": "#/components/schemas/Sentinel"
-                  }
-                ],
-                "ge": 0
+                "ge": 0,
+                "type": "integer"
               },
               {
                 "type": "null"
               }
             ],
-            "default": 1,
             "title": "Revision History Limit"
           },
           "deployment_strategy": {
@@ -8660,13 +8620,9 @@
                 "$ref": "#/components/schemas/DeploymentStrategyInput"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
             "title": "Deployment Strategy"
           }
         },
