@@ -415,6 +415,15 @@ class AbstractKernelCreationContext[KernelObjectType: AbstractKernel](aobject):
     async def prepare_scratch(self) -> None:
         pass
 
+    async def destroy_scratch(self) -> None:
+        """Undo `prepare_scratch`, for a create that does not get past it.
+
+        Not abstract, and a no-op by default: a backend that has nothing to undo is not wrong, and
+        one that does can say so. What is wrong is leaving it: the scratch is real, it takes disk,
+        and the create's failure path only rebuilds the resource accounting -- so a kernel whose
+        network attach was refused left its directory behind with nothing coming back for it.
+        """
+
     @abstractmethod
     async def get_intrinsic_mounts(self) -> Sequence[Mount]:
         return []
@@ -2811,10 +2820,19 @@ class AbstractAgent[
                         kernel_id,
                         session_id,
                     )
+                # What this create has made on the host, in the order it was made. Everything
+                # after the scratch can fail -- the network attach most of all, since it is the
+                # one that talks to another process and refuses a session this node cannot serve
+                # -- and the failure path above only reconstructs the resource accounting. The
+                # scratch directory it leaves behind is real, occupies the disk, and nothing comes
+                # back for it: this is what the dataplane harness records as a leak after a
+                # privnet failure.
+                made: list[Callable[[], Awaitable[None]]] = []
                 try:
                     # Prepare scratch spaces and dotfiles inside it.
                     if not restarting:
                         await ctx.prepare_scratch()
+                        made.append(ctx.destroy_scratch)
                         log.info(
                             "create_kernel(kernel:{}, session:{}) scratch prepared",
                             kernel_id,
@@ -3394,7 +3412,19 @@ class AbstractAgent[
                     # The startup command for the batch-type sessions will be executed by the manager
                     # upon firing of the "session_started" event.
                     return kernel_creation_info
-                except Exception:
+                except BaseException:
+                    # BaseException, not Exception: a cancelled create leaves the same host state
+                    # behind as a failed one, and it is the launcher's timeout that cancels.
+                    for undo in reversed(made):
+                        try:
+                            await undo()
+                        except Exception:
+                            log.exception(
+                                "create_kernel(kernel:{}, session:{}) could not undo what it had"
+                                " already made on this host",
+                                kernel_id,
+                                session_id,
+                            )
                     await self.reconstruct_resource_usage()
                     raise
 

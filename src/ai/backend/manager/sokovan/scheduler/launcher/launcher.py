@@ -44,6 +44,7 @@ from ai.backend.manager.repositories.scheduler import (
     SchedulerRepository,
 )
 from ai.backend.manager.sokovan.recorder.context import RecorderContext
+from ai.backend.manager.sokovan.scheduler.results import FailureDisposition
 from ai.backend.manager.views.sokovan.config import NetworkSetup
 from ai.backend.manager.views.sokovan.image import ImageConfigData
 from ai.backend.manager.views.sokovan.lifecycle import (
@@ -73,6 +74,18 @@ class SessionLauncherArgs:
     network_plugin_ctx: NetworkPluginContext
     config_provider: ManagerConfigProvider
     valkey_schedule: ValkeyScheduleClient
+
+
+@dataclass(frozen=True)
+class StartFailure:
+    """Why a session did not start, and what should happen to it.
+
+    Two kinds, and the difference is whether anything was asked of an agent. Neither is a session
+    that started, which is what the handler used to report for both.
+    """
+
+    reason: str
+    disposition: FailureDisposition
 
 
 class SessionLauncher:
@@ -176,7 +189,7 @@ class SessionLauncher:
         self,
         sessions: list[SessionDataForStart],
         image_configs: dict[UUID, ImageConfigData],
-    ) -> dict[SessionId, str]:
+    ) -> dict[SessionId, StartFailure]:
         """
         Start sessions on agents for the given sessions.
 
@@ -209,7 +222,7 @@ class SessionLauncher:
         self,
         sessions: list[SessionDataForStart],
         image_configs: dict[UUID, ImageConfigData],
-    ) -> dict[SessionId, str]:
+    ) -> dict[SessionId, StartFailure]:
         """
         Start multiple sessions concurrently with individual timeouts.
 
@@ -218,7 +231,7 @@ class SessionLauncher:
         :return: the sessions that could not be started, and why.
         """
 
-        async def start_with_timeout(session: SessionDataForStart) -> str | None:
+        async def start_with_timeout(session: SessionDataForStart) -> StartFailure | None:
             async with async_timeout.timeout(delay=START_SESSION_TIMEOUT_SEC):
                 return await self._start_single_session(session, image_configs)
 
@@ -226,7 +239,7 @@ class SessionLauncher:
             *[start_with_timeout(session) for session in sessions],
             return_exceptions=True,
         )
-        failed: dict[SessionId, str] = {}
+        failed: dict[SessionId, StartFailure] = {}
         for session, result in zip(sessions, results, strict=True):
             if isinstance(result, BaseException):
                 log.warning(
@@ -234,7 +247,11 @@ class SessionLauncher:
                     session.session_id,
                     exc_info=result,
                 )
-                failed[session.session_id] = f"{type(result).__name__}: {result}"
+                # Unknown how far it got, so it is treated as the worse of the two: something may
+                # be running, and a second placement on top of it would be worse than a teardown.
+                failed[session.session_id] = StartFailure(
+                    f"{type(result).__name__}: {result}", FailureDisposition.ABANDON
+                )
             elif result is not None:
                 failed[session.session_id] = result
         return failed
@@ -243,20 +260,18 @@ class SessionLauncher:
         self,
         session: SessionDataForStart,
         image_configs: dict[UUID, ImageConfigData],
-    ) -> str | None:
+    ) -> StartFailure | None:
         """
         Start a single session by creating kernels on agents.
 
         :param session: Session data to start
         :param image_configs: Image configurations indexed by image ID
-        :return: why this session could not be started, if it could not be started AND nothing was
-            asked of any agent yet. That second half is the whole distinction. A session whose
-            network could not be set up has had nothing done to it: no kernel was requested, so
-            the placement can simply be given up and made again somewhere else, and it must be --
-            the node it was placed on is one whose data plane will not take it, and waiting will
-            not change that. Once kernel creation has been REQUESTED, some of it may be running,
-            and the answer is a teardown rather than a second placement; those keep the old
-            behaviour of recording the error and letting the coordinator's timeout find it.
+        :return: why this session did not start, and which of the two kinds of failure it is.
+            Nothing asked of any agent -- a network the node will not set up -- is a placement
+            that will fail identically every time, so it is given up and made again elsewhere.
+            Anything after kernel creation has been REQUESTED cannot be placed a second time,
+            because some of it may be running: that is a teardown. Neither is a session that
+            started, and reporting either as one left it in CREATING on a node it was not on.
         """
         log_fmt = "start-session(s:{}, type:{}, name:{}, ak:{}, cluster_mode:{}): "
         log_args = (
@@ -289,7 +304,24 @@ class SessionLauncher:
                 error_info = convert_to_status_data(e, self._config_provider.config.debug.enabled)
                 log.warning(log_fmt + "failed-network-setup", *log_args, exc_info=True)
                 await self._repository.update_session_error_info(session.session_id, error_info)
-                return f"{type(e).__name__}: {e}"
+                # Recorded against the session so the next placement excludes it: this node's
+                # data plane refused the session, and offering it the same one again is the one
+                # outcome we know does not work.
+                agents = sorted({
+                    AgentId(k.agent_id) for k in session.kernels if k.agent_id is not None
+                })
+                if agents:
+                    try:
+                        await self._valkey_schedule.record_session_failed_agents(
+                            session.session_id, agents
+                        )
+                    except Exception:
+                        log.warning(
+                            log_fmt + "failed to record failed agents in Valkey",
+                            *log_args,
+                            exc_info=True,
+                        )
+                return StartFailure(f"{type(e).__name__}: {e}", FailureDisposition.REPLACE)
             log.debug("ssh connection info mapping: {}", network_setup.cluster_ssh_port_mapping)
 
             # Setup environment variables - similar to registry.py
@@ -464,6 +496,7 @@ class SessionLauncher:
                         kernel_image_refs,
                     )
 
+            failed_agent_ids: list[AgentId] = []
             agent_ids_ordered: list[AgentId] = []
             create_tasks: list[Awaitable[None]] = []
             for agent_id, agent_kernels in kernels_by_agent.items():
@@ -472,7 +505,7 @@ class SessionLauncher:
 
             if create_tasks:
                 results = await asyncio.gather(*create_tasks, return_exceptions=True)
-                failed_agent_ids = [
+                failed_agent_ids += [
                     aid
                     for aid, result in zip(agent_ids_ordered, results, strict=True)
                     if isinstance(result, BaseException)
@@ -494,6 +527,23 @@ class SessionLauncher:
                             exc_info=True,
                         )
 
+            if failed_agent_ids:
+                # Some kernels were requested and some were refused. There is no second placement
+                # to make -- what was accepted may be running -- so this is a teardown, and saying
+                # so now is the difference between a session torn down and a session sitting in
+                # CREATING until something times it out. Reported whether or not any agent
+                # accepted: a session missing kernels is not a session.
+                log.warning(
+                    log_fmt + "failed-on {} of {} agent(s)",
+                    *log_args,
+                    len(failed_agent_ids),
+                    len(agent_ids_ordered),
+                )
+                return StartFailure(
+                    f"kernel creation was refused by {len(failed_agent_ids)} of"
+                    f" {len(agent_ids_ordered)} agent(s)",
+                    FailureDisposition.ABANDON,
+                )
             log.info(log_fmt + "started", *log_args)
 
         except Exception as e:

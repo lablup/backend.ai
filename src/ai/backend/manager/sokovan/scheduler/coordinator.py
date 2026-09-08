@@ -78,6 +78,7 @@ from .post_processors import (
 )
 from .recorder import SessionRecorderContext
 from .results import (
+    FailureDisposition,
     KernelExecutionResult,
     KernelStatusTransitions,
     SessionExecutionResult,
@@ -1293,6 +1294,18 @@ class ScheduleCoordinator:
             session = session_map.get(failure.session_id)
             if not session:
                 # Session not found - skip (shouldn't happen)
+                continue
+
+            # 0. What the handler knows and the counters cannot. A failure it has marked is one
+            # where trying again on this placement is pointless: either nothing was asked of any
+            # agent and the placement itself is the problem (give it up and be scheduled again),
+            # or work was already requested somewhere and there is no second placement to make
+            # (tear it down). Both are answered now rather than after five identical retries.
+            if failure.disposition is FailureDisposition.REPLACE:
+                expired_failures.append(failure)
+                continue
+            if failure.disposition is FailureDisposition.ABANDON:
+                give_up_failures.append(failure)
                 continue
 
             policy = session.session_info.handler_options.resolve(handler_name)

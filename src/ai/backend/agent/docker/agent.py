@@ -591,6 +591,17 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                     )
 
     @override
+    @override
+    async def destroy_scratch(self) -> None:
+        """Take back what `prepare_scratch` made, through the same path a teardown uses."""
+        await _clean_scratch(
+            current_loop(),
+            self.local_config.container.scratch_type,
+            self.local_config.container.scratch_root,
+            self.kernel_id,
+        )
+
+    @override
     async def prepare_scratch(self) -> None:
         loop = current_loop()
 
@@ -2017,10 +2028,9 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
             allowlist=self.local_config.agent.allow_network_plugins,
             blocklist=self.local_config.agent.block_network_plugins,
         )
-        # Last, and only now. This is what admits the node to a cluster-network session, so it is
-        # the commit point of the whole start: nothing that can fail comes after it.
-        await self._publish_network_identity()
-        self._network_identity_task = asyncio.create_task(self._publish_network_identity_forever())
+        # The advert is NOT published here either. It admits the node to a cluster-network
+        # session, and the node cannot serve one until its RPC transport is up -- which happens
+        # after every `__ainit__` has returned. `start_serving` is where it goes.
 
     async def _withdraw_network_identity(self) -> None:
         """Stop advertising this node, and make sure nothing puts the advert back.
@@ -2034,7 +2044,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
         """
         for step in ("first", "final"):
             try:
-                await withdraw_caps(self.etcd, str(self.id))
+                await withdraw_caps(self.etcd, str(self.id), self._boot_id)
             except Exception:
                 log.exception("could not withdraw this agent's network capabilities ({})", step)
             if step == "first" and self._network_identity_task is not None:
@@ -2042,6 +2052,24 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                 with contextlib.suppress(asyncio.CancelledError):
                     await self._network_identity_task
                 self._network_identity_task = None
+
+    @override
+    async def start_serving(self) -> None:
+        """Announce the node, and only then advertise what it can serve.
+
+        The advert is last of all: it is what admits this node to a cluster-network session, and
+        until the RPC transport is up there is nothing here to take one. Published from
+        `__ainit__` it stood over a process that could not yet serve, and a previous run's entry
+        in the manager's own table can keep that node looking ALIVE for its own timeout.
+        """
+        await super().start_serving()
+        await self._publish_network_identity()
+        self._network_identity_task = asyncio.create_task(self._publish_network_identity_forever())
+
+    @override
+    async def stop_serving(self) -> None:
+        await self._withdraw_network_identity()
+        await super().stop_serving()
 
     async def _publish_network_identity_forever(self) -> None:
         """Keep this node's advertised capabilities honest while it runs.
@@ -2146,7 +2174,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
             # diagnostic. With no advert standing it is simply not admitted to a cluster-network
             # session, which is the answer that matters.
             log.exception("could not publish this agent's network capabilities; withdrawing")
-            await withdraw_caps(self.etcd, str(self.id))
+            await withdraw_caps(self.etcd, str(self.id), self._boot_id)
 
     @override
     async def shutdown(self, stop_signal: signal.Signals) -> None:

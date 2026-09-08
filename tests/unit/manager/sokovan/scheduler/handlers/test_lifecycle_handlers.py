@@ -31,7 +31,12 @@ from ai.backend.manager.sokovan.scheduler.handlers.lifecycle.start_sessions impo
 from ai.backend.manager.sokovan.scheduler.handlers.lifecycle.terminate_sessions import (
     TerminateSessionsLifecycleHandler,
 )
-from ai.backend.manager.sokovan.scheduler.results import ScheduleResult, SchedulingSkip
+from ai.backend.manager.sokovan.scheduler.launcher.launcher import StartFailure
+from ai.backend.manager.sokovan.scheduler.results import (
+    FailureDisposition,
+    ScheduleResult,
+    SchedulingSkip,
+)
 from ai.backend.manager.views.sokovan.allocation import SchedulingFailure
 from ai.backend.manager.views.sokovan.lifecycle import (
     SessionsForPullWithImages,
@@ -642,13 +647,21 @@ class TestStartSessionsLifecycleHandler:
         mock_repository.search_sessions_with_kernels_and_user.return_value = sessions_for_start
         failing = prepared_session.session_info.identity.id
         mock_launcher.start_sessions_for_handler = AsyncMock(
-            return_value={failing: "NetworkBackendMismatch: it is not advertising vxlan"}
+            return_value={
+                failing: StartFailure(
+                    "NetworkBackendMismatch: it is not advertising vxlan",
+                    FailureDisposition.REPLACE,
+                )
+            }
         )
 
         result = await handler.execute(ResourceGroupID(uuid.uuid4()), [prepared_session])
 
         assert [t.session_id for t in result.failures] == [failing]
         assert not result.successes
+        # Carried through, so the coordinator gives the placement up now rather than retrying it
+        # five times on the node that refused it.
+        assert result.failures[0].disposition is FailureDisposition.REPLACE
 
     async def test_empty_session_list_returns_empty(
         self,

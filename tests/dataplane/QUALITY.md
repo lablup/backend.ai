@@ -627,3 +627,19 @@ releases the agent allocation. That is a scheduler change with its own blast rad
 be proposed, not slipped into a network branch.
 
 R3 unchanged. Ninth consecutive round of P1s in agent identity/readiness lifecycle.
+
+Twenty-ninth round. The re-placement gap I said I would not guess at is closed, on the evidence
+this review supplied.
+
+| # | Was | Now |
+|---|-----|-----|
+| A11d | a reported failure went through the ordinary retry classification -- `max_retry_count=5`, `timeout=None` -- so five identical retries on the node that refused it and then TERMINATING, not another agent | a handler can say what the counters cannot work out. `FailureDisposition.REPLACE` routes to the existing expired transition (PENDING) at once, and the refusing agent is recorded against the session so the next placement excludes it. `ABANDON` routes to give_up (TERMINATING) at once. Neither is a new status: both are transitions this handler already declares and the timeout path already uses |
+| A11e | a kernel-creation RPC that failed on some or all agents recorded the failed agent ids and returned SUCCESS, so the handler moved the session to CREATING with kernels missing. My own test froze that as `failed == {}` | reported as ABANDON: there is no second placement to make once creation has been requested, and a session missing kernels is not a session |
+| A11f | the create's failure path rebuilt the resource accounting and left the scratch directory behind -- and the step most likely to fail after it is `apply_network`, the one that talks to another process and refuses a session this node cannot serve. The harness records exactly this leak after a privnet failure | the create keeps an undo stack; a scratch it made is destroyed on any exit, cancellation included |
+| C50 | capability publish and withdraw named only the agent id, so an id restarted quickly -- two processes alive at once -- had the old run's last refresh land on the new run's advert, or the old run's shutdown delete it | both are conditional on the boot key still naming this run |
+| C50 | the advert was published at the end of `__ainit__`, while serving begins only after the RPC transport is entered | published in `start_serving`, after the transport, and withdrawn in `stop_serving` |
+
+Still not done: `AsyncEtcd.get_prefix` has no paginated form, the startup reconciliation is
+awaited and unbounded, and there is no inspect/repair/quarantine tool for a corrupt root.
+
+R3 unchanged. Tenth consecutive round of P1s in this path.
