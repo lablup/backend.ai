@@ -7046,6 +7046,51 @@
             "entity_id": "5e96b4ee-2296-495b-90b4-0fc845d13c67",
             "registered_at": "2025-09-12 09:51:58.265582+00",
             "relation_type": "auto"
+        },
+        {
+            "id": "7c85ff00-e5c2-5627-9d4a-75c48255e733",
+            "scope_type": "user",
+            "scope_id": "f38dea23-50fa-42a0-b5ae-338f5f4693f4",
+            "entity_type": "keypair",
+            "entity_id": "AKIAIOSFODNN7EXAMPLE",
+            "registered_at": "2025-09-12 09:51:58.265582+00",
+            "relation_type": "auto"
+        },
+        {
+            "id": "5953ba19-5290-525b-a691-21691b8c51f8",
+            "scope_type": "user",
+            "scope_id": "4f13d193-f646-425a-a340-270c4d2b9860",
+            "entity_type": "keypair",
+            "entity_id": "AKIAHUKCHDEZGEXAMPLE",
+            "registered_at": "2025-09-12 09:51:58.265582+00",
+            "relation_type": "auto"
+        },
+        {
+            "id": "ee04bdf2-5fc7-5f99-a5c9-dc8093bf9bca",
+            "scope_type": "user",
+            "scope_id": "dfa9da54-4b28-432f-be29-c0d680c7a412",
+            "entity_type": "keypair",
+            "entity_id": "AKIANABBDUSEREXAMPLE",
+            "registered_at": "2025-09-12 09:51:58.265582+00",
+            "relation_type": "auto"
+        },
+        {
+            "id": "3cfa4002-0d5a-529c-95c5-ea5b7ab692d8",
+            "scope_type": "user",
+            "scope_id": "009fb1a4-487c-4f6e-9b1b-228b94b1d040",
+            "entity_type": "keypair",
+            "entity_id": "AKIANATWOUSEREXAMPLE",
+            "registered_at": "2025-09-12 09:51:58.265582+00",
+            "relation_type": "auto"
+        },
+        {
+            "id": "8534b805-f576-54bf-acad-e5cbe083cede",
+            "scope_type": "user",
+            "scope_id": "2e10157d-20ca-4bd0-9806-3f909cbcd0e6",
+            "entity_type": "keypair",
+            "entity_id": "AKIANAMONITOREXAMPLE",
+            "registered_at": "2025-09-12 09:51:58.265582+00",
+            "relation_type": "auto"
         }
     ],
     "role_presets": [
@@ -7155,6 +7200,41 @@
             "role_preset_id": "06057849-3534-546f-b74c-b79d5d3ecf5e",
             "entity_type": "model_deployment",
             "operation": "read",
+            "created_at": "2025-09-12 09:51:58.265582+00"
+        },
+        {
+            "id": "bbc6fc69-63c3-59c7-93f0-f83ce26e7d1d",
+            "role_preset_id": "776c1366-dcf3-5abd-b8de-bc3ad3b759ad",
+            "entity_type": "keypair",
+            "operation": "create",
+            "created_at": "2025-09-12 09:51:58.265582+00"
+        },
+        {
+            "id": "025ee359-2400-5577-bfeb-9a1189ac8209",
+            "role_preset_id": "776c1366-dcf3-5abd-b8de-bc3ad3b759ad",
+            "entity_type": "keypair",
+            "operation": "hard-delete",
+            "created_at": "2025-09-12 09:51:58.265582+00"
+        },
+        {
+            "id": "fbbac31d-709f-51a5-b3a5-49f05d909db8",
+            "role_preset_id": "776c1366-dcf3-5abd-b8de-bc3ad3b759ad",
+            "entity_type": "keypair",
+            "operation": "read",
+            "created_at": "2025-09-12 09:51:58.265582+00"
+        },
+        {
+            "id": "db16eb2f-39e0-5b90-85aa-f3c3eac84177",
+            "role_preset_id": "776c1366-dcf3-5abd-b8de-bc3ad3b759ad",
+            "entity_type": "keypair",
+            "operation": "soft-delete",
+            "created_at": "2025-09-12 09:51:58.265582+00"
+        },
+        {
+            "id": "42a1d35d-784d-5061-8ed0-9388dc7e3153",
+            "role_preset_id": "776c1366-dcf3-5abd-b8de-bc3ad3b759ad",
+            "entity_type": "keypair",
+            "operation": "update",
             "created_at": "2025-09-12 09:51:58.265582+00"
         },
         {
