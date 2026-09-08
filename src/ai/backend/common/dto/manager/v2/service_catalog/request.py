@@ -10,8 +10,9 @@ from uuid import UUID
 
 from pydantic import Field, field_validator
 
-from ai.backend.common.api_handlers import SENTINEL, BaseRequestModel, Sentinel
+from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.dto.manager.query import StringFilter
+from ai.backend.common.tristate.unset import UNSET, Unset
 from ai.backend.common.types import ServiceCatalogStatus
 
 from .types import OrderDirection, ServiceCatalogOrderField, ServiceCatalogStatusFilter
@@ -94,8 +95,8 @@ class UpdateServiceCatalogInput(BaseRequestModel):
         description="Updated display name",
     )
     version: str | None = Field(default=None, description="Updated version string")
-    labels: dict[str, Any] | Sentinel | None = Field(
-        default=SENTINEL, description="Updated labels. Use SENTINEL to clear."
+    labels: dict[str, Any] | None | Unset = Field(
+        default=UNSET, description="Updated labels. Omit to leave unchanged; null clears."
     )
     status: ServiceCatalogStatus | None = Field(default=None, description="Updated service status")
     config_hash: str | None = Field(default=None, description="Updated configuration hash")

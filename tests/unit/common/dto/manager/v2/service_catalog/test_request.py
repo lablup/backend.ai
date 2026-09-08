@@ -9,7 +9,6 @@ from typing import Any
 import pytest
 from pydantic import ValidationError
 
-from ai.backend.common.api_handlers import SENTINEL, Sentinel
 from ai.backend.common.dto.manager.v2.service_catalog.request import (
     CreateServiceCatalogInput,
     DeleteServiceCatalogInput,
@@ -18,6 +17,7 @@ from ai.backend.common.dto.manager.v2.service_catalog.request import (
     UpdateServiceCatalogInput,
 )
 from ai.backend.common.exception import BackendAISchemaValidationFailed
+from ai.backend.common.tristate.unset import UNSET, Unset
 from ai.backend.common.types import ServiceCatalogStatus
 
 
@@ -219,17 +219,17 @@ class TestUpdateServiceCatalogInput:
         assert inp.status is None
         assert inp.config_hash is None
 
-    def test_default_labels_is_sentinel(self) -> None:
+    def test_default_labels_is_unset(self) -> None:
         inp = UpdateServiceCatalogInput()
-        assert inp.labels is SENTINEL
-        assert isinstance(inp.labels, Sentinel)
+        assert inp.labels is UNSET
+        assert isinstance(inp.labels, Unset)
 
-    def test_explicit_sentinel_labels_signals_clear(self) -> None:
-        inp = UpdateServiceCatalogInput(labels=SENTINEL)
-        assert inp.labels is SENTINEL
-        assert isinstance(inp.labels, Sentinel)
+    def test_explicit_unset_labels_leaves_unchanged(self) -> None:
+        inp = UpdateServiceCatalogInput(labels=UNSET)
+        assert inp.labels is UNSET
+        assert isinstance(inp.labels, Unset)
 
-    def test_none_labels_means_no_change(self) -> None:
+    def test_none_labels_clears(self) -> None:
         inp = UpdateServiceCatalogInput(labels=None)
         assert inp.labels is None
 
