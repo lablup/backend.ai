@@ -10846,14 +10846,10 @@
                 "type": "string"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
-            "description": "Updated description. Omit to leave unchanged or pass null to clear.",
+            "description": "Updated description. Omit to leave unchanged; null clears.",
             "title": "Description"
           },
           "target_session_types": {
