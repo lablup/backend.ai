@@ -47,6 +47,8 @@ async def security_policy_middleware(request: web.Request, handler: Handler) -> 
         security_policy.check_request_policies(request)
         response = await handler(request)
     except web.HTTPException as e:
+        # A raised response never reaches the return path below, so it would
+        # otherwise ship without the security headers.
         security_policy.apply_response_policies(e)
         raise
     else:
