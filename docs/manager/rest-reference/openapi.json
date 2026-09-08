@@ -15462,14 +15462,10 @@
                 "type": "string"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
-            "description": "Updated region. Use SENTINEL (default) for no change, None to clear.",
+            "description": "Updated region. Omit to leave unchanged; null clears.",
             "title": "Region"
           }
         },
