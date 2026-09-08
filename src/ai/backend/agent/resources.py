@@ -80,9 +80,11 @@ if TYPE_CHECKING:
 
 
 type DeviceAllocation = Mapping[SlotName, Mapping[DeviceId, Decimal]]
+type DeviceCapacityMap = Mapping[tuple[SlotName, DeviceId], Decimal]
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 known_slot_types: Mapping[SlotName, SlotTypes] = {}
+_GPU_ALLOC_RATIO_PRECISION = Decimal("0.0001")
 
 
 def _combine_mappings(mappings: list[Mapping[SlotName, Decimal]]) -> dict[SlotName, Decimal]:
@@ -921,11 +923,52 @@ async def scan_resource_usage_per_slot(
     return slot_allocs
 
 
+def collect_device_capacities(
+    computers: Mapping[DeviceName, ComputerContext],
+) -> DeviceCapacityMap:
+    """
+    Collect the allocatable capacity of each device in its own slot unit,
+    which is the denominator to normalize recorded allocations into ratios.
+    """
+    return {
+        (slot_info.slot_name, device_id): slot_info.amount
+        for computer_ctx in computers.values()
+        for device_id, slot_info in computer_ctx.alloc_map.device_slots.items()
+    }
+
+
+def _normalize_device_alloc(
+    device_capacities: DeviceCapacityMap,
+    slot_name: SlotName,
+    device_id: DeviceId,
+    alloc: Decimal,
+) -> Decimal:
+    """
+    Convert a recorded allocation into a ratio (0 to 1) of the device's capacity.
+    """
+    capacity = device_capacities.get((slot_name, device_id))
+    if capacity is None or capacity <= 0:
+        # The device is no longer in the alloc map (e.g. removed or masked),
+        # so the ratio is unknown and the raw amount is reported as-is.
+        log.warning(
+            "scan_gpu_alloc_map(): no capacity for {}:{} (capacity:{!r}), "
+            "reporting the raw allocation {}",
+            slot_name,
+            device_id,
+            capacity,
+            alloc,
+        )
+        return alloc
+    return alloc / capacity
+
+
 async def scan_gpu_alloc_map(
-    kernel_ids: Sequence[KernelId], scratch_root: Path
+    kernel_ids: Sequence[KernelId],
+    scratch_root: Path,
+    device_capacities: DeviceCapacityMap,
 ) -> dict[DeviceId, Decimal]:
     """
-    Fetch the current allocated amounts for fractional gpu from
+    Fetch the current allocated ratio (0 to 1) of each gpu device from
     ``/home/config/resource.txt`` files in the kernel containers managed by this agent.
     """
 
@@ -939,13 +982,11 @@ async def scan_gpu_alloc_map(
             resource_spec = KernelResourceSpec.read_from_string(content)
 
             if cuda := resource_spec.allocations.get(DeviceName("cuda")):
-                if cuda_shares := cuda.get(SlotName("cuda.shares")):
-                    for device_id, shares in cuda_shares.items():
-                        alloc_map[device_id] += Decimal(shares)
-
-                if cuda_device := cuda.get(SlotName("cuda.device")):
-                    for device_id, device in cuda_device.items():
-                        alloc_map[device_id] += Decimal(device)
+                for slot_name, per_device_alloc in cuda.items():
+                    for device_id, alloc in per_device_alloc.items():
+                        alloc_map[device_id] += _normalize_device_alloc(
+                            device_capacities, slot_name, device_id, Decimal(alloc)
+                        )
 
         except FileNotFoundError:
             return {}
@@ -978,7 +1019,10 @@ async def scan_gpu_alloc_map(
         for device_id, alloc in alloc_map.items():
             gpu_alloc_map[device_id] += alloc
 
-    return gpu_alloc_map
+    return {
+        device_id: alloc.quantize(_GPU_ALLOC_RATIO_PRECISION)
+        for device_id, alloc in gpu_alloc_map.items()
+    }
 
 
 def allocate(
