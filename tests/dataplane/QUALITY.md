@@ -643,3 +643,22 @@ Still not done: `AsyncEtcd.get_prefix` has no paginated form, the startup reconc
 awaited and unbounded, and there is no inspect/repair/quarantine tool for a corrupt root.
 
 R3 unchanged. Tenth consecutive round of P1s in this path.
+
+Thirtieth round. Three of the four closed; the fourth is named and declined.
+
+| # | Was | Now |
+|---|-----|-----|
+| C50 | the boot-ownership check read the key and then wrote, which is the TOCTOU the check was meant to close. A new run publishing between the two had its advert overwritten by the old run's refresh, or deleted by its shutdown | the condition travels WITH every write, as a guard in the same store operation -- caps, the readiness fence and the VTEP alike. A write that has lost the id does not land. The test drives a new run in on the first read, which is where the window actually is |
+| A11e | only the network failure was returned. Anything else before the first agent call -- the SSH keypair, a session with no kernels, a session whose kernels have no agent -- fell through to "no failure" and the session was reported as started | no exception path returns success. `dispatched` says which of the two kinds it is: before the first agent call the placement is the problem and the session is made again elsewhere; after it, something may be running and it is a teardown |
+| A11f | the scratch undo was registered AFTER `prepare_scratch`, so a preparation that failed part-way left what it had made; and it stayed armed for the whole create, so a failure after the container was up -- publishing an event, say -- deleted the scratch under a running container | registered before it is made, and disarmed the moment the container is running and in the registry, where teardown becomes the kernel lifecycle's job |
+
+NOT done, and named rather than guessed at: the session's PENDING transition, the kernel reset,
+the allocation release and the agent unbinding are separate operations, so a manager that dies
+between them leaves a PENDING session with PREPARED kernels still holding an agent -- which the
+scheduler will then schedule again. Closing it means one DB transaction across repository methods
+whose boundaries I have not read, and the failure mode of getting that wrong is worse than the one
+it fixes. It wants someone who owns the scheduler repository.
+
+Startup reconciliation is still awaited, unbounded and unpaginated.
+
+R3 unchanged.
