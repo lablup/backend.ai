@@ -20,6 +20,7 @@ from ai.backend.common.clients.valkey_client.valkey_rate_limit.client import (
     ValkeyRateLimitClient,
 )
 from ai.backend.common.data.entity.user import UserID
+from ai.backend.common.exception import UnreachableError
 from ai.backend.common.web.session import get_session
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.web.auth import get_client_ip
@@ -34,15 +35,15 @@ type Handler = Callable[[web.Request], Awaitable[web.StreamResponse]]
 async def _read_ratelimit_window(request: web.Request) -> RateLimitState | None:
     """The window the manager will count this request in.
 
-    None when this server cannot name one: an anonymous caller it can see no address
-    for, a session stored before the login handler kept the user id, or no open window.
+    None when this server cannot name one: a session stored before the login handler
+    kept the user id, or no open window.
     """
     valkey_client: ValkeyRateLimitClient = request.app["valkey_rate_limit"]
     session = await get_session(request)
     if not session.get("authenticated", False):
         client_ip = get_client_ip(request)
         if client_ip is None:
-            return None
+            raise UnreachableError("a request over a socket always has a peer address")
         return await valkey_client.get_ip_rate_limit(client_ip)
     token = session.get("token") or {}
     raw_user_id = token.get("user_id")
