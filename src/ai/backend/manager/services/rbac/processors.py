@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from ai.backend.manager.actions.monitors.monitor import ActionMonitor
+from ai.backend.manager.actions.processor import ActionProcessor
 from ai.backend.manager.actions.registry.group import ProcessorGroup
 from ai.backend.manager.actions.registry.relation import RelationGroup
 from ai.backend.manager.actions.v2.relation.processor import RelationActionProcessor
@@ -21,6 +23,22 @@ from ai.backend.manager.services.rbac.actions.relation.switch import (
     RestoreRelationAction,
     RestoreRelationActionResult,
 )
+from ai.backend.manager.services.rbac.actions.role.assign import (
+    AssignRoleAction,
+    AssignRoleActionResult,
+)
+from ai.backend.manager.services.rbac.actions.role.bulk_assign import (
+    BulkAssignRoleAction,
+    BulkAssignRoleActionResult,
+)
+from ai.backend.manager.services.rbac.actions.role.bulk_revoke import (
+    BulkRevokeRoleAction,
+    BulkRevokeRoleActionResult,
+)
+from ai.backend.manager.services.rbac.actions.role.revoke import (
+    RevokeRoleAction,
+    RevokeRoleActionResult,
+)
 from ai.backend.manager.services.rbac.actions.roster.join_project import (
     JoinProjectAction,
     JoinProjectActionResult,
@@ -29,7 +47,11 @@ from ai.backend.manager.services.rbac.actions.roster.leave_project import (
     LeaveProjectAction,
     LeaveProjectActionResult,
 )
-from ai.backend.manager.services.rbac.service import RbacRelationService, RbacRosterService
+from ai.backend.manager.services.rbac.service import (
+    RbacRelationService,
+    RbacRoleService,
+    RbacRosterService,
+)
 
 __all__ = ("RbacProcessors",)
 
@@ -44,6 +66,9 @@ class RbacProcessors:
     every scope it names, so a caller reaching one side alone gets nothing. A roster
     place asks the ``user`` permission at the project, the one scope a user inside a
     project is in.
+
+    Granting a role and taking it back sit here too: each writes a roster place beside
+    the role row, and the two have to land together.
     """
 
     create_relation: RelationActionProcessor[
@@ -60,6 +85,10 @@ class RbacProcessors:
     ]
     join_project: ScopeActionProcessor[JoinProjectAction, JoinProjectActionResult]
     leave_project: ScopeActionProcessor[LeaveProjectAction, LeaveProjectActionResult]
+    assign_role: ActionProcessor[AssignRoleAction, AssignRoleActionResult]
+    revoke_role: ActionProcessor[RevokeRoleAction, RevokeRoleActionResult]
+    bulk_assign_role: ActionProcessor[BulkAssignRoleAction, BulkAssignRoleActionResult]
+    bulk_revoke_role: ActionProcessor[BulkRevokeRoleAction, BulkRevokeRoleActionResult]
 
     def __init__(
         self,
@@ -67,6 +96,8 @@ class RbacProcessors:
         roster_group: ProcessorGroup[UserData],
         service: RbacRelationService,
         roster_service: RbacRosterService,
+        role_service: RbacRoleService,
+        action_monitors: list[ActionMonitor],
     ) -> None:
         self.create_relation = group.relation(CreateRelationAction, service.create)
         self.purge_relation = group.relation(PurgeRelationAction, service.purge)
@@ -74,3 +105,7 @@ class RbacProcessors:
         self.restore_relation = group.relation(RestoreRelationAction, service.restore)
         self.join_project = roster_group.scope(JoinProjectAction, roster_service.join)
         self.leave_project = roster_group.scope(LeaveProjectAction, roster_service.leave)
+        self.assign_role = ActionProcessor(role_service.assign_role, action_monitors)
+        self.revoke_role = ActionProcessor(role_service.revoke_role, action_monitors)
+        self.bulk_assign_role = ActionProcessor(role_service.bulk_assign_role, action_monitors)
+        self.bulk_revoke_role = ActionProcessor(role_service.bulk_revoke_role, action_monitors)

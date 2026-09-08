@@ -33,6 +33,9 @@ from ai.backend.manager.repositories.domain.repository import DomainRepository
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.ops.v2.relation.provider import RelationOpsProvider
 from ai.backend.manager.repositories.ops.v2.roster.provider import RosterOpsProvider
+from ai.backend.manager.repositories.permission_controller.repository import (
+    PermissionControllerRepository,
+)
 from ai.backend.manager.repositories.rbac.relation_repository import RbacRelationRepository
 from ai.backend.manager.repositories.rbac.roster_repository import RbacRosterRepository
 from ai.backend.manager.repositories.resource_group.repository import ResourceGroupRepository
@@ -40,7 +43,11 @@ from ai.backend.manager.services.domain.processors import DomainProcessors
 from ai.backend.manager.services.domain.service import DomainService
 from ai.backend.manager.services.processors import Processors
 from ai.backend.manager.services.rbac.processors import RbacProcessors
-from ai.backend.manager.services.rbac.service import RbacRelationService, RbacRosterService
+from ai.backend.manager.services.rbac.service import (
+    RbacRelationService,
+    RbacRoleService,
+    RbacRosterService,
+)
 from ai.backend.manager.services.resource_group.processors import ResourceGroupProcessors
 from ai.backend.manager.services.resource_group.service import ResourceGroupService
 
@@ -81,6 +88,11 @@ def rbac_processors(
         rbac_groups.group(GroupMeta(USER_ENTITY_TYPE)),
         RbacRelationService(RbacRelationRepository(RelationOpsProvider(database_engine))),
         RbacRosterService(RbacRosterRepository(RosterOpsProvider(database_engine))),
+        RbacRoleService(
+            PermissionControllerRepository(database_engine),
+            RbacRosterRepository(RosterOpsProvider(database_engine)),
+        ),
+        [],
     )
 
 

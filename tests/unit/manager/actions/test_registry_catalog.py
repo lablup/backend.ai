@@ -392,6 +392,8 @@ def test_every_defined_v2_action_is_wired() -> None:
         rbac_groups.group(GroupMeta(USER_ENTITY_TYPE)),
         MagicMock(),
         MagicMock(),
+        MagicMock(),
+        [],
     )
     RuntimeVariantProcessors(registry.group(GroupMeta(RUNTIME_VARIANT_ENTITY_TYPE)))
     ObjectStorageProcessors(

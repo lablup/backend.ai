@@ -1,9 +1,6 @@
 import logging
 from collections.abc import Sequence
-from typing import cast
 
-from ai.backend.common.data.entity.project import ProjectID
-from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.permission.types import OperationType, RBACElementType, ScopeType
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.actions.action.rbac import (
@@ -11,25 +8,8 @@ from ai.backend.manager.actions.action.rbac import (
     RBACActionName,
     RBACRequiredPermission,
 )
-from ai.backend.manager.data.permission.role import (
-    UserRoleRevocationData,
-)
-from ai.backend.manager.repositories.permission_controller.creators import UserRoleCreatorSpec
 from ai.backend.manager.repositories.permission_controller.repository import (
     PermissionControllerRepository,
-)
-from ai.backend.manager.repositories.rbac.roster_repository import RbacRosterRepository
-from ai.backend.manager.services.permission_contoller.actions.assign_role import (
-    AssignRoleAction,
-    AssignRoleActionResult,
-)
-from ai.backend.manager.services.permission_contoller.actions.bulk_assign_role import (
-    BulkAssignRoleAction,
-    BulkAssignRoleActionResult,
-)
-from ai.backend.manager.services.permission_contoller.actions.bulk_revoke_role import (
-    BulkRevokeRoleAction,
-    BulkRevokeRoleActionResult,
 )
 from ai.backend.manager.services.permission_contoller.actions.get_entity_types import (
     GetEntityTypesAction,
@@ -56,10 +36,6 @@ from ai.backend.manager.services.permission_contoller.actions.permission import 
 from ai.backend.manager.services.permission_contoller.actions.replace_role_permissions import (
     ReplaceRolePermissionsAction,
     ReplaceRolePermissionsActionResult,
-)
-from ai.backend.manager.services.permission_contoller.actions.revoke_role import (
-    RevokeRoleAction,
-    RevokeRoleActionResult,
 )
 from ai.backend.manager.services.permission_contoller.actions.search_element_associations import (
     SearchElementAssociationsAction,
@@ -111,17 +87,14 @@ _GRANT_OPERATIONS: frozenset[OperationType] = frozenset({
 
 class PermissionControllerService:
     _repository: PermissionControllerRepository
-    _roster_repository: RbacRosterRepository
     _rbac_action_registry: Sequence[type[BaseRBACAction]]
 
     def __init__(
         self,
         repository: PermissionControllerRepository,
-        roster_repository: RbacRosterRepository,
         rbac_action_registry: Sequence[type[BaseRBACAction]],
     ) -> None:
         self._repository = repository
-        self._roster_repository = roster_repository
         self._rbac_action_registry = rbac_action_registry
 
     async def create_permission(
@@ -150,57 +123,6 @@ class PermissionControllerService:
         """
         result = await self._repository.update_permission(action.updater)
         return UpdatePermissionActionResult(data=result)
-
-    async def assign_role(self, action: AssignRoleAction) -> AssignRoleActionResult:
-        """Assigns a role to a user.
-
-        When project_id is provided, also binds the user to the project.
-        """
-        if action.input.project_id is not None:
-            await self._roster_repository.join_member(
-                ProjectID(action.input.project_id), UserID(action.input.user_id)
-            )
-        data = await self._repository.assign_role(action.input)
-        return AssignRoleActionResult(data=data)
-
-    async def revoke_role(self, action: RevokeRoleAction) -> RevokeRoleActionResult:
-        """Revokes a role from a user.
-
-        If the role was project-scoped and no remaining roles exist in that
-        project, the user is also removed from the project.
-        """
-        result = await self._repository.revoke_role(action.input)
-        for prc in result.project_remaining_roles:
-            if prc.remaining_count == 0:
-                await self._roster_repository.leave_member(
-                    ProjectID(prc.project_id), UserID(action.input.user_id)
-                )
-        return RevokeRoleActionResult(
-            data=UserRoleRevocationData(
-                user_role_id=result.user_role_id,
-                user_id=action.input.user_id,
-                role_id=action.input.role_id,
-            )
-        )
-
-    async def bulk_assign_role(self, action: BulkAssignRoleAction) -> BulkAssignRoleActionResult:
-        """Assigns a role to multiple users with partial failure support.
-
-        When project_id is provided, also binds each user to the project.
-        """
-        if action.project_id is not None:
-            for spec in action.bulk_creator.specs:
-                user_role_spec = cast(UserRoleCreatorSpec, spec)
-                await self._roster_repository.join_member(
-                    ProjectID(action.project_id), UserID(user_role_spec.user_id)
-                )
-        data = await self._repository.bulk_assign_role(action.bulk_creator)
-        return BulkAssignRoleActionResult(data=data)
-
-    async def bulk_revoke_role(self, action: BulkRevokeRoleAction) -> BulkRevokeRoleActionResult:
-        """Revokes a role from multiple users with partial failure support."""
-        data = await self._repository.bulk_revoke_role(action.input)
-        return BulkRevokeRoleActionResult(data=data)
 
     async def get_role_detail(self, action: GetRoleDetailAction) -> GetRoleDetailActionResult:
         """Get role with all permission details and assigned users."""

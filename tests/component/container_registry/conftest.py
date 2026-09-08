@@ -28,13 +28,20 @@ from ai.backend.manager.repositories.container_registry.repository import (
 )
 from ai.backend.manager.repositories.ops.v2.relation.provider import RelationOpsProvider
 from ai.backend.manager.repositories.ops.v2.roster.provider import RosterOpsProvider
+from ai.backend.manager.repositories.permission_controller.repository import (
+    PermissionControllerRepository,
+)
 from ai.backend.manager.repositories.rbac.relation_repository import RbacRelationRepository
 from ai.backend.manager.repositories.rbac.roster_repository import RbacRosterRepository
 from ai.backend.manager.services.container_registry.processors import ContainerRegistryProcessors
 from ai.backend.manager.services.container_registry.service import ContainerRegistryService
 from ai.backend.manager.services.processors import Processors
 from ai.backend.manager.services.rbac.processors import RbacProcessors
-from ai.backend.manager.services.rbac.service import RbacRelationService, RbacRosterService
+from ai.backend.manager.services.rbac.service import (
+    RbacRelationService,
+    RbacRoleService,
+    RbacRosterService,
+)
 
 
 @pytest.fixture()
@@ -61,6 +68,11 @@ def rbac_processors(
         rbac_groups.group(GroupMeta(USER_ENTITY_TYPE)),
         RbacRelationService(RbacRelationRepository(RelationOpsProvider(database_engine))),
         RbacRosterService(RbacRosterRepository(RosterOpsProvider(database_engine))),
+        RbacRoleService(
+            PermissionControllerRepository(database_engine),
+            RbacRosterRepository(RosterOpsProvider(database_engine)),
+        ),
+        [],
     )
 
 

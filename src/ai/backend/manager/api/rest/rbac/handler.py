@@ -56,11 +56,9 @@ from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.models.rbac_models.role.creators import GlobalRoleCreator
 from ai.backend.manager.models.rbac_models.role.updaters import RoleSoftDeleteUpdater
 from ai.backend.manager.services.permission_contoller.actions import (
-    AssignRoleAction,
     CreateGlobalRoleAction,
     DeleteRoleAction,
     GetRoleDetailAction,
-    RevokeRoleAction,
     SearchRolesAction,
     SearchUsersAssignedToRoleAction,
     UpdateRoleAction,
@@ -81,6 +79,9 @@ from ai.backend.manager.services.permission_contoller.actions.search_scopes impo
 from ai.backend.manager.services.permission_contoller.processors import (
     PermissionControllerProcessors,
 )
+from ai.backend.manager.services.rbac.actions.role.assign import AssignRoleAction
+from ai.backend.manager.services.rbac.actions.role.revoke import RevokeRoleAction
+from ai.backend.manager.services.rbac.processors import RbacProcessors
 
 from .assigned_user_adapter import AssignedUserAdapter
 from .entity_adapter import EntityAdapter
@@ -91,8 +92,14 @@ from .scope_adapter import ScopeAdapter
 class RBACHandler:
     """REST API handler for RBAC operations with constructor-injected dependencies."""
 
-    def __init__(self, *, permission_controller: PermissionControllerProcessors) -> None:
+    def __init__(
+        self,
+        *,
+        permission_controller: PermissionControllerProcessors,
+        rbac: RbacProcessors,
+    ) -> None:
         self._permission_controller = permission_controller
+        self._rbac = rbac
         self._role_adapter = RoleAdapter()
         self._assigned_user_adapter = AssignedUserAdapter()
         self._scope_adapter = ScopeAdapter()
@@ -224,7 +231,7 @@ class RBACHandler:
             role_id=body.parsed.role_id,
             granted_by=body.parsed.granted_by or ctx.user_uuid,
         )
-        action_result = await self._permission_controller.assign_role.wait_for_complete(
+        action_result = await self._rbac.assign_role.wait_for_complete(
             AssignRoleAction(input=input_data)
         )
         resp = AssignRoleResponse(
@@ -247,7 +254,7 @@ class RBACHandler:
             user_id=body.parsed.user_id,
             role_id=body.parsed.role_id,
         )
-        action_result = await self._permission_controller.revoke_role.wait_for_complete(
+        action_result = await self._rbac.revoke_role.wait_for_complete(
             RevokeRoleAction(input=input_data)
         )
         resp = RevokeRoleResponse(

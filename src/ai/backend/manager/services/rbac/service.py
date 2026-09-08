@@ -7,8 +7,15 @@ composed of.
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, cast
 
+from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.user import UserID
+from ai.backend.manager.data.permission.role import UserRoleRevocationData
+from ai.backend.manager.repositories.permission_controller.creators import UserRoleCreatorSpec
+from ai.backend.manager.repositories.permission_controller.repository import (
+    PermissionControllerRepository,
+)
 from ai.backend.manager.repositories.rbac.relation_repository import RbacRelationRepository
 from ai.backend.manager.repositories.rbac.roster_repository import RbacRosterRepository
 from ai.backend.manager.services.rbac.actions.relation.base import (
@@ -30,6 +37,22 @@ from ai.backend.manager.services.rbac.actions.relation.switch import (
     RestoreRelationAction,
     RestoreRelationActionResult,
 )
+from ai.backend.manager.services.rbac.actions.role.assign import (
+    AssignRoleAction,
+    AssignRoleActionResult,
+)
+from ai.backend.manager.services.rbac.actions.role.bulk_assign import (
+    BulkAssignRoleAction,
+    BulkAssignRoleActionResult,
+)
+from ai.backend.manager.services.rbac.actions.role.bulk_revoke import (
+    BulkRevokeRoleAction,
+    BulkRevokeRoleActionResult,
+)
+from ai.backend.manager.services.rbac.actions.role.revoke import (
+    RevokeRoleAction,
+    RevokeRoleActionResult,
+)
 from ai.backend.manager.services.rbac.actions.roster.join_project import (
     JoinProjectAction,
     JoinProjectActionResult,
@@ -39,7 +62,7 @@ from ai.backend.manager.services.rbac.actions.roster.leave_project import (
     LeaveProjectActionResult,
 )
 
-__all__ = ("RbacRelationService", "RbacRosterService")
+__all__ = ("RbacRelationService", "RbacRoleService", "RbacRosterService")
 
 
 class RbacRelationService:
@@ -124,3 +147,73 @@ class RbacRosterService:
     async def leave(self, action: LeaveProjectAction) -> LeaveProjectActionResult:
         result = await self._repository.leave_members(action.project_id, action.user_ids)
         return LeaveProjectActionResult(members=result.members, failures=result.failures)
+
+
+class RbacRoleService:
+    """Granting a role to a user and taking it back.
+
+    A grant is a roster place as well: a user holding a role in a project is on that
+    project's list, and losing the last role there takes them off it.
+    """
+
+    _repository: PermissionControllerRepository
+    _roster_repository: RbacRosterRepository
+
+    def __init__(
+        self,
+        repository: PermissionControllerRepository,
+        roster_repository: RbacRosterRepository,
+    ) -> None:
+        self._repository = repository
+        self._roster_repository = roster_repository
+
+    async def assign_role(self, action: AssignRoleAction) -> AssignRoleActionResult:
+        """Assigns a role to a user.
+
+        When project_id is provided, also binds the user to the project.
+        """
+        if action.input.project_id is not None:
+            await self._roster_repository.join_member(
+                ProjectID(action.input.project_id), UserID(action.input.user_id)
+            )
+        data = await self._repository.assign_role(action.input)
+        return AssignRoleActionResult(data=data)
+
+    async def revoke_role(self, action: RevokeRoleAction) -> RevokeRoleActionResult:
+        """Revokes a role from a user.
+
+        If the role was project-scoped and no remaining roles exist in that
+        project, the user is also removed from the project.
+        """
+        result = await self._repository.revoke_role(action.input)
+        for prc in result.project_remaining_roles:
+            if prc.remaining_count == 0:
+                await self._roster_repository.leave_member(
+                    ProjectID(prc.project_id), UserID(action.input.user_id)
+                )
+        return RevokeRoleActionResult(
+            data=UserRoleRevocationData(
+                user_role_id=result.user_role_id,
+                user_id=action.input.user_id,
+                role_id=action.input.role_id,
+            )
+        )
+
+    async def bulk_assign_role(self, action: BulkAssignRoleAction) -> BulkAssignRoleActionResult:
+        """Assigns a role to multiple users with partial failure support.
+
+        When project_id is provided, also binds each user to the project.
+        """
+        if action.project_id is not None:
+            for spec in action.bulk_creator.specs:
+                user_role_spec = cast(UserRoleCreatorSpec, spec)
+                await self._roster_repository.join_member(
+                    ProjectID(action.project_id), UserID(user_role_spec.user_id)
+                )
+        data = await self._repository.bulk_assign_role(action.bulk_creator)
+        return BulkAssignRoleActionResult(data=data)
+
+    async def bulk_revoke_role(self, action: BulkRevokeRoleAction) -> BulkRevokeRoleActionResult:
+        """Revokes a role from multiple users with partial failure support."""
+        data = await self._repository.bulk_revoke_role(action.input)
+        return BulkRevokeRoleActionResult(data=data)

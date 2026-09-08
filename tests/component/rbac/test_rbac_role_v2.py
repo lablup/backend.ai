@@ -44,6 +44,7 @@ from ai.backend.manager.services.permission_contoller.processors import (
     PermissionControllerProcessors,
 )
 from ai.backend.manager.services.permission_contoller.service import PermissionControllerService
+from ai.backend.manager.services.rbac.processors import RbacProcessors
 from ai.backend.testutils.action_validators import mock_virtual_entity_rbac_validators
 
 if TYPE_CHECKING:
@@ -59,9 +60,7 @@ def permission_controller_processors(
     processor_registry: ProcessorRegistry[Any],
 ) -> PermissionControllerProcessors:
     repo = PermissionControllerRepository(database_engine)
-    service = PermissionControllerService(
-        repo, roster_repository=MagicMock(), rbac_action_registry=[]
-    )
+    service = PermissionControllerService(repo, rbac_action_registry=[])
     validators = ActionValidators(
         virtual_entity_rbac=mock_virtual_entity_rbac_validators(),
         rbac=RBACValidators(scope=AsyncMock()),
@@ -78,10 +77,12 @@ def permission_controller_processors(
 def server_module_registries(
     route_deps: RouteDeps,
     permission_controller_processors: PermissionControllerProcessors,
+    rbac_processors: RbacProcessors,
 ) -> list[RouteRegistry]:
     """Register both v1 RBAC (for role creation) and v2 RBAC (for assignments) routes."""
     rbac_registry = register_rbac_routes(
-        RBACHandler(permission_controller=permission_controller_processors), route_deps
+        RBACHandler(permission_controller=permission_controller_processors, rbac=rbac_processors),
+        route_deps,
     )
     admin_registry = register_admin_routes(
         AdminHandler(
@@ -97,6 +98,7 @@ def server_module_registries(
 
     processors = MagicMock()
     processors.permission_controller = permission_controller_processors
+    processors.rbac = rbac_processors
     adapter = RBACAdapter(processors)
     handler = V2RBACHandler(adapter=adapter)
     v2_reg = RouteRegistry.create("v2", route_deps.cors_options)

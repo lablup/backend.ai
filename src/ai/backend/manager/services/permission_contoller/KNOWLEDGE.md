@@ -37,9 +37,10 @@ the entity type, shape, operation, gate and backing.
   empty. Taking the scope-less request through the scope action would leave the gate
   open.
 - The role is registered in the virtual entity graph, not in
-  `association_scopes_entities`. The readers still on that table — the legacy
-  auto_assign grant, the project remaining-role count in `revoke_role` — do not see a
-  role created this way.
+  `association_scopes_entities`. The readers still on that table — the project
+  remaining-role count a revocation makes — do not see a role created this way.
+- Granting a role to a user and taking it back are not here. Each writes a roster place
+  beside the role row, so they sit with the other graph writes in `../rbac`.
 
 ## Role edits are guarded single-entity operations
 

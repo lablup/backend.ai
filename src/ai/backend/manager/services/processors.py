@@ -205,6 +205,7 @@ if TYPE_CHECKING:
     )
     from ai.backend.manager.services.rbac.service import (
         RbacRelationService,
+        RbacRoleService,
         RbacRosterService,
     )
     from ai.backend.manager.services.resource_group.processors import (
@@ -377,6 +378,7 @@ class Services:
     role_preset: RolePresetService
     entity_share: EntityShareService
     rbac_relation: RbacRelationService
+    rbac_role: RbacRoleService
     rbac_roster: RbacRosterService
     runtime_variant_preset: RuntimeVariantPresetService
     deployment_revision_preset: DeploymentPresetService

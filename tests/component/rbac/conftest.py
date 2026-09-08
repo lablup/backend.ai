@@ -10,6 +10,7 @@ import pytest
 
 from ai.backend.client.v2.registry import BackendAIClientRegistry
 from ai.backend.common.data.entity.role import ROLE_ENTITY_TYPE
+from ai.backend.common.data.entity.user import USER_ENTITY_TYPE
 from ai.backend.common.dto.manager.rbac.request import (
     CreateRoleRequest,
     PurgeRoleRequest,
@@ -17,7 +18,7 @@ from ai.backend.common.dto.manager.rbac.request import (
 from ai.backend.common.dto.manager.rbac.response import CreateRoleResponse
 from ai.backend.common.dto.manager.rbac.types import RoleSource, RoleStatus
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
-from ai.backend.manager.actions.registry.types import GroupMeta
+from ai.backend.manager.actions.registry.types import Concern, ConcernMeta, GroupMeta
 from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.actions.validators.rbac import RBACValidators
 from ai.backend.manager.api.rest.admin.handler import AdminHandler
@@ -27,13 +28,17 @@ from ai.backend.manager.api.rest.rbac.registry import register_rbac_routes
 from ai.backend.manager.api.rest.routing import RouteRegistry
 from ai.backend.manager.api.rest.types import RouteDeps
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.ops.v2.roster.provider import RosterOpsProvider
 from ai.backend.manager.repositories.permission_controller.repository import (
     PermissionControllerRepository,
 )
+from ai.backend.manager.repositories.rbac.roster_repository import RbacRosterRepository
 from ai.backend.manager.services.permission_contoller.processors import (
     PermissionControllerProcessors,
 )
 from ai.backend.manager.services.permission_contoller.service import PermissionControllerService
+from ai.backend.manager.services.rbac.processors import RbacProcessors
+from ai.backend.manager.services.rbac.service import RbacRoleService
 from ai.backend.testutils.action_validators import mock_virtual_entity_rbac_validators
 
 RoleFactory = Callable[..., Coroutine[Any, Any, CreateRoleResponse]]
@@ -47,7 +52,6 @@ def permission_controller_processors(
     repo = PermissionControllerRepository(database_engine)
     service = PermissionControllerService(
         repo,
-        roster_repository=MagicMock(),
         rbac_action_registry=[],
     )
     validators = ActionValidators(
@@ -63,13 +67,35 @@ def permission_controller_processors(
 
 
 @pytest.fixture()
+def rbac_processors(
+    database_engine: ExtendedAsyncSAEngine,
+    processor_registry: ProcessorRegistry[Any],
+) -> RbacProcessors:
+    """Real RbacProcessors for the role grants these tests make."""
+    rbac_groups = processor_registry.concern(ConcernMeta(Concern.RBAC))
+    return RbacProcessors(
+        rbac_groups.relation_group(),
+        rbac_groups.group(GroupMeta(USER_ENTITY_TYPE)),
+        MagicMock(),
+        MagicMock(),
+        RbacRoleService(
+            PermissionControllerRepository(database_engine),
+            RbacRosterRepository(RosterOpsProvider(database_engine)),
+        ),
+        [],
+    )
+
+
+@pytest.fixture()
 def server_module_registries(
     route_deps: RouteDeps,
     permission_controller_processors: PermissionControllerProcessors,
+    rbac_processors: RbacProcessors,
 ) -> list[RouteRegistry]:
     """Load only the modules required for RBAC-domain tests."""
     rbac_registry = register_rbac_routes(
-        RBACHandler(permission_controller=permission_controller_processors), route_deps
+        RBACHandler(permission_controller=permission_controller_processors, rbac=rbac_processors),
+        route_deps,
     )
     return [
         register_admin_routes(

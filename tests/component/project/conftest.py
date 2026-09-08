@@ -101,7 +101,11 @@ from ai.backend.manager.services.processors import Processors
 from ai.backend.manager.services.project.processors import ProjectProcessors
 from ai.backend.manager.services.project.service import ProjectService
 from ai.backend.manager.services.rbac.processors import RbacProcessors
-from ai.backend.manager.services.rbac.service import RbacRelationService, RbacRosterService
+from ai.backend.manager.services.rbac.service import (
+    RbacRelationService,
+    RbacRoleService,
+    RbacRosterService,
+)
 from ai.backend.manager.services.user.processors import UserProcessors
 from ai.backend.manager.services.user.service import UserService
 from ai.backend.testutils.action_validators import mock_virtual_entity_rbac_validators
@@ -194,7 +198,6 @@ def permission_controller_processors(
     perm_repo = PermissionControllerRepository(database_engine)
     service = PermissionControllerService(
         perm_repo,
-        roster_repository=RbacRosterRepository(RosterOpsProvider(database_engine)),
         rbac_action_registry=[],
     )
     return PermissionControllerProcessors(
@@ -229,6 +232,11 @@ def rbac_processors(
         rbac_groups.group(GroupMeta(USER_ENTITY_TYPE)),
         RbacRelationService(RbacRelationRepository(RelationOpsProvider(database_engine))),
         RbacRosterService(RbacRosterRepository(RosterOpsProvider(database_engine))),
+        RbacRoleService(
+            PermissionControllerRepository(database_engine),
+            RbacRosterRepository(RosterOpsProvider(database_engine)),
+        ),
+        [],
     )
 
 

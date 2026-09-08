@@ -1,4 +1,4 @@
-"""Tests for PermissionControllerService assign/revoke role with project binding."""
+"""Tests for RbacRoleService assign/revoke role with project binding."""
 
 from __future__ import annotations
 
@@ -20,12 +20,12 @@ from ai.backend.manager.data.permission.role import (
 from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
 from ai.backend.manager.repositories.base.creator import BulkCreator
 from ai.backend.manager.repositories.permission_controller.creators import UserRoleCreatorSpec
-from ai.backend.manager.services.permission_contoller.actions.assign_role import AssignRoleAction
-from ai.backend.manager.services.permission_contoller.actions.bulk_assign_role import (
+from ai.backend.manager.services.rbac.actions.role.assign import AssignRoleAction
+from ai.backend.manager.services.rbac.actions.role.bulk_assign import (
     BulkAssignRoleAction,
 )
-from ai.backend.manager.services.permission_contoller.actions.revoke_role import RevokeRoleAction
-from ai.backend.manager.services.permission_contoller.service import PermissionControllerService
+from ai.backend.manager.services.rbac.actions.role.revoke import RevokeRoleAction
+from ai.backend.manager.services.rbac.service import RbacRoleService
 
 
 @pytest.fixture
@@ -46,20 +46,14 @@ def mock_roster_repository() -> MagicMock:
 
 
 @pytest.fixture
-def service(
-    mock_repository: MagicMock, mock_roster_repository: MagicMock
-) -> PermissionControllerService:
-    return PermissionControllerService(
-        repository=mock_repository,
-        roster_repository=mock_roster_repository,
-        rbac_action_registry=[],
-    )
+def service(mock_repository: MagicMock, mock_roster_repository: MagicMock) -> RbacRoleService:
+    return RbacRoleService(mock_repository, mock_roster_repository)
 
 
 class TestAssignRoleWithProject:
     async def test_assign_with_project_id_enrolls(
         self,
-        service: PermissionControllerService,
+        service: RbacRoleService,
         mock_repository: MagicMock,
         mock_roster_repository: MagicMock,
     ) -> None:
@@ -82,7 +76,7 @@ class TestAssignRoleWithProject:
 
     async def test_assign_without_project_id_skips_bind(
         self,
-        service: PermissionControllerService,
+        service: RbacRoleService,
         mock_repository: MagicMock,
         mock_roster_repository: MagicMock,
     ) -> None:
@@ -101,7 +95,7 @@ class TestAssignRoleWithProject:
 class TestRevokeRoleWithProject:
     async def test_revoke_with_zero_remaining_calls_unbind(
         self,
-        service: PermissionControllerService,
+        service: RbacRoleService,
         mock_repository: MagicMock,
         mock_roster_repository: MagicMock,
     ) -> None:
@@ -122,7 +116,7 @@ class TestRevokeRoleWithProject:
 
     async def test_revoke_with_nonzero_remaining_skips_unbind(
         self,
-        service: PermissionControllerService,
+        service: RbacRoleService,
         mock_repository: MagicMock,
         mock_roster_repository: MagicMock,
     ) -> None:
@@ -141,7 +135,7 @@ class TestRevokeRoleWithProject:
 
     async def test_revoke_global_role_skips_unbind(
         self,
-        service: PermissionControllerService,
+        service: RbacRoleService,
         mock_repository: MagicMock,
         mock_roster_repository: MagicMock,
     ) -> None:
@@ -160,7 +154,7 @@ class TestRevokeRoleWithProject:
 class TestBulkAssignRoleWithProject:
     async def test_bulk_assign_with_project_id_calls_bind_for_each_user(
         self,
-        service: PermissionControllerService,
+        service: RbacRoleService,
         mock_repository: MagicMock,
         mock_roster_repository: MagicMock,
     ) -> None:
@@ -187,7 +181,7 @@ class TestBulkAssignRoleWithProject:
 
     async def test_bulk_assign_without_project_id_skips_bind(
         self,
-        service: PermissionControllerService,
+        service: RbacRoleService,
         mock_repository: MagicMock,
         mock_roster_repository: MagicMock,
     ) -> None:

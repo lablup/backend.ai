@@ -205,7 +205,11 @@ from ai.backend.manager.services.prometheus_query_preset_category.processors imp
     PrometheusQueryPresetCategoryProcessors,
 )
 from ai.backend.manager.services.rbac.processors import RbacProcessors
-from ai.backend.manager.services.rbac.service import RbacRelationService, RbacRosterService
+from ai.backend.manager.services.rbac.service import (
+    RbacRelationService,
+    RbacRoleService,
+    RbacRosterService,
+)
 from ai.backend.manager.services.resource_group.processors import ResourceGroupProcessors
 from ai.backend.manager.services.resource_group.service import ResourceGroupService
 from ai.backend.manager.services.resource_preset.processors import ResourcePresetProcessors
@@ -378,6 +382,10 @@ def create_services(args: ServiceArgs) -> Services:
         rbac_relation=RbacRelationService(
             repositories.rbac.relation,
         ),
+        rbac_role=RbacRoleService(
+            repositories.permission_controller.repository,
+            repositories.rbac.roster,
+        ),
         rbac_roster=RbacRosterService(
             repositories.rbac.roster,
         ),
@@ -447,7 +455,6 @@ def create_services(args: ServiceArgs) -> Services:
         ),
         permission_controller=PermissionControllerService(
             repository=repositories.permission_controller.repository,
-            roster_repository=repositories.rbac.roster,
             rbac_action_registry=RBAC_ACTION_REGISTRY,
         ),
         vfs_storage=VFSStorageService(
@@ -685,6 +692,8 @@ def create_processors(
             rbac_groups.group(GroupMeta(USER_ENTITY_TYPE)),
             services.rbac_relation,
             services.rbac_roster,
+            services.rbac_role,
+            action_monitors,
         ),
         entity_share=EntityShareProcessors(
             rbac_groups.group(GroupMeta(ENTITY_SHARE_ENTITY_TYPE)),

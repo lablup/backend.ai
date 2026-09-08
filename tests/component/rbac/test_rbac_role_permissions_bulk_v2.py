@@ -50,6 +50,7 @@ from ai.backend.manager.api.rest.v2.rbac.registry import register_v2_rbac_routes
 from ai.backend.manager.services.permission_contoller.processors import (
     PermissionControllerProcessors,
 )
+from ai.backend.manager.services.rbac.processors import RbacProcessors
 from ai.backend.testutils.fixtures import DomainFixtureData
 
 if TYPE_CHECKING:
@@ -62,10 +63,12 @@ if TYPE_CHECKING:
 def server_module_registries(
     route_deps: RouteDeps,
     permission_controller_processors: PermissionControllerProcessors,
+    rbac_processors: RbacProcessors,
 ) -> list[RouteRegistry]:
     """Register both v1 RBAC (for role/permission setup) and v2 RBAC routes."""
     rbac_registry = register_rbac_routes(
-        RBACHandler(permission_controller=permission_controller_processors), route_deps
+        RBACHandler(permission_controller=permission_controller_processors, rbac=rbac_processors),
+        route_deps,
     )
     admin_registry = register_admin_routes(
         AdminHandler(
@@ -81,6 +84,7 @@ def server_module_registries(
 
     processors = MagicMock()
     processors.permission_controller = permission_controller_processors
+    processors.rbac = rbac_processors
     adapter = RBACAdapter(processors)
     handler = V2RBACHandler(adapter=adapter)
     v2_reg = RouteRegistry.create("v2", route_deps.cors_options)
