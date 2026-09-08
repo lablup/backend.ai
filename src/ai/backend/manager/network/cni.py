@@ -24,7 +24,8 @@ from ai.backend.common.configs.etcd import EtcdConfig
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
 from ai.backend.common.metrics.metric import CommonMetricRegistry
 from ai.backend.common.network.keys import (
-    agent_caps_key,
+    agent_backend_key,
+    agent_boot_key,
     agent_vtep_key,
     endpoint_key,
     endpoints_prefix,
@@ -861,19 +862,20 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
             # and anyone who had already been handed the half-built record would be holding a
             # subnet and a VNI the pool has since given to somebody else.
             meta[_STATE] = _READY
-            # Conditional on the adverts this session was ADMITTED on, all of them, in the same
-            # store operation that declares it ready. Admission is a read and everything since
-            # has been writes: an agent that restarted or withdrew in between has taken back the
-            # capability the placement was made on, and the manager would otherwise hand back a
-            # network that node then refuses. Rolled back like any other failed create.
+            # Conditional on each member agent's IDENTITY, in the same store operation that
+            # declares the session ready. Admission is a read and everything since has been
+            # writes: an agent that restarted in between is not the node the placement was made
+            # on, and the manager would otherwise hand back a network that node then refuses.
+            #
+            # The identity keys, not the capability record. The capability record carries a
+            # timestamp the agent rewrites every minute to say it is still there, so guarding on
+            # its bytes would fail any create that happened to straddle a refresh -- a heartbeat
+            # turned into a fence, refusing sessions on a cluster where nothing is wrong. These
+            # two change only when the agent restarts or changes runtime, which is the thing that
+            # actually invalidates an admission. ``None`` guards absence: an agent with no boot
+            # key must still have none, or it has restarted into one.
             held = await self._publish(
-                etcd,
-                session_id,
-                held,
-                meta,
-                guards={
-                    agent_caps_key(agent_id): known.raw for agent_id, known in admitted.items()
-                },
+                etcd, session_id, held, meta, guards=self._member_identities(admitted)
             )
             return NetworkInfo(
                 network_id=session_id, options={**_published(meta), "endpoint_ips": endpoint_ips}
@@ -1254,13 +1256,30 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
             )
         return True
 
+    @staticmethod
+    def _member_identities(admitted: Mapping[str, AdmittedAgent]) -> dict[str, str | None]:
+        """Each admitted agent's identity keys, as they stood WHEN IT WAS ADMITTED.
+
+        As they stood then, not as they stand now: the whole point is that the READY write says
+        "these have not moved since the placement was made on them". Reading them again at the end
+        would compare the state to itself and pass whatever happened in between.
+        """
+        return {
+            key: value
+            for agent_id, known in admitted.items()
+            for key, value in (
+                (agent_boot_key(agent_id), known.boot_key),
+                (agent_backend_key(agent_id), known.backend_key),
+            )
+        }
+
     async def _publish(
         self,
         etcd: AsyncEtcd,
         session_id: str,
         held: str,
         meta: Mapping[str, Any],
-        guards: Mapping[str, str] | None = None,
+        guards: Mapping[str, str | None] | None = None,
     ) -> str:
         """Write the session's record, but only over the one this call still holds.
 

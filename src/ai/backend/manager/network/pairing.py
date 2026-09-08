@@ -140,6 +140,13 @@ class AdmittedAgent:
 
     caps: AgentNetworkCaps
     raw: str
+    #: What the agent's identity keys held at admission. Not the capability record: that carries a
+    #: timestamp the agent rewrites every minute to say it is still there, so a condition on its
+    #: bytes would turn a heartbeat into a fence. These move only when the agent restarts or
+    #: changes runtime, which is the thing that actually invalidates an admission. ``None`` means
+    #: the key was absent, which is a condition too -- one appearing is a restart.
+    backend_key: str | None
+    boot_key: str | None
 
 
 async def require_members_cni_ready(
@@ -242,7 +249,7 @@ async def require_members_cni_ready(
                 " refused when it arrives. Set container.advertised-host (or bind-host) to a"
                 " routable address this host holds."
             )
-        admitted[agent_id] = AdmittedAgent(caps, raw)
+        admitted[agent_id] = AdmittedAgent(caps, raw, running, booted)
     return admitted
 
 

@@ -158,7 +158,7 @@ class AgentEtcdClientView(AbstractKVStore):
         val: str,
         *,
         expected: str | None,
-        guards: Mapping[str, str],
+        guards: Mapping[str, str | None],
         scope: ConfigScopes = ConfigScopes.GLOBAL,
         scope_prefix_map: Mapping[ConfigScopes, str] | None = None,
     ) -> bool:

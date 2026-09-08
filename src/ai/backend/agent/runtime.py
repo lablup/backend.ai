@@ -141,7 +141,13 @@ class AgentRuntime:
 
         backend = local_config.agent_common.backend
         agent_cls = get_agent_discovery(backend).get_agent_cls()
-        return await agent_cls.new(etcd_view, agent_config, **agent_kwargs)
+        agent = await agent_cls.new(etcd_view, agent_config, **agent_kwargs)
+        # Last, and only once the agent is fully built. This is what marks the node ALIVE and
+        # schedulable; announcing from inside `__ainit__` marked it so while the backend still had
+        # work to do -- including publishing the capability that admits it to a cluster-network
+        # session -- and a failure in that work aborts this call before `shutdown` can run.
+        await agent.announce_started()
+        return agent
 
     def __init__(
         self,
