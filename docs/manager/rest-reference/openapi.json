@@ -23830,14 +23830,10 @@
                 "$ref": "#/components/schemas/BinarySizeInput"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
-            "description": "Updated shared memory. Use null to clear.",
+            "description": "Updated shared memory. Omit to leave unchanged; null clears.",
             "title": "Shared Memory"
           },
           "resource_group_name": {
@@ -23846,14 +23842,10 @@
                 "type": "string"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
-            "description": "Updated resource group name. Use null to make global.",
+            "description": "Updated resource group name. Omit to leave unchanged; null makes the preset global.",
             "title": "Resource Group Name"
           }
         },
