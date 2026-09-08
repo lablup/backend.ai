@@ -5,7 +5,7 @@ from uuid import UUID
 
 from pydantic import Field, model_validator
 
-from ai.backend.common.api_handlers import SENTINEL, BaseRequestModel, Sentinel
+from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.dto.manager.query import StringFilter, UUIDFilter
 from ai.backend.common.dto.manager.v2.common import OrderDirection
 from ai.backend.common.dto.manager.v2.runtime_variant_preset.types import (
@@ -15,6 +15,7 @@ from ai.backend.common.dto.manager.v2.runtime_variant_preset.types import (
     RuntimeVariantPresetOrderField,
     UIOption,
 )
+from ai.backend.common.tristate.unset import UNSET, Unset
 
 
 class CreateRuntimeVariantPresetInput(BaseRequestModel):
@@ -67,7 +68,9 @@ class CreateRuntimeVariantPresetInput(BaseRequestModel):
 class UpdateRuntimeVariantPresetInput(BaseRequestModel):
     id: UUID = Field(description="Preset ID.")
     name: str | None = Field(default=None, min_length=1, max_length=256)
-    description: str | Sentinel | None = Field(default=SENTINEL)
+    description: str | None | Unset = Field(
+        default=UNSET, description="Description. Omit to leave unchanged; null clears."
+    )
     rank: int | None = Field(default=None, ge=0)
     preset_target: PresetTarget | None = Field(default=None)
     value_type: PresetValueType | None = Field(
@@ -77,14 +80,23 @@ class UpdateRuntimeVariantPresetInput(BaseRequestModel):
             "(the stored target applies when preset_target is omitted)."
         ),
     )
-    default_value: str | Sentinel | None = Field(default=SENTINEL)
+    default_value: str | None | Unset = Field(
+        default=UNSET, description="Default value. Omit to leave unchanged; null clears."
+    )
     key: str | None = Field(default=None, min_length=1, max_length=256)
     required: bool | None = Field(
         default=None, description="Toggle required flag; None = no change."
     )
-    category: str | Sentinel | None = Field(default=SENTINEL)
-    display_name: str | Sentinel | None = Field(default=SENTINEL)
-    ui_option: UIOption | Sentinel | None = Field(default=SENTINEL)
+    category: str | None | Unset = Field(
+        default=UNSET, description="UI category group. Omit to leave unchanged; null clears."
+    )
+    display_name: str | None | Unset = Field(
+        default=UNSET, description="UI display name. Omit to leave unchanged; null clears."
+    )
+    ui_option: UIOption | None | Unset = Field(
+        default=UNSET,
+        description="UI rendering option. Omit to leave unchanged; null clears.",
+    )
 
     @model_validator(mode="after")
     def validate_flag_requires_args(self) -> Self:
@@ -98,7 +110,11 @@ class UpdateRuntimeVariantPresetInput(BaseRequestModel):
 
     @model_validator(mode="after")
     def validate_default_value(self) -> Self:
-        if self.value_type is None or self.default_value is SENTINEL or self.default_value is None:
+        if (
+            self.value_type is None
+            or isinstance(self.default_value, Unset)
+            or self.default_value is None
+        ):
             return self
         validator = VALUE_TYPE_VALIDATORS.get(self.value_type)
         if validator is None:
