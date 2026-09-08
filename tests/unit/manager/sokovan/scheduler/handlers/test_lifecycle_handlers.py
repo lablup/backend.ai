@@ -18,6 +18,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
+from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.sokovan.scheduler.handlers.lifecycle.check_precondition import (
     CheckPreconditionLifecycleHandler,
@@ -631,6 +632,18 @@ class TestStartSessionsLifecycleHandler:
         # Verify success reason
         for success in result.successes:
             assert success.reason == "triggered-by-scheduler"
+
+    def test_it_also_selects_a_session_whose_kernels_were_already_reset(self) -> None:
+        """The session's move to PENDING and its kernels' reset are two transactions, and the
+        kernels go first. A manager dying between them leaves a PREPARED session whose kernels are
+        already PENDING -- and this handler is the only way out of it. Without PENDING here
+        nothing selects that session at all: the scheduler wants PENDING SESSIONS."""
+        assert KernelStatus.PENDING in (
+            StartSessionsLifecycleHandler.target_kernel_statuses() or []
+        )
+        assert KernelStatus.PREPARED in (
+            StartSessionsLifecycleHandler.target_kernel_statuses() or []
+        )
 
     async def test_a_session_the_launcher_could_not_start_is_a_failure(
         self,

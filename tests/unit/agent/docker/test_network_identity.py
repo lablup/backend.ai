@@ -401,6 +401,103 @@ class TestAContainerThatIsUpWhenSomethingFails:
         assert caught.container_id == "cid-1"
 
 
+class TestACreateThatWasCancelled:
+    """A11i. Cancellation is the ordinary way a create fails -- the launcher's timeout does it,
+    and so does an agent shutdown -- and it is not an `Exception`, so no handler catching that
+    reached it. A cancelled attach left the container running with its kernel already out of the
+    registry and nothing queued to destroy it. And once a container exists the create's own undo
+    must keep its hands off: the lifecycle stops the container, detaches it and removes its
+    scratch, in that order, and deleting the scratch from here cuts across that."""
+
+    def _agent(self, container_id: str | None) -> Any:
+        """Enough of an agent to drive the unwind, and nothing else.
+
+        `create_kernel` cannot be called without the whole agent, and the abstract base cannot be
+        instantiated -- but the branch that decides what a failed create takes back is the whole
+        of what is being tested, and an unbound call reaches it.
+        """
+        registry: dict[str, Any] = {}
+        if container_id is not None:
+            registry["k1"] = SimpleNamespace(container_id=container_id)
+        return SimpleNamespace(
+            kernel_registry=registry,
+            inject_container_lifecycle_event=AsyncMock(),
+            reconstruct_resource_usage=AsyncMock(),
+        )
+
+    async def test_a_container_that_exists_is_destroyed_through_the_lifecycle(self) -> None:
+        agent = self._agent("cid-1")
+        undone = False
+
+        async def _undo() -> None:
+            nonlocal undone
+            undone = True
+
+        await AbstractAgent._unwind_failed_create(
+            cast(Any, agent), cast(Any, "k1"), cast(Any, "s1"), [_undo]
+        )
+
+        agent.inject_container_lifecycle_event.assert_awaited_once()
+        assert agent.inject_container_lifecycle_event.await_args.kwargs["container_id"] == "cid-1"
+        assert not undone, "the scratch of a running container was deleted from under it"
+
+    async def test_with_no_container_the_undo_stack_runs(self) -> None:
+        agent = self._agent(None)
+        undone: list[str] = []
+
+        async def _undo_scratch() -> None:
+            undone.append("scratch")
+
+        await AbstractAgent._unwind_failed_create(
+            cast(Any, agent), cast(Any, "k1"), cast(Any, "s1"), [_undo_scratch]
+        )
+
+        assert undone == ["scratch"]
+        agent.inject_container_lifecycle_event.assert_not_awaited()
+
+    async def test_the_cleanup_survives_the_cancellation_that_triggered_it(self) -> None:
+        # What is being unwound here is usually a cancellation, and a cleanup cancelled halfway
+        # is the leak it exists to prevent.
+        agent = self._agent("cid-1")
+        started = asyncio.Event()
+
+        async def _slow_destroy(*args: Any, **kwargs: Any) -> None:
+            started.set()
+            await asyncio.sleep(0.05)
+            agent.destroyed = True
+
+        agent.inject_container_lifecycle_event = _slow_destroy
+        task = asyncio.create_task(
+            AbstractAgent._unwind_failed_create(
+                cast(Any, agent), cast(Any, "k1"), cast(Any, "s1"), []
+            )
+        )
+        await started.wait()
+        task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await task
+        await asyncio.sleep(0.1)
+
+        assert getattr(agent, "destroyed", False), "the teardown was cancelled halfway"
+
+    async def test_an_undo_that_raises_does_not_stop_the_rest(self) -> None:
+        agent = self._agent(None)
+        undone: list[str] = []
+
+        async def _boom() -> None:
+            raise RuntimeError("could not remove it")
+
+        async def _works() -> None:
+            undone.append("worked")
+
+        await AbstractAgent._unwind_failed_create(
+            cast(Any, agent), cast(Any, "k1"), cast(Any, "s1"), [_works, _boom]
+        )
+
+        assert undone == ["worked"]
+        agent.reconstruct_resource_usage.assert_awaited_once()
+
+
 class TestWithdrawingTheVtep:
     async def test_it_deletes_the_expected_key(self) -> None:
         etcd = _RecordingEtcd()

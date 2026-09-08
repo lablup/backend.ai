@@ -1370,10 +1370,10 @@ class ScheduleCoordinator:
         # the allocation it never gave up.
         #
         # Kernels first leaves the opposite: kernels PENDING and unbound under a session that has
-        # not moved. Nothing picks that up -- the PENDING scheduler selects PENDING SESSIONS --
-        # so the session stays where it was and its own handler comes round again; a start with no
-        # agent on any kernel is reported as a placement to make again, which is exactly the state
-        # this was heading for. Neither half is atomic; only one of them is safe to be caught in.
+        # not moved. That state has no allocation left to lose, and the start handler selects it
+        # -- its kernel filter includes PENDING for exactly this reason -- finds no agent on any
+        # kernel, and reports a placement to make again, which sends the session to PENDING and
+        # back through scheduling. Neither half is atomic; this is the one that recovers.
         if transition.kernel == KernelStatus.PENDING:
             await self._apply_kernel_pending_resets(handler_name, session_ids)
 
