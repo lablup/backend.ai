@@ -20,17 +20,14 @@ from ai.backend.common.resilience import (
 from ai.backend.common.resilience.policies.retry import BackoffStrategy
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.data.resource_usage_history.types import (
-    DomainUsageBucketData,
     KernelUsageRecordData,
-    ProjectUsageBucketData,
-    UserUsageBucketData,
 )
 from ai.backend.manager.models.resource_usage_history.scopes import (
     DomainUsageBucketOperationScope,
     ProjectUsageBucketOperationScope,
     UserUsageBucketOperationScope,
 )
-from ai.backend.manager.repositories.base import BatchQuerier, BulkCreator, Creator, Upserter
+from ai.backend.manager.repositories.base import BatchQuerier, BulkCreator, Creator
 from ai.backend.manager.repositories.resource_usage_history.types import (
     DomainUsageBucketSearchResult,
     KernelUsageRecordSearchResult,
@@ -42,12 +39,7 @@ from .db_source import ResourceUsageHistoryDBSource
 
 if TYPE_CHECKING:
     from ai.backend.manager.data.fair_share import UsageBucketAggregationResult
-    from ai.backend.manager.models.resource_usage_history import (
-        DomainUsageBucketRow,
-        KernelUsageRecordRow,
-        ProjectUsageBucketRow,
-        UserUsageBucketRow,
-    )
+    from ai.backend.manager.models.resource_usage_history import KernelUsageRecordRow
     from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
 
@@ -171,22 +163,6 @@ class ResourceUsageHistoryRepository:
     # ==================== Domain Usage Buckets ====================
 
     @resource_usage_history_repository_resilience.apply()
-    async def create_domain_usage_bucket(
-        self,
-        creator: Creator[DomainUsageBucketRow],
-    ) -> DomainUsageBucketData:
-        """Create a new domain usage bucket."""
-        return await self._db_source.create_domain_usage_bucket(creator)
-
-    @resource_usage_history_repository_resilience.apply()
-    async def upsert_domain_usage_bucket(
-        self,
-        upserter: Upserter[DomainUsageBucketRow],
-    ) -> DomainUsageBucketData:
-        """Upsert a domain usage bucket."""
-        return await self._db_source.upsert_domain_usage_bucket(upserter)
-
-    @resource_usage_history_repository_resilience.apply()
     async def search_domain_usage_buckets(
         self,
         querier: BatchQuerier,
@@ -198,22 +174,6 @@ class ResourceUsageHistoryRepository:
     # ==================== Project Usage Buckets ====================
 
     @resource_usage_history_repository_resilience.apply()
-    async def create_project_usage_bucket(
-        self,
-        creator: Creator[ProjectUsageBucketRow],
-    ) -> ProjectUsageBucketData:
-        """Create a new project usage bucket."""
-        return await self._db_source.create_project_usage_bucket(creator)
-
-    @resource_usage_history_repository_resilience.apply()
-    async def upsert_project_usage_bucket(
-        self,
-        upserter: Upserter[ProjectUsageBucketRow],
-    ) -> ProjectUsageBucketData:
-        """Upsert a project usage bucket."""
-        return await self._db_source.upsert_project_usage_bucket(upserter)
-
-    @resource_usage_history_repository_resilience.apply()
     async def search_project_usage_buckets(
         self,
         querier: BatchQuerier,
@@ -223,22 +183,6 @@ class ResourceUsageHistoryRepository:
         return await self._db_source.search_project_usage_buckets(querier, scope)
 
     # ==================== User Usage Buckets ====================
-
-    @resource_usage_history_repository_resilience.apply()
-    async def create_user_usage_bucket(
-        self,
-        creator: Creator[UserUsageBucketRow],
-    ) -> UserUsageBucketData:
-        """Create a new user usage bucket."""
-        return await self._db_source.create_user_usage_bucket(creator)
-
-    @resource_usage_history_repository_resilience.apply()
-    async def upsert_user_usage_bucket(
-        self,
-        upserter: Upserter[UserUsageBucketRow],
-    ) -> UserUsageBucketData:
-        """Upsert a user usage bucket."""
-        return await self._db_source.upsert_user_usage_bucket(upserter)
 
     @resource_usage_history_repository_resilience.apply()
     async def search_user_usage_buckets(

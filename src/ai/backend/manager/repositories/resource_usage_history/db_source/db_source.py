@@ -17,10 +17,7 @@ from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.types import ResourceSlot
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.data.resource_usage_history.types import (
-    DomainUsageBucketData,
     KernelUsageRecordData,
-    ProjectUsageBucketData,
-    UserUsageBucketData,
 )
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.resource_usage_history import (
@@ -39,11 +36,9 @@ from ai.backend.manager.repositories.base import (
     BatchQuerier,
     BulkCreator,
     Creator,
-    Upserter,
     execute_batch_querier,
     execute_bulk_creator,
     execute_creator,
-    execute_upserter,
 )
 from ai.backend.manager.repositories.resource_usage_history.types import (
     DomainUsageBucketSearchResult,
@@ -237,28 +232,6 @@ class ResourceUsageHistoryDBSource:
 
     # ==================== Domain Usage Buckets ====================
 
-    async def create_domain_usage_bucket(
-        self,
-        creator: Creator[DomainUsageBucketRow],
-    ) -> DomainUsageBucketData:
-        """Create a new domain usage bucket."""
-        async with self._db.begin_session() as db_sess:
-            result = await execute_creator(db_sess, creator)
-            return result.row.to_data()
-
-    async def upsert_domain_usage_bucket(
-        self,
-        upserter: Upserter[DomainUsageBucketRow],
-    ) -> DomainUsageBucketData:
-        """Upsert a domain usage bucket."""
-        async with self._db.begin_session() as db_sess:
-            result = await execute_upserter(
-                db_sess,
-                upserter,
-                index_elements=["domain_name", "resource_group_id", "period_start"],
-            )
-            return result.row.to_data()
-
     async def search_domain_usage_buckets(
         self,
         querier: BatchQuerier,
@@ -280,28 +253,6 @@ class ResourceUsageHistoryDBSource:
 
     # ==================== Project Usage Buckets ====================
 
-    async def create_project_usage_bucket(
-        self,
-        creator: Creator[ProjectUsageBucketRow],
-    ) -> ProjectUsageBucketData:
-        """Create a new project usage bucket."""
-        async with self._db.begin_session() as db_sess:
-            result = await execute_creator(db_sess, creator)
-            return result.row.to_data()
-
-    async def upsert_project_usage_bucket(
-        self,
-        upserter: Upserter[ProjectUsageBucketRow],
-    ) -> ProjectUsageBucketData:
-        """Upsert a project usage bucket."""
-        async with self._db.begin_session() as db_sess:
-            result = await execute_upserter(
-                db_sess,
-                upserter,
-                index_elements=["project_id", "resource_group_id", "period_start"],
-            )
-            return result.row.to_data()
-
     async def search_project_usage_buckets(
         self,
         querier: BatchQuerier,
@@ -322,28 +273,6 @@ class ResourceUsageHistoryDBSource:
             )
 
     # ==================== User Usage Buckets ====================
-
-    async def create_user_usage_bucket(
-        self,
-        creator: Creator[UserUsageBucketRow],
-    ) -> UserUsageBucketData:
-        """Create a new user usage bucket."""
-        async with self._db.begin_session() as db_sess:
-            result = await execute_creator(db_sess, creator)
-            return result.row.to_data()
-
-    async def upsert_user_usage_bucket(
-        self,
-        upserter: Upserter[UserUsageBucketRow],
-    ) -> UserUsageBucketData:
-        """Upsert a user usage bucket."""
-        async with self._db.begin_session() as db_sess:
-            result = await execute_upserter(
-                db_sess,
-                upserter,
-                index_elements=["user_uuid", "project_id", "resource_group_id", "period_start"],
-            )
-            return result.row.to_data()
 
     async def search_user_usage_buckets(
         self,

@@ -48,24 +48,35 @@ from ai.backend.manager.models.user import (
     UserStatus,
 )
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.base import BatchQuerier, BulkCreator, Creator, Upserter
+from ai.backend.manager.repositories.base import BatchQuerier, BulkCreator, Creator
 from ai.backend.manager.repositories.resource_usage_history import (
     DomainUsageBucketConditions,
-    DomainUsageBucketCreatorSpec,
     DomainUsageBucketOrders,
-    DomainUsageBucketUpserterSpec,
     KernelUsageRecordConditions,
     KernelUsageRecordCreatorSpec,
     KernelUsageRecordOrders,
-    ProjectUsageBucketCreatorSpec,
     ResourceUsageHistoryRepository,
-    UserUsageBucketCreatorSpec,
-    UserUsageBucketUpserterSpec,
 )
 from ai.backend.testutils.db import with_tables
 from ai.backend.testutils.fixtures import DomainFixtureData
 
 RESOURCE_GROUP_ID = ResourceGroupID(uuid.UUID("00000000-0000-0000-0000-000000000001"))
+
+
+type _BucketRow = DomainUsageBucketRow | ProjectUsageBucketRow | UserUsageBucketRow
+
+
+async def _add_bucket(db: ExtendedAsyncSAEngine, row: _BucketRow) -> uuid.UUID:
+    """Seed one usage bucket row and answer its id.
+
+    Buckets are written by the fair share observation path alone, which takes an
+    aggregation result rather than a row, so a test that needs a bucket in place
+    inserts it.
+    """
+    async with db.begin_session() as db_sess:
+        db_sess.add(row)
+        await db_sess.flush()
+        return row.id
 
 
 class TestResourceUsageHistoryRepository:
@@ -393,126 +404,10 @@ class TestResourceUsageHistoryRepository:
 
     # ==================== Domain Usage Bucket Tests ====================
 
-    async def test_create_domain_usage_bucket(
-        self,
-        resource_usage_history_repository: ResourceUsageHistoryRepository,
-        test_scaling_group: str,
-        test_resource_group_id: ResourceGroupID,
-        test_domain: DomainFixtureData,
-    ) -> None:
-        """Test creating domain usage bucket"""
-        today = datetime.now(tz=UTC).date()
-
-        creator = Creator(
-            spec=DomainUsageBucketCreatorSpec(
-                domain_name=test_domain.domain_name,
-                resource_group=test_scaling_group,
-                resource_group_id=test_resource_group_id,
-                period_start=today,
-                period_end=today + timedelta(days=1),
-                decay_unit_days=1,
-                resource_usage=ResourceSlot({
-                    "cpu": Decimal("86400"),
-                    "mem": Decimal("86400000000"),
-                }),
-                capacity_snapshot=ResourceSlot({
-                    "cpu": Decimal("16"),
-                    "mem": Decimal("68719476736"),
-                }),
-            )
-        )
-
-        result = await resource_usage_history_repository.create_domain_usage_bucket(creator)
-
-        assert result.domain_name == test_domain.domain_name
-        assert result.resource_group == test_scaling_group
-        assert result.resource_group_id == test_resource_group_id
-        assert result.period_start == today
-        assert result.resource_usage["cpu"] == Decimal("86400")
-
-    async def test_upsert_domain_usage_bucket_insert(
-        self,
-        resource_usage_history_repository: ResourceUsageHistoryRepository,
-        test_scaling_group: str,
-        test_resource_group_id: ResourceGroupID,
-        test_domain: DomainFixtureData,
-    ) -> None:
-        """Test upsert domain usage bucket - insert case"""
-        today = datetime.now(tz=UTC).date()
-
-        upserter = Upserter(
-            spec=DomainUsageBucketUpserterSpec(
-                domain_name=test_domain.domain_name,
-                resource_group=test_scaling_group,
-                resource_group_id=test_resource_group_id,
-                period_start=today,
-                period_end=today + timedelta(days=1),
-                decay_unit_days=1,
-                resource_usage=ResourceSlot({"cpu": Decimal("3600")}),
-                capacity_snapshot=ResourceSlot({"cpu": Decimal("8")}),
-            )
-        )
-
-        result = await resource_usage_history_repository.upsert_domain_usage_bucket(upserter)
-
-        assert result.domain_name == test_domain.domain_name
-        assert result.resource_usage["cpu"] == Decimal("3600")
-
-    async def test_upsert_domain_usage_bucket_update(
-        self,
-        db_with_cleanup: ExtendedAsyncSAEngine,
-        resource_usage_history_repository: ResourceUsageHistoryRepository,
-        test_scaling_group: str,
-        test_resource_group_id: ResourceGroupID,
-        test_domain: DomainFixtureData,
-    ) -> None:
-        """Test upsert domain usage bucket - update case"""
-        today = datetime.now(tz=UTC).date()
-
-        # First upsert (insert)
-        upserter1 = Upserter(
-            spec=DomainUsageBucketUpserterSpec(
-                domain_name=test_domain.domain_name,
-                resource_group=test_scaling_group,
-                resource_group_id=test_resource_group_id,
-                period_start=today,
-                period_end=today + timedelta(days=1),
-                decay_unit_days=1,
-                resource_usage=ResourceSlot({"cpu": Decimal("3600")}),
-                capacity_snapshot=ResourceSlot({"cpu": Decimal("8")}),
-            )
-        )
-        await resource_usage_history_repository.upsert_domain_usage_bucket(upserter1)
-
-        # Second upsert (update)
-        upserter2 = Upserter(
-            spec=DomainUsageBucketUpserterSpec(
-                domain_name=test_domain.domain_name,
-                resource_group=test_scaling_group,
-                resource_group_id=test_resource_group_id,
-                period_start=today,
-                period_end=today + timedelta(days=1),
-                decay_unit_days=1,
-                resource_usage=ResourceSlot({"cpu": Decimal("7200")}),
-                capacity_snapshot=ResourceSlot({"cpu": Decimal("8")}),
-            )
-        )
-        result = await resource_usage_history_repository.upsert_domain_usage_bucket(upserter2)
-
-        assert result.resource_usage["cpu"] == Decimal("7200")
-        async with db_with_cleanup.begin_readonly_session() as db_sess:
-            stored_resource_group_id = await db_sess.scalar(
-                sa.select(DomainUsageBucketRow.resource_group_id).where(
-                    DomainUsageBucketRow.domain_name == test_domain.domain_name,
-                    DomainUsageBucketRow.resource_group == test_scaling_group,
-                    DomainUsageBucketRow.period_start == today,
-                )
-            )
-        assert stored_resource_group_id == test_resource_group_id
-
     async def test_search_domain_usage_buckets(
         self,
         resource_usage_history_repository: ResourceUsageHistoryRepository,
+        db_with_cleanup: ExtendedAsyncSAEngine,
         test_scaling_group: str,
         test_resource_group_id: ResourceGroupID,
         test_domain: DomainFixtureData,
@@ -523,8 +418,9 @@ class TestResourceUsageHistoryRepository:
         # Create buckets for multiple days
         for i in range(5):
             bucket_date = today - timedelta(days=i)
-            creator = Creator(
-                spec=DomainUsageBucketCreatorSpec(
+            await _add_bucket(
+                db_with_cleanup,
+                DomainUsageBucketRow(
                     domain_name=test_domain.domain_name,
                     resource_group=test_scaling_group,
                     resource_group_id=test_resource_group_id,
@@ -533,9 +429,8 @@ class TestResourceUsageHistoryRepository:
                     decay_unit_days=1,
                     resource_usage=ResourceSlot({"cpu": Decimal("3600")}),
                     capacity_snapshot=ResourceSlot({"cpu": Decimal("8")}),
-                )
+                ),
             )
-            await resource_usage_history_repository.create_domain_usage_bucket(creator)
 
         # Search with lookback window using BatchQuerier
         lookback_start = today - timedelta(days=3)
@@ -552,107 +447,6 @@ class TestResourceUsageHistoryRepository:
 
         assert result.total_count == 4  # days 0, 1, 2, 3
         assert len(result.items) == 4
-
-    # ==================== User Usage Bucket Tests ====================
-
-    async def test_create_user_usage_bucket(
-        self,
-        resource_usage_history_repository: ResourceUsageHistoryRepository,
-        test_scaling_group: str,
-        test_resource_group_id: ResourceGroupID,
-        test_domain: DomainFixtureData,
-        test_project_id: uuid.UUID,
-        test_user_uuid: uuid.UUID,
-    ) -> None:
-        """Test creating user usage bucket"""
-        today = datetime.now(tz=UTC).date()
-
-        creator = Creator(
-            spec=UserUsageBucketCreatorSpec(
-                user_uuid=test_user_uuid,
-                project_id=test_project_id,
-                domain_name=test_domain.domain_name,
-                resource_group=test_scaling_group,
-                resource_group_id=test_resource_group_id,
-                period_start=today,
-                period_end=today + timedelta(days=1),
-                decay_unit_days=1,
-                resource_usage=ResourceSlot({"cpu": Decimal("3600")}),
-                capacity_snapshot=ResourceSlot({"cpu": Decimal("8")}),
-            )
-        )
-
-        result = await resource_usage_history_repository.create_user_usage_bucket(creator)
-
-        assert result.user_uuid == test_user_uuid
-        assert result.project_id == test_project_id
-        assert result.resource_group_id == test_resource_group_id
-        assert result.resource_usage["cpu"] == Decimal("3600")
-
-    async def test_upsert_user_usage_bucket(
-        self,
-        resource_usage_history_repository: ResourceUsageHistoryRepository,
-        test_scaling_group: str,
-        test_resource_group_id: ResourceGroupID,
-        test_domain: DomainFixtureData,
-        test_project_id: uuid.UUID,
-        test_user_uuid: uuid.UUID,
-    ) -> None:
-        """Test upsert user usage bucket"""
-        today = datetime.now(tz=UTC).date()
-
-        upserter = Upserter(
-            spec=UserUsageBucketUpserterSpec(
-                user_uuid=test_user_uuid,
-                project_id=test_project_id,
-                domain_name=test_domain.domain_name,
-                resource_group=test_scaling_group,
-                resource_group_id=test_resource_group_id,
-                period_start=today,
-                period_end=today + timedelta(days=1),
-                decay_unit_days=1,
-                resource_usage=ResourceSlot({"cpu": Decimal("7200")}),
-                capacity_snapshot=ResourceSlot({"cpu": Decimal("8")}),
-            )
-        )
-
-        result = await resource_usage_history_repository.upsert_user_usage_bucket(upserter)
-
-        assert result.user_uuid == test_user_uuid
-        assert result.resource_usage["cpu"] == Decimal("7200")
-
-    # ==================== Project Usage Bucket Tests ====================
-
-    async def test_create_project_usage_bucket(
-        self,
-        resource_usage_history_repository: ResourceUsageHistoryRepository,
-        test_scaling_group: str,
-        test_resource_group_id: ResourceGroupID,
-        test_domain: DomainFixtureData,
-        test_project_id: uuid.UUID,
-    ) -> None:
-        """Test creating project usage bucket"""
-        today = datetime.now(tz=UTC).date()
-
-        creator = Creator(
-            spec=ProjectUsageBucketCreatorSpec(
-                project_id=test_project_id,
-                domain_name=test_domain.domain_name,
-                resource_group=test_scaling_group,
-                resource_group_id=test_resource_group_id,
-                period_start=today,
-                period_end=today + timedelta(days=1),
-                decay_unit_days=1,
-                resource_usage=ResourceSlot({"cpu": Decimal("3600")}),
-                capacity_snapshot=ResourceSlot({"cpu": Decimal("8")}),
-            )
-        )
-
-        result = await resource_usage_history_repository.create_project_usage_bucket(creator)
-
-        assert result.project_id == test_project_id
-        assert result.resource_group_id == test_resource_group_id
-        assert result.resource_usage["cpu"] == Decimal("3600")
 
     # ==================== Aggregation Tests ====================
 
@@ -672,8 +466,9 @@ class TestResourceUsageHistoryRepository:
         # Create multiple user usage buckets with normalized entries
         for i in range(3):
             bucket_date = today - timedelta(days=i)
-            creator = Creator(
-                spec=UserUsageBucketCreatorSpec(
+            bucket_id = await _add_bucket(
+                db_with_cleanup,
+                UserUsageBucketRow(
                     user_uuid=test_user_uuid,
                     project_id=test_project_id,
                     domain_name=test_domain.domain_name,
@@ -684,14 +479,13 @@ class TestResourceUsageHistoryRepository:
                     decay_unit_days=1,
                     resource_usage=ResourceSlot({"cpu": Decimal("3600")}),
                     capacity_snapshot=ResourceSlot({"cpu": Decimal("8")}),
-                )
+                ),
             )
-            result = await resource_usage_history_repository.create_user_usage_bucket(creator)
             # Create normalized entries for aggregation queries
             async with db_with_cleanup.begin_session() as db_sess:
                 db_sess.add(
                     UsageBucketEntryRow(
-                        bucket_id=result.id,
+                        bucket_id=bucket_id,
                         bucket_type="user",
                         slot_name="cpu",
                         resource_usage=Decimal("3600"),
@@ -745,8 +539,9 @@ class TestResourceUsageHistoryRepository:
         # Create multiple project usage buckets
         for i in range(2):
             bucket_date = today - timedelta(days=i)
-            creator = Creator(
-                spec=ProjectUsageBucketCreatorSpec(
+            bucket_id = await _add_bucket(
+                db_with_cleanup,
+                ProjectUsageBucketRow(
                     project_id=test_project_id,
                     domain_name=test_domain.domain_name,
                     resource_group=test_scaling_group,
@@ -756,14 +551,13 @@ class TestResourceUsageHistoryRepository:
                     decay_unit_days=1,
                     resource_usage=ResourceSlot({"cpu": Decimal("7200")}),
                     capacity_snapshot=ResourceSlot({"cpu": Decimal("8")}),
-                )
+                ),
             )
-            result = await resource_usage_history_repository.create_project_usage_bucket(creator)
             # Create normalized entries for aggregation queries
             async with db_with_cleanup.begin_session() as db_sess:
                 db_sess.add(
                     UsageBucketEntryRow(
-                        bucket_id=result.id,
+                        bucket_id=bucket_id,
                         bucket_type="project",
                         slot_name="cpu",
                         resource_usage=Decimal("7200"),
@@ -797,8 +591,9 @@ class TestResourceUsageHistoryRepository:
         # Create multiple domain usage buckets
         for i in range(2):
             bucket_date = today - timedelta(days=i)
-            creator = Creator(
-                spec=DomainUsageBucketCreatorSpec(
+            bucket_id = await _add_bucket(
+                db_with_cleanup,
+                DomainUsageBucketRow(
                     domain_name=test_domain.domain_name,
                     resource_group=test_scaling_group,
                     resource_group_id=test_resource_group_id,
@@ -807,14 +602,13 @@ class TestResourceUsageHistoryRepository:
                     decay_unit_days=1,
                     resource_usage=ResourceSlot({"cpu": Decimal("86400")}),
                     capacity_snapshot=ResourceSlot({"cpu": Decimal("16")}),
-                )
+                ),
             )
-            result = await resource_usage_history_repository.create_domain_usage_bucket(creator)
             # Create normalized entries for aggregation queries
             async with db_with_cleanup.begin_session() as db_sess:
                 db_sess.add(
                     UsageBucketEntryRow(
-                        bucket_id=result.id,
+                        bucket_id=bucket_id,
                         bucket_type="domain",
                         slot_name="cpu",
                         resource_usage=Decimal("86400"),
