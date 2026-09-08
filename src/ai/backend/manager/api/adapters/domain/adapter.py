@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
-from ai.backend.common.api_handlers import Sentinel
 from ai.backend.common.data.entity.domain import DomainID, DomainName
 from ai.backend.common.data.entity.resource_group import ResourceGroupName
 from ai.backend.common.dto.manager.query import StringFilter
@@ -228,32 +227,14 @@ class DomainAdapter(BaseAdapter):
         )
         updater = DomainUpdater(
             domain_id=target.entity_id(),
-            description=(
-                TriState.nop()
-                if isinstance(input.description, Sentinel)
-                else TriState.nullify()
-                if input.description is None
-                else TriState.update(input.description)
-            ),
+            description=TriState.from_unset(input.description),
             is_active=(
                 OptionalState.update(input.is_active)
                 if input.is_active is not None
                 else OptionalState.nop()
             ),
-            allowed_docker_registries=(
-                OptionalState.nop()
-                if isinstance(input.allowed_docker_registries, Sentinel)
-                else OptionalState.update(input.allowed_docker_registries)
-                if input.allowed_docker_registries is not None
-                else OptionalState.nop()
-            ),
-            integration_name=(
-                TriState.nop()
-                if isinstance(input.integration_name, Sentinel)
-                else TriState.nullify()
-                if input.integration_name is None
-                else TriState.update(input.integration_name)
-            ),
+            allowed_docker_registries=OptionalState.from_unset(input.allowed_docker_registries),
+            integration_name=TriState.from_unset(input.integration_name),
         )
         result = await self._processors.domain.update_domain_node.run(
             UpdateDomainNodeAction(
