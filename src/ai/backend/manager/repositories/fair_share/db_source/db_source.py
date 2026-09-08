@@ -64,11 +64,9 @@ from ai.backend.manager.repositories.base import (
     BatchQuerier,
     BulkUpserter,
     BulkUpserterResult,
-    Creator,
     Upserter,
     execute_batch_querier,
     execute_bulk_upserter,
-    execute_creator,
     execute_upserter,
 )
 from ai.backend.manager.repositories.fair_share.types import (
@@ -95,25 +93,6 @@ class FairShareDBSource:
         self._db = db
 
     # ==================== Domain Fair Share ====================
-
-    async def create_domain_fair_share(
-        self,
-        creator: Creator[DomainFairShareRow],
-    ) -> DomainFairShareData:
-        """Create a new domain fair share record."""
-        async with self._db.begin_session_read_committed() as db_sess:
-            result = await execute_creator(db_sess, creator)
-            sg_row = await self._fetch_resource_group_row_by_id(
-                db_sess, result.row.resource_group_id
-            )
-            fair_share_spec = sg_row.fair_share_spec or FairShareResourceGroupSpec()
-            available_slots = await self._fetch_available_slots(
-                db_sess, result.row.resource_group_id
-            )
-            return result.row.to_data(
-                default_weight=fair_share_spec.default_weight,
-                available_slots=available_slots,
-            )
 
     async def upsert_domain_fair_share(
         self,
@@ -312,25 +291,6 @@ class FairShareDBSource:
         )
 
     # ==================== Project Fair Share ====================
-
-    async def create_project_fair_share(
-        self,
-        creator: Creator[ProjectFairShareRow],
-    ) -> ProjectFairShareData:
-        """Create a new project fair share record."""
-        async with self._db.begin_session_read_committed() as db_sess:
-            result = await execute_creator(db_sess, creator)
-            sg_row = await self._fetch_resource_group_row_by_id(
-                db_sess, result.row.resource_group_id
-            )
-            fair_share_spec = sg_row.fair_share_spec or FairShareResourceGroupSpec()
-            available_slots = await self._fetch_available_slots(
-                db_sess, result.row.resource_group_id
-            )
-            return result.row.to_data(
-                default_weight=fair_share_spec.default_weight,
-                available_slots=available_slots,
-            )
 
     async def upsert_project_fair_share(
         self,
@@ -540,25 +500,6 @@ class FairShareDBSource:
         )
 
     # ==================== User Fair Share ====================
-
-    async def create_user_fair_share(
-        self,
-        creator: Creator[UserFairShareRow],
-    ) -> UserFairShareData:
-        """Create a new user fair share record."""
-        async with self._db.begin_session_read_committed() as db_sess:
-            result = await execute_creator(db_sess, creator)
-            sg_row = await self._fetch_resource_group_row_by_id(
-                db_sess, result.row.resource_group_id
-            )
-            fair_share_spec = sg_row.fair_share_spec or FairShareResourceGroupSpec()
-            available_slots = await self._fetch_available_slots(
-                db_sess, result.row.resource_group_id
-            )
-            return result.row.to_data(
-                default_weight=fair_share_spec.default_weight,
-                available_slots=available_slots,
-            )
 
     async def upsert_user_fair_share(
         self,

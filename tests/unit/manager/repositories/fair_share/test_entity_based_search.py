@@ -66,14 +66,15 @@ from ai.backend.manager.models.user import (
     UserStatus,
 )
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.base import BatchQuerier, Creator
+from ai.backend.manager.repositories.base import BatchQuerier, Upserter
 from ai.backend.manager.repositories.fair_share import (
-    DomainFairShareCreatorSpec,
+    DomainFairShareUpserterSpec,
     FairShareRepository,
-    ProjectFairShareCreatorSpec,
-    UserFairShareCreatorSpec,
+    ProjectFairShareUpserterSpec,
+    UserFairShareUpserterSpec,
 )
 from ai.backend.manager.secret.types import SecretValue
+from ai.backend.manager.types import TriState
 from ai.backend.testutils.db import with_tables
 from ai.backend.testutils.fixtures import DomainFixtureData
 
@@ -173,13 +174,14 @@ class TestSearchDomainFairSharesEntityBased:
             )
             await db_sess.commit()
 
-        await fair_share_repository.create_domain_fair_share(
-            Creator(
-                spec=DomainFairShareCreatorSpec(
+        await fair_share_repository.upsert_domain_fair_share(
+            Upserter(
+                spec=DomainFairShareUpserterSpec(
                     resource_group=resource_group,
                     resource_group_id=RESOURCE_GROUP_ID,
                     domain_name=domain_name,
-                    weight=Decimal("2.0"),  # Explicit weight for use_default=False
+                    # Explicit weight for use_default=False
+                    weight=TriState.update(Decimal("2.0")),
                 )
             )
         )
@@ -340,13 +342,14 @@ class TestSearchDomainFairSharesEntityBased:
             await db_sess.commit()
 
         for name in domain_names[:2]:
-            await fair_share_repository.create_domain_fair_share(
-                Creator(
-                    spec=DomainFairShareCreatorSpec(
+            await fair_share_repository.upsert_domain_fair_share(
+                Upserter(
+                    spec=DomainFairShareUpserterSpec(
                         resource_group=resource_group,
                         resource_group_id=RESOURCE_GROUP_ID,
                         domain_name=name,
-                        weight=Decimal("2.0"),  # Explicit weight for use_default=False
+                        # Explicit weight for use_default=False
+                        weight=TriState.update(Decimal("2.0")),
                     )
                 )
             )
@@ -782,14 +785,15 @@ class TestSearchProjectFairSharesEntityBased:
             )
             await db_sess.commit()
 
-        await fair_share_repository.create_project_fair_share(
-            Creator(
-                spec=ProjectFairShareCreatorSpec(
+        await fair_share_repository.upsert_project_fair_share(
+            Upserter(
+                spec=ProjectFairShareUpserterSpec(
                     resource_group=resource_group,
                     resource_group_id=RESOURCE_GROUP_ID,
                     project_id=project_id,
                     domain_name=domain_name,
-                    weight=Decimal("2.0"),  # Explicit weight for use_default=False
+                    # Explicit weight for use_default=False
+                    weight=TriState.update(Decimal("2.0")),
                 )
             )
         )
@@ -1258,15 +1262,16 @@ class TestSearchUserFairSharesEntityBased:
         """Create a user with fair share record."""
         user_uuid = await self._create_user(db_with_cleanup, domain_name, project_id)
 
-        await fair_share_repository.create_user_fair_share(
-            Creator(
-                spec=UserFairShareCreatorSpec(
+        await fair_share_repository.upsert_user_fair_share(
+            Upserter(
+                spec=UserFairShareUpserterSpec(
                     resource_group=resource_group,
                     resource_group_id=RESOURCE_GROUP_ID,
                     user_uuid=user_uuid,
                     project_id=project_id,
                     domain_name=domain_name,
-                    weight=Decimal("2.0"),  # Explicit weight for use_default=False
+                    # Explicit weight for use_default=False
+                    weight=TriState.update(Decimal("2.0")),
                 )
             )
         )

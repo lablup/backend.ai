@@ -11,11 +11,6 @@ from ai.backend.manager.models.fair_share.orders import (
     UserFairShareOrders,
 )
 
-from .creators import (
-    DomainFairShareCreatorSpec,
-    ProjectFairShareCreatorSpec,
-    UserFairShareCreatorSpec,
-)
 from .repositories import FairShareRepositories
 from .repository import FairShareRepository
 from .types import (
@@ -36,10 +31,6 @@ __all__ = (
     # Repositories
     "FairShareRepositories",
     "FairShareRepository",
-    # Creator specs
-    "DomainFairShareCreatorSpec",
-    "ProjectFairShareCreatorSpec",
-    "UserFairShareCreatorSpec",
     # Upserter specs
     "DomainFairShareUpserterSpec",
     "ProjectFairShareUpserterSpec",

@@ -39,7 +39,6 @@ from ai.backend.manager.repositories.base import (
     BatchQuerier,
     BulkUpserter,
     BulkUpserterResult,
-    Creator,
     Upserter,
 )
 from ai.backend.manager.repositories.fair_share.types import (
@@ -87,14 +86,6 @@ class FairShareRepository:
         self._db_source = FairShareDBSource(db)
 
     # ==================== Domain Fair Share ====================
-
-    @fair_share_repository_resilience.apply()
-    async def create_domain_fair_share(
-        self,
-        creator: Creator[DomainFairShareRow],
-    ) -> DomainFairShareData:
-        """Create a new domain fair share record."""
-        return await self._db_source.create_domain_fair_share(creator)
 
     @fair_share_repository_resilience.apply()
     async def upsert_domain_fair_share(
@@ -149,14 +140,6 @@ class FairShareRepository:
     # ==================== Project Fair Share ====================
 
     @fair_share_repository_resilience.apply()
-    async def create_project_fair_share(
-        self,
-        creator: Creator[ProjectFairShareRow],
-    ) -> ProjectFairShareData:
-        """Create a new project fair share record."""
-        return await self._db_source.create_project_fair_share(creator)
-
-    @fair_share_repository_resilience.apply()
     async def upsert_project_fair_share(
         self,
         upserter: Upserter[ProjectFairShareRow],
@@ -207,14 +190,6 @@ class FairShareRepository:
         return await self._db_source.search_rg_project_fair_shares(scope, querier)
 
     # ==================== User Fair Share ====================
-
-    @fair_share_repository_resilience.apply()
-    async def create_user_fair_share(
-        self,
-        creator: Creator[UserFairShareRow],
-    ) -> UserFairShareData:
-        """Create a new user fair share record."""
-        return await self._db_source.create_user_fair_share(creator)
 
     @fair_share_repository_resilience.apply()
     async def upsert_user_fair_share(
