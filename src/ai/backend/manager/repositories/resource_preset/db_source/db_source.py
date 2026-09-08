@@ -40,6 +40,7 @@ from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.project import groups
 from ai.backend.manager.models.resource_group import query_allowed_sgroups
 from ai.backend.manager.models.resource_preset import ResourcePresetRow
+from ai.backend.manager.models.resource_preset.creators import ResourcePresetCreator
 from ai.backend.manager.models.resource_slot import (
     AgentResourceRow,
     ResourceAllocationRow,
@@ -49,7 +50,6 @@ from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.virtual_entity.queries import user_scope_membership_exists
 from ai.backend.manager.repositories.base import BatchQuerier, execute_batch_querier
-from ai.backend.manager.repositories.base.creator import Creator, execute_creator
 from ai.backend.manager.repositories.base.updater import Updater, execute_updater
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.resource_slot.types import (
@@ -89,14 +89,13 @@ class ResourcePresetDBSource:
         self._db = db
         self._v2_ops = v2_ops
 
-    async def create_preset(self, creator: Creator[ResourcePresetRow]) -> ResourcePresetData:
+    async def create_preset(self, creator: ResourcePresetCreator) -> ResourcePresetData:
         """
         Creates a new resource preset.
         Raises ResourcePresetConflict if a preset with the same name and scaling group already exists.
         """
-        async with self._db.begin_session() as session:
-            result = await execute_creator(session, creator)
-            return result.row.to_dataclass()
+        async with self._v2_ops.write_ops() as w:
+            return await w.create_global_entity(creator)
 
     async def get_preset_by_id(self, preset_id: UUID) -> ResourcePresetData:
         """

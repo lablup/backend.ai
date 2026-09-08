@@ -15,14 +15,13 @@ from ai.backend.common.types import BinarySize, ResourceSlot
 from ai.backend.manager.data.resource_preset.types import ResourcePresetData
 from ai.backend.manager.errors.resource import ResourcePresetNotFound
 from ai.backend.manager.models.resource_preset import ResourcePresetRow
+from ai.backend.manager.models.resource_preset.creators import ResourcePresetCreator
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.resource_preset.cache_source.cache_source import (
     ResourcePresetCacheSource,
 )
-from ai.backend.manager.repositories.resource_preset.creators import ResourcePresetCreatorSpec
 from ai.backend.manager.repositories.resource_preset.db_source.db_source import (
     ResourcePresetDBSource,
 )
@@ -102,22 +101,20 @@ class TestResourcePresetRepository:
         return mock_row
 
     @pytest.fixture
-    def sample_preset_creator(self) -> Creator[ResourcePresetRow]:
+    def sample_preset_creator(self) -> ResourcePresetCreator:
         """Create sample resource preset creator for testing"""
-        return Creator(
-            spec=ResourcePresetCreatorSpec(
-                name="new-preset",
-                resource_slots=ResourceSlot({"cpu": "2", "mem": "4G"}),
-                shared_memory="1 GiB",
-                resource_group_name=None,
-            )
+        return ResourcePresetCreator(
+            name="new-preset",
+            resource_slots=ResourceSlot({"cpu": "2", "mem": "4G"}),
+            shared_memory="1 GiB",
+            resource_group_name=None,
         )
 
     async def test_create_preset_validated_success(
         self,
         resource_preset_repository: ResourcePresetRepository,
         mock_db_source: MagicMock,
-        sample_preset_creator: Creator[ResourcePresetRow],
+        sample_preset_creator: ResourcePresetCreator,
         sample_preset_row: MagicMock,
     ) -> None:
         """Test successful preset creation"""
@@ -136,7 +133,7 @@ class TestResourcePresetRepository:
         self,
         resource_preset_repository: ResourcePresetRepository,
         mock_db_source: MagicMock,
-        sample_preset_creator: Creator[ResourcePresetRow],
+        sample_preset_creator: ResourcePresetCreator,
     ) -> None:
         """Test preset creation with duplicate name"""
         mock_db_source.create_preset = AsyncMock(

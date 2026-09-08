@@ -22,9 +22,9 @@ from ai.backend.manager.data.resource_preset.types import (
     ResourcePresetSearchResult,
 )
 from ai.backend.manager.models.resource_preset import ResourcePresetRow
+from ai.backend.manager.models.resource_preset.creators import ResourcePresetCreator
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base import BatchQuerier
-from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 
@@ -72,9 +72,7 @@ class ResourcePresetRepository:
         self._config_provider = config_provider
 
     @resource_preset_repository_resilience.apply()
-    async def create_preset_validated(
-        self, creator: Creator[ResourcePresetRow]
-    ) -> ResourcePresetData:
+    async def create_preset_validated(self, creator: ResourcePresetCreator) -> ResourcePresetData:
         """
         Creates a new resource preset.
         Raises ResourcePresetConflict if a preset with the same name and scaling group already exists.

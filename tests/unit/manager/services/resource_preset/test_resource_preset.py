@@ -25,11 +25,10 @@ from ai.backend.common.types import (
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.resource_preset.types import ResourcePresetData
 from ai.backend.manager.errors.common import ObjectNotFound
+from ai.backend.manager.models.resource_preset.creators import ResourcePresetCreator
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.registry import AgentRegistry
-from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.base.updater import Updater
-from ai.backend.manager.repositories.resource_preset.creators import ResourcePresetCreatorSpec
 from ai.backend.manager.repositories.resource_preset.db_source.types import (
     PresetAllocatabilityData,
 )
@@ -123,13 +122,11 @@ class TestResourcePresetServiceCompatibility:
 
         # Test 1: Normal CPU-only preset creation
         action = CreateResourcePresetAction(
-            creator=Creator(
-                spec=ResourcePresetCreatorSpec(
-                    name="cpu-small",
-                    resource_slots=ResourceSlot({"cpu": "2", "mem": "4G"}),
-                    shared_memory=str(BinarySize.from_str("1G")),
-                    resource_group_name=None,
-                )
+            creator=ResourcePresetCreator(
+                name="cpu-small",
+                resource_slots=ResourceSlot({"cpu": "2", "mem": "4G"}),
+                shared_memory=str(BinarySize.from_str("1G")),
+                resource_group_name=None,
             )
         )
 
@@ -164,18 +161,16 @@ class TestResourcePresetServiceCompatibility:
         )
 
         action = CreateResourcePresetAction(
-            creator=Creator(
-                spec=ResourcePresetCreatorSpec(
-                    name="gpu-standard",
-                    resource_slots=ResourceSlot({
-                        "cpu": "4",
-                        "mem": "16G",
-                        "gpu": "1",
-                        "gpu_memory": "8G",
-                    }),
-                    shared_memory=str(BinarySize.from_str("2G")),
-                    resource_group_name="gpu-cluster",
-                )
+            creator=ResourcePresetCreator(
+                name="gpu-standard",
+                resource_slots=ResourceSlot({
+                    "cpu": "4",
+                    "mem": "16G",
+                    "gpu": "1",
+                    "gpu_memory": "8G",
+                }),
+                shared_memory=str(BinarySize.from_str("2G")),
+                resource_group_name="gpu-cluster",
             )
         )
 
@@ -189,13 +184,11 @@ class TestResourcePresetServiceCompatibility:
     ) -> None:
         """Test preset creation fails when missing intrinsic slots."""
         action = CreateResourcePresetAction(
-            creator=Creator(
-                spec=ResourcePresetCreatorSpec(
-                    name="invalid-preset",
-                    resource_slots=ResourceSlot({"gpu": "1"}),  # Missing CPU and mem
-                    shared_memory=None,
-                    resource_group_name=None,
-                )
+            creator=ResourcePresetCreator(
+                name="invalid-preset",
+                resource_slots=ResourceSlot({"gpu": "1"}),  # Missing CPU and mem
+                shared_memory=None,
+                resource_group_name=None,
             )
         )
 
@@ -214,13 +207,11 @@ class TestResourcePresetServiceCompatibility:
         )
 
         action = CreateResourcePresetAction(
-            creator=Creator(
-                spec=ResourcePresetCreatorSpec(
-                    name="existing-preset",
-                    resource_slots=ResourceSlot({"cpu": "2", "mem": "4G"}),
-                    shared_memory=None,
-                    resource_group_name=None,
-                )
+            creator=ResourcePresetCreator(
+                name="existing-preset",
+                resource_slots=ResourceSlot({"cpu": "2", "mem": "4G"}),
+                shared_memory=None,
+                resource_group_name=None,
             )
         )
 
@@ -511,13 +502,11 @@ class TestResourcePresetServiceCompatibility:
         )
 
         action = CreateResourcePresetAction(
-            creator=Creator(
-                spec=ResourcePresetCreatorSpec(
-                    name="custom-preset",
-                    resource_slots=ResourceSlot({"cpu": "4", "mem": "8G", "npu": "2", "tpu": "1"}),
-                    shared_memory=None,
-                    resource_group_name=None,
-                )
+            creator=ResourcePresetCreator(
+                name="custom-preset",
+                resource_slots=ResourceSlot({"cpu": "4", "mem": "8G", "npu": "2", "tpu": "1"}),
+                shared_memory=None,
+                resource_group_name=None,
             )
         )
 
