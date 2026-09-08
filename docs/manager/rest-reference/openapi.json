@@ -8402,7 +8402,6 @@
                 "type": "null"
               }
             ],
-            "default": null,
             "title": "Name"
           },
           "model_path": {
@@ -8415,7 +8414,6 @@
                 "type": "null"
               }
             ],
-            "default": null,
             "title": "Model Path"
           },
           "service": {
@@ -8427,7 +8425,7 @@
                 "type": "null"
               }
             ],
-            "default": null
+            "title": "Service"
           },
           "metadata": {
             "anyOf": [
@@ -8438,7 +8436,7 @@
                 "type": "null"
               }
             ],
-            "default": null
+            "title": "Metadata"
           }
         },
         "title": "UpdatePresetModelConfigInput",
@@ -8460,7 +8458,6 @@
                 "type": "null"
               }
             ],
-            "default": null,
             "title": "Models"
           }
         },
@@ -8479,7 +8476,6 @@
                 "type": "null"
               }
             ],
-            "default": null,
             "title": "Enable"
           },
           "interval": {
@@ -8491,7 +8487,6 @@
                 "type": "null"
               }
             ],
-            "default": null,
             "title": "Interval"
           },
           "path": {
@@ -8503,7 +8498,6 @@
                 "type": "null"
               }
             ],
-            "default": null,
             "title": "Path"
           },
           "max_retries": {
@@ -8515,7 +8509,6 @@
                 "type": "null"
               }
             ],
-            "default": null,
             "title": "Max Retries"
           },
           "max_wait_time": {
@@ -8527,7 +8520,6 @@
                 "type": "null"
               }
             ],
-            "default": null,
             "title": "Max Wait Time"
           },
           "expected_status_code": {
@@ -8540,7 +8532,6 @@
                 "type": "null"
               }
             ],
-            "default": null,
             "title": "Expected Status Code"
           },
           "initial_delay": {
@@ -8553,7 +8544,6 @@
                 "type": "null"
               }
             ],
-            "default": null,
             "title": "Initial Delay"
           }
         },
@@ -8572,7 +8562,6 @@
                 "type": "null"
               }
             ],
-            "default": null,
             "title": "Author"
           },
           "title": {
@@ -8584,7 +8573,6 @@
                 "type": "null"
               }
             ],
-            "default": null,
             "title": "Title"
           },
           "version": {
@@ -8596,7 +8584,6 @@
                 "type": "null"
               }
             ],
-            "default": null,
             "title": "Version"
           },
           "created": {
@@ -8608,7 +8595,6 @@
                 "type": "null"
               }
             ],
-            "default": null,
             "title": "Created"
           },
           "last_modified": {
@@ -8620,7 +8606,6 @@
                 "type": "null"
               }
             ],
-            "default": null,
             "title": "Last Modified"
           },
           "description": {
@@ -8632,7 +8617,6 @@
                 "type": "null"
               }
             ],
-            "default": null,
             "title": "Description"
           },
           "task": {
@@ -8644,7 +8628,6 @@
                 "type": "null"
               }
             ],
-            "default": null,
             "title": "Task"
           },
           "category": {
@@ -8656,7 +8639,6 @@
                 "type": "null"
               }
             ],
-            "default": null,
             "title": "Category"
           },
           "architecture": {
@@ -8668,7 +8650,6 @@
                 "type": "null"
               }
             ],
-            "default": null,
             "title": "Architecture"
           },
           "framework": {
@@ -8683,7 +8664,6 @@
                 "type": "null"
               }
             ],
-            "default": null,
             "title": "Framework"
           },
           "label": {
@@ -8698,7 +8678,6 @@
                 "type": "null"
               }
             ],
-            "default": null,
             "title": "Label"
           },
           "license": {
@@ -8710,7 +8689,6 @@
                 "type": "null"
               }
             ],
-            "default": null,
             "title": "License"
           },
           "min_resource": {
@@ -8723,7 +8701,6 @@
                 "type": "null"
               }
             ],
-            "default": null,
             "title": "Min Resource"
           }
         },
@@ -8745,7 +8722,6 @@
                 "type": "null"
               }
             ],
-            "default": null,
             "title": "Pre Start Actions"
           },
           "command": {
@@ -8757,7 +8733,6 @@
                 "type": "null"
               }
             ],
-            "default": null,
             "title": "Command"
           },
           "start_command": {
@@ -8772,7 +8747,6 @@
                 "type": "null"
               }
             ],
-            "default": null,
             "title": "Start Command"
           },
           "shell": {
@@ -8784,7 +8758,6 @@
                 "type": "null"
               }
             ],
-            "default": null,
             "title": "Shell"
           },
           "port": {
@@ -8797,7 +8770,6 @@
                 "type": "null"
               }
             ],
-            "default": null,
             "title": "Port"
           },
           "health_check": {
@@ -8809,7 +8781,7 @@
                 "type": "null"
               }
             ],
-            "default": null
+            "title": "Health Check"
           }
         },
         "title": "UpdatePresetModelServiceConfigInput",
