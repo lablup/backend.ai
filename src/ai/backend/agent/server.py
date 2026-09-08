@@ -56,7 +56,7 @@ from ai.backend.agent.errors import (
 from ai.backend.agent.health.docker import DockerHealthChecker
 from ai.backend.agent.metrics.metric import RPCMetricObserver
 from ai.backend.agent.monitor import AgentErrorPluginContext, AgentStatsPluginContext
-from ai.backend.agent.resources import scan_gpu_alloc_map
+from ai.backend.agent.resources import collect_device_capacities, scan_gpu_alloc_map
 from ai.backend.agent.rpc.health.registry import register_health_domain
 from ai.backend.agent.rpc.hwinfo.registry import register_hwinfo_domain
 from ai.backend.agent.rpc.kernel.registry import register_kernel_domain
@@ -1242,7 +1242,11 @@ class AgentRPCServer(aobject):
         log.debug("rpc::scan_gpu_alloc_map()")
         agent = self.runtime.get_agent(agent_id)
         scratch_root = agent.local_config.container.scratch_root
-        result = await scan_gpu_alloc_map(list(agent.kernel_registry.keys()), scratch_root)
+        result = await scan_gpu_alloc_map(
+            list(agent.kernel_registry.keys()),
+            scratch_root,
+            collect_device_capacities(agent.computers),
+        )
         return {k: str(v) for k, v in result.items()}
 
 
