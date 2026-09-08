@@ -8,11 +8,9 @@ from __future__ import annotations
 from decimal import Decimal
 from typing import Any
 
-from ai.backend.common.api_handlers import Sentinel
 from ai.backend.common.contexts.user import current_user
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.dto.manager.v2.common import (
-    BinarySizeInput,
     ResourceLimitEntryInfo,
     ResourceSlotEntryInfo,
     ResourceSlotEntryInput,
@@ -273,14 +271,8 @@ class ResourcePolicyAdapter(BaseAdapter):
                 if input.default_for_unspecified is not None
                 else OptionalState.nop()
             ),
-            total_resource_slots=(
-                OptionalState.nop()
-                if isinstance(input.total_resource_slots, Sentinel)
-                else OptionalState.update(
-                    self._entries_to_resource_slot(input.total_resource_slots)
-                )
-                if input.total_resource_slots is not None
-                else OptionalState.nop()
+            total_resource_slots=OptionalState.from_unset(input.total_resource_slots).map(
+                self._entries_to_resource_slot
             ),
             max_session_lifetime=(
                 OptionalState.update(input.max_session_lifetime)
@@ -292,29 +284,11 @@ class ResourcePolicyAdapter(BaseAdapter):
                 if input.max_concurrent_sessions is not None
                 else OptionalState.nop()
             ),
-            max_pending_session_count=(
-                TriState.nop()
-                if isinstance(input.max_pending_session_count, Sentinel)
-                else TriState.nullify()
-                if input.max_pending_session_count is None
-                else TriState.update(input.max_pending_session_count)
-            ),
-            max_pending_session_resource_slots=(
-                TriState.nop()
-                if isinstance(input.max_pending_session_resource_slots, Sentinel)
-                else TriState.nullify()
-                if input.max_pending_session_resource_slots is None
-                else TriState.update(
-                    self._entries_to_resource_slot(input.max_pending_session_resource_slots)
-                )
-            ),
-            max_priority=(
-                TriState.nop()
-                if isinstance(input.max_priority, Sentinel)
-                else TriState.nullify()
-                if input.max_priority is None
-                else TriState.update(input.max_priority)
-            ),
+            max_pending_session_count=TriState.from_unset(input.max_pending_session_count),
+            max_pending_session_resource_slots=TriState.from_unset(
+                input.max_pending_session_resource_slots
+            ).map(self._entries_to_resource_slot),
+            max_priority=TriState.from_unset(input.max_priority),
             max_concurrent_sftp_sessions=(
                 OptionalState.update(input.max_concurrent_sftp_sessions)
                 if input.max_concurrent_sftp_sessions is not None
@@ -330,14 +304,8 @@ class ResourcePolicyAdapter(BaseAdapter):
                 if input.idle_timeout is not None
                 else OptionalState.nop()
             ),
-            allowed_vfolder_hosts=(
-                OptionalState.nop()
-                if isinstance(input.allowed_vfolder_hosts, Sentinel)
-                else OptionalState.update(
-                    self._entries_to_vfolder_hosts(input.allowed_vfolder_hosts)
-                )
-                if input.allowed_vfolder_hosts is not None
-                else OptionalState.nop()
+            allowed_vfolder_hosts=OptionalState.from_unset(input.allowed_vfolder_hosts).map(
+                self._entries_to_vfolder_hosts
             ),
         )
         result = await self._processors.keypair_resource_policy.update.run(
@@ -433,26 +401,10 @@ class ResourcePolicyAdapter(BaseAdapter):
         )
         updater = UserResourcePolicyUpdater(
             policy_id=target.entity_id(),
-            max_vfolder_count=(
-                OptionalState.nop()
-                if isinstance(input.max_vfolder_count, Sentinel)
-                else OptionalState.update(input.max_vfolder_count)
-                if input.max_vfolder_count is not None
-                else OptionalState.nop()
-            ),
-            max_concurrent_logins=(
-                TriState.nop()
-                if isinstance(input.max_concurrent_logins, Sentinel)
-                else TriState.nullify()
-                if input.max_concurrent_logins is None
-                else TriState.update(input.max_concurrent_logins)
-            ),
-            max_quota_scope_size=(
-                OptionalState.nop()
-                if isinstance(input.max_quota_scope_size, Sentinel)
-                else OptionalState.update(input.max_quota_scope_size.bytes)
-                if isinstance(input.max_quota_scope_size, BinarySizeInput)
-                else OptionalState.nop()
+            max_vfolder_count=OptionalState.from_unset(input.max_vfolder_count),
+            max_concurrent_logins=TriState.from_unset(input.max_concurrent_logins),
+            max_quota_scope_size=OptionalState.from_unset(input.max_quota_scope_size).map(
+                lambda x: x.bytes
             ),
             max_session_count_per_model_session=(
                 OptionalState.update(input.max_session_count_per_model_session)
@@ -556,19 +508,9 @@ class ResourcePolicyAdapter(BaseAdapter):
         )
         updater = ProjectResourcePolicyUpdater(
             policy_id=target.entity_id(),
-            max_vfolder_count=(
-                OptionalState.nop()
-                if isinstance(input.max_vfolder_count, Sentinel)
-                else OptionalState.update(input.max_vfolder_count)
-                if input.max_vfolder_count is not None
-                else OptionalState.nop()
-            ),
-            max_quota_scope_size=(
-                OptionalState.nop()
-                if isinstance(input.max_quota_scope_size, Sentinel)
-                else OptionalState.update(input.max_quota_scope_size.bytes)
-                if isinstance(input.max_quota_scope_size, BinarySizeInput)
-                else OptionalState.nop()
+            max_vfolder_count=OptionalState.from_unset(input.max_vfolder_count),
+            max_quota_scope_size=OptionalState.from_unset(input.max_quota_scope_size).map(
+                lambda x: x.bytes
             ),
             max_network_count=(
                 OptionalState.update(input.max_network_count)
