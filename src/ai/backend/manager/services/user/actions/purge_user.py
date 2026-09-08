@@ -26,7 +26,7 @@ class PurgeUserAction(BaseSingleEntityAction):
 
     user_id: UserID
     admin_user_id: UUID
-    purge_shared_vfolders: OptionalState[bool] = field(default_factory=OptionalState[bool].nop)
+    delete_shared_vfolders: bool = False
     delegate_endpoint_ownership: OptionalState[bool] = field(
         default_factory=OptionalState[bool].nop
     )
@@ -57,7 +57,7 @@ class BulkPurgeUserAction(BaseGlobalAction):
 
     user_ids: list[UUID]
     admin_user_id: UUID
-    purge_shared_vfolders: OptionalState[bool] = field(default_factory=OptionalState[bool].nop)
+    delete_shared_vfolders: bool = False
     delegate_endpoint_ownership: OptionalState[bool] = field(
         default_factory=OptionalState[bool].nop
     )

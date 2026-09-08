@@ -244,10 +244,7 @@ class UserHandler:
         body: BodyParam[PurgeUserRequest],
         ctx: UserContext,
     ) -> APIResponse:
-        purge_shared = OptionalState[bool].nop()
         delegate_endpoint = OptionalState[bool].nop()
-        if body.parsed.purge_shared_vfolders:
-            purge_shared = OptionalState.update(body.parsed.purge_shared_vfolders)
         if body.parsed.delegate_endpoint_ownership:
             delegate_endpoint = OptionalState.update(body.parsed.delegate_endpoint_ownership)
 
@@ -255,7 +252,7 @@ class UserHandler:
             PurgeUserAction(
                 user_id=UserID(body.parsed.user_id),
                 admin_user_id=ctx.user_uuid,
-                purge_shared_vfolders=purge_shared,
+                delete_shared_vfolders=body.parsed.delete_shared_vfolders,
                 delegate_endpoint_ownership=delegate_endpoint,
             )
         )

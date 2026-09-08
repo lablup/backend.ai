@@ -220,7 +220,7 @@ class TestUserCRUD:
 
         request = PurgeUserRequest(
             user_id=_SAMPLE_USER_ID,
-            purge_shared_vfolders=True,
+            delete_shared_vfolders=True,
             delegate_endpoint_ownership=True,
         )
         result = await uc.purge(request)
@@ -232,5 +232,5 @@ class TestUserCRUD:
         assert url.endswith("/admin/users/purge")
         assert body is not None
         assert body["user_id"] == str(_SAMPLE_USER_ID)
-        assert body["purge_shared_vfolders"] is True
+        assert body["delete_shared_vfolders"] is True
         assert body["delegate_endpoint_ownership"] is True

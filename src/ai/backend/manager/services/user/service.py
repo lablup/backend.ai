@@ -188,7 +188,7 @@ class UserService:
         bulk_action = BulkPurgeUserAction(
             user_ids=[action.user_id],
             admin_user_id=action.admin_user_id,
-            purge_shared_vfolders=action.purge_shared_vfolders,
+            delete_shared_vfolders=action.delete_shared_vfolders,
             delegate_endpoint_ownership=action.delegate_endpoint_ownership,
         )
         await self._purge_single_user(action.user_id, bulk_action, user_info_ctx)
@@ -217,8 +217,10 @@ class UserService:
                 "Terminate those kernels first.",
             )
 
-        # Handle shared vfolders migration
-        if action.purge_shared_vfolders.optional_value():
+        # Folders shared with other users are handed to the requesting admin unless the
+        # caller asked for them to go too; the delete pass below only sweeps rows still
+        # owned by the purged user.
+        if not action.delete_shared_vfolders:
             await self._user_repository.migrate_shared_vfolders(
                 deleted_user_uuid=user_uuid,
                 target_user_uuid=user_info_ctx.uuid,

@@ -633,13 +633,12 @@ def delete(ctx: CLIContext, email: str) -> None:
 @pass_ctx_obj
 @click.argument("email", type=str, metavar="EMAIL")
 @click.option(
-    "--purge-shared-vfolders",
+    "--delete-shared-vfolders",
     is_flag=True,
     default=False,
     help=(
-        "Delete user's all virtual folders. "
-        "If False, shared folders will not be deleted "
-        "and migrated the ownership to the requested admin."
+        "Delete the user's virtual folders that are shared with other users. "
+        "If False, their ownership is migrated to the requested admin instead."
     ),
 )
 @click.option(
@@ -653,7 +652,7 @@ def delete(ctx: CLIContext, email: str) -> None:
     ),
 )
 def purge(
-    ctx: CLIContext, email: str, purge_shared_vfolders: bool, delegate_endpoint_ownership: bool
+    ctx: CLIContext, email: str, delete_shared_vfolders: bool, delegate_endpoint_ownership: bool
 ) -> None:
     """
     Delete an existing user. This action cannot be undone.
@@ -666,7 +665,7 @@ def purge(
             if not ask_yn():
                 print_info("Cancelled")
                 sys.exit(ExitCode.FAILURE)
-            data = session.User.purge(email, purge_shared_vfolders, delegate_endpoint_ownership)
+            data = session.User.purge(email, delete_shared_vfolders, delegate_endpoint_ownership)
         except Exception as e:
             ctx.output.print_mutation_error(
                 e,

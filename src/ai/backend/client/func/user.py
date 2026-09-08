@@ -394,7 +394,7 @@ class User(BaseFunction):
     async def purge(
         cls,
         email: str,
-        purge_shared_vfolders: bool = False,
+        delete_shared_vfolders: bool = False,
         delegate_endpoint_ownership: bool = False,
     ) -> dict[str, Any]:
         """
@@ -402,7 +402,7 @@ class User(BaseFunction):
 
         User's virtual folders are also deleted, except the ones shared with other users.
         Shared virtual folder's ownership will be transferred to the requested admin.
-        To delete shared folders as well, set ``purge_shared_vfolders`` to ``True``.
+        To delete shared folders as well, set ``delete_shared_vfolders`` to ``True``.
         """
         query = _d("""
             mutation($email: String!, $input: PurgeUserInput!) {
@@ -414,7 +414,7 @@ class User(BaseFunction):
         variables = {
             "email": email,
             "input": {
-                "purge_shared_vfolders": purge_shared_vfolders,
+                "delete_shared_vfolders": delete_shared_vfolders,
                 "delegate_endpoint_ownership": delegate_endpoint_ownership,
             },
         }

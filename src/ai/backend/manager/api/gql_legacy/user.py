@@ -1052,7 +1052,23 @@ class ModifyUserInput(graphene.InputObjectType):  # type: ignore[misc]
 
 
 class PurgeUserInput(graphene.InputObjectType):  # type: ignore[misc]
-    purge_shared_vfolders = graphene.Boolean(required=False, default=False)
+    purge_shared_vfolders = graphene.Boolean(
+        required=False,
+        default=False,
+        deprecation_reason=(
+            f"Deprecated since {NEXT_RELEASE_VERSION} and ignored: it did the opposite of "
+            "its name. Use `delete_shared_vfolders`."
+        ),
+    )
+    delete_shared_vfolders = graphene.Boolean(
+        required=False,
+        default=False,
+        description=(
+            f"Added in {NEXT_RELEASE_VERSION}. The default value is `false`. "
+            "If true, the user's virtual folders shared with other users are deleted "
+            "along with the rest; otherwise their ownership goes to the requester."
+        ),
+    )
     delegate_endpoint_ownership = graphene.Boolean(
         required=False,
         default=False,
@@ -1066,9 +1082,7 @@ class PurgeUserInput(graphene.InputObjectType):  # type: ignore[misc]
         return PurgeUserAction(
             user_id=user_id,
             admin_user_id=admin_user_id,
-            purge_shared_vfolders=OptionalState[bool].from_graphql(
-                self.purge_shared_vfolders,
-            ),
+            delete_shared_vfolders=bool(self.delete_shared_vfolders),
             delegate_endpoint_ownership=OptionalState[bool].from_graphql(
                 self.delegate_endpoint_ownership,
             ),

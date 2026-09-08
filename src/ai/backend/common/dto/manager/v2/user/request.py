@@ -28,6 +28,7 @@ from ai.backend.common.dto.manager.v2.user.types import (
     UserStatus,
     UserStatusFilter,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 
 __all__ = (
     "AdminSearchUsersInput",
@@ -211,7 +212,20 @@ class PurgeUserInput(BaseRequestModel):
     user_id: UUID = Field(description="UUID of the user to purge.")
     purge_shared_vfolders: bool = Field(
         default=False,
-        description="If true, migrate shared virtual folders to the admin user before purging.",
+        description=(
+            "Whether to purge the user's shared virtual folders. "
+            f"Deprecated since {NEXT_RELEASE_VERSION} and ignored: it did the opposite of "
+            "its name. Use delete_shared_vfolders."
+        ),
+        deprecated=True,
+    )
+    delete_shared_vfolders: bool = Field(
+        default=False,
+        description=(
+            "If true, delete the purged user's virtual folders that are shared with other "
+            "users. If false, their ownership is transferred to the requesting admin. "
+            "Virtual folders that are not shared are deleted either way."
+        ),
     )
     delegate_endpoint_ownership: bool = Field(
         default=False,
@@ -249,7 +263,20 @@ class PurgeUserV2Options(BaseRequestModel):
 
     purge_shared_vfolders: bool = Field(
         default=False,
-        description="If true, migrate shared virtual folders to the admin user before purging.",
+        description=(
+            "Whether to purge the user's shared virtual folders. "
+            f"Deprecated since {NEXT_RELEASE_VERSION} and ignored: it did the opposite of "
+            "its name. Use delete_shared_vfolders."
+        ),
+        deprecated=True,
+    )
+    delete_shared_vfolders: bool = Field(
+        default=False,
+        description=(
+            "If true, delete the purged user's virtual folders that are shared with other "
+            "users. If false, their ownership is transferred to the requesting admin. "
+            "Virtual folders that are not shared are deleted either way."
+        ),
     )
     delegate_endpoint_ownership: bool = Field(
         default=False,
@@ -271,7 +298,20 @@ class BulkPurgeUsersOptions(BaseRequestModel):
 
     purge_shared_vfolders: bool = Field(
         default=False,
-        description="If true, migrate shared virtual folders to the admin user before purging.",
+        description=(
+            "Whether to purge the user's shared virtual folders. "
+            f"Deprecated since {NEXT_RELEASE_VERSION} and ignored: it did the opposite of "
+            "its name. Use delete_shared_vfolders."
+        ),
+        deprecated=True,
+    )
+    delete_shared_vfolders: bool = Field(
+        default=False,
+        description=(
+            "If true, delete the purged user's virtual folders that are shared with other "
+            "users. If false, their ownership is transferred to the requesting admin. "
+            "Virtual folders that are not shared are deleted either way."
+        ),
     )
     delegate_endpoint_ownership: bool = Field(
         default=False,

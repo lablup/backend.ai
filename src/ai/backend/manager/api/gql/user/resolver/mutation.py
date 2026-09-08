@@ -509,7 +509,7 @@ async def admin_purge_user_v2(
     await ctx.adapters.user.purge_user_by_id(
         PurgeUserInput(
             user_id=dto.user_id,
-            purge_shared_vfolders=options.purge_shared_vfolders if options else False,
+            delete_shared_vfolders=options.delete_shared_vfolders if options else False,
             delegate_endpoint_ownership=options.delegate_endpoint_ownership if options else False,
         ),
         me.user_id,
@@ -547,11 +547,7 @@ async def admin_bulk_purge_users_v2(
     action = BulkPurgeUserAction(
         user_ids=input.user_ids,
         admin_user_id=me.user_id,
-        purge_shared_vfolders=(
-            OptionalState.update(options.purge_shared_vfolders)
-            if options and options.purge_shared_vfolders
-            else OptionalState.nop()
-        ),
+        delete_shared_vfolders=bool(options and options.delete_shared_vfolders),
         delegate_endpoint_ownership=(
             OptionalState.update(options.delegate_endpoint_ownership)
             if options and options.delegate_endpoint_ownership

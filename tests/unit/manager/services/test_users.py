@@ -501,7 +501,12 @@ class TestPurgeUser:
         with pytest.raises(UserPurgeFailure):
             await service.purge_user(action)
 
-    async def test_purge_user_with_shared_vfolders_migration(
+    @pytest.mark.parametrize(
+        ("delete_shared_vfolders", "should_migrate"),
+        [(True, False), (False, True)],
+        ids=["delete-shared", "keep-shared"],
+    )
+    async def test_purge_user_shared_vfolders_disposition(
         self,
         admin_user_row: MagicMock,
         service: UserService,
@@ -509,8 +514,10 @@ class TestPurgeUser:
         purge_user_uuid: uuid.UUID,
         purge_user_data: UserData,
         admin_user_info_ctx: UserInfoContext,
+        delete_shared_vfolders: bool,
+        should_migrate: bool,
     ) -> None:
-        """Purge user with shared vfolders migration enabled should migrate vfolders."""
+        """The flag deletes the shared vfolders when set and migrates them when not."""
         mock_user_repository.get_user_by_uuid = AsyncMock(return_value=admin_user_row)
         mock_user_repository.check_user_vfolder_mounted_to_active_kernels = AsyncMock(
             return_value=False
@@ -524,17 +531,50 @@ class TestPurgeUser:
         action = PurgeUserAction(
             user_id=UserID(purge_user_uuid),
             admin_user_id=admin_user_info_ctx.uuid,
-            purge_shared_vfolders=OptionalState.update(True),
+            delete_shared_vfolders=delete_shared_vfolders,
         )
 
         result = await service.purge_user(action)
 
         assert result is not None
-        mock_user_repository.migrate_shared_vfolders.assert_called_once_with(
-            deleted_user_uuid=purge_user_uuid,
-            target_user_uuid=admin_user_info_ctx.uuid,
-            target_user_email=admin_user_info_ctx.email,
+        if should_migrate:
+            mock_user_repository.migrate_shared_vfolders.assert_called_once_with(
+                deleted_user_uuid=purge_user_uuid,
+                target_user_uuid=admin_user_info_ctx.uuid,
+                target_user_email=admin_user_info_ctx.email,
+            )
+        else:
+            mock_user_repository.migrate_shared_vfolders.assert_not_called()
+        mock_user_repository.delete_user_vfolders.assert_called_once()
+
+    async def test_purge_user_keeps_shared_vfolders_by_default(
+        self,
+        admin_user_row: MagicMock,
+        service: UserService,
+        mock_user_repository: MagicMock,
+        purge_user_uuid: uuid.UUID,
+        purge_user_data: UserData,
+        admin_user_info_ctx: UserInfoContext,
+    ) -> None:
+        """Leaving the flag unset must not destroy the shared vfolders."""
+        mock_user_repository.get_user_by_uuid = AsyncMock(return_value=admin_user_row)
+        mock_user_repository.check_user_vfolder_mounted_to_active_kernels = AsyncMock(
+            return_value=False
         )
+        mock_user_repository.migrate_shared_vfolders = AsyncMock(return_value=None)
+        mock_user_repository.retrieve_active_sessions = AsyncMock(return_value=[])
+        mock_user_repository.delete_endpoints = AsyncMock(return_value=None)
+        mock_user_repository.delete_user_vfolders = AsyncMock(return_value=None)
+        mock_user_repository.purge_user_by_uuid = AsyncMock(return_value=None)
+
+        action = PurgeUserAction(
+            user_id=UserID(purge_user_uuid),
+            admin_user_id=admin_user_info_ctx.uuid,
+        )
+
+        await service.purge_user(action)
+
+        mock_user_repository.migrate_shared_vfolders.assert_called_once()
 
     async def test_purge_user_with_endpoint_delegation(
         self,

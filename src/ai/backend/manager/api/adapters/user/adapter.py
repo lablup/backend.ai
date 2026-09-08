@@ -582,11 +582,7 @@ class UserAdapter(BaseAdapter):
             PurgeUserAction(
                 user_id=UserID(input.user_id),
                 admin_user_id=admin_user_id,
-                purge_shared_vfolders=(
-                    OptionalState.update(input.purge_shared_vfolders)
-                    if input.purge_shared_vfolders
-                    else OptionalState.nop()
-                ),
+                delete_shared_vfolders=input.delete_shared_vfolders,
                 delegate_endpoint_ownership=(
                     OptionalState.update(input.delegate_endpoint_ownership)
                     if input.delegate_endpoint_ownership

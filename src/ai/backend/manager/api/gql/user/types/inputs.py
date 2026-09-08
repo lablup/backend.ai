@@ -39,6 +39,7 @@ from ai.backend.common.dto.manager.v2.user.request import (
 from ai.backend.common.dto.manager.v2.user.request import (
     UpdateUserInput as UpdateUserInputDTO,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_added_field,
@@ -217,8 +218,24 @@ class DeleteUsersInputGQL(PydanticInputMixin[DeleteUsersInputDTO]):
 class PurgeUserV2OptionsGQL(PydanticInputMixin[PurgeUserV2OptionsDTO]):
     """Options for single user purge operation."""
 
-    purge_shared_vfolders: bool = gql_field(
-        description="If true, migrate shared virtual folders to the admin user before purging.",
+    purge_shared_vfolders: bool = gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.4.2",
+            deprecated_version=NEXT_RELEASE_VERSION,
+            description="Whether to purge the user's shared virtual folders.",
+        ),
+        deprecation_reason=("Ignored: it did the opposite of its name. Use deleteSharedVfolders."),
+        default=False,
+    )
+    delete_shared_vfolders: bool = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description=(
+                "If true, delete the purged user's virtual folders that are shared with "
+                "other users. If false, their ownership is transferred to the requesting "
+                "admin. Virtual folders that are not shared are deleted either way."
+            ),
+        ),
         default=False,
     )
     delegate_endpoint_ownership: bool = gql_field(
@@ -254,8 +271,24 @@ class PurgeUserInputGQL(PydanticInputMixin[PurgeUserV2InputDTO]):
 class BulkPurgeUsersV2OptionsGQL(PydanticInputMixin[BulkPurgeUsersOptionsDTO]):
     """Options for bulk user purge operation."""
 
-    purge_shared_vfolders: bool = gql_field(
-        description="If true, migrate shared virtual folders to the admin user before purging.",
+    purge_shared_vfolders: bool = gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.3.0",
+            deprecated_version=NEXT_RELEASE_VERSION,
+            description="Whether to purge the user's shared virtual folders.",
+        ),
+        deprecation_reason=("Ignored: it did the opposite of its name. Use deleteSharedVfolders."),
+        default=False,
+    )
+    delete_shared_vfolders: bool = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description=(
+                "If true, delete the purged user's virtual folders that are shared with "
+                "other users. If false, their ownership is transferred to the requesting "
+                "admin. Virtual folders that are not shared are deleted either way."
+            ),
+        ),
         default=False,
     )
     delegate_endpoint_ownership: bool = gql_field(

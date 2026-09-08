@@ -310,26 +310,26 @@ class TestPurgeUserInput:
     def test_default_flags_are_false(self) -> None:
         user_id = uuid.uuid4()
         req = PurgeUserInput(user_id=user_id)
-        assert req.purge_shared_vfolders is False
+        assert req.delete_shared_vfolders is False
         assert req.delegate_endpoint_ownership is False
 
     def test_all_fields(self) -> None:
         user_id = uuid.uuid4()
         req = PurgeUserInput(
             user_id=user_id,
-            purge_shared_vfolders=True,
+            delete_shared_vfolders=True,
             delegate_endpoint_ownership=True,
         )
-        assert req.purge_shared_vfolders is True
+        assert req.delete_shared_vfolders is True
         assert req.delegate_endpoint_ownership is True
 
     def test_round_trip(self) -> None:
         user_id = uuid.uuid4()
-        req = PurgeUserInput(user_id=user_id, purge_shared_vfolders=True)
+        req = PurgeUserInput(user_id=user_id, delete_shared_vfolders=True)
         json_data = req.model_dump_json()
         restored = PurgeUserInput.model_validate_json(json_data)
         assert restored.user_id == user_id
-        assert restored.purge_shared_vfolders is True
+        assert restored.delete_shared_vfolders is True
 
 
 class TestPurgeUserV2Options:
@@ -337,38 +337,43 @@ class TestPurgeUserV2Options:
 
     def test_default_values_are_false(self) -> None:
         opts = PurgeUserV2Options()
-        assert opts.purge_shared_vfolders is False
+        assert opts.delete_shared_vfolders is False
         assert opts.delegate_endpoint_ownership is False
 
-    def test_purge_shared_vfolders_true(self) -> None:
-        opts = PurgeUserV2Options(purge_shared_vfolders=True)
-        assert opts.purge_shared_vfolders is True
+    def test_delete_shared_vfolders_true(self) -> None:
+        opts = PurgeUserV2Options(delete_shared_vfolders=True)
+        assert opts.delete_shared_vfolders is True
         assert opts.delegate_endpoint_ownership is False
 
     def test_delegate_endpoint_ownership_true(self) -> None:
         opts = PurgeUserV2Options(delegate_endpoint_ownership=True)
-        assert opts.purge_shared_vfolders is False
+        assert opts.delete_shared_vfolders is False
         assert opts.delegate_endpoint_ownership is True
 
     def test_both_flags_true(self) -> None:
-        opts = PurgeUserV2Options(purge_shared_vfolders=True, delegate_endpoint_ownership=True)
-        assert opts.purge_shared_vfolders is True
+        opts = PurgeUserV2Options(delete_shared_vfolders=True, delegate_endpoint_ownership=True)
+        assert opts.delete_shared_vfolders is True
         assert opts.delegate_endpoint_ownership is True
 
     def test_round_trip(self) -> None:
-        opts = PurgeUserV2Options(purge_shared_vfolders=True, delegate_endpoint_ownership=False)
+        opts = PurgeUserV2Options(delete_shared_vfolders=True, delegate_endpoint_ownership=False)
         json_data = opts.model_dump_json()
         restored = PurgeUserV2Options.model_validate_json(json_data)
-        assert restored.purge_shared_vfolders is True
+        assert restored.delete_shared_vfolders is True
         assert restored.delegate_endpoint_ownership is False
 
     def test_from_dict(self) -> None:
         opts = PurgeUserV2Options.model_validate({
-            "purge_shared_vfolders": True,
+            "delete_shared_vfolders": True,
             "delegate_endpoint_ownership": True,
         })
-        assert opts.purge_shared_vfolders is True
+        assert opts.delete_shared_vfolders is True
         assert opts.delegate_endpoint_ownership is True
+
+    def test_deprecated_flag_is_accepted_but_does_not_set_the_new_one(self) -> None:
+        opts = PurgeUserV2Options.model_validate({"purge_shared_vfolders": True})
+        assert opts.purge_shared_vfolders is True
+        assert opts.delete_shared_vfolders is False
 
 
 class TestPurgeUserV2Input:
@@ -385,12 +390,12 @@ class TestPurgeUserV2Input:
         req = PurgeUserV2Input(user_id=user_id)
         assert req.options is None
 
-    def test_with_options_purge_shared_vfolders(self) -> None:
+    def test_with_options_delete_shared_vfolders(self) -> None:
         user_id = uuid.uuid4()
-        opts = PurgeUserV2Options(purge_shared_vfolders=True)
+        opts = PurgeUserV2Options(delete_shared_vfolders=True)
         req = PurgeUserV2Input(user_id=user_id, options=opts)
         assert req.options is not None
-        assert req.options.purge_shared_vfolders is True
+        assert req.options.delete_shared_vfolders is True
         assert req.options.delegate_endpoint_ownership is False
 
     def test_with_options_delegate_endpoint_ownership(self) -> None:
@@ -398,7 +403,7 @@ class TestPurgeUserV2Input:
         opts = PurgeUserV2Options(delegate_endpoint_ownership=True)
         req = PurgeUserV2Input(user_id=user_id, options=opts)
         assert req.options is not None
-        assert req.options.purge_shared_vfolders is False
+        assert req.options.delete_shared_vfolders is False
         assert req.options.delegate_endpoint_ownership is True
 
     def test_with_explicit_null_options(self) -> None:
@@ -424,13 +429,13 @@ class TestPurgeUserV2Input:
 
     def test_round_trip_with_options(self) -> None:
         user_id = uuid.uuid4()
-        opts = PurgeUserV2Options(purge_shared_vfolders=True, delegate_endpoint_ownership=True)
+        opts = PurgeUserV2Options(delete_shared_vfolders=True, delegate_endpoint_ownership=True)
         req = PurgeUserV2Input(user_id=user_id, options=opts)
         json_data = req.model_dump_json()
         restored = PurgeUserV2Input.model_validate_json(json_data)
         assert restored.user_id == user_id
         assert restored.options is not None
-        assert restored.options.purge_shared_vfolders is True
+        assert restored.options.delete_shared_vfolders is True
         assert restored.options.delegate_endpoint_ownership is True
 
     def test_from_dict_with_options(self) -> None:
@@ -438,13 +443,13 @@ class TestPurgeUserV2Input:
         req = PurgeUserV2Input.model_validate({
             "user_id": str(user_id),
             "options": {
-                "purge_shared_vfolders": True,
+                "delete_shared_vfolders": True,
                 "delegate_endpoint_ownership": False,
             },
         })
         assert req.user_id == user_id
         assert req.options is not None
-        assert req.options.purge_shared_vfolders is True
+        assert req.options.delete_shared_vfolders is True
         assert req.options.delegate_endpoint_ownership is False
 
     def test_from_dict_without_options(self) -> None:

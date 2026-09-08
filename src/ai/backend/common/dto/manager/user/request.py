@@ -11,6 +11,7 @@ from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.dto.manager.query import StringFilter, UUIDFilter
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 
 from .types import OrderDirection, UserOrderField, UserRole, UserStatus
 
@@ -124,7 +125,20 @@ class PurgeUserRequest(BaseRequestModel):
 
     user_id: UUID = Field(description="UUID of the user to purge")
     purge_shared_vfolders: bool = Field(
-        default=False, description="Whether to purge shared virtual folders"
+        default=False,
+        description=(
+            "Whether to purge shared virtual folders. "
+            f"Deprecated since {NEXT_RELEASE_VERSION} and ignored: it did the opposite of "
+            "its name. Use delete_shared_vfolders."
+        ),
+        deprecated=True,
+    )
+    delete_shared_vfolders: bool = Field(
+        default=False,
+        description=(
+            "If true, delete the purged user's virtual folders that are shared with other "
+            "users. If false, their ownership is transferred to the requesting admin."
+        ),
     )
     delegate_endpoint_ownership: bool = Field(
         default=False, description="Whether to delegate endpoint ownership"
