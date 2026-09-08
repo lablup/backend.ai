@@ -147,19 +147,24 @@ async def publish_caps(
     capabilities that were not published together.
     """
     published = dataclasses.replace(caps, backend=backend, vtep_ip=vtep_ip, boot_id=boot_id)
-    await etcd.put(
-        agent_caps_key(agent_id),
-        json.dumps({**dataclasses.asdict(published), "updated_at": time.time()}),
-        scope=ConfigScopes.GLOBAL,
-    )
-    # And what this node can serve, as a value that does not move when nothing has changed. The
-    # record above is also a heartbeat -- it carries the time -- so a manager cannot fence a
-    # create on it without failing every create that straddles a refresh. It fences on this.
-    # Written after the record, so a manager never fences on readiness the record does not yet
-    # describe.
-    await etcd.put(
-        agent_ready_key(agent_id), published.readiness_digest(), scope=ConfigScopes.GLOBAL
-    )
+    digest = published.readiness_digest()
+    record = json.dumps({**dataclasses.asdict(published), "updated_at": time.time()})
+    standing = await etcd.get(agent_ready_key(agent_id), scope=ConfigScopes.GLOBAL)
+    if standing == digest:
+        # Nothing this node can serve has changed; this is the heartbeat saying it is still here.
+        # The fence is deliberately NOT touched: a manager's create is conditional on it, and
+        # rewriting the same value would be a change to anything watching a revision.
+        await etcd.put(agent_caps_key(agent_id), record, scope=ConfigScopes.GLOBAL)
+        return
+    # Readiness has moved. These are two writes and a manager can read between them, so the order
+    # decides what it can see. Taking the OLD fence down first means the worst a reader gets is
+    # "this node is not currently admitting" -- true, briefly. Writing the record first instead
+    # would leave the old fence standing over a record that no longer matches it, and a create
+    # admitted a moment earlier would pass its READY check on a node whose endpoint had already
+    # changed.
+    await etcd.delete(agent_ready_key(agent_id), scope=ConfigScopes.GLOBAL)
+    await etcd.put(agent_caps_key(agent_id), record, scope=ConfigScopes.GLOBAL)
+    await etcd.put(agent_ready_key(agent_id), digest, scope=ConfigScopes.GLOBAL)
 
 
 async def publish_backend(
