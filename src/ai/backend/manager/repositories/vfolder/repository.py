@@ -10,6 +10,7 @@ from sqlalchemy.orm import contains_eager, selectinload
 
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
 from ai.backend.common.contexts.user import current_user
+from ai.backend.common.data.entity.model_card import ModelCardID
 from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE, ProjectID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.entity.vfolder import VFolderUUID
@@ -68,6 +69,7 @@ from ai.backend.manager.errors.user import UserNotFound
 from ai.backend.manager.models.agent import agents
 from ai.backend.manager.models.kernel import kernels
 from ai.backend.manager.models.keypair import KeyPairRow, keypairs
+from ai.backend.manager.models.model_card.purgers import ModelCardPurger
 from ai.backend.manager.models.model_card.row import ModelCardRow
 from ai.backend.manager.models.project import ProjectRow, ProjectType
 from ai.backend.manager.models.project.lookups import PersonalProjectOfUserLookup
@@ -765,7 +767,7 @@ class VfolderRepository:
                 records = await self._fetch_vfolders_with_linked_model_cards(
                     db_session, vfolder_ids
                 )
-                cards_to_delete: list[ModelCardRow] = []
+                card_ids_to_delete: list[ModelCardID] = []
                 succeeded_ids: list[uuid.UUID] = []
                 succeeded_rows: list[VFolderRow] = []
                 for rec in records:
@@ -793,14 +795,17 @@ class VfolderRepository:
                             )
                         )
                         continue
-                    cards_to_delete.extend(rec.model_card_rows)
+                    card_ids_to_delete.extend(row.id for row in rec.model_card_rows)
                     succeeded_ids.append(rec.vfolder_row.id)
                     succeeded_rows.append(rec.vfolder_row)
 
-                if cards_to_delete:
-                    for card in cards_to_delete:
-                        await db_session.delete(card)
-                    await db_session.flush()
+                if card_ids_to_delete:
+                    # A card is an entity of its own, so its graph goes with it. The
+                    # purge runs in its own transaction; a failure after it leaves the
+                    # folders alive and card-less, which a retry completes.
+                    async with self._v2_ops.write_ops() as w:
+                        for card_id in card_ids_to_delete:
+                            await w.purge_entity(ModelCardPurger(card_id=card_id))
 
                 if succeeded_ids:
                     delete_stmt = (
