@@ -76,6 +76,9 @@ class NaturalKey(str):
 class EntityRef:
     """An entity identified by its (open) type and id.
 
+    Deprecated: use :class:`EntityIdentifier` — BA-7204. This pair stays only where a
+    row's type is read at run time.
+
     Both are values read at run time — the graph layer reads them off a row — so the id
     is a bare one. Where the entity is known statically, pass an
     :class:`EntityIdentifier`, which needs no separate type beside it.
@@ -88,6 +91,9 @@ class EntityRef:
 @dataclass(frozen=True, slots=True)
 class ScopeRef:
     """A scope identified by its (open) type and id.
+
+    Deprecated: use :class:`EntityIdentifier` — BA-7204. This pair stays only where a
+    row's type is read at run time.
 
     ``scope_type`` is a free-form string (NewType), not a fixed enum: the virtual
     scope layer accepts any owner type without extending a hard-coded scope enum.

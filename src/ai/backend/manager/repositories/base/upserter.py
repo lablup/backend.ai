@@ -1,6 +1,7 @@
 """Upserter for repository upsert (INSERT ON CONFLICT UPDATE) operations.
 
-Deprecated: declare new upsert specs in ``models/specs/upserter.py``.
+Deprecated: declare new upsert specs in ``models/specs/upserter.py``. The remaining
+users move under BA-7204.
 """
 
 from __future__ import annotations
@@ -27,7 +28,7 @@ class UpserterSpec[TRow: Base](ABC):
     """Abstract base class for upsert operations.
 
     Deprecated: use ``GlobalEntityUpserter`` / ``EntityUpserter`` / ``FieldUpserter``
-    in ``models/specs/upserter.py``.
+    in ``models/specs/upserter.py`` — BA-7204.
 
     Implementations specify what to upsert by providing:
     - row_class property for target table and result reconstruction

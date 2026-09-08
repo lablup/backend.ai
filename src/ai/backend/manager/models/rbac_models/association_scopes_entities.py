@@ -25,6 +25,9 @@ from ai.backend.manager.models.base import (
 
 
 class AssociationScopesEntitiesRow(Base):
+    """Deprecated: the ``association_scopes_entities`` table is replaced by the own edges
+    of the virtual entity graph and is scheduled for removal."""
+
     __tablename__ = "association_scopes_entities"
     __table_args__ = (
         sa.Index("ix_association_scopes_entities_entity", "entity_type", "entity_id"),

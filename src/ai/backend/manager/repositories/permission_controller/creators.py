@@ -1,4 +1,10 @@
-"""CreatorSpec implementations for permission-related entities."""
+"""CreatorSpec implementations for permission-related entities.
+
+Deprecated: roles and their permissions use the v2 specs under
+``models/rbac_models/``; the graph rows (memberships, bindings, role grants) are
+written by the ops primitives in ``repositories/ops/v2/`` from whole declarations,
+with no spec lineage (BEP-1077). The remaining users move under BA-7204.
+"""
 
 from __future__ import annotations
 
@@ -35,6 +41,8 @@ from ai.backend.manager.repositories.base.creator import CreatorSpec, DependentC
 class RoleCreatorSpec(CreatorSpec[RoleRow]):
     """CreatorSpec for role creation.
 
+    Deprecated: use ``RoleCreator`` in ``models/rbac_models/role/creators.py`` — BA-7204.
+
     Only defines the role itself. Object permissions
     are passed separately to create_role() for better separation of concerns.
     """
@@ -58,7 +66,11 @@ class RoleCreatorSpec(CreatorSpec[RoleRow]):
 
 @dataclass
 class PermissionCreatorSpec(CreatorSpec[PermissionRow]):
-    """CreatorSpec for permissions."""
+    """CreatorSpec for permissions.
+
+    Deprecated: use ``RolePermissionCreator`` in
+    ``models/rbac_models/permission/creators.py`` — BA-7204.
+    """
 
     role_id: uuid.UUID
     scope_type: ScopeType
@@ -79,7 +91,11 @@ class PermissionCreatorSpec(CreatorSpec[PermissionRow]):
 
 @dataclass
 class UserRoleCreatorSpec(CreatorSpec[UserRoleRow]):
-    """CreatorSpec for user role mappings."""
+    """CreatorSpec for user role mappings.
+
+    Deprecated: role grants are written by ``V2EntityWriteOps`` in
+    ``repositories/ops/v2/entity_write.py`` — BA-7204.
+    """
 
     user_id: uuid.UUID
     role_id: uuid.UUID
@@ -110,7 +126,11 @@ class UserRoleCreatorSpec(CreatorSpec[UserRoleRow]):
 
 @dataclass
 class AssociationScopesEntitiesCreatorSpec(CreatorSpec[AssociationScopesEntitiesRow]):
-    """CreatorSpec for association between scopes and entities."""
+    """CreatorSpec for association between scopes and entities.
+
+    Deprecated: goes with the ``association_scopes_entities`` table; the own edge is
+    written by ``V2GraphWriteOpsBase`` in ``repositories/ops/v2/graph_write.py``.
+    """
 
     scope_id: ScopeId
     object_id: ObjectId
@@ -128,7 +148,11 @@ class AssociationScopesEntitiesCreatorSpec(CreatorSpec[AssociationScopesEntities
 @dataclass
 class EntityMembershipCreatorSpec(DependentCreatorSpec[VirtualEntityID, EntityMembershipRow]):
     """Membership of the entity behind ``member_entity_id`` in the virtual entity given
-    as the dependency."""
+    as the dependency.
+
+    Deprecated: memberships are written by ``V2GraphWriteOpsBase`` in
+    ``repositories/ops/v2/graph_write.py`` — BA-7204.
+    """
 
     member_entity_id: VirtualEntityID
     capped: bool = False
@@ -147,7 +171,11 @@ class ScopeBindingCreatorSpec(
     DependentCreatorSpec[Mapping[ScopeRef, VirtualEntityID], ScopeBindingRow]
 ):
     """Binding of ``bound_scope`` into ``anchor_scope``'s virtual entity; the dependency
-    maps both scopes to their virtual entity ids."""
+    maps both scopes to their virtual entity ids.
+
+    Deprecated: bindings are written by ``V2GraphWriteOpsBase`` in
+    ``repositories/ops/v2/graph_write.py`` — BA-7204.
+    """
 
     anchor_scope: ScopeRef
     bound_scope: ScopeRef

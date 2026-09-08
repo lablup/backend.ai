@@ -1,6 +1,7 @@
 """Purger for delete operations.
 
-Deprecated: declare new delete specs in ``models/specs/purger.py``.
+Deprecated: declare new delete specs in ``models/specs/purger.py``. The remaining
+users move under BA-7204.
 """
 
 from __future__ import annotations
@@ -59,7 +60,7 @@ async def validate_conflict_checks(
 class PurgerSpec[TRow: Base](ABC):
     """Abstract base class defining a single-row purge target.
 
-    Deprecated: use ``EntityPurger`` / ``FieldPurger`` in ``models/specs/purger.py``.
+    Deprecated: use ``EntityPurger`` / ``FieldPurger`` in ``models/specs/purger.py`` — BA-7204.
     """
 
     @abstractmethod
