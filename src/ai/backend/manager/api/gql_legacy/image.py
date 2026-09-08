@@ -78,7 +78,7 @@ from ai.backend.manager.services.image.actions.forget_image import (
 )
 from ai.backend.manager.services.image.actions.get_all_images import PublicGetAllImagesAction
 from ai.backend.manager.services.image.actions.get_image_installed_agents import (
-    GetImageInstalledAgentsAction,
+    PublicGetImageInstalledAgentsAction,
 )
 from ai.backend.manager.services.image.actions.get_images import (
     PublicGetImageByIdAction,
@@ -461,8 +461,8 @@ class ImageNode(graphene.ObjectType):  # type: ignore[misc]
     async def _batch_load_installed_agents(
         cls, ctx: GraphQueryContext, image_ids: Sequence[ImageID]
     ) -> list[set[AgentId]]:
-        result = await ctx.processors.image.get_image_installed_agents.run(
-            GetImageInstalledAgentsAction(image_ids=list(image_ids))
+        result = await ctx.processors.image.public_get_image_installed_agents.run(
+            PublicGetImageInstalledAgentsAction(image_ids=list(image_ids))
         )
         installed_agent_ids_per_image: Mapping[ImageID, set[AgentId]] = result.data
         return [installed_agent_ids_per_image.get(image_id, set()) for image_id in image_ids]

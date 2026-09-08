@@ -8,13 +8,13 @@ from ai.backend.manager.services.image.actions.base import ImageAction
 
 
 @dataclass
-class GetImageInstalledAgentsAction(ImageAction):
+class PublicGetImageInstalledAgentsAction(ImageAction):
     image_ids: list[ImageID]
 
     @override
     @classmethod
     def action_name(cls) -> str:
-        return "get_image_installed_agents"
+        return "public_get_image_installed_agents"
 
     @override
     @classmethod
@@ -23,5 +23,5 @@ class GetImageInstalledAgentsAction(ImageAction):
 
 
 @dataclass
-class GetImageInstalledAgentsActionResult:
+class PublicGetImageInstalledAgentsActionResult:
     data: Mapping[ImageID, set[AgentId]]

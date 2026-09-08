@@ -32,8 +32,8 @@ from ai.backend.manager.services.image.actions.get_all_images import (
     PublicGetAllImagesActionResult,
 )
 from ai.backend.manager.services.image.actions.get_image_installed_agents import (
-    GetImageInstalledAgentsAction,
-    GetImageInstalledAgentsActionResult,
+    PublicGetImageInstalledAgentsAction,
+    PublicGetImageInstalledAgentsActionResult,
 )
 from ai.backend.manager.services.image.actions.get_images import (
     PublicGetImageByIdAction,
@@ -137,8 +137,8 @@ class ImageProcessors:
     public_get_images_by_canonicals: PublicActionProcessor[
         PublicGetImagesByCanonicalsAction, PublicGetImagesByCanonicalsActionResult
     ]
-    get_image_installed_agents: GlobalActionProcessor[
-        GetImageInstalledAgentsAction, GetImageInstalledAgentsActionResult
+    public_get_image_installed_agents: PublicActionProcessor[
+        PublicGetImageInstalledAgentsAction, PublicGetImageInstalledAgentsActionResult
     ]
     public_get_all_images: PublicActionProcessor[
         PublicGetAllImagesAction, PublicGetAllImagesActionResult
@@ -158,8 +158,8 @@ class ImageProcessors:
             PublicGetImagesByCanonicalsAction, service.get_images_by_canonicals
         )
 
-        self.get_image_installed_agents = group.global_scope(
-            GetImageInstalledAgentsAction, service.get_image_installed_agents
+        self.public_get_image_installed_agents = group.public(
+            PublicGetImageInstalledAgentsAction, service.get_image_installed_agents
         )
         self.forget_image = group.global_scope(ForgetImageAction, service.forget_image)
         self.search_images = group.global_scope(SearchImagesAction, service.search_images)
