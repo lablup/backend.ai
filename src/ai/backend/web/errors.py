@@ -15,6 +15,7 @@ from ai.backend.common.exception import (
     ErrorDomain,
     ErrorOperation,
 )
+from ai.backend.common.json import dump_json
 
 
 class AlreadyLoggedInError(BackendAIError, web.HTTPBadRequest):
@@ -108,6 +109,13 @@ class MissingRequestParameterError(BackendAIError, web.HTTPBadRequest):
 class ProxyTargetUnreachableError(BackendAIError, web.HTTPBadGateway):
     error_type = "https://api.backend.ai/probs/bad-gateway"
     error_title = "The proxy target server is inaccessible."
+
+    def __init__(self, details: str | None = None) -> None:
+        super().__init__(details)
+        if details is not None:
+            # Legacy alias of ``msg``, kept for clients that already read ``details``.
+            self.body_dict["details"] = details
+            self.body = dump_json(self.body_dict)
 
     @override
     def error_code(self) -> ErrorCode:
