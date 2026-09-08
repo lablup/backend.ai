@@ -18,6 +18,7 @@ from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.scheduler import SchedulerRepository
 from ai.backend.manager.sokovan.scheduler.handlers.base import SessionLifecycleHandler
 from ai.backend.manager.sokovan.scheduler.results import (
+    FailureDisposition,
     SessionExecutionResult,
     SessionTransitionInfo,
 )
@@ -64,15 +65,17 @@ class StartSessionsLifecycleHandler(SessionLifecycleHandler):
     def target_kernel_statuses(cls) -> list[KernelStatus] | None:
         """Sessions with a kernel in PREPARED status -- or in PENDING.
 
-        PENDING is here for one state, and it is a state this handler is the only way out of. The
-        session's move to PENDING and its kernels' reset are two transactions: the kernels go
-        first, so a manager that dies between them leaves a PREPARED session whose kernels are
-        already PENDING and unbound. Without PENDING in this filter nothing selects that session
-        at all -- the scheduler wants PENDING SESSIONS -- and it waits for a person.
+        PENDING is here for one state, and this handler is the only way out of it. The session's
+        move to PENDING and its kernels' reset are two transactions: the kernels go first, so a
+        manager that dies between them leaves a PREPARED session whose kernels are already PENDING
+        and unbound. Without PENDING in this filter nothing selects that session at all -- the
+        scheduler wants PENDING SESSIONS -- and it waits for a person.
 
-        With it, this handler picks the session up, finds no agent on any kernel, and reports a
-        placement to make again; the session goes to PENDING and is scheduled cleanly. A session
-        in this state has no allocation to lose, because losing it is what put it here.
+        The filter is coarse: the repository returns a session if ANY of its kernels matches. So
+        `execute` decides what it has actually been given, and only a session whose kernels are
+        ALL PENDING and unbound is completed; a mixture is skipped rather than started. Widening
+        this without that check would hand the launcher sessions whose kernels are half in other
+        states, and it would dispatch to the ones that still have an agent.
         """
         return [KernelStatus.PREPARED, KernelStatus.PENDING]
 
@@ -128,6 +131,58 @@ class StartSessionsLifecycleHandler(SessionLifecycleHandler):
         """
         result = SessionExecutionResult()
 
+        if not sessions:
+            return result
+
+        # Sessions whose kernels have ALREADY been reset are not started; they are finished.
+        # See `target_kernel_statuses` for how they arise. They are reported straight to the
+        # coordinator as a placement to make again, and the launcher never sees them -- asking it
+        # to start a session with no agent on any kernel would work, but only by accident.
+        startable: list[SessionWithKernels] = []
+        for session in sessions:
+            kernels = session.kernel_infos
+            if kernels and all(
+                k.lifecycle.status == KernelStatus.PENDING and k.resource.agent is None
+                for k in kernels
+            ):
+                info = session.session_info
+                log.warning(
+                    "session {} has been reset to PENDING kernels without its own status"
+                    " following; completing that transition",
+                    info.identity.id,
+                )
+                result.failures.append(
+                    SessionTransitionInfo(
+                        session_id=info.identity.id,
+                        from_status=info.lifecycle.status,
+                        reason="kernels were reset without the session following",
+                        creation_id=info.identity.creation_id,
+                        access_key=AccessKey(info.metadata.access_key),
+                        disposition=FailureDisposition.REPLACE,
+                    )
+                )
+                continue
+            if any(k.lifecycle.status == KernelStatus.PENDING for k in kernels):
+                # A mixture. Not the state above and not one to start either: dispatching would
+                # ask agents to create some of the kernels of a session whose others are in
+                # another state entirely. Left for the pass that owns whatever it actually is.
+                log.warning(
+                    "session {} has some kernels PENDING and some not; not starting it",
+                    session.session_info.identity.id,
+                )
+                result.skipped.append(
+                    SessionTransitionInfo(
+                        session_id=session.session_info.identity.id,
+                        from_status=session.session_info.lifecycle.status,
+                        reason="kernel statuses disagree",
+                        creation_id=session.session_info.identity.creation_id,
+                        access_key=AccessKey(session.session_info.metadata.access_key),
+                    )
+                )
+                continue
+            startable.append(session)
+
+        sessions = startable
         if not sessions:
             return result
 
