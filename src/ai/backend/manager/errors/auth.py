@@ -76,7 +76,7 @@ class OpenIDAuthenticationFailed(BackendAIError, web.HTTPUnauthorized):
     error_title = "Not authenticated by OpenID Provider"
 
     def __init__(self) -> None:
-        # The reason phrase carried this text before the error class existed.
+        # Legacy reason phrase, kept for clients that already read it.
         super().__init__(reason=self.error_title)
 
     @override
