@@ -226,7 +226,9 @@ def server_module_registries(
     processors = MagicMock(spec=Processors)
     processors.idle_checker_assignment = idle_checker_assignment_processors
     processors.rbac = rbac_processors
-    handler = V2IdleCheckerAssignmentHandler(adapter=IdleCheckerAssignmentAdapter(processors))
+    handler = V2IdleCheckerAssignmentHandler(
+        adapter=IdleCheckerAssignmentAdapter(processors.idle_checker_assignment, processors.rbac)
+    )
     v2_reg = RouteRegistry.create("v2", route_deps.cors_options)
     v2_reg.add_subregistry(register_v2_idle_checker_assignment_routes(handler, route_deps))
     return [v2_reg]

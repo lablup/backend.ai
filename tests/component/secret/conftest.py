@@ -57,7 +57,7 @@ def server_module_registries(
     processors = MagicMock(spec=Processors)
     processors.secret = secret_processors
 
-    handler = V2SecretHandler(adapter=SecretAdapter(processors))
+    handler = V2SecretHandler(adapter=SecretAdapter(processors.secret))
     v2_reg = RouteRegistry.create("v2", route_deps.cors_options)
     v2_reg.add_subregistry(register_v2_secret_routes(handler, route_deps))
     return [v2_reg]

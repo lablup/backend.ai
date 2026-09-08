@@ -71,6 +71,7 @@ from ai.backend.manager.models.project.updaters import (
 )
 from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.services.domain.actions.lookup import LookupDomainAction
+from ai.backend.manager.services.domain.processors import DomainProcessors
 from ai.backend.manager.services.project.actions.create_project import CreateProjectAction
 from ai.backend.manager.services.project.actions.delete_project import DeleteProjectAction
 from ai.backend.manager.services.project.actions.purge_project import PurgeProjectAction
@@ -85,13 +86,16 @@ from ai.backend.manager.services.project.actions.search_projects import (
     GlobalSearchProjectsAction,
 )
 from ai.backend.manager.services.project.actions.update_project import UpdateProjectAction
+from ai.backend.manager.services.project.processors import ProjectProcessors
 from ai.backend.manager.services.rbac.actions.roster.join_project import (
     JoinProjectAction,
 )
 from ai.backend.manager.services.rbac.actions.roster.leave_project import (
     LeaveProjectAction,
 )
+from ai.backend.manager.services.rbac.processors import RbacProcessors
 from ai.backend.manager.services.user.actions.keypair_ops import GetDefaultKeypairsAction
+from ai.backend.manager.services.user.processors import UserProcessors
 from ai.backend.manager.types import OptionalState, TriState
 
 _PROJECT_PAGINATION_SPEC = PaginationSpec(
@@ -110,10 +114,25 @@ _PROJECT_PAGINATION_SPEC = PaginationSpec(
 class ProjectAdapter(BaseAdapter):
     """Adapter for project (group) operations."""
 
+    _project: ProjectProcessors
+    _rbac: RbacProcessors
+    _domain: DomainProcessors
+    _user: UserProcessors
+
+    def __init__(
+        self,
+        project: ProjectProcessors,
+        rbac: RbacProcessors,
+        domain: DomainProcessors,
+        user: UserProcessors,
+    ) -> None:
+        self._project = project
+        self._rbac = rbac
+        self._domain = domain
+        self._user = user
+
     async def _resolve_domain_id(self, domain_name: str) -> DomainID:
-        result = await self._processors.domain.lookup.run(
-            LookupDomainAction(name=DomainName(domain_name))
-        )
+        result = await self._domain.lookup.run(LookupDomainAction(name=DomainName(domain_name)))
         return result.entity_id()
 
     # ------------------------------------------------------------------ batch load (DataLoader)
@@ -131,7 +150,7 @@ class ProjectAdapter(BaseAdapter):
                 ProjectConditions.by_id_in(UUIDInMatchSpec(values=list(group_ids), negated=False))
             ],
         )
-        result = await self._processors.project.global_search.run(
+        result = await self._project.global_search.run(
             GlobalSearchProjectsAction(searcher=searcher)
         )
         project_map = {group.id: self._group_data_to_node(group) for group in result.items}
@@ -141,7 +160,7 @@ class ProjectAdapter(BaseAdapter):
 
     async def get(self, project_id: UUID) -> ProjectNode:
         """Retrieve a single project by UUID."""
-        action_result = await self._processors.project.get_project.run(
+        action_result = await self._project.get_project.run(
             GetProjectAction(project_id=ProjectID(project_id))
         )
         return self._group_data_to_node(action_result.data)
@@ -166,7 +185,7 @@ class ProjectAdapter(BaseAdapter):
             offset=input.offset,
         )
 
-        result = await self._processors.project.global_search.run(
+        result = await self._project.global_search.run(
             GlobalSearchProjectsAction(searcher=searcher)
         )
 
@@ -180,7 +199,7 @@ class ProjectAdapter(BaseAdapter):
     async def admin_create(self, input: CreateProjectInput) -> ProjectPayload:
         """Create a new project (superadmin only)."""
         domain_id = await self._resolve_domain_id(input.domain_name)
-        result = await self._processors.project.create_project.run(
+        result = await self._project.create_project.run(
             CreateProjectAction(
                 domain_id=domain_id,
                 creator=ProjectCreator(
@@ -228,9 +247,7 @@ class ProjectAdapter(BaseAdapter):
                 else OptionalState.nop()
             ),
         )
-        result = await self._processors.project.update_project.run(
-            UpdateProjectAction(updater=updater)
-        )
+        result = await self._project.update_project.run(UpdateProjectAction(updater=updater))
         if result.data is None:
             raise UnreachableError("modify_group must return data")
         return ProjectPayload(project=self._group_data_to_node(result.data))
@@ -238,7 +255,7 @@ class ProjectAdapter(BaseAdapter):
     async def admin_delete(self, input: DeleteProjectInput) -> DeleteProjectPayload:
         """Soft-delete a project (superadmin only)."""
         project_id = ProjectID(input.group_id)
-        await self._processors.project.delete_project.run(
+        await self._project.delete_project.run(
             DeleteProjectAction(updater=ProjectSoftDeleteUpdater(project_id=project_id))
         )
         return DeleteProjectPayload(deleted=True)
@@ -246,14 +263,14 @@ class ProjectAdapter(BaseAdapter):
     async def admin_restore(self, input: RestoreProjectInput) -> RestoreProjectPayload:
         """Restore a soft-deleted project (superadmin only)."""
         project_id = ProjectID(input.group_id)
-        await self._processors.project.restore_project.run(
+        await self._project.restore_project.run(
             RestoreProjectAction(updater=ProjectRestoreUpdater(project_id=project_id))
         )
         return RestoreProjectPayload(restored=True)
 
     async def admin_purge(self, input: PurgeProjectInput) -> PurgeProjectPayload:
         """Permanently purge a project (superadmin only)."""
-        await self._processors.project.purge_project.run(
+        await self._project.purge_project.run(
             PurgeProjectAction(project_id=ProjectID(input.group_id))
         )
         return PurgeProjectPayload(purged=True)
@@ -262,7 +279,7 @@ class ProjectAdapter(BaseAdapter):
         self, project_id: UUID, input: UnassignUsersFromProjectInput
     ) -> UnassignUsersFromProjectPayload:
         """Unassign users from a project."""
-        result = await self._processors.rbac.leave_project.run(
+        result = await self._rbac.leave_project.run(
             LeaveProjectAction(
                 project_id=ProjectID(project_id),
                 user_ids=[UserID(uid) for uid in input.user_ids],
@@ -297,7 +314,7 @@ class ProjectAdapter(BaseAdapter):
             offset=input.offset,
         )
 
-        result = await self._processors.project.scoped_search.run(
+        result = await self._project.scoped_search.run(
             ScopedSearchProjectsAction(
                 items=[DomainProjectScopeItem(domain_id=domain_id)], searcher=searcher
             )
@@ -331,7 +348,7 @@ class ProjectAdapter(BaseAdapter):
             offset=input.offset,
         )
 
-        result = await self._processors.project.scoped_search.run(
+        result = await self._project.scoped_search.run(
             ScopedSearchProjectsAction(
                 items=[UserProjectScopeItem(user_id=user_id)], searcher=searcher
             )
@@ -350,7 +367,7 @@ class ProjectAdapter(BaseAdapter):
         input: AssignUsersToProjectInput,
     ) -> AssignUsersToProjectPayload:
         """Assign users to a project."""
-        result = await self._processors.rbac.join_project.run(
+        result = await self._rbac.join_project.run(
             JoinProjectAction(
                 project_id=ProjectID(project_id),
                 user_ids=[UserID(uid) for uid in input.user_ids],
@@ -365,7 +382,7 @@ class ProjectAdapter(BaseAdapter):
         """Convert users, reading the key each authorizes with for all of them at once."""
         if not users:
             return []
-        result = await self._processors.user.get_default_keypairs.run(
+        result = await self._user.get_default_keypairs.run(
             GetDefaultKeypairsAction(user_ids=[UserID(user.id) for user in users])
         )
         keys = {owner: AccessKey(kp.access_key) for owner, kp in result.designated.items()}

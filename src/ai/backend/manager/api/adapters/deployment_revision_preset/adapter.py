@@ -110,6 +110,9 @@ from ai.backend.manager.services.deployment_revision_preset.actions.search_resou
 from ai.backend.manager.services.deployment_revision_preset.actions.update import (
     UpdateDeploymentPresetAction,
 )
+from ai.backend.manager.services.deployment_revision_preset.processors import (
+    DeploymentPresetProcessors,
+)
 from ai.backend.manager.types import OptionalState, TriState
 
 
@@ -207,6 +210,11 @@ def _model_definition_to_dto(
 
 
 class DeploymentRevisionPresetAdapter(BaseAdapter):
+    _deployment_revision_preset: DeploymentPresetProcessors
+
+    def __init__(self, deployment_revision_preset: DeploymentPresetProcessors) -> None:
+        self._deployment_revision_preset = deployment_revision_preset
+
     async def search(
         self,
         input: SearchDeploymentRevisionPresetsInput,
@@ -225,7 +233,7 @@ class DeploymentRevisionPresetAdapter(BaseAdapter):
             limit=input.limit,
             offset=input.offset,
         )
-        result = await self._processors.deployment_revision_preset.global_search.run(
+        result = await self._deployment_revision_preset.global_search.run(
             GlobalSearchDeploymentPresetsAction(searcher=searcher)
         )
         return SearchDeploymentRevisionPresetsPayload(
@@ -236,7 +244,7 @@ class DeploymentRevisionPresetAdapter(BaseAdapter):
         )
 
     async def get(self, preset_id: UUID) -> DeploymentRevisionPresetNode:
-        result = await self._processors.deployment_revision_preset.get.run(
+        result = await self._deployment_revision_preset.get.run(
             GetDeploymentPresetAction(preset_id=DeploymentPresetID(preset_id))
         )
         return self._data_to_node(result.data)
@@ -276,7 +284,7 @@ class DeploymentRevisionPresetAdapter(BaseAdapter):
             deployment_strategy=strategy,
             deployment_strategy_spec=strategy_spec,
         )
-        result = await self._processors.deployment_revision_preset.create.run(
+        result = await self._deployment_revision_preset.create.run(
             CreateDeploymentPresetAction(creator=creator, slot_creators=slot_creators)
         )
         return CreateDeploymentRevisionPresetPayload(preset=self._data_to_node(result.data))
@@ -374,13 +382,13 @@ class DeploymentRevisionPresetAdapter(BaseAdapter):
                 input.deployment_strategy
             ),
         )
-        result = await self._processors.deployment_revision_preset.update.run(
+        result = await self._deployment_revision_preset.update.run(
             UpdateDeploymentPresetAction(updater=updater, slot_creators=slot_creators)
         )
         return UpdateDeploymentRevisionPresetPayload(preset=self._data_to_node(result.data))
 
     async def delete(self, preset_id: UUID) -> DeleteDeploymentRevisionPresetPayload:
-        result = await self._processors.deployment_revision_preset.purge.run(
+        result = await self._deployment_revision_preset.purge.run(
             PurgeDeploymentPresetAction(preset_id=DeploymentPresetID(preset_id))
         )
         return DeleteDeploymentRevisionPresetPayload(id=result.data.id)
@@ -392,7 +400,7 @@ class DeploymentRevisionPresetAdapter(BaseAdapter):
     ) -> SearchAllocatedResourceSlotsPayload:
         """Search resource slots allocated to a deployment revision preset."""
         searcher = self._build_preset_resource_slot_searcher(input)
-        action_result = await self._processors.deployment_revision_preset.search_resource_slots.run(
+        action_result = await self._deployment_revision_preset.search_resource_slots.run(
             SearchPresetResourceSlotsAction(
                 preset_id=DeploymentPresetID(preset_id),
                 searcher=searcher,

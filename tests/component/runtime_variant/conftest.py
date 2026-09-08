@@ -49,7 +49,7 @@ def server_module_registries(
     processors = MagicMock(spec=Processors)
     processors.runtime_variant = runtime_variant_processors
 
-    adapter = RuntimeVariantAdapter(processors)
+    adapter = RuntimeVariantAdapter(processors.runtime_variant)
 
     handler = V2RuntimeVariantHandler(adapter=adapter)
     v2_reg = RouteRegistry.create("v2", route_deps.cors_options)

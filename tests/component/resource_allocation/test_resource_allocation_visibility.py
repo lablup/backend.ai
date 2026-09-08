@@ -115,7 +115,9 @@ def _build_registries(
     processors.session = MagicMock()
     processors.session.resource_allocation = ra_processors
     adapter = ResourceAllocationAdapter(
-        processors=processors,
+        processors.session,
+        MagicMock(),
+        MagicMock(),
         config_provider=config_provider,
     )
     handler = V2ResourceAllocationHandler(adapter=adapter)
