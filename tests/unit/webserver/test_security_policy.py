@@ -5,6 +5,7 @@ from aiohttp import web
 from aiohttp.test_utils import make_mocked_request
 from aiohttp.typedefs import Handler
 
+from ai.backend.web.errors import StaticFileNotFoundError
 from ai.backend.web.security import (
     SecurityPolicy,
     add_self_content_security_policy,
@@ -234,9 +235,9 @@ async def test_response_policies_apply_to_raised_exception() -> None:
     request = make_mocked_request("GET", "/", app=test_app)
 
     async def handler(request: web.Request) -> web.Response:
-        raise web.HTTPFound("/elsewhere")
+        raise StaticFileNotFoundError()
 
-    with pytest.raises(web.HTTPFound) as exc_info:
+    with pytest.raises(StaticFileNotFoundError) as exc_info:
         await security_policy_middleware(request, handler)
 
     assert exc_info.value.headers["X-Content-Type-Options"] == "nosniff"

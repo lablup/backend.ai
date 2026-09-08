@@ -1,6 +1,7 @@
 import json
 import logging
 from collections.abc import Mapping, Sequence
+from http import HTTPStatus
 from typing import Any, cast, override
 
 import aiohttp_cors
@@ -60,7 +61,7 @@ async def login(request: web.Request) -> web.Response:
         secret=token_secret,
     )
     redirect_location = redirect_uri.update_query({"sToken": token})
-    raise web.HTTPFound(redirect_location)
+    return web.Response(status=HTTPStatus.FOUND, headers={"Location": str(redirect_location)})
 
 
 async def _webapp_init(app: web.Application) -> None:

@@ -104,12 +104,7 @@ def build_exception_middleware(
             if config_provider.config.debug.enabled:
                 return _debug_error_response(ex)
             raise
-        except (web.HTTPSuccessful, web.HTTPRedirection) as ex:
-            await stats_monitor.report_metric(
-                INCREMENT, f"ai.backend.manager.api.status.{ex.status_code}"
-            )
-            raise
-        except web.HTTPError as ex:
+        except web.HTTPException as ex:
             await stats_monitor.report_metric(INCREMENT, "ai.backend.manager.api.failures")
             await stats_monitor.report_metric(
                 INCREMENT, f"ai.backend.manager.api.status.{ex.status_code}"

@@ -217,10 +217,10 @@ class TestWebAppLogin:
             "ai.backend.manager.plugin.openid.webapp.AsyncOAuth2Client",
             return_value=mock_oauth2_client,
         ):
-            with pytest.raises(web.HTTPFound) as exc_info:
-                await webapp_plugin.login(login_request)
+            response = await webapp_plugin.login(login_request)
 
-        redirect_url = str(exc_info.value.location)
+        assert response.status == 302
+        redirect_url = response.headers["Location"]
         assert "idp.example.com/authorize" in redirect_url
         assert "client_id=test-client-id" in redirect_url
 
@@ -273,10 +273,10 @@ class TestWebAppRedirect:
             "ai.backend.manager.plugin.openid.webapp.AsyncOAuth2Client",
             return_value=mock_oauth2_client,
         ):
-            with pytest.raises(web.HTTPFound) as exc_info:
-                await webapp_plugin.redirect(redirect_request)
+            response = await webapp_plugin.redirect(redirect_request)
 
-        location = str(exc_info.value.location)
+        assert response.status == 302
+        location = response.headers["Location"]
         assert "sToken=" in location
         assert "app.example.com/dashboard" in location
 

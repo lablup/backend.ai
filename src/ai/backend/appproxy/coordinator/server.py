@@ -242,9 +242,7 @@ async def exception_middleware(
             else:
                 log.warning("Client error: {0!r}", ex)
             raise
-        except (web.HTTPSuccessful, web.HTTPRedirection):
-            raise
-        except web.HTTPError as ex:
+        except web.HTTPException as ex:
             if ex.status_code == 404:
                 raise URLNotFound(extra_data=request.path) from ex
             if ex.status_code == 405:

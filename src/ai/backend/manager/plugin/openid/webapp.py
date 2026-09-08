@@ -6,6 +6,7 @@ import urllib.parse
 import uuid
 from collections.abc import Mapping, Sequence
 from datetime import UTC, datetime, timedelta
+from http import HTTPStatus
 from typing import (
     Any,
     Final,
@@ -285,7 +286,7 @@ class OIDCWebAppPlugin(WebappPlugin):
             redirect_uri=str(redirect_uri.with_path("/func/openid/redirect")),
         )
 
-        raise web.HTTPFound(uri)
+        return web.Response(status=HTTPStatus.FOUND, headers={"Location": uri})
 
     async def redirect(self, request: web.Request) -> web.Response:
         root_app = request.app["_root_app"]
@@ -350,7 +351,10 @@ class OIDCWebAppPlugin(WebappPlugin):
             "force": force,
         }
         token = encode_jwt_token(token_data, self._config.secret)
-        raise web.HTTPFound(redirect_uri.update_query({"sToken": token}))
+        return web.Response(
+            status=HTTPStatus.FOUND,
+            headers={"Location": str(redirect_uri.update_query({"sToken": token}))},
+        )
 
     @override
     async def create_app(
