@@ -24,6 +24,7 @@ from ai.backend.common.network.keys import (
     agent_backend_key,
     agent_boot_key,
     agent_caps_key,
+    agent_ready_key,
 )
 from ai.backend.common.network.types import OVERLAY_ENCRYPTION_PROFILE, AgentNetworkCaps
 from ai.backend.logging import BraceStyleAdapter
@@ -147,6 +148,11 @@ class AdmittedAgent:
     #: the key was absent, which is a condition too -- one appearing is a restart.
     backend_key: str | None
     boot_key: str | None
+    #: What the node said it could serve, at admission. Guarded on for the same reason as the two
+    #: above and one more: a withdrawal leaves boot and backend exactly as they were -- an agent
+    #: shutting down, losing its tunnel endpoint or failing its probe takes back the capability
+    #: without restarting -- so those two alone cannot see it happen.
+    ready_key: str
 
 
 async def require_members_cni_ready(
@@ -243,13 +249,23 @@ async def require_members_cni_ready(
                 f"agent '{agent_id}' published its capabilities from the '{caps.backend}'"
                 " backend, which cannot serve the 'cni' cluster network driver"
             )
+        # What the node currently says it can serve, and it must agree with the record just read.
+        # The two are separate writes, so a disagreement means the advert is being changed right
+        # now -- and admitting on a half-published pair is admitting on nothing.
+        ready = await etcd.get(agent_ready_key(agent_id), scope=ConfigScopes.GLOBAL)
+        if ready != caps.readiness_digest():
+            raise NetworkBackendMismatch(
+                f"agent '{agent_id}' has withdrawn from cluster-network work, or is republishing"
+                " what it can serve right now; its capabilities and its readiness do not describe"
+                " the same node"
+            )
         if not caps.vtep_ip:
             raise NetworkBackendMismatch(
                 f"agent '{agent_id}' holds no tunnel endpoint, so a vxlan session placed on it is"
                 " refused when it arrives. Set container.advertised-host (or bind-host) to a"
                 " routable address this host holds."
             )
-        admitted[agent_id] = AdmittedAgent(caps, raw, running, booted)
+        admitted[agent_id] = AdmittedAgent(caps, raw, running, booted, ready)
     return admitted
 
 

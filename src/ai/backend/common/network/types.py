@@ -7,6 +7,7 @@ proposals/BEP-1078 and its sub-documents `control-plane.md` and `agent-plugin-v2
 
 from __future__ import annotations
 
+import hashlib
 import ipaddress
 import json
 import logging
@@ -600,6 +601,32 @@ class AgentNetworkCaps:
     #: The overlay encryption profiles this node can hold up ITS end of. Absent -- which is what an
     #: agent from before this field publishes -- means none: see `OVERLAY_ENCRYPTION_PROFILE`.
     encryption_profiles: list[str] = field(default_factory=list)
+
+    def readiness_digest(self) -> str:
+        """A stable summary of what this node can currently serve.
+
+        Everything that decides whether a session may be placed here, and nothing that merely says
+        the agent is still running. The publish time is deliberately absent: it changes every
+        minute by design, and a fence built on it refuses creates on a cluster where nothing is
+        wrong. This changes when the runtime changes, the boot changes, the tunnel endpoint moves,
+        a backend stops being advertised, an encryption profile appears or disappears, or a
+        readiness problem is found or cleared -- each of which makes an earlier admission no
+        longer true.
+        """
+        return hashlib.sha256(
+            json.dumps(
+                {
+                    "backend": self.backend,
+                    "boot_id": self.boot_id,
+                    "vtep_ip": self.vtep_ip,
+                    "backends": sorted(self.backends),
+                    "encryption_profiles": sorted(self.encryption_profiles),
+                    "readiness": sorted(self.readiness),
+                    "tunnel_offload": self.tunnel_offload,
+                },
+                sort_keys=True,
+            ).encode("utf-8")
+        ).hexdigest()
 
     @classmethod
     def from_etcd_payload(cls, payload: Mapping[str, Any]) -> AgentNetworkCaps:

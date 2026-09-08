@@ -20,6 +20,7 @@ from ai.backend.common.network.keys import member_key, session_ipam_key, session
 from ai.backend.common.network.types import (
     DEFAULT_VXLAN_PORT,
     OVERLAY_ENCRYPTION_PROFILE,
+    AgentNetworkCaps,
     GenerationMatch,
     Member,
     NetworkBackendKind,
@@ -440,13 +441,13 @@ def _encryption_capable(etcd: FakeEtcd, *agent_ids: str) -> None:
     `required`, so a member that cannot encrypt refuses the session -- which is the point.
     """
     for agent_id in agent_ids:
-        etcd.store[f"network/agent/{agent_id}/caps"] = _caps(agent_id)
+        _publish_caps(etcd, agent_id)
 
 
 def _caps(agent_id: str, **overrides: Any) -> str:
     """What a running agent publishes: its capabilities, the runtime that published them, the
     tunnel endpoint it holds, and when. All one value, because the manager reads them as one."""
-    return json.dumps({
+    payload = {
         "tunnel_offload": False,
         "backends": ["vxlan"],
         "readiness": [],
@@ -455,7 +456,21 @@ def _caps(agent_id: str, **overrides: Any) -> str:
         "vtep_ip": f"10.0.0.{abs(hash(agent_id)) % 250 + 1}",
         "updated_at": time.time(),
         **overrides,
-    })
+    }
+    return json.dumps(payload)
+
+
+def _publish_caps(etcd: FakeEtcd, agent_id: str, **overrides: Any) -> str:
+    """Seed both halves of what a running agent publishes: the record and the readiness fence."""
+    raw = _caps(agent_id, **overrides)
+    etcd.store[f"network/agent/{agent_id}/caps"] = raw
+    try:
+        etcd.store[f"network/agent/{agent_id}/ready"] = AgentNetworkCaps.from_etcd_payload(
+            json.loads(raw)
+        ).readiness_digest()
+    except ValueError:
+        etcd.store.pop(f"network/agent/{agent_id}/ready", None)
+    return raw
 
 
 class TestCreateNetwork:
@@ -616,8 +631,8 @@ class TestCreateNetwork:
         etcd.store["network/agent/a2/vtep"] = "192.168.105.8"
         # The record the agent is ADMITTED on carries the endpoint too, and that is the one the
         # pre-seed uses: the separate key is a second write nothing checked.
-        etcd.store["network/agent/a1/caps"] = _caps("a1", vtep_ip="192.168.105.7")
-        etcd.store["network/agent/a2/caps"] = _caps("a2", vtep_ip="192.168.105.8")
+        _publish_caps(etcd, "a1", vtep_ip="192.168.105.7")
+        _publish_caps(etcd, "a2", vtep_ip="192.168.105.8")
         plugin = _plugin_with(etcd)
         info = await plugin.create_network(
             identifier="s1",
@@ -691,7 +706,7 @@ class TestMemberBackendCompat:
     async def test_containerd_member_ok(self) -> None:
         etcd = FakeEtcd()
         etcd.store["network/agent/a1/backend"] = "containerd"
-        etcd.store["network/agent/a1/caps"] = _caps("a1", backend="containerd")
+        _publish_caps(etcd, "a1", backend="containerd")
         plugin = _plugin_with(etcd)
         info = await plugin.create_network(
             identifier="s1", options={"forced_backend": "vxlan", "member_agents": ["a1"]}
@@ -858,7 +873,7 @@ class TestEncryptingOnlyWhereEveryNodeCan:
     def _old(self, etcd: FakeEtcd, *agent_ids: str) -> None:
         """An agent from before the profile existed: it publishes caps, but not that field."""
         for agent_id in agent_ids:
-            etcd.store[f"network/agent/{agent_id}/caps"] = _caps(agent_id, encryption_profiles=[])
+            _publish_caps(etcd, agent_id, encryption_profiles=[])
 
     def _with_policy(self, etcd: FakeEtcd, policy: object) -> CNINetworkPlugin:
         plugin = CNINetworkPlugin({"overlay-encryption": policy}, {})
@@ -933,9 +948,7 @@ class TestEncryptingOnlyWhereEveryNodeCan:
     async def test_required_refuses_an_unknown_profile(self) -> None:
         etcd = FakeEtcd()
         _encryption_capable(etcd, "a1")
-        etcd.store["network/agent/a2/caps"] = _caps(
-            "a2", encryption_profiles=["esp-aesgcm-esn-v99"]
-        )
+        _publish_caps(etcd, "a2", encryption_profiles=["esp-aesgcm-esn-v99"])
         plugin = self._with_policy(etcd, "required")
         with pytest.raises(NetworkBackendMismatch, match="esp-aesgcm-esn-v99"):
             await plugin.create_network(
@@ -2113,6 +2126,55 @@ class TestTheGuardIsWiredIntoTheRealPath:
         assert "network/agent/a1/boot" in etcd.guarded[_META_KEY]
         assert "network/agent/a1/backend" in etcd.guarded[_META_KEY]
 
+    @pytest.mark.parametrize("how", ["withdrawn", "changed"])
+    async def test_a_member_that_stopped_being_ready_mid_create_is_caught(self, how: str) -> None:
+        """Withdrawal leaves boot and backend exactly as they were. An agent shutting down, losing
+        its tunnel endpoint or failing its probe takes back what it can serve WITHOUT restarting,
+        so a fence on those two alone cannot see it happen."""
+        etcd = _RecordsGuards()
+        _encryption_capable(etcd, "a1")
+
+        class _StopsBeingReady(CNINetworkPlugin):
+            @override
+            async def _preseed_members(
+                self,
+                session_id: str,
+                member_agents: list[str],
+                generation: str | None = None,
+                held: str | None = None,
+                admitted: Mapping[str, AdmittedAgent] | None = None,
+            ) -> None:
+                if how == "withdrawn":
+                    etcd.store.pop("network/agent/a1/ready", None)
+                else:
+                    # Its VTEP moved: same boot, same runtime, different node to place work on.
+                    _publish_caps(etcd, "a1", vtep_ip="10.44.44.44")
+
+        plugin = _wire(_StopsBeingReady({}, {}), etcd)
+
+        with pytest.raises(SessionRecordContested):
+            await plugin.create_network(identifier="s1", options=dict(self._OPTIONS))
+
+    async def test_readiness_is_guarded_at_ready(self) -> None:
+        etcd = _RecordsGuards()
+        _encryption_capable(etcd, "a1")
+        plugin = _plugin_with(etcd)
+
+        await plugin.create_network(identifier="s1", options=dict(self._OPTIONS))
+
+        assert "network/agent/a1/ready" in etcd.guarded[_META_KEY]
+
+    async def test_a_half_published_advert_is_not_admitted(self) -> None:
+        # The record and the fence are two writes. A pair that does not describe the same node is
+        # an advert being changed right now, and admitting on it is admitting on nothing.
+        etcd = FakeEtcd()
+        _encryption_capable(etcd, "a1")
+        etcd.store["network/agent/a1/caps"] = _caps("a1", vtep_ip="10.55.55.55")
+        plugin = _plugin_with(etcd)
+
+        with pytest.raises(NetworkBackendMismatch, match="do not describe the same node"):
+            await plugin.create_network(identifier="s1", options=dict(self._OPTIONS))
+
     async def test_it_does_not_guard_on_the_advert_the_agent_keeps_refreshing(self) -> None:
         """The capability record carries a timestamp the agent rewrites every minute to say it is
         still there. Guarding on its bytes turns that heartbeat into a fence: any create that
@@ -2140,7 +2202,7 @@ class TestTheGuardIsWiredIntoTheRealPath:
                 admitted: Mapping[str, AdmittedAgent] | None = None,
             ) -> None:
                 # The agent's ordinary sixty-second refresh, mid-create.
-                etcd.store["network/agent/a1/caps"] = _caps("a1")
+                _publish_caps(etcd, "a1")
 
         plugin = _wire(_RefreshesBeforeReady({}, {}), etcd)
 
@@ -2156,7 +2218,7 @@ class TestTheGuardIsWiredIntoTheRealPath:
         _encryption_capable(etcd, "a1")
         etcd.store["network/agent/a1/boot"] = "run-1"
         etcd.store["network/agent/a1/backend"] = "docker"
-        etcd.store["network/agent/a1/caps"] = _caps("a1", boot_id="run-1")
+        _publish_caps(etcd, "a1", boot_id="run-1")
 
         class _RestartsBeforeReady(CNINetworkPlugin):
             @override
@@ -3739,9 +3801,7 @@ class TestTheAdvertIsAboutTheNodeThatIsThereNow:
     async def test_a_stale_advert_is_refused(self) -> None:
         etcd = FakeEtcd()
         etcd.store["network/agent/a1/backend"] = "docker"
-        etcd.store["network/agent/a1/caps"] = _caps(
-            "a1", updated_at=time.time() - pairing.CAPS_FRESH_FOR_SEC - 1
-        )
+        _publish_caps(etcd, "a1", updated_at=time.time() - pairing.CAPS_FRESH_FOR_SEC - 1)
         plugin = _plugin_with(etcd)
         with pytest.raises(NetworkBackendMismatch, match="dated"):
             await plugin.create_network(
@@ -3755,7 +3815,7 @@ class TestTheAdvertIsAboutTheNodeThatIsThereNow:
         # old runtime's advert for as long as it stayed fresh.
         etcd = FakeEtcd()
         etcd.store["network/agent/a1/backend"] = "containerd"
-        etcd.store["network/agent/a1/caps"] = _caps("a1", backend="docker")
+        _publish_caps(etcd, "a1", backend="docker")
         plugin = _plugin_with(etcd)
         with pytest.raises(NetworkBackendMismatch, match="a boot that is over"):
             await plugin.create_network(
@@ -3764,7 +3824,7 @@ class TestTheAdvertIsAboutTheNodeThatIsThereNow:
 
     async def test_an_advert_with_no_publisher_is_refused(self) -> None:
         etcd = FakeEtcd()
-        etcd.store["network/agent/a1/caps"] = _caps("a1", backend=None)
+        _publish_caps(etcd, "a1", backend=None)
         plugin = _plugin_with(etcd)
         with pytest.raises(NetworkBackendMismatch, match="do not say which backend"):
             await plugin.create_network(
@@ -3774,9 +3834,7 @@ class TestTheAdvertIsAboutTheNodeThatIsThereNow:
     async def test_an_advert_dated_in_the_future_is_refused(self) -> None:
         # A clock far enough ahead is a record no age check can ever expire.
         etcd = FakeEtcd()
-        etcd.store["network/agent/a1/caps"] = _caps(
-            "a1", updated_at=time.time() + pairing.CAPS_CLOCK_SKEW_SEC + 60
-        )
+        _publish_caps(etcd, "a1", updated_at=time.time() + pairing.CAPS_CLOCK_SKEW_SEC + 60)
         plugin = _plugin_with(etcd)
         with pytest.raises(NetworkBackendMismatch, match="dated"):
             await plugin.create_network(
@@ -3800,7 +3858,7 @@ class TestTheAdvertIsAboutTheNodeThatIsThereNow:
         # No backend key, so the equality check above cannot answer and this is what is left:
         # the runtime that WROTE the advert could not serve cni whoever is running now.
         etcd = FakeEtcd()
-        etcd.store["network/agent/a1/caps"] = _caps("a1", backend="kubernetes")
+        _publish_caps(etcd, "a1", backend="kubernetes")
         plugin = _plugin_with(etcd)
         with pytest.raises(NetworkBackendMismatch, match="published its capabilities from"):
             await plugin.create_network(
@@ -3811,7 +3869,7 @@ class TestTheAdvertIsAboutTheNodeThatIsThereNow:
         # It publishes vxlan caps before it works out its VTEP, and refuses the session on arrival
         # if it has none. Admitting it is a slower way of failing.
         etcd = FakeEtcd()
-        etcd.store["network/agent/a1/caps"] = _caps("a1", vtep_ip=None)
+        _publish_caps(etcd, "a1", vtep_ip=None)
         plugin = _plugin_with(etcd)
         with pytest.raises(NetworkBackendMismatch, match="no tunnel endpoint"):
             await plugin.create_network(
@@ -3832,7 +3890,7 @@ class TestTheAdvertIsAboutTheNodeThatIsThereNow:
         self, bogus: dict[str, Any]
     ) -> None:
         etcd = FakeEtcd()
-        etcd.store["network/agent/a1/caps"] = _caps("a1", **bogus)
+        _publish_caps(etcd, "a1", **bogus)
         plugin = _plugin_with(etcd)
         with pytest.raises(NetworkBackendMismatch):
             await plugin.create_network(
@@ -3904,7 +3962,7 @@ class TestTheAdvertBelongsToOneRunOfTheAgent:
         etcd = FakeEtcd()
         etcd.store["network/agent/a1/backend"] = "docker"
         etcd.store["network/agent/a1/boot"] = "run-2"
-        etcd.store["network/agent/a1/caps"] = _caps("a1", boot_id="run-1")
+        _publish_caps(etcd, "a1", boot_id="run-1")
         plugin = _plugin_with(etcd)
         with pytest.raises(NetworkBackendMismatch, match="is on run"):
             await plugin.create_network(
@@ -3915,7 +3973,7 @@ class TestTheAdvertBelongsToOneRunOfTheAgent:
         etcd = FakeEtcd()
         etcd.store["network/agent/a1/backend"] = "docker"
         etcd.store["network/agent/a1/boot"] = "run-2"
-        etcd.store["network/agent/a1/caps"] = _caps("a1", boot_id="run-2")
+        _publish_caps(etcd, "a1", boot_id="run-2")
         plugin = _plugin_with(etcd)
         info = await plugin.create_network(
             identifier="s1", options={"forced_backend": "vxlan", "member_agents": ["a1"]}
@@ -3937,7 +3995,7 @@ class TestTheAdvertBelongsToOneRunOfTheAgent:
         does. Admitting on one and seeding peers from the other means peers program an address
         nothing checked."""
         etcd = FakeEtcd()
-        etcd.store["network/agent/a1/caps"] = _caps("a1", vtep_ip="10.9.9.9")
+        _publish_caps(etcd, "a1", vtep_ip="10.9.9.9")
         etcd.store["network/agent/a1/vtep"] = "10.1.1.1"  # an older write, never validated
         plugin = _plugin_with(etcd)
 

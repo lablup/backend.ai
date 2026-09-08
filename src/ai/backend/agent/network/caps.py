@@ -24,6 +24,7 @@ from ai.backend.common.network.keys import (
     agent_backend_key,
     agent_boot_key,
     agent_caps_key,
+    agent_ready_key,
     agent_vtep_key,
 )
 from ai.backend.common.network.types import (
@@ -145,16 +146,19 @@ async def publish_caps(
     session it is given. Written as one value, so the manager can never pair a backend with
     capabilities that were not published together.
     """
+    published = dataclasses.replace(caps, backend=backend, vtep_ip=vtep_ip, boot_id=boot_id)
     await etcd.put(
         agent_caps_key(agent_id),
-        json.dumps({
-            **dataclasses.asdict(caps),
-            "backend": backend,
-            "vtep_ip": vtep_ip,
-            "boot_id": boot_id,
-            "updated_at": time.time(),
-        }),
+        json.dumps({**dataclasses.asdict(published), "updated_at": time.time()}),
         scope=ConfigScopes.GLOBAL,
+    )
+    # And what this node can serve, as a value that does not move when nothing has changed. The
+    # record above is also a heartbeat -- it carries the time -- so a manager cannot fence a
+    # create on it without failing every create that straddles a refresh. It fences on this.
+    # Written after the record, so a manager never fences on readiness the record does not yet
+    # describe.
+    await etcd.put(
+        agent_ready_key(agent_id), published.readiness_digest(), scope=ConfigScopes.GLOBAL
     )
 
 
@@ -188,6 +192,10 @@ async def withdraw_caps(etcd: AbstractKVStore, agent_id: str) -> None:
     removed when the agent stops, and when a refresh could not renew it: an advert nobody can
     renew is not one anybody should act on.
     """
+    # The fence first. A create in flight is conditional on it, so removing it is what stops one
+    # from being declared READY on a node that has just stopped being able to serve it; the
+    # capability record only stops the NEXT placement.
+    await etcd.delete(agent_ready_key(agent_id), scope=ConfigScopes.GLOBAL)
     await etcd.delete(agent_caps_key(agent_id), scope=ConfigScopes.GLOBAL)
 
 
