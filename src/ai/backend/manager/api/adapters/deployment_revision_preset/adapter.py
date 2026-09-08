@@ -3,7 +3,6 @@ from __future__ import annotations
 from typing import Any
 from uuid import UUID
 
-from ai.backend.common.api_handlers import SENTINEL, Sentinel
 from ai.backend.common.config import (
     ModelHealthCheck,
     ModelMetadata,
@@ -24,7 +23,6 @@ from ai.backend.common.dto.manager.v2.deployment_revision_preset.request import 
     CreateDeploymentRevisionPresetInput,
     DeploymentRevisionPresetFilter,
     DeploymentRevisionPresetOrder,
-    PresetModelDefinitionInput,
     SearchDeploymentRevisionPresetsInput,
     UpdateDeploymentRevisionPresetInput,
 )
@@ -303,9 +301,9 @@ class DeploymentRevisionPresetAdapter(BaseAdapter):
             if input.preset_values is not None
             else OptionalState.nop()
         )
-        model_def_state: TriState[PresetModelDefinition] = self._convert_model_definition_state(
+        model_def_state: TriState[PresetModelDefinition] = TriState.from_unset(
             input.model_definition
-        )
+        ).map(lambda m: m.to_model_definition())
 
         updater = DeploymentPresetUpdater(
             preset_id=DeploymentPresetID(input.id),
@@ -317,23 +315,11 @@ class DeploymentRevisionPresetAdapter(BaseAdapter):
             name=(
                 OptionalState.update(input.name) if input.name is not None else OptionalState.nop()
             ),
-            description=(
-                TriState.nop()
-                if input.description is SENTINEL
-                else TriState.nullify()
-                if input.description is None
-                else TriState.update(input.description)
-            ),
+            description=TriState.from_unset(input.description),
             rank=(
                 OptionalState.update(input.rank) if input.rank is not None else OptionalState.nop()
             ),
-            image_id=(
-                TriState.nop()
-                if input.image_id is SENTINEL
-                else TriState.nullify()
-                if input.image_id is None
-                else TriState.update(input.image_id)
-            ),
+            image_id=TriState.from_unset(input.image_id),
             model_definition=model_def_state,
             resource_opts=(
                 OptionalState.update(self._convert_resource_opts_input(input.resource_opts))
@@ -350,28 +336,18 @@ class DeploymentRevisionPresetAdapter(BaseAdapter):
                 if input.cluster_size is not None
                 else OptionalState.nop()
             ),
-            startup_command=(
-                TriState.nop()
-                if input.startup_command is SENTINEL
-                else TriState.nullify()
-                if input.startup_command is None
-                else TriState.update(input.startup_command)
-            ),
-            bootstrap_script=(
-                TriState.nop()
-                if input.bootstrap_script is SENTINEL
-                else TriState.nullify()
-                if input.bootstrap_script is None
-                else TriState.update(input.bootstrap_script)
-            ),
+            startup_command=TriState.from_unset(input.startup_command),
+            bootstrap_script=TriState.from_unset(input.bootstrap_script),
             environ=environ_state,
             runtime_variant_preset_values=preset_values_state,
-            open_to_public=self._convert_tri_state(input.open_to_public),
-            replica_count=self._convert_tri_state(input.replica_count),
-            revision_history_limit=self._convert_tri_state(input.revision_history_limit),
-            deployment_strategy=self._convert_strategy_update_state(input.deployment_strategy),
-            deployment_strategy_spec=self._convert_strategy_spec_update_state(
-                input.deployment_strategy
+            open_to_public=TriState.from_unset(input.open_to_public),
+            replica_count=TriState.from_unset(input.replica_count),
+            revision_history_limit=TriState.from_unset(input.revision_history_limit),
+            deployment_strategy=TriState.from_unset(input.deployment_strategy).map(
+                lambda si: self._convert_required_strategy_input(si)[0]
+            ),
+            deployment_strategy_spec=TriState.from_unset(input.deployment_strategy).map(
+                lambda si: self._convert_required_strategy_input(si)[1]
             ),
         )
         result = await self._processors.deployment_revision_preset.update.run(
@@ -556,44 +532,6 @@ class DeploymentRevisionPresetAdapter(BaseAdapter):
             for pv in preset_values
         ]
 
-    @staticmethod
-    def _convert_model_definition_state(
-        value: PresetModelDefinitionInput | Sentinel | None,
-    ) -> TriState[PresetModelDefinition]:
-        if value is SENTINEL:
-            return TriState.nop()
-        if value is None:
-            return TriState.nullify()
-        return TriState.update(value.to_model_definition())
-
-    @staticmethod
-    def _convert_tri_state(value: Any) -> TriState[Any]:
-        """Convert a Sentinel | None | T input to TriState."""
-        if value is SENTINEL:
-            return TriState.nop()
-        if value is None:
-            return TriState.nullify()
-        return TriState.update(value)
-
-    @staticmethod
-    def _convert_strategy_input(
-        strategy_input: DeploymentStrategyInput | None,
-    ) -> tuple[DeploymentStrategy | None, dict[str, Any] | None]:
-        """Convert DeploymentStrategyInput to (strategy, strategy_spec dict)."""
-        if strategy_input is None:
-            return None, None
-        match strategy_input.type:
-            case DeploymentStrategy.ROLLING:
-                rolling = strategy_input.rolling_update
-                spec_dict: dict[str, Any] = (
-                    rolling.model_dump(mode="json") if rolling is not None else {}
-                )
-                return DeploymentStrategy.ROLLING, spec_dict
-            case DeploymentStrategy.BLUE_GREEN:
-                bg = strategy_input.blue_green
-                spec_dict = bg.model_dump(mode="json") if bg is not None else {}
-                return DeploymentStrategy.BLUE_GREEN, spec_dict
-
     def _convert_required_strategy_input(
         self,
         strategy_input: DeploymentStrategyInput,
@@ -610,34 +548,6 @@ class DeploymentRevisionPresetAdapter(BaseAdapter):
                 bg = strategy_input.blue_green
                 spec_dict = bg.model_dump(mode="json") if bg is not None else {}
                 return DeploymentStrategy.BLUE_GREEN, spec_dict
-
-    @classmethod
-    def _convert_strategy_update_state(
-        cls,
-        strategy_input: Any,
-    ) -> TriState[DeploymentStrategy]:
-        if strategy_input is SENTINEL:
-            return TriState.nop()
-        if strategy_input is None:
-            return TriState.nullify()
-        strategy, _ = cls._convert_strategy_input(strategy_input)
-        if strategy is None:
-            return TriState.nullify()
-        return TriState.update(strategy)
-
-    @classmethod
-    def _convert_strategy_spec_update_state(
-        cls,
-        strategy_input: Any,
-    ) -> TriState[dict[str, Any]]:
-        if strategy_input is SENTINEL:
-            return TriState.nop()
-        if strategy_input is None:
-            return TriState.nullify()
-        _, spec = cls._convert_strategy_input(strategy_input)
-        if spec is None:
-            return TriState.nullify()
-        return TriState.update(spec)
 
     @staticmethod
     def _data_to_node(
