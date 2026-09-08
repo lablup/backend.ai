@@ -14592,14 +14592,10 @@
                 "type": "string"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
-            "description": "Updated channel description. Use SENTINEL to clear.",
+            "description": "Updated channel description. Omit to leave unchanged; null clears.",
             "title": "Description"
           },
           "spec": {
@@ -15003,14 +14999,10 @@
                 "type": "string"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
-            "description": "Updated rule description. Use SENTINEL to clear.",
+            "description": "Updated rule description. Omit to leave unchanged; null clears.",
             "title": "Description"
           },
           "message_template": {
