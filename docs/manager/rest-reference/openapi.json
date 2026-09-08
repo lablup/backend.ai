@@ -12219,14 +12219,10 @@
                 "type": "string"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
-            "description": "Updated accelerator string. Set to null to clear.",
+            "description": "Updated accelerator string. Omit to leave unchanged; null clears.",
             "title": "Supported Accelerators"
           },
           "resource_limits": {
