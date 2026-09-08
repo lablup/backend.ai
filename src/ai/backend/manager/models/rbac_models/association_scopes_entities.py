@@ -4,6 +4,8 @@ import uuid
 from datetime import datetime
 
 import sqlalchemy as sa
+from sqlalchemy.dialects.postgresql import Insert
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Mapped, mapped_column
 
 from ai.backend.manager.data.permission.association_scopes_entities import (
@@ -95,3 +97,28 @@ class AssociationScopesEntitiesRow(Base):  # type: ignore[misc]
             permission_cap=self.permission_cap,
             registered_at=self.registered_at,
         )
+
+
+def keypair_owner_association_stmt(user_id: uuid.UUID, access_key: str) -> Insert:
+    """The scope edge binding a keypair to the user that owns it.
+
+    ``RBACEntityCreator`` writes this edge for every keypair it creates. The paths that
+    insert a keypair row directly -- signup, the legacy ``create_keypair`` mutation and
+    OpenID user provisioning -- write it through this statement instead. Without the edge
+    the scope chain cannot resolve a keypair to its owner, so every permission check on
+    that keypair is refused.
+
+    Idempotent: a keypair that already carries the edge conflicts on
+    ``uq_scope_id_entity_id`` and the insert is dropped.
+    """
+    return (
+        pg_insert(AssociationScopesEntitiesRow.__table__)
+        .values(
+            scope_type=ScopeType.USER,
+            scope_id=str(user_id),
+            entity_type=EntityType.KEYPAIR,
+            entity_id=access_key,
+            relation_type=RelationType.AUTO,
+        )
+        .on_conflict_do_nothing()
+    )
