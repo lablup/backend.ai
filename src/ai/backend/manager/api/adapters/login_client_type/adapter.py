@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from ai.backend.common.api_handlers import Sentinel
 from ai.backend.common.data.entity.login_client_type import LoginClientTypeID
 from ai.backend.common.dto.manager.v2.login_client_type.request import (
     CreateLoginClientTypeInput,
@@ -128,13 +127,7 @@ class LoginClientTypeAdapter(BaseAdapter):
             name=(
                 OptionalState.update(input.name) if input.name is not None else OptionalState.nop()
             ),
-            description=(
-                TriState.nop()
-                if isinstance(input.description, Sentinel)
-                else TriState.nullify()
-                if input.description is None
-                else TriState.update(input.description)
-            ),
+            description=TriState.from_unset(input.description),
         )
         action_result = await self._processors.login_client_type.update.run(
             UpdateLoginClientTypeAction(updater=updater)
