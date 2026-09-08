@@ -73,6 +73,9 @@ from ai.backend.manager.repositories.db.engine import connect_database
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.secret.pool import KeyProviderPool
 from ai.backend.testutils.bootstrap import (  # noqa: F401
+    POSTGRES_MAINTENANCE_DB,
+    POSTGRES_PASSWORD,
+    POSTGRES_USER,
     postgres_container,
     redis_container,
 )
@@ -280,8 +283,8 @@ def db_config(postgres_container: Any, test_db: str) -> DatabaseConfig:  # noqa:
         type="postgresql",
         addr=HostPortPairModel(host=addr.host, port=addr.port),
         name=test_db,
-        user="postgres",
-        password="develove",
+        user=POSTGRES_USER,
+        password=POSTGRES_PASSWORD,
         pool_size=4,
         pool_recycle=-1,
         pool_pre_ping=False,
@@ -300,7 +303,7 @@ def database(request: pytest.FixtureRequest, db_config: DatabaseConfig, test_db:
     address = f"{addr.host}:{addr.port}"
     user = db_config.user or "postgres"
     password = db_config.password or ""
-    bootstrap_url = f"postgresql+asyncpg://{urlquote(user)}:{urlquote(password)}@{address}/testing"
+    bootstrap_url = f"postgresql+asyncpg://{urlquote(user)}:{urlquote(password)}@{address}/{POSTGRES_MAINTENANCE_DB}"
 
     # 1. Create the test database.
     async def _create() -> None:
@@ -377,7 +380,7 @@ def database(request: pytest.FixtureRequest, db_config: DatabaseConfig, test_db:
             await conn.execute(
                 sa.text(
                     "SELECT pg_terminate_backend(pid) FROM pg_stat_activity "
-                    "WHERE pid <> pg_backend_pid();"
+                    f"WHERE datname = '{test_db}' AND pid <> pg_backend_pid();"
                 )
             )
             await conn.execute(sa.text(f'DROP DATABASE "{test_db}";'))

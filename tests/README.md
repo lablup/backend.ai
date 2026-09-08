@@ -81,6 +81,24 @@ pants test tests/component/agent/::
 pants test --changed-since=HEAD~1
 ```
 
+## Test containers
+
+`etcd_container`, `redis_container` and `postgres_container`
+(`src/ai/backend/testutils/bootstrap.py`) take their containers from a pool with one
+container per (role, Pants execution slot). Pants runs one pytest process per slot at a
+time, so a process reuses the containers the previous process in its slot left running
+instead of starting new ones. The pool is keyed by checkout path, so worktrees do not
+share it.
+
+| Step | Who |
+|---|---|
+| Create a slot's container | The first process in that slot; later processes in the slot reuse it |
+| Reset between processes | postgres: per-process database `test_db_<token>`; etcd: per-process namespace; redis: FLUSHALL on attach |
+| Remove the pool | A detached reaper (flock on `tmp/backend.ai/test-pool/holders`) once no process has held the pool for 20 s |
+
+`BACKEND_TEST_SHARE_CONTAINERS=0` makes each process start and remove its own containers
+instead.
+
 ## Test Selection Guide
 
 **When writing a new test, ask yourself:**
