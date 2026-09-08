@@ -218,9 +218,9 @@ class SessionLauncher:
         :return: the sessions that could not be started, and why.
         """
 
-        async def start_with_timeout(session: SessionDataForStart) -> None:
+        async def start_with_timeout(session: SessionDataForStart) -> str | None:
             async with async_timeout.timeout(delay=START_SESSION_TIMEOUT_SEC):
-                await self._start_single_session(session, image_configs)
+                return await self._start_single_session(session, image_configs)
 
         results = await asyncio.gather(
             *[start_with_timeout(session) for session in sessions],
@@ -235,18 +235,28 @@ class SessionLauncher:
                     exc_info=result,
                 )
                 failed[session.session_id] = f"{type(result).__name__}: {result}"
+            elif result is not None:
+                failed[session.session_id] = result
         return failed
 
     async def _start_single_session(
         self,
         session: SessionDataForStart,
         image_configs: dict[UUID, ImageConfigData],
-    ) -> None:
+    ) -> str | None:
         """
         Start a single session by creating kernels on agents.
 
         :param session: Session data to start
         :param image_configs: Image configurations indexed by image ID
+        :return: why this session could not be started, if it could not be started AND nothing was
+            asked of any agent yet. That second half is the whole distinction. A session whose
+            network could not be set up has had nothing done to it: no kernel was requested, so
+            the placement can simply be given up and made again somewhere else, and it must be --
+            the node it was placed on is one whose data plane will not take it, and waiting will
+            not change that. Once kernel creation has been REQUESTED, some of it may be running,
+            and the answer is a teardown rather than a second placement; those keep the old
+            behaviour of recording the error and letting the coordinator's timeout find it.
         """
         log_fmt = "start-session(s:{}, type:{}, name:{}, ak:{}, cluster_mode:{}): "
         log_args = (
@@ -270,8 +280,16 @@ class SessionLauncher:
                 # Would need proper resource policy lookup
                 pass
 
-            # Setup network configuration
-            network_setup = await self._setup_network_configuration(session)
+            # Setup network configuration. Its failure is reported rather than swallowed: nothing
+            # has been asked of an agent at this point, so this session can still be placed
+            # elsewhere -- see the return contract above.
+            try:
+                network_setup = await self._setup_network_configuration(session)
+            except Exception as e:
+                error_info = convert_to_status_data(e, self._config_provider.config.debug.enabled)
+                log.warning(log_fmt + "failed-network-setup", *log_args, exc_info=True)
+                await self._repository.update_session_error_info(session.session_id, error_info)
+                return f"{type(e).__name__}: {e}"
             log.debug("ssh connection info mapping: {}", network_setup.cluster_ssh_port_mapping)
 
             # Setup environment variables - similar to registry.py
@@ -482,9 +500,12 @@ class SessionLauncher:
             # Convert exception to error status info
             error_info = convert_to_status_data(e, self._config_provider.config.debug.enabled)
             log.warning(log_fmt + "failed-starting", *log_args, exc_info=True)
-            # Update error info in status_data without changing status
-            # Session will be handled by timeout detection in Coordinator
+            # Update error info in status_data without changing status. Not reported as a
+            # re-placeable failure: by here kernel creation has been requested and some of it may
+            # be running, so this needs a teardown and not a second placement. The coordinator's
+            # timeout detection is what handles it.
             await self._repository.update_session_error_info(session.session_id, error_info)
+        return None
 
     async def _setup_network_configuration(
         self,

@@ -292,6 +292,9 @@ class AgentRPCServer(aobject):
     loop: asyncio.AbstractEventLoop
     etcd: AsyncEtcd
     runtime: AgentRuntime
+    #: Whether the RPC transport is actually serving. Registering handlers is not serving, and
+    #: `start_serving` refuses until this is true -- see there.
+    _transport_entered: bool
     rpc_server: Peer
     rpc_addr: str
     agent_addr: str
@@ -362,6 +365,7 @@ class AgentRPCServer(aobject):
             self.rpc_auth_agent_secret_key = None
             auth_handler = None
 
+        self._transport_entered = False
         self.runtime = await AgentRuntime.create_runtime(
             self.local_config,
             self.etcd,
@@ -391,12 +395,11 @@ class AgentRPCServer(aobject):
         for func_name in self.rpc_function_v2.functions:
             self.rpc_server.handle_function(func_name, getattr(self, func_name))
 
-        log.info("started handling RPC requests at {}", rpc_addr)
-
-        # Only now does this node say it is here. The manager marks an agent ALIVE on a heartbeat
-        # alone and schedules onto it, so announcing before this point offers work to a process
-        # with nothing listening for it.
-        await self.runtime.start_serving()
+        log.info("registered RPC handlers for {}", rpc_addr)
+        # The node does NOT announce itself here. Registering handlers is not serving: the
+        # transport is entered later, in `__aenter__`, and the HTTP listener is set up between the
+        # two. Announcing at this point offers work to a process with nothing listening for it,
+        # and a failure in between leaves the manager holding an ALIVE node that never served.
 
         debug_socket_path = (
             self.local_config.agent_common.ipc_base_path / "agent-registry-snapshot.sock"
@@ -618,6 +621,40 @@ class AgentRPCServer(aobject):
 
     async def __aenter__(self) -> None:
         await self.rpc_server.__aenter__()
+        self._transport_entered = True
+
+    async def start_serving(self) -> None:
+        """Say this node is here, once it actually is.
+
+        Called after everything: the RPC transport entered, the HTTP listener up. Both things
+        that announce a node -- the started event and the heartbeat, either of which makes the
+        manager mark it ALIVE and schedule onto it -- happen here and nowhere earlier.
+
+        The check is not a formality. Registering RPC handlers is not serving, and the two were
+        far enough apart that announcing after the first read as announcing after the second:
+        handlers registered inside `__ainit__`, transport entered in `__aenter__`, an HTTP
+        listener set up in between. This makes the ordering something that fails rather than
+        something a reader has to keep true.
+
+        Raises:
+            RuntimeError: the RPC transport is not serving yet.
+        """
+        if not self._transport_entered:
+            raise RuntimeError(
+                "the agent cannot announce itself before its RPC transport is serving: the"
+                " manager marks a node ALIVE on the announcement and sends it work"
+            )
+        await self.runtime.start_serving()
+
+    async def stop_serving(self) -> None:
+        """Take the announcement back, for a start that got this far and then failed.
+
+        `aobject.new` does not call cleanup when `__ainit__` raises, and neither does an exception
+        between entering the transport and serving traffic. Without this the manager is left
+        holding an ALIVE node with a fresh readiness advert over a process that is going away.
+        """
+        self._transport_entered = False
+        await self.runtime.stop_serving()
 
     def mark_stop_signal(self, stop_signal: signal.Signals) -> None:
         self.runtime.mark_stop_signal(stop_signal)
@@ -1549,7 +1586,15 @@ async def agent_server_ctx(
     await site.start()
     log.info("started serving HTTP at {}", internal_addr)
     async with agent_server:
-        yield agent_server
+        # Last of all, and only now: the RPC transport is entered and the HTTP listener is up, so
+        # anything the manager sends can actually be taken. If yielding raises -- or anything
+        # after this does -- the announcement is taken back rather than left standing over a
+        # process that is stopping.
+        await agent_server.start_serving()
+        try:
+            yield agent_server
+        finally:
+            await agent_server.stop_serving()
 
 
 @asynccontextmanager

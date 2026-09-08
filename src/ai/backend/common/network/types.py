@@ -622,7 +622,12 @@ class AgentNetworkCaps:
                     "backends": sorted(self.backends),
                     "encryption_profiles": sorted(self.encryption_profiles),
                     "readiness": sorted(self.readiness),
-                    "tunnel_offload": self.tunnel_offload,
+                    # `tunnel_offload` is deliberately absent. It is a diagnostic -- whether the
+                    # NIC can offload VXLAN checksums -- and it says nothing about whether a
+                    # session may be placed here; the overlay works either way. It is also read by
+                    # running `ethtool`, which fails transiently and answers False when it does.
+                    # Including it would break the fence, and fail live creates, over a command
+                    # that did not run.
                 },
                 sort_keys=True,
             ).encode("utf-8")

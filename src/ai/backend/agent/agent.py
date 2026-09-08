@@ -1133,6 +1133,17 @@ class AbstractAgent[
             await self._local_cron.start()
         await self.anycast_event(AgentStartedEvent(reason="self-started"))
 
+    async def stop_serving(self) -> None:
+        """Stop announcing this node, for a start that got as far as announcing and then failed.
+
+        Idempotent, and separate from `shutdown`: `aobject.new` does not call cleanup when
+        `__ainit__` raises, and a failure after the transport is entered unwinds without it
+        either. What must not survive is the heartbeat -- a manager marks a node ALIVE on that
+        alone -- so it is stopped here whatever else happens to the process.
+        """
+        if self._local_cron is not None:
+            await self._local_cron.stop()
+
     async def _make_message_queue(self, stream_redis_target: RedisTarget) -> AbstractMessageQueue:
         """
         Returns the message queue object.

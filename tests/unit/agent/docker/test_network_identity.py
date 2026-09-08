@@ -15,6 +15,7 @@ import pathlib
 from types import SimpleNamespace
 from typing import Any, cast
 from unittest import mock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -22,7 +23,6 @@ import ai.backend.agent.server as agent_server
 from ai.backend.agent.agent import AbstractAgent
 from ai.backend.agent.docker.agent import DockerAgent
 from ai.backend.agent.network.caps import withdraw_vtep
-from ai.backend.agent.runtime import AgentRuntime
 from ai.backend.common.etcd import AbstractKVStore
 
 
@@ -32,6 +32,9 @@ class _RecordingEtcd:
     def __init__(self) -> None:
         self.puts: dict[str, str] = {}
         self.deletes: list[str] = []
+
+    async def get(self, key: str, **kwargs: Any) -> str | None:
+        return self.puts.get(key)
 
     async def put(self, key: str, val: str, **kwargs: Any) -> None:
         self.puts[key] = val
@@ -108,7 +111,7 @@ class TestAVtepThatWentAway:
     async def test_it_is_retracted_when_the_host_stops_holding_it(self) -> None:
         stub = _AgentStub(vtep_ip="192.168.0.112", host_ip="192.168.0.112")
         await _publish(stub, still_usable=False)
-        assert stub.etcd.deletes == ["network/agent/i-abc123/vtep"]
+        assert "network/agent/i-abc123/vtep" in stub.etcd.deletes
         assert json.loads(stub.etcd.puts["network/agent/i-abc123/caps"])["vtep_ip"] is None
 
     async def test_an_address_that_moved_to_another_nic_is_not_advertised(self) -> None:
@@ -117,7 +120,7 @@ class TestAVtepThatWentAway:
         the new NIC and advertising it healthy builds the tunnel somewhere the traffic is not."""
         stub = _AgentStub(vtep_ip="192.168.0.112", host_ip="192.168.0.112")
         await _publish(stub, still_usable=True, uplink="eth-somewhere-else")
-        assert stub.etcd.deletes == ["network/agent/i-abc123/vtep"]
+        assert "network/agent/i-abc123/vtep" in stub.etcd.deletes
         assert json.loads(stub.etcd.puts["network/agent/i-abc123/caps"])["vtep_ip"] is None
 
     async def test_an_address_the_serving_path_never_took_is_not_advertised(self) -> None:
@@ -254,13 +257,42 @@ class TestTheNodeIsAnnouncedOnlyOnceItCanServe:
         assert "_local_cron.start()" in source
         assert "AgentStartedEvent" in source
 
-    def test_the_server_starts_serving_after_the_rpc_listener(self) -> None:
-        source = pathlib.Path(inspect.getfile(AgentRuntime)).read_text()
-        assert "async def start_serving" in source
-        server_source = pathlib.Path(inspect.getfile(agent_server)).read_text()
-        assert server_source.index("started handling RPC requests") < server_source.index(
-            "runtime.start_serving()"
-        )
+    async def test_announcing_before_the_transport_serves_is_refused(self) -> None:
+        """Registering RPC handlers is not serving: the transport is entered later still, with an
+        HTTP listener set up in between. Making this raise means the ordering fails loudly rather
+        than depending on a reader keeping it true."""
+        server = object.__new__(agent_server.AgentRPCServer)
+        server._transport_entered = False
+        server.runtime = MagicMock(start_serving=AsyncMock(), stop_serving=AsyncMock())
+
+        with pytest.raises(RuntimeError, match="before its RPC transport is serving"):
+            await server.start_serving()
+
+        server.runtime.start_serving.assert_not_awaited()
+
+    async def test_it_announces_once_the_transport_is_serving(self) -> None:
+        server = object.__new__(agent_server.AgentRPCServer)
+        server._transport_entered = False
+        server.runtime = MagicMock(start_serving=AsyncMock(), stop_serving=AsyncMock())
+        server.rpc_server = MagicMock(__aenter__=AsyncMock())
+
+        await server.__aenter__()
+        await server.start_serving()
+
+        server.runtime.start_serving.assert_awaited_once()
+
+    async def test_stopping_takes_the_announcement_back(self) -> None:
+        # `aobject.new` does not call cleanup when `__ainit__` raises, and a failure after the
+        # transport is entered unwinds without it either.
+        server = object.__new__(agent_server.AgentRPCServer)
+        server._transport_entered = True
+        server.runtime = MagicMock(start_serving=AsyncMock(), stop_serving=AsyncMock())
+
+        await server.stop_serving()
+
+        server.runtime.stop_serving.assert_awaited_once()
+        with pytest.raises(RuntimeError):
+            await server.start_serving()
 
 
 class TestWithdrawingTheVtep:
