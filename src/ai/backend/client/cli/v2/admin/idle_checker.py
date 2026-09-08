@@ -191,12 +191,12 @@ def update(
     checker_spec: str | None,
 ) -> None:
     """Update an idle checker."""
-    from ai.backend.common.api_handlers import SENTINEL
     from ai.backend.common.data.entity.idle_checker import IdleCheckerID
     from ai.backend.common.dto.manager.v2.idle_checker.request import (
         IdleCheckerSpecInputDTO,
         UpdateIdleCheckerInput,
     )
+    from ai.backend.common.tristate.unset import UNSET
 
     if description is not None and clear_description:
         raise click.UsageError("--description and --clear-description cannot be used together")
@@ -206,7 +206,7 @@ def update(
         id=checker_id,
         name=name,
         description=(
-            None if clear_description else description if description is not None else SENTINEL
+            None if clear_description else description if description is not None else UNSET
         ),
         target_session_types=(
             [SessionTypes(session_type) for session_type in target_session_types]

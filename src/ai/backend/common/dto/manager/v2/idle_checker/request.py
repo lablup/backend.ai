@@ -5,7 +5,7 @@ from typing import Self
 
 from pydantic import ConfigDict, Field, model_validator
 
-from ai.backend.common.api_handlers import SENTINEL, BaseRequestModel, Sentinel
+from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.data.entity.idle_checker import IdleCheckerID
 from ai.backend.common.data.entity.prometheus_query_preset import PrometheusQueryPresetID
 from ai.backend.common.data.idle_checker.types import SESSION_ID_LABEL
@@ -17,6 +17,7 @@ from ai.backend.common.dto.manager.v2.idle_checker.types import (
     IdleCheckerOrderField,
 )
 from ai.backend.common.dto.manager.v2.prometheus_query_preset.request import MetricLabelEntry
+from ai.backend.common.tristate.unset import UNSET, Unset
 from ai.backend.common.types import SessionTypes
 
 
@@ -87,9 +88,9 @@ class CreateIdleCheckerInput(BaseRequestModel):
 class UpdateIdleCheckerInput(BaseRequestModel):
     id: IdleCheckerID = Field(description="Idle checker ID to update.")
     name: str | None = Field(default=None, min_length=1, max_length=128)
-    description: str | Sentinel | None = Field(
-        default=SENTINEL,
-        description="Updated description. Omit to leave unchanged or pass null to clear.",
+    description: str | None | Unset = Field(
+        default=UNSET,
+        description="Updated description. Omit to leave unchanged; null clears.",
     )
     target_session_types: list[SessionTypes] | None = Field(default=None, min_length=1)
     initial_grace_period_seconds: int | None = Field(default=None, ge=0)

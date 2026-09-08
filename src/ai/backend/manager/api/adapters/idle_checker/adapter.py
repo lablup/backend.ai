@@ -6,7 +6,6 @@ from collections.abc import Sequence
 from functools import lru_cache
 from typing import cast
 
-from ai.backend.common.api_handlers import SENTINEL
 from ai.backend.common.data.entity.idle_checker import IdleCheckerID
 from ai.backend.common.data.idle_checker.types import (
     CheckerType,
@@ -147,13 +146,7 @@ class IdleCheckerAdapter(BaseAdapter):
         updater = IdleCheckerUpdater(
             checker_id=input.id,
             name=OptionalState.from_nullable(input.name),
-            description=(
-                TriState.nop()
-                if input.description is SENTINEL
-                else TriState.nullify()
-                if input.description is None
-                else TriState.update(input.description)
-            ),
+            description=TriState.from_unset(input.description),
             target_session_types=OptionalState.from_nullable(input.target_session_types),
             initial_grace_period_seconds=OptionalState.from_nullable(
                 input.initial_grace_period_seconds
