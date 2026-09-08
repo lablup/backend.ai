@@ -1657,13 +1657,23 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
         if self.local_config.debug.log_kernel_config:
             log.debug("full container config: {!r}", pretty(container_config))
 
-        async def _rollback_container_creation() -> None:
-            await _clean_scratch(
-                loop,
-                self.local_config.container.scratch_type,
-                self.local_config.container.scratch_root,
-                self.kernel_id,
-            )
+        async def _rollback_container_creation(container_exists: bool = False) -> None:
+            """Give back what this create took, for a create with nothing left running.
+
+            ``container_exists`` is the one thing that changes the answer. A container's scratch
+            belongs to the container: the kernel's teardown stops it, detaches it and removes its
+            scratch, in that order, and reclaiming it from here cuts across that -- deleting the
+            filesystem of a container that is still up. `docker start` can be cancelled AFTER the
+            daemon has acted on it, which is exactly when that happens. Ports and device
+            allocations are this agent's own bookkeeping and are given back either way.
+            """
+            if not container_exists:
+                await _clean_scratch(
+                    loop,
+                    self.local_config.container.scratch_type,
+                    self.local_config.container.scratch_root,
+                    self.kernel_id,
+                )
             self.port_pool.release_many(host_ports)
             async with self.resource_lock:
                 for dev_name, device_alloc in resource_spec.allocations.items():
@@ -1713,7 +1723,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                 raise
             except Exception as e:
                 # Oops, we have to restore the allocated resources!
-                await _rollback_container_creation()
+                await _rollback_container_creation(container_exists=container is not None)
                 if container is not None:
                     raise ContainerCreationError(
                         container_id=ContainerId(container.id),
@@ -1724,13 +1734,15 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
             try:
                 await container.start()
             except asyncio.CancelledError as e:
-                await _rollback_container_creation()
+                # The container exists whatever this says: `docker start` can be cancelled after
+                # the daemon has acted on it, and a container that is up owns its own scratch.
+                await _rollback_container_creation(container_exists=True)
                 raise ContainerCreationError(
                     container_id=cid,
                     message="Container start was cancelled",
                 ) from e
             except Exception as e:
-                await _rollback_container_creation()
+                await _rollback_container_creation(container_exists=True)
                 raise ContainerCreationError(
                     container_id=cid,
                     message=f"Unexpected error during container start: {e!r}",
@@ -1812,7 +1824,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                         )
                     host_port = int(ports[0]["HostPort"])
                     if host_port != host_ports[idx]:
-                        await _rollback_container_creation()
+                        await _rollback_container_creation(container_exists=True)
                         raise ContainerCreationError(
                             container_id=cid,
                             message=f"Port mapping mismatch. {host_port = }, {host_ports[idx] = }",

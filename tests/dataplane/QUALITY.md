@@ -694,3 +694,15 @@ nothing about behaviour.
 Still ordering, not atomicity, and still no bound on the startup reconciliation.
 
 R3 unchanged.
+
+Thirty-third round. Both findings are the same shape: a fix that was right in direction and did
+not finish the job.
+
+| # | Was | Now |
+|---|-----|-----|
+| A11j | cleanup still had two owners. The docker rollback reclaimed the scratch on a `container.start()` that failed OR was CANCELLED -- and `docker start` can be cancelled after the daemon has acted on it, so that reclaimed the scratch of a container that was running. And the container-creation handler injected a DESTROY of its own while the outer unwind injected another, which the lifecycle does not collapse: it ran the whole teardown twice | the rollback is told whether a container exists and leaves the scratch alone when one does -- ports and device allocations are this agent's own bookkeeping and go back either way. The DESTROY is injected in one place, `_unwind_failed_create`, and the creation handler only names the container on the kernel object |
+| A11h | widening the start handler's kernel filter admitted more than the state it was for: the repository returns a session if ANY kernel matches, so a session with one PENDING kernel and others RUNNING or TERMINATED arrived here too -- and the launcher would have dispatched to the kernels that still had an agent, rebuilding half a session | the filter is still coarse and `execute` decides what it has been given. Kernels ALL PENDING and unbound: completed here, launcher never called. A mixture: skipped, and left to whatever pass owns the state it is actually in. Anything else: started as before |
+
+Still ordering rather than atomicity, and the startup reconciliation is still unbounded.
+
+R3 unchanged.

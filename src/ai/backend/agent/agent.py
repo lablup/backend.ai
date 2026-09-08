@@ -2641,6 +2641,9 @@ class AbstractAgent[
         """
         running = self.kernel_registry.get(kernel_id)
         if running is not None and running.container_id is not None:
+            # One DESTROY, from here and nowhere else. The container-creation handler above used
+            # to inject one of its own, and the lifecycle does not collapse two for the same
+            # kernel -- it ran the whole teardown twice.
             # This is also the path a cancelled create takes, which no `except Exception`
             # anywhere below reaches: without it the container was left running, its kernel
             # already out of the registry and nothing queued to destroy it.
@@ -3184,33 +3187,27 @@ class AbstractAgent[
                     except ContainerCreationError as e:
                         msg = e.message or "unknown"
                         log.error(
-                            "Kernel failed to create container. Kernel is going to be destroyed. (k:{}, detail:{})",
+                            "Kernel failed to create container. Kernel is going to be destroyed."
+                            " (k:{}, detail:{})",
                             kernel_id,
                             msg,
                         )
-                        cid = e.container_id
+                        # The container is named on the kernel object, and NOTHING is destroyed
+                        # here. `_unwind_failed_create` below is the single owner of that: two
+                        # handlers each injecting a DESTROY for the same kernel had the lifecycle
+                        # run the teardown twice, because it does not collapse them.
                         async with self.registry_lock:
-                            self.kernel_registry[ctx.kernel_id].set_container_id(ContainerId(cid))
-                        await self.inject_container_lifecycle_event(
-                            kernel_id,
-                            session_id,
-                            LifecycleEvent.DESTROY,
-                            KernelLifecycleEventReason.FAILED_TO_CREATE,
-                            container_id=ContainerId(cid),
-                        )
+                            self.kernel_registry[ctx.kernel_id].set_container_id(
+                                ContainerId(e.container_id)
+                            )
                         raise ContainerCreationFailedError(
                             f"Kernel failed to create container (k:{ctx.kernel_id!s}, detail:{msg})"
                         ) from e
                     except Exception as e:
                         log.warning(
-                            "Kernel failed to create container (k:{}). Kernel is going to be destroyed.",
+                            "Kernel failed to create container (k:{}). Kernel is going to be"
+                            " destroyed.",
                             kernel_id,
-                        )
-                        await self.inject_container_lifecycle_event(
-                            kernel_id,
-                            session_id,
-                            LifecycleEvent.DESTROY,
-                            KernelLifecycleEventReason.FAILED_TO_CREATE,
                         )
                         raise ContainerCreationFailedError(
                             f"Kernel failed to create container (k:{kernel_id!s}, detail: {e!s})"
