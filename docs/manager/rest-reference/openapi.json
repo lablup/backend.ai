@@ -34379,8 +34379,15 @@
           },
           "purge_shared_vfolders": {
             "default": false,
-            "description": "Whether to purge shared virtual folders",
+            "deprecated": true,
+            "description": "Whether to purge shared virtual folders. Deprecated since 26.9.0 and ignored: it did the opposite of its name. Use delete_shared_vfolders.",
             "title": "Purge Shared Vfolders",
+            "type": "boolean"
+          },
+          "delete_shared_vfolders": {
+            "default": false,
+            "description": "If true, delete the purged user's virtual folders that are shared with other users. If false, their ownership is transferred to the requesting admin.",
+            "title": "Delete Shared Vfolders",
             "type": "boolean"
           },
           "delegate_endpoint_ownership": {

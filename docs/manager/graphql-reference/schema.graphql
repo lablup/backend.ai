@@ -2872,7 +2872,12 @@ type PurgeUser {
 }
 
 input PurgeUserInput {
-  purge_shared_vfolders: Boolean
+  purge_shared_vfolders: Boolean @deprecated(reason: "Deprecated since 26.9.0 and ignored: it did the opposite of its name. Use `delete_shared_vfolders`.")
+
+  """
+  Added in 26.9.0. The default value is `false`. If true, the user's virtual folders shared with other users are deleted along with the rest; otherwise their ownership goes to the requester.
+  """
+  delete_shared_vfolders: Boolean
 
   """
   Added in 25.4.0. The default value is `false`. Indicates whether the user's existing endpoints are delegated to the requester.

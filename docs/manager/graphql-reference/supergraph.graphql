@@ -2627,9 +2627,14 @@ input BulkPurgeUsersV2Options
   @join__type(graph: STRAWBERRY)
 {
   """
-  If true, migrate shared virtual folders to the admin user before purging.
+  Added in 26.3.0. Whether to purge the user's shared virtual folders. Deprecated since 26.9.0.
   """
-  purgeSharedVfolders: Boolean! = false
+  purgeSharedVfolders: Boolean! = false @deprecated(reason: "Ignored: it did the opposite of its name. Use deleteSharedVfolders.")
+
+  """
+  Added in 26.9.0. If true, delete the purged user's virtual folders that are shared with other users. If false, their ownership is transferred to the requesting admin. Virtual folders that are not shared are deleted either way.
+  """
+  deleteSharedVfolders: Boolean! = false
 
   """If true, delegate endpoint ownership to the admin user before purging."""
   delegateEndpointOwnership: Boolean! = false
@@ -15962,7 +15967,12 @@ type PurgeUser
 input PurgeUserInput
   @join__type(graph: GRAPHENE)
 {
-  purge_shared_vfolders: Boolean
+  purge_shared_vfolders: Boolean @deprecated(reason: "Deprecated since 26.9.0 and ignored: it did the opposite of its name. Use `delete_shared_vfolders`.")
+
+  """
+  Added in 26.9.0. The default value is `false`. If true, the user's virtual folders shared with other users are deleted along with the rest; otherwise their ownership goes to the requester.
+  """
+  delete_shared_vfolders: Boolean
 
   """
   Added in 25.4.0. The default value is `false`. Indicates whether the user's existing endpoints are delegated to the requester.
@@ -15988,9 +15998,14 @@ input PurgeUserV2Options
   @join__type(graph: STRAWBERRY)
 {
   """
-  If true, migrate shared virtual folders to the admin user before purging.
+  Added in 26.4.2. Whether to purge the user's shared virtual folders. Deprecated since 26.9.0.
   """
-  purgeSharedVfolders: Boolean! = false
+  purgeSharedVfolders: Boolean! = false @deprecated(reason: "Ignored: it did the opposite of its name. Use deleteSharedVfolders.")
+
+  """
+  Added in 26.9.0. If true, delete the purged user's virtual folders that are shared with other users. If false, their ownership is transferred to the requesting admin. Virtual folders that are not shared are deleted either way.
+  """
+  deleteSharedVfolders: Boolean! = false
 
   """If true, delegate endpoint ownership to the admin user before purging."""
   delegateEndpointOwnership: Boolean! = false

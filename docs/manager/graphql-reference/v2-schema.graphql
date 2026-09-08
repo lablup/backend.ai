@@ -1944,9 +1944,14 @@ input BulkPurgeUsersV2Input {
 """Added in 26.3.0. Options for bulk user purge operation."""
 input BulkPurgeUsersV2Options {
   """
-  If true, migrate shared virtual folders to the admin user before purging.
+  Added in 26.3.0. Whether to purge the user's shared virtual folders. Deprecated since 26.9.0.
   """
-  purgeSharedVfolders: Boolean! = false
+  purgeSharedVfolders: Boolean! = false @deprecated(reason: "Ignored: it did the opposite of its name. Use deleteSharedVfolders.")
+
+  """
+  Added in 26.9.0. If true, delete the purged user's virtual folders that are shared with other users. If false, their ownership is transferred to the requesting admin. Virtual folders that are not shared are deleted either way.
+  """
+  deleteSharedVfolders: Boolean! = false
 
   """If true, delegate endpoint ownership to the admin user before purging."""
   delegateEndpointOwnership: Boolean! = false
@@ -11189,9 +11194,14 @@ input PurgeUserV2Input {
 """Added in 26.4.2. Options for single user purge operation."""
 input PurgeUserV2Options {
   """
-  If true, migrate shared virtual folders to the admin user before purging.
+  Added in 26.4.2. Whether to purge the user's shared virtual folders. Deprecated since 26.9.0.
   """
-  purgeSharedVfolders: Boolean! = false
+  purgeSharedVfolders: Boolean! = false @deprecated(reason: "Ignored: it did the opposite of its name. Use deleteSharedVfolders.")
+
+  """
+  Added in 26.9.0. If true, delete the purged user's virtual folders that are shared with other users. If false, their ownership is transferred to the requesting admin. Virtual folders that are not shared are deleted either way.
+  """
+  deleteSharedVfolders: Boolean! = false
 
   """If true, delegate endpoint ownership to the admin user before purging."""
   delegateEndpointOwnership: Boolean! = false
