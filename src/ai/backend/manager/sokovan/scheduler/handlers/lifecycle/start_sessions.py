@@ -62,8 +62,19 @@ class StartSessionsLifecycleHandler(SessionLifecycleHandler):
     @classmethod
     @override
     def target_kernel_statuses(cls) -> list[KernelStatus] | None:
-        """Include sessions where kernels are in PREPARED status."""
-        return [KernelStatus.PREPARED]
+        """Sessions with a kernel in PREPARED status -- or in PENDING.
+
+        PENDING is here for one state, and it is a state this handler is the only way out of. The
+        session's move to PENDING and its kernels' reset are two transactions: the kernels go
+        first, so a manager that dies between them leaves a PREPARED session whose kernels are
+        already PENDING and unbound. Without PENDING in this filter nothing selects that session
+        at all -- the scheduler wants PENDING SESSIONS -- and it waits for a person.
+
+        With it, this handler picks the session up, finds no agent on any kernel, and reports a
+        placement to make again; the session goes to PENDING and is scheduled cleanly. A session
+        in this state has no allocation to lose, because losing it is what put it here.
+        """
+        return [KernelStatus.PREPARED, KernelStatus.PENDING]
 
     @classmethod
     @override

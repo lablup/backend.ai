@@ -678,3 +678,19 @@ repository work whose boundaries this branch should not be inventing.
 Startup reconciliation is still awaited, unbounded and unpaginated.
 
 R3 unchanged.
+
+Thirty-second round. The second finding is one I created in the round before it, and the review
+caught it by reading the query rather than the comment.
+
+| # | Was | Now |
+|---|-----|-----|
+| A11i | the post-start wrapper caught `Exception`, and cancellation is not one. The launcher's timeout and an agent shutdown both cancel, so a cancelled attach left the container running with its kernel already out of the registry and nothing queued to destroy it. And the create's undo stack stayed armed past the point a container existed, so the failure path deleted the scratch of a running container before the lifecycle worker had stopped it | one `_unwind_failed_create`, and it asks whether a container exists. If one does, the lifecycle destroys it and nothing else is touched -- that path stops it, detaches it and removes its scratch, in that order. If none does, the undo stack gives the scratch back. Both shielded, because what is being unwound is usually a cancellation, and a cleanup cancelled halfway is the leak it exists to prevent |
+| A11h | I reordered the two transactions last round so the kernels go back first, and wrote that the session's own handler would come round again. It would not: the start handler selects PREPARED sessions with PREPARED KERNELS, and the scheduler selects PENDING sessions -- so a manager dying between them left a session nothing would ever pick up. I had traded a double-allocation risk for a wedge | the start handler's kernel filter includes PENDING. That state is the only thing it admits that it did not before, and it is the only way out of it: the handler finds no agent on any kernel, reports a placement to make again, and the session goes to PENDING and is scheduled cleanly |
+
+The unwind is now driven rather than read: four tests call it with and without a container, cancel
+it mid-teardown, and make an undo raise. The two source-inspection tests it replaced asserted
+nothing about behaviour.
+
+Still ordering, not atomicity, and still no bound on the startup reconciliation.
+
+R3 unchanged.

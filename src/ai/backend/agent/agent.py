@@ -2619,6 +2619,55 @@ class AbstractAgent[
             service.start_command = f"{service.start_command} {shlex.join(extra_args)}"
         return models
 
+    async def _unwind_failed_create(
+        self,
+        kernel_id: KernelId,
+        session_id: SessionId,
+        made: Sequence[Callable[[], Awaitable[None]]],
+    ) -> None:
+        """Take back what a failed or cancelled create left on this host.
+
+        Which of two things, depending on whether a CONTAINER exists. Once one does, its teardown
+        belongs to the kernel lifecycle -- which stops it, detaches its networks and removes its
+        scratch, in that order -- and running the create's own undo would cut across that: the
+        scratch of a container still running, deleted before the lifecycle worker gets to it. So
+        the container is destroyed through the lifecycle and nothing else is touched.
+
+        Before there is a container there is no lifecycle to hand to, and the undo stack is what
+        gives the scratch back.
+
+        Both are shielded: what is being unwound here is usually a cancellation, and a cleanup
+        cancelled halfway is the leak it exists to prevent.
+        """
+        running = self.kernel_registry.get(kernel_id)
+        if running is not None and running.container_id is not None:
+            # This is also the path a cancelled create takes, which no `except Exception`
+            # anywhere below reaches: without it the container was left running, its kernel
+            # already out of the registry and nothing queued to destroy it.
+            await asyncio.shield(
+                asyncio.ensure_future(
+                    self.inject_container_lifecycle_event(
+                        kernel_id,
+                        session_id,
+                        LifecycleEvent.DESTROY,
+                        KernelLifecycleEventReason.FAILED_TO_CREATE,
+                        container_id=running.container_id,
+                    )
+                )
+            )
+        else:
+            for undo in reversed(made):
+                try:
+                    await asyncio.shield(asyncio.ensure_future(undo()))
+                except Exception:
+                    log.exception(
+                        "create_kernel(kernel:{}, session:{}) could not undo what it had already"
+                        " made on this host",
+                        kernel_id,
+                        session_id,
+                    )
+        await self.reconstruct_resource_usage()
+
     async def create_kernel(
         self,
         ownership_data: KernelOwnershipData,
@@ -3176,11 +3225,8 @@ class AbstractAgent[
                         session_id,
                         pretty_container_id,
                     )
-                    # The container is running and in the registry, so its teardown belongs to the
-                    # kernel lifecycle now -- which stops it, unmounts it and removes its scratch
-                    # in that order. This create's own undo is disarmed here: left armed, a
-                    # failure in any of the steps that follow (the last of them is publishing an
-                    # event) would delete the scratch out from under a container that is up.
+                    # Belt and braces with the container check in the failure path below: by
+                    # here the container is up and its teardown belongs to the kernel lifecycle.
                     made.clear()
                     async with self.registry_lock:
                         self.kernel_registry[kernel_id].data.update(container_data)
@@ -3425,17 +3471,7 @@ class AbstractAgent[
                 except BaseException:
                     # BaseException, not Exception: a cancelled create leaves the same host state
                     # behind as a failed one, and it is the launcher's timeout that cancels.
-                    for undo in reversed(made):
-                        try:
-                            await undo()
-                        except Exception:
-                            log.exception(
-                                "create_kernel(kernel:{}, session:{}) could not undo what it had"
-                                " already made on this host",
-                                kernel_id,
-                                session_id,
-                            )
-                    await self.reconstruct_resource_usage()
+                    await self._unwind_failed_create(kernel_id, session_id, made)
                     raise
 
     async def start_model_service_and_handle_failure(
