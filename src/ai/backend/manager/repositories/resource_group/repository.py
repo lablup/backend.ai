@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING
 from uuid import UUID
 
 from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID, ResourceGroupName
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience import (
@@ -22,21 +23,10 @@ from ai.backend.manager.data.resource_group.types import (
 )
 from ai.backend.manager.data.session.options import DefaultSessionOptions
 from ai.backend.manager.errors.resource import ResourceGroupNotFound
-from ai.backend.manager.models.resource_group import (
-    ResourceGroupForDomainRow,
-    ResourceGroupForKeypairsRow,
-    ResourceGroupForProjectRow,
-)
 from ai.backend.manager.models.resource_group.creators import ResourceGroupCreator
 from ai.backend.manager.models.resource_group.purgers import ResourceGroupPurger
 from ai.backend.manager.models.resource_group.updaters import ResourceGroupUpdater
 from ai.backend.manager.repositories.base import BatchQuerier
-from ai.backend.manager.repositories.base.creator import BulkCreator
-from ai.backend.manager.repositories.base.purger import BatchPurger
-from ai.backend.manager.repositories.base.rbac.scope_binder import RBACScopeBinder
-from ai.backend.manager.repositories.base.rbac.scope_unbinder import (
-    RBACScopeEntityUnbinder,
-)
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 
 from .db_source import ResourceGroupDBSource
@@ -196,20 +186,6 @@ class ResourceGroupRepository:
         """
         return await self._db_source.replace_default_session_options(name, options)
 
-    async def associate_resource_group_with_domains(
-        self,
-        binder: RBACScopeBinder[ResourceGroupForDomainRow],
-    ) -> None:
-        """Associates a resource group with multiple domains."""
-        await self._db_source.associate_resource_group_with_domains(binder)
-
-    async def disassociate_resource_group_with_domains(
-        self,
-        unbinder: RBACScopeEntityUnbinder[ResourceGroupForDomainRow],
-    ) -> None:
-        """Disassociates resource groups from a domain."""
-        await self._db_source.disassociate_resource_group_with_domains(unbinder)
-
     async def check_resource_group_domain_association_exists(
         self,
         resource_group_id: ResourceGroupID,
@@ -221,20 +197,6 @@ class ResourceGroupRepository:
             domain_id=domain_id,
         )
 
-    async def associate_resource_group_with_keypairs(
-        self,
-        bulk_creator: BulkCreator[ResourceGroupForKeypairsRow],
-    ) -> None:
-        """Associates a resource group with multiple keypairs."""
-        await self._db_source.associate_resource_group_with_keypairs(bulk_creator)
-
-    async def disassociate_resource_group_with_keypairs(
-        self,
-        purger: BatchPurger[ResourceGroupForKeypairsRow],
-    ) -> None:
-        """Disassociates a resource group from multiple keypairs."""
-        await self._db_source.disassociate_resource_group_with_keypairs(purger)
-
     async def check_resource_group_keypair_association_exists(
         self,
         resource_group_id: ResourceGroupID,
@@ -244,20 +206,6 @@ class ResourceGroupRepository:
         return await self._db_source.check_resource_group_keypair_association_exists(
             resource_group_id, access_key
         )
-
-    async def associate_resource_group_with_user_groups(
-        self,
-        binder: RBACScopeBinder[ResourceGroupForProjectRow],
-    ) -> None:
-        """Associates a resource group with multiple user groups (projects)."""
-        await self._db_source.associate_resource_group_with_user_groups(binder)
-
-    async def disassociate_resource_group_with_user_groups(
-        self,
-        unbinder: RBACScopeEntityUnbinder[ResourceGroupForProjectRow],
-    ) -> None:
-        """Disassociates resource groups from a project."""
-        await self._db_source.disassociate_resource_group_with_user_groups(unbinder)
 
     async def check_resource_group_user_group_association_exists(
         self,
@@ -304,58 +252,6 @@ class ResourceGroupRepository:
 
     # Allow / Disallow operations
 
-    async def update_allowed_resource_groups_for_domain(
-        self,
-        domain_name: str,
-        add: list[ResourceGroupID],
-        remove: list[ResourceGroupID],
-    ) -> list[str]:
-        """Atomically add/remove allowed resource groups for a domain."""
-        return await self._db_source.update_allowed_resource_groups_for_domain(
-            domain_name=domain_name,
-            add=add,
-            remove=remove,
-        )
-
-    async def update_allowed_resource_groups_for_project(
-        self,
-        project_id: UUID,
-        add: list[ResourceGroupID],
-        remove: list[ResourceGroupID],
-    ) -> list[str]:
-        """Atomically add/remove allowed resource groups for a project."""
-        return await self._db_source.update_allowed_resource_groups_for_project(
-            project_id=project_id,
-            add=add,
-            remove=remove,
-        )
-
-    async def update_allowed_domains_for_resource_group(
-        self,
-        resource_group_id: ResourceGroupID,
-        add: list[str],
-        remove: list[str],
-    ) -> list[str]:
-        """Atomically add/remove allowed domains for a resource group."""
-        return await self._db_source.update_allowed_domains_for_resource_group(
-            resource_group_id=resource_group_id,
-            add=add,
-            remove=remove,
-        )
-
-    async def update_allowed_projects_for_resource_group(
-        self,
-        resource_group_id: ResourceGroupID,
-        add: list[UUID],
-        remove: list[UUID],
-    ) -> list[UUID]:
-        """Atomically add/remove allowed projects for a resource group."""
-        return await self._db_source.update_allowed_projects_for_resource_group(
-            resource_group_id=resource_group_id,
-            add=add,
-            remove=remove,
-        )
-
     async def get_allowed_domains_for_resource_group(
         self,
         resource_group_id: ResourceGroupID,
@@ -369,3 +265,17 @@ class ResourceGroupRepository:
     ) -> list[UUID]:
         """Get allowed projects for a resource group."""
         return await self._db_source.get_allowed_projects_for_resource_group(resource_group_id)
+
+    async def get_allowed_resource_groups_for_domain(
+        self,
+        domain_id: DomainID,
+    ) -> list[str]:
+        """Get allowed resource group names for a domain."""
+        return await self._db_source.get_allowed_resource_groups_for_domain(domain_id)
+
+    async def get_allowed_resource_groups_for_project(
+        self,
+        project_id: ProjectID,
+    ) -> list[str]:
+        """Get allowed resource group names for a project."""
+        return await self._db_source.get_allowed_resource_groups_for_project(project_id)

@@ -11,11 +11,10 @@ import sqlalchemy as sa
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
 from ai.backend.client.v2.v2_registry import V2ClientRegistry
-from ai.backend.common.data.permission.types import EntityType, ScopeType
+from ai.backend.common.data.permission.types import ScopeType
 from ai.backend.common.dto.manager.v2.group.request import UnassignUsersFromProjectInput
-from ai.backend.manager.models.rbac_models.association_scopes_entities import (
-    AssociationScopesEntitiesRow,
-)
+from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
+from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
 
 
 class TestUnassignUsersFromProject:
@@ -39,17 +38,26 @@ class TestUnassignUsersFromProject:
         assert returned_ids == set(assigned_users)
         assert result.failed == []
 
-        # Verify ASE rows removed (PROJECT scope, USER entity)
+        # Verify the roster edges are gone
+        member = sa.alias(VirtualEntityRow.__table__, name="member_virtual_entity")
+        project = sa.alias(VirtualEntityRow.__table__, name="project_virtual_entity")
         async with db_engine.begin() as conn:
             rows = (
                 await conn.execute(
-                    sa.select(AssociationScopesEntitiesRow.entity_id).where(
-                        AssociationScopesEntitiesRow.scope_type == ScopeType.PROJECT,
-                        AssociationScopesEntitiesRow.scope_id == str(group_fixture),
-                        AssociationScopesEntitiesRow.entity_type == EntityType.USER,
-                        AssociationScopesEntitiesRow.entity_id.in_([
-                            str(uid) for uid in assigned_users
-                        ]),
+                    sa.select(member.c.entity_id)
+                    .select_from(
+                        EntityMembershipRow.__table__.join(
+                            project,
+                            EntityMembershipRow.__table__.c.virtual_entity_id == project.c.id,
+                        ).join(
+                            member,
+                            EntityMembershipRow.__table__.c.member_entity_id == member.c.id,
+                        )
+                    )
+                    .where(
+                        project.c.entity_type == ScopeType.PROJECT,
+                        project.c.entity_id == group_fixture,
+                        member.c.entity_id.in_(assigned_users),
                     )
                 )
             ).all()
@@ -96,17 +104,26 @@ class TestUnassignUsersFromProject:
         assert len(result.failed) == 1
         assert result.failed[0].user_id == fake_id
 
-        # The other assigned users should still be bound (ASE)
+        # The other assigned users are still on the roster
+        member = sa.alias(VirtualEntityRow.__table__, name="member_virtual_entity")
+        project = sa.alias(VirtualEntityRow.__table__, name="project_virtual_entity")
         async with db_engine.begin() as conn:
             remaining = (
                 await conn.execute(
-                    sa.select(AssociationScopesEntitiesRow.entity_id).where(
-                        AssociationScopesEntitiesRow.scope_type == ScopeType.PROJECT,
-                        AssociationScopesEntitiesRow.scope_id == str(group_fixture),
-                        AssociationScopesEntitiesRow.entity_type == EntityType.USER,
-                        AssociationScopesEntitiesRow.entity_id.in_([
-                            str(uid) for uid in assigned_users[1:]
-                        ]),
+                    sa.select(member.c.entity_id)
+                    .select_from(
+                        EntityMembershipRow.__table__.join(
+                            project,
+                            EntityMembershipRow.__table__.c.virtual_entity_id == project.c.id,
+                        ).join(
+                            member,
+                            EntityMembershipRow.__table__.c.member_entity_id == member.c.id,
+                        )
+                    )
+                    .where(
+                        project.c.entity_type == ScopeType.PROJECT,
+                        project.c.entity_id == group_fixture,
+                        member.c.entity_id.in_(assigned_users[1:]),
                     )
                 )
             ).all()

@@ -24,7 +24,7 @@ from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.data.permission.types import EntityType, Permission, ScopeType
 from ai.backend.common.types import QuotaScopeID, QuotaScopeType, VFolderUsageMode
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
-from ai.backend.manager.actions.registry.types import GroupMeta
+from ai.backend.manager.actions.registry.types import Concern, ConcernMeta, GroupMeta
 from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.actions.validators.rbac import RBACValidators
 from ai.backend.manager.actions.validators.rbac.scope import ScopeActionRBACValidator
@@ -58,12 +58,16 @@ from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingR
 from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
 from ai.backend.manager.repositories.model_card.repository import ModelCardRepository
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
+from ai.backend.manager.repositories.ops.v2.relation.provider import RelationOpsProvider
+from ai.backend.manager.repositories.ops.v2.roster.provider import RosterOpsProvider
 from ai.backend.manager.repositories.ops.v2.share.provider import ShareOpsProvider
 from ai.backend.manager.repositories.permission_controller.repository import (
     PermissionControllerRepository,
 )
 from ai.backend.manager.repositories.project.repositories import ProjectRepositories
 from ai.backend.manager.repositories.project.repository import ProjectRepository
+from ai.backend.manager.repositories.rbac.relation_repository import RbacRelationRepository
+from ai.backend.manager.repositories.rbac.roster_repository import RbacRosterRepository
 from ai.backend.manager.repositories.user.repository import UserRepository
 from ai.backend.manager.secret.pool import KeyProviderPool
 from ai.backend.manager.services.model_card.processors import ModelCardProcessors
@@ -75,6 +79,12 @@ from ai.backend.manager.services.permission_contoller.service import PermissionC
 from ai.backend.manager.services.processors import Processors
 from ai.backend.manager.services.project.processors import ProjectProcessors
 from ai.backend.manager.services.project.service import ProjectService
+from ai.backend.manager.services.rbac.processors import RbacProcessors
+from ai.backend.manager.services.rbac.service import (
+    RbacRelationService,
+    RbacRoleService,
+    RbacRosterService,
+)
 from ai.backend.manager.services.user.processors import UserProcessors
 from ai.backend.manager.services.user.service import UserService
 from ai.backend.testutils.action_validators import mock_virtual_entity_rbac_validators
@@ -146,15 +156,9 @@ def permission_controller_processors(
 ) -> PermissionControllerProcessors:
     """Real PermissionControllerProcessors for role assign/revoke SDK calls."""
     perm_repo = PermissionControllerRepository(database_engine)
-    group_repo = ProjectRepository(
-        database_engine,
-        V2DBOpsProvider(database_engine),
-        config_provider,
-        valkey_clients.stat,
-        storage_manager,
-    )
     service = PermissionControllerService(
-        perm_repo, group_repository=group_repo, rbac_action_registry=[]
+        perm_repo,
+        rbac_action_registry=[],
     )
     return PermissionControllerProcessors(
         processor_registry.group(GroupMeta(ROLE_ENTITY_TYPE)),
@@ -186,11 +190,32 @@ def user_processors(
 
 
 @pytest.fixture()
+def rbac_processors(
+    database_engine: ExtendedAsyncSAEngine,
+    processor_registry: ProcessorRegistry[Any],
+) -> RbacProcessors:
+    """Real RbacProcessors for the project roster SDK calls."""
+    rbac_groups = processor_registry.concern(ConcernMeta(Concern.RBAC))
+    return RbacProcessors(
+        rbac_groups.relation_group(),
+        rbac_groups.group(GroupMeta(USER_ENTITY_TYPE)),
+        RbacRelationService(RbacRelationRepository(RelationOpsProvider(database_engine))),
+        RbacRosterService(RbacRosterRepository(RosterOpsProvider(database_engine))),
+        RbacRoleService(
+            PermissionControllerRepository(database_engine),
+            RbacRosterRepository(RosterOpsProvider(database_engine)),
+        ),
+        [],
+    )
+
+
+@pytest.fixture()
 def server_module_registries(
     route_deps: RouteDeps,
     model_card_processors: ModelCardProcessors,
     group_processors: ProjectProcessors,
     permission_controller_processors: PermissionControllerProcessors,
+    rbac_processors: RbacProcessors,
     user_processors: UserProcessors,
 ) -> list[RouteRegistry]:
     """Register v2 model-card, project, and RBAC routes for testing."""
@@ -198,6 +223,7 @@ def server_module_registries(
     processors.model_card = model_card_processors
     processors.project = group_processors
     processors.permission_controller = permission_controller_processors
+    processors.rbac = rbac_processors
     processors.user = user_processors
 
     mc_handler = V2ModelCardHandler(adapter=ModelCardAdapter(processors))

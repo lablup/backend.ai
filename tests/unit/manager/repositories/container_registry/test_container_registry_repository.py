@@ -9,7 +9,7 @@ from uuid import UUID
 import pytest
 import sqlalchemy as sa
 
-from ai.backend.common.container_registry import AllowedGroupsModel, ContainerRegistryType
+from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.data.entity.container_registry import (
     CONTAINER_REGISTRY_ENTITY_TYPE,
     ContainerRegistryID,
@@ -18,21 +18,26 @@ from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.project import PROJECT_ENTITY_TYPE, ProjectID
 from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.common.data.permission.types import Permission
-from ai.backend.common.exception import ContainerRegistryGroupsAlreadyAssociated
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.data.container_registry.types import ContainerRegistryData
 from ai.backend.manager.data.image.types import ImageStatus, ImageType
 from ai.backend.manager.errors.image import (
-    ContainerRegistryGroupsAssociationNotFound,
     ContainerRegistryNotFound,
 )
+from ai.backend.manager.errors.resource import ProjectNotFound
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.association_container_registries_groups import (
     AssociationContainerRegistriesGroupsRow,
 )
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
-from ai.backend.manager.models.container_registry.creators import ContainerRegistryCreator
-from ai.backend.manager.models.container_registry.purgers import ContainerRegistryPurger
+from ai.backend.manager.models.container_registry.creators import (
+    ContainerRegistryCreator,
+    ContainerRegistryProjectCreator,
+)
+from ai.backend.manager.models.container_registry.purgers import (
+    ContainerRegistryProjectPurger,
+    ContainerRegistryPurger,
+)
 from ai.backend.manager.models.container_registry.updaters import ContainerRegistryUpdater
 from ai.backend.manager.models.deployment_auto_scaling_policy import (
     DeploymentAutoScalingPolicyRow,
@@ -84,6 +89,7 @@ from ai.backend.manager.repositories.container_registry.repository import (
     ContainerRegistryRepository,
 )
 from ai.backend.manager.repositories.ops.v2.relation.provider import RelationOpsProvider
+from ai.backend.manager.repositories.rbac.relation_repository import RbacRelationRepository
 from ai.backend.manager.types import OptionalState, TriState
 from ai.backend.testutils.db import with_tables
 from ai.backend.testutils.fixtures import DomainFactory, DomainFixtureData
@@ -182,6 +188,11 @@ class TestContainerRegistryRepository:
         return ContainerRegistryRepository(
             db=db_with_cleanup, ops_provider=RelationOpsProvider(db_with_cleanup)
         )
+
+    @pytest.fixture
+    def relation_repository(self, db_with_cleanup: ExtendedAsyncSAEngine) -> RbacRelationRepository:
+        """The relation writes the registry's allowed projects go through."""
+        return RbacRelationRepository(RelationOpsProvider(db_with_cleanup))
 
     @pytest.fixture
     async def sample_domain(
@@ -442,11 +453,11 @@ class TestContainerRegistryRepository:
         assert result.id is not None
 
     @pytest.fixture
-    async def creator_spec_with_allowed_groups(
+    async def registry_creator_and_projects(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> tuple[ContainerRegistryCreator, list[str]]:
-        """Fixture that provides a creator spec with allowed_groups for creating registries."""
+        """A creator for a registry, beside the projects to be allowed on it."""
         registry_name = "registry-with-groups-" + str(uuid.uuid4())[:8]
         project = "project-with-groups-" + str(uuid.uuid4())[:8]
         domain_name = f"test-domain-{registry_name}"
@@ -494,27 +505,32 @@ class TestContainerRegistryRepository:
             type=ContainerRegistryType.HARBOR2,
             registry_name=registry_name,
             project=project,
-            allowed_groups=AllowedGroupsModel(add=group_ids, remove=[]),
         )
         return creator, group_ids
 
-    async def test_create_registry_with_allowed_groups(
+    async def test_create_registry_then_link_projects(
         self,
         repository: ContainerRegistryRepository,
+        relation_repository: RbacRelationRepository,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        creator_spec_with_allowed_groups: tuple[ContainerRegistryCreator, list[str]],
+        registry_creator_and_projects: tuple[ContainerRegistryCreator, list[str]],
     ) -> None:
-        """Test creating registry with allowed_groups"""
+        """A registry created, then linked to the projects allowed on it."""
         # Given - Registry and groups
-        creator, group_ids = creator_spec_with_allowed_groups
+        creator, group_ids = registry_creator_and_projects
         # When
         result = await repository.create_registry(creator)
+        for group_id in group_ids:
+            await relation_repository.create(
+                [(ProjectID(uuid.UUID(group_id)), ContainerRegistryID(result.id))],
+                ContainerRegistryProjectCreator(),
+            )
 
         # Then - Verify registry created
         assert result is not None
         assert result.registry_name == creator.registry_name
 
-        # Then - Verify allowed_groups associations created
+        # Then - Verify the association rows
         async with db_with_cleanup.begin_readonly_session() as session:
             associations = (
                 (
@@ -789,7 +805,6 @@ class TestContainerRegistryRepository:
                 ssl_verify=TriState.nop(),
                 is_global=TriState.nop(),
                 extra=TriState.update(changed_extra),
-                allowed_groups=TriState.nop(),
             )
         )
 
@@ -824,7 +839,6 @@ class TestContainerRegistryRepository:
                     ssl_verify=TriState.nop(),
                     is_global=TriState.nop(),
                     extra=TriState.nop(),
-                    allowed_groups=TriState.nop(),
                 )
             )
 
@@ -839,7 +853,7 @@ class TestContainerRegistryRepository:
     async def registry_and_groups_for_adding(
         self, db_with_cleanup: ExtendedAsyncSAEngine, sample_groups: list[ProjectID]
     ) -> _RegistryWithAvailableGroups:
-        """Pre-created registry and 2 groups for testing adding allowed_groups."""
+        """Pre-created registry and 2 groups to link it to."""
         registry_name = str(uuid.uuid4())[:8] + ".example.com"
         project = "project-" + str(uuid.uuid4())[:8]
 
@@ -863,37 +877,18 @@ class TestContainerRegistryRepository:
                 group_ids=sample_groups,
             )
 
-    async def test_modify_registry_add_allowed_groups(
+    async def test_link_projects_to_registry(
         self,
-        repository: ContainerRegistryRepository,
+        relation_repository: RbacRelationRepository,
         db_with_cleanup: ExtendedAsyncSAEngine,
         registry_and_groups_for_adding: _RegistryWithAvailableGroups,
     ) -> None:
-        """Test adding allowed_groups to an existing registry"""
-        # When
-        result = await repository.modify_registry(
-            ContainerRegistryUpdater(
-                registry_id=ContainerRegistryID(registry_and_groups_for_adding.registry.id),
-                url=OptionalState.nop(),
-                type=OptionalState.nop(),
-                registry_name=OptionalState.nop(),
-                project=TriState.nop(),
-                username=TriState.nop(),
-                password=TriState.nop(),
-                ssl_verify=TriState.update(True),
-                is_global=TriState.nop(),
-                extra=TriState.nop(),
-                allowed_groups=TriState.update(
-                    AllowedGroupsModel(
-                        add=[str(g) for g in registry_and_groups_for_adding.group_ids],
-                        remove=[],
-                    )
-                ),
+        """Linking projects to an existing registry writes the association rows."""
+        registry_id = ContainerRegistryID(registry_and_groups_for_adding.registry.id)
+        for group_id in registry_and_groups_for_adding.group_ids:
+            await relation_repository.create(
+                [(group_id, registry_id)], ContainerRegistryProjectCreator()
             )
-        )
-
-        # Then
-        assert result is not None
 
         # Then - Verify associations were created
         async with db_with_cleanup.begin_readonly_session() as session:
@@ -981,39 +976,27 @@ class TestContainerRegistryRepository:
             await session.refresh(registry)
             return _RegistryWithGroups(registry=registry.to_dataclass(), group_ids=group_ids)
 
-    async def test_modify_registry_remove_allowed_groups(
+    async def test_unlink_project_from_registry(
         self,
-        repository: ContainerRegistryRepository,
+        relation_repository: RbacRelationRepository,
         db_with_cleanup: ExtendedAsyncSAEngine,
         registry_with_associated_groups: _RegistryWithGroups,
     ) -> None:
-        """Test removing allowed_groups from an existing registry"""
+        """Unlinking one project leaves the rest of the associations standing."""
         # Given - Registry already has 3 groups associated
         group_count = 3
 
-        # When - Request to remove one group
-        result = await repository.modify_registry(
-            ContainerRegistryUpdater(
-                registry_id=ContainerRegistryID(registry_with_associated_groups.registry.id),
-                url=OptionalState.nop(),
-                type=OptionalState.nop(),
-                registry_name=OptionalState.nop(),
-                project=TriState.nop(),
-                username=TriState.nop(),
-                password=TriState.nop(),
-                ssl_verify=TriState.update(True),
-                is_global=TriState.nop(),
-                extra=TriState.nop(),
-                allowed_groups=TriState.update(
-                    AllowedGroupsModel(
-                        add=[], remove=[str(registry_with_associated_groups.group_ids[0])]
-                    )
-                ),
-            )
+        # When - Unlink one group
+        unlinked = await relation_repository.purge(
+            [
+                (
+                    registry_with_associated_groups.group_ids[0],
+                    ContainerRegistryID(registry_with_associated_groups.registry.id),
+                )
+            ],
+            ContainerRegistryProjectPurger(),
         )
-
-        # Then
-        assert result is not None
+        assert unlinked == [True]
 
         # Then - Verify one group was removed
         async with db_with_cleanup.begin_readonly_session() as session:
@@ -1117,40 +1100,25 @@ class TestContainerRegistryRepository:
                 available_group_ids=group_ids[2:],
             )
 
-    async def test_modify_registry_add_and_remove_allowed_groups(
+    async def test_link_and_unlink_projects_in_one_pass(
         self,
-        repository: ContainerRegistryRepository,
+        relation_repository: RbacRelationRepository,
         db_with_cleanup: ExtendedAsyncSAEngine,
         registry_with_partial_groups: _RegistryWithPartialGroups,
     ) -> None:
-        """Test adding and removing allowed_groups simultaneously"""
+        """Links and unlinks made one pair at a time leave the expected set."""
         # Given - Registry has groups 0 and 1 associated
         group_ids = registry_with_partial_groups.all_group_ids
+        registry_id = ContainerRegistryID(registry_with_partial_groups.registry.id)
 
         # When - Remove group 0, add group 2, 3
-        result = await repository.modify_registry(
-            ContainerRegistryUpdater(
-                registry_id=ContainerRegistryID(registry_with_partial_groups.registry.id),
-                url=OptionalState.nop(),
-                type=OptionalState.nop(),
-                registry_name=OptionalState.nop(),
-                project=TriState.nop(),
-                username=TriState.nop(),
-                password=TriState.nop(),
-                ssl_verify=TriState.update(True),
-                is_global=TriState.nop(),
-                extra=TriState.nop(),
-                allowed_groups=TriState.update(
-                    AllowedGroupsModel(
-                        add=[str(group_ids[2]), str(group_ids[3])],
-                        remove=[str(group_ids[0])],
-                    )
-                ),
-            )
+        await relation_repository.purge(
+            [(group_ids[0], registry_id)], ContainerRegistryProjectPurger()
         )
-
-        # Then
-        assert result is not None
+        for group_id in group_ids[2:]:
+            await relation_repository.create(
+                [(group_id, registry_id)], ContainerRegistryProjectCreator()
+            )
 
         # Then - Verify group 0 removed, groups 2,3 added, group 1 remains
         async with db_with_cleanup.begin_readonly_session() as session:
@@ -1174,74 +1142,53 @@ class TestContainerRegistryRepository:
                 group_ids[3],
             }
 
-    async def test_modify_registry_remove_nonexistent_allowed_groups(
-        self, repository: ContainerRegistryRepository, sample_registry: ContainerRegistryData
+    async def test_unlink_a_project_that_was_never_linked(
+        self, relation_repository: RbacRelationRepository, sample_registry: ContainerRegistryData
     ) -> None:
-        """Test removing non-existent allowed_groups raises error"""
-        # Given - An updater attempting to remove a non-existent group
-        updater = ContainerRegistryUpdater(
-            registry_id=ContainerRegistryID(sample_registry.id),
-            url=OptionalState.nop(),
-            type=OptionalState.nop(),
-            registry_name=OptionalState.nop(),
-            project=TriState.nop(),
-            username=TriState.update("user"),
-            password=TriState.nop(),
-            ssl_verify=TriState.nop(),
-            is_global=TriState.nop(),
-            extra=TriState.nop(),
-            allowed_groups=TriState.update(
-                AllowedGroupsModel(add=[], remove=["00000000-0000-0000-0000-000000000000"])
-            ),
-        )
+        """Unlinking a pair that was never linked answers False and raises nothing.
 
-        # Then - Should raise error for non-existent group
-        with pytest.raises(ContainerRegistryGroupsAssociationNotFound):
-            await repository.modify_registry(updater)
-
-    @pytest.fixture
-    async def updater_with_two_duplicate_two_new_allowed_groups(
-        self, registry_with_partial_groups: _RegistryWithPartialGroups
-    ) -> ContainerRegistryUpdater:
-        """Updater that attempts to add duplicate allowed_groups."""
-        group_ids = registry_with_partial_groups.all_group_ids
-        return ContainerRegistryUpdater(
-            registry_id=ContainerRegistryID(registry_with_partial_groups.registry.id),
-            url=OptionalState.nop(),
-            type=OptionalState.nop(),
-            registry_name=OptionalState.nop(),
-            project=TriState.nop(),
-            username=TriState.nop(),
-            password=TriState.nop(),
-            ssl_verify=TriState.update(True),
-            is_global=TriState.nop(),
-            extra=TriState.nop(),
-            allowed_groups=TriState.update(
-                AllowedGroupsModel(
-                    add=[
-                        str(group_ids[0]),  # duplicate
-                        str(group_ids[1]),  # duplicate
-                        str(group_ids[2]),  # new
-                        str(group_ids[3]),  # new
-                    ],
-                    remove=[],
+        Turning that into an error is the adapter's, which counts what it unlinked
+        across the projects one request named."""
+        unlinked = await relation_repository.purge(
+            [
+                (
+                    ProjectID(uuid.UUID("00000000-0000-0000-0000-000000000000")),
+                    ContainerRegistryID(sample_registry.id),
                 )
-            ),
+            ],
+            ContainerRegistryProjectPurger(),
         )
+        assert unlinked == [False]
 
-    async def test_modify_registry_add_duplicate_allowed_groups(
+    async def test_link_a_project_already_linked_is_skipped(
         self,
-        repository: ContainerRegistryRepository,
+        relation_repository: RbacRelationRepository,
         registry_with_partial_groups: _RegistryWithPartialGroups,
-        updater_with_two_duplicate_two_new_allowed_groups: ContainerRegistryUpdater,
     ) -> None:
-        """Test adding duplicate allowed_groups raises ContainerRegistryGroupsAlreadyAssociated error"""
-        # When - Try to add 2 duplicate, 2 new groups
-        # Then - Should raise error for duplicate groups
-        with pytest.raises(ContainerRegistryGroupsAlreadyAssociated):
-            await repository.modify_registry(updater_with_two_duplicate_two_new_allowed_groups)
+        """A project already allowed is left as it stands, so one request may name it
+        beside a new one and the answer says which of the two landed."""
+        group_ids = registry_with_partial_groups.all_group_ids
+        registry_id = ContainerRegistryID(registry_with_partial_groups.registry.id)
+        written = await relation_repository.create(
+            [(group_ids[0], registry_id), (group_ids[2], registry_id)],
+            ContainerRegistryProjectCreator(),
+        )
+        assert written == [False, True]
 
-    async def test_modify_registry_set_is_global_keeps_allowed_groups(
+    async def test_link_a_project_that_is_not_there(
+        self,
+        relation_repository: RbacRelationRepository,
+        registry_with_partial_groups: _RegistryWithPartialGroups,
+    ) -> None:
+        """A project id naming no project is refused rather than left to the foreign
+        key."""
+        registry_id = ContainerRegistryID(registry_with_partial_groups.registry.id)
+        with pytest.raises(ProjectNotFound):
+            await relation_repository.create(
+                [(ProjectID(uuid.uuid4()), registry_id)], ContainerRegistryProjectCreator()
+            )
+
+    async def test_modify_registry_set_is_global_keeps_project_relations(
         self,
         repository: ContainerRegistryRepository,
         db_with_cleanup: ExtendedAsyncSAEngine,
@@ -1271,7 +1218,7 @@ class TestContainerRegistryRepository:
 
     async def test_allowed_project_reads_the_registry_and_is_read_by_it(
         self,
-        repository: ContainerRegistryRepository,
+        relation_repository: RbacRelationRepository,
         db_with_cleanup: ExtendedAsyncSAEngine,
         registry_and_groups_for_adding: _RegistryWithAvailableGroups,
     ) -> None:
@@ -1279,25 +1226,15 @@ class TestContainerRegistryRepository:
         holds the project under a READ share."""
         registry_id = ContainerRegistryID(registry_and_groups_for_adding.registry.id)
         project_id = registry_and_groups_for_adding.group_ids[0]
-        await repository.modify_registry(
-            ContainerRegistryUpdater(
-                registry_id=registry_id,
-                allowed_groups=TriState.update(
-                    AllowedGroupsModel(add=[str(project_id)], remove=[])
-                ),
-            )
+        await relation_repository.create(
+            [(project_id, registry_id)], ContainerRegistryProjectCreator()
         )
 
         assert await self._govern_cap(db_with_cleanup, project_id, registry_id) == Permission.READ
         assert await self._share_cap(db_with_cleanup, registry_id, project_id) == Permission.READ
 
-        await repository.modify_registry(
-            ContainerRegistryUpdater(
-                registry_id=registry_id,
-                allowed_groups=TriState.update(
-                    AllowedGroupsModel(add=[], remove=[str(project_id)])
-                ),
-            )
+        await relation_repository.purge(
+            [(project_id, registry_id)], ContainerRegistryProjectPurger()
         )
 
         assert await self._govern_cap(db_with_cleanup, project_id, registry_id) is None
@@ -1350,10 +1287,23 @@ class TestContainerRegistryRepository:
     async def test_delete_registry_takes_its_project_relations_with_it(
         self,
         repository: ContainerRegistryRepository,
+        relation_repository: RbacRelationRepository,
         db_with_cleanup: ExtendedAsyncSAEngine,
         registry_with_associated_groups: _RegistryWithGroups,
     ) -> None:
+        """Deleting the registry takes the association rows and what each side read of
+        the other: the foreign key removes the rows, and the registry's node going takes
+        the edges naming it."""
         registry_id = ContainerRegistryID(registry_with_associated_groups.registry.id)
+        project_id = registry_with_associated_groups.group_ids[0]
+        await relation_repository.purge(
+            [(project_id, registry_id)], ContainerRegistryProjectPurger()
+        )
+        await relation_repository.create(
+            [(project_id, registry_id)], ContainerRegistryProjectCreator()
+        )
+        assert await self._govern_cap(db_with_cleanup, project_id, registry_id) == Permission.READ
+
         await repository.delete_registry(ContainerRegistryPurger(registry_id=registry_id))
 
         async with db_with_cleanup.begin_readonly_session() as session:
@@ -1363,6 +1313,8 @@ class TestContainerRegistryRepository:
                 .where(AssociationContainerRegistriesGroupsRow.registry_id == registry_id)
             )
             assert left == 0
+        assert await self._govern_cap(db_with_cleanup, project_id, registry_id) is None
+        assert await self._share_cap(db_with_cleanup, registry_id, project_id) is None
 
     async def test_delete_registry_success(
         self,

@@ -12,14 +12,8 @@ from ai.backend.manager.data.idle_checker.types import IdleCheckerAssignmentData
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.errors.idle_checker import IdleCheckerAssignmentNotFound
 from ai.backend.manager.models.idle_checker.conditions import IdleCheckerAssignmentConditions
-from ai.backend.manager.models.idle_checker.creators import IdleCheckerAssignmentCreator
-from ai.backend.manager.models.idle_checker.purgers import IdleCheckerAssignmentPurger
 from ai.backend.manager.models.idle_checker.row import SessionIdleCheckRow
 from ai.backend.manager.models.idle_checker.searchers import IdleCheckerAssignmentSearcher
-from ai.backend.manager.models.idle_checker.updaters import (
-    IdleCheckerAssignmentDisabler,
-    IdleCheckerAssignmentEnabler,
-)
 from ai.backend.manager.models.scopes import OperationScope
 from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.repositories.base import BulkUpserter
@@ -52,38 +46,6 @@ class IdleCheckerRepository:
         self._db_source = IdleCheckerDBSource(ops_provider)
         self._relation_ops = relation_ops_provider
 
-    async def create_assignment(
-        self,
-        creator: IdleCheckerAssignmentCreator,
-        scope: EntityIdentifier,
-        checker_id: IdleCheckerID,
-    ) -> IdleCheckerAssignmentData:
-        """Link the scope to the checker. The spec's precondition refuses a scope row
-        that is not there, since its side of the pair carries no foreign key."""
-        async with self._relation_ops.write_ops() as ops:
-            await ops.create_relation(creator, scope, checker_id)
-        return await self._get_assignment_by_pair(scope, checker_id)
-
-    async def enable_assignment(
-        self, scope: EntityIdentifier, checker_id: IdleCheckerID
-    ) -> IdleCheckerAssignmentData:
-        async with self._relation_ops.write_ops() as ops:
-            await ops.restore_relation(IdleCheckerAssignmentEnabler(), scope, checker_id)
-        return await self._get_assignment_by_pair(scope, checker_id)
-
-    async def disable_assignment(
-        self, scope: EntityIdentifier, checker_id: IdleCheckerID
-    ) -> IdleCheckerAssignmentData:
-        async with self._relation_ops.write_ops() as ops:
-            await ops.delete_relation(IdleCheckerAssignmentDisabler(), scope, checker_id)
-        return await self._get_assignment_by_pair(scope, checker_id)
-
-    async def purge_assignment(self, scope: EntityIdentifier, checker_id: IdleCheckerID) -> None:
-        async with self._relation_ops.write_ops() as ops:
-            unlinked = await ops.purge_relation(IdleCheckerAssignmentPurger(), scope, checker_id)
-        if not unlinked:
-            raise IdleCheckerAssignmentNotFound(f"{scope.entity_type()}:{scope} -> {checker_id}")
-
     async def get_assignment(
         self, assignment_id: IdleCheckerAssignmentID
     ) -> IdleCheckerAssignmentData:
@@ -98,7 +60,7 @@ class IdleCheckerRepository:
             raise IdleCheckerAssignmentNotFound(str(assignment_id))
         return result.items[0]
 
-    async def _get_assignment_by_pair(
+    async def get_assignment_by_pair(
         self, scope: EntityIdentifier, checker_id: IdleCheckerID
     ) -> IdleCheckerAssignmentData:
         async with self._relation_ops.read_ops() as r:

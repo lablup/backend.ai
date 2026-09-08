@@ -1,0 +1,33 @@
+from dataclasses import dataclass
+from typing import override
+
+from ai.backend.manager.actions.action import BaseActionResult
+from ai.backend.manager.actions.types import ActionOperationType
+from ai.backend.manager.data.permission.role import (
+    UserRoleAssignmentData,
+    UserRoleAssignmentInput,
+)
+from ai.backend.manager.services.rbac.actions.role.base import RoleAction
+
+
+@dataclass
+class AssignRoleAction(RoleAction):
+    input: UserRoleAssignmentInput
+
+    @override
+    def entity_id(self) -> str | None:
+        return str(self.input.user_id)
+
+    @override
+    @classmethod
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.CREATE
+
+
+@dataclass
+class AssignRoleActionResult(BaseActionResult):
+    data: UserRoleAssignmentData
+
+    @override
+    def entity_id(self) -> str | None:
+        return None

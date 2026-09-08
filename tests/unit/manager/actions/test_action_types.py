@@ -3,20 +3,20 @@
 from ai.backend.common.data.permission.types import EntityType, OperationType, Permission
 from ai.backend.manager.actions.action.base import BaseAction
 from ai.backend.manager.actions.types import ActionOperationType
-
-# Import representative concrete action classes across different entity types
-# and operation types to verify enum usage at runtime.
-from ai.backend.manager.services.permission_contoller.actions.assign_role import AssignRoleAction
 from ai.backend.manager.services.permission_contoller.actions.get_role_detail import (
     GetRoleDetailAction,
 )
 from ai.backend.manager.services.permission_contoller.actions.replace_role_permissions import (
     ReplaceRolePermissionsAction,
 )
-from ai.backend.manager.services.permission_contoller.actions.revoke_role import RevokeRoleAction
 from ai.backend.manager.services.permission_contoller.actions.search_entities import (
     SearchEntitiesAction,
 )
+
+# Import representative concrete action classes across different entity types
+# and operation types to verify enum usage at runtime.
+from ai.backend.manager.services.rbac.actions.role.assign import AssignRoleAction
+from ai.backend.manager.services.rbac.actions.role.revoke import RevokeRoleAction
 
 # Legacy-family actions only. The v2 families answer with
 # ``ai.backend.common.data.entity.types.EntityType``, a distinct NewType, so mixing

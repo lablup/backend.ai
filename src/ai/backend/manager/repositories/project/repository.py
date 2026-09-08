@@ -9,7 +9,6 @@ from uuid import UUID
 
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.data.entity.project import ProjectID
-from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.exception import BackendAIError
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
@@ -19,10 +18,8 @@ from ai.backend.common.types import ResourceSlot
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.config.provider import ManagerConfigProvider
-from ai.backend.manager.data.project.types import ProjectData, UnassignUsersResult
-from ai.backend.manager.data.user.types import UserData
+from ai.backend.manager.data.project.types import ProjectData
 from ai.backend.manager.errors.resource import (
-    InvalidUserUpdateMode,
     ProjectNotFound,
 )
 from ai.backend.manager.models.kernel import KernelRow
@@ -30,7 +27,6 @@ from ai.backend.manager.models.project.updaters import ProjectDotfilesUpdater, P
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.project.db_source import ProjectDBSource
-from ai.backend.manager.repositories.project.scope_binders import UserProjectEntityUnbinder
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -73,18 +69,9 @@ class ProjectRepository:
     @project_repository_resilience.apply()
     async def modify_validated(
         self,
-        project_id: ProjectID,
         updater: ProjectUpdater,
-        user_update_mode: str | None = None,
-        user_uuids: list[uuid.UUID] | None = None,
     ) -> ProjectData | None:
-        """Modify a project, optionally rewriting its membership first."""
-        if user_update_mode not in (None, "add", "remove"):
-            raise InvalidUserUpdateMode("invalid user_update_mode")
-        if user_uuids and user_update_mode:
-            await self._db_source.update_members(
-                project_id, user_update_mode, [UserID(uid) for uid in user_uuids]
-            )
+        """Modify a project. Who belongs to it is the roster's own operation."""
         async with self._v2_ops.write_ops() as w:
             return await w.update_data(updater)
 
@@ -127,38 +114,6 @@ class ProjectRepository:
     async def purge_group(self, group_id: uuid.UUID) -> bool:
         """Completely remove a group and all its associated data."""
         return await self._db_source.purge_group(group_id, self._storage_manager)
-
-    @project_repository_resilience.apply()
-    async def assign_users_to_project(
-        self, project_id: UUID, user_ids: list[UUID], role_id: UUID
-    ) -> list[UserData]:
-        """Assign users to a project with domain validation and RBAC scope binding.
-
-        Returns the list of newly assigned users.
-        """
-        return await self._db_source.assign_users_to_project(
-            ProjectID(project_id), [UserID(uid) for uid in user_ids], role_id
-        )
-
-    @project_repository_resilience.apply()
-    async def unassign_users_from_project(
-        self, unbinder: UserProjectEntityUnbinder
-    ) -> UnassignUsersResult:
-        """Remove users from a project and return unassigned users and failures."""
-        return await self._db_source.unassign_users_from_project(unbinder)
-
-    @project_repository_resilience.apply()
-    async def bind_user_to_project(self, user_id: UUID, project_id: UUID) -> None:
-        """Add a user to a project via the RBAC scope binding (ASE).
-
-        Idempotent: re-binding an existing member is a no-op.
-        """
-        await self._db_source.bind_user_to_project(UserID(user_id), ProjectID(project_id))
-
-    @project_repository_resilience.apply()
-    async def unbind_user_from_project(self, user_id: UUID, project_id: UUID) -> None:
-        """Remove a user from a project (RBAC scope binding only)."""
-        await self._db_source.unbind_user_from_project(UserID(user_id), ProjectID(project_id))
 
     @project_repository_resilience.apply()
     async def get_project(self, project_id: UUID) -> ProjectData:

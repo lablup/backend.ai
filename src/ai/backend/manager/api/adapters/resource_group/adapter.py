@@ -64,6 +64,7 @@ from ai.backend.common.dto.manager.v2.resource_group.types import (
     ResourceGroupOrderField,
     SchedulerTypeDTO,
 )
+from ai.backend.common.exception import DomainNotFound
 from ai.backend.common.types import PreemptionMode, PreemptionOrder, SlotQuantity
 from ai.backend.manager.api.adapter_options.deployment.options import (
     deployment_options_from_input,
@@ -87,13 +88,24 @@ from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.condition_utils import combine_conditions_or, negate_conditions
 from ai.backend.manager.models.resource_group import ResourceGroupRow
 from ai.backend.manager.models.resource_group.conditions import ResourceGroupConditions
-from ai.backend.manager.models.resource_group.creators import ResourceGroupCreator
+from ai.backend.manager.models.resource_group.creators import (
+    ResourceGroupCreator,
+    ResourceGroupForDomainRelationCreator,
+    ResourceGroupForProjectRelationCreator,
+)
 from ai.backend.manager.models.resource_group.orders import ResourceGroupOrders
+from ai.backend.manager.models.resource_group.purgers import (
+    ResourceGroupForDomainRelationPurger,
+    ResourceGroupForProjectRelationPurger,
+)
 from ai.backend.manager.models.resource_group.searchers import ResourceGroupSearcher
 from ai.backend.manager.models.resource_group.updaters import ResourceGroupUpdater
 from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.services.domain.actions.lookup import LookupDomainAction
+from ai.backend.manager.services.rbac.actions.relation.base import RelationPair
+from ai.backend.manager.services.rbac.actions.relation.create import CreateRelationAction
+from ai.backend.manager.services.rbac.actions.relation.purge import PurgeRelationAction
 from ai.backend.manager.services.resource_group.actions.bulk_get import (
     BulkGetResourceGroupsAction,
 )
@@ -106,6 +118,12 @@ from ai.backend.manager.services.resource_group.actions.get_allowed_domains_for_
 )
 from ai.backend.manager.services.resource_group.actions.get_allowed_projects_for_rg import (
     GetAllowedProjectsForResourceGroupAction,
+)
+from ai.backend.manager.services.resource_group.actions.get_allowed_rgs_for_domain import (
+    GetAllowedResourceGroupsForDomainAction,
+)
+from ai.backend.manager.services.resource_group.actions.get_allowed_rgs_for_project import (
+    GetAllowedResourceGroupsForProjectAction,
 )
 from ai.backend.manager.services.resource_group.actions.get_resource_info import (
     GetResourceInfoAction,
@@ -133,18 +151,6 @@ from ai.backend.manager.services.resource_group.actions.scoped_search import (
     ScopedSearchResourceGroupsAction,
 )
 from ai.backend.manager.services.resource_group.actions.update import UpdateResourceGroupAction
-from ai.backend.manager.services.resource_group.actions.update_allowed_domains_for_rg import (
-    UpdateAllowedDomainsForResourceGroupAction,
-)
-from ai.backend.manager.services.resource_group.actions.update_allowed_projects_for_rg import (
-    UpdateAllowedProjectsForResourceGroupAction,
-)
-from ai.backend.manager.services.resource_group.actions.update_allowed_rgs_for_domain import (
-    UpdateAllowedResourceGroupsForDomainAction,
-)
-from ai.backend.manager.services.resource_group.actions.update_allowed_rgs_for_project import (
-    UpdateAllowedResourceGroupsForProjectAction,
-)
 from ai.backend.manager.services.resource_group.actions.update_fair_share_spec import (
     ResourceWeightInput,
     UpdateFairShareSpecAction,
@@ -719,70 +725,214 @@ class ResourceGroupAdapter(BaseAdapter):
         ]
         return add_ids, remove_ids
 
+    async def _link_resource_groups_to_domain(
+        self, domain_id: DomainID, resource_group_ids: list[ResourceGroupID]
+    ) -> None:
+        """Link the domain to every named resource group in one run. A pair already
+        linked is left as it stands: naming one twice is not an error to the caller."""
+        if not resource_group_ids:
+            return
+        await self._processors.rbac.create_relation.run(
+            CreateRelationAction(
+                pairs=[
+                    RelationPair(scope=domain_id, target=resource_group_id)
+                    for resource_group_id in resource_group_ids
+                ],
+                creator=ResourceGroupForDomainRelationCreator(),
+            )
+        )
+
+    async def _unlink_resource_groups_from_domain(
+        self, domain_id: DomainID, resource_group_ids: list[ResourceGroupID]
+    ) -> None:
+        if not resource_group_ids:
+            return
+        await self._processors.rbac.purge_relation.run(
+            PurgeRelationAction(
+                pairs=[
+                    RelationPair(scope=domain_id, target=resource_group_id)
+                    for resource_group_id in resource_group_ids
+                ],
+                purger=ResourceGroupForDomainRelationPurger(),
+            )
+        )
+
+    async def _link_resource_groups_to_project(
+        self, project_id: ProjectID, resource_group_ids: list[ResourceGroupID]
+    ) -> None:
+        """Link the project to every named resource group in one run. A pair already
+        linked is left as it stands: naming one twice is not an error to the caller."""
+        if not resource_group_ids:
+            return
+        await self._processors.rbac.create_relation.run(
+            CreateRelationAction(
+                pairs=[
+                    RelationPair(scope=project_id, target=resource_group_id)
+                    for resource_group_id in resource_group_ids
+                ],
+                creator=ResourceGroupForProjectRelationCreator(),
+            )
+        )
+
+    async def _unlink_resource_groups_from_project(
+        self, project_id: ProjectID, resource_group_ids: list[ResourceGroupID]
+    ) -> None:
+        if not resource_group_ids:
+            return
+        await self._processors.rbac.purge_relation.run(
+            PurgeRelationAction(
+                pairs=[
+                    RelationPair(scope=project_id, target=resource_group_id)
+                    for resource_group_id in resource_group_ids
+                ],
+                purger=ResourceGroupForProjectRelationPurger(),
+            )
+        )
+
+    async def _link_domains_to_resource_group(
+        self, resource_group_id: ResourceGroupID, domain_ids: list[DomainID]
+    ) -> None:
+        """The same link read from the resource group's side, in one run."""
+        if not domain_ids:
+            return
+        await self._processors.rbac.create_relation.run(
+            CreateRelationAction(
+                pairs=[
+                    RelationPair(scope=domain_id, target=resource_group_id)
+                    for domain_id in domain_ids
+                ],
+                creator=ResourceGroupForDomainRelationCreator(),
+            )
+        )
+
+    async def _unlink_domains_from_resource_group(
+        self, resource_group_id: ResourceGroupID, domain_ids: list[DomainID]
+    ) -> None:
+        if not domain_ids:
+            return
+        await self._processors.rbac.purge_relation.run(
+            PurgeRelationAction(
+                pairs=[
+                    RelationPair(scope=domain_id, target=resource_group_id)
+                    for domain_id in domain_ids
+                ],
+                purger=ResourceGroupForDomainRelationPurger(),
+            )
+        )
+
+    async def _link_projects_to_resource_group(
+        self, resource_group_id: ResourceGroupID, project_ids: list[ProjectID]
+    ) -> None:
+        """The same link read from the resource group's side, in one run."""
+        if not project_ids:
+            return
+        await self._processors.rbac.create_relation.run(
+            CreateRelationAction(
+                pairs=[
+                    RelationPair(scope=project_id, target=resource_group_id)
+                    for project_id in project_ids
+                ],
+                creator=ResourceGroupForProjectRelationCreator(),
+            )
+        )
+
+    async def _unlink_projects_from_resource_group(
+        self, resource_group_id: ResourceGroupID, project_ids: list[ProjectID]
+    ) -> None:
+        if not project_ids:
+            return
+        await self._processors.rbac.purge_relation.run(
+            PurgeRelationAction(
+                pairs=[
+                    RelationPair(scope=project_id, target=resource_group_id)
+                    for project_id in project_ids
+                ],
+                purger=ResourceGroupForProjectRelationPurger(),
+            )
+        )
+
+    async def _resolve_allowed_domain_ids(
+        self,
+        add: list[str],
+        remove: list[str],
+    ) -> tuple[list[DomainID], list[DomainID]]:
+        """Resolve allow-list domain names to row ids at the API boundary.
+
+        Names to add must exist; unknown names to remove are skipped.
+        """
+        add_ids = [await self._resolve_domain_id(name) for name in add]
+        remove_ids: list[DomainID] = []
+        for name in remove:
+            try:
+                remove_ids.append(await self._resolve_domain_id(name))
+            except DomainNotFound:
+                continue
+        return add_ids, remove_ids
+
     async def update_allowed_resource_groups_for_domain(
         self,
         input: UpdateAllowedResourceGroupsForDomainInput,
     ) -> AllowedResourceGroupsPayload:
-        """Atomically add/remove allowed resource groups for a domain."""
+        """Add and remove the resource groups a domain may schedule on."""
         add_ids, remove_ids = await self._resolve_allowed_resource_group_ids(
             input.add or [], input.remove or []
         )
-        result = await self._processors.resource_group.update_allowed_rgs_for_domain.run(
-            UpdateAllowedResourceGroupsForDomainAction(
-                domain_id=await self._resolve_domain_id(input.domain_name),
-                domain_name=input.domain_name,
-                add=add_ids,
-                remove=remove_ids,
-            )
+        domain_id = await self._resolve_domain_id(input.domain_name)
+        await self._unlink_resource_groups_from_domain(domain_id, remove_ids)
+        await self._link_resource_groups_to_domain(domain_id, add_ids)
+        result = await self._processors.resource_group.get_allowed_rgs_for_domain.run(
+            GetAllowedResourceGroupsForDomainAction(domain_id=domain_id)
         )
-        return AllowedResourceGroupsPayload(items=result.allowed_resource_groups)
+        return AllowedResourceGroupsPayload(items=result.items)
 
     async def update_allowed_resource_groups_for_project(
         self,
         input: UpdateAllowedResourceGroupsForProjectInput,
     ) -> AllowedResourceGroupsPayload:
-        """Atomically add/remove allowed resource groups for a project."""
+        """Add and remove the resource groups a project may schedule on."""
         add_ids, remove_ids = await self._resolve_allowed_resource_group_ids(
             input.add or [], input.remove or []
         )
-        result = await self._processors.resource_group.update_allowed_rgs_for_project.run(
-            UpdateAllowedResourceGroupsForProjectAction(
-                project_id=ProjectID(input.project_id),
-                add=add_ids,
-                remove=remove_ids,
-            )
+        project_id = ProjectID(input.project_id)
+        await self._unlink_resource_groups_from_project(project_id, remove_ids)
+        await self._link_resource_groups_to_project(project_id, add_ids)
+        result = await self._processors.resource_group.get_allowed_rgs_for_project.run(
+            GetAllowedResourceGroupsForProjectAction(project_id=project_id)
         )
-        return AllowedResourceGroupsPayload(items=result.allowed_resource_groups)
+        return AllowedResourceGroupsPayload(items=result.items)
 
     async def update_allowed_domains_for_resource_group(
         self,
         input: UpdateAllowedDomainsForResourceGroupInput,
     ) -> AllowedDomainsPayload:
-        """Atomically add/remove allowed domains for a resource group."""
+        """Add and remove the domains a resource group may be scheduled on from."""
         resource_group_id = await self._resolve_resource_group_id(input.resource_group_name)
-        result = await self._processors.resource_group.update_allowed_domains_for_rg.run(
-            UpdateAllowedDomainsForResourceGroupAction(
-                resource_group_id=resource_group_id,
-                add=input.add or [],
-                remove=input.remove or [],
-            )
+        add_ids, remove_ids = await self._resolve_allowed_domain_ids(
+            input.add or [], input.remove or []
         )
-        return AllowedDomainsPayload(items=result.allowed_domains)
+        await self._unlink_domains_from_resource_group(resource_group_id, remove_ids)
+        await self._link_domains_to_resource_group(resource_group_id, add_ids)
+        result = await self._processors.resource_group.get_allowed_domains_for_rg.run(
+            GetAllowedDomainsForResourceGroupAction(resource_group_id=resource_group_id)
+        )
+        return AllowedDomainsPayload(items=result.items)
 
     async def update_allowed_projects_for_resource_group(
         self,
         input: UpdateAllowedProjectsForResourceGroupInput,
     ) -> AllowedProjectsPayload:
-        """Atomically add/remove allowed projects for a resource group."""
+        """Add and remove the projects a resource group may be scheduled on from."""
         resource_group_id = await self._resolve_resource_group_id(input.resource_group_name)
-        result = await self._processors.resource_group.update_allowed_projects_for_rg.run(
-            UpdateAllowedProjectsForResourceGroupAction(
-                resource_group_id=resource_group_id,
-                add=input.add or [],
-                remove=input.remove or [],
-            )
+        await self._unlink_projects_from_resource_group(
+            resource_group_id, [ProjectID(raw) for raw in input.remove or []]
         )
-        return AllowedProjectsPayload(items=result.allowed_projects)
+        await self._link_projects_to_resource_group(
+            resource_group_id, [ProjectID(raw) for raw in input.add or []]
+        )
+        result = await self._processors.resource_group.get_allowed_projects_for_rg.run(
+            GetAllowedProjectsForResourceGroupAction(resource_group_id=resource_group_id)
+        )
+        return AllowedProjectsPayload(items=result.items)
 
     async def _scoped_resource_group_names(self, item: ResourceGroupScopeItem) -> list[str]:
         """Read the resource groups one scope reaches, by name."""

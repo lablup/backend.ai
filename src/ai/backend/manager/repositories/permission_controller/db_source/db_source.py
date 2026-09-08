@@ -239,11 +239,8 @@ class PermissionDBSource:
             await db_session.delete(user_role_row)
             await db_session.flush()
 
-            # Used by PermissionControllerService.revoke_role() to decide whether
-            # to call ProjectDBSource.unbind_user_from_project().
-            # TODO: remove this query when unbind_user_from_project() is retired
-            # (i.e. association_groups_users is fully migrated to
-            # association_scopes_entities).
+            # Used by PermissionControllerService.revoke_role() to decide whether to
+            # take the user off the project's roster.
             ase = AssociationScopesEntitiesRow
             project_subq = (
                 sa.select(ase.scope_id).where(

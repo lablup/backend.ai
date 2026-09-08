@@ -219,15 +219,8 @@ from ai.backend.manager.repositories.permission_controller.updaters import Permi
 from ai.backend.manager.services.permission_contoller.actions.add_role_permission import (
     AddRolePermissionAction,
 )
-from ai.backend.manager.services.permission_contoller.actions.assign_role import AssignRoleAction
-from ai.backend.manager.services.permission_contoller.actions.bulk_assign_role import (
-    BulkAssignRoleAction,
-)
 from ai.backend.manager.services.permission_contoller.actions.bulk_remove_role_permissions import (
     BulkRemoveRolePermissionsAction,
-)
-from ai.backend.manager.services.permission_contoller.actions.bulk_revoke_role import (
-    BulkRevokeRoleAction,
 )
 from ai.backend.manager.services.permission_contoller.actions.create_global_role import (
     CreateGlobalRoleAction,
@@ -248,7 +241,6 @@ from ai.backend.manager.services.permission_contoller.actions.purge_role import 
 from ai.backend.manager.services.permission_contoller.actions.replace_role_permissions import (
     ReplaceRolePermissionsAction,
 )
-from ai.backend.manager.services.permission_contoller.actions.revoke_role import RevokeRoleAction
 from ai.backend.manager.services.permission_contoller.actions.search_element_associations import (
     SearchElementAssociationsAction,
     SearchElementAssociationsActionResult,
@@ -277,6 +269,14 @@ from ai.backend.manager.services.permission_contoller.actions.update_permission 
     UpdatePermissionAction,
 )
 from ai.backend.manager.services.permission_contoller.actions.update_role import UpdateRoleAction
+from ai.backend.manager.services.rbac.actions.role.assign import AssignRoleAction
+from ai.backend.manager.services.rbac.actions.role.bulk_assign import (
+    BulkAssignRoleAction,
+)
+from ai.backend.manager.services.rbac.actions.role.bulk_revoke import (
+    BulkRevokeRoleAction,
+)
+from ai.backend.manager.services.rbac.actions.role.revoke import RevokeRoleAction
 from ai.backend.manager.types import OptionalState, TriState
 
 # ------------------------------------------------------------------ pagination specs
@@ -958,7 +958,7 @@ class RBACAdapter(BaseAdapter):
 
     async def assign_role(self, input: AssignRoleInputDTO) -> RoleAssignmentNode:
         """Assign a role to a user."""
-        action_result = await self._processors.permission_controller.assign_role.wait_for_complete(
+        action_result = await self._processors.rbac.assign_role.wait_for_complete(
             AssignRoleAction(
                 input=UserRoleAssignmentInput(
                     user_id=input.user_id,
@@ -978,7 +978,7 @@ class RBACAdapter(BaseAdapter):
 
     async def revoke_role(self, input: RevokeRoleInputDTO) -> RoleAssignmentNode:
         """Revoke a role from a user."""
-        action_result = await self._processors.permission_controller.revoke_role.wait_for_complete(
+        action_result = await self._processors.rbac.revoke_role.wait_for_complete(
             RevokeRoleAction(
                 input=UserRoleRevocationInput(user_id=input.user_id, role_id=input.role_id)
             )
@@ -997,12 +997,10 @@ class RBACAdapter(BaseAdapter):
     async def bulk_assign_role(self, input: BulkAssignRoleInputDTO) -> BulkAssignRoleResultPayload:
         """Bulk-assign a role to multiple users."""
         specs = [UserRoleCreatorSpec(user_id=uid, role_id=input.role_id) for uid in input.user_ids]
-        action_result = (
-            await self._processors.permission_controller.bulk_assign_role.wait_for_complete(
-                BulkAssignRoleAction(
-                    bulk_creator=BulkCreator(specs=specs),
-                    project_id=input.project_id,
-                )
+        action_result = await self._processors.rbac.bulk_assign_role.wait_for_complete(
+            BulkAssignRoleAction(
+                bulk_creator=BulkCreator(specs=specs),
+                project_id=input.project_id,
             )
         )
         result: BulkRoleAssignmentResultData = action_result.data
@@ -1140,13 +1138,9 @@ class RBACAdapter(BaseAdapter):
 
     async def bulk_revoke_role(self, input: BulkRevokeRoleInputDTO) -> BulkRevokeRoleResultPayload:
         """Bulk-revoke a role from multiple users."""
-        action_result = (
-            await self._processors.permission_controller.bulk_revoke_role.wait_for_complete(
-                BulkRevokeRoleAction(
-                    input=BulkUserRoleRevocationInput(
-                        role_id=input.role_id, user_ids=input.user_ids
-                    )
-                )
+        action_result = await self._processors.rbac.bulk_revoke_role.wait_for_complete(
+            BulkRevokeRoleAction(
+                input=BulkUserRoleRevocationInput(role_id=input.role_id, user_ids=input.user_ids)
             )
         )
         result: BulkRoleRevocationResultData = action_result.data

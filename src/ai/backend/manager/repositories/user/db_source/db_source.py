@@ -80,7 +80,6 @@ from ai.backend.manager.models.user.purgers import (
     UserErrorLogPurger,
     UserGroupAssociationPurger,
     UserKeyPairPurger,
-    UserProjectRolePurger,
     UserPurger,
     UserScopeAssociationPurger,
     UserSessionGroupPurger,
@@ -202,7 +201,7 @@ class UserDBSource:
                 keypair_resource_policy=keypair_resource_policy,
             )
         )
-        await w.enroll_in_projects(
+        await w.join_projects(
             UserID(result.user.id),
             creator.domain_id,
             [ProjectID(UUID(gid)) for gid in group_ids or []],
@@ -695,21 +694,15 @@ class UserDBSource:
         domain_name: str,
         group_ids: list[str],
     ) -> None:
-        """Sync the user's project memberships to match ``group_ids``, in its own
-        transaction, then revoke the roles of the projects left behind — the roster
-        write leaves role mappings untouched on the way out."""
-        user_id = UserID(user_uuid)
-        async with self._user_ops_provider.write_ops() as w:
-            left_project_ids = await w.replace_user_projects(
-                user_id, domain_name, [ProjectID(UUID(gid)) for gid in group_ids]
-            )
+        """Sync the user's project memberships to match ``group_ids``.
 
-        if left_project_ids:
-            async with self._v2_ops.write_ops() as v2:
-                for project_id in left_project_ids:
-                    await v2.batch_purge_field_entities(
-                        user_id, UserProjectRolePurger(project_id=project_id)
-                    )
+        Leaving a project takes that project's roles back with it, so this is one
+        transaction and not a membership write followed by a role sweep that a crash
+        could leave undone."""
+        async with self._user_ops_provider.write_ops() as w:
+            await w.replace_user_projects(
+                UserID(user_uuid), domain_name, [ProjectID(UUID(gid)) for gid in group_ids]
+            )
 
     async def _get_user_uuid_by_email_with_conn(self, conn: AsyncConnection, email: str) -> UUID:
         """Get user UUID by email using an existing connection."""

@@ -1,8 +1,5 @@
 from .add_role_permission import AddRolePermissionAction
-from .assign_role import AssignRoleAction, AssignRoleActionResult
-from .bulk_assign_role import BulkAssignRoleAction, BulkAssignRoleActionResult
 from .bulk_remove_role_permissions import BulkRemoveRolePermissionsAction
-from .bulk_revoke_role import BulkRevokeRoleAction, BulkRevokeRoleActionResult
 from .create_global_role import CreateGlobalRoleAction
 from .create_role import CreateRoleAction
 from .delete_role import DeleteRoleAction
@@ -13,7 +10,6 @@ from .replace_role_permissions import (
     ReplaceRolePermissionsAction,
     ReplaceRolePermissionsActionResult,
 )
-from .revoke_role import RevokeRoleAction, RevokeRoleActionResult
 from .search_permissions import (
     SearchPermissionsAction,
     SearchPermissionsActionResult,
@@ -32,13 +28,7 @@ from .update_role import UpdateRoleAction
 
 __all__ = [
     "AddRolePermissionAction",
-    "AssignRoleAction",
-    "AssignRoleActionResult",
-    "BulkAssignRoleAction",
-    "BulkAssignRoleActionResult",
     "BulkRemoveRolePermissionsAction",
-    "BulkRevokeRoleAction",
-    "BulkRevokeRoleActionResult",
     "CreateGlobalRoleAction",
     "CreateRoleAction",
     "DeleteRoleAction",
@@ -49,8 +39,6 @@ __all__ = [
     "PurgeRoleAction",
     "ReplaceRolePermissionsAction",
     "ReplaceRolePermissionsActionResult",
-    "RevokeRoleAction",
-    "RevokeRoleActionResult",
     "SearchRolesAction",
     "SearchRolesActionResult",
     "SearchRolesInScopeAction",

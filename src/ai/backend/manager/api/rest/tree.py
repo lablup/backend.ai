@@ -165,7 +165,8 @@ def build_api_routes(
     )
     compute_sessions_handler = ComputeSessionsHandler(session=processors.session)
     container_registry_handler = ContainerRegistryHandler(
-        container_registry=processors.container_registry
+        container_registry=processors.container_registry,
+        adapter=adapters.container_registry,
     )
     deployment_handler = DeploymentAPIHandler(
         deployment=processors.deployment,
@@ -245,7 +246,9 @@ def build_api_routes(
         user=processors.user, domain=processors.domain, config_provider=config_provider
     )
     image_handler = ImageHandler(image=processors.image)
-    rbac_handler = RBACHandler(permission_controller=processors.permission_controller)
+    rbac_handler = RBACHandler(
+        permission_controller=processors.permission_controller, rbac=processors.rbac
+    )
     quota_scope_handler = QuotaScopeHandler(vfs_storage=processors.vfs_storage)
     auto_scaling_rule_handler = AutoScalingRuleHandler(deployment=processors.deployment)
 

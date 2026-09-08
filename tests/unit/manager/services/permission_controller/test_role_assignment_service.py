@@ -1,4 +1,4 @@
-"""Tests for PermissionControllerService assign/revoke role with project binding."""
+"""Tests for RbacRoleService assign/revoke role with project binding."""
 
 from __future__ import annotations
 
@@ -7,6 +7,8 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
+from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.manager.data.permission.role import (
     BulkRoleAssignmentResultData,
     ProjectRoleCount,
@@ -18,12 +20,12 @@ from ai.backend.manager.data.permission.role import (
 from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
 from ai.backend.manager.repositories.base.creator import BulkCreator
 from ai.backend.manager.repositories.permission_controller.creators import UserRoleCreatorSpec
-from ai.backend.manager.services.permission_contoller.actions.assign_role import AssignRoleAction
-from ai.backend.manager.services.permission_contoller.actions.bulk_assign_role import (
+from ai.backend.manager.services.rbac.actions.role.assign import AssignRoleAction
+from ai.backend.manager.services.rbac.actions.role.bulk_assign import (
     BulkAssignRoleAction,
 )
-from ai.backend.manager.services.permission_contoller.actions.revoke_role import RevokeRoleAction
-from ai.backend.manager.services.permission_contoller.service import PermissionControllerService
+from ai.backend.manager.services.rbac.actions.role.revoke import RevokeRoleAction
+from ai.backend.manager.services.rbac.service import RbacRoleService
 
 
 @pytest.fixture
@@ -36,30 +38,24 @@ def mock_repository() -> MagicMock:
 
 
 @pytest.fixture
-def mock_group_repository() -> MagicMock:
+def mock_roster_repository() -> MagicMock:
     repo = MagicMock()
-    repo.bind_user_to_project = AsyncMock()
-    repo.unbind_user_from_project = AsyncMock()
+    repo.join_member = AsyncMock()
+    repo.leave_member = AsyncMock()
     return repo
 
 
 @pytest.fixture
-def service(
-    mock_repository: MagicMock, mock_group_repository: MagicMock
-) -> PermissionControllerService:
-    return PermissionControllerService(
-        repository=mock_repository,
-        group_repository=mock_group_repository,
-        rbac_action_registry=[],
-    )
+def service(mock_repository: MagicMock, mock_roster_repository: MagicMock) -> RbacRoleService:
+    return RbacRoleService(mock_repository, mock_roster_repository)
 
 
 class TestAssignRoleWithProject:
-    async def test_assign_with_project_id_calls_bind(
+    async def test_assign_with_project_id_enrolls(
         self,
-        service: PermissionControllerService,
+        service: RbacRoleService,
         mock_repository: MagicMock,
-        mock_group_repository: MagicMock,
+        mock_roster_repository: MagicMock,
     ) -> None:
         user_id = uuid.uuid4()
         role_id = uuid.uuid4()
@@ -73,14 +69,16 @@ class TestAssignRoleWithProject:
         )
         await service.assign_role(action)
 
-        mock_group_repository.bind_user_to_project.assert_called_once_with(user_id, project_id)
+        mock_roster_repository.join_member.assert_called_once_with(
+            ProjectID(project_id), UserID(user_id)
+        )
         mock_repository.assign_role.assert_called_once()
 
     async def test_assign_without_project_id_skips_bind(
         self,
-        service: PermissionControllerService,
+        service: RbacRoleService,
         mock_repository: MagicMock,
-        mock_group_repository: MagicMock,
+        mock_roster_repository: MagicMock,
     ) -> None:
         user_id = uuid.uuid4()
         role_id = uuid.uuid4()
@@ -91,15 +89,15 @@ class TestAssignRoleWithProject:
         action = AssignRoleAction(input=UserRoleAssignmentInput(user_id=user_id, role_id=role_id))
         await service.assign_role(action)
 
-        mock_group_repository.bind_user_to_project.assert_not_called()
+        mock_roster_repository.join_member.assert_not_called()
 
 
 class TestRevokeRoleWithProject:
     async def test_revoke_with_zero_remaining_calls_unbind(
         self,
-        service: PermissionControllerService,
+        service: RbacRoleService,
         mock_repository: MagicMock,
-        mock_group_repository: MagicMock,
+        mock_roster_repository: MagicMock,
     ) -> None:
         user_id = uuid.uuid4()
         role_id = uuid.uuid4()
@@ -112,13 +110,15 @@ class TestRevokeRoleWithProject:
         action = RevokeRoleAction(input=UserRoleRevocationInput(user_id=user_id, role_id=role_id))
         await service.revoke_role(action)
 
-        mock_group_repository.unbind_user_from_project.assert_called_once_with(user_id, project_id)
+        mock_roster_repository.leave_member.assert_called_once_with(
+            ProjectID(project_id), UserID(user_id)
+        )
 
     async def test_revoke_with_nonzero_remaining_skips_unbind(
         self,
-        service: PermissionControllerService,
+        service: RbacRoleService,
         mock_repository: MagicMock,
-        mock_group_repository: MagicMock,
+        mock_roster_repository: MagicMock,
     ) -> None:
         user_id = uuid.uuid4()
         role_id = uuid.uuid4()
@@ -131,13 +131,13 @@ class TestRevokeRoleWithProject:
         action = RevokeRoleAction(input=UserRoleRevocationInput(user_id=user_id, role_id=role_id))
         await service.revoke_role(action)
 
-        mock_group_repository.unbind_user_from_project.assert_not_called()
+        mock_roster_repository.leave_member.assert_not_called()
 
     async def test_revoke_global_role_skips_unbind(
         self,
-        service: PermissionControllerService,
+        service: RbacRoleService,
         mock_repository: MagicMock,
-        mock_group_repository: MagicMock,
+        mock_roster_repository: MagicMock,
     ) -> None:
         user_id = uuid.uuid4()
         role_id = uuid.uuid4()
@@ -148,15 +148,15 @@ class TestRevokeRoleWithProject:
         action = RevokeRoleAction(input=UserRoleRevocationInput(user_id=user_id, role_id=role_id))
         await service.revoke_role(action)
 
-        mock_group_repository.unbind_user_from_project.assert_not_called()
+        mock_roster_repository.leave_member.assert_not_called()
 
 
 class TestBulkAssignRoleWithProject:
     async def test_bulk_assign_with_project_id_calls_bind_for_each_user(
         self,
-        service: PermissionControllerService,
+        service: RbacRoleService,
         mock_repository: MagicMock,
-        mock_group_repository: MagicMock,
+        mock_roster_repository: MagicMock,
     ) -> None:
         role_id = uuid.uuid4()
         user_ids = [uuid.uuid4(), uuid.uuid4()]
@@ -175,15 +175,15 @@ class TestBulkAssignRoleWithProject:
         )
         await service.bulk_assign_role(action)
 
-        assert mock_group_repository.bind_user_to_project.call_count == 2
+        assert mock_roster_repository.join_member.call_count == 2
         for uid in user_ids:
-            mock_group_repository.bind_user_to_project.assert_any_call(uid, project_id)
+            mock_roster_repository.join_member.assert_any_call(ProjectID(project_id), UserID(uid))
 
     async def test_bulk_assign_without_project_id_skips_bind(
         self,
-        service: PermissionControllerService,
+        service: RbacRoleService,
         mock_repository: MagicMock,
-        mock_group_repository: MagicMock,
+        mock_roster_repository: MagicMock,
     ) -> None:
         role_id = uuid.uuid4()
         user_ids = [uuid.uuid4(), uuid.uuid4()]
@@ -199,4 +199,4 @@ class TestBulkAssignRoleWithProject:
         action = BulkAssignRoleAction(bulk_creator=BulkCreator[UserRoleRow](specs=specs))
         await service.bulk_assign_role(action)
 
-        mock_group_repository.bind_user_to_project.assert_not_called()
+        mock_roster_repository.join_member.assert_not_called()

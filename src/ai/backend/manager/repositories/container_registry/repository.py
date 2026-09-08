@@ -1,12 +1,9 @@
 import logging
-import uuid
 
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
-from ai.backend.common.container_registry import AllowedGroupsModel, ContainerRegistryType
-from ai.backend.common.data.entity.container_registry import ContainerRegistryID
-from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.exception import BackendAIError
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
@@ -18,23 +15,14 @@ from ai.backend.manager.data.container_registry.types import (
     ContainerRegistrySearchResult,
 )
 from ai.backend.manager.data.image.types import ImageStatus
-from ai.backend.manager.errors.image import (
-    ContainerRegistryGroupsAssociationNotFound,
-    ContainerRegistryNotFound,
-)
+from ai.backend.manager.errors.image import ContainerRegistryNotFound
 from ai.backend.manager.models.container_registry import (
     ContainerRegistryRow,
     ContainerRegistryValidator,
     ContainerRegistryValidatorArgs,
 )
-from ai.backend.manager.models.container_registry.creators import (
-    ContainerRegistryCreator,
-    ContainerRegistryProjectCreator,
-)
-from ai.backend.manager.models.container_registry.purgers import (
-    ContainerRegistryProjectPurger,
-    ContainerRegistryPurger,
-)
+from ai.backend.manager.models.container_registry.creators import ContainerRegistryCreator
+from ai.backend.manager.models.container_registry.purgers import ContainerRegistryPurger
 from ai.backend.manager.models.container_registry.updaters import ContainerRegistryUpdater
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -43,7 +31,6 @@ from ai.backend.manager.repositories.base.querier import (
     execute_batch_querier,
 )
 from ai.backend.manager.repositories.ops.v2.relation.provider import RelationOpsProvider
-from ai.backend.manager.repositories.ops.v2.relation.write import V2RelationWriteOps
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -76,14 +63,9 @@ class ContainerRegistryRepository:
         self,
         creator: ContainerRegistryCreator,
     ) -> ContainerRegistryData:
-        """Create a container registry with its own virtual entity, related to the
-        allowed projects."""
-        allowed_groups = creator.allowed_groups
+        """Create a container registry with its own virtual entity."""
         async with self._ops_provider.write_ops() as w:
-            data = await w.create_global_entity(creator)
-            if allowed_groups is not None and allowed_groups.add:
-                await self._handle_allowed_groups_update(w, data.id, allowed_groups)
-            return data
+            return await w.create_global_entity(creator)
 
     async def modify_registry(
         self,
@@ -91,11 +73,6 @@ class ContainerRegistryRepository:
     ) -> ContainerRegistryData:
         registry_id = updater.registry_id
         async with self._ops_provider.write_ops() as w:
-            if updater.has_allowed_groups_update:
-                await self._handle_allowed_groups_update(
-                    w, registry_id, updater.allowed_groups.value()
-                )
-
             data = await w.update_data(updater)
             if data is None:
                 raise ContainerRegistryNotFound(f"Container registry not found (id:{registry_id})")
@@ -257,33 +234,6 @@ class ContainerRegistryRepository:
                 has_next_page=result.has_next_page,
                 has_previous_page=result.has_previous_page,
             )
-
-    async def _handle_allowed_groups_update(
-        self,
-        ops: V2RelationWriteOps,
-        registry_id: ContainerRegistryID,
-        allowed_group_updates: AllowedGroupsModel,
-    ) -> None:
-        """Relate the registry to the projects to add and unrelate it from the ones to
-        remove. Raises ContainerRegistryGroupsAlreadyAssociated on a project already
-        related and ContainerRegistryGroupsAssociationNotFound when none to remove was.
-        """
-        for raw_project_id in allowed_group_updates.add:
-            project_id = ProjectID(uuid.UUID(raw_project_id))
-            await ops.create_relation(ContainerRegistryProjectCreator(), project_id, registry_id)
-
-        if allowed_group_updates.remove:
-            unlinked = 0
-            for raw_project_id in allowed_group_updates.remove:
-                project_id = ProjectID(uuid.UUID(raw_project_id))
-                if await ops.purge_relation(
-                    ContainerRegistryProjectPurger(), project_id, registry_id
-                ):
-                    unlinked += 1
-            if unlinked == 0:
-                raise ContainerRegistryGroupsAssociationNotFound(
-                    f"Tried to remove non-existing associations for registry_id: {registry_id}, group_ids: {allowed_group_updates.remove}"
-                )
 
     async def _get_by_registry_and_project(
         self,

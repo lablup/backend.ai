@@ -5,7 +5,10 @@ from __future__ import annotations
 import uuid
 from functools import lru_cache
 
-from ai.backend.common.data.entity.idle_checker import IdleCheckerAssignmentID
+from ai.backend.common.data.entity.idle_checker import (
+    IdleCheckerAssignmentID,
+    IdleCheckerID,
+)
 from ai.backend.common.data.entity.types import EntityIdentifier, EntityType, RuntimeEntityID
 from ai.backend.common.data.permission.types import ScopeType
 from ai.backend.common.dto.manager.v2.common import OrderDirection
@@ -32,30 +35,37 @@ from ai.backend.common.dto.manager.v2.idle_checker_assignment.types import (
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.data.idle_checker.types import IdleCheckerAssignmentData
+from ai.backend.manager.errors.idle_checker import (
+    IdleCheckerAssignmentAlreadyExists,
+    IdleCheckerAssignmentNotFound,
+)
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.condition_utils import combine_conditions_or, negate_conditions
 from ai.backend.manager.models.idle_checker.conditions import IdleCheckerAssignmentConditions
 from ai.backend.manager.models.idle_checker.creators import IdleCheckerAssignmentCreator
 from ai.backend.manager.models.idle_checker.orders import IdleCheckerAssignmentOrders
+from ai.backend.manager.models.idle_checker.purgers import IdleCheckerAssignmentPurger
 from ai.backend.manager.models.idle_checker.searchers import IdleCheckerAssignmentSearcher
+from ai.backend.manager.models.idle_checker.updaters import (
+    IdleCheckerAssignmentDisabler,
+    IdleCheckerAssignmentEnabler,
+)
 from ai.backend.manager.services.idle_checker_assignment.actions.admin_search import (
     AdminSearchIdleCheckerAssignmentsAction,
 )
-from ai.backend.manager.services.idle_checker_assignment.actions.create import (
-    CreateIdleCheckerAssignmentAction,
-)
 from ai.backend.manager.services.idle_checker_assignment.actions.lookup import (
     LookupIdleCheckerAssignmentAction,
-)
-from ai.backend.manager.services.idle_checker_assignment.actions.purge import (
-    PurgeIdleCheckerAssignmentAction,
+    LookupIdleCheckerAssignmentByPairAction,
 )
 from ai.backend.manager.services.idle_checker_assignment.actions.scoped_search import (
     ScopedSearchIdleCheckerAssignmentsAction,
 )
-from ai.backend.manager.services.idle_checker_assignment.actions.update import (
-    DisableIdleCheckerAssignmentAction,
-    EnableIdleCheckerAssignmentAction,
+from ai.backend.manager.services.rbac.actions.relation.base import RelationPair
+from ai.backend.manager.services.rbac.actions.relation.create import CreateRelationAction
+from ai.backend.manager.services.rbac.actions.relation.purge import PurgeRelationAction
+from ai.backend.manager.services.rbac.actions.relation.switch import (
+    DeleteRelationAction,
+    RestoreRelationAction,
 )
 
 
@@ -76,44 +86,65 @@ class IdleCheckerAssignmentAdapter(BaseAdapter):
     async def admin_create(
         self, input: CreateIdleCheckerAssignmentInput
     ) -> CreateIdleCheckerAssignmentPayload:
-        data = await self._processors.idle_checker_assignment.create.run(
-            CreateIdleCheckerAssignmentAction(
-                scope=self._scope_entity(input.scope.scope_type, input.scope.scope_id),
-                idle_checker_id=input.idle_checker_id,
+        scope = self._scope_entity(input.scope.scope_type, input.scope.scope_id)
+        result = await self._processors.rbac.create_relation.run(
+            CreateRelationAction(
+                pairs=[RelationPair(scope=scope, target=input.idle_checker_id)],
                 creator=IdleCheckerAssignmentCreator(enabled=input.enabled),
             )
         )
-        return CreateIdleCheckerAssignmentPayload(idle_checker_assignment=self._data_to_node(data))
+        if not all(link.linked for link in result.results):
+            raise IdleCheckerAssignmentAlreadyExists(
+                f"{scope.entity_type()}:{scope} -> {input.idle_checker_id}"
+            )
+        return CreateIdleCheckerAssignmentPayload(
+            idle_checker_assignment=self._data_to_node(
+                await self._read_by_pair(scope, input.idle_checker_id)
+            )
+        )
 
     async def update(
         self, input: UpdateIdleCheckerAssignmentInput
     ) -> UpdateIdleCheckerAssignmentPayload:
         """Switch the binding the id names on or off."""
         current = await self._resolve(input.id)
+        pairs = [RelationPair(scope=current.scope_entity(), target=current.idle_checker_id)]
         if input.enabled:
-            data = await self._processors.idle_checker_assignment.enable.run(
-                EnableIdleCheckerAssignmentAction(
-                    scope=current.scope_entity(), idle_checker_id=current.idle_checker_id
-                )
+            await self._processors.rbac.restore_relation.run(
+                RestoreRelationAction(pairs=pairs, updater=IdleCheckerAssignmentEnabler())
             )
         else:
-            data = await self._processors.idle_checker_assignment.disable.run(
-                DisableIdleCheckerAssignmentAction(
-                    scope=current.scope_entity(), idle_checker_id=current.idle_checker_id
-                )
+            await self._processors.rbac.delete_relation.run(
+                DeleteRelationAction(pairs=pairs, updater=IdleCheckerAssignmentDisabler())
             )
-        return UpdateIdleCheckerAssignmentPayload(idle_checker_assignment=self._data_to_node(data))
+        return UpdateIdleCheckerAssignmentPayload(
+            idle_checker_assignment=self._data_to_node(
+                await self._read_by_pair(current.scope_entity(), current.idle_checker_id)
+            )
+        )
 
     async def purge(
         self, input: PurgeIdleCheckerAssignmentInput
     ) -> PurgeIdleCheckerAssignmentPayload:
         current = await self._resolve(input.id)
-        await self._processors.idle_checker_assignment.purge.run(
-            PurgeIdleCheckerAssignmentAction(
-                scope=current.scope_entity(), idle_checker_id=current.idle_checker_id
+        result = await self._processors.rbac.purge_relation.run(
+            PurgeRelationAction(
+                pairs=[RelationPair(scope=current.scope_entity(), target=current.idle_checker_id)],
+                purger=IdleCheckerAssignmentPurger(),
             )
         )
+        if not any(unlink.unlinked for unlink in result.results):
+            raise IdleCheckerAssignmentNotFound(str(current.id))
         return PurgeIdleCheckerAssignmentPayload(id=current.id)
+
+    async def _read_by_pair(
+        self, scope: EntityIdentifier, idle_checker_id: IdleCheckerID
+    ) -> IdleCheckerAssignmentData:
+        """Read the binding back: a relation write answers with the pair alone."""
+        result = await self._processors.idle_checker_assignment.lookup_by_pair.run(
+            LookupIdleCheckerAssignmentByPairAction(scope=scope, idle_checker_id=idle_checker_id)
+        )
+        return result.data
 
     async def admin_search(
         self, input: SearchIdleCheckerAssignmentsInput

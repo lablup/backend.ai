@@ -7,12 +7,12 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Any, override
 
-from ai.backend.common.container_registry import AllowedGroupsModel, ContainerRegistryType
+from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.data.entity.container_registry import ContainerRegistryID
 from ai.backend.common.data.entity.project import ProjectID
-from ai.backend.common.exception import ContainerRegistryGroupsAlreadyAssociated
 from ai.backend.manager.data.container_registry.types import ContainerRegistryData
-from ai.backend.manager.errors.repository import UniqueConstraintViolationError
+from ai.backend.manager.errors.repository import ForeignKeyViolationError
+from ai.backend.manager.errors.resource import ProjectNotFound
 from ai.backend.manager.models.association_container_registries_groups import (
     AssociationContainerRegistriesGroupsRow,
 )
@@ -42,7 +42,6 @@ class ContainerRegistryCreator(
     password: str | None = None
     ssl_verify: bool | None = None
     extra: dict[str, Any] | None = None
-    allowed_groups: AllowedGroupsModel | None = None
 
     @override
     def entity_id(self, row: ContainerRegistryRow) -> ContainerRegistryID:
@@ -96,12 +95,13 @@ class ContainerRegistryProjectCreator(
 
     @override
     def integrity_error_checks(self) -> Sequence[IntegrityErrorCheck]:
+        """A project that is not there is the one violation a caller can act on. The
+        unique constraint is not among them: a pair already linked is skipped in SQL, so
+        naming one twice never reaches here."""
         return (
             IntegrityErrorCheck(
-                violation_type=UniqueConstraintViolationError,
-                constraint_name="uq_registry_id_group_id",
-                error=ContainerRegistryGroupsAlreadyAssociated(
-                    "The project is already allowed on the registry"
-                ),
+                violation_type=ForeignKeyViolationError,
+                constraint_name="fk_association_container_registries_groups_group_id",
+                error=ProjectNotFound("The project to allow on the registry does not exist"),
             ),
         )

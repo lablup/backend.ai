@@ -387,7 +387,6 @@ class CreateContainerRegistryNode(graphene.Mutation):  # type: ignore[misc]
                 password=value_or_none(password),
                 ssl_verify=value_or_none(ssl_verify),
                 extra=value_or_none(extra),
-                allowed_groups=None,  # allowed groups are not supported in v1 mutation
             )
         )
 
@@ -459,7 +458,6 @@ class ModifyContainerRegistryNode(graphene.Mutation):  # type: ignore[misc]
                 password=TriState.from_graphql(password),
                 ssl_verify=TriState.from_graphql(ssl_verify),
                 extra=TriState.from_graphql(extra),
-                allowed_groups=TriState.nop(),  # Not handled in this deprecated mutation
             )
         )
 

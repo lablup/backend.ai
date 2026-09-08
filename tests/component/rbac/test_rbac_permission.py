@@ -38,15 +38,16 @@ from ai.backend.manager.repositories.permission_controller.purgers import Permis
 from ai.backend.manager.repositories.permission_controller.repository import (
     PermissionControllerRepository,
 )
-from ai.backend.manager.services.permission_contoller.actions.assign_role import AssignRoleAction
 from ai.backend.manager.services.permission_contoller.actions.permission import (
     CreatePermissionAction,
     DeletePermissionAction,
 )
-from ai.backend.manager.services.permission_contoller.actions.revoke_role import RevokeRoleAction
 from ai.backend.manager.services.permission_contoller.processors import (
     PermissionControllerProcessors,
 )
+from ai.backend.manager.services.rbac.actions.role.assign import AssignRoleAction
+from ai.backend.manager.services.rbac.actions.role.revoke import RevokeRoleAction
+from ai.backend.manager.services.rbac.processors import RbacProcessors
 from ai.backend.testutils.fixtures import DomainFixtureData
 
 from .conftest import RoleFactory
@@ -288,6 +289,7 @@ class TestCheckPermissionInScope:
     async def test_user_with_permission_in_scope_returns_true(
         self,
         permission_controller_processors: PermissionControllerProcessors,
+        rbac_processors: RbacProcessors,
         permission_repo: PermissionControllerRepository,
         role_factory: RoleFactory,
         admin_user_fixture: Any,
@@ -312,7 +314,7 @@ class TestCheckPermissionInScope:
             )
         )
 
-        await permission_controller_processors.assign_role.wait_for_complete(
+        await rbac_processors.assign_role.wait_for_complete(
             AssignRoleAction(input=UserRoleAssignmentInput(user_id=user_id, role_id=role_id))
         )
 
@@ -329,7 +331,7 @@ class TestCheckPermissionInScope:
             )
             assert has_perm is True
         finally:
-            await permission_controller_processors.revoke_role.wait_for_complete(
+            await rbac_processors.revoke_role.wait_for_complete(
                 RevokeRoleAction(input=UserRoleRevocationInput(user_id=user_id, role_id=role_id))
             )
             await permission_controller_processors.delete_permission.wait_for_complete(

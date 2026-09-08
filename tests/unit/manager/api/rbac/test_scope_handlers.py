@@ -33,7 +33,7 @@ from ai.backend.manager.services.permission_contoller.actions.search_scopes impo
 
 def make_test_handler(mock_permission_controller: MagicMock) -> RBACHandler:
     """Create an RBACHandler with mock permission controller processors."""
-    return RBACHandler(permission_controller=mock_permission_controller)
+    return RBACHandler(permission_controller=mock_permission_controller, rbac=MagicMock())
 
 
 def make_test_superadmin_ctx() -> UserContext:

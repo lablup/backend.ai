@@ -20,6 +20,7 @@ import pytest
 import sqlalchemy as sa
 from sqlalchemy import text
 
+from ai.backend.common.data.entity.user import USER_ENTITY_TYPE
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
 from ai.backend.common.types import DefaultForUnspecified, ResourceSlot, VFolderHostPermissionMap
@@ -78,6 +79,8 @@ from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingR
 from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
 from ai.backend.manager.repositories.db.engine import create_async_engine
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
+from ai.backend.manager.repositories.ops.v2.relation.provider import RelationOpsProvider
+from ai.backend.manager.repositories.rbac.relation_repository import RbacRelationRepository
 from ai.backend.manager.repositories.resource_group.repository import ResourceGroupRepository
 from ai.backend.manager.secret.types import SecretValue
 from ai.backend.manager.services.resource_group.service import ResourceGroupService
@@ -196,6 +199,12 @@ async def database_fixture(
 
 
 @pytest.fixture
+def rbac_relation_repository(database_engine: ExtendedAsyncSAEngine) -> RbacRelationRepository:
+    """The relation writes the resource group's associations go through."""
+    return RbacRelationRepository(RelationOpsProvider(database_engine))
+
+
+@pytest.fixture
 def resource_group_repository(database_engine: ExtendedAsyncSAEngine) -> ResourceGroupRepository:
     """Direct repository instance for association existence checks."""
     return ResourceGroupRepository(database_engine, V2DBOpsProvider(database_engine))
@@ -287,6 +296,12 @@ async def admin_user_fixture(
             )
         )
         await conn.execute(
+            sa.insert(VirtualEntityRow.__table__).values(
+                entity_type=USER_ENTITY_TYPE,
+                entity_id=str(user_uuid),
+            )
+        )
+        await conn.execute(
             sa.insert(KeyPairRow.__table__).values(
                 access_key=access_key,
                 secret_key=SecretValue(secret_key),
@@ -333,6 +348,12 @@ async def regular_user_fixture(
                 domain_id=sa.select(DomainRow.id)
                 .where(DomainRow.name == domain_fixture.domain_name)
                 .scalar_subquery(),
+            )
+        )
+        await conn.execute(
+            sa.insert(VirtualEntityRow.__table__).values(
+                entity_type=USER_ENTITY_TYPE,
+                entity_id=str(user_uuid),
             )
         )
         await conn.execute(

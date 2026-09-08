@@ -46,7 +46,6 @@ class TestGetScopeTypes:
         """Create service with mocked repository."""
         return PermissionControllerService(
             repository=mock_repository,
-            group_repository=MagicMock(),
             rbac_action_registry=[],
         )
 
@@ -82,7 +81,6 @@ class TestSearchScopes:
         """Create service with mocked repository."""
         return PermissionControllerService(
             repository=mock_repository,
-            group_repository=MagicMock(),
             rbac_action_registry=[],
         )
 

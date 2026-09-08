@@ -10,14 +10,10 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from ai.backend.common.data.entity.domain import DomainID
-from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
-from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.exception import ResourceGroupConflict
 from ai.backend.common.types import AccessKey, AgentSelectionStrategy, ResourceSlot, SessionTypes
 from ai.backend.manager.data.deployment.types import DeploymentOptions
-from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.data.resource_group.types import (
     FairShareResourceGroupSpec,
     ResourceGroupData,
@@ -36,55 +32,14 @@ from ai.backend.manager.errors.resource import (
     ResourceGroupNotFound,
     ResourceGroupSessionTypeNotAllowed,
 )
-from ai.backend.manager.models.resource_group import (
-    ResourceGroupForDomainRow,
-    ResourceGroupForKeypairsRow,
-    ResourceGroupForProjectRow,
-    ResourceGroupOpts,
-)
+from ai.backend.manager.models.resource_group import ResourceGroupOpts
 from ai.backend.manager.models.resource_group.creators import ResourceGroupCreator
 from ai.backend.manager.models.resource_group.updaters import ResourceGroupUpdater
 from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.registry import check_resource_group
 from ai.backend.manager.repositories.base import BatchQuerier
-from ai.backend.manager.repositories.base.creator import BulkCreator
-from ai.backend.manager.repositories.base.purger import BatchPurger
-from ai.backend.manager.repositories.base.rbac.scope_binder import (
-    RBACScopeBinder,
-    RBACScopeBindingPair,
-)
 from ai.backend.manager.repositories.resource_group import ResourceGroupRepository
-from ai.backend.manager.repositories.resource_group.creators import (
-    ResourceGroupForDomainCreatorSpec,
-    ResourceGroupForKeypairsCreatorSpec,
-    ResourceGroupForProjectCreatorSpec,
-)
-from ai.backend.manager.repositories.resource_group.purgers import (
-    create_resource_group_for_keypairs_purger,
-)
-from ai.backend.manager.repositories.resource_group.scope_binders import (
-    ResourceGroupDomainEntityUnbinder,
-    ResourceGroupProjectEntityUnbinder,
-)
-from ai.backend.manager.services.resource_group.actions.associate_with_domain import (
-    AssociateResourceGroupWithDomainsAction,
-)
-from ai.backend.manager.services.resource_group.actions.associate_with_keypair import (
-    AssociateResourceGroupWithKeypairsAction,
-)
-from ai.backend.manager.services.resource_group.actions.associate_with_user_group import (
-    AssociateResourceGroupWithUserGroupsAction,
-)
 from ai.backend.manager.services.resource_group.actions.create import CreateResourceGroupAction
-from ai.backend.manager.services.resource_group.actions.disassociate_with_domain import (
-    DisassociateResourceGroupWithDomainsAction,
-)
-from ai.backend.manager.services.resource_group.actions.disassociate_with_keypair import (
-    DisassociateResourceGroupWithKeypairsAction,
-)
-from ai.backend.manager.services.resource_group.actions.disassociate_with_user_group import (
-    DisassociateResourceGroupWithUserGroupsAction,
-)
 from ai.backend.manager.services.resource_group.actions.get_wsproxy_version import (
     GetWsproxyVersionAction,
 )
@@ -424,177 +379,6 @@ class TestScalingGroupService:
 
         with pytest.raises(ResourceGroupNotFound):
             await resource_group_service.update_resource_group(action)
-
-    # Associate with Domain Tests
-
-    async def test_associate_scaling_group_with_domains_success(
-        self,
-        resource_group_service: ResourceGroupService,
-        mock_repository: MagicMock,
-    ) -> None:
-        """Test associating a scaling group with domains"""
-        mock_repository.associate_resource_group_with_domains = AsyncMock(return_value=None)
-
-        resource_group_id = ResourceGroupID(uuid.uuid4())
-        domain_id = DomainID(uuid.uuid4())
-
-        binder: RBACScopeBinder[ResourceGroupForDomainRow] = RBACScopeBinder(
-            pairs=[
-                RBACScopeBindingPair(
-                    spec=ResourceGroupForDomainCreatorSpec(
-                        resource_group_id=resource_group_id,
-                        domain_id=domain_id,
-                    ),
-                    entity_ref=RBACElementRef(
-                        RBACElementType.RESOURCE_GROUP, str(resource_group_id)
-                    ),
-                    scope_ref=RBACElementRef(RBACElementType.DOMAIN, str(domain_id)),
-                )
-            ]
-        )
-        action = AssociateResourceGroupWithDomainsAction(
-            domain_id=DomainID(uuid.uuid4()), binder=binder
-        )
-        result = await resource_group_service.associate_resource_group_with_domains(action)
-
-        assert result is not None
-        mock_repository.associate_resource_group_with_domains.assert_called_once_with(binder)
-
-    # Disassociate with Domain Tests
-
-    async def test_disassociate_scaling_group_with_domains_success(
-        self,
-        resource_group_service: ResourceGroupService,
-        mock_repository: MagicMock,
-    ) -> None:
-        """Test disassociating a scaling group from domains"""
-        mock_repository.disassociate_resource_group_with_domains = AsyncMock(return_value=None)
-
-        unbinder = ResourceGroupDomainEntityUnbinder(
-            resource_group_ids=[ResourceGroupID(uuid.uuid4())],
-            domain_id=DomainID(uuid.uuid4()),
-        )
-        action = DisassociateResourceGroupWithDomainsAction(
-            domain_id=DomainID(uuid.uuid4()), unbinder=unbinder
-        )
-        result = await resource_group_service.disassociate_resource_group_with_domains(action)
-
-        assert result is not None
-        mock_repository.disassociate_resource_group_with_domains.assert_called_once_with(unbinder)
-
-    # Associate/Disassociate with Keypair Tests
-
-    async def test_associate_scaling_group_with_keypairs_success(
-        self,
-        resource_group_service: ResourceGroupService,
-        mock_repository: MagicMock,
-    ) -> None:
-        """Test associating a scaling group with keypairs"""
-        mock_repository.associate_resource_group_with_keypairs = AsyncMock(return_value=None)
-
-        resource_group_id = ResourceGroupID(uuid.uuid4())
-        access_key = AccessKey("AKTEST1234567890")
-
-        bulk_creator: BulkCreator[ResourceGroupForKeypairsRow] = BulkCreator(
-            specs=[
-                ResourceGroupForKeypairsCreatorSpec(
-                    resource_group_id=resource_group_id,
-                    access_key=access_key,
-                )
-            ]
-        )
-        action = AssociateResourceGroupWithKeypairsAction(
-            resource_group_id=ResourceGroupID(uuid.uuid4()), bulk_creator=bulk_creator
-        )
-        result = await resource_group_service.associate_resource_group_with_keypairs(action)
-
-        assert result is not None
-        mock_repository.associate_resource_group_with_keypairs.assert_called_once_with(bulk_creator)
-
-    async def test_disassociate_scaling_group_with_keypairs_success(
-        self,
-        resource_group_service: ResourceGroupService,
-        mock_repository: MagicMock,
-    ) -> None:
-        """Test disassociating a scaling group from keypairs"""
-        mock_repository.disassociate_resource_group_with_keypairs = AsyncMock(return_value=None)
-
-        resource_group_id = ResourceGroupID(uuid.uuid4())
-        access_key = AccessKey("AKTEST1234567890")
-
-        purger: BatchPurger[ResourceGroupForKeypairsRow] = (
-            create_resource_group_for_keypairs_purger(
-                resource_group_id=resource_group_id,
-                access_key=access_key,
-            )
-        )
-        action = DisassociateResourceGroupWithKeypairsAction(
-            resource_group_id=ResourceGroupID(uuid.uuid4()), purger=purger
-        )
-        result = await resource_group_service.disassociate_resource_group_with_keypairs(action)
-
-        assert result is not None
-        mock_repository.disassociate_resource_group_with_keypairs.assert_called_once_with(purger)
-
-    # Associate/Disassociate with User Group (Project) Tests
-
-    async def test_associate_scaling_group_with_user_groups_success(
-        self,
-        resource_group_service: ResourceGroupService,
-        mock_repository: MagicMock,
-    ) -> None:
-        """Test associating a scaling group with user groups (projects)"""
-        mock_repository.associate_resource_group_with_user_groups = AsyncMock(return_value=None)
-
-        resource_group_id = ResourceGroupID(uuid.uuid4())
-        project_id = uuid.uuid4()
-
-        binder: RBACScopeBinder[ResourceGroupForProjectRow] = RBACScopeBinder(
-            pairs=[
-                RBACScopeBindingPair(
-                    spec=ResourceGroupForProjectCreatorSpec(
-                        resource_group_id=resource_group_id,
-                        project=project_id,
-                    ),
-                    entity_ref=RBACElementRef(
-                        RBACElementType.RESOURCE_GROUP, str(resource_group_id)
-                    ),
-                    scope_ref=RBACElementRef(RBACElementType.PROJECT, str(project_id)),
-                )
-            ]
-        )
-        action = AssociateResourceGroupWithUserGroupsAction(
-            project_id=ProjectID(uuid.uuid4()), binder=binder
-        )
-        result = await resource_group_service.associate_resource_group_with_user_groups(action)
-
-        assert result is not None
-        mock_repository.associate_resource_group_with_user_groups.assert_called_once_with(binder)
-
-    async def test_disassociate_scaling_group_with_user_group_success(
-        self,
-        resource_group_service: ResourceGroupService,
-        mock_repository: MagicMock,
-    ) -> None:
-        """Test disassociating a scaling group from a user group (project)"""
-        mock_repository.disassociate_resource_group_with_user_groups = AsyncMock(return_value=None)
-
-        resource_group_id = ResourceGroupID(uuid.uuid4())
-        project_id = uuid.uuid4()
-
-        unbinder = ResourceGroupProjectEntityUnbinder(
-            resource_group_ids=[resource_group_id],
-            project=project_id,
-        )
-        action = DisassociateResourceGroupWithUserGroupsAction(
-            project_id=ProjectID(uuid.uuid4()), unbinder=unbinder
-        )
-        result = await resource_group_service.disassociate_resource_group_with_user_groups(action)
-
-        assert result is not None
-        mock_repository.disassociate_resource_group_with_user_groups.assert_called_once_with(
-            unbinder
-        )
 
 
 class TestCheckScalingGroup:

@@ -21,7 +21,6 @@ import sqlalchemy as sa
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE, ProjectID
 from ai.backend.common.data.entity.user import UserID
-from ai.backend.common.data.permission.types import Permission
 from ai.backend.manager.data.keypair.types import KeyPairData, KeyPairSecrets
 from ai.backend.manager.data.project.types import ProjectData
 from ai.backend.manager.data.user.types import UserData
@@ -34,8 +33,7 @@ from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.user.creators import UserCreator
 from ai.backend.manager.models.virtual_entity.queries import user_scope_membership_query
 from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
-from ai.backend.manager.repositories.ops.v2.cap import V2CapOps
-from ai.backend.manager.repositories.ops.v2.write import V2WriteOps
+from ai.backend.manager.repositories.ops.v2.roster.write import V2RosterWriteOps
 
 
 @dataclass
@@ -58,8 +56,8 @@ class FullUserCreatorResult:
     keypair: KeyPairData
 
 
-class V2UserWriteOps(V2WriteOps, V2CapOps):
-    """The v2 write ops plus provisioning a user."""
+class V2UserWriteOps(V2RosterWriteOps):
+    """The roster write ops plus provisioning a user."""
 
     # groups.name is a slug of at most 64 characters; the tail is reserved for the
     # collision suffix a personal project's name may need.
@@ -68,9 +66,6 @@ class V2UserWriteOps(V2WriteOps, V2CapOps):
     _SLUG_EDGE_CHARS: ClassVar[str] = "._-"
     _PROJECT_NAME_BASE_LIMIT: ClassVar[int] = 60
     _PROJECT_NAME_SUFFIX_LIMIT: ClassVar[int] = 1000
-
-    # A project roster caps its users to read.
-    _MEMBER_CAP: ClassVar[Permission] = Permission.READ
 
     async def user_exists(self, email: str, username: str) -> bool:
         """Whether an account already holds either name."""
@@ -115,13 +110,13 @@ class V2UserWriteOps(V2WriteOps, V2CapOps):
             ),
         )
 
-    async def enroll_in_projects(
+    async def join_projects(
         self,
         user_id: UserID,
         domain_id: DomainID,
         project_ids: Collection[ProjectID],
     ) -> None:
-        """Enroll the user in each project's roster — the domain's model-store projects
+        """Put the user on each project's roster — the domain's model-store projects
         always included, ``project_ids`` narrowed to projects that exist in the domain,
         and personal projects left out."""
         domain_name = await self._domain_name(domain_id)
@@ -133,30 +128,30 @@ class V2UserWriteOps(V2WriteOps, V2CapOps):
         user_id: UserID,
         domain_name: str,
         project_ids: Collection[ProjectID],
-    ) -> list[ProjectID]:
+    ) -> None:
         """Set the user's projects to ``project_ids``, the domain's model-store projects
-        always included, and answer the projects left.
+        always included.
 
         Only the projects entering or leaving the set are touched, so an unchanged
         membership keeps its rows. Personal projects stand outside: none is joined and
-        the user's own is never left. Role mappings are left untouched on the way out —
-        revoking the roles of the projects left is the caller's call.
+        the user's own is never left. Leaving takes the project's roles back.
         """
         target = await self._member_project_ids(domain_name, project_ids)
         joined = await self._joined_project_ids(user_id)
-        left = sorted(joined - target, key=str)
-        for project_id in left:
+        for project_id in sorted(joined - target, key=str):
             await self._leave(project_id, user_id)
         for project_id in sorted(target - joined, key=str):
             await self._join(project_id, user_id)
-        return left
 
     async def _create_personal_project(
         self, user_id: UserID, username: str, domain_id: DomainID
     ) -> ProjectData:
         """Create the user's personal project in its domain and put the user on the
         roster as its only member. The project is created in the domain, so the domain's
-        roles reach it the way they reach every other project."""
+        roles reach it the way they reach every other project.
+
+        Joins through the primitive rather than :meth:`join_member`, which refuses a
+        personal project: the owner is the one member such a project ever takes."""
         domain_name = await self._domain_name(domain_id)
         project = await self.create_role_managed_entity(
             ProjectCreator.personal(
@@ -238,17 +233,3 @@ class V2UserWriteOps(V2WriteOps, V2CapOps):
             )
         )
         return {ProjectID(row.scope_id) for row in (await self._sess.execute(stmt)).all()}
-
-    async def _join(self, project_id: ProjectID, user_id: UserID) -> None:
-        """Put the user on the project's roster — a share capped to read — and grant the
-        project's auto_assign roles. The project is provisioned first: one created before
-        the graph, or by a data migration, has no virtual entity yet."""
-        await self._provision([project_id])
-        membership_id = await self._reset_share(project_id, user_id)
-        await self._insert_caps(membership_id, dict.fromkeys(self._bits_of(self._MEMBER_CAP)))
-        await self._grant_auto_assign_roles([project_id], user_id)
-
-    async def _leave(self, project_id: ProjectID, user_id: UserID) -> None:
-        """Take the user off the project's roster — the reverse of :meth:`_join`, the
-        cap rows going with the edge. Silent where the user was never on it."""
-        await self._disown([project_id], user_id)

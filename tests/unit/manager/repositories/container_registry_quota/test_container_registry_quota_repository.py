@@ -34,6 +34,7 @@ from ai.backend.manager.models.resource_policy import (
 )
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
 from ai.backend.manager.repositories.container_registry_quota.repositories import (
     PerProjectRegistryQuotaRepositories,
 )
@@ -99,6 +100,7 @@ class TestPerProjectRegistryQuotaRepository:
         async with with_tables(
             database_connection,
             [
+                VirtualEntityRow,
                 DomainRow,
                 ProjectResourcePolicyRow,
                 UserResourcePolicyRow,

@@ -8,6 +8,7 @@ from typing import Any, override
 from ai.backend.common.data.entity.idle_checker import (
     IDLE_CHECKER_ENTITY_TYPE,
     IdleCheckerAssignmentID,
+    IdleCheckerID,
 )
 from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
 from ai.backend.manager.actions.v2.lookup.base import (
@@ -66,3 +67,46 @@ class LookupIdleCheckerAssignmentActionResult(BaseLookupActionResult):
     @override
     def entity_id(self) -> EntityIdentifier:
         return self.data.idle_checker_id
+
+
+@dataclass(frozen=True)
+class IdleCheckerAssignmentPairKey(LookupKey):
+    """The pair the binding stands between, which is what names the row."""
+
+    scope: EntityIdentifier
+    idle_checker_id: IdleCheckerID
+
+    @override
+    def kind(self) -> str:
+        return "idle_checker_assignment_pair"
+
+    @override
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "scope_type": str(self.scope.entity_type()),
+            "scope_id": str(self.scope),
+            "idle_checker_id": str(self.idle_checker_id),
+        }
+
+
+@dataclass(frozen=True)
+class LookupIdleCheckerAssignmentByPairAction(BaseLookupAction):
+    """Read the binding a pair stands for, as the caller of a write reads back what it
+    wrote."""
+
+    scope: EntityIdentifier
+    idle_checker_id: IdleCheckerID
+
+    @override
+    @classmethod
+    def entity_type(cls) -> EntityType:
+        return IDLE_CHECKER_ENTITY_TYPE
+
+    @override
+    @classmethod
+    def action_name(cls) -> str:
+        return "lookup_idle_checker_assignment_by_pair"
+
+    @override
+    def lookup_key(self) -> IdleCheckerAssignmentPairKey:
+        return IdleCheckerAssignmentPairKey(scope=self.scope, idle_checker_id=self.idle_checker_id)

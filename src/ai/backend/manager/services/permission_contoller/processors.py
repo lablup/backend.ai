@@ -22,13 +22,7 @@ from ai.backend.manager.data.permission.role import RoleData
 
 from .actions import (
     AddRolePermissionAction,
-    AssignRoleAction,
-    AssignRoleActionResult,
-    BulkAssignRoleAction,
-    BulkAssignRoleActionResult,
     BulkRemoveRolePermissionsAction,
-    BulkRevokeRoleAction,
-    BulkRevokeRoleActionResult,
     CreateGlobalRoleAction,
     CreateRoleAction,
     DeleteRoleAction,
@@ -36,8 +30,6 @@ from .actions import (
     GetRoleDetailActionResult,
     ReplaceRolePermissionsAction,
     ReplaceRolePermissionsActionResult,
-    RevokeRoleAction,
-    RevokeRoleActionResult,
     SearchRolesAction,
     SearchRolesActionResult,
     SearchRolesInScopeAction,
@@ -102,10 +94,6 @@ class PermissionControllerProcessors:
     update_role: SingleEntityActionProcessor[UpdateRoleAction, EntityOpsResult[RoleData]]
     delete_role: SingleEntityActionProcessor[DeleteRoleAction, EntityOpsResult[RoleData]]
     purge_role: SingleEntityActionProcessor[PurgeRoleAction, EntityOpsResult[RoleData]]
-    assign_role: ActionProcessor[AssignRoleAction, AssignRoleActionResult]
-    revoke_role: ActionProcessor[RevokeRoleAction, RevokeRoleActionResult]
-    bulk_assign_role: ActionProcessor[BulkAssignRoleAction, BulkAssignRoleActionResult]
-    bulk_revoke_role: ActionProcessor[BulkRevokeRoleAction, BulkRevokeRoleActionResult]
     get_role_detail: ActionProcessor[GetRoleDetailAction, GetRoleDetailActionResult]
     search_roles: ActionProcessor[SearchRolesAction, SearchRolesActionResult]
     search_roles_in_scope: ScopeActionProcessor[
@@ -150,10 +138,6 @@ class PermissionControllerProcessors:
         self.update_role = role_group.single_update_ops(UpdateRoleAction)
         self.delete_role = role_group.single_delete_ops(DeleteRoleAction)
         self.purge_role = role_group.entity_purge_ops(PurgeRoleAction)
-        self.assign_role = ActionProcessor(service.assign_role, action_monitors)
-        self.revoke_role = ActionProcessor(service.revoke_role, action_monitors)
-        self.bulk_assign_role = ActionProcessor(service.bulk_assign_role, action_monitors)
-        self.bulk_revoke_role = ActionProcessor(service.bulk_revoke_role, action_monitors)
         self.get_role_detail = ActionProcessor(service.get_role_detail, action_monitors)
         self.search_roles = ActionProcessor(service.search_roles, action_monitors)
         scope_rbac_validators = [validators.rbac.scope]

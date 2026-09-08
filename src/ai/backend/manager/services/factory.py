@@ -204,6 +204,12 @@ from ai.backend.manager.services.prometheus_query_preset.service import (
 from ai.backend.manager.services.prometheus_query_preset_category.processors import (
     PrometheusQueryPresetCategoryProcessors,
 )
+from ai.backend.manager.services.rbac.processors import RbacProcessors
+from ai.backend.manager.services.rbac.service import (
+    RbacRelationService,
+    RbacRoleService,
+    RbacRosterService,
+)
 from ai.backend.manager.services.resource_group.processors import ResourceGroupProcessors
 from ai.backend.manager.services.resource_group.service import ResourceGroupService
 from ai.backend.manager.services.resource_preset.processors import ResourcePresetProcessors
@@ -373,6 +379,16 @@ def create_services(args: ServiceArgs) -> Services:
         role_preset=RolePresetService(
             OpsRepository(repositories.v2_ops_provider), repositories.role_preset.repository
         ),
+        rbac_relation=RbacRelationService(
+            repositories.rbac.relation,
+        ),
+        rbac_role=RbacRoleService(
+            repositories.permission_controller.repository,
+            repositories.rbac.roster,
+        ),
+        rbac_roster=RbacRosterService(
+            repositories.rbac.roster,
+        ),
         entity_share=EntityShareService(
             repositories.entity_share.repository,
         ),
@@ -439,7 +455,6 @@ def create_services(args: ServiceArgs) -> Services:
         ),
         permission_controller=PermissionControllerService(
             repository=repositories.permission_controller.repository,
-            group_repository=repositories.project.repository,
             rbac_action_registry=RBAC_ACTION_REGISTRY,
         ),
         vfs_storage=VFSStorageService(
@@ -672,6 +687,14 @@ def create_processors(
         client_ip_masking=ClientIPMaskingProcessors(
             system_groups.group(GroupMeta(CLIENT_IP_MASKING_POLICY_ENTITY_TYPE))
         ),
+        rbac=RbacProcessors(
+            rbac_groups.relation_group(),
+            rbac_groups.group(GroupMeta(USER_ENTITY_TYPE)),
+            services.rbac_relation,
+            services.rbac_roster,
+            services.rbac_role,
+            action_monitors,
+        ),
         entity_share=EntityShareProcessors(
             rbac_groups.group(GroupMeta(ENTITY_SHARE_ENTITY_TYPE)),
             services.entity_share,
@@ -777,7 +800,6 @@ def create_processors(
         ),
         idle_checker_assignment=IdleCheckerAssignmentProcessors(
             session_groups.group(GroupMeta(IDLE_CHECKER_ENTITY_TYPE)),
-            session_groups.relation_group(),
             services.idle_checker_assignment,
         ),
         scheduling_history=SchedulingHistoryProcessors(

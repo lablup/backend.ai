@@ -20,15 +20,13 @@ from ai.backend.manager.data.permission.role import (
 from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
 from ai.backend.manager.repositories.base.creator import BulkCreator
 from ai.backend.manager.repositories.permission_controller.creators import UserRoleCreatorSpec
-from ai.backend.manager.services.permission_contoller.actions.bulk_assign_role import (
+from ai.backend.manager.services.rbac.actions.role.bulk_assign import (
     BulkAssignRoleAction,
 )
-from ai.backend.manager.services.permission_contoller.actions.bulk_revoke_role import (
+from ai.backend.manager.services.rbac.actions.role.bulk_revoke import (
     BulkRevokeRoleAction,
 )
-from ai.backend.manager.services.permission_contoller.service import (
-    PermissionControllerService,
-)
+from ai.backend.manager.services.rbac.service import RbacRoleService
 
 if TYPE_CHECKING:
     from ai.backend.manager.repositories.permission_controller.repository import (
@@ -44,18 +42,12 @@ class TestBulkAssignRole:
         return repository
 
     @pytest.fixture
-    def service(
-        self, mock_repository: PermissionControllerRepository
-    ) -> PermissionControllerService:
-        return PermissionControllerService(
-            repository=mock_repository,
-            group_repository=MagicMock(),
-            rbac_action_registry=[],
-        )
+    def service(self, mock_repository: PermissionControllerRepository) -> RbacRoleService:
+        return RbacRoleService(mock_repository, MagicMock())
 
     async def test_bulk_assign_all_succeed(
         self,
-        service: PermissionControllerService,
+        service: RbacRoleService,
         mock_repository: MagicMock,
     ) -> None:
         role_id = uuid.uuid4()
@@ -80,7 +72,7 @@ class TestBulkAssignRole:
 
     async def test_bulk_assign_partial_failure(
         self,
-        service: PermissionControllerService,
+        service: RbacRoleService,
         mock_repository: MagicMock,
     ) -> None:
         role_id = uuid.uuid4()
@@ -111,7 +103,7 @@ class TestBulkAssignRole:
 
     async def test_bulk_assign_all_fail(
         self,
-        service: PermissionControllerService,
+        service: RbacRoleService,
         mock_repository: MagicMock,
     ) -> None:
         role_id = uuid.uuid4()
@@ -135,7 +127,7 @@ class TestBulkAssignRole:
 
     async def test_bulk_assign_empty_user_ids(
         self,
-        service: PermissionControllerService,
+        service: RbacRoleService,
         mock_repository: MagicMock,
     ) -> None:
         mock_repository.bulk_assign_role.return_value = BulkRoleAssignmentResultData(
@@ -158,18 +150,12 @@ class TestBulkRevokeRole:
         return repository
 
     @pytest.fixture
-    def service(
-        self, mock_repository: PermissionControllerRepository
-    ) -> PermissionControllerService:
-        return PermissionControllerService(
-            repository=mock_repository,
-            group_repository=MagicMock(),
-            rbac_action_registry=[],
-        )
+    def service(self, mock_repository: PermissionControllerRepository) -> RbacRoleService:
+        return RbacRoleService(mock_repository, MagicMock())
 
     async def test_bulk_revoke_all_succeed(
         self,
-        service: PermissionControllerService,
+        service: RbacRoleService,
         mock_repository: MagicMock,
     ) -> None:
         role_id = uuid.uuid4()
@@ -192,7 +178,7 @@ class TestBulkRevokeRole:
 
     async def test_bulk_revoke_partial_failure(
         self,
-        service: PermissionControllerService,
+        service: RbacRoleService,
         mock_repository: MagicMock,
     ) -> None:
         role_id = uuid.uuid4()
@@ -218,7 +204,7 @@ class TestBulkRevokeRole:
 
     async def test_bulk_revoke_all_fail(
         self,
-        service: PermissionControllerService,
+        service: RbacRoleService,
         mock_repository: MagicMock,
     ) -> None:
         role_id = uuid.uuid4()
@@ -240,7 +226,7 @@ class TestBulkRevokeRole:
 
     async def test_bulk_revoke_empty_user_ids(
         self,
-        service: PermissionControllerService,
+        service: RbacRoleService,
         mock_repository: MagicMock,
     ) -> None:
         role_id = uuid.uuid4()

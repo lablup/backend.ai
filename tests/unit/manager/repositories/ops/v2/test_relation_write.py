@@ -24,7 +24,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
 from ai.backend.common.data.permission.types import Permission
-from ai.backend.manager.errors.repository import UniqueConstraintViolationError
+from ai.backend.manager.errors.common import ObjectNotFound
 from ai.backend.manager.models.base import Base
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.specs.relation import (
@@ -173,6 +173,15 @@ async def pair(database: ExtendedAsyncSAEngine) -> tuple[_ScopeID, _TargetID]:
     return scope, target
 
 
+@pytest.fixture
+async def other_target(database: ExtendedAsyncSAEngine) -> _TargetID:
+    """A second target in the graph, for the runs that name several pairs."""
+    target = _TargetID(uuid.uuid4())
+    async with database.begin_session() as sess:
+        sess.add(VirtualEntityRow(entity_type=_TARGET_TYPE, entity_id=target))
+    return target
+
+
 async def _off(database: ExtendedAsyncSAEngine) -> bool:
     async with database.begin_readonly_session() as sess:
         return (await sess.execute(sa.select(RelationTestRow.off))).scalar_one()
@@ -250,6 +259,23 @@ async def _share_cap(
         return cap
 
 
+class _RefusingCreator(_Creator):
+    """Refuses the link while any row already stands, so the check is observable."""
+
+    @override
+    def precondition_checks(
+        self, scope: _ScopeID, target: _TargetID
+    ) -> Sequence[PreconditionCheck]:
+        return (
+            PreconditionCheck(
+                finder=sa.select(RelationTestRow.id).where(
+                    RelationTestRow.scope_id == scope,
+                ),
+                error=ObjectNotFound(object_name="precondition"),
+            ),
+        )
+
+
 class TestCreateRelation:
     async def test_link_writes_the_row_the_govern_and_the_share(
         self,
@@ -259,27 +285,12 @@ class TestCreateRelation:
     ) -> None:
         scope, target = pair
         async with provider.write_ops() as ops:
-            await ops.create_relation(_Creator(), scope, target)
+            await ops.create_relations(_Creator(), [(scope, target)])
 
         assert await _row_count(database) == 1
         assert await _govern_cap(database, scope, target) == Permission.READ
         assert await _share_cap(database, target, scope) == Permission.READ
         assert await _share_cap(database, scope, target) is None
-
-    async def test_linking_a_linked_pair_is_a_unique_violation(
-        self,
-        database: ExtendedAsyncSAEngine,
-        provider: RelationOpsProvider,
-        pair: tuple[_ScopeID, _TargetID],
-    ) -> None:
-        scope, target = pair
-        async with provider.write_ops() as ops:
-            await ops.create_relation(_Creator(), scope, target)
-        with pytest.raises(UniqueConstraintViolationError):
-            async with provider.write_ops() as ops:
-                await ops.create_relation(_Creator(), scope, target)
-
-        assert await _row_count(database) == 1
 
     async def test_link_and_unlink_leave_a_share_set_beside_them(
         self,
@@ -291,13 +302,30 @@ class TestCreateRelation:
         async with ShareOpsProvider(database).write_ops() as share_ops:
             await share_ops.replace_share(target, scope, Permission.UPDATE)
         async with provider.write_ops() as ops:
-            await ops.create_relation(_Creator(), scope, target)
+            await ops.create_relations(_Creator(), [(scope, target)])
         assert await _share_cap(database, target, scope) == Permission.READ | Permission.UPDATE
 
         async with provider.write_ops() as ops:
-            await ops.purge_relation(_Purger(), scope, target)
+            await ops.purge_relations(_Purger(), [(scope, target)])
         assert await _share_cap(database, target, scope) == Permission.UPDATE
         assert await _govern_cap(database, scope, target) is False
+
+    async def test_a_precondition_the_spec_names_turns_the_link_away(
+        self,
+        database: ExtendedAsyncSAEngine,
+        provider: RelationOpsProvider,
+        pair: tuple[_ScopeID, _TargetID],
+    ) -> None:
+        """What the spec declares must not be there is looked for before the insert."""
+        scope, target = pair
+        async with provider.write_ops() as ops:
+            await ops.create_relations(_Creator(), [(scope, target)])
+
+        with pytest.raises(ObjectNotFound):
+            async with provider.write_ops() as ops:
+                await ops.create_relations(_RefusingCreator(), [(scope, _TargetID(uuid.uuid4()))])
+
+        assert await _row_count(database) == 1
 
 
 class TestSwitchRelation:
@@ -309,16 +337,18 @@ class TestSwitchRelation:
     ) -> None:
         scope, target = pair
         async with provider.write_ops() as ops:
-            await ops.create_relation(_Creator(), scope, target)
+            await ops.create_relations(_Creator(), [(scope, target)])
         async with provider.write_ops() as ops:
-            await ops.delete_relation(_SwitchOff(), scope, target)
+            switched = await ops.delete_relations(_SwitchOff(), [(scope, target)])
+        assert switched == [True]
 
         assert await _off(database) is True
         assert await _govern_cap(database, scope, target) == Permission.READ
         assert await _share_cap(database, target, scope) == Permission.READ
 
         async with provider.write_ops() as ops:
-            await ops.restore_relation(_SwitchOn(), scope, target)
+            switched = await ops.restore_relations(_SwitchOn(), [(scope, target)])
+        assert switched == [True]
 
         assert await _off(database) is False
 
@@ -332,9 +362,9 @@ class TestPurgeRelation:
     ) -> None:
         scope, target = pair
         async with provider.write_ops() as ops:
-            await ops.create_relation(_Creator(), scope, target)
+            await ops.create_relations(_Creator(), [(scope, target)])
         async with provider.write_ops() as ops:
-            await ops.purge_relation(_Purger(), scope, target)
+            await ops.purge_relations(_Purger(), [(scope, target)])
 
         assert await _row_count(database) == 0
         assert await _govern_cap(database, scope, target) is False
@@ -348,6 +378,66 @@ class TestPurgeRelation:
     ) -> None:
         scope, target = pair
         async with provider.write_ops() as ops:
-            assert await ops.purge_relation(_Purger(), scope, target) is False
+            assert await ops.purge_relations(_Purger(), [(scope, target)]) == [False]
 
+        assert await _row_count(database) == 0
+
+
+class TestManyPairsInOneRun:
+    """The plural forms, which take every pair a request named."""
+
+    async def test_one_run_links_every_pair_it_names(
+        self,
+        database: ExtendedAsyncSAEngine,
+        provider: RelationOpsProvider,
+        pair: tuple[_ScopeID, _TargetID],
+        other_target: _TargetID,
+    ) -> None:
+        """Several pairs go in one run, and the answer is per pair in the order given."""
+        scope, target = pair
+        async with provider.write_ops() as ops:
+            written = await ops.create_relations(
+                _Creator(), [(scope, target), (scope, other_target)]
+            )
+
+        assert written == [True, True]
+        assert await _row_count(database) == 2
+
+    async def test_a_pair_already_linked_is_skipped(
+        self,
+        database: ExtendedAsyncSAEngine,
+        provider: RelationOpsProvider,
+        pair: tuple[_ScopeID, _TargetID],
+        other_target: _TargetID,
+    ) -> None:
+        """A pair already linked is left as it stands and answered False, so naming one
+        twice is not something a caller has to avoid."""
+        scope, target = pair
+        async with provider.write_ops() as ops:
+            await ops.create_relations(_Creator(), [(scope, target)])
+        async with provider.write_ops() as ops:
+            written = await ops.create_relations(
+                _Creator(), [(scope, target), (scope, other_target)]
+            )
+
+        assert written == [False, True]
+        assert await _row_count(database) == 2
+
+    async def test_unlinking_answers_per_pair(
+        self,
+        database: ExtendedAsyncSAEngine,
+        provider: RelationOpsProvider,
+        pair: tuple[_ScopeID, _TargetID],
+        other_target: _TargetID,
+    ) -> None:
+        """Unlinking a pair that was never linked is silent and answered False."""
+        scope, target = pair
+        async with provider.write_ops() as ops:
+            await ops.create_relations(_Creator(), [(scope, target)])
+        async with provider.write_ops() as ops:
+            unlinked = await ops.purge_relations(
+                _Purger(), [(scope, target), (scope, other_target)]
+            )
+
+        assert unlinked == [True, False]
         assert await _row_count(database) == 0

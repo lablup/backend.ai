@@ -11,6 +11,7 @@ from graphql import Undefined
 from ai.backend.common.container_registry import AllowedGroupsModel
 from ai.backend.common.data.entity.container_registry import ContainerRegistryID
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.api.adapters.container_registry.adapter import ContainerRegistryAdapter
 from ai.backend.manager.models.container_registry import (
     ContainerRegistryValidator,
     ContainerRegistryValidatorArgs,
@@ -66,8 +67,6 @@ class CreateContainerRegistryNodeInputV2(graphene.InputObjectType):  # type: ign
         def value_or_none(val: Any) -> None | Any:
             return None if val is Undefined else val
 
-        sanitized_allowed_groups: AllowedGroups | None = value_or_none(self.allowed_groups)
-
         return CreateContainerRegistryAction(
             creator=ContainerRegistryCreator(
                 url=self.url,
@@ -79,11 +78,16 @@ class CreateContainerRegistryNodeInputV2(graphene.InputObjectType):  # type: ign
                 password=value_or_none(self.password),
                 ssl_verify=value_or_none(self.ssl_verify),
                 extra=value_or_none(self.extra),
-                allowed_groups=sanitized_allowed_groups.to_model()
-                if sanitized_allowed_groups is not None
-                else None,
             )
         )
+
+    def to_allowed_groups(self) -> AllowedGroupsModel | None:
+        """The projects the registry is to be linked to, which the relation operations
+        write beside the registry itself."""
+        groups: AllowedGroups | None = (
+            None if self.allowed_groups is Undefined else self.allowed_groups
+        )
+        return groups.to_model() if groups is not None else None
 
 
 class CreateContainerRegistryNodeV2(graphene.Mutation):  # type: ignore[misc]
@@ -118,6 +122,11 @@ class CreateContainerRegistryNodeV2(graphene.Mutation):  # type: ignore[misc]
         result = await ctx.processors.container_registry.create_container_registry.run(
             props.to_action()
         )
+        allowed_groups = props.to_allowed_groups()
+        if allowed_groups is not None:
+            await ContainerRegistryAdapter(ctx.processors).apply_allowed_groups(
+                ContainerRegistryID(result.data.id), allowed_groups
+            )
 
         return cls(
             container_registry=ContainerRegistryNode.from_dataclass(result.data),
@@ -140,16 +149,17 @@ class ModifyContainerRegistryNodeInputV2(graphene.InputObjectType):  # type: ign
     extra = graphene.JSONString(description="Added in 25.3.0.")
     allowed_groups = AllowedGroups(description="Added in 25.3.0.")
 
-    def to_action(self, registry_id: uuid.UUID) -> UpdateContainerRegistryAction:
-        if self.allowed_groups is not Undefined:
-            allowed_groups_model = AllowedGroupsModel(
-                add=self.allowed_groups.add or [],
-                remove=self.allowed_groups.remove or [],
-            )
-            allowed_groups_state = TriState.update(allowed_groups_model)
-        else:
-            allowed_groups_state = TriState.nop()
+    def to_allowed_groups(self) -> AllowedGroupsModel | None:
+        """The projects to link and unlink, which the relation operations write beside
+        the update."""
+        if self.allowed_groups is Undefined:
+            return None
+        return AllowedGroupsModel(
+            add=self.allowed_groups.add or [],
+            remove=self.allowed_groups.remove or [],
+        )
 
+    def to_action(self, registry_id: uuid.UUID) -> UpdateContainerRegistryAction:
         return UpdateContainerRegistryAction(
             updater=ContainerRegistryUpdater(
                 registry_id=ContainerRegistryID(registry_id),
@@ -162,7 +172,6 @@ class ModifyContainerRegistryNodeInputV2(graphene.InputObjectType):  # type: ign
                 password=TriState.from_graphql(self.password),
                 ssl_verify=TriState.from_graphql(self.ssl_verify),
                 extra=TriState.from_graphql(self.extra),
-                allowed_groups=allowed_groups_state,
             )
         )
 
@@ -195,6 +204,11 @@ class ModifyContainerRegistryNodeV2(graphene.Mutation):  # type: ignore[misc]
         _, _id = AsyncNode.resolve_global_id(info, id)
         reg_id = uuid.UUID(_id) if _id else uuid.UUID(id)
 
+        allowed_groups = props.to_allowed_groups()
+        if allowed_groups is not None:
+            await ContainerRegistryAdapter(ctx.processors).apply_allowed_groups(
+                ContainerRegistryID(reg_id), allowed_groups
+            )
         result = await ctx.processors.container_registry.update_container_registry.run(
             props.to_action(reg_id)
         )

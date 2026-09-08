@@ -1,33 +1,25 @@
 from __future__ import annotations
 
-from ai.backend.manager.data.idle_checker.types import IdleCheckerAssignmentData
 from ai.backend.manager.repositories.idle_checker.repository import IdleCheckerRepository
 from ai.backend.manager.services.idle_checker_assignment.actions.admin_search import (
     AdminSearchIdleCheckerAssignmentsAction,
     SearchIdleCheckerAssignmentsActionResult,
 )
-from ai.backend.manager.services.idle_checker_assignment.actions.create import (
-    CreateIdleCheckerAssignmentAction,
-)
 from ai.backend.manager.services.idle_checker_assignment.actions.lookup import (
     LookupIdleCheckerAssignmentAction,
     LookupIdleCheckerAssignmentActionResult,
-)
-from ai.backend.manager.services.idle_checker_assignment.actions.purge import (
-    PurgeIdleCheckerAssignmentAction,
+    LookupIdleCheckerAssignmentByPairAction,
 )
 from ai.backend.manager.services.idle_checker_assignment.actions.scoped_search import (
     ScopedSearchIdleCheckerAssignmentsAction,
     ScopedSearchIdleCheckerAssignmentsActionResult,
 )
-from ai.backend.manager.services.idle_checker_assignment.actions.update import (
-    DisableIdleCheckerAssignmentAction,
-    EnableIdleCheckerAssignmentAction,
-)
 
 
 class IdleCheckerAssignmentService:
-    """Hands each relation action's pair to the repository; nothing reads before writing."""
+    """Reads a binding, by its id or by the pair it stands between.
+
+    The writes are the relation operations, which the rbac boundary answers for."""
 
     _repository: IdleCheckerRepository
 
@@ -41,21 +33,12 @@ class IdleCheckerAssignmentService:
             data=await self._repository.get_assignment(action.assignment_id)
         )
 
-    async def create(self, action: CreateIdleCheckerAssignmentAction) -> IdleCheckerAssignmentData:
-        return await self._repository.create_assignment(
-            action.creator, action.scope, action.idle_checker_id
+    async def lookup_by_pair(
+        self, action: LookupIdleCheckerAssignmentByPairAction
+    ) -> LookupIdleCheckerAssignmentActionResult:
+        return LookupIdleCheckerAssignmentActionResult(
+            data=await self._repository.get_assignment_by_pair(action.scope, action.idle_checker_id)
         )
-
-    async def enable(self, action: EnableIdleCheckerAssignmentAction) -> IdleCheckerAssignmentData:
-        return await self._repository.enable_assignment(action.scope, action.idle_checker_id)
-
-    async def disable(
-        self, action: DisableIdleCheckerAssignmentAction
-    ) -> IdleCheckerAssignmentData:
-        return await self._repository.disable_assignment(action.scope, action.idle_checker_id)
-
-    async def purge(self, action: PurgeIdleCheckerAssignmentAction) -> None:
-        await self._repository.purge_assignment(action.scope, action.idle_checker_id)
 
     async def admin_search(
         self, action: AdminSearchIdleCheckerAssignmentsAction
