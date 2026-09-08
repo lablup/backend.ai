@@ -36,12 +36,12 @@ from ai.backend.manager.services.image.actions.get_image_installed_agents import
     GetImageInstalledAgentsActionResult,
 )
 from ai.backend.manager.services.image.actions.get_images import (
-    GetImageByIdAction,
-    GetImageByIdActionResult,
-    GetImageByIdentifierAction,
-    GetImageByIdentifierActionResult,
-    GetImagesByCanonicalsAction,
-    GetImagesByCanonicalsActionResult,
+    PublicGetImageByIdAction,
+    PublicGetImageByIdActionResult,
+    PublicGetImageByIdentifierAction,
+    PublicGetImageByIdentifierActionResult,
+    PublicGetImagesByCanonicalsAction,
+    PublicGetImagesByCanonicalsActionResult,
 )
 from ai.backend.manager.services.image.actions.preload_image import (
     PreloadImageAction,
@@ -128,12 +128,14 @@ class ImageProcessors:
     set_image_resource_limit_by_id: GlobalActionProcessor[
         SetImageResourceLimitByIdAction, SetImageResourceLimitByIdActionResult
     ]
-    get_image_by_id: GlobalActionProcessor[GetImageByIdAction, GetImageByIdActionResult]
-    get_image_by_identifier: GlobalActionProcessor[
-        GetImageByIdentifierAction, GetImageByIdentifierActionResult
+    public_get_image_by_id: PublicActionProcessor[
+        PublicGetImageByIdAction, PublicGetImageByIdActionResult
     ]
-    get_images_by_canonicals: GlobalActionProcessor[
-        GetImagesByCanonicalsAction, GetImagesByCanonicalsActionResult
+    public_get_image_by_identifier: PublicActionProcessor[
+        PublicGetImageByIdentifierAction, PublicGetImageByIdentifierActionResult
+    ]
+    public_get_images_by_canonicals: PublicActionProcessor[
+        PublicGetImagesByCanonicalsAction, PublicGetImagesByCanonicalsActionResult
     ]
     get_image_installed_agents: GlobalActionProcessor[
         GetImageInstalledAgentsAction, GetImageInstalledAgentsActionResult
@@ -145,20 +147,21 @@ class ImageProcessors:
     search_aliases: GlobalActionProcessor[SearchAliasesAction, SearchAliasesActionResult]
 
     def __init__(self, group: ProcessorGroup[ImageData], service: ImageService) -> None:
-        # Actions without RBAC validation (internal/system or special entity types)
+        self.public_get_all_images = group.public(PublicGetAllImagesAction, service.get_all_images)
+        self.public_get_image_by_id = group.public(
+            PublicGetImageByIdAction, service.get_image_by_id
+        )
+        self.public_get_image_by_identifier = group.public(
+            PublicGetImageByIdentifierAction, service.get_image_by_identifier
+        )
+        self.public_get_images_by_canonicals = group.public(
+            PublicGetImagesByCanonicalsAction, service.get_images_by_canonicals
+        )
+
         self.get_image_installed_agents = group.global_scope(
             GetImageInstalledAgentsAction, service.get_image_installed_agents
         )
-        self.get_images_by_canonicals = group.global_scope(
-            GetImagesByCanonicalsAction, service.get_images_by_canonicals
-        )
-        self.get_image_by_identifier = group.global_scope(
-            GetImageByIdentifierAction, service.get_image_by_identifier
-        )
-        self.get_image_by_id = group.global_scope(GetImageByIdAction, service.get_image_by_id)
         self.forget_image = group.global_scope(ForgetImageAction, service.forget_image)
-
-        self.public_get_all_images = group.public(PublicGetAllImagesAction, service.get_all_images)
         self.search_images = group.global_scope(SearchImagesAction, service.search_images)
 
         self.forget_image_by_id = group.single_entity(
