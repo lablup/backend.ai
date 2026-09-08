@@ -930,11 +930,11 @@ def collect_device_capacities(
     Collect the allocatable capacity of each device in its own slot unit,
     which is the denominator to normalize recorded allocations into ratios.
     """
-    return {
-        (slot_info.slot_name, device_id): slot_info.amount
-        for computer_ctx in computers.values()
-        for device_id, slot_info in computer_ctx.alloc_map.device_slots.items()
-    }
+    capacities: dict[tuple[SlotName, DeviceId], Decimal] = {}
+    for computer_ctx in computers.values():
+        for device_id, slot_info in computer_ctx.alloc_map.device_slots.items():
+            capacities[(slot_info.slot_name, device_id)] = slot_info.amount
+    return capacities
 
 
 def _normalize_device_alloc(
@@ -951,8 +951,8 @@ def _normalize_device_alloc(
         # The device is no longer in the alloc map (e.g. removed or masked),
         # so the ratio is unknown and the raw amount is reported as-is.
         log.warning(
-            "scan_gpu_alloc_map(): no capacity for {}:{} (capacity:{!r}), "
-            "reporting the raw allocation {}",
+            "scan_gpu_alloc_map(): no capacity found, reporting the raw allocation "
+            "(slot:{}, device:{}, capacity:{!r}, alloc:{})",
             slot_name,
             device_id,
             capacity,
