@@ -1101,14 +1101,28 @@ class AbstractAgent[
         loop = current_loop()
         self.container_lifecycle_handler = loop.create_task(self.process_lifecycle_events())
 
-        # Notify the gateway.
-        await self.anycast_event(AgentStartedEvent(reason="self-started"))
+        # The gateway is NOT told here. This runs from inside `__ainit__`, and a backend's own
+        # `__ainit__` has work of its own still to do after calling up to this one -- the docker
+        # agent's socket relay, its network plugin context, the advert that says it can serve a
+        # cluster-network session. Announcing at this point marks the agent ALIVE and schedulable
+        # while all of that is still ahead of it, and a failure in any of it aborts the runtime
+        # before `shutdown` ever runs. `announce_started` is called once the agent is actually
+        # built; see `AgentRuntime._create_agent`.
 
         # passive events
         evd = self.event_dispatcher
         evd.subscribe(DoVolumeMountEvent, self, handle_volume_mount, name="ag.volume.mount")
         evd.subscribe(DoVolumeUnmountEvent, self, handle_volume_umount, name="ag.volume.umount")
         await self.event_dispatcher.start()
+
+    async def announce_started(self) -> None:
+        """Tell the manager this agent is up, once it actually is.
+
+        Called after the whole of `__ainit__` -- this class's and the backend's -- has finished,
+        because this is what makes the node schedulable. Anything that can still fail after it
+        would leave the manager placing work on an agent that is not there.
+        """
+        await self.anycast_event(AgentStartedEvent(reason="self-started"))
 
     async def _make_message_queue(self, stream_redis_target: RedisTarget) -> AbstractMessageQueue:
         """

@@ -573,3 +573,21 @@ the commit point of agent startup generally is a wider change than this branch s
 R3 unchanged. `SCENARIOS.md` still has no result for two-node, restart, failure or
 encryption-wire, and neither NIC failover nor a failed agent start appears there at all. Six
 rounds of admission and lifecycle gates have each been unit-tested; none has met a real agent.
+
+Twenty-sixth round. The first finding is a defect I introduced in the round before it, and it is
+worth naming for what it is: I guarded a create on a liveness heartbeat.
+
+| # | Was | Now |
+|---|-----|-----|
+| C48 | the READY write was made conditional on the capability record's exact bytes -- and the agent rewrites those every sixty seconds with a new timestamp, to say it is still there. Any create that straddled a refresh failed, on a cluster where nothing was wrong. A fence built out of a heartbeat | conditional on the agent's IDENTITY keys instead -- boot and backend -- which move only when it restarts or changes runtime. Captured at admission, not re-read at the end: re-reading compares the state to itself and passes whatever happened in between |
+| C48 | those identity keys were not checked at all, so an agent that restarted mid-create still got a READY session declared on the advert its previous run had left | both are guards, and `None` guards absence -- an agent with no boot key that gains one has restarted into a run that publishes them. `compare_and_put` now takes absence as a guard condition, as `compare_and_delete` already did |
+| A11c | the started event went out from inside `AbstractAgent.__ainit__`, which a backend calls up to with its own work still ahead -- the socket relay, the network plugin context, the advert that admits it to a cluster-network session. The manager marked the node ALIVE and schedulable through all of it, and a failure aborts the runtime before `shutdown` can withdraw anything | `announce_started` is called by the runtime once the agent is built. Nothing that can fail comes between being announced and being able to serve |
+
+Still not done. `AsyncEtcd.get_prefix` has no paginated form and there is no bound on session
+count. There is no inspect/repair/quarantine tool for a corrupt root. The agent identity is three
+keys, and ordering narrows rather than closes that window.
+
+R3 unchanged, and this round makes the case louder rather than quieter: the last defect was one
+where the unit tests all passed because the fake never heartbeats. `SCENARIOS.md` still has no
+result for two-node, restart, failure or encryption-wire, and nothing for NIC failover, a failed
+agent start, or a create that runs across a capability refresh.
