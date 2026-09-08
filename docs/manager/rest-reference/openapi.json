@@ -18124,7 +18124,7 @@
         "type": "object"
       },
       "ModifyQueryDefinitionInput": {
-        "description": "Input for modifying a prometheus query definition.\n\nNullable DB columns (``time_window``, ``description``, ``category_id``) use the\n``Sentinel`` pattern so callers can distinguish \"leave unchanged\" from \"clear to null\".\nNon-nullable fields use ``None`` to mean \"do not update\".",
+        "description": "Input for modifying a prometheus query definition.\n\nNullable DB columns (``time_window``, ``description``, ``category_id``) use the\n``Unset`` pattern so callers can distinguish \"leave unchanged\" from \"clear to null\".\nNon-nullable fields use ``None`` to mean \"do not update\".",
         "properties": {
           "name": {
             "anyOf": [
@@ -18145,14 +18145,10 @@
                 "type": "string"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
-            "description": "Updated description. Pass SENTINEL (default) to leave unchanged; pass None to clear.",
+            "description": "Updated description. Omit to leave unchanged; null clears.",
             "title": "Description"
           },
           "rank": {
@@ -18176,14 +18172,10 @@
                 "type": "string"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
-            "description": "Updated category ID. Pass SENTINEL (default) to leave unchanged; pass None to clear.",
+            "description": "Updated category ID. Omit to leave unchanged; null clears.",
             "title": "Category Id"
           },
           "metric_name": {
@@ -18218,14 +18210,10 @@
                 "type": "string"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
-            "description": "Updated default time window. Pass SENTINEL (default) to leave unchanged; pass None to clear.",
+            "description": "Updated default time window. Omit to leave unchanged; null clears.",
             "title": "Time Window"
           },
           "options": {
