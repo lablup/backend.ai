@@ -82,3 +82,21 @@ that group hands out. The entity recorded is always the preset.
   environment, refusing syntax errors, undefined variables and an empty result.
 - Length is not checked: the render truncates to the column limit, so there is nothing
   to refuse.
+
+## A preset change carries over to the roles derived from it
+
+- A role records the preset that instantiated it in `roles.role_preset_id`. Update,
+  add permissions and remove permissions go through `RolePresetRepository`, which in the
+  same transaction brings that preset's derived roles back to what the preset now
+  declares. A role whose link is NULL is never touched.
+- Permissions are stated on the role's own scope to equal the preset's set. An entity
+  type the preset dropped is revoked. Rows are not deleted and recreated, so role ids
+  stay.
+- The name is rendered again by the same rule creation used (`_preset_role_name`). A
+  templated preset whose scope row is gone leaves that role's name alone.
+- A role sits in the scope that provisioned it, so the roles to update are the ones
+  found by joining the preset's roles to a scope of the preset's `scope_type`. When
+  `scope_type` changes, the existing derived roles fall out of that join and stay as they
+  are: a role sitting in a scope of another type cannot be re-derived for the new type.
+- `auto_assign` going False to True grants nothing to existing users. Granting is a rule
+  of entity creation; a preset change only flips the roles' flag.

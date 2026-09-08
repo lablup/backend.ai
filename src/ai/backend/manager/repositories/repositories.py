@@ -57,6 +57,7 @@ from ai.backend.manager.repositories.resource_usage_history.repositories import 
     ResourceUsageHistoryRepositories,
 )
 from ai.backend.manager.repositories.retention.repositories import RetentionRepositories
+from ai.backend.manager.repositories.role_preset.repositories import RolePresetRepositories
 from ai.backend.manager.repositories.runtime_variant.repositories import RuntimeVariantRepositories
 from ai.backend.manager.repositories.runtime_variant_preset.repositories import (
     RuntimeVariantPresetRepositories,
@@ -131,6 +132,7 @@ class Repositories:
     events: EventsRepositories
     storage_namespace: StorageNamespaceRepositories
     retention: RetentionRepositories
+    role_preset: RolePresetRepositories
     secret: SecretRepositories
 
     @classmethod
@@ -181,6 +183,7 @@ class Repositories:
         events_repositories = EventsRepositories.create(args)
         storage_namespace_repositories = StorageNamespaceRepositories.create(args)
         retention_repositories = RetentionRepositories.create(args)
+        role_preset_repositories = RolePresetRepositories.create(args)
         secret_repositories = SecretRepositories.create(args)
 
         return cls(
@@ -232,5 +235,6 @@ class Repositories:
             events=events_repositories,
             storage_namespace=storage_namespace_repositories,
             retention=retention_repositories,
+            role_preset=role_preset_repositories,
             secret=secret_repositories,
         )

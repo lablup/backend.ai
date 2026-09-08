@@ -7,8 +7,10 @@ import jinja2
 import jinja2.sandbox
 
 from ai.backend.manager.actions.v2.ops.result import (
+    BulkFieldOpsResult,
     CreatedEntityWithFieldsOpsResult,
     EntityOpsResult,
+    FieldsOpsResult,
 )
 from ai.backend.manager.data.permission.scope_template import ScopeTemplateValue
 from ai.backend.manager.data.role_preset.types import (
@@ -17,6 +19,13 @@ from ai.backend.manager.data.role_preset.types import (
 )
 from ai.backend.manager.errors.role_preset import InvalidRoleNameTemplate
 from ai.backend.manager.repositories.ops.repository import OpsRepository
+from ai.backend.manager.repositories.role_preset.repository import RolePresetRepository
+from ai.backend.manager.services.role_preset.actions.bulk_add_permissions import (
+    BulkAddRolePermissionPresetsAction,
+)
+from ai.backend.manager.services.role_preset.actions.bulk_remove_permissions import (
+    BulkRemoveRolePermissionPresetsAction,
+)
 from ai.backend.manager.services.role_preset.actions.create import CreateRolePresetAction
 from ai.backend.manager.services.role_preset.actions.update import UpdateRolePresetAction
 
@@ -24,17 +33,23 @@ __all__ = ("RolePresetService",)
 
 
 class RolePresetService:
-    """The two writes that settle a preset's ``role_name_template``.
+    """The writes that settle a preset's ``role_name_template`` and the ones that
+    carry over to the roles instantiated from the preset.
 
-    Every other operation of this domain runs straight against ops; these two branch,
-    so they are the whole of this service.
+    Create validates the template. Update, add and remove permissions go through
+    :class:`RolePresetRepository`, which re-derives the preset's roles in the same
+    transaction. Every other operation of this domain runs straight against ops.
     """
 
     _repository: OpsRepository[RolePresetData]
+    _preset_repository: RolePresetRepository
     _template_env: jinja2.sandbox.ImmutableSandboxedEnvironment
 
-    def __init__(self, repository: OpsRepository[RolePresetData]) -> None:
+    def __init__(
+        self, repository: OpsRepository[RolePresetData], preset_repository: RolePresetRepository
+    ) -> None:
         self._repository = repository
+        self._preset_repository = preset_repository
         self._template_env = jinja2.sandbox.ImmutableSandboxedEnvironment(
             undefined=jinja2.StrictUndefined,
         )
@@ -52,7 +67,21 @@ class RolePresetService:
         template = action.updater.role_name_template
         if template.is_update():
             self._reject_unrenderable(template.value())
-        return EntityOpsResult(data=await self._repository.update(action.to_updater()))
+        return EntityOpsResult(data=await self._preset_repository.update(action.to_updater()))
+
+    async def bulk_add_permissions(
+        self, action: BulkAddRolePermissionPresetsAction
+    ) -> FieldsOpsResult[RolePermissionPresetData]:
+        return FieldsOpsResult(
+            items=await self._preset_repository.add_permissions(
+                action.owner_id(), action.to_creators()
+            )
+        )
+
+    async def bulk_remove_permissions(
+        self, action: BulkRemoveRolePermissionPresetsAction
+    ) -> BulkFieldOpsResult[RolePermissionPresetData]:
+        return await self._preset_repository.remove_permissions(action.to_purgers())
 
     def _reject_unrenderable(self, template: str | None) -> None:
         """Render the template against representative values and refuse a broken one.
