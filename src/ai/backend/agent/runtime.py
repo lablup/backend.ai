@@ -185,6 +185,11 @@ class AgentRuntime:
         for agent in self.get_agents():
             await agent.start_serving()
 
+    async def stop_serving(self) -> None:
+        """Stop every agent announcing itself. See `AbstractAgent.stop_serving`."""
+        for agent in self.get_agents():
+            await agent.stop_serving()
+
     def get_agents(self) -> list[AbstractAgent[Any, Any]]:
         return list(self._agents.values())
 

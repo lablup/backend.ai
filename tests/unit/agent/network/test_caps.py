@@ -82,9 +82,22 @@ class TestPublishVtep:
 class _CapturingEtcd:
     def __init__(self) -> None:
         self.puts: dict[str, str] = {}
+        self.deleted: list[str] = []
+        #: Every write in the order it happened. The order is the contract between the capability
+        #: record and the readiness fence, so a test has to be able to see it.
+        self.order: list[tuple[str, str]] = []
+
+    async def delete(self, key: str, **kwargs: Any) -> None:
+        self.puts.pop(key, None)
+        self.deleted.append(key)
+        self.order.append(("delete", key))
+
+    async def get(self, key: str, **kwargs: Any) -> str | None:
+        return self.puts.get(key)
 
     async def put(self, key: str, val: str, **kwargs: Any) -> None:
         self.puts[key] = val
+        self.order.append(("put", key))
 
 
 class TestPublishCaps:
@@ -96,6 +109,63 @@ class TestPublishCaps:
         payload = json.loads(raw)
         assert payload["backends"] == ["vxlan"]
         assert payload["tunnel_offload"] is False
+
+
+class TestTheReadinessFenceIsNeverAheadOfTheRecord:
+    """The record and the fence are two writes, and a manager reads between them. A create is
+    admitted on the pair and its READY check is conditional on the fence, so the order decides
+    whether a node whose endpoint has already moved can still have a session declared on it."""
+
+    async def test_a_heartbeat_leaves_the_fence_alone(self) -> None:
+        etcd = _CapturingEtcd()
+        caps = AgentNetworkCaps(tunnel_offload=False, backends=["vxlan"])
+        await publish_caps(cast(AbstractKVStore, etcd), "i-abc123", caps, vtep_ip="10.0.0.1")
+        first = etcd.puts["network/agent/i-abc123/ready"]
+        etcd.deleted.clear()
+
+        await publish_caps(cast(AbstractKVStore, etcd), "i-abc123", caps, vtep_ip="10.0.0.1")
+
+        assert etcd.puts["network/agent/i-abc123/ready"] == first
+        assert etcd.deleted == [], "an unchanged fence was taken down and put back"
+
+    async def test_a_readiness_change_takes_the_old_fence_down_first(self) -> None:
+        etcd = _CapturingEtcd()
+        caps = AgentNetworkCaps(tunnel_offload=False, backends=["vxlan"])
+        await publish_caps(cast(AbstractKVStore, etcd), "i-abc123", caps, vtep_ip="10.0.0.1")
+        before = etcd.puts["network/agent/i-abc123/ready"]
+        etcd.order.clear()
+
+        await publish_caps(cast(AbstractKVStore, etcd), "i-abc123", caps, vtep_ip="10.0.0.2")
+
+        assert etcd.puts["network/agent/i-abc123/ready"] != before
+        # Down, then the record, then up: the worst a reader sees is "not admitting", which is
+        # true. The other order leaves the old fence standing over a record it no longer matches.
+        assert etcd.order == [
+            ("delete", "network/agent/i-abc123/ready"),
+            ("put", "network/agent/i-abc123/caps"),
+            ("put", "network/agent/i-abc123/ready"),
+        ]
+
+    async def test_a_diagnostic_that_flapped_does_not_move_the_fence(self) -> None:
+        # `tunnel_offload` comes from running ethtool, which fails transiently and answers False
+        # when it does. The overlay works either way, so it must not break a live create.
+        etcd = _CapturingEtcd()
+        await publish_caps(
+            cast(AbstractKVStore, etcd),
+            "i-abc123",
+            AgentNetworkCaps(tunnel_offload=True, backends=["vxlan"]),
+            vtep_ip="10.0.0.1",
+        )
+        before = etcd.puts["network/agent/i-abc123/ready"]
+
+        await publish_caps(
+            cast(AbstractKVStore, etcd),
+            "i-abc123",
+            AgentNetworkCaps(tunnel_offload=False, backends=["vxlan"]),
+            vtep_ip="10.0.0.1",
+        )
+
+        assert etcd.puts["network/agent/i-abc123/ready"] == before
 
 
 class TestTheOverlayEncryptionProfile:
