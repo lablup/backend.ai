@@ -1,6 +1,7 @@
 """Creator for repository insert operations.
 
-Deprecated: declare new insert specs in ``models/specs/creator.py``.
+Deprecated: declare new insert specs in ``models/specs/creator.py``. The remaining
+users move under BA-7204.
 """
 
 from __future__ import annotations
@@ -29,7 +30,7 @@ class CreatorSpec[TRow: Base](ABC):
     """Abstract base class defining a row to insert.
 
     Deprecated: use ``GlobalEntityCreator`` / ``EntityCreator`` /
-    ``RoleManagedEntityCreator`` / ``FieldCreator`` in ``models/specs/creator.py``.
+    ``RoleManagedEntityCreator`` / ``FieldCreator`` in ``models/specs/creator.py`` — BA-7204.
 
     Implementations specify what to create by providing:
     - A build_row() method that returns the ORM instance to insert
@@ -57,7 +58,7 @@ class CreatorSpec[TRow: Base](ABC):
 class DataCreator[TRow: Base, TData](CreatorSpec[TRow], ABC):
     """A creator spec that also says how the inserted row becomes data.
 
-    Deprecated with :class:`CreatorSpec`; the v2 roots already carry ``to_data``.
+    Deprecated with :class:`CreatorSpec`; the v2 roots already carry ``to_data`` — BA-7204.
 
     ``CreatorSpec`` stops at building the row, which leaves every caller converting it
     by hand. Adding ``to_data`` here lets the ops layer return the ``data/`` type

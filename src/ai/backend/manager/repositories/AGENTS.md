@@ -30,8 +30,8 @@
   - write specs: `GlobalEntity*` / `Entity*` / `RoleManagedEntity*` / `FieldEntity*` (Creator/Purger/Upserter)
   - read/update: `DataQuerier`, `DataLookup`, `Searcher`, `DataUpdater`
 - No new use of the legacy specs — transition-only maintenance of existing code:
-  - `repositories/base/`: `CreatorSpec`, `DataCreator`, `UpserterSpec`, `PurgerSpec`
-  - `repositories/base/rbac/`: the scope binder and unbinder
+  - `repositories/base/`: `CreatorSpec`, `DataCreator`, `DependentCreatorSpec`, `UpserterSpec`, `PurgerSpec`
+  - `repositories/permission_controller/`: the local creator and purger specs
   - Judge by import path (`models.specs.*` is v2) — `repositories.base` re-exports some
     v2 types and bridge classes like `DataBatchPurger` share names, so never judge by
     the class name alone.
@@ -55,10 +55,11 @@
   and inject that provider only into the repositories needing the primitive
   (`ops/v2/reconciler/`, `ops/v2/user/`, `ops/rbac/`).
 - Separating into a repository is the default; internal operations may use db directly.
-- ops methods take only spec types (Querier/Creator/Updater/Upserter/Purger, `DependentCreatorSpec`).
+- ops methods take only spec types (Querier/Creator/Updater/Upserter/Purger).
   A single spec owns only a single table.
-- Do NOT do multi-table writes inside a spec. The repository creates the parent first, then composes the dependent values
-  from the result and passes them to `create_dependent` / `bulk_create_dependent` as a `DependentCreatorSpec`.
+- Do NOT do multi-table writes inside a spec. A row owned by another is a `FieldCreator` /
+  `NestedFieldCreator` built under the owner's settled id (`create_field`, or the
+  `*_with_fields` create when both rows share one transaction).
 - The read default is `batch_query_with_scopes`. `batch_query_in_global` is for superadmin/internal paths only.
 - Graph relations are written through three provider / ops pairs only. Entity write
   (`V2DBOpsProvider` / `V2WriteOps`: create and delete, own and govern written at

@@ -1,9 +1,9 @@
 ---
 name: repository-tx-and-ops
 type: design-rationale
-description: choosing between v2 ops, generic OpsRepository, and db objects, rationale for single-method transactions, single-table specs with DependentCreatorSpec, batch_query_with_scopes as the read default
+description: choosing between v2 ops, generic OpsRepository, and db objects, rationale for single-method transactions, single-table specs with field creators, batch_query_with_scopes as the read default
 scope: src/ai/backend/manager/repositories
-keywords: [DBOpsProvider, transaction, spec, DependentCreatorSpec, batch_query_with_scopes, EmptyOperationScopeError]
+keywords: [DBOpsProvider, transaction, spec, FieldCreator, batch_query_with_scopes, EmptyOperationScopeError]
 sources:
   - src/ai/backend/manager/repositories/ops
 generated:
@@ -64,8 +64,8 @@ guarantees atomicity without partial commits. Splitting a method into small piec
 
 ## Why a spec owns only a single table
 
-Hiding multi-table writes in a spec obscures ordering and dependencies. The repository reveals the parent→child order procedurally
-and makes the dependency explicit with `DependentCreatorSpec`.
+Hiding multi-table writes in a spec obscures ordering and dependencies. The owner is created first and the owned row is a
+`FieldCreator` built under the owner's settled id, so the parent→child order is explicit.
 
 ## Scope filter default
 

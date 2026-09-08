@@ -46,6 +46,8 @@ class FieldRef:
 
 @dataclass(frozen=True)
 class ScopeId:
+    """Deprecated: use ``EntityIdentifier``; this pair is keyed by the legacy scope type enum."""
+
     scope_type: ScopeType
     scope_id: str
 
@@ -60,6 +62,8 @@ class ScopeId:
 
 @dataclass(frozen=True)
 class ObjectId:
+    """Deprecated: use ``EntityIdentifier``; this pair is keyed by the legacy entity type enum."""
+
     entity_type: EntityType
     entity_id: str
 

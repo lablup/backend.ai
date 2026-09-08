@@ -1,3 +1,9 @@
+"""PurgerSpec implementations for permission-related entities.
+
+Deprecated: permission rows are removed through the v2 specs under
+``models/rbac_models/permission/``. The remaining users move under BA-7204.
+"""
+
 from __future__ import annotations
 
 import uuid
@@ -12,7 +18,11 @@ from ai.backend.manager.repositories.base.purger import PurgerSpec
 
 @dataclass
 class PermissionPurgerSpec(PurgerSpec[PermissionRow]):
-    """PurgerSpec for deleting a permission."""
+    """PurgerSpec for deleting a permission.
+
+    Deprecated: use ``RolePermissionPurger`` in
+    ``models/rbac_models/permission/purgers.py`` — BA-7204.
+    """
 
     permission_id: uuid.UUID
 
