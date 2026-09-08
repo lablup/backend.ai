@@ -2831,8 +2831,12 @@ class AbstractAgent[
                 try:
                     # Prepare scratch spaces and dotfiles inside it.
                     if not restarting:
-                        await ctx.prepare_scratch()
+                        # Registered BEFORE it is made. Preparing a scratch is several
+                        # directories and a filesystem, so a failure part-way through has already
+                        # made something -- and registering afterwards would step over exactly
+                        # that case. `destroy_scratch` tolerates a scratch that is not all there.
                         made.append(ctx.destroy_scratch)
+                        await ctx.prepare_scratch()
                         log.info(
                             "create_kernel(kernel:{}, session:{}) scratch prepared",
                             kernel_id,
@@ -3172,6 +3176,12 @@ class AbstractAgent[
                         session_id,
                         pretty_container_id,
                     )
+                    # The container is running and in the registry, so its teardown belongs to the
+                    # kernel lifecycle now -- which stops it, unmounts it and removes its scratch
+                    # in that order. This create's own undo is disarmed here: left armed, a
+                    # failure in any of the steps that follow (the last of them is publishing an
+                    # event) would delete the scratch out from under a container that is up.
+                    made.clear()
                     async with self.registry_lock:
                         self.kernel_registry[kernel_id].data.update(container_data)
                         if "container_id" in container_data:

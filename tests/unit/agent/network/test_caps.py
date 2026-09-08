@@ -1,5 +1,6 @@
 import json
-from typing import Any, cast
+from collections.abc import Mapping
+from typing import Any, cast, override
 
 from ai.backend.agent.network.caps import (
     compute_caps,
@@ -88,6 +89,42 @@ class _CapturingEtcd:
         #: record and the readiness fence, so a test has to be able to see it.
         self.order: list[tuple[str, str]] = []
 
+    async def compare_and_put(
+        self,
+        key: str,
+        val: str,
+        *,
+        expected: str | None,
+        guards: "Mapping[str, str | None]",
+        **kwargs: Any,
+    ) -> bool:
+        """The store's own compare-and-swap, modelled because it is the fence being tested.
+
+        The target must hold ``expected`` (absent when that is None) AND every guard must hold
+        exactly what it is given (absent when that is None). All of it or none of it.
+        """
+        if self.puts.get(key) != expected:
+            return False
+        for guard_key, guard_val in guards.items():
+            if self.puts.get(guard_key) != guard_val:
+                return False
+        self.puts[key] = val
+        self.order.append(("put", key))
+        return True
+
+    async def compare_and_delete(
+        self, key: str, expected: str, *, guards: "Mapping[str, str | None]", **kwargs: Any
+    ) -> bool:
+        if self.puts.get(key) != expected:
+            return False
+        for guard_key, guard_val in guards.items():
+            if self.puts.get(guard_key) != guard_val:
+                return False
+        self.puts.pop(key, None)
+        self.deleted.append(key)
+        self.order.append(("delete", key))
+        return True
+
     async def delete(self, key: str, **kwargs: Any) -> None:
         self.puts.pop(key, None)
         self.deleted.append(key)
@@ -169,6 +206,29 @@ class TestTheReadinessFenceIsNeverAheadOfTheRecord:
         assert etcd.puts["network/agent/i-abc123/ready"] == before
 
 
+class _NewRunLandsMidway(_CapturingEtcd):
+    """A store where a NEWER run of the same agent id takes the id the moment this one looks.
+
+    The window is between whatever this process last read and the write it makes off the back of
+    it, so the injection goes on the first read: after that, every write this process makes is one
+    it decided on stale information.
+    """
+
+    def __init__(self) -> None:
+        super().__init__()
+        self._landed = False
+
+    @override
+    async def get(self, key: str, **kwargs: Any) -> str | None:
+        answer = await super().get(key)
+        if not self._landed:
+            self._landed = True
+            self.puts["network/agent/i-abc123/boot"] = "run-2"
+            self.puts["network/agent/i-abc123/caps"] = '{"from": "run-2"}'
+            self.puts["network/agent/i-abc123/ready"] = "run-2-digest"
+        return answer
+
+
 class TestTwoRunsOfOneAgentId:
     """An agent id restarted quickly has two processes alive at once. Whichever of them writes
     last wins the key, and both outcomes are wrong: the old run's shutdown deleting the new run's
@@ -200,6 +260,33 @@ class TestTwoRunsOfOneAgentId:
 
         assert "network/agent/i-abc123/caps" in etcd.puts
         assert "network/agent/i-abc123/ready" in etcd.puts
+
+    async def test_a_new_run_landing_mid_publish_is_not_overwritten(self) -> None:
+        """The check and the write are two operations, and the new run publishes between them.
+        Reading the boot key first only narrows that; the condition has to travel WITH the write.
+        """
+        caps = AgentNetworkCaps(tunnel_offload=False, backends=["vxlan"])
+
+        racing = _NewRunLandsMidway()
+        racing.puts["network/agent/i-abc123/boot"] = "run-1"
+
+        await publish_caps(
+            cast(AbstractKVStore, racing), "i-abc123", caps, vtep_ip="10.0.0.1", boot_id="run-1"
+        )
+
+        assert racing.puts["network/agent/i-abc123/caps"] == '{"from": "run-2"}'
+        assert racing.puts["network/agent/i-abc123/ready"] == "run-2-digest"
+
+    async def test_a_new_run_landing_mid_withdraw_keeps_its_advert(self) -> None:
+        racing = _NewRunLandsMidway()
+        racing.puts["network/agent/i-abc123/boot"] = "run-1"
+        racing.puts["network/agent/i-abc123/caps"] = '{"from": "run-2"}'
+        racing.puts["network/agent/i-abc123/ready"] = "run-2-digest"
+
+        await withdraw_caps(cast(AbstractKVStore, racing), "i-abc123", boot_id="run-1")
+
+        assert racing.puts["network/agent/i-abc123/caps"] == '{"from": "run-2"}'
+        assert racing.puts["network/agent/i-abc123/ready"] == "run-2-digest"
 
     async def test_the_current_run_publishes_and_withdraws_its_own(self) -> None:
         etcd = _CapturingEtcd()

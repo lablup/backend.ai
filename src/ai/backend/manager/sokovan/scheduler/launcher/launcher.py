@@ -283,6 +283,12 @@ class SessionLauncher:
         )
         log.debug(log_fmt + "try-starting", *log_args)
 
+        # Whether anything has been asked of an agent yet. Every failure is one of two things and
+        # this is the only thing that tells them apart: before, the placement is the problem and
+        # the session can be made again elsewhere; after, something may be running and there is
+        # no second placement to make. What no failure may be is a session that started.
+        dispatched = False
+
         try:
             # Ensure we have kernels to start
             if len(session.kernels) == 0:
@@ -503,7 +509,20 @@ class SessionLauncher:
                 agent_ids_ordered.append(agent_id)
                 create_tasks.append(create_kernels_on_agent(agent_id, agent_kernels))
 
+            if not create_tasks:
+                # No kernel has an agent, so nothing was ever going to be asked of one. Reported
+                # as a placement to make again rather than as a session that started: this used
+                # to fall through to "started" and leave the session in CREATING with no kernels
+                # anywhere.
+                log.warning(
+                    log_fmt + "no kernel of this session is assigned to an agent", *log_args
+                )
+                return StartFailure(
+                    "no kernel of this session is assigned to an agent",
+                    FailureDisposition.REPLACE,
+                )
             if create_tasks:
+                dispatched = True
                 results = await asyncio.gather(*create_tasks, return_exceptions=True)
                 failed_agent_ids += [
                     aid
@@ -550,11 +569,15 @@ class SessionLauncher:
             # Convert exception to error status info
             error_info = convert_to_status_data(e, self._config_provider.config.debug.enabled)
             log.warning(log_fmt + "failed-starting", *log_args, exc_info=True)
-            # Update error info in status_data without changing status. Not reported as a
-            # re-placeable failure: by here kernel creation has been requested and some of it may
-            # be running, so this needs a teardown and not a second placement. The coordinator's
-            # timeout detection is what handles it.
             await self._repository.update_session_error_info(session.session_id, error_info)
+            # Never None. Falling through to "no failure" here is what let a session with no
+            # kernels, a failed SSH keypair or any other preparation error be reported as started
+            # and moved to CREATING. Which of the two it is depends only on whether an agent has
+            # been asked for anything yet.
+            return StartFailure(
+                f"{type(e).__name__}: {e}",
+                FailureDisposition.ABANDON if dispatched else FailureDisposition.REPLACE,
+            )
         return None
 
     async def _setup_network_configuration(

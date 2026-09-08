@@ -2127,12 +2127,12 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
         # can still fail after it has landed can leave a fresh advert standing over an agent whose
         # start never finished, and the manager has no way to tell.
         if self._vtep_ip is not None:
-            await publish_vtep(self.etcd, str(self.id), self._vtep_ip)
+            await publish_vtep(self.etcd, str(self.id), self._vtep_ip, self._boot_id)
         else:
             # Retract, not merely skip: the key is durable, so an address published on an earlier
             # boot would otherwise keep being pre-seeded into peers' FDBs long after this node
             # stopped holding it -- by which time it may belong to a different host entirely.
-            await withdraw_vtep(self.etcd, str(self.id))
+            await withdraw_vtep(self.etcd, str(self.id), self._boot_id)
             log.warning(
                 "no usable VTEP: container.advertised-host/bind-host ({!r}) is not a routable"
                 " unicast IPv4 address held by an interface of this host that is up. Single-node"

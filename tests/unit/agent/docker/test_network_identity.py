@@ -12,6 +12,7 @@ import asyncio
 import inspect
 import json
 import pathlib
+from collections.abc import Mapping
 from types import SimpleNamespace
 from typing import Any, cast
 from unittest import mock
@@ -32,6 +33,40 @@ class _RecordingEtcd:
     def __init__(self) -> None:
         self.puts: dict[str, str] = {}
         self.deletes: list[str] = []
+
+    async def compare_and_put(
+        self,
+        key: str,
+        val: str,
+        *,
+        expected: str | None,
+        guards: Mapping[str, str | None],
+        **kwargs: Any,
+    ) -> bool:
+        """The store's own compare-and-swap, modelled because it is the fence being tested.
+
+        The target must hold ``expected`` (absent when that is None) AND every guard must hold
+        exactly what it is given (absent when that is None). All of it or none of it.
+        """
+        if self.puts.get(key) != expected:
+            return False
+        for guard_key, guard_val in guards.items():
+            if self.puts.get(guard_key) != guard_val:
+                return False
+        self.puts[key] = val
+        return True
+
+    async def compare_and_delete(
+        self, key: str, expected: str, *, guards: Mapping[str, str | None], **kwargs: Any
+    ) -> bool:
+        if self.puts.get(key) != expected:
+            return False
+        for guard_key, guard_val in guards.items():
+            if self.puts.get(guard_key) != guard_val:
+                return False
+        self.puts.pop(key, None)
+        self.deletes.append(key)
+        return True
 
     async def get(self, key: str, **kwargs: Any) -> str | None:
         return self.puts.get(key)
@@ -114,6 +149,7 @@ class TestAVtepThatWentAway:
 
     async def test_it_is_retracted_when_the_host_stops_holding_it(self) -> None:
         stub = _AgentStub(vtep_ip="192.168.0.112", host_ip="192.168.0.112")
+        stub.etcd.puts["network/agent/i-abc123/vtep"] = "192.168.0.112"
         await _publish(stub, still_usable=False)
         assert "network/agent/i-abc123/vtep" in stub.etcd.deletes
         assert json.loads(stub.etcd.puts["network/agent/i-abc123/caps"])["vtep_ip"] is None
@@ -123,6 +159,7 @@ class TestAVtepThatWentAway:
         vxlan device goes on being created on the interface this process started with, so probing
         the new NIC and advertising it healthy builds the tunnel somewhere the traffic is not."""
         stub = _AgentStub(vtep_ip="192.168.0.112", host_ip="192.168.0.112")
+        stub.etcd.puts["network/agent/i-abc123/vtep"] = "192.168.0.112"
         await _publish(stub, still_usable=True, uplink="eth-somewhere-else")
         assert "network/agent/i-abc123/vtep" in stub.etcd.deletes
         assert json.loads(stub.etcd.puts["network/agent/i-abc123/caps"])["vtep_ip"] is None
@@ -147,6 +184,7 @@ class TestPublishingTheVtep:
         # Skipping would leave an address published on an earlier boot in place, and peers
         # pre-seed straight from it -- by now it may belong to a different host.
         stub = _AgentStub(vtep_ip=None, host_ip="0.0.0.0")
+        stub.etcd.puts["network/agent/i-abc123/vtep"] = "10.9.9.9"  # an earlier boot's address
         await _publish(stub, still_usable=False)
         assert "network/agent/i-abc123/vtep" not in stub.etcd.puts
         assert "network/agent/i-abc123/vtep" in stub.etcd.deletes
@@ -302,5 +340,6 @@ class TestTheNodeIsAnnouncedOnlyOnceItCanServe:
 class TestWithdrawingTheVtep:
     async def test_it_deletes_the_expected_key(self) -> None:
         etcd = _RecordingEtcd()
+        etcd.puts["network/agent/i-abc123/vtep"] = "10.9.9.9"
         await withdraw_vtep(cast(AbstractKVStore, etcd), "i-abc123")
         assert etcd.deletes == ["network/agent/i-abc123/vtep"]

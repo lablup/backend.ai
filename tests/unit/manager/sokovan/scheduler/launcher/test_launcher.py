@@ -305,6 +305,55 @@ class TestWhatTheLauncherReportsAsUnstarted:
         mock_agent_client_pool._mock_client.create_kernels.assert_not_awaited()
         mock_repository.update_session_error_info.assert_awaited()
 
+    async def test_a_preparation_failure_after_the_network_is_also_reported(
+        self,
+        launcher: SessionLauncher,
+        mock_agent_client_pool: MagicMock,
+        session_for_start_single_kernel: SessionDataForStart,
+        image_config_default: dict[UUID, ImageConfigData],
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Only the network failure was reported; anything else before the first agent call fell
+        through to "no failure" and the session was recorded as started. The SSH keypair is one
+        such step, and there are several."""
+
+        async def _boom() -> tuple[str, str]:
+            raise RuntimeError("could not make the cluster ssh keypair")
+
+        monkeypatch.setattr(launcher, "_create_cluster_ssh_keypair", _boom)
+        session_ids = [session_for_start_single_kernel.session_id]
+
+        with RecorderContext.scope("test", entity_ids=session_ids):
+            failed = await launcher.start_sessions_for_handler(
+                [session_for_start_single_kernel], image_config_default
+            )
+
+        failure = failed[session_for_start_single_kernel.session_id]
+        assert failure.disposition is FailureDisposition.REPLACE
+        mock_agent_client_pool._mock_client.create_kernels.assert_not_awaited()
+
+    async def test_a_session_whose_kernels_have_no_agent_is_reported(
+        self,
+        launcher: SessionLauncher,
+        mock_agent_client_pool: MagicMock,
+        session_for_start_single_kernel: SessionDataForStart,
+        image_config_default: dict[UUID, ImageConfigData],
+    ) -> None:
+        # Nothing is ever asked of an agent, so the gather is empty and the old code went
+        # straight to "started" -- a session in CREATING with no kernels anywhere.
+        for kernel in session_for_start_single_kernel.kernels:
+            kernel.agent_id = None
+        session_ids = [session_for_start_single_kernel.session_id]
+
+        with RecorderContext.scope("test", entity_ids=session_ids):
+            failed = await launcher.start_sessions_for_handler(
+                [session_for_start_single_kernel], image_config_default
+            )
+
+        failure = failed[session_for_start_single_kernel.session_id]
+        assert failure.disposition is FailureDisposition.REPLACE
+        mock_agent_client_pool._mock_client.create_kernels.assert_not_awaited()
+
     async def test_a_session_that_started_is_not_reported(
         self,
         launcher: SessionLauncher,
