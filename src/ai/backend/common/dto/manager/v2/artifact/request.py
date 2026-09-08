@@ -8,8 +8,9 @@ from uuid import UUID
 
 from pydantic import Field, field_validator
 
-from ai.backend.common.api_handlers import SENTINEL, BaseRequestModel, Sentinel
+from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.dto.manager.query import IntFilter, StringFilter, UUIDFilter
+from ai.backend.common.tristate.unset import UNSET, Unset
 
 from .types import (
     ArtifactAvailability,
@@ -62,14 +63,14 @@ class UpdateArtifactInput(BaseRequestModel):
         default=None,
         description="Whether the artifact should be readonly. None means no change.",
     )
-    description: str | Sentinel | None = Field(
-        default=SENTINEL,
-        description="Updated description. Use SENTINEL to clear the field; None means no change.",
+    description: str | None | Unset = Field(
+        default=UNSET,
+        description="Updated description. Omit to leave unchanged; null clears.",
     )
 
     @field_validator("description", mode="before")
     @classmethod
-    def description_strip_whitespace(cls, v: str | Sentinel | None) -> str | Sentinel | None:
+    def description_strip_whitespace(cls, v: str | None | Unset) -> str | None | Unset:
         if isinstance(v, str):
             stripped = v.strip()
             return stripped if stripped else None

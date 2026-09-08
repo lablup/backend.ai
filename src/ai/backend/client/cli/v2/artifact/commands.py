@@ -54,12 +54,12 @@ def update(
     """Update artifact metadata."""
     from uuid import UUID
 
-    from ai.backend.common.api_handlers import SENTINEL, Sentinel
     from ai.backend.common.dto.manager.v2.artifact.request import UpdateArtifactInput
+    from ai.backend.common.tristate.unset import UNSET, Unset
 
-    # SENTINEL means "no change" in the DTO; None means "clear the field".
-    # When the CLI user does not pass --description, keep SENTINEL (no change).
-    desc_value: str | Sentinel | None = SENTINEL
+    # UNSET means "no change" in the DTO; None means "clear the field".
+    # When the CLI user does not pass --description, keep UNSET (no change).
+    desc_value: str | None | Unset = UNSET
     if description is not None:
         desc_value = description
 

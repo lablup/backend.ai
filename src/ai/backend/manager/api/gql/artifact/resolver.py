@@ -6,7 +6,6 @@ from uuid import UUID
 import strawberry
 from strawberry import ID, UNSET, Info
 
-from ai.backend.common.api_handlers import SENTINEL
 from ai.backend.common.data.entity.artifact_registry import ArtifactRegistryID
 from ai.backend.common.data.storage.registries.types import ModelSortKey
 from ai.backend.common.dto.manager.v2.artifact.request import (
@@ -16,6 +15,7 @@ from ai.backend.common.dto.manager.v2.artifact.request import (
 from ai.backend.common.dto.manager.v2.artifact.request import (
     UpdateArtifactInput as UpdateArtifactInputDTO,
 )
+from ai.backend.common.tristate.unset import UNSET as DTO_UNSET
 from ai.backend.manager.api.gql.base import (
     encode_cursor,
 )
@@ -420,7 +420,7 @@ async def update_artifact(
 ) -> UpdateArtifactPayload | None:
     pydantic_input = UpdateArtifactInputDTO(
         readonly=input.readonly if input.readonly is not UNSET else None,
-        description=input.description if input.description is not UNSET else SENTINEL,
+        description=input.description if input.description is not UNSET else DTO_UNSET,
     )
     payload = await info.context.adapters.artifact.update(pydantic_input, UUID(input.artifact_id))
 

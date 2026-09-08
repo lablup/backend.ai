@@ -7,7 +7,6 @@ import uuid
 import pytest
 from pydantic import ValidationError
 
-from ai.backend.common.api_handlers import SENTINEL, Sentinel
 from ai.backend.common.dto.manager.v2.artifact.request import (
     CancelImportTaskInput,
     CleanupRevisionsInput,
@@ -16,19 +15,20 @@ from ai.backend.common.dto.manager.v2.artifact.request import (
     UpdateArtifactInput,
 )
 from ai.backend.common.exception import BackendAISchemaValidationFailed
+from ai.backend.common.tristate.unset import UNSET, Unset
 
 
 class TestUpdateArtifactInput:
     """Tests for UpdateArtifactInput model creation and validation."""
 
-    def test_default_description_is_sentinel(self) -> None:
+    def test_default_description_is_unset(self) -> None:
         req = UpdateArtifactInput()
-        assert req.description is SENTINEL
-        assert isinstance(req.description, Sentinel)
+        assert req.description is UNSET
+        assert isinstance(req.description, Unset)
 
-    def test_explicit_sentinel_description_signals_clear(self) -> None:
-        req = UpdateArtifactInput(description=SENTINEL)
-        assert req.description is SENTINEL
+    def test_explicit_unset_description_signals_no_change(self) -> None:
+        req = UpdateArtifactInput(description=UNSET)
+        assert req.description is UNSET
 
     def test_none_description_means_no_change(self) -> None:
         req = UpdateArtifactInput(description=None)
