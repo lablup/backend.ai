@@ -75,7 +75,6 @@ from typing import override
 from ai.backend.agent.errors.network import (
     HostAddressesUnreadable,
     LocalSubnetLayoutChanged,
-    LocalSubnetOwnerChanged,
     LocalSubnetPoolExhausted,
 )
 from ai.backend.agent.network.journal_io import atomic_exclusive_write, atomic_write
@@ -96,7 +95,11 @@ DEFAULT_BLOCK_PREFIXLEN = 26
 _LAYOUT_FILE = ".layout"
 
 # One allocator per store, per process. See the module docstring.
-_allocators: dict[Path, LocalSubnetAllocator] = {}
+#: One allocator per (store, owner). Per store, so collaborators in one process share a lock
+#: rather than each holding their own; per OWNER too, because one privileged daemon serves every
+#: agent on a node and each of their claims must carry its own agent's id -- a single instance
+#: would stamp them all with whichever agent was constructed first.
+_allocators: dict[tuple[Path, str], LocalSubnetAllocator] = {}
 
 
 @dataclass(frozen=True)
@@ -219,23 +222,17 @@ def get_local_subnet_allocator(
     """
     resolved = state_dir if state_dir is not None else _DEFAULT_LOCAL_SUBNET_STATE_DIR
     wanted = layout if layout is not None else DEFAULT_LAYOUT
-    if (existing := _allocators.get(resolved)) is not None:
-        if existing.layout != wanted:
+    for (held_dir, _held_owner), held in _allocators.items():
+        if held_dir == resolved and held.layout != wanted:
             # Two collaborators in one process asked for one store under two pools; whichever lost
-            # would hand out subnets the other does not believe it owns.
+            # would hand out subnets the other does not believe it owns. Checked across every
+            # owner of the store, since the pool is a property of the store and not of who is
+            # writing to it.
             raise LocalSubnetLayoutChanged(
                 f"the node-local subnet store {resolved} is already owned in this process as"
-                f" {existing.layout}, but was requested as {wanted}"
+                f" {held.layout}, but was requested as {wanted}"
             )
-        if existing.owner != owner:
-            # Checked for the same reason the layout is, and it used to be silently ignored: the
-            # cache is keyed on the directory alone, so whichever collaborator constructed it
-            # FIRST decided the owner, and a later caller asking for its own id was handed the
-            # other's. Claims would then be written under a name that is not the writer's.
-            raise LocalSubnetOwnerChanged(
-                f"the node-local subnet store {resolved} is already owned in this process by"
-                f" {existing.owner!r}, but was requested for {owner!r}"
-            )
+    if (existing := _allocators.get((resolved, owner))) is not None:
         return existing
     allocator = LocalSubnetAllocator(
         resolved,
@@ -244,7 +241,7 @@ def get_local_subnet_allocator(
         legacy_dir=legacy_dir,
         host_addresses=host_addresses or host_ipv4_addresses,
     )
-    _allocators[resolved] = allocator
+    _allocators[(resolved, owner)] = allocator
     return allocator
 
 
