@@ -33,6 +33,9 @@ from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.clients.agent import AgentClientPool
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.defs import START_SESSION_TIMEOUT_SEC
+from ai.backend.manager.errors.kernel import InvalidSessionData
+from ai.backend.manager.errors.network import ManagerNetworkMisconfigured
+from ai.backend.manager.errors.resource import AgentNotAllocated
 from ai.backend.manager.exceptions import convert_to_status_data
 from ai.backend.manager.metrics.scheduler import (
     SchedulerPhaseMetricObserver,
@@ -292,7 +295,7 @@ class SessionLauncher:
         try:
             # Ensure we have kernels to start
             if len(session.kernels) == 0:
-                raise ValueError(f"Session {session.session_id} has no kernels")
+                raise InvalidSessionData(f"Session {session.session_id} has no kernels")
 
             # Get resource policy and idle timeout
             # In production, this would come from database lookups
@@ -408,7 +411,7 @@ class SessionLauncher:
                             k.image_id,
                             image_str,
                         )
-                        raise ValueError(
+                        raise InvalidSessionData(
                             f"Image {image_str} (id={k.image_id}) not found in database"
                             " - session start failed"
                         )
@@ -611,7 +614,9 @@ class SessionLauncher:
                 network_name = f"bai-singlenode-{session.session_id}"
                 first_kernel = session.kernels[0]
                 if not first_kernel.agent_id:
-                    raise ValueError(f"No agent assigned for kernel {first_kernel.kernel_id}")
+                    raise AgentNotAllocated(
+                        f"No agent assigned for kernel {first_kernel.kernel_id}"
+                    )
                 try:
                     async with self._agent_client_pool.acquire(first_kernel.agent_id) as client:
                         await client.create_local_network(network_name)
@@ -626,12 +631,11 @@ class SessionLauncher:
                 member_agents = sorted({
                     str(kernel.agent_id) for kernel in session.kernels if kernel.agent_id
                 })
-                # The agents' container runtime decides the driver: a containerd agent cannot speak
-                # Swarm ('overlay') and a docker agent cannot speak CNI, so there is exactly one
-                # right answer and no reason to make the operator supply it as a second, separate
-                # choice — picking the runtime is the choice. The configured default_driver remains
-                # the fallback for agents that have not published a backend, so this cannot strand
-                # an existing deployment.
+                # The runtime limits the compatible drivers. Docker supports the established
+                # Swarm path and the initial CNI implementation, while other runtimes fail closed
+                # until their CNI attachment is implemented. The configured default selects among
+                # the runtime's supported drivers and remains the fallback for legacy agents that
+                # have not published a backend.
                 configured = self._config_provider.config.network.inter_container.default_driver
                 driver = await resolve_driver_for_agents(
                     self._network_plugin_ctx.etcd,
@@ -639,7 +643,9 @@ class SessionLauncher:
                     configured_driver=configured,
                 )
                 if driver is None:
-                    raise ValueError("No inter-container network driver is configured.")
+                    raise ManagerNetworkMisconfigured(
+                        "No inter-container network driver is configured."
+                    )
                 if driver != configured:
                     log.info(
                         "using the '{}' cluster-network driver for session {} (the member agents'"
@@ -657,7 +663,7 @@ class SessionLauncher:
                         driver,
                         available_plugins,
                     )
-                    raise KeyError(
+                    raise ManagerNetworkMisconfigured(
                         f"Network plugin '{driver}' not found. Available plugins: {available_plugins}. "
                         f"For overlay networks, ensure Docker Swarm is initialized with 'docker swarm init'."
                     )

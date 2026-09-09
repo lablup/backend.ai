@@ -141,7 +141,8 @@ class TestPublishedPorts:
         agent_control: AgentController,
         session_spec: SessionSpec,
     ) -> None:
-        async with session_driver.session(session_spec, "dp-a9"):
+        published_spec = replace(session_spec, preopen_ports=(12345,))
+        async with session_driver.session(published_spec, "dp-a9"):
             before = await _stable(leak_guard)
             rules_before = frozenset(r for r in before if r.kind == "iptables")
             assert rules_before, (

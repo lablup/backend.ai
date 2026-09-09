@@ -1,17 +1,6 @@
-"""Agent-facing composition of session network + container runtime (BEP-1078).
+"""Compose the agent's session network with its container locator and lifecycle.
 
-`ContainerdAgent` holds one of these. It bridges the data the manager sends
-(``cluster_info["network_config"]`` = the CNINetworkPlugin's ``{backend, subnet, vni,
-mtu}``) into the network subsystem, resolves the **per-session** data-plane backend
-(vxlan / bridge) by name, and composes:
-
-- per-session setup/teardown via `SessionNetworkCoordinator` (bridge + peers), and
-- per-container launch/terminate via `ContainerdKernelOrchestrator`
-  (runtime + `ContainerNetworkProvisioner`).
-
-The runtime client and the network subsystem remain separate classes that never
-reference each other; this facade and the orchestrator are the only composition points.
-Each backend is instantiated per session with the backend the manager selected.
+Docker is the implemented runtime seam; the data-plane backend remains session-scoped.
 """
 
 from __future__ import annotations
@@ -29,6 +18,7 @@ from ai.backend.agent.errors.network import (
     ClusterDNSStartError,
     ContainerLifecycleUnavailable,
     ContainerSourceUnwired,
+    InvalidSessionNetworkDescriptor,
     LocalSubnetSourceUnwired,
     OverlayEncryptionUnavailable,
     OverlayTeardownIncomplete,
@@ -99,22 +89,26 @@ def session_net_meta_from_network_config(
     # using, instead of silently rebuilding its tunnel on a different one.
     port_raw = network_config.get("vxlan_port")
     generation_raw = network_config.get(SESSION_META_GENERATION)
-    return SessionNetMeta(
-        session_id=session_id,
-        subnet=network_config["subnet"],
-        backend=NetworkBackendKind(network_config["backend"]),
-        mtu=int(network_config.get("mtu") or _DEFAULT_MTU),
-        vni=int(vni_raw) if vni_raw is not None else None,
-        vxlan_port=int(port_raw) if port_raw else DEFAULT_VXLAN_PORT,
-        encryption_key=str(key_raw) if key_raw else None,
-        # Which incarnation of the session id this request was issued for. The coordinator refuses
-        # to join on a descriptor the manager's record no longer matches -- see `_session_fence`.
-        generation=str(generation_raw) if generation_raw else None,
-    )
-
-
-class UnknownNetworkBackend(RuntimeError):
-    pass
+    try:
+        return SessionNetMeta(
+            session_id=session_id,
+            subnet=network_config["subnet"],
+            backend=NetworkBackendKind(network_config["backend"]),
+            mtu=int(network_config.get("mtu") or _DEFAULT_MTU),
+            vni=int(vni_raw) if vni_raw is not None else None,
+            vxlan_port=int(port_raw) if port_raw else DEFAULT_VXLAN_PORT,
+            encryption_key=str(key_raw) if key_raw else None,
+            encryption_key_id=(
+                str(network_config["encryption_key_id"])
+                if network_config.get("encryption_key_id")
+                else None
+            ),
+            generation=str(generation_raw) if generation_raw else None,
+        )
+    except (KeyError, TypeError, ValueError) as e:
+        raise InvalidSessionNetworkDescriptor(
+            f"session {session_id} has an invalid network descriptor: {e}"
+        ) from e
 
 
 def _cleanup_debt_of(backend: Any) -> Mapping[str, str]:
@@ -809,7 +803,7 @@ class SessionNetwork:
         try:
             return self._backends[str(meta.backend)]
         except KeyError:
-            raise UnknownNetworkBackend(
+            raise InvalidSessionNetworkDescriptor(
                 f"no data-plane backend registered for '{meta.backend}' "
                 f"(available: {sorted(self._backends)})"
             ) from None

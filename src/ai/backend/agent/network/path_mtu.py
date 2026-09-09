@@ -30,6 +30,7 @@ import re
 from collections.abc import Awaitable, Callable
 from pathlib import Path
 
+from ai.backend.agent.errors.network import NetworkOperationFailed
 from ai.backend.agent.network import command
 from ai.backend.logging import BraceStyleAdapter
 
@@ -61,9 +62,9 @@ async def _read_command(argv: list[str]) -> str:
     try:
         rc, out, _ = await command.run(argv, capture_stderr=False)
     except command.CommandTimeout as e:
-        raise RuntimeError(f"{' '.join(argv)}: {e}") from e
+        raise NetworkOperationFailed(f"{' '.join(argv)}: {e}") from e
     if rc != 0:
-        raise RuntimeError(f"{' '.join(argv)} exited {rc}")
+        raise NetworkOperationFailed(f"{' '.join(argv)} exited {rc}")
     return out.decode(errors="replace")
 
 
@@ -101,6 +102,6 @@ async def underlay_mtu(
     )
     try:
         candidates.extend(parse_route_mtus(await read_command(argv)))
-    except (RuntimeError, OSError, FileNotFoundError) as e:
+    except (NetworkOperationFailed, RuntimeError, OSError, FileNotFoundError) as e:
         log.debug("could not read route MTU via {}: {!r}", " ".join(argv), e)
     return min(candidates) if candidates else None

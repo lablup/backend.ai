@@ -100,6 +100,27 @@ async def task_pid(node: Node, container_id: str) -> str:
     raise AssertionError(f"no running task for container {container_id}:\n{listing.stdout}")
 
 
+async def read_container_file(node: Node, container_id: str, path: str) -> str:
+    """Read a file through the runtime that owns ``container_id``."""
+    docker = await node.run(["docker", "inspect", container_id], check=False)
+    if docker.returncode == 0:
+        result = await node.run(["docker", "exec", container_id, "cat", path])
+        return result.stdout
+    result = await node.run([
+        "ctr",
+        "-n",
+        "backend-ai",
+        "tasks",
+        "exec",
+        "--exec-id",
+        f"dp-read-{abs(hash(path)) % 100000}",
+        container_id,
+        "cat",
+        path,
+    ])
+    return result.stdout
+
+
 async def interface_address(node: Node, pid: str, ifname: str) -> str:
     """The IPv4 address of one interface inside a kernel's netns (``eth0`` LOCAL, ``baimulti0``
     OVERLAY)."""

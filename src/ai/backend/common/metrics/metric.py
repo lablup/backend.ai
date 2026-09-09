@@ -769,15 +769,24 @@ class NetworkPoolMetricObserver:
     _instance: Self | None = None
 
     _reconcile_failures: Counter
+    _pool_exhaustions: Counter
     _reconcile_pending: Gauge
     _reclaimed_claims: Counter
     _unrecoverable_incarnations: Gauge
     _invalid_records: Counter
+    _reconcile_duration: Histogram
+    _reconcile_in_progress: Gauge
+    _reconcile_last_success: Gauge
 
     def __init__(self) -> None:
         self._reconcile_failures = Counter(
             name="backendai_network_pool_reconcile_failure_count",
             documentation="Total number of overlay pool reconciliation passes that raised",
+        )
+        self._pool_exhaustions = Counter(
+            name="backendai_network_pool_exhaustion_count",
+            documentation="Total number of exhausted cluster-network allocation attempts",
+            labelnames=["resource"],
         )
         self._reconcile_pending = Gauge(
             name="backendai_network_pool_reconcile_pending",
@@ -804,6 +813,22 @@ class NetworkPoolMetricObserver:
                 " stepped over"
             ),
         )
+        self._reconcile_duration = Histogram(
+            name="backendai_network_pool_reconcile_duration_seconds",
+            documentation="Duration of overlay pool reconciliation passes",
+            labelnames=["success"],
+            buckets=[0.1, 0.5, 1, 2, 5, 10, 30, 60, 120, 300],
+        )
+        self._reconcile_in_progress = Gauge(
+            name="backendai_network_pool_reconcile_in_progress",
+            documentation="1 while this manager is running an overlay reconciliation pass",
+            multiprocess_mode="livemax",
+        )
+        self._reconcile_last_success = Gauge(
+            name="backendai_network_pool_reconcile_last_success_timestamp_seconds",
+            documentation="Unix timestamp of the most recent successful reconciliation pass",
+            multiprocess_mode="livemax",
+        )
 
     @classmethod
     def instance(cls) -> Self:
@@ -814,14 +839,27 @@ class NetworkPoolMetricObserver:
     def observe_invalid_record(self) -> None:
         self._invalid_records.inc()
 
-    def observe_reconcile_succeeded(self, *, reclaimed: int, unrecoverable: int) -> None:
+    def observe_pool_exhausted(self, resource: str) -> None:
+        self._pool_exhaustions.labels(resource=resource).inc()
+
+    def observe_reconcile_started(self) -> None:
+        self._reconcile_in_progress.set(1)
+
+    def observe_reconcile_succeeded(
+        self, *, reclaimed: int, unrecoverable: int, duration: float
+    ) -> None:
         self._reconcile_pending.set(0)
         self._reclaimed_claims.inc(reclaimed)
         self._unrecoverable_incarnations.set(unrecoverable)
+        self._reconcile_duration.labels(success=SUCCESS_LABEL_TRUE).observe(duration)
+        self._reconcile_last_success.set(time.time())
+        self._reconcile_in_progress.set(0)
 
-    def observe_reconcile_failed(self) -> None:
+    def observe_reconcile_failed(self, *, duration: float) -> None:
         self._reconcile_failures.inc()
         self._reconcile_pending.set(1)
+        self._reconcile_duration.labels(success=SUCCESS_LABEL_FALSE).observe(duration)
+        self._reconcile_in_progress.set(0)
 
 
 class CommonMetricRegistry:

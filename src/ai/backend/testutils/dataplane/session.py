@@ -72,6 +72,7 @@ class SessionSpec:
     cluster_size: int = 1
     cluster_mode: ClusterModeEnum = ClusterModeEnum.SINGLE_NODE
     """SINGLE_NODE places every kernel on one agent; MULTI_NODE spreads them."""
+    preopen_ports: tuple[int, ...] = ()
     agent_list: tuple[str, ...] = ()
     """Agents the session is restricted to, empty for the scheduler's own choice. A two-node
     scenario names both real nodes so a stale agent still registered in the group cannot be
@@ -103,6 +104,7 @@ class SessionSpec:
             ],
             cluster_mode=self.cluster_mode,
             cluster_size=self.cluster_size,
+            preopen_ports=list(self.preopen_ports) or None,
             agent_list=list(self.agent_list) or None,
             agent_selection_policy=(AgentSelectionPolicyEnum.STRICT if self.agent_list else None),
         )

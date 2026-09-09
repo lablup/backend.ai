@@ -26,6 +26,8 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 # (which builds the devices and checks the result against the real path) ---
 
 DEFAULT_VXLAN_PORT = 4789
+DEFAULT_CLUSTER_IPAM_POOL = "10.128.0.0/12"
+DEFAULT_CLUSTER_IPAM_BLOCK_PREFIXLEN = 24
 """The IANA VXLAN port, and the default this project ships.
 
 It is a *default*, not a constant, because a cluster's CNI may already claim it in a way that is
@@ -339,6 +341,8 @@ class SessionNetMeta:
     since the manager encrypts by default (see `CNINetworkPlugin._encryption_enabled`). The root is
     distributed via etcd like ``vni``; the backend derives pair-and-12-hour-generation keys and
     programs only those into XFRM. See overlay-encryption.md."""
+    encryption_key_id: str | None = None
+    """Non-secret fingerprint identifying the cluster root for audit and rotation checks."""
     generation: str | None = None
     """Which incarnation of ``session_id`` this descriptor names -- see ``SESSION_META_GENERATION``.
 

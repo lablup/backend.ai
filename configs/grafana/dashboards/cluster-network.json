@@ -1,0 +1,80 @@
+{
+  "annotations": {"list": []},
+  "editable": true,
+  "graphTooltip": 1,
+  "links": [],
+  "panels": [
+    {
+      "id": 1,
+      "title": "Reconciliation pending",
+      "type": "stat",
+      "gridPos": {"h": 6, "w": 6, "x": 0, "y": 0},
+      "targets": [{"expr": "max(backendai_network_pool_reconcile_pending)", "refId": "A"}]
+    },
+    {
+      "id": 2,
+      "title": "Seconds since successful reconciliation",
+      "type": "stat",
+      "gridPos": {"h": 6, "w": 6, "x": 6, "y": 0},
+      "targets": [{"expr": "time() - max(backendai_network_pool_reconcile_last_success_timestamp_seconds)", "refId": "A"}]
+    },
+    {
+      "id": 3,
+      "title": "Unrecoverable incarnations",
+      "type": "stat",
+      "gridPos": {"h": 6, "w": 6, "x": 12, "y": 0},
+      "targets": [{"expr": "max(backendai_network_pool_unrecoverable_incarnation_count)", "refId": "A"}]
+    },
+    {
+      "id": 4,
+      "title": "Invalid records (1h)",
+      "type": "stat",
+      "gridPos": {"h": 6, "w": 6, "x": 18, "y": 0},
+      "targets": [{"expr": "sum(increase(backendai_network_pool_invalid_record_count_total[1h]))", "refId": "A"}]
+    },
+    {
+      "id": 5,
+      "title": "Reconciliation duration p95",
+      "type": "timeseries",
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 6},
+      "targets": [{"expr": "histogram_quantile(0.95, sum by (le) (rate(backendai_network_pool_reconcile_duration_seconds_bucket[15m])))", "legendFormat": "p95", "refId": "A"}]
+    },
+    {
+      "id": 6,
+      "title": "Claims reclaimed",
+      "type": "timeseries",
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 6},
+      "targets": [{"expr": "sum(rate(backendai_network_pool_reclaimed_claim_count_total[5m]))", "legendFormat": "claims/s", "refId": "A"}]
+    },
+    {
+      "id": 7,
+      "title": "Reconciliation failures",
+      "type": "timeseries",
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 14},
+      "targets": [{"expr": "sum(increase(backendai_network_pool_reconcile_failure_count_total[1h]))", "legendFormat": "failures/hour", "refId": "A"}]
+    },
+    {
+      "id": 8,
+      "title": "Reconciliation in progress",
+      "type": "timeseries",
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 14},
+      "targets": [{"expr": "max(backendai_network_pool_reconcile_in_progress)", "legendFormat": "running", "refId": "A"}]
+    },
+    {
+      "id": 9,
+      "title": "Allocation exhaustion",
+      "type": "timeseries",
+      "gridPos": {"h": 8, "w": 24, "x": 0, "y": 22},
+      "targets": [{"expr": "sum by (resource) (increase(backendai_network_pool_exhaustion_count_total[1h]))", "legendFormat": "{{resource}}", "refId": "A"}]
+    }
+  ],
+  "refresh": "30s",
+  "schemaVersion": 41,
+  "tags": ["backend.ai", "network", "vxlan"],
+  "templating": {"list": []},
+  "time": {"from": "now-6h", "to": "now"},
+  "timezone": "browser",
+  "title": "Backend.AI Cluster Network",
+  "uid": "backendai-cluster-network",
+  "version": 1
+}

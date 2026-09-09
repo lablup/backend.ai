@@ -328,7 +328,9 @@ class TestOwnershipOfADeviceTheHostShares:
             device = f"baivx{await _vni_on(node)}"
             await node.run(["sudo", "-n", "ip", "link", "set", device, "down"], check=False)
             assert await _wait_for(lambda: _device_is_up(node, device))
-            await probe.reaches(node, placed.pid_a, placed.ip_b)
+            assert await probe.reaches(node, placed.pid_a, placed.ip_b), (
+                f"traffic did not recover after {device} returned to UP"
+            )
 
 
 async def _device_is_up(node: Node, device: str) -> bool:

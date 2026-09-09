@@ -1,10 +1,6 @@
-"""Runtime-neutral cluster-network manager plugin (CNI/etcd control plane).
+"""CNI/etcd control plane for the Docker-backed BEP-1078 cluster network.
 
-Replaces the Swarm-based `OverlayNetworkPlugin` for containerd and other host-native
-runtimes. This plugin owns the *control plane*: it allocates a per-session subnet
-(and a VNI for the vxlan backend), selects the data-plane backend (the portable vxlan
-overlay unless the operator pins one), and writes the session network descriptor to etcd.
-The data plane itself is realized by the agent-side v2 plugins (see BEP-1078, agent plugin).
+The runtime seam is extensible, but Docker is the only implemented runtime integration.
 """
 
 from __future__ import annotations
@@ -15,13 +11,17 @@ import json
 import logging
 import time
 import uuid
+from collections import OrderedDict
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from enum import StrEnum
 from typing import Any, Final, override
 
+from etcd_client import ClientError
+
 from ai.backend.common.configs.etcd import EtcdConfig
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
+from ai.backend.common.lock import EtcdLock
 from ai.backend.common.metrics.metric import CommonMetricRegistry
 from ai.backend.common.network.keys import (
     agent_backend_key,
@@ -69,10 +69,12 @@ from ai.backend.manager.errors.network import (
 from ai.backend.manager.network.ipam import (
     DEFAULT_BLOCK_PREFIXLEN,
     DEFAULT_IPAM_POOL,
+    OVERLAY_KEY_ROTATION_LOCK,
+    OVERLAY_KEY_ROTATION_LOCK_LIFETIME_SEC,
     EndpointAllocator,
     SubnetAllocator,
     VNIAllocator,
-    overlay_encryption_key,
+    _active_overlay_encryption_key_locked,
 )
 from ai.backend.manager.network.pairing import (
     AdmittedAgent,
@@ -136,20 +138,14 @@ _CREATE_POLL_SEC: Final = 0.5
 #: of the cluster.
 _CLEANUP_DEBT_PREFIX: Final = "network/cleanup-debt"
 
-#: Who swept the pool last, and when. The turn is claimed by compare-and-swap, so of all the
-#: managers in an HA set exactly one sweeps per interval -- the others read a fresh ticket and do
-#: nothing. That is both halves of the same problem: a sweep has to keep happening on a cluster
-#: where nobody is creating sessions (the retry on the next create never comes), and it must not
-#: happen on every manager at once (a rolling restart would otherwise put one full pool scan per
-#: manager on etcd at the same moment).
-_RECONCILE_TICKET: Final = "network/reconcile-ticket"
+_RECONCILE_LOCK: Final = "network/reconcile"
 #: How often the pool is swept, cluster-wide. Long: it is a safety net under the debt notes and
 #: the per-session reconciliation, not the thing that normally gives claims back.
 _RECONCILE_INTERVAL_SEC: Final = 600.0
-#: How often a sweep in progress re-dates its own ticket. A fraction of the interval, so a pass
-#: that outlasts one keeps the turn instead of inviting a second manager to start over the top of
-#: it. This is what the ticket lacks that a lease would give it for free.
-_RECONCILE_HEARTBEAT_SEC: Final = _RECONCILE_INTERVAL_SEC / 4
+_RECONCILE_LEASE_SEC: Final = 30.0
+_RECONCILE_LEADER_RETRY_SEC: Final = 5.0
+_RECONCILE_LOCK_TIMEOUT_SEC: Final = 0.1
+_RECONCILE_META_CACHE_SIZE: Final = 4096
 
 
 def _published(meta: Mapping[str, Any]) -> dict[str, Any]:
@@ -433,18 +429,11 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
     #: Read by health reporting: it is the one leak no retry finds on its own, and the pool
     #: reconciler is what eventually reaches it.
     _unrecoverable: dict[str, str]
-    #: Whether a reconciliation pass this manager owes has not yet succeeded. The pool is the only
-    #: evidence an orphan claim exists, so a pass that could not run leaves nothing else to find
-    #: it: it is retried where a session id comes round, and reported until it goes through.
+    #: Whether the leased reconciliation leader's last pass failed. Reported until its retry
+    #: succeeds.
     _reconciliation_owed: bool
     #: The periodic sweep. Cancelled before etcd is closed, or its next pass runs on a shut client.
     _reconcile_task: asyncio.Task[None] | None
-    #: Which manager this is, written on the ticket so a sweep can be traced to one.
-    _reconcile_token: str
-    #: The exact ticket bytes this manager last wrote. Every rewrite is a compare-and-swap over
-    #: them, so a manager whose sweep ran long cannot stamp over the turn somebody else has since
-    #: taken.
-    _reconcile_ticket: str | None
 
     def __init__(self, plugin_config: Mapping[str, Any], local_config: Mapping[str, Any]) -> None:
         super().__init__(plugin_config, local_config)
@@ -453,8 +442,6 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
         self._unrecoverable = {}
         self._reconciliation_owed = False
         self._reconcile_task = None
-        self._reconcile_token = uuid.uuid4().hex
-        self._reconcile_ticket = None
 
     def _validated_config(self) -> tuple[int, int, str, int]:
         """The operator's settings, or a refusal to start on them.
@@ -539,14 +526,9 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
         )
         self._vni_allocator = VNIAllocator(self._etcd)
         self._endpoint_allocator = EndpointAllocator(self._etcd)
-        # What a previous manager life could neither release nor write down. Started from the
-        # POOL rather than from a list of what is owed, because the case this exists for is the
-        # one where nothing was written down. A manager that cannot reconcile still serves
-        # sessions -- refusing to start over a transient etcd error would be worse -- but it does
-        # not carry on as if it had: the pass stays owed, it is retried the next time a session id
-        # comes round, and `backendai_network_pool_reconcile_pending` says so until it succeeds.
-        if await self._claim_reconcile_turn():
-            await self._sweep_holding_the_turn()
+        # Startup remains bounded: the elected manager performs the first pass in the background.
+        # The lease is kept for the whole interval, so an HA peer cannot queue another full pass
+        # immediately after this one finishes.
         self._reconcile_task = asyncio.create_task(self._reconcile_loop())
 
     async def _reconcile_loop(self) -> None:
@@ -559,126 +541,27 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
         """
         while True:
             try:
-                await asyncio.sleep(_RECONCILE_INTERVAL_SEC)
-                if await self._claim_reconcile_turn():
-                    await self._sweep_holding_the_turn()
+                async with EtcdLock(
+                    _RECONCILE_LOCK,
+                    self._require_etcd(),
+                    timeout=_RECONCILE_LOCK_TIMEOUT_SEC,
+                    lifetime=_RECONCILE_LEASE_SEC,
+                ):
+                    while True:
+                        succeeded = await self._reconcile_pool_reporting()
+                        delay = (
+                            _RECONCILE_INTERVAL_SEC if succeeded else _RECONCILE_LEADER_RETRY_SEC
+                        )
+                        await asyncio.sleep(delay)
             except asyncio.CancelledError:
                 raise
+            except ClientError:
+                await asyncio.sleep(_RECONCILE_LEADER_RETRY_SEC)
             except Exception:
-                # Never let one bad pass end the loop; the next one is the retry.
-                log.exception("the periodic overlay pool reconciliation raised")
+                log.exception("the overlay reconciliation leader loop raised")
+                await asyncio.sleep(_RECONCILE_LEADER_RETRY_SEC)
 
-    async def _claim_reconcile_turn(self) -> bool:
-        """Whether this manager is the one to sweep now.
-
-        Leader election by compare-and-swap on a single key rather than by a lock: the sweep is
-        idempotent and cheap to skip, so all that is needed is that one manager wins and the rest
-        find out without waiting. A lock would leave every other manager blocked on it, and a
-        rolling restart would then run the sweep once per manager in turn instead of once.
-
-        Fails OPEN -- an unreadable ticket means this manager sweeps. A pass too many costs a pool
-        read; a pass too few is a claim nobody reclaims. A ticket dated in the FUTURE is unreadable
-        by that rule: managers compare wall clocks here, and one running ahead would otherwise
-        park the whole cluster's reconciliation for as long as its clock is ahead. Trusting only
-        tickets in the past bounds the damage of skew to the skew itself. The proper fix is a TTL
-        lease, which this etcd client does not expose.
-        """
-        etcd = self._require_etcd()
-        now = time.time()
-        try:
-            standing = await etcd.get(_RECONCILE_TICKET, scope=ConfigScopes.GLOBAL)
-        except Exception:
-            log.warning("could not read the reconciliation ticket; sweeping anyway", exc_info=True)
-            return True
-        ticket = self._ticket(now)
-        if standing is None:
-            if not await etcd.put_if_absent(_RECONCILE_TICKET, ticket):
-                return False
-            self._reconcile_ticket = ticket
-            return True
-        swept_at = (_record(standing) or {}).get("at")
-        if isinstance(swept_at, (int, float, str)):
-            try:
-                age = now - float(swept_at)
-            except ValueError:
-                age = None  # unreadable ticket: take the turn and write a readable one
-            if age is not None and 0.0 <= age < _RECONCILE_INTERVAL_SEC:
-                return False  # somebody swept recently
-        if not await etcd.compare_and_put(_RECONCILE_TICKET, ticket, expected=standing, guards={}):
-            return False
-        self._reconcile_ticket = ticket
-        return True
-
-    def _ticket(self, at: float) -> str:
-        return json.dumps({"at": at, "by": self._reconcile_token})
-
-    async def _sweep_holding_the_turn(self) -> None:
-        """Sweep, keeping the turn re-dated for as long as it takes.
-
-        The turn is a timestamp, so a pass that outlasts the interval leaves an expired ticket
-        behind it and the next manager starts a second full scan over the top of this one. Two
-        passes are safe -- every delete is guarded and named by exact bytes -- but they are two
-        scans of the whole pool for one pass's worth of work, on exactly the cluster too big to
-        sweep inside an interval.
-
-        So the ticket is re-dated while the sweep runs, not only when it ends. Every re-dating is
-        a compare-and-swap over this manager's own bytes: if the turn was taken anyway, the
-        heartbeat stops rather than stamping over whoever has it, and this pass finishes on its
-        own. A lease is what would do this without a heartbeat, and this etcd client has none.
-        """
-
-        async def heartbeat() -> None:
-            while True:
-                await asyncio.sleep(_RECONCILE_HEARTBEAT_SEC)
-                if not await self._hold_reconcile_turn():
-                    return
-
-        beat = asyncio.create_task(heartbeat())
-        try:
-            await self._reconcile_pool_reporting()
-        finally:
-            beat.cancel()
-            try:
-                await beat
-            except asyncio.CancelledError:
-                pass
-        # Dated from when the pass FINISHED, so the next interval starts here rather than at the
-        # top of a sweep whose length nobody knows in advance.
-        await self._hold_reconcile_turn()
-
-    async def _hold_reconcile_turn(self) -> bool:
-        """Re-date this manager's ticket, but only over the bytes it put there.
-
-        The turn is a timestamp, not a lease, so a sweep that outlasts the interval lets another
-        manager take the turn from under this one. Re-dating unconditionally then let the first
-        manager stamp over the second's fresh ticket, and the two would trade the turn back and
-        forth. Compare-and-swap over this manager's own bytes instead: losing it means the turn is
-        somebody else's now, and this manager stops refreshing.
-
-        Called on a heartbeat while a long sweep runs and again when it finishes -- see
-        `_sweep_holding_the_turn` -- so the interval is measured from the end of a pass rather
-        than the start of one.
-
-        :return: ``True`` while this manager still holds the turn.
-        """
-        if self._reconcile_ticket is None:
-            return False
-        ticket = self._ticket(time.time())
-        try:
-            held = await self._require_etcd().compare_and_put(
-                _RECONCILE_TICKET, ticket, expected=self._reconcile_ticket, guards={}
-            )
-        except Exception:
-            log.warning("could not re-date the reconciliation ticket", exc_info=True)
-            return True  # unknown, not lost: keep going rather than abandon a pass mid-way
-        if not held:
-            log.info("another manager has taken the reconciliation turn; not re-dating it")
-            self._reconcile_ticket = None
-            return False
-        self._reconcile_ticket = ticket
-        return True
-
-    async def _reconcile_pool_reporting(self) -> None:
+    async def _reconcile_pool_reporting(self) -> bool:
         """Run a reconciliation pass, and leave behind what its outcome means.
 
         Not fail-open: a pass that raises used to be a log line and nothing else, so a single
@@ -686,22 +569,26 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
         clean. What it reclaims and what it could not reach are both numbers now.
         """
         metrics = CommonMetricRegistry.instance().network_pool
+        started_at = time.monotonic()
+        metrics.observe_reconcile_started()
         try:
             reclaimed = await self.reconcile_pool()
         except Exception:
             self._reconciliation_owed = True
-            metrics.observe_reconcile_failed()
+            metrics.observe_reconcile_failed(duration=time.monotonic() - started_at)
             log.exception(
-                "could not reconcile the overlay pool; the pass stays owed and is retried the"
-                " next time one of this cluster's session ids is used"
+                "could not reconcile the overlay pool; the leased leader will retry the pass"
             )
-            return
+            return False
         self._reconciliation_owed = False
         metrics.observe_reconcile_succeeded(
-            reclaimed=reclaimed, unrecoverable=len(self._unrecoverable)
+            reclaimed=reclaimed,
+            unrecoverable=len(self._unrecoverable),
+            duration=time.monotonic() - started_at,
         )
         if reclaimed:
             log.warning("reclaimed {} pool claim(s) no live session names", reclaimed)
+        return True
 
     @override
     async def cleanup(self) -> None:
@@ -718,7 +605,9 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
 
     def _require_etcd(self) -> AsyncEtcd:
         if self._etcd is None:
-            raise RuntimeError("CNINetworkPlugin is not initialized (call init() first)")
+            raise ManagerNetworkMisconfigured(
+                "CNINetworkPlugin is not initialized; call init() before handling networks"
+            )
         return self._etcd
 
     @override
@@ -730,7 +619,12 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
         options = options or {}
         member_agents = list(options.get("member_agents", []))
         forced_raw = options.get("forced_backend")
-        forced_backend = NetworkBackendKind(forced_raw) if forced_raw else None
+        try:
+            forced_backend = NetworkBackendKind(forced_raw) if forced_raw else None
+        except ValueError as e:
+            raise ForcedBackendUnsupported(
+                f"Unknown cluster-network backend: {forced_raw!r}"
+            ) from e
         # Each endpoint = one container: {"container_id", "agent_id"}. The manager assigns
         # its overlay IP centrally (BEP-1078) so per-node IPs are disjoint.
         endpoints = list(options.get("endpoints", []))
@@ -792,7 +686,6 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
             )
             if encrypt:
                 encrypt = await self._nodes_can_encrypt(etcd, member_agents, policy=policy)
-            encryption_key = await overlay_encryption_key(etcd) if encrypt else None
             if backend is NetworkBackendKind.VXLAN:
                 vni = await self._vni_allocator.acquire(session_id, generation, pool_guards)
             # `mtu` in plugin_config is the UNDERLAY MTU; the overlay MTU (what the kernel's NIC
@@ -809,22 +702,35 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
             # real underlay and refuses the session when this number does not fit, which turns a
             # silent black hole into a named error. See agent/network/path_mtu.py.
 
-            meta: dict[str, Any] = {
-                "subnet": subnet,
-                "vni": vni,
-                "backend": str(backend),
-                "mtu": mtu,
-                "vxlan_port": vxlan_port,
-                "encryption_key": encryption_key,
-                _GENERATION: generation,
-                # Who is building this session, and whether they finished. Two managers can be
-                # here at once for one session; the allocation they converge on is shared, so
-                # "undo what I did" is only meaningful against a record that says whose it is.
-                _OWNER: token,
-                _STATE: _CREATING,
-                _CLAIMED_AT: time.time(),
-            }
-            held = await self._publish(etcd, session_id, held, meta)
+            async def publish_with_key(
+                encryption_key: str | None, encryption_key_id: str | None
+            ) -> tuple[dict[str, Any], str]:
+                meta: dict[str, Any] = {
+                    "subnet": subnet,
+                    "vni": vni,
+                    "backend": str(backend),
+                    "mtu": mtu,
+                    "vxlan_port": vxlan_port,
+                    "encryption_key": encryption_key,
+                    "encryption_key_id": encryption_key_id,
+                    _GENERATION: generation,
+                    _OWNER: token,
+                    _STATE: _CREATING,
+                    _CLAIMED_AT: time.time(),
+                }
+                return meta, await self._publish(etcd, session_id, held, meta)
+
+            if encrypt:
+                async with EtcdLock(
+                    OVERLAY_KEY_ROTATION_LOCK,
+                    etcd,
+                    timeout=30.0,
+                    lifetime=OVERLAY_KEY_ROTATION_LOCK_LIFETIME_SEC,
+                ):
+                    active_key = await _active_overlay_encryption_key_locked(etcd)
+                    meta, held = await publish_with_key(active_key.secret, active_key.key_id)
+            else:
+                meta, held = await publish_with_key(None, None)
             # Assign each endpoint a disjoint overlay IP and record it under endpoints/ (the
             # coordinator programs FDB/ARP from there). Returned map is threaded per-kernel by
             # the launcher into KernelCreationConfig["cluster_network_ip"].
@@ -1519,12 +1425,12 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
             return 0  # a record from before the field; not this sweep's to judge
         guard: Mapping[str, str | None] = {session_meta_key(session_id): meta_raw}
 
-        for unit, (owner, _stamp, raw) in (await self._subnet_allocator.claims()).items():
+        async for unit, (owner, _stamp, raw) in self._subnet_allocator.iter_claims():
             if owner != session_id or _claim_is_live(meta_raw, raw, False, unit):
                 continue
             if await self._subnet_allocator.release_unit(unit, raw, guard):
                 released += 1
-        for vni, (owner, _stamp, raw) in (await self._vni_allocator.claims()).items():
+        async for vni, (owner, _stamp, raw) in self._vni_allocator.iter_claims():
             if owner != session_id or _claim_is_live(meta_raw, raw, True, vni):
                 continue
             if await self._vni_allocator.release_one(vni, raw, guard):
@@ -1555,19 +1461,31 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
         #: with the record that says so. Keyed by session, not by claim: a wide block is many
         #: units and each would otherwise queue a promotion of its own, and every promotion
         #: re-reads the whole pool.
-        to_take: dict[str, tuple[str, str]] = {}
+        to_take: OrderedDict[str, tuple[str, str]] = OrderedDict()
 
         # One read of each session's record per sweep, not one per claim. Safe to cache only
         # because the guard is re-checked inside every delete: a record that changed after it was
         # cached makes the delete fail, never succeed wrongly.
-        seen: dict[str, str | None] = {}
+        seen: OrderedDict[str, str | None] = OrderedDict()
 
         async def live_meta(session_id: str) -> str | None:
-            if session_id not in seen:
-                seen[session_id] = await etcd.get(
-                    session_meta_key(session_id), scope=ConfigScopes.GLOBAL
+            if session_id in seen:
+                found = seen.pop(session_id)
+                seen[session_id] = found
+                return found
+            found = await etcd.get(session_meta_key(session_id), scope=ConfigScopes.GLOBAL)
+            seen[session_id] = found
+            if len(seen) > _RECONCILE_META_CACHE_SIZE:
+                seen.popitem(last=False)
+            return found
+
+        async def promote_queued() -> None:
+            session_id, (_live, meta_raw) = to_take.popitem(last=False)
+            if not await self._take_allocation(session_id, _record(meta_raw) or {}, meta_raw):
+                log.warning(
+                    "session {}'s allocation could not be taken onto its live incarnation",
+                    session_id,
                 )
-            return seen[session_id]
 
         async def orphan_guard(
             session_id: str, raw: str, *, is_vni: bool, key: str | int
@@ -1600,10 +1518,15 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
                 # In use, but not on the face of it this incarnation's -- unstamped, or stamped
                 # with one the record has moved on from. Taken onto the one the record names,
                 # because while the two disagree a cleanup of the other reads it as its own.
-                to_take[session_id] = (str(live), meta_raw)
+                if session_id in to_take:
+                    to_take.move_to_end(session_id)
+                else:
+                    if len(to_take) >= _RECONCILE_META_CACHE_SIZE:
+                        await promote_queued()
+                    to_take[session_id] = (str(live), meta_raw)
             return None
 
-        for unit, (session_id, generation, raw) in (await self._subnet_allocator.claims()).items():
+        async for unit, (session_id, generation, raw) in self._subnet_allocator.iter_claims():
             guard = await orphan_guard(session_id, raw, is_vni=False, key=unit)
             if guard is None:
                 continue
@@ -1615,7 +1538,7 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
                     session_id,
                     generation,
                 )
-        for vni, (session_id, generation, raw) in (await self._vni_allocator.claims()).items():
+        async for vni, (session_id, generation, raw) in self._vni_allocator.iter_claims():
             guard = await orphan_guard(session_id, raw, is_vni=True, key=vni)
             if guard is None:
                 continue
@@ -1635,11 +1558,8 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
         # cost one full scan per session. The listing goes stale as the promotions land, and that
         # is safe: every rewrite is a compare-and-swap over the bytes the listing gave, so a unit
         # that moved fails the swap instead of being written over blind.
-        allocated = await self._subnet_allocator.pool_listing() if to_take else {}
         for session_id, (_live, meta_raw) in to_take.items():
-            if not await self._take_allocation(
-                session_id, _record(meta_raw) or {}, meta_raw, allocated
-            ):
+            if not await self._take_allocation(session_id, _record(meta_raw) or {}, meta_raw):
                 log.warning(
                     "session {}'s allocation could not be taken onto the incarnation its record"
                     " names; an earlier cleanup of this id can still give it away",
@@ -1671,75 +1591,56 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
         field, whose session is long gone, is exactly what nothing else reaches.
         """
         reclaimed = 0
-        if only is not None:
-            session_ids = [only]
-        else:
-            try:
-                listing = await etcd.get_prefix("network/session", scope=ConfigScopes.GLOBAL)
-            except Exception:
-                log.exception("could not list the session subtree while reconciling")
-                return 0
-            # The first path segment of whatever the listing returns. `get_prefix` gives a nested
-            # mapping whose top level is already the session id, but taking the segment works on a
-            # flat listing too, and this sweep must not depend on which shape it is handed.
-            session_ids = sorted({str(key).split("/", 1)[0] for key in dict(listing) if key})
-        for session_id in session_ids:
-            if not session_id:
+        root = "network/session/"
+        scan_prefix = f"{root}{only}/" if only is not None else root
+        current_session: str | None = None
+        meta_raw: str | None = None
+        live: str | None = None
+        guard: Mapping[str, str | None] = {}
+        async for key, payload in etcd.iter_prefix(scan_prefix, scope=ConfigScopes.GLOBAL):
+            if not key.startswith(root):
                 continue
-            meta_key = session_meta_key(str(session_id))
-            meta_raw = await etcd.get(meta_key, scope=ConfigScopes.GLOBAL)
-            live = _generation_of(meta_raw)
+            parts = key[len(root) :].split("/", 2)
+            if len(parts) != 3 or parts[1] not in {"endpoints", "members", "ipam"} or not parts[2]:
+                continue
+            session_id = parts[0]
+            if only is not None and session_id != only:
+                continue
+            if current_session != session_id:
+                current_session = session_id
+                meta_key = session_meta_key(session_id)
+                meta_raw = await etcd.get(meta_key, scope=ConfigScopes.GLOBAL)
+                live = _generation_of(meta_raw)
+                guard = {meta_key: meta_raw}
             if meta_raw is not None and live is None:
-                continue  # a record from before the field; not this sweep's to judge
-            guard: Mapping[str, str | None] = {meta_key: meta_raw}
-            for prefix, key_of in (
-                (endpoints_prefix, endpoint_key),
-                (members_prefix, member_key),
-                (session_ipam_prefix, session_ipam_key),
-            ):
-                found = await etcd.get_prefix(
-                    prefix(str(session_id)).rstrip("/"), scope=ConfigScopes.GLOBAL
+                continue
+            match = generation_match(payload, live)
+            if match is GenerationMatch.UNREADABLE:
+                CommonMetricRegistry.instance().network_pool.observe_invalid_record()
+                log.warning("leaving {} alone: it cannot be read", key)
+                continue
+            if meta_raw is not None and match is not GenerationMatch.DIFFERENT:
+                continue
+            if await etcd.compare_and_delete(key, payload, guards=dict(guard)):
+                reclaimed += 1
+                log.warning(
+                    "reclaimed {}: session {} does not name its incarnation", key, session_id
                 )
-                for name, payload in dict(found).items():
-                    if not name or not isinstance(payload, str):
-                        continue
-                    match = generation_match(payload, live)
-                    if match is GenerationMatch.UNREADABLE:
-                        # Not evidence of anything, least of all of being garbage. The teardown
-                        # path already reads an unreadable member as a node that still holds the
-                        # data plane; this one deleted it, so the two disagreed about the same key
-                        # and the sweep removed a live session's teardown barrier.
-                        CommonMetricRegistry.instance().network_pool.observe_invalid_record()
-                        log.warning(
-                            "leaving {} alone: it cannot be read, and unreadable is not stale",
-                            key_of(str(session_id), str(name)),
-                        )
-                        continue
-                    if meta_raw is not None and match is not GenerationMatch.DIFFERENT:
-                        continue  # this incarnation's, or unstamped and so compatible with it
-                    if await etcd.compare_and_delete(
-                        key_of(str(session_id), str(name)), payload, guards=dict(guard)
-                    ):
-                        reclaimed += 1
-                        log.warning(
-                            "reclaimed {}: session {} does not name the incarnation that wrote it",
-                            key_of(str(session_id), str(name)),
-                            session_id,
-                        )
         return reclaimed
 
     async def _still_owed(self, etcd: AsyncEtcd, session_id: str, generation: str) -> bool:
         """Whether anything of this incarnation is still held anywhere."""
-        for unit, (owner, stamped, _raw) in (await self._subnet_allocator.claims()).items():
+        async for _unit, (owner, stamped, _raw) in self._subnet_allocator.iter_claims():
             if owner == session_id and stamped == generation:
                 return True
-        for vni, (owner, stamped, _raw) in (await self._vni_allocator.claims()).items():
+        async for _vni, (owner, stamped, _raw) in self._vni_allocator.iter_claims():
             if owner == session_id and stamped == generation:
                 return True
         for prefix in (endpoints_prefix, members_prefix, session_ipam_prefix):
-            found = await etcd.get_prefix(prefix(session_id).rstrip("/"), scope=ConfigScopes.GLOBAL)
-            for _name, payload in dict(found).items():
-                if isinstance(payload, str) and _generation_of(payload) == generation:
+            async for _key, payload in etcd.iter_prefix(
+                prefix(session_id), scope=ConfigScopes.GLOBAL
+            ):
+                if _generation_of(payload) == generation:
                     return True
         return False
 
@@ -1796,12 +1697,6 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
                 f"could not reconcile what earlier incarnations of session {session_id} left"
                 f" ({e}); retrying rather than reusing the id over keys nothing has looked at"
             ) from e
-        # A reconciliation pass this manager owes -- one that raised at startup -- retried here.
-        # Not on a timer, which would need a leader lock this plugin does not hold and would have
-        # every manager in an HA set scanning at once; here it is paid once, by whoever is next to
-        # use a session id, and stops being owed as soon as it goes through.
-        if self._reconciliation_owed:
-            await self._reconcile_pool_reporting()
         # The pool half of the same debt, and only where something is actually owed: a claim whose
         # note could not be written is named by nothing, so the id coming back round is the one
         # chance to reach it before a manager restart does. Reading the whole pool is not a cost

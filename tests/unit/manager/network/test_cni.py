@@ -10,10 +10,11 @@ import asyncio
 import ipaddress
 import json
 import time
-from collections.abc import Mapping
+from collections.abc import AsyncIterator, Mapping
 from typing import Any, TypeVar, cast, override
 
 import pytest
+from etcd_client import ClientError
 
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.network.keys import member_key, session_ipam_key, session_meta_key
@@ -34,6 +35,8 @@ from ai.backend.manager.errors.network import (
     ManagerNetworkMisconfigured,
     NetworkBackendMismatch,
     NetworkPoolExhausted,
+    NetworkStateQuarantineFailed,
+    OverlayEncryptionRotationBlocked,
     OverlayTeardownPending,
     RequestedSubnetInvalid,
     RequestedSubnetUnavailable,
@@ -44,6 +47,11 @@ from ai.backend.manager.errors.network import (
 )
 from ai.backend.manager.network import cni, pairing
 from ai.backend.manager.network.cni import CNINetworkPlugin
+from ai.backend.manager.network.diagnostics import (
+    audit_overlay_state,
+    quarantine_overlay_record,
+    repair_overlay_state,
+)
 from ai.backend.manager.network.ipam import (
     DEFAULT_IPAM_POOL,
     EndpointAllocator,
@@ -52,9 +60,33 @@ from ai.backend.manager.network.ipam import (
     _allocated_key,
     _claim,
     _prefix_for_hosts,
+    active_overlay_encryption_key,
+    overlay_encryption_key_status,
+    rotate_overlay_encryption_key,
 )
 from ai.backend.manager.network.pairing import AdmittedAgent
 from ai.backend.manager.plugin.network import NetworkInfo
+
+
+class _FakeLockContext:
+    def __init__(self, lock: asyncio.Lock) -> None:
+        self._lock = lock
+
+    async def __aenter__(self) -> "_FakeLockContext":
+        await self._lock.acquire()
+        return self
+
+    async def __aexit__(self, *exc_info: Any) -> None:
+        self._lock.release()
+
+
+class _FakeNativeEtcd:
+    def __init__(self) -> None:
+        self._locks: dict[bytes, asyncio.Lock] = {}
+
+    def with_lock(self, option: Any) -> _FakeLockContext:
+        lock = self._locks.setdefault(option.lock_name, asyncio.Lock())
+        return _FakeLockContext(lock)
 
 
 class FakeEtcd:
@@ -62,6 +94,7 @@ class FakeEtcd:
 
     def __init__(self) -> None:
         self.store: dict[str, str] = {}
+        self.etcd = _FakeNativeEtcd()
 
     async def put_if_absent(self, key: str, val: str, **kwargs: Any) -> bool:
         if key in self.store:
@@ -126,7 +159,7 @@ class FakeEtcd:
         val: str,
         *,
         expected: str | None,
-        guards: Mapping[str, str],
+        guards: Mapping[str, str | None],
         **kwargs: Any,
     ) -> bool:
         """One store operation over the target AND the keys that make writing it legitimate.
@@ -151,6 +184,12 @@ class FakeEtcd:
         return {
             key[len(head) :]: value for key, value in self.store.items() if key.startswith(head)
         }
+
+    async def iter_prefix(self, prefix: str, **kwargs: Any) -> AsyncIterator[tuple[str, str]]:
+        head = prefix.rstrip("/") + "/"
+        for key in sorted(self.store):
+            if key.startswith(head):
+                yield key, self.store[key]
 
     async def delete_prefix(self, prefix: str, **kwargs: Any) -> None:
         for key in [k for k in self.store if k.startswith(prefix)]:
@@ -193,6 +232,112 @@ class TestSubnetAllocator:
         await allocator.acquire("s2")
         with pytest.raises(NetworkPoolExhausted):
             await allocator.acquire("s3")
+
+
+class TestNetworkDiagnostics:
+    async def test_audit_reports_orphans_without_exposing_values(self) -> None:
+        etcd = FakeEtcd()
+        secret = "ab" * 32
+        etcd.store["network/ipam/vni/4096"] = json.dumps({"session_id": "gone"})
+        etcd.store["network/session/gone/endpoints/c1"] = json.dumps({
+            "generation": "old",
+            "encryption_key": secret,
+        })
+
+        report = await audit_overlay_state(cast(AsyncEtcd, etcd))
+
+        assert report.orphan_claims == 1
+        assert report.orphan_session_children == 1
+        assert secret not in repr(report)
+
+    async def test_repair_reclaims_only_cas_guarded_orphans(self) -> None:
+        etcd = FakeEtcd()
+        etcd.store["network/ipam/vni/4096"] = json.dumps({"session_id": "gone"})
+
+        reclaimed = await repair_overlay_state(
+            cast(AsyncEtcd, etcd), pool=DEFAULT_IPAM_POOL, block_prefixlen=24
+        )
+
+        assert reclaimed == 1
+        assert (await audit_overlay_state(cast(AsyncEtcd, etcd))).healthy
+
+    async def test_quarantine_preserves_a_snapshot_and_removes_the_source(self) -> None:
+        etcd = FakeEtcd()
+        source = "network/ipam/vni/not-a-vni"
+        etcd.store[source] = "corrupt"
+
+        destination = await quarantine_overlay_record(cast(AsyncEtcd, etcd), source)
+
+        assert source not in etcd.store
+        snapshot = json.loads(etcd.store[destination])
+        assert snapshot["original_key"] == source
+        assert snapshot["original_value"] == "corrupt"
+
+    async def test_quarantine_refuses_unreadable_ownership_of_a_valid_pool_key(self) -> None:
+        etcd = FakeEtcd()
+        source = "network/ipam/vni/4096"
+        etcd.store[source] = "corrupt"
+
+        with pytest.raises(NetworkStateQuarantineFailed, match="unreadable ownership"):
+            await quarantine_overlay_record(cast(AsyncEtcd, etcd), source)
+
+        assert etcd.store[source] == "corrupt"
+
+    async def test_quarantine_refuses_a_claim_owned_by_a_live_session(self) -> None:
+        etcd = FakeEtcd()
+        plugin = _plugin_with(etcd)
+        await plugin.create_network(identifier="s1", options={"forced_backend": "vxlan"})
+        meta = json.loads(etcd.store["network/session/s1/meta"])
+        source = f"network/ipam/vni/{meta['vni']}"
+
+        with pytest.raises(NetworkStateQuarantineFailed, match="owned by a live session"):
+            await quarantine_overlay_record(cast(AsyncEtcd, etcd), source)
+
+        assert source in etcd.store
+
+    async def test_quarantine_loses_if_an_owner_appears_before_the_copy(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        etcd = FakeEtcd()
+        source = "network/ipam/vni/4096"
+        claim = json.dumps({"session_id": "s1", "generation": "g1"})
+        etcd.store[source] = claim
+        original_compare_and_put = etcd.compare_and_put
+
+        async def owner_appears(
+            key: str,
+            val: str,
+            *,
+            expected: str | None,
+            guards: Mapping[str, str | None],
+            **kwargs: Any,
+        ) -> bool:
+            etcd.store["network/session/s1/meta"] = json.dumps({
+                "_state": "ready",
+                "generation": "g1",
+                "backend": "vxlan",
+                "subnet": "10.128.0.0/24",
+                "vni": 4096,
+            })
+            return await original_compare_and_put(
+                key, val, expected=expected, guards=guards, **kwargs
+            )
+
+        monkeypatch.setattr(etcd, "compare_and_put", owner_appears)
+        with pytest.raises(NetworkStateQuarantineFailed, match="changed before"):
+            await quarantine_overlay_record(cast(AsyncEtcd, etcd), source)
+
+        assert etcd.store[source] == claim
+
+    async def test_session_meta_cannot_be_quarantined(self) -> None:
+        etcd = FakeEtcd()
+        source = "network/session/s1/meta"
+        etcd.store[source] = "corrupt"
+
+        with pytest.raises(NetworkStateQuarantineFailed):
+            await quarantine_overlay_record(cast(AsyncEtcd, etcd), source)
+
+        assert etcd.store[source] == "corrupt"
 
 
 class TestVNIAllocator:
@@ -511,7 +656,76 @@ class TestCreateNetwork:
         info = await plugin.create_network(identifier="s1", options={"forced_backend": "vxlan"})
         key = info.options["encryption_key"]
         assert isinstance(key, str) and len(key) == 64
+        assert info.options["encryption_key_id"].startswith("k-")
         assert json.loads(etcd.store["network/session/s1/meta"])["encryption_key"] == key
+
+    async def test_overlay_key_lifecycle_contains_no_secret(self) -> None:
+        etcd = FakeEtcd()
+        active = await active_overlay_encryption_key(cast(AsyncEtcd, etcd))
+
+        lifecycle = etcd.store["network/overlay-encryption-key-lifecycle"]
+
+        assert active.secret == etcd.store["network/overlay-encryption-key"]
+        assert active.secret not in lifecycle
+        assert active.key_id in lifecycle
+
+    async def test_overlay_key_rotation_requires_a_full_drain(self) -> None:
+        etcd = FakeEtcd()
+        await active_overlay_encryption_key(cast(AsyncEtcd, etcd))
+        etcd.store["network"] = "unrelated"
+        etcd.store["network/session/s1/meta"] = json.dumps({"encryption_key": "ab" * 32})
+
+        with pytest.raises(OverlayEncryptionRotationBlocked, match="s1"):
+            await rotate_overlay_encryption_key(cast(AsyncEtcd, etcd))
+
+    async def test_overlay_key_rotation_refuses_unreadable_session_state(self) -> None:
+        etcd = FakeEtcd()
+        await active_overlay_encryption_key(cast(AsyncEtcd, etcd))
+        etcd.store["network/session/s-corrupt/meta"] = "not-json"
+
+        with pytest.raises(OverlayEncryptionRotationBlocked, match=r"unreadable.*s-corrupt"):
+            await rotate_overlay_encryption_key(cast(AsyncEtcd, etcd))
+
+    async def test_drained_overlay_key_rotation_retires_the_old_id(self) -> None:
+        etcd = FakeEtcd()
+        old = await active_overlay_encryption_key(cast(AsyncEtcd, etcd))
+
+        rotated = await rotate_overlay_encryption_key(cast(AsyncEtcd, etcd))
+        current = await overlay_encryption_key_status(cast(AsyncEtcd, etcd))
+
+        assert rotated == current
+        assert current.active_key_id != old.key_id
+        assert old.key_id in current.retired_key_ids
+        assert etcd.store["network/overlay-encryption-key"] != old.secret
+
+    async def test_overlay_key_read_excludes_a_concurrent_rotation(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        etcd = FakeEtcd()
+        entered = asyncio.Event()
+        resume = asyncio.Event()
+        original_get = etcd.get
+        paused = False
+
+        async def pausing_get(key: str, **kwargs: Any) -> str | None:
+            nonlocal paused
+            if key == "network/overlay-encryption-key" and not paused:
+                paused = True
+                entered.set()
+                await resume.wait()
+            return await original_get(key, **kwargs)
+
+        monkeypatch.setattr(etcd, "get", pausing_get)
+        reader = asyncio.create_task(active_overlay_encryption_key(cast(AsyncEtcd, etcd)))
+        await asyncio.wait_for(entered.wait(), timeout=1.0)
+
+        rotator = asyncio.create_task(rotate_overlay_encryption_key(cast(AsyncEtcd, etcd)))
+        await asyncio.sleep(0.01)
+
+        assert not rotator.done()
+        resume.set()
+        old, rotated = await asyncio.gather(reader, rotator)
+        assert old.key_id in rotated.retired_key_ids
 
     async def test_the_default_leaves_room_for_the_esp_overhead(self) -> None:
         # The MTU the manager publishes is what the agent builds the devices with, so it has to
@@ -703,15 +917,15 @@ class TestCreateNetwork:
 
 
 class TestMemberBackendCompat:
-    async def test_containerd_member_ok(self) -> None:
+    async def test_containerd_member_is_refused_until_runtime_seam_exists(self) -> None:
         etcd = FakeEtcd()
         etcd.store["network/agent/a1/backend"] = "containerd"
         _publish_caps(etcd, "a1", backend="containerd")
         plugin = _plugin_with(etcd)
-        info = await plugin.create_network(
-            identifier="s1", options={"forced_backend": "vxlan", "member_agents": ["a1"]}
-        )
-        assert info.options["backend"] == "vxlan"
+        with pytest.raises(NetworkBackendMismatch, match="cannot serve"):
+            await plugin.create_network(
+                identifier="s1", options={"forced_backend": "vxlan", "member_agents": ["a1"]}
+            )
 
     async def test_a_docker_member_is_accepted(self) -> None:
         # Docker serves the cni driver too: the vxlan device is moved into the container's netns
@@ -2059,7 +2273,7 @@ class _RecordsGuards(FakeEtcd):
 
     def __init__(self) -> None:
         super().__init__()
-        self.guarded: dict[str, dict[str, str]] = {}
+        self.guarded: dict[str, dict[str, str | None]] = {}
 
     @override
     async def compare_and_put(
@@ -2068,7 +2282,7 @@ class _RecordsGuards(FakeEtcd):
         val: str,
         *,
         expected: str | None,
-        guards: Mapping[str, str],
+        guards: Mapping[str, str | None],
         **kwargs: Any,
     ) -> bool:
         written = await super().compare_and_put(
@@ -2106,7 +2320,7 @@ class TestTheGuardIsWiredIntoTheRealPath:
             # The session record itself is fenced by the bytes it is written OVER, not by naming
             # itself as a guard. Its own guards are the member agents' adverts, so that a session
             # cannot be declared READY over an advert the node has since taken back.
-            if key.startswith("network/") and key != _META_KEY
+            if key.startswith("network/session/") and key != _META_KEY
         }
         unguarded = [key for key, guards in written.items() if _META_KEY not in guards]
         assert written, "nothing went through the guarded write at all"
@@ -2301,6 +2515,15 @@ class TestTheGuardIsWiredIntoTheRealPath:
                         "_state": "ready",
                     })
                 return found
+
+            @override
+            async def iter_prefix(
+                self, prefix: str, **kwargs: Any
+            ) -> AsyncIterator[tuple[str, str]]:
+                if prefix.rstrip("/").endswith(("/ipam", "/s1")):
+                    self.ipam_reads += 1
+                async for item in super().iter_prefix(prefix, **kwargs):
+                    yield item
 
         etcd = _TakenMidCreate()
         _encryption_capable(etcd, "a1")
@@ -3067,6 +3290,13 @@ class TestAReconciliationPassThatCouldNotRun:
                 raise RuntimeError("etcd is unreachable")
             return await super().get_prefix(prefix, **kwargs)
 
+        @override
+        async def iter_prefix(self, prefix: str, **kwargs: Any) -> AsyncIterator[tuple[str, str]]:
+            if self.refusing and prefix == "network/ipam/allocated":
+                raise RuntimeError("etcd is unreachable")
+            async for item in super().iter_prefix(prefix, **kwargs):
+                yield item
+
     async def test_a_failed_pass_stays_owed(self) -> None:
         etcd = self._PoolUnreadable()
         plugin = _plugin_with(etcd)
@@ -3076,7 +3306,7 @@ class TestAReconciliationPassThatCouldNotRun:
 
         assert _owed(plugin) is True
 
-    async def test_the_next_use_of_a_session_id_pays_it(self) -> None:
+    async def test_the_next_use_does_not_run_an_unleased_full_scan(self) -> None:
         etcd = self._PoolUnreadable()
         plugin = _plugin_with(etcd)
         await plugin._reconcile_pool_reporting()
@@ -3088,8 +3318,8 @@ class TestAReconciliationPassThatCouldNotRun:
 
         await plugin.create_network(identifier="s1", options=dict(self._OPTIONS))
 
-        assert _owed(plugin) is False
-        assert _allocated_key(stray) not in etcd.store, "the orphan waited for a restart"
+        assert _owed(plugin) is True
+        assert _allocated_key(stray) in etcd.store
 
     async def test_a_pass_that_went_through_is_not_owed(self) -> None:
         etcd = FakeEtcd()
@@ -3099,41 +3329,49 @@ class TestAReconciliationPassThatCouldNotRun:
 
 
 class TestWhoSweepsAndWhen:
-    """C30. The sweep was conditional on traffic: it ran at startup and was retried only when a
-    session id came round. On a cluster where nobody is starting sessions, that retry never
-    arrives. And on a rolling restart every manager swept at once."""
-
-    _OPTIONS: dict[str, Any] = {"forced_backend": "vxlan", "endpoints": [], "subnet": None}
-
-    async def test_the_first_manager_takes_the_turn_and_the_rest_skip(self) -> None:
+    async def test_the_leased_leader_retries_a_failed_pass_promptly(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         etcd = FakeEtcd()
-        first = _plugin_with(etcd)
-        second = _plugin_with(etcd)
+        plugin = _wire(_FailThenSucceedSweep({}, {}), etcd)
+        monkeypatch.setattr("ai.backend.manager.network.cni.EtcdLock", _FakeReconcileLease())
+        monkeypatch.setattr("ai.backend.manager.network.cni._RECONCILE_INTERVAL_SEC", 3600.0)
+        monkeypatch.setattr("ai.backend.manager.network.cni._RECONCILE_LEADER_RETRY_SEC", 0.01)
 
-        assert await first._claim_reconcile_turn() is True
-        assert await second._claim_reconcile_turn() is False, (
-            "every manager in an HA set swept the whole pool at the same moment"
-        )
+        task = asyncio.create_task(plugin._reconcile_loop())
+        await asyncio.wait_for(plugin.succeeded.wait(), timeout=1)
+        task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await task
 
-    async def test_the_turn_comes_round_again_once_the_interval_has_passed(self) -> None:
+        assert plugin.passes == 2
+
+    async def test_one_lease_holder_sweeps_and_a_peer_takes_over(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         etcd = FakeEtcd()
-        plugin = _plugin_with(etcd)
-        assert await plugin._claim_reconcile_turn() is True
-        etcd.store[cni._RECONCILE_TICKET] = json.dumps({
-            "at": time.time() - cni._RECONCILE_INTERVAL_SEC - 1,
-            "by": "someone",
-        })
+        lease = _FakeReconcileLease()
+        first = _wire(_CountingSweep({}, {}), etcd)
+        second = _wire(_CountingSweep({}, {}), etcd)
+        monkeypatch.setattr("ai.backend.manager.network.cni.EtcdLock", lease)
+        monkeypatch.setattr("ai.backend.manager.network.cni._RECONCILE_INTERVAL_SEC", 3600.0)
+        monkeypatch.setattr("ai.backend.manager.network.cni._RECONCILE_LEADER_RETRY_SEC", 0.01)
 
-        assert await plugin._claim_reconcile_turn() is True
+        first_task = asyncio.create_task(first._reconcile_loop())
+        await first.swept.wait()
+        second_task = asyncio.create_task(second._reconcile_loop())
+        await asyncio.sleep(0.03)
+        assert first.passes == 1
+        assert second.passes == 0
 
-    async def test_an_unreadable_ticket_does_not_stop_the_sweep(self) -> None:
-        # Fails open: a pass too many costs a pool read, a pass too few is a claim nobody
-        # reclaims.
-        etcd = FakeEtcd()
-        plugin = _plugin_with(etcd)
-        etcd.store[cni._RECONCILE_TICKET] = "null"
-
-        assert await plugin._claim_reconcile_turn() is True
+        first_task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await first_task
+        await asyncio.wait_for(second.swept.wait(), timeout=1)
+        assert second.passes == 1
+        second_task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await second_task
 
 
 class TestOneUnreadableKeyDoesNotStopTheSweep:
@@ -3347,21 +3585,56 @@ class TestTheRecordContractNotJustTheParse:
         assert await plugin.reconcile_pool() == 0
 
 
-class _SlowSweep(CNINetworkPlugin):
-    """A plugin whose reconciliation pass takes as long as the test wants it to."""
-
-    sweeping: asyncio.Event
-    finish: asyncio.Event
+class _CountingSweep(CNINetworkPlugin):
+    swept: asyncio.Event
+    passes: int
 
     def __init__(self, plugin_config: dict[str, Any], local_config: dict[str, Any]) -> None:
         super().__init__(plugin_config, local_config)
-        self.sweeping = asyncio.Event()
-        self.finish = asyncio.Event()
+        self.swept = asyncio.Event()
+        self.passes = 0
 
     @override
-    async def _reconcile_pool_reporting(self) -> None:
-        self.sweeping.set()
-        await self.finish.wait()
+    async def _reconcile_pool_reporting(self) -> bool:
+        self.passes += 1
+        self.swept.set()
+        return True
+
+
+class _FailThenSucceedSweep(CNINetworkPlugin):
+    succeeded: asyncio.Event
+    passes: int
+
+    def __init__(self, plugin_config: dict[str, Any], local_config: dict[str, Any]) -> None:
+        super().__init__(plugin_config, local_config)
+        self.succeeded = asyncio.Event()
+        self.passes = 0
+
+    @override
+    async def _reconcile_pool_reporting(self) -> bool:
+        self.passes += 1
+        if self.passes == 1:
+            return False
+        self.succeeded.set()
+        return True
+
+
+class _FakeReconcileLease:
+    _held: bool
+
+    def __init__(self) -> None:
+        self._held = False
+
+    def __call__(self, *args: Any, **kwargs: Any) -> "_FakeReconcileLease":
+        return self
+
+    async def __aenter__(self) -> None:
+        if self._held:
+            raise ClientError("the reconciliation lease is held")
+        self._held = True
+
+    async def __aexit__(self, *args: Any) -> None:
+        self._held = False
 
 
 class TestOnePoisonKeyDoesNotStopEverything:
@@ -3814,8 +4087,8 @@ class TestTheAdvertIsAboutTheNodeThatIsThereNow:
         # asking whether the WRITER could serve cni let the manager pair the new runtime with the
         # old runtime's advert for as long as it stayed fresh.
         etcd = FakeEtcd()
-        etcd.store["network/agent/a1/backend"] = "containerd"
-        _publish_caps(etcd, "a1", backend="docker")
+        etcd.store["network/agent/a1/backend"] = "docker"
+        _publish_caps(etcd, "a1", backend="containerd")
         plugin = _plugin_with(etcd)
         with pytest.raises(NetworkBackendMismatch, match="a boot that is over"):
             await plugin.create_network(
@@ -4005,80 +4278,6 @@ class TestTheAdvertBelongsToOneRunOfTheAgent:
 
         member = json.loads(etcd.store[member_key("s1", "a1")])
         assert member["vtep_ip"] == "10.9.9.9"
-
-
-class TestTheReconcileTicketAndTheClock:
-    """C33. Managers compare wall clocks on the ticket, so one running ahead could park the whole
-    cluster's reconciliation for as long as its clock is ahead."""
-
-    async def test_a_ticket_dated_in_the_future_is_not_trusted(self) -> None:
-        etcd = FakeEtcd()
-        plugin = _plugin_with(etcd)
-        etcd.store[cni._RECONCILE_TICKET] = json.dumps({
-            "at": time.time() + cni._RECONCILE_INTERVAL_SEC * 10,
-            "by": "a-fast-clock",
-        })
-
-        assert await plugin._claim_reconcile_turn() is True
-
-    async def test_the_interval_runs_from_when_the_sweep_finished(self) -> None:
-        # Dated from the start, a sweep that outlasts the interval lets the next manager take a
-        # turn while this one is still walking the pool.
-        etcd = FakeEtcd()
-        plugin = _plugin_with(etcd)
-        assert await plugin._claim_reconcile_turn() is True
-        aged = json.dumps({
-            "at": time.time() - cni._RECONCILE_INTERVAL_SEC - 1,
-            "by": plugin._reconcile_token,
-        })
-        etcd.store[cni._RECONCILE_TICKET] = aged
-        plugin._reconcile_ticket = aged
-
-        assert await plugin._hold_reconcile_turn() is True
-
-        assert await _plugin_with(etcd)._claim_reconcile_turn() is False
-
-    async def test_a_long_sweep_keeps_the_turn_while_it_runs(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        """The ticket is a timestamp, so a pass that outlasts the interval leaves an expired one
-        behind it and the next manager starts a second full scan over the top. Re-dating only at
-        the END could not prevent that -- which is what the comment claimed and the code did
-        not."""
-        etcd = FakeEtcd()
-        plugin = _SlowSweep({}, {})
-        _wire(plugin, etcd)
-        monkeypatch.setattr("ai.backend.manager.network.cni._RECONCILE_HEARTBEAT_SEC", 0.01)
-
-        assert await plugin._claim_reconcile_turn() is True
-        first = etcd.store[cni._RECONCILE_TICKET]
-        sweep = asyncio.create_task(plugin._sweep_holding_the_turn())
-        await plugin.sweeping.wait()
-        await asyncio.sleep(0.05)
-        beaten = etcd.store[cni._RECONCILE_TICKET]
-        plugin.finish.set()
-        await sweep
-
-        assert beaten != first, "the turn was not re-dated while the sweep ran"
-
-    async def test_a_long_sweep_does_not_stamp_over_the_turn_it_lost(self) -> None:
-        """A sweep that outlasts the interval loses the turn to the next manager. Re-dating
-        unconditionally then put the first manager's ticket back over the second's, and the two
-        traded the turn back and forth while both scanned the pool."""
-        etcd = FakeEtcd()
-        slow = _plugin_with(etcd)
-        assert await slow._claim_reconcile_turn() is True
-        # The interval passes while `slow` is still walking, and another manager takes the turn.
-        etcd.store[cni._RECONCILE_TICKET] = json.dumps({
-            "at": time.time() - cni._RECONCILE_INTERVAL_SEC - 1,
-            "by": slow._reconcile_token,
-        })
-        other = _plugin_with(etcd)
-        assert await other._claim_reconcile_turn() is True
-        taken = etcd.store[cni._RECONCILE_TICKET]
-
-        assert await slow._hold_reconcile_turn() is False, "it stamped over the new turn"
-        assert etcd.store[cni._RECONCILE_TICKET] == taken
 
 
 class TestADestroyThatFindsNoRecordAtAll:

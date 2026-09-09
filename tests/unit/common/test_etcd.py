@@ -7,9 +7,10 @@ from typing import Any
 from unittest.mock import AsyncMock, patch
 
 import pytest
-from etcd_client import CondVar, GRPCStatusCode, GRPCStatusError, WatchEventType
+from etcd_client import ClientError, CondVar, GRPCStatusCode, GRPCStatusError, WatchEventType
 
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes, Event
+from ai.backend.common.lock import EtcdLock
 from ai.backend.common.types import HostPortPair, QueueSentinel
 
 
@@ -35,6 +36,121 @@ async def test_basic_crud(etcd: AsyncEtcd) -> None:
     assert v is None
     vp = await etcd.get_prefix("wow")
     assert len(vp) == 0
+
+
+async def test_put_if_absent_has_one_winner_on_real_etcd(etcd: AsyncEtcd) -> None:
+    results = await asyncio.gather(*(etcd.put_if_absent("cas/key", str(i)) for i in range(16)))
+
+    assert results.count(True) == 1
+    assert await etcd.get("cas/key", scope=ConfigScopes.GLOBAL) in {str(i) for i in range(16)}
+
+
+async def test_compare_and_put_checks_target_and_guards_atomically(etcd: AsyncEtcd) -> None:
+    await etcd.put("cas/target", "old")
+    await etcd.put("cas/guard", "generation-1")
+
+    assert await etcd.compare_and_put(
+        "cas/target",
+        "new",
+        expected="old",
+        guards={"cas/guard": "generation-1", "cas/absent": None},
+    )
+    await etcd.put("cas/guard", "generation-2")
+
+    assert not await etcd.compare_and_put(
+        "cas/target",
+        "wrong",
+        expected="new",
+        guards={"cas/guard": "generation-1"},
+    )
+    assert await etcd.get("cas/target", scope=ConfigScopes.GLOBAL) == "new"
+
+
+async def test_compare_and_delete_preserves_a_value_when_a_guard_moves(etcd: AsyncEtcd) -> None:
+    await etcd.put("cas/claim", "owner-1")
+    await etcd.put("cas/guard", "generation-2")
+
+    assert not await etcd.compare_and_delete(
+        "cas/claim",
+        "owner-1",
+        guards={"cas/guard": "generation-1"},
+    )
+    assert await etcd.get("cas/claim", scope=ConfigScopes.GLOBAL) == "owner-1"
+
+
+async def test_iter_prefix_pages_over_one_revision(etcd: AsyncEtcd) -> None:
+    for index in range(7):
+        await etcd.put(f"paged/{index}", f"value-{index}")
+
+    iterator = etcd.iter_prefix("paged", page_size=2)
+    first_page = [await anext(iterator), await anext(iterator)]
+    await etcd.put("paged/9", "written-after-the-snapshot")
+    remaining = [item async for item in iterator]
+
+    assert first_page + remaining == [(f"paged/{index}", f"value-{index}") for index in range(7)]
+
+
+async def test_iter_prefix_keeps_scope_prefixes_internal(etcd: AsyncEtcd) -> None:
+    await etcd.put("paged/global", "global", scope=ConfigScopes.GLOBAL)
+    await etcd.put("paged/node", "node", scope=ConfigScopes.NODE)
+
+    items = [
+        item
+        async for item in etcd.iter_prefix(
+            "paged",
+            scope=ConfigScopes.GLOBAL,
+            page_size=1,
+        )
+    ]
+
+    assert items == [("paged/global", "global")]
+
+
+async def test_etcd_lease_lock_allows_one_holder_and_releases_on_exit(
+    etcd: AsyncEtcd, test_case_ns: str
+) -> None:
+    acquired = asyncio.Event()
+    release = asyncio.Event()
+    lock_name = f"tests/reconcile/{test_case_ns}"
+
+    async def hold() -> None:
+        async with EtcdLock(lock_name, etcd, timeout=1, lifetime=2):
+            acquired.set()
+            await release.wait()
+
+    holder = asyncio.create_task(hold())
+    await acquired.wait()
+    with pytest.raises(ClientError):
+        async with EtcdLock(lock_name, etcd, timeout=0.05, lifetime=2):
+            pytest.fail("two managers acquired one reconciliation lease")
+
+    release.set()
+    await holder
+    async with EtcdLock(lock_name, etcd, timeout=1, lifetime=2):
+        pass
+
+
+async def test_etcd_lease_lock_renews_while_the_reconciler_holds_it(
+    etcd: AsyncEtcd, test_case_ns: str
+) -> None:
+    acquired = asyncio.Event()
+    release = asyncio.Event()
+    lock_name = f"tests/reconcile-renewal/{test_case_ns}"
+
+    async def hold_past_ttl() -> None:
+        async with EtcdLock(lock_name, etcd, timeout=1, lifetime=1):
+            acquired.set()
+            await release.wait()
+
+    holder = asyncio.create_task(hold_past_ttl())
+    await acquired.wait()
+    await asyncio.sleep(1.5)
+    with pytest.raises(ClientError):
+        async with EtcdLock(lock_name, etcd, timeout=0.05, lifetime=1):
+            pytest.fail("the reconciliation lease expired while its leader was still running")
+
+    release.set()
+    await holder
 
 
 async def test_quote_for_put_prefix(etcd: AsyncEtcd) -> None:

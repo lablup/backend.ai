@@ -29,6 +29,8 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Final
 
+from ai.backend.agent.errors.agent import ContainerStartupFailedError
+
 #: Where the gate directory is bind-mounted inside the container.
 GATE_MNT: Final = "/.bai-gate"
 #: Written by the wrapper once it is parked in the container's namespaces.
@@ -87,5 +89,5 @@ async def wait_ready(
     ready = gate_dir / READY_MARKER
     while not ready.exists():
         if (reason := failure()) is not None:
-            raise RuntimeError(reason)
+            raise ContainerStartupFailedError(reason)
         await asyncio.sleep(poll_interval_sec)

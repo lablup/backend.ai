@@ -244,3 +244,48 @@ class ManagerNetworkMisconfigured(BackendAIError, web.HTTPInternalServerError):
             operation=ErrorOperation.SETUP,
             error_detail=ErrorDetail.INVALID_PARAMETERS,
         )
+
+
+class OverlayEncryptionKeyInvalid(BackendAIError, web.HTTPInternalServerError):
+    """The cluster overlay root or its lifecycle record is unreadable."""
+
+    error_type = "https://api.backend.ai/probs/manager/overlay-encryption-key-invalid"
+    error_title = "The cluster overlay encryption key is invalid."
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.SESSION,
+            operation=ErrorOperation.SETUP,
+            error_detail=ErrorDetail.INTERNAL_ERROR,
+        )
+
+
+class OverlayEncryptionRotationBlocked(BackendAIError, web.HTTPConflict):
+    """The cluster root cannot rotate while an encrypted data plane is active."""
+
+    error_type = "https://api.backend.ai/probs/manager/overlay-encryption-rotation-blocked"
+    error_title = "Active encrypted sessions block overlay key rotation."
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.SESSION,
+            operation=ErrorOperation.UPDATE,
+            error_detail=ErrorDetail.CONFLICT,
+        )
+
+
+class NetworkStateQuarantineFailed(BackendAIError, web.HTTPConflict):
+    """An etcd network record could not be moved without risking live state."""
+
+    error_type = "https://api.backend.ai/probs/manager/network-state-quarantine-failed"
+    error_title = "The cluster-network record was not quarantined."
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.SESSION,
+            operation=ErrorOperation.UPDATE,
+            error_detail=ErrorDetail.CONFLICT,
+        )

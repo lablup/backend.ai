@@ -10,6 +10,7 @@ using callbacks in separate threads.
 from __future__ import annotations
 
 import asyncio
+import base64
 import enum
 import functools
 import logging
@@ -35,6 +36,7 @@ from typing import (
 from urllib.parse import quote as _quote
 from urllib.parse import unquote
 
+import aiohttp
 import trafaret as t
 from etcd_client import (
     Client as EtcdClient,
@@ -113,6 +115,16 @@ def make_dict_from_pairs(
 
 def _slash(v: str) -> str:
     return v.rstrip("/") + "/" if len(v) > 0 else ""
+
+
+def _prefix_range_end(prefix: bytes) -> bytes:
+    """Return etcd's exclusive range end for all keys beginning with ``prefix``."""
+    end = bytearray(prefix)
+    for index in range(len(end) - 1, -1, -1):
+        if end[index] < 0xFF:
+            end[index] += 1
+            return bytes(end[: index + 1])
+    return b"\0"
 
 
 def _flatten_nested_dict(
@@ -322,6 +334,8 @@ class AbstractKVStore(ABC):
 class AsyncEtcd(AbstractKVStore):
     etcd: EtcdClient
     _connect_options: ConnectOptions | None
+    _credentials: dict[str, str] | None
+    _http_endpoints: tuple[str, ...]
 
     def __init__(
         self,
@@ -359,8 +373,10 @@ class AsyncEtcd(AbstractKVStore):
         self.encoding = encoding
         self.watch_reconnect_intvl = watch_reconnect_intvl
         self.watch_reconnect_max_intvl = watch_reconnect_max_intvl
+        self._credentials = credentials
+        self._http_endpoints = tuple(f"http://{addr.host}:{addr.port}" for addr in addrs)
         self.etcd = EtcdClient(
-            [f"http://{addr.host}:{addr.port}" for addr in addrs],
+            list(self._http_endpoints),
             connect_options=self._connect_options,
         )
 
@@ -717,6 +733,123 @@ class AsyncEtcd(AbstractKVStore):
             for scope_prefix, pairs in zip(scope_prefixes, pair_sets, strict=True)
         ]
         return ChainMap(*configs)
+
+    async def iter_prefix(
+        self,
+        key_prefix: str,
+        *,
+        scope: ConfigScopes = ConfigScopes.GLOBAL,
+        scope_prefix_map: Mapping[ConfigScopes, str] | None = None,
+        page_size: int = 256,
+    ) -> AsyncGenerator[tuple[str, str], None]:
+        """Stream one scope's prefix at a stable etcd revision in bounded pages."""
+        if scope is ConfigScopes.MERGED:
+            raise ValueError("iter_prefix requires one concrete etcd scope")
+        if page_size < 1:
+            raise ValueError("iter_prefix page_size must be positive")
+
+        scope_prefix = self._merge_scope_prefix_map(scope_prefix_map)[scope]
+        logical_scope_prefix = _slash(scope_prefix)
+        mangled_prefix = self._mangle_key(f"{_slash(scope_prefix)}{key_prefix}").encode(
+            self.encoding
+        )
+        range_end = _prefix_range_end(mangled_prefix)
+        next_key = mangled_prefix
+        revision: int | None = None
+        headers: dict[str, dict[str, str]] = {}
+        timeout = aiohttp.ClientTimeout(total=10.0)
+
+        async with aiohttp.ClientSession(timeout=timeout) as session:
+            while True:
+                payload: dict[str, str] = {
+                    "key": base64.b64encode(next_key).decode("ascii"),
+                    "range_end": base64.b64encode(range_end).decode("ascii"),
+                    "limit": str(page_size),
+                    "sort_order": "ASCEND",
+                    "sort_target": "KEY",
+                }
+                if revision is not None:
+                    payload["revision"] = str(revision)
+                page = await self._request_range_page(session, payload, headers)
+                if revision is None:
+                    revision = int(page["header"]["revision"])
+                kvs = page.get("kvs", [])
+                if not kvs:
+                    if page.get("more", False):
+                        raise RuntimeError("etcd returned an empty range page with more=true")
+                    return
+                last_key: bytes | None = None
+                for item in kvs:
+                    raw_key = base64.b64decode(item["key"])
+                    raw_value = base64.b64decode(item["value"])
+                    last_key = raw_key
+                    logical_key = self._demangle_key(raw_key).removeprefix(logical_scope_prefix)
+                    yield logical_key, raw_value.decode(self.encoding)
+                if not page.get("more", False):
+                    return
+                if last_key is None:
+                    raise RuntimeError("etcd range page did not carry a continuation key")
+                next_key = last_key + b"\0"
+
+    async def _request_range_page(
+        self,
+        session: aiohttp.ClientSession,
+        payload: Mapping[str, str],
+        headers: dict[str, dict[str, str]],
+    ) -> Mapping[str, Any]:
+        """Read one range page, failing over across the configured cluster endpoints."""
+        last_error: BaseException | None = None
+        for endpoint in self._http_endpoints:
+            try:
+                for attempt in range(2):
+                    endpoint_headers = headers.get(endpoint)
+                    if endpoint_headers is None:
+                        endpoint_headers = await self._range_auth_headers(session, endpoint)
+                        headers[endpoint] = endpoint_headers
+                    async with session.post(
+                        f"{endpoint}/v3/kv/range",
+                        json=payload,
+                        headers=endpoint_headers,
+                    ) as response:
+                        if (
+                            response.status == 401
+                            and self._credentials is not None
+                            and attempt == 0
+                        ):
+                            headers.pop(endpoint, None)
+                            continue
+                        response.raise_for_status()
+                        result = await response.json()
+                        if not isinstance(result, Mapping):
+                            raise RuntimeError("etcd range response is not a JSON object")
+                        return result
+            except (aiohttp.ClientError, TimeoutError) as error:
+                last_error = error
+        if last_error is not None:
+            raise last_error
+        raise RuntimeError("no etcd endpoint is configured")
+
+    async def _range_auth_headers(
+        self,
+        session: aiohttp.ClientSession,
+        endpoint: str,
+    ) -> dict[str, str]:
+        """Authenticate the JSON range transport when etcd credentials are configured."""
+        if self._credentials is None:
+            return {}
+        async with session.post(
+            f"{endpoint}/v3/auth/authenticate",
+            json={
+                "name": self._credentials["user"],
+                "password": self._credentials["password"],
+            },
+        ) as response:
+            response.raise_for_status()
+            result = await response.json()
+        token = result.get("token") if isinstance(result, Mapping) else None
+        if not isinstance(token, str) or not token:
+            raise RuntimeError("etcd authentication returned no token")
+        return {"Authorization": token}
 
     # for legacy
     get_prefix_dict = get_prefix

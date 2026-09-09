@@ -13,6 +13,7 @@ import pytest
 
 import ai.backend.agent.docker.locator as locator_mod
 from ai.backend.agent.docker.locator import DockerContainerLocator
+from ai.backend.agent.errors.network import ContainerSourceUnwired
 
 
 class _FakeDocker:
@@ -96,5 +97,5 @@ class TestClosing:
         assert client.closed
 
     async def test_using_it_unopened_says_so(self) -> None:
-        with pytest.raises(RuntimeError, match="before open"):
+        with pytest.raises(ContainerSourceUnwired, match="before open"):
             DockerContainerLocator()._client()

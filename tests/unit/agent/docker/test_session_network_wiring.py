@@ -18,6 +18,7 @@ import pytest
 
 from ai.backend.agent.docker.gate import GATE_READY_TIMEOUT_SEC, stage_gate, wait_gated_pid
 from ai.backend.agent.docker.session_network import make_docker_locator
+from ai.backend.agent.errors.agent import ContainerStartupFailedError
 from ai.backend.agent.errors.network import OverlayTeardownIncomplete
 from ai.backend.agent.gate import READY_MARKER
 from ai.backend.agent.network.session_network import SessionNetwork
@@ -55,7 +56,7 @@ class TestWaitingForTheGate:
         # timeout and then reported as slow rather than as broken.
         gate_dir = tmp_path / "gate"
         stage_gate(gate_dir)
-        with pytest.raises(RuntimeError, match="exited before reaching the gate"):
+        with pytest.raises(ContainerStartupFailedError, match="exited before reaching the gate"):
             await wait_gated_pid(_FakeContainer(running=False), gate_dir)
 
     async def test_a_gate_that_never_opens_times_out(self, tmp_path: Path) -> None:
@@ -70,7 +71,7 @@ class TestWaitingForTheGate:
         stage_gate(gate_dir)
         (gate_dir / READY_MARKER).touch()
         container = _FakeContainer(pid=0)
-        with pytest.raises(RuntimeError, match="no PID"):
+        with pytest.raises(ContainerStartupFailedError, match="no PID"):
             await wait_gated_pid(container, gate_dir)
 
     def test_the_default_timeout_is_finite(self) -> None:

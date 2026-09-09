@@ -9,6 +9,7 @@ from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
+from aiodocker import Docker
 from aiodocker.exceptions import DockerError
 
 from ai.backend.agent.agent import AgentClass
@@ -44,6 +45,18 @@ class DummyEtcd:
         self.store.pop(key, None)
 
 
+async def _remove_test_socket_relay(agent_id: str) -> None:
+    docker = Docker()
+    try:
+        container = docker.containers.container(f"backendai-socket-relay.{agent_id}")
+        await container.delete(force=True)
+    except DockerError as e:
+        if e.status != 404:
+            raise
+    finally:
+        await docker.close()
+
+
 @pytest.fixture
 async def agent(local_config: Any, test_id: str, mocker: Any, socket_relay_image: Any) -> Any:
     dummy_etcd = DummyEtcd()
@@ -67,7 +80,10 @@ async def agent(local_config: Any, test_id: str, mocker: Any, socket_relay_image
     try:
         yield agent
     finally:
-        await agent.shutdown(signal.SIGTERM)
+        try:
+            await agent.shutdown(signal.SIGTERM)
+        finally:
+            await _remove_test_socket_relay(str(agent.id))
 
 
 async def test_init(agent: DockerAgent, mocker: Any) -> None:

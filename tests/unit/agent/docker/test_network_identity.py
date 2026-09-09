@@ -23,6 +23,7 @@ import pytest
 import ai.backend.agent.server as agent_server
 from ai.backend.agent.agent import AbstractAgent
 from ai.backend.agent.docker.agent import DockerAgent, DockerKernelCreationContext
+from ai.backend.agent.errors import AgentInitializationError
 from ai.backend.agent.errors.agent import ContainerCreationError
 from ai.backend.agent.network.caps import withdraw_vtep
 from ai.backend.common.etcd import AbstractKVStore
@@ -301,14 +302,12 @@ class TestTheNodeIsAnnouncedOnlyOnceItCanServe:
         assert "AgentStartedEvent" in source
 
     async def test_announcing_before_the_transport_serves_is_refused(self) -> None:
-        """Registering RPC handlers is not serving: the transport is entered later still, with an
-        HTTP listener set up in between. Making this raise means the ordering fails loudly rather
-        than depending on a reader keeping it true."""
+        """Refuse announcements before the transport enters serving state."""
         server = object.__new__(agent_server.AgentRPCServer)
         server._transport_entered = False
         server.runtime = MagicMock(start_serving=AsyncMock(), stop_serving=AsyncMock())
 
-        with pytest.raises(RuntimeError, match="before its RPC transport is serving"):
+        with pytest.raises(AgentInitializationError, match="before its RPC transport is serving"):
             await server.start_serving()
 
         server.runtime.start_serving.assert_not_awaited()
@@ -334,7 +333,7 @@ class TestTheNodeIsAnnouncedOnlyOnceItCanServe:
         await server.stop_serving()
 
         server.runtime.stop_serving.assert_awaited_once()
-        with pytest.raises(RuntimeError):
+        with pytest.raises(AgentInitializationError):
             await server.start_serving()
 
 

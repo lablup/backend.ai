@@ -43,13 +43,19 @@ import logging
 import os
 import pwd
 import socket
+import stat
 import struct
 from collections.abc import AsyncIterator, Mapping, Sequence
 from dataclasses import replace
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
-from ai.backend.agent.errors.network import UnusableVtep
+from ai.backend.agent.errors.network import (
+    PrivnetAlreadyRunning,
+    PrivnetConfigurationInvalid,
+    UnsafePrivnetSocket,
+    UnusableVtep,
+)
 from ai.backend.agent.network.cni import CniAttacher, plan_to_invocations
 from ai.backend.agent.network.local_subnet import LocalSubnetAllocator, get_local_subnet_allocator
 from ai.backend.agent.network.locator import ContainerLocator
@@ -353,7 +359,7 @@ class PrivNetServer:
             # It is the owner half of every node-wide claim this process makes. An empty one
             # writes claims no reader can attribute, and an unattributable claim on a VNI reads as
             # nobody -- after which the next setup deletes the devices behind it.
-            raise ValueError("network privnet requires a non-empty agent id")
+            raise PrivnetConfigurationInvalid("network privnet requires a non-empty agent id")
         self._agent_id = agent_id
         self._host_ip = host_ip
         # Validated by the entry point (__main__), like the agent validates its own before handing
@@ -413,6 +419,8 @@ class PrivNetServer:
                 self._locks.pop(session_id, None)
 
     async def serve_forever(self) -> None:
+        sock_path = Path(self._socket_path)
+        await self._prepare_socket_path(sock_path)
         # Both under a deadline, and both before the socket exists -- which is the point: nothing
         # can race the rebuild, and nothing can reach this node while it is stuck opening a
         # runtime that will not answer. Stuck is fail-closed, but a node that never finishes
@@ -446,10 +454,8 @@ class PrivNetServer:
             for backend in self._backends.values():
                 self._start_fail_close_retry(backend)
             self._start_recovery_retry()
-        sock_path = Path(self._socket_path)
-        if sock_path.exists():
-            sock_path.unlink()
         server = await asyncio.start_unix_server(self._handle_conn, path=self._socket_path)
+        bound_socket = sock_path.lstat()
         self._restrict_socket(sock_path)
         log.info(
             "network privnet listening on {} (agent uid={})", self._socket_path, self._allowed_uid
@@ -461,6 +467,48 @@ class PrivNetServer:
                 await server.serve_forever()
         finally:
             await self._runtime.close()
+            self._unlink_bound_socket(sock_path, bound_socket)
+
+    async def _prepare_socket_path(self, sock_path: Path) -> None:
+        """Refuse foreign paths and live daemons; remove only our own stale socket."""
+        try:
+            original = sock_path.lstat()
+        except FileNotFoundError:
+            return
+        if not stat.S_ISSOCK(original.st_mode) or original.st_uid != os.geteuid():
+            raise UnsafePrivnetSocket(
+                f"refusing to replace {sock_path}: it is not a socket owned by uid {os.geteuid()}"
+            )
+        try:
+            reader, writer = await asyncio.open_unix_connection(sock_path)
+        except FileNotFoundError:
+            return
+        except ConnectionRefusedError:
+            try:
+                current = sock_path.lstat()
+            except FileNotFoundError:
+                return
+            if (current.st_dev, current.st_ino) != (original.st_dev, original.st_ino):
+                raise UnsafePrivnetSocket(
+                    f"refusing to replace changed socket path {sock_path}"
+                ) from None
+            sock_path.unlink()
+            return
+        except OSError as e:
+            raise UnsafePrivnetSocket(f"cannot verify existing socket {sock_path}: {e}") from e
+        del reader
+        writer.close()
+        await writer.wait_closed()
+        raise PrivnetAlreadyRunning(f"another privnet is listening on {sock_path}")
+
+    def _unlink_bound_socket(self, sock_path: Path, bound_socket: os.stat_result) -> None:
+        """Remove the socket on shutdown only if it is still the one this process bound."""
+        try:
+            current = sock_path.lstat()
+        except FileNotFoundError:
+            return
+        if (current.st_dev, current.st_ino) == (bound_socket.st_dev, bound_socket.st_ino):
+            sock_path.unlink()
 
     def _restrict_socket(self, sock_path: Path) -> None:
         """Make the socket reachable by the agent and nobody else.
@@ -1136,6 +1184,7 @@ class PrivNetServer:
             vni=cfg.vni,
             vxlan_port=cfg.vxlan_port,
             encryption_key=cfg.encryption_key,
+            encryption_key_id=cfg.encryption_key_id,
             generation=cfg.generation,
         )
 

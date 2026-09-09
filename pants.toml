@@ -55,7 +55,12 @@ env_vars.add = [
 ]
 
 [test]
-extra_env_vars = ["BACKEND_BUILD_ROOT=%(buildroot)s", "HOME"]
+extra_env_vars = [
+    "BACKEND_BUILD_ROOT=%(buildroot)s",
+    "BAI_DATAPLANE_*",
+    "BAI_REQUIRE_DATAPLANE",
+    "HOME",
+]
 attempts_default = 2
 timeout_default = 180
 # Files sharing a batch_compatibility_tag run in one pytest process, batch_size to 2x batch_size

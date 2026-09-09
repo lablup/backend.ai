@@ -11,6 +11,7 @@ from collections.abc import Awaitable, Callable
 
 import pytest
 
+from ai.backend.agent.errors.network import NetworkOperationFailed
 from ai.backend.agent.network import command, path_mtu
 from ai.backend.agent.network.path_mtu import parse_route_mtus, underlay_mtu
 
@@ -140,6 +141,6 @@ class TestARouteQueryThatNeverReturns:
 
         monkeypatch.setattr(asyncio, "create_subprocess_exec", _spawn)
         monkeypatch.setattr(command, "DEFAULT_TIMEOUT_SEC", 0.05)
-        with pytest.raises(RuntimeError, match="timed out"):
+        with pytest.raises(NetworkOperationFailed, match="timed out"):
             await path_mtu._read_command(["ip", "route", "get", "10.0.0.2"])
         assert killed.is_set()

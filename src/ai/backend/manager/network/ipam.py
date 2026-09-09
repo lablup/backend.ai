@@ -8,20 +8,27 @@ replacing Swarm's internal global IPAM. See BEP-1078 (control plane).
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import ipaddress
 import json
 import logging
 import secrets
-from collections.abc import Mapping, Sequence
+from collections.abc import AsyncIterator, Mapping, Sequence
+from dataclasses import dataclass
+from time import time
 from typing import TYPE_CHECKING, Any
 from urllib.parse import quote, unquote
 
+from ai.backend.common.lock import EtcdLock
+from ai.backend.common.metrics.metric import CommonMetricRegistry
 from ai.backend.common.network.keys import (
     endpoint_key,
     session_ipam_key,
     session_ipam_prefix,
 )
 from ai.backend.common.network.types import (
+    DEFAULT_CLUSTER_IPAM_BLOCK_PREFIXLEN,
+    DEFAULT_CLUSTER_IPAM_POOL,
     DEFAULT_VNI_RANGE,
     SESSION_META_GENERATION,
     EndpointAddr,
@@ -32,6 +39,8 @@ from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.errors.network import (
     EndpointSuperseded,
     NetworkPoolExhausted,
+    OverlayEncryptionKeyInvalid,
+    OverlayEncryptionRotationBlocked,
     RequestedSubnetInvalid,
     RequestedSubnetUnavailable,
     SessionRecordContested,
@@ -42,8 +51,8 @@ from ai.backend.manager.errors.network import (
 if TYPE_CHECKING:
     from ai.backend.common.etcd import AsyncEtcd
 
-DEFAULT_IPAM_POOL = "10.128.0.0/12"
-DEFAULT_BLOCK_PREFIXLEN = 24
+DEFAULT_IPAM_POOL = DEFAULT_CLUSTER_IPAM_POOL
+DEFAULT_BLOCK_PREFIXLEN = DEFAULT_CLUSTER_IPAM_BLOCK_PREFIXLEN
 
 #: How many times `EndpointAllocator.assign` re-reads an endpoint record that changed under its
 #: compare-and-swap before it gives up. More than one because a concurrent create of the SAME
@@ -54,6 +63,10 @@ _SETTLE_ATTEMPTS = 3
 _ALLOCATED_PREFIX = "network/ipam/allocated"
 _VNI_PREFIX = "network/ipam/vni"
 _OVERLAY_KEY = "network/overlay-encryption-key"
+_OVERLAY_KEY_LIFECYCLE = "network/overlay-encryption-key-lifecycle"
+OVERLAY_KEY_ROTATION_LOCK = "network/overlay-encryption-key-rotation"
+OVERLAY_KEY_ROTATION_LOCK_LIFETIME_SEC = 600.0
+_OVERLAY_KEY_LIFECYCLE_FORMAT = 1
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -341,6 +354,7 @@ class SubnetAllocator:
                 if await self._claim_as_ours(taken, held, session_id, generation, guards):
                     return held
             owned = {unquote(key) for key in taken} | set(units)
+        CommonMetricRegistry.instance().network_pool.observe_pool_exhausted("subnet")
         raise NetworkPoolExhausted()
 
     async def _require_guards(self, session_id: str, guards: Mapping[str, str]) -> None:
@@ -793,8 +807,15 @@ class SubnetAllocator:
         back with it because they are what the judgement is made on, and re-reading them before
         the delete would condition it on a claim the sweep never judged.
         """
-        found: dict[str, tuple[str, str | None, str]] = {}
-        for key, raw in _flat(await self._etcd.get_prefix(_ALLOCATED_PREFIX)).items():
+        return {unit: claim async for unit, claim in self.iter_claims()}
+
+    async def iter_claims(self) -> AsyncIterator[tuple[str, tuple[str, str | None, str]]]:
+        """Yield pool claims without materializing the whole allocated prefix."""
+        head = f"{_ALLOCATED_PREFIX}/"
+        async for full_key, raw in self._etcd.iter_prefix(_ALLOCATED_PREFIX):
+            if not full_key.startswith(head):
+                continue
+            key = full_key[len(head) :]
             claim = _record(raw)
             if claim is None:
                 log.warning("ignoring the unreadable pool claim at {}", unquote(key))
@@ -802,8 +823,7 @@ class SubnetAllocator:
             session_id = claim.get("session_id")
             if not session_id:
                 continue
-            found[unquote(key)] = (str(session_id), claim.get(SESSION_META_GENERATION), raw)
-        return found
+            yield unquote(key), (str(session_id), claim.get(SESSION_META_GENERATION), raw)
 
     async def pool_listing(self) -> dict[str, str]:
         """Every claim in the pool, keyed as `promote` expects to be handed it.
@@ -854,7 +874,12 @@ class SubnetAllocator:
         :return: ``True`` if the block is now this incarnation's.
         """
         if allocated is None:
-            allocated = _flat(await self._etcd.get_prefix(_ALLOCATED_PREFIX))
+            allocated = {}
+            for unit in _unit_blocks(ipaddress.ip_network(subnet), self._block_prefixlen):
+                encoded = quote(str(unit), safe="")
+                raw = await self._etcd.get(_allocated_key(str(unit)))
+                if isinstance(raw, str):
+                    allocated[encoded] = raw
         return await self._claim_as_ours(
             allocated, subnet, session_id, generation, guards, take_stale=True
         )
@@ -1026,6 +1051,7 @@ class EndpointAllocator:
                 if raw == claim:
                     return await settle(other)
             taken = set(held) | {ip}
+        CommonMetricRegistry.instance().network_pool.observe_pool_exhausted("endpoint")
         raise NetworkPoolExhausted()
 
     async def _require_guards(self, session_id: str, guards: Mapping[str, str]) -> None:
@@ -1046,37 +1072,179 @@ class EndpointAllocator:
         await self._etcd.delete(endpoint_key(session_id, container_id))
 
 
-async def overlay_encryption_key(etcd: AsyncEtcd) -> str:
-    """The cluster's overlay encryption secret, created once and reused.
+@dataclass(frozen=True)
+class OverlayEncryptionKey:
+    key_id: str
+    secret: str
+    activated_at: float | None
 
-    A root to derive from, not a key that reaches a kernel: each agent expands it into a key for one
-    node pair and 12-hour generation (`ai.backend.agent.network.backends.vxlan._pair_key`), because
-    `ip xfrm state` prints an SA's key back in the clear and this value protects every pair in the
-    cluster.
 
-    One secret for the whole cluster, not one per session — the same shape Docker Swarm uses, and the
-    only shape the data plane can actually honour. ESP policies select on the OUTER packet (VTEP
-    addresses and the VXLAN UDP port); the VNI that identifies a session lives inside that packet's
-    payload, where no XFRM selector reaches it. So every session between a pair of nodes shares one
-    policy no matter how many keys exist, and with per-session keys the kernel simply picks one of
-    the matching SAs — measured: of two SAs on one policy, one carried every packet and the other
-    none, and which one is not something either end chooses. A per-session key was therefore a
-    promise the layer below could not keep.
+@dataclass(frozen=True)
+class OverlayEncryptionKeyStatus:
+    active_key_id: str
+    activated_at: float | None
+    retired_key_ids: tuple[str, ...]
 
-    With one key the ambiguity is gone: whichever SA is used, it is the same secret. Session
-    isolation on the overlay is the VNI's job (L2), as it is in Swarm.
 
-    Created with put_if_absent so racing managers converge on one value. The root remains stable;
-    agents derive previous/current/next traffic-key generations and rotate the XFRM SAs every 12
-    hours. Automatic rotation of this etcd root itself remains a separate control-plane concern.
-    """
+def _overlay_key_id(secret: str) -> str:
+    return f"k-{hashlib.sha256(bytes.fromhex(secret)).hexdigest()[:16]}"
+
+
+def _validate_overlay_key(raw: str | None) -> str:
+    if raw is None or len(raw) != 64:
+        raise OverlayEncryptionKeyInvalid("the overlay root must be 32 bytes encoded as hex")
+    try:
+        bytes.fromhex(raw)
+    except ValueError as e:
+        raise OverlayEncryptionKeyInvalid("the overlay root is not valid hexadecimal") from e
+    return raw
+
+
+def _lifecycle_record(raw: str | None) -> dict[str, Any] | None:
+    if raw is None:
+        return None
+    record = _record(raw)
+    if record is None or record.get("format") != _OVERLAY_KEY_LIFECYCLE_FORMAT:
+        raise OverlayEncryptionKeyInvalid("the overlay key lifecycle record is unreadable")
+    if not isinstance(record.get("active_key_id"), str):
+        raise OverlayEncryptionKeyInvalid("the overlay key lifecycle record has no active key id")
+    if not isinstance(record.get("retired_key_ids", []), list):
+        raise OverlayEncryptionKeyInvalid("the retired overlay key ids are not a list")
+    return record
+
+
+async def _sync_overlay_key_lifecycle(
+    etcd: AsyncEtcd, key_id: str, *, activated_at: float | None = None
+) -> dict[str, Any]:
+    for _attempt in range(8):
+        held = await etcd.get(_OVERLAY_KEY_LIFECYCLE)
+        record = _lifecycle_record(held)
+        if record is not None and record["active_key_id"] == key_id:
+            return record
+        retired = [] if record is None else list(record.get("retired_key_ids", []))
+        if record is not None:
+            retired.append(str(record["active_key_id"]))
+        updated = {
+            "format": _OVERLAY_KEY_LIFECYCLE_FORMAT,
+            "active_key_id": key_id,
+            "activated_at": activated_at if activated_at is not None else time(),
+            "retired_key_ids": list(dict.fromkeys(retired))[-16:],
+        }
+        encoded = json.dumps(updated, sort_keys=True)
+        if await etcd.compare_and_put(_OVERLAY_KEY_LIFECYCLE, encoded, expected=held, guards={}):
+            return updated
+    raise OverlayEncryptionKeyInvalid("the overlay key lifecycle record did not settle")
+
+
+async def _active_overlay_encryption_key_locked(etcd: AsyncEtcd) -> OverlayEncryptionKey:
     created = await etcd.put_if_absent(_OVERLAY_KEY, secrets.token_hex(32))
     if created:
         log.info("generated the cluster overlay encryption key")
-    key = await etcd.get(_OVERLAY_KEY)
-    if not key:
-        raise RuntimeError("the overlay encryption key vanished from etcd right after it was set")
-    return str(key)
+    secret = _validate_overlay_key(await etcd.get(_OVERLAY_KEY))
+    key_id = _overlay_key_id(secret)
+    lifecycle = await _sync_overlay_key_lifecycle(etcd, key_id)
+    activated_at = lifecycle.get("activated_at")
+    return OverlayEncryptionKey(
+        key_id=key_id,
+        secret=secret,
+        activated_at=float(activated_at) if isinstance(activated_at, (int, float)) else None,
+    )
+
+
+async def active_overlay_encryption_key(etcd: AsyncEtcd) -> OverlayEncryptionKey:
+    """Return the cluster root while excluding concurrent rotations."""
+    async with EtcdLock(
+        OVERLAY_KEY_ROTATION_LOCK,
+        etcd,
+        timeout=30.0,
+        lifetime=OVERLAY_KEY_ROTATION_LOCK_LIFETIME_SEC,
+    ):
+        return await _active_overlay_encryption_key_locked(etcd)
+
+
+async def overlay_encryption_key(etcd: AsyncEtcd) -> str:
+    """Return the raw root for backward-compatible callers."""
+    return (await active_overlay_encryption_key(etcd)).secret
+
+
+async def _overlay_encryption_key_status_locked(
+    etcd: AsyncEtcd,
+) -> OverlayEncryptionKeyStatus:
+    active = await _active_overlay_encryption_key_locked(etcd)
+    lifecycle = _lifecycle_record(await etcd.get(_OVERLAY_KEY_LIFECYCLE))
+    if lifecycle is None:
+        raise OverlayEncryptionKeyInvalid("the overlay key lifecycle record vanished")
+    return OverlayEncryptionKeyStatus(
+        active_key_id=active.key_id,
+        activated_at=active.activated_at,
+        retired_key_ids=tuple(str(item) for item in lifecycle.get("retired_key_ids", [])),
+    )
+
+
+async def overlay_encryption_key_status(etcd: AsyncEtcd) -> OverlayEncryptionKeyStatus:
+    async with EtcdLock(
+        OVERLAY_KEY_ROTATION_LOCK,
+        etcd,
+        timeout=30.0,
+        lifetime=OVERLAY_KEY_ROTATION_LOCK_LIFETIME_SEC,
+    ):
+        return await _overlay_encryption_key_status_locked(etcd)
+
+
+async def rotate_overlay_encryption_key(etcd: AsyncEtcd) -> OverlayEncryptionKeyStatus:
+    """Replace the root only after every encrypted session has been drained."""
+    async with EtcdLock(
+        OVERLAY_KEY_ROTATION_LOCK,
+        etcd,
+        timeout=30.0,
+        lifetime=OVERLAY_KEY_ROTATION_LOCK_LIFETIME_SEC,
+    ):
+        active_count = 0
+        examples: list[str] = []
+        unreadable: list[str] = []
+        async for key, raw in etcd.iter_prefix("network/session"):
+            if not key.endswith("/meta"):
+                continue
+            record = _record(raw)
+            session_id = key.removeprefix("network/session/").removesuffix("/meta")
+            if record is None:
+                if len(unreadable) < 5:
+                    unreadable.append(session_id)
+                continue
+            encryption_key = record.get("encryption_key")
+            if encryption_key is None:
+                continue
+            if not isinstance(encryption_key, str) or len(encryption_key) != 64:
+                if len(unreadable) < 5:
+                    unreadable.append(session_id)
+                continue
+            active_count += 1
+            if len(examples) < 5:
+                examples.append(session_id)
+        if unreadable:
+            raise OverlayEncryptionRotationBlocked(
+                "repair unreadable encryption state before rotating the cluster root; "
+                f"examples: {', '.join(unreadable)}"
+            )
+        if active_count:
+            raise OverlayEncryptionRotationBlocked(
+                f"drain {active_count} encrypted session(s) before rotating the cluster root; "
+                f"examples: {', '.join(examples)}"
+            )
+        current = await _active_overlay_encryption_key_locked(etcd)
+        replacement = secrets.token_hex(32)
+        if not await etcd.compare_and_put(
+            _OVERLAY_KEY, replacement, expected=current.secret, guards={}
+        ):
+            raise OverlayEncryptionKeyInvalid("the overlay root changed during rotation")
+        replacement_id = _overlay_key_id(replacement)
+        await _sync_overlay_key_lifecycle(etcd, replacement_id, activated_at=time())
+        log.warning(
+            "rotated the drained cluster overlay root from {} to {}",
+            current.key_id,
+            replacement_id,
+        )
+        return await _overlay_encryption_key_status_locked(etcd)
 
 
 class VNIAllocator:
@@ -1148,6 +1316,7 @@ class VNIAllocator:
             ) is not None:
                 return mine
             taken = {int(key) for key in allocated if key.isdigit()}
+        CommonMetricRegistry.instance().network_pool.observe_pool_exhausted("vni")
         raise VNIPoolExhausted()
 
     async def _adopt(
@@ -1277,8 +1446,15 @@ class VNIAllocator:
     async def claims(self) -> dict[int, tuple[str, str | None, str]]:
         """Every allocated VNI, as ``vni -> (session_id, generation, bytes)``. See
         `SubnetAllocator.claims`."""
-        found: dict[int, tuple[str, str | None, str]] = {}
-        for key, raw in _flat(await self._etcd.get_prefix(_VNI_PREFIX)).items():
+        return {vni: claim async for vni, claim in self.iter_claims()}
+
+    async def iter_claims(self) -> AsyncIterator[tuple[int, tuple[str, str | None, str]]]:
+        """Yield VNI claims without materializing the whole allocated prefix."""
+        head = f"{_VNI_PREFIX}/"
+        async for full_key, raw in self._etcd.iter_prefix(_VNI_PREFIX):
+            if not full_key.startswith(head):
+                continue
+            key = full_key[len(head) :]
             if not key.isdigit():
                 continue
             claim = _record(raw)
@@ -1288,8 +1464,7 @@ class VNIAllocator:
             session_id = claim.get("session_id")
             if not session_id:
                 continue
-            found[int(key)] = (str(session_id), claim.get(SESSION_META_GENERATION), raw)
-        return found
+            yield int(key), (str(session_id), claim.get(SESSION_META_GENERATION), raw)
 
     async def release_one(self, vni: int, expected: str, guards: Mapping[str, str | None]) -> bool:
         """Give one VNI back, over the bytes it was judged on and under the record that made it

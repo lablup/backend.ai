@@ -3,7 +3,7 @@ Author: Daemyung Jang (daemyung@lablup.com)
 Status: Draft
 Created: 2026-09-06
 Created-Version: 26.9.0
-Target-Version: 26.9.0
+Target-Version:
 Implemented-Version:
 ---
 
@@ -37,12 +37,10 @@ to hand over a container's network namespace.
 | Backend | agent | how the L2 domain is realized (`vxlan`, `bridge`) |
 | Runtime seam | agent | netns of a container, by PID |
 
-Docker is the runtime wired today, and the only agent that publishes network capabilities. The
-seam names no runtime type -- what a backend has to provide is a container's netns by PID, and a
-netns does not care which daemon made it -- so a provisioner for another runtime implements the
-same contract, but this proposal does not claim more than one exists. A member agent that has not
-published capabilities is refused a cluster-network session rather than sent a descriptor it
-cannot act on.
+Docker is the only supported runtime in the initial implementation. It is the only agent discovery
+that supplies a container locator and publishes cluster-network capabilities. Containerd, enroot,
+and singularity remain planned until their discoveries implement both contracts. A member agent
+without a fresh, matching capability record is refused a CNI cluster-network session.
 
 An agent joins a session by publishing a member record; it removes that record only once its
 teardown has completed, which is what the manager reads before it reuses an allocation.
@@ -56,15 +54,19 @@ compare-and-swap.
 |-----|-------|
 | `network/ipam/allocated/{block}` | the session that owns a unit block of the pool |
 | `network/ipam/vni/{vni}` | the session that owns a VNI |
-| `network/session/{id}/meta` | subnet, VNI, backend, MTU, VXLAN port, encryption key |
+| `network/session/{id}/meta` | generation, subnet, VNI, backend, MTU, VXLAN port, key and key id |
 | `network/session/{id}/ipam/{ip}` | the container that holds an overlay address |
 | `network/session/{id}/endpoints/{container}` | ip, mac, agent, cluster hostname |
 | `network/session/{id}/members/{agent}` | an agent's VTEP, and its teardown acknowledgement |
 | `network/agent/{id}/caps` | what the node's data plane can do |
 
-`create_network` is idempotent on the session id: a retried session start converges on the
-allocation already recorded rather than claiming a second one. An allocation is released only
-once no member record remains.
+`create_network` is idempotent on the session id and uses a generation token to fence a reused
+identifier. Claims and publications use compare-and-swap. A retried start converges on its existing
+allocation, and cleanup releases an allocation only after every member acknowledges teardown.
+
+Managers reconcile paginated etcd scans under a leased leader lock. Reconciliation retains bounded
+state, repairs missing claims and stale partial creates, and never deletes unreadable records. The
+scheduler requeue and network rollback state transition commits in one database transaction.
 
 Central IPAM — rather than host-local IPAM per node — is what guarantees disjoint addresses on a
 subnet stretched across nodes, and the endpoints table is also the input each agent programs
@@ -84,8 +86,8 @@ The plugin exposes the node's half of a session:
 
 A node's privileged operations can be delegated to a separate `privnet` daemon, so the agent
 itself needs no `CAP_NET_ADMIN`. That is opt-in: `network-privnet-socket` selects it, and with it
-unset the agent does this work in-process and must hold the capabilities. Two agents sharing a
-host share one privnet when it is used.
+unset the agent performs the work in-process. Each agent owns one configured daemon socket; etcd
+claims still prevent two agents on one host from programming conflicting session state.
 
 ### 2.4 Cluster name resolution
 
@@ -95,12 +97,59 @@ endpoints table, so a kernel reaches its peers by name without a shared `/etc/ho
 ### 2.5 Encryption
 
 The VXLAN backend encrypts the overlay by default, in ESP transport mode with
-`rfc4106(gcm(aes))`, ESN and a replay window. The key is the cluster's, not the session's: ESP
-policies select on the outer packet, which carries nothing identifying a session. The manager
-turns encryption off for a session only when a member node's published capabilities say it
-cannot do the profile, and refuses the session outright when policy is `required`.
+`rfc4106(gcm(aes))`, ESN and a replay window. The key is cluster-wide because ESP policies select
+on the outer packet, which carries no session identifier. The lifecycle record exposes only a
+fingerprint and key id. Rotation uses the same leased lock as network creation and fails unless all
+encrypted sessions are drained, so one session cannot publish the previous key during rotation.
+
+The manager disables encryption only when policy is `prefer` and a member lacks the advertised
+profile. Policy `required` refuses the session instead.
 
 ## 3. Compatibility
 
 The Swarm overlay plugin stays. `network.inter_container.default-driver` selects between them,
 and an operator can pin a backend with `forced_backend`.
+
+| Runtime backend | Swarm `overlay` | BEP-1078 `cni` |
+|-----------------|-----------------|----------------|
+| Docker | Supported | Supported |
+| containerd | Not supported | Planned |
+| enroot / singularity | Not supported | Planned |
+| Kubernetes | Out of scope | Out of scope |
+
+Published runtime identity and boot identity fence stale capability advertisements. Older agents
+that publish no identity remain compatible with the Swarm path, but fail closed on the CNI path.
+
+## 4. Operations
+
+- `backend.ai mgr network audit` reports corrupt records, orphaned claims, and key mismatches
+  without returning stored values or secrets.
+- `backend.ai mgr network audit --repair` runs one CAS-guarded reconciliation pass.
+- `backend.ai mgr network quarantine` copies a CAS-verified orphan to a retained quarantine key
+  before deletion; session metadata cannot be quarantined.
+- `backend.ai mgr network overlay-key-status` reports only the active key id and lifecycle times.
+- `backend.ai mgr network rotate-overlay-key --confirm-drained` rotates only after the manager
+  verifies that no encrypted session exists and older managers have been stopped.
+
+The agent distribution includes `backendai-privnet.service`. Startup refuses symlinks, foreign
+sockets, non-socket paths, and an already-live daemon; it removes only a stale owned socket.
+
+Prometheus rules alert on allocation exhaustion, invalid records, reconciliation failure, and a
+stalled reconciler. The shipped Grafana dashboard shows allocator and reconciliation health.
+
+## 5. Release Gates
+
+Production promotion requires all of the following:
+
+1. Unit and real-etcd tests pass, including pagination, compare-and-swap races, leases, stale
+   generations, scheduler rollback, key rotation, audit, repair, and quarantine.
+2. The privileged multi-node data-plane suite runs on Docker with
+   `BAI_REQUIRE_DATAPLANE=1`, `BAI_DATAPLANE_PRIVNET_MODE=1`, and a reachable privnet socket on
+   every node; missing inventory, credentials, or placement is a failure, not a skip.
+3. The suite verifies encrypted cross-node traffic, DNS, MTU, agent restart convergence, teardown,
+   and absence of leaked links, rules, XFRM state, addresses, subnet claims, and VNIs.
+4. Formatting, lint, type checks, and tests pass against the complete branch diff.
+
+This document remains Draft until maintainers approve it. `Target-Version` and
+`Implemented-Version` become authoritative only through the status transitions in
+`proposals/README.md`; code on an unmerged implementation branch does not make the BEP Implemented.

@@ -1,8 +1,7 @@
 # Data-plane tests — Guardrails
 
-> Node-level tests for the containerd agent's network data plane (BEP-1078): netns, netlink
-> devices, iptables, VXLAN FDB/ARP, containerd objects, and the durable state stores.
-> These need a real host (root) and a live containerd — they are NOT unit tests.
+> Node-level tests for the BEP-1078 data plane: netns, netlink devices, iptables, VXLAN,
+> runtime objects, and durable state. These require privileged real hosts.
 
 Read `CONTEXTS.md` in this directory for why the suite is shaped this way.
 
@@ -20,6 +19,13 @@ Read `CONTEXTS.md` in this directory for why the suite is shaped this way.
 Every fixture that touches a host is gated on `BAI_DATAPLANE_NODES`. With it unset the suite
 still runs — but only `test_harness_selfcheck.py`, which exercises the harness against fake
 nodes and needs no privileges. `pants test ::` must stay safe on a developer laptop.
+
+## Production release gate
+
+- Set `BAI_REQUIRE_DATAPLANE=1` for a production qualification run.
+- Treat every skip and xfail as failure in that mode.
+- Require two distinct Docker nodes and one distinct agent id per node.
+- Run every file listed by the release command in `QUALITY.md`; do not narrow the selection.
 
 ## The leak guard is the point
 

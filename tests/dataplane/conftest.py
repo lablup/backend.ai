@@ -10,7 +10,7 @@ from __future__ import annotations
 import asyncio
 import os
 import shlex
-from collections.abc import AsyncIterator, Generator, Sequence
+from collections.abc import AsyncIterator, Awaitable, Callable, Generator, Sequence
 from dataclasses import dataclass, field
 from uuid import UUID
 
@@ -25,7 +25,10 @@ from ai.backend.common.types import HostPortPair
 from ai.backend.testutils.dataplane.agent_control import AgentControlConfig, AgentController
 from ai.backend.testutils.dataplane.collectors.base import ResourceCollector
 from ai.backend.testutils.dataplane.collectors.containerd_objects import ContainerdObjectCollector
-from ai.backend.testutils.dataplane.collectors.docker_objects import DockerKernelContainerCollector
+from ai.backend.testutils.dataplane.collectors.docker_objects import (
+    DockerKernelContainerCollector,
+    docker_collectors,
+)
 from ai.backend.testutils.dataplane.collectors.etcd_keys import EtcdNetworkKeyCollector
 from ai.backend.testutils.dataplane.collectors.gauges import ProcessGaugeCollector
 from ai.backend.testutils.dataplane.collectors.host import (
@@ -42,10 +45,25 @@ from ai.backend.testutils.dataplane.nodes import Node, SudoNode, parse_node_spec
 from ai.backend.testutils.dataplane.session import SessionDriver, SessionSpec
 
 ENV_NODES = "BAI_DATAPLANE_NODES"
+ENV_RELEASE_GATE = "BAI_REQUIRE_DATAPLANE"
+RELEASE_GATE_REQUIRED_ENV = (
+    ENV_NODES,
+    "BAI_DATAPLANE_ACCESS_KEY",
+    "BAI_DATAPLANE_AGENT_IDS",
+    "BAI_DATAPLANE_AGENT_START_CMD",
+    "BAI_DATAPLANE_ETCD_ADDR",
+    "BAI_DATAPLANE_IMAGE_ID",
+    "BAI_DATAPLANE_MANAGER",
+    "BAI_DATAPLANE_PRIVNET_MODE",
+    "BAI_DATAPLANE_PRIVNET_SOCKET",
+    "BAI_DATAPLANE_PROJECT_ID",
+    "BAI_DATAPLANE_SECRET_KEY",
+)
 
 
 @dataclass(frozen=True)
 class DataplaneConfig:
+    runtime: str = "docker"
     state_root: str = "/var/lib/backend.ai"
     scratch_roots: tuple[str, ...] = ("/var/lib/backend.ai/scratches",)
     containerd_address: str = "/run/containerd/containerd.sock"
@@ -73,6 +91,7 @@ class DataplaneConfig:
     scenario pins a session to one of these so it lands on the node it inspects: with a second
     agent registered in the group the scheduler is free to place a single-node session on either,
     and a co-location scenario that read the wrong node would find no kernel."""
+    privnet_socket: str = "/run/backend.ai/privnet/net-privnet.sock"
 
     @property
     def state_dirs(self) -> tuple[str, ...]:
@@ -86,10 +105,64 @@ def _env(name: str, default: str) -> str:
     return os.environ.get(name, default)
 
 
+def _release_gate_required() -> bool:
+    return _env(ENV_RELEASE_GATE, "0") == "1"
+
+
+def _unavailable(reason: str) -> None:
+    if _release_gate_required():
+        pytest.fail(f"data-plane release gate prerequisite failed: {reason}", pytrace=False)
+    pytest.skip(reason)
+
+
+@pytest.fixture(scope="session", autouse=True)
+def release_gate_preflight() -> None:
+    """Fail before touching hosts when a production gate is incomplete."""
+    if not _release_gate_required():
+        return
+    missing = [name for name in RELEASE_GATE_REQUIRED_ENV if not _env(name, "").strip()]
+    if missing:
+        pytest.fail(
+            "data-plane release gate is missing: " + ", ".join(missing),
+            pytrace=False,
+        )
+    node_specs = [value.strip() for value in _env(ENV_NODES, "").split(",") if value.strip()]
+    node_targets = [
+        value.partition("=")[2] if "=" in value and not value.startswith("ssh://") else value
+        for value in node_specs
+    ]
+    agent_ids = [
+        value.strip() for value in _env("BAI_DATAPLANE_AGENT_IDS", "").split(",") if value.strip()
+    ]
+    if len(node_specs) < 2 or len(set(node_targets)) != len(node_targets):
+        pytest.fail(
+            "data-plane release gate requires at least two distinct node specifications",
+            pytrace=False,
+        )
+    if len(agent_ids) != len(node_specs) or len(set(agent_ids)) != len(agent_ids):
+        pytest.fail(
+            "BAI_DATAPLANE_AGENT_IDS must name one distinct agent per node",
+            pytrace=False,
+        )
+    runtime = _env("BAI_DATAPLANE_RUNTIME", "docker")
+    if runtime != "docker":
+        pytest.fail(
+            "the production gate requires BAI_DATAPLANE_RUNTIME=docker; other runtime seams are "
+            "not implemented",
+            pytrace=False,
+        )
+    if _env("BAI_DATAPLANE_PRIVNET_MODE", "0") != "1":
+        pytest.fail(
+            "the production gate requires BAI_DATAPLANE_PRIVNET_MODE=1",
+            pytrace=False,
+        )
+
+
 @pytest.fixture(scope="session")
 def dataplane_config() -> DataplaneConfig:
     host, _, port = _env("BAI_DATAPLANE_ETCD_ADDR", "127.0.0.1:8120").rpartition(":")
     return DataplaneConfig(
+        runtime=_env("BAI_DATAPLANE_RUNTIME", "docker"),
         state_root=_env("BAI_DATAPLANE_STATE_ROOT", "/var/lib/backend.ai"),
         scratch_roots=tuple(
             p
@@ -113,8 +186,39 @@ def dataplane_config() -> DataplaneConfig:
         agent_stop_cmd=tuple(shlex.split(_env("BAI_DATAPLANE_AGENT_STOP_CMD", ""))),
         agent_rpc_port=int(_env("BAI_DATAPLANE_AGENT_RPC_PORT", "6011")),
         privnet_mode=_env("BAI_DATAPLANE_PRIVNET_MODE", "0") != "0",
+        privnet_socket=_env(
+            "BAI_DATAPLANE_PRIVNET_SOCKET", "/run/backend.ai/privnet/net-privnet.sock"
+        ),
         agent_ids=tuple(p for p in _env("BAI_DATAPLANE_AGENT_IDS", "").split(",") if p),
     )
+
+
+@pytest.fixture(scope="session", autouse=True)
+def release_gate_privnet_preflight(
+    request: pytest.FixtureRequest, dataplane_config: DataplaneConfig
+) -> None:
+    """Require a reachable privnet socket from the agent account on every release-gate node."""
+    if not _release_gate_required():
+        return
+    raw_nodes: Sequence[Node] = request.getfixturevalue("raw_nodes")
+    probe = (
+        "import socket,sys; "
+        "s=socket.socket(socket.AF_UNIX); s.settimeout(2); s.connect(sys.argv[1]); s.close()"
+    )
+
+    async def check_nodes() -> None:
+        for node in raw_nodes:
+            result = await node.run(
+                ["python3", "-c", probe, dataplane_config.privnet_socket], check=False
+            )
+            if result.returncode != 0:
+                pytest.fail(
+                    f"[{node.name}] privnet socket is not reachable at "
+                    f"{dataplane_config.privnet_socket}: {result.stderr.strip()}",
+                    pytrace=False,
+                )
+
+    asyncio.run(check_nodes())
 
 
 @pytest.fixture(scope="session")
@@ -128,7 +232,7 @@ def raw_nodes(dataplane_config: DataplaneConfig) -> Sequence[Node]:
     """
     raw = os.environ.get(ENV_NODES, "").strip()
     if not raw:
-        pytest.skip(f"{ENV_NODES} is unset; data-plane tests need a host to run against")
+        _unavailable(f"{ENV_NODES} is unset; data-plane tests need a host to run against")
     return parse_node_specs(raw)
 
 
@@ -152,7 +256,7 @@ def agent_ids(dataplane_config: DataplaneConfig) -> tuple[str, ...]:
     a session without it, so it declines rather than silently testing the wrong node.
     """
     if not dataplane_config.agent_ids:
-        pytest.skip("BAI_DATAPLANE_AGENT_IDS is unset; placement-pinned scenarios need it")
+        _unavailable("BAI_DATAPLANE_AGENT_IDS is unset; placement-pinned scenarios need it")
     return dataplane_config.agent_ids
 
 
@@ -165,7 +269,7 @@ def primary_agent_id(agent_ids: tuple[str, ...]) -> str:
 @pytest.fixture(scope="session")
 def node_pair(nodes: Sequence[Node]) -> tuple[Node, Node]:
     if len(nodes) < 2:
-        pytest.skip(f"needs two nodes; {ENV_NODES} names {len(nodes)}")
+        _unavailable(f"needs two nodes; {ENV_NODES} names {len(nodes)}")
     return nodes[0], nodes[1]
 
 
@@ -186,22 +290,24 @@ def _build_collectors(
 ) -> list[ResourceCollector]:
     collectors: list[ResourceCollector] = []
     for node in nodes:
-        containerd = ContainerdObjectCollector(
-            node,
-            address=config.containerd_address,
-            namespace=config.containerd_namespace,
-        )
-        docker = DockerKernelContainerCollector(node)
+        if config.runtime == "docker":
+            runtime_collectors = list(docker_collectors(node))
+            runtime_kernel_ids = DockerKernelContainerCollector(node).kernel_ids
+        elif config.runtime == "containerd":
+            containerd = ContainerdObjectCollector(
+                node,
+                address=config.containerd_address,
+                namespace=config.containerd_namespace,
+            )
+            runtime_collectors = [containerd]
+            runtime_kernel_ids = containerd.kernel_ids
+        else:
+            pytest.fail(f"unsupported BAI_DATAPLANE_RUNTIME: {config.runtime}", pytrace=False)
 
         async def live_kernel_ids(
-            containerd: ContainerdObjectCollector = containerd,
-            docker: DockerKernelContainerCollector = docker,
+            getter: Callable[[], Awaitable[set[str]]] = runtime_kernel_ids,
         ) -> set[str]:
-            # The union of both runtimes, not just the configured one: a scratch directory is
-            # orphaned only when *nothing* still has a container record for it, and a host that
-            # has run both backends holds scratches from each.
-            owned = await asyncio.gather(containerd.kernel_ids(), docker.kernel_ids())
-            return set().union(*owned)
+            return await getter()
 
         collectors.extend([
             NetworkLinkCollector(node),
@@ -211,7 +317,7 @@ def _build_collectors(
             StateFileCollector(node, dirs=config.state_dirs),
             MountCollector(node, prefixes=config.scratch_roots),
             ScratchDirCollector(node, roots=config.scratch_roots, live_ids=live_kernel_ids),
-            containerd,
+            *runtime_collectors,
         ])
     if etcd is not None:
         collectors.append(EtcdNetworkKeyCollector(etcd))
@@ -249,7 +355,7 @@ async def session_driver(dataplane_config: DataplaneConfig) -> AsyncIterator[Ses
     first live run of this suite failed.
     """
     if not (dataplane_config.access_key and dataplane_config.secret_key):
-        pytest.skip(
+        _unavailable(
             "BAI_DATAPLANE_ACCESS_KEY / _SECRET_KEY are unset; scenarios that create sessions "
             "need a keypair reserved for the suite"
         )
@@ -300,7 +406,7 @@ def session_spec(dataplane_config: DataplaneConfig) -> SessionSpec:
     search happened to return first.
     """
     if not (dataplane_config.image_id and dataplane_config.project_id):
-        pytest.skip("BAI_DATAPLANE_IMAGE_ID / _PROJECT_ID are unset")
+        _unavailable("BAI_DATAPLANE_IMAGE_ID / _PROJECT_ID are unset")
     return SessionSpec(
         image_id=UUID(dataplane_config.image_id),
         project_id=UUID(dataplane_config.project_id),
@@ -324,7 +430,7 @@ def agent_control(raw_nodes: Sequence[Node], dataplane_config: DataplaneConfig) 
         rpc_port=dataplane_config.agent_rpc_port,
     )
     if not config.configured:
-        pytest.skip(
+        _unavailable(
             "BAI_DATAPLANE_AGENT_START_CMD is unset; restart scenarios cannot bring the agent back"
         )
     return AgentController(raw_nodes[0], config)
@@ -350,6 +456,12 @@ def pytest_runtest_makereport(
     item: pytest.Item, call: pytest.CallInfo[None]
 ) -> Generator[None, pytest.TestReport, pytest.TestReport]:
     report = yield
+    if report.skipped and _release_gate_required():
+        reason = getattr(report, "longreprtext", "scenario skipped")
+        report.outcome = "failed"
+        report.longrepr = (
+            f"{item.nodeid}: data-plane release gate forbids skipped or xfailed scenarios\n{reason}"
+        )
     if report.when == "call":
         _call_reports[item.nodeid] = report
     elif report.when == "teardown":

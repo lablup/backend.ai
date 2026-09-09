@@ -25,10 +25,13 @@ from dataclasses import dataclass
 from typing import Any, Final, override
 
 from ai.backend.agent.errors.network import (
+    InvalidSessionNetworkDescriptor,
+    NetworkOperationFailed,
     OverlayAddressNotAssigned,
     OverlayEncryptionUnavailable,
     OverlayMtuTooLarge,
     OverlayTeardownIncomplete,
+    UndescribableVxlanDevice,
 )
 from ai.backend.agent.kernel import AbstractKernel
 from ai.backend.agent.network import command
@@ -258,9 +261,9 @@ async def _list_vxlan_devices() -> frozenset[str]:
         )
     except command.CommandTimeout as e:
         # Recovery fail-closes on this, so an unanswered question must not read as an empty host.
-        raise RuntimeError(f"could not enumerate VXLAN links: {e}") from e
+        raise UndescribableVxlanDevice(f"could not enumerate VXLAN links: {e}") from e
     if rc != 0:
-        raise RuntimeError(f"could not enumerate VXLAN links (rc={rc})")
+        raise UndescribableVxlanDevice(f"could not enumerate VXLAN links (rc={rc})")
     names: set[str] = set()
     for line in (out or b"").decode(errors="replace").splitlines():
         # "<index>: <name>[@<parent>]: <FLAGS> ..." -- the one part of `ip link` output that has
@@ -1298,7 +1301,9 @@ def overlay_cni_config(meta: SessionNetMeta, ip: str | None = None) -> dict[str,
     ``ip`` is the manager-assigned overlay address and is required: without it the container
     cannot be given a cluster-unique address on the stretched overlay (see _overlay_ipam)."""
     if meta.vni is None:
-        raise ValueError(f"overlay_cni_config requires a vxlan meta with a VNI: {meta}")
+        raise InvalidSessionNetworkDescriptor(
+            f"overlay_cni_config requires a vxlan meta with a VNI: {meta}"
+        )
     if ip is None:
         raise OverlayAddressNotAssigned(
             f"no manager-assigned overlay IP for session {meta.session_id}; "
@@ -1441,7 +1446,7 @@ async def _run_command(argv: Sequence[str]) -> None:
         # netlink socket. Every one of these runs under a node-wide barrier, so one that never
         # returns stops every session operation on this node. It is killed and reported -- the
         # caller's retry is what this backend is built around.
-        raise RuntimeError(f"{e}: {_redacted(argv)}") from e
+        raise NetworkOperationFailed(f"{e}: {_redacted(argv)}") from e
     if returncode != 0:
         display_argv = list(argv)
         secrets: set[str] = set()
@@ -1455,7 +1460,7 @@ async def _run_command(argv: Sequence[str]) -> None:
         display_stderr = stderr.decode(errors="replace").strip()
         for secret in secrets:
             display_stderr = display_stderr.replace(secret, "[REDACTED]")
-        raise RuntimeError(
+        raise NetworkOperationFailed(
             f"command failed (rc={returncode}): {' '.join(display_argv)}: {display_stderr}"
         )
 
@@ -2456,7 +2461,9 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
     @override
     async def setup_session_network(self, meta: SessionNetMeta, self_member: Member) -> None:
         if meta.backend is not NetworkBackendKind.VXLAN or meta.vni is None:
-            raise ValueError(f"VxlanNetworkPlugin requires a vxlan meta with a VNI: {meta}")
+            raise InvalidSessionNetworkDescriptor(
+                f"VxlanNetworkPlugin requires a vxlan meta with a VNI: {meta}"
+            )
         vni = meta.vni
         # Preconditions, so they run before any side effect: a session this node cannot carry must
         # leave nothing half-built behind.
@@ -2652,7 +2659,9 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
     @override
     async def adopt_session_network(self, meta: SessionNetMeta, self_member: Member) -> None:
         if meta.backend is not NetworkBackendKind.VXLAN or meta.vni is None:
-            raise ValueError(f"VxlanNetworkPlugin requires a vxlan meta with a VNI: {meta}")
+            raise InvalidSessionNetworkDescriptor(
+                f"VxlanNetworkPlugin requires a vxlan meta with a VNI: {meta}"
+            )
         # Register first so a tunnel held down below remains tearable. For encryption, close the
         # data path before any diagnostic await: a new process cannot know whether the surviving
         # XFRM set is complete, so even an MTU probe must not extend a possible clear-text window.

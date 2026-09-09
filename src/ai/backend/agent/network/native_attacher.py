@@ -24,6 +24,8 @@ from pathlib import Path
 from typing import Any
 
 from ai.backend.agent.errors.network import (
+    ContainerAttachFailed,
+    NetworkOperationFailed,
     NetworkStateStoreConflict,
     StaticAddressUnavailable,
     SubnetAddressPoolExhausted,
@@ -95,7 +97,7 @@ async def _delete_dns_rules(match: str) -> None:
             if _DNS_COMMENT_PREFIX in line and match in line
         ]
         if survivors:
-            raise RuntimeError(
+            raise NetworkOperationFailed(
                 f"{len(survivors)} DNS redirect rule(s) for {match} could not be removed;"
                 f" the first of them still answers :53: {survivors[0].strip()}"
             )
@@ -139,9 +141,9 @@ async def _run(argv: Sequence[str], *, check: bool = True) -> tuple[int, bytes, 
         # `nsenter` into a namespace whose task is stuck, `ip` blocked on netlink. Attach runs
         # under the privnet's node-wide barrier, so one of these that never returns stops every
         # session operation on the node. It is killed; the caller's retry deals with the rest.
-        raise RuntimeError(f"{e}: {' '.join(argv)}") from e
+        raise NetworkOperationFailed(f"{e}: {' '.join(argv)}") from e
     if check and rc != 0:
-        raise RuntimeError(
+        raise NetworkOperationFailed(
             f"command failed (rc={rc}): {' '.join(argv)}: {err.decode(errors='replace').strip()}"
         )
     return rc, out, err
@@ -158,7 +160,9 @@ def _first_cidr_addr(ips: Any) -> str | None:
 def _pid_from_netns(netns: str) -> str:
     m = _NETNS_PID_RE.match(netns)
     if not m:
-        raise ValueError(f"unsupported netns path (expected /proc/<pid>/ns/net): {netns}")
+        raise ContainerAttachFailed(
+            f"unsupported netns path (expected /proc/<pid>/ns/net): {netns}"
+        )
     return m.group(1)
 
 
@@ -376,7 +380,7 @@ class NativeBridgeAttachRunner:
         if command == "DEL":
             await self._del(ifname, container_id, config)
             return None
-        raise ValueError(f"unsupported CNI command: {command}")
+        raise ContainerAttachFailed(f"unsupported CNI command: {command}")
 
     async def _resolve_ip(
         self,
@@ -560,7 +564,7 @@ class NativeBridgeAttachRunner:
             if rc_add != 0:
                 rc_show, _, _ = await _run(["ip", "link", "show", bridge], check=False)
                 if rc_show != 0:
-                    raise RuntimeError(
+                    raise NetworkOperationFailed(
                         f"cannot create bridge {bridge}: {err_add.decode(errors='replace').strip()}"
                     )
         # Checked, both of them. An unset MTU black-holes every full-size frame the moment one
@@ -597,7 +601,7 @@ class NativeBridgeAttachRunner:
             if "dev" in tokens:
                 self._uplink = tokens[tokens.index("dev") + 1]
                 return self._uplink
-        raise RuntimeError(
+        raise NetworkOperationFailed(
             "cannot determine the egress uplink for LOCAL-bridge isolation (no default route)"
         )
 

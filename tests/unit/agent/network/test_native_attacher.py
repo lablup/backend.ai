@@ -9,6 +9,8 @@ import pytest
 
 import ai.backend.agent.network.native_attacher as na
 from ai.backend.agent.errors.network import (
+    ContainerAttachFailed,
+    NetworkOperationFailed,
     NetworkStateStoreConflict,
     StaticAddressUnavailable,
     SubnetAddressPoolExhausted,
@@ -497,7 +499,7 @@ class TestUnsupported:
     async def test_unknown_command_raises(self, tmp_path: Path, monkeypatch: Any) -> None:
         monkeypatch.setattr(na, "_run", _RunRecorder())
         runner = NativeBridgeAttachRunner(ipam_state_dir=tmp_path)
-        with pytest.raises(ValueError):
+        with pytest.raises(ContainerAttachFailed):
             await runner("CHECK", ifname="eth0", netns=_NETNS, container_id="c", config=_LOCAL_CFG)
 
 
@@ -577,7 +579,7 @@ class TestClusterDnsRedirect:
         # reported a failure. The exit codes say nothing here; the chain does.
         rec = self._recorder_with_rules(self._RULE, undeletable=True)
         monkeypatch.setattr(na, "_run", rec)
-        with pytest.raises(RuntimeError, match="could not be removed"):
+        with pytest.raises(NetworkOperationFailed, match="could not be removed"):
             await na.install_dns_redirect("172.30.1.1", 40001, "sid-4")
 
     async def test_install_clears_a_stale_rule_on_the_same_gateway(self, monkeypatch: Any) -> None:
@@ -659,7 +661,7 @@ class TestEnsureBridgeIsRaceTolerant:
         run = _BridgeRaceRun(ever_appears=False)
         monkeypatch.setattr(na, "_run", run)
         runner = NativeBridgeAttachRunner(ipam_state_dir=tmp_path)
-        with pytest.raises(RuntimeError, match="cannot create bridge bailo4103"):
+        with pytest.raises(NetworkOperationFailed, match="cannot create bridge bailo4103"):
             await runner._ensure_bridge("bailo4103", "1450", None)
 
 

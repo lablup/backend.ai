@@ -507,6 +507,27 @@ class ContainerConfigTest:
 
         assert "must be a tuple of two integers" in str(exc_info.value)
 
+    @pytest.mark.parametrize(
+        "pool,block_size",
+        [
+            ("8.8.8.0/24", 26),
+            ("172.30.0.1/16", 26),
+            ("172.30.0.0/24", 16),
+        ],
+    )
+    def test_local_network_layout_is_rejected_during_config_validation(
+        self,
+        make_raw_config: MakeRawConfig,
+        pool: str,
+        block_size: int,
+    ) -> None:
+        raw = make_raw_config()
+        raw["local-network-pool"] = pool
+        raw["local-network-block-size"] = block_size
+
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
+            ContainerConfig.model_validate(raw)
+
 
 class TestResourceConfigValidation:
     def test_affinity_policy_parses_string(self) -> None:

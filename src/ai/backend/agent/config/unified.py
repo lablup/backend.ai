@@ -49,7 +49,12 @@ from ai.backend.common.configs import (
     ServiceDiscoveryConfig,
 )
 from ai.backend.common.configs.redis import RedisConfig
-from ai.backend.common.meta import BackendAIConfigMeta, CompositeType, ConfigExample
+from ai.backend.common.meta import (
+    NEXT_RELEASE_VERSION,
+    BackendAIConfigMeta,
+    CompositeType,
+    ConfigExample,
+)
 from ai.backend.common.typed_validators import (
     AutoDirectoryPath,
     GroupID,
@@ -1339,7 +1344,6 @@ class AgentConfig(CommonAgentConfig, OverridableAgentConfig):
     Complete agent configuration (common + overridable).
     """
 
-    pass
     network_privnet_socket: Annotated[
         str | None,
         Field(
@@ -1350,15 +1354,13 @@ class AgentConfig(CommonAgentConfig, OverridableAgentConfig):
         BackendAIConfigMeta(
             description=(
                 "Unix socket path of the privnet daemon (BEP-1078). When set, the "
-                "containerd agent delegates all CAP_NET_ADMIN/CAP_SYS_ADMIN container networking "
-                "to the privnet over this socket and needs no network privilege itself. When unset "
-                "(the default), the agent performs container networking in-process, which requires "
-                "the agent process to hold those capabilities. Only used by the containerd backend."
+                "Docker agent delegates privileged session-network operations to the daemon. "
+                "When unset, those operations run in the agent process."
             ),
-            added_version="25.12.0",
+            added_version=NEXT_RELEASE_VERSION,
             example=ConfigExample(
                 local="/tmp/backend.ai/net-privnet.sock",
-                prod="/run/backend.ai/net-privnet.sock",
+                prod="/run/backend.ai/privnet/net-privnet.sock",
             ),
         ),
     ]
@@ -1747,7 +1749,7 @@ class ContainerConfig(CommonContainerConfig, OverridableContainerConfig):
                 "the systemd-resolved uplink file instead when one is present. Set this to pin "
                 "specific nameservers, e.g. an internal corporate resolver."
             ),
-            added_version="26.7.0",
+            added_version=NEXT_RELEASE_VERSION,
             example=ConfigExample(local="", prod='["10.0.0.53", "10.0.0.54"]'),
         ),
     ]
@@ -1766,9 +1768,9 @@ class ContainerConfig(CommonContainerConfig, OverridableContainerConfig):
                 "any network the host itself routes, or containers will reach this pool instead "
                 "of the real destination. Change it on a drained node only: sessions hold blocks "
                 "cut from the previous pool, and the agent refuses to start rather than read them "
-                "as a different subnet. Only used by the containerd backend."
+                "as a different subnet. Used by Docker's native session-network path."
             ),
-            added_version="26.7.0",
+            added_version=NEXT_RELEASE_VERSION,
             example=ConfigExample(local="172.30.0.0/16", prod="172.30.0.0/16"),
         ),
     ]
@@ -1789,7 +1791,7 @@ class ContainerConfig(CommonContainerConfig, OverridableContainerConfig):
                 "up to 61 containers each. Raise it for more, smaller sessions; lower it for "
                 "fewer, larger ones. Change it on a drained node only (see 'local-network-pool')."
             ),
-            added_version="26.7.0",
+            added_version=NEXT_RELEASE_VERSION,
             example=ConfigExample(local="26", prod="26"),
         ),
     ]
@@ -1797,6 +1799,19 @@ class ContainerConfig(CommonContainerConfig, OverridableContainerConfig):
     def local_subnet_layout(self) -> LocalSubnetLayout:
         """How this node cuts its LOCAL pool into per-session blocks (BEP-1078)."""
         return LocalSubnetLayout.parse(self.local_network_pool, self.local_network_block_size)
+
+    @model_validator(mode="after")
+    def _validate_local_network_layout(self) -> Self:
+        try:
+            pool = ipaddress.IPv4Network(self.local_network_pool, strict=True)
+        except ValueError as e:
+            raise ValueError(
+                "local-network-pool must be a prefix-aligned private IPv4 network"
+            ) from e
+        if not pool.is_private:
+            raise ValueError("local-network-pool must be a private IPv4 network")
+        LocalSubnetLayout.parse(self.local_network_pool, self.local_network_block_size)
+        return self
 
 
 class ResourceAllocationConfig(BaseConfigSchema):
