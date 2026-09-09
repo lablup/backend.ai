@@ -22576,8 +22576,8 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Updated default resource allocation. Leave null to keep existing value."
+            "description": "Updated default resource allocation. Omit to leave unchanged.",
+            "title": "Default For Unspecified"
           },
           "total_resource_slots": {
             "anyOf": [
@@ -22603,8 +22603,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Updated maximum session lifetime in seconds. Leave null to keep existing.",
+            "description": "Updated maximum session lifetime in seconds. Omit to leave unchanged.",
             "title": "Max Session Lifetime"
           },
           "max_concurrent_sessions": {
@@ -22616,8 +22615,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Updated maximum concurrent sessions. Leave null to keep existing.",
+            "description": "Updated maximum concurrent sessions. Omit to leave unchanged.",
             "title": "Max Concurrent Sessions"
           },
           "max_pending_session_count": {
@@ -22668,8 +22666,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Updated max concurrent SFTP sessions. Leave null to keep existing.",
+            "description": "Updated max concurrent SFTP sessions. Omit to leave unchanged.",
             "title": "Max Concurrent Sftp Sessions"
           },
           "max_containers_per_session": {
@@ -22681,8 +22678,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Updated max containers per session. Leave null to keep existing.",
+            "description": "Updated max containers per session. Omit to leave unchanged.",
             "title": "Max Containers Per Session"
           },
           "idle_timeout": {
@@ -22694,8 +22690,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Updated idle timeout in seconds. Leave null to keep existing.",
+            "description": "Updated idle timeout in seconds. Omit to leave unchanged.",
             "title": "Idle Timeout"
           },
           "allowed_vfolder_hosts": {
@@ -23105,8 +23100,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Updated max sessions per model session. Leave null to keep existing.",
+            "description": "Updated max sessions per model session. Omit to leave unchanged.",
             "title": "Max Session Count Per Model Session"
           },
           "max_customized_image_count": {
@@ -23118,8 +23112,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Updated max customized image count. Leave null to keep existing.",
+            "description": "Updated max customized image count. Omit to leave unchanged.",
             "title": "Max Customized Image Count"
           }
         },
@@ -23455,8 +23448,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Updated max network count. Leave null to keep existing.",
+            "description": "Updated max network count. Omit to leave unchanged.",
             "title": "Max Network Count"
           }
         },
