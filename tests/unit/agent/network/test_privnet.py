@@ -365,7 +365,7 @@ class _Harness:
         # An allocator on the harness's own state dir, not the process-global one, so LOCAL_SUBNET
         # queries are isolated between tests (and survive a same-state_dir restart, like the real
         # journal does).
-        self.local_subnets = LocalSubnetAllocator(root / "local-subnet")
+        self.local_subnets = LocalSubnetAllocator(root / "local-subnet", owner="i-test")
         # Node-wide: every harness in one test shares it, which is what makes two of them
         # co-located agents. Redirected away from the real node-global path by
         # `_isolated_vni_registry`.

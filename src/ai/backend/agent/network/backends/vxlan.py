@@ -41,7 +41,7 @@ from ai.backend.agent.network.backends.vxlan_security import (
     VxlanSecurityStateMachine,
 )
 from ai.backend.agent.network.caps import probe_caps
-from ai.backend.agent.network.local_subnet import LocalSubnetAllocator, get_local_subnet_allocator
+from ai.backend.agent.network.local_subnet import LocalSubnetAllocator
 from ai.backend.agent.network.native_attacher import redirect_session_dns, remove_dns_redirect
 from ai.backend.agent.network.overlay_probe import arp_probe
 from ai.backend.agent.network.pair_journal import (
@@ -1606,7 +1606,7 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
         runner: Runner | None = None,
         reader: Reader | None = None,
         rule_inventory: Reader | None = None,
-        local_subnets: LocalSubnetAllocator | None = None,
+        local_subnets: LocalSubnetAllocator,
         pair_journal: PairJournal | None = None,
         journal_owner: str | None = None,
         mtu_probe: MtuProbe | None = None,
@@ -1664,10 +1664,10 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
         # This node's own VXLAN tunnel endpoint per session — the local `src` for every XFRM SA,
         # captured from `self_member` at setup/adopt because add_peer/del_peer only receive the peer.
         self._self_vteps = {}
-        # Defaults to the store's single process-wide owner, which is also what the bridge backend
-        # resolves: both carve their LOCAL block out of the same node-local pool, so one owner keeps
-        # their indices from colliding on a subnet.
-        self._local_subnets = local_subnets or get_local_subnet_allocator()
+        # Required, not defaulted, for the reason the bridge backend's __init__ gives: a backend
+        # holds no agent id, so an allocator it resolved for itself would be unowned -- and the
+        # process-wide cache would then hand that one to everybody who asked later.
+        self._local_subnets = local_subnets
 
     async def _local_index(self, session_id: str) -> int:
         """The session's node-local block index (idempotent, durable across restarts).

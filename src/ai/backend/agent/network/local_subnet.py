@@ -75,6 +75,7 @@ from typing import override
 from ai.backend.agent.errors.network import (
     HostAddressesUnreadable,
     LocalSubnetLayoutChanged,
+    LocalSubnetOwnerChanged,
     LocalSubnetPoolExhausted,
 )
 from ai.backend.agent.network.journal_io import atomic_exclusive_write, atomic_write
@@ -199,17 +200,16 @@ def host_ipv4_addresses() -> frozenset[str]:
 def get_local_subnet_allocator(
     state_dir: Path | None = None,
     *,
+    owner: str,
     layout: LocalSubnetLayout | None = None,
-    owner: str | None = None,
     legacy_dir: Path | None = None,
     host_addresses: Callable[[], Iterable[str]] | None = None,
 ) -> LocalSubnetAllocator:
     """The process-wide allocator owning ``state_dir``. Construct the class directly only in
     tests, where each case owns its own store.
 
-    ``owner`` is this agent's id. It is written into every claim so a co-located agent replaying the
-    same node-wide journal can tell whose sessions are whose; None means "unowned", which is read
-    back as ours (the single-agent node).
+    ``owner`` is this agent's id, and it is required. It is written into every claim so a
+    co-located agent replaying the same node-wide journal can tell whose sessions are whose.
 
     ``legacy_dir`` is this agent's own pre-node-wide store, if it had one. Claims found there are
     adopted at load so a half-upgraded node does not hand out a block a legacy session still holds.
@@ -227,11 +227,20 @@ def get_local_subnet_allocator(
                 f"the node-local subnet store {resolved} is already owned in this process as"
                 f" {existing.layout}, but was requested as {wanted}"
             )
+        if existing.owner != owner:
+            # Checked for the same reason the layout is, and it used to be silently ignored: the
+            # cache is keyed on the directory alone, so whichever collaborator constructed it
+            # FIRST decided the owner, and a later caller asking for its own id was handed the
+            # other's. Claims would then be written under a name that is not the writer's.
+            raise LocalSubnetOwnerChanged(
+                f"the node-local subnet store {resolved} is already owned in this process by"
+                f" {existing.owner!r}, but was requested for {owner!r}"
+            )
         return existing
     allocator = LocalSubnetAllocator(
         resolved,
-        layout=wanted,
         owner=owner,
+        layout=wanted,
         legacy_dir=legacy_dir,
         host_addresses=host_addresses or host_ipv4_addresses,
     )
@@ -249,7 +258,9 @@ class LocalSubnetAllocator:
     _indices: dict[str, int]
     #: Indices a co-located agent holds. Not ours to hand out, and not ours to reconcile away.
     _foreign: set[int]
-    _owner: str | None
+    #: This agent's id. Required: a claim that does not say whose it is cannot be told from a
+    #: co-located agent's, and reading it as ours is what lets one agent release another's block.
+    _owner: str
     #: This agent's pre-node-wide store, whose claims are adopted at load. None when there is none.
     _legacy_dir: Path | None
     #: Reads the host's own addresses, so a block already carried by a device nobody journalled
@@ -261,11 +272,16 @@ class LocalSubnetAllocator:
         self,
         state_dir: Path | None = None,
         *,
+        owner: str,
         layout: LocalSubnetLayout | None = None,
-        owner: str | None = None,
         legacy_dir: Path | None = None,
         host_addresses: Callable[[], Iterable[str]] | None = None,
     ) -> None:
+        if not owner:
+            raise ValueError(
+                "a local-subnet allocator needs the id of the agent that owns its claims; without"
+                " one its records cannot be told from a co-located agent's"
+            )
         self._dir = state_dir if state_dir is not None else _DEFAULT_LOCAL_SUBNET_STATE_DIR
         self._layout = layout if layout is not None else DEFAULT_LAYOUT
         self._lock = asyncio.Lock()
@@ -282,6 +298,10 @@ class LocalSubnetAllocator:
     @property
     def layout(self) -> LocalSubnetLayout:
         return self._layout
+
+    @property
+    def owner(self) -> str:
+        return self._owner
 
     def subnet(self, index: int) -> str:
         """The CIDR that block ``index`` names under this node's pool."""
@@ -335,7 +355,12 @@ class LocalSubnetAllocator:
                 # Another agent's claim we may not even read. It is taken either way.
                 foreign.add(index)
                 continue
-            if owner and owner != self._owner:
+            if owner != self._owner:
+                # Including a record with NO owner. Nothing this code has ever written is
+                # unowned -- the node-wide store and the owner tag arrived together -- so an
+                # untagged record is either a co-located agent's, or corrupt. Either way it is
+                # not ours to hand out or to release, and reading it as ours is what would let
+                # one agent take another's block away.
                 foreign.add(index)
                 continue
             indices.setdefault(session_id, index)
@@ -444,7 +469,7 @@ class LocalSubnetAllocator:
         """
         self._ensure_dir()
         self._write_layout()  # the first claim is what marks a fresh store
-        record = f"{session_id}\n{self._owner}" if self._owner else session_id
+        record = f"{session_id}\n{self._owner}"
         try:
             # Atomic + exclusive: a crash mid-write must never leave an empty claim (replay would
             # read a block owned by "" -- a leaked /26), and O_EXCL is what makes the race between

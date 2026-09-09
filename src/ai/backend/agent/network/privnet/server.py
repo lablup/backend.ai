@@ -376,7 +376,7 @@ class PrivNetServer:
         self._lock_users = {}
         self._journal = journal or PrivNetJournal()
         self._ipam = ipam or get_host_local_ipam()
-        self._local_subnets = local_subnets or get_local_subnet_allocator()
+        self._local_subnets = local_subnets or get_local_subnet_allocator(owner=agent_id)
         self._vni_registry = vni_registry or VniRegistry()
         self._fail_close_tasks = {}
         self._recovery_failed = None
