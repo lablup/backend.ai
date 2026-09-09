@@ -33,7 +33,7 @@ from sqlalchemy.sql.expression import SQLColumnExpression
 
 from ai.backend.common import msgpack
 from ai.backend.common.data.entity.project import ProjectID
-from ai.backend.common.data.entity.types import ScopeID
+from ai.backend.common.data.entity.types import EntityID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 from ai.backend.logging import BraceStyleAdapter
@@ -239,7 +239,7 @@ class ProjectRow(LifecycleTimestampsMixin, Base):
     )
 
     @classmethod
-    def scope_id_expr(cls) -> SQLColumnExpression[ScopeID]:
+    def scope_id_expr(cls) -> SQLColumnExpression[EntityID]:
         return cls.id
 
     @classmethod

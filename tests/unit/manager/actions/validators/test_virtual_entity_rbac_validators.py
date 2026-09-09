@@ -28,7 +28,6 @@ from ai.backend.common.data.entity.types import (
     EntityID,
     EntityIdentifier,
     EntityType,
-    ScopeID,
 )
 from ai.backend.common.data.entity.vfolder import VFolderEntityType
 from ai.backend.common.data.entity.virtual_entity import VirtualEntityID
@@ -110,9 +109,9 @@ _ORM_CLUSTER = (
     ResourceGroupForDomainRow,
 )
 
-_DOMAIN_ID: ScopeID = uuid.uuid4()
-_OTHER_DOMAIN_ID: ScopeID = uuid.uuid4()
-_PROJECT_ID: ScopeID = uuid.uuid4()
+_DOMAIN_ID: EntityID = uuid.uuid4()
+_OTHER_DOMAIN_ID: EntityID = uuid.uuid4()
+_PROJECT_ID: EntityID = uuid.uuid4()
 _VFOLDER_ID: EntityID = uuid.uuid4()
 _BULK_VF_GRANTED: EntityID = uuid.uuid4()
 _BULK_VF_DENIED: EntityID = uuid.uuid4()
@@ -235,7 +234,7 @@ class _VfolderID(EntityIdentifier):
         return VFolderEntityType()
 
 
-def _domain_scope(scope_id: ScopeID) -> EntityIdentifier:
+def _domain_scope(scope_id: EntityID) -> EntityIdentifier:
     return DomainID(scope_id)
 
 

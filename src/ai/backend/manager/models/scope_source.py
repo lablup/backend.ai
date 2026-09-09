@@ -6,14 +6,14 @@ from typing import Protocol
 
 from sqlalchemy.sql.expression import SQLColumnExpression
 
-from ai.backend.common.data.entity.types import ScopeID
+from ai.backend.common.data.entity.types import EntityID
 
 
 class ScopeSource(Protocol):
     """A Row queryable as an RBAC scope: its scope-id and display-name expressions."""
 
     @classmethod
-    def scope_id_expr(cls) -> SQLColumnExpression[ScopeID]:
+    def scope_id_expr(cls) -> SQLColumnExpression[EntityID]:
         """Column carrying the scope's id."""
         ...
 

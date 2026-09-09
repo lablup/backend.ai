@@ -12,9 +12,6 @@ from pydantic_core import CoreSchema, core_schema
 # An entity's identifier. Polymorphic across entity kinds; the concrete kind is
 # discriminated by the accompanying entity_type.
 type EntityID = uuid.UUID
-# A scope's identifier. Every scope doubles as an entity, so this is an alias of
-# EntityID: the subset relation is visible in the type.
-type ScopeID = EntityID
 
 
 class EntityType(str):

@@ -11,7 +11,7 @@ from typing import override
 
 from ai.backend.common.data.entity.action import ActionID
 from ai.backend.common.data.entity.audit_log import AuditLogID
-from ai.backend.common.data.entity.types import EntityID, EntityIdentifier, EntityType, ScopeID
+from ai.backend.common.data.entity.types import EntityID, EntityIdentifier, EntityType
 from ai.backend.manager.actions.types import ActionKind, OperationStatus
 from ai.backend.manager.data.audit_log.types import AuditLogData, AuditLogScopeData
 from ai.backend.manager.models.audit_log.row import AuditLogRow
@@ -257,7 +257,7 @@ class AuditLogScopeCreator(NestedFieldCreator[AuditLogID, AuditLogScopeRow, Audi
     """A scope the audited run covered, owned by the audit row it is written under."""
 
     scope_type: str
-    scope_id: ScopeID
+    scope_id: EntityID
 
     @override
     def integrity_error_checks(self) -> Sequence[IntegrityErrorCheck]:
