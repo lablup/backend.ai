@@ -198,7 +198,6 @@ class UpdatePresetModelMetadataInput(BaseRequestModel):
     title: str | None | Unset = Field(default=UNSET)
     version: str | None | Unset = Field(default=UNSET)
     created: str | None | Unset = Field(default=UNSET)
-    last_modified: str | None | Unset = Field(default=UNSET)
     description: str | None | Unset = Field(default=UNSET)
     task: str | None | Unset = Field(default=UNSET)
     category: str | None | Unset = Field(default=UNSET)

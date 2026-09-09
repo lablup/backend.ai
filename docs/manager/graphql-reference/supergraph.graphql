@@ -22497,9 +22497,6 @@ input UpdatePresetModelMetadataInput
   """Creation date of the model. Omit to keep the current value."""
   created: String
 
-  """Last modified date of the model. Omit to keep the current value."""
-  lastModified: String
-
   """Description of the model. Omit to keep the current value."""
   description: String
 

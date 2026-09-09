@@ -877,10 +877,6 @@ class UpdatePresetModelMetadataInputGQL(PydanticInputMixin[UpdatePresetModelMeta
     created: str | None = gql_field(
         default=UNSET, description="Creation date of the model. Omit to keep the current value."
     )
-    last_modified: str | None = gql_field(
-        default=UNSET,
-        description="Last modified date of the model. Omit to keep the current value.",
-    )
     description: str | None = gql_field(
         default=UNSET, description="Description of the model. Omit to keep the current value."
     )

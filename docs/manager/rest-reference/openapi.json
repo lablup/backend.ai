@@ -8597,17 +8597,6 @@
             ],
             "title": "Created"
           },
-          "last_modified": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Last Modified"
-          },
           "description": {
             "anyOf": [
               {
