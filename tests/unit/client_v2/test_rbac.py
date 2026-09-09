@@ -47,6 +47,7 @@ from .conftest import MockAuth
 _DEFAULT_CONFIG = ClientConfig(endpoint=URL("https://api.example.com"))
 
 _SAMPLE_ROLE_ID = str(uuid.uuid4())
+_SAMPLE_SCOPE_ID = str(uuid.uuid4())
 _SAMPLE_USER_ID = str(uuid.uuid4())
 _NOW_ISO = "2025-01-01T00:00:00+00:00"
 
@@ -84,6 +85,8 @@ def _sample_role_dict(role_id: str = _SAMPLE_ROLE_ID) -> dict[str, Any]:
     return {
         "id": role_id,
         "name": "test-role",
+        "scope_type": "project",
+        "scope_id": _SAMPLE_SCOPE_ID,
         "source": RoleSource.CUSTOM.value,
         "status": RoleStatus.ACTIVE.value,
         "created_at": _NOW_ISO,

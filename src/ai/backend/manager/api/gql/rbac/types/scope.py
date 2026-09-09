@@ -11,6 +11,7 @@ from uuid import UUID
 
 from ai.backend.common.dto.manager.v2.rbac.types import (
     EntityTypeScope,
+    PermissionBitDTO,
     RBACElementTypeDTO,
     ScopeInputDTO,
     UUIDScope,
@@ -18,6 +19,7 @@ from ai.backend.common.dto.manager.v2.rbac.types import (
 from ai.backend.common.dto.manager.v2.rbac.types import (
     RBACElementTypeFilter as RBACElementTypeFilterDTO,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     PydanticInputMixin,
@@ -115,3 +117,13 @@ class RBACElementTypeFilterGQL(PydanticInputMixin[RBACElementTypeFilterDTO]):
     not_in: list[RBACElementTypeGQL] | None = gql_field(
         description="Excludes rows whose element type is in this list.", default=None
     )
+
+
+PermissionBitGQL: type[PermissionBitDTO] = gql_enum(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="One bit of a permission mask; distinct from OperationType, which names an action.",
+    ),
+    PermissionBitDTO,
+    name="PermissionBit",
+)
