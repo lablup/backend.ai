@@ -25236,8 +25236,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "New name.",
+            "description": "New name. Omit to leave unchanged.",
             "title": "Name"
           },
           "description": {

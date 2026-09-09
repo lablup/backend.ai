@@ -16500,7 +16500,7 @@ input UpdateRuntimeVariantInput {
   id: UUID!
 
   """New name."""
-  name: String = null
+  name: String
 
   """New description. Set to null to clear."""
   description: String
