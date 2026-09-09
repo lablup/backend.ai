@@ -8389,6 +8389,393 @@
         "title": "CreateDeploymentRevisionPresetInput",
         "type": "object"
       },
+      "UpdatePresetModelConfigInput": {
+        "description": "Patch for a single preset model entry. Omit a field to keep its current stored value.",
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "model_path": {
+            "anyOf": [
+              {
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model Path"
+          },
+          "service": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UpdatePresetModelServiceConfigInput"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Service"
+          },
+          "metadata": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UpdatePresetModelMetadataInput"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Metadata"
+          }
+        },
+        "title": "UpdatePresetModelConfigInput",
+        "type": "object"
+      },
+      "UpdatePresetModelDefinitionInput": {
+        "description": "Patch for a preset's model definition. Omit `models` to keep the current model entry.",
+        "properties": {
+          "models": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/UpdatePresetModelConfigInput"
+                },
+                "maxItems": 1,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Models"
+          }
+        },
+        "title": "UpdatePresetModelDefinitionInput",
+        "type": "object"
+      },
+      "UpdatePresetModelHealthCheckInput": {
+        "description": "Patch for a preset model's health check. Omit a field to keep its current stored value.",
+        "properties": {
+          "enable": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Enable"
+          },
+          "interval": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Interval"
+          },
+          "path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Path"
+          },
+          "max_retries": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Retries"
+          },
+          "max_wait_time": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Wait Time"
+          },
+          "expected_status_code": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 100,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expected Status Code"
+          },
+          "initial_delay": {
+            "anyOf": [
+              {
+                "minimum": 0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Initial Delay"
+          }
+        },
+        "title": "UpdatePresetModelHealthCheckInput",
+        "type": "object"
+      },
+      "UpdatePresetModelMetadataInput": {
+        "description": "Patch for a preset model's metadata. Omit a field to keep its current stored value.",
+        "properties": {
+          "author": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Author"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Version"
+          },
+          "created": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "task": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Task"
+          },
+          "category": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Category"
+          },
+          "architecture": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Architecture"
+          },
+          "framework": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Framework"
+          },
+          "label": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label"
+          },
+          "license": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "License"
+          },
+          "min_resource": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Min Resource"
+          }
+        },
+        "title": "UpdatePresetModelMetadataInput",
+        "type": "object"
+      },
+      "UpdatePresetModelServiceConfigInput": {
+        "description": "Patch for a preset model's service config. Omit a field to keep its current stored value.",
+        "properties": {
+          "pre_start_actions": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/PreStartAction"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pre Start Actions"
+          },
+          "command": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Command"
+          },
+          "start_command": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Start Command"
+          },
+          "shell": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Shell"
+          },
+          "port": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Port"
+          },
+          "health_check": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UpdatePresetModelHealthCheckInput"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Health Check"
+          }
+        },
+        "title": "UpdatePresetModelServiceConfigInput",
+        "type": "object"
+      },
       "UpdateDeploymentRevisionPresetInput": {
         "properties": {
           "id": {
@@ -8471,7 +8858,7 @@
           "model_definition": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/PresetModelDefinitionInput"
+                "$ref": "#/components/schemas/UpdatePresetModelDefinitionInput"
               },
               {
                 "$ref": "#/components/schemas/Sentinel"
