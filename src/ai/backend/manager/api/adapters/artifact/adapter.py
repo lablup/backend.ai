@@ -126,7 +126,7 @@ from ai.backend.manager.services.artifact.revision.actions.reject import (
 from ai.backend.manager.services.artifact.revision.actions.search import (
     SearchArtifactRevisionsAction,
 )
-from ai.backend.manager.types import TriState
+from ai.backend.manager.types import OptionalState, TriState
 
 DEFAULT_PAGINATION_LIMIT = 10
 
@@ -261,7 +261,7 @@ class ArtifactAdapter(BaseAdapter):
         """Update artifact metadata (readonly flag and description)."""
         updater = ArtifactUpdater(
             artifact_id=ArtifactID(artifact_id),
-            readonly=TriState.from_unset(input.readonly),
+            readonly=OptionalState.from_unset(input.readonly),
             description=TriState.from_unset(input.description),
         )
         action_result = await self._processors.artifact.update.run(

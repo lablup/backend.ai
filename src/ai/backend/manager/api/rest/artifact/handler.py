@@ -67,7 +67,7 @@ from ai.backend.manager.services.artifact.revision.actions.import_revision impor
 from ai.backend.manager.services.artifact.revision.actions.reject import (
     RejectArtifactRevisionAction,
 )
-from ai.backend.manager.types import TriState
+from ai.backend.manager.types import OptionalState, TriState
 
 if TYPE_CHECKING:
     from ai.backend.manager.services.artifact.processors import ArtifactProcessors
@@ -249,7 +249,7 @@ class ArtifactHandler:
                 artifact_id=ArtifactID(path.parsed.artifact_id),
                 updater=ArtifactUpdater(
                     artifact_id=ArtifactID(path.parsed.artifact_id),
-                    readonly=TriState.from_nullable(body.parsed.readonly),
+                    readonly=OptionalState.from_nullable(body.parsed.readonly),
                     description=TriState.from_nullable(body.parsed.description),
                 ),
             )
