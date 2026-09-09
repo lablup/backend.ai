@@ -44,14 +44,14 @@ from ai.backend.manager.services.model_card.actions.scan import (
     ScanProjectModelCardsAction,
     ScanProjectModelCardsActionResult,
 )
+from ai.backend.manager.services.model_card.actions.scoped_search import (
+    ScopedSearchModelCardsAction,
+)
 from ai.backend.manager.services.model_card.actions.scoped_search_requirements import (
     ScopedSearchModelCardResourceRequirementsAction,
 )
 from ai.backend.manager.services.model_card.actions.search import (
     GlobalSearchModelCardsAction,
-)
-from ai.backend.manager.services.model_card.actions.search_in_project import (
-    SearchModelCardsInProjectAction,
 )
 from ai.backend.manager.services.model_card.actions.update import (
     UpdateModelCardAction,
@@ -72,8 +72,8 @@ class ModelCardProcessors:
     global_search: GlobalActionProcessor[
         GlobalSearchModelCardsAction, BatchOpsResult[ModelCardData]
     ]
-    search_in_project: ScopeActionProcessor[
-        SearchModelCardsInProjectAction, ScopedBatchOpsResult[ModelCardData]
+    scoped_search: ScopeActionProcessor[
+        ScopedSearchModelCardsAction, ScopedBatchOpsResult[ModelCardData]
     ]
     scan: GlobalActionProcessor[ScanProjectModelCardsAction, ScanProjectModelCardsActionResult]
     available_presets: GlobalActionProcessor[AvailablePresetsAction, AvailablePresetsActionResult]
@@ -89,7 +89,7 @@ class ModelCardProcessors:
         self.bulk_delete = group.partial_bulk(BulkDeleteModelCardAction, service.bulk_delete)
         self.get = group.single_get_ops(GetModelCardAction)
         self.global_search = group.global_search_ops(GlobalSearchModelCardsAction)
-        self.search_in_project = group.scope_search_ops(SearchModelCardsInProjectAction)
+        self.scoped_search = group.scope_search_ops(ScopedSearchModelCardsAction)
         self.scan = group.global_scope(ScanProjectModelCardsAction, service.scan)
         self.available_presets = group.global_scope(
             AvailablePresetsAction, service.available_presets

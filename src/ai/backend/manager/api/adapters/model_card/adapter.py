@@ -95,13 +95,14 @@ from ai.backend.manager.services.model_card.actions.create import CreateModelCar
 from ai.backend.manager.services.model_card.actions.delete import DeleteModelCardAction
 from ai.backend.manager.services.model_card.actions.get import GetModelCardAction
 from ai.backend.manager.services.model_card.actions.scan import ScanProjectModelCardsAction
+from ai.backend.manager.services.model_card.actions.scoped_search import (
+    ModelCardScopeItem,
+    ScopedSearchModelCardsAction,
+)
 from ai.backend.manager.services.model_card.actions.scoped_search_requirements import (
     ScopedSearchModelCardResourceRequirementsAction,
 )
 from ai.backend.manager.services.model_card.actions.search import GlobalSearchModelCardsAction
-from ai.backend.manager.services.model_card.actions.search_in_project import (
-    SearchModelCardsInProjectAction,
-)
 from ai.backend.manager.services.model_card.actions.update import UpdateModelCardAction
 from ai.backend.manager.services.model_card.processors import ModelCardProcessors
 from ai.backend.manager.types import OptionalState, TriState
@@ -223,8 +224,10 @@ class ModelCardAdapter(BaseAdapter):
             limit=input.limit,
             offset=input.offset,
         )
-        result = await self._model_card.search_in_project.run(
-            SearchModelCardsInProjectAction(project_id=ProjectID(project_id), searcher=searcher)
+        result = await self._model_card.scoped_search.run(
+            ScopedSearchModelCardsAction(
+                items=[ModelCardScopeItem(project_id=ProjectID(project_id))], searcher=searcher
+            )
         )
         return SearchModelCardsPayload(
             items=await self._nodes_with_min_resources(result.items),
