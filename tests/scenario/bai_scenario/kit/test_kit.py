@@ -115,10 +115,12 @@ def _stand_in_wiring(deps: WiringDeps) -> Wired:
 
 class TestRunnerDispatch:
     @pytest.fixture
-    def runner(self, world_template: TemplateDatabase) -> AdapterRunner:
+    def runner(self, world_template: TemplateDatabase, engine: Any) -> AdapterRunner:
+        # The stand-in adapter never reads the engine; a real one is passed anyway so
+        # nothing here has to be declared as something it is not.
         return AdapterRunner(
             wiring=_stand_in_wiring,
-            engine=None,  # type: ignore[arg-type]  # the stand-in never touches it
+            engine=engine,
             world=world_template.world,
             base_config={},
             recorder=ActionRecorder(),

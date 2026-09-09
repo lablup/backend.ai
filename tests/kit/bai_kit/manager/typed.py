@@ -8,7 +8,7 @@ replaying the same accessor over a recording proxy, so nothing is written twice.
 
 from __future__ import annotations
 
-from collections.abc import Awaitable, Callable, Mapping, Sequence
+from collections.abc import Awaitable, Callable, Sequence
 from dataclasses import dataclass, field
 from typing import Any, Concatenate, cast, override
 
@@ -21,8 +21,11 @@ __all__ = (
     "TypedMatcher",
     "TypedScenario",
     "TypedSetup",
+    "Answer",
+    "FakeOf",
     "at",
     "config_of",
+    "fake_of",
     "every",
     "op",
     "path_of",
@@ -242,12 +245,65 @@ def config_of[C](config_cls: type[C]) -> ConfigOf[C]:
     return ConfigOf()
 
 
+# ---------------------------------------------------------------------------
+# Setting the situation: what the outside answers, said in the outside's own types
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class Answer[F]:
+    """What one method of an external client answers for this scenario.
+
+    The value is checked against the return type the real client declares, so a fake
+    cannot answer something the manager would never receive.
+    """
+
+    method_name: str
+    value: Any = None
+    error: BaseException | None = None
+
+    def apply(self, fake: F) -> None:
+        """Install this answer on the fake, replacing whatever it answered before."""
+        setattr(fake, f"__scripted_{self.method_name}", self)
+
+
+class FakeOf[F]:
+    """Scripts one external client class. The class is fixed here so each answer is
+    checked against the method it belongs to."""
+
+    _cls: type[F]
+
+    def __init__(self, cls: type[F]) -> None:
+        self._cls = cls
+
+    @property
+    def cls(self) -> type[F]:
+        return self._cls
+
+    def answers[**P, R](
+        self, method: Callable[Concatenate[F, P], Awaitable[R]], value: R
+    ) -> Answer[F]:
+        """This method answers ``value``. ``R`` is the client's own return type."""
+        return Answer(method.__name__, value=value)
+
+    def raises[**P, R](
+        self, method: Callable[Concatenate[F, P], Awaitable[R]], error: BaseException
+    ) -> Answer[F]:
+        """This method refuses with ``error`` instead of answering."""
+        return Answer(method.__name__, error=error)
+
+
+def fake_of[F](cls: type[F]) -> FakeOf[F]:
+    return FakeOf(cls)
+
+
 @dataclass(frozen=True)
 class TypedSetup[C]:
-    """Config overrides named by accessor, external fakes keyed by their class."""
+    """The situation a scenario runs in: what the config says, and what the outside
+    answers. Both are named in the types of the thing being set, never as text."""
 
     config: Sequence[Override[C, Any]] = ()
-    extras: Mapping[type[Any], Any] = field(default_factory=dict)
+    answers: Sequence[Answer[Any]] = ()
 
     def dotted_config(self) -> dict[str, Any]:
         return {o.dotted(): o.value for o in self.config}
@@ -255,10 +311,18 @@ class TypedSetup[C]:
 
 @dataclass(frozen=True)
 class OnFake[T, F](TypedMatcher[T]):
-    """A matcher over an external fake rather than the payload; the fake names itself."""
+    """A matcher over an external fake rather than the payload.
+
+    The fake names itself by its class, so what is read off it is checked the way the
+    payload is: ``on_fake(FakeStorage, at(lambda s: s.calls, [...]))``.
+    """
 
     fake: type[F]
     matcher: TypedMatcher[F]
+
+    @override
+    def mismatches(self, actual: T) -> list[str]:
+        raise TypeError("on_fake needs the run's fakes; the runner resolves it")
 
 
 def on_fake[T, F](fake: type[F], matcher: TypedMatcher[F]) -> OnFake[T, F]:

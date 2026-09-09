@@ -12,6 +12,8 @@ from bai_kit.manager.fakes.storage_proxy import (
 )
 from bai_kit.manager.personas import MEMBER
 from bai_kit.manager.wiring.vfolder import vfolder_wiring
+from multidict import CIMultiDict, CIMultiDictProxy
+from yarl import URL
 
 from ai.backend.common.dto.manager.v2.vfolder.request import CreateVFolderInput
 from ai.backend.manager.errors.permission import NotEnoughPermission
@@ -37,8 +39,12 @@ ENFORCEMENT_OFF = Setup(config={"manager.rbac.enforcement_enabled": False})
 
 
 def _storage_refusal() -> aiohttp.ClientResponseError:
+    """What the storage proxy client raises when the host answers 500."""
+    url = URL("http://storage.invalid/folder/create")
     return aiohttp.ClientResponseError(
-        request_info=None,  # type: ignore[arg-type]
+        request_info=aiohttp.RequestInfo(
+            url=url, method="POST", headers=CIMultiDictProxy(CIMultiDict()), real_url=url
+        ),
         history=(),
         status=500,
         message="disk full",
