@@ -28,9 +28,9 @@ from ai.backend.common.data.idle_checker.types import (
     UtilizationSpec,
     UtilizationThresholdEntry,
 )
-from ai.backend.common.data.permission.types import ScopeType
+from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.prometheus_query_preset import PrometheusQueryPresetID
 from ai.backend.common.exception import BackendAISchemaValidationFailed
-from ai.backend.common.identifier.prometheus_query_preset import PrometheusQueryPresetID
 from ai.backend.common.metrics.types import (
     CONTAINER_UTILIZATION_METRIC_LABEL_NAME,
     CONTAINER_UTILIZATION_METRIC_NAME,
@@ -39,25 +39,25 @@ from ai.backend.common.types import SessionTypes
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.cli.context import config_ctx
 from ai.backend.manager.clients.prometheus.metric_types import DIFF_METRICS
-from ai.backend.manager.data.group.types import ProjectType
-from ai.backend.manager.errors.idle_checker import IdleCheckerAssignmentAlreadyExists
+from ai.backend.manager.data.project.types import ProjectType
 from ai.backend.manager.idle import ThresholdOperator, UtilizationConfig
-from ai.backend.manager.models.group.row import GroupRow
+from ai.backend.manager.models.idle_checker.creators import (
+    IdleCheckerAssignmentCreator,
+    IdleCheckerCreator,
+)
+from ai.backend.manager.models.idle_checker.searchers import IdleCheckerSearcher
+from ai.backend.manager.models.project.row import ProjectRow
+from ai.backend.manager.models.prometheus_query_preset.creators import (
+    PrometheusQueryPresetCreator,
+)
+from ai.backend.manager.models.prometheus_query_preset.searchers import (
+    PrometheusQueryPresetSearcher,
+)
 from ai.backend.manager.models.resource_policy.row import KeyPairResourcePolicyRow
-from ai.backend.manager.repositories.base import BatchQuerier, Creator, NoPagination
+from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.repositories.db.engine import connect_database
-from ai.backend.manager.repositories.idle_checker.creators import (
-    IdleCheckerAssignmentCreatorSpec,
-    IdleCheckerCreatorSpec,
-)
-from ai.backend.manager.repositories.idle_checker.repository import IdleCheckerRepository
-from ai.backend.manager.repositories.ops import DBOpsProvider
-from ai.backend.manager.repositories.prometheus_query_preset.creators import (
-    PrometheusQueryPresetCreatorSpec,
-)
-from ai.backend.manager.repositories.prometheus_query_preset.db_source.db_source import (
-    PrometheusQueryPresetDBSource,
-)
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
+from ai.backend.manager.repositories.ops.v2.relation.provider import RelationOpsProvider
 
 if TYPE_CHECKING:
     from .context import CLIContext
@@ -271,7 +271,7 @@ def plan_utilization_checkers(
 
 
 async def _ensure_utilization_presets(
-    db_source: PrometheusQueryPresetDBSource,
+    ops_provider: V2DBOpsProvider,
     resources: Sequence[str],
 ) -> Mapping[str, PrometheusQueryPresetID]:
     """Map each resource to its preset, creating only the presets the resources need.
@@ -279,8 +279,11 @@ async def _ensure_utilization_presets(
     Dedicated presets are used instead of seeded ones, because the seeded presets get
     renamed by later migrations and may have been edited by operators.
     """
-    presets = await db_source.search(BatchQuerier(pagination=NoPagination()))
-    known_ids = {preset.name: PrometheusQueryPresetID(preset.id) for preset in presets.items}
+    async with ops_provider.read_ops() as read_ops:
+        presets = await read_ops.search_in_global(
+            PrometheusQueryPresetSearcher(pagination=NoPagination())
+        )
+    known_ids = {preset.name: preset.id for preset in presets.items}
     preset_ids: dict[str, PrometheusQueryPresetID] = {}
     for resource in resources:
         if resource in DIFF_METRICS:
@@ -302,9 +305,9 @@ async def _ensure_utilization_presets(
             )
         preset_id = known_ids.get(name)
         if preset_id is None:
-            created = await db_source.create(
-                Creator(
-                    spec=PrometheusQueryPresetCreatorSpec(
+            async with ops_provider.write_ops() as write_ops:
+                created = await write_ops.create_global_entity(
+                    PrometheusQueryPresetCreator(
                         name=name,
                         metric_name=CONTAINER_UTILIZATION_METRIC_NAME,
                         query_template=query_template,
@@ -317,8 +320,7 @@ async def _ensure_utilization_presets(
                         description=description,
                     )
                 )
-            )
-            preset_id = PrometheusQueryPresetID(created.id)
+            preset_id = created.id
             known_ids[name] = preset_id
             log.info("created prometheus query preset {}", name)
         preset_ids[resource] = preset_id
@@ -335,14 +337,14 @@ def _register_cli_orm_cluster() -> None:
     from ai.backend.manager.models.rbac_models.association_scopes_entities import (
         AssociationScopesEntitiesRow,
     )
-    from ai.backend.manager.models.scaling_group.row import ScalingGroupForProjectRow
+    from ai.backend.manager.models.resource_group.row import ResourceGroupForProjectRow
 
     _ = (
         AgentRow,
         ImageRow,
         PrometheusQueryPresetCategoryRow,
         AssociationScopesEntitiesRow,
-        ScalingGroupForProjectRow,
+        ResourceGroupForProjectRow,
     )
 
 
@@ -352,8 +354,8 @@ async def _migrate_legacy(cli_ctx: CLIContext) -> None:
     async with config_ctx(cli_ctx) as unified_config:
         idle_config = unified_config.idle
     async with connect_database(bootstrap_config.db) as db:
-        idle_checker_repository = IdleCheckerRepository(DBOpsProvider(db))
-        preset_db_source = PrometheusQueryPresetDBSource(db)
+        ops_provider = V2DBOpsProvider(db)
+        relation_ops_provider = RelationOpsProvider(db)
         async with db.begin_readonly_session_read_committed() as db_sess:
             policy_query = sa.select(
                 KeyPairResourcePolicyRow.name,
@@ -368,10 +370,12 @@ async def _migrate_legacy(cli_ctx: CLIContext) -> None:
                 )
                 for row in (await db_sess.execute(policy_query)).all()
             ]
-            project_query = sa.select(GroupRow.id).where(
-                (GroupRow.type == ProjectType.GENERAL) & GroupRow.is_active.is_(True)
+            project_query = sa.select(ProjectRow.id).where(
+                (ProjectRow.type == ProjectType.GENERAL) & ProjectRow.is_active.is_(True)
             )
-            project_ids = [row.id for row in (await db_sess.execute(project_query)).all()]
+            project_ids = [
+                ProjectID(row.id) for row in (await db_sess.execute(project_query)).all()
+            ]
 
         enabled = {name.strip() for name in idle_config.enabled.split(",")}
         planned_checkers = plan_session_lifetime_checkers(policies)
@@ -381,7 +385,7 @@ async def _migrate_legacy(cli_ctx: CLIContext) -> None:
             utilization_plan = parse_utilization_config(idle_config.checkers, policies)
             if utilization_plan is not None:
                 preset_ids = await _ensure_utilization_presets(
-                    preset_db_source, [resource for resource, _ in utilization_plan.thresholds]
+                    ops_provider, [resource for resource, _ in utilization_plan.thresholds]
                 )
                 planned_checkers += plan_utilization_checkers(utilization_plan, preset_ids)
         if not planned_checkers:
@@ -392,9 +396,10 @@ async def _migrate_legacy(cli_ctx: CLIContext) -> None:
 
         # Re-runs match on what a checker *does*, so renaming or re-describing a migrated
         # checker afterwards does not make this command create a duplicate of it.
-        existing = await idle_checker_repository.admin_search(
-            BatchQuerier(pagination=NoPagination())
-        )
+        async with ops_provider.read_ops() as read_ops:
+            existing = await read_ops.search_in_global(
+                IdleCheckerSearcher(pagination=NoPagination())
+            )
         checker_ids = []
         for planned in planned_checkers:
             checker_id = None
@@ -407,9 +412,9 @@ async def _migrate_legacy(cli_ctx: CLIContext) -> None:
                     checker_id = checker.id
                     break
             if checker_id is None:
-                created = await idle_checker_repository.create(
-                    Creator(
-                        spec=IdleCheckerCreatorSpec(
+                async with ops_provider.write_ops() as write_ops:
+                    created = await write_ops.create_global_entity(
+                        IdleCheckerCreator(
                             name=planned.name,
                             description=planned.description,
                             target_session_types=planned.target_session_types,
@@ -417,26 +422,22 @@ async def _migrate_legacy(cli_ctx: CLIContext) -> None:
                             spec=planned.spec,
                         )
                     )
-                )
                 checker_id = created.id
                 log.info("created idle checker {}", planned.name)
             checker_ids.append(checker_id)
 
+        # An already-bound pair is answered `False` rather than raised on, so re-running
+        # only adds the bindings that are still missing.
+        pairs = [
+            (project_id, checker_id) for checker_id in checker_ids for project_id in project_ids
+        ]
         created_assignments = 0
-        for checker_id in checker_ids:
-            for project_id in project_ids:
-                try:
-                    await idle_checker_repository.create_assignment(
-                        IdleCheckerAssignmentCreatorSpec(
-                            scope_type=ScopeType.PROJECT,
-                            scope_id=project_id,
-                            idle_checker_id=checker_id,
-                            enabled=False,
-                        )
-                    )
-                except IdleCheckerAssignmentAlreadyExists:
-                    continue
-                created_assignments += 1
+        if pairs:
+            async with relation_ops_provider.write_ops() as relation_write_ops:
+                written = await relation_write_ops.create_relations(
+                    IdleCheckerAssignmentCreator(enabled=False), pairs
+                )
+            created_assignments = sum(written)
         log.info(
             "Migrated {} idle checker(s) and created {} disabled assignment(s) over {} project(s).",
             len(checker_ids),
