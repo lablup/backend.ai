@@ -34,7 +34,6 @@ from ai.backend.manager.api.gql.decorators import (
 )
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
 from ai.backend.manager.api.gql.rbac.types.entity_node import EntityNode
-from ai.backend.manager.api.gql.rbac.types.scope import EntityTypeFilterGQL
 from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy, StrawberryGQLContext
 
 # ==================== Enums ====================
@@ -113,9 +112,9 @@ class EntityRefGQL(PydanticNodeMixin[AssociationScopesEntitiesNode]):
     name="EntityFilter",
 )
 class EntityFilter(PydanticInputMixin[EntityFilterDTO], GQLFilter):
-    entity_type: EntityTypeFilterGQL | None = None
+    entity_type: StringFilter | None = None
     entity_id: StringFilter | None = None
-    scope_type: EntityTypeFilterGQL | None = gql_added_field(
+    scope_type: StringFilter | None = gql_added_field(
         BackendAIGQLMeta(
             added_version="26.8.0",
             description="Filter by the type of scope the entity is registered in.",

@@ -79,7 +79,7 @@ from ai.backend.common.dto.manager.v2.rbac.types import (
     OperationTypeFilter as OperationTypeFilterDTO,
 )
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
-from ai.backend.manager.api.gql.base import DateTimeFilter, OrderDirection, UUIDFilter
+from ai.backend.manager.api.gql.base import DateTimeFilter, OrderDirection, StringFilter, UUIDFilter
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     PydanticInputMixin,
@@ -93,7 +93,6 @@ from ai.backend.manager.api.gql.decorators import (
 )
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin, PydanticOutputMixin
 from ai.backend.manager.api.gql.rbac.types.scope import (
-    EntityTypeFilterGQL,
     PermissionBitGQL,
 )
 from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy, StrawberryGQLContext
@@ -206,7 +205,7 @@ class PermissionGQL(PydanticNodeMixin[PermissionNodeDTO]):
     name="PermissionNestedFilter",
 )
 class PermissionNestedFilterGQL(PydanticInputMixin[PermissionNestedFilterDTO]):
-    entity_type: EntityTypeFilterGQL | None = None
+    entity_type: StringFilter | None = None
     operation: OperationTypeFilterGQL | None = None
 
     AND: list[Self] | None = None
@@ -220,7 +219,7 @@ class PermissionNestedFilterGQL(PydanticInputMixin[PermissionNestedFilterDTO]):
 )
 class PermissionFilter(PydanticInputMixin[PermissionFilterDTO], GQLFilter):
     role_id: UUIDFilter | None = None
-    entity_type: EntityTypeFilterGQL | None = None
+    entity_type: StringFilter | None = None
     created_at: DateTimeFilter | None = None
     AND: list[Self] | None = None
     OR: list[Self] | None = None

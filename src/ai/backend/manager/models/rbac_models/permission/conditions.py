@@ -12,6 +12,7 @@ from ai.backend.common.data.entity.types import EntityType
 from ai.backend.common.data.filter_specs import UUIDEqualMatchSpec, UUIDInMatchSpec
 from ai.backend.manager.data.permission.types import Permission
 from ai.backend.manager.models.clauses import QueryCondition
+from ai.backend.manager.models.condition_utils import StringConditions
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 
 __all__ = ("ScopedPermissionConditions",)
@@ -141,33 +142,7 @@ class ScopedPermissionConditions:
 
         return inner
 
-    @staticmethod
-    def by_entity_type_equals(entity_type: EntityType) -> QueryCondition:
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return PermissionRow.entity_type == entity_type
-
-        return inner
-
-    @staticmethod
-    def by_entity_type_not_equals(entity_type: EntityType) -> QueryCondition:
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return PermissionRow.entity_type != entity_type
-
-        return inner
-
-    @staticmethod
-    def by_entity_type_in(entity_types: Collection[EntityType]) -> QueryCondition:
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return PermissionRow.entity_type.in_(list(entity_types))
-
-        return inner
-
-    @staticmethod
-    def by_entity_type_not_in(entity_types: Collection[EntityType]) -> QueryCondition:
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return PermissionRow.entity_type.not_in(list(entity_types))
-
-        return inner
+    by_entity_type_match = StringConditions(PermissionRow.entity_type)
 
     @staticmethod
     def by_permission_equals(permission: Permission) -> QueryCondition:

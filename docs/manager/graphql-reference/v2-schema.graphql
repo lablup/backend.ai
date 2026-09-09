@@ -5351,13 +5351,13 @@ type EntityConnection {
 
 """Added in 26.3.0. Filter for entity associations"""
 input EntityFilter {
-  entityType: EntityTypeFilter = null
+  entityType: StringFilter = null
   entityId: StringFilter = null
 
   """
   Added in 26.8.0. Filter by the type of scope the entity is registered in.
   """
-  scopeType: EntityTypeFilter = null
+  scopeType: StringFilter = null
 
   """
   Added in 26.8.0. Filter by the id of scope the entity is registered in.
@@ -5679,21 +5679,6 @@ type EntityType implements Node {
 
   """The entity type, as a request names it."""
   name: String!
-}
-
-"""Added in 26.9.0. Filter for a field holding an entity type."""
-input EntityTypeFilter {
-  """Matches rows with this exact entity type."""
-  equals: String = null
-
-  """Matches rows whose entity type is in this list."""
-  in: [String!] = null
-
-  """Excludes rows with this exact entity type."""
-  notEquals: String = null
-
-  """Excludes rows whose entity type is in this list."""
-  notIn: [String!] = null
 }
 
 """Added in 26.4.4. Entity reference parametrized by RBAC element type."""
@@ -9987,7 +9972,7 @@ type PermissionEdge {
 """Added in 26.3.0. Filter for scoped permissions"""
 input PermissionFilter {
   roleId: UUIDFilter = null
-  entityType: EntityTypeFilter = null
+  entityType: StringFilter = null
   createdAt: DateTimeFilter = null
   AND: [PermissionFilter!] = null
   OR: [PermissionFilter!] = null
@@ -9998,7 +9983,7 @@ input PermissionFilter {
 Added in 26.4.0. Nested filter for permissions within a role assignment. Filters assignments where the assigned role has permissions matching all specified conditions.
 """
 input PermissionNestedFilter {
-  entityType: EntityTypeFilter = null
+  entityType: StringFilter = null
   operation: OperationTypeFilter = null
   AND: [PermissionNestedFilter!] = null
   OR: [PermissionNestedFilter!] = null
@@ -13594,7 +13579,7 @@ input RoleFilter {
 Added in 26.8.0. Filter roles by the scope they are mapped (registered) to.
 """
 input RoleMappedScopeNestedFilter {
-  scopeType: EntityTypeFilter = null
+  scopeType: StringFilter = null
   scopeId: UUIDFilter = null
   AND: [RoleMappedScopeNestedFilter!] = null
   OR: [RoleMappedScopeNestedFilter!] = null
@@ -13674,7 +13659,7 @@ input RolePermissionPresetFilter {
   rolePresetId: UUIDFilter = null
 
   """Filter by entity type the permission applies to."""
-  entityType: EntityTypeFilter = null
+  entityType: StringFilter = null
 
   """Filter by granted operation."""
   operation: OperationTypeFilter = null
@@ -13774,7 +13759,7 @@ input RolePresetFilter {
   name: StringFilter = null
 
   """Filter by scope type."""
-  scopeType: EntityTypeFilter = null
+  scopeType: StringFilter = null
 
   """Filter by auto-assign flag."""
   autoAssign: Boolean = null

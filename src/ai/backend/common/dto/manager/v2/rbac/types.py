@@ -19,7 +19,6 @@ from ai.backend.common.dto.manager.v2.common import OrderDirection
 __all__ = (
     "EntityOrderField",
     "EntityType",
-    "EntityTypeFilter",
     "EntityTypeScope",
     "OperationType",
     "OperationTypeDTO",
@@ -125,15 +124,6 @@ class RoleSourceFilter(BaseRequestModel):
 
 class RoleStatusFilter(BaseRequestModel):
     """Filter for role status with equality and membership operators."""
-
-    equals: str | None = None
-    in_: list[str] | None = None
-    not_equals: str | None = None
-    not_in: list[str] | None = None
-
-
-class EntityTypeFilter(BaseRequestModel):
-    """Filter for a column holding an entity type."""
 
     equals: str | None = None
     in_: list[str] | None = None

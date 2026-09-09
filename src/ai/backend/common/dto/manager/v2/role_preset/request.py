@@ -103,7 +103,7 @@ class RolePresetFilter(BaseRequestModel):
     """Filter criteria for searching role presets."""
 
     name: StringFilter | None = Field(default=None, description="Filter by name.")
-    scope_type: EntityType | None = Field(default=None, description="Filter by scope type.")
+    scope_type: StringFilter | None = Field(default=None, description="Filter by scope type.")
     auto_assign: bool | None = Field(default=None, description="Filter by auto-assign flag.")
     deleted: bool | None = Field(
         default=None,

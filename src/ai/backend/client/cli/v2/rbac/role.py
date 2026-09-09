@@ -88,7 +88,6 @@ def search(
         UserNestedFilter,
     )
     from ai.backend.common.dto.manager.v2.rbac.types import (
-        EntityTypeFilter,
         RoleOrderField,
         RoleSourceFilter,
         RoleStatusFilter,
@@ -98,7 +97,7 @@ def search(
     mapped_scope_dto: MappedScopeNestedFilter | None = None
     if scope_type is not None or scope_id is not None:
         mapped_scope_dto = MappedScopeNestedFilter(
-            scope_type=EntityTypeFilter(equals=scope_type) if scope_type is not None else None,
+            scope_type=StringFilter(equals=scope_type) if scope_type is not None else None,
             scope_id=StringFilter(equals=scope_id) if scope_id is not None else None,
         )
 

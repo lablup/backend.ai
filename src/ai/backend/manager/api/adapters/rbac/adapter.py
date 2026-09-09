@@ -135,7 +135,6 @@ from ai.backend.common.dto.manager.v2.rbac.request import (
     UserNestedFilter as UserNestedFilterDTO,
 )
 from ai.backend.common.dto.manager.v2.rbac.types import (
-    EntityTypeFilter,
     OperationTypeDTO,
     OperationTypeFilter,
     PermissionBitDTO,
@@ -145,7 +144,7 @@ from ai.backend.common.dto.manager.v2.rbac.types import (
 from ai.backend.common.dto.manager.v2.rbac.types import (
     OrderDirection as OrderDirectionV2,
 )
-from ai.backend.common.exception import InvalidAPIParameters, UnreachableError
+from ai.backend.common.exception import UnreachableError
 from ai.backend.manager.actions.action import build_operation_description
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.api.adapters.base import BaseAdapter
@@ -1184,59 +1183,6 @@ class RBACAdapter(BaseAdapter):
 
     # ------------------------------------------------------------------ helpers (GQL layer)
 
-    def _rbac_element_type(self, name: str) -> RBACElementType:
-        """The element type answering to ``name``."""
-        try:
-            return RBACElementType(name)
-        except ValueError as e:
-            raise InvalidAPIParameters(f"{name!r} is not an RBAC element type") from e
-
-    def _convert_rbac_element_type_filter(
-        self,
-        f: EntityTypeFilter,
-        *,
-        equals_factory: Callable[[RBACElementType], QueryCondition],
-        not_equals_factory: Callable[[RBACElementType], QueryCondition],
-        in_factory: Callable[[Collection[RBACElementType]], QueryCondition],
-        not_in_factory: Callable[[Collection[RBACElementType]], QueryCondition],
-    ) -> list[QueryCondition]:
-        """Translate an ``EntityTypeFilter`` into the matching ``QueryCondition``
-        instances for a column still holding ``RBACElementType``. A name the enum
-        does not carry matches no row, so it is refused.
-        """
-        conditions: list[QueryCondition] = []
-        if f.equals is not None:
-            conditions.append(equals_factory(self._rbac_element_type(f.equals)))
-        if f.not_equals is not None:
-            conditions.append(not_equals_factory(self._rbac_element_type(f.not_equals)))
-        if f.in_:
-            conditions.append(in_factory([self._rbac_element_type(v) for v in f.in_]))
-        if f.not_in:
-            conditions.append(not_in_factory([self._rbac_element_type(v) for v in f.not_in]))
-        return conditions
-
-    def _convert_entity_type_filter(
-        self,
-        f: EntityTypeFilter,
-        *,
-        equals_factory: Callable[[EntityType], QueryCondition],
-        not_equals_factory: Callable[[EntityType], QueryCondition],
-        in_factory: Callable[[Collection[EntityType]], QueryCondition],
-        not_in_factory: Callable[[Collection[EntityType]], QueryCondition],
-    ) -> list[QueryCondition]:
-        """Translate an ``EntityTypeFilter`` for a column holding an entity type.
-        The column accepts any name, so the value passes through unvalidated."""
-        conditions: list[QueryCondition] = []
-        if f.equals is not None:
-            conditions.append(equals_factory(EntityType(f.equals)))
-        if f.not_equals is not None:
-            conditions.append(not_equals_factory(EntityType(f.not_equals)))
-        if f.in_:
-            conditions.append(in_factory([EntityType(v) for v in f.in_]))
-        if f.not_in:
-            conditions.append(not_in_factory([EntityType(v) for v in f.not_in]))
-        return conditions
-
     def _permission_bit(self, operation: OperationTypeDTO | str) -> Permission:
         """The permission bit an API operation names; grant operations name none."""
         value = operation.value if isinstance(operation, OperationTypeDTO) else operation
@@ -1300,15 +1246,16 @@ class RBACAdapter(BaseAdapter):
             if condition is not None:
                 conditions.append(condition)
         if f.entity_type is not None:
-            conditions.extend(
-                self._convert_entity_type_filter(
-                    f.entity_type,
-                    equals_factory=ScopedPermissionConditions.by_entity_type_equals,
-                    not_equals_factory=ScopedPermissionConditions.by_entity_type_not_equals,
-                    in_factory=ScopedPermissionConditions.by_entity_type_in,
-                    not_in_factory=ScopedPermissionConditions.by_entity_type_not_in,
-                )
+            condition = self.convert_string_filter(
+                f.entity_type,
+                contains_factory=ScopedPermissionConditions.by_entity_type_match.contains,
+                equals_factory=ScopedPermissionConditions.by_entity_type_match.equals,
+                starts_with_factory=ScopedPermissionConditions.by_entity_type_match.starts_with,
+                ends_with_factory=ScopedPermissionConditions.by_entity_type_match.ends_with,
+                in_factory=ScopedPermissionConditions.by_entity_type_match.in_,
             )
+            if condition is not None:
+                conditions.append(condition)
         if f.created_at is not None:
             cond = f.created_at.build_query_condition(
                 before_factory=ScopedPermissionConditions.by_created_at_before,
@@ -1448,21 +1395,16 @@ class RBACAdapter(BaseAdapter):
     ) -> list[QueryCondition]:
         raw_conditions: list[QueryCondition] = []
         if f.scope_type is not None:
-            st = f.scope_type
-            if st.equals is not None:
-                raw_conditions.append(RoleConditions.by_scope_type_equals(EntityType(st.equals)))
-            if st.in_ is not None and st.in_:
-                raw_conditions.append(
-                    RoleConditions.by_scope_type_in([EntityType(s) for s in st.in_])
-                )
-            if st.not_equals is not None:
-                raw_conditions.append(
-                    RoleConditions.by_scope_type_not_equals(EntityType(st.not_equals))
-                )
-            if st.not_in is not None and st.not_in:
-                raw_conditions.append(
-                    RoleConditions.by_scope_type_not_in([EntityType(s) for s in st.not_in])
-                )
+            condition = self.convert_string_filter(
+                f.scope_type,
+                contains_factory=RoleConditions.by_scope_type_match.contains,
+                equals_factory=RoleConditions.by_scope_type_match.equals,
+                starts_with_factory=RoleConditions.by_scope_type_match.starts_with,
+                ends_with_factory=RoleConditions.by_scope_type_match.ends_with,
+                in_factory=RoleConditions.by_scope_type_match.in_,
+            )
+            if condition is not None:
+                raw_conditions.append(condition)
         if f.scope_id is not None:
             condition = self.convert_uuid_filter(
                 f.scope_id,
@@ -1578,15 +1520,16 @@ class RBACAdapter(BaseAdapter):
     ) -> list[QueryCondition]:
         raw_conditions: list[QueryCondition] = []
         if f.entity_type is not None:
-            raw_conditions.extend(
-                self._convert_entity_type_filter(
-                    f.entity_type,
-                    equals_factory=ScopedPermissionConditions.by_entity_type_equals,
-                    not_equals_factory=ScopedPermissionConditions.by_entity_type_not_equals,
-                    in_factory=ScopedPermissionConditions.by_entity_type_in,
-                    not_in_factory=ScopedPermissionConditions.by_entity_type_not_in,
-                )
+            condition = self.convert_string_filter(
+                f.entity_type,
+                contains_factory=ScopedPermissionConditions.by_entity_type_match.contains,
+                equals_factory=ScopedPermissionConditions.by_entity_type_match.equals,
+                starts_with_factory=ScopedPermissionConditions.by_entity_type_match.starts_with,
+                ends_with_factory=ScopedPermissionConditions.by_entity_type_match.ends_with,
+                in_factory=ScopedPermissionConditions.by_entity_type_match.in_,
             )
+            if condition is not None:
+                raw_conditions.append(condition)
         if f.operation is not None:
             raw_conditions.extend(
                 self._convert_operation_bit_filter(
@@ -1686,15 +1629,16 @@ class RBACAdapter(BaseAdapter):
     def _convert_entity_filter(self, f: EntityFilterDTO) -> list[QueryCondition]:
         conditions: list[QueryCondition] = []
         if f.entity_type is not None:
-            conditions.extend(
-                self._convert_rbac_element_type_filter(
-                    f.entity_type,
-                    equals_factory=EntityScopeConditions.by_entity_type_equals,
-                    not_equals_factory=EntityScopeConditions.by_entity_type_not_equals,
-                    in_factory=EntityScopeConditions.by_entity_type_in,
-                    not_in_factory=EntityScopeConditions.by_entity_type_not_in,
-                )
+            condition = self.convert_string_filter(
+                f.entity_type,
+                contains_factory=EntityScopeConditions.by_entity_type_match.contains,
+                equals_factory=EntityScopeConditions.by_entity_type_match.equals,
+                starts_with_factory=EntityScopeConditions.by_entity_type_match.starts_with,
+                ends_with_factory=EntityScopeConditions.by_entity_type_match.ends_with,
+                in_factory=EntityScopeConditions.by_entity_type_match.in_,
             )
+            if condition is not None:
+                conditions.append(condition)
         if f.entity_id is not None:
             condition = self.convert_string_filter(
                 f.entity_id,
@@ -1707,15 +1651,16 @@ class RBACAdapter(BaseAdapter):
             if condition is not None:
                 conditions.append(condition)
         if f.scope_type is not None:
-            conditions.extend(
-                self._convert_rbac_element_type_filter(
-                    f.scope_type,
-                    equals_factory=EntityScopeConditions.by_scope_type_equals,
-                    not_equals_factory=EntityScopeConditions.by_scope_type_not_equals,
-                    in_factory=EntityScopeConditions.by_scope_type_in,
-                    not_in_factory=EntityScopeConditions.by_scope_type_not_in,
-                )
+            condition = self.convert_string_filter(
+                f.scope_type,
+                contains_factory=EntityScopeConditions.by_scope_type_match.contains,
+                equals_factory=EntityScopeConditions.by_scope_type_match.equals,
+                starts_with_factory=EntityScopeConditions.by_scope_type_match.starts_with,
+                ends_with_factory=EntityScopeConditions.by_scope_type_match.ends_with,
+                in_factory=EntityScopeConditions.by_scope_type_match.in_,
             )
+            if condition is not None:
+                conditions.append(condition)
         if f.scope_id is not None:
             condition = self.convert_string_filter(
                 f.scope_id,

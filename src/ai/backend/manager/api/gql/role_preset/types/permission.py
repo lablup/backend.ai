@@ -38,6 +38,7 @@ from ai.backend.common.dto.manager.v2.role_permission_preset.response import (
 from ai.backend.manager.api.gql.base import (
     DateTimeFilter,
     OrderDirection,
+    StringFilter,
     UUIDFilter,
 )
 from ai.backend.manager.api.gql.decorators import (
@@ -58,7 +59,6 @@ from ai.backend.manager.api.gql.rbac.types import (
     OperationTypeFilterGQL,
     OperationTypeGQL,
 )
-from ai.backend.manager.api.gql.rbac.types.scope import EntityTypeFilterGQL
 
 # --- Node / Connection types ---
 
@@ -115,7 +115,7 @@ class RolePermissionPresetFilterGQL(PydanticInputMixin[RolePermissionPresetFilte
     role_preset_id: UUIDFilter | None = gql_field(
         description="Filter by parent role preset ID.", default=None
     )
-    entity_type: EntityTypeFilterGQL | None = gql_field(
+    entity_type: StringFilter | None = gql_field(
         description="Filter by entity type the permission applies to.", default=None
     )
     operation: OperationTypeFilterGQL | None = gql_field(

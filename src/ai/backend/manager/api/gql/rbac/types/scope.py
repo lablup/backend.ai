@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from ai.backend.common.dto.manager.v2.rbac.types import (
-    EntityTypeFilter,
     EntityTypeScope,
     PermissionBitDTO,
     ScopeInputDTO,
@@ -19,7 +18,6 @@ from ai.backend.manager.api.gql.decorators import (
 
 # Re-export for stable import paths in audit_log scope
 __all__ = (
-    "EntityTypeFilterGQL",
     "EntityTypeScopeGQL",
     "ScopeInputGQL",
 )
@@ -52,30 +50,6 @@ class EntityTypeScopeGQL(PydanticInputMixin[EntityTypeScope]):
     )
     entity_id: str = gql_field(
         description="ID of the entity.",
-    )
-
-
-@gql_pydantic_input(
-    BackendAIGQLMeta(
-        description="Filter for a field holding an entity type.",
-        added_version=NEXT_RELEASE_VERSION,
-    ),
-    name="EntityTypeFilter",
-)
-class EntityTypeFilterGQL(PydanticInputMixin[EntityTypeFilter]):
-    equals: str | None = gql_field(
-        description="Matches rows with this exact entity type.", default=None
-    )
-    in_: list[str] | None = gql_field(
-        description="Matches rows whose entity type is in this list.",
-        name="in",
-        default=None,
-    )
-    not_equals: str | None = gql_field(
-        description="Excludes rows with this exact entity type.", default=None
-    )
-    not_in: list[str] | None = gql_field(
-        description="Excludes rows whose entity type is in this list.", default=None
     )
 
 

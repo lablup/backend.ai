@@ -20,7 +20,7 @@ from ai.backend.client.v2.auth import HMACAuth
 from ai.backend.client.v2.config import ClientConfig
 from ai.backend.client.v2.exceptions import InvalidRequestError, PermissionDeniedError
 from ai.backend.client.v2.v2_registry import V2ClientRegistry
-from ai.backend.common.dto.manager.query import UUIDFilter
+from ai.backend.common.dto.manager.query import StringFilter, UUIDFilter
 from ai.backend.common.dto.manager.v2.rbac.request import (
     AdminSearchPermissionsGQLInput,
     BulkAddRolePermissionsInput,
@@ -33,9 +33,6 @@ from ai.backend.common.dto.manager.v2.rbac.response import (
     BulkAddRolePermissionsPayload,
     BulkRemoveRolePermissionsPayload,
     ReplaceRolePermissionsPayload,
-)
-from ai.backend.common.dto.manager.v2.rbac.types import (
-    EntityTypeFilter,
 )
 from ai.backend.manager.api.adapters.rbac.adapter import RBACAdapter
 from ai.backend.manager.api.rest.admin.handler import AdminHandler
@@ -412,7 +409,7 @@ class TestPermissionFilters:
         target_role: CreateRoleResponse,
         domain_fixture: DomainFixtureData,
     ) -> None:
-        """``EntityTypeFilter.equals`` carries the entity type's name, which the
+        """``StringFilter.equals`` carries the entity type's name, which the
         column takes as-is."""
         await admin_v2_registry.rbac.bulk_add_role_permissions(
             BulkAddRolePermissionsInput(
@@ -426,7 +423,7 @@ class TestPermissionFilters:
             AdminSearchPermissionsGQLInput(
                 filter=PermissionFilter(
                     role_id=UUIDFilter(equals=target_role.role.id),
-                    entity_type=EntityTypeFilter(equals="session"),
+                    entity_type=StringFilter(equals="session"),
                 ),
                 limit=100,
             ),
@@ -439,7 +436,7 @@ class TestPermissionFilters:
         target_role: CreateRoleResponse,
         domain_fixture: DomainFixtureData,
     ) -> None:
-        """``EntityTypeFilter.in_`` returns rows whose entity_type is in the list."""
+        """``StringFilter.in_`` returns rows whose entity_type is in the list."""
         await admin_v2_registry.rbac.bulk_add_role_permissions(
             BulkAddRolePermissionsInput(
                 permissions=[
@@ -453,7 +450,7 @@ class TestPermissionFilters:
             AdminSearchPermissionsGQLInput(
                 filter=PermissionFilter(
                     role_id=UUIDFilter(equals=target_role.role.id),
-                    entity_type=EntityTypeFilter(in_=["session", "image"]),
+                    entity_type=StringFilter(in_=["session", "image"]),
                 ),
                 limit=100,
             ),

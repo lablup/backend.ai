@@ -16,7 +16,7 @@ from ai.backend.common.data.filter_specs import (
 from ai.backend.manager.data.permission.status import RoleStatus
 from ai.backend.manager.data.permission.types import RoleSource
 from ai.backend.manager.models.clauses import QueryCondition
-from ai.backend.manager.models.condition_utils import make_string_in_factory
+from ai.backend.manager.models.condition_utils import StringConditions, make_string_in_factory
 from ai.backend.manager.models.rbac_models.role.row import RoleRow
 from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
 
@@ -190,6 +190,8 @@ class RoleConditions:
             return sa.exists(subq)
 
         return inner
+
+    by_scope_type_match = StringConditions(RoleRow.scope_type)
 
     @staticmethod
     def by_scope_type_equals(scope_type: EntityType) -> QueryCondition:
