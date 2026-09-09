@@ -56,10 +56,21 @@ from ai.backend.manager.services.prometheus_query_preset_category.actions import
 from ai.backend.manager.services.prometheus_query_preset_category.actions.bulk_get import (
     PublicBulkGetCategoriesAction,
 )
+from ai.backend.manager.services.prometheus_query_preset_category.processors import (
+    PrometheusQueryPresetCategoryProcessors,
+)
 
 
 class PrometheusQueryPresetCategoryAdapter(BaseAdapter):
     """Adapter for prometheus query preset category domain operations."""
+
+    _prometheus_query_preset_category: PrometheusQueryPresetCategoryProcessors
+
+    def __init__(
+        self,
+        prometheus_query_preset_category: PrometheusQueryPresetCategoryProcessors,
+    ) -> None:
+        self._prometheus_query_preset_category = prometheus_query_preset_category
 
     async def batch_load_by_ids(self, ids: Sequence[UUID]) -> list[CategoryNode | Exception | None]:
         """Batch load categories by id for DataLoader use.
@@ -70,10 +81,8 @@ class PrometheusQueryPresetCategoryAdapter(BaseAdapter):
         if not ids:
             return []
         entity_ids = [PrometheusQueryPresetCategoryID(value) for value in ids]
-        result = (
-            await self._processors.prometheus_query_preset_category.public_bulk_get_categories.run(
-                PublicBulkGetCategoriesAction(ids=entity_ids)
-            )
+        result = await self._prometheus_query_preset_category.public_bulk_get_categories.run(
+            PublicBulkGetCategoriesAction(ids=entity_ids)
         )
         return [
             self._data_to_dto(item.value)
@@ -89,10 +98,8 @@ class PrometheusQueryPresetCategoryAdapter(BaseAdapter):
             description=input.description,
         )
 
-        action_result = (
-            await self._processors.prometheus_query_preset_category.global_create_category.run(
-                CreateCategoryAction(creator=creator)
-            )
+        action_result = await self._prometheus_query_preset_category.global_create_category.run(
+            CreateCategoryAction(creator=creator)
         )
 
         return CreateCategoryPayload(item=self._data_to_dto(action_result.data))
@@ -105,10 +112,8 @@ class PrometheusQueryPresetCategoryAdapter(BaseAdapter):
         """
         searcher = self.build_searcher(input)
 
-        action_result = (
-            await self._processors.prometheus_query_preset_category.public_search_categories.run(
-                SearchCategoriesAction(searcher=searcher)
-            )
+        action_result = await self._prometheus_query_preset_category.public_search_categories.run(
+            SearchCategoriesAction(searcher=searcher)
         )
 
         return SearchCategoriesPayload(
@@ -120,17 +125,15 @@ class PrometheusQueryPresetCategoryAdapter(BaseAdapter):
 
     async def get(self, category_id: UUID) -> GetCategoryPayload:
         """Get a single category by ID."""
-        action_result = (
-            await self._processors.prometheus_query_preset_category.public_get_category.run(
-                GetCategoryAction(category_id=PrometheusQueryPresetCategoryID(category_id))
-            )
+        action_result = await self._prometheus_query_preset_category.public_get_category.run(
+            GetCategoryAction(category_id=PrometheusQueryPresetCategoryID(category_id))
         )
 
         return GetCategoryPayload(item=self._data_to_dto(action_result.data))
 
     async def delete(self, input: DeleteCategoryInput) -> DeleteCategoryPayload:
         """Remove a category by ID."""
-        action_result = await self._processors.prometheus_query_preset_category.purge_category.run(
+        action_result = await self._prometheus_query_preset_category.purge_category.run(
             PurgeCategoryAction(category_id=PrometheusQueryPresetCategoryID(input.id))
         )
 

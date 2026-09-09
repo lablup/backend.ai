@@ -18,7 +18,7 @@ from sqlalchemy.orm import InstrumentedAttribute
 
 from ai.backend.common.data.entity.entity_share import EntityShareID
 from ai.backend.common.data.entity.types import EntityIdentifier
-from ai.backend.common.data.entity.user import USER_ENTITY_TYPE
+from ai.backend.common.data.entity.user import UserEntityType
 from ai.backend.manager.data.entity_share.types import (
     EntityShareData,
     EntityShareStatus,
@@ -81,7 +81,7 @@ class _RecipientInvitationUpdater(GuardedDataUpdater[EntityShareRow, EntityShare
                 EntityShareRow.recipient_entity_type == scope.entity_type(),
                 EntityShareRow.recipient_entity_id == scope,
             )
-            if scope.entity_type() != USER_ENTITY_TYPE:
+            if scope.entity_type() != UserEntityType():
                 return named
             return sa.or_(
                 named,

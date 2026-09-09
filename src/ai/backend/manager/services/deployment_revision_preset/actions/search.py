@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.common.data.entity.deployment_preset import DEPLOYMENT_PRESET_ENTITY_TYPE
+from ai.backend.common.data.entity.deployment_preset import DeploymentPresetEntityType
 from ai.backend.common.data.entity.types import EntityType
 from ai.backend.manager.actions.v2.ops.base import SearchGlobalOpsAction
 from ai.backend.manager.data.deployment_revision_preset.types import DeploymentRevisionPresetData
@@ -24,7 +24,7 @@ class GlobalSearchDeploymentPresetsAction(
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return DEPLOYMENT_PRESET_ENTITY_TYPE
+        return DeploymentPresetEntityType()
 
     @override
     @classmethod

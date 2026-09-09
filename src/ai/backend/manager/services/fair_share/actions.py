@@ -14,9 +14,9 @@ from decimal import Decimal
 from typing import override
 
 from ai.backend.common.data.entity.fair_share import (
-    DOMAIN_FAIR_SHARE_ENTITY_TYPE,
-    PROJECT_FAIR_SHARE_ENTITY_TYPE,
-    USER_FAIR_SHARE_ENTITY_TYPE,
+    DomainFairShareEntityType,
+    ProjectFairShareEntityType,
+    UserFairShareEntityType,
 )
 from ai.backend.common.data.entity.resource_group import (
     RESOURCE_GROUP_SCOPE_TYPE,
@@ -60,7 +60,7 @@ class DomainFairShareAction(BaseScopeAction):
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return DOMAIN_FAIR_SHARE_ENTITY_TYPE
+        return DomainFairShareEntityType()
 
     @override
     def scope_targets(self) -> Sequence[ScopeRef]:
@@ -100,7 +100,7 @@ class GlobalSearchDomainFairSharesAction(BaseGlobalAction):
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return DOMAIN_FAIR_SHARE_ENTITY_TYPE
+        return DomainFairShareEntityType()
 
     @override
     @classmethod
@@ -207,7 +207,7 @@ class ProjectFairShareAction(BaseScopeAction):
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return PROJECT_FAIR_SHARE_ENTITY_TYPE
+        return ProjectFairShareEntityType()
 
     @override
     def scope_targets(self) -> Sequence[ScopeRef]:
@@ -247,7 +247,7 @@ class GlobalSearchProjectFairSharesAction(BaseGlobalAction):
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return PROJECT_FAIR_SHARE_ENTITY_TYPE
+        return ProjectFairShareEntityType()
 
     @override
     @classmethod
@@ -356,7 +356,7 @@ class UserFairShareAction(BaseScopeAction):
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return USER_FAIR_SHARE_ENTITY_TYPE
+        return UserFairShareEntityType()
 
     @override
     def scope_targets(self) -> Sequence[ScopeRef]:
@@ -397,7 +397,7 @@ class GlobalSearchUserFairSharesAction(BaseGlobalAction):
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return USER_FAIR_SHARE_ENTITY_TYPE
+        return UserFairShareEntityType()
 
     @override
     @classmethod

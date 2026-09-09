@@ -2,7 +2,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.common.data.entity.deployment import DEPLOYMENT_ENTITY_TYPE, DeploymentID
+from ai.backend.common.data.entity.deployment import DeploymentEntityType, DeploymentID
 from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
 from ai.backend.manager.actions.v2.global_scope.base import BaseGlobalAction
 from ai.backend.manager.actions.v2.scope.base import BaseScopeAction
@@ -38,7 +38,7 @@ class DeploymentGlobalAction(BaseGlobalAction):
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return DEPLOYMENT_ENTITY_TYPE
+        return DeploymentEntityType()
 
 
 @dataclass
@@ -48,7 +48,7 @@ class DeploymentScopeAction(BaseScopeAction):
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return DEPLOYMENT_ENTITY_TYPE
+        return DeploymentEntityType()
 
 
 @dataclass

@@ -7,7 +7,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.common.data.entity.entity_share import ENTITY_SHARE_ENTITY_TYPE
+from ai.backend.common.data.entity.entity_share import EntityShareEntityType
 from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE, ProjectID
 from ai.backend.common.data.entity.types import (
     EntityIdentifier,
@@ -130,7 +130,7 @@ class SearchEntitySharesAction(OperationScopeOpsAction[EntityShareRow, EntitySha
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return ENTITY_SHARE_ENTITY_TYPE
+        return EntityShareEntityType()
 
     @override
     @classmethod

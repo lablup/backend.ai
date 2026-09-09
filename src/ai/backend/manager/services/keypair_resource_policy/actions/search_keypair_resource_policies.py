@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from typing import override
 
 from ai.backend.common.data.entity.resource_policy import (
-    KEYPAIR_RESOURCE_POLICY_ENTITY_TYPE,
+    KeyPairResourcePolicyEntityType,
 )
 from ai.backend.common.data.entity.types import EntityType, ScopeRef
 from ai.backend.common.data.entity.user import USER_SCOPE_TYPE, UserID
@@ -34,7 +34,7 @@ class SearchKeypairResourcePoliciesAction(
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return KEYPAIR_RESOURCE_POLICY_ENTITY_TYPE
+        return KeyPairResourcePolicyEntityType()
 
     @override
     def scope_targets(self) -> Sequence[ScopeRef]:

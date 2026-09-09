@@ -11,8 +11,8 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
 from ai.backend.client.v2.registry import BackendAIClientRegistry
-from ai.backend.common.data.entity.domain import DOMAIN_ENTITY_TYPE
-from ai.backend.common.data.entity.project import PROJECT_ENTITY_TYPE
+from ai.backend.common.data.entity.domain import DomainEntityType
+from ai.backend.common.data.entity.project import ProjectEntityType
 from ai.backend.common.dto.manager.domain import (
     CreateDomainRequest,
     CreateDomainResponse,
@@ -45,13 +45,13 @@ def domain_processors(
 ) -> DomainProcessors:
     repo = DomainRepository(database_engine, V2DBOpsProvider(database_engine))
     service = DomainService(repo)
-    return DomainProcessors(processor_registry.group(GroupMeta(DOMAIN_ENTITY_TYPE)), service, [])
+    return DomainProcessors(processor_registry.group(GroupMeta(DomainEntityType())), service, [])
 
 
 @pytest.fixture()
 def project_processors(processor_registry: ProcessorRegistry[Any]) -> ProjectProcessors:
     """Only the ops-backed create is exercised here, so the service is a stub."""
-    return ProjectProcessors(processor_registry.group(GroupMeta(PROJECT_ENTITY_TYPE)), MagicMock())
+    return ProjectProcessors(processor_registry.group(GroupMeta(ProjectEntityType())), MagicMock())
 
 
 @pytest.fixture()

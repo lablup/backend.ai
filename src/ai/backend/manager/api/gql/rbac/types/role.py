@@ -94,6 +94,7 @@ from ai.backend.common.dto.manager.v2.rbac.types import (
 from ai.backend.common.dto.manager.v2.rbac.types import (
     RoleStatusFilter as RoleStatusFilterDTO,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import OrderDirection, StringFilter, UUIDFilter, encode_cursor
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
@@ -107,7 +108,10 @@ from ai.backend.manager.api.gql.decorators import (
     gql_pydantic_type,
 )
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin, PydanticOutputMixin
-from ai.backend.manager.api.gql.rbac.types.scope import RBACElementTypeFilterGQL, ScopeInputGQL
+from ai.backend.manager.api.gql.rbac.types.scope import (
+    RBACElementTypeFilterGQL,
+    ScopeInputGQL,
+)
 from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy, StrawberryGQLContext
 
 if TYPE_CHECKING:
@@ -166,6 +170,18 @@ class RoleGQL(PydanticNodeMixin[Any]):
                 "When true, the role is automatically granted to a user when the user is added "
                 "to a scope this role is registered in."
             ),
+        )
+    )
+    scope_type: str = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Type of the scope the role belongs to.",
+        )
+    )
+    scope_id: UUID = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="ID of the scope the role belongs to.",
         )
     )
 
@@ -543,7 +559,7 @@ class RoleUserNestedFilterGQL(PydanticInputMixin[UserNestedFilterDTO]):
 )
 class RoleMappedScopeNestedFilterGQL(PydanticInputMixin[MappedScopeNestedFilterDTO]):
     scope_type: RBACElementTypeFilterGQL | None = None
-    scope_id: StringFilter | None = None
+    scope_id: UUIDFilter | None = None
 
     AND: list[Self] | None = None
     OR: list[Self] | None = None
@@ -644,7 +660,13 @@ class RoleAssignmentOrderBy(PydanticInputMixin[RoleAssignmentOrderByDTO], GQLOrd
 class CreateRoleInput(PydanticInputMixin[CreateRoleInputDTO]):
     name: str
     description: str | None = None
-    source: RoleSourceGQL = RoleSourceGQL.CUSTOM
+    source: RoleSourceGQL | None = gql_field(
+        description="Deprecated and ignored: a created role is always custom.",
+        default=None,
+        deprecation_reason=(
+            f"Deprecated since {NEXT_RELEASE_VERSION}. Ignored: a created role is always custom."
+        ),
+    )
     auto_assign: bool = gql_added_field(
         BackendAIGQLMeta(
             added_version="26.4.4",
@@ -655,7 +677,18 @@ class CreateRoleInput(PydanticInputMixin[CreateRoleInputDTO]):
         ),
         default=False,
     )
-    scopes: list[ScopeInputGQL] | None = None
+    scope: ScopeInputGQL | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="The scope the role belongs to.",
+        ),
+        default=None,
+    )
+    scopes: list[ScopeInputGQL] | None = gql_field(
+        description="Deprecated: use `scope`. Accepts exactly one entry.",
+        default=None,
+        deprecation_reason=f"Deprecated since {NEXT_RELEASE_VERSION}. Use `scope`.",
+    )
 
 
 @gql_pydantic_input(

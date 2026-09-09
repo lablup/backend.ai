@@ -9,6 +9,7 @@ import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import contains_eager, selectinload
 
+from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.permission.types import (
     RBACElementType,
@@ -241,36 +242,29 @@ class PermissionDBSource:
 
             # Used by PermissionControllerService.revoke_role() to decide whether to
             # take the user off the project's roster.
-            ase = AssociationScopesEntitiesRow
-            project_subq = (
-                sa.select(ase.scope_id).where(
-                    ase.entity_type == LegacyEntityType.ROLE,
-                    ase.scope_type == LegacyScopeType.PROJECT,
-                    sa.cast(ase.entity_id, sa.String) == str(data.role_id),
-                )
-            ).subquery()
-
+            project_subq = sa.select(RoleRow.scope_id).where(
+                RoleRow.id == data.role_id,
+                RoleRow.scope_type == PROJECT_SCOPE_TYPE,
+            )
             rows = (
                 await db_session.execute(
-                    sa.select(ase.scope_id, sa.func.count(UserRoleRow.id))
+                    sa.select(RoleRow.scope_id, sa.func.count(UserRoleRow.id))
                     .outerjoin(
                         UserRoleRow,
-                        (sa.cast(UserRoleRow.role_id, sa.String) == ase.entity_id)
-                        & (UserRoleRow.user_id == data.user_id),
+                        (UserRoleRow.role_id == RoleRow.id) & (UserRoleRow.user_id == data.user_id),
                     )
                     .where(
-                        ase.entity_type == LegacyEntityType.ROLE,
-                        ase.scope_type == LegacyScopeType.PROJECT,
-                        ase.scope_id.in_(sa.select(project_subq.c.scope_id)),
+                        RoleRow.scope_type == PROJECT_SCOPE_TYPE,
+                        RoleRow.scope_id.in_(project_subq),
                     )
-                    .group_by(ase.scope_id)
+                    .group_by(RoleRow.scope_id)
                 )
             ).all()
 
             return RoleRevocationResult(
                 user_role_id=user_role_id,
                 project_remaining_roles=[
-                    ProjectRoleCount(project_id=uuid.UUID(r[0]), remaining_count=r[1]) for r in rows
+                    ProjectRoleCount(project_id=r[0], remaining_count=r[1]) for r in rows
                 ],
             )
 

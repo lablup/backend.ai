@@ -10,15 +10,19 @@ import sqlalchemy as sa
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
 from ai.backend.common.data.entity.fair_share import (
-    DOMAIN_FAIR_SHARE_ENTITY_TYPE,
-    PROJECT_FAIR_SHARE_ENTITY_TYPE,
-    USER_FAIR_SHARE_ENTITY_TYPE,
+    DomainFairShareEntityType,
+    ProjectFairShareEntityType,
+    UserFairShareEntityType,
 )
-from ai.backend.common.data.entity.resource_group import RESOURCE_GROUP_ENTITY_TYPE, ResourceGroupID
+from ai.backend.common.data.entity.resource_group import (
+    ResourceGroupEntityType,
+    ResourceGroupID,
+    ResourceGroupName,
+)
 from ai.backend.common.data.entity.usage_bucket import (
-    DOMAIN_USAGE_BUCKET_FIELD_TYPE,
-    PROJECT_USAGE_BUCKET_FIELD_TYPE,
-    USER_USAGE_BUCKET_FIELD_TYPE,
+    DomainUsageBucketFieldType,
+    ProjectUsageBucketFieldType,
+    UserUsageBucketFieldType,
 )
 from ai.backend.common.data.permission.types import ScopeType
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
@@ -37,8 +41,13 @@ from ai.backend.manager.data.resource_usage_history.types import (
     ProjectUsageBucketData,
     UserUsageBucketData,
 )
+from ai.backend.manager.models.fair_share.row import (
+    DomainFairShareRow,
+    ProjectFairShareRow,
+    UserFairShareRow,
+)
 from ai.backend.manager.models.project import ProjectRow
-from ai.backend.manager.models.resource_group import sgroups_for_groups
+from ai.backend.manager.models.resource_group import resource_groups, sgroups_for_groups
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
 from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
@@ -62,9 +71,9 @@ def fair_share_processors(
     service = FairShareService(FairShareRepository(database_engine))
     fair_share_groups = processor_registry.concern(ConcernMeta(Concern.RESOURCE_GROUP))
     return FairShareProcessors(
-        fair_share_groups.group(GroupMeta(DOMAIN_FAIR_SHARE_ENTITY_TYPE)),
-        fair_share_groups.group(GroupMeta(PROJECT_FAIR_SHARE_ENTITY_TYPE)),
-        fair_share_groups.group(GroupMeta(USER_FAIR_SHARE_ENTITY_TYPE)),
+        fair_share_groups.group(GroupMeta(DomainFairShareEntityType())),
+        fair_share_groups.group(GroupMeta(ProjectFairShareEntityType())),
+        fair_share_groups.group(GroupMeta(UserFairShareEntityType())),
         service,
     )
 
@@ -75,13 +84,13 @@ def resource_usage_processors(
 ) -> ResourceUsageProcessors:
     return ResourceUsageProcessors(
         processor_registry.dangling_field_group(
-            FieldGroupMeta(DOMAIN_USAGE_BUCKET_FIELD_TYPE), DomainUsageBucketData
+            FieldGroupMeta(DomainUsageBucketFieldType()), DomainUsageBucketData
         ),
         processor_registry.dangling_field_group(
-            FieldGroupMeta(PROJECT_USAGE_BUCKET_FIELD_TYPE), ProjectUsageBucketData
+            FieldGroupMeta(ProjectUsageBucketFieldType()), ProjectUsageBucketData
         ),
         processor_registry.dangling_field_group(
-            FieldGroupMeta(USER_USAGE_BUCKET_FIELD_TYPE), UserUsageBucketData
+            FieldGroupMeta(UserUsageBucketFieldType()), UserUsageBucketData
         ),
     )
 
@@ -95,7 +104,7 @@ def resource_group_processors(
         ResourceGroupRepository(database_engine, V2DBOpsProvider(database_engine))
     )
     return ResourceGroupProcessors(
-        processor_registry.group(GroupMeta(RESOURCE_GROUP_ENTITY_TYPE)), service
+        processor_registry.group(GroupMeta(ResourceGroupEntityType())), service
     )
 
 
@@ -117,6 +126,25 @@ def server_module_registries(
             route_deps,
         ),
     ]
+
+
+@pytest.fixture()
+async def resource_group_name(
+    db_engine: SAEngine,
+    resource_group_name: ResourceGroupName,
+) -> AsyncIterator[ResourceGroupName]:
+    """Drop the fair-share rows a test wrote; no FK removes them with the scaling group."""
+    yield resource_group_name
+    async with db_engine.begin() as conn:
+        sgroup_id = sa.select(resource_groups.c.id).where(
+            resource_groups.c.name == resource_group_name
+        )
+        for row_cls in (DomainFairShareRow, ProjectFairShareRow, UserFairShareRow):
+            await conn.execute(
+                row_cls.__table__.delete().where(
+                    row_cls.__table__.c.resource_group_id.in_(sgroup_id)
+                )
+            )
 
 
 @pytest.fixture()

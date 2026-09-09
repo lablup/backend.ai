@@ -361,7 +361,7 @@ class TestDeploymentAdapterFilter:
     ) -> DeploymentAdapter:
         processors_mock = MagicMock(spec=Processors)
         processors_mock.deployment = deployment_processors
-        return DeploymentAdapter(processors_mock, deployment_coordinator=MagicMock())
+        return DeploymentAdapter(processors_mock.deployment, deployment_coordinator=MagicMock())
 
     @staticmethod
     def _admin_user_data(user_uuid: uuid.UUID, domain: str) -> UserData:

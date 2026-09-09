@@ -5,9 +5,9 @@ from __future__ import annotations
 import enum
 
 from ai.backend.common.data.entity.app_config import AppConfigScopeID
-from ai.backend.common.data.entity.domain import DOMAIN_ENTITY_TYPE, DomainID
+from ai.backend.common.data.entity.domain import DomainEntityType, DomainID
 from ai.backend.common.data.entity.types import EntityIdentifier
-from ai.backend.common.data.entity.user import USER_ENTITY_TYPE, UserID
+from ai.backend.common.data.entity.user import UserEntityType, UserID
 from ai.backend.common.data.permission.types import RBACElementType, ScopeType
 from ai.backend.common.exception import UnreachableError
 
@@ -34,9 +34,9 @@ class AppConfigScopeType(enum.StrEnum):
         match owner:
             case None:
                 return cls.PUBLIC
-            case _ if owner.entity_type() == DOMAIN_ENTITY_TYPE:
+            case _ if owner.entity_type() == DomainEntityType():
                 return cls.DOMAIN
-            case _ if owner.entity_type() == USER_ENTITY_TYPE:
+            case _ if owner.entity_type() == UserEntityType():
                 return cls.USER
             case _:
                 raise UnreachableError(f"No app config scope owns a {owner.entity_type()}")

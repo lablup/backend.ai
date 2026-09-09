@@ -6,8 +6,8 @@ from dataclasses import dataclass
 from typing import Any, override
 
 from ai.backend.common.data.entity.idle_checker import (
-    IDLE_CHECKER_ENTITY_TYPE,
     IdleCheckerAssignmentID,
+    IdleCheckerEntityType,
     IdleCheckerID,
 )
 from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
@@ -48,7 +48,7 @@ class LookupIdleCheckerAssignmentAction(BaseLookupAction):
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return IDLE_CHECKER_ENTITY_TYPE
+        return IdleCheckerEntityType()
 
     @override
     @classmethod
@@ -100,7 +100,7 @@ class LookupIdleCheckerAssignmentByPairAction(BaseLookupAction):
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return IDLE_CHECKER_ENTITY_TYPE
+        return IdleCheckerEntityType()
 
     @override
     @classmethod
