@@ -67,6 +67,19 @@ class PermissionWriteOps(V2WriteOps, PermissionReadOps, V2CapOps):
             for bit, paths in self._scoped_paths(entry.fields).items():
                 await self._insert_bit_row(role_id, entry, bit, False, paths)
 
+    async def replace_permissions(
+        self, role_id: RoleID, entries: Sequence[PermissionEntry]
+    ) -> None:
+        """State the role's whole permission set; an entity type it held and the entries
+        do not name is cleared."""
+        named = {entry.entity_type for entry in entries}
+        cleared = [
+            PermissionEntry(entity_type=entity_type, permission=Permission.NONE)
+            for entity_type in await self.held_entity_types(role_id)
+            if entity_type not in named
+        ]
+        await self.set_permissions(role_id, [*entries, *cleared])
+
     async def widen_permissions(self, role_id: RoleID, entries: Sequence[PermissionEntry]) -> None:
         """Add each entry to what its entity type holds, never taking away.
 

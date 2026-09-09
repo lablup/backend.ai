@@ -8,6 +8,7 @@ from itertools import batched
 from typing import cast
 
 import sqlalchemy as sa
+from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
 from ai.backend.common.data.entity.idle_checker import IdleCheckerID
 from ai.backend.common.data.entity.session import SessionID
@@ -39,8 +40,10 @@ from ai.backend.manager.models.idle_checker.upserters import (
 from ai.backend.manager.models.session.conditions import SessionConditions
 from ai.backend.manager.models.session.row import SessionRow
 from ai.backend.manager.models.specs.pagination import NoPagination
+from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
+    execute_batch_querier,
 )
 from ai.backend.manager.repositories.idle_checker.types import (
     ExpiredIdleCheckBatchData,
@@ -55,7 +58,6 @@ from ai.backend.manager.repositories.idle_checker.types import (
     SessionIdleCheckPair,
     SessionIdleCheckPairResult,
 )
-from ai.backend.manager.repositories.ops import DBOpsProvider
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.ops.v2.relation.provider import RelationOpsProvider
 
@@ -66,19 +68,23 @@ _IDLE_CHECK_UPDATE_BATCH_SIZE = 1000
 
 
 class IdleCheckerDBSource:
-    _ops: DBOpsProvider
+    _db: ExtendedAsyncSAEngine
     _v2_ops: V2DBOpsProvider
     _relation_ops: RelationOpsProvider
 
     def __init__(
         self,
-        ops_provider: DBOpsProvider,
+        db: ExtendedAsyncSAEngine,
         v2_ops_provider: V2DBOpsProvider,
         relation_ops_provider: RelationOpsProvider,
     ) -> None:
-        self._ops = ops_provider
+        self._db = db
         self._v2_ops = v2_ops_provider
         self._relation_ops = relation_ops_provider
+
+    async def _current_time(self, db_sess: SASession) -> datetime:
+        """DB-sourced current time, consistent across servers (not a per-server clock)."""
+        return (await db_sess.execute(sa.select(sa.func.now()))).scalar_one()
 
     async def fetch_judgment_batch(
         self,
@@ -108,8 +114,8 @@ class IdleCheckerDBSource:
             )
         )
         querier = BatchQuerier(pagination=NoPagination())
-        async with self._ops.read_ops() as r:
-            rows = (await r.batch_query_in_global(query, querier)).rows
+        async with self._db.begin_readonly_session_read_committed() as db_sess:
+            rows = (await execute_batch_querier(db_sess, query, querier)).rows
         return IdleCheckBatchData(
             assignments=[
                 IdleCheckAssignmentData(
@@ -144,15 +150,15 @@ class IdleCheckerDBSource:
                 SessionIdleCheckRow.expire_at.is_not(None),
             )
         )
-        async with self._ops.read_ops() as r:
-            now = await r.current_time()
-            querier = BatchQuerier(
-                pagination=NoPagination(),
-                conditions=[
-                    SessionConditions.by_statuses(session_statuses),
-                ],
-            )
-            result_rows = (await r.batch_query_in_global(check_query, querier)).rows
+        querier = BatchQuerier(
+            pagination=NoPagination(),
+            conditions=[
+                SessionConditions.by_statuses(session_statuses),
+            ],
+        )
+        async with self._db.begin_readonly_session_read_committed() as db_sess:
+            now = await self._current_time(db_sess)
+            result_rows = (await execute_batch_querier(db_sess, check_query, querier)).rows
         checks: list[ExpiredIdleCheckData] = []
         for row in result_rows:
             check_row: SessionIdleCheckRow = row.SessionIdleCheckRow
@@ -187,9 +193,9 @@ class IdleCheckerDBSource:
             )
         )
         querier = BatchQuerier(pagination=NoPagination())
-        async with self._ops.read_ops() as r:
-            now = await r.current_time()
-            rows = (await r.batch_query_in_global(query, querier)).rows
+        async with self._db.begin_readonly_session_read_committed() as db_sess:
+            now = await self._current_time(db_sess)
+            rows = (await execute_batch_querier(db_sess, query, querier)).rows
         return InitialGracePeriodBatchData(
             checks=tuple(
                 InitialGracePeriodCheckData(
@@ -257,10 +263,10 @@ class IdleCheckerDBSource:
             .where(SessionRow.status.in_(session_statuses))
         )
         querier = BatchQuerier(pagination=NoPagination())
-        async with self._ops.read_ops() as r:
-            now = await r.current_time()
-            desired_rows = (await r.batch_query_in_global(desired_query, querier)).rows
-            current_rows = (await r.batch_query_in_global(current_query, querier)).rows
+        async with self._db.begin_readonly_session_read_committed() as db_sess:
+            now = await self._current_time(db_sess)
+            desired_rows = (await execute_batch_querier(db_sess, desired_query, querier)).rows
+            current_rows = (await execute_batch_querier(db_sess, current_query, querier)).rows
         return SessionIdleCheckAssignmentData(
             desired_pairs=tuple(
                 SessionIdleCheckPair(

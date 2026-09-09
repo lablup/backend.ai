@@ -10,6 +10,7 @@ from sqlalchemy.orm import contains_eager, selectinload
 
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
 from ai.backend.common.contexts.user import current_user
+from ai.backend.common.data.entity.model_card import ModelCardID
 from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE, ProjectID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.entity.vfolder import VFolderUUID
@@ -68,6 +69,7 @@ from ai.backend.manager.errors.user import UserNotFound
 from ai.backend.manager.models.agent import agents
 from ai.backend.manager.models.kernel import kernels
 from ai.backend.manager.models.keypair import KeyPairRow, keypairs
+from ai.backend.manager.models.model_card.purgers import ModelCardPurger
 from ai.backend.manager.models.model_card.row import ModelCardRow
 from ai.backend.manager.models.project import ProjectRow, ProjectType
 from ai.backend.manager.models.project.lookups import PersonalProjectOfUserLookup
@@ -102,7 +104,6 @@ from ai.backend.manager.models.vfolder import (
     get_sessions_by_mounted_folder,
     is_unmanaged,
     query_accessible_vfolders,
-    vfolder_invitations,
     vfolder_permissions,
     vfolder_status_map,
     vfolders,
@@ -112,10 +113,13 @@ from ai.backend.manager.models.vfolder.creators import (
     PersonalVFolderCreator,
     ProjectVFolderCreator,
     VFolderBaseCreator,
+    VFolderInvitationCreator,
     VFolderPermissionCreator,
 )
 from ai.backend.manager.models.vfolder.lookups import VFolderMountPermissionLookup
 from ai.backend.manager.models.vfolder.purgers import (
+    VFolderInvitationBatchPurger,
+    VFolderInviteeInvitationBatchPurger,
     VFolderPurger,
     VFolderUserPermissionBatchPurger,
 )
@@ -764,7 +768,7 @@ class VfolderRepository:
                 records = await self._fetch_vfolders_with_linked_model_cards(
                     db_session, vfolder_ids
                 )
-                cards_to_delete: list[ModelCardRow] = []
+                card_ids_to_delete: list[ModelCardID] = []
                 succeeded_ids: list[uuid.UUID] = []
                 succeeded_rows: list[VFolderRow] = []
                 for rec in records:
@@ -792,14 +796,17 @@ class VfolderRepository:
                             )
                         )
                         continue
-                    cards_to_delete.extend(rec.model_card_rows)
+                    card_ids_to_delete.extend(row.id for row in rec.model_card_rows)
                     succeeded_ids.append(rec.vfolder_row.id)
                     succeeded_rows.append(rec.vfolder_row)
 
-                if cards_to_delete:
-                    for card in cards_to_delete:
-                        await db_session.delete(card)
-                    await db_session.flush()
+                if card_ids_to_delete:
+                    # A card is an entity of its own, so its graph goes with it. The
+                    # purge runs in its own transaction; a failure after it leaves the
+                    # folders alive and card-less, which a retry completes.
+                    async with self._v2_ops.write_ops() as w:
+                        for card_id in card_ids_to_delete:
+                            await w.purge_entity(ModelCardPurger(card_id=card_id))
 
                 if succeeded_ids:
                     delete_stmt = (
@@ -820,6 +827,11 @@ class VfolderRepository:
 
             if succeeded_ids:
                 # Delete relation rows for succeeded vfolders only.
+                async with self._v2_ops.write_ops() as w:
+                    # TODO: scope this purge. A user operation must not use in_global.
+                    await w.batch_purge_entities_in_global(
+                        VFolderInvitationBatchPurger(vfolder_ids=succeeded_ids)
+                    )
                 await delete_vfolder_relation_rows(db_conn, self._db.begin_session, succeeded_ids)
 
             result.succeeded = succeeded_data
@@ -1399,19 +1411,19 @@ class VfolderRepository:
         Create a VFolder invitation.
         Returns the invitee email on success, None on failure.
         """
-        async with self._db.begin_session() as session:
-            query = sa.insert(VFolderInvitationRow).values(
-                permission=permission,
-                vfolder=vfolder_id,
-                inviter=inviter_email,
-                invitee=invitee_email,
-                state=VFolderInvitationState.PENDING,
-            )
-            try:
-                await session.execute(query)
-                return invitee_email
-            except sa_exc.DataError:
-                return None
+        try:
+            async with self._v2_ops.write_ops() as w:
+                await w.create_entity(
+                    VFolderInvitationCreator(
+                        vfolder_id=VFolderUUID(vfolder_id),
+                        inviter_email=inviter_email,
+                        invitee_email=invitee_email,
+                        permission=permission,
+                    )
+                )
+            return invitee_email
+        except sa_exc.DataError:
+            return None
 
     @vfolder_repository_resilience.apply()
     async def get_invitation_by_id(self, invitation_id: uuid.UUID) -> VFolderInvitationData | None:
@@ -2211,18 +2223,16 @@ class VfolderRepository:
 
         # Step 4: Delete related invitations and permissions for new owner
         async def _delete_related_rows() -> None:
-            async with self._db.begin_session() as session:
-                conn = await session.connection()
-                del_query = sa.delete(vfolder_invitations).where(
-                    (vfolder_invitations.c.invitee == user_email)
-                    & (vfolder_invitations.c.vfolder == vfolder_id)
-                )
-                await conn.execute(del_query)
-
             # Also clear what the new owner held from when they were an invitee; the
             # ownership below replaces it uncapped. Their legacy mount row is left
             # standing — accepting a later invitation reads it (BA-5277).
             async with self._v2_ops.write_ops() as w:
+                # TODO: scope this purge. A user operation must not use in_global.
+                await w.batch_purge_entities_in_global(
+                    VFolderInviteeInvitationBatchPurger(
+                        vfolder_ids=[vfolder_id], invitee_email=user_email
+                    )
+                )
                 await w.unshare(new_owner_project, [VFolderUUID(vfolder_id)])
 
         await execute_with_retry(_delete_related_rows)

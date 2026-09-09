@@ -15,7 +15,10 @@ from dataclasses import dataclass
 import sqlalchemy as sa
 
 from ai.backend.common.data.entity.role import RoleID
-from ai.backend.common.data.entity.types import EntityID, EntityType
+from ai.backend.common.data.entity.types import (
+    EntityID,
+    EntityType,
+)
 from ai.backend.common.data.permission.id import FieldPath
 from ai.backend.common.data.permission.types import Permission
 from ai.backend.manager.data.permission.status import RoleStatus
@@ -49,6 +52,17 @@ class _GroupKey:
 
 class PermissionReadOps(V2ReadOps):
     """The general v2 read ops plus the role permission read."""
+
+    async def held_entity_types(self, role_id: RoleID) -> set[EntityType]:
+        """Every entity type the role holds a permission on."""
+        rows = (
+            await self._sess.execute(
+                sa.select(PermissionRow.entity_type)
+                .where(PermissionRow.role_id == role_id)
+                .distinct()
+            )
+        ).scalars()
+        return {EntityType(entity_type) for entity_type in rows}
 
     async def permissions(
         self, role_id: RoleID, entity_types: Sequence[EntityType]

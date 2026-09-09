@@ -14,6 +14,7 @@ import pytest
 import sqlalchemy as sa
 
 from ai.backend.common.data.entity.domain import DomainID, DomainName
+from ai.backend.common.data.entity.kernel import KernelID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.models.agent import AgentRow
@@ -38,7 +39,9 @@ from ai.backend.manager.models.resource_usage_history import (
     UsageBucketEntryRow,
     UserUsageBucketRow,
 )
+from ai.backend.manager.models.resource_usage_history.creators import KernelUsageRecordCreator
 from ai.backend.manager.models.session import SessionRow
+from ai.backend.manager.models.specs.creator import NestedFieldToCreate
 from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.models.user import (
     PasswordHashAlgorithm,
@@ -48,12 +51,12 @@ from ai.backend.manager.models.user import (
     UserStatus,
 )
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.base import BatchQuerier, BulkCreator, Creator
+from ai.backend.manager.repositories.base import BatchQuerier
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.resource_usage_history import (
     DomainUsageBucketConditions,
     DomainUsageBucketOrders,
     KernelUsageRecordConditions,
-    KernelUsageRecordCreatorSpec,
     KernelUsageRecordOrders,
     ResourceUsageHistoryRepository,
 )
@@ -263,7 +266,9 @@ class TestResourceUsageHistoryRepository:
         db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> ResourceUsageHistoryRepository:
         """Create ResourceUsageHistoryRepository instance with database"""
-        return ResourceUsageHistoryRepository(db=db_with_cleanup)
+        return ResourceUsageHistoryRepository(
+            db=db_with_cleanup, v2_ops=V2DBOpsProvider(db_with_cleanup)
+        )
 
     # ==================== Kernel Usage Record Tests ====================
 
@@ -281,25 +286,24 @@ class TestResourceUsageHistoryRepository:
         session_id = uuid.uuid4()
         now = datetime.now(tz=UTC)
 
-        creator = Creator(
-            spec=KernelUsageRecordCreatorSpec(
-                kernel_id=kernel_id,
-                session_id=session_id,
-                user_uuid=test_user_uuid,
-                project_id=test_project_id,
-                domain_name=test_domain.domain_name,
-                resource_group=test_scaling_group,
-                resource_group_id=test_resource_group_id,
-                period_start=now - timedelta(minutes=5),
-                period_end=now,
-                resource_usage=ResourceSlot({
-                    "cpu": Decimal("300"),
-                    "mem": Decimal("1073741824"),
-                }),
-            )
+        creator = KernelUsageRecordCreator(
+            session_id=session_id,
+            user_uuid=test_user_uuid,
+            project_id=test_project_id,
+            domain_name=test_domain.domain_name,
+            resource_group=test_scaling_group,
+            resource_group_id=test_resource_group_id,
+            period_start=now - timedelta(minutes=5),
+            period_end=now,
+            resource_usage=ResourceSlot({
+                "cpu": Decimal("300"),
+                "mem": Decimal("1073741824"),
+            }),
         )
 
-        result = await resource_usage_history_repository.create_kernel_usage_record(creator)
+        result = await resource_usage_history_repository.create_kernel_usage_record(
+            KernelID(kernel_id), creator
+        )
 
         assert result.kernel_id == kernel_id
         assert result.session_id == session_id
@@ -319,7 +323,7 @@ class TestResourceUsageHistoryRepository:
     ) -> None:
         """Test bulk creating kernel usage records"""
         now = datetime.now(tz=UTC)
-        specs = []
+        creations = []
 
         for i in range(5):
             kernel_id = uuid.uuid4()
@@ -327,24 +331,25 @@ class TestResourceUsageHistoryRepository:
             period_start = now - timedelta(minutes=5 * (i + 1))
             period_end = now - timedelta(minutes=5 * i)
 
-            specs.append(
-                KernelUsageRecordCreatorSpec(
-                    kernel_id=kernel_id,
-                    session_id=session_id,
-                    user_uuid=test_user_uuid,
-                    project_id=test_project_id,
-                    domain_name=test_domain.domain_name,
-                    resource_group=test_scaling_group,
-                    resource_group_id=test_resource_group_id,
-                    period_start=period_start,
-                    period_end=period_end,
-                    resource_usage=ResourceSlot({"cpu": Decimal("300")}),
+            creations.append(
+                NestedFieldToCreate(
+                    owner_id=KernelID(kernel_id),
+                    creator=KernelUsageRecordCreator(
+                        session_id=session_id,
+                        user_uuid=test_user_uuid,
+                        project_id=test_project_id,
+                        domain_name=test_domain.domain_name,
+                        resource_group=test_scaling_group,
+                        resource_group_id=test_resource_group_id,
+                        period_start=period_start,
+                        period_end=period_end,
+                        resource_usage=ResourceSlot({"cpu": Decimal("300")}),
+                    ),
                 )
             )
 
-        bulk_creator = BulkCreator(specs=specs)
         results = await resource_usage_history_repository.bulk_create_kernel_usage_records(
-            bulk_creator
+            creations
         )
 
         assert len(results) == 5
@@ -367,27 +372,28 @@ class TestResourceUsageHistoryRepository:
         now = datetime.now(tz=UTC)
 
         # Create multiple records for same kernel
-        specs = []
+        creations = []
         for i in range(3):
             period_start = now - timedelta(minutes=5 * (i + 1))
             period_end = now - timedelta(minutes=5 * i)
-            specs.append(
-                KernelUsageRecordCreatorSpec(
-                    kernel_id=kernel_id,
-                    session_id=session_id,
-                    user_uuid=test_user_uuid,
-                    project_id=test_project_id,
-                    domain_name=test_domain.domain_name,
-                    resource_group=test_scaling_group,
-                    resource_group_id=test_resource_group_id,
-                    period_start=period_start,
-                    period_end=period_end,
-                    resource_usage=ResourceSlot({"cpu": Decimal("300")}),
+            creations.append(
+                NestedFieldToCreate(
+                    owner_id=KernelID(kernel_id),
+                    creator=KernelUsageRecordCreator(
+                        session_id=session_id,
+                        user_uuid=test_user_uuid,
+                        project_id=test_project_id,
+                        domain_name=test_domain.domain_name,
+                        resource_group=test_scaling_group,
+                        resource_group_id=test_resource_group_id,
+                        period_start=period_start,
+                        period_end=period_end,
+                        resource_usage=ResourceSlot({"cpu": Decimal("300")}),
+                    ),
                 )
             )
 
-        bulk_creator = BulkCreator(specs=specs)
-        await resource_usage_history_repository.bulk_create_kernel_usage_records(bulk_creator)
+        await resource_usage_history_repository.bulk_create_kernel_usage_records(creations)
 
         # Search by kernel using BatchQuerier
         querier = BatchQuerier(

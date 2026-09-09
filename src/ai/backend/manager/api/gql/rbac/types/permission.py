@@ -414,7 +414,11 @@ class ReplaceRolePermissionsPayloadGQL(
 ):
     items: list[PermissionGQL] = gql_field(description="Permission rows that make up the new set.")
     failed: list[ReplaceRolePermissionFailureInfoGQL] = gql_field(
-        description="Permission entries that failed to insert."
+        description="Permission entries that failed to insert.",
+        deprecation_reason=(
+            "Always empty. The write states the whole set or raises; a later API reports"
+            " what it refused."
+        ),
     )
 
 

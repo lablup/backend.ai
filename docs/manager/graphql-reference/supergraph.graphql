@@ -2429,7 +2429,7 @@ type BulkAssignRolePayload
   assigned: [RoleAssignment!]!
 
   """List of errors for users that failed to be assigned."""
-  failed: [BulkAssignRoleError!]!
+  failed: [BulkAssignRoleError!]! @deprecated(reason: "Always empty. A user already holding the role keeps it; every other refusal raises.")
 }
 
 """
@@ -17659,7 +17659,7 @@ type ReplaceRolePermissionsPayload
   items: [Permission!]!
 
   """Permission entries that failed to insert."""
-  failed: [ReplaceRolePermissionFailureInfo!]!
+  failed: [ReplaceRolePermissionFailureInfo!]! @deprecated(reason: "Always empty. The write states the whole set or raises; a later API reports what it refused.")
 }
 
 """Added in 25.19.0. """

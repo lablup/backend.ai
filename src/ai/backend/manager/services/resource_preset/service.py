@@ -67,7 +67,7 @@ class ResourcePresetService:
         self, action: DeleteResourcePresetAction
     ) -> DeleteResourcePresetActionResult:
         preset_data = await self._resource_preset_repository.delete_preset_validated(
-            action.preset_id, None
+            action.preset_id
         )
         return DeleteResourcePresetActionResult(resource_preset=preset_data)
 

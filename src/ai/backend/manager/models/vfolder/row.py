@@ -997,14 +997,6 @@ async def filter_host_allowed_permission(
     return allowed_hosts
 
 
-async def _delete_vfolder_invitation_rows(
-    db_session: SASession,
-    vfolder_row_ids: Iterable[uuid.UUID],
-) -> None:
-    stmt = sa.delete(VFolderInvitationRow).where(VFolderInvitationRow.vfolder.in_(vfolder_row_ids))
-    await db_session.execute(stmt)
-
-
 async def _delete_vfolder_permission_rows(
     db_session: SASession,
     vfolder_row_ids: Iterable[uuid.UUID],
@@ -1018,8 +1010,12 @@ async def delete_vfolder_relation_rows(
     begin_session: Callable[..., AbstractAsyncCtxMgr[SASession]],
     vfolder_row_ids: Iterable[uuid.UUID],
 ) -> None:
+    """Clears the mount rows the named vfolders leave behind.
+
+    Their invitations are entities of their own and go through the write path.
+    """
+
     async def _delete(db_session: SASession) -> None:
-        await _delete_vfolder_invitation_rows(db_session, vfolder_row_ids)
         await _delete_vfolder_permission_rows(db_session, vfolder_row_ids)
 
     await execute_with_txn_retry(_delete, begin_session, db_conn)

@@ -20,6 +20,7 @@ from typing import TYPE_CHECKING, ClassVar
 import jinja2
 import jinja2.sandbox
 import sqlalchemy as sa
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from ai.backend.common.data.entity.role import RoleID
 from ai.backend.common.data.entity.role_preset import RolePresetID
@@ -271,6 +272,32 @@ class V2EntityWriteOps(V2GraphWriteOpsBase):
         for upserter, row, entity in zip(upserters, rows, entities, strict=True):
             await self._created_in(upserter.created_in(row), entity)
         return [upserter.to_data(row) for upserter, row in zip(upserters, rows, strict=True)]
+
+    async def grant_roles(
+        self,
+        user_id: UserID,
+        role_ids: Sequence[RoleID],
+        granted_by: UserID | None = None,
+    ) -> list[bool]:
+        """Map the user to each role, answering per role, in the order given, whether
+        the grant was written. A role the user already holds is left as it stands and
+        answers False."""
+        if not role_ids:
+            return []
+        granted = set(
+            (
+                await self._sess.scalars(
+                    pg_insert(UserRoleRow)
+                    .values([
+                        {"user_id": user_id, "role_id": role_id, "granted_by": granted_by}
+                        for role_id in role_ids
+                    ])
+                    .on_conflict_do_nothing()
+                    .returning(UserRoleRow.role_id)
+                )
+            ).all()
+        )
+        return [role_id in granted for role_id in role_ids]
 
     async def _grant_auto_assign_roles(
         self, entities: Collection[EntityIdentifier], user_id: UserID

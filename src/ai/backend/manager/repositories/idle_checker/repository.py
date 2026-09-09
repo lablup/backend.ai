@@ -16,6 +16,7 @@ from ai.backend.manager.models.idle_checker.conditions import IdleCheckerAssignm
 from ai.backend.manager.models.idle_checker.searchers import IdleCheckerAssignmentSearcher
 from ai.backend.manager.models.scopes import OperationScope
 from ai.backend.manager.models.specs.pagination import OffsetPagination
+from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.idle_checker.db_source.db_source import IdleCheckerDBSource
 from ai.backend.manager.repositories.idle_checker.types import (
     ExpiredIdleCheckBatchData,
@@ -25,7 +26,6 @@ from ai.backend.manager.repositories.idle_checker.types import (
     SessionIdleCheckBatchResult,
     SessionIdleCheckPair,
 )
-from ai.backend.manager.repositories.ops import DBOpsProvider
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.ops.v2.relation.provider import RelationOpsProvider
 
@@ -41,11 +41,11 @@ class IdleCheckerRepository:
 
     def __init__(
         self,
-        ops_provider: DBOpsProvider,
+        db: ExtendedAsyncSAEngine,
         relation_ops_provider: RelationOpsProvider,
         v2_ops_provider: V2DBOpsProvider,
     ) -> None:
-        self._db_source = IdleCheckerDBSource(ops_provider, v2_ops_provider, relation_ops_provider)
+        self._db_source = IdleCheckerDBSource(db, v2_ops_provider, relation_ops_provider)
         self._relation_ops = relation_ops_provider
 
     async def get_assignment(

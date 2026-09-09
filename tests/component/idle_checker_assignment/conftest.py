@@ -89,7 +89,6 @@ from ai.backend.manager.models.virtual_entity.entity_membership import EntityMem
 from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
 from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
 from ai.backend.manager.repositories.idle_checker.repository import IdleCheckerRepository
-from ai.backend.manager.repositories.ops import DBOpsProvider
 from ai.backend.manager.repositories.ops.repository import OpsRepository
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.ops.v2.relation.provider import RelationOpsProvider
@@ -190,7 +189,7 @@ def idle_checker_assignment_processors(
     """The binding reads; its writes are the rbac boundary's."""
     service = IdleCheckerAssignmentService(
         IdleCheckerRepository(
-            DBOpsProvider(database_engine),
+            database_engine,
             RelationOpsProvider(database_engine),
             V2DBOpsProvider(database_engine),
         )
@@ -342,7 +341,7 @@ async def assignment_seed(
     )
     checker_id = checker.id
     repository = IdleCheckerRepository(
-        DBOpsProvider(database_engine),
+        database_engine,
         RelationOpsProvider(database_engine),
         V2DBOpsProvider(database_engine),
     )

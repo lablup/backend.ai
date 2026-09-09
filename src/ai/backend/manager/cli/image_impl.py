@@ -19,6 +19,7 @@ from ai.backend.manager.container_registry.harbor import HarborRegistry_v2
 from ai.backend.manager.data.image.types import ImageStatus
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.image import ImageAliasRow, ImageIdentifier, ImageRow
+from ai.backend.manager.models.image.purgers import ImagePurger
 from ai.backend.manager.repositories.db.engine import connect_database
 from ai.backend.manager.repositories.image.db_source.db_source import ImageDBSource
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
@@ -154,7 +155,8 @@ async def purge_image(
                 ],
                 filter_by_statuses=None,
             )
-            await session.delete(image_row)
+            async with V2DBOpsProvider(db).write_ops() as w:
+                await w.purge_entity(ImagePurger(image_id=ImageID(image_row.id)))
 
             if remove_from_registry:
                 registry_info = await session.get(ContainerRegistryRow, image_row.registry_id)

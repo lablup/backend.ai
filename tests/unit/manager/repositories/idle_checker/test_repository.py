@@ -57,7 +57,6 @@ from ai.backend.manager.repositories.idle_checker.repository import IdleCheckerR
 from ai.backend.manager.repositories.idle_checker.types import (
     SessionIdleCheckPair,
 )
-from ai.backend.manager.repositories.ops import DBOpsProvider
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.ops.v2.relation.provider import RelationOpsProvider
 from ai.backend.testutils.db import with_tables
@@ -240,7 +239,7 @@ class TestFetchJudgmentBatch:
     @pytest.fixture
     def repository(self, database: ExtendedAsyncSAEngine) -> IdleCheckerRepository:
         return IdleCheckerRepository(
-            DBOpsProvider(database),
+            database,
             RelationOpsProvider(database),
             V2DBOpsProvider(database),
         )
@@ -902,7 +901,7 @@ class TestFetchExpiredIdleChecks:
     @pytest.fixture
     def repository(self, database: ExtendedAsyncSAEngine) -> IdleCheckerRepository:
         return IdleCheckerRepository(
-            DBOpsProvider(database),
+            database,
             RelationOpsProvider(database),
             V2DBOpsProvider(database),
         )
@@ -1101,7 +1100,7 @@ class TestSessionIdleCheckExclusion:
     @pytest.fixture
     def repository(self, database: ExtendedAsyncSAEngine) -> IdleCheckerRepository:
         return IdleCheckerRepository(
-            DBOpsProvider(database),
+            database,
             RelationOpsProvider(database),
             V2DBOpsProvider(database),
         )
@@ -1555,7 +1554,7 @@ class TestUserScopeAssignments:
     @pytest.fixture
     def repository(self, database: ExtendedAsyncSAEngine) -> IdleCheckerRepository:
         return IdleCheckerRepository(
-            DBOpsProvider(database),
+            database,
             RelationOpsProvider(database),
             V2DBOpsProvider(database),
         )

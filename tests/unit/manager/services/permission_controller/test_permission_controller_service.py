@@ -364,10 +364,11 @@ class TestCreatePermission:
         mock_repository.create_permission.return_value = perm_data
 
         creator = MagicMock()
-        action = CreatePermissionAction(creator=creator)
+        role_id = RoleID(uuid.uuid4())
+        action = CreatePermissionAction(role_id=role_id, creator=creator)
         result = await service.create_permission(action)
 
-        mock_repository.create_permission.assert_called_once_with(creator)
+        mock_repository.create_permission.assert_called_once_with(role_id, creator)
         assert result.data.id == perm_data.id
 
 

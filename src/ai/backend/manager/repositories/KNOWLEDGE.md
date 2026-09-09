@@ -3,7 +3,7 @@ name: repository-tx-and-ops
 type: design-rationale
 description: choosing between v2 ops, generic OpsRepository, and db objects, rationale for single-method transactions, single-table specs with field creators, batch_query_with_scopes as the read default
 scope: src/ai/backend/manager/repositories
-keywords: [DBOpsProvider, transaction, spec, FieldCreator, batch_query_with_scopes, EmptyOperationScopeError]
+keywords: [V2DBOpsProvider, transaction, spec, FieldCreator, batch_query_with_scopes, EmptyOperationScopeError]
 sources:
   - src/ai/backend/manager/repositories/ops
 generated:
@@ -53,7 +53,7 @@ pass-through would remain.
 
 ## Gradual migration to the ops provider
 
-`DBOpsProvider` in `ops/base/provider.py` is the standard path. db_source is gradually migrating to ops —
+`V2DBOpsProvider` in `ops/v2/provider.py` is the standard path. db_source is gradually migrating to ops —
 use ops for new/modified code, and leave existing code until you touch it. Isolate the engine so a raw session does not leak to the caller,
 and take only spec types so arbitrary SQL cannot cross layers.
 
