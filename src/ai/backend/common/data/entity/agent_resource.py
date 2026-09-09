@@ -19,7 +19,7 @@ class AgentResourceFieldType(FieldType):
     @override
     @classmethod
     def description(cls) -> str:
-        return "One slot of a resource an agent offers."
+        return "One slot's capacity and usage on one agent."
 
     @override
     @classmethod
