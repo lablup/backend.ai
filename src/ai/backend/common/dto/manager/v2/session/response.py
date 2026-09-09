@@ -28,7 +28,9 @@ __all__ = (
     "IncludeSessionIdleChecksPayload",
     "RestartSessionPayload",
     "SearchSessionsPayload",
-    "SessionIdleCheckResult",
+    "SessionIdleCheckTargetInfo",
+    "ExcludeSessionIdleChecksFailureInfo",
+    "IncludeSessionIdleChecksFailureInfo",
     "SessionLifecycleInfo",
     "SessionLifecycleInfoGQLDTO",
     "SessionLogsPayload",
@@ -273,8 +275,8 @@ class TerminateSessionsPayload(BaseResponseModel):
     )
 
 
-class SessionIdleCheckResult(BaseResponseModel):
-    """How one (checker, session) pair an idle-check request named fared."""
+class SessionIdleCheckTargetInfo(BaseResponseModel):
+    """One (checker, session) pair an idle-check exclusion or inclusion applied to."""
 
     checker_id: IdleCheckerID = Field(
         description=f"Added in {NEXT_RELEASE_VERSION}. Idle checker UUID of the pair."
@@ -282,28 +284,64 @@ class SessionIdleCheckResult(BaseResponseModel):
     session_id: SessionID = Field(
         description=f"Added in {NEXT_RELEASE_VERSION}. Session UUID of the pair."
     )
-    applied: bool = Field(
-        description=f"Added in {NEXT_RELEASE_VERSION}. Whether the pair was written."
+
+
+class ExcludeSessionIdleChecksFailureInfo(BaseResponseModel):
+    """Why one pair could not be excluded from idle checks."""
+
+    checker_id: IdleCheckerID = Field(
+        description=f"Added in {NEXT_RELEASE_VERSION}. Idle checker of the pair the failure applies to."
     )
-    message: str | None = Field(
-        default=None,
-        description=f"Added in {NEXT_RELEASE_VERSION}. Why the pair was not written.",
+    session_id: SessionID = Field(
+        description=f"Added in {NEXT_RELEASE_VERSION}. Session of the pair the failure applies to."
+    )
+    message: str = Field(
+        description=f"Added in {NEXT_RELEASE_VERSION}. Why the pair was not excluded."
     )
 
 
 class ExcludeSessionIdleChecksPayload(BaseResponseModel):
-    """Payload for idle-check exclusion, one entry per pair the request named."""
+    """Payload for idle-check exclusion with per-pair partial success.
 
-    results: list[SessionIdleCheckResult] = Field(
-        description=f"Added in {NEXT_RELEASE_VERSION}. Each pair, in the order named."
+    Both lists run in the order the request named its pairs and are that long: a pair
+    lands in one of them and is null in the other, so an index reaches the same pair
+    in either.
+    """
+
+    items: list[SessionIdleCheckTargetInfo | None] = Field(
+        description=f"Added in {NEXT_RELEASE_VERSION}. Pairs excluded, null where the pair was not."
+    )
+    failed: list[ExcludeSessionIdleChecksFailureInfo | None] = Field(
+        description=f"Added in {NEXT_RELEASE_VERSION}. Why a pair was not excluded, null where it was."
+    )
+
+
+class IncludeSessionIdleChecksFailureInfo(BaseResponseModel):
+    """Why one pair could not be included into idle checks."""
+
+    checker_id: IdleCheckerID = Field(
+        description=f"Added in {NEXT_RELEASE_VERSION}. Idle checker of the pair the failure applies to."
+    )
+    session_id: SessionID = Field(
+        description=f"Added in {NEXT_RELEASE_VERSION}. Session of the pair the failure applies to."
+    )
+    message: str = Field(
+        description=f"Added in {NEXT_RELEASE_VERSION}. Why the pair was not included."
     )
 
 
 class IncludeSessionIdleChecksPayload(BaseResponseModel):
-    """Payload for idle-check inclusion, one entry per pair the request named."""
+    """Payload for idle-check inclusion with per-pair partial success.
 
-    results: list[SessionIdleCheckResult] = Field(
-        description=f"Added in {NEXT_RELEASE_VERSION}. Each pair, in the order named."
+    Both lists run in the order the request named its pairs, as the exclusion payload's
+    do.
+    """
+
+    items: list[SessionIdleCheckTargetInfo | None] = Field(
+        description=f"Added in {NEXT_RELEASE_VERSION}. Pairs included, null where the pair was not."
+    )
+    failed: list[IncludeSessionIdleChecksFailureInfo | None] = Field(
+        description=f"Added in {NEXT_RELEASE_VERSION}. Why a pair was not included, null where it was."
     )
 
 

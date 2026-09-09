@@ -68,9 +68,11 @@ from ai.backend.common.dto.manager.v2.session.request import (
 from ai.backend.common.dto.manager.v2.session.response import (
     AdminSearchSessionsPayload,
     EnqueueSessionPayload,
+    ExcludeSessionIdleChecksFailureInfo,
     ExcludeSessionIdleChecksPayload,
+    IncludeSessionIdleChecksFailureInfo,
     IncludeSessionIdleChecksPayload,
-    SessionIdleCheckResult,
+    SessionIdleCheckTargetInfo,
     SessionLifecycleInfoGQLDTO,
     SessionLogsPayload,
     SessionMetadataInfoGQLDTO,
@@ -1067,12 +1069,22 @@ class SessionAdapter(BaseAdapter):
             )
         )
         return ExcludeSessionIdleChecksPayload(
-            results=[
-                SessionIdleCheckResult(
+            items=[
+                SessionIdleCheckTargetInfo(
                     checker_id=item.pair.checker_id,
                     session_id=SessionID(item.pair.session_id),
-                    applied=item.applied,
-                    message=None if item.error is None else str(item.error),
+                )
+                if item.applied
+                else None
+                for item in result.results
+            ],
+            failed=[
+                None
+                if item.applied
+                else ExcludeSessionIdleChecksFailureInfo(
+                    checker_id=item.pair.checker_id,
+                    session_id=SessionID(item.pair.session_id),
+                    message=str(item.error) if item.error is not None else "Not excluded.",
                 )
                 for item in result.results
             ],
@@ -1095,12 +1107,22 @@ class SessionAdapter(BaseAdapter):
             )
         )
         return IncludeSessionIdleChecksPayload(
-            results=[
-                SessionIdleCheckResult(
+            items=[
+                SessionIdleCheckTargetInfo(
                     checker_id=item.pair.checker_id,
                     session_id=SessionID(item.pair.session_id),
-                    applied=item.applied,
-                    message=None if item.error is None else str(item.error),
+                )
+                if item.applied
+                else None
+                for item in result.results
+            ],
+            failed=[
+                None
+                if item.applied
+                else IncludeSessionIdleChecksFailureInfo(
+                    checker_id=item.pair.checker_id,
+                    session_id=SessionID(item.pair.session_id),
+                    message=str(item.error) if item.error is not None else "Not included.",
                 )
                 for item in result.results
             ],

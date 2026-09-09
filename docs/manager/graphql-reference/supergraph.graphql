@@ -8192,6 +8192,20 @@ input EnvironmentVariablesInput
   entries: [EnvironmentVariableEntryInput!]!
 }
 
+"""Added in 26.9.0. Why one pair could not be excluded from idle checks."""
+type ExcludeSessionIdleChecksFailureInfo
+  @join__type(graph: STRAWBERRY)
+{
+  """Idle checker of the pair the failure applies to."""
+  checkerId: ID!
+
+  """Session of the pair the failure applies to."""
+  sessionId: ID!
+
+  """Why the pair was not excluded."""
+  message: String!
+}
+
 """Added in 26.9.0. Input for excluding session pairs from idle checks."""
 input ExcludeSessionIdleChecksInput
   @join__type(graph: STRAWBERRY)
@@ -8206,8 +8220,11 @@ Added in 26.9.0. Payload returned after excluding session pairs from idle checks
 type ExcludeSessionIdleChecksPayload
   @join__type(graph: STRAWBERRY)
 {
-  """Added in 26.9.0. Each pair, in the order named."""
-  results: [SessionIdleCheckResult!]!
+  """Pairs excluded, null where the pair was not."""
+  items: [SessionIdleCheckTargetInfo]!
+
+  """Why a pair was not excluded, null where it was."""
+  failed: [ExcludeSessionIdleChecksFailureInfo]!
 }
 
 """Added in 26.3.0. Options for executing a query definition."""
@@ -9551,6 +9568,20 @@ type ImportArtifactsPayload
   tasks: [ArtifactRevisionImportTask!]!
 }
 
+"""Added in 26.9.0. Why one pair could not be included into idle checks."""
+type IncludeSessionIdleChecksFailureInfo
+  @join__type(graph: STRAWBERRY)
+{
+  """Idle checker of the pair the failure applies to."""
+  checkerId: ID!
+
+  """Session of the pair the failure applies to."""
+  sessionId: ID!
+
+  """Why the pair was not included."""
+  message: String!
+}
+
 """Added in 26.9.0. Input for including session pairs into idle checks."""
 input IncludeSessionIdleChecksInput
   @join__type(graph: STRAWBERRY)
@@ -9567,8 +9598,11 @@ Added in 26.9.0. Payload returned after including session pairs into idle checks
 type IncludeSessionIdleChecksPayload
   @join__type(graph: STRAWBERRY)
 {
-  """Added in 26.9.0. Each pair, in the order named."""
-  results: [SessionIdleCheckResult!]!
+  """Pairs included, null where the pair was not."""
+  items: [SessionIdleCheckTargetInfo]!
+
+  """Why a pair was not included, null where it was."""
+  failed: [IncludeSessionIdleChecksFailureInfo]!
 }
 
 type InferenceSessionError
@@ -20737,9 +20771,9 @@ enum SessionFailurePolicy
 }
 
 """
-Added in 26.9.0. How one (checker, session) pair an idle-check request named fared.
+Added in 26.9.0. One (checker, session) pair an idle-check exclusion or inclusion applied to.
 """
-type SessionIdleCheckResult
+type SessionIdleCheckTargetInfo
   @join__type(graph: STRAWBERRY)
 {
   """Idle checker UUID of the pair."""
@@ -20747,12 +20781,6 @@ type SessionIdleCheckResult
 
   """Session UUID of the pair."""
   sessionId: ID!
-
-  """Whether the pair was written."""
-  applied: Boolean!
-
-  """Why the pair was not written."""
-  message: String
 }
 
 """

@@ -21,12 +21,14 @@ from ai.backend.manager.api.gql.decorators import (
 from ai.backend.manager.api.gql.session.types import (
     EnqueueSessionInputGQL,
     EnqueueSessionPayloadGQL,
+    ExcludeSessionIdleChecksFailureInfoGQL,
     ExcludeSessionIdleChecksInputGQL,
     ExcludeSessionIdleChecksPayloadGQL,
+    IncludeSessionIdleChecksFailureInfoGQL,
     IncludeSessionIdleChecksInputGQL,
     IncludeSessionIdleChecksPayloadGQL,
     ProjectSessionScopeGQL,
-    SessionIdleCheckResultGQL,
+    SessionIdleCheckTargetInfoGQL,
     SessionV2ConnectionGQL,
     SessionV2EdgeGQL,
     SessionV2FilterGQL,
@@ -217,14 +219,24 @@ async def exclude_session_idle_checks(
     """Exclude one or more checker-session pairs from idle checks."""
     payload = await info.context.adapters.session.exclude_idle_checks(input.to_pydantic())
     return ExcludeSessionIdleChecksPayloadGQL(
-        results=[
-            SessionIdleCheckResultGQL(
-                checker_id=ID(str(item.checker_id)),
-                session_id=ID(str(item.session_id)),
-                applied=item.applied,
-                message=item.message,
+        items=[
+            SessionIdleCheckTargetInfoGQL(
+                checker_id=ID(str(target.checker_id)),
+                session_id=ID(str(target.session_id)),
             )
-            for item in payload.results
+            if target is not None
+            else None
+            for target in payload.items
+        ],
+        failed=[
+            ExcludeSessionIdleChecksFailureInfoGQL(
+                checker_id=ID(str(failure.checker_id)),
+                session_id=ID(str(failure.session_id)),
+                message=failure.message,
+            )
+            if failure is not None
+            else None
+            for failure in payload.failed
         ],
     )
 
@@ -246,13 +258,23 @@ async def include_session_idle_checks(
     """Include one or more checker-session pairs into idle checks."""
     payload = await info.context.adapters.session.include_idle_checks(input.to_pydantic())
     return IncludeSessionIdleChecksPayloadGQL(
-        results=[
-            SessionIdleCheckResultGQL(
-                checker_id=ID(str(item.checker_id)),
-                session_id=ID(str(item.session_id)),
-                applied=item.applied,
-                message=item.message,
+        items=[
+            SessionIdleCheckTargetInfoGQL(
+                checker_id=ID(str(target.checker_id)),
+                session_id=ID(str(target.session_id)),
             )
-            for item in payload.results
+            if target is not None
+            else None
+            for target in payload.items
+        ],
+        failed=[
+            IncludeSessionIdleChecksFailureInfoGQL(
+                checker_id=ID(str(failure.checker_id)),
+                session_id=ID(str(failure.session_id)),
+                message=failure.message,
+            )
+            if failure is not None
+            else None
+            for failure in payload.failed
         ],
     )
