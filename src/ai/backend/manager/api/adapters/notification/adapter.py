@@ -470,20 +470,10 @@ class NotificationAdapter(BaseAdapter):
     ) -> NotificationChannelUpdater:
         return NotificationChannelUpdater(
             channel_id=channel_id,
-            name=(
-                OptionalState.update(input.name) if input.name is not None else OptionalState.nop()
-            ),
+            name=OptionalState.from_unset(input.name),
             description=TriState.from_unset(input.description),
-            spec=(
-                OptionalState.update(_spec_input_to_domain(input.spec))
-                if input.spec is not None
-                else OptionalState.nop()
-            ),
-            enabled=(
-                OptionalState.update(input.enabled)
-                if input.enabled is not None
-                else OptionalState.nop()
-            ),
+            spec=OptionalState.from_unset(input.spec).map(_spec_input_to_domain),
+            enabled=OptionalState.from_unset(input.enabled),
         )
 
     @staticmethod
@@ -493,20 +483,10 @@ class NotificationAdapter(BaseAdapter):
     ) -> NotificationRuleUpdater:
         return NotificationRuleUpdater(
             rule_id=rule_id,
-            name=(
-                OptionalState.update(input.name) if input.name is not None else OptionalState.nop()
-            ),
+            name=OptionalState.from_unset(input.name),
             description=TriState.from_unset(input.description),
-            message_template=(
-                OptionalState.update(input.message_template)
-                if input.message_template is not None
-                else OptionalState.nop()
-            ),
-            enabled=(
-                OptionalState.update(input.enabled)
-                if input.enabled is not None
-                else OptionalState.nop()
-            ),
+            message_template=OptionalState.from_unset(input.message_template),
+            enabled=OptionalState.from_unset(input.enabled),
         )
 
     @staticmethod

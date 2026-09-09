@@ -194,9 +194,9 @@ class TestUpdateNotificationChannelInput:
         inp = UpdateNotificationChannelInput(description="New desc")
         assert inp.description == "New desc"
 
-    def test_default_name_is_none(self) -> None:
+    def test_default_name_is_unset(self) -> None:
         inp = UpdateNotificationChannelInput()
-        assert inp.name is None
+        assert inp.name is UNSET
 
     def test_name_whitespace_stripped(self) -> None:
         inp = UpdateNotificationChannelInput(name="  Updated  ")
@@ -210,9 +210,9 @@ class TestUpdateNotificationChannelInput:
         with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             UpdateNotificationChannelInput(name="")
 
-    def test_default_enabled_is_none(self) -> None:
+    def test_default_enabled_is_unset(self) -> None:
         inp = UpdateNotificationChannelInput()
-        assert inp.enabled is None
+        assert inp.enabled is UNSET
 
     def test_enabled_update(self) -> None:
         inp = UpdateNotificationChannelInput(enabled=False)
@@ -222,9 +222,9 @@ class TestUpdateNotificationChannelInput:
         inp = UpdateNotificationChannelInput(spec=_make_webhook_spec())
         assert inp.spec is not None
 
-    def test_spec_default_is_none(self) -> None:
+    def test_spec_default_is_unset(self) -> None:
         inp = UpdateNotificationChannelInput()
-        assert inp.spec is None
+        assert inp.spec is UNSET
 
     def test_all_fields_none_is_valid(self) -> None:
         inp = UpdateNotificationChannelInput(name=None, description=None, spec=None, enabled=None)
@@ -361,9 +361,9 @@ class TestUpdateNotificationRuleInput:
         inp = UpdateNotificationRuleInput(description=None)
         assert inp.description is None
 
-    def test_default_name_is_none(self) -> None:
+    def test_default_name_is_unset(self) -> None:
         inp = UpdateNotificationRuleInput()
-        assert inp.name is None
+        assert inp.name is UNSET
 
     def test_name_whitespace_stripped(self) -> None:
         inp = UpdateNotificationRuleInput(name="  Updated Rule  ")
@@ -373,17 +373,17 @@ class TestUpdateNotificationRuleInput:
         with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             UpdateNotificationRuleInput(name="   ")
 
-    def test_default_message_template_is_none(self) -> None:
+    def test_default_message_template_is_unset(self) -> None:
         inp = UpdateNotificationRuleInput()
-        assert inp.message_template is None
+        assert inp.message_template is UNSET
 
     def test_message_template_update(self) -> None:
         inp = UpdateNotificationRuleInput(message_template="New template")
         assert inp.message_template == "New template"
 
-    def test_default_enabled_is_none(self) -> None:
+    def test_default_enabled_is_unset(self) -> None:
         inp = UpdateNotificationRuleInput()
-        assert inp.enabled is None
+        assert inp.enabled is UNSET
 
     def test_enabled_update(self) -> None:
         inp = UpdateNotificationRuleInput(enabled=True)
