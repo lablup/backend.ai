@@ -176,20 +176,36 @@ class CreateDeploymentRevisionPresetInput(BaseRequestModel):
 
 class UpdateDeploymentRevisionPresetInput(BaseRequestModel):
     id: UUID = Field(description="Preset ID.")
-    runtime_variant_id: RuntimeVariantID | None = Field(default=None)
-    name: str | None = Field(default=None, min_length=1, max_length=256)
+    runtime_variant_id: RuntimeVariantID | None | Unset = Field(
+        default=UNSET, description="Omit to leave unchanged."
+    )
+    name: str | None | Unset = Field(
+        default=UNSET, min_length=1, max_length=256, description="Omit to leave unchanged."
+    )
     description: str | None | Unset = Field(default=UNSET)
-    rank: int | None = Field(default=None, ge=0)
+    rank: int | None | Unset = Field(default=UNSET, ge=0, description="Omit to leave unchanged.")
     image_id: ImageID | None | Unset = Field(default=UNSET)
     model_definition: PresetModelDefinitionInput | None | Unset = Field(default=UNSET)
-    resource_slots: list[ResourceSlotEntryInput] | None = Field(default=None)
-    resource_opts: list[ResourceOptsEntryDTO] | None = Field(default=None)
-    cluster_mode: str | None = Field(default=None, max_length=16)
-    cluster_size: int | None = Field(default=None, ge=1)
+    resource_slots: list[ResourceSlotEntryInput] | None | Unset = Field(
+        default=UNSET, description="Omit to leave unchanged."
+    )
+    resource_opts: list[ResourceOptsEntryDTO] | None | Unset = Field(
+        default=UNSET, description="Omit to leave unchanged."
+    )
+    cluster_mode: str | None | Unset = Field(
+        default=UNSET, max_length=16, description="Omit to leave unchanged."
+    )
+    cluster_size: int | None | Unset = Field(
+        default=UNSET, ge=1, description="Omit to leave unchanged."
+    )
     startup_command: str | None | Unset = Field(default=UNSET)
     bootstrap_script: str | None | Unset = Field(default=UNSET)
-    environ: list[EnvironmentVariableEntryInput] | None = Field(default=None)
-    preset_values: list[PresetValueInput] | None = Field(default=None)
+    environ: list[EnvironmentVariableEntryInput] | None | Unset = Field(
+        default=UNSET, description="Omit to leave unchanged."
+    )
+    preset_values: list[PresetValueInput] | None | Unset = Field(
+        default=UNSET, description="Omit to leave unchanged."
+    )
     open_to_public: bool | None | Unset = Field(default=UNSET)
     replica_count: int | None | Unset = Field(default=UNSET, ge=0)
     revision_history_limit: int | None | Unset = Field(default=UNSET, ge=0)

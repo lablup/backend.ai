@@ -284,22 +284,14 @@ class DeploymentRevisionPresetAdapter(BaseAdapter):
         input: UpdateDeploymentRevisionPresetInput,
     ) -> UpdateDeploymentRevisionPresetPayload:
         slot_creators: list[PresetResourceSlotCreator] | None = (
-            [
-                PresetResourceSlotCreator(entry=entry)
-                for entry in self._convert_resource_slots_input(input.resource_slots)
-            ]
-            if input.resource_slots is not None
-            else None
-        )
-        environ_state: OptionalState[dict[str, str]] = (
-            OptionalState.update(self._convert_environ_input(input.environ))
-            if input.environ is not None
-            else OptionalState.nop()
-        )
-        preset_values_state: OptionalState[list[RuntimeVariantPresetValueEntry]] = (
-            OptionalState.update(self._convert_preset_values_input(input.preset_values))
-            if input.preset_values is not None
-            else OptionalState.nop()
+            OptionalState.from_unset(input.resource_slots)
+            .map(
+                lambda slots: [
+                    PresetResourceSlotCreator(entry=entry)
+                    for entry in self._convert_resource_slots_input(slots)
+                ]
+            )
+            .optional_value()
         )
         model_def_state: TriState[PresetModelDefinition] = TriState.from_unset(
             input.model_definition
@@ -307,39 +299,23 @@ class DeploymentRevisionPresetAdapter(BaseAdapter):
 
         updater = DeploymentPresetUpdater(
             preset_id=DeploymentPresetID(input.id),
-            runtime_variant=(
-                OptionalState.update(input.runtime_variant_id)
-                if input.runtime_variant_id is not None
-                else OptionalState.nop()
-            ),
-            name=(
-                OptionalState.update(input.name) if input.name is not None else OptionalState.nop()
-            ),
+            runtime_variant=OptionalState.from_unset(input.runtime_variant_id),
+            name=OptionalState.from_unset(input.name),
             description=TriState.from_unset(input.description),
-            rank=(
-                OptionalState.update(input.rank) if input.rank is not None else OptionalState.nop()
-            ),
+            rank=OptionalState.from_unset(input.rank),
             image_id=TriState.from_unset(input.image_id),
             model_definition=model_def_state,
-            resource_opts=(
-                OptionalState.update(self._convert_resource_opts_input(input.resource_opts))
-                if input.resource_opts is not None
-                else OptionalState.nop()
+            resource_opts=OptionalState.from_unset(input.resource_opts).map(
+                self._convert_resource_opts_input
             ),
-            cluster_mode=(
-                OptionalState.update(input.cluster_mode)
-                if input.cluster_mode is not None
-                else OptionalState.nop()
-            ),
-            cluster_size=(
-                OptionalState.update(input.cluster_size)
-                if input.cluster_size is not None
-                else OptionalState.nop()
-            ),
+            cluster_mode=OptionalState.from_unset(input.cluster_mode),
+            cluster_size=OptionalState.from_unset(input.cluster_size),
             startup_command=TriState.from_unset(input.startup_command),
             bootstrap_script=TriState.from_unset(input.bootstrap_script),
-            environ=environ_state,
-            runtime_variant_preset_values=preset_values_state,
+            environ=OptionalState.from_unset(input.environ).map(self._convert_environ_input),
+            runtime_variant_preset_values=OptionalState.from_unset(input.preset_values).map(
+                self._convert_preset_values_input
+            ),
             open_to_public=TriState.from_unset(input.open_to_public),
             replica_count=TriState.from_unset(input.replica_count),
             revision_history_limit=TriState.from_unset(input.revision_history_limit),
