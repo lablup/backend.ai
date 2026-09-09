@@ -16054,7 +16054,7 @@ Added in 26.4.2. Input for updating a login client type. Both fields are optiona
 """
 input UpdateLoginClientTypeInput {
   """Updated name."""
-  name: String = null
+  name: String
 
   """Updated description. Pass null to clear, omit to leave unchanged."""
   description: String

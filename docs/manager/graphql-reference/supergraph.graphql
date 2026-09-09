@@ -22217,7 +22217,7 @@ input UpdateLoginClientTypeInput
   @join__type(graph: STRAWBERRY)
 {
   """Updated name."""
-  name: String = null
+  name: String
 
   """Updated description. Pass null to clear, omit to leave unchanged."""
   description: String
