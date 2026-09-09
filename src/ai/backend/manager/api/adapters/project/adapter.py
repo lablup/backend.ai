@@ -20,6 +20,7 @@ from ai.backend.common.dto.manager.v2.group.request import (
     ProjectOrder,
     PurgeProjectInput,
     RestoreProjectInput,
+    ScopedSearchProjectsInput,
     UnassignUsersFromProjectInput,
     UpdateProjectInput,
 )
@@ -42,6 +43,7 @@ from ai.backend.common.dto.manager.v2.group.response import (
 from ai.backend.common.dto.manager.v2.group.types import (
     OrderDirection,
     ProjectOrderField,
+    ProjectScope,
     ProjectType,
     ProjectTypeFilter,
     ProjectUserFilter,
@@ -77,6 +79,7 @@ from ai.backend.manager.services.project.actions.purge_project import PurgeProje
 from ai.backend.manager.services.project.actions.restore_project import RestoreProjectAction
 from ai.backend.manager.services.project.actions.scoped_search import (
     DomainProjectScopeItem,
+    ProjectScopeItem,
     ScopedSearchProjectsAction,
     UserProjectScopeItem,
 )
@@ -297,6 +300,45 @@ class ProjectAdapter(BaseAdapter):
             )
         )
 
+        return AdminSearchGroupsPayload(
+            items=[self._group_data_to_node(item) for item in result.items],
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+        )
+
+    def _scope_items(self, scope: ProjectScope) -> list[ProjectScopeItem]:
+        """The scope items the request named, in the order the input lists them."""
+        items: list[ProjectScopeItem] = [
+            DomainProjectScopeItem(domain_id=DomainID(entry.value)) for entry in scope.domain or ()
+        ]
+        items.extend(
+            UserProjectScopeItem(user_id=UserID(entry.value)) for entry in scope.user or ()
+        )
+        return items
+
+    async def scoped_search(
+        self,
+        input: ScopedSearchProjectsInput,
+    ) -> AdminSearchGroupsPayload:
+        """Search the projects the named scopes reach, combined with OR."""
+        conditions = self._convert_group_filter(input.filter) if input.filter else []
+        orders = self._convert_orders(input.order) if input.order else []
+        searcher = self._build_searcher(
+            ProjectSearcher,
+            conditions=conditions,
+            orders=orders,
+            pagination_spec=_PROJECT_PAGINATION_SPEC,
+            first=input.first,
+            after=input.after,
+            last=input.last,
+            before=input.before,
+            limit=input.limit,
+            offset=input.offset,
+        )
+        result = await self._processors.project.scoped_search.run(
+            ScopedSearchProjectsAction(items=self._scope_items(input.scope), searcher=searcher)
+        )
         return AdminSearchGroupsPayload(
             items=[self._group_data_to_node(item) for item in result.items],
             total_count=result.total_count,
