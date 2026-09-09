@@ -12,6 +12,7 @@ from dataclasses import dataclass, field
 import pytest
 
 from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.types import EntityType as ScopeEntityType
 from ai.backend.common.data.permission.types import (
     RBACElementType,
     RelationType,
@@ -410,28 +411,52 @@ class TestCheckBulkPermissionWithScopeChain:
         fixture_ids: BatchFixture,
         request: pytest.FixtureRequest,
     ) -> None:
-        scope_map: dict[str, tuple[ScopeType, str]] = {
-            "vfolder_0": (ScopeType.VFOLDER, fixture_ids.vfolder_ids[0]),
-            "vfolder_1": (ScopeType.VFOLDER, fixture_ids.vfolder_ids[1]),
-            "project": (ScopeType.PROJECT, fixture_ids.project_id),
-            "domain": (ScopeType.DOMAIN, fixture_ids.domain_id),
+        """Grant the entries, each from a role sitting in the scope the entry names.
+
+        A permission row carries no scope of its own, so the role is what places the
+        grant. Entries naming a second scope get a sibling role, copied from the
+        user's own so that an inactive or deleted role stays that way.
+        """
+        scope_map: dict[str, tuple[ScopeEntityType, str]] = {
+            "vfolder_0": (ScopeEntityType("vfolder"), fixture_ids.vfolder_ids[0]),
+            "vfolder_1": (ScopeEntityType("vfolder"), fixture_ids.vfolder_ids[1]),
+            "project": (ScopeEntityType("project"), fixture_ids.project_id),
+            "domain": (ScopeEntityType("domain"), fixture_ids.domain_id),
         }
+        by_scope: dict[str, list[PermissionEntry]] = {}
         for entry in request.param:
-            domain_id = DomainID(uuid.uuid4())
-            scope_type, scope_id = scope_map[entry.scope_key]
-            async with db_with_rbac_tables.begin_session() as db_sess:
-                domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
-                domain_id = DomainID(uuid.uuid4())
-                db_sess.add(
-                    DomainRow(id=domain_id, name=domain_name, total_resource_slots=ResourceSlot())
-                )
-                db_sess.add(
-                    PermissionRow(
-                        role_id=fixture_ids.role_id,
-                        entity_type=entry.entity_type,
-                        permission=Permission.from_operation(entry.operation),
+            by_scope.setdefault(entry.scope_key, []).append(entry)
+        async with db_with_rbac_tables.begin_session() as db_sess:
+            base = await db_sess.get(RoleRow, fixture_ids.role_id)
+            if base is None:
+                raise LookupError(f"No role {fixture_ids.role_id} to grant from")
+            for index, (scope_key, entries) in enumerate(by_scope.items()):
+                scope_type, scope_id = scope_map[scope_key]
+                if index == 0:
+                    role_id = fixture_ids.role_id
+                    base.scope_type = scope_type
+                    base.scope_id = uuid.UUID(scope_id)
+                else:
+                    role_id = uuid.uuid4()
+                    db_sess.add(
+                        RoleRow(
+                            id=role_id,
+                            name=f"{base.name}-{scope_key}",
+                            scope_type=scope_type,
+                            scope_id=uuid.UUID(scope_id),
+                            status=base.status,
+                        )
                     )
-                )
+                    db_sess.add(UserRoleRow(user_id=fixture_ids.user_id, role_id=role_id))
+                await db_sess.flush()
+                for entry in entries:
+                    db_sess.add(
+                        PermissionRow(
+                            role_id=role_id,
+                            entity_type=entry.entity_type,
+                            permission=Permission.from_operation(entry.operation),
+                        )
+                    )
                 await db_sess.flush()
 
     # ── Other user fixture ──
