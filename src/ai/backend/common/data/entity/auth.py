@@ -14,4 +14,4 @@ class AuthEntityType(EntityType):
     @override
     @classmethod
     def description(cls) -> str:
-        return "The authentication operations, which name no row."
+        return "An authentication operation that names no user, such as a login."
