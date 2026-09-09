@@ -199,21 +199,11 @@ class ProjectAdapter(BaseAdapter):
         """Update an existing project (superadmin only)."""
         updater = ProjectUpdater(
             project_id=ProjectID(project_id),
-            name=(
-                OptionalState.update(input.name) if input.name is not None else OptionalState.nop()
-            ),
+            name=OptionalState.from_unset(input.name),
             description=TriState.from_unset(input.description),
-            is_active=(
-                OptionalState.update(input.is_active)
-                if input.is_active is not None
-                else OptionalState.nop()
-            ),
+            is_active=OptionalState.from_unset(input.is_active),
             integration_name=TriState.from_unset(input.integration_name),
-            resource_policy=(
-                OptionalState.update(input.resource_policy)
-                if input.resource_policy is not None
-                else OptionalState.nop()
-            ),
+            resource_policy=OptionalState.from_unset(input.resource_policy),
         )
         result = await self._processors.project.update_project.run(
             UpdateProjectAction(updater=updater)

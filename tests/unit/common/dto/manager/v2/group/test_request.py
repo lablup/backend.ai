@@ -83,8 +83,14 @@ class TestUpdateProjectInput:
         assert req.integration_name is UNSET
         assert isinstance(req.integration_name, Unset)
 
-    def test_non_sentinel_fields_default_to_none(self) -> None:
+    def test_optional_state_fields_default_to_unset(self) -> None:
         req = UpdateProjectInput()
+        assert req.name is UNSET
+        assert req.is_active is UNSET
+        assert req.resource_policy is UNSET
+
+    def test_explicit_none_optional_state_fields_stay_none(self) -> None:
+        req = UpdateProjectInput(name=None, is_active=None, resource_policy=None)
         assert req.name is None
         assert req.is_active is None
         assert req.resource_policy is None

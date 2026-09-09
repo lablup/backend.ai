@@ -68,26 +68,26 @@ class CreateProjectInput(BaseRequestModel):
 class UpdateProjectInput(BaseRequestModel):
     """Input for updating group information. All fields optional — only provided fields will be updated."""
 
-    name: str | None = Field(
-        default=None,
-        description="New group name.",
+    name: str | None | Unset = Field(
+        default=UNSET,
+        description="New group name. Omit to leave unchanged.",
         max_length=64,
     )
     description: str | None | Unset = Field(
         default=UNSET,
         description="Updated group description. Omit to leave unchanged; null clears.",
     )
-    is_active: bool | None = Field(
-        default=None,
-        description="Updated active status.",
+    is_active: bool | None | Unset = Field(
+        default=UNSET,
+        description="Updated active status. Omit to leave unchanged.",
     )
     integration_name: str | None | Unset = Field(
         default=UNSET,
         description="Updated external integration identifier. Omit to leave unchanged; null clears.",
     )
-    resource_policy: str | None = Field(
-        default=None,
-        description="Name of the updated resource policy to apply to this group.",
+    resource_policy: str | None | Unset = Field(
+        default=UNSET,
+        description="Name of the updated resource policy to apply to this group. Omit to leave unchanged.",
     )
 
 
