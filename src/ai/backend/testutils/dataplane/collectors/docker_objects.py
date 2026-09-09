@@ -135,6 +135,12 @@ class DockerKernelContainerCollector:
         return {r.ident.rsplit(".", 1)[-1] for r in self.parse(result.stdout)}
 
 
+def _only_missing_containers(stderr: str) -> bool:
+    """Whether every line docker complained about is a container that is simply not there."""
+    lines = [line for line in stderr.splitlines() if line.strip()]
+    return bool(lines) and all("no such object" in line.lower() for line in lines)
+
+
 class DockerSandboxCollector:
     """Network sandboxes in `/var/run/docker/netns/` that no container claims.
 
@@ -188,13 +194,23 @@ class DockerSandboxCollector:
         ids = [line.split("\t")[-1] for line in keys.lines]
         if not ids:
             return self.parse(listing.stdout, "")
-        inspected = await self._node.run([
-            "docker",
-            "inspect",
-            "--format",
-            "{{.NetworkSettings.SandboxKey}}",
-            *ids,
-        ])
+        inspected = await self._node.run(
+            [
+                "docker",
+                "inspect",
+                "--format",
+                "{{.NetworkSettings.SandboxKey}}",
+                *ids,
+            ],
+            check=False,
+        )
+        # A container that exits between the `ps` and this `inspect` makes the whole call exit 1,
+        # and the baseline of a test that had nothing to do with it fails. It still prints a key
+        # for every container it did find, and the one it did not has no sandbox to claim -- so the
+        # missing ids are the one failure to read through. Any other stderr is a real fault (a
+        # daemon that is down would otherwise report every netns as unowned) and must still raise.
+        if inspected.returncode != 0 and not _only_missing_containers(inspected.stderr):
+            inspected.check()
         return self.parse(listing.stdout, inspected.stdout)
 
 

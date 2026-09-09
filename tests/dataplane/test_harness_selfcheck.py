@@ -583,6 +583,81 @@ class TestDockerSandboxCollector:
         assert not any("1-w7890l4900" in r.ident for r in found)
 
 
+class _ScriptedNode:
+    """A node whose `docker inspect` answers with a chosen rc and stderr.
+
+    `FakeNode` always succeeds, so it cannot say what `collect` does with a failed command -- which
+    is the whole question here.
+    """
+
+    _name: str
+    _listing: str
+    _ps: str
+    _inspect: tuple[int, str, str]
+    calls: list[tuple[str, ...]]
+
+    def __init__(self, *, listing: str, ps: str, inspect: tuple[int, str, str]) -> None:
+        self._name = "n1"
+        self._listing = listing
+        self._ps = ps
+        self._inspect = inspect
+        self.calls = []
+
+    @property
+    def name(self) -> str:
+        return self._name
+
+    async def run(self, argv: list[str], *, check: bool = True) -> CommandResult:
+        key = tuple(argv)
+        self.calls.append(key)
+        if argv[0] == "ls":
+            return CommandResult(self._name, key, 0, self._listing, "")
+        if argv[:2] == ["docker", "ps"]:
+            return CommandResult(self._name, key, 0, self._ps, "")
+        rc, stdout, stderr = self._inspect
+        result = CommandResult(self._name, key, rc, stdout, stderr)
+        if check and rc != 0:
+            result.check()
+        return result
+
+
+class TestTheSandboxCollectorAgainstAMovingHost:
+    """`docker ps` then `docker inspect` is two commands over one changing host, and the suite runs
+    against a live rig where containers come and go. A container that exits between them makes the
+    whole inspect exit 1, and the baseline of whichever test happened to be starting fails with
+    someone else's container id -- which is what it did (G15 erroring on a container belonging to
+    no test in the file)."""
+
+    LISTING = "037aa310d6b6\ndefault\ndeadbeef99\n"
+    PS = "running\t037aa310d6b6\nexited\tde045f82915b\n"
+
+    async def test_a_container_that_exits_mid_snapshot_does_not_break_the_baseline(self) -> None:
+        node = _ScriptedNode(
+            listing=self.LISTING,
+            ps=self.PS,
+            inspect=(
+                1,
+                "/var/run/docker/netns/037aa310d6b6\n",
+                "error: no such object: de045f82915b\n",
+            ),
+        )
+        found = await DockerSandboxCollector(cast(Any, node)).collect()
+        # The surviving container still claims its sandbox, so only the genuinely unowned one is
+        # reported -- the vanished container has no sandbox to claim.
+        assert {r.ident for r in found} == {"/var/run/docker/netns/deadbeef99"}
+
+    async def test_a_real_docker_failure_still_raises(self) -> None:
+        """Reading through every failure would turn a dead daemon into "every sandbox is leaked",
+        and the leak guard would blame the test that was running at the time."""
+        node = _ScriptedNode(
+            listing=self.LISTING,
+            ps=self.PS,
+            inspect=(1, "", "Cannot connect to the Docker daemon at unix:///var/run/docker.sock\n"),
+        )
+        with pytest.raises(CommandFailed):
+            await DockerSandboxCollector(cast(Any, node)).collect()
+
+
 # --- etcd collector ---------------------------------------------------------------------------
 
 
