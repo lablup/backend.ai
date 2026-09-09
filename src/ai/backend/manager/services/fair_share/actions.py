@@ -13,6 +13,8 @@ from dataclasses import dataclass
 from decimal import Decimal
 from typing import override
 
+from ai.backend.common.data.entity.domain import DomainEntityType
+from ai.backend.common.data.entity.project import ProjectEntityType
 from ai.backend.common.data.entity.resource_group import (
     RESOURCE_GROUP_SCOPE_TYPE,
     ResourceGroupID,
@@ -23,6 +25,7 @@ from ai.backend.common.data.entity.types import (
     GlobalEntityType,
     ScopeRef,
 )
+from ai.backend.common.data.entity.user import UserEntityType
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.actions.v2.global_scope.base import BaseGlobalAction
 from ai.backend.manager.actions.v2.scope.base import BaseScopeAction
@@ -60,7 +63,7 @@ class DomainFairShareAction(BaseScopeAction):
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return GlobalEntityType()
+        return DomainEntityType()
 
     @override
     def scope_targets(self) -> Sequence[ScopeRef]:
@@ -207,7 +210,7 @@ class ProjectFairShareAction(BaseScopeAction):
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return GlobalEntityType()
+        return ProjectEntityType()
 
     @override
     def scope_targets(self) -> Sequence[ScopeRef]:
@@ -356,7 +359,7 @@ class UserFairShareAction(BaseScopeAction):
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return GlobalEntityType()
+        return UserEntityType()
 
     @override
     def scope_targets(self) -> Sequence[ScopeRef]:
