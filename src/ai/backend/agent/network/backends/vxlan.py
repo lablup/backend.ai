@@ -1788,7 +1788,7 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
         """
         try:
             await self._runner(link_del_args(dev))
-        except (RuntimeError, OSError) as e:
+        except command.HOST_COMMAND_ERRORS as e:
             if not command.is_absent_error(e):
                 raise
 
@@ -1802,7 +1802,7 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
         try:
             await self._runner(link_down_args(dev))
             return True
-        except (RuntimeError, OSError) as down_error:
+        except command.HOST_COMMAND_ERRORS as down_error:
             try:
                 devices = await self._vxlan_lister()
             except Exception as inventory_error:
@@ -1836,14 +1836,18 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
         try:
             await self._runner(forward_accept_check_args(vni))
             return  # already present
-        except OSError as e:
-            raise OverlayEncryptionUnavailable(
-                f"could not ask this host whether {bridge_dev(vni)} is allowed to forward"
-                f" ({e}); refusing the session rather than building an overlay that a FORWARD"
-                " policy may silently drop"
-            ) from e
-        except RuntimeError:
-            pass  # the rule is absent -- install it
+        except command.HOST_COMMAND_ERRORS as e:
+            # Two different answers from one exception type, told apart by what the command said.
+            # `iptables -C` on a rule that is not there is the ordinary case and reads as absence;
+            # anything else -- a missing binary, a held xtables lock, a timeout -- means this host
+            # could not be asked, and a FORWARD policy that silently drops is exactly what the
+            # check exists to catch.
+            if not command.is_absent_error(e):
+                raise OverlayEncryptionUnavailable(
+                    f"could not ask this host whether {bridge_dev(vni)} is allowed to forward"
+                    f" ({e}); refusing the session rather than building an overlay that a FORWARD"
+                    " policy may silently drop"
+                ) from e
         await self._runner(forward_accept_add_args(vni))
 
     async def _del_forward_accept(self, vni: int, failures: list[str] | None = None) -> None:
@@ -1858,7 +1862,7 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
         """
         try:
             await self._runner(argv)
-        except (RuntimeError, OSError) as e:
+        except command.HOST_COMMAND_ERRORS as e:
             if command.is_absent_error(e):
                 return
             if failures is None:
@@ -2116,7 +2120,7 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
         for table, builtin, chain in OWNED_CHAINS:
             try:
                 await self._runner(chain_create_args(table, chain))
-            except (RuntimeError, OSError):
+            except command.HOST_COMMAND_ERRORS:
                 pass  # already exists
             listing = await self._reader(chain_list_args(table, builtin))
             if jump_is_first(listing, builtin, chain):
@@ -2125,7 +2129,7 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
             # before re-inserting, so a displaced jump does not become a duplicate.
             try:
                 await self._runner(jump_del_args(table, builtin, chain))
-            except (RuntimeError, OSError):
+            except command.HOST_COMMAND_ERRORS:
                 pass  # nothing to remove
             await self._runner(jump_add_args(table, builtin, chain))
 
@@ -2147,7 +2151,7 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
         try:
             await self._runner(check)
             return  # already present
-        except (RuntimeError, OSError):
+        except command.HOST_COMMAND_ERRORS:
             pass  # absent, or a match module is unavailable -- try to add it
         await self._runner(add)
 
@@ -2309,7 +2313,7 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
         # record that says this session is still closed, so no later pass would retry it.
         try:
             await self._runner(link_up_args(vxlan_dev(meta.vni)))
-        except (RuntimeError, OSError):
+        except command.HOST_COMMAND_ERRORS:
             self._transition_security(
                 session_id,
                 VxlanSecurityEvent.PROTECTION_FAILED,
@@ -2708,7 +2712,7 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
         if meta.encryption_key is None:
             try:
                 await self._runner(link_up_args(vxlan_dev(meta.vni)))
-            except (RuntimeError, OSError):
+            except command.HOST_COMMAND_ERRORS:
                 log.warning("could not bring {} up while adopting", vxlan_dev(meta.vni))
 
     @override
@@ -3388,7 +3392,7 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
                 ):
                     try:
                         await self._runner(del_args)
-                    except RuntimeError:
+                    except command.HOST_COMMAND_ERRORS:
                         pass
                 for args in add_args:
                     await self._runner(args)
@@ -3628,7 +3632,7 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
         """
         try:
             await self._runner(argv)
-        except RuntimeError:
+        except command.HOST_COMMAND_ERRORS:
             if list(argv[:4]) != ["ip", "xfrm", "state", "add"]:
                 raise
             await self._refuse_foreign_sa(argv)
@@ -3646,7 +3650,7 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
         """
         try:
             existing = parse_sa_identities(await self._reader(["ip", "xfrm", "state"]))
-        except (RuntimeError, OSError) as e:
+        except command.HOST_COMMAND_ERRORS as e:
             # Unverified is not permission to delete, for the same reason an unknown journal answer
             # is not: a leaked SA of ours keeps traffic encrypted, a wrongly deleted one does not.
             if failures is None:
@@ -3704,7 +3708,7 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
             return
         try:
             existing = parse_sa_identities(await self._reader(["ip", "xfrm", "state"]))
-        except (RuntimeError, OSError) as e:
+        except command.HOST_COMMAND_ERRORS as e:
             # We could not establish whose SA is there. Overwriting on a guess is the outcome this
             # guard exists to prevent.
             raise OverlayEncryptionUnavailable(

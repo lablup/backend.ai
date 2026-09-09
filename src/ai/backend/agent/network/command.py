@@ -20,6 +20,8 @@ import contextlib
 from collections.abc import Sequence
 from typing import Final
 
+from ai.backend.agent.errors.network import NetworkOperationFailed
+
 #: How long one privileged command may take. Generous next to what these normally do
 #: (milliseconds), and finite because they run under a node-wide barrier.
 DEFAULT_TIMEOUT_SEC: Final = 30.0
@@ -81,6 +83,20 @@ _ABSENT_MARKERS: Final = (
     "no such file or directory",  # bridge fdb del, ip neigh del
     "cannot delete",  # iptables -X on a chain that was never created
 )
+
+
+#: What running a host command can fail with.
+#:
+#: `NetworkOperationFailed` is the one that matters and the one that was missing: it is a
+#: `BackendAIError`, so it is neither a `RuntimeError` nor an `OSError`, and every handler written
+#: as `except (RuntimeError, OSError)` around a command call was dead code. That silently disabled
+#: every absence and idempotency guard in the vxlan backend -- including the leftover-delete that
+#: begins session setup, which on a clean host is always "Cannot find device". A two-node session
+#: could not be created at all.
+#:
+#: `OSError` stays because the binary can be missing before the command is ever run, and
+#: `RuntimeError` because a caller may pass a runner of its own (the tests do).
+HOST_COMMAND_ERRORS: Final = (NetworkOperationFailed, RuntimeError, OSError)
 
 
 def is_absent_error(exc: BaseException) -> bool:
