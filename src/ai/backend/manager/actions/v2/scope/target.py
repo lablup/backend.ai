@@ -2,7 +2,7 @@
 
 from abc import ABC, abstractmethod
 
-from ai.backend.common.data.entity.types import ScopeRef
+from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.manager.models.scopes import OperationScope
 
 
@@ -16,7 +16,7 @@ class SearchableScopeTarget(ABC):
     """
 
     @abstractmethod
-    def to_scope_ref(self) -> ScopeRef:
+    def to_scope_ref(self) -> EntityIdentifier:
         """Return the scope the read is answered for."""
         raise NotImplementedError
 

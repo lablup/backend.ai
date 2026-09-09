@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from typing import override
 
 from ai.backend.common.data.entity.deployment import DeploymentEntityType, DeploymentID
-from ai.backend.common.data.entity.types import EntityType, ScopeRef, ScopeType
+from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
 from ai.backend.manager.actions.v2.ops.base import OperationScopeOpsAction
 from ai.backend.manager.data.deployment.types import ModelRevisionData
 from ai.backend.manager.models.deployment_revision.row import DeploymentRevisionRow
@@ -38,10 +38,8 @@ class SearchRevisionsAction(OperationScopeOpsAction[DeploymentRevisionRow, Model
         return "search_revisions"
 
     @override
-    def scope_targets(self) -> Sequence[ScopeRef]:
-        return (
-            ScopeRef(scope_type=ScopeType(DeploymentEntityType()), scope_id=self.deployment_id),
-        )
+    def scope_targets(self) -> Sequence[EntityIdentifier]:
+        return (self.deployment_id,)
 
     @override
     def operation_scopes(self) -> Sequence[OperationScope]:

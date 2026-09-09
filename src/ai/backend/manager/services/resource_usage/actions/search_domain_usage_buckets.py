@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from typing import override
 
 from ai.backend.common.data.entity.domain import DomainEntityType
-from ai.backend.common.data.entity.types import EntityType, ScopeRef
+from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
 from ai.backend.manager.actions.v2.ops.base import OperationScopeOpsAction
 from ai.backend.manager.data.resource_usage_history.types import DomainUsageBucketData
 from ai.backend.manager.models.resource_usage_history.row import DomainUsageBucketRow
@@ -38,7 +38,7 @@ class SearchDomainUsageBucketsAction(
         return "search_domain_usage_buckets"
 
     @override
-    def scope_targets(self) -> Sequence[ScopeRef]:
+    def scope_targets(self) -> Sequence[EntityIdentifier]:
         return [item.scope_ref() for item in self.items]
 
     @override

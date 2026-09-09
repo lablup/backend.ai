@@ -14,7 +14,7 @@ class ScopeSource(Protocol):
 
     @classmethod
     def scope_id_expr(cls) -> SQLColumnExpression[ScopeID]:
-        """Column whose value is used as ``ScopeRef.scope_id``."""
+        """Column carrying the scope's id."""
         ...
 
     @classmethod

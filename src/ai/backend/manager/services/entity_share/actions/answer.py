@@ -10,7 +10,7 @@ from ai.backend.common.data.entity.entity_share import (
     EntityShareEntityType,
     EntityShareID,
 )
-from ai.backend.common.data.entity.types import EntityIdentifier, EntityType, ScopeRef, ScopeType
+from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.actions.v2.scope.base import BaseScopeAction
 from ai.backend.manager.actions.v2.scope.result import BaseScopeActionResult
@@ -53,9 +53,9 @@ class _RecipientAnswerAction(BaseScopeAction):
         return ActionOperationType.UPDATE
 
     @override
-    def scope_targets(self) -> Sequence[ScopeRef]:
+    def scope_targets(self) -> Sequence[EntityIdentifier]:
         scope = self.answering_scope
-        return (ScopeRef(scope_type=ScopeType(scope.entity_type()), scope_id=scope),)
+        return (scope,)
 
 
 @dataclass

@@ -7,8 +7,8 @@ from abc import ABC
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.common.data.entity.resource_group import RESOURCE_GROUP_SCOPE_TYPE, ResourceGroupID
-from ai.backend.common.data.entity.types import ScopeRef
+from ai.backend.common.data.entity.resource_group import ResourceGroupID
+from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.manager.actions.v2.ops.base import ScopeItem
 from ai.backend.manager.models.resource_usage_history.scopes import (
     DomainUsageBucketOperationScope,
@@ -34,8 +34,8 @@ class UsageBucketScopeItem(ScopeItem, ABC):
     resource_group_id: ResourceGroupID
 
     @override
-    def scope_ref(self) -> ScopeRef:
-        return ScopeRef(scope_type=RESOURCE_GROUP_SCOPE_TYPE, scope_id=self.resource_group_id)
+    def scope_ref(self) -> EntityIdentifier:
+        return self.resource_group_id
 
 
 @dataclass(frozen=True)

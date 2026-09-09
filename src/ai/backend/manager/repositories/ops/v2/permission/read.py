@@ -152,16 +152,16 @@ class PermissionReadOps(V2ReadOps):
             groups[
                 _GroupKey(
                     user_id=key.user_id,
-                    entity_type=EntityType(key.scope.scope_type),
+                    entity_type=key.scope.entity_type(),
                     subject_entity_type=key.entity_type,
                 )
             ].append(key)
 
         result: dict[GovernCheckKey, Permission] = {}
         for group_key, members in groups.items():
-            granted = await self._resolve_group(group_key, [k.scope.scope_id for k in members])
+            granted = await self._resolve_group(group_key, [k.scope for k in members])
             for key in members:
-                result[key] = granted.get(key.scope.scope_id, Permission.NONE)
+                result[key] = granted.get(key.scope, Permission.NONE)
         return result
 
     async def _resolve_group(

@@ -21,18 +21,16 @@ from ai.backend.common.data.entity.container_registry import (
     CONTAINER_REGISTRY_SCOPE_TYPE,
     ContainerRegistryID,
 )
-from ai.backend.common.data.entity.domain import DOMAIN_SCOPE_TYPE, DomainID
+from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.idle_checker import (
-    IdleCheckerEntityType,
     IdleCheckerID,
 )
 from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE, ProjectID
 from ai.backend.common.data.entity.resource_group import (
-    RESOURCE_GROUP_SCOPE_TYPE,
     ResourceGroupID,
 )
-from ai.backend.common.data.entity.types import ScopeType
-from ai.backend.common.data.entity.user import USER_SCOPE_TYPE, UserID
+from ai.backend.common.data.entity.types import EntityIdentifier
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.types import AccessKey
 from ai.backend.manager.actions.audit_policy import AuditLogPolicy
 from ai.backend.manager.actions.types import ActionOperationType, OperationStatus
@@ -90,8 +88,8 @@ class TestEveryPairBecomesTheRunsScopes:
                 ),
                 ActionOperationType.CREATE,
                 [
-                    (PROJECT_SCOPE_TYPE, _PROJECT_ID),
-                    (CONTAINER_REGISTRY_SCOPE_TYPE, _REGISTRY_ID),
+                    _PROJECT_ID,
+                    _REGISTRY_ID,
                 ],
             ),
             (
@@ -101,8 +99,8 @@ class TestEveryPairBecomesTheRunsScopes:
                 ),
                 ActionOperationType.DELETE,
                 [
-                    (PROJECT_SCOPE_TYPE, _PROJECT_ID),
-                    (CONTAINER_REGISTRY_SCOPE_TYPE, _REGISTRY_ID),
+                    _PROJECT_ID,
+                    _REGISTRY_ID,
                 ],
             ),
             (
@@ -112,8 +110,8 @@ class TestEveryPairBecomesTheRunsScopes:
                 ),
                 ActionOperationType.CREATE,
                 [
-                    (PROJECT_SCOPE_TYPE, _PROJECT_ID),
-                    (RESOURCE_GROUP_SCOPE_TYPE, _RESOURCE_GROUP_ID),
+                    _PROJECT_ID,
+                    _RESOURCE_GROUP_ID,
                 ],
             ),
             (
@@ -123,8 +121,8 @@ class TestEveryPairBecomesTheRunsScopes:
                 ),
                 ActionOperationType.DELETE,
                 [
-                    (PROJECT_SCOPE_TYPE, _PROJECT_ID),
-                    (RESOURCE_GROUP_SCOPE_TYPE, _RESOURCE_GROUP_ID),
+                    _PROJECT_ID,
+                    _RESOURCE_GROUP_ID,
                 ],
             ),
             (
@@ -134,8 +132,8 @@ class TestEveryPairBecomesTheRunsScopes:
                 ),
                 ActionOperationType.CREATE,
                 [
-                    (DOMAIN_SCOPE_TYPE, _DOMAIN_ID),
-                    (RESOURCE_GROUP_SCOPE_TYPE, _RESOURCE_GROUP_ID),
+                    _DOMAIN_ID,
+                    _RESOURCE_GROUP_ID,
                 ],
             ),
             (
@@ -145,8 +143,8 @@ class TestEveryPairBecomesTheRunsScopes:
                 ),
                 ActionOperationType.DELETE,
                 [
-                    (DOMAIN_SCOPE_TYPE, _DOMAIN_ID),
-                    (RESOURCE_GROUP_SCOPE_TYPE, _RESOURCE_GROUP_ID),
+                    _DOMAIN_ID,
+                    _RESOURCE_GROUP_ID,
                 ],
             ),
             (
@@ -156,8 +154,8 @@ class TestEveryPairBecomesTheRunsScopes:
                 ),
                 ActionOperationType.CREATE,
                 [
-                    (USER_SCOPE_TYPE, _USER_ID),
-                    (RESOURCE_GROUP_SCOPE_TYPE, _RESOURCE_GROUP_ID),
+                    _USER_ID,
+                    _RESOURCE_GROUP_ID,
                 ],
             ),
             (
@@ -167,8 +165,8 @@ class TestEveryPairBecomesTheRunsScopes:
                 ),
                 ActionOperationType.DELETE,
                 [
-                    (USER_SCOPE_TYPE, _USER_ID),
-                    (RESOURCE_GROUP_SCOPE_TYPE, _RESOURCE_GROUP_ID),
+                    _USER_ID,
+                    _RESOURCE_GROUP_ID,
                 ],
             ),
             (
@@ -178,8 +176,8 @@ class TestEveryPairBecomesTheRunsScopes:
                 ),
                 ActionOperationType.DELETE,
                 [
-                    (PROJECT_SCOPE_TYPE, _PROJECT_ID),
-                    (ScopeType(IdleCheckerEntityType()), _IDLE_CHECKER_ID),
+                    _PROJECT_ID,
+                    _IDLE_CHECKER_ID,
                 ],
             ),
             (
@@ -189,8 +187,8 @@ class TestEveryPairBecomesTheRunsScopes:
                 ),
                 ActionOperationType.RESTORE,
                 [
-                    (PROJECT_SCOPE_TYPE, _PROJECT_ID),
-                    (ScopeType(IdleCheckerEntityType()), _IDLE_CHECKER_ID),
+                    _PROJECT_ID,
+                    _IDLE_CHECKER_ID,
                 ],
             ),
         ],
@@ -199,9 +197,9 @@ class TestEveryPairBecomesTheRunsScopes:
         self,
         action: BaseRelationAction,
         operation: ActionOperationType,
-        expected: list[tuple[str, uuid.UUID]],
+        expected: list[EntityIdentifier],
     ) -> None:
-        assert [(s.scope_type, s.scope_id) for s in action.scope_targets()] == expected
+        assert list(action.scope_targets()) == expected
         assert action.operation_type() is operation
 
     def test_a_run_over_several_pairs_names_every_entity_once(self) -> None:
@@ -213,11 +211,11 @@ class TestEveryPairBecomesTheRunsScopes:
             creator=ContainerRegistryProjectCreator(),
         )
 
-        assert [(s.scope_type, s.scope_id) for s in action.scope_targets()] == [
-            (PROJECT_SCOPE_TYPE, projects[0]),
-            (CONTAINER_REGISTRY_SCOPE_TYPE, _REGISTRY_ID),
-            (PROJECT_SCOPE_TYPE, projects[1]),
-            (PROJECT_SCOPE_TYPE, projects[2]),
+        assert list(action.scope_targets()) == [
+            projects[0],
+            _REGISTRY_ID,
+            projects[1],
+            projects[2],
         ]
 
 

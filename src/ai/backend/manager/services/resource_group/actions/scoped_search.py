@@ -7,11 +7,11 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.common.data.entity.domain import DOMAIN_SCOPE_TYPE, DomainID
-from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE, ProjectID
+from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.resource_group import ResourceGroupEntityType
-from ai.backend.common.data.entity.types import EntityType, ScopeRef
-from ai.backend.common.data.entity.user import USER_SCOPE_TYPE, UserID
+from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.manager.actions.v2.ops.base import OperationScopeOpsAction, ScopeItem
 from ai.backend.manager.data.resource_group.types import ResourceGroupData
 from ai.backend.manager.models.resource_group.row import ResourceGroupRow
@@ -39,8 +39,8 @@ class DomainResourceGroupScopeItem(ResourceGroupScopeItem):
     domain_id: DomainID
 
     @override
-    def scope_ref(self) -> ScopeRef:
-        return ScopeRef(scope_type=DOMAIN_SCOPE_TYPE, scope_id=self.domain_id)
+    def scope_ref(self) -> EntityIdentifier:
+        return self.domain_id
 
     @override
     def operation_scope(self) -> OperationScope:
@@ -54,8 +54,8 @@ class ProjectResourceGroupScopeItem(ResourceGroupScopeItem):
     project_id: ProjectID
 
     @override
-    def scope_ref(self) -> ScopeRef:
-        return ScopeRef(scope_type=PROJECT_SCOPE_TYPE, scope_id=self.project_id)
+    def scope_ref(self) -> EntityIdentifier:
+        return self.project_id
 
     @override
     def operation_scope(self) -> OperationScope:
@@ -69,8 +69,8 @@ class UserResourceGroupScopeItem(ResourceGroupScopeItem):
     user_id: UserID
 
     @override
-    def scope_ref(self) -> ScopeRef:
-        return ScopeRef(scope_type=USER_SCOPE_TYPE, scope_id=self.user_id)
+    def scope_ref(self) -> EntityIdentifier:
+        return self.user_id
 
     @override
     def operation_scope(self) -> OperationScope:
@@ -101,7 +101,7 @@ class ScopedSearchResourceGroupsAction(
         return "scoped_search_resource_groups"
 
     @override
-    def scope_targets(self) -> Sequence[ScopeRef]:
+    def scope_targets(self) -> Sequence[EntityIdentifier]:
         return [item.scope_ref() for item in self.items]
 
     @override

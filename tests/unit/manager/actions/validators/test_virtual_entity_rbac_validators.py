@@ -22,15 +22,13 @@ import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
 from ai.backend.common.contexts.user import with_user
-from ai.backend.common.data.entity.domain import DomainEntityType, DomainID
+from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.project import ProjectEntityType
 from ai.backend.common.data.entity.types import (
     EntityID,
     EntityIdentifier,
     EntityType,
     ScopeID,
-    ScopeRef,
-    ScopeType,
 )
 from ai.backend.common.data.entity.vfolder import VFolderEntityType
 from ai.backend.common.data.entity.virtual_entity import VirtualEntityID
@@ -130,9 +128,9 @@ class _StubEntityID(EntityIdentifier):
 class _ProjectCreateScopeAction(BaseScopeAction):
     """PROJECT:CREATE at domain scopes — subject type differs from the scope type."""
 
-    _scopes: Sequence[ScopeRef]
+    _scopes: Sequence[EntityIdentifier]
 
-    def __init__(self, scopes: Sequence[ScopeRef]) -> None:
+    def __init__(self, scopes: Sequence[EntityIdentifier]) -> None:
         self._scopes = scopes
 
     @classmethod
@@ -141,7 +139,7 @@ class _ProjectCreateScopeAction(BaseScopeAction):
         return ProjectEntityType()
 
     @override
-    def scope_targets(self) -> Sequence[ScopeRef]:
+    def scope_targets(self) -> Sequence[EntityIdentifier]:
         return self._scopes
 
     @classmethod
@@ -237,8 +235,8 @@ class _VfolderID(EntityIdentifier):
         return VFolderEntityType()
 
 
-def _domain_scope(scope_id: ScopeID) -> ScopeRef:
-    return ScopeRef(scope_type=ScopeType(DomainEntityType()), scope_id=scope_id)
+def _domain_scope(scope_id: ScopeID) -> EntityIdentifier:
+    return DomainID(scope_id)
 
 
 def _make_user_data(user_id: uuid.UUID, *, is_superadmin: bool) -> UserData:

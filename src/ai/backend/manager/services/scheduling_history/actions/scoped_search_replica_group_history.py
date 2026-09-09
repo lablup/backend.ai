@@ -5,11 +5,10 @@ from dataclasses import dataclass
 from typing import override
 
 from ai.backend.common.data.entity.deployment import (
-    DEPLOYMENT_SCOPE_TYPE,
     DeploymentEntityType,
     DeploymentID,
 )
-from ai.backend.common.data.entity.types import EntityIdentifier, EntityType, ScopeRef
+from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.actions.v2.scope.base import BaseScopeAction
 from ai.backend.manager.actions.v2.scope.result import BaseScopeActionResult
@@ -42,8 +41,8 @@ class DeploymentReplicaGroupHistoryTarget(ReplicaGroupHistoryTarget):
         return DeploymentReplicaGroupHistoryOperationScope(deployment_id=self.deployment_id)
 
     @override
-    def to_scope_ref(self) -> ScopeRef:
-        return ScopeRef(scope_type=DEPLOYMENT_SCOPE_TYPE, scope_id=self.deployment_id)
+    def to_scope_ref(self) -> EntityIdentifier:
+        return self.deployment_id
 
 
 @dataclass
@@ -57,7 +56,7 @@ class ScopedSearchReplicaGroupHistoryAction(BaseScopeAction):
     querier: BatchQuerier
 
     @override
-    def scope_targets(self) -> Sequence[ScopeRef]:
+    def scope_targets(self) -> Sequence[EntityIdentifier]:
         return (self.target.to_scope_ref(),)
 
     @override
