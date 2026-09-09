@@ -9,7 +9,7 @@ from ai.backend.common.data.entity.resource_policy import (
 )
 from ai.backend.common.data.entity.types import EntityType, ScopeRef
 from ai.backend.common.data.entity.user import USER_SCOPE_TYPE, UserID
-from ai.backend.manager.actions.v2.ops.base import OperationScopeOpsAction
+from ai.backend.manager.actions.v2.ops.base import OperationScopeOpsAction, ScopeItem
 from ai.backend.manager.data.resource.types import KeyPairResourcePolicyData
 from ai.backend.manager.models.resource_policy.row import KeyPairResourcePolicyRow
 from ai.backend.manager.models.resource_policy.scopes import UserKeypairResourcePolicyOperationScope
@@ -19,16 +19,32 @@ from ai.backend.manager.models.resource_policy.searchers import (
 from ai.backend.manager.models.scopes import OperationScope
 
 
+@dataclass(frozen=True)
+class KeypairResourcePolicyScopeItem(ScopeItem):
+    """The keypair resource policies of one user."""
+
+    user_id: UserID
+
+    @override
+    def scope_ref(self) -> ScopeRef:
+        return ScopeRef(scope_type=USER_SCOPE_TYPE, scope_id=self.user_id)
+
+    @override
+    def operation_scope(self) -> OperationScope:
+        return UserKeypairResourcePolicyOperationScope(user_id=self.user_id)
+
+
 @dataclass
 class SearchKeypairResourcePoliciesAction(
     OperationScopeOpsAction[KeyPairResourcePolicyRow, KeyPairResourcePolicyData]
 ):
-    """Page through the keypair resource policies that apply within a user scope.
+    """Page through the keypair resource policies the named scopes reach, combined
+    with OR.
 
-    Which user that is, is the caller's business: the scope is an argument.
+    Which users those are, is the caller's business: the scopes are an argument.
     """
 
-    user_id: UserID
+    items: Sequence[KeypairResourcePolicyScopeItem]
     searcher: KeyPairResourcePolicySearcher
 
     @override
@@ -38,11 +54,11 @@ class SearchKeypairResourcePoliciesAction(
 
     @override
     def scope_targets(self) -> Sequence[ScopeRef]:
-        return (ScopeRef(scope_type=USER_SCOPE_TYPE, scope_id=self.user_id),)
+        return [item.scope_ref() for item in self.items]
 
     @override
     def operation_scopes(self) -> Sequence[OperationScope]:
-        return (UserKeypairResourcePolicyOperationScope(user_id=self.user_id),)
+        return [item.operation_scope() for item in self.items]
 
     @override
     @classmethod
