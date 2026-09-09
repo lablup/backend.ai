@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from typing import Any
 
 import pytest
@@ -12,7 +13,17 @@ from bai_kit.manager.db import TemplateDatabase
 from bai_kit.manager.monitors import ActionRecorder
 from bai_kit.manager.personas import ALL_PERSONAS, MEMBER, SUPERADMIN
 from bai_kit.manager.runner import AdapterRunner, Wired, WiringDeps
-from bai_kit.manager.typed import At, Every, at, every, path_of
+from bai_kit.manager.typed import (
+    At,
+    Checked,
+    Every,
+    Exactly,
+    at,
+    checked,
+    every,
+    exactly,
+    path_of,
+)
 
 from ai.backend.common.contexts.user import current_user
 from ai.backend.manager.models.domain.row import DomainRow
@@ -234,3 +245,50 @@ class TestTypedMatchers:
     def test_a_computed_accessor_still_answers_a_path(self) -> None:
         select: Callable[[_Outer], object] = lambda o: len(o.items)
         assert path_of(select) == "<computed>"
+
+
+# --- exhaustive comparison: everything is compared unless a condition takes it over ---
+
+
+@dataclass
+class _Stamped:
+    name: str
+    n: int
+    at: datetime
+
+
+class TestExactly:
+    def test_a_full_match_passes(self) -> None:
+        moment = datetime.now(UTC)
+        matcher: Exactly[_Stamped] = exactly(_Stamped("a", 1, moment))
+        assert matcher.mismatches(_Stamped("a", 1, moment)) == []
+
+    def test_a_field_the_expected_value_got_wrong_is_reported(self) -> None:
+        moment = datetime.now(UTC)
+        matcher: Exactly[_Stamped] = exactly(_Stamped("a", 2, moment))
+        assert matcher.mismatches(_Stamped("a", 1, moment)) == ["n: expected 2, got 1"]
+
+    def test_a_generated_field_is_taken_over_by_a_condition_not_ignored(self) -> None:
+        rule: Checked[_Stamped, datetime] = checked(
+            lambda s: s.at, lambda t: t.tzinfo is not None, "an aware moment"
+        )
+        matcher: Exactly[_Stamped] = exactly(_Stamped("a", 1, datetime.now(UTC)), where=(rule,))
+        # A different moment passes, because the condition is what is checked.
+        assert matcher.mismatches(_Stamped("a", 1, datetime.now(UTC))) == []
+
+    def test_a_taken_over_field_that_fails_its_condition_is_reported(self) -> None:
+        rule: Checked[_Stamped, datetime] = checked(
+            lambda s: s.at, lambda t: t.tzinfo is not None, "an aware moment"
+        )
+        matcher: Exactly[_Stamped] = exactly(_Stamped("a", 1, datetime.now(UTC)), where=(rule,))
+        naive = datetime.now(UTC).replace(tzinfo=None)
+        problems = matcher.mismatches(_Stamped("a", 1, naive))
+        assert len(problems) == 1
+        assert problems[0].startswith("at: ")
+        assert problems[0].endswith("does not hold (an aware moment)")
+
+    def test_every_other_field_is_still_compared_while_one_is_taken_over(self) -> None:
+        rule: Checked[_Stamped, datetime] = checked(lambda s: s.at, lambda t: True)
+        matcher: Exactly[_Stamped] = exactly(_Stamped("a", 1, datetime.now(UTC)), where=(rule,))
+        naive = datetime.now(UTC).replace(tzinfo=None)
+        assert matcher.mismatches(_Stamped("b", 1, naive)) == ["name: expected 'a', got 'b'"]

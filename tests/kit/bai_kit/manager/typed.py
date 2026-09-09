@@ -8,9 +8,19 @@ replaying the same accessor over a recording proxy, so nothing is written twice.
 
 from __future__ import annotations
 
-from collections.abc import Awaitable, Callable, Sequence
+from collections.abc import Awaitable, Callable, Mapping, Sequence
 from dataclasses import dataclass, field
-from typing import Any, Concatenate, cast, override
+from typing import Any, Concatenate, cast, overload, override
+
+from ai.backend.manager.models.base import Base
+from ai.backend.manager.models.specs.creator import (
+    EntityCreator,
+    GlobalEntityCreator,
+    RoleManagedEntityCreator,
+    RoleManagedGlobalEntityCreator,
+)
+from ai.backend.manager.repositories.ops.repository import OpsRepository
+from ai.backend.testutils.scenario import Persona
 
 __all__ = (
     "At",
@@ -23,8 +33,16 @@ __all__ = (
     "TypedSetup",
     "Answer",
     "FakeOf",
+    "Deferred",
+    "Seed",
+    "after",
+    "Checked",
+    "Exactly",
     "at",
+    "checked",
     "config_of",
+    "creates",
+    "exactly",
     "fake_of",
     "every",
     "op",
@@ -330,6 +348,196 @@ def on_fake[T, F](fake: type[F], matcher: TypedMatcher[F]) -> OnFake[T, F]:
 
 
 # ---------------------------------------------------------------------------
+# Putting rows in the database: the creator spec names the row and its data type
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class Seed[D]:
+    """One row to lay down before the call, described by the creator that makes it.
+
+    Carries the data type the creator answers, so a later part of the scenario reads
+    the created row without saying what it is again.
+    """
+
+    make: Callable[[OpsRepository[Any]], Awaitable[D]]
+    label: str
+    owner: Persona | None = None
+
+    def by(self, owner: Persona) -> Seed[D]:
+        """The same row, written as somebody else."""
+        return Seed(self.make, self.label, owner)
+
+
+@overload
+def creates[R: Base, D](creator: RoleManagedGlobalEntityCreator[R, D]) -> Seed[D]: ...
+
+
+@overload
+def creates[R: Base, D](creator: RoleManagedEntityCreator[R, D]) -> Seed[D]: ...
+
+
+@overload
+def creates[R: Base, D](creator: EntityCreator[R, D]) -> Seed[D]: ...
+
+
+@overload
+def creates[R: Base, D](creator: GlobalEntityCreator[R, D]) -> Seed[D]: ...
+
+
+def creates(creator: Any) -> Seed[Any]:
+    """Lay down the row this creator describes, through the same ops path production
+    uses. Which path that is follows from the creator's own type, so nothing here
+    chooses it by name.
+    """
+    label = type(creator).__name__
+    if isinstance(creator, RoleManagedGlobalEntityCreator):
+
+        async def make_role_managed_global(ops: OpsRepository[Any]) -> Any:
+            return await ops.create_role_managed_global_entity(creator)
+
+        return Seed(make_role_managed_global, label)
+    if isinstance(creator, RoleManagedEntityCreator):
+
+        async def make_role_managed(ops: OpsRepository[Any]) -> Any:
+            return await ops.create_role_managed_entity(creator)
+
+        return Seed(make_role_managed, label)
+    if isinstance(creator, EntityCreator):
+
+        async def make_entity(ops: OpsRepository[Any]) -> Any:
+            return await ops.create_entity(creator)
+
+        return Seed(make_entity, label)
+
+    async def make_global(ops: OpsRepository[Any]) -> Any:
+        return await ops.create_global_entity(creator)
+
+    return Seed(make_global, label)
+
+
+@dataclass(frozen=True)
+class Deferred[A, R]:
+    """A call that cannot be written until a seeded row exists, because it names
+    something the database generated."""
+
+    seed: Seed[Any]
+    build: Callable[[Any], Invocation[A, R]]
+
+
+def after[D, A, R](seed: Seed[D], build: Callable[[D], Invocation[A, R]]) -> Deferred[A, R]:
+    """Read the row the seed made, then say what to call with it.
+
+    ``build`` receives the created data, typed, so an id the database generated is
+    reachable without a placeholder or a lookup by name.
+    """
+    return Deferred(seed, build)
+
+
+# ---------------------------------------------------------------------------
+# Checking the whole answer, with the generated fields taken over rather than dropped
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class Checked[T, V]:
+    """One field the expected value cannot state, checked by a condition instead.
+
+    A generated id or a timestamp is not written into the expected payload, but it is
+    not skipped either: whatever the field holds still has to satisfy this.
+    """
+
+    select: Callable[[T], V]
+    condition: Callable[[V], bool]
+    describe: str = ""
+
+    def path(self) -> str:
+        return path_of(self.select)
+
+    def failure(self, value: V) -> str:
+        wanted = f" ({self.describe})" if self.describe else ""
+        return f"{self.path()}: {value!r} does not hold{wanted}"
+
+
+def checked[T, V](
+    select: Callable[[T], V], condition: Callable[[V], bool], describe: str = ""
+) -> Checked[T, V]:
+    return Checked(select, condition, describe)
+
+
+def _fields_of(value: object) -> Sequence[str] | None:
+    """The field names of a model or dataclass, or ``None`` when it is a plain value."""
+    model_fields = getattr(type(value), "model_fields", None)
+    if isinstance(model_fields, Mapping):
+        return list(model_fields)
+    dataclass_fields = getattr(type(value), "__dataclass_fields__", None)
+    if isinstance(dataclass_fields, Mapping):
+        return list(dataclass_fields)
+    return None
+
+
+def _compare(expected: object, actual: object, path: str, covered: frozenset[str]) -> list[str]:
+    """Every field of ``expected`` against ``actual``, the covered paths left out.
+
+    Walks the models rather than dumping them, so a condition further down receives the
+    value in its own type: a datetime stays a datetime.
+    """
+    if path in covered:
+        return []
+    if type(expected) is not type(actual):
+        return [
+            f"{path or 'result'}: expected {type(expected).__name__}, got {type(actual).__name__}"
+        ]
+    names = _fields_of(expected)
+    if names is not None:
+        out: list[str] = []
+        for name in names:
+            sub = f"{path}.{name}" if path else name
+            out.extend(_compare(getattr(expected, name), getattr(actual, name), sub, covered))
+        return out
+    if isinstance(expected, (list, tuple)) and isinstance(actual, (list, tuple)):
+        if len(expected) != len(actual):
+            return [f"{path}: expected {len(expected)} items, got {len(actual)}"]
+        return [
+            m
+            for i, (e, a) in enumerate(zip(expected, actual, strict=True))
+            for m in _compare(e, a, f"{path}[{i}]", covered)
+        ]
+    if expected != actual:
+        return [f"{path or 'result'}: expected {expected!r}, got {actual!r}"]
+    return []
+
+
+@dataclass(frozen=True)
+class Exactly[T](TypedMatcher[T]):
+    """The whole answer, field by field, with named fields taken over by a condition.
+
+    The default is exhaustive: a field the expected value does not mention is still
+    compared, so a payload that grows a field fails until somebody looks at it. The
+    fields a test cannot state are named in ``where`` and checked by condition, which
+    is stricter than leaving them out.
+    """
+
+    expected: T
+    where: tuple[Checked[T, Any], ...] = ()
+
+    @override
+    def mismatches(self, actual: T) -> list[str]:
+        covered = frozenset(rule.path() for rule in self.where)
+        out = _compare(self.expected, actual, "", covered)
+        for rule in self.where:
+            value = rule.select(actual)
+            if not rule.condition(value):
+                out.append(rule.failure(value))
+        return out
+
+
+def exactly[T](expected: T, where: Sequence[Checked[T, Any]] = ()) -> Exactly[T]:
+    """Compare the whole answer. Anything generated goes in ``where``, with a condition."""
+    return Exactly(expected, tuple(where))
+
+
+# ---------------------------------------------------------------------------
 # The scenario: result type bound where it is written, erased where it is stored
 # ---------------------------------------------------------------------------
 
@@ -338,13 +546,16 @@ def on_fake[T, F](fake: type[F], matcher: TypedMatcher[F]) -> OnFake[T, F]:
 class TypedScenario[A, C]:
     """A scenario over adapter ``A`` and config ``C``.
 
-    The result type is checked where the row is written and dropped afterwards, so a
-    table of rows returning different payloads is still one list.
+    The four parts are named in the types of what they set: the rows already there, the
+    situation, the call, and what the call must answer. The result type is checked where
+    the row is written and dropped afterwards, so a table of rows returning different
+    payloads is still one list.
     """
 
     id: str
-    invoke: Callable[[A], Awaitable[Any]]
+    invoke: Callable[[A, Mapping[str, Any]], Awaitable[Any]]
     then: TypedMatcher[Any] | type[BaseException] | None = None
+    given: tuple[Seed[Any], ...] = ()
     setup: TypedSetup[C] = field(default_factory=TypedSetup)
 
     @classmethod
@@ -352,19 +563,43 @@ class TypedScenario[A, C]:
         cls,
         id: str,
         *,
-        when: Invocation[A, R],
+        when: Invocation[A, R] | Deferred[A, R],
         then: TypedMatcher[R] | None = None,
+        given: Sequence[Seed[Any]] = (),
         setup: TypedSetup[C] | None = None,
     ) -> TypedScenario[A, C]:
-        return cls(id, when.call, then, setup or TypedSetup())
+        return cls(id, _invoker(when), then, tuple(given), setup or TypedSetup())
 
     @classmethod
     def error[R](
         cls,
         id: str,
         *,
-        when: Invocation[A, R],
+        when: Invocation[A, R] | Deferred[A, R],
         then: type[BaseException],
+        given: Sequence[Seed[Any]] = (),
         setup: TypedSetup[C] | None = None,
     ) -> TypedScenario[A, C]:
-        return cls(id, when.call, then, setup or TypedSetup())
+        return cls(id, _invoker(when), then, tuple(given), setup or TypedSetup())
+
+
+def _invoker[A, R](
+    when: Invocation[A, R] | Deferred[A, R],
+) -> Callable[[A, Mapping[str, Any]], Awaitable[R]]:
+    """One shape for both kinds of call: the runner hands over what the seeds made, and
+    a deferred call reads its own row out of it."""
+    if isinstance(when, Deferred):
+        deferred = when
+
+        def run_deferred(adapter: A, seeded: Mapping[str, Any]) -> Awaitable[R]:
+            row = seeded[deferred.seed.label]
+            return deferred.build(row).call(adapter)
+
+        return run_deferred
+
+    invocation = when
+
+    def run(adapter: A, seeded: Mapping[str, Any]) -> Awaitable[R]:
+        return invocation.call(adapter)
+
+    return run

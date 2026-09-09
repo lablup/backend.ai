@@ -16,8 +16,11 @@ suppression.
 from __future__ import annotations
 
 from collections.abc import Mapping
+from datetime import UTC, datetime, timedelta
 from typing import Any, assert_type
+from uuid import UUID
 
+from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.dto.manager.v2.domain.request import (
     AdminSearchDomainsInput,
     CreateDomainInput,
@@ -26,27 +29,36 @@ from ai.backend.common.dto.manager.v2.domain.request import (
 from ai.backend.common.dto.manager.v2.domain.response import (
     AdminSearchDomainsPayload,
     DeleteDomainPayload,
+    DomainBasicInfo,
+    DomainLifecycleInfo,
     DomainNode,
     DomainPayload,
+    DomainRegistryInfo,
 )
 from ai.backend.manager.api.adapters.domain.adapter import DomainAdapter
 from ai.backend.manager.clients.storage_proxy.manager_facing_client import (
     StorageProxyManagerFacingClient,
 )
 from ai.backend.manager.config.unified import ManagerUnifiedConfig
-from ai.backend.manager.data.domain.types import UserInfo
+from ai.backend.manager.data.domain.types import DomainData, UserInfo
 from ai.backend.manager.errors.auth import InsufficientPrivilege
 from ai.backend.manager.errors.storage import VFolderCreationFailure
+from ai.backend.manager.models.domain.creators import DomainCreator
 from bai_kit.manager.typed import (
     Answer,
     Invocation,
     Override,
+    Seed,
     TypedScenario,
     TypedSetup,
+    after,
     all_of_typed,
     at,
+    checked,
     config_of,
+    creates,
     every,
+    exactly,
     fake_of,
     holds,
     op,
@@ -202,5 +214,85 @@ STORAGE_SCENARIOS: list[DomainScenario] = [
             ],
         ),
         then=VFolderCreationFailure,
+    ),
+]
+
+
+# ---------------------------------------------------------------------------
+# Putting a row in the database: the creator names the row and its data type
+# ---------------------------------------------------------------------------
+
+
+def _a_seed_carries_the_data_type_its_creator_answers() -> None:
+    """``DomainCreator`` answers ``DomainData``, so the seed does too. Which ops path
+    writes it follows from the creator's type, not from a name given here."""
+    assert_type(creates(DomainCreator(name="dup")), Seed[DomainData])
+
+
+existing_domain = creates(DomainCreator(name="dup"))
+
+SEEDED_SCENARIOS: list[DomainScenario] = [
+    TypedScenario.ok(
+        "a-name-already-taken-is-refused",
+        given=[existing_domain],
+        when=create_domain(CreateDomainInput(name="dup"), _actor()),
+        then=at(lambda p: p.domain.basic_info.name, "dup"),
+    ),
+    TypedScenario.ok(
+        "the-generated-id-is-reachable-after-the-seed",
+        given=[existing_domain],
+        # The id is made by the database, so the call is written against the row.
+        when=after(existing_domain, lambda row: get_domain(row.name)),
+        then=at(lambda node: node.basic_info.name, "dup"),
+    ),
+]
+
+
+# ---------------------------------------------------------------------------
+# Checking the whole answer, with the generated fields taken over by a condition
+# ---------------------------------------------------------------------------
+
+
+def _recent(within: timedelta) -> Any:
+    def condition(moment: datetime) -> bool:
+        return timedelta() <= datetime.now(UTC) - moment <= within
+
+    return condition
+
+
+EXHAUSTIVE: list[DomainScenario] = [
+    TypedScenario.ok(
+        "the-created-domain-in-full",
+        when=create_domain(CreateDomainInput(name="d1"), _actor()),
+        then=exactly(
+            DomainPayload(
+                domain=DomainNode(
+                    # Stated so the payload can be built; taken over below, so the
+                    # value written here is never compared.
+                    id=DomainID(UUID(int=0)),
+                    basic_info=DomainBasicInfo(name="d1", description=None, integration_name=None),
+                    registry=DomainRegistryInfo(allowed_docker_registries=[]),
+                    lifecycle=DomainLifecycleInfo(
+                        is_active=True,
+                        is_default=False,
+                        created_at=datetime.now(UTC),
+                        modified_at=datetime.now(UTC),
+                    ),
+                )
+            ),
+            where=(
+                checked(lambda p: p.domain.id, lambda i: i.version == 7, "a uuid v7"),
+                checked(
+                    lambda p: p.domain.lifecycle.created_at,
+                    _recent(timedelta(minutes=1)),
+                    "written just now",
+                ),
+                checked(
+                    lambda p: p.domain.lifecycle.modified_at,
+                    _recent(timedelta(minutes=1)),
+                    "written just now",
+                ),
+            ),
+        ),
     ),
 ]
