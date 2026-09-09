@@ -10,17 +10,12 @@ from ai.backend.common.data.entity.role_preset import RolePresetID
 from ai.backend.common.data.entity.types import EntityData, EntityIdentifier, EntityType
 from ai.backend.manager.data.common.types import SearchResult
 
-from .id import ObjectId, ScopeId
 from .object_permission import (
     ObjectPermissionData,
 )
 from .permission import PermissionData
 from .status import RoleStatus
 from .types import (
-    EntityType as LegacyEntityType,
-)
-from .types import (
-    OperationType,
     Permission,
     RBACElementType,
     RoleSource,
@@ -86,28 +81,6 @@ class RoleDetailData:
     auto_assign: bool = False
     description: str | None = None
     role_preset_id: RolePresetID | None = None
-
-
-@dataclass(frozen=True)
-class ScopePermissionCheckInput:
-    user_id: uuid.UUID
-    target_entity_type: LegacyEntityType
-    target_scope_id: ScopeId
-    permission: Permission
-
-
-@dataclass(frozen=True)
-class SingleEntityPermissionCheckInput:
-    user_id: uuid.UUID
-    target_object_id: ObjectId
-    operation: OperationType
-
-
-@dataclass(frozen=True)
-class BatchEntityPermissionCheckInput:
-    user_id: uuid.UUID
-    target_object_ids: list[ObjectId]
-    operation: OperationType
 
 
 @dataclass(frozen=True)

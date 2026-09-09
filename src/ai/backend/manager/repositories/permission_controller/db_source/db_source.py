@@ -1,13 +1,13 @@
 import logging
 import uuid
 from collections import defaultdict
-from collections.abc import Collection, Iterable, Mapping, Sequence
+from collections.abc import Collection, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any
 
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
-from sqlalchemy.orm import contains_eager, selectinload
+from sqlalchemy.orm import selectinload
 
 from ai.backend.common.data.entity.project import ProjectEntityType
 from ai.backend.common.data.entity.role import RoleID
@@ -22,7 +22,7 @@ from ai.backend.manager.data.permission.entity import (
     EntityData,
     EntityListResult,
 )
-from ai.backend.manager.data.permission.id import ObjectId, ScopeId
+from ai.backend.manager.data.permission.id import ScopeId
 from ai.backend.manager.data.permission.permission import (
     PermissionData,
     PermissionListResult,
@@ -50,7 +50,6 @@ from ai.backend.manager.data.permission.types import (
     EntityType as LegacyEntityType,
 )
 from ai.backend.manager.data.permission.types import (
-    OperationType,
     Permission,
     ScopeData,
     ScopeListResult,
@@ -74,7 +73,6 @@ from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
 )
 from ai.backend.manager.models.rbac_models.permission.creators import RolePermissionCreator
-from ai.backend.manager.models.rbac_models.permission.object_permission import ObjectPermissionRow
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.rbac_models.permission.purgers import RolePermissionPurger
 from ai.backend.manager.models.rbac_models.permission.scopes import PermissionOperationScope
@@ -277,128 +275,6 @@ class PermissionDBSource:
             except RoleNotFound:
                 return None
             return result
-
-    async def get_user_roles(self, user_id: uuid.UUID) -> list[RoleRow]:
-        async with self._db.begin_readonly_session_read_committed() as db_session:
-            j = (
-                sa.join(
-                    RoleRow,
-                    UserRoleRow,
-                    RoleRow.id == UserRoleRow.role_id,
-                )
-                .join(
-                    ObjectPermissionRow,
-                    RoleRow.id == ObjectPermissionRow.role_id,
-                )
-                .join(
-                    PermissionRow,
-                    RoleRow.id == PermissionRow.role_id,
-                )
-            )
-            stmt = (
-                sa.select(RoleRow)
-                .select_from(j)
-                .where(UserRoleRow.user_id == user_id)
-                .options(
-                    selectinload(RoleRow.object_permission_rows),
-                )
-            )
-
-            result = await db_session.scalars(stmt)
-            return list(result.all())
-
-    async def check_scope_permission_exist(
-        self,
-        user_id: uuid.UUID,
-        scope_id: ScopeId,
-        permission: Permission,
-    ) -> bool:
-        inner_query = (
-            sa.select(sa.literal(1))
-            .select_from(
-                sa.join(RoleRow, UserRoleRow, RoleRow.id == UserRoleRow.role_id).join(
-                    PermissionRow, RoleRow.id == PermissionRow.role_id
-                )
-            )
-            .where(
-                sa.and_(
-                    RoleRow.status == RoleStatus.ACTIVE,
-                    UserRoleRow.user_id == user_id,
-                    sa.cast(RoleRow.scope_id, sa.String) == scope_id.scope_id,
-                    PermissionRow.permission == permission,
-                    PermissionRow.all_fields.is_(True),
-                )
-            )
-        )
-        role_query = sa.select(sa.exists(inner_query))
-        async with self._db.begin_readonly_session_read_committed() as db_session:
-            result = await db_session.scalar(role_query)
-            return result or False
-
-    def _make_query_statement_for_object_permissions(
-        self,
-        user_id: uuid.UUID,
-        object_ids: Iterable[ObjectId],
-        operation: OperationType,
-    ) -> sa.sql.Select[Any]:
-        object_id_for_cond = [obj_id.entity_id for obj_id in object_ids]
-        return (
-            sa.select(RoleRow)
-            .select_from(
-                sa.join(RoleRow, UserRoleRow, RoleRow.id == UserRoleRow.role_id)
-                .join(PermissionRow, RoleRow.id == PermissionRow.role_id)
-                .join(
-                    AssociationScopesEntitiesRow,
-                    sa.and_(
-                        sa.cast(RoleRow.scope_id, sa.String)
-                        == AssociationScopesEntitiesRow.scope_id,
-                        RoleRow.scope_type == AssociationScopesEntitiesRow.scope_type,
-                    ),
-                    isouter=True,
-                )
-                .join(ObjectPermissionRow, RoleRow.id == ObjectPermissionRow.role_id)
-            )
-            .where(
-                sa.and_(
-                    RoleRow.status == RoleStatus.ACTIVE,
-                    UserRoleRow.user_id == user_id,
-                    sa.or_(
-                        sa.and_(
-                            AssociationScopesEntitiesRow.entity_id.in_(object_id_for_cond),
-                            PermissionRow.permission == Permission.from_operation(operation),
-                            PermissionRow.all_fields.is_(True),
-                        ),
-                        sa.and_(
-                            ObjectPermissionRow.entity_id.in_(object_id_for_cond),
-                            ObjectPermissionRow.operation == operation,
-                        ),
-                    ),
-                )
-            )
-            .options(
-                contains_eager(RoleRow.object_permission_rows),
-            )
-        )
-
-    async def check_batch_object_permission_exist(
-        self,
-        user_id: uuid.UUID,
-        object_ids: Iterable[ObjectId],
-        operation: OperationType,
-    ) -> dict[ObjectId, bool]:
-        result: dict[ObjectId, bool] = dict.fromkeys(object_ids, False)
-        role_query = self._make_query_statement_for_object_permissions(
-            user_id, object_ids, operation
-        )
-        async with self._db.begin_readonly_session_read_committed() as db_session:
-            role_rows_result = await db_session.scalars(role_query)
-            role_rows = list(role_rows_result.unique().all())
-
-            for role in role_rows:
-                for op in role.object_permission_rows:
-                    object_id = op.object_id()
-                    result[object_id] = True
-        return result
 
     async def search_roles(
         self,
