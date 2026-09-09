@@ -4667,3 +4667,74 @@ class TestATunnelAnotherAgentIsUsing:
         plugin = _plugin(rec, vxlans=(vxlan_dev(5000),))
         await plugin.prepare_recovery(spare=(5000,))
         assert plugin.unclosed_devices() == frozenset()
+
+
+class _ProductionRunner(Recorder):
+    """Fails the way the real runner fails, and that difference is the whole point.
+
+    `Recorder` raises `RuntimeError`. `_run`/`_runner` raise `NetworkOperationFailed`, which is a
+    `BackendAIError` -- neither a `RuntimeError` nor an `OSError`. Every handler written around
+    those two was dead code in production while passing every unit test that used `Recorder`, so a
+    test double that cannot reproduce the real exception type cannot catch the real bug.
+    """
+
+    @override
+    async def __call__(self, argv: Sequence[str]) -> None:
+        self.calls.append(list(argv))
+        if self.fail_on is not None and self.fail_on(argv):
+            raise NetworkOperationFailed(
+                f"command failed (rc=1): {' '.join(argv)}: "
+                "iptables: No chain/target/match by that name."
+            )
+
+
+def _is_delete(argv: Sequence[str]) -> bool:
+    return "-D" in argv
+
+
+class TestReinstallingARuleTheFlushAlreadyRemoved:
+    """`reinstall` deletes then re-adds, to move a rule that is present but shadowed. The delete
+    of a rule that is *not* there must not stop the add.
+
+    This is the flushed-chain case the drift pass exists for: `iptables -F` empties our chain, the
+    pass finds the plaintext-drop rule missing, and restoring it ran the delete first -- which
+    failed on the rule the flush had just removed. Measured on a live node: the receive side stayed
+    open for the life of the session while the tunnel kept encrypting what it sent.
+    """
+
+    _CHECK = ["iptables", "-w", "-C", "BAI-VXLAN-IN", "-j", "DROP"]
+    _ADD = ["iptables", "-w", "-A", "BAI-VXLAN-IN", "-j", "DROP"]
+
+    async def test_the_add_runs_after_a_delete_that_found_nothing(self) -> None:
+        rec = _ProductionRunner(fail_on=_is_delete)
+        plugin = _plugin(rec)
+        await plugin._ensure_rule(self._CHECK, self._ADD, reinstall=True)
+        assert any("-A" in call for call in rec.calls), (
+            "the re-add never ran, so a flushed chain stays empty and the receive side stays open"
+        )
+
+    async def test_the_delete_is_attempted_first_so_a_shadowed_rule_moves(self) -> None:
+        rec = _ProductionRunner()
+        plugin = _plugin(rec)
+        await plugin._ensure_rule(self._CHECK, self._ADD, reinstall=True)
+        verbs = [next(t for t in call if t in ("-C", "-D", "-A")) for call in rec.calls]
+        assert verbs == ["-D", "-A"], (
+            "reinstall must delete before adding, or a rule sitting below an ACCEPT is duplicated"
+            " rather than moved back to the head"
+        )
+
+    async def test_a_reinstall_never_consults_the_check(self) -> None:
+        """`iptables -C` cannot tell "not there" from "there but shadowed", which is the reason
+        this branch skips it."""
+        rec = _ProductionRunner()
+        plugin = _plugin(rec)
+        await plugin._ensure_rule(self._CHECK, self._ADD, reinstall=True)
+        assert not any("-C" in call for call in rec.calls)
+
+    async def test_an_add_that_really_fails_still_propagates(self) -> None:
+        """Only the delete is best-effort. An add that fails leaves the chain open, and the caller
+        turns that into a refusal to carry the session."""
+        rec = _ProductionRunner(fail_on=lambda argv: "-A" in argv)
+        plugin = _plugin(rec)
+        with pytest.raises(NetworkOperationFailed):
+            await plugin._ensure_rule(self._CHECK, self._ADD, reinstall=True)
