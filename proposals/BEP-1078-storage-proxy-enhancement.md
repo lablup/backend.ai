@@ -12,10 +12,10 @@ type: bep
 scope: Normalize storage proxies, backends, volumes and their mounts into the database
 key-constraints:
   - Storage proxy identity and address stay in the service catalog, never in a dedicated table
-  - Volume and backend identity is the operator-declared name, global rather than proxy-scoped, never an inferred path
+  - Volume and backend identity is an operator-assigned id declared in each service's configuration, never a name or an inferred path
   - Service state lives in the service catalog; storage state lives on relationships, never on a volume or a backend
 key-decisions:
-  - Heartbeat upserts volumes by name; backends are inserted only when absent
+  - Heartbeat upserts volumes by id; backends are inserted only when absent
 upstream: BEP-1046 (service catalog)
 -->
 
@@ -69,7 +69,7 @@ erDiagram
     STORAGE_VOLUME ||--o{ VFOLDER : stores
 ```
 
-A storage backend is one storage appliance. A storage volume is a logical volume on it, identified by an operator-declared name. Storage proxies and agents both mount volumes, each at its own path, so the proxy's path and an agent's path are independent facts rather than an assumption. A resource group offers a set of volumes to the sessions scheduled onto its agents.
+A storage backend is one storage appliance. A storage volume is a logical volume on it, identified by an operator-assigned id. Storage proxies and agents both mount volumes, each at its own path, so the proxy's path and an agent's path are independent facts rather than an assumption. A resource group offers a set of volumes to the sessions scheduled onto its agents.
 
 Every many-to-many relationship above carries data of its own:
 
@@ -84,11 +84,11 @@ Storage proxies and agents are not storage-specific records. They are services: 
 
 The agent — volume relationship records which agents mount a volume. Whether it constrains placement is out of scope here.
 
-### Volume identity
+### Identity
 
-A volume is identified by its **name**, declared as the configuration section key in every service that mounts it. The name is global, not scoped per proxy: two services declaring the same name are declaring the same volume, and that declaration is the only evidence of sameness the system has. An operator who wants two volumes kept apart gives them different names.
+A storage volume and a storage backend are each identified by an **id (UUID)**, assigned by the operator and written into the configuration of every service that declares it. Two services declaring the same id are declaring the same volume or the same backend, and that declaration is the only evidence of sameness the system has. A name stays a human label and may be changed without touching a reference.
 
-Paths cannot serve as identity. A path is a local mount point on one host: the same export mounted at two different paths is still one volume, and two unrelated local disks mounted at the same path are two volumes. Inferring identity from a path would merge unrelated storage and point folders at the wrong data.
+Neither a name nor a path can serve as identity. A name is scoped per proxy today, so the same configuration section key on two proxies can mean unrelated storage. A path is a local mount point on one host: the same export mounted at two different paths is still one volume, and two unrelated local disks mounted at the same path are two volumes.
 
 ### State management
 
@@ -131,11 +131,11 @@ Registration is driven by heartbeats so that a fresh installation needs no manua
 
 **A service starts and finishes initializing.** It registers in the service catalog and its heartbeat declares the backends it is configured against and the volumes it mounts, each with that service's mount path. The manager then:
 
-- inserts a storage backend record **only if one with that name is absent**, so administrator-supplied connection details are never overwritten;
-- upserts each storage volume by name and links it to its backend, logging an error and leaving the volume unlinked if the named backend does not resolve;
+- inserts a storage backend record **only if one with that id is absent**, so administrator-supplied connection details are never overwritten;
+- upserts each storage volume by id and links it to its backend, logging an error and leaving the volume unlinked if the declared backend id does not resolve;
 - creates the service's backend and volume relationships, with mount state unknown until the first probe.
 
-A backend name is optional in the service configuration; when absent the backend type is used as the name, so existing configurations register a backend named after their type. Backend names are global on the same terms as volume names: services naming the same backend are naming one appliance, and separating two appliances is done by naming them differently. Connection details and credentials are never carried in a heartbeat, because it travels over the shared event bus.
+Every volume and backend in a service's configuration carries its id. A declaration missing one is rejected rather than registered under a generated id, so which records exist is always the operator's choice. Connection details and credentials are never carried in a heartbeat, because it travels over the shared event bus.
 
 **A heartbeat arrives normally.** The catalog records it. The service's relationships are reconciled against what it now reports: a volume newly declared gets a relationship, and one no longer declared has its relationship marked detached rather than deleted. Backend and volume records are not touched beyond the volume upsert.
 
@@ -149,8 +149,8 @@ Once a service is confirmed down, its relationships are left in place but are no
 
 | Record | Created by | Updated by | Removed by |
 |--------|-----------|-----------|-----------|
-| Storage backend | First heartbeat naming it | Administrator | Nothing |
-| Storage volume | First heartbeat naming it | Heartbeat | Administrator, soft delete only |
+| Storage backend | First heartbeat declaring it | Administrator | Nothing |
+| Storage volume | First heartbeat declaring it | Heartbeat | Administrator, soft delete only |
 | Storage proxy — backend | Heartbeat | Probe results | Never deleted; marked detached by the manager on deregistration |
 | Storage proxy — volume | Heartbeat | Heartbeat, probe results | Never deleted; marked detached when the service deregisters or stops declaring it |
 | Agent — volume | Heartbeat | Heartbeat, probe results | Never deleted; marked detached when the service deregisters or stops declaring it |
@@ -203,9 +203,8 @@ A folder names a volume and no longer names a proxy, so the manager selects one 
 | Step | Note |
 |------|------|
 | Proxy connection settings move from etcd to the manager configuration file | The TOML loader must take precedence over the etcd volume loader, otherwise the file values are silently overridden |
-| Built-in backend types are seeded when the schema is created | Following `resource_slot_types`, the migration inserts a backend record per built-in type, so an existing single-node installation has a working `vfs` backend before any heartbeat arrives |
 | Volume and backend records are pulled from the running storage proxies by a CLI command | etcd holds no volume or backend data — it lives only in each proxy's configuration file. The command reads what each proxy reports and writes the records and relationships, so an operator does not have to wait for every proxy to be upgraded to the new heartbeat |
-| Volume and backend names that collide across proxies are reported, and the operator renames them before the data migration proceeds | Names are scoped per proxy today, so two proxies can hold unrelated storage under one section name. The CLI dry run lists every collision and refuses to merge them on its own |
+| The CLI assigns an id to every volume and backend it finds, and the operator writes those ids into each proxy's configuration | Configurations carry no id today. Until a proxy's configuration is updated its declarations are rejected, so the assignment is reported and rehearsed before it is applied |
 | `vfolders.host` is split into a volume reference | Hosts naming a volume that no longer exists still get a row, so the reference stays valid |
 | `resource_group_storage_volumes` is seeded with every resource group and every volume | Resource groups place no restriction on volumes today; seeding preserves that. Without it, no session could mount anything after the migration |
 
@@ -226,8 +225,7 @@ Data migration runs through a manager CLI command, not an Alembic migration, so 
 | Date | Decision | Rationale |
 |------|----------|-----------|
 | 2026-09-04 | Storage proxies get no table; the service catalog is their record | A proxy is a service like any other, and its liveness is already tracked there |
-| 2026-09-04 | Volume identity is the declared name | A path is a property of a host, not of a volume, and inferring identity from it can merge unrelated storage |
-| 2026-09-09 | Volume and backend names are global, not proxy-scoped | Sameness has to be declarable across services; operators separate two of them by naming them differently |
+| 2026-09-09 | Volume and backend identity is an operator-assigned id | A name is scoped per proxy and a path is a property of a host; neither is a stable reference, and a folder must keep pointing at the same storage across a rename |
 | 2026-09-04 | Storage proxies and agents are state-managed through the service catalog | One place answers whether a service is up; the `agents` table keeps only what scheduling requires |
 | 2026-09-04 | Health belongs to relationships | The same appliance can be reachable from one service and not another |
 | 2026-09-04 | No overall verdict for a backend or a volume | Aggregating per-service observations into one value needs an arbitrary rule, and consumers already have the per-relationship states |
