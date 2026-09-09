@@ -40,7 +40,6 @@ from ai.backend.common.dto.manager.v2.rbac import (
     AssociationScopesEntitiesNode,
     BulkAddRolePermissionFailureInfo,
     BulkAddRolePermissionsPayload,
-    BulkAssignRoleFailureInfo,
     BulkAssignRoleResultPayload,
     BulkRemoveRolePermissionFailureInfo,
     BulkRemoveRolePermissionsPayload,
@@ -206,13 +205,7 @@ from ai.backend.manager.models.rbac_models.role.updaters import RoleSoftDeleteUp
 from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
 from ai.backend.manager.models.specs.pagination import NoPagination, OffsetPagination
 from ai.backend.manager.models.specs.permission import PermissionEntry
-from ai.backend.manager.models.virtual_entity.conditions import OwningScopeConditions
-from ai.backend.manager.repositories.base import BatchQuerier, BulkCreator, Purger
-from ai.backend.manager.repositories.base.creator import Creator
-from ai.backend.manager.repositories.base.updater import Updater
-from ai.backend.manager.repositories.permission_controller.creators import (
-    UserRoleCreatorSpec,
-)
+from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.services.permission_contoller.actions.add_role_permission import (
     AddRolePermissionAction,
 )
@@ -975,10 +968,10 @@ class RBACAdapter(BaseAdapter):
 
     async def bulk_assign_role(self, input: BulkAssignRoleInputDTO) -> BulkAssignRoleResultPayload:
         """Bulk-assign a role to multiple users."""
-        specs = [UserRoleCreatorSpec(user_id=uid, role_id=input.role_id) for uid in input.user_ids]
         action_result = await self._rbac.bulk_assign_role.wait_for_complete(
             BulkAssignRoleAction(
-                bulk_creator=BulkCreator(specs=specs),
+                role_id=RoleID(input.role_id),
+                user_ids=[UserID(uid) for uid in input.user_ids],
                 project_id=input.project_id,
             )
         )
@@ -995,10 +988,7 @@ class RBACAdapter(BaseAdapter):
                 )
                 for s in result.successes
             ],
-            failed=[
-                BulkAssignRoleFailureInfo(user_id=f.user_id, message=f.message)
-                for f in result.failures
-            ],
+            failed=[],
         )
 
     async def bulk_add_role_permissions(

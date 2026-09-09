@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Collection, Mapping, Sequence
-from typing import cast
 
 from ai.backend.common.data.entity.role import RoleID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.permission.types import Permission, RBACElementType
 from ai.backend.common.exception import BackendAIError
 from ai.backend.common.metrics.metric import DomainType, LayerType
@@ -21,7 +21,6 @@ from ai.backend.manager.data.permission.role import (
     AssignedUserListResult,
     BatchEntityPermissionCheckInput,
     BulkPermissionCheckInput,
-    BulkRoleAssignmentFailure,
     BulkRoleAssignmentResultData,
     BulkRolePermissionReplaceResultData,
     BulkRoleRevocationResultData,
@@ -50,16 +49,9 @@ from ai.backend.manager.models.rbac_models.permission.purgers import RolePermiss
 from ai.backend.manager.models.rbac_models.permission.scopes import PermissionOperationScope
 from ai.backend.manager.models.rbac_models.permission.updaters import RolePermissionUpdater
 from ai.backend.manager.models.rbac_models.role.scopes import ScopedRoleOperationScope
-from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
 from ai.backend.manager.models.specs.permission import PermissionEntry
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.base.creator import (
-    BulkCreator,
-)
 from ai.backend.manager.repositories.base.querier import BatchQuerier
-from ai.backend.manager.repositories.permission_controller.creators import (
-    UserRoleCreatorSpec,
-)
 
 from .db_source.db_source import PermissionDBSource
 
@@ -151,20 +143,13 @@ class PermissionControllerRepository:
 
     @permission_controller_repository_resilience.apply()
     async def bulk_assign_role(
-        self, bulk_creator: BulkCreator[UserRoleRow]
+        self,
+        role_id: RoleID,
+        user_ids: Sequence[UserID],
+        granted_by: UserID | None = None,
     ) -> BulkRoleAssignmentResultData:
-        result = await self._db_source.bulk_assign_role(bulk_creator)
-        failures = [
-            BulkRoleAssignmentFailure(
-                user_id=cast(UserRoleCreatorSpec, error.spec).user_id,
-                message=str(error.exception),
-            )
-            for error in result.errors
-        ]
-        return BulkRoleAssignmentResultData(
-            successes=[row.to_data() for row in result.successes],
-            failures=failures,
-        )
+        rows = await self._db_source.bulk_assign_role(role_id, user_ids, granted_by)
+        return BulkRoleAssignmentResultData(successes=[row.to_data() for row in rows])
 
     @permission_controller_repository_resilience.apply()
     async def bulk_revoke_role(
