@@ -12441,10 +12441,10 @@ input ModifyQueryDefinitionOptionsInput
   @join__type(graph: STRAWBERRY)
 {
   """Allowed filter label keys."""
-  filterLabels: [String!] = null
+  filterLabels: [String!]
 
   """Allowed group-by label keys."""
-  groupLabels: [String!] = null
+  groupLabels: [String!]
 }
 
 """Added in 26.3.0. Payload returned after modifying a query definition."""
