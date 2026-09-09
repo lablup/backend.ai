@@ -33,12 +33,14 @@ __all__ = (
     "FakeOf",
     "Deferred",
     "Seed",
+    "ActorBound",
     "after",
     "Checked",
     "Exactly",
     "Ignored",
     "Taken",
     "at",
+    "mismatches_of",
     "checked",
     "config_of",
     "exactly",
@@ -376,6 +378,22 @@ class Seed[S, D]:
 
 
 @dataclass(frozen=True)
+class ActorBound[A, R, I]:
+    """A call that cannot be written until the actor is known, because the method takes
+    something about the caller beside the request.
+
+    ``I`` is whatever the runner knows about the actor; nothing here says what that is.
+    """
+
+    build: Callable[[I], Invocation[A, R]]
+
+
+def needs_actor[A, R, I](build: Callable[[I], Invocation[A, R]]) -> ActorBound[A, R, I]:
+    """Say the call needs the actor, and how to make it once the runner supplies one."""
+    return ActorBound(build)
+
+
+@dataclass(frozen=True)
 class Deferred[A, R]:
     """A call that cannot be written until a seeded row exists, because it names
     something the database generated."""
@@ -558,8 +576,9 @@ class TypedScenario[A, C]:
     """
 
     id: str
-    invoke: Callable[[A, Mapping[str, Any]], Awaitable[Any]]
+    invoke: Callable[[A, Mapping[str, Any], Any], Awaitable[Any]]
     then: TypedMatcher[Any] | type[BaseException] | None = None
+    actor: Persona | None = None
     given: tuple[Seed[Any, Any], ...] = ()
     setup: TypedSetup[C] = field(default_factory=TypedSetup)
 
@@ -568,43 +587,68 @@ class TypedScenario[A, C]:
         cls,
         id: str,
         *,
-        when: Invocation[A, R] | Deferred[A, R],
+        when: Invocation[A, R] | Deferred[A, R] | ActorBound[A, R, Any],
         then: TypedMatcher[R] | None = None,
+        actor: Persona | None = None,
         given: Sequence[Seed[Any, Any]] = (),
         setup: TypedSetup[C] | None = None,
     ) -> TypedScenario[A, C]:
-        return cls(id, _invoker(when), then, tuple(given), setup or TypedSetup())
+        return cls(id, _invoker(when), then, actor, tuple(given), setup or TypedSetup())
 
     @classmethod
     def error[R](
         cls,
         id: str,
         *,
-        when: Invocation[A, R] | Deferred[A, R],
+        when: Invocation[A, R] | Deferred[A, R] | ActorBound[A, R, Any],
         then: type[BaseException],
+        actor: Persona | None = None,
         given: Sequence[Seed[Any, Any]] = (),
         setup: TypedSetup[C] | None = None,
     ) -> TypedScenario[A, C]:
-        return cls(id, _invoker(when), then, tuple(given), setup or TypedSetup())
+        return cls(id, _invoker(when), then, actor, tuple(given), setup or TypedSetup())
 
 
 def _invoker[A, R](
-    when: Invocation[A, R] | Deferred[A, R],
-) -> Callable[[A, Mapping[str, Any]], Awaitable[R]]:
-    """One shape for both kinds of call: the runner hands over what the seeds made, and
-    a deferred call reads its own row out of it."""
+    when: Invocation[A, R] | Deferred[A, R] | ActorBound[A, R, Any],
+) -> Callable[[A, Mapping[str, Any], Any], Awaitable[R]]:
+    """One shape for the three kinds of call. The runner hands over what the seeds made
+    and what it knows about the actor; each kind takes what it needs."""
     if isinstance(when, Deferred):
         deferred = when
 
-        def run_deferred(adapter: A, seeded: Mapping[str, Any]) -> Awaitable[R]:
-            row = seeded[deferred.seed.label]
-            return deferred.build(row).call(adapter)
+        def run_deferred(adapter: A, sown: Mapping[str, Any], _actor: Any) -> Awaitable[R]:
+            return deferred.build(sown[deferred.seed.label]).call(adapter)
 
         return run_deferred
 
+    if isinstance(when, ActorBound):
+        bound = when
+
+        def run_bound(adapter: A, _sown: Mapping[str, Any], actor: Any) -> Awaitable[R]:
+            return bound.build(actor).call(adapter)
+
+        return run_bound
+
     invocation = when
 
-    def run(adapter: A, _seeded: Mapping[str, Any]) -> Awaitable[R]:
+    def run(adapter: A, _sown: Mapping[str, Any], _actor: Any) -> Awaitable[R]:
         return invocation.call(adapter)
 
     return run
+
+
+def mismatches_of(matcher: TypedMatcher[Any], answered: Any, fakes: Mapping[str, Any]) -> list[str]:
+    """What a matcher says about one answer.
+
+    A matcher over an external fake is resolved here, because only the run knows which
+    fakes it wired.
+    """
+    if isinstance(matcher, OnFake):
+        fake = fakes.get(matcher.fake.__name__)
+        if fake is None:
+            return [f"{matcher.fake.__name__} was not wired by this run"]
+        return matcher.matcher.mismatches(fake)
+    if isinstance(matcher, All):
+        return [m for part in matcher.parts for m in mismatches_of(part, answered, fakes)]
+    return matcher.mismatches(answered)

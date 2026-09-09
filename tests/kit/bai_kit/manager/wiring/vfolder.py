@@ -2,13 +2,12 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, cast
+from typing import Any, cast
 from unittest.mock import MagicMock
 
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
-from ai.backend.common.data.entity.vfolder import VFOLDER_ENTITY_TYPE
+from ai.backend.common.data.entity.vfolder import VFolderEntityType
 from ai.backend.common.dto.manager.v2.vfolder.request import CreateVFolderInput
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
@@ -24,23 +23,19 @@ from ai.backend.manager.repositories.ops.v2.share.provider import ShareOpsProvid
 from ai.backend.manager.repositories.user.repository import UserRepository
 from ai.backend.manager.repositories.vfolder.repository import VfolderRepository
 from ai.backend.manager.secret.pool import KeyProviderPool
+from ai.backend.manager.services.deployment.processors import DeploymentProcessors
+from ai.backend.manager.services.vfolder.processors.file import VFolderFileProcessors
 from ai.backend.manager.services.vfolder.processors.vfolder import VFolderProcessors
+from ai.backend.manager.services.vfolder.processors.vfolder_admin import VFolderAdminProcessors
 from ai.backend.manager.services.vfolder.services.vfolder import VFolderService
+from ai.backend.testutils.typed_scenario import op
 from bai_kit.manager.fakes.storage_proxy import (
     FakeStorageProxyManagerFacingClient,
     FakeStorageSessionManager,
     StorageScript,
 )
 from bai_kit.manager.runner import Wired, WiringDeps
-
-if TYPE_CHECKING:
-    from ai.backend.manager.services.processors import Processors  # pants: no-infer-dep
-
-
-@dataclass
-class VFolderAdapterProcessors:
-    vfolder: VFolderProcessors
-
+from bai_kit.manager.unwired import unwired
 
 DISPATCH: dict[type, str] = {
     CreateVFolderInput: "create",
@@ -87,11 +82,26 @@ def vfolder_wiring(deps: WiringDeps) -> Wired:
         ),
         valkey_stat_client=MagicMock(spec=ValkeyStatClient),
     )
-    processors = VFolderProcessors(registry.group(GroupMeta(VFOLDER_ENTITY_TYPE)), service)
-    adapter = VFolderAdapter(cast("Processors", VFolderAdapterProcessors(processors)))
+    processors = VFolderProcessors(registry.group(GroupMeta(VFolderEntityType())), service)
+    adapter = VFolderAdapter(
+        processors,
+        unwired(VFolderFileProcessors, "no file operation is exercised here"),
+        unwired(VFolderAdminProcessors, "no admin operation is exercised here"),
+        unwired(DeploymentProcessors, "only deploy() reaches it"),
+    )
     return Wired(
         adapter=adapter,
         dispatch=DISPATCH,
         client_attr="vfolder",
         extras={STORAGE_EXTRA: storage},
     )
+
+
+# ---------------------------------------------------------------------------
+# The operations a vfolder scenario may name
+# ---------------------------------------------------------------------------
+
+create_vfolder = op(VFolderAdapter.create)
+get_vfolder = op(VFolderAdapter.get)
+delete_vfolder = op(VFolderAdapter.delete)
+my_vfolders = op(VFolderAdapter.my_search)

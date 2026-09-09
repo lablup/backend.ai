@@ -1,45 +1,34 @@
-"""Domain scenarios through the transport-agnostic adapter."""
+"""Domain behaviour through the transport-agnostic adapter."""
 
 from __future__ import annotations
 
 from typing import Any
 
 import pytest
+from bai_kit.manager.config import base_config_dict
+from bai_kit.manager.db import TemplateDatabase
+from bai_kit.manager.monitors import ActionRecorder
+from bai_kit.manager.typed_runner import TypedRunner
 from bai_kit.manager.wiring.domain import domain_wiring
-from bai_scenario.manager.domain.scenarios import SCENARIOS
-
-from ai.backend.manager.data.domain.types import DomainData
-from ai.backend.manager.models.domain.creators import DomainCreator
-from ai.backend.manager.repositories.ops.repository import OpsRepository
-from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
-from ai.backend.testutils.scenario import Call, Runner, Scenario, has, scenario_id
-
-WIRING = domain_wiring
-
-
-@pytest.mark.parametrize("s", SCENARIOS, ids=scenario_id)
-async def test_domain(s: Scenario, run: Runner) -> None:
-    await run(s)
-
-
-# --- given, alternative 2: a pytest fixture instead of a lazy seed --------------------
-# The row lands the same way; what differs is where the reader looks. A fixture is
-# shared by name across tests and hides which scenario needs it; a Seed sits on the
-# scenario line. Kept as one example for the comparison.
+from bai_scenario.manager.domain.scenarios import SCENARIOS, DomainScenario
 
 
 @pytest.fixture
-async def fixture_domain(engine: Any) -> DomainData:
-    ops: OpsRepository[Any] = OpsRepository(V2DBOpsProvider(engine))
-    data: DomainData = await ops.create_role_managed_global_entity(DomainCreator(name="fx-domain"))
-    return data
-
-
-async def test_get_with_fixture_given(fixture_domain: DomainData, run: Runner) -> None:
-    await run(
-        Scenario.ok(
-            "fixture-given",
-            when=Call("get", "fx-domain"),
-            then=has(basic_info=has(name="fx-domain")),
-        )
+def run(
+    world_template: TemplateDatabase,
+    test_db: str,
+    engine: Any,
+    recorder: ActionRecorder,
+) -> TypedRunner:
+    return TypedRunner(
+        wiring=domain_wiring,
+        engine=engine,
+        world=world_template.world,
+        base_config=base_config_dict(world_template.addr, test_db, None),
+        recorder=recorder,
     )
+
+
+@pytest.mark.parametrize("scenario", SCENARIOS, ids=lambda s: s.id)
+async def test_domain(scenario: DomainScenario, run: TypedRunner) -> None:
+    await run(scenario)

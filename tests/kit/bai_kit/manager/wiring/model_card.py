@@ -7,10 +7,9 @@ and says so if a scenario reaches it.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, cast
+from typing import Any
 
-from ai.backend.common.data.entity.model_card import MODEL_CARD_ENTITY_TYPE
+from ai.backend.common.data.entity.model_card import ModelCardEntityType
 from ai.backend.common.dto.manager.v2.model_card.request import (
     CreateModelCardInput,
     SearchModelCardsInput,
@@ -25,24 +24,13 @@ from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.services.deployment.processors import DeploymentProcessors
 from ai.backend.manager.services.model_card.processors import ModelCardProcessors
 from ai.backend.manager.services.model_card.service import ModelCardService
+from ai.backend.testutils.typed_scenario import op
 from bai_kit.manager.fakes.storage_proxy import (
     FakeStorageProxyManagerFacingClient,
     FakeStorageSessionManager,
 )
 from bai_kit.manager.runner import Wired, WiringDeps
 from bai_kit.manager.unwired import unwired
-
-if TYPE_CHECKING:
-    from ai.backend.manager.services.processors import Processors  # pants: no-infer-dep
-
-
-@dataclass
-class ModelCardAdapterProcessors:
-    """The two groups ``ModelCardAdapter`` reads. Only ``deploy`` touches deployment."""
-
-    model_card: ModelCardProcessors
-    deployment: DeploymentProcessors
-
 
 DISPATCH: dict[type, str] = {
     CreateModelCardInput: "create",
@@ -68,15 +56,10 @@ def model_card_wiring(deps: WiringDeps) -> Wired:
         ModelCardRepository(provider),
         FakeStorageSessionManager({"local": storage}),
     )
-    model_card = ModelCardProcessors(registry.group(GroupMeta(MODEL_CARD_ENTITY_TYPE)), service)
+    model_card = ModelCardProcessors(registry.group(GroupMeta(ModelCardEntityType())), service)
     adapter = ModelCardAdapter(
-        cast(
-            "Processors",
-            ModelCardAdapterProcessors(
-                model_card=model_card,
-                deployment=unwired(DeploymentProcessors, "only deploy() reaches it"),
-            ),
-        )
+        model_card,
+        unwired(DeploymentProcessors, "only deploy() reaches it"),
     )
     return Wired(
         adapter=adapter,
@@ -84,3 +67,13 @@ def model_card_wiring(deps: WiringDeps) -> Wired:
         client_attr="model_card",
         extras={STORAGE_EXTRA: storage},
     )
+
+
+# ---------------------------------------------------------------------------
+# The operations a model card scenario may name
+# ---------------------------------------------------------------------------
+
+search_model_cards = op(ModelCardAdapter.admin_search)
+search_model_cards_in_project = op(ModelCardAdapter.project_search)
+get_model_card = op(ModelCardAdapter.get)
+create_model_card = op(ModelCardAdapter.create)

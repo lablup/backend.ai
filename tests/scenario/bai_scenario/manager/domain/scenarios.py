@@ -1,203 +1,357 @@
-"""The domain scenario table. Two test modules run it: the adapter and the HTTP round trip."""
+"""What the domain adapter does, said as a request, an actor, and an answer.
+
+Every row names a request DTO, who makes it, and either the response DTO it must answer
+or the error it must raise. The four personas differ in what the World granted them, so
+the same request appears more than once with different answers, and that difference is
+the permission rule under test.
+
+| persona      | holds                                                |
+|--------------|------------------------------------------------------|
+| SUPERADMIN   | the superadmin role, which the global gate lets past  |
+| DOMAIN_ADMIN | the domain's admin preset: users within the domain    |
+| MEMBER       | its own user preset, and a seat on the shared project |
+| OTHER_MEMBER | its own user preset, and no seat                      |
+
+Neither admin preset grants anything on the domain entity itself, so reading or editing
+a domain is the superadmin's alone. That is what the refusals below record.
+"""
 
 from __future__ import annotations
 
-from bai_kit.manager.personas import MEMBER
-from bai_kit.manager.wiring.domain import create_input, domain_wiring, seed_domain
+from datetime import UTC, datetime, timedelta
+from uuid import UUID
 
+from bai_kit.manager.personas import DOMAIN_ADMIN, MEMBER, OTHER_MEMBER
+from bai_kit.manager.seeding import Sown, creates
+from bai_kit.manager.wiring.domain import (
+    admin_create,
+    admin_delete,
+    admin_purge,
+    admin_restore,
+    admin_search,
+    admin_update,
+    get_domain,
+)
+
+from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.dto.manager.query import StringFilter
 from ai.backend.common.dto.manager.v2.domain.request import (
     AdminSearchDomainsInput,
+    CreateDomainInput,
     DeleteDomainInput,
     DomainFilter,
     PurgeDomainInput,
     RestoreDomainInput,
     UpdateDomainInput,
 )
+from ai.backend.common.dto.manager.v2.domain.response import (
+    DomainBasicInfo,
+    DomainLifecycleInfo,
+    DomainNode,
+    DomainPayload,
+    DomainRegistryInfo,
+)
 from ai.backend.common.exception import InvalidAPIParameters
+from ai.backend.manager.api.adapters.domain.adapter import DomainAdapter
+from ai.backend.manager.config.unified import ManagerUnifiedConfig
+from ai.backend.manager.data.domain.types import DomainData
 from ai.backend.manager.errors.auth import InsufficientPrivilege
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.errors.repository import EntityNotFoundError
-from ai.backend.testutils.scenario import (
-    Call,
-    Scenario,
-    Setup,
-    Step,
-    each,
-    has,
-    snapshot,
+from ai.backend.manager.models.domain.creators import DomainCreator
+from ai.backend.testutils.typed_scenario import (
+    TypedScenario,
+    TypedSetup,
+    at,
+    checked,
+    config_of,
+    every,
+    exactly,
+    ignored,
+    recent,
 )
 
-WIRING = domain_wiring
+type DomainScenario = TypedScenario[DomainAdapter, ManagerUnifiedConfig]
 
-ENFORCEMENT_OFF = Setup(config={"manager.rbac.enforcement_enabled": False})
+manager_config = config_of(ManagerUnifiedConfig)
+ENFORCEMENT_OFF = TypedSetup[ManagerUnifiedConfig](
+    config=[manager_config.set(lambda c: c.manager.rbac.enforcement_enabled, False)]
+)
 
-SCENARIOS = [
-    # --- create ---------------------------------------------------------------
-    Scenario.ok(
-        "superadmin-creates-domain",
-        when=create_input(name="d1", description="first"),
-        then=has(
-            domain=has(
-                basic_info=has(name="d1", description="first"),
-                lifecycle=has(is_active=True, is_default=False),
-                registry=has(allowed_docker_registries=[]),
-            )
+_WITHIN_THE_RUN = recent(timedelta(minutes=5))
+
+# ``description`` is optional on the node, so what it is compared against has to be too.
+_SEEDED_DESCRIPTION: str | None = "readable was already here"
+
+
+def _already_there(name: str) -> Sown[DomainData]:
+    """A domain sitting in the database before the request arrives."""
+    return creates(DomainCreator(name=name, description=f"{name} was already here"))
+
+
+# ---------------------------------------------------------------------------
+# Creating a domain
+# ---------------------------------------------------------------------------
+
+CREATING: list[DomainScenario] = [
+    TypedScenario.ok(
+        "superadmin-creates-a-domain-and-gets-the-whole-node-back",
+        when=admin_create(CreateDomainInput(name="new-domain", description="a fresh one")),
+        then=exactly(
+            DomainPayload(
+                domain=DomainNode(
+                    id=DomainID(UUID(int=0)),
+                    basic_info=DomainBasicInfo(
+                        name="new-domain", description="a fresh one", integration_name=None
+                    ),
+                    registry=DomainRegistryInfo(allowed_docker_registries=[]),
+                    lifecycle=DomainLifecycleInfo(
+                        is_active=True,
+                        is_default=False,
+                        created_at=datetime.now(UTC),
+                        modified_at=datetime.now(UTC),
+                    ),
+                )
+            ),
+            where=(
+                ignored(lambda p: p.domain.id, "generated by the database"),
+                checked(lambda p: p.domain.lifecycle.created_at, _WITHIN_THE_RUN, "just written"),
+                checked(lambda p: p.domain.lifecycle.modified_at, _WITHIN_THE_RUN, "just written"),
+            ),
         ),
     ),
-    Scenario.error(
-        "create-rejects-duplicate-name",
-        given=[seed_domain("dup")],
-        when=create_input(name="dup"),
-        then=(InvalidAPIParameters, "already exists"),
+    TypedScenario.ok(
+        "a-domain-is-created-active-unless-the-request-says-otherwise",
+        when=admin_create(CreateDomainInput(name="dormant", is_active=False)),
+        then=at(lambda p: p.domain.lifecycle.is_active, False),
     ),
-    Scenario.error(
-        "create-rejects-blank-name",
-        when=create_input(name="   "),
+    TypedScenario.ok(
+        "the-allowed-registries-of-the-request-are-what-the-domain-gets",
+        when=admin_create(
+            CreateDomainInput(name="with-registries", allowed_docker_registries=["cr.example.io"])
+        ),
+        then=at(lambda p: p.domain.registry.allowed_docker_registries, ["cr.example.io"]),
+    ),
+    TypedScenario.error(
+        "a-name-already-taken-is-refused",
+        given=[_already_there("taken")],
+        when=admin_create(CreateDomainInput(name="taken")),
         then=InvalidAPIParameters,
     ),
-    Scenario.error(
-        "member-cannot-create-domain",
-        actor=MEMBER,
-        when=create_input(name="d2"),
+    TypedScenario.error(
+        "a-blank-name-is-refused",
+        when=admin_create(CreateDomainInput(name="   ")),
+        then=InvalidAPIParameters,
+    ),
+    TypedScenario.error(
+        "the-domain-admin-may-not-create-a-domain",
+        actor=DOMAIN_ADMIN,
+        when=admin_create(CreateDomainInput(name="by-domain-admin")),
         then=InsufficientPrivilege,
     ),
-    Scenario.error(
-        "enforcement-off-still-blocks-member-create",
+    TypedScenario.error(
+        "a-member-may-not-create-a-domain",
         actor=MEMBER,
-        setup=ENFORCEMENT_OFF,
-        when=create_input(name="d3"),
+        when=admin_create(CreateDomainInput(name="by-member")),
         then=InsufficientPrivilege,
     ),
-    # --- get ------------------------------------------------------------------
-    Scenario.ok(
-        "superadmin-gets-domain-by-name",
-        given=[seed_domain("d-get", description="to read")],
-        when=Call("get", "d-get"),
-        then=has(basic_info=has(name="d-get", description="to read")),
-    ),
-    Scenario.error(
-        "get-unknown-domain-is-not-found",
-        when=Call("get", "no-such-domain"),
-        then=EntityNotFoundError,
-    ),
-    Scenario.error(
-        "member-cannot-get-foreign-domain",
-        actor=MEMBER,
-        given=[seed_domain("d-foreign")],
-        when=Call("get", "d-foreign"),
-        then=NotEnoughPermission,
-    ),
-    Scenario.ok(
-        "enforcement-off-lets-member-get-domain",
+    TypedScenario.error(
+        # The gate is the role, not the permission graph, so turning enforcement off
+        # changes nothing here. That is the rule this row records.
+        "turning-enforcement-off-still-does-not-let-a-member-create-a-domain",
         actor=MEMBER,
         setup=ENFORCEMENT_OFF,
-        given=[seed_domain("d-open")],
-        when=Call("get", "d-open"),
-        then=has(basic_info=has(name="d-open")),
-    ),
-    # --- search ---------------------------------------------------------------
-    Scenario.ok(
-        "superadmin-sees-only-the-world-domain",
-        when=AdminSearchDomainsInput(),
-        then=has(total_count=1, items=each(has(basic_info=has(name="default")))),
-    ),
-    Scenario.ok(
-        "search-filters-by-exact-name",
-        given=[seed_domain("alpha"), seed_domain("beta")],
-        when=AdminSearchDomainsInput(filter=DomainFilter(name=StringFilter(equals="alpha"))),
-        then=has(total_count=1, items=each(has(basic_info=has(name="alpha")))),
-    ),
-    Scenario.error(
-        "member-cannot-search-domains",
-        actor=MEMBER,
-        when=AdminSearchDomainsInput(),
+        when=admin_create(CreateDomainInput(name="by-member-again")),
         then=InsufficientPrivilege,
-    ),
-    # --- update ---------------------------------------------------------------
-    Scenario.ok(
-        "superadmin-updates-description",
-        given=[seed_domain("d-upd")],
-        when=Call("admin_update", "d-upd", UpdateDomainInput(description="edited")),
-        then=has(domain=has(basic_info=has(name="d-upd", description="edited"))),
-    ),
-    Scenario.ok(
-        "update-deactivates-domain",
-        given=[seed_domain("d-off")],
-        when=Call("admin_update", "d-off", UpdateDomainInput(is_active=False)),
-        then=has(domain=has(lifecycle=has(is_active=False))),
-    ),
-    Scenario.error(
-        "member-cannot-update-domain",
-        actor=MEMBER,
-        given=[seed_domain("d-locked")],
-        when=Call("admin_update", "d-locked", UpdateDomainInput(description="x")),
-        then=NotEnoughPermission,
-    ),
-    Scenario.ok(
-        "enforcement-off-lets-member-update-domain",
-        actor=MEMBER,
-        setup=ENFORCEMENT_OFF,
-        given=[seed_domain("d-open-upd")],
-        when=Call("admin_update", "d-open-upd", UpdateDomainInput(description="by member")),
-        then=has(domain=has(basic_info=has(description="by member"))),
-        # The route is superadmin_required: over HTTP the member never reaches the adapter.
-        variants={"http": InsufficientPrivilege},
-    ),
-    # --- delete / restore / purge --------------------------------------------
-    Scenario.ok(
-        "superadmin-soft-deletes-domain",
-        given=[seed_domain("d-del")],
-        when=DeleteDomainInput(name="d-del"),
-        then=has(deleted=True),
-    ),
-    Scenario.error(
-        "member-cannot-delete-domain",
-        actor=MEMBER,
-        given=[seed_domain("d-keep")],
-        when=DeleteDomainInput(name="d-keep"),
-        then=NotEnoughPermission,
-    ),
-    Scenario.ok(
-        "enforcement-off-lets-member-delete-domain",
-        actor=MEMBER,
-        setup=ENFORCEMENT_OFF,
-        given=[seed_domain("d-open-del")],
-        when=DeleteDomainInput(name="d-open-del"),
-        then=has(deleted=True),
-        variants={"http": InsufficientPrivilege},
-    ),
-    Scenario.flow(
-        "delete-then-restore-reactivates",
-        given=[seed_domain("d-flow")],
-        steps=[
-            Step(DeleteDomainInput(name="d-flow"), has(deleted=True)),
-            Step(Call("get", "d-flow"), has(lifecycle=has(is_active=False))),
-            Step(RestoreDomainInput(name="d-flow"), has(restored=True)),
-            Step(Call("get", "d-flow"), has(lifecycle=has(is_active=True))),
-        ],
-    ),
-    Scenario.flow(
-        "purge-removes-domain",
-        given=[seed_domain("d-purge")],
-        steps=[
-            Step(PurgeDomainInput(name="d-purge"), has(purged=True)),
-            Step(Call("get", "d-purge"), EntityNotFoundError),
-        ],
-    ),
-    # --- then alternative: snapshot ------------------------------------------
-    Scenario.ok(
-        "create-domain-snapshot",
-        when=create_input(name="snap"),
-        then=snapshot(
-            {
-                "domain": {
-                    "basic_info": {"name": "snap", "description": None, "integration_name": None},
-                    "registry": {"allowed_docker_registries": []},
-                    "lifecycle": {"is_active": True, "is_default": False},
-                }
-            },
-            volatile=("domain.id", "domain.lifecycle.created_at", "domain.lifecycle.modified_at"),
-        ),
     ),
 ]
+
+
+# ---------------------------------------------------------------------------
+# Reading one domain
+# ---------------------------------------------------------------------------
+
+READING: list[DomainScenario] = [
+    TypedScenario.ok(
+        "superadmin-reads-a-domain-by-name",
+        given=[_already_there("readable")],
+        when=get_domain("readable"),
+        then=at(lambda node: node.basic_info.description, _SEEDED_DESCRIPTION),
+    ),
+    TypedScenario.error(
+        "reading-a-name-nothing-answers-to-is-not-found",
+        when=get_domain("no-such-domain"),
+        then=EntityNotFoundError,
+    ),
+    TypedScenario.error(
+        "the-domain-admin-holds-nothing-on-the-domain-entity-itself",
+        actor=DOMAIN_ADMIN,
+        given=[_already_there("admin-cannot-read")],
+        when=get_domain("admin-cannot-read"),
+        then=NotEnoughPermission,
+    ),
+    TypedScenario.error(
+        "a-member-may-not-read-a-domain",
+        actor=MEMBER,
+        given=[_already_there("member-cannot-read")],
+        when=get_domain("member-cannot-read"),
+        then=NotEnoughPermission,
+    ),
+    TypedScenario.ok(
+        # Here the refusal does come from the permission graph, so turning enforcement
+        # off lets the same request through. The contrast with creation is the point.
+        "turning-enforcement-off-lets-a-member-read-a-domain",
+        actor=MEMBER,
+        setup=ENFORCEMENT_OFF,
+        given=[_already_there("now-readable")],
+        when=get_domain("now-readable"),
+        then=at(lambda node: node.basic_info.name, "now-readable"),
+    ),
+]
+
+
+# ---------------------------------------------------------------------------
+# Searching domains
+# ---------------------------------------------------------------------------
+
+SEARCHING: list[DomainScenario] = [
+    TypedScenario.ok(
+        "an-untouched-world-answers-with-its-one-domain",
+        when=admin_search(AdminSearchDomainsInput()),
+        then=at(lambda p: p.total_count, 1),
+    ),
+    TypedScenario.ok(
+        "a-name-filter-narrows-the-answer-to-the-domain-it-names",
+        given=[_already_there("alpha"), _already_there("beta")],
+        when=admin_search(
+            AdminSearchDomainsInput(filter=DomainFilter(name=StringFilter(equals="alpha")))
+        ),
+        then=every(lambda p: p.items, at(lambda node: node.basic_info.name, "alpha")),
+    ),
+    TypedScenario.ok(
+        "an-active-filter-leaves-out-what-was-retired",
+        given=[_already_there("retired")],
+        when=admin_search(AdminSearchDomainsInput(filter=DomainFilter(is_active=True))),
+        then=every(lambda p: p.items, at(lambda node: node.lifecycle.is_active, True)),
+    ),
+    TypedScenario.error(
+        "the-domain-admin-may-not-search-every-domain",
+        actor=DOMAIN_ADMIN,
+        when=admin_search(AdminSearchDomainsInput()),
+        then=InsufficientPrivilege,
+    ),
+    TypedScenario.error(
+        "a-member-may-not-search-every-domain",
+        actor=MEMBER,
+        when=admin_search(AdminSearchDomainsInput()),
+        then=InsufficientPrivilege,
+    ),
+]
+
+
+# ---------------------------------------------------------------------------
+# Editing a domain
+# ---------------------------------------------------------------------------
+
+EDITING: list[DomainScenario] = [
+    TypedScenario.ok(
+        "superadmin-edits-a-description-and-the-rest-is-left-alone",
+        given=[_already_there("editable")],
+        when=admin_update("editable", UpdateDomainInput(description="edited")),
+        then=exactly(
+            DomainPayload(
+                domain=DomainNode(
+                    id=DomainID(UUID(int=0)),
+                    basic_info=DomainBasicInfo(
+                        name="editable", description="edited", integration_name=None
+                    ),
+                    registry=DomainRegistryInfo(allowed_docker_registries=[]),
+                    lifecycle=DomainLifecycleInfo(
+                        is_active=True,
+                        is_default=False,
+                        created_at=datetime.now(UTC),
+                        modified_at=datetime.now(UTC),
+                    ),
+                )
+            ),
+            where=(
+                ignored(lambda p: p.domain.id, "generated by the database"),
+                checked(lambda p: p.domain.lifecycle.created_at, _WITHIN_THE_RUN, "just written"),
+                checked(lambda p: p.domain.lifecycle.modified_at, _WITHIN_THE_RUN, "just edited"),
+            ),
+        ),
+    ),
+    TypedScenario.ok(
+        "retiring-a-domain-is-an-edit-of-its-active-flag",
+        given=[_already_there("to-retire")],
+        when=admin_update("to-retire", UpdateDomainInput(is_active=False)),
+        then=at(lambda p: p.domain.lifecycle.is_active, False),
+    ),
+    TypedScenario.error(
+        "editing-a-name-nothing-answers-to-is-not-found",
+        when=admin_update("no-such-domain", UpdateDomainInput(description="x")),
+        then=EntityNotFoundError,
+    ),
+    TypedScenario.error(
+        "a-member-may-not-edit-a-domain",
+        actor=MEMBER,
+        given=[_already_there("member-cannot-edit")],
+        when=admin_update("member-cannot-edit", UpdateDomainInput(description="x")),
+        then=NotEnoughPermission,
+    ),
+    TypedScenario.error(
+        "the-domain-admin-may-not-edit-the-domain-either",
+        actor=DOMAIN_ADMIN,
+        given=[_already_there("admin-cannot-edit")],
+        when=admin_update("admin-cannot-edit", UpdateDomainInput(description="x")),
+        then=NotEnoughPermission,
+    ),
+]
+
+
+# ---------------------------------------------------------------------------
+# Retiring, restoring and purging
+# ---------------------------------------------------------------------------
+
+RETIRING: list[DomainScenario] = [
+    TypedScenario.ok(
+        "superadmin-retires-a-domain",
+        given=[_already_there("to-delete")],
+        when=admin_delete(DeleteDomainInput(name="to-delete")),
+        then=at(lambda p: p.deleted, True),
+    ),
+    TypedScenario.ok(
+        "restoring-answers-that-it-restored",
+        given=[_already_there("to-restore")],
+        when=admin_restore(RestoreDomainInput(name="to-restore")),
+        then=at(lambda p: p.restored, True),
+    ),
+    TypedScenario.ok(
+        "purging-a-domain-nothing-else-refers-to-succeeds",
+        given=[_already_there("to-purge")],
+        when=admin_purge(PurgeDomainInput(name="to-purge")),
+        then=at(lambda p: p.purged, True),
+    ),
+    TypedScenario.error(
+        "retiring-a-name-nothing-answers-to-is-not-found",
+        when=admin_delete(DeleteDomainInput(name="no-such-domain")),
+        then=EntityNotFoundError,
+    ),
+    TypedScenario.error(
+        "a-member-may-not-retire-a-domain",
+        actor=MEMBER,
+        given=[_already_there("member-cannot-delete")],
+        when=admin_delete(DeleteDomainInput(name="member-cannot-delete")),
+        then=NotEnoughPermission,
+    ),
+    TypedScenario.error(
+        "a-member-outside-everything-may-not-purge-a-domain",
+        actor=OTHER_MEMBER,
+        given=[_already_there("stranger-cannot-purge")],
+        when=admin_purge(PurgeDomainInput(name="stranger-cannot-purge")),
+        then=NotEnoughPermission,
+    ),
+]
+
+
+SCENARIOS: list[DomainScenario] = [*CREATING, *READING, *SEARCHING, *EDITING, *RETIRING]

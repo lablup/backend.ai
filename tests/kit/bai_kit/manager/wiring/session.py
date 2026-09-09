@@ -9,12 +9,11 @@ that answered on its own.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, cast
+from typing import Any
 
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
-from ai.backend.common.data.entity.resource_group import RESOURCE_GROUP_ENTITY_TYPE
-from ai.backend.common.data.entity.session import SESSION_ENTITY_TYPE
+from ai.backend.common.data.entity.resource_group import ResourceGroupEntityType
+from ai.backend.common.data.entity.session import SessionEntityType
 from ai.backend.common.dto.manager.v2.session.request import AdminSearchSessionsInput
 from ai.backend.common.events.fetcher import EventFetcher
 from ai.backend.common.events.hub.hub import EventHub
@@ -40,20 +39,9 @@ from ai.backend.manager.services.session.service import SessionService, SessionS
 from ai.backend.manager.sokovan.scheduling_controller.scheduling_controller import (
     SchedulingController,
 )
+from ai.backend.testutils.typed_scenario import op
 from bai_kit.manager.runner import Wired, WiringDeps
 from bai_kit.manager.unwired import unwired
-
-if TYPE_CHECKING:
-    from ai.backend.manager.services.processors import Processors  # pants: no-infer-dep
-
-
-@dataclass
-class SessionAdapterProcessors:
-    """The two groups ``SessionAdapter`` reads."""
-
-    session: SessionProcessors
-    idle_checker: IdleCheckerProcessors
-
 
 DISPATCH: dict[type, str] = {
     AdminSearchSessionsInput: "admin_search",
@@ -88,18 +76,22 @@ def session_wiring(deps: WiringDeps) -> Wired:
         )
     )
     session = SessionProcessors(
-        registry.group(GroupMeta(SESSION_ENTITY_TYPE)),
-        registry.group(GroupMeta(RESOURCE_GROUP_ENTITY_TYPE)),
+        registry.group(GroupMeta(SessionEntityType())),
+        registry.group(GroupMeta(ResourceGroupEntityType())),
         unwired(ResourceAllocationProcessors, "only allocation reads reach it"),
         service,
     )
     adapter = SessionAdapter(
-        cast(
-            "Processors",
-            SessionAdapterProcessors(
-                session=session,
-                idle_checker=unwired(IdleCheckerProcessors, "only idle-check reads reach it"),
-            ),
-        )
+        session,
+        unwired(IdleCheckerProcessors, "only idle-check reads reach it"),
     )
     return Wired(adapter=adapter, dispatch=DISPATCH, client_attr="session")
+
+
+# ---------------------------------------------------------------------------
+# The operations a session scenario may name
+# ---------------------------------------------------------------------------
+
+search_sessions = op(SessionAdapter.admin_search)
+my_sessions = op(SessionAdapter.my_search)
+get_session = op(SessionAdapter.get)

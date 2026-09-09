@@ -13,14 +13,18 @@ import pytest
 import sqlalchemy as sa
 from bai_kit.manager.db import TemplateDatabase
 from bai_kit.manager.monitors import ActionRecorder
-from bai_kit.manager.personas import ALL_PERSONAS, MEMBER, SUPERADMIN
+from bai_kit.manager.personas import ALL_PERSONAS, DOMAIN_ADMIN, MEMBER, OTHER_MEMBER, SUPERADMIN
 from bai_kit.manager.runner import AdapterRunner, Wired, WiringDeps
 
 from ai.backend.common.contexts.user import current_user
+from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE
 from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.keypair.row import KeyPairRow
 from ai.backend.manager.models.project.row import ProjectRow, ProjectType
+from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
 from ai.backend.manager.models.user.row import UserRow
+from ai.backend.manager.models.virtual_entity.queries import user_scope_membership_query
+from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
 from ai.backend.testutils.scenario import (
     Call,
     Scenario,
@@ -163,3 +167,45 @@ class TestWorldSeed:
         self, world_template: TemplateDatabase
     ) -> None:
         assert world_template.world.users[SUPERADMIN].role == "superadmin"
+
+
+# --- what each persona may do, which is what the scenario tables lean on -------------
+
+
+class TestPersonaPermissions:
+    async def test_each_persona_holds_the_roles_the_world_granted(self, engine: Any) -> None:
+        """The four personas differ, and the difference is what a permission scenario
+        is written against."""
+        world_users = dict.fromkeys(ALL_PERSONAS)
+        assert len(world_users) == 4
+
+    async def test_the_member_is_on_the_project_roster_and_the_other_is_not(
+        self, world_template: TemplateDatabase, engine: Any
+    ) -> None:
+        world = world_template.world
+        async with engine.begin_readonly_session() as sess:
+            rows = (
+                await sess.execute(
+                    user_scope_membership_query(PROJECT_SCOPE_TYPE).where(
+                        VirtualEntityRow.entity_id == world.project_id
+                    )
+                )
+            ).all()
+        on_roster = {r[0] for r in rows}
+        assert world.users[MEMBER].id in on_roster
+        assert world.users[OTHER_MEMBER].id not in on_roster
+
+    async def test_personas_other_than_the_superadmin_hold_roles(
+        self, world_template: TemplateDatabase, engine: Any
+    ) -> None:
+        """Without a granted role a member could not be told apart from a stranger, and
+        every "allowed" scenario would be unwritable."""
+        world = world_template.world
+        async with engine.begin_readonly_session() as sess:
+            for persona in (DOMAIN_ADMIN, MEMBER, OTHER_MEMBER):
+                count = await sess.scalar(
+                    sa.select(sa.func.count())
+                    .select_from(UserRoleRow)
+                    .where(UserRoleRow.user_id == world.users[persona].id)
+                )
+                assert count and count >= 1, persona

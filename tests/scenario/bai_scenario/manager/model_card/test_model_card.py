@@ -1,40 +1,83 @@
-"""Model card scenarios: the second domain the adapter runner was tried on."""
+"""What the model card adapter does, said as a request, an actor, and an answer.
+
+A model card lives in a project, so the personas divide by the seat they hold: the
+member is on the shared project's roster and the other member is not.
+"""
 
 from __future__ import annotations
 
+from typing import Any
 from uuid import UUID
 
 import pytest
-from bai_kit.manager.personas import MEMBER
-from bai_kit.manager.wiring.model_card import model_card_wiring
+from bai_kit.manager.config import base_config_dict
+from bai_kit.manager.db import TemplateDatabase
+from bai_kit.manager.monitors import ActionRecorder
+from bai_kit.manager.personas import DOMAIN_ADMIN, MEMBER, OTHER_MEMBER
+from bai_kit.manager.typed_runner import TypedRunner
+from bai_kit.manager.wiring.model_card import (
+    get_model_card,
+    model_card_wiring,
+    search_model_cards,
+)
 
 from ai.backend.common.dto.manager.v2.model_card.request import SearchModelCardsInput
+from ai.backend.manager.api.adapters.model_card.adapter import ModelCardAdapter
+from ai.backend.manager.config.unified import ManagerUnifiedConfig
 from ai.backend.manager.errors.auth import InsufficientPrivilege
 from ai.backend.manager.errors.repository import EntityNotFoundError
-from ai.backend.testutils.scenario import Call, Runner, Scenario, has, length, scenario_id
+from ai.backend.testutils.typed_scenario import TypedScenario, at
 
-WIRING = model_card_wiring
+type ModelCardScenario = TypedScenario[ModelCardAdapter, ManagerUnifiedConfig]
 
-SCENARIOS = [
-    Scenario.ok(
-        "an-empty-world-holds-no-model-cards",
-        when=SearchModelCardsInput(),
-        then=has(items=length(0), total_count=0),
+SCENARIOS: list[ModelCardScenario] = [
+    TypedScenario.ok(
+        "an-untouched-world-holds-no-model-cards",
+        when=search_model_cards(SearchModelCardsInput()),
+        then=at(lambda p: p.total_count, 0),
     ),
-    Scenario.error(
-        "member-cannot-search-every-model-card",
+    TypedScenario.error(
+        "reading-a-card-nothing-answers-to-is-not-found",
+        when=get_model_card(UUID(int=0)),
+        then=EntityNotFoundError,
+    ),
+    TypedScenario.error(
+        "a-member-may-not-search-every-model-card",
         actor=MEMBER,
-        when=SearchModelCardsInput(),
+        when=search_model_cards(SearchModelCardsInput()),
         then=InsufficientPrivilege,
     ),
-    Scenario.error(
-        "get-unknown-card-is-not-found",
-        when=Call("get", UUID(int=0)),
-        then=EntityNotFoundError,
+    TypedScenario.error(
+        "the-domain-admin-may-not-search-every-model-card-either",
+        actor=DOMAIN_ADMIN,
+        when=search_model_cards(SearchModelCardsInput()),
+        then=InsufficientPrivilege,
+    ),
+    TypedScenario.error(
+        "a-member-outside-the-project-may-not-search-every-model-card",
+        actor=OTHER_MEMBER,
+        when=search_model_cards(SearchModelCardsInput()),
+        then=InsufficientPrivilege,
     ),
 ]
 
 
-@pytest.mark.parametrize("s", SCENARIOS, ids=scenario_id)
-async def test_model_card(s: Scenario, run: Runner) -> None:
-    await run(s)
+@pytest.fixture
+def run(
+    world_template: TemplateDatabase,
+    test_db: str,
+    engine: Any,
+    recorder: ActionRecorder,
+) -> TypedRunner:
+    return TypedRunner(
+        wiring=model_card_wiring,
+        engine=engine,
+        world=world_template.world,
+        base_config=base_config_dict(world_template.addr, test_db, None),
+        recorder=recorder,
+    )
+
+
+@pytest.mark.parametrize("scenario", SCENARIOS, ids=lambda s: s.id)
+async def test_model_card(scenario: ModelCardScenario, run: TypedRunner) -> None:
+    await run(scenario)
