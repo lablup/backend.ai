@@ -1,9 +1,14 @@
 """A type-checked scenario surface: no method names, field names or config paths as text.
 
-What the string-keyed surface leaves to runtime, this leaves to the type checker.
-An operation is bound from the adapter method itself, a field is named by reading it,
-and an external fake is named by its class. Paths for failure messages are recovered by
-replaying the same accessor over a recording proxy, so nothing is written twice.
+What a text-keyed surface leaves to runtime, this leaves to the type checker. An
+operation is bound from the method itself, a field is named by reading it, a config
+value by reading it off the config class, and an external client by its own class.
+Paths for failure messages are recovered by replaying the same accessor over a
+recording proxy, so nothing is written twice.
+
+Nothing here knows any component. What rows a scenario lays down, which adapter it
+calls and which config class it reads are all supplied by whoever uses it; the manager
+side lives in the test kit.
 """
 
 from __future__ import annotations
@@ -11,16 +16,8 @@ from __future__ import annotations
 from collections.abc import Awaitable, Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
-from typing import Any, Concatenate, cast, overload, override
+from typing import Any, Concatenate, cast, override
 
-from ai.backend.manager.models.base import Base
-from ai.backend.manager.models.specs.creator import (
-    EntityCreator,
-    GlobalEntityCreator,
-    RoleManagedEntityCreator,
-    RoleManagedGlobalEntityCreator,
-)
-from ai.backend.manager.repositories.ops.repository import OpsRepository
 from ai.backend.testutils.scenario import Persona
 
 __all__ = (
@@ -44,7 +41,6 @@ __all__ = (
     "at",
     "checked",
     "config_of",
-    "creates",
     "exactly",
     "ignored",
     "recent",
@@ -251,6 +247,7 @@ class Override[C, V]:
         return path_of(self.select)
 
 
+@dataclass(frozen=True)
 class ConfigOf[C]:
     """Names config fields of one config class.
 
@@ -259,13 +256,15 @@ class ConfigOf[C]:
     makes the field name text again.
     """
 
+    config_cls: type[C]
+
     def set[V](self, select: Callable[[C], V], value: V) -> Override[C, Any]:
         """One config field and the value to put in it, both checked against the class."""
         return Override(select, value)
 
 
 def config_of[C](config_cls: type[C]) -> ConfigOf[C]:
-    return ConfigOf()
+    return ConfigOf(config_cls)
 
 
 # ---------------------------------------------------------------------------
@@ -353,72 +352,27 @@ def on_fake[T, F](fake: type[F], matcher: TypedMatcher[F]) -> OnFake[T, F]:
 
 
 # ---------------------------------------------------------------------------
-# Putting rows in the database: the creator spec names the row and its data type
+# Rows laid down before the call
 # ---------------------------------------------------------------------------
 
 
 @dataclass(frozen=True)
-class Seed[D]:
-    """One row to lay down before the call, described by the creator that makes it.
+class Seed[S, D]:
+    """One row to lay down before the call.
 
-    Carries the data type the creator answers, so a later part of the scenario reads
-    the created row without saying what it is again.
+    ``S`` is whatever writes rows for the component under test, and ``D`` the data the
+    write answers. Neither is named here: what a row is made with belongs to the
+    component, and this only has to carry the two types so a later part reads the
+    created row without saying what it is again.
     """
 
-    make: Callable[[OpsRepository[Any]], Awaitable[D]]
+    make: Callable[[S], Awaitable[D]]
     label: str
     owner: Persona | None = None
 
-    def by(self, owner: Persona) -> Seed[D]:
+    def by(self, owner: Persona) -> Seed[S, D]:
         """The same row, written as somebody else."""
         return Seed(self.make, self.label, owner)
-
-
-@overload
-def creates[R: Base, D](creator: RoleManagedGlobalEntityCreator[R, D]) -> Seed[D]: ...
-
-
-@overload
-def creates[R: Base, D](creator: RoleManagedEntityCreator[R, D]) -> Seed[D]: ...
-
-
-@overload
-def creates[R: Base, D](creator: EntityCreator[R, D]) -> Seed[D]: ...
-
-
-@overload
-def creates[R: Base, D](creator: GlobalEntityCreator[R, D]) -> Seed[D]: ...
-
-
-def creates(creator: Any) -> Seed[Any]:
-    """Lay down the row this creator describes, through the same ops path production
-    uses. Which path that is follows from the creator's own type, so nothing here
-    chooses it by name.
-    """
-    label = type(creator).__name__
-    if isinstance(creator, RoleManagedGlobalEntityCreator):
-
-        async def make_role_managed_global(ops: OpsRepository[Any]) -> Any:
-            return await ops.create_role_managed_global_entity(creator)
-
-        return Seed(make_role_managed_global, label)
-    if isinstance(creator, RoleManagedEntityCreator):
-
-        async def make_role_managed(ops: OpsRepository[Any]) -> Any:
-            return await ops.create_role_managed_entity(creator)
-
-        return Seed(make_role_managed, label)
-    if isinstance(creator, EntityCreator):
-
-        async def make_entity(ops: OpsRepository[Any]) -> Any:
-            return await ops.create_entity(creator)
-
-        return Seed(make_entity, label)
-
-    async def make_global(ops: OpsRepository[Any]) -> Any:
-        return await ops.create_global_entity(creator)
-
-    return Seed(make_global, label)
 
 
 @dataclass(frozen=True)
@@ -426,11 +380,11 @@ class Deferred[A, R]:
     """A call that cannot be written until a seeded row exists, because it names
     something the database generated."""
 
-    seed: Seed[Any]
+    seed: Seed[Any, Any]
     build: Callable[[Any], Invocation[A, R]]
 
 
-def after[D, A, R](seed: Seed[D], build: Callable[[D], Invocation[A, R]]) -> Deferred[A, R]:
+def after[S, D, A, R](seed: Seed[S, D], build: Callable[[D], Invocation[A, R]]) -> Deferred[A, R]:
     """Read the row the seed made, then say what to call with it.
 
     ``build`` receives the created data, typed, so an id the database generated is
@@ -606,7 +560,7 @@ class TypedScenario[A, C]:
     id: str
     invoke: Callable[[A, Mapping[str, Any]], Awaitable[Any]]
     then: TypedMatcher[Any] | type[BaseException] | None = None
-    given: tuple[Seed[Any], ...] = ()
+    given: tuple[Seed[Any, Any], ...] = ()
     setup: TypedSetup[C] = field(default_factory=TypedSetup)
 
     @classmethod
@@ -616,7 +570,7 @@ class TypedScenario[A, C]:
         *,
         when: Invocation[A, R] | Deferred[A, R],
         then: TypedMatcher[R] | None = None,
-        given: Sequence[Seed[Any]] = (),
+        given: Sequence[Seed[Any, Any]] = (),
         setup: TypedSetup[C] | None = None,
     ) -> TypedScenario[A, C]:
         return cls(id, _invoker(when), then, tuple(given), setup or TypedSetup())
@@ -628,7 +582,7 @@ class TypedScenario[A, C]:
         *,
         when: Invocation[A, R] | Deferred[A, R],
         then: type[BaseException],
-        given: Sequence[Seed[Any]] = (),
+        given: Sequence[Seed[Any, Any]] = (),
         setup: TypedSetup[C] | None = None,
     ) -> TypedScenario[A, C]:
         return cls(id, _invoker(when), then, tuple(given), setup or TypedSetup())
@@ -650,7 +604,7 @@ def _invoker[A, R](
 
     invocation = when
 
-    def run(adapter: A, seeded: Mapping[str, Any]) -> Awaitable[R]:
+    def run(adapter: A, _seeded: Mapping[str, Any]) -> Awaitable[R]:
         return invocation.call(adapter)
 
     return run

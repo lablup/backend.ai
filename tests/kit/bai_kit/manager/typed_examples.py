@@ -44,11 +44,10 @@ from ai.backend.manager.data.domain.types import DomainData, UserInfo
 from ai.backend.manager.errors.auth import InsufficientPrivilege
 from ai.backend.manager.errors.storage import VFolderCreationFailure
 from ai.backend.manager.models.domain.creators import DomainCreator
-from bai_kit.manager.typed import (
+from ai.backend.testutils.typed_scenario import (
     Answer,
     Invocation,
     Override,
-    Seed,
     TypedScenario,
     TypedSetup,
     after,
@@ -56,7 +55,6 @@ from bai_kit.manager.typed import (
     at,
     checked,
     config_of,
-    creates,
     every,
     exactly,
     fake_of,
@@ -65,6 +63,7 @@ from bai_kit.manager.typed import (
     op,
     recent,
 )
+from bai_kit.manager.seeding import Sown, creates
 
 # ---------------------------------------------------------------------------
 # What this domain can do, bound once from the adapter and the classes involved
@@ -228,7 +227,7 @@ STORAGE_SCENARIOS: list[DomainScenario] = [
 def _a_seed_carries_the_data_type_its_creator_answers() -> None:
     """``DomainCreator`` answers ``DomainData``, so the seed does too. Which ops path
     writes it follows from the creator's type, not from a name given here."""
-    assert_type(creates(DomainCreator(name="dup")), Seed[DomainData])
+    assert_type(creates(DomainCreator(name="dup")), Sown[DomainData])
 
 
 existing_domain = creates(DomainCreator(name="dup"))
