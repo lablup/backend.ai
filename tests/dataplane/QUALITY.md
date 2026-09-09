@@ -120,3 +120,51 @@ trip, and that is a durable per-session counter this branch should not be invent
 `SCENARIOS.md` is not updated: what ran here is not the release gate. P2 (two-node connectivity),
 P4 (MTU), P5 (isolation) and the encryption-wire checks need two nodes on the SAME code, and two
 of the three are 169 commits behind.
+
+Thirty-sixth round -- both reachable nodes upgraded to this HEAD and run against each other.
+
+Rig: manager + i-dk-104 + i-dk-156 all on this commit. i-dk-112 could not be upgraded: it refuses
+my key for every user tried, so it stayed on `aa2870fd9` and sessions were pinned away from it
+with `agent_list`. .156's working tree (3,569 uncommitted files) was committed to
+`wip/pre-vxlan-upgrade-20260909` before anything was touched; nothing was discarded.
+
+**A11m -- fourteen dead exception handlers, and a data plane that could not start**
+
+`_run_command` raises `NetworkOperationFailed`, which is a `BackendAIError` -- neither a
+`RuntimeError` nor an `OSError`. Every handler in the vxlan backend is written
+`except (RuntimeError, OSError)`. All fourteen are dead code, and with them every absence and
+idempotency guard in the backend: chain creation that tolerates "already exists", rule deletion
+that tolerates "no matching rule", the adopt path that tolerates a link that has gone.
+
+The one that stopped everything is the first: session setup begins by deleting leftovers under the
+names it is about to build, and on a clean host that is always `Cannot find device`. So a vxlan
+session could not be created at all. `is_absent_error` was correct and never consulted.
+
+The tuple of what a host command can raise now lives once, beside `is_absent_error`, and every
+guarded site uses it. One site had two branches told apart by exception type -- "the host could
+not be asked" versus "the rule is absent" -- and they are told apart by `is_absent_error` now,
+which is what actually distinguishes them. After the fix `setup_session` succeeds on both nodes.
+
+No unit test could have found this: the fakes raise `RuntimeError`, which those handlers catch.
+
+**Where a two-node session stops now, unfixed**
+
+Both kernels reach `add_endpoint`, and both refuse: "the session is encrypted and the SAs for VTEP
+<peer> are not in place". The manager's side is correct -- both `members/` records carry
+`joined: true` with the right VTEPs, both `endpoints/` carry matching generations. The agent side
+never calls `add_peer`, so the pair SAs are never installed, and `add_endpoint` fails closed as it
+is designed to. The privnet on 104 logged three `add_endpoint` ops for three sessions and no
+`setup_session` and no `add_peer` at all.
+
+That is as far as this session took it. It is a reproducible blocker with the evidence above, and
+it wants proper investigation rather than a third same-day patch.
+
+Also observed, and operational rather than code: upgrading agents leaves XFRM state from
+sessions created before peer journalling, which the SA guard rightly refuses to overwrite --
+`dead encrypted session ... predates peer journalling; reclaiming its devices but leaving
+unidentifiable shared XFRM state in place`. The nodes needed `ip xfrm state deleteall` for the
+104<->156 pairs before a new encrypted session could even be attempted. An upgrade procedure has
+to say so.
+
+`SCENARIOS.md` stays unmarked: P2 connectivity, P4 MTU, P5 isolation and the encryption-wire
+checks all need a session that reaches RUNNING on two nodes, and none has.
