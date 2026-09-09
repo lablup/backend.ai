@@ -9,12 +9,12 @@ the other's test module.
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Sequence
 from dataclasses import dataclass
 from typing import Protocol, runtime_checkable
 from uuid import UUID
 
-from ai.backend.testutils.dataplane.nodes import Node
+from ai.backend.testutils.dataplane.nodes import CommandResult, Node
 
 
 @runtime_checkable
@@ -100,25 +100,55 @@ async def task_pid(node: Node, container_id: str) -> str:
     raise AssertionError(f"no running task for container {container_id}:\n{listing.stdout}")
 
 
-async def read_container_file(node: Node, container_id: str, path: str) -> str:
-    """Read a file through the runtime that owns ``container_id``."""
+async def _exec_in_container(
+    node: Node, container_id: str, argv: Sequence[str], *, exec_tag: str, check: bool = True
+) -> CommandResult:
+    """Run ``argv`` inside the container, through whichever runtime owns it.
+
+    Inside, not merely in its netns: a name lookup has to read the container's own
+    ``/etc/resolv.conf``, and ``nsenter -n`` would leave it reading the host's.
+    """
     docker = await node.run(["docker", "inspect", container_id], check=False)
     if docker.returncode == 0:
-        result = await node.run(["docker", "exec", container_id, "cat", path])
-        return result.stdout
-    result = await node.run([
-        "ctr",
-        "-n",
-        "backend-ai",
-        "tasks",
-        "exec",
-        "--exec-id",
-        f"dp-read-{abs(hash(path)) % 100000}",
-        container_id,
-        "cat",
-        path,
-    ])
+        return await node.run(["docker", "exec", container_id, *argv], check=check)
+    return await node.run(
+        [
+            "ctr",
+            "-n",
+            "backend-ai",
+            "tasks",
+            "exec",
+            "--exec-id",
+            f"dp-{exec_tag}-{abs(hash(exec_tag)) % 100000}",
+            container_id,
+            *argv,
+        ],
+        check=check,
+    )
+
+
+async def read_container_file(node: Node, container_id: str, path: str) -> str:
+    """Read a file through the runtime that owns ``container_id``."""
+    result = await _exec_in_container(node, container_id, ["cat", path], exec_tag=f"read{path}")
     return result.stdout
+
+
+async def resolves_in_container(node: Node, container_id: str, hostname: str) -> bool:
+    """Does ``hostname`` resolve from inside the kernel, the way its runner resolves peers?
+
+    The peer map left ``/etc/hosts`` in f51f3d6038 (resolver-only peer names), so reading that
+    file answers a question nothing asks any more. Resolution is the contract: the session's
+    cluster resolver for containerd, dockerd's embedded DNS for Docker — and ``getent hosts``
+    goes through whichever of them the container is pointed at.
+    """
+    result = await _exec_in_container(
+        node,
+        container_id,
+        ["getent", "hosts", hostname],
+        exec_tag=f"resolve{hostname}",
+        check=False,
+    )
+    return result.returncode == 0 and bool(result.stdout.strip())
 
 
 async def interface_address(node: Node, pid: str, ifname: str) -> str:
