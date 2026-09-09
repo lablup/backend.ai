@@ -19,7 +19,7 @@ class AppConfigEntityType(EntityType):
     @override
     @classmethod
     def description(cls) -> str:
-        return "The app config read from a scope, built from its fragments."
+        return "The value of one app config key, merged from its fragments in every visible scope."
 
 
 # Who an app config fragment belongs to. Polymorphic across scope kinds (domain/user); the
