@@ -47,3 +47,6 @@ class ProjectScopeGQL(PydanticInputMixin[ProjectScope]):
     user: list[UUIDScopeGQL] | None = gql_field(
         default=None, description="Users whose project memberships are being read."
     )
+    resource_group: list[UUIDScopeGQL] | None = gql_field(
+        default=None, description="Resource groups whose projects are being read."
+    )

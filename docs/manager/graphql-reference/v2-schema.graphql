@@ -5121,6 +5121,9 @@ type DomainV2 implements Node @key(fields: "id") {
 
   """Users belonging to this domain."""
   users(filter: UserV2Filter = null, orderBy: [UserV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): UserV2Connection
+
+  """Added in 26.9.0. Resource groups this domain may schedule on."""
+  resourceGroups(filter: ResourceGroupFilter = null, orderBy: [ResourceGroupOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ResourceGroupConnection
 }
 
 """
@@ -10795,6 +10798,9 @@ input ProjectScope {
 
   """Users whose project memberships are being read."""
   user: [UUIDScope!] = null
+
+  """Resource groups whose projects are being read."""
+  resourceGroup: [UUIDScope!] = null
 }
 
 """
@@ -11036,6 +11042,9 @@ type ProjectV2 implements Node @key(fields: "id") {
 
   """Users who are members of this project."""
   users(filter: UserV2Filter = null, orderBy: [UserV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): UserV2Connection
+
+  """Added in 26.9.0. Resource groups this project may schedule on."""
+  resourceGroups(filter: ResourceGroupFilter = null, orderBy: [ResourceGroupOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ResourceGroupConnection
 }
 
 """
@@ -12861,6 +12870,12 @@ type ResourceGroup implements Node {
   Added in 26.1.0. Resource usage information for this resource group. Provides aggregated metrics for capacity, used, and free resources. This is a lazy-loaded field that queries agent and kernel data on demand.
   """
   resourceInfo: ResourceInfo
+
+  """Added in 26.9.0. Domains this resource group serves."""
+  domains(filter: DomainV2Filter = null, orderBy: [DomainV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): DomainV2Connection
+
+  """Added in 26.9.0. Projects this resource group serves."""
+  projects(filter: ProjectV2Filter = null, orderBy: [ProjectV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ProjectV2Connection
 }
 
 """Added in 26.2.0. Resource group connection"""
@@ -17585,6 +17600,9 @@ type UserV2 implements Node @key(fields: "id") {
 
   """Projects this user is a member of."""
   projects(filter: ProjectV2Filter = null, orderBy: [ProjectV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ProjectV2Connection
+
+  """Added in 26.9.0. Resource groups this user may schedule on."""
+  resourceGroups(filter: ResourceGroupFilter = null, orderBy: [ResourceGroupOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ResourceGroupConnection
 }
 
 """

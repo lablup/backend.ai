@@ -2,11 +2,10 @@
 
 from __future__ import annotations
 
-from typing import Any
 from uuid import UUID
 
 from strawberry import Info
-from strawberry.relay import Connection, Edge, PageInfo
+from strawberry.relay import PageInfo
 
 from ai.backend.common.dto.manager.v2.resource_group.request import (
     AdminSearchResourceGroupsInput,
@@ -19,7 +18,6 @@ from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
-    gql_connection_type,
     gql_mutation,
     gql_root_field,
 )
@@ -37,6 +35,8 @@ from .types import (
     ReplaceResourceGroupDefaultDeploymentOptionsPayloadGQL,
     ReplaceResourceGroupDefaultSessionOptionsInputGQL,
     ReplaceResourceGroupDefaultSessionOptionsPayloadGQL,
+    ResourceGroupConnection,
+    ResourceGroupEdge,
     ResourceGroupFilterGQL,
     ResourceGroupGQL,
     ResourceGroupOrderByGQL,
@@ -50,25 +50,6 @@ from .types import (
     UpdateResourceGroupInput,
     UpdateResourceGroupPayload,
 )
-
-# Connection types
-
-ResourceGroupEdge = Edge[ResourceGroupGQL]
-
-
-@gql_connection_type(
-    BackendAIGQLMeta(
-        added_version="26.2.0",
-        description="Resource group connection",
-    )
-)
-class ResourceGroupConnection(Connection[ResourceGroupGQL]):
-    count: int
-
-    def __init__(self, *args: Any, count: int, **kwargs: Any) -> None:
-        super().__init__(*args, **kwargs)
-        self.count = count
-
 
 # Query fields
 

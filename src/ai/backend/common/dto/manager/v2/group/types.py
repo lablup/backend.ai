@@ -90,9 +90,14 @@ class ProjectScope(BaseRequestModel):
     user: list[UUIDScope] | None = Field(
         default=None, description="Users whose project memberships are being read"
     )
+    resource_group: list[UUIDScope] | None = Field(
+        default=None, description="Resource groups whose projects are being read"
+    )
 
     @model_validator(mode="after")
     def _require_non_empty(self) -> ProjectScope:
-        if not self.domain and not self.user:
-            raise ValueError("ProjectScope requires a non-empty value for 'domain' or 'user'")
+        if not self.domain and not self.user and not self.resource_group:
+            raise ValueError(
+                "ProjectScope requires a non-empty value for 'domain', 'user' or 'resource_group'"
+            )
         return self
