@@ -9,7 +9,6 @@ __all__ = (
 )
 
 
-# The merged config a caller reads; the fragments it is merged from are their own type.
 class AppConfigEntityType(EntityType):
     @override
     @classmethod
