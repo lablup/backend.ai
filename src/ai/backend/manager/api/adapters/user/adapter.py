@@ -51,6 +51,7 @@ from ai.backend.common.dto.manager.v2.user.request import (
     DeleteUserInput,
     PurgeUserInput,
     RestoreUserInput,
+    ScopedSearchUsersInput,
     SearchUsersRequest,
     UpdateUserInput,
     UserFilter,
@@ -87,6 +88,7 @@ from ai.backend.common.dto.manager.v2.user.types import (
     UserOrderField,
     UserProjectFilter,
     UserRoleFilter,
+    UserScope,
     UserStatusFilter,
 )
 from ai.backend.common.dto.manager.v2.user.types import (
@@ -154,6 +156,7 @@ from ai.backend.manager.services.user.actions.scoped_search import (
     DomainUserScopeItem,
     ProjectUserScopeItem,
     ScopedSearchUsersAction,
+    UserScopeItem,
 )
 from ai.backend.manager.services.user.actions.search_users import GlobalSearchUsersAction
 from ai.backend.manager.services.user.actions.search_users_by_role import (
@@ -348,6 +351,72 @@ class UserAdapter(BaseAdapter):
                 offset=input.offset,
                 limit=input.limit,
             ),
+        )
+
+    def _scope_items(self, scope: UserScope) -> list[UserScopeItem]:
+        """The scope items the request named, in the order the input lists them."""
+        items: list[UserScopeItem] = [
+            DomainUserScopeItem(domain_id=DomainID(entry.value)) for entry in scope.domain or ()
+        ]
+        items.extend(
+            ProjectUserScopeItem(project_id=ProjectID(entry.value)) for entry in scope.project or ()
+        )
+        return items
+
+    async def scoped_search(
+        self,
+        input: ScopedSearchUsersInput,
+    ) -> SearchUsersPayload:
+        """Search the users the named scopes reach, combined with OR."""
+        conditions = self._convert_filter(input.filter) if input.filter else []
+        orders = self._convert_orders(input.order) if input.order else []
+        result = await self._processors.user.scoped_search.run(
+            ScopedSearchUsersAction(
+                items=self._scope_items(input.scope),
+                searcher=UserSearcher(
+                    conditions=conditions,
+                    orders=orders,
+                    pagination=OffsetPagination(limit=input.limit, offset=input.offset),
+                ),
+            )
+        )
+        return SearchUsersPayload(
+            items=await self._user_nodes(result.items),
+            pagination=PaginationInfo(
+                total=result.total_count,
+                offset=input.offset,
+                limit=input.limit,
+            ),
+        )
+
+    async def gql_scoped_search(
+        self,
+        scope: UserScope,
+        input: AdminSearchUsersInput,
+    ) -> AdminSearchUsersPayload:
+        """Search the users the named scopes reach, cursor-based pagination."""
+        conditions = self._convert_gql_filter(input.filter) if input.filter else []
+        orders = self._convert_gql_orders(input.order) if input.order else []
+        searcher = self._build_searcher(
+            UserSearcher,
+            conditions=conditions,
+            orders=orders,
+            pagination_spec=_USER_PAGINATION_SPEC,
+            first=input.first,
+            after=input.after,
+            last=input.last,
+            before=input.before,
+            limit=input.limit,
+            offset=input.offset,
+        )
+        result = await self._processors.user.scoped_search.run(
+            ScopedSearchUsersAction(items=self._scope_items(scope), searcher=searcher)
+        )
+        return AdminSearchUsersPayload(
+            items=await self._user_nodes(result.items),
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
         )
 
     async def domain_search(

@@ -7,11 +7,12 @@ from __future__ import annotations
 from enum import StrEnum
 from uuid import UUID
 
-from pydantic import Field
+from pydantic import Field, model_validator
 
 from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.dto.manager.query import StringFilter
 from ai.backend.common.dto.manager.v2.common import OrderDirection
+from ai.backend.common.dto.manager.v2.rbac.types import UUIDScope
 
 __all__ = (
     "DomainUserScope",
@@ -22,6 +23,7 @@ __all__ = (
     "UserOrderField",
     "UserProjectFilter",
     "UserRole",
+    "UserScope",
     "UserRoleFilter",
     "UserStatus",
     "UserStatusFilter",
@@ -104,6 +106,27 @@ class DomainUserScope(BaseRequestModel):
     """Scope for querying users within a specific domain."""
 
     domain_name: str = Field(description="Domain name to scope the user query.")
+
+
+class UserScope(BaseRequestModel):
+    """Scope for the scoped user query.
+
+    Each list is OR'd internally and across lists. Raises an error if every field is
+    empty.
+    """
+
+    domain: list[UUIDScope] | None = Field(
+        default=None, description="Domains whose users are being read"
+    )
+    project: list[UUIDScope] | None = Field(
+        default=None, description="Projects whose users are being read"
+    )
+
+    @model_validator(mode="after")
+    def _require_non_empty(self) -> UserScope:
+        if not self.domain and not self.project:
+            raise ValueError("UserScope requires a non-empty value for 'domain' or 'project'")
+        return self
 
 
 class ProjectUserScope(BaseRequestModel):
