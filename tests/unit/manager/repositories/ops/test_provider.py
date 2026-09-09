@@ -1,8 +1,7 @@
-"""Tests for the DB ops wrapper (DBOpsProvider / ReadOps / WriteOps).
+"""Tests for the DB ops wrapper (DBOpsProvider / ReadOps).
 
-These verify observable contracts — the empty-scope constraint, real create/query/
-update/purge outcomes, and that dependent inserts carry the resolved dependency — not
-internal call wiring.
+These verify observable contracts — the empty-scope constraint, single-row and scoped
+batch reads — not internal call wiring.
 """
 
 from __future__ import annotations
@@ -21,19 +20,8 @@ from ai.backend.manager.models.base import Base
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.scopes import ExistenceCheck, OperationScope
 from ai.backend.manager.models.specs.pagination import NoPagination
-from ai.backend.manager.models.specs.types import ConflictCheck
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.base import (
-    BatchQuerier,
-    Creator,
-    CreatorSpec,
-    DependentCreatorSpec,
-    Purger,
-    Querier,
-    Updater,
-    UpdaterSpec,
-)
-from ai.backend.manager.repositories.base.purger import PurgerSpec
+from ai.backend.manager.repositories.base import BatchQuerier, Querier
 from ai.backend.manager.repositories.ops import DBOpsProvider, ReadOps
 from ai.backend.testutils.db import with_tables
 
@@ -45,72 +33,6 @@ class OpsTestParentRow(Base):
     id: Mapped[int] = mapped_column(sa.Integer, primary_key=True, autoincrement=True)
     name: Mapped[str] = mapped_column(sa.String(64), nullable=False)
     domain_name: Mapped[str] = mapped_column(sa.String(64), nullable=False)
-
-
-class OpsTestChildRow(Base):
-    __tablename__ = "test_ops_child"
-    __table_args__ = {"extend_existing": True}
-
-    id: Mapped[int] = mapped_column(sa.Integer, primary_key=True, autoincrement=True)
-    parent_id: Mapped[int] = mapped_column(
-        sa.Integer, sa.ForeignKey("test_ops_parent.id"), nullable=False
-    )
-    label: Mapped[str] = mapped_column(sa.String(64), nullable=False)
-
-
-@dataclass
-class ParentCreatorSpec(CreatorSpec[OpsTestParentRow]):
-    name: str
-    domain_name: str
-
-    @override
-    def build_row(self) -> OpsTestParentRow:
-        return OpsTestParentRow(name=self.name, domain_name=self.domain_name)
-
-
-@dataclass
-class ParentUpdaterSpec(UpdaterSpec[OpsTestParentRow]):
-    new_name: str
-
-    @property
-    @override
-    def row_class(self) -> type[OpsTestParentRow]:
-        return OpsTestParentRow
-
-    @override
-    def build_values(self) -> dict[str, Any]:
-        return {"name": self.new_name}
-
-
-@dataclass
-class ParentPurgerSpec(PurgerSpec[OpsTestParentRow]):
-    parent_id: int
-
-    @override
-    def row_class(self) -> type[OpsTestParentRow]:
-        return OpsTestParentRow
-
-    @override
-    def pk_value(self) -> int:
-        return self.parent_id
-
-    @override
-    def conflict_checks(self) -> Sequence[ConflictCheck]:
-        return ()
-
-
-@dataclass(frozen=True)
-class ChildDependency:
-    parent_id: int
-
-
-@dataclass
-class ChildDependentCreatorSpec(DependentCreatorSpec[ChildDependency, OpsTestChildRow]):
-    label: str
-
-    @override
-    def build_row(self, dependency: ChildDependency) -> OpsTestChildRow:
-        return OpsTestChildRow(parent_id=dependency.parent_id, label=self.label)
 
 
 @dataclass(frozen=True)
@@ -131,13 +53,21 @@ class ParentDomainScope(OperationScope):
 async def ops_tables(
     database_connection: ExtendedAsyncSAEngine,
 ) -> AsyncGenerator[None, None]:
-    async with with_tables(database_connection, [OpsTestParentRow, OpsTestChildRow]):
+    async with with_tables(database_connection, [OpsTestParentRow]):
         yield
 
 
 @pytest.fixture
 def provider(database_connection: ExtendedAsyncSAEngine) -> DBOpsProvider:
     return DBOpsProvider(database_connection)
+
+
+async def _seed_parents(db: ExtendedAsyncSAEngine, parents: Sequence[tuple[str, str]]) -> list[int]:
+    async with db.begin_session() as session:
+        rows = [OpsTestParentRow(name=name, domain_name=domain) for name, domain in parents]
+        session.add_all(rows)
+        await session.flush()
+        return [row.id for row in rows]
 
 
 class TestScopeConstraint:
@@ -148,11 +78,14 @@ class TestScopeConstraint:
             await ops.batch_query_with_scopes(sa.select(OpsTestParentRow), querier, [])
 
 
-class TestWriteRoundTrip:
-    async def test_create_then_query(self, provider: DBOpsProvider, ops_tables: None) -> None:
-        async with provider.write_ops() as w:
-            created = await w.create(Creator(spec=ParentCreatorSpec(name="p1", domain_name="d1")))
-        parent_id = created.row.id
+class TestQuery:
+    async def test_query_returns_the_named_row(
+        self,
+        provider: DBOpsProvider,
+        database_connection: ExtendedAsyncSAEngine,
+        ops_tables: None,
+    ) -> None:
+        (parent_id,) = await _seed_parents(database_connection, [("p1", "d1")])
 
         async with provider.read_ops() as r:
             fetched = await r.query(Querier(row_class=OpsTestParentRow, pk_value=parent_id))
@@ -161,69 +94,23 @@ class TestWriteRoundTrip:
         assert fetched.row.name == "p1"
         assert fetched.row.domain_name == "d1"
 
-    async def test_update_reflected(self, provider: DBOpsProvider, ops_tables: None) -> None:
-        async with provider.write_ops() as w:
-            created = await w.create(Creator(spec=ParentCreatorSpec(name="p1", domain_name="d1")))
-            parent_id = created.row.id
-            await w.update(Updater(spec=ParentUpdaterSpec(new_name="p2"), pk_value=parent_id))
-
+    async def test_query_returns_none_for_a_missing_row(
+        self, provider: DBOpsProvider, ops_tables: None
+    ) -> None:
         async with provider.read_ops() as r:
-            fetched = await r.query(Querier(row_class=OpsTestParentRow, pk_value=parent_id))
-
-        assert fetched is not None
-        assert fetched.row.name == "p2"
-
-    async def test_purge_removes(self, provider: DBOpsProvider, ops_tables: None) -> None:
-        async with provider.write_ops() as w:
-            created = await w.create(Creator(spec=ParentCreatorSpec(name="p1", domain_name="d1")))
-            parent_id = created.row.id
-            await w.purge(Purger(spec=ParentPurgerSpec(parent_id=parent_id)))
-
-        async with provider.read_ops() as r:
-            fetched = await r.query(Querier(row_class=OpsTestParentRow, pk_value=parent_id))
+            fetched = await r.query(Querier(row_class=OpsTestParentRow, pk_value=-1))
 
         assert fetched is None
 
 
-class TestDependentCreate:
-    async def test_bulk_create_dependent_carries_parent_id(
-        self, provider: DBOpsProvider, ops_tables: None
-    ) -> None:
-        async with provider.write_ops() as w:
-            parent = (
-                await w.create(Creator(spec=ParentCreatorSpec(name="p", domain_name="d")))
-            ).row
-            dependency = ChildDependency(parent_id=parent.id)
-            specs = [
-                ChildDependentCreatorSpec(label="a"),
-                ChildDependentCreatorSpec(label="b"),
-            ]
-            result = await w.bulk_create_dependent(specs, dependency)
-
-        assert {child.label for child in result.rows} == {"a", "b"}
-        assert all(child.parent_id == parent.id for child in result.rows)
-
-    async def test_create_dependent_single(self, provider: DBOpsProvider, ops_tables: None) -> None:
-        async with provider.write_ops() as w:
-            parent = (
-                await w.create(Creator(spec=ParentCreatorSpec(name="p", domain_name="d")))
-            ).row
-            dependency = ChildDependency(parent_id=parent.id)
-            child = (
-                await w.create_dependent(ChildDependentCreatorSpec(label="solo"), dependency)
-            ).row
-
-        assert child.parent_id == parent.id
-        assert child.label == "solo"
-
-
 class TestScopeFiltering:
     async def test_with_scopes_filters_and_global_returns_all(
-        self, provider: DBOpsProvider, ops_tables: None
+        self,
+        provider: DBOpsProvider,
+        database_connection: ExtendedAsyncSAEngine,
+        ops_tables: None,
     ) -> None:
-        async with provider.write_ops() as w:
-            await w.create(Creator(spec=ParentCreatorSpec(name="a", domain_name="d1")))
-            await w.create(Creator(spec=ParentCreatorSpec(name="b", domain_name="d2")))
+        await _seed_parents(database_connection, [("a", "d1"), ("b", "d2")])
 
         async with provider.read_ops() as r:
             scoped = await r.batch_query_with_scopes(
