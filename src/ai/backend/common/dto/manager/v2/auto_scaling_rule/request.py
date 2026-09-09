@@ -47,16 +47,15 @@ class CreateAutoScalingRuleInput(BaseRequestModel):
 class UpdateAutoScalingRuleInput(BaseRequestModel):
     """Input for updating an auto-scaling rule.
 
-    Fields default to UNSET (no change). Set a field to None to clear it.
-    Fields that cannot be cleared use None to signal no change.
+    Every field defaults to UNSET (no change). Null clears only the nullable fields.
     """
 
     id: UUID = Field(description="ID of the auto-scaling rule to update")
-    metric_source: AutoScalingMetricSource | None = Field(
-        default=None, description="Updated metric source. None means no change."
+    metric_source: AutoScalingMetricSource | None | Unset = Field(
+        default=UNSET, description="Updated metric source. Omit to leave unchanged."
     )
-    metric_name: str | None = Field(
-        default=None, description="Updated metric name. None means no change."
+    metric_name: str | None | Unset = Field(
+        default=UNSET, description="Updated metric name. Omit to leave unchanged."
     )
     min_threshold: Decimal | None | Unset = Field(
         default=UNSET,
@@ -66,11 +65,11 @@ class UpdateAutoScalingRuleInput(BaseRequestModel):
         default=UNSET,
         description="Updated maximum threshold. Omit to leave unchanged; null clears.",
     )
-    step_size: int | None = Field(
-        default=None, description="Updated step size. None means no change."
+    step_size: int | None | Unset = Field(
+        default=UNSET, description="Updated step size. Omit to leave unchanged."
     )
-    time_window: int | None = Field(
-        default=None, description="Updated time window in seconds. None means no change."
+    time_window: int | None | Unset = Field(
+        default=UNSET, description="Updated time window in seconds. Omit to leave unchanged."
     )
     min_replicas: int | None | Unset = Field(
         default=UNSET,

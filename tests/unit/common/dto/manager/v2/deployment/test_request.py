@@ -360,12 +360,20 @@ class TestUpdateDeploymentInput:
         assert inp.replica_count is None
         assert inp.tags is None
 
-    def test_default_tags_is_sentinel(self) -> None:
+    def test_default_fields_are_unset(self) -> None:
+        inp = UpdateDeploymentInput()
+        assert inp.name is UNSET
+        assert inp.replica_count is UNSET
+        assert inp.open_to_public is UNSET
+        assert inp.preferred_domain_name is UNSET
+        assert inp.default_deployment_strategy is UNSET
+
+    def test_default_tags_is_unset(self) -> None:
         inp = UpdateDeploymentInput()
         assert inp.tags is UNSET
         assert isinstance(inp.tags, Unset)
 
-    def test_explicit_sentinel_tags_signals_clear(self) -> None:
+    def test_explicit_unset_tags_means_no_change(self) -> None:
         inp = UpdateDeploymentInput(tags=UNSET)
         assert inp.tags is UNSET
         assert isinstance(inp.tags, Unset)
@@ -401,7 +409,7 @@ class TestUpdateDeploymentInput:
     def test_partial_update_name_only(self) -> None:
         inp = UpdateDeploymentInput(name="updated-name")
         assert inp.name == "updated-name"
-        assert inp.replica_count is None
+        assert inp.replica_count is UNSET
 
 
 class TestDeleteDeploymentInput:

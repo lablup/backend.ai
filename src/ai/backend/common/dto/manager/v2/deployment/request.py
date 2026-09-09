@@ -525,25 +525,29 @@ class CreateDeploymentInput(BaseRequestModel):
 class UpdateDeploymentInput(BaseRequestModel):
     """Input for updating a deployment."""
 
-    name: str | None = Field(default=None, description="Updated deployment name")
-    replica_count: int | None = Field(default=None, ge=0, description="Updated replica count")
+    name: str | None | Unset = Field(
+        default=UNSET, description="Updated deployment name. Omit to leave unchanged."
+    )
+    replica_count: int | None | Unset = Field(
+        default=UNSET, ge=0, description="Updated replica count. Omit to leave unchanged."
+    )
     tags: list[str] | None | Unset = Field(
         default=UNSET, description="Updated tags. Omit to leave unchanged; null clears."
     )
-    open_to_public: bool | None = Field(
-        default=None, description="Updated network visibility. None means no change."
+    open_to_public: bool | None | Unset = Field(
+        default=UNSET, description="Updated network visibility. Omit to leave unchanged."
     )
-    preferred_domain_name: str | None = Field(
-        default=None, description="Updated preferred domain name. None means no change."
+    preferred_domain_name: str | None | Unset = Field(
+        default=UNSET, description="Updated preferred domain name. Omit to leave unchanged."
     )
-    default_deployment_strategy: DeploymentStrategyInput | None = Field(
-        default=None, description="Updated deployment strategy. None means no change."
+    default_deployment_strategy: DeploymentStrategyInput | None | Unset = Field(
+        default=UNSET, description="Updated deployment strategy. Omit to leave unchanged."
     )
 
     @field_validator("name")
     @classmethod
-    def name_must_not_be_blank(cls, v: str | None) -> str | None:
-        if v is None:
+    def name_must_not_be_blank(cls, v: str | None | Unset) -> str | None | Unset:
+        if not isinstance(v, str):
             return v
         stripped = v.strip()
         if not stripped:
@@ -988,27 +992,29 @@ class CreateAutoScalingRuleInput(BaseRequestModel):
 class UpdateAutoScalingRuleInput(BaseRequestModel):
     """Input for updating an auto-scaling rule (all fields are optional)."""
 
-    metric_source: AutoScalingMetricSource | None = Field(
-        default=None, description="Metric source (None = no change)"
+    metric_source: AutoScalingMetricSource | None | Unset = Field(
+        default=UNSET, description="Metric source. Omit to leave unchanged."
     )
-    metric_name: str | None = Field(default=None, description="Metric name (None = no change)")
-    min_threshold: Decimal | None = Field(
-        default=None, description="Minimum threshold (None = no change)"
+    metric_name: str | None | Unset = Field(
+        default=UNSET, description="Metric name. Omit to leave unchanged."
     )
-    max_threshold: Decimal | None = Field(
-        default=None, description="Maximum threshold (None = no change)"
+    min_threshold: Decimal | None | Unset = Field(
+        default=UNSET, description="Minimum threshold. Omit to leave unchanged; null clears."
     )
-    step_size: int | None = Field(
-        default=None, ge=1, description="Scale step size (None = no change)"
+    max_threshold: Decimal | None | Unset = Field(
+        default=UNSET, description="Maximum threshold. Omit to leave unchanged; null clears."
     )
-    time_window: int | None = Field(
-        default=None, ge=1, description="Time window in seconds (None = no change)"
+    step_size: int | None | Unset = Field(
+        default=UNSET, ge=1, description="Scale step size. Omit to leave unchanged."
     )
-    min_replicas: int | None = Field(
-        default=None, ge=0, description="Minimum replicas (None = no change)"
+    time_window: int | None | Unset = Field(
+        default=UNSET, ge=1, description="Time window in seconds. Omit to leave unchanged."
     )
-    max_replicas: int | None = Field(
-        default=None, ge=1, description="Maximum replicas (None = no change)"
+    min_replicas: int | None | Unset = Field(
+        default=UNSET, ge=0, description="Minimum replicas. Omit to leave unchanged; null clears."
+    )
+    max_replicas: int | None | Unset = Field(
+        default=UNSET, ge=1, description="Maximum replicas. Omit to leave unchanged; null clears."
     )
 
 

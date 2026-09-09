@@ -230,15 +230,15 @@ def update(
     body = UpdateAutoScalingRuleInput(
         id=rule_id,
         metric_source=(
-            AutoScalingMetricSource(metric_source.upper()) if metric_source is not None else None
+            AutoScalingMetricSource(metric_source.upper()) if metric_source is not None else UNSET
         ),
-        metric_name=metric_name,
-        step_size=step_size,
-        time_window=time_window,
-        min_threshold=Decimal(min_threshold) if min_threshold is not None else None,
-        max_threshold=Decimal(max_threshold) if max_threshold is not None else None,
-        min_replicas=min_replicas if min_replicas is not None else None,
-        max_replicas=max_replicas if max_replicas is not None else None,
+        metric_name=metric_name if metric_name is not None else UNSET,
+        step_size=step_size if step_size is not None else UNSET,
+        time_window=time_window if time_window is not None else UNSET,
+        min_threshold=Decimal(min_threshold) if min_threshold is not None else UNSET,
+        max_threshold=Decimal(max_threshold) if max_threshold is not None else UNSET,
+        min_replicas=min_replicas if min_replicas is not None else UNSET,
+        max_replicas=max_replicas if max_replicas is not None else UNSET,
         prometheus_query_preset_id=(
             prometheus_query_preset_id if prometheus_query_preset_id is not None else UNSET
         ),

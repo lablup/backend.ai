@@ -785,22 +785,10 @@ class DeploymentAdapter(BaseAdapter):
         """Update deployment metadata and configuration."""
         updater = DeploymentUpdater(
             deployment_id=deployment_id,
-            name=(
-                OptionalState.update(input.name)
-                if input.name is not None
-                else OptionalState[str].nop()
-            ),
+            name=OptionalState.from_unset(input.name),
             tag=TriState.from_unset(input.tags).map(lambda tags: ",".join(tags)),
-            replica_count=(
-                OptionalState.update(input.replica_count)
-                if input.replica_count is not None
-                else OptionalState[int].nop()
-            ),
-            open_to_public=(
-                OptionalState.from_graphql(input.open_to_public)
-                if input.open_to_public is not None
-                else OptionalState[bool].nop()
-            ),
+            replica_count=OptionalState.from_unset(input.replica_count),
+            open_to_public=OptionalState.from_unset(input.open_to_public),
         )
         action_result = await self._processors.deployment.update_deployment.run(
             UpdateDeploymentAction(deployment_id=deployment_id, updater=updater)
@@ -1033,28 +1021,12 @@ class DeploymentAdapter(BaseAdapter):
     ) -> UpdateAutoScalingRulePayload:
         """Update an auto-scaling rule."""
         modifier = ModelDeploymentAutoScalingRuleModifier(
-            metric_source=(
-                OptionalState.update(input.metric_source)
-                if input.metric_source is not None
-                else OptionalState.nop()
-            ),
-            metric_name=(
-                OptionalState.update(input.metric_name)
-                if input.metric_name is not None
-                else OptionalState.nop()
-            ),
+            metric_source=OptionalState.from_unset(input.metric_source),
+            metric_name=OptionalState.from_unset(input.metric_name),
             min_threshold=TriState.from_unset(input.min_threshold),
             max_threshold=TriState.from_unset(input.max_threshold),
-            step_size=(
-                OptionalState.update(input.step_size)
-                if input.step_size is not None
-                else OptionalState.nop()
-            ),
-            time_window=(
-                OptionalState.update(input.time_window)
-                if input.time_window is not None
-                else OptionalState.nop()
-            ),
+            step_size=OptionalState.from_unset(input.step_size),
+            time_window=OptionalState.from_unset(input.time_window),
             min_replicas=TriState.from_unset(input.min_replicas),
             max_replicas=TriState.from_unset(input.max_replicas),
             prometheus_query_preset_id=TriState.from_unset(input.prometheus_query_preset_id),

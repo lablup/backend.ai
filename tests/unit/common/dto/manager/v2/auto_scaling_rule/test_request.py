@@ -185,7 +185,7 @@ class TestUpdateAutoScalingRuleInput:
     def rule_id(self) -> uuid.UUID:
         return uuid.UUID("00000000-0000-0000-0000-000000000001")
 
-    def test_default_sentinel_fields(self, rule_id: uuid.UUID) -> None:
+    def test_default_nullable_fields_are_unset(self, rule_id: uuid.UUID) -> None:
         req = UpdateAutoScalingRuleInput(id=rule_id)
         assert req.min_threshold is UNSET
         assert isinstance(req.min_threshold, Unset)
@@ -196,8 +196,17 @@ class TestUpdateAutoScalingRuleInput:
         assert req.max_replicas is UNSET
         assert isinstance(req.max_replicas, Unset)
 
-    def test_none_for_non_sentinel_fields_means_no_change(self, rule_id: uuid.UUID) -> None:
+    def test_default_non_nullable_fields_are_unset(self, rule_id: uuid.UUID) -> None:
         req = UpdateAutoScalingRuleInput(id=rule_id)
+        assert req.metric_source is UNSET
+        assert req.metric_name is UNSET
+        assert req.step_size is UNSET
+        assert req.time_window is UNSET
+
+    def test_none_for_non_nullable_fields_stays_none(self, rule_id: uuid.UUID) -> None:
+        req = UpdateAutoScalingRuleInput(
+            id=rule_id, metric_source=None, metric_name=None, step_size=None, time_window=None
+        )
         assert req.metric_source is None
         assert req.metric_name is None
         assert req.step_size is None
