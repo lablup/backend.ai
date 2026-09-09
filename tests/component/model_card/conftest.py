@@ -226,9 +226,13 @@ def server_module_registries(
     processors.rbac = rbac_processors
     processors.user = user_processors
 
-    mc_handler = V2ModelCardHandler(adapter=ModelCardAdapter(processors))
-    proj_handler = V2ProjectHandler(adapter=ProjectAdapter(processors))
-    rbac_handler = V2RBACHandler(adapter=RBACAdapter(processors))
+    mc_handler = V2ModelCardHandler(adapter=ModelCardAdapter(processors.model_card, MagicMock()))
+    proj_handler = V2ProjectHandler(
+        adapter=ProjectAdapter(processors.project, processors.rbac, MagicMock(), processors.user)
+    )
+    rbac_handler = V2RBACHandler(
+        adapter=RBACAdapter(processors.rbac, processors.permission_controller)
+    )
 
     v2_reg = RouteRegistry.create("v2", route_deps.cors_options)
     v2_reg.add_subregistry(register_v2_model_card_routes(mc_handler, route_deps))

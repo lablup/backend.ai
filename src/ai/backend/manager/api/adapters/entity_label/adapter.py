@@ -36,7 +36,7 @@ from ai.backend.manager.models.entity_label.upserters import EntityLabelUpserter
 from ai.backend.manager.services.entity_label.actions.purge import PurgeEntityLabelAction
 from ai.backend.manager.services.entity_label.actions.search import SearchEntityLabelsAction
 from ai.backend.manager.services.entity_label.actions.upsert import UpsertEntityLabelAction
-from ai.backend.manager.services.processors import Processors
+from ai.backend.manager.services.entity_label.processors import EntityLabelProcessors
 
 _LABEL_PAGINATION_SPEC = PaginationSpec(
     forward_order=EntityLabelOrders.created_at(ascending=False),
@@ -50,15 +50,16 @@ _LABEL_PAGINATION_SPEC = PaginationSpec(
 class EntityLabelAdapter(BaseAdapter):
     """Adapter for label domain operations."""
 
+    _entity_label: EntityLabelProcessors
     _entity_types: WiredEntityTypes
 
-    def __init__(self, processors: Processors, entity_types: WiredEntityTypes) -> None:
-        super().__init__(processors)
+    def __init__(self, entity_label: EntityLabelProcessors, entity_types: WiredEntityTypes) -> None:
+        self._entity_label = entity_label
         self._entity_types = entity_types
 
     async def upsert(self, input: UpsertEntityLabelInput) -> UpsertEntityLabelPayload:
         """Set one key on the entity the request names, replacing the value it carries."""
-        action_result = await self._processors.entity_label.upsert.run(
+        action_result = await self._entity_label.upsert.run(
             UpsertEntityLabelAction(
                 owner=self._target(input.target),
                 upserter=EntityLabelUpserter(key=EntityLabelKey(input.key), value=input.value),
@@ -72,7 +73,7 @@ class EntityLabelAdapter(BaseAdapter):
         Which entity answers for it is read from the row before the delete runs, so a
         caller reaching for a label on an entity they cannot see is refused there.
         """
-        action_result = await self._processors.entity_label.purge.run(
+        action_result = await self._entity_label.purge.run(
             PurgeEntityLabelAction(label_id=label_id)
         )
         return PurgeEntityLabelPayload(label=self._data_to_node(action_result.data))
@@ -106,7 +107,7 @@ class EntityLabelAdapter(BaseAdapter):
             limit=input.limit,
             offset=input.offset,
         )
-        action_result = await self._processors.entity_label.search.run(
+        action_result = await self._entity_label.search.run(
             SearchEntityLabelsAction(owners=owners, searcher=searcher)
         )
         return SearchEntityLabelsPayload(

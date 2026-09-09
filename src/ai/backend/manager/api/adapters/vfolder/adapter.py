@@ -115,6 +115,7 @@ from ai.backend.manager.models.vfolder.scopes import (
     UserVFolderOperationScope,
 )
 from ai.backend.manager.services.deployment.actions.create_deployment import CreateDeploymentAction
+from ai.backend.manager.services.deployment.processors import DeploymentProcessors
 from ai.backend.manager.services.vfolder.actions.admin_search_vfolders import (
     GlobalSearchVFoldersAction,
 )
@@ -150,6 +151,8 @@ from ai.backend.manager.services.vfolder.actions.vfolder_v2 import (
     DeleteVFolderV2Action,
     PurgeVFolderV2Action,
 )
+from ai.backend.manager.services.vfolder.processors import VFolderFileProcessors, VFolderProcessors
+from ai.backend.manager.services.vfolder.processors.vfolder_admin import VFolderAdminProcessors
 
 _VFOLDER_PAGINATION_SPEC = PaginationSpec(
     forward_order=VFOLDER_DEFAULT_FORWARD_ORDER,
@@ -199,6 +202,23 @@ def _build_policy_from_strategy_input(
 class VFolderAdapter(BaseAdapter):
     """Adapter for VFolder domain operations."""
 
+    _vfolder: VFolderProcessors
+    _vfolder_file: VFolderFileProcessors
+    _vfolder_admin: VFolderAdminProcessors
+    _deployment: DeploymentProcessors
+
+    def __init__(
+        self,
+        vfolder: VFolderProcessors,
+        vfolder_file: VFolderFileProcessors,
+        vfolder_admin: VFolderAdminProcessors,
+        deployment: DeploymentProcessors,
+    ) -> None:
+        self._vfolder = vfolder
+        self._vfolder_file = vfolder_file
+        self._vfolder_admin = vfolder_admin
+        self._deployment = deployment
+
     @staticmethod
     def _vfolder_data_to_node(data: VFolderData) -> VFolderNode:
         """Convert VFolderData to VFolderNode DTO."""
@@ -247,7 +267,7 @@ class VFolderAdapter(BaseAdapter):
         """
         if not ids:
             return []
-        action_result = await self._processors.vfolder.batch_load_vfolders_by_ids.run(
+        action_result = await self._vfolder.batch_load_vfolders_by_ids.run(
             GlobalBatchLoadVFoldersAction(ids=list(ids))
         )
         return [
@@ -277,7 +297,7 @@ class VFolderAdapter(BaseAdapter):
             limit=input.limit,
             offset=input.offset,
         )
-        action_result = await self._processors.vfolder_admin.admin_search_vfolders.run(
+        action_result = await self._vfolder_admin.admin_search_vfolders.run(
             GlobalSearchVFoldersAction(querier=querier)
         )
         return SearchVFoldersPayload(
@@ -312,7 +332,7 @@ class VFolderAdapter(BaseAdapter):
             limit=input.limit,
             offset=input.offset,
         )
-        action_result = await self._processors.vfolder.search_user_vfolders.run(
+        action_result = await self._vfolder.search_user_vfolders.run(
             SearchUserVFoldersAction(scope=scope, querier=querier)
         )
         return SearchVFoldersPayload(
@@ -345,7 +365,7 @@ class VFolderAdapter(BaseAdapter):
             limit=input.limit,
             offset=input.offset,
         )
-        action_result = await self._processors.vfolder.search_vfolders_in_project.run(
+        action_result = await self._vfolder.search_vfolders_in_project.run(
             SearchVFoldersInProjectAction(scope=scope, querier=querier)
         )
         return SearchVFoldersPayload(
@@ -379,9 +399,7 @@ class VFolderAdapter(BaseAdapter):
         return await self._create(self._project_creator(me, ProjectID(project_id), input))
 
     async def _create(self, creator: VFolderBaseCreator) -> CreateVFolderPayload:
-        result = await self._processors.vfolder.create_vfolder.run(
-            CreateVFolderAction(creator=creator)
-        )
+        result = await self._vfolder.create_vfolder.run(CreateVFolderAction(creator=creator))
         return CreateVFolderPayload(vfolder=self._vfolder_data_to_node(result.vfolder))
 
     def _personal_creator(
@@ -433,12 +451,12 @@ class VFolderAdapter(BaseAdapter):
             path=input.path,
             size=input.size,
         )
-        result = await self._processors.vfolder.create_upload_session_v2.run(action)
+        result = await self._vfolder.create_upload_session_v2.run(action)
         return CreateUploadSessionPayload(token=result.token, url=result.url)
 
     async def get(self, vfolder_id: UUID) -> VFolderNode:
         """Get a single vfolder by ID with RBAC validation."""
-        result = await self._processors.vfolder.get_v2.run(
+        result = await self._vfolder.get_v2.run(
             GetVFolderV2Action(vfolder_uuid=VFolderUUID(vfolder_id))
         )
         return self._vfolder_data_to_node(result.vfolder)
@@ -451,7 +469,7 @@ class VFolderAdapter(BaseAdapter):
         walk on vfs). Returns ``None`` for unmanaged vfolders, which have no
         storage-proxy backing.
         """
-        result = await self._processors.vfolder.get_folder_usage.run(
+        result = await self._vfolder.get_folder_usage.run(
             GetVFolderUsageAction(vfolder_uuid=VFolderUUID(vfolder_id))
         )
         usage = result.usage
@@ -465,7 +483,7 @@ class VFolderAdapter(BaseAdapter):
     async def delete(self, vfolder_id: UUID) -> DeleteVFolderPayload:
         """Soft-delete a vfolder (move to trash). RBAC enforced."""
         action = DeleteVFolderV2Action(vfolder_uuid=VFolderUUID(vfolder_id))
-        await self._processors.vfolder.delete_v2.run(action)
+        await self._vfolder.delete_v2.run(action)
         return DeleteVFolderPayload(id=vfolder_id)
 
     async def restore(self, vfolder_id: UUID) -> RestoreVFolderPayload:
@@ -477,7 +495,7 @@ class VFolderAdapter(BaseAdapter):
             user_uuid=me.user_id,
             vfolder_uuid=VFolderUUID(vfolder_id),
         )
-        await self._processors.vfolder.restore_vfolder_from_trash.run(action)
+        await self._vfolder.restore_vfolder_from_trash.run(action)
         return RestoreVFolderPayload(id=vfolder_id)
 
     async def purge(self, vfolder_id: UUID, input: PurgeVFolderInput) -> PurgeVFolderPayload:
@@ -487,7 +505,7 @@ class VFolderAdapter(BaseAdapter):
             cascade_model_card=input.options.cascade_model_card,
             force=input.options.force,
         )
-        await self._processors.vfolder.purge_v2.run(action)
+        await self._vfolder.purge_v2.run(action)
         return PurgeVFolderPayload(id=vfolder_id)
 
     async def deploy(
@@ -508,7 +526,7 @@ class VFolderAdapter(BaseAdapter):
         if me is None:
             raise UnreachableError("User context is not available")
 
-        batch_result = await self._processors.vfolder.batch_load_vfolders_by_ids.run(
+        batch_result = await self._vfolder.batch_load_vfolders_by_ids.run(
             GlobalBatchLoadVFoldersAction(ids=[vfolder_id])
         )
         if not batch_result.data or batch_result.data[0] is None:
@@ -563,7 +581,7 @@ class VFolderAdapter(BaseAdapter):
             policy=policy,
         )
 
-        result = await self._processors.deployment.create_deployment.run(
+        result = await self._deployment.create_deployment.run(
             CreateDeploymentAction(
                 project_id=ProjectID(creator.metadata.project),
                 creator=creator,
@@ -587,7 +605,7 @@ class VFolderAdapter(BaseAdapter):
         for vfolder_id in input.ids:
             action = DeleteVFolderV2Action(vfolder_uuid=VFolderUUID(vfolder_id))
             try:
-                result = await self._processors.vfolder.delete_v2.run(action)
+                result = await self._vfolder.delete_v2.run(action)
             except BackendAIError as e:
                 failed.append(BulkDeleteVFolderV2Error(vfolder_id=vfolder_id, message=str(e)))
                 continue
@@ -613,7 +631,7 @@ class VFolderAdapter(BaseAdapter):
                 force=input.options.force,
             )
             try:
-                await self._processors.vfolder.purge_v2.run(action)
+                await self._vfolder.purge_v2.run(action)
             except BackendAIError as e:
                 failed.append(BulkPurgeVFolderV2Error(vfolder_id=vfolder_id, message=str(e)))
                 continue
@@ -632,7 +650,7 @@ class VFolderAdapter(BaseAdapter):
         action = ListFilesV2Action(
             user_id=me.user_id, vfolder_uuid=VFolderUUID(vfolder_id), path=input.path
         )
-        result = await self._processors.vfolder_file.list_files_v2.run(action)
+        result = await self._vfolder_file.list_files_v2.run(action)
         return ListFilesPayload(
             items=[
                 FileEntryNode(
@@ -659,7 +677,7 @@ class VFolderAdapter(BaseAdapter):
             parents=input.parents,
             exist_ok=input.exist_ok,
         )
-        await self._processors.vfolder_file.mkdir_v2.run(action)
+        await self._vfolder_file.mkdir_v2.run(action)
         paths = [input.path] if isinstance(input.path, str) else input.path
         return MkdirPayload(results=paths)
 
@@ -671,7 +689,7 @@ class VFolderAdapter(BaseAdapter):
         action = MoveFileV2Action(
             user_id=me.user_id, vfolder_uuid=VFolderUUID(vfolder_id), src=input.src, dst=input.dst
         )
-        await self._processors.vfolder_file.move_file_v2.run(action)
+        await self._vfolder_file.move_file_v2.run(action)
         return MoveFilePayload(src=input.src, dst=input.dst)
 
     async def delete_files(self, vfolder_id: UUID, input: DeleteFilesInput) -> DeleteFilesPayload:
@@ -685,7 +703,7 @@ class VFolderAdapter(BaseAdapter):
             files=input.files,
             recursive=input.recursive,
         )
-        result = await self._processors.vfolder_file.delete_files_v2.run(action)
+        result = await self._vfolder_file.delete_files_v2.run(action)
         return DeleteFilesPayload(bgtask_id=result.bgtask_id)
 
     async def create_download_session(
@@ -701,7 +719,7 @@ class VFolderAdapter(BaseAdapter):
             path=input.path,
             archive=input.archive,
         )
-        result = await self._processors.vfolder_file.download_file_v2.run(action)
+        result = await self._vfolder_file.download_file_v2.run(action)
         return CreateDownloadSessionPayload(token=result.token, url=result.url)
 
     async def clone(self, vfolder_id: UUID, input: CloneVFolderInput) -> CloneVFolderPayload:
@@ -715,7 +733,7 @@ class VFolderAdapter(BaseAdapter):
             target_name=input.name,
             target_host=input.host,
         )
-        result = await self._processors.vfolder.clone_v2.run(action)
+        result = await self._vfolder.clone_v2.run(action)
         # Fetch the newly created vfolder for the response
         cloned_vfolder = await self.get(result.new_vfolder_id)
         return CloneVFolderPayload(

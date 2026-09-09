@@ -100,6 +100,7 @@ from ai.backend.manager.services.role_preset.actions.search_permission_presets i
     SearchRolePermissionPresetsAction,
 )
 from ai.backend.manager.services.role_preset.actions.update import UpdateRolePresetAction
+from ai.backend.manager.services.role_preset.processors import RolePresetProcessors
 from ai.backend.manager.types import OptionalState
 
 
@@ -126,6 +127,11 @@ def _role_permission_preset_pagination_spec() -> PaginationSpec:
 class RolePresetAdapter(BaseAdapter):
     """Adapter for role preset domain operations."""
 
+    _role_preset: RolePresetProcessors
+
+    def __init__(self, role_preset: RolePresetProcessors) -> None:
+        self._role_preset = role_preset
+
     async def create(self, input: CreateRolePresetInput) -> CreateRolePresetPayload:
         """Create a new role preset."""
         creator = RolePresetCreator(
@@ -140,7 +146,7 @@ class RolePresetAdapter(BaseAdapter):
             )
             for entry in input.permissions
         ]
-        result = await self._processors.role_preset.create.run(
+        result = await self._role_preset.create.run(
             CreateRolePresetAction(
                 creator=creator,
                 permission_creators=permission_creators,
@@ -150,9 +156,7 @@ class RolePresetAdapter(BaseAdapter):
 
     async def get(self, role_preset_id: RolePresetID) -> RolePresetNode:
         """Get a single role preset by ID."""
-        result = await self._processors.role_preset.get.run(
-            GetRolePresetAction(preset_id=role_preset_id)
-        )
+        result = await self._role_preset.get.run(GetRolePresetAction(preset_id=role_preset_id))
         return self._data_to_node(result.data)
 
     async def search(self, input: SearchRolePresetsInput) -> SearchRolePresetsPayload:
@@ -176,9 +180,7 @@ class RolePresetAdapter(BaseAdapter):
             limit=input.limit,
             offset=input.offset,
         )
-        result = await self._processors.role_preset.search.run(
-            SearchRolePresetsAction(searcher=searcher)
-        )
+        result = await self._role_preset.search.run(SearchRolePresetsAction(searcher=searcher))
         return SearchRolePresetsPayload(
             items=[self._data_to_node(d) for d in result.items],
             total_count=result.total_count,
@@ -199,9 +201,7 @@ class RolePresetAdapter(BaseAdapter):
                 else OptionalState.nop()
             ),
         )
-        result = await self._processors.role_preset.update.run(
-            UpdateRolePresetAction(updater=updater)
-        )
+        result = await self._role_preset.update.run(UpdateRolePresetAction(updater=updater))
         return UpdateRolePresetPayload(role_preset=self._data_to_node(result.data))
 
     async def update_from_body(
@@ -222,7 +222,7 @@ class RolePresetAdapter(BaseAdapter):
 
     async def bulk_delete(self, input: BulkDeleteRolePresetsInput) -> BulkDeleteRolePresetsPayload:
         """Bulk-soft-delete role presets."""
-        result = await self._processors.role_preset.bulk_delete.run(
+        result = await self._role_preset.bulk_delete.run(
             BulkDeleteRolePresetsAction(ids=input.role_preset_ids)
         )
         return BulkDeleteRolePresetsPayload(
@@ -242,7 +242,7 @@ class RolePresetAdapter(BaseAdapter):
         self, input: BulkRestoreRolePresetsInput
     ) -> BulkRestoreRolePresetsPayload:
         """Bulk-restore soft-deleted role presets."""
-        result = await self._processors.role_preset.bulk_restore.run(
+        result = await self._role_preset.bulk_restore.run(
             BulkRestoreRolePresetsAction(ids=input.role_preset_ids)
         )
         return BulkRestoreRolePresetsPayload(
@@ -260,7 +260,7 @@ class RolePresetAdapter(BaseAdapter):
 
     async def bulk_purge(self, input: BulkPurgeRolePresetsInput) -> BulkPurgeRolePresetsPayload:
         """Bulk-hard-delete role presets."""
-        result = await self._processors.role_preset.bulk_purge.run(
+        result = await self._role_preset.bulk_purge.run(
             BulkPurgeRolePresetsAction(ids=input.role_preset_ids)
         )
         return BulkPurgeRolePresetsPayload(
@@ -300,7 +300,7 @@ class RolePresetAdapter(BaseAdapter):
             limit=input.limit,
             offset=input.offset,
         )
-        result = await self._processors.role_preset.search_permission_presets.run(
+        result = await self._role_preset.search_permission_presets.run(
             SearchRolePermissionPresetsAction(preset_id=role_preset_id, searcher=searcher)
         )
         return SearchRolePermissionPresetsPayload(
@@ -323,7 +323,7 @@ class RolePresetAdapter(BaseAdapter):
             )
             for entry in input.permissions
         ]
-        result = await self._processors.role_preset.bulk_add_permissions.run(
+        result = await self._role_preset.bulk_add_permissions.run(
             BulkAddRolePermissionPresetsAction(preset_id=role_preset_id, creators=creators)
         )
         # The write is atomic: every entry landed, or the run raised and nothing did.
@@ -336,7 +336,7 @@ class RolePresetAdapter(BaseAdapter):
         self, input: BulkRemoveRolePermissionPresetsInput
     ) -> BulkRemoveRolePermissionPresetsPayload:
         """Bulk-remove permission entries from a role preset."""
-        result = await self._processors.role_preset.bulk_remove_permissions.run(
+        result = await self._role_preset.bulk_remove_permissions.run(
             BulkRemoveRolePermissionPresetsAction(ids=input.permission_preset_ids)
         )
         return BulkRemoveRolePermissionPresetsPayload(

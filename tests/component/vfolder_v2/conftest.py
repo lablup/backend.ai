@@ -123,7 +123,7 @@ def server_module_registries(
     """Register v2 vfolder routes for testing."""
     processors = MagicMock(spec=Processors)
     processors.vfolder = vfolder_processors
-    adapter = VFolderAdapter(processors)
+    adapter = VFolderAdapter(processors.vfolder, MagicMock(), MagicMock(), MagicMock())
     handler = V2VFolderHandler(adapter=adapter)
     v2_reg = RouteRegistry.create("v2", route_deps.cors_options)
     v2_reg.add_subregistry(register_v2_vfolder_routes(handler, route_deps))

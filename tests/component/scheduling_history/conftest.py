@@ -108,7 +108,7 @@ def scheduling_history_adapter(
     processors.resource_slot.lookup_kernel_owner = processor_registry.group(
         GroupMeta(SESSION_ENTITY_TYPE)
     ).key_owner_lookup_ops(LookupKernelOwnerAction)
-    return SchedulingHistoryAdapter(processors)
+    return SchedulingHistoryAdapter(processors.scheduling_history, processors.resource_slot)
 
 
 @pytest.fixture()

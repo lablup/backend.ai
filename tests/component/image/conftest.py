@@ -58,14 +58,7 @@ def image_processors(
 
 @pytest.fixture()
 def image_adapter(image_processors: ImageProcessors) -> ImageAdapter:
-    """Build an ImageAdapter wired only with image processors.
-
-    Other adapter call sites in ImageAdapter use ``self._processors.image`` exclusively,
-    so a MagicMock backing object with ``.image`` set to the real ImageProcessors is sufficient.
-    """
-    processors = MagicMock()
-    processors.image = image_processors
-    return ImageAdapter(processors)
+    return ImageAdapter(image_processors)
 
 
 @pytest.fixture()

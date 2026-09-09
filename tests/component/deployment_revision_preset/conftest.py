@@ -82,7 +82,7 @@ def server_module_registries(
 ) -> list[RouteRegistry]:
     processors = MagicMock(spec=Processors)
     processors.deployment_revision_preset = deployment_revision_preset_processors
-    adapter = DeploymentRevisionPresetAdapter(processors)
+    adapter = DeploymentRevisionPresetAdapter(processors.deployment_revision_preset)
     handler = V2DeploymentRevisionPresetHandler(adapter=adapter)
     v2_reg = RouteRegistry.create("v2", route_deps.cors_options)
     v2_reg.add_subregistry(register_v2_deployment_revision_preset_routes(handler, route_deps))

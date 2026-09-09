@@ -50,6 +50,7 @@ from ai.backend.manager.services.object_storage.actions.get_upload_presigned_url
 from ai.backend.manager.services.object_storage.actions.purge import PurgeObjectStorageAction
 from ai.backend.manager.services.object_storage.actions.search import SearchObjectStoragesAction
 from ai.backend.manager.services.object_storage.actions.update import UpdateObjectStorageAction
+from ai.backend.manager.services.object_storage.processors import ObjectStorageProcessors
 from ai.backend.manager.types import OptionalState, TriState
 
 DEFAULT_PAGINATION_LIMIT = 50
@@ -57,6 +58,11 @@ DEFAULT_PAGINATION_LIMIT = 50
 
 class ObjectStorageAdapter(BaseAdapter):
     """Adapter for object storage domain operations."""
+
+    _object_storage: ObjectStorageProcessors
+
+    def __init__(self, object_storage: ObjectStorageProcessors) -> None:
+        self._object_storage = object_storage
 
     async def admin_search(
         self, input: AdminSearchObjectStoragesInput
@@ -71,7 +77,7 @@ class ObjectStorageAdapter(BaseAdapter):
         """
         searcher = self.build_searcher(input)
 
-        action_result = await self._processors.object_storage.global_search_object_storages.run(
+        action_result = await self._object_storage.global_search_object_storages.run(
             SearchObjectStoragesAction(searcher=searcher)
         )
 
@@ -151,7 +157,7 @@ class ObjectStorageAdapter(BaseAdapter):
         if not ids:
             return []
         entity_ids = [ObjectStorageID(value) for value in ids]
-        result = await self._processors.object_storage.bulk_get.run(
+        result = await self._object_storage.bulk_get.run(
             BulkGetObjectStoragesAction(ids=entity_ids)
         )
         return [
@@ -163,14 +169,14 @@ class ObjectStorageAdapter(BaseAdapter):
 
     async def get(self, storage_id: UUID) -> ObjectStorageNode:
         """Retrieve a single object storage by ID."""
-        action_result = await self._processors.object_storage.get.run(
+        action_result = await self._object_storage.get.run(
             GetObjectStorageAction(storage_id=ObjectStorageID(storage_id))
         )
         return self._data_to_dto(action_result.data)
 
     async def create(self, input: CreateObjectStorageInput) -> CreateObjectStoragePayload:
         """Create a new object storage."""
-        action_result = await self._processors.object_storage.global_create.run(
+        action_result = await self._object_storage.global_create.run(
             CreateObjectStorageAction(
                 creator=ObjectStorageCreator(
                     name=input.name,
@@ -211,14 +217,14 @@ class ObjectStorageAdapter(BaseAdapter):
                 else TriState.update(input.region)
             ),
         )
-        action_result = await self._processors.object_storage.update.run(
+        action_result = await self._object_storage.update.run(
             UpdateObjectStorageAction(updater=updater)
         )
         return UpdateObjectStoragePayload(object_storage=self._data_to_dto(action_result.data))
 
     async def delete(self, input: DeleteObjectStorageInput) -> DeleteObjectStoragePayload:
         """Delete an object storage."""
-        action_result = await self._processors.object_storage.purge.run(
+        action_result = await self._object_storage.purge.run(
             PurgeObjectStorageAction(storage_id=input.id)
         )
         return DeleteObjectStoragePayload(id=action_result.data.id)
@@ -230,7 +236,7 @@ class ObjectStorageAdapter(BaseAdapter):
         expiration: int | None = None,
     ) -> PresignedDownloadURLPayload:
         """Generate a presigned download URL for an artifact revision."""
-        action_result = await self._processors.object_storage.get_presigned_download_url.run(
+        action_result = await self._object_storage.get_presigned_download_url.run(
             GetDownloadPresignedURLAction(
                 artifact_revision_id=ArtifactRevisionID(artifact_revision_id),
                 key=key,
@@ -245,7 +251,7 @@ class ObjectStorageAdapter(BaseAdapter):
         key: str,
     ) -> PresignedUploadURLPayload:
         """Generate a presigned upload URL for an artifact revision."""
-        action_result = await self._processors.object_storage.get_presigned_upload_url.run(
+        action_result = await self._object_storage.get_presigned_upload_url.run(
             GetUploadPresignedURLAction(
                 artifact_revision_id=ArtifactRevisionID(artifact_revision_id),
                 key=key,

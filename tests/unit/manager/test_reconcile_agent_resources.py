@@ -18,7 +18,6 @@ from dateutil.tz import tzutc
 from ai.backend.common.auth import PublicKey, SecretKey
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
-from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
 from ai.backend.manager.data.agent.types import AgentStatus
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.session.types import SessionStatus
@@ -42,7 +41,6 @@ from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.registry import AgentRegistry
-from ai.backend.manager.repositories.db.engine import create_async_engine
 from ai.backend.testutils.db import with_tables
 
 
@@ -60,22 +58,6 @@ class SeededInfra:
 
 class TestReconcileAgentResources:
     """Tests for AgentRegistry._reconcile_agent_resources()."""
-
-    @pytest.fixture
-    async def database_connection(
-        self,
-        postgres_container: tuple[str, HostPortPairModel],
-    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
-        _, addr = postgres_container
-        url = f"postgresql+asyncpg://postgres:develove@{addr.host}:{addr.port}/testing"
-        engine = create_async_engine(
-            url,
-            pool_size=8,
-            pool_pre_ping=False,
-            max_overflow=64,
-        )
-        yield engine
-        await engine.dispose()
 
     @pytest.fixture
     async def db_with_tables(
@@ -454,22 +436,6 @@ class TestOrphanedAllocationCleanup:
     Each test sets up an inconsistent DB state via fixtures and verifies
     that reconcile normalizes it by checking DB state directly.
     """
-
-    @pytest.fixture
-    async def database_connection(
-        self,
-        postgres_container: tuple[str, HostPortPairModel],
-    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
-        _, addr = postgres_container
-        url = f"postgresql+asyncpg://postgres:develove@{addr.host}:{addr.port}/testing"
-        engine = create_async_engine(
-            url,
-            pool_size=8,
-            pool_pre_ping=False,
-            max_overflow=64,
-        )
-        yield engine
-        await engine.dispose()
 
     @pytest.fixture
     async def db(
@@ -914,22 +880,6 @@ class TestTerminalSessionKernelReconciliation:
     of terminal sessions to the session's terminal status and freeing their
     active allocations atomically.
     """
-
-    @pytest.fixture
-    async def database_connection(
-        self,
-        postgres_container: tuple[str, HostPortPairModel],
-    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
-        _, addr = postgres_container
-        url = f"postgresql+asyncpg://postgres:develove@{addr.host}:{addr.port}/testing"
-        engine = create_async_engine(
-            url,
-            pool_size=8,
-            pool_pre_ping=False,
-            max_overflow=64,
-        )
-        yield engine
-        await engine.dispose()
 
     @pytest.fixture
     async def db(
