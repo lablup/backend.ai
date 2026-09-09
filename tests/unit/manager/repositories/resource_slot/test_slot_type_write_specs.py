@@ -10,6 +10,7 @@ from uuid import uuid4
 import pytest
 import sqlalchemy as sa
 
+from ai.backend.common.data.entity.agent import AgentUUID
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.data.entity.resource_slot import ResourceSlotTypeUUID
@@ -313,8 +314,10 @@ class TestResourceSlotTypePurger:
                 )
             )
             await db_sess.flush()
+            agent_uuid = AgentUUID(uuid.uuid4())
             db_sess.add(
                 AgentRow(
+                    uuid=agent_uuid,
                     id=agent_id,
                     status=AgentStatus.ALIVE,
                     region="local",
@@ -329,6 +332,7 @@ class TestResourceSlotTypePurger:
             db_sess.add(
                 AgentResourceRow(
                     agent_id=agent_id,
+                    agent_uuid=agent_uuid,
                     slot_name=existing_slot_type.slot_name,
                     capacity=Decimal(2),
                 )
