@@ -27,7 +27,7 @@ from ai.backend.agent.network.backends.vxlan import (
     local_ip_capability_args,
 )
 from ai.backend.agent.network.caps import probe_caps
-from ai.backend.agent.network.local_subnet import LocalSubnetAllocator, get_local_subnet_allocator
+from ai.backend.agent.network.local_subnet import LocalSubnetAllocator
 from ai.backend.agent.network.native_attacher import redirect_session_dns, remove_dns_redirect
 from ai.backend.agent.plugin.network_v2 import AbstractNetworkAgentPluginV2
 from ai.backend.common.network.types import (
@@ -59,14 +59,16 @@ class BridgeNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
         *,
         uplink: str = "eth0",
         runner: Runner | None = None,
-        local_subnets: LocalSubnetAllocator | None = None,
+        local_subnets: LocalSubnetAllocator,
     ) -> None:
         super().__init__(plugin_config, local_config)
         self._uplink = uplink
         self._runner = runner or _run_command
-        # Defaults to the store's single process-wide owner (see the vxlan backend's __init__),
-        # which also owns the pool the block is cut from (the operator's, not ours).
-        self._local_subnets = local_subnets or get_local_subnet_allocator()
+        # Required, not defaulted. The store is node-wide and every claim in it is tagged with the
+        # agent that owns it; a backend has no agent id, so one resolving its own would build an
+        # UNOWNED allocator -- and the process-wide cache is keyed on the directory alone, so
+        # whichever collaborator got there first would decide the owner for everybody.
+        self._local_subnets = local_subnets
 
     async def _index(self, session_id: str) -> int:
         """Claim the session's node-local block index (idempotent, durable across restarts)."""
