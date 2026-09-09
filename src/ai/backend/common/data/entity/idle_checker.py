@@ -19,7 +19,10 @@ class IdleCheckerEntityType(EntityType):
     @override
     @classmethod
     def description(cls) -> str:
-        return "A rule that ends idle sessions, assigned to scopes."
+        return (
+            "A rule terminating sessions by lifetime, network silence or utilization,"
+            " assigned to scopes."
+        )
 
 
 class IdleCheckerID(EntityIdentifier):

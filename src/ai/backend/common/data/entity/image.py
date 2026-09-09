@@ -16,7 +16,7 @@ class ImageEntityType(EntityType):
     @override
     @classmethod
     def description(cls) -> str:
-        return "A container image known to a container registry."
+        return "A container image in a registry, one row per architecture."
 
 
 class ImageID(EntityIdentifier):
