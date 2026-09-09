@@ -170,3 +170,30 @@ class V2FieldWriteOps(V2WriteOpsBase):
             upserter.integrity_error_checks(),
         )
         return upserter.to_data(row)
+
+    async def atomic_upsert_field_entities[
+        TOwnerID: EntityIdentifier,
+        TRow: Base,
+        TData: FieldData,
+    ](
+        self, owner_id: TOwnerID, upserters: Sequence[FieldUpserter[TOwnerID, TRow, TData]]
+    ) -> list[TData]:
+        """Insert-or-update every field row of one owner atomically.
+
+        One statement per row, as :meth:`V2EntityWriteOps.atomic_upsert_entities` runs
+        them: each carries its own update values, so they cannot be folded into a
+        single insert.
+        """
+        if not upserters:
+            return []
+        rows = [
+            await self._upsert_row_returning(
+                upserter.row_class(),
+                upserter.index_elements(),
+                upserter.build_insert_values(owner_id),
+                upserter.build_update_values(),
+                upserter.integrity_error_checks(),
+            )
+            for upserter in upserters
+        ]
+        return [upserter.to_data(row) for upserter, row in zip(upserters, rows, strict=True)]

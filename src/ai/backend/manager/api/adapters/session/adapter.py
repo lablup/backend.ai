@@ -1071,18 +1071,20 @@ class SessionAdapter(BaseAdapter):
         return ExcludeSessionIdleChecksPayload(
             items=[
                 SessionIdleCheckTargetInfo(
-                    checker_id=pair.checker_id,
-                    session_id=SessionID(pair.session_id),
+                    checker_id=item.pair.checker_id,
+                    session_id=SessionID(item.pair.session_id),
                 )
-                for pair in result.success
+                for item in result.results
+                if item.applied
             ],
             failed=[
                 ExcludeSessionIdleChecksFailureInfo(
-                    checker_id=pair.checker_id,
-                    session_id=SessionID(pair.session_id),
-                    message=str(error),
+                    checker_id=item.pair.checker_id,
+                    session_id=SessionID(item.pair.session_id),
+                    message=str(item.error) if item.error is not None else "Not excluded.",
                 )
-                for pair, error in result.errors.items()
+                for item in result.results
+                if not item.applied
             ],
         )
 
@@ -1105,18 +1107,20 @@ class SessionAdapter(BaseAdapter):
         return IncludeSessionIdleChecksPayload(
             items=[
                 SessionIdleCheckTargetInfo(
-                    checker_id=pair.checker_id,
-                    session_id=SessionID(pair.session_id),
+                    checker_id=item.pair.checker_id,
+                    session_id=SessionID(item.pair.session_id),
                 )
-                for pair in result.success
+                for item in result.results
+                if item.applied
             ],
             failed=[
                 IncludeSessionIdleChecksFailureInfo(
-                    checker_id=pair.checker_id,
-                    session_id=SessionID(pair.session_id),
-                    message=str(error),
+                    checker_id=item.pair.checker_id,
+                    session_id=SessionID(item.pair.session_id),
+                    message=str(item.error) if item.error is not None else "Not included.",
                 )
-                for pair, error in result.errors.items()
+                for item in result.results
+                if not item.applied
             ],
         )
 

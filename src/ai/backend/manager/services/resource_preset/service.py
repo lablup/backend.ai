@@ -1,13 +1,11 @@
 import logging
 from collections.abc import Mapping
-from typing import Any, cast
+from typing import Any
 
 from ai.backend.common.exception import InvalidAPIParameters
 from ai.backend.common.types import LegacyResourceSlotState as ResourceSlotState
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.repositories.resource_preset import ResourcePresetRepository
-from ai.backend.manager.repositories.resource_preset.creators import ResourcePresetCreatorSpec
-from ai.backend.manager.repositories.resource_preset.updaters import ResourcePresetUpdaterSpec
 from ai.backend.manager.services.resource_preset.actions.check_presets import (
     CheckResourcePresetsAction,
     CheckResourcePresetsActionResult,
@@ -49,9 +47,7 @@ class ResourcePresetService:
         self, action: CreateResourcePresetAction
     ) -> CreateResourcePresetActionResult:
         creator = action.creator
-        spec = cast(ResourcePresetCreatorSpec, creator.spec)
-
-        if not spec.resource_slots.has_intrinsic_slots():
+        if not creator.resource_slots.has_intrinsic_slots():
             raise InvalidAPIParameters("ResourceSlot must have all intrinsic resource slots.")
 
         preset_data = await self._resource_preset_repository.create_preset_validated(creator)
@@ -60,12 +56,10 @@ class ResourcePresetService:
     async def update_preset(
         self, action: UpdateResourcePresetAction
     ) -> UpdateResourcePresetActionResult:
-        spec = cast(ResourcePresetUpdaterSpec, action.updater.spec)
-        if resource_slots := spec.resource_slots.optional_value():
+        if resource_slots := action.updater.resource_slots.optional_value():
             if not resource_slots.has_intrinsic_slots():
                 raise InvalidAPIParameters("ResourceSlot must have all intrinsic resource slots.")
 
-        action.updater.pk_value = action.preset_id
         preset_data = await self._resource_preset_repository.modify_preset_validated(action.updater)
         return UpdateResourcePresetActionResult(resource_preset=preset_data)
 

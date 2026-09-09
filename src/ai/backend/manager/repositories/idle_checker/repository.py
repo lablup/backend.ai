@@ -4,30 +4,29 @@ from collections.abc import Collection, Sequence
 
 from ai.backend.common.data.entity.idle_checker import IdleCheckerAssignmentID, IdleCheckerID
 from ai.backend.common.data.entity.types import EntityIdentifier
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.filter_specs import UUIDEqualMatchSpec
 from ai.backend.common.data.idle_checker.types import IdleCheckPhase
 from ai.backend.common.data.permission.types import ScopeType
 from ai.backend.manager.data.common.types import SearchResult
-from ai.backend.manager.data.idle_checker.types import IdleCheckerAssignmentData
+from ai.backend.manager.data.idle_checker.types import IdleCheckerAssignmentData, IdleJudgmentData
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.errors.idle_checker import IdleCheckerAssignmentNotFound
 from ai.backend.manager.models.idle_checker.conditions import IdleCheckerAssignmentConditions
-from ai.backend.manager.models.idle_checker.row import SessionIdleCheckRow
 from ai.backend.manager.models.idle_checker.searchers import IdleCheckerAssignmentSearcher
 from ai.backend.manager.models.scopes import OperationScope
 from ai.backend.manager.models.specs.pagination import OffsetPagination
-from ai.backend.manager.repositories.base import BulkUpserter
 from ai.backend.manager.repositories.idle_checker.db_source.db_source import IdleCheckerDBSource
 from ai.backend.manager.repositories.idle_checker.types import (
     ExpiredIdleCheckBatchData,
     IdleCheckBatchData,
-    IdleJudgmentData,
     InitialGracePeriodBatchData,
     SessionIdleCheckAssignmentData,
     SessionIdleCheckBatchResult,
     SessionIdleCheckPair,
 )
 from ai.backend.manager.repositories.ops import DBOpsProvider
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.ops.v2.relation.provider import RelationOpsProvider
 
 __all__ = ("IdleCheckerRepository",)
@@ -41,9 +40,12 @@ class IdleCheckerRepository:
     _relation_ops: RelationOpsProvider
 
     def __init__(
-        self, ops_provider: DBOpsProvider, relation_ops_provider: RelationOpsProvider
+        self,
+        ops_provider: DBOpsProvider,
+        relation_ops_provider: RelationOpsProvider,
+        v2_ops_provider: V2DBOpsProvider,
     ) -> None:
-        self._db_source = IdleCheckerDBSource(ops_provider)
+        self._db_source = IdleCheckerDBSource(ops_provider, v2_ops_provider, relation_ops_provider)
         self._relation_ops = relation_ops_provider
 
     async def get_assignment(
@@ -158,15 +160,17 @@ class IdleCheckerRepository:
 
     async def batch_exclude_session_idle_checks(
         self,
-        upserter: BulkUpserter[SessionIdleCheckRow],
+        pairs: Sequence[SessionIdleCheckPair],
+        user_id: UserID,
     ) -> SessionIdleCheckBatchResult:
-        return await self._db_source.batch_exclude_session_idle_checks(upserter)
+        return await self._db_source.batch_exclude_session_idle_checks(pairs, user_id)
 
     async def batch_include_session_idle_checks(
         self,
-        upserter: BulkUpserter[SessionIdleCheckRow],
+        pairs: Sequence[SessionIdleCheckPair],
+        user_id: UserID,
     ) -> SessionIdleCheckBatchResult:
-        return await self._db_source.batch_include_session_idle_checks(upserter)
+        return await self._db_source.batch_include_session_idle_checks(pairs, user_id)
 
     async def batch_apply_session_idle_check_judgments(
         self,

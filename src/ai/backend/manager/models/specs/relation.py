@@ -112,3 +112,36 @@ class RelationPurger[TScope: EntityIdentifier, TTarget: EntityIdentifier, TRow: 
     def conflict_checks(self) -> Sequence[ConflictCheck]:
         """Return rows that must not exist before the link is removed (empty if none)."""
         raise NotImplementedError
+
+
+class RelationUpserter[TScope: EntityIdentifier, TTarget: EntityIdentifier, TRow: Base](ABC):
+    """Write the pair's row whether or not the pair already stands.
+
+    :class:`RelationCreator` refuses a pair already linked, because reviving one
+    switched off is the restore updater's. This is for a relation whose row carries
+    working state rather than access: the caller names the state it wants the pair in,
+    and whether the row was there is not something it has to know.
+
+    Answers no data, as the creator does.
+    """
+
+    @abstractmethod
+    def row_class(self) -> type[TRow]:
+        raise NotImplementedError
+
+    @abstractmethod
+    def index_elements(self) -> list[str]:
+        """The column names conflict detection keys on."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def build_insert_values(self, scope: TScope, target: TTarget) -> dict[str, Any]:
+        raise NotImplementedError
+
+    @abstractmethod
+    def build_update_values(self) -> dict[str, Any]:
+        raise NotImplementedError
+
+    @abstractmethod
+    def integrity_error_checks(self) -> Sequence[IntegrityErrorCheck]:
+        raise NotImplementedError

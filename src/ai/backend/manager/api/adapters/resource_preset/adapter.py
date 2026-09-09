@@ -37,12 +37,10 @@ from ai.backend.manager.errors.resource import ResourcePresetNotFound
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.condition_utils import combine_conditions_or, negate_conditions
 from ai.backend.manager.models.resource_preset.conditions import ResourcePresetConditions
+from ai.backend.manager.models.resource_preset.creators import ResourcePresetCreator
 from ai.backend.manager.models.resource_preset.orders import ResourcePresetOrders
 from ai.backend.manager.models.resource_preset.row import ResourcePresetRow
-from ai.backend.manager.repositories.base.creator import Creator
-from ai.backend.manager.repositories.base.updater import Updater
-from ai.backend.manager.repositories.resource_preset.creators import ResourcePresetCreatorSpec
-from ai.backend.manager.repositories.resource_preset.updaters import ResourcePresetUpdaterSpec
+from ai.backend.manager.models.resource_preset.updaters import ResourcePresetUpdater
 from ai.backend.manager.services.resource_preset.actions.create_preset import (
     CreateResourcePresetAction,
 )
@@ -144,13 +142,11 @@ class ResourcePresetAdapter(BaseAdapter):
     ) -> CreateResourcePresetPayload:
         """Create a new resource preset."""
         shared_memory_str = str(shared_memory) if shared_memory is not None else None
-        creator = Creator(
-            spec=ResourcePresetCreatorSpec(
-                name=name,
-                resource_slots=resource_slots,
-                shared_memory=shared_memory_str,
-                resource_group_name=resource_group_name,
-            )
+        creator = ResourcePresetCreator(
+            name=name,
+            resource_slots=resource_slots,
+            shared_memory=shared_memory_str,
+            resource_group_name=resource_group_name,
         )
         result = await self._resource_preset.create_preset.run(
             CreateResourcePresetAction(creator=creator)
@@ -164,7 +160,8 @@ class ResourcePresetAdapter(BaseAdapter):
         input: UpdateResourcePresetInput,
     ) -> UpdateResourcePresetPayload:
         """Update an existing resource preset."""
-        updater_spec = ResourcePresetUpdaterSpec(
+        updater = ResourcePresetUpdater(
+            preset_id=ResourcePresetID(input.id),
             resource_slots=OptionalState.from_unset(input.resource_slots).map(
                 _resource_slot_entries_to_slot
             ),
@@ -174,9 +171,8 @@ class ResourcePresetAdapter(BaseAdapter):
             ),
             resource_group_name=TriState.from_unset(input.resource_group_name),
         )
-        updater = Updater(spec=updater_spec, pk_value=input.id)
         result = await self._resource_preset.update_preset.run(
-            UpdateResourcePresetAction(preset_id=ResourcePresetID(input.id), updater=updater)
+            UpdateResourcePresetAction(updater=updater)
         )
         return UpdateResourcePresetPayload(
             resource_preset=self._data_to_node(result.resource_preset),
