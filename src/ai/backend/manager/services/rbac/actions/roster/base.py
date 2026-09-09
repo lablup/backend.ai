@@ -4,7 +4,7 @@ from typing import override
 
 from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE, ProjectID
 from ai.backend.common.data.entity.types import EntityType, ScopeRef
-from ai.backend.common.data.entity.user import USER_ENTITY_TYPE, UserID
+from ai.backend.common.data.entity.user import UserEntityType, UserID
 from ai.backend.manager.actions.v2.scope.base import BaseScopeAction
 
 __all__ = ("ProjectRosterAction",)
@@ -29,4 +29,4 @@ class ProjectRosterAction(BaseScopeAction):
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return USER_ENTITY_TYPE
+        return UserEntityType()

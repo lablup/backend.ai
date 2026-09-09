@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from typing import override
 
 from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE, ProjectID
-from ai.backend.common.data.entity.session import SESSION_ENTITY_TYPE
+from ai.backend.common.data.entity.session import SessionEntityType
 from ai.backend.common.data.entity.types import EntityIdentifier, EntityType, ScopeRef
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.actions.v2.scope.base import BaseScopeAction
@@ -22,7 +22,7 @@ class GetProjectResourceOverviewAction(BaseScopeAction):
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return SESSION_ENTITY_TYPE
+        return SessionEntityType()
 
     @override
     def scope_targets(self) -> Sequence[ScopeRef]:

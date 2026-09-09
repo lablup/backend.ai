@@ -13,10 +13,16 @@ from ai.backend.manager.services.vfolder.actions.search_storage_host_permissions
     SearchStorageHostPermissionsAction,
     StorageHostPermissionEntry,
 )
+from ai.backend.manager.services.vfolder.processors import VFolderProcessors
 
 
 class StorageHostAdapter(BaseAdapter):
     """Adapter for storage host queries."""
+
+    _vfolder: VFolderProcessors
+
+    def __init__(self, vfolder: VFolderProcessors) -> None:
+        self._vfolder = vfolder
 
     async def my_storage_host_permissions(self) -> MyStorageHostPermissionsPayload:
         """Return storage hosts the current user is allowed to use.
@@ -27,7 +33,7 @@ class StorageHostAdapter(BaseAdapter):
         me = current_user()
         if me is None:
             raise UnreachableError("User context is not available")
-        result = await self._processors.vfolder.search_storage_host_permissions.run(
+        result = await self._vfolder.search_storage_host_permissions.run(
             SearchStorageHostPermissionsAction(
                 user_uuid=me.user_id,
                 domain_name=me.domain_name,

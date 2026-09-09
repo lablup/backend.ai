@@ -13,7 +13,7 @@ from strawberry import ID, Info
 from strawberry.relay import Connection, Edge, NodeID
 
 from ai.backend.common.contexts.user import current_user
-from ai.backend.common.data.entity.session import SESSION_ENTITY_TYPE
+from ai.backend.common.data.entity.session import SessionEntityType
 from ai.backend.common.data.entity.types import RuntimeEntityID
 from ai.backend.common.dto.manager.v2.common import (
     ResourceSlotEntryInput as ResourceSlotEntryInputDTO,
@@ -561,7 +561,7 @@ class SessionV2GQL(PydanticNodeMixin[SessionNode]):
     ) -> EntityLabelConnection | None:
         return await resolve_entity_labels(
             info,
-            RuntimeEntityID(SESSION_ENTITY_TYPE, UUID(str(self.id))),
+            RuntimeEntityID(SessionEntityType(), UUID(str(self.id))),
             filter=filter,
             order_by=order_by,
             before=before,

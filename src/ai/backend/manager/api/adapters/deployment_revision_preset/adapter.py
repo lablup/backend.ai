@@ -8,6 +8,7 @@ from ai.backend.common.config import (
     ModelMetadata,
     PresetModelConfig,
     PresetModelDefinition,
+    PresetModelDefinitionDraft,
     PresetModelServiceConfig,
     PreStartAction,
 )
@@ -25,6 +26,7 @@ from ai.backend.common.dto.manager.v2.deployment_revision_preset.request import 
     DeploymentRevisionPresetOrder,
     SearchDeploymentRevisionPresetsInput,
     UpdateDeploymentRevisionPresetInput,
+    UpdatePresetModelDefinitionInput,
 )
 from ai.backend.common.dto.manager.v2.deployment_revision_preset.response import (
     CreateDeploymentRevisionPresetPayload,
@@ -55,6 +57,7 @@ from ai.backend.common.dto.manager.v2.resource_slot.response import (
     SearchAllocatedResourceSlotsPayload,
 )
 from ai.backend.common.model_service_start_command_compat import to_legacy_start_command
+from ai.backend.common.tristate.unset import Unset
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.data.deployment_revision_preset.types import (
@@ -107,6 +110,9 @@ from ai.backend.manager.services.deployment_revision_preset.actions.search_resou
 )
 from ai.backend.manager.services.deployment_revision_preset.actions.update import (
     UpdateDeploymentPresetAction,
+)
+from ai.backend.manager.services.deployment_revision_preset.processors import (
+    DeploymentPresetProcessors,
 )
 from ai.backend.manager.types import OptionalState, TriState
 
@@ -205,6 +211,11 @@ def _model_definition_to_dto(
 
 
 class DeploymentRevisionPresetAdapter(BaseAdapter):
+    _deployment_revision_preset: DeploymentPresetProcessors
+
+    def __init__(self, deployment_revision_preset: DeploymentPresetProcessors) -> None:
+        self._deployment_revision_preset = deployment_revision_preset
+
     async def search(
         self,
         input: SearchDeploymentRevisionPresetsInput,
@@ -223,7 +234,7 @@ class DeploymentRevisionPresetAdapter(BaseAdapter):
             limit=input.limit,
             offset=input.offset,
         )
-        result = await self._processors.deployment_revision_preset.global_search.run(
+        result = await self._deployment_revision_preset.global_search.run(
             GlobalSearchDeploymentPresetsAction(searcher=searcher)
         )
         return SearchDeploymentRevisionPresetsPayload(
@@ -234,7 +245,7 @@ class DeploymentRevisionPresetAdapter(BaseAdapter):
         )
 
     async def get(self, preset_id: UUID) -> DeploymentRevisionPresetNode:
-        result = await self._processors.deployment_revision_preset.get.run(
+        result = await self._deployment_revision_preset.get.run(
             GetDeploymentPresetAction(preset_id=DeploymentPresetID(preset_id))
         )
         return self._data_to_node(result.data)
@@ -274,7 +285,7 @@ class DeploymentRevisionPresetAdapter(BaseAdapter):
             deployment_strategy=strategy,
             deployment_strategy_spec=strategy_spec,
         )
-        result = await self._processors.deployment_revision_preset.create.run(
+        result = await self._deployment_revision_preset.create.run(
             CreateDeploymentPresetAction(creator=creator, slot_creators=slot_creators)
         )
         return CreateDeploymentRevisionPresetPayload(preset=self._data_to_node(result.data))
@@ -283,6 +294,12 @@ class DeploymentRevisionPresetAdapter(BaseAdapter):
         self,
         input: UpdateDeploymentRevisionPresetInput,
     ) -> UpdateDeploymentRevisionPresetPayload:
+        # A model_definition patch merges onto the currently stored preset, so fetch it
+        # upfront when it's being patched (unset/None need no current value).
+        current: DeploymentRevisionPresetNode | None = None
+        if isinstance(input.model_definition, UpdatePresetModelDefinitionInput):
+            current = await self.get(input.id)
+
         slot_creators: list[PresetResourceSlotCreator] | None = (
             OptionalState.from_unset(input.resource_slots)
             .map(
@@ -293,9 +310,10 @@ class DeploymentRevisionPresetAdapter(BaseAdapter):
             )
             .optional_value()
         )
-        model_def_state: TriState[PresetModelDefinition] = TriState.from_unset(
-            input.model_definition
-        ).map(lambda m: m.to_model_definition())
+        model_def_state: TriState[PresetModelDefinition] = self._convert_model_definition_state(
+            input.model_definition,
+            current.model_definition if current is not None else None,
+        )
 
         updater = DeploymentPresetUpdater(
             preset_id=DeploymentPresetID(input.id),
@@ -326,13 +344,13 @@ class DeploymentRevisionPresetAdapter(BaseAdapter):
                 lambda si: self._convert_required_strategy_input(si)[1]
             ),
         )
-        result = await self._processors.deployment_revision_preset.update.run(
+        result = await self._deployment_revision_preset.update.run(
             UpdateDeploymentPresetAction(updater=updater, slot_creators=slot_creators)
         )
         return UpdateDeploymentRevisionPresetPayload(preset=self._data_to_node(result.data))
 
     async def delete(self, preset_id: UUID) -> DeleteDeploymentRevisionPresetPayload:
-        result = await self._processors.deployment_revision_preset.purge.run(
+        result = await self._deployment_revision_preset.purge.run(
             PurgeDeploymentPresetAction(preset_id=DeploymentPresetID(preset_id))
         )
         return DeleteDeploymentRevisionPresetPayload(id=result.data.id)
@@ -344,7 +362,7 @@ class DeploymentRevisionPresetAdapter(BaseAdapter):
     ) -> SearchAllocatedResourceSlotsPayload:
         """Search resource slots allocated to a deployment revision preset."""
         searcher = self._build_preset_resource_slot_searcher(input)
-        action_result = await self._processors.deployment_revision_preset.search_resource_slots.run(
+        action_result = await self._deployment_revision_preset.search_resource_slots.run(
             SearchPresetResourceSlotsAction(
                 preset_id=DeploymentPresetID(preset_id),
                 searcher=searcher,
@@ -507,6 +525,19 @@ class DeploymentRevisionPresetAdapter(BaseAdapter):
             RuntimeVariantPresetValueEntry(preset_id=pv.preset_id, value=pv.value)
             for pv in preset_values
         ]
+
+    @staticmethod
+    def _convert_model_definition_state(
+        value: UpdatePresetModelDefinitionInput | None | Unset,
+        current: PresetModelDefinitionInfoDTO | None,
+    ) -> TriState[PresetModelDefinition]:
+        def _merge(patch: UpdatePresetModelDefinitionInput) -> PresetModelDefinition:
+            base_draft = PresetModelDefinitionDraft()
+            if current is not None:
+                base_draft = PresetModelDefinitionDraft.model_validate(current.model_dump())
+            return base_draft.merge(patch.to_draft()).to_resolved()
+
+        return TriState.from_unset(value).map(_merge)
 
     def _convert_required_strategy_input(
         self,

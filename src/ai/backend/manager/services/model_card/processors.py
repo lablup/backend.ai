@@ -2,7 +2,7 @@ from typing import Any
 
 from ai.backend.common.data.entity.model_card import ModelCardID
 from ai.backend.common.data.entity.model_card_resource_requirement import (
-    MODEL_CARD_RESOURCE_REQUIREMENT_FIELD_TYPE,
+    ModelCardResourceRequirementFieldType,
 )
 from ai.backend.manager.actions.registry.field import LookupFieldGroup
 from ai.backend.manager.actions.registry.group import ProcessorGroup
@@ -96,7 +96,7 @@ class ModelCardProcessors:
         )
 
         requirements: LookupFieldGroup[ModelCardResourceRequirementData] = group.field_group(
-            FieldGroupMeta(MODEL_CARD_RESOURCE_REQUIREMENT_FIELD_TYPE),
+            FieldGroupMeta(ModelCardResourceRequirementFieldType()),
             ModelCardResourceRequirementData,
             LookupModelCardResourceRequirementOwnerAction,
             LookupBulkModelCardResourceRequirementOwnerAction,

@@ -11,7 +11,6 @@ from collections.abc import Collection, Mapping, Sequence
 from typing import ClassVar
 
 import sqlalchemy as sa
-from sqlalchemy.orm import aliased
 
 from ai.backend.common.data.entity.container_registry import CONTAINER_REGISTRY_SCOPE_TYPE
 from ai.backend.common.data.entity.domain import DOMAIN_SCOPE_TYPE
@@ -41,8 +40,6 @@ from ai.backend.manager.models.resource_group.row import ResourceGroupRow
 from ai.backend.manager.models.scope_source import ScopeSource
 from ai.backend.manager.models.specs.permission import PermissionEntry
 from ai.backend.manager.models.user import UserRow
-from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
-from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
 from ai.backend.manager.repositories.ops.v2.permission.write import PermissionWriteOps
 
 # Derived roles re-synced per round trip; a preset may have one role per scope.
@@ -132,19 +129,12 @@ class RolePresetWriteOps(PermissionWriteOps):
         self, preset_id: RolePresetID, scope_type: ScopeType
     ) -> list[tuple[RoleID, EntityIdentifier]]:
         """Each role the preset instantiated with the scope of ``scope_type`` it sits in."""
-        scope_node = aliased(VirtualEntityRow)
-        role_node = aliased(VirtualEntityRow)
         rows = (
             await self._sess.execute(
-                sa.select(RoleRow.id, scope_node.entity_id)
-                .join(role_node, role_node.entity_id == RoleRow.id)
-                .join(EntityMembershipRow, EntityMembershipRow.member_entity_id == role_node.id)
-                .join(scope_node, scope_node.id == EntityMembershipRow.virtual_entity_id)
+                sa.select(RoleRow.id, RoleRow.scope_id)
                 .where(
                     RoleRow.role_preset_id == preset_id,
-                    role_node.entity_type == self._ROLE_ENTITY_TYPE,
-                    scope_node.entity_type == scope_type,
-                    EntityMembershipRow.capped.is_(False),
+                    RoleRow.scope_type == scope_type,
                 )
                 .order_by(RoleRow.id)
             )

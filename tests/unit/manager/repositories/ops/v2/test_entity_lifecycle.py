@@ -33,6 +33,7 @@ from sqlalchemy.orm import InstrumentedAttribute, Mapped, aliased, mapped_column
 
 from ai.backend.common.data.entity.domain import DOMAIN_SCOPE_TYPE
 from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE
+from ai.backend.common.data.entity.role import RoleEntityType
 from ai.backend.common.data.entity.types import (
     EntityIdentifier,
     EntityType,
@@ -119,8 +120,21 @@ class _EntityData:
 _SCOPE_TYPE = PROJECT_SCOPE_TYPE
 _PARENT_SCOPE_TYPE = DOMAIN_SCOPE_TYPE
 
+
 # A scope type outside every permission-layer enum — the chain accepts it as-is.
-_OPEN_SCOPE_TYPE = ScopeType(EntityType("not_an_rbac_element_type"))
+class _OpenEntityType(EntityType):
+    @override
+    @classmethod
+    def name(cls) -> str:
+        return "not_an_rbac_element_type"
+
+    @override
+    @classmethod
+    def description(cls) -> str:
+        return "A kind outside every permission-layer enum."
+
+
+_OPEN_SCOPE_TYPE = ScopeType(_OpenEntityType())
 
 
 class _EntityID(EntityIdentifier):
@@ -535,7 +549,7 @@ async def _scope_roles(database: ExtendedAsyncSAEngine, scope_id: UUID) -> dict[
                 .join(EntityMembershipRow, EntityMembershipRow.member_entity_id == role_node.id)
                 .where(
                     EntityMembershipRow.virtual_entity_id == _node_id(_SCOPE_TYPE, scope_id),
-                    role_node.entity_type == EntityType("role"),
+                    role_node.entity_type == RoleEntityType(),
                 )
             )
         ).all()
@@ -558,8 +572,7 @@ async def _scope_governs_role(
     async with database.begin_readonly_session() as sess:
         row = await sess.scalar(
             sa.select(ScopeBindingRow.scope_entity_id).where(
-                ScopeBindingRow.virtual_entity_id
-                == _node_id(ScopeType(EntityType("role")), role_id),
+                ScopeBindingRow.virtual_entity_id == _node_id(ScopeType(RoleEntityType()), role_id),
                 ScopeBindingRow.scope_entity_id == _node_id(_SCOPE_TYPE, scope_id),
             )
         )
@@ -921,7 +934,24 @@ class TestEntityPurge:
 # =============================================================================
 
 
-_SIDECAR_FIELD_TYPE = FieldType("test_sidecar")
+class _SidecarFieldType(FieldType):
+    @override
+    @classmethod
+    def name(cls) -> str:
+        return "test_sidecar"
+
+    @override
+    @classmethod
+    def description(cls) -> str:
+        return "A row that rides beside the graph."
+
+    @override
+    @classmethod
+    def owner_type(cls) -> type[EntityType] | None:
+        return None
+
+
+_SIDECAR_FIELD_TYPE = _SidecarFieldType()
 
 
 class _SidecarID(FieldIdentifier):

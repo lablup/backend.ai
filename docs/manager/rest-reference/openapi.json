@@ -8389,6 +8389,393 @@
         "title": "CreateDeploymentRevisionPresetInput",
         "type": "object"
       },
+      "UpdatePresetModelConfigInput": {
+        "description": "Patch for a single preset model entry. Omit a field to keep its current stored value.",
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "model_path": {
+            "anyOf": [
+              {
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model Path"
+          },
+          "service": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UpdatePresetModelServiceConfigInput"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Service"
+          },
+          "metadata": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UpdatePresetModelMetadataInput"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Metadata"
+          }
+        },
+        "title": "UpdatePresetModelConfigInput",
+        "type": "object"
+      },
+      "UpdatePresetModelDefinitionInput": {
+        "description": "Patch for a preset's model definition. Omit `models` to keep the current model entry.",
+        "properties": {
+          "models": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/UpdatePresetModelConfigInput"
+                },
+                "maxItems": 1,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Models"
+          }
+        },
+        "title": "UpdatePresetModelDefinitionInput",
+        "type": "object"
+      },
+      "UpdatePresetModelHealthCheckInput": {
+        "description": "Patch for a preset model's health check. Omit a field to keep its current stored value.",
+        "properties": {
+          "enable": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Enable"
+          },
+          "interval": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Interval"
+          },
+          "path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Path"
+          },
+          "max_retries": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Retries"
+          },
+          "max_wait_time": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Wait Time"
+          },
+          "expected_status_code": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 100,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expected Status Code"
+          },
+          "initial_delay": {
+            "anyOf": [
+              {
+                "minimum": 0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Initial Delay"
+          }
+        },
+        "title": "UpdatePresetModelHealthCheckInput",
+        "type": "object"
+      },
+      "UpdatePresetModelMetadataInput": {
+        "description": "Patch for a preset model's metadata. Omit a field to keep its current stored value.",
+        "properties": {
+          "author": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Author"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Version"
+          },
+          "created": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "task": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Task"
+          },
+          "category": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Category"
+          },
+          "architecture": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Architecture"
+          },
+          "framework": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Framework"
+          },
+          "label": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label"
+          },
+          "license": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "License"
+          },
+          "min_resource": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Min Resource"
+          }
+        },
+        "title": "UpdatePresetModelMetadataInput",
+        "type": "object"
+      },
+      "UpdatePresetModelServiceConfigInput": {
+        "description": "Patch for a preset model's service config. Omit a field to keep its current stored value.",
+        "properties": {
+          "pre_start_actions": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/PreStartAction"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pre Start Actions"
+          },
+          "command": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Command"
+          },
+          "start_command": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Start Command"
+          },
+          "shell": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Shell"
+          },
+          "port": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Port"
+          },
+          "health_check": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UpdatePresetModelHealthCheckInput"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Health Check"
+          }
+        },
+        "title": "UpdatePresetModelServiceConfigInput",
+        "type": "object"
+      },
       "UpdateDeploymentRevisionPresetInput": {
         "properties": {
           "id": {
@@ -8463,7 +8850,7 @@
           "model_definition": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/PresetModelDefinitionInput"
+                "$ref": "#/components/schemas/UpdatePresetModelDefinitionInput"
               },
               {
                 "type": "null"
@@ -12045,8 +12432,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Updated canonical name.",
+            "description": "Updated canonical name. Omit to leave unchanged.",
             "title": "Name"
           },
           "registry": {
@@ -12058,8 +12444,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Updated registry hostname.",
+            "description": "Updated registry hostname. Omit to leave unchanged.",
             "title": "Registry"
           },
           "image": {
@@ -12071,8 +12456,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Updated namespace/path within registry.",
+            "description": "Updated namespace/path within registry. Omit to leave unchanged.",
             "title": "Image"
           },
           "tag": {
@@ -12084,8 +12468,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Updated image tag.",
+            "description": "Updated image tag. Omit to leave unchanged.",
             "title": "Tag"
           },
           "architecture": {
@@ -12097,8 +12480,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Updated CPU architecture.",
+            "description": "Updated CPU architecture. Omit to leave unchanged.",
             "title": "Architecture"
           },
           "is_local": {
@@ -12110,8 +12492,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Updated local-only status.",
+            "description": "Updated local-only status. Omit to leave unchanged.",
             "title": "Is Local"
           },
           "size_bytes": {
@@ -12123,8 +12504,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Updated image size in bytes.",
+            "description": "Updated image size in bytes. Omit to leave unchanged.",
             "title": "Size Bytes"
           },
           "type": {
@@ -12136,8 +12516,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Updated image type (compute, system, service).",
+            "description": "Updated image type (compute, system, service). Omit to leave unchanged.",
             "title": "Type"
           },
           "config_digest": {
@@ -12149,8 +12528,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Updated config digest.",
+            "description": "Updated config digest. Omit to leave unchanged.",
             "title": "Config Digest"
           },
           "labels": {
@@ -12165,8 +12543,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Updated labels dict.",
+            "description": "Updated labels dict. Omit to leave unchanged.",
             "title": "Labels"
           },
           "supported_accelerators": {
@@ -12175,14 +12552,10 @@
                 "type": "string"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
-            "description": "Updated accelerator string. Set to null to clear.",
+            "description": "Updated accelerator string. Omit to leave unchanged; null clears.",
             "title": "Supported Accelerators"
           },
           "resource_limits": {
@@ -12195,8 +12568,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Updated resource limits dict.",
+            "description": "Updated resource limits dict. Omit to leave unchanged.",
             "title": "Resource Limits"
           }
         },
@@ -14538,7 +14910,6 @@
                 "type": "null"
               }
             ],
-            "default": null,
             "description": "Updated channel name",
             "title": "Name"
           },
@@ -14548,14 +14919,10 @@
                 "type": "string"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
-            "description": "Updated channel description. Use SENTINEL to clear.",
+            "description": "Updated channel description. Omit to leave unchanged; null clears.",
             "title": "Description"
           },
           "spec": {
@@ -14567,8 +14934,8 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Updated channel specification"
+            "description": "Updated channel specification",
+            "title": "Spec"
           },
           "enabled": {
             "anyOf": [
@@ -14579,7 +14946,6 @@
                 "type": "null"
               }
             ],
-            "default": null,
             "description": "Updated enabled status",
             "title": "Enabled"
           }
@@ -14949,7 +15315,6 @@
                 "type": "null"
               }
             ],
-            "default": null,
             "description": "Updated rule name",
             "title": "Name"
           },
@@ -14959,14 +15324,10 @@
                 "type": "string"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
-            "description": "Updated rule description. Use SENTINEL to clear.",
+            "description": "Updated rule description. Omit to leave unchanged; null clears.",
             "title": "Description"
           },
           "message_template": {
@@ -14979,7 +15340,6 @@
                 "type": "null"
               }
             ],
-            "default": null,
             "description": "Updated message template (max 64KB)",
             "title": "Message Template"
           },
@@ -14992,7 +15352,6 @@
                 "type": "null"
               }
             ],
-            "default": null,
             "description": "Updated enabled status",
             "title": "Enabled"
           }
@@ -15356,8 +15715,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Updated name of the object storage",
+            "description": "Updated name of the object storage. Omit to leave unchanged.",
             "title": "Name"
           },
           "host": {
@@ -15369,8 +15727,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Updated host address",
+            "description": "Updated host address. Omit to leave unchanged.",
             "title": "Host"
           },
           "access_key": {
@@ -15382,8 +15739,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Updated access key",
+            "description": "Updated access key. Omit to leave unchanged.",
             "title": "Access Key"
           },
           "secret_key": {
@@ -15395,8 +15751,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Updated secret key",
+            "description": "Updated secret key. Omit to leave unchanged.",
             "title": "Secret Key"
           },
           "endpoint": {
@@ -15408,8 +15763,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Updated endpoint URL",
+            "description": "Updated endpoint URL. Omit to leave unchanged.",
             "title": "Endpoint"
           },
           "region": {
@@ -15418,14 +15772,10 @@
                 "type": "string"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
-            "description": "Updated region. Use SENTINEL (default) for no change, None to clear.",
+            "description": "Updated region. Omit to leave unchanged; null clears.",
             "title": "Region"
           }
         },
@@ -16177,8 +16527,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "New group name.",
+            "description": "New group name. Omit to leave unchanged.",
             "title": "Name"
           },
           "description": {
@@ -16187,14 +16536,10 @@
                 "type": "string"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
-            "description": "New group description. Set to null to clear.",
+            "description": "Updated group description. Omit to leave unchanged; null clears.",
             "title": "Description"
           },
           "is_active": {
@@ -16206,8 +16551,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Updated active status.",
+            "description": "Updated active status. Omit to leave unchanged.",
             "title": "Is Active"
           },
           "integration_name": {
@@ -16216,14 +16560,10 @@
                 "type": "string"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
-            "description": "New external integration identifier. Set to null to clear.",
+            "description": "Updated external integration identifier. Omit to leave unchanged; null clears.",
             "title": "Integration Name"
           },
           "resource_policy": {
@@ -16235,8 +16575,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Name of the updated resource policy to apply to this group.",
+            "description": "Name of the updated resource policy to apply to this group. Omit to leave unchanged.",
             "title": "Resource Policy"
           }
         },
@@ -18561,15 +18900,6 @@
         "title": "DeleteCategoryInput",
         "type": "object"
       },
-      "RoleSource": {
-        "description": "Definition source of the role.",
-        "enum": [
-          "system",
-          "custom"
-        ],
-        "title": "RoleSource",
-        "type": "string"
-      },
       "ScopeInputDTO": {
         "description": "Scope reference for associating an entity with a scope.",
         "properties": {
@@ -18611,16 +18941,23 @@
             "description": "Role description",
             "title": "Description"
           },
-          "source": {
-            "$ref": "#/components/schemas/RoleSource",
-            "default": "custom",
-            "description": "Role source"
-          },
           "auto_assign": {
             "default": false,
             "description": "When true, the role is automatically granted to a user when the user is added to a scope this role is registered in.",
             "title": "Auto Assign",
             "type": "boolean"
+          },
+          "scope": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ScopeInputDTO"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The scope the role belongs to"
           },
           "scopes": {
             "anyOf": [
@@ -18635,7 +18972,7 @@
               }
             ],
             "default": null,
-            "description": "Scopes to register the role in",
+            "description": "Deprecated: use `scope`. Accepts exactly one entry.",
             "title": "Scopes"
           }
         },
@@ -18662,7 +18999,7 @@
           "scope_id": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/StringFilter"
+                "$ref": "#/components/schemas/UUIDFilter"
               },
               {
                 "type": "null"
@@ -22532,8 +22869,8 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Updated default resource allocation. Leave null to keep existing value."
+            "description": "Updated default resource allocation. Omit to leave unchanged.",
+            "title": "Default For Unspecified"
           },
           "total_resource_slots": {
             "anyOf": [
@@ -22544,14 +22881,10 @@
                 "type": "array"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
-            "description": "Updated resource slot limits. Set to null to clear.",
+            "description": "Updated resource slot limits. Omit to leave unchanged.",
             "title": "Total Resource Slots"
           },
           "max_session_lifetime": {
@@ -22563,8 +22896,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Updated maximum session lifetime in seconds. Leave null to keep existing.",
+            "description": "Updated maximum session lifetime in seconds. Omit to leave unchanged.",
             "title": "Max Session Lifetime"
           },
           "max_concurrent_sessions": {
@@ -22576,8 +22908,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Updated maximum concurrent sessions. Leave null to keep existing.",
+            "description": "Updated maximum concurrent sessions. Omit to leave unchanged.",
             "title": "Max Concurrent Sessions"
           },
           "max_pending_session_count": {
@@ -22586,14 +22917,10 @@
                 "type": "integer"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
-            "description": "Updated max pending sessions. Set to null to clear.",
+            "description": "Updated max pending sessions. Omit to leave unchanged; null clears.",
             "title": "Max Pending Session Count"
           },
           "max_priority": {
@@ -22602,14 +22929,10 @@
                 "type": "integer"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
-            "description": "Updated max priority. Set to null to clear.",
+            "description": "Updated max priority. Omit to leave unchanged; null clears.",
             "title": "Max Priority"
           },
           "max_pending_session_resource_slots": {
@@ -22621,14 +22944,10 @@
                 "type": "array"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
-            "description": "Updated max pending session resource slots. Set to null to clear.",
+            "description": "Updated max pending session resource slots. Omit to leave unchanged; null clears.",
             "title": "Max Pending Session Resource Slots"
           },
           "max_concurrent_sftp_sessions": {
@@ -22640,8 +22959,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Updated max concurrent SFTP sessions. Leave null to keep existing.",
+            "description": "Updated max concurrent SFTP sessions. Omit to leave unchanged.",
             "title": "Max Concurrent Sftp Sessions"
           },
           "max_containers_per_session": {
@@ -22653,8 +22971,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Updated max containers per session. Leave null to keep existing.",
+            "description": "Updated max containers per session. Omit to leave unchanged.",
             "title": "Max Containers Per Session"
           },
           "idle_timeout": {
@@ -22666,8 +22983,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Updated idle timeout in seconds. Leave null to keep existing.",
+            "description": "Updated idle timeout in seconds. Omit to leave unchanged.",
             "title": "Idle Timeout"
           },
           "allowed_vfolder_hosts": {
@@ -22679,14 +22995,10 @@
                 "type": "array"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
-            "description": "Updated vfolder host permissions. Set to null to clear.",
+            "description": "Updated vfolder host permissions. Omit to leave unchanged.",
             "title": "Allowed Vfolder Hosts"
           }
         },
@@ -23041,35 +23353,23 @@
                 "type": "integer"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
-            "description": "Updated max vfolder count. Use SENTINEL to clear, null to keep existing.",
+            "description": "Updated max vfolder count. Omit to leave unchanged.",
             "title": "Max Vfolder Count"
           },
           "max_concurrent_logins": {
             "anyOf": [
               {
-                "anyOf": [
-                  {
-                    "type": "integer"
-                  },
-                  {
-                    "$ref": "#/components/schemas/Sentinel"
-                  }
-                ],
-                "ge": 1
+                "ge": 1,
+                "type": "integer"
               },
               {
                 "type": "null"
               }
             ],
-            "default": 1,
-            "description": "Updated maximum number of concurrent authenticated login sessions per user. Set to null to clear (unlimited). Must be >= 1 when set. Distinct from keypair_resource_policies.max_concurrent_sessions which caps compute sessions.",
+            "description": "Updated maximum number of concurrent authenticated login sessions per user. Omit to leave unchanged; null clears (unlimited). Must be >= 1 when set. Distinct from keypair_resource_policies.max_concurrent_sessions which caps compute sessions.",
             "title": "Max Concurrent Logins"
           },
           "max_quota_scope_size": {
@@ -23078,14 +23378,10 @@
                 "$ref": "#/components/schemas/BinarySizeInput"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
-            "description": "Updated max quota scope size. Use SENTINEL to clear, null to keep existing.",
+            "description": "Updated max quota scope size. Omit to leave unchanged.",
             "title": "Max Quota Scope Size"
           },
           "max_session_count_per_model_session": {
@@ -23097,8 +23393,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Updated max sessions per model session. Leave null to keep existing.",
+            "description": "Updated max sessions per model session. Omit to leave unchanged.",
             "title": "Max Session Count Per Model Session"
           },
           "max_customized_image_count": {
@@ -23110,8 +23405,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Updated max customized image count. Leave null to keep existing.",
+            "description": "Updated max customized image count. Omit to leave unchanged.",
             "title": "Max Customized Image Count"
           }
         },
@@ -23420,14 +23714,10 @@
                 "type": "integer"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
-            "description": "Updated max vfolder count. Use SENTINEL to clear, null to keep existing.",
+            "description": "Updated max vfolder count. Omit to leave unchanged.",
             "title": "Max Vfolder Count"
           },
           "max_quota_scope_size": {
@@ -23436,14 +23726,10 @@
                 "$ref": "#/components/schemas/BinarySizeInput"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
-            "description": "Updated max quota scope size. Use SENTINEL to clear, null to keep existing.",
+            "description": "Updated max quota scope size. Omit to leave unchanged.",
             "title": "Max Quota Scope Size"
           },
           "max_network_count": {
@@ -23455,8 +23741,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Updated max network count. Leave null to keep existing.",
+            "description": "Updated max network count. Omit to leave unchanged.",
             "title": "Max Network Count"
           }
         },
@@ -34550,15 +34835,28 @@
             "title": "Name",
             "type": "string"
           },
-          "source": {
-            "$ref": "#/components/schemas/RoleSource",
-            "default": "custom",
-            "description": "Role source"
+          "scope_type": {
+            "description": "Type of the scope the role belongs to",
+            "title": "Scope Type",
+            "type": "string"
+          },
+          "scope_id": {
+            "description": "ID of the scope the role belongs to",
+            "format": "uuid",
+            "title": "Scope Id",
+            "type": "string"
           },
           "status": {
-            "$ref": "#/components/schemas/RoleStatus",
-            "default": "active",
-            "description": "Role status"
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RoleStatus"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Role status; active if omitted"
           },
           "description": {
             "anyOf": [
@@ -34575,7 +34873,9 @@
           }
         },
         "required": [
-          "name"
+          "name",
+          "scope_type",
+          "scope_id"
         ],
         "title": "CreateRoleRequest",
         "type": "object"
@@ -34607,6 +34907,15 @@
           "updated_at"
         ],
         "title": "RoleOrderField",
+        "type": "string"
+      },
+      "RoleSource": {
+        "description": "Definition source of the role.",
+        "enum": [
+          "system",
+          "custom"
+        ],
+        "title": "RoleSource",
         "type": "string"
       },
       "SearchRolesRequest": {

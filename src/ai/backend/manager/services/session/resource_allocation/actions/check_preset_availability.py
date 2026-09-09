@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from typing import Any, override
 
 from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE, ProjectID
-from ai.backend.common.data.entity.resource_preset import RESOURCE_PRESET_ENTITY_TYPE
+from ai.backend.common.data.entity.resource_preset import ResourcePresetEntityType
 from ai.backend.common.data.entity.types import EntityIdentifier, EntityType, ScopeRef
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.types import AccessKey
@@ -33,7 +33,7 @@ class CheckPresetAvailabilityAction(BaseScopeAction):
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return RESOURCE_PRESET_ENTITY_TYPE
+        return ResourcePresetEntityType()
 
     @override
     def scope_targets(self) -> Sequence[ScopeRef]:

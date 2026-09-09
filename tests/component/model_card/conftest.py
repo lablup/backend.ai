@@ -16,10 +16,10 @@ from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 from ai.backend.client.v2.auth import HMACAuth
 from ai.backend.client.v2.config import ClientConfig
 from ai.backend.client.v2.v2_registry import V2ClientRegistry
-from ai.backend.common.data.entity.model_card import MODEL_CARD_ENTITY_TYPE
-from ai.backend.common.data.entity.project import PROJECT_ENTITY_TYPE
-from ai.backend.common.data.entity.role import ROLE_ENTITY_TYPE
-from ai.backend.common.data.entity.user import USER_ENTITY_TYPE
+from ai.backend.common.data.entity.model_card import ModelCardEntityType
+from ai.backend.common.data.entity.project import ProjectEntityType
+from ai.backend.common.data.entity.role import RoleEntityType
+from ai.backend.common.data.entity.user import UserEntityType
 from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.data.permission.types import EntityType, Permission, ScopeType
 from ai.backend.common.types import QuotaScopeID, QuotaScopeType, VFolderUsageMode
@@ -117,7 +117,7 @@ def model_card_processors(
     """Real ModelCardProcessors with real RBAC enforcement."""
     repo = ModelCardRepository(V2DBOpsProvider(database_engine))
     service = ModelCardService(repo, storage_manager)
-    return ModelCardProcessors(processor_registry.group(GroupMeta(MODEL_CARD_ENTITY_TYPE)), service)
+    return ModelCardProcessors(processor_registry.group(GroupMeta(ModelCardEntityType())), service)
 
 
 @pytest.fixture()
@@ -143,7 +143,7 @@ def group_processors(
         valkey_stat_client=valkey_clients.stat,
         group_repositories=repositories,
     )
-    return ProjectProcessors(processor_registry.group(GroupMeta(PROJECT_ENTITY_TYPE)), service)
+    return ProjectProcessors(processor_registry.group(GroupMeta(ProjectEntityType())), service)
 
 
 @pytest.fixture()
@@ -161,7 +161,7 @@ def permission_controller_processors(
         rbac_action_registry=[],
     )
     return PermissionControllerProcessors(
-        processor_registry.group(GroupMeta(ROLE_ENTITY_TYPE)),
+        processor_registry.group(GroupMeta(RoleEntityType())),
         service=service,
         action_monitors=[],
         validators=_build_validators(database_engine, config_provider),
@@ -186,7 +186,7 @@ def user_processors(
         ),
         scheduling_controller=AsyncMock(),
     )
-    return UserProcessors(processor_registry.group(GroupMeta(USER_ENTITY_TYPE)), service)
+    return UserProcessors(processor_registry.group(GroupMeta(UserEntityType())), service)
 
 
 @pytest.fixture()
@@ -198,7 +198,7 @@ def rbac_processors(
     rbac_groups = processor_registry.concern(ConcernMeta(Concern.RBAC))
     return RbacProcessors(
         rbac_groups.relation_group(),
-        rbac_groups.group(GroupMeta(USER_ENTITY_TYPE)),
+        rbac_groups.group(GroupMeta(UserEntityType())),
         RbacRelationService(RbacRelationRepository(RelationOpsProvider(database_engine))),
         RbacRosterService(RbacRosterRepository(RosterOpsProvider(database_engine))),
         RbacRoleService(
@@ -226,9 +226,13 @@ def server_module_registries(
     processors.rbac = rbac_processors
     processors.user = user_processors
 
-    mc_handler = V2ModelCardHandler(adapter=ModelCardAdapter(processors))
-    proj_handler = V2ProjectHandler(adapter=ProjectAdapter(processors))
-    rbac_handler = V2RBACHandler(adapter=RBACAdapter(processors))
+    mc_handler = V2ModelCardHandler(adapter=ModelCardAdapter(processors.model_card, MagicMock()))
+    proj_handler = V2ProjectHandler(
+        adapter=ProjectAdapter(processors.project, processors.rbac, MagicMock(), processors.user)
+    )
+    rbac_handler = V2RBACHandler(
+        adapter=RBACAdapter(processors.rbac, processors.permission_controller)
+    )
 
     v2_reg = RouteRegistry.create("v2", route_deps.cors_options)
     v2_reg.add_subregistry(register_v2_model_card_routes(mc_handler, route_deps))
@@ -390,6 +394,7 @@ async def vfolder_fixture(
 @pytest.fixture()
 async def role_fixture(
     db_engine: SAEngine,
+    model_store_project_fixture: uuid.UUID,
 ) -> AsyncIterator[uuid.UUID]:
     """Insert a project member role for assign_users SDK calls."""
     role_id = uuid.uuid4()
@@ -399,6 +404,8 @@ async def role_fixture(
                 id=role_id,
                 name=f"test-member-{secrets.token_hex(4)}",
                 status=RoleStatus.ACTIVE,
+                scope_type=ScopeType.PROJECT.value,
+                scope_id=model_store_project_fixture,
             )
         )
     yield role_id

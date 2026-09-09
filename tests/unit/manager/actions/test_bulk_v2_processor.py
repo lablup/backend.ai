@@ -14,6 +14,7 @@ from typing import override
 
 import pytest
 
+from ai.backend.common.data.entity.session import SessionEntityType
 from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
 from ai.backend.common.exception import PermissionDeniedError
 from ai.backend.manager.actions.types import ActionOperationType, OperationStatus
@@ -31,7 +32,7 @@ from ai.backend.manager.actions.v2.bulk.result import (
 from ai.backend.manager.actions.v2.bulk.trigger import BulkActionTriggerMeta
 from ai.backend.manager.actions.v2.bulk.validator.base import AtomicBulkActionValidator
 
-_SESSION_ENTITY_TYPE = EntityType("session")
+_SESSION_ENTITY_TYPE = SessionEntityType()
 
 
 class _SessionID(EntityIdentifier):

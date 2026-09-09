@@ -9,11 +9,11 @@ import pytest
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
-from ai.backend.common.data.entity.agent import AGENT_ENTITY_TYPE
-from ai.backend.common.data.entity.container_registry import CONTAINER_REGISTRY_ENTITY_TYPE
-from ai.backend.common.data.entity.project import PROJECT_ENTITY_TYPE
-from ai.backend.common.data.entity.resource_preset import RESOURCE_PRESET_ENTITY_TYPE
-from ai.backend.common.data.entity.user import USER_ENTITY_TYPE
+from ai.backend.common.data.entity.agent import AgentEntityType
+from ai.backend.common.data.entity.container_registry import ContainerRegistryEntityType
+from ai.backend.common.data.entity.project import ProjectEntityType
+from ai.backend.common.data.entity.resource_preset import ResourcePresetEntityType
+from ai.backend.common.data.entity.user import UserEntityType
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
@@ -85,7 +85,7 @@ def container_registry_processors(
     repo = ContainerRegistryRepository(database_engine, RelationOpsProvider(database_engine))
     service = ContainerRegistryService(database_engine, repo)
     return ContainerRegistryProcessors(
-        processor_registry.group(GroupMeta(CONTAINER_REGISTRY_ENTITY_TYPE)), service
+        processor_registry.group(GroupMeta(ContainerRegistryEntityType())), service
     )
 
 
@@ -99,7 +99,7 @@ def resource_preset_processors(
     repo = ResourcePresetRepository(database_engine, valkey_clients.stat, config_provider)
     service = ResourcePresetService(repo)
     return ResourcePresetProcessors(
-        processor_registry.group(GroupMeta(RESOURCE_PRESET_ENTITY_TYPE)), service
+        processor_registry.group(GroupMeta(ResourcePresetEntityType())), service
     )
 
 
@@ -137,7 +137,7 @@ def agent_processors(
         own_check=BulkOwnCheck(PermissionControllerRepository(database_engine), config_provider),
     )
     return AgentProcessors(
-        processor_registry.group(GroupMeta(AGENT_ENTITY_TYPE)),
+        processor_registry.group(GroupMeta(AgentEntityType())),
         service,
         [],
     )
@@ -160,7 +160,7 @@ def project_processors(
     )
     group_repos = ProjectRepositories(repository=group_repo)
     service = ProjectService(storage_manager, config_provider, valkey_clients.stat, group_repos)
-    return ProjectProcessors(processor_registry.group(GroupMeta(PROJECT_ENTITY_TYPE)), service)
+    return ProjectProcessors(processor_registry.group(GroupMeta(ProjectEntityType())), service)
 
 
 @pytest.fixture()
@@ -178,7 +178,7 @@ def user_processors(
     )
     service = UserService(storage_manager, valkey_clients.stat, AsyncMock(), user_repo, AsyncMock())
     return UserProcessors(
-        processor_registry.group(GroupMeta(USER_ENTITY_TYPE)),
+        processor_registry.group(GroupMeta(UserEntityType())),
         service,
     )
 

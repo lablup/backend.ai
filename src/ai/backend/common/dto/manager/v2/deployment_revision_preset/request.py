@@ -1,12 +1,17 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Annotated, Any
 from uuid import UUID
 
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseRequestModel
-from ai.backend.common.config import DEFAULT_SHELL, PresetModelDefinition, PreStartAction
+from ai.backend.common.config import (
+    DEFAULT_SHELL,
+    PresetModelDefinition,
+    PresetModelDefinitionDraft,
+    PreStartAction,
+)
 from ai.backend.common.data.entity.image import ImageID
 from ai.backend.common.data.entity.runtime_variant import RuntimeVariantID
 from ai.backend.common.dto.manager.query import StringFilter, UUIDFilter
@@ -174,6 +179,69 @@ class CreateDeploymentRevisionPresetInput(BaseRequestModel):
     )
 
 
+class UpdatePresetModelHealthCheckInput(BaseRequestModel):
+    """Patch for a preset model's health check. Omit a field to keep its current stored value."""
+
+    enable: bool | None | Unset = Field(default=UNSET)
+    interval: float | None | Unset = Field(default=UNSET)
+    path: str | None | Unset = Field(default=UNSET)
+    max_retries: int | None | Unset = Field(default=UNSET)
+    max_wait_time: float | None | Unset = Field(default=UNSET)
+    expected_status_code: Annotated[int, Field(gt=100)] | None | Unset = Field(default=UNSET)
+    initial_delay: Annotated[float, Field(ge=0)] | None | Unset = Field(default=UNSET)
+
+
+class UpdatePresetModelMetadataInput(BaseRequestModel):
+    """Patch for a preset model's metadata. Omit a field to keep its current stored value."""
+
+    author: str | None | Unset = Field(default=UNSET)
+    title: str | None | Unset = Field(default=UNSET)
+    version: str | None | Unset = Field(default=UNSET)
+    created: str | None | Unset = Field(default=UNSET)
+    description: str | None | Unset = Field(default=UNSET)
+    task: str | None | Unset = Field(default=UNSET)
+    category: str | None | Unset = Field(default=UNSET)
+    architecture: str | None | Unset = Field(default=UNSET)
+    framework: list[str] | None | Unset = Field(default=UNSET)
+    label: list[str] | None | Unset = Field(default=UNSET)
+    license: str | None | Unset = Field(default=UNSET)
+    min_resource: dict[str, Any] | None | Unset = Field(default=UNSET)
+
+
+class UpdatePresetModelServiceConfigInput(BaseRequestModel):
+    """Patch for a preset model's service config. Omit a field to keep its current stored value."""
+
+    pre_start_actions: list[PreStartAction] | None | Unset = Field(default=UNSET)
+    command: str | None | Unset = Field(default=UNSET)
+    start_command: list[str] | None | Unset = Field(default=UNSET)
+    shell: str | None | Unset = Field(default=UNSET)
+    port: Annotated[int, Field(gt=1)] | None | Unset = Field(default=UNSET)
+    health_check: UpdatePresetModelHealthCheckInput | None | Unset = Field(default=UNSET)
+
+
+class UpdatePresetModelConfigInput(BaseRequestModel):
+    """Patch for a single preset model entry. Omit a field to keep its current stored value."""
+
+    name: Annotated[str, Field(min_length=1)] | None | Unset = Field(default=UNSET)
+    model_path: Annotated[str, Field(min_length=1)] | None | Unset = Field(default=UNSET)
+    service: UpdatePresetModelServiceConfigInput | None | Unset = Field(default=UNSET)
+    metadata: UpdatePresetModelMetadataInput | None | Unset = Field(default=UNSET)
+
+
+class UpdatePresetModelDefinitionInput(BaseRequestModel):
+    """Patch for a preset's model definition. Omit `models` to keep the current model entry."""
+
+    models: Annotated[list[UpdatePresetModelConfigInput], Field(max_length=1)] | None | Unset = (
+        Field(default=UNSET)
+    )
+
+    def to_draft(self) -> PresetModelDefinitionDraft:
+        # exclude_unset keeps the resulting draft's model_fields_set aligned with what the
+        # caller actually provided, so merging onto the stored preset doesn't clobber fields
+        # the caller didn't touch.
+        return PresetModelDefinitionDraft.model_validate(self.model_dump(exclude_unset=True))
+
+
 class UpdateDeploymentRevisionPresetInput(BaseRequestModel):
     id: UUID = Field(description="Preset ID.")
     runtime_variant_id: RuntimeVariantID | None | Unset = Field(
@@ -185,7 +253,7 @@ class UpdateDeploymentRevisionPresetInput(BaseRequestModel):
     description: str | None | Unset = Field(default=UNSET)
     rank: int | None | Unset = Field(default=UNSET, ge=0, description="Omit to leave unchanged.")
     image_id: ImageID | None | Unset = Field(default=UNSET)
-    model_definition: PresetModelDefinitionInput | None | Unset = Field(default=UNSET)
+    model_definition: UpdatePresetModelDefinitionInput | None | Unset = Field(default=UNSET)
     resource_slots: list[ResourceSlotEntryInput] | None | Unset = Field(
         default=UNSET, description="Omit to leave unchanged."
     )

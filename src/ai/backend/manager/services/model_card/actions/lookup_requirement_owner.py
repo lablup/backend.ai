@@ -4,7 +4,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Any, override
 
-from ai.backend.common.data.entity.model_card import MODEL_CARD_ENTITY_TYPE, ModelCardID
+from ai.backend.common.data.entity.model_card import ModelCardEntityType, ModelCardID
 from ai.backend.common.data.entity.model_card_resource_requirement import (
     ModelCardResourceRequirementID,
 )
@@ -43,7 +43,7 @@ class LookupModelCardResourceRequirementOwnerAction(
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return MODEL_CARD_ENTITY_TYPE
+        return ModelCardEntityType()
 
     @override
     @classmethod
@@ -74,7 +74,7 @@ class LookupBulkModelCardResourceRequirementOwnerAction(
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return MODEL_CARD_ENTITY_TYPE
+        return ModelCardEntityType()
 
     @override
     @classmethod

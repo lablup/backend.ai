@@ -19,10 +19,16 @@ from ai.backend.manager.services.app_config.actions.search import (
     AnonymousSearchAppConfigsAction,
     SearchAppConfigsAction,
 )
+from ai.backend.manager.services.app_config.processors import AppConfigProcessors
 
 
 class AppConfigAdapter(BaseAdapter):
     """Adapter for the merged AppConfig (read) operations."""
+
+    _app_config: AppConfigProcessors
+
+    def __init__(self, app_config: AppConfigProcessors) -> None:
+        self._app_config = app_config
 
     # --- merged AppConfig read ---
 
@@ -32,7 +38,7 @@ class AppConfigAdapter(BaseAdapter):
         if me is None:
             # ``auth_required`` guarantees a session on this route, so this is never hit.
             raise UnreachableError("User context is not available")
-        action_result = await self._processors.app_config.search_app_configs.run(
+        action_result = await self._app_config.search_app_configs.run(
             SearchAppConfigsAction(
                 config_names=input.config_names,
                 user_id=UserID(me.user_id),
@@ -47,7 +53,7 @@ class AppConfigAdapter(BaseAdapter):
 
     async def public_app_configs(self, input: PublicGetAppConfigsInput) -> GetAppConfigsPayload:
         """Merged AppConfigs from public fragments only; naming no principal is what makes it anonymous."""
-        action_result = await self._processors.app_config.anonymous_search_app_configs.run(
+        action_result = await self._app_config.anonymous_search_app_configs.run(
             AnonymousSearchAppConfigsAction(config_names=input.config_names)
         )
         return GetAppConfigsPayload(

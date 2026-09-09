@@ -5,7 +5,6 @@ from __future__ import annotations
 import pytest
 from pydantic import ValidationError
 
-from ai.backend.common.api_handlers import SENTINEL, Sentinel
 from ai.backend.common.dto.manager.v2.common import (
     BinarySizeInput,
     ResourceSlotEntryInput,
@@ -24,6 +23,7 @@ from ai.backend.common.dto.manager.v2.resource_policy.request import (
 )
 from ai.backend.common.dto.manager.v2.resource_policy.types import DefaultForUnspecified
 from ai.backend.common.exception import BackendAISchemaValidationFailed
+from ai.backend.common.tristate.unset import UNSET, Unset
 
 
 class TestCreateKeypairResourcePolicyInput:
@@ -150,18 +150,27 @@ class TestUpdateKeypairResourcePolicyInput:
             idle_timeout=None,
         )
         assert req.default_for_unspecified is None
+        assert req.max_session_lifetime is None
+        assert req.idle_timeout is None
 
     def test_default_sentinel_fields(self) -> None:
         req = UpdateKeypairResourcePolicyInput()
-        assert req.total_resource_slots is SENTINEL
-        assert isinstance(req.total_resource_slots, Sentinel)
-        assert req.max_pending_session_count is SENTINEL
-        assert req.max_pending_session_resource_slots is SENTINEL
-        assert req.allowed_vfolder_hosts is SENTINEL
+        assert req.default_for_unspecified is UNSET
+        assert req.total_resource_slots is UNSET
+        assert isinstance(req.total_resource_slots, Unset)
+        assert req.max_session_lifetime is UNSET
+        assert req.max_concurrent_sessions is UNSET
+        assert req.max_pending_session_count is UNSET
+        assert req.max_priority is UNSET
+        assert req.max_pending_session_resource_slots is UNSET
+        assert req.max_concurrent_sftp_sessions is UNSET
+        assert req.max_containers_per_session is UNSET
+        assert req.idle_timeout is UNSET
+        assert req.allowed_vfolder_hosts is UNSET
 
     def test_sentinel_signals_clear(self) -> None:
-        req = UpdateKeypairResourcePolicyInput(total_resource_slots=SENTINEL)
-        assert req.total_resource_slots is SENTINEL
+        req = UpdateKeypairResourcePolicyInput(total_resource_slots=UNSET)
+        assert req.total_resource_slots is UNSET
 
     def test_none_means_no_change(self) -> None:
         req = UpdateKeypairResourcePolicyInput(total_resource_slots=None)
@@ -238,17 +247,29 @@ class TestUpdateUserResourcePolicyInput:
 
     def test_all_default_sentinel_fields(self) -> None:
         req = UpdateUserResourcePolicyInput()
-        assert req.max_vfolder_count is SENTINEL
-        assert req.max_quota_scope_size is SENTINEL
+        assert req.max_vfolder_count is UNSET
+        assert req.max_concurrent_logins is UNSET
+        assert req.max_quota_scope_size is UNSET
+        assert req.max_session_count_per_model_session is UNSET
+        assert req.max_customized_image_count is UNSET
 
     def test_all_sentinel_fields_is_valid(self) -> None:
         req = UpdateUserResourcePolicyInput(
-            max_vfolder_count=SENTINEL,
-            max_quota_scope_size=SENTINEL,
+            max_vfolder_count=UNSET,
+            max_quota_scope_size=UNSET,
+            max_session_count_per_model_session=UNSET,
+            max_customized_image_count=UNSET,
+        )
+        assert req.max_vfolder_count is UNSET
+        assert req.max_session_count_per_model_session is UNSET
+
+    def test_none_stays_none(self) -> None:
+        req = UpdateUserResourcePolicyInput(
             max_session_count_per_model_session=None,
             max_customized_image_count=None,
         )
-        assert req.max_vfolder_count is SENTINEL
+        assert req.max_session_count_per_model_session is None
+        assert req.max_customized_image_count is None
 
     def test_update_specific_field(self) -> None:
         req = UpdateUserResourcePolicyInput(max_session_count_per_model_session=10)
@@ -317,16 +338,22 @@ class TestUpdateProjectResourcePolicyInput:
 
     def test_all_default_sentinel_fields(self) -> None:
         req = UpdateProjectResourcePolicyInput()
-        assert req.max_vfolder_count is SENTINEL
-        assert req.max_quota_scope_size is SENTINEL
+        assert req.max_vfolder_count is UNSET
+        assert req.max_quota_scope_size is UNSET
+        assert req.max_network_count is UNSET
 
     def test_all_sentinel_fields_is_valid(self) -> None:
         req = UpdateProjectResourcePolicyInput(
-            max_vfolder_count=SENTINEL,
-            max_quota_scope_size=SENTINEL,
-            max_network_count=None,
+            max_vfolder_count=UNSET,
+            max_quota_scope_size=UNSET,
+            max_network_count=UNSET,
         )
-        assert req.max_vfolder_count is SENTINEL
+        assert req.max_vfolder_count is UNSET
+        assert req.max_network_count is UNSET
+
+    def test_none_stays_none(self) -> None:
+        req = UpdateProjectResourcePolicyInput(max_network_count=None)
+        assert req.max_network_count is None
 
     def test_update_specific_field(self) -> None:
         req = UpdateProjectResourcePolicyInput(max_network_count=10)

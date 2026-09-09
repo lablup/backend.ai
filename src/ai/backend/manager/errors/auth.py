@@ -71,6 +71,23 @@ class AuthorizationFailed(BackendAIError, web.HTTPUnauthorized):
         )
 
 
+class OpenIDAuthenticationFailed(BackendAIError, web.HTTPUnauthorized):
+    error_type = "https://api.backend.ai/probs/openid-not-authenticated"
+    error_title = "Not authenticated by OpenID Provider"
+
+    def __init__(self) -> None:
+        # Legacy reason phrase, kept for clients that already read it.
+        super().__init__(reason=self.error_title)
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.USER,
+            operation=ErrorOperation.AUTH,
+            error_detail=ErrorDetail.UNAUTHORIZED,
+        )
+
+
 class PasswordExpired(BackendAIError, web.HTTPUnauthorized):
     error_type = "https://api.backend.ai/probs/password-expired"
     error_title = "Password has expired."

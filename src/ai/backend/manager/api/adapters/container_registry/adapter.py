@@ -59,9 +59,11 @@ from ai.backend.manager.services.container_registry.actions.search_container_reg
 from ai.backend.manager.services.container_registry.actions.update_container_registry import (
     UpdateContainerRegistryAction,
 )
+from ai.backend.manager.services.container_registry.processors import ContainerRegistryProcessors
 from ai.backend.manager.services.rbac.actions.relation.base import RelationPair
 from ai.backend.manager.services.rbac.actions.relation.create import CreateRelationAction
 from ai.backend.manager.services.rbac.actions.relation.purge import PurgeRelationAction
+from ai.backend.manager.services.rbac.processors import RbacProcessors
 from ai.backend.manager.types import OptionalState, TriState
 
 DEFAULT_PAGINATION_LIMIT = 10
@@ -69,6 +71,17 @@ DEFAULT_PAGINATION_LIMIT = 10
 
 class ContainerRegistryAdapter(BaseAdapter):
     """Adapter for container registry domain operations."""
+
+    _container_registry: ContainerRegistryProcessors
+    _rbac: RbacProcessors
+
+    def __init__(
+        self,
+        container_registry: ContainerRegistryProcessors,
+        rbac: RbacProcessors,
+    ) -> None:
+        self._container_registry = container_registry
+        self._rbac = rbac
 
     async def admin_search(
         self,
@@ -84,7 +97,7 @@ class ContainerRegistryAdapter(BaseAdapter):
         """
         querier = self.build_querier(input)
 
-        action_result = await self._processors.container_registry.search_container_registries.run(
+        action_result = await self._container_registry.search_container_registries.run(
             SearchContainerRegistriesAction(querier=querier)
         )
 
@@ -111,7 +124,7 @@ class ContainerRegistryAdapter(BaseAdapter):
             ssl_verify=input.ssl_verify,
             extra=input.extra,
         )
-        result = await self._processors.container_registry.create_container_registry.run(
+        result = await self._container_registry.create_container_registry.run(
             CreateContainerRegistryAction(creator=creator)
         )
         if input.allowed_groups is not None:
@@ -167,7 +180,7 @@ class ContainerRegistryAdapter(BaseAdapter):
             ),
             extra=(TriState.update(input.extra) if input.extra is not None else TriState.nop()),
         )
-        result = await self._processors.container_registry.update_container_registry.run(
+        result = await self._container_registry.update_container_registry.run(
             UpdateContainerRegistryAction(updater=updater)
         )
         return UpdateContainerRegistryPayload(registry=self._data_to_dto(result.data))
@@ -186,7 +199,7 @@ class ContainerRegistryAdapter(BaseAdapter):
         repository wrote these rows beside the update.
         """
         if allowed_groups.add:
-            await self._processors.rbac.create_relation.run(
+            await self._rbac.create_relation.run(
                 CreateRelationAction(
                     pairs=[
                         RelationPair(scope=ProjectID(uuid.UUID(raw)), target=registry_id)
@@ -197,7 +210,7 @@ class ContainerRegistryAdapter(BaseAdapter):
             )
         if not allowed_groups.remove:
             return
-        result = await self._processors.rbac.purge_relation.run(
+        result = await self._rbac.purge_relation.run(
             PurgeRelationAction(
                 pairs=[
                     RelationPair(scope=ProjectID(uuid.UUID(raw)), target=registry_id)
@@ -218,7 +231,7 @@ class ContainerRegistryAdapter(BaseAdapter):
     ) -> DeleteContainerRegistryPayload:
         """Delete a container registry (superadmin only). This is a hard delete."""
         purger = ContainerRegistryPurger(registry_id=ContainerRegistryID(input.id))
-        await self._processors.container_registry.delete_container_registry.run(
+        await self._container_registry.delete_container_registry.run(
             DeleteContainerRegistryAction(purger=purger)
         )
         return DeleteContainerRegistryPayload(id=input.id)
@@ -306,7 +319,7 @@ class ContainerRegistryAdapter(BaseAdapter):
             pagination=OffsetPagination(limit=len(ids)),
             conditions=[ContainerRegistryConditions.by_ids(ids)],
         )
-        action_result = await self._processors.container_registry.search_container_registries.run(
+        action_result = await self._container_registry.search_container_registries.run(
             SearchContainerRegistriesAction(querier=querier)
         )
         registry_map = {item.id: self._data_to_dto(item) for item in action_result.data}

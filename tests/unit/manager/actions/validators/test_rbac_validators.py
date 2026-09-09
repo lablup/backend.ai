@@ -190,6 +190,8 @@ async def _seed_user_with_role(
         await db_sess.flush()
         db_sess.add(
             RoleRow(
+                scope_type=EntityType("project"),
+                scope_id=uuid.uuid4(),
                 id=role_id,
                 name=f"role-{suffix}",
                 description="rbac validator test role",
