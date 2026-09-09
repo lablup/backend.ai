@@ -7,11 +7,12 @@ from datetime import UTC, datetime
 
 import pytest
 import sqlalchemy as sa
+from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
 from ai.backend.common.data.entity.domain import DomainID
-from ai.backend.common.data.entity.idle_checker import IdleCheckerID
+from ai.backend.common.data.entity.idle_checker import IDLE_CHECKER_ENTITY_TYPE, IdleCheckerID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
-from ai.backend.common.data.entity.session import SessionID
+from ai.backend.common.data.entity.session import SESSION_ENTITY_TYPE, SessionID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.idle_checker.types import (
     CheckerType,
@@ -45,6 +46,13 @@ from ai.backend.manager.models.resource_policy import (
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
+from ai.backend.manager.models.virtual_entity.entity_membership_cap import EntityMembershipCapRow
+from ai.backend.manager.models.virtual_entity.entity_membership_field import (
+    EntityMembershipFieldRow,
+)
+from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
+from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
 from ai.backend.manager.repositories.base import BulkUpserter
 from ai.backend.manager.repositories.idle_checker.repository import IdleCheckerRepository
 from ai.backend.manager.repositories.idle_checker.types import (
@@ -58,6 +66,19 @@ from ai.backend.manager.repositories.ops import DBOpsProvider
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.ops.v2.relation.provider import RelationOpsProvider
 from ai.backend.testutils.db import with_tables
+
+
+async def _provision_nodes(db_sess: SASession) -> None:
+    """The relation write refuses a pair whose sides are not in the graph, and these
+    fixtures add the rows straight to the table."""
+    await db_sess.flush()
+    for entity_type, id_column in (
+        (SESSION_ENTITY_TYPE, SessionRow.id),
+        (IDLE_CHECKER_ENTITY_TYPE, IdleCheckerRow.id),
+    ):
+        for entity_id in (await db_sess.scalars(sa.select(id_column))).all():
+            db_sess.add(VirtualEntityRow(entity_type=entity_type, entity_id=entity_id))
+    await db_sess.flush()
 
 
 @dataclass(frozen=True)
@@ -212,6 +233,11 @@ class TestFetchJudgmentBatch:
                 IdleCheckerRow,
                 IdleCheckerBindingRow,
                 SessionIdleCheckRow,
+                VirtualEntityRow,
+                ScopeBindingRow,
+                EntityMembershipRow,
+                EntityMembershipCapRow,
+                EntityMembershipFieldRow,
             ],
         ):
             yield database_connection
@@ -267,6 +293,7 @@ class TestFetchJudgmentBatch:
             for session_id, status in session_specs:
                 db_sess.add(_expired_check_session_row(scope, session_id, status))
             db_sess.add(_expired_check_checker_row(checker_id))
+            await _provision_nodes(db_sess)
             await db_sess.flush()
             db_sess.add(
                 IdleCheckerBindingRow(
@@ -868,6 +895,11 @@ class TestFetchExpiredIdleChecks:
                 SessionRow,
                 IdleCheckerRow,
                 SessionIdleCheckRow,
+                VirtualEntityRow,
+                ScopeBindingRow,
+                EntityMembershipRow,
+                EntityMembershipCapRow,
+                EntityMembershipFieldRow,
             ],
         ):
             yield database_connection
@@ -897,6 +929,7 @@ class TestFetchExpiredIdleChecks:
             db_sess.add(_expired_check_session_row(scope, session_id, SessionStatus.RUNNING))
             db_sess.add(_expired_check_checker_row(first_checker_id))
             db_sess.add(_expired_check_checker_row(second_checker_id))
+            await _provision_nodes(db_sess)
             await db_sess.flush()
             db_sess.add(
                 SessionIdleCheckRow(
@@ -937,6 +970,7 @@ class TestFetchExpiredIdleChecks:
                 db_sess.add(scope_row)
             db_sess.add(_expired_check_session_row(scope, session_id, SessionStatus.RUNNING))
             db_sess.add(_expired_check_checker_row(checker_id))
+            await _provision_nodes(db_sess)
             await db_sess.flush()
             db_sess.add(
                 SessionIdleCheckRow(
@@ -962,6 +996,7 @@ class TestFetchExpiredIdleChecks:
                 db_sess.add(scope_row)
             db_sess.add(_expired_check_session_row(scope, session_id, SessionStatus.TERMINATED))
             db_sess.add(_expired_check_checker_row(checker_id))
+            await _provision_nodes(db_sess)
             await db_sess.flush()
             db_sess.add(
                 SessionIdleCheckRow(
@@ -1059,6 +1094,11 @@ class TestSessionIdleCheckExclusion:
                 SessionRow,
                 IdleCheckerRow,
                 SessionIdleCheckRow,
+                VirtualEntityRow,
+                ScopeBindingRow,
+                EntityMembershipRow,
+                EntityMembershipCapRow,
+                EntityMembershipFieldRow,
             ],
         ):
             yield database_connection
@@ -1137,6 +1177,7 @@ class TestSessionIdleCheckExclusion:
                 )
             )
             db_sess.add(_expired_check_checker_row(rows.checker_id))
+            await _provision_nodes(db_sess)
             await db_sess.flush()
             for session_id, phase, expire_at in check_specs:
                 db_sess.add(
@@ -1556,6 +1597,11 @@ class TestUserScopeAssignments:
                 IdleCheckerRow,
                 IdleCheckerBindingRow,
                 SessionIdleCheckRow,
+                VirtualEntityRow,
+                ScopeBindingRow,
+                EntityMembershipRow,
+                EntityMembershipCapRow,
+                EntityMembershipFieldRow,
             ],
         ):
             yield database_connection
@@ -1613,6 +1659,7 @@ class TestUserScopeAssignments:
             db_sess.add(_expired_check_checker_row(user_only_checker_id))
             db_sess.add(_expired_check_checker_row(domain_checker_id))
             db_sess.add(_expired_check_checker_row(interactive_only_checker_id))
+            await _provision_nodes(db_sess)
             await db_sess.flush()
             db_sess.add(
                 IdleCheckerBindingRow(

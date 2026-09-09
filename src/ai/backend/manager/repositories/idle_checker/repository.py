@@ -46,7 +46,7 @@ class IdleCheckerRepository:
         relation_ops_provider: RelationOpsProvider,
         v2_ops_provider: V2DBOpsProvider,
     ) -> None:
-        self._db_source = IdleCheckerDBSource(ops_provider, v2_ops_provider)
+        self._db_source = IdleCheckerDBSource(ops_provider, v2_ops_provider, relation_ops_provider)
         self._relation_ops = relation_ops_provider
 
     async def get_assignment(

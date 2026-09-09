@@ -10,6 +10,7 @@ from typing import cast
 import sqlalchemy as sa
 
 from ai.backend.common.data.entity.idle_checker import IdleCheckerID
+from ai.backend.common.data.entity.session import SessionID
 from ai.backend.common.data.idle_checker.types import (
     CheckerType,
     IdleCheckerSpec,
@@ -19,6 +20,8 @@ from ai.backend.common.data.permission.types import ScopeType
 from ai.backend.common.types import SessionId, SessionTypes
 from ai.backend.manager.data.idle_checker.types import IdleCheckSession, IdleJudgmentData
 from ai.backend.manager.data.session.types import SessionStatus
+from ai.backend.manager.models.idle_checker.creators import SessionIdleCheckLink
+from ai.backend.manager.models.idle_checker.purgers import SessionIdleCheckUnlink
 from ai.backend.manager.models.idle_checker.row import (
     IdleCheckerBindingRow,
     IdleCheckerRow,
@@ -32,14 +35,8 @@ from ai.backend.manager.models.session.conditions import SessionConditions
 from ai.backend.manager.models.session.row import SessionRow
 from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.repositories.base import (
-    BatchPurger,
     BatchQuerier,
-    BulkCreator,
     BulkUpserter,
-)
-from ai.backend.manager.repositories.idle_checker.creators import SessionIdleCheckCreatorSpec
-from ai.backend.manager.repositories.idle_checker.purgers import (
-    SessionIdleCheckSyncPurgerSpec,
 )
 from ai.backend.manager.repositories.idle_checker.types import (
     ExpiredIdleCheckBatchData,
@@ -59,6 +56,7 @@ from ai.backend.manager.repositories.idle_checker.upserters import (
 )
 from ai.backend.manager.repositories.ops import DBOpsProvider
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
+from ai.backend.manager.repositories.ops.v2.relation.provider import RelationOpsProvider
 
 _ASSIGNMENT_DELETE_BATCH_SIZE = 1000
 
@@ -69,10 +67,17 @@ _IDLE_CHECK_UPDATE_BATCH_SIZE = 1000
 class IdleCheckerDBSource:
     _ops: DBOpsProvider
     _v2_ops: V2DBOpsProvider
+    _relation_ops: RelationOpsProvider
 
-    def __init__(self, ops_provider: DBOpsProvider, v2_ops_provider: V2DBOpsProvider) -> None:
+    def __init__(
+        self,
+        ops_provider: DBOpsProvider,
+        v2_ops_provider: V2DBOpsProvider,
+        relation_ops_provider: RelationOpsProvider,
+    ) -> None:
         self._ops = ops_provider
         self._v2_ops = v2_ops_provider
+        self._relation_ops = relation_ops_provider
 
     async def fetch_judgment_batch(
         self,
@@ -278,21 +283,17 @@ class IdleCheckerDBSource:
         pairs_to_create: Sequence[SessionIdleCheckPair],
         pairs_to_delete: Sequence[SessionIdleCheckPair],
     ) -> None:
-        async with self._ops.write_ops() as w:
+        async with self._relation_ops.write_ops() as w:
             if pairs_to_create:
-                await w.bulk_create(
-                    BulkCreator(
-                        specs=[SessionIdleCheckCreatorSpec(pair) for pair in pairs_to_create]
-                    )
+                await w.create_relations(
+                    SessionIdleCheckLink(),
+                    [(SessionID(pair.session_id), pair.checker_id) for pair in pairs_to_create],
                 )
-            if pairs_to_delete:
-                for pair_batch in batched(pairs_to_delete, _ASSIGNMENT_DELETE_BATCH_SIZE):
-                    await w.batch_purge(
-                        BatchPurger(
-                            spec=SessionIdleCheckSyncPurgerSpec(pair_batch),
-                            batch_size=_ASSIGNMENT_DELETE_BATCH_SIZE,
-                        )
-                    )
+            for pair_batch in batched(pairs_to_delete, _ASSIGNMENT_DELETE_BATCH_SIZE):
+                await w.purge_relations(
+                    SessionIdleCheckUnlink(),
+                    [(SessionID(pair.session_id), pair.checker_id) for pair in pair_batch],
+                )
 
     async def batch_update_session_idle_check_phase(
         self,
