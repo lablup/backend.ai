@@ -14582,7 +14582,6 @@
                 "type": "null"
               }
             ],
-            "default": null,
             "description": "Updated channel name",
             "title": "Name"
           },
@@ -14592,14 +14591,10 @@
                 "type": "string"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
-            "description": "Updated channel description. Use SENTINEL to clear.",
+            "description": "Updated channel description. Omit to leave unchanged; null clears.",
             "title": "Description"
           },
           "spec": {
@@ -14611,8 +14606,8 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Updated channel specification"
+            "description": "Updated channel specification",
+            "title": "Spec"
           },
           "enabled": {
             "anyOf": [
@@ -14623,7 +14618,6 @@
                 "type": "null"
               }
             ],
-            "default": null,
             "description": "Updated enabled status",
             "title": "Enabled"
           }
@@ -14993,7 +14987,6 @@
                 "type": "null"
               }
             ],
-            "default": null,
             "description": "Updated rule name",
             "title": "Name"
           },
@@ -15003,14 +14996,10 @@
                 "type": "string"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
-            "description": "Updated rule description. Use SENTINEL to clear.",
+            "description": "Updated rule description. Omit to leave unchanged; null clears.",
             "title": "Description"
           },
           "message_template": {
@@ -15023,7 +15012,6 @@
                 "type": "null"
               }
             ],
-            "default": null,
             "description": "Updated message template (max 64KB)",
             "title": "Message Template"
           },
@@ -15036,7 +15024,6 @@
                 "type": "null"
               }
             ],
-            "default": null,
             "description": "Updated enabled status",
             "title": "Enabled"
           }
