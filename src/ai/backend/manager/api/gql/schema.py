@@ -134,6 +134,7 @@ from .domain_v2 import (
     admin_update_domain_v2,
     domain_v2,
     rg_domains_v2,
+    scoped_domains_v2,
 )
 from .entity.resolver import entity_types
 from .entity_label.resolver import (
@@ -737,6 +738,7 @@ class Query:
     domain_v2 = domain_v2
     admin_domains_v2 = admin_domains_v2
     rg_domains_v2 = rg_domains_v2
+    scoped_domains_v2 = scoped_domains_v2
     # Project V2 APIs
     project_v2 = project_v2
     admin_projects_v2 = admin_projects_v2
