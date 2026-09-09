@@ -18,15 +18,15 @@ import yarl
 from ai.backend.client.v2.auth import HMACAuth
 from ai.backend.client.v2.config import ClientConfig
 from ai.backend.client.v2.v2_registry import V2ClientRegistry
-from ai.backend.common.data.entity.domain import DOMAIN_ENTITY_TYPE
-from ai.backend.common.data.entity.project import PROJECT_ENTITY_TYPE
+from ai.backend.common.data.entity.domain import DomainEntityType
+from ai.backend.common.data.entity.project import ProjectEntityType
 from ai.backend.common.data.entity.resource_group import (
-    RESOURCE_GROUP_ENTITY_TYPE,
+    ResourceGroupEntityType,
     ResourceGroupName,
 )
-from ai.backend.common.data.entity.resource_preset import RESOURCE_PRESET_ENTITY_TYPE
-from ai.backend.common.data.entity.session import SESSION_ENTITY_TYPE
-from ai.backend.common.data.entity.user import USER_ENTITY_TYPE
+from ai.backend.common.data.entity.resource_preset import ResourcePresetEntityType
+from ai.backend.common.data.entity.session import SessionEntityType
+from ai.backend.common.data.entity.user import UserEntityType
 from ai.backend.common.dto.manager.v2.resource_allocation.request import (
     EffectiveResourceAllocationInput,
 )
@@ -115,7 +115,9 @@ def _build_registries(
     processors.session = MagicMock()
     processors.session.resource_allocation = ra_processors
     adapter = ResourceAllocationAdapter(
-        processors=processors,
+        processors.session,
+        MagicMock(),
+        MagicMock(),
         config_provider=config_provider,
     )
     handler = V2ResourceAllocationHandler(adapter=adapter)
@@ -164,12 +166,12 @@ class TestHideAgentsVisibility:
         )
         groups = processor_registry.concern(ConcernMeta(Concern.RESOURCE_GROUP))
         return ResourceAllocationProcessors(
-            groups.group(GroupMeta(USER_ENTITY_TYPE)),
-            groups.group(GroupMeta(PROJECT_ENTITY_TYPE)),
-            groups.group(GroupMeta(DOMAIN_ENTITY_TYPE)),
-            groups.group(GroupMeta(RESOURCE_GROUP_ENTITY_TYPE)),
-            groups.group(GroupMeta(SESSION_ENTITY_TYPE)),
-            groups.group(GroupMeta(RESOURCE_PRESET_ENTITY_TYPE)),
+            groups.group(GroupMeta(UserEntityType())),
+            groups.group(GroupMeta(ProjectEntityType())),
+            groups.group(GroupMeta(DomainEntityType())),
+            groups.group(GroupMeta(ResourceGroupEntityType())),
+            groups.group(GroupMeta(SessionEntityType())),
+            groups.group(GroupMeta(ResourcePresetEntityType())),
             service,
         )
 
@@ -300,12 +302,12 @@ class TestGroupResourceVisibility:
         )
         groups = processor_registry.concern(ConcernMeta(Concern.RESOURCE_GROUP))
         return ResourceAllocationProcessors(
-            groups.group(GroupMeta(USER_ENTITY_TYPE)),
-            groups.group(GroupMeta(PROJECT_ENTITY_TYPE)),
-            groups.group(GroupMeta(DOMAIN_ENTITY_TYPE)),
-            groups.group(GroupMeta(RESOURCE_GROUP_ENTITY_TYPE)),
-            groups.group(GroupMeta(SESSION_ENTITY_TYPE)),
-            groups.group(GroupMeta(RESOURCE_PRESET_ENTITY_TYPE)),
+            groups.group(GroupMeta(UserEntityType())),
+            groups.group(GroupMeta(ProjectEntityType())),
+            groups.group(GroupMeta(DomainEntityType())),
+            groups.group(GroupMeta(ResourceGroupEntityType())),
+            groups.group(GroupMeta(SessionEntityType())),
+            groups.group(GroupMeta(ResourcePresetEntityType())),
             service,
         )
 

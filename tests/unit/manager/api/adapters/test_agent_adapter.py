@@ -112,7 +112,7 @@ def processors(readable: AgentData, denied: AgentData, denial: GenericForbidden)
 
 @pytest.fixture
 def adapter(processors: MagicMock) -> AgentAdapter:
-    return AgentAdapter(processors)
+    return AgentAdapter(processors.agent)
 
 
 async def test_batch_load_answers_per_name(

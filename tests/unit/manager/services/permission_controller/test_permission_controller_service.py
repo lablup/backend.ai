@@ -102,6 +102,8 @@ def _make_role_data(
         created_at=now,
         updated_at=now,
         deleted_at=deleted_at,
+        scope_type=EntityType("project"),
+        scope_id=uuid.uuid4(),
         description=description,
     )
 
@@ -122,6 +124,8 @@ def _make_role_detail_data(
         created_at=now,
         updated_at=now,
         deleted_at=None,
+        scope_type=EntityType("project"),
+        scope_id=uuid.uuid4(),
     )
 
 

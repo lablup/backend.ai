@@ -3,16 +3,24 @@ from typing import override
 from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
 
 __all__ = (
-    "OBJECT_STORAGE_ENTITY_TYPE",
+    "ObjectStorageEntityType",
     "ObjectStorageID",
 )
 
 
-# Raw string mirroring the RBAC-managed EntityType.OBJECT_STORAGE value.
-OBJECT_STORAGE_ENTITY_TYPE = EntityType("object_storage")
+class ObjectStorageEntityType(EntityType):
+    @override
+    @classmethod
+    def name(cls) -> str:
+        return "object_storage"
+
+    @override
+    @classmethod
+    def description(cls) -> str:
+        return "An object storage backend behind a storage namespace."
 
 
 class ObjectStorageID(EntityIdentifier):
     @override
     def entity_type(self) -> EntityType:
-        return OBJECT_STORAGE_ENTITY_TYPE
+        return ObjectStorageEntityType()

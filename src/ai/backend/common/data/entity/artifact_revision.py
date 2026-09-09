@@ -1,18 +1,37 @@
 from typing import override
 
-from ai.backend.common.data.entity.types import FieldIdentifier, FieldType
+from ai.backend.common.data.entity.artifact import ArtifactEntityType
+from ai.backend.common.data.entity.types import (
+    EntityType,
+    FieldIdentifier,
+    FieldType,
+)
 
 __all__ = (
-    "ARTIFACT_REVISION_FIELD_TYPE",
+    "ArtifactRevisionFieldType",
     "ArtifactRevisionID",
 )
 
 
-ARTIFACT_REVISION_FIELD_TYPE = FieldType("artifact_revision")
+class ArtifactRevisionFieldType(FieldType):
+    @override
+    @classmethod
+    def name(cls) -> str:
+        return "artifact_revision"
+
+    @override
+    @classmethod
+    def description(cls) -> str:
+        return "One version of an artifact."
+
+    @override
+    @classmethod
+    def owner_type(cls) -> type[EntityType]:
+        return ArtifactEntityType
 
 
 class ArtifactRevisionID(FieldIdentifier):
     @override
     @classmethod
     def field_type(cls) -> FieldType:
-        return ARTIFACT_REVISION_FIELD_TYPE
+        return ArtifactRevisionFieldType()

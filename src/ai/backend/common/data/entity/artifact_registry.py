@@ -4,9 +4,19 @@ from typing import override
 
 from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
 
-__all__ = ("ARTIFACT_REGISTRY_ENTITY_TYPE", "ArtifactRegistryID")
+__all__ = ("ArtifactRegistryEntityType", "ArtifactRegistryID")
 
-ARTIFACT_REGISTRY_ENTITY_TYPE = EntityType("artifact_registry")
+
+class ArtifactRegistryEntityType(EntityType):
+    @override
+    @classmethod
+    def name(cls) -> str:
+        return "artifact_registry"
+
+    @override
+    @classmethod
+    def description(cls) -> str:
+        return "A source artifacts are pulled from."
 
 
 class ArtifactRegistryID(EntityIdentifier):
@@ -14,4 +24,4 @@ class ArtifactRegistryID(EntityIdentifier):
 
     @override
     def entity_type(self) -> EntityType:
-        return ARTIFACT_REGISTRY_ENTITY_TYPE
+        return ArtifactRegistryEntityType()

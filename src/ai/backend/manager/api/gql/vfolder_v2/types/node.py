@@ -10,7 +10,7 @@ from strawberry import Info
 from strawberry.relay import Connection, Edge, NodeID, PageInfo
 
 from ai.backend.common.data.entity.types import RuntimeEntityID
-from ai.backend.common.data.entity.vfolder import VFOLDER_ENTITY_TYPE, VFolderUUID
+from ai.backend.common.data.entity.vfolder import VFolderEntityType, VFolderUUID
 from ai.backend.common.dto.manager.v2.model_card.request import SearchModelCardsInput
 from ai.backend.common.dto.manager.v2.vfolder.response import VFolderNode
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
@@ -186,7 +186,7 @@ class VFolderGQL(PydanticNodeMixin[VFolderNode]):
     ) -> EntityLabelConnection | None:
         return await resolve_entity_labels(
             info,
-            RuntimeEntityID(VFOLDER_ENTITY_TYPE, UUID(self.id)),
+            RuntimeEntityID(VFolderEntityType(), UUID(self.id)),
             filter=filter,
             order_by=order_by,
             before=before,

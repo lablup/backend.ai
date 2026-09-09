@@ -16,7 +16,7 @@ from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.permission.types import Permission
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
-from ai.backend.manager.data.permission.types import EntityType, ScopeType
+from ai.backend.manager.data.permission.types import ScopeType
 from ai.backend.manager.data.project.types import ProjectType
 from ai.backend.manager.errors.resource import PersonalProjectMemberAdditionError
 from ai.backend.manager.models.agent import AgentRow
@@ -346,6 +346,7 @@ class TestEnrollUsersInProject:
     async def test_role(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
+        test_project: ProjectID,
     ) -> RoleID:
         role_id = RoleID(uuid.uuid4())
         async with db_with_cleanup.begin_session() as session:
@@ -353,6 +354,8 @@ class TestEnrollUsersInProject:
                 RoleRow(
                     id=role_id,
                     name=f"test-role-{role_id.hex[:8]}",
+                    scope_type=ScopeType.PROJECT.value,
+                    scope_id=test_project,
                 )
             )
             await session.commit()
@@ -810,6 +813,7 @@ class TestWithdrawUsersFromProject:
     async def test_role(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
+        test_project: ProjectID,
     ) -> RoleID:
         role_id = RoleID(uuid.uuid4())
         async with db_with_cleanup.begin_session() as session:
@@ -817,30 +821,12 @@ class TestWithdrawUsersFromProject:
                 RoleRow(
                     id=role_id,
                     name=f"test-role-{role_id.hex[:8]}",
+                    scope_type=ScopeType.PROJECT.value,
+                    scope_id=test_project,
                 )
             )
             await session.commit()
         return role_id
-
-    @pytest.fixture
-    async def project_with_role_registered(
-        self,
-        db_with_cleanup: ExtendedAsyncSAEngine,
-        test_project: ProjectID,
-        test_role: RoleID,
-    ) -> ProjectID:
-        """Register the test role in the project scope via association_scopes_entities."""
-        async with db_with_cleanup.begin_session() as session:
-            session.add(
-                AssociationScopesEntitiesRow(
-                    scope_type=ScopeType.PROJECT,
-                    scope_id=str(test_project),
-                    entity_type=EntityType.ROLE,
-                    entity_id=str(test_role),
-                )
-            )
-            await session.commit()
-        return test_project
 
     @pytest.fixture
     def roster_repository(
@@ -855,12 +841,12 @@ class TestWithdrawUsersFromProject:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         roster_repository: RbacRosterRepository,
-        project_with_role_registered: ProjectID,
+        test_project: ProjectID,
         test_role: RoleID,
         same_domain_user_1: UserID,
     ) -> None:
         """Unassign reports the users it removed from the project scope."""
-        project_id = project_with_role_registered
+        project_id = test_project
         await roster_repository.join_members(project_id, [same_domain_user_1], test_role)
 
         result = await roster_repository.leave_members(project_id, [same_domain_user_1])
@@ -871,12 +857,12 @@ class TestWithdrawUsersFromProject:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         roster_repository: RbacRosterRepository,
-        project_with_role_registered: ProjectID,
+        test_project: ProjectID,
         test_role: RoleID,
         same_domain_user_1: UserID,
     ) -> None:
         """Withdrawing takes the user off the project's list."""
-        project_id = project_with_role_registered
+        project_id = test_project
         await roster_repository.join_members(project_id, [same_domain_user_1], test_role)
 
         await roster_repository.leave_members(project_id, [same_domain_user_1])
@@ -894,11 +880,11 @@ class TestWithdrawUsersFromProject:
     async def test_withdraw_nonexistent_user_reports_failure(
         self,
         roster_repository: RbacRosterRepository,
-        project_with_role_registered: ProjectID,
+        test_project: ProjectID,
     ) -> None:
         """Non-existent user UUID is reported as failure."""
         fake_user = UserID(uuid.uuid4())
-        result = await roster_repository.leave_members(project_with_role_registered, [fake_user])
+        result = await roster_repository.leave_members(test_project, [fake_user])
         assert len(result.members) == 0
         assert len(result.failures) == 1
         assert result.failures[0].user_id == fake_user

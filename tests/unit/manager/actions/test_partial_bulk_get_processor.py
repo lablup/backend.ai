@@ -16,6 +16,7 @@ import pytest
 
 from ai.backend.common.contexts.user import with_user
 from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.object_storage import ObjectStorageEntityType
 from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
 from ai.backend.common.data.user.types import UserData, UserRole
 from ai.backend.manager.actions.types import ActionOperationType, OperationStatus
@@ -37,7 +38,7 @@ from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.errors.repository import EntityNotFoundError
 from ai.backend.manager.errors.user import UserNotFound
 
-_STORAGE_ENTITY_TYPE = EntityType("object_storage")
+_STORAGE_ENTITY_TYPE = ObjectStorageEntityType()
 
 
 class _StorageID(EntityIdentifier):

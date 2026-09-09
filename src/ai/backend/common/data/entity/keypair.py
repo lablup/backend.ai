@@ -1,21 +1,37 @@
 from typing import override
 
-from ai.backend.common.data.entity.types import FieldIdentifier, FieldType
+from ai.backend.common.data.entity.types import (
+    EntityType,
+    FieldIdentifier,
+    FieldType,
+)
+from ai.backend.common.data.entity.user import UserEntityType
 
 __all__ = (
-    "KEYPAIR_FIELD_TYPE",
+    "KeyPairFieldType",
     "KeyPairID",
 )
 
 
-# Raw string mirroring the RBAC-managed EntityType.KEYPAIR value. It names what the row
+class KeyPairFieldType(FieldType):
+    @override
+    @classmethod
+    def name(cls) -> str:
+        return "keypair"
 
+    @override
+    @classmethod
+    def description(cls) -> str:
+        return "An access key and secret key pair of a user."
 
-KEYPAIR_FIELD_TYPE = FieldType("keypair")
+    @override
+    @classmethod
+    def owner_type(cls) -> type[EntityType]:
+        return UserEntityType
 
 
 class KeyPairID(FieldIdentifier):
     @override
     @classmethod
     def field_type(cls) -> FieldType:
-        return KEYPAIR_FIELD_TYPE
+        return KeyPairFieldType()

@@ -22,7 +22,8 @@ import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
 from ai.backend.common.contexts.user import with_user
-from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.domain import DomainEntityType, DomainID
+from ai.backend.common.data.entity.project import ProjectEntityType
 from ai.backend.common.data.entity.types import (
     EntityID,
     EntityIdentifier,
@@ -31,6 +32,7 @@ from ai.backend.common.data.entity.types import (
     ScopeRef,
     ScopeType,
 )
+from ai.backend.common.data.entity.vfolder import VFolderEntityType
 from ai.backend.common.data.entity.virtual_entity import VirtualEntityID
 from ai.backend.common.data.permission.types import (
     EntityType as PermEntityType,
@@ -122,7 +124,7 @@ class _StubEntityID(EntityIdentifier):
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return EntityType("vfolder")
+        return VFolderEntityType()
 
 
 class _ProjectCreateScopeAction(BaseScopeAction):
@@ -136,7 +138,7 @@ class _ProjectCreateScopeAction(BaseScopeAction):
     @classmethod
     @override
     def entity_type(cls) -> EntityType:
-        return EntityType("project")
+        return ProjectEntityType()
 
     @override
     def scope_targets(self) -> Sequence[ScopeRef]:
@@ -232,11 +234,11 @@ class _VfolderID(EntityIdentifier):
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return EntityType("vfolder")
+        return VFolderEntityType()
 
 
 def _domain_scope(scope_id: ScopeID) -> ScopeRef:
-    return ScopeRef(scope_type=ScopeType(EntityType("domain")), scope_id=scope_id)
+    return ScopeRef(scope_type=ScopeType(DomainEntityType()), scope_id=scope_id)
 
 
 def _make_user_data(user_id: uuid.UUID, *, is_superadmin: bool) -> UserData:
@@ -292,11 +294,14 @@ async def _seed_user_with_role(
             )
         )
         await db_sess.flush()
+        db_sess.add(VirtualEntityRow(entity_type=EntityType("domain"), entity_id=domain_id))
         db_sess.add(
             RoleRow(
                 id=role_id,
                 name=f"role-{suffix}",
                 description="virtual-entity validator test role",
+                scope_type=EntityType("domain"),
+                scope_id=domain_id,
             )
         )
         await db_sess.flush()

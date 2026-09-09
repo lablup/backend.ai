@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from typing import Any, override
 
-from ai.backend.common.data.entity.agent import AGENT_ENTITY_TYPE
+from ai.backend.common.data.entity.agent import AgentEntityType
 from ai.backend.common.data.entity.types import EntityType
 from ai.backend.common.types import AgentId
 from ai.backend.manager.actions.types import ActionOperationType
@@ -16,7 +16,7 @@ class SyncAgentRegistryAction(BaseGlobalAction):
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return AGENT_ENTITY_TYPE
+        return AgentEntityType()
 
     @override
     @classmethod

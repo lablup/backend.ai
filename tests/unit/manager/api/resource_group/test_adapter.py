@@ -45,7 +45,9 @@ def _get_pagination_spec() -> PaginationSpec:
 def _make_adapter() -> ResourceGroupAdapter:
     """Create a ResourceGroupAdapter with a mock processors."""
     return ResourceGroupAdapter(
-        processors=MagicMock(),
+        resource_group=MagicMock(),
+        rbac=MagicMock(),
+        domain=MagicMock(),
         deployment_coordinator=MagicMock(),
         schedule_coordinator=MagicMock(),
     )

@@ -16,10 +16,9 @@ from dataclasses import dataclass, field
 from typing import ClassVar
 
 import sqlalchemy as sa
-from sqlalchemy.orm import aliased
 
 from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE, ProjectID
-from ai.backend.common.data.entity.role import ROLE_ENTITY_TYPE, RoleID
+from ai.backend.common.data.entity.role import RoleID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.permission.types import Permission
 from ai.backend.common.exception import InvalidAPIParameters
@@ -33,9 +32,7 @@ from ai.backend.manager.models.project import ProjectRow, ProjectType
 from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
 from ai.backend.manager.models.user import UserRow
-from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
 from ai.backend.manager.models.virtual_entity.queries import user_scope_membership_exists
-from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
 from ai.backend.manager.repositories.ops.v2.cap import V2CapOps
 from ai.backend.manager.repositories.ops.v2.write import V2WriteOps
 
@@ -176,18 +173,11 @@ class V2RosterWriteOps(V2WriteOps, V2CapOps):
             )
 
     async def _revoke_project_roles(self, project_id: ProjectID, user_id: UserID) -> None:
-        """Unmap the user from every role enrolled in the project's virtual entity —
-        the reverse of what joining granted, read the same way."""
-        role_node = aliased(VirtualEntityRow, name="role_virtual_entity")
-        project_role_ids = (
-            sa.select(role_node.entity_id)
-            .join(EntityMembershipRow, EntityMembershipRow.member_entity_id == role_node.id)
-            .join(VirtualEntityRow, EntityMembershipRow.virtual_entity_id == VirtualEntityRow.id)
-            .where(
-                VirtualEntityRow.entity_type == PROJECT_SCOPE_TYPE,
-                VirtualEntityRow.entity_id == project_id,
-                role_node.entity_type == ROLE_ENTITY_TYPE,
-            )
+        """Unmap the user from every role of the project — the reverse of what joining
+        granted, read the same way."""
+        project_role_ids = sa.select(RoleRow.id).where(
+            RoleRow.scope_type == PROJECT_SCOPE_TYPE,
+            RoleRow.scope_id == project_id,
         )
         await self._sess.execute(
             sa.delete(UserRoleRow).where(
@@ -213,6 +203,6 @@ class V2RosterWriteOps(V2WriteOps, V2CapOps):
         Taking the roles back is the other half of removal, not the caller's to remember
         (BEP-1076): a role may only be chosen from the project's own, so holding one
         without being on the roster is not a state that arises. What comes back is the
-        roles enrolled in this project that this user holds."""
+        roles of this project that this user holds."""
         await self._disown([project_id], user_id)
         await self._revoke_project_roles(project_id, user_id)

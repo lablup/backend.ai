@@ -8389,6 +8389,393 @@
         "title": "CreateDeploymentRevisionPresetInput",
         "type": "object"
       },
+      "UpdatePresetModelConfigInput": {
+        "description": "Patch for a single preset model entry. Omit a field to keep its current stored value.",
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "model_path": {
+            "anyOf": [
+              {
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model Path"
+          },
+          "service": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UpdatePresetModelServiceConfigInput"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Service"
+          },
+          "metadata": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UpdatePresetModelMetadataInput"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Metadata"
+          }
+        },
+        "title": "UpdatePresetModelConfigInput",
+        "type": "object"
+      },
+      "UpdatePresetModelDefinitionInput": {
+        "description": "Patch for a preset's model definition. Omit `models` to keep the current model entry.",
+        "properties": {
+          "models": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/UpdatePresetModelConfigInput"
+                },
+                "maxItems": 1,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Models"
+          }
+        },
+        "title": "UpdatePresetModelDefinitionInput",
+        "type": "object"
+      },
+      "UpdatePresetModelHealthCheckInput": {
+        "description": "Patch for a preset model's health check. Omit a field to keep its current stored value.",
+        "properties": {
+          "enable": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Enable"
+          },
+          "interval": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Interval"
+          },
+          "path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Path"
+          },
+          "max_retries": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Retries"
+          },
+          "max_wait_time": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Wait Time"
+          },
+          "expected_status_code": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 100,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expected Status Code"
+          },
+          "initial_delay": {
+            "anyOf": [
+              {
+                "minimum": 0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Initial Delay"
+          }
+        },
+        "title": "UpdatePresetModelHealthCheckInput",
+        "type": "object"
+      },
+      "UpdatePresetModelMetadataInput": {
+        "description": "Patch for a preset model's metadata. Omit a field to keep its current stored value.",
+        "properties": {
+          "author": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Author"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Version"
+          },
+          "created": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "task": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Task"
+          },
+          "category": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Category"
+          },
+          "architecture": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Architecture"
+          },
+          "framework": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Framework"
+          },
+          "label": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label"
+          },
+          "license": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "License"
+          },
+          "min_resource": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Min Resource"
+          }
+        },
+        "title": "UpdatePresetModelMetadataInput",
+        "type": "object"
+      },
+      "UpdatePresetModelServiceConfigInput": {
+        "description": "Patch for a preset model's service config. Omit a field to keep its current stored value.",
+        "properties": {
+          "pre_start_actions": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/PreStartAction"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pre Start Actions"
+          },
+          "command": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Command"
+          },
+          "start_command": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Start Command"
+          },
+          "shell": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Shell"
+          },
+          "port": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Port"
+          },
+          "health_check": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UpdatePresetModelHealthCheckInput"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Health Check"
+          }
+        },
+        "title": "UpdatePresetModelServiceConfigInput",
+        "type": "object"
+      },
       "UpdateDeploymentRevisionPresetInput": {
         "properties": {
           "id": {
@@ -8471,7 +8858,7 @@
           "model_definition": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/PresetModelDefinitionInput"
+                "$ref": "#/components/schemas/UpdatePresetModelDefinitionInput"
               },
               {
                 "$ref": "#/components/schemas/Sentinel"
@@ -12089,8 +12476,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Updated canonical name.",
+            "description": "Updated canonical name. Omit to leave unchanged.",
             "title": "Name"
           },
           "registry": {
@@ -12102,8 +12488,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Updated registry hostname.",
+            "description": "Updated registry hostname. Omit to leave unchanged.",
             "title": "Registry"
           },
           "image": {
@@ -12115,8 +12500,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Updated namespace/path within registry.",
+            "description": "Updated namespace/path within registry. Omit to leave unchanged.",
             "title": "Image"
           },
           "tag": {
@@ -12128,8 +12512,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Updated image tag.",
+            "description": "Updated image tag. Omit to leave unchanged.",
             "title": "Tag"
           },
           "architecture": {
@@ -12141,8 +12524,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Updated CPU architecture.",
+            "description": "Updated CPU architecture. Omit to leave unchanged.",
             "title": "Architecture"
           },
           "is_local": {
@@ -12154,8 +12536,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Updated local-only status.",
+            "description": "Updated local-only status. Omit to leave unchanged.",
             "title": "Is Local"
           },
           "size_bytes": {
@@ -12167,8 +12548,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Updated image size in bytes.",
+            "description": "Updated image size in bytes. Omit to leave unchanged.",
             "title": "Size Bytes"
           },
           "type": {
@@ -12180,8 +12560,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Updated image type (compute, system, service).",
+            "description": "Updated image type (compute, system, service). Omit to leave unchanged.",
             "title": "Type"
           },
           "config_digest": {
@@ -12193,8 +12572,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Updated config digest.",
+            "description": "Updated config digest. Omit to leave unchanged.",
             "title": "Config Digest"
           },
           "labels": {
@@ -12209,8 +12587,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Updated labels dict.",
+            "description": "Updated labels dict. Omit to leave unchanged.",
             "title": "Labels"
           },
           "supported_accelerators": {
@@ -12235,8 +12612,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Updated resource limits dict.",
+            "description": "Updated resource limits dict. Omit to leave unchanged.",
             "title": "Resource Limits"
           }
         },
@@ -14578,7 +14954,6 @@
                 "type": "null"
               }
             ],
-            "default": null,
             "description": "Updated channel name",
             "title": "Name"
           },
@@ -14588,14 +14963,10 @@
                 "type": "string"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
-            "description": "Updated channel description. Use SENTINEL to clear.",
+            "description": "Updated channel description. Omit to leave unchanged; null clears.",
             "title": "Description"
           },
           "spec": {
@@ -14607,8 +14978,8 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Updated channel specification"
+            "description": "Updated channel specification",
+            "title": "Spec"
           },
           "enabled": {
             "anyOf": [
@@ -14619,7 +14990,6 @@
                 "type": "null"
               }
             ],
-            "default": null,
             "description": "Updated enabled status",
             "title": "Enabled"
           }
@@ -14989,7 +15359,6 @@
                 "type": "null"
               }
             ],
-            "default": null,
             "description": "Updated rule name",
             "title": "Name"
           },
@@ -14999,14 +15368,10 @@
                 "type": "string"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
-            "description": "Updated rule description. Use SENTINEL to clear.",
+            "description": "Updated rule description. Omit to leave unchanged; null clears.",
             "title": "Description"
           },
           "message_template": {
@@ -15019,7 +15384,6 @@
                 "type": "null"
               }
             ],
-            "default": null,
             "description": "Updated message template (max 64KB)",
             "title": "Message Template"
           },
@@ -15032,7 +15396,6 @@
                 "type": "null"
               }
             ],
-            "default": null,
             "description": "Updated enabled status",
             "title": "Enabled"
           }
@@ -18601,15 +18964,6 @@
         "title": "DeleteCategoryInput",
         "type": "object"
       },
-      "RoleSource": {
-        "description": "Definition source of the role.",
-        "enum": [
-          "system",
-          "custom"
-        ],
-        "title": "RoleSource",
-        "type": "string"
-      },
       "ScopeInputDTO": {
         "description": "Scope reference for associating an entity with a scope.",
         "properties": {
@@ -18651,16 +19005,23 @@
             "description": "Role description",
             "title": "Description"
           },
-          "source": {
-            "$ref": "#/components/schemas/RoleSource",
-            "default": "custom",
-            "description": "Role source"
-          },
           "auto_assign": {
             "default": false,
             "description": "When true, the role is automatically granted to a user when the user is added to a scope this role is registered in.",
             "title": "Auto Assign",
             "type": "boolean"
+          },
+          "scope": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ScopeInputDTO"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The scope the role belongs to"
           },
           "scopes": {
             "anyOf": [
@@ -18675,7 +19036,7 @@
               }
             ],
             "default": null,
-            "description": "Scopes to register the role in",
+            "description": "Deprecated: use `scope`. Accepts exactly one entry.",
             "title": "Scopes"
           }
         },
@@ -18702,7 +19063,7 @@
           "scope_id": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/StringFilter"
+                "$ref": "#/components/schemas/UUIDFilter"
               },
               {
                 "type": "null"
@@ -34590,15 +34951,28 @@
             "title": "Name",
             "type": "string"
           },
-          "source": {
-            "$ref": "#/components/schemas/RoleSource",
-            "default": "custom",
-            "description": "Role source"
+          "scope_type": {
+            "description": "Type of the scope the role belongs to",
+            "title": "Scope Type",
+            "type": "string"
+          },
+          "scope_id": {
+            "description": "ID of the scope the role belongs to",
+            "format": "uuid",
+            "title": "Scope Id",
+            "type": "string"
           },
           "status": {
-            "$ref": "#/components/schemas/RoleStatus",
-            "default": "active",
-            "description": "Role status"
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RoleStatus"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Role status; active if omitted"
           },
           "description": {
             "anyOf": [
@@ -34615,7 +34989,9 @@
           }
         },
         "required": [
-          "name"
+          "name",
+          "scope_type",
+          "scope_id"
         ],
         "title": "CreateRoleRequest",
         "type": "object"
@@ -34647,6 +35023,15 @@
           "updated_at"
         ],
         "title": "RoleOrderField",
+        "type": "string"
+      },
+      "RoleSource": {
+        "description": "Definition source of the role.",
+        "enum": [
+          "system",
+          "custom"
+        ],
+        "title": "RoleSource",
         "type": "string"
       },
       "SearchRolesRequest": {
