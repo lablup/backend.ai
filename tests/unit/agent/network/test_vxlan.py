@@ -3,6 +3,7 @@ import contextlib
 import inspect
 import logging
 import re
+import tempfile
 from collections.abc import Awaitable, Callable, Collection, Sequence
 from dataclasses import replace
 from pathlib import Path
@@ -341,10 +342,18 @@ def _our_sas(src: str, dst: str) -> str:
     )
 
 
+def _isolated_local_subnets() -> LocalSubnetAllocator:
+    """A store of this test's own. The allocator used to be resolvable without an owner, which
+    made the process-wide one under /var/lib the convenient default in tests -- and hid that a
+    backend could build an unowned allocator at all."""
+    return LocalSubnetAllocator(Path(tempfile.mkdtemp(prefix="bai-test-subnet-")), owner="i-test")
+
+
 def _plugin(
     recorder: Recorder,
     *,
     uplink: str = "eth0",
+    local_subnets: LocalSubnetAllocator | None = None,
     pair_journal: PairJournal | None = None,
     journal_owner: str | None = None,
     underlay: int | None = 1500,
@@ -358,6 +367,7 @@ def _plugin(
         {},
         uplink=uplink,
         runner=recorder,
+        local_subnets=local_subnets or _isolated_local_subnets(),
         reader=reader or _Listing(),
         pair_journal=pair_journal,
         journal_owner=journal_owner,
@@ -596,7 +606,7 @@ class TestSetupTeardown:
             {},
             {},
             runner=rec,
-            local_subnets=LocalSubnetAllocator(),
+            local_subnets=_isolated_local_subnets(),
             mtu_probe=_mtu_probe(1500),
             vxlan_lister=list_vxlans,
             key_generation=lambda: _TEST_GENERATION,
@@ -1606,7 +1616,7 @@ class TestLocalSubnetAllocation:
             {},
             {},
             runner=Recorder(),
-            local_subnets=LocalSubnetAllocator(local_subnet_state_dir),
+            local_subnets=LocalSubnetAllocator(local_subnet_state_dir, owner="i-test"),
             mtu_probe=_mtu_probe(1500),
             reach_probe=_ReachRecorder(True),
         )
