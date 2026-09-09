@@ -1,8 +1,9 @@
 """Running one typed scenario against an adapter the fixtures already built.
 
-The runner knows nothing about which component it is running: it lays the rows the
-situation names, makes the call as the actor, and checks the answer. How the adapter
-was assembled is the component's own fixture.
+The runner knows nothing about which component it is running. It lays the rows the
+scenario named — the actor among them — makes the call as that actor, and checks the
+answer. Every row is written in one session, and a row several others rest on is
+written once.
 """
 
 from __future__ import annotations
@@ -10,21 +11,37 @@ from __future__ import annotations
 from collections.abc import Sequence
 from typing import Any
 
+from bai_scenario.seeds.seeder import Given, lay, steps_of
+
 from ai.backend.common.contexts.user import with_user
+from ai.backend.common.data.user.types import UserData, UserRole
+from ai.backend.manager.data.domain.types import UserInfo
+from ai.backend.manager.data.user.types import UserData as SeededUser
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.ops.repository import OpsRepository
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
-from ai.backend.testutils.scenario import Persona
-from ai.backend.testutils.typed_scenario import (
-    Seed,
-    TypedMatcher,
-    TypedScenario,
-    mismatches_of,
-)
-from bai_scenario.infra.monitors import ActionRecorder
-from bai_scenario.infra.personas import SUPERADMIN, user_data, user_info
-from bai_scenario.infra.world import World
-from bai_scenario.seeds.seeding import SeedRoom
+from ai.backend.testutils.typed_scenario import TypedMatcher, TypedScenario, mismatches_of
+
+
+class NoActor(Exception):
+    """The scenario made a call that needs a caller and named no actor."""
+
+
+def _context_of(user: SeededUser) -> UserData:
+    """What ``with_user`` needs: the request-context view of the user the row laid."""
+    return UserData(
+        user_id=user.id,
+        is_authorized=True,
+        is_admin=user.role in (UserRole.ADMIN, UserRole.SUPERADMIN),
+        is_superadmin=user.role == UserRole.SUPERADMIN,
+        role=user.role,
+        domain_name=user.domain_name,
+        domain_id=user.domain_id,
+    )
+
+
+def _info_of(user: SeededUser) -> UserInfo:
+    """What an adapter method taking the caller beside the DTO wants."""
+    return UserInfo(id=user.id, role=user.role, domain_name=user.domain_name)
 
 
 class ScenarioRunner:
@@ -34,49 +51,31 @@ class ScenarioRunner:
         self,
         adapter: Any,
         engine: ExtendedAsyncSAEngine,
-        world: World,
-        recorder: ActionRecorder,
         fakes: Sequence[object] = (),
-        default_actor: Persona = SUPERADMIN,
     ) -> None:
         self._adapter = adapter
         self._engine = engine
-        self._world = world
-        self._recorder = recorder
         self._fakes = fakes
-        self._default_actor = default_actor
 
-    def _room(self) -> SeedRoom:
-        ops: OpsRepository[Any] = OpsRepository(V2DBOpsProvider(self._engine))
-        return SeedRoom(engine=self._engine, world=self._world, ops=ops)
-
-    async def _hand_over(self, scenario: TypedScenario[Any, Any], actor: Persona) -> None:
-        """Give the actor what the scenario says they hold, before any row is laid."""
-        room = self._room()
-        for item in scenario.holding:
-            await item.apply(room, item.holder or actor)
-
-    async def _sow(
-        self, scenario: TypedScenario[Any, Any], actor: Persona
-    ) -> dict[Seed[Any, Any], Any]:
-        room = self._room()
-        sown: dict[Seed[Any, Any], Any] = {}
-        for seed in scenario.given.rows():
-            owner = seed.owner or actor
-            with with_user(user_data(self._world, owner)):
-                sown[seed] = await seed.make(room)
-        return sown
+    async def _lay(self, scenario: TypedScenario[Any, Any]) -> dict[Given[Any], Any]:
+        wanted = [row for row in scenario.given.rows if isinstance(row, Given)]
+        if isinstance(scenario.actor, Given):
+            wanted.append(scenario.actor)
+        async with V2DBOpsProvider(self._engine).write_ops() as ops:
+            return await lay(ops, wanted)
 
     async def __call__(self, scenario: TypedScenario[Any, Any]) -> None:
-        actor = scenario.actor or self._default_actor
-        await self._hand_over(scenario, actor)
-        sown = await self._sow(scenario, actor)
-        with with_user(user_data(self._world, actor)):
-            try:
-                answered = await scenario.invoke(self._adapter, sown, user_info(self._world, actor))
-            except Exception as raised:
-                self._check_raised(scenario, raised)
-                return
+        made = await self._lay(scenario)
+        actor = made.get(scenario.actor) if isinstance(scenario.actor, Given) else None
+        try:
+            if actor is None:
+                answered = await scenario.invoke(self._adapter, made, None)
+            else:
+                with with_user(_context_of(actor)):
+                    answered = await scenario.invoke(self._adapter, made, _info_of(actor))
+        except Exception as raised:
+            self._check_raised(scenario, raised)
+            return
         self._check_answered(scenario, answered)
 
     def _check_raised(self, scenario: TypedScenario[Any, Any], raised: Exception) -> None:
@@ -101,6 +100,14 @@ class ScenarioRunner:
         problems = mismatches_of(expected, answered, self._fakes)
         if problems:
             raise AssertionError(f"[{scenario.summary}] " + "; ".join(problems))
+
+
+def scenario_steps(scenario: TypedScenario[Any, Any]) -> list[str]:
+    """What laying this scenario's rows does, in order, for the report."""
+    wanted = [row for row in scenario.given.rows if isinstance(row, Given)]
+    if isinstance(scenario.actor, Given):
+        wanted.append(scenario.actor)
+    return steps_of(wanted)
 
 
 def typed_matcher_problems(matcher: TypedMatcher[Any], answered: Any) -> list[str]:

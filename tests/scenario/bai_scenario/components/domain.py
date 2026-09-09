@@ -1,35 +1,33 @@
 """What a domain scenario table says besides the call.
 
-How the adapter is built lives in the tables' own conftest. This holds the words the
-rows use: the rows they lay down, and the situations worth naming more than once.
+How the adapter is built lives in the tables' own conftest, and the rows a scenario
+lays come from ``seeds``. This holds what is left: the type a domain table is written
+against, and the situations worth naming more than once.
 """
 
 from __future__ import annotations
 
-from collections.abc import Callable, Sequence
+from collections.abc import Callable
 from datetime import datetime, timedelta
-from typing import Any, override
 
+from bai_scenario.seeds.rbac.role import seed_permission, seed_role
+from bai_scenario.seeds.resource_policy.user import seed_user_policy
+from bai_scenario.seeds.seeder import Given, Seeder
+from bai_scenario.seeds.user.user import seed_user
+
+from ai.backend.common.data.entity.domain import DomainEntityType
+from ai.backend.common.data.entity.user import UserID
+from ai.backend.common.data.user.types import UserRole
 from ai.backend.manager.api.adapters.domain.adapter import DomainAdapter
 from ai.backend.manager.config.unified import ManagerUnifiedConfig
 from ai.backend.manager.data.domain.types import DomainData
-from ai.backend.manager.models.domain.creators import DomainCreator
+from ai.backend.manager.data.permission.types import Permission
+from ai.backend.manager.data.user.types import UserData
 from ai.backend.testutils.typed_scenario import (
-    Arrangement,
-    Held,
     Situation,
     TypedScenario,
     config_of,
     recent,
-    situation,
-)
-from bai_scenario.seeds.seeding import (
-    DOMAIN_ADMIN_PRESET,
-    Grown,
-    SeedRoom,
-    creates,
-    holds,
-    on_the_domain,
 )
 
 type DomainScenario = TypedScenario[DomainAdapter, ManagerUnifiedConfig]
@@ -37,107 +35,37 @@ type DomainScenario = TypedScenario[DomainAdapter, ManagerUnifiedConfig]
 MANAGER_CONFIG = config_of(ManagerUnifiedConfig)
 
 
-def a_domain(named: str = "already-here") -> Grown[DomainData]:
-    """A domain sitting in the database before the request arrives."""
-    return creates(DomainCreator(name=named, description=description_of(named)))
+def seed_someone_of(
+    seed: Seeder, domain: Given[DomainData], *, role: UserRole = UserRole.USER
+) -> Given[UserData]:
+    """A user of that domain, held to a policy of their own and granted nothing."""
+    policy = seed.creating(seed_user_policy())
+    return seed.creating(seed_user(role=role), domain, policy)
 
 
-def description_of(name: str) -> str | None:
-    """What ``a_domain`` writes, so a table checking it cannot drift."""
-    return f"{name} was already here"
+def seed_someone_reading_domains(
+    seed: Seeder, domain: Given[DomainData]
+) -> tuple[Given[UserData], Given[None]]:
+    """A user, and the grant that lets them read domains in that domain's scope.
+
+    The two are answered apart so a row lays the grant by naming it, and the row
+    beside it that wants the same user without it simply does not.
+    """
+    someone = seed_someone_of(seed, domain)
+    role = seed.creating(seed_role(lambda d: d.id, name_hint="domain-reader"), domain)
+    seed.adding(seed_permission(entity_type=DomainEntityType(), permission=Permission.READ), role)
+    grant = seed.granting(role, someone, role_id=lambda r: r.id, user_id=lambda u: UserID(u.id))
+    return someone, grant
 
 
-def the_domain_admin_role() -> Held[SeedRoom]:
-    """The domain's admin role. Holding it is what makes the refusals say something:
-    the actor holds it and is still turned away, because that preset covers users
-    rather than the domain entity."""
-    return holds(DOMAIN_ADMIN_PRESET, on_the_domain())
-
-
-def enforcement_off(setup: Arrangement[SeedRoom] | None = None) -> Situation[ManagerUnifiedConfig]:
-    """The same set-up, in an install that does not enforce entity permissions."""
-    return situation(
-        setup=setup,
-        config=[MANAGER_CONFIG.set(lambda c: c.manager.rbac.enforcement_enabled, False)],
+def enforcement_off(seed: Seeder) -> Situation[ManagerUnifiedConfig]:
+    """What this scenario laid, in an install that does not enforce entity
+    permissions."""
+    return seed.situation(
+        config=[MANAGER_CONFIG.set(lambda c: c.manager.rbac.enforcement_enabled, False)]
     )
 
 
 def within_the_run() -> Callable[[datetime], bool]:
     """A timestamp the run itself wrote."""
     return recent(timedelta(minutes=5))
-
-
-# ---------------------------------------------------------------------------
-# The set-ups a domain table shares. Each names what is in the database, and holds
-# each row so a call reads it off the row rather than repeating a literal.
-# ---------------------------------------------------------------------------
-
-
-class ADomainIsThere(Arrangement[SeedRoom]):
-    """One domain, already written when the request arrives.
-
-    The values it was written with are held here too, so a row checking one reads it
-    off the set-up rather than repeating a literal the seed also carries.
-    """
-
-    domain: Grown[DomainData]
-    name: str
-    description: str | None
-
-    def __init__(self, named: str = "already-here") -> None:
-        self.name = named
-        self.description = description_of(named)
-        self.domain = a_domain(named)
-
-    @override
-    def rows(self) -> Sequence[Grown[Any]]:
-        return [self.domain]
-
-
-class TheNameIsTaken(Arrangement[SeedRoom]):
-    """A domain holding the name a creation is about to ask for."""
-
-    domain: Grown[DomainData]
-    name: str
-
-    def __init__(self, name: str) -> None:
-        self.name = name
-        self.domain = a_domain(name)
-
-    @override
-    def rows(self) -> Sequence[Grown[Any]]:
-        return [self.domain]
-
-
-class TwoDomainsAreThere(Arrangement[SeedRoom]):
-    """Two domains a filter has to tell apart."""
-
-    first: Grown[DomainData]
-    second: Grown[DomainData]
-    first_name: str
-    second_name: str
-
-    def __init__(self, first: str, second: str) -> None:
-        self.first_name = first
-        self.second_name = second
-        self.first = a_domain(first)
-        self.second = a_domain(second)
-
-    @override
-    def rows(self) -> Sequence[Grown[Any]]:
-        return [self.first, self.second]
-
-
-class SomeDomainsAreThere(Arrangement[SeedRoom]):
-    """A counted set of domains, so a table saying how many says it once."""
-
-    domains: Sequence[Grown[DomainData]]
-    count: int
-
-    def __init__(self, count: int) -> None:
-        self.count = count
-        self.domains = [a_domain(f"already-{i}") for i in range(count)]
-
-    @override
-    def rows(self) -> Sequence[Grown[Any]]:
-        return list(self.domains)

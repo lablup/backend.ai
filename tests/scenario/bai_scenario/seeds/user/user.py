@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from bai_scenario.seeds.seeder import SpecFromTwo
+
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.domain.types import DomainData
@@ -9,7 +11,6 @@ from ai.backend.manager.data.resource.types import UserResourcePolicyData
 from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.user.creators import UserCreator
-from bai_scenario.seeds.seeder import SpecFromTwo
 
 PASSWORD = "scenario-password"
 

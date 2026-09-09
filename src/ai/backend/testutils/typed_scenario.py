@@ -30,17 +30,12 @@ __all__ = (
     "TypedMatcher",
     "TypedScenario",
     "Situation",
-    "Arrangement",
     "Sown",
-    "Held",
     "situation",
-    "held",
     "Answer",
     "FakeOf",
     "Deferred",
-    "Seed",
     "ActorBound",
-    "after",
     "Checked",
     "Exactly",
     "Ignored",
@@ -339,42 +334,24 @@ def fake_of[F](cls: type[F]) -> FakeOf[F]:
     return FakeOf(cls)
 
 
-type Sown = Mapping["Seed[Any, Any]", Any]
+type Sown = Mapping[Any, Any]
 """What the seeds made, reached by holding the seed itself."""
 
 
-class Arrangement[S](ABC):
-    """A set-up that scenarios share: what is in the database before the call.
-
-    Subclasses hold their rows as attributes, so a scenario reaches one by attribute
-    and the report names the arrangement instead of listing anonymous rows. One
-    instance is reusable across a whole table: a seed is a recipe, and each run lays it
-    into its own database.
-    """
-
-    @abstractmethod
-    def rows(self) -> Sequence[Seed[S, Any]]:
-        """Every row this arrangement lays down, in the order it lays them."""
-        raise NotImplementedError
 
 
 @dataclass(frozen=True)
 class Situation[C]:
-    """What is already true when the call is made, on three axes: the arrangement in
-    the database, what the config says, and what the outside answers. Each is named in
-    the type of the thing being set, never as text.
+    """What is already true when the call is made, on three axes: the rows in the
+    database, what the config says, and what the outside answers.
+
+    A row is a handle the component's own seeder made. Nothing here knows what writing
+    one involves; the runner hands them back to that seeder.
     """
 
-    setup: Arrangement[Any] | None = None
+    rows: Sequence[object] = ()
     config: Sequence[Override[C, Any]] = ()
     answers: Sequence[Answer[Any]] = ()
-
-    def rows(self) -> Sequence[Seed[Any, Any]]:
-        return self.setup.rows() if self.setup is not None else ()
-
-    def arrangement(self) -> str:
-        """What the set-up is called, for the report."""
-        return type(self.setup).__name__ if self.setup is not None else ""
 
     def dotted_config(self) -> dict[str, Any]:
         return {o.dotted(): o.value for o in self.config}
@@ -382,11 +359,11 @@ class Situation[C]:
 
 def situation[C](
     *,
-    setup: Arrangement[Any] | None = None,
+    rows: Sequence[object] = (),
     config: Sequence[Override[C, Any]] = (),
     answers: Sequence[Answer[Any]] = (),
 ) -> Situation[C]:
-    return Situation(setup, tuple(config), tuple(answers))
+    return Situation(tuple(rows), tuple(config), tuple(answers))
 
 
 @dataclass(frozen=True)
@@ -414,49 +391,10 @@ def on_fake[T, F](fake: type[F], matcher: TypedMatcher[F]) -> OnFake[T, F]:
 # ---------------------------------------------------------------------------
 
 
-@dataclass(frozen=True, eq=False)
-class Seed[S, D]:
-    """One row to lay down before the call.
-
-    Compared by identity: a later part reaches the row this seed made by holding the
-    seed itself, so nothing is ever looked up by a name.
-
-    ``S`` is whatever writes rows for the component under test, and ``D`` the data the
-    write answers. Neither is named here: what a row is made with belongs to the
-    component, and this only has to carry the two types so a later part reads the
-    created row without saying what it is again.
-    """
-
-    make: Callable[[S], Awaitable[D]]
-    label: str
-    owner: Persona | None = None
-
-    def by(self, owner: Persona) -> Seed[S, D]:
-        """The same row, written as somebody else."""
-        return Seed(self.make, self.label, owner)
 
 
-@dataclass(frozen=True)
-class Held[S]:
-    """Something the actor holds before the call.
-
-    Not a row the request acts on: a fact about who is asking, which is why it sits
-    beside ``actor`` rather than among the rows. It reaches the same writer the rows
-    do, and the persona it applies to is the scenario's actor unless ``by`` names
-    another.
-    """
-
-    apply: Callable[[S, Persona], Awaitable[None]]
-    label: str
-    holder: Persona | None = None
-
-    def by(self, holder: Persona) -> Held[S]:
-        """The same thing, held by somebody else."""
-        return Held(self.apply, self.label, holder)
 
 
-def held[S](apply: Callable[[S, Persona], Awaitable[None]], label: str) -> Held[S]:
-    return Held(apply, label)
 
 
 @dataclass(frozen=True)
@@ -491,20 +429,10 @@ class Deferred[A, R]:
     and the caller is one of these too.
     """
 
-    seed: Seed[Any, Any]
+    row: object
     build: Callable[[Any], Invocation[A, R] | ActorBound[A, R, Any]]
 
 
-def after[S, D, A, R](
-    seed: Seed[S, D],
-    build: Callable[[D], Invocation[A, R] | ActorBound[A, R, Any]],
-) -> Deferred[A, R]:
-    """Read the row the seed made, then say what to call with it.
-
-    ``build`` receives the created data, typed, so an id the database generated is
-    reachable without a placeholder or a lookup by name.
-    """
-    return Deferred(seed, build)
 
 
 # ---------------------------------------------------------------------------
@@ -671,18 +599,21 @@ def exactly[T](expected: T, where: Sequence[Taken[T]] = ()) -> Exactly[T]:
 class TypedScenario[A, C]:
     """A scenario over adapter ``A`` and config ``C``.
 
-    Five parts, each named in the type of what it sets: who asks, what that actor
-    holds, the situation the call is made in, the call, and what it must answer. The
-    result type is checked where the row is written and dropped afterwards, so a table
-    of rows returning different payloads is still one list.
+    Five parts: what it is called, what it guarantees, who asks, the situation the
+    call is made in, and what the call must answer. The result type is checked where
+    the row is written and dropped afterwards, so a table of rows returning different
+    payloads is still one list.
+
+    The actor is a row like any other: the user the scenario laid down, with whatever
+    that user was given. Nothing about them is inherited from a shared background.
     """
 
     summary: str
+    description: str
     invoke: Callable[[A, Sown, Any], Awaitable[Any]]
     then: TypedMatcher[Any] | type[BaseException] | None = None
-    actor: Persona | None = None
+    actor: object | None = None
     operation: str = ""
-    holding: tuple[Held[Any], ...] = ()
     given: Situation[C] = field(default_factory=Situation)
 
     def describe(self) -> dict[str, Any]:
@@ -694,12 +625,9 @@ class TypedScenario[A, C]:
         )
         return {
             "summary": self.summary,
+            "description": self.description,
             "operation": self.operation,
-            "actor": str(self.actor) if self.actor else "",
             "expects": expects,
-            "holding": [item.label for item in self.holding],
-            "setup": self.given.arrangement(),
-            "rows": [seed.label for seed in self.given.rows()],
             "situation": sorted(self.given.dotted_config()),
         }
 
@@ -708,19 +636,19 @@ class TypedScenario[A, C]:
         cls,
         summary: str,
         *,
+        description: str,
         when: Invocation[A, R] | Deferred[A, R] | ActorBound[A, R, Any],
         then: TypedMatcher[R] | None = None,
-        actor: Persona | None = None,
-        holding: Sequence[Held[Any]] = (),
+        actor: object | None = None,
         given: Situation[C] | None = None,
     ) -> TypedScenario[A, C]:
         return cls(
             summary,
+            _described(description),
             _invoker(when),
             then,
             actor,
             _operation_of(when),
-            tuple(holding),
             given or Situation(),
         )
 
@@ -729,21 +657,28 @@ class TypedScenario[A, C]:
         cls,
         summary: str,
         *,
+        description: str,
         when: Invocation[A, R] | Deferred[A, R] | ActorBound[A, R, Any],
         then: type[BaseException],
-        actor: Persona | None = None,
-        holding: Sequence[Held[Any]] = (),
+        actor: object | None = None,
         given: Situation[C] | None = None,
     ) -> TypedScenario[A, C]:
         return cls(
             summary,
+            _described(description),
             _invoker(when),
             then,
             actor,
             _operation_of(when),
-            tuple(holding),
             given or Situation(),
         )
+
+
+def _described(description: str) -> str:
+    """A row says what it guarantees, in a sentence a reviewer can hold against it."""
+    if not description.strip():
+        raise ValueError("a scenario must say what it guarantees")
+    return description
 
 
 def _invoker[A, R](
@@ -755,12 +690,12 @@ def _invoker[A, R](
         deferred = when
 
         def run_deferred(adapter: A, sown: Sown, actor: Any) -> Awaitable[R]:
-            if deferred.seed not in sown:
+            if deferred.row not in sown:
                 raise LookupError(
-                    f"the call reads the row {deferred.seed.label!r}, "
+                    f"the call reads the row {deferred.row!r}, "
                     "which this scenario's set-up does not lay down"
                 )
-            built = deferred.build(sown[deferred.seed])
+            built = deferred.build(sown[deferred.row])
             if isinstance(built, ActorBound):
                 return built.build(actor).call(adapter)
             return built.call(adapter)
@@ -809,7 +744,7 @@ def _operation_of(when: object) -> str:
     if isinstance(when, Invocation):
         return when.label
     if isinstance(when, Deferred):
-        return f"{when.seed.label} then a call"
+        return "a call reading a row it laid"
     if isinstance(when, ActorBound):
         return when.label or "a call needing the actor"
     return ""

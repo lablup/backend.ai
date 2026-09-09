@@ -9,6 +9,8 @@ from __future__ import annotations
 from typing import Any
 
 import sqlalchemy as sa
+from bai_scenario.infra.db import TemplateDatabase
+from bai_scenario.infra.personas import ALL_PERSONAS, DOMAIN_ADMIN, MEMBER, OTHER_MEMBER, SUPERADMIN
 
 from ai.backend.common.data.entity.project import ProjectEntityType
 from ai.backend.manager.models.domain.row import DomainRow
@@ -18,8 +20,6 @@ from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
 from ai.backend.manager.models.user.row import UserRow
 from ai.backend.manager.models.virtual_entity.queries import user_scope_membership_query
 from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
-from bai_scenario.infra.db import TemplateDatabase
-from bai_scenario.infra.personas import ALL_PERSONAS, DOMAIN_ADMIN, MEMBER, OTHER_MEMBER, SUPERADMIN
 
 # --- World seed --------------------------------------------------------------------------
 

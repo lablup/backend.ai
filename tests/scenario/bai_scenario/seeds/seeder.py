@@ -31,6 +31,15 @@ from ai.backend.manager.models.specs.creator import (
 )
 from ai.backend.manager.models.specs.updater import GuardedDataUpdater
 from ai.backend.manager.repositories.ops.v2.write import V2WriteOps
+from ai.backend.testutils.typed_scenario import (
+    ActorBound,
+    Answer,
+    Deferred,
+    Invocation,
+    Override,
+    Situation,
+    situation,
+)
 
 type WriteSpec[D] = (
     GlobalEntityCreator[Any, D]
@@ -121,6 +130,23 @@ class Seeder:
     """
 
     _counts: dict[str, int] = field(default_factory=dict)
+    _laid: list[Given[Any]] = field(default_factory=list)
+
+    def situation[C](
+        self,
+        *,
+        config: Sequence[Override[C, Any]] = (),
+        answers: Sequence[Answer[Any]] = (),
+    ) -> Situation[C]:
+        """Every row this scenario asked for, in the order it asked.
+
+        The scenario does not list its rows again: what it made is what it lays.
+        """
+        return situation(rows=tuple(self._laid), config=config, answers=answers)
+
+    def _remember[D](self, row: Given[D]) -> Given[D]:
+        self._laid.append(row)
+        return row
 
     def name(self, hint: str) -> str:
         """``hint-1``, ``hint-2``, ... within this scenario."""
@@ -151,7 +177,7 @@ class Seeder:
         async def write(ops: V2WriteOps, values: Sequence[Any]) -> Any:
             return await _write(ops, build(name, *values))
 
-        return Given(describe=name, sources=tuple(sources), write=write)
+        return self._remember(Given(describe=name, sources=tuple(sources), write=write))
 
     def adding[A, D: FieldData](self, spec: FieldOf[A, D], owner: Given[A], /) -> Given[D]:
         """Lay one field row under the owner the scenario already laid."""
@@ -174,10 +200,12 @@ class Seeder:
         async def write(ops: V2WriteOps, values: Sequence[Any]) -> None:
             await ops.grant_roles(user_id(values[1]), [role_id(values[0])])
 
-        return Given(
-            describe=f"{to.describe} holds {role.describe}",
-            sources=(role, to),
-            write=write,
+        return self._remember(
+            Given(
+                describe=f"{to.describe} holds {role.describe}",
+                sources=(role, to),
+                write=write,
+            )
         )
 
 
@@ -211,3 +239,15 @@ def steps_of(wanted: Sequence[Given[Any]]) -> list[str]:
     for row in wanted:
         walk(row)
     return [row.describe for row in seen]
+
+
+def after[D, A, R](
+    row: Given[D],
+    build: Callable[[D], Invocation[A, R] | ActorBound[A, R, Any]],
+) -> Deferred[A, R]:
+    """Read the row this scenario laid, then say what to call with it.
+
+    ``build`` receives the created data, typed, so an id the database generated is
+    reachable without a placeholder or a literal repeated from the seed.
+    """
+    return Deferred(row, build)

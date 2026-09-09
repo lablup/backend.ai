@@ -9,6 +9,8 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
+from bai_scenario.seeds.seeder import FieldOf, SpecFrom
+
 from ai.backend.common.data.entity.role import RoleID
 from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
 from ai.backend.manager.data.permission.permission import PermissionData
@@ -16,7 +18,6 @@ from ai.backend.manager.data.permission.role import RoleData
 from ai.backend.manager.data.permission.types import Permission
 from ai.backend.manager.models.rbac_models.permission.creators import RolePermissionCreator
 from ai.backend.manager.models.rbac_models.role.creators import RoleCreator
-from bai_scenario.seeds.seeder import FieldOf, SpecFrom
 
 
 def seed_role[S](

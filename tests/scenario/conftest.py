@@ -137,21 +137,9 @@ def monitors(recorder: ActionRecorder) -> ActionMonitors:
 
 
 @pytest.fixture
-def run(
-    adapter: Any,
-    engine: Any,
-    world_template: TemplateDatabase,
-    recorder: ActionRecorder,
-    fakes: Sequence[object],
-) -> ScenarioRunner:
+def run(adapter: Any, engine: Any, fakes: Sequence[object]) -> ScenarioRunner:
     """The runner for the adapter the component's own conftest built."""
-    return ScenarioRunner(
-        adapter=adapter,
-        engine=engine,
-        world=world_template.world,
-        recorder=recorder,
-        fakes=fakes,
-    )
+    return ScenarioRunner(adapter=adapter, engine=engine, fakes=fakes)
 
 
 @pytest.fixture

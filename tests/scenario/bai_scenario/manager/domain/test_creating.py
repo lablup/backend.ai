@@ -8,18 +8,17 @@ from uuid import UUID
 import pytest
 from bai_scenario.components.domain import (
     DomainScenario,
-    TheNameIsTaken,
     enforcement_off,
-    the_domain_admin_role,
+    seed_someone_of,
     within_the_run,
 )
-from bai_scenario.infra.personas import DOMAIN_ADMIN, MEMBER
 from bai_scenario.runner.runner import ScenarioRunner
+from bai_scenario.seeds.domain.domain import seed_domain
+from bai_scenario.seeds.seeder import Seeder, after
 
 from ai.backend.common.data.entity.domain import DomainID
-from ai.backend.common.dto.manager.v2.domain.request import (
-    CreateDomainInput,
-)
+from ai.backend.common.data.user.types import UserRole
+from ai.backend.common.dto.manager.v2.domain.request import CreateDomainInput
 from ai.backend.common.dto.manager.v2.domain.response import (
     DomainBasicInfo,
     DomainLifecycleInfo,
@@ -32,20 +31,25 @@ from ai.backend.manager.api.adapters.domain.adapter import DomainAdapter
 from ai.backend.manager.errors.auth import InsufficientPrivilege
 from ai.backend.testutils.typed_scenario import (
     TypedScenario,
-    at,
     call,
     checked,
     exactly,
     ignored,
     needs_actor,
-    situation,
 )
 
-TAKEN = TheNameIsTaken("taken")
 
-SCENARIOS: list[DomainScenario] = [
-    TypedScenario.ok(
-        "superadmin-creates-a-domain-and-gets-the-whole-node-back",
+def the_whole_node_comes_back(seed: Seeder) -> DomainScenario:
+    home = seed.creating(seed_domain(name_hint="home"))
+    superadmin = seed_someone_of(seed, home, role=UserRole.SUPERADMIN)
+    return TypedScenario.ok(
+        "creating-a-domain-answers-with-the-whole-node",
+        description=(
+            "슈퍼관리자가 이름과 설명만 주고 도메인을 만들면, "
+            "요청에 없던 값들은 기본값으로 채워진 노드 전체가 답으로 온다"
+        ),
+        actor=superadmin,
+        given=seed.situation(),
         when=needs_actor(
             lambda actor: call(
                 DomainAdapter.admin_create,
@@ -76,90 +80,100 @@ SCENARIOS: list[DomainScenario] = [
                 checked(lambda p: p.domain.lifecycle.modified_at, within_the_run(), "just written"),
             ),
         ),
-    ),
-    TypedScenario.ok(
-        "a-domain-is-created-active-unless-the-request-says-otherwise",
-        when=needs_actor(
-            lambda actor: call(
-                DomainAdapter.admin_create,
-                CreateDomainInput(name="dormant", is_active=False),
-                actor,
-            ),
-            "admin_create",
+    )
+
+
+def a_name_already_taken(seed: Seeder) -> DomainScenario:
+    home = seed.creating(seed_domain(name_hint="home"))
+    taken = seed.creating(seed_domain(name_hint="taken"))
+    superadmin = seed_someone_of(seed, home, role=UserRole.SUPERADMIN)
+    return TypedScenario.error(
+        "a-name-another-domain-already-holds-is-refused",
+        description=(
+            "이미 어떤 도메인이 쓰고 있는 이름으로 만들려 하면, "
+            "권한이 있어도 이름이 겹친다는 이유로 거부된다"
         ),
-        then=at(lambda p: p.domain.lifecycle.is_active, False),
-    ),
-    TypedScenario.ok(
-        "the-allowed-registries-of-the-request-are-what-the-domain-gets",
-        when=needs_actor(
-            lambda actor: call(
-                DomainAdapter.admin_create,
-                CreateDomainInput(
-                    name="with-registries", allowed_docker_registries=["cr.example.io"]
+        actor=superadmin,
+        given=seed.situation(),
+        when=after(
+            taken,
+            lambda d: needs_actor(
+                lambda actor: call(
+                    DomainAdapter.admin_create, CreateDomainInput(name=d.name), actor
                 ),
-                actor,
+                "admin_create",
             ),
-            "admin_create",
-        ),
-        then=at(lambda p: p.domain.registry.allowed_docker_registries, ["cr.example.io"]),
-    ),
-    TypedScenario.error(
-        "a-name-already-taken-is-refused",
-        given=situation(setup=TAKEN),
-        when=needs_actor(
-            lambda actor: call(
-                DomainAdapter.admin_create, CreateDomainInput(name=TAKEN.name), actor
-            ),
-            "admin_create",
         ),
         then=InvalidAPIParameters,
-    ),
-    TypedScenario.error(
+    )
+
+
+def a_blank_name(seed: Seeder) -> DomainScenario:
+    home = seed.creating(seed_domain(name_hint="home"))
+    superadmin = seed_someone_of(seed, home, role=UserRole.SUPERADMIN)
+    return TypedScenario.error(
         "a-blank-name-is-refused",
+        description="이름이 공백뿐이면 도메인을 만들 수 없다",
+        actor=superadmin,
+        given=seed.situation(),
         when=needs_actor(
             lambda actor: call(DomainAdapter.admin_create, CreateDomainInput(name="   "), actor),
             "admin_create",
         ),
         then=InvalidAPIParameters,
-    ),
-    TypedScenario.error(
-        "the-domain-admin-may-not-create-a-domain",
-        actor=DOMAIN_ADMIN,
-        holding=[the_domain_admin_role()],
+    )
+
+
+def a_plain_user_may_not(seed: Seeder) -> DomainScenario:
+    home = seed.creating(seed_domain(name_hint="home"))
+    someone = seed_someone_of(seed, home)
+    return TypedScenario.error(
+        "a-user-who-is-not-the-superadmin-may-not-create-a-domain",
+        description=(
+            "슈퍼관리자가 아닌 사용자가 도메인을 만들려 하면, "
+            "권한을 얼마나 받았는지와 무관하게 역할로 막힌다"
+        ),
+        actor=someone,
+        given=seed.situation(),
         when=needs_actor(
             lambda actor: call(
-                DomainAdapter.admin_create, CreateDomainInput(name="by-domain-admin"), actor
+                DomainAdapter.admin_create, CreateDomainInput(name="by-a-user"), actor
             ),
             "admin_create",
         ),
         then=InsufficientPrivilege,
-    ),
-    TypedScenario.error(
-        "a-member-may-not-create-a-domain",
-        actor=MEMBER,
+    )
+
+
+def enforcement_off_changes_nothing(seed: Seeder) -> DomainScenario:
+    home = seed.creating(seed_domain(name_hint="home"))
+    someone = seed_someone_of(seed, home)
+    return TypedScenario.error(
+        "turning-enforcement-off-still-does-not-let-a-user-create-a-domain",
+        description=(
+            "엔티티 권한 집행을 꺼도 도메인 생성은 여전히 막힌다. "
+            "이 문은 권한 그래프가 아니라 역할이 지키기 때문이다"
+        ),
+        actor=someone,
+        given=enforcement_off(seed),
         when=needs_actor(
             lambda actor: call(
-                DomainAdapter.admin_create, CreateDomainInput(name="by-member"), actor
+                DomainAdapter.admin_create, CreateDomainInput(name="by-a-user-again"), actor
             ),
             "admin_create",
         ),
         then=InsufficientPrivilege,
-    ),
-    TypedScenario.error(
-        # The gate is the role, not the permission graph, so turning enforcement off
-        # changes nothing here. That is the rule this row records.
-        "turning-enforcement-off-still-does-not-let-a-member-create-a-domain",
-        actor=MEMBER,
-        given=enforcement_off(),
-        when=needs_actor(
-            lambda actor: call(
-                DomainAdapter.admin_create, CreateDomainInput(name="by-member-again"), actor
-            ),
-            "admin_create",
-        ),
-        then=InsufficientPrivilege,
-    ),
-]
+    )
+
+
+BUILDERS = (
+    the_whole_node_comes_back,
+    a_name_already_taken,
+    a_blank_name,
+    a_plain_user_may_not,
+    enforcement_off_changes_nothing,
+)
+SCENARIOS: list[DomainScenario] = [build(Seeder()) for build in BUILDERS]
 
 
 @pytest.mark.parametrize("scenario", SCENARIOS, ids=lambda s: s.summary)

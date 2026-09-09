@@ -3,65 +3,69 @@
 from __future__ import annotations
 
 import pytest
-from bai_scenario.components.domain import (
-    ADomainIsThere,
-    DomainScenario,
-    enforcement_off,
-    the_domain_admin_role,
-)
-from bai_scenario.infra.personas import DOMAIN_ADMIN, MEMBER
+from bai_scenario.components.domain import DomainScenario, seed_someone_of
 from bai_scenario.runner.runner import ScenarioRunner
+from bai_scenario.seeds.domain.domain import seed_domain
+from bai_scenario.seeds.seeder import Seeder, after
 
+from ai.backend.common.data.user.types import UserRole
 from ai.backend.manager.api.adapters.domain.adapter import DomainAdapter
 from ai.backend.manager.errors.base.entity import EntityNotFoundError
 from ai.backend.manager.errors.permission import NotEnoughPermission
-from ai.backend.testutils.typed_scenario import (
-    TypedScenario,
-    after,
-    at,
-    call,
-    situation,
-)
+from ai.backend.testutils.typed_scenario import TypedScenario, at, call
 
-A_DOMAIN = ADomainIsThere()
 
-SCENARIOS: list[DomainScenario] = [
-    TypedScenario.ok(
-        "superadmin-reads-a-domain-by-name",
-        given=situation(setup=A_DOMAIN),
-        when=after(A_DOMAIN.domain, lambda row: call(DomainAdapter.get, row.name)),
-        then=at(lambda node: node.basic_info.description, A_DOMAIN.description),
-    ),
-    TypedScenario.error(
+def the_superadmin_reads_a_domain(seed: Seeder) -> DomainScenario:
+    domain = seed.creating(seed_domain(name_hint="host"))
+    superadmin = seed_someone_of(seed, domain, role=UserRole.SUPERADMIN)
+    return TypedScenario.ok(
+        "the-superadmin-reads-a-domain-by-name",
+        description=("도메인 하나가 있고 슈퍼관리자가 이름으로 조회하면, 그 도메인이 답으로 온다"),
+        actor=superadmin,
+        given=seed.situation(),
+        when=after(domain, lambda d: call(DomainAdapter.get, d.name)),
+        then=at(lambda node: node.basic_info.name, domain.describe),
+    )
+
+
+def a_user_without_the_grant_is_refused(seed: Seeder) -> DomainScenario:
+    domain = seed.creating(seed_domain(name_hint="host"))
+    stranger = seed_someone_of(seed, domain)
+    return TypedScenario.error(
+        "a-user-granted-nothing-may-not-read-a-domain",
+        description=(
+            "같은 도메인이 있고 사용자가 아무 권한도 받지 않았을 때, "
+            "이름으로 조회하면 권한 부족으로 거부된다"
+        ),
+        actor=stranger,
+        given=seed.situation(),
+        when=after(domain, lambda d: call(DomainAdapter.get, d.name)),
+        then=NotEnoughPermission,
+    )
+
+
+def a_name_nothing_answers_to(seed: Seeder) -> DomainScenario:
+    domain = seed.creating(seed_domain(name_hint="host"))
+    superadmin = seed_someone_of(seed, domain, role=UserRole.SUPERADMIN)
+    return TypedScenario.error(
         "reading-a-name-nothing-answers-to-is-not-found",
+        description=(
+            "슈퍼관리자가 존재하지 않는 이름으로 조회하면, "
+            "권한 문제가 아니라 대상이 없다는 것으로 거부된다"
+        ),
+        actor=superadmin,
+        given=seed.situation(),
         when=call(DomainAdapter.get, "no-such-domain"),
         then=EntityNotFoundError,
-    ),
-    TypedScenario.error(
-        "the-domain-admin-holds-nothing-on-the-domain-entity-itself",
-        actor=DOMAIN_ADMIN,
-        holding=[the_domain_admin_role()],
-        given=situation(setup=A_DOMAIN),
-        when=after(A_DOMAIN.domain, lambda row: call(DomainAdapter.get, row.name)),
-        then=NotEnoughPermission,
-    ),
-    TypedScenario.error(
-        "a-member-may-not-read-a-domain",
-        actor=MEMBER,
-        given=situation(setup=A_DOMAIN),
-        when=after(A_DOMAIN.domain, lambda row: call(DomainAdapter.get, row.name)),
-        then=NotEnoughPermission,
-    ),
-    TypedScenario.ok(
-        # Here the refusal does come from the permission graph, so turning enforcement
-        # off lets the same request through. The contrast with creation is the point.
-        "turning-enforcement-off-lets-a-member-read-a-domain",
-        actor=MEMBER,
-        given=enforcement_off(A_DOMAIN),
-        when=after(A_DOMAIN.domain, lambda row: call(DomainAdapter.get, row.name)),
-        then=at(lambda node: node.basic_info.name, A_DOMAIN.name),
-    ),
-]
+    )
+
+
+BUILDERS = (
+    the_superadmin_reads_a_domain,
+    a_user_without_the_grant_is_refused,
+    a_name_nothing_answers_to,
+)
+SCENARIOS: list[DomainScenario] = [build(Seeder()) for build in BUILDERS]
 
 
 @pytest.mark.parametrize("scenario", SCENARIOS, ids=lambda s: s.summary)

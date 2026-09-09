@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
+from bai_scenario.seeds.seeder import Spec
+
 from ai.backend.manager.data.domain.types import DomainData
 from ai.backend.manager.models.domain.creators import DomainCreator
-from bai_scenario.seeds.seeder import Spec
 
 
 def seed_domain(*, name_hint: str = "domain", is_active: bool = True) -> Spec[DomainData]:

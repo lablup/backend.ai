@@ -10,6 +10,8 @@ import time
 from dataclasses import dataclass
 
 import sqlalchemy as sa
+from bai_scenario.infra import schema as _schema  # the full schema, statically named
+from bai_scenario.infra.world import World, build_world
 
 from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
 from ai.backend.manager.models.base import (
@@ -21,8 +23,6 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.uuid7 import UUID_GENERATE_V7_DDL
 from ai.backend.manager.repositories.db.engine import create_async_engine
 from ai.backend.testutils.bootstrap import POSTGRES_MAINTENANCE_DB, POSTGRES_PASSWORD, POSTGRES_USER
-from bai_scenario.infra import schema as _schema  # the full schema, statically named
-from bai_scenario.infra.world import World, build_world
 
 
 def db_url(addr: HostPortPairModel, dbname: str) -> str:
