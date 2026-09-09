@@ -27,7 +27,6 @@ from ai.backend.manager.api.adapters.session.adapter import SessionAdapter
 from ai.backend.manager.clients.appproxy.client import AppProxyClientPool
 from ai.backend.manager.idle import IdleCheckerHost
 from ai.backend.manager.registry import AgentRegistry
-from ai.backend.manager.repositories.ops.base.provider import DBOpsProvider
 from ai.backend.manager.repositories.ops.repository import OpsRepository
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
@@ -62,7 +61,7 @@ async def adapter(
     service = SessionService(
         SessionServiceArgs(
             # The one a read reaches: get and search both go straight to it.
-            session_repository=SessionRepository(engine, DBOpsProvider(engine)),
+            session_repository=SessionRepository(engine),
             # The ten it does not.
             scheduler_repository=unwired(SchedulerRepository, "only scheduling reads it"),
             user_repository=unwired(UserRepository, "only writes resolve the owner"),

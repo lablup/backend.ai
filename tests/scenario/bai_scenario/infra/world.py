@@ -36,7 +36,6 @@ from ai.backend.manager.models.base import populate_fixture
 from ai.backend.manager.models.domain.creators import DomainCreator
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.project.creators import ProjectCreator
-from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.rbac_models.role.row import RoleRow
 from ai.backend.manager.models.rbac_models.role_preset.row import RolePresetRow
 from ai.backend.manager.models.resource_group.creators import ResourceGroupCreator
@@ -130,19 +129,17 @@ class World:
 
 
 async def _preset_roles(engine: ExtendedAsyncSAEngine) -> dict[tuple[str, str], RoleID]:
-    """Every role a preset made, keyed by the preset and the scope it covers.
+    """Every role a preset made, keyed by the preset and the scope it belongs to.
 
-    A preset role is discoverable by the permissions it carries: they name the scope,
-    and the role names the preset it came from.
+    The role names both: the preset it came from, and the one scope it covers.
     """
     async with engine.begin_readonly_session() as sess:
         rows = await sess.execute(
-            sa.select(RolePresetRow.name, PermissionRow.scope_id, RoleRow.id)
+            sa.select(RolePresetRow.name, RoleRow.scope_id, RoleRow.id)
             .select_from(RoleRow)
             .join(RolePresetRow, RolePresetRow.id == RoleRow.role_preset_id)
-            .join(PermissionRow, PermissionRow.role_id == RoleRow.id)
         )
-    return {(preset, scope_id): RoleID(role_id) for preset, scope_id, role_id in rows}
+    return {(preset, str(scope_id)): RoleID(role_id) for preset, scope_id, role_id in rows}
 
 
 def _all_host_permissions() -> VFolderHostPermissionMap:

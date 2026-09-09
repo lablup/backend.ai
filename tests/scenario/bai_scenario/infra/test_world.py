@@ -10,7 +10,7 @@ from typing import Any
 
 import sqlalchemy as sa
 
-from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE
+from ai.backend.common.data.entity.project import ProjectEntityType
 from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.keypair.row import KeyPairRow
 from ai.backend.manager.models.project.row import ProjectRow, ProjectType
@@ -75,7 +75,7 @@ class TestPersonaPermissions:
         async with engine.begin_readonly_session() as sess:
             rows = (
                 await sess.execute(
-                    user_scope_membership_query(PROJECT_SCOPE_TYPE).where(
+                    user_scope_membership_query(ProjectEntityType()).where(
                         VirtualEntityRow.entity_id == world.project_id
                     )
                 )

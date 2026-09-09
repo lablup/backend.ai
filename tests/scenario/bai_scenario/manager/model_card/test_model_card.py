@@ -16,7 +16,7 @@ from ai.backend.common.dto.manager.v2.model_card.request import SearchModelCards
 from ai.backend.manager.api.adapters.model_card.adapter import ModelCardAdapter
 from ai.backend.manager.config.unified import ManagerUnifiedConfig
 from ai.backend.manager.errors.auth import InsufficientPrivilege
-from ai.backend.manager.errors.repository import EntityNotFoundError
+from ai.backend.manager.errors.base.entity import EntityNotFoundError
 from ai.backend.testutils.typed_scenario import (
     TypedScenario,
     at,

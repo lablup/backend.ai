@@ -16,8 +16,8 @@ from ai.backend.common.dto.manager.v2.domain.request import (
     RestoreDomainInput,
 )
 from ai.backend.manager.api.adapters.domain.adapter import DomainAdapter
+from ai.backend.manager.errors.base.entity import EntityNotFoundError
 from ai.backend.manager.errors.permission import NotEnoughPermission
-from ai.backend.manager.errors.repository import EntityNotFoundError
 from ai.backend.testutils.typed_scenario import (
     TypedScenario,
     after,
