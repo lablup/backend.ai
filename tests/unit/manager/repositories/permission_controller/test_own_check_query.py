@@ -30,7 +30,7 @@ from ai.backend.common.data.entity.domain import DomainEntityType, DomainID
 from ai.backend.common.data.entity.project import ProjectEntityType
 from ai.backend.common.data.entity.session import SessionEntityType, SessionID
 from ai.backend.common.data.entity.types import EntityID, EntityIdentifier, EntityType
-from ai.backend.common.data.entity.user import USER_SCOPE_TYPE, UserID
+from ai.backend.common.data.entity.user import UserEntityType, UserID
 from ai.backend.common.data.entity.vfolder import VFolderEntityType, VFolderUUID
 from ai.backend.common.data.permission.types import Permission
 from ai.backend.common.types import ResourceSlot
@@ -203,7 +203,7 @@ async def _user_in_domain(sess: AsyncSession) -> tuple[UserID, DomainID, uuid.UU
     )
     await sess.flush()
     domain_node = await _node(sess, _DOMAIN, domain_id)
-    user_node = await _node(sess, USER_SCOPE_TYPE, user_id)
+    user_node = await _node(sess, UserEntityType(), user_id)
     await _govern(sess, domain_node, user_node)
     return user_id, domain_id, user_node, domain_node
 
@@ -212,7 +212,7 @@ async def _role(sess: AsyncSession, user_id: UserID, rows: Sequence[PermissionRo
     role = RoleRow(
         name=f"role-{uuid.uuid4().hex[:8]}",
         status=RoleStatus.ACTIVE,
-        scope_type=USER_SCOPE_TYPE,
+        scope_type=UserEntityType(),
         scope_id=user_id,
     )
     sess.add(role)
@@ -264,7 +264,7 @@ async def seed_shares(sess: AsyncSession, count: int) -> _Seed:
         user_id,
         _permission_rows(
             uuid.uuid4(),
-            USER_SCOPE_TYPE,
+            UserEntityType(),
             user_id,
             VFolderEntityType(),
             Permission.READ | Permission.UPDATE,
@@ -520,7 +520,7 @@ async def seed_at_scale(database: ExtendedAsyncSAEngine, scale: _Scale) -> _Scal
         for kind, ids in (
             (str(_DOMAIN), domain_ids),
             (str(ProjectEntityType()), project_ids),
-            (str(USER_SCOPE_TYPE), user_ids),
+            (str(UserEntityType()), user_ids),
             (str(SessionEntityType()), session_ids),
             (str(VFolderEntityType()), vfolder_ids),
         ):
@@ -617,7 +617,7 @@ async def seed_at_scale(database: ExtendedAsyncSAEngine, scale: _Scale) -> _Scal
         for bit in (Permission.READ, Permission.UPDATE):
             yield (
                 vfolder_role,
-                str(USER_SCOPE_TYPE),
+                str(UserEntityType()),
                 str(measured),
                 str(VFolderEntityType()),
                 int(bit),

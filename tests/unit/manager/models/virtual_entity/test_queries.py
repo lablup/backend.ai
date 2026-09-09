@@ -10,8 +10,8 @@ import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased
 
-from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE
-from ai.backend.common.data.entity.types import EntityType, ScopeType
+from ai.backend.common.data.entity.project import ProjectEntityType
+from ai.backend.common.data.entity.types import EntityType
 from ai.backend.common.data.entity.user import UserEntityType
 from ai.backend.common.data.entity.vfolder import VFolderEntityType
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -47,7 +47,7 @@ class TestScopeMembershipExists:
     async def _holds(
         self,
         db: ExtendedAsyncSAEngine,
-        scope_type: ScopeType,
+        scope_type: EntityType,
         scope_id: uuid.UUID,
         member_type: EntityType,
         member_id: uuid.UUID,
@@ -62,7 +62,7 @@ class TestScopeMembershipExists:
     async def test_belonging_edge_is_held(self, db_with_cleanup: ExtendedAsyncSAEngine) -> None:
         project_id, vfolder_id = uuid.uuid4(), uuid.uuid4()
         async with db_with_cleanup.begin_session() as sess:
-            project = await self._node(sess, PROJECT_SCOPE_TYPE, project_id)
+            project = await self._node(sess, ProjectEntityType(), project_id)
             vfolder = await self._node(sess, VFolderEntityType(), vfolder_id)
             sess.add(
                 EntityMembershipRow(
@@ -70,14 +70,14 @@ class TestScopeMembershipExists:
                 )
             )
         assert await self._holds(
-            db_with_cleanup, PROJECT_SCOPE_TYPE, project_id, VFolderEntityType(), vfolder_id
+            db_with_cleanup, ProjectEntityType(), project_id, VFolderEntityType(), vfolder_id
         )
 
     async def test_capped_edge_is_held(self, db_with_cleanup: ExtendedAsyncSAEngine) -> None:
         """A share is what the scope holds under a cap, so a read still finds it."""
         project_id, vfolder_id = uuid.uuid4(), uuid.uuid4()
         async with db_with_cleanup.begin_session() as sess:
-            project = await self._node(sess, PROJECT_SCOPE_TYPE, project_id)
+            project = await self._node(sess, ProjectEntityType(), project_id)
             vfolder = await self._node(sess, VFolderEntityType(), vfolder_id)
             sess.add(
                 EntityMembershipRow(
@@ -85,7 +85,7 @@ class TestScopeMembershipExists:
                 )
             )
         assert await self._holds(
-            db_with_cleanup, PROJECT_SCOPE_TYPE, project_id, VFolderEntityType(), vfolder_id
+            db_with_cleanup, ProjectEntityType(), project_id, VFolderEntityType(), vfolder_id
         )
 
     async def test_another_scope_does_not_hold_it(
@@ -93,8 +93,8 @@ class TestScopeMembershipExists:
     ) -> None:
         holder_id, other_id, vfolder_id = uuid.uuid4(), uuid.uuid4(), uuid.uuid4()
         async with db_with_cleanup.begin_session() as sess:
-            holder = await self._node(sess, PROJECT_SCOPE_TYPE, holder_id)
-            await self._node(sess, PROJECT_SCOPE_TYPE, other_id)
+            holder = await self._node(sess, ProjectEntityType(), holder_id)
+            await self._node(sess, ProjectEntityType(), other_id)
             vfolder = await self._node(sess, VFolderEntityType(), vfolder_id)
             sess.add(
                 EntityMembershipRow(
@@ -102,7 +102,7 @@ class TestScopeMembershipExists:
                 )
             )
         assert not await self._holds(
-            db_with_cleanup, PROJECT_SCOPE_TYPE, other_id, VFolderEntityType(), vfolder_id
+            db_with_cleanup, ProjectEntityType(), other_id, VFolderEntityType(), vfolder_id
         )
 
     async def test_member_type_narrows_the_answer(
@@ -111,7 +111,7 @@ class TestScopeMembershipExists:
         """Two entities may share an id across types; the type tells them apart."""
         project_id, shared_id = uuid.uuid4(), uuid.uuid4()
         async with db_with_cleanup.begin_session() as sess:
-            project = await self._node(sess, PROJECT_SCOPE_TYPE, project_id)
+            project = await self._node(sess, ProjectEntityType(), project_id)
             vfolder = await self._node(sess, VFolderEntityType(), shared_id)
             await self._node(sess, UserEntityType(), shared_id)
             sess.add(
@@ -120,10 +120,10 @@ class TestScopeMembershipExists:
                 )
             )
         assert await self._holds(
-            db_with_cleanup, PROJECT_SCOPE_TYPE, project_id, VFolderEntityType(), shared_id
+            db_with_cleanup, ProjectEntityType(), project_id, VFolderEntityType(), shared_id
         )
         assert not await self._holds(
-            db_with_cleanup, PROJECT_SCOPE_TYPE, project_id, UserEntityType(), shared_id
+            db_with_cleanup, ProjectEntityType(), project_id, UserEntityType(), shared_id
         )
 
     async def test_correlates_with_the_outer_row(
@@ -132,7 +132,7 @@ class TestScopeMembershipExists:
         """The member id may be a column, which is how an operation scope uses it."""
         project_id, held_id, loose_id = uuid.uuid4(), uuid.uuid4(), uuid.uuid4()
         async with db_with_cleanup.begin_session() as sess:
-            project = await self._node(sess, PROJECT_SCOPE_TYPE, project_id)
+            project = await self._node(sess, ProjectEntityType(), project_id)
             held = await self._node(sess, VFolderEntityType(), held_id)
             await self._node(sess, VFolderEntityType(), loose_id)
             sess.add(
@@ -145,7 +145,7 @@ class TestScopeMembershipExists:
                     sa.select(vfolders.entity_id).where(
                         vfolders.entity_type == VFolderEntityType(),
                         scope_membership_exists(
-                            PROJECT_SCOPE_TYPE,
+                            ProjectEntityType(),
                             project_id,
                             VFolderEntityType(),
                             vfolders.entity_id,

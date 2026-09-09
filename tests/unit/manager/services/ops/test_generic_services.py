@@ -34,7 +34,6 @@ from ai.backend.common.data.entity.types import (
     FieldData,
     FieldIdentifier,
     FieldType,
-    ScopeType,
 )
 from ai.backend.common.data.entity.vfolder import VFolderEntityType
 from ai.backend.common.data.user.types import UserData, UserRole
@@ -147,7 +146,7 @@ from ai.backend.manager.services.ops.service import (
 )
 
 _ENTITY_TYPE = RolePresetEntityType()
-_SCOPE_TYPE = ScopeType(_ENTITY_TYPE)
+_SCOPE_TYPE = EntityType(_ENTITY_TYPE)
 
 
 class _TestFieldType(FieldType):

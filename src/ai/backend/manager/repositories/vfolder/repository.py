@@ -11,7 +11,7 @@ from sqlalchemy.orm import contains_eager, selectinload
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
 from ai.backend.common.contexts.user import current_user
 from ai.backend.common.data.entity.model_card import ModelCardID
-from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE, ProjectID
+from ai.backend.common.data.entity.project import ProjectEntityType, ProjectID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.data.entity.vfolder_permission import VFolderPermissionID
@@ -1835,7 +1835,9 @@ class VfolderRepository:
                 raise VFolderInvalidParameter("Only group vfolders can be shared with users.")
             users_table = UserRow.__table__
             db_query = sa.select(users_table.c.uuid, users_table.c.email).where(
-                user_scope_membership_exists(PROJECT_SCOPE_TYPE, vfolder_group, users_table.c.uuid),
+                user_scope_membership_exists(
+                    ProjectEntityType(), vfolder_group, users_table.c.uuid
+                ),
                 users_table.c.email.in_(emails),
                 users_table.c.email != requester_email,
                 users_table.c.status.in_(ACTIVE_USER_STATUSES),
@@ -1949,7 +1951,7 @@ class VfolderRepository:
                         vf_table.c.user == requester_id,
                         vf_table.c.creator_id == requester_id,
                         user_scope_membership_exists(
-                            PROJECT_SCOPE_TYPE, vf_table.c.group, requester_id
+                            ProjectEntityType(), vf_table.c.group, requester_id
                         ),
                     )
                 )

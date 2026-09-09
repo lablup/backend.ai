@@ -18,14 +18,14 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from ai.backend.common.data.entity.container_registry import (
-    CONTAINER_REGISTRY_SCOPE_TYPE,
+    ContainerRegistryEntityType,
     ContainerRegistryID,
 )
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.idle_checker import (
     IdleCheckerID,
 )
-from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE, ProjectID
+from ai.backend.common.data.entity.project import ProjectEntityType, ProjectID
 from ai.backend.common.data.entity.resource_group import (
     ResourceGroupID,
 )
@@ -261,6 +261,6 @@ class TestARelationRunIsRecordedOnItsOwn:
         assert creators[0].entity_type is None
         assert creators[0].action_name == "create_relation"
         assert {(s.scope_type, s.scope_id) for s in scopes} == {
-            (str(PROJECT_SCOPE_TYPE), _PROJECT_ID),
-            (str(CONTAINER_REGISTRY_SCOPE_TYPE), _REGISTRY_ID),
+            (str(ProjectEntityType()), _PROJECT_ID),
+            (str(ContainerRegistryEntityType()), _REGISTRY_ID),
         }

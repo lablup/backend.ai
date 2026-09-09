@@ -3,7 +3,7 @@ from __future__ import annotations
 import uuid
 from abc import ABC, abstractmethod
 from collections.abc import Iterator
-from typing import Any, NewType, Self, override
+from typing import Any, Self, override
 from uuid import UUID
 
 from pydantic import GetCoreSchemaHandler
@@ -75,11 +75,6 @@ class EntityType(str):
         return core_schema.no_info_after_validator_function(
             lambda _: cls(), core_schema.literal_schema([cls.name()])
         )
-
-
-# Every entity doubles as a scope, so a scope type IS an entity type; the
-# reverse direction stays an explicit declaration (`ScopeType(<entity type>)`).
-ScopeType = NewType("ScopeType", EntityType)
 
 
 class GlobalEntityType(EntityType):

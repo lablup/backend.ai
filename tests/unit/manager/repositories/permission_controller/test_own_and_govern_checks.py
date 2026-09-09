@@ -16,12 +16,12 @@ import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ai.backend.common.data.entity.domain import DomainID
-from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE, ProjectEntityType, ProjectID
+from ai.backend.common.data.entity.project import ProjectEntityType, ProjectID
 from ai.backend.common.data.entity.resource_group import ResourceGroupEntityType
 from ai.backend.common.data.entity.role_preset import RolePresetEntityType, RolePresetID
 from ai.backend.common.data.entity.session import SessionEntityType, SessionID
-from ai.backend.common.data.entity.types import EntityID, EntityIdentifier, EntityType, ScopeType
-from ai.backend.common.data.entity.user import USER_SCOPE_TYPE, UserID
+from ai.backend.common.data.entity.types import EntityID, EntityIdentifier, EntityType
+from ai.backend.common.data.entity.user import UserEntityType, UserID
 from ai.backend.common.data.entity.vfolder import VFolderEntityType, VFolderUUID
 from ai.backend.common.data.entity.virtual_entity import VirtualEntityID
 from ai.backend.common.data.permission.types import Permission
@@ -238,7 +238,7 @@ class TestCheckPermissionViaVirtualEntity:
     def _chain_nodes(
         self,
         ids: VSChainFixture,
-        scope_type: ScopeType,
+        scope_type: EntityType,
         entity_type: EntityType,
     ) -> list[VirtualEntityRow]:
         """The nodes a chain names beyond the bound scope, which is made with the role:
@@ -270,9 +270,7 @@ class TestCheckPermissionViaVirtualEntity:
             db_sess.add(
                 DomainRow(id=domain_id, name=domain_name, total_resource_slots=ResourceSlot())
             )
-            db_sess.add_all(
-                self._chain_nodes(ids, ScopeType(ProjectEntityType()), _TARGET_ENTITY_TYPE)
-            )
+            db_sess.add_all(self._chain_nodes(ids, ProjectEntityType(), _TARGET_ENTITY_TYPE))
             await db_sess.flush()
 
             db_sess.add(
@@ -535,9 +533,7 @@ class TestCheckPermissionViaVirtualEntity:
         """The chain of :meth:`_build_chain`, over an entity type the legacy enum
         does not name."""
         async with db.begin_session() as db_sess:
-            db_sess.add_all(
-                self._chain_nodes(ids, ScopeType(ProjectEntityType()), _UNMAPPED_ENTITY_TYPE)
-            )
+            db_sess.add_all(self._chain_nodes(ids, ProjectEntityType(), _UNMAPPED_ENTITY_TYPE))
             await db_sess.flush()
             db_sess.add(
                 ScopeBindingRow(
@@ -755,7 +751,7 @@ class TestUserRosterEnrollment:
         async with db.begin_session() as db_sess:
             user_vs_id = await db_sess.scalar(
                 sa.select(VirtualEntityRow.id).where(
-                    VirtualEntityRow.entity_type == USER_SCOPE_TYPE,
+                    VirtualEntityRow.entity_type == UserEntityType(),
                     VirtualEntityRow.entity_id == ids.user_id,
                 )
             )
@@ -787,7 +783,7 @@ class TestUserRosterEnrollment:
         async with db.begin_session() as db_sess:
             project_ve_id = await db_sess.scalar(
                 sa.select(VirtualEntityRow.id).where(
-                    VirtualEntityRow.entity_type == PROJECT_SCOPE_TYPE,
+                    VirtualEntityRow.entity_type == ProjectEntityType(),
                     VirtualEntityRow.entity_id == project_id,
                 )
             )
@@ -917,7 +913,7 @@ class TestUserRosterEnrollment:
         async with db.begin_session() as db_sess:
             project_ve_id = await db_sess.scalar(
                 sa.select(VirtualEntityRow.id).where(
-                    VirtualEntityRow.entity_type == PROJECT_SCOPE_TYPE,
+                    VirtualEntityRow.entity_type == ProjectEntityType(),
                     VirtualEntityRow.entity_id == project_id,
                 )
             )
@@ -983,7 +979,7 @@ class TestUserRosterEnrollment:
         async with db.begin_session() as db_sess:
             project_ve_id = await db_sess.scalar(
                 sa.select(VirtualEntityRow.id).where(
-                    VirtualEntityRow.entity_type == PROJECT_SCOPE_TYPE,
+                    VirtualEntityRow.entity_type == ProjectEntityType(),
                     VirtualEntityRow.entity_id == project_id,
                 )
             )

@@ -24,10 +24,7 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from ai.backend.common.data.entity.role import RoleID
 from ai.backend.common.data.entity.role_preset import RolePresetID
-from ai.backend.common.data.entity.types import (
-    EntityIdentifier,
-    ScopeType,
-)
+from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.exception import RBACTypeConversionError
@@ -329,7 +326,7 @@ class V2EntityWriteOps(V2GraphWriteOpsBase):
 
     # -- Preset-derived roles (role-managed paths only) ---------------------------
 
-    def _scope_element_type(self, scope_type: ScopeType) -> RBACElementType:
+    def _scope_element_type(self, scope_type: EntityType) -> RBACElementType:
         try:
             return RBACElementType(scope_type)
         except ValueError as e:
@@ -389,8 +386,7 @@ class V2EntityWriteOps(V2GraphWriteOpsBase):
             await self._sess.scalars(
                 sa.select(RolePresetRow).where(
                     RolePresetRow.scope_type.in_({
-                        self._scope_element_type(ScopeType(e.entity_type())).to_scope_type()
-                        for e in entities
+                        self._scope_element_type(e.entity_type()).to_scope_type() for e in entities
                     }),
                     RolePresetRow.deleted.is_(False),
                 )
@@ -430,7 +426,7 @@ class V2EntityWriteOps(V2GraphWriteOpsBase):
             )
             for entity in entities
             for preset in presets_by_scope_type[
-                self._scope_element_type(ScopeType(entity.entity_type())).to_scope_type()
+                self._scope_element_type(entity.entity_type()).to_scope_type()
             ]
         ]
 

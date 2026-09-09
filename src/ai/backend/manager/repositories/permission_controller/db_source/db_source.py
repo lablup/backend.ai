@@ -9,7 +9,7 @@ import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import contains_eager, selectinload
 
-from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE
+from ai.backend.common.data.entity.project import ProjectEntityType
 from ai.backend.common.data.entity.role import RoleID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.permission.types import (
@@ -224,7 +224,7 @@ class PermissionDBSource:
             # take the user off the project's roster.
             project_subq = sa.select(RoleRow.scope_id).where(
                 RoleRow.id == data.role_id,
-                RoleRow.scope_type == PROJECT_SCOPE_TYPE,
+                RoleRow.scope_type == ProjectEntityType(),
             )
             rows = (
                 await db_session.execute(
@@ -234,7 +234,7 @@ class PermissionDBSource:
                         (UserRoleRow.role_id == RoleRow.id) & (UserRoleRow.user_id == data.user_id),
                     )
                     .where(
-                        RoleRow.scope_type == PROJECT_SCOPE_TYPE,
+                        RoleRow.scope_type == ProjectEntityType(),
                         RoleRow.scope_id.in_(project_subq),
                     )
                     .group_by(RoleRow.scope_id)

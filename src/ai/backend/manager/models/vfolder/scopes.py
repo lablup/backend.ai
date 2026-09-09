@@ -9,8 +9,8 @@ from uuid import UUID
 
 import sqlalchemy as sa
 
-from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE
-from ai.backend.common.data.entity.user import USER_SCOPE_TYPE
+from ai.backend.common.data.entity.project import ProjectEntityType
+from ai.backend.common.data.entity.user import UserEntityType
 from ai.backend.common.data.entity.vfolder import VFolderEntityType
 from ai.backend.manager.data.project.types import ProjectType
 from ai.backend.manager.errors.resource import ProjectNotFound
@@ -48,7 +48,7 @@ class ProjectVFolderOperationScope(OperationScope):
             return sa.or_(
                 VFolderRow.group == project_id,
                 scope_membership_exists(
-                    PROJECT_SCOPE_TYPE, project_id, VFolderEntityType(), VFolderRow.id
+                    ProjectEntityType(), project_id, VFolderEntityType(), VFolderRow.id
                 ),
             )
 
@@ -104,10 +104,10 @@ class UserVFolderOperationScope(OperationScope):
                 VFolderRow.user == user_id,
                 VFolderRow.id.in_(permitted_vfolder_ids),
                 scope_membership_exists(
-                    PROJECT_SCOPE_TYPE, personal_project_id, VFolderEntityType(), VFolderRow.id
+                    ProjectEntityType(), personal_project_id, VFolderEntityType(), VFolderRow.id
                 ),
                 scope_membership_exists(
-                    USER_SCOPE_TYPE, user_id, VFolderEntityType(), VFolderRow.id
+                    UserEntityType(), user_id, VFolderEntityType(), VFolderRow.id
                 ),
             )
 

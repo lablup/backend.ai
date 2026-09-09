@@ -13,7 +13,7 @@ import yarl
 from ai.backend.client.v2.auth import HMACAuth
 from ai.backend.client.v2.config import ClientConfig
 from ai.backend.client.v2.v2_registry import V2ClientRegistry
-from ai.backend.common.data.entity.domain import DOMAIN_SCOPE_TYPE
+from ai.backend.common.data.entity.domain import DomainEntityType
 from ai.backend.common.data.entity.role import RoleEntityType
 from ai.backend.common.dto.manager.v2.rbac.request import SearchRolesInput
 from ai.backend.common.dto.manager.v2.rbac.response import AdminSearchRolesPayload
@@ -165,7 +165,7 @@ class TestScopedRoleSearch:
         """Roles of another scope should NOT appear in project search."""
         not_in_project = await role_factory(
             name=f"not-in-proj-{uuid.uuid4().hex[:8]}",
-            scope_type=DOMAIN_SCOPE_TYPE,
+            scope_type=DomainEntityType(),
             scope_id=domain_fixture.domain_id,
         )
 

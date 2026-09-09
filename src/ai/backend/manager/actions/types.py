@@ -2,7 +2,7 @@ import enum
 from dataclasses import dataclass
 from typing import Final
 
-from ai.backend.common.data.entity.types import EntityType, ScopeType
+from ai.backend.common.data.entity.types import EntityType
 from ai.backend.common.data.permission.types import OperationType, Permission
 from ai.backend.common.exception import ErrorOperation
 
@@ -200,5 +200,5 @@ class ActionSpec:
 
 @dataclass(frozen=True)
 class Scope:
-    type: ScopeType
+    type: EntityType
     id: str

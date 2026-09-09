@@ -11,7 +11,7 @@ from yarl import URL
 from ai.backend.client.v2.base_client import BackendAIAuthClient
 from ai.backend.client.v2.config import ClientConfig
 from ai.backend.client.v2.domains.rbac import RBACClient
-from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE
+from ai.backend.common.data.entity.project import ProjectEntityType
 from ai.backend.common.dto.manager.query import StringFilter
 from ai.backend.common.dto.manager.rbac.request import (
     AssignRoleRequest,
@@ -104,7 +104,7 @@ class TestRoleCreate:
 
         result = await rc.create_role(
             CreateRoleRequest(
-                scope_type=PROJECT_SCOPE_TYPE,
+                scope_type=ProjectEntityType(),
                 scope_id=uuid.uuid4(),
                 name="test-role",
                 description="A test role",

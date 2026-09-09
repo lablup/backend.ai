@@ -9,10 +9,7 @@ from typing import Any, override
 import sqlalchemy as sa
 
 from ai.backend.common.data.entity.domain import DomainEntityType
-from ai.backend.common.data.entity.resource_group import (
-    RESOURCE_GROUP_SCOPE_TYPE,
-    ResourceGroupID,
-)
+from ai.backend.common.data.entity.resource_group import ResourceGroupEntityType, ResourceGroupID
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.resource_group.row import ResourceGroupForDomainRow
@@ -41,7 +38,7 @@ class ResourceGroupDomainOperationScope(OperationScope):
                     )
                 ),
                 scope_membership_exists(
-                    RESOURCE_GROUP_SCOPE_TYPE,
+                    ResourceGroupEntityType(),
                     resource_group_id,
                     DomainEntityType(),
                     DomainRow.id,

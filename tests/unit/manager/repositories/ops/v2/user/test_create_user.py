@@ -10,11 +10,7 @@ import sqlalchemy as sa
 from sqlalchemy import Table
 
 from ai.backend.common.data.entity.domain import DomainEntityType, DomainID, DomainName
-from ai.backend.common.data.entity.project import (
-    PROJECT_SCOPE_TYPE,
-    ProjectEntityType,
-    ProjectID,
-)
+from ai.backend.common.data.entity.project import ProjectEntityType, ProjectID
 from ai.backend.common.data.entity.role import RoleEntityType, RoleID
 from ai.backend.common.data.entity.user import UserEntityType, UserID
 from ai.backend.common.data.entity.virtual_entity import VirtualEntityID
@@ -503,7 +499,7 @@ async def _enrol_auto_assign_role(db: ExtendedAsyncSAEngine, project_id: Project
                 name=f"role-{role_id.hex[:8]}",
                 status=RoleStatus.ACTIVE,
                 auto_assign=True,
-                scope_type=PROJECT_SCOPE_TYPE,
+                scope_type=ProjectEntityType(),
                 scope_id=project_id,
             )
         )
@@ -512,7 +508,7 @@ async def _enrol_auto_assign_role(db: ExtendedAsyncSAEngine, project_id: Project
         await session.flush()
         project_node_id = await session.scalar(
             sa.select(VirtualEntityRow.id).where(
-                VirtualEntityRow.entity_type == PROJECT_SCOPE_TYPE,
+                VirtualEntityRow.entity_type == ProjectEntityType(),
                 VirtualEntityRow.entity_id == project_id,
             )
         )

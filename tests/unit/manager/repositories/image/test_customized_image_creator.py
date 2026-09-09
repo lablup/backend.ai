@@ -22,11 +22,7 @@ from ai.backend.common.data.entity.container_registry import (
 )
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.image import ImageID
-from ai.backend.common.data.entity.project import (
-    PROJECT_SCOPE_TYPE,
-    ProjectEntityType,
-    ProjectID,
-)
+from ai.backend.common.data.entity.project import ProjectEntityType, ProjectID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.docker import LabelName
 from ai.backend.common.types import ResourceSlot
@@ -306,7 +302,7 @@ class TestImageOwnershipGraph:
 
     async def _owning_projects(self, db: ExtendedAsyncSAEngine, image_id: ImageID) -> list[UUID]:
         async with V2DBOpsProvider(db).read_ops() as r:
-            return list(await r.scopes_owning(PROJECT_SCOPE_TYPE, image_id))
+            return list(await r.scopes_owning(ProjectEntityType(), image_id))
 
     async def _commit_rescan(
         self,

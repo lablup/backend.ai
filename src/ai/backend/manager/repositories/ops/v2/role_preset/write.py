@@ -12,19 +12,14 @@ from typing import ClassVar
 
 import sqlalchemy as sa
 
-from ai.backend.common.data.entity.container_registry import CONTAINER_REGISTRY_SCOPE_TYPE
-from ai.backend.common.data.entity.domain import DOMAIN_SCOPE_TYPE
-from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE
-from ai.backend.common.data.entity.resource_group import RESOURCE_GROUP_SCOPE_TYPE
+from ai.backend.common.data.entity.container_registry import ContainerRegistryEntityType
+from ai.backend.common.data.entity.domain import DomainEntityType
+from ai.backend.common.data.entity.project import ProjectEntityType
+from ai.backend.common.data.entity.resource_group import ResourceGroupEntityType
 from ai.backend.common.data.entity.role import RoleID
 from ai.backend.common.data.entity.role_preset import RolePresetID
-from ai.backend.common.data.entity.types import (
-    EntityIdentifier,
-    EntityType,
-    RuntimeEntityID,
-    ScopeType,
-)
-from ai.backend.common.data.entity.user import USER_SCOPE_TYPE
+from ai.backend.common.data.entity.types import EntityIdentifier, EntityType, RuntimeEntityID
+from ai.backend.common.data.entity.user import UserEntityType
 from ai.backend.common.data.permission.types import Permission
 from ai.backend.manager.data.permission.scope_template import ScopeTemplateValue
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
@@ -49,12 +44,12 @@ _SYNC_CHUNK_SIZE = 200
 class RolePresetWriteOps(PermissionWriteOps):
     """The permission write ops plus the sync of a preset's derived roles."""
 
-    _scope_rows: ClassVar[Mapping[ScopeType, type[ScopeSource]]] = {
-        CONTAINER_REGISTRY_SCOPE_TYPE: ContainerRegistryRow,
-        DOMAIN_SCOPE_TYPE: DomainRow,
-        PROJECT_SCOPE_TYPE: ProjectRow,
-        RESOURCE_GROUP_SCOPE_TYPE: ResourceGroupRow,
-        USER_SCOPE_TYPE: UserRow,
+    _scope_rows: ClassVar[Mapping[EntityType, type[ScopeSource]]] = {
+        ContainerRegistryEntityType(): ContainerRegistryRow,
+        DomainEntityType(): DomainRow,
+        ProjectEntityType(): ProjectRow,
+        ResourceGroupEntityType(): ResourceGroupRow,
+        UserEntityType(): UserRow,
     }
 
     async def sync_preset_roles(self, preset_id: RolePresetID) -> None:
@@ -68,7 +63,7 @@ class RolePresetWriteOps(PermissionWriteOps):
         preset = await self._sess.get(RolePresetRow, preset_id)
         if preset is None:
             return
-        scope_type = ScopeType(EntityType(preset.scope_type.to_element().value))
+        scope_type = EntityType(EntityType(preset.scope_type.to_element().value))
         granted = await self._preset_grants(preset_id)
         roles = await self._derived_roles(preset_id, scope_type)
         for start in range(0, len(roles), _SYNC_CHUNK_SIZE):
@@ -79,7 +74,7 @@ class RolePresetWriteOps(PermissionWriteOps):
     async def _sync_roles(
         self,
         preset: RolePresetRow,
-        scope_type: ScopeType,
+        scope_type: EntityType,
         granted: Mapping[EntityType, Permission],
         entities: Mapping[RoleID, EntityIdentifier],
     ) -> None:
@@ -125,7 +120,7 @@ class RolePresetWriteOps(PermissionWriteOps):
         return granted
 
     async def _derived_roles(
-        self, preset_id: RolePresetID, scope_type: ScopeType
+        self, preset_id: RolePresetID, scope_type: EntityType
     ) -> list[tuple[RoleID, EntityIdentifier]]:
         """Each role the preset instantiated with the scope of ``scope_type`` it sits in."""
         rows = (
@@ -160,7 +155,7 @@ class RolePresetWriteOps(PermissionWriteOps):
     async def _rendered_names(
         self,
         preset: RolePresetRow,
-        scope_type: ScopeType,
+        scope_type: EntityType,
         entities: Mapping[RoleID, EntityIdentifier],
     ) -> dict[RoleID, str]:
         """The name the preset's rule now yields per role; a templated preset whose
@@ -178,7 +173,7 @@ class RolePresetWriteOps(PermissionWriteOps):
         }
 
     async def _scope_template_values(
-        self, scope_type: ScopeType, scopes: Collection[EntityIdentifier]
+        self, scope_type: EntityType, scopes: Collection[EntityIdentifier]
     ) -> dict[EntityIdentifier, ScopeTemplateValue]:
         row_cls = self._scope_rows.get(scope_type)
         if row_cls is None:

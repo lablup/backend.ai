@@ -14,7 +14,7 @@ from typing import Any
 import sqlalchemy as sa
 from sqlalchemy.orm import InstrumentedAttribute, aliased
 
-from ai.backend.common.data.entity.types import EntityID, EntityType, ScopeType
+from ai.backend.common.data.entity.types import EntityID, EntityType
 from ai.backend.common.data.entity.user import UserEntityType
 from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
 from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
@@ -32,7 +32,7 @@ type _UuidExpr = uuid.UUID | sa.ColumnElement[Any] | InstrumentedAttribute[Any]
 
 
 def user_scope_membership_query(
-    scope_type: ScopeType, user_id: _UuidExpr | None = None
+    scope_type: EntityType, user_id: _UuidExpr | None = None
 ) -> sa.Select[tuple[EntityID, EntityID]]:
     """(``user_id``, ``scope_id``) pairs of the users enrolled in scopes of
     ``scope_type``, narrowed to one user when ``user_id`` is given. The scope side is
@@ -58,7 +58,7 @@ def user_scope_membership_query(
 
 
 def scope_membership_exists(
-    scope_type: ScopeType,
+    scope_type: EntityType,
     scope_id: _UuidExpr,
     member_type: EntityType,
     member_id: _UuidExpr,
@@ -87,7 +87,7 @@ def scope_membership_exists(
 
 
 def user_scope_membership_exists(
-    scope_type: ScopeType,
+    scope_type: EntityType,
     scope_id: _UuidExpr,
     user_id: _UuidExpr,
 ) -> sa.ColumnElement[bool]:

@@ -13,8 +13,8 @@ from ai.backend.common.data.entity.app_config_fragment import (
     AppConfigFragmentEntityType,
     AppConfigFragmentID,
 )
-from ai.backend.common.data.entity.domain import DOMAIN_SCOPE_TYPE, DomainID
-from ai.backend.common.data.entity.user import USER_SCOPE_TYPE, UserID
+from ai.backend.common.data.entity.domain import DomainEntityType, DomainID
+from ai.backend.common.data.entity.user import UserEntityType, UserID
 from ai.backend.common.data.filter_specs import StringMatchSpec, UUIDEqualMatchSpec
 from ai.backend.manager.models.app_config_fragment.row import AppConfigFragmentRow
 from ai.backend.manager.models.clauses import QueryCondition
@@ -166,7 +166,7 @@ class AppConfigFragmentConditions:
                     AppConfigFragmentRow.scope_id == domain_id,
                 ),
                 scope_membership_exists(
-                    DOMAIN_SCOPE_TYPE,
+                    DomainEntityType(),
                     domain_id,
                     AppConfigFragmentEntityType(),
                     AppConfigFragmentRow.id,
@@ -187,7 +187,7 @@ class AppConfigFragmentConditions:
                     AppConfigFragmentRow.scope_id == user_id,
                 ),
                 scope_membership_exists(
-                    USER_SCOPE_TYPE,
+                    UserEntityType(),
                     user_id,
                     AppConfigFragmentEntityType(),
                     AppConfigFragmentRow.id,

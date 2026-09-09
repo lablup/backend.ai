@@ -17,8 +17,8 @@ import sqlalchemy as sa
 from sqlalchemy.orm import aliased
 
 from ai.backend.common.data.entity.domain import DomainID, DomainName
-from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE, ProjectID
-from ai.backend.common.data.entity.user import USER_SCOPE_TYPE, UserID
+from ai.backend.common.data.entity.project import ProjectEntityType, ProjectID
+from ai.backend.common.data.entity.user import UserEntityType, UserID
 from ai.backend.common.data.entity.vfolder import VFolderEntityType
 from ai.backend.common.data.permission.types import Permission
 from ai.backend.common.types import (
@@ -116,7 +116,7 @@ async def _membership_cap(
                 )
                 .join(member, member.id == EntityMembershipRow.member_entity_id)
                 .where(
-                    VirtualEntityRow.entity_type == PROJECT_SCOPE_TYPE,
+                    VirtualEntityRow.entity_type == ProjectEntityType(),
                     VirtualEntityRow.entity_id == personal_project_id,
                     member.entity_type == VFolderEntityType(),
                     member.entity_id == vfolder_id,
@@ -366,7 +366,7 @@ class TestVFolderOwnershipTransferRBACCleanup:
                 id=role_id,
                 name=f"user-role-{user_uuid.hex[:8]}",
                 source=RoleSource.SYSTEM,
-                scope_type=USER_SCOPE_TYPE,
+                scope_type=UserEntityType(),
                 scope_id=user_uuid,
             )
             db_sess.add(role_row)
@@ -395,7 +395,7 @@ class TestVFolderOwnershipTransferRBACCleanup:
             db_sess.add(
                 VirtualEntityRow(
                     id=uuid.uuid4(),
-                    entity_type=USER_SCOPE_TYPE,
+                    entity_type=UserEntityType(),
                     entity_id=UserID(user_uuid),
                 )
             )
@@ -419,7 +419,7 @@ class TestVFolderOwnershipTransferRBACCleanup:
             db_sess.add(
                 VirtualEntityRow(
                     id=uuid.uuid4(),
-                    entity_type=PROJECT_SCOPE_TYPE,
+                    entity_type=ProjectEntityType(),
                     entity_id=ProjectID(personal_project_id),
                 )
             )

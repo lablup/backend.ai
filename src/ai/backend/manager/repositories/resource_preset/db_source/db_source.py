@@ -11,7 +11,7 @@ from uuid import UUID
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
-from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE, ProjectID
+from ai.backend.common.data.entity.project import ProjectEntityType, ProjectID
 from ai.backend.common.data.entity.resource_preset import ResourcePresetID
 from ai.backend.common.types import (
     AccessKey,
@@ -267,7 +267,7 @@ class ResourcePresetDBSource:
         :raises ProjectNotFound: If the group does not exist or the user is not a member
         """
         query = sa.select(groups.c.id, groups.c.total_resource_slots).where(
-            user_scope_membership_exists(PROJECT_SCOPE_TYPE, groups.c.id, user_id)
+            user_scope_membership_exists(ProjectEntityType(), groups.c.id, user_id)
             & (groups.c.name == group_name)
             & (groups.c.domain_name == domain_name),
         )
