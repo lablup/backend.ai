@@ -145,13 +145,13 @@ class IdleCheckerAdapter(BaseAdapter):
     ) -> UpdateIdleCheckerPayload:
         updater = IdleCheckerUpdater(
             checker_id=input.id,
-            name=OptionalState.from_nullable(input.name),
+            name=OptionalState.from_unset(input.name),
             description=TriState.from_unset(input.description),
-            target_session_types=OptionalState.from_nullable(input.target_session_types),
-            initial_grace_period_seconds=OptionalState.from_nullable(
+            target_session_types=OptionalState.from_unset(input.target_session_types),
+            initial_grace_period_seconds=OptionalState.from_unset(
                 input.initial_grace_period_seconds
             ),
-            spec=self._build_spec_update(input.checker_spec),
+            spec=OptionalState.from_unset(input.checker_spec).map(self._build_spec),
         )
         action_result = await self._processors.idle_checker.update.run(
             UpdateIdleCheckerAction(updater=updater)
@@ -265,15 +265,6 @@ class IdleCheckerAdapter(BaseAdapter):
                 ),
             ),
         )
-
-    @classmethod
-    def _build_spec_update(
-        cls,
-        checker_spec: IdleCheckerSpecInputDTO | None,
-    ) -> OptionalState[IdleCheckerSpec]:
-        if checker_spec is None:
-            return OptionalState.nop()
-        return OptionalState.update(cls._build_spec(checker_spec))
 
     def _convert_filter(self, filter_: IdleCheckerFilter) -> list[QueryCondition]:
         conditions: list[QueryCondition] = []

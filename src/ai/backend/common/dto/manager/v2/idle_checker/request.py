@@ -87,14 +87,30 @@ class CreateIdleCheckerInput(BaseRequestModel):
 
 class UpdateIdleCheckerInput(BaseRequestModel):
     id: IdleCheckerID = Field(description="Idle checker ID to update.")
-    name: str | None = Field(default=None, min_length=1, max_length=128)
+    name: str | None | Unset = Field(
+        default=UNSET,
+        min_length=1,
+        max_length=128,
+        description="Updated name. Omit to leave unchanged.",
+    )
     description: str | None | Unset = Field(
         default=UNSET,
         description="Updated description. Omit to leave unchanged; null clears.",
     )
-    target_session_types: list[SessionTypes] | None = Field(default=None, min_length=1)
-    initial_grace_period_seconds: int | None = Field(default=None, ge=0)
-    checker_spec: IdleCheckerSpecInputDTO | None = Field(default=None)
+    target_session_types: list[SessionTypes] | None | Unset = Field(
+        default=UNSET,
+        min_length=1,
+        description="Updated target session types. Omit to leave unchanged.",
+    )
+    initial_grace_period_seconds: int | None | Unset = Field(
+        default=UNSET,
+        ge=0,
+        description="Updated initial grace period in seconds. Omit to leave unchanged.",
+    )
+    checker_spec: IdleCheckerSpecInputDTO | None | Unset = Field(
+        default=UNSET,
+        description="Updated checker specification. Omit to leave unchanged.",
+    )
 
 
 class PurgeIdleCheckerInput(BaseRequestModel):
