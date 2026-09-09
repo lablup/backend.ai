@@ -19,7 +19,10 @@ class ClientIPMaskingPolicyEntityType(EntityType):
     @override
     @classmethod
     def description(cls) -> str:
-        return "A rule masking client addresses in recorded logs."
+        return (
+            "How a client address is masked before it is stored in the login history or an"
+            " audit log. Without a row of its own or a default row, the address is not masked."
+        )
 
 
 class ClientIPMaskingPolicyID(EntityIdentifier):

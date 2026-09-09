@@ -18,7 +18,7 @@ class ContainerRegistryEntityType(EntityType):
     @override
     @classmethod
     def description(cls) -> str:
-        return "A registry images are pulled from."
+        return "A registry that container images are pulled from, with the credentials to reach it."
 
 
 CONTAINER_REGISTRY_SCOPE_TYPE = ScopeType(ContainerRegistryEntityType())
