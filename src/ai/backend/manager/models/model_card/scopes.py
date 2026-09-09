@@ -9,7 +9,7 @@ from uuid import UUID
 
 import sqlalchemy as sa
 
-from ai.backend.common.data.entity.model_card import MODEL_CARD_ENTITY_TYPE, ModelCardID
+from ai.backend.common.data.entity.model_card import ModelCardEntityType, ModelCardID
 from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE
 from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.manager.errors.resource import ProjectNotFound
@@ -63,7 +63,7 @@ class ProjectModelCardOperationScope(OperationScope):
             return sa.or_(
                 ModelCardRow.project == project_id,
                 scope_membership_exists(
-                    PROJECT_SCOPE_TYPE, project_id, MODEL_CARD_ENTITY_TYPE, ModelCardRow.id
+                    PROJECT_SCOPE_TYPE, project_id, ModelCardEntityType(), ModelCardRow.id
                 ),
             )
 

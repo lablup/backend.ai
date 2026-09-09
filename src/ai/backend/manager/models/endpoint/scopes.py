@@ -9,7 +9,7 @@ from uuid import UUID
 
 import sqlalchemy as sa
 
-from ai.backend.common.data.entity.deployment import DEPLOYMENT_ENTITY_TYPE, DeploymentID
+from ai.backend.common.data.entity.deployment import DeploymentEntityType, DeploymentID
 from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE
 from ai.backend.common.data.entity.user import USER_SCOPE_TYPE
 from ai.backend.manager.errors.resource import ProjectNotFound
@@ -40,7 +40,7 @@ class ProjectDeploymentOperationScope(OperationScope):
             return sa.or_(
                 EndpointRow.project == project_id,
                 scope_membership_exists(
-                    PROJECT_SCOPE_TYPE, project_id, DEPLOYMENT_ENTITY_TYPE, EndpointRow.id
+                    PROJECT_SCOPE_TYPE, project_id, DeploymentEntityType(), EndpointRow.id
                 ),
             )
 
@@ -73,7 +73,7 @@ class UserDeploymentOperationScope(OperationScope):
             return sa.or_(
                 EndpointRow.created_user == user_id,
                 scope_membership_exists(
-                    USER_SCOPE_TYPE, user_id, DEPLOYMENT_ENTITY_TYPE, EndpointRow.id
+                    USER_SCOPE_TYPE, user_id, DeploymentEntityType(), EndpointRow.id
                 ),
             )
 

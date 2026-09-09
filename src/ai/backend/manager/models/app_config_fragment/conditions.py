@@ -9,7 +9,7 @@ from datetime import datetime
 import sqlalchemy as sa
 
 from ai.backend.common.data.app_config.types import AppConfigScopeType
-from ai.backend.common.data.entity.app_config import APP_CONFIG_FRAGMENT_ENTITY_TYPE
+from ai.backend.common.data.entity.app_config import AppConfigFragmentEntityType
 from ai.backend.common.data.entity.app_config_fragment import AppConfigFragmentID
 from ai.backend.common.data.entity.domain import DOMAIN_SCOPE_TYPE, DomainID
 from ai.backend.common.data.entity.user import USER_SCOPE_TYPE, UserID
@@ -166,7 +166,7 @@ class AppConfigFragmentConditions:
                 scope_membership_exists(
                     DOMAIN_SCOPE_TYPE,
                     domain_id,
-                    APP_CONFIG_FRAGMENT_ENTITY_TYPE,
+                    AppConfigFragmentEntityType(),
                     AppConfigFragmentRow.id,
                 ),
             )
@@ -187,7 +187,7 @@ class AppConfigFragmentConditions:
                 scope_membership_exists(
                     USER_SCOPE_TYPE,
                     user_id,
-                    APP_CONFIG_FRAGMENT_ENTITY_TYPE,
+                    AppConfigFragmentEntityType(),
                     AppConfigFragmentRow.id,
                 ),
             )

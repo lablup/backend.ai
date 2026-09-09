@@ -10,7 +10,7 @@ from uuid import UUID
 import sqlalchemy as sa
 
 from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE
-from ai.backend.common.data.entity.session import SESSION_ENTITY_TYPE
+from ai.backend.common.data.entity.session import SessionEntityType
 from ai.backend.manager.errors.resource import ProjectNotFound
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.project.row import ProjectRow
@@ -41,7 +41,7 @@ class ProjectSessionOperationScope(OperationScope):
             return sa.or_(
                 SessionRow.group_id == project_id,
                 scope_membership_exists(
-                    PROJECT_SCOPE_TYPE, project_id, SESSION_ENTITY_TYPE, SessionRow.id
+                    PROJECT_SCOPE_TYPE, project_id, SessionEntityType(), SessionRow.id
                 ),
             )
 

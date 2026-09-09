@@ -225,7 +225,7 @@ class ModelCardAdapter(BaseAdapter):
             limit=input.limit,
             offset=input.offset,
         )
-        result = await self._processors.model_card.scoped_search.run(
+        result = await self._model_card.scoped_search.run(
             ScopedSearchModelCardsAction(
                 items=[
                     ModelCardScopeItem(project_id=ProjectID(entry.value))

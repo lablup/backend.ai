@@ -11,7 +11,7 @@ import sqlalchemy as sa
 
 from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE
 from ai.backend.common.data.entity.user import USER_SCOPE_TYPE
-from ai.backend.common.data.entity.vfolder import VFOLDER_ENTITY_TYPE
+from ai.backend.common.data.entity.vfolder import VFolderEntityType
 from ai.backend.manager.data.project.types import ProjectType
 from ai.backend.manager.errors.resource import ProjectNotFound
 from ai.backend.manager.errors.user import UserNotFound
@@ -48,7 +48,7 @@ class ProjectVFolderOperationScope(OperationScope):
             return sa.or_(
                 VFolderRow.group == project_id,
                 scope_membership_exists(
-                    PROJECT_SCOPE_TYPE, project_id, VFOLDER_ENTITY_TYPE, VFolderRow.id
+                    PROJECT_SCOPE_TYPE, project_id, VFolderEntityType(), VFolderRow.id
                 ),
             )
 
@@ -104,10 +104,10 @@ class UserVFolderOperationScope(OperationScope):
                 VFolderRow.user == user_id,
                 VFolderRow.id.in_(permitted_vfolder_ids),
                 scope_membership_exists(
-                    PROJECT_SCOPE_TYPE, personal_project_id, VFOLDER_ENTITY_TYPE, VFolderRow.id
+                    PROJECT_SCOPE_TYPE, personal_project_id, VFolderEntityType(), VFolderRow.id
                 ),
                 scope_membership_exists(
-                    USER_SCOPE_TYPE, user_id, VFOLDER_ENTITY_TYPE, VFolderRow.id
+                    USER_SCOPE_TYPE, user_id, VFolderEntityType(), VFolderRow.id
                 ),
             )
 

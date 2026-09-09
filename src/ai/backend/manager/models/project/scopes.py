@@ -9,7 +9,7 @@ from typing import Any, override
 import sqlalchemy as sa
 
 from ai.backend.common.data.entity.domain import DOMAIN_SCOPE_TYPE, DomainID
-from ai.backend.common.data.entity.project import PROJECT_ENTITY_TYPE, PROJECT_SCOPE_TYPE
+from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE, ProjectEntityType
 from ai.backend.common.data.entity.resource_group import (
     RESOURCE_GROUP_SCOPE_TYPE,
     ResourceGroupID,
@@ -58,7 +58,7 @@ class DomainProjectOperationScope(OperationScope):
                 ProjectRow.domain_name
                 == sa.select(DomainRow.name).where(DomainRow.id == domain_id).scalar_subquery(),
                 scope_membership_exists(
-                    DOMAIN_SCOPE_TYPE, domain_id, PROJECT_ENTITY_TYPE, ProjectRow.id
+                    DOMAIN_SCOPE_TYPE, domain_id, ProjectEntityType(), ProjectRow.id
                 ),
             )
 
@@ -130,7 +130,7 @@ class ResourceGroupProjectOperationScope(OperationScope):
                 scope_membership_exists(
                     RESOURCE_GROUP_SCOPE_TYPE,
                     resource_group_id,
-                    PROJECT_ENTITY_TYPE,
+                    ProjectEntityType(),
                     ProjectRow.id,
                 ),
             )

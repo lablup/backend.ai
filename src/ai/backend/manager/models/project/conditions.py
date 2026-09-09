@@ -9,7 +9,7 @@ from uuid import UUID
 import sqlalchemy as sa
 
 from ai.backend.common.data.entity.domain import DOMAIN_SCOPE_TYPE
-from ai.backend.common.data.entity.project import PROJECT_ENTITY_TYPE
+from ai.backend.common.data.entity.project import ProjectEntityType
 from ai.backend.common.data.filter_specs import StringMatchSpec, UUIDEqualMatchSpec, UUIDInMatchSpec
 from ai.backend.manager.data.project.types import ProjectStatus, ProjectType
 from ai.backend.manager.data.user.types import UserStatus
@@ -42,7 +42,7 @@ class ProjectConditions:
             return sa.or_(
                 ProjectRow.domain_name == domain_name,
                 scope_membership_exists(
-                    DOMAIN_SCOPE_TYPE, domain_id, PROJECT_ENTITY_TYPE, ProjectRow.id
+                    DOMAIN_SCOPE_TYPE, domain_id, ProjectEntityType(), ProjectRow.id
                 ),
             )
 

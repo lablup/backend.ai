@@ -181,7 +181,7 @@ class DomainAdapter(BaseAdapter):
             limit=input.limit,
             offset=input.offset,
         )
-        result = await self._processors.domain.scoped_search.run(
+        result = await self._domain.scoped_search.run(
             ScopedSearchDomainsAction(
                 items=[
                     ResourceGroupDomainScopeItem(resource_group_id=ResourceGroupID(entry.value))

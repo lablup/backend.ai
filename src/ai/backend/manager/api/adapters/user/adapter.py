@@ -370,7 +370,7 @@ class UserAdapter(BaseAdapter):
         """Search the users the named scopes reach, combined with OR."""
         conditions = self._convert_filter(input.filter) if input.filter else []
         orders = self._convert_orders(input.order) if input.order else []
-        result = await self._processors.user.scoped_search.run(
+        result = await self._user.scoped_search.run(
             ScopedSearchUsersAction(
                 items=self._scope_items(input.scope),
                 searcher=UserSearcher(
@@ -409,7 +409,7 @@ class UserAdapter(BaseAdapter):
             limit=input.limit,
             offset=input.offset,
         )
-        result = await self._processors.user.scoped_search.run(
+        result = await self._user.scoped_search.run(
             ScopedSearchUsersAction(items=self._scope_items(scope), searcher=searcher)
         )
         return AdminSearchUsersPayload(

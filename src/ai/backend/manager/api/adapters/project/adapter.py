@@ -336,7 +336,7 @@ class ProjectAdapter(BaseAdapter):
             limit=input.limit,
             offset=input.offset,
         )
-        result = await self._processors.project.scoped_search.run(
+        result = await self._project.scoped_search.run(
             ScopedSearchProjectsAction(items=self._scope_items(input.scope), searcher=searcher)
         )
         return AdminSearchGroupsPayload(

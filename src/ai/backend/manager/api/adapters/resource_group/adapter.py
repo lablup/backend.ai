@@ -366,7 +366,7 @@ class ResourceGroupAdapter(BaseAdapter):
             limit=input.limit,
             offset=input.offset,
         )
-        result = await self._processors.resource_group.scoped_search_resource_groups.run(
+        result = await self._resource_group.scoped_search_resource_groups.run(
             ScopedSearchResourceGroupsAction(
                 items=self._scope_items(input.scope), searcher=searcher
             )

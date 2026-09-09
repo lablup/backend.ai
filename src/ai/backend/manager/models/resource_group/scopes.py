@@ -17,10 +17,10 @@ from typing import Any, override
 
 import sqlalchemy as sa
 
-from ai.backend.common.data.entity.domain import DOMAIN_ENTITY_TYPE, DomainID
-from ai.backend.common.data.entity.project import PROJECT_ENTITY_TYPE, ProjectID
+from ai.backend.common.data.entity.domain import DomainEntityType, DomainID
+from ai.backend.common.data.entity.project import ProjectEntityType, ProjectID
 from ai.backend.common.data.entity.resource_group import RESOURCE_GROUP_SCOPE_TYPE
-from ai.backend.common.data.entity.user import USER_ENTITY_TYPE, UserID
+from ai.backend.common.data.entity.user import UserEntityType, UserID
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.keypair.row import KeyPairRow
 from ai.backend.manager.models.resource_group.row import (
@@ -60,7 +60,7 @@ class DomainResourceGroupOperationScope(OperationScope):
                 scope_membership_exists(
                     RESOURCE_GROUP_SCOPE_TYPE,
                     ResourceGroupRow.id,
-                    DOMAIN_ENTITY_TYPE,
+                    DomainEntityType(),
                     domain_id,
                 ),
             )
@@ -94,7 +94,7 @@ class ProjectResourceGroupOperationScope(OperationScope):
                 scope_membership_exists(
                     RESOURCE_GROUP_SCOPE_TYPE,
                     ResourceGroupRow.id,
-                    PROJECT_ENTITY_TYPE,
+                    ProjectEntityType(),
                     project_id,
                 ),
             )
@@ -134,7 +134,7 @@ class UserResourceGroupOperationScope(OperationScope):
                 scope_membership_exists(
                     RESOURCE_GROUP_SCOPE_TYPE,
                     ResourceGroupRow.id,
-                    USER_ENTITY_TYPE,
+                    UserEntityType(),
                     user_id,
                 ),
             )

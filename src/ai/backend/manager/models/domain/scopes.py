@@ -8,7 +8,7 @@ from typing import Any, override
 
 import sqlalchemy as sa
 
-from ai.backend.common.data.entity.domain import DOMAIN_ENTITY_TYPE
+from ai.backend.common.data.entity.domain import DomainEntityType
 from ai.backend.common.data.entity.resource_group import (
     RESOURCE_GROUP_SCOPE_TYPE,
     ResourceGroupID,
@@ -43,7 +43,7 @@ class ResourceGroupDomainOperationScope(OperationScope):
                 scope_membership_exists(
                     RESOURCE_GROUP_SCOPE_TYPE,
                     resource_group_id,
-                    DOMAIN_ENTITY_TYPE,
+                    DomainEntityType(),
                     DomainRow.id,
                 ),
             )
