@@ -1,10 +1,14 @@
 from __future__ import annotations
 
+import inspect
 from collections.abc import Iterator
+from typing import Any, cast
 from unittest.mock import patch
 
+import psutil
 import pytest
 
+from ai.backend.agent.agent import AbstractAgent
 from ai.backend.agent.errors.resources import PortPoolExhaustedError
 from ai.backend.agent.port_pool import PortPool
 
@@ -159,3 +163,142 @@ class TestRemaining:
         first = pool.acquire()
         pool.release(first)
         assert pool.remaining() == [30001, 30002, first]
+
+
+class TestHoldingBackWhatTheHostStillHas:
+    """A fresh pool has no memory: every port starts marked never-used, so the cooldown that
+    exists to keep a just-released port out of circulation does not apply to any of them. A
+    restarted agent therefore hands out ports the host has not let go -- a departing container's
+    docker-proxy, a socket in TIME_WAIT -- and the container's bind fails with EADDRINUSE.
+    Measured on a restarted node: 9 of 12 sessions failed that way, against 3 of 12 once the same
+    node had settled.
+    """
+
+    def test_a_fresh_pool_would_hand_out_every_port_at_once(self) -> None:
+        """The state the fix is against, pinned so the reason for it stays visible."""
+        pool = PortPool((30000, 30002), cooldown_sec=60)
+        assert [pool.acquire() for _ in range(3)] == [30000, 30001, 30002]
+
+    def test_a_deferred_port_is_not_handed_out_within_the_cooldown(
+        self, fake_clock: list[float]
+    ) -> None:
+        pool = PortPool((30000, 30000), cooldown_sec=60)
+        pool.defer(30000)
+        with pytest.raises(PortPoolExhaustedError):
+            pool.acquire()
+
+    def test_it_comes_back_once_the_cooldown_passes(self, fake_clock: list[float]) -> None:
+        """Held back, not taken away: the host will let the port go, and the pool is small."""
+        pool = PortPool((30000, 30000), cooldown_sec=60)
+        pool.defer(30000)
+        fake_clock[0] += 60.0
+        assert pool.acquire() == 30000
+
+    def test_a_free_port_is_still_served_immediately(self, fake_clock: list[float]) -> None:
+        """Deferring must not stall a restart: only the ports the host holds wait."""
+        pool = PortPool((30000, 30002), cooldown_sec=60)
+        pool.defer(30000)
+        assert pool.acquire() == 30001
+
+    def test_deferred_ports_go_behind_the_free_ones(self, fake_clock: list[float]) -> None:
+        pool = PortPool((30000, 30002), cooldown_sec=60)
+        pool.defer_many([30000, 30001])
+        assert pool.remaining() == [30002, 30000, 30001]
+
+    def test_a_port_a_live_container_owns_stays_out(self, fake_clock: list[float]) -> None:
+        """`discard` and `defer` answer different questions. A live kernel's port is not waiting
+        for a cooldown -- it is taken -- and deferring it would put it back in the queue for the
+        next session to bind over."""
+        pool = PortPool((30000, 30002), cooldown_sec=60)
+        pool.discard(30001)
+        pool.defer(30001)
+        assert 30001 not in pool.remaining()
+
+    def test_a_port_outside_the_range_is_ignored(self, fake_clock: list[float]) -> None:
+        """The host's sockets are scanned node-wide; most of what comes back is not ours."""
+        pool = PortPool((30000, 30002), cooldown_sec=60)
+        pool.defer(22)
+        assert pool.remaining() == [30000, 30001, 30002]
+
+
+class _Conn:
+    def __init__(self, port: int | None) -> None:
+        self.laddr = None if port is None else _Addr(port)
+
+
+class _Addr:
+    def __init__(self, port: int) -> None:
+        self.port = port
+
+
+class TestTheStartupScanIsWiredIn:
+    """The pool method above is only worth having if startup calls it. `scan_running_kernels`
+    `discard`s the ports our own live kernels hold; everything the host holds beyond those is what
+    this defers."""
+
+    class _Holder:
+        """Only the attribute the method reads. `AbstractAgent` cannot be instantiated -- it has
+        eighteen abstract methods -- and the method under test is the shipped one either way."""
+
+        def __init__(self, pool: PortPool) -> None:
+            self.port_pool = pool
+
+        def _defer_ports_the_host_still_holds(self) -> None:
+            AbstractAgent._defer_ports_the_host_still_holds(cast(Any, self))
+
+    def _agent_with(self, pool: PortPool) -> _Holder:
+        return self._Holder(pool)
+
+    def test_ports_the_host_holds_are_deferred(
+        self, fake_clock: list[float], monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        pool = PortPool((30000, 30002), cooldown_sec=60)
+        monkeypatch.setattr(psutil, "net_connections", lambda kind="tcp": [_Conn(30000), _Conn(22)])
+        self._agent_with(pool)._defer_ports_the_host_still_holds()
+        assert pool.remaining() == [30001, 30002, 30000], (
+            "the port the host still holds was left at the head, so the next session binds over it"
+        )
+
+    def test_a_port_a_live_kernel_already_claimed_is_not_put_back(
+        self, fake_clock: list[float], monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        pool = PortPool((30000, 30002), cooldown_sec=60)
+        pool.discard(30000)  # what the container scan does for our own live kernels
+        monkeypatch.setattr(psutil, "net_connections", lambda kind="tcp": [_Conn(30000)])
+        self._agent_with(pool)._defer_ports_the_host_still_holds()
+        assert 30000 not in pool.remaining()
+
+    def test_a_host_that_will_not_say_does_not_stop_the_agent(
+        self, fake_clock: list[float], monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Reading the host's sockets can be refused. A node that cannot is no worse off than
+        before this existed, so it carries on rather than refusing to start."""
+
+        def _refuse(kind: str = "tcp") -> list[_Conn]:
+            raise psutil.AccessDenied()
+
+        pool = PortPool((30000, 30002), cooldown_sec=60)
+        monkeypatch.setattr(psutil, "net_connections", _refuse)
+        self._agent_with(pool)._defer_ports_the_host_still_holds()
+        assert pool.remaining() == [30000, 30001, 30002]
+
+    def test_a_connection_without_a_local_address_is_skipped(
+        self, fake_clock: list[float], monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        pool = PortPool((30000, 30000), cooldown_sec=60)
+        monkeypatch.setattr(psutil, "net_connections", lambda kind="tcp": [_Conn(None)])
+        self._agent_with(pool)._defer_ports_the_host_still_holds()
+        assert pool.acquire() == 30000
+
+    def test_startup_calls_it_after_claiming_our_own_kernels_ports(self) -> None:
+        """Order is the invariant, not just presence. `scan_running_kernels` `discard`s the ports
+        our live kernels hold; deferring before that would put those back in the queue with a
+        cooldown, and the next session would bind over a running kernel."""
+        source = inspect.getsource(AbstractAgent.scan_running_kernels)
+        assert "_defer_ports_the_host_still_holds()" in source, (
+            "startup no longer holds back the ports the host still has, so the first sessions"
+            " after a restart bind against them and fail with EADDRINUSE"
+        )
+        assert source.index("port_pool.discard(") < source.index(
+            "_defer_ports_the_host_still_holds()"
+        ), "the host scan must come after our own kernels' ports are claimed"

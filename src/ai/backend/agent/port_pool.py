@@ -87,6 +87,29 @@ class PortPool:
         for p in ports:
             self.release(p)
 
+    def defer(self, port: int) -> None:
+        """Hold a port back until its cooldown passes, without claiming it.
+
+        For a port the HOST still holds although no live container of ours does: the docker-proxy
+        of a container on its way out, or a socket in TIME_WAIT. The pool is built with every port
+        marked never-used, so a restarted agent hands those straight out and the container's bind
+        fails with EADDRINUSE -- the one moment this cooldown exists for is the one moment it did
+        not apply. Measured on a restarted node: 9 of 12 sessions failed that way, against 3 of 12
+        once it had settled.
+
+        A port already `discard`ed stays out: a live container owns it, and the cooldown is not
+        what is keeping it away.
+        """
+        if port not in self._ports:
+            return
+        del self._ports[port]
+        self._ports[port] = monotonic()
+
+    def defer_many(self, ports: Iterable[int]) -> None:
+        """Hold back multiple ports at once. See :meth:`defer`."""
+        for p in ports:
+            self.defer(p)
+
     def discard(self, port: int) -> None:
         """Remove a port from the pool without scheduling reuse.
 
