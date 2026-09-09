@@ -68,6 +68,5 @@ VFOLDER_GROUP_PERMISSION_MODE: Final[int] = 0o775
 DEFAULT_DOMAIN_NAME: Final[str] = "default"
 
 NOOP_STORAGE_VOLUME_NAME: Final[str] = "noop"
-NOOP_STORAGE_BACKEND_TYPE: Final[str] = "noop"
 
 UNKNOWN_CONTAINER_ID: Final[str] = "unknown"
