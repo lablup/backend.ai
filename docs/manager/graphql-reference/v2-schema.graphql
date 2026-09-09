@@ -16441,26 +16441,22 @@ input UpdateResourceGroupFairShareSpecInput {
   """Name of the resource group to update."""
   resourceGroupName: String!
 
-  """
-  Half-life for exponential decay in days. Leave null to keep existing value.
-  """
-  halfLifeDays: Int = null
+  """Half-life for exponential decay in days. Omit to leave unchanged."""
+  halfLifeDays: Int
 
-  """Total lookback period in days. Leave null to keep existing value."""
-  lookbackDays: Int = null
+  """Total lookback period in days. Omit to leave unchanged."""
+  lookbackDays: Int
 
-  """
-  Granularity of decay buckets in days. Leave null to keep existing value.
-  """
-  decayUnitDays: Int = null
+  """Granularity of decay buckets in days. Omit to leave unchanged."""
+  decayUnitDays: Int
 
-  """Default weight for entities. Leave null to keep existing value."""
-  defaultWeight: Decimal = null
+  """Default weight for entities. Omit to leave unchanged."""
+  defaultWeight: Decimal
 
   """
-  Resource weights for fair share calculation. Each entry specifies a resource type and its weight multiplier. Only provided resource types are updated (partial update). Set weight to null to remove that resource type (revert to default). Leave the entire list null to keep all existing values.
+  Resource weights for fair share calculation. Each entry specifies a resource type and its weight multiplier. Only provided resource types are updated (partial update). Set weight to null to remove that resource type (revert to default). Omit the entire list to keep all existing values.
   """
-  resourceWeights: [ResourceWeightEntryInput!] = null
+  resourceWeights: [ResourceWeightEntryInput!]
 }
 
 """
@@ -16478,42 +16474,36 @@ input UpdateResourceGroupInput {
   """Name of the resource group to update."""
   resourceGroupName: String!
 
-  """
-  Whether the resource group is active. Leave null to keep existing value.
-  """
-  isActive: Boolean = null
+  """Whether the resource group is active. Omit to leave unchanged."""
+  isActive: Boolean
+
+  """Whether the resource group is public. Omit to leave unchanged."""
+  isPublic: Boolean
 
   """
-  Whether the resource group is public. Leave null to keep existing value.
+  Added in 26.9.0. Whether this is the default resource group. At most one resource group may hold the flag, so setting it to true is rejected while another one holds it; clear that one first. Omit to leave unchanged.
   """
-  isPublic: Boolean = null
+  isDefault: Boolean
+
+  """Human-readable description. Omit to leave unchanged; null clears."""
+  description: String
+
+  """App proxy address. Omit to leave unchanged; null clears."""
+  appProxyAddr: String
+
+  """App proxy API token. Omit to leave unchanged; null clears."""
+  appproxyApiToken: String
+
+  """Whether to use host network mode. Omit to leave unchanged."""
+  useHostNetwork: Boolean
+
+  """Scheduler type (FIFO, LIFO, DRF, FAIR_SHARE). Omit to leave unchanged."""
+  schedulerType: SchedulerType
 
   """
-  Added in 26.9.0. Whether this is the default resource group. At most one resource group may hold the flag, so setting it to true is rejected while another one holds it; clear that one first. Leave null to keep existing value.
+  Added in 26.3.0. Preemption configuration. When provided, replaces the entire preemption config. Omit to leave unchanged.
   """
-  isDefault: Boolean = null
-
-  """Human-readable description. Leave null to keep existing value."""
-  description: String = null
-
-  """App proxy address. Leave null to keep existing value."""
-  appProxyAddr: String = null
-
-  """App proxy API token. Leave null to keep existing value."""
-  appproxyApiToken: String = null
-
-  """Whether to use host network mode. Leave null to keep existing value."""
-  useHostNetwork: Boolean = null
-
-  """
-  Scheduler type (FIFO, LIFO, DRF, FAIR_SHARE). Leave null to keep existing value.
-  """
-  schedulerType: SchedulerType = null
-
-  """
-  Added in 26.3.0. Preemption configuration. When provided, replaces the entire preemption config. Leave null to keep existing value.
-  """
-  preemption: PreemptionConfigInput = null
+  preemption: PreemptionConfigInput
 }
 
 """Added in 26.2.0. Payload for resource group update mutation."""
