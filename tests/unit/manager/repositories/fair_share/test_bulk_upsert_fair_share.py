@@ -45,6 +45,7 @@ from ai.backend.manager.repositories.fair_share.upserters import (
     ProjectFairShareBulkWeightUpserterSpec,
     UserFairShareBulkWeightUpserterSpec,
 )
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.testutils.db import with_tables
 
 
@@ -115,7 +116,7 @@ class TestBulkUpsertDomainFairShare:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> FairShareRepository:
-        return FairShareRepository(db=db_with_cleanup)
+        return FairShareRepository(db_with_cleanup, V2DBOpsProvider(db_with_cleanup))
 
     @pytest.fixture
     async def context_all_new_domains(
@@ -425,7 +426,7 @@ class TestBulkUpsertProjectFairShare:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> FairShareRepository:
-        return FairShareRepository(db=db_with_cleanup)
+        return FairShareRepository(db_with_cleanup, V2DBOpsProvider(db_with_cleanup))
 
     @pytest.fixture
     async def context_all_new_projects(
@@ -679,7 +680,7 @@ class TestBulkUpsertUserFairShare:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> FairShareRepository:
-        return FairShareRepository(db=db_with_cleanup)
+        return FairShareRepository(db_with_cleanup, V2DBOpsProvider(db_with_cleanup))
 
     @pytest.fixture
     async def context_all_new_users(

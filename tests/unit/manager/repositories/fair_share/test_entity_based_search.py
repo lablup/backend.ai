@@ -73,6 +73,7 @@ from ai.backend.manager.repositories.fair_share import (
     ProjectFairShareUpserterSpec,
     UserFairShareUpserterSpec,
 )
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.secret.types import SecretValue
 from ai.backend.manager.types import TriState
 from ai.backend.testutils.db import with_tables
@@ -144,7 +145,7 @@ class TestSearchDomainFairSharesEntityBased:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> FairShareRepository:
-        return FairShareRepository(db_with_cleanup)
+        return FairShareRepository(db_with_cleanup, V2DBOpsProvider(db_with_cleanup))
 
     @pytest.fixture
     async def domain_with_record(
@@ -745,7 +746,7 @@ class TestSearchProjectFairSharesEntityBased:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> FairShareRepository:
-        return FairShareRepository(db_with_cleanup)
+        return FairShareRepository(db_with_cleanup, V2DBOpsProvider(db_with_cleanup))
 
     @pytest.fixture
     async def project_with_record(
@@ -1174,7 +1175,7 @@ class TestSearchUserFairSharesEntityBased:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> FairShareRepository:
-        return FairShareRepository(db_with_cleanup)
+        return FairShareRepository(db_with_cleanup, V2DBOpsProvider(db_with_cleanup))
 
     async def _create_user(
         self,

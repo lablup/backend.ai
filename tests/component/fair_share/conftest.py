@@ -73,7 +73,9 @@ def fair_share_processors(
     database_engine: ExtendedAsyncSAEngine,
     processor_registry: ProcessorRegistry[Any],
 ) -> FairShareProcessors:
-    service = FairShareService(FairShareRepository(database_engine))
+    service = FairShareService(
+        FairShareRepository(database_engine, V2DBOpsProvider(database_engine))
+    )
     fair_share_groups = processor_registry.concern(ConcernMeta(Concern.RESOURCE_GROUP))
     return FairShareProcessors(
         fair_share_groups.dangling_field_group(

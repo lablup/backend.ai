@@ -61,6 +61,7 @@ from ai.backend.manager.repositories.fair_share import (
     ProjectFairShareUpserterSpec,
     UserFairShareUpserterSpec,
 )
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.types import OptionalState, TriState
 from ai.backend.testutils.db import with_tables
 from ai.backend.testutils.fixtures import DomainFixtureData
@@ -265,7 +266,7 @@ class TestFairShareRepository:
         db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> FairShareRepository:
         """Create FairShareRepository instance with database"""
-        return FairShareRepository(db=db_with_cleanup)
+        return FairShareRepository(db_with_cleanup, V2DBOpsProvider(db_with_cleanup))
 
     # ==================== Domain Fair Share Tests ====================
 

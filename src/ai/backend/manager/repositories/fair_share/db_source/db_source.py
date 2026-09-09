@@ -74,6 +74,7 @@ from ai.backend.manager.repositories.fair_share.types import (
     ProjectFairShareEntitySearchResult,
     UserFairShareEntitySearchResult,
 )
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession as SASession
@@ -88,9 +89,11 @@ class FairShareDBSource:
     """Database source for Fair Share operations."""
 
     _db: ExtendedAsyncSAEngine
+    _v2_ops: V2DBOpsProvider
 
-    def __init__(self, db: ExtendedAsyncSAEngine) -> None:
+    def __init__(self, db: ExtendedAsyncSAEngine, v2_ops: V2DBOpsProvider) -> None:
         self._db = db
+        self._v2_ops = v2_ops
 
     # ==================== Domain Fair Share ====================
 

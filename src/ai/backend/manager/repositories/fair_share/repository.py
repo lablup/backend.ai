@@ -56,7 +56,7 @@ if TYPE_CHECKING:
         UserFairShareRow,
     )
     from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 
 __all__ = ("FairShareRepository",)
 
@@ -82,8 +82,8 @@ class FairShareRepository:
 
     _db_source: FairShareDBSource
 
-    def __init__(self, db: ExtendedAsyncSAEngine) -> None:
-        self._db_source = FairShareDBSource(db)
+    def __init__(self, db: ExtendedAsyncSAEngine, v2_ops_provider: V2DBOpsProvider) -> None:
+        self._db_source = FairShareDBSource(db, v2_ops_provider)
 
     # ==================== Domain Fair Share ====================
 
