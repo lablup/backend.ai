@@ -5,7 +5,6 @@ from __future__ import annotations
 from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Any, override
-from uuid import UUID
 
 from sqlalchemy.orm import InstrumentedAttribute
 
@@ -31,7 +30,7 @@ class DeploymentPolicyPurger(FieldPurger[DeploymentPolicyRow, DeploymentPolicyDa
         return DeploymentPolicyRow.id
 
     @override
-    def target_id_value(self) -> UUID:
+    def target_id_value(self) -> DeploymentPolicyID:
         return self.policy_id
 
     @override

@@ -32,6 +32,7 @@ from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.exception import RBACTypeConversionError
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.permission.scope_template import ScopeTemplateValue
 from ai.backend.manager.data.permission.status import RoleStatus
 from ai.backend.manager.data.permission.types import (
@@ -42,7 +43,7 @@ from ai.backend.manager.data.permission.types import (
 from ai.backend.manager.data.permission.types import (
     ScopeType as LegacyScopeType,
 )
-from ai.backend.manager.errors.repository import EntityNotFoundError
+from ai.backend.manager.errors.base.entity import EntityNotFoundError
 from ai.backend.manager.errors.role_preset import InvalidRoleNameTemplate
 from ai.backend.manager.models.base import Base
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
@@ -221,7 +222,9 @@ class V2EntityWriteOps(V2GraphWriteOpsBase):
                     data = await self.purge_entity(purger)
                     if data is None:
                         raise EntityNotFoundError(
-                            f"{purger.row_class().__name__} {purger.entity_id()} not found"
+                            entity_type=entity_id.entity_type(),
+                            operation=ActionOperationType.PURGE,
+                            extra_msg=f"{purger.row_class().__name__} {entity_id} not found",
                         )
                     successes[entity_id] = data
             except Exception as e:

@@ -16,7 +16,7 @@ from typing import Any
 
 from ai.backend.common.data.entity.types import EntityData, FieldData
 from ai.backend.manager.actions.run_status import ActionRunStatus
-from ai.backend.manager.actions.types import OperationStatus
+from ai.backend.manager.actions.types import ActionOperationType, OperationStatus
 from ai.backend.manager.actions.v2.bulk.result import (
     PartialBulkEntityResult,
     PartialBulkResult,
@@ -88,7 +88,8 @@ from ai.backend.manager.actions.v2.ops.result import (
     ScopedBatchOpsResult,
     ScopedFieldsOpsResult,
 )
-from ai.backend.manager.errors.repository import EntityNotFoundError
+from ai.backend.manager.errors.base.entity import EntityNotFoundError
+from ai.backend.manager.errors.base.field import FieldNotFoundError
 from ai.backend.manager.models.specs.types import BulkResultWithFailures
 from ai.backend.manager.repositories.ops.repository import OpsRepository
 
@@ -222,7 +223,11 @@ class PartialBulkGetService[TData]:
                 if entity_id in found
                 else PartialBulkEntityResult[TData].failed(
                     entity_id,
-                    EntityNotFoundError(f"{querier.row_class().__name__} {entity_id} not found"),
+                    EntityNotFoundError(
+                        entity_type=entity_id.entity_type(),
+                        operation=ActionOperationType.GET,
+                        extra_msg=f"{querier.row_class().__name__} {entity_id} not found",
+                    ),
                 )
                 for entity_id in entity_ids
             ]
@@ -729,8 +734,9 @@ class FieldPartialBulkGetService[TData: FieldData]:
         return BulkFieldOpsResult(
             successes={field_id: found[field_id] for field_id in field_ids if field_id in found},
             errors={
-                field_id: EntityNotFoundError(
-                    f"{querier.row_class().__name__} {field_id} not found"
+                field_id: FieldNotFoundError(
+                    f"{querier.row_class().__name__} {field_id} not found",
+                    field_type=field_id.field_type(),
                 )
                 for field_id in field_ids
                 if field_id not in found

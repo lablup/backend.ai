@@ -9,7 +9,8 @@ from uuid import UUID
 
 import sqlalchemy as sa
 
-from ai.backend.common.data.entity.agent import AgentUUID
+from ai.backend.common.data.entity.agent import AgentEntityType, AgentUUID
+from ai.backend.common.data.entity.types import EntityType
 from ai.backend.common.types import AgentId
 from ai.backend.manager.models.agent.row import AgentRow
 from ai.backend.manager.models.clauses import QueryCondition
@@ -28,6 +29,10 @@ class AgentNameLookup(DataLookup[AgentRow, AgentUUID]):
     @override
     def row_class(self) -> type[AgentRow]:
         return AgentRow
+
+    @override
+    def entity_type(self) -> EntityType:
+        return AgentEntityType()
 
     @override
     def conditions(self) -> Sequence[QueryCondition]:

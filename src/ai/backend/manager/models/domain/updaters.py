@@ -5,7 +5,6 @@ from __future__ import annotations
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import Any, override
-from uuid import UUID
 
 from sqlalchemy.orm import InstrumentedAttribute
 
@@ -48,7 +47,7 @@ class DomainUpdater(GuardedDataUpdater[DomainRow, DomainData]):
         return DomainRow.id
 
     @override
-    def target_id_value(self) -> UUID:
+    def target_id_value(self) -> DomainID:
         return self.domain_id
 
     @override
@@ -101,7 +100,7 @@ class DomainDotfilesUpdater(DataUpdater[DomainRow, DomainData]):
         return DomainRow.id
 
     @override
-    def target_id_value(self) -> UUID:
+    def target_id_value(self) -> DomainID:
         return self.domain_id
 
     @override
@@ -134,7 +133,7 @@ class DomainSoftDeleteUpdater(GuardedDataUpdater[DomainRow, DomainData]):
         return DomainRow.id
 
     @override
-    def target_id_value(self) -> UUID:
+    def target_id_value(self) -> DomainID:
         return self.domain_id
 
     @override
@@ -177,7 +176,7 @@ class DomainRestoreUpdater(GuardedDataUpdater[DomainRow, DomainData]):
         return DomainRow.id
 
     @override
-    def target_id_value(self) -> UUID:
+    def target_id_value(self) -> DomainID:
         return self.domain_id
 
     @override

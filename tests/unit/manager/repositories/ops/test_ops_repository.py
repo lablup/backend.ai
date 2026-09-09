@@ -42,11 +42,8 @@ from ai.backend.manager.actions.v2.ops.base import SearchOpsAction
 from ai.backend.manager.actions.v2.scope.base import BaseScopeAction
 from ai.backend.manager.actions.v2.scope.processor import ScopeActionProcessor
 from ai.backend.manager.data.role_preset.types import RolePresetData
-from ai.backend.manager.errors.repository import (
-    AmbiguousEntityKeyError,
-    EmptyOperationScopeError,
-    EntityNotFoundError,
-)
+from ai.backend.manager.errors.base.entity import EntityNotFoundError
+from ai.backend.manager.errors.repository import AmbiguousEntityKeyError, EmptyOperationScopeError
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.entity_label.row import EntityLabelRow
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
@@ -206,8 +203,8 @@ class _PresetFieldType(FieldType):
 
     @override
     @classmethod
-    def owner_type(cls) -> type[EntityType] | None:
-        return None
+    def owner_type(cls) -> type[EntityType]:
+        return RolePresetEntityType
 
 
 class _PresetFieldID(FieldIdentifier):
@@ -330,6 +327,10 @@ class _PresetByName(DataLookup[RolePresetRow, RolePresetID]):
     @override
     def row_class(self) -> type[RolePresetRow]:
         return RolePresetRow
+
+    @override
+    def entity_type(self) -> EntityType:
+        return RolePresetEntityType()
 
     @override
     def conditions(self) -> Sequence[QueryCondition]:

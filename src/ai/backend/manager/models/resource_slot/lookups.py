@@ -11,7 +11,11 @@ import sqlalchemy as sa
 
 from ai.backend.common.data.entity.agent import AgentUUID
 from ai.backend.common.data.entity.agent_resource import AgentResourceID
-from ai.backend.common.data.entity.resource_slot import ResourceSlotTypeUUID
+from ai.backend.common.data.entity.resource_slot import (
+    ResourceSlotTypeEntityType,
+    ResourceSlotTypeUUID,
+)
+from ai.backend.common.data.entity.types import EntityType
 from ai.backend.manager.models.agent.row import AgentRow
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.resource_slot.row import AgentResourceRow, ResourceSlotTypeRow
@@ -27,6 +31,10 @@ class ResourceSlotTypeLookup(DataLookup[ResourceSlotTypeRow, ResourceSlotTypeUUI
     @override
     def row_class(self) -> type[ResourceSlotTypeRow]:
         return ResourceSlotTypeRow
+
+    @override
+    def entity_type(self) -> EntityType:
+        return ResourceSlotTypeEntityType()
 
     @override
     def conditions(self) -> Sequence[QueryCondition]:

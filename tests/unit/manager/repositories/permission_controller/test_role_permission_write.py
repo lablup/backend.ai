@@ -16,8 +16,8 @@ from ai.backend.common.data.entity.session import SessionEntityType
 from ai.backend.manager.data.permission.permission import PermissionData
 from ai.backend.manager.data.permission.status import RoleStatus
 from ai.backend.manager.data.permission.types import Permission, RoleSource
+from ai.backend.manager.errors.base.field import FieldNotFoundError
 from ai.backend.manager.errors.permission import PermissionAlreadyGranted
-from ai.backend.manager.errors.repository import EntityNotFoundError
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.rbac_models.permission.creators import RolePermissionCreator
 from ai.backend.manager.models.rbac_models.permission.lookups import RolePermissionOwnerLookup
@@ -110,4 +110,4 @@ class TestRolePermissionWrite:
         })
 
         assert set(result.successes) == {created.id}
-        assert isinstance(result.errors[unknown], EntityNotFoundError)
+        assert isinstance(result.errors[unknown], FieldNotFoundError)

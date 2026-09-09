@@ -169,11 +169,12 @@ from ai.backend.manager.data.permission.role import (
 )
 from ai.backend.manager.data.permission.status import RoleStatus as InternalRoleStatus
 from ai.backend.manager.data.permission.types import RoleSource as InternalRoleSource
+from ai.backend.manager.errors.base.not_found import NotFoundError
 from ai.backend.manager.errors.permission import (
     PermissionAlreadyGranted,
     ReplaceRolePermissionRoleIdMismatch,
 )
-from ai.backend.manager.errors.repository import EntityNotFoundError, RepositoryIntegrityError
+from ai.backend.manager.errors.repository import RepositoryIntegrityError
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.condition_utils import combine_conditions_or, negate_conditions
 from ai.backend.manager.models.rbac.exceptions import InvalidScope
@@ -1035,7 +1036,7 @@ class RBACAdapter(BaseAdapter):
                     permission_ids=[PermissionID(pid) for pid in input.permission_ids]
                 )
             )
-        except EntityNotFoundError:
+        except NotFoundError:
             return BulkRemoveRolePermissionsPayload(items=[], failed=[])
         return BulkRemoveRolePermissionsPayload(
             items=[self._permission_data_to_node(item) for item in result.successes.values()],
@@ -1045,7 +1046,7 @@ class RBACAdapter(BaseAdapter):
                     message=str(exception),
                 )
                 for permission_id, exception in result.errors.items()
-                if not isinstance(exception, EntityNotFoundError)
+                if not isinstance(exception, NotFoundError)
             ],
         )
 

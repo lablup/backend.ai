@@ -7,7 +7,11 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.common.data.entity.storage_namespace import StorageNamespaceID
+from ai.backend.common.data.entity.storage_namespace import (
+    StorageNamespaceEntityType,
+    StorageNamespaceID,
+)
+from ai.backend.common.data.entity.types import EntityType
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.specs.lookup import DataLookup
 from ai.backend.manager.models.storage_namespace import StorageNamespaceRow
@@ -27,6 +31,10 @@ class StorageNamespaceLookup(DataLookup[StorageNamespaceRow, StorageNamespaceID]
     @override
     def row_class(self) -> type[StorageNamespaceRow]:
         return StorageNamespaceRow
+
+    @override
+    def entity_type(self) -> EntityType:
+        return StorageNamespaceEntityType()
 
     @override
     def conditions(self) -> Sequence[QueryCondition]:

@@ -82,7 +82,7 @@ from ai.backend.manager.actions.v2.scope.processor import ScopeActionProcessor
 from ai.backend.manager.actions.v2.single_entity.base import BaseSingleEntityAction
 from ai.backend.manager.actions.v2.single_entity.processor import SingleEntityActionProcessor
 from ai.backend.manager.data.permission.scope_template import ScopeTemplateValue
-from ai.backend.manager.errors.repository import EntityNotFoundError
+from ai.backend.manager.errors.base.field import FieldNotFoundError
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.rbac_models.role_preset.row import RolePresetRow
 from ai.backend.manager.models.scopes import ExistenceCheck, OperationScope
@@ -164,8 +164,8 @@ class _TestFieldType(FieldType):
 
     @override
     @classmethod
-    def owner_type(cls) -> type[EntityType] | None:
-        return None
+    def owner_type(cls) -> type[EntityType]:
+        return RolePresetEntityType
 
 
 _FIELD_TYPE = _TestFieldType()
@@ -301,8 +301,8 @@ class _PresetUpdater(DataUpdater[RolePresetRow, _PresetData]):
         return RolePresetRow.id
 
     @override
-    def target_id_value(self) -> uuid.UUID:
-        return self.target
+    def target_id_value(self) -> EntityIdentifier:
+        return _EntityID(self.target)
 
     @property
     @override
@@ -367,6 +367,10 @@ class _PresetByName(DataLookup[RolePresetRow, EntityIdentifier]):
     @override
     def row_class(self) -> type[RolePresetRow]:
         return RolePresetRow
+
+    @override
+    def entity_type(self) -> EntityType:
+        return _ENTITY_TYPE
 
     @override
     def conditions(self) -> Sequence[QueryCondition]:
@@ -532,8 +536,8 @@ class _PresetFieldPurger(FieldPurger[RolePresetRow, _PresetFieldData]):
         return RolePresetRow.id
 
     @override
-    def target_id_value(self) -> uuid.UUID:
-        return self.target
+    def target_id_value(self) -> FieldIdentifier:
+        return _FieldID(self.target)
 
     @override
     def conflict_checks(self) -> Sequence[ConflictCheck]:
@@ -1695,7 +1699,7 @@ async def test_field_partial_bulk_get_answers_for_every_named_row(
 
     assert result.successes == {field_stored.id: field_stored}
     assert list(result.errors) == [absent]
-    assert isinstance(result.errors[absent], EntityNotFoundError)
+    assert isinstance(result.errors[absent], FieldNotFoundError)
 
 
 async def test_field_upsert_forwards_owner_and_upserter(

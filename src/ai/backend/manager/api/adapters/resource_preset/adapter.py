@@ -32,7 +32,7 @@ from ai.backend.common.types import BinarySize, ResourceSlot
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.data.resource_preset.types import ResourcePresetData
-from ai.backend.manager.errors.repository import EntityNotFoundError
+from ai.backend.manager.errors.base.not_found import NotFoundError
 from ai.backend.manager.errors.resource import ResourcePresetNotFound
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.condition_utils import combine_conditions_or, negate_conditions
@@ -127,7 +127,7 @@ class ResourcePresetAdapter(BaseAdapter):
             result = await self._resource_preset.get_preset.run(
                 GetResourcePresetAction(preset_id=ResourcePresetID(preset_id))
             )
-        except EntityNotFoundError as e:
+        except NotFoundError as e:
             # The generic repository names no domain; the route answered with the
             # preset's own error before and keeps doing so.
             raise ResourcePresetNotFound() from e
