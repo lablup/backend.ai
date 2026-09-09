@@ -18605,15 +18605,6 @@
         "title": "DeleteCategoryInput",
         "type": "object"
       },
-      "RoleSource": {
-        "description": "Definition source of the role.",
-        "enum": [
-          "system",
-          "custom"
-        ],
-        "title": "RoleSource",
-        "type": "string"
-      },
       "ScopeInputDTO": {
         "description": "Scope reference for associating an entity with a scope.",
         "properties": {
@@ -18655,16 +18646,23 @@
             "description": "Role description",
             "title": "Description"
           },
-          "source": {
-            "$ref": "#/components/schemas/RoleSource",
-            "default": "custom",
-            "description": "Role source"
-          },
           "auto_assign": {
             "default": false,
             "description": "When true, the role is automatically granted to a user when the user is added to a scope this role is registered in.",
             "title": "Auto Assign",
             "type": "boolean"
+          },
+          "scope": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ScopeInputDTO"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The scope the role belongs to"
           },
           "scopes": {
             "anyOf": [
@@ -18679,7 +18677,7 @@
               }
             ],
             "default": null,
-            "description": "Scopes to register the role in",
+            "description": "Deprecated: use `scope`. Accepts exactly one entry.",
             "title": "Scopes"
           }
         },
@@ -18706,7 +18704,7 @@
           "scope_id": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/StringFilter"
+                "$ref": "#/components/schemas/UUIDFilter"
               },
               {
                 "type": "null"
@@ -34594,15 +34592,28 @@
             "title": "Name",
             "type": "string"
           },
-          "source": {
-            "$ref": "#/components/schemas/RoleSource",
-            "default": "custom",
-            "description": "Role source"
+          "scope_type": {
+            "description": "Type of the scope the role belongs to",
+            "title": "Scope Type",
+            "type": "string"
+          },
+          "scope_id": {
+            "description": "ID of the scope the role belongs to",
+            "format": "uuid",
+            "title": "Scope Id",
+            "type": "string"
           },
           "status": {
-            "$ref": "#/components/schemas/RoleStatus",
-            "default": "active",
-            "description": "Role status"
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RoleStatus"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Role status; active if omitted"
           },
           "description": {
             "anyOf": [
@@ -34619,7 +34630,9 @@
           }
         },
         "required": [
-          "name"
+          "name",
+          "scope_type",
+          "scope_id"
         ],
         "title": "CreateRoleRequest",
         "type": "object"
@@ -34651,6 +34664,15 @@
           "updated_at"
         ],
         "title": "RoleOrderField",
+        "type": "string"
+      },
+      "RoleSource": {
+        "description": "Definition source of the role.",
+        "enum": [
+          "system",
+          "custom"
+        ],
+        "title": "RoleSource",
         "type": "string"
       },
       "SearchRolesRequest": {

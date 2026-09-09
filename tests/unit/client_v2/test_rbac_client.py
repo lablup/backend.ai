@@ -1,3 +1,4 @@
+import uuid
 from unittest.mock import AsyncMock, MagicMock
 from uuid import UUID
 
@@ -6,6 +7,7 @@ from yarl import URL
 from ai.backend.client.v2.base_client import BackendAIAuthClient
 from ai.backend.client.v2.config import ClientConfig
 from ai.backend.client.v2.domains.rbac import RBACClient
+from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE
 from ai.backend.common.dto.manager.rbac.request import (
     AssignRoleRequest,
     CreateRoleRequest,
@@ -32,7 +34,6 @@ from ai.backend.common.dto.manager.rbac.response import (
     SearchUsersAssignedToRoleResponse,
     UpdateRoleResponse,
 )
-from ai.backend.common.dto.manager.rbac.types import RoleSource, RoleStatus
 
 from .conftest import MockAuth
 
@@ -88,9 +89,9 @@ class TestRBACClient:
         rbac = RBACClient(client)
 
         request = CreateRoleRequest(
+            scope_type=PROJECT_SCOPE_TYPE,
+            scope_id=uuid.uuid4(),
             name="admin",
-            source=RoleSource.CUSTOM,
-            status=RoleStatus.ACTIVE,
             description="Admin role",
         )
         result = await rbac.create_role(request)

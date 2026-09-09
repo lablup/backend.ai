@@ -211,7 +211,12 @@ async def _user_in_domain(sess: AsyncSession) -> tuple[UserID, DomainID, uuid.UU
 
 
 async def _role(sess: AsyncSession, user_id: UserID, rows: Sequence[PermissionRow]) -> None:
-    role = RoleRow(name=f"role-{uuid.uuid4().hex[:8]}", status=RoleStatus.ACTIVE)
+    role = RoleRow(
+        name=f"role-{uuid.uuid4().hex[:8]}",
+        status=RoleStatus.ACTIVE,
+        scope_type=USER_SCOPE_TYPE,
+        scope_id=user_id,
+    )
     sess.add(role)
     await sess.flush()
     sess.add(UserRoleRow(user_id=user_id, role_id=role.id))

@@ -222,6 +222,8 @@ async def regular_user_vfolder_create_permission(
                 id=role_id,
                 name=f"test-vfolder-creator-{secrets.token_hex(4)}",
                 status=RoleStatus.ACTIVE,
+                scope_type=ScopeType.PROJECT.value,
+                scope_id=group_fixture,
             )
         )
         await conn.execute(

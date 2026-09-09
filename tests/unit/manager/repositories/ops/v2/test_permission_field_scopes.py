@@ -79,7 +79,15 @@ def provider(database: ExtendedAsyncSAEngine) -> PermissionOpsProvider:
 @pytest.fixture
 async def role_id(database: ExtendedAsyncSAEngine) -> RoleID:
     async with database.begin_session() as sess:
-        row = RoleRow(name="field-scope-role", source=RoleSource.SYSTEM, status=RoleStatus.ACTIVE)
+        home = uuid.uuid4()
+        sess.add(VirtualEntityRow(entity_type=_SCOPE_TYPE, entity_id=home))
+        row = RoleRow(
+            name="field-scope-role",
+            source=RoleSource.SYSTEM,
+            status=RoleStatus.ACTIVE,
+            scope_type=_SCOPE_TYPE,
+            scope_id=home,
+        )
         sess.add(row)
         await sess.flush()
         return RoleID(row.id)

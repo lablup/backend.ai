@@ -454,6 +454,8 @@ async def user_system_role(
                 name=f"user-{str(user_uuid)[:8]}",
                 source=RoleSource.SYSTEM,
                 status=RoleStatus.ACTIVE,
+                scope_type=ScopeType.USER.value,
+                scope_id=user_uuid,
             )
         )
         await conn.execute(

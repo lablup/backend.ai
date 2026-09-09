@@ -22,7 +22,7 @@ from ai.backend.common.data.entity.idle_checker import (
     IdleCheckerID,
 )
 from ai.backend.common.data.entity.project import ProjectID
-from ai.backend.common.data.entity.types import EntityIdentifier
+from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
 from ai.backend.common.data.entity.user import USER_ENTITY_TYPE, UserID
 from ai.backend.common.data.idle_checker.types import (
     CheckerType,
@@ -30,7 +30,9 @@ from ai.backend.common.data.idle_checker.types import (
     SessionLifetimeSpec,
 )
 from ai.backend.common.data.permission.types import (
-    EntityType,
+    EntityType as LegacyEntityType,
+)
+from ai.backend.common.data.permission.types import (
     OperationType,
     Permission,
     ScopeType,
@@ -392,6 +394,8 @@ async def _grant(
                 id=role_id,
                 name=f"icb-role-{role_id.hex[:8]}",
                 description="idle checker assignment component test role",
+                scope_type=EntityType(scope_type),
+                scope_id=scope_id,
             )
         )
         await db_sess.flush()
@@ -453,7 +457,7 @@ async def project_assignment_manage_permission(
         regular_user_fixture.user_uuid,
         ScopeType.PROJECT,
         assignment_seed.project_id,
-        EntityType.PROJECT,
+        LegacyEntityType.PROJECT,
         (OperationType.SOFT_DELETE, OperationType.HARD_DELETE),
     ):
         async for _ in _grant(
@@ -491,7 +495,7 @@ async def user_self_scope_permission(
         regular_user_fixture.user_uuid,
         ScopeType.USER,
         regular_user_fixture.user_uuid,
-        EntityType.USER,
+        LegacyEntityType.USER,
         (
             OperationType.READ,
             OperationType.UPDATE,

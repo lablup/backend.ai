@@ -23,10 +23,8 @@ class CreateRoleAction(CreateEntityOpsAction[RoleRow, RoleData]):
 
     @override
     def scope_targets(self) -> Sequence[ScopeRef]:
-        return tuple(
-            ScopeRef(scope_type=ScopeType(scope.entity_type()), scope_id=scope)
-            for scope in self.creator.scopes
-        )
+        scope = self.creator.scope
+        return (ScopeRef(scope_type=ScopeType(scope.entity_type()), scope_id=scope),)
 
     @override
     @classmethod

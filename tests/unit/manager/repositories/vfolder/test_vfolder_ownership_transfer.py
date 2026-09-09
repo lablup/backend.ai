@@ -366,6 +366,8 @@ class TestVFolderOwnershipTransferRBACCleanup:
                 id=role_id,
                 name=f"user-role-{user_uuid.hex[:8]}",
                 source=RoleSource.SYSTEM,
+                scope_type=USER_SCOPE_TYPE,
+                scope_id=user_uuid,
             )
             db_sess.add(role_row)
             await db_sess.flush()

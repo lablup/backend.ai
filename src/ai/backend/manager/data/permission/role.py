@@ -9,6 +9,7 @@ from ai.backend.common.data.entity.role import RoleID
 from ai.backend.common.data.entity.role_preset import RolePresetID
 from ai.backend.common.data.entity.types import (
     EntityData,
+    EntityID,
     EntityIdentifier,
     EntityType,
     ScopeType,
@@ -46,6 +47,9 @@ class RoleData(EntityData):
     created_at: datetime
     updated_at: datetime
     deleted_at: datetime | None
+    # The one scope the role belongs to.
+    scope_type: EntityType
+    scope_id: EntityID
     auto_assign: bool = False
     description: str | None = None
     role_preset_id: RolePresetID | None = None
@@ -83,6 +87,8 @@ class RoleDetailData:
     created_at: datetime
     updated_at: datetime
     deleted_at: datetime | None
+    scope_type: EntityType
+    scope_id: EntityID
     auto_assign: bool = False
     description: str | None = None
     role_preset_id: RolePresetID | None = None

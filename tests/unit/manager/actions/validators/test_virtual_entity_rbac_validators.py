@@ -292,11 +292,14 @@ async def _seed_user_with_role(
             )
         )
         await db_sess.flush()
+        db_sess.add(VirtualEntityRow(entity_type=EntityType("domain"), entity_id=domain_id))
         db_sess.add(
             RoleRow(
                 id=role_id,
                 name=f"role-{suffix}",
                 description="virtual-entity validator test role",
+                scope_type=EntityType("domain"),
+                scope_id=domain_id,
             )
         )
         await db_sess.flush()

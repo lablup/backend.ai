@@ -9,19 +9,16 @@ reads.
 from __future__ import annotations
 
 import uuid
-from collections.abc import Sequence
 
 import sqlalchemy as sa
 from sqlalchemy.orm import InstrumentedAttribute, aliased
 
-from ai.backend.common.data.entity.types import EntityID, EntityType, ScopeID, ScopeType
+from ai.backend.common.data.entity.types import EntityID, ScopeID, ScopeType
 from ai.backend.common.data.entity.user import USER_ENTITY_TYPE
-from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
 from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
 
 __all__ = (
-    "owning_scope_exists",
     "user_scope_membership_exists",
     "user_scope_membership_query",
 )
@@ -79,33 +76,3 @@ def user_scope_membership_exists(
             member.entity_id == user_id,
         )
     )
-
-
-def owning_scope_exists(
-    member_type: EntityType,
-    member_id: _UuidExpr,
-    scope_conditions: Sequence[QueryCondition],
-) -> sa.ColumnElement[bool]:
-    """EXISTS predicate: a scope satisfying every condition owns the named entity.
-
-    The scope side of the edge is the un-aliased :class:`VirtualEntityRow`, so the
-    conditions read its columns; the member side is aliased. The self edge every node
-    carries is excluded, and a capped edge is a share rather than something the scope
-    owns.
-    """
-    member = aliased(VirtualEntityRow, name="member_virtual_entity")
-    query = (
-        sa.select(sa.literal(1))
-        .select_from(EntityMembershipRow)
-        .join(VirtualEntityRow, EntityMembershipRow.virtual_entity_id == VirtualEntityRow.id)
-        .join(member, EntityMembershipRow.member_entity_id == member.id)
-        .where(
-            EntityMembershipRow.virtual_entity_id != EntityMembershipRow.member_entity_id,
-            EntityMembershipRow.capped.is_(False),
-            member.entity_type == member_type,
-            member.entity_id == member_id,
-        )
-    )
-    for condition in scope_conditions:
-        query = query.where(condition())
-    return sa.exists(query)

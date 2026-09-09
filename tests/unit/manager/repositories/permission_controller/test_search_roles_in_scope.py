@@ -11,6 +11,7 @@ from collections.abc import AsyncGenerator
 from dataclasses import dataclass
 
 import pytest
+import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
 from ai.backend.common.data.entity.domain import DomainID
@@ -51,24 +52,37 @@ class ScopedRoleFixture:
     role_outside_scope: uuid.UUID
 
 
-async def _own_role(
-    db_sess: SASession, scope_type: EntityType, scope_id: uuid.UUID, role_id: uuid.UUID
-) -> None:
-    """Put the role under the scope in the graph, as ``_created_in`` does."""
-    scope_node = VirtualEntityRow(entity_type=scope_type, entity_id=scope_id)
-    role_node = VirtualEntityRow(entity_type=ROLE_ENTITY_TYPE, entity_id=role_id)
-    db_sess.add_all([scope_node, role_node])
+async def _add_role(
+    db_sess: SASession, name: str, scope_type: EntityType, scope_id: uuid.UUID
+) -> uuid.UUID:
+    """A role of the scope: on the row, and under the scope in the graph as
+    ``_created_in`` does. The scope's node is created if it has none."""
+    scope_node = await db_sess.scalar(
+        sa.select(VirtualEntityRow).where(
+            VirtualEntityRow.entity_type == scope_type, VirtualEntityRow.entity_id == scope_id
+        )
+    )
+    if scope_node is None:
+        scope_node = VirtualEntityRow(entity_type=scope_type, entity_id=scope_id)
+        db_sess.add(scope_node)
+        await db_sess.flush()
+        db_sess.add(
+            EntityMembershipRow(virtual_entity_id=scope_node.id, member_entity_id=scope_node.id)
+        )
+    role = RoleRow(name=name, description=name, scope_type=scope_type, scope_id=scope_id)
+    db_sess.add(role)
     await db_sess.flush()
-    db_sess.add_all([
-        EntityMembershipRow(virtual_entity_id=node.id, member_entity_id=node.id)
-        for node in (scope_node, role_node)
-    ])
+    role_node = VirtualEntityRow(entity_type=ROLE_ENTITY_TYPE, entity_id=role.id)
+    db_sess.add(role_node)
+    await db_sess.flush()
+    db_sess.add(EntityMembershipRow(virtual_entity_id=role_node.id, member_entity_id=role_node.id))
     db_sess.add(EntityMembershipRow(virtual_entity_id=scope_node.id, member_entity_id=role_node.id))
     await db_sess.flush()
+    return role.id
 
 
 class TestSearchRolesInScope:
-    """Tests for searching roles registered in a scope via association_scopes_entities."""
+    """Tests for searching the roles of a scope."""
 
     @pytest.fixture
     async def db_with_tables(
@@ -97,21 +111,19 @@ class TestSearchRolesInScope:
         self,
         db_with_tables: ExtendedAsyncSAEngine,
     ) -> ScopedRoleFixture:
-        """Create two roles: one owned by a project scope, one not."""
+        """Create two roles: one of the project, one of another project."""
         project_id = uuid.uuid4()
 
         async with db_with_tables.begin_session() as db_sess:
-            role_in = RoleRow(name="role-in-scope", description="In scope")
-            role_out = RoleRow(name="role-outside-scope", description="Outside scope")
-            db_sess.add(role_in)
-            db_sess.add(role_out)
-            await db_sess.flush()
-            await _own_role(db_sess, PROJECT_ENTITY_TYPE, project_id, role_in.id)
+            role_in = await _add_role(db_sess, "role-in-scope", PROJECT_ENTITY_TYPE, project_id)
+            role_out = await _add_role(
+                db_sess, "role-outside-scope", PROJECT_ENTITY_TYPE, uuid.uuid4()
+            )
 
         return ScopedRoleFixture(
             project_id=project_id,
-            role_in_scope=role_in.id,
-            role_outside_scope=role_out.id,
+            role_in_scope=role_in,
+            role_outside_scope=role_out,
         )
 
     async def test_returns_only_roles_in_scope(
@@ -178,10 +190,7 @@ class TestSearchRolesInScope:
         scope_id = uuid.uuid4()
 
         async with db_with_tables.begin_session() as db_sess:
-            role = RoleRow(name="project-only-role")
-            db_sess.add(role)
-            await db_sess.flush()
-            await _own_role(db_sess, PROJECT_ENTITY_TYPE, scope_id, role.id)
+            await _add_role(db_sess, "project-only-role", PROJECT_ENTITY_TYPE, scope_id)
 
         querier = BatchQuerier(
             conditions=[],
