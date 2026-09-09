@@ -10837,7 +10837,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
+            "description": "Updated name. Omit to leave unchanged.",
             "title": "Name"
           },
           "description": {
@@ -10858,27 +10858,27 @@
                 "items": {
                   "$ref": "#/components/schemas/SessionTypes"
                 },
-                "minItems": 1,
+                "minLength": 1,
                 "type": "array"
               },
               {
                 "type": "null"
               }
             ],
-            "default": null,
+            "description": "Updated target session types. Omit to leave unchanged.",
             "title": "Target Session Types"
           },
           "initial_grace_period_seconds": {
             "anyOf": [
               {
-                "minimum": 0,
+                "ge": 0,
                 "type": "integer"
               },
               {
                 "type": "null"
               }
             ],
-            "default": null,
+            "description": "Updated initial grace period in seconds. Omit to leave unchanged.",
             "title": "Initial Grace Period Seconds"
           },
           "checker_spec": {
@@ -10890,7 +10890,8 @@
                 "type": "null"
               }
             ],
-            "default": null
+            "description": "Updated checker specification. Omit to leave unchanged.",
+            "title": "Checker Spec"
           }
         },
         "required": [
