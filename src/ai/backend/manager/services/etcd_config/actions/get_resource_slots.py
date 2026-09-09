@@ -3,8 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, override
 
-from ai.backend.common.data.entity.etcd_config import EtcdConfigEntityType
-from ai.backend.common.data.entity.types import EntityType
+from ai.backend.common.data.entity.types import EntityType, GlobalEntityType
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.actions.v2.global_scope.base import BaseGlobalAction
 
@@ -16,7 +15,7 @@ class GetResourceSlotsAction(BaseGlobalAction):
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return EtcdConfigEntityType()
+        return GlobalEntityType()
 
     @override
     @classmethod

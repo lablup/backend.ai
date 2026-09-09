@@ -17,7 +17,6 @@ from ai.backend.common.data.entity.deployment_preset import DeploymentPresetEnti
 from ai.backend.common.data.entity.domain import DomainEntityType
 from ai.backend.common.data.entity.entity_label import EntityLabelFieldType
 from ai.backend.common.data.entity.entity_share import EntityShareEntityType
-from ai.backend.common.data.entity.etcd_config import EtcdConfigEntityType
 from ai.backend.common.data.entity.fair_share import (
     DomainFairShareFieldType,
     ProjectFairShareFieldType,
@@ -26,7 +25,6 @@ from ai.backend.common.data.entity.fair_share import (
 from ai.backend.common.data.entity.idle_checker import IdleCheckerEntityType
 from ai.backend.common.data.entity.image import ImageEntityType
 from ai.backend.common.data.entity.login_client_type import LoginClientTypeEntityType
-from ai.backend.common.data.entity.manager_admin import ManagerAdminEntityType
 from ai.backend.common.data.entity.model_card import ModelCardEntityType
 from ai.backend.common.data.entity.notification import (
     NotificationChannelEntityType,
@@ -587,7 +585,7 @@ def create_processors(
             action_monitors,
         ),
         etcd_config=EtcdConfigProcessors(
-            system_groups.group(GroupMeta(EtcdConfigEntityType())), services.etcd_config
+            system_groups.group(GroupMeta(GlobalEntityType())), services.etcd_config
         ),
         export=ExportProcessors(
             visibility_groups.group(GroupMeta(UserEntityType())),
@@ -664,7 +662,7 @@ def create_processors(
             resource_policy_groups.group(GroupMeta(KeyPairResourcePolicyEntityType()))
         ),
         manager_admin=ManagerAdminProcessors(
-            system_groups.group(GroupMeta(ManagerAdminEntityType())), services.manager_admin
+            system_groups.group(GroupMeta(GlobalEntityType())), services.manager_admin
         ),
         secret=SecretProcessors(
             system_groups.dangling_field_group(FieldGroupMeta(SecretFieldType()), SecretFieldData),

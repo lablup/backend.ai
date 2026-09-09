@@ -12,10 +12,10 @@ from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 from ai.backend.common.data.entity.agent import AgentEntityType
 from ai.backend.common.data.entity.container_registry import ContainerRegistryEntityType
 from ai.backend.common.data.entity.domain import DomainEntityType
-from ai.backend.common.data.entity.etcd_config import EtcdConfigEntityType
 from ai.backend.common.data.entity.project import ProjectEntityType
 from ai.backend.common.data.entity.resource_group import ResourceGroupEntityType
 from ai.backend.common.data.entity.resource_preset import ResourcePresetEntityType
+from ai.backend.common.data.entity.types import GlobalEntityType
 from ai.backend.common.data.entity.user import UserEntityType
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.types import ResourceSlot
@@ -113,9 +113,7 @@ def etcd_config_processors(
         etcd=async_etcd,
         valkey_stat=valkey_clients.stat,
     )
-    return EtcdConfigProcessors(
-        processor_registry.group(GroupMeta(EtcdConfigEntityType())), service
-    )
+    return EtcdConfigProcessors(processor_registry.group(GroupMeta(GlobalEntityType())), service)
 
 
 @pytest.fixture()
