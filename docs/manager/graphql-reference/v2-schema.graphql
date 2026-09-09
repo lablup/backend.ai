@@ -11840,6 +11840,11 @@ type Query {
   projectUsersV2(scope: ProjectUserV2Scope!, filter: UserV2Filter = null, orderBy: [UserV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): UserV2Connection
 
   """
+  Added in 26.9.0. Page through the users the named scopes reach, combined with OR. Every scope is authorized before the read runs.
+  """
+  scopedUsersV2(scope: UserScope!, filter: UserV2Filter = null, orderBy: [UserV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): UserV2Connection
+
+  """
   Added in 26.2.0. Get a single domain by name. Returns an error if domain is not found.
   """
   domainV2(domainName: String!): DomainV2
@@ -17311,6 +17316,17 @@ input UserRoleV2EnumFilter {
   in: [UserRoleV2!] = null
   notEquals: UserRoleV2 = null
   notIn: [UserRoleV2!] = null
+}
+
+"""
+Added in 26.9.0. Scope for the scoped user query. Each list is OR'd internally and across lists, and every scope named is authorized before the read runs.
+"""
+input UserScope {
+  """Domains whose users are being read."""
+  domain: [UUIDScope!] = null
+
+  """Projects whose users are being read."""
+  project: [UUIDScope!] = null
 }
 
 """

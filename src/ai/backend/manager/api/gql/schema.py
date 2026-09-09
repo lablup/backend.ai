@@ -526,6 +526,7 @@ from .user import (
     my_client_ip,
     my_user_v2,
     project_users_v2,
+    scoped_users_v2,
     update_my_allowed_client_ip,
     update_user_v2,
 )
@@ -730,6 +731,7 @@ class Query:
     my_client_ip = my_client_ip
     my_user_v2 = my_user_v2
     project_users_v2 = project_users_v2
+    scoped_users_v2 = scoped_users_v2
     # Domain V2 APIs
     domain_v2 = domain_v2
     admin_domains_v2 = admin_domains_v2
