@@ -40,7 +40,7 @@ from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.services.image.actions.alias_image import AliasImageByIdAction
 from ai.backend.manager.services.image.actions.dealias_image import DealiasImageAction
 from ai.backend.manager.services.image.actions.forget_image import ForgetImageByIdAction
-from ai.backend.manager.services.image.actions.get_images import GetImageByIdAction
+from ai.backend.manager.services.image.actions.get_images import PublicGetImageByIdAction
 from ai.backend.manager.services.image.actions.purge_images import PurgeImageByIdAction
 from ai.backend.manager.services.image.actions.scan_image import ScanImageAction
 from ai.backend.manager.services.image.actions.search_images import SearchImagesAction
@@ -412,7 +412,9 @@ class TestImageAPIHandler:
         processors.image.search_images.wait_for_complete = AsyncMock(
             return_value=mock_search_result
         )
-        processors.image.get_image_by_id.wait_for_complete = AsyncMock(return_value=mock_get_result)
+        processors.image.public_get_image_by_id.wait_for_complete = AsyncMock(
+            return_value=mock_get_result
+        )
         processors.image.scan_image.wait_for_complete = AsyncMock(return_value=mock_scan_result)
         processors.image.alias_image_by_id.wait_for_complete = AsyncMock(
             return_value=mock_alias_result
@@ -469,10 +471,10 @@ class TestImageAPIHandler:
     ) -> None:
         """Get handler should call get_image_by_id processor."""
         image_id = ImageID(UUID("11111111-1111-1111-1111-111111111111"))
-        await mock_processors.image.get_image_by_id.wait_for_complete(
-            GetImageByIdAction(image_id=image_id, image_status=None)
+        await mock_processors.image.public_get_image_by_id.wait_for_complete(
+            PublicGetImageByIdAction(image_id=image_id, image_status=None)
         )
-        mock_processors.image.get_image_by_id.wait_for_complete.assert_called_once()
+        mock_processors.image.public_get_image_by_id.wait_for_complete.assert_called_once()
 
     async def test_get_image_converts_detailed_dto(
         self,
@@ -480,8 +482,8 @@ class TestImageAPIHandler:
     ) -> None:
         """Get result should be convertible to detailed DTO."""
         image_id = ImageID(UUID("11111111-1111-1111-1111-111111111111"))
-        result = await mock_processors.image.get_image_by_id.wait_for_complete(
-            GetImageByIdAction(image_id=image_id, image_status=None)
+        result = await mock_processors.image.public_get_image_by_id.wait_for_complete(
+            PublicGetImageByIdAction(image_id=image_id, image_status=None)
         )
         adapter = ImageAdapter()
         dto = adapter.convert_detailed_to_dto(result.image_with_agent_install_status.image)

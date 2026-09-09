@@ -4,7 +4,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.common.data.entity.app_config import APP_CONFIG_ENTITY_TYPE
+from ai.backend.common.data.entity.app_config import AppConfigEntityType
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.types import EntityIdentifier, EntityType, ScopeRef
 from ai.backend.common.data.entity.user import USER_SCOPE_TYPE, UserID
@@ -42,7 +42,7 @@ class SearchAppConfigsAction(
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return APP_CONFIG_ENTITY_TYPE
+        return AppConfigEntityType()
 
     @override
     @classmethod
@@ -82,7 +82,7 @@ class AnonymousSearchAppConfigsAction(
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return APP_CONFIG_ENTITY_TYPE
+        return AppConfigEntityType()
 
     @override
     @classmethod

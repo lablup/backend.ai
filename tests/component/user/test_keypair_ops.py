@@ -138,7 +138,8 @@ def server_module_registries(
     mock_gql_deps.processors = mock_processors
     mock_gql_deps.config_provider = config_provider
     mock_gql_deps.adapters.user = UserAdapter(
-        processors=mock_processors,
+        mock_processors.user,
+        mock_processors.domain,
         auth_config=None,  # type: ignore[arg-type]
         key_provider_pool=KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
     )

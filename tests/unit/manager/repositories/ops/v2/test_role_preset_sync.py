@@ -12,8 +12,9 @@ import sqlalchemy as sa
 from sqlalchemy import Table
 
 from ai.backend.common.data.entity.domain import DomainID, DomainName
+from ai.backend.common.data.entity.project import ProjectEntityType
 from ai.backend.common.data.entity.role_preset import RolePresetID
-from ai.backend.common.data.entity.types import EntityType
+from ai.backend.common.data.entity.vfolder import VFolderEntityType
 from ai.backend.common.data.permission.types import Permission
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
@@ -125,15 +126,17 @@ async def _add_role(
                 source=RoleSource.SYSTEM,
                 status=RoleStatus.ACTIVE,
                 role_preset_id=preset_id,
+                scope_type=ProjectEntityType(),
+                scope_id=project_id,
             )
         )
         await sess.flush()
         sess.add(
             PermissionRow(
                 role_id=role_id,
-                scope_type=EntityType("project"),
+                scope_type=ProjectEntityType(),
                 scope_id=str(project_id),
-                entity_type=EntityType("vfolder"),
+                entity_type=VFolderEntityType(),
                 permission=Permission.READ,
                 all_fields=True,
             )

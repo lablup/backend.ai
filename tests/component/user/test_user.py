@@ -53,6 +53,7 @@ from ai.backend.manager.models.rbac_models.association_scopes_entities import (
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.user import users
+from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
 from ai.backend.testutils.fixtures import DomainFixtureData
 
 from .conftest import (
@@ -417,10 +418,17 @@ async def user_with_rbac_rows(
             )
         )
         await conn.execute(
+            sa.insert(VirtualEntityRow.__table__).values(
+                entity_type=ScopeType.USER.value, entity_id=user_id
+            )
+        )
+        await conn.execute(
             sa.insert(RoleRow.__table__).values(
                 id=role_id,
                 name=f"user-{scope_id[:8]}",
                 status=RoleStatus.ACTIVE,
+                scope_type=ScopeType.USER.value,
+                scope_id=user_id,
             )
         )
         # Role registered in the user's own scope (the per-user SYSTEM role binding).
@@ -469,6 +477,12 @@ async def user_with_rbac_rows(
             )
         )
         await conn.execute(RoleRow.__table__.delete().where(RoleRow.__table__.c.id == role_id))
+        await conn.execute(
+            VirtualEntityRow.__table__.delete().where(
+                VirtualEntityRow.__table__.c.entity_type == ScopeType.USER.value,
+                VirtualEntityRow.__table__.c.entity_id == user_id,
+            )
+        )
         await conn.execute(users.delete().where(users.c.uuid == str(user_id)))
 
 

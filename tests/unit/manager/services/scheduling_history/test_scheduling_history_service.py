@@ -17,7 +17,7 @@ from ai.backend.common.data.entity.kernel_scheduling_history import KernelSchedu
 from ai.backend.common.data.entity.replica import ReplicaID
 from ai.backend.common.data.entity.replica_group import ReplicaGroupID
 from ai.backend.common.data.entity.replica_group_history import ReplicaGroupHistoryID
-from ai.backend.common.data.entity.session import SESSION_ENTITY_TYPE, SESSION_SCOPE_TYPE, SessionID
+from ai.backend.common.data.entity.session import SESSION_SCOPE_TYPE, SessionEntityType, SessionID
 from ai.backend.common.data.entity.types import ScopeRef
 from ai.backend.common.types import KernelId, SessionId
 from ai.backend.manager.data.deployment.types import (
@@ -428,7 +428,7 @@ class TestSearchKernelScopedHistoryAction:
         assert action.scope_targets() == (
             ScopeRef(scope_type=SESSION_SCOPE_TYPE, scope_id=_SESSION_ID),
         )
-        assert action.entity_type() == SESSION_ENTITY_TYPE
+        assert action.entity_type() == SessionEntityType()
         mock_repository.search_kernel_scoped_history.assert_awaited_once_with(
             querier=querier,
             scopes=[SessionKernelHistoryOperationScope(session_id=_SESSION_ID)],

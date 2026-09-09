@@ -85,7 +85,7 @@ def server_module_registries(
     processors = MagicMock()
     processors.permission_controller = permission_controller_processors
     processors.rbac = rbac_processors
-    adapter = RBACAdapter(processors)
+    adapter = RBACAdapter(processors.rbac, processors.permission_controller)
     handler = V2RBACHandler(adapter=adapter)
     v2_reg = RouteRegistry.create("v2", route_deps.cors_options)
     v2_reg.add_subregistry(register_v2_rbac_routes(handler, route_deps))

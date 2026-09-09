@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from typing import Any, override
 from uuid import UUID
 
-from ai.backend.common.data.entity.session import SESSION_ENTITY_TYPE, SessionID
+from ai.backend.common.data.entity.session import SessionEntityType, SessionID
 from ai.backend.common.data.entity.types import EntityType
 from ai.backend.manager.actions.v2.lookup.base import LookupKey
 from ai.backend.manager.actions.v2.ops.base import LookupEntityOpsAction
@@ -38,7 +38,7 @@ class LookupSessionAction(LookupEntityOpsAction[SessionRow, SessionID]):
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return SESSION_ENTITY_TYPE
+        return SessionEntityType()
 
     @override
     @classmethod

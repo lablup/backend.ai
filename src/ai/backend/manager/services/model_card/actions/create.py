@@ -4,7 +4,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.common.data.entity.model_card import MODEL_CARD_ENTITY_TYPE
+from ai.backend.common.data.entity.model_card import ModelCardEntityType
 from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE, ProjectID
 from ai.backend.common.data.entity.types import EntityType, ScopeRef
 from ai.backend.manager.actions.v2.ops.base import CreateEntityWithFieldsOpsAction
@@ -38,7 +38,7 @@ class CreateModelCardAction(
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return MODEL_CARD_ENTITY_TYPE
+        return ModelCardEntityType()
 
     @override
     def scope_targets(self) -> Sequence[ScopeRef]:

@@ -22,8 +22,10 @@ from uuid import UUID
 import pytest
 import sqlalchemy as sa
 
+from ai.backend.common.data.entity.project import ProjectEntityType
 from ai.backend.common.data.entity.role import RoleID
 from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
+from ai.backend.common.data.entity.vfolder import VFolderEntityType
 from ai.backend.common.data.permission.id import FieldPath
 from ai.backend.common.data.permission.types import Permission
 from ai.backend.manager.data.permission.status import RoleStatus
@@ -43,8 +45,8 @@ from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntit
 from ai.backend.manager.repositories.ops.v2.permission.provider import PermissionOpsProvider
 from ai.backend.testutils.db import with_tables
 
-_SCOPE_TYPE = EntityType("project")
-_ENTITY_TYPE = EntityType("vfolder")
+_SCOPE_TYPE = ProjectEntityType()
+_ENTITY_TYPE = VFolderEntityType()
 
 _NAME = FieldPath("name")
 _DATA = FieldPath("data")
@@ -79,7 +81,15 @@ def provider(database: ExtendedAsyncSAEngine) -> PermissionOpsProvider:
 @pytest.fixture
 async def role_id(database: ExtendedAsyncSAEngine) -> RoleID:
     async with database.begin_session() as sess:
-        row = RoleRow(name="field-scope-role", source=RoleSource.SYSTEM, status=RoleStatus.ACTIVE)
+        home = uuid.uuid4()
+        sess.add(VirtualEntityRow(entity_type=_SCOPE_TYPE, entity_id=home))
+        row = RoleRow(
+            name="field-scope-role",
+            source=RoleSource.SYSTEM,
+            status=RoleStatus.ACTIVE,
+            scope_type=_SCOPE_TYPE,
+            scope_id=home,
+        )
         sess.add(row)
         await sess.flush()
         return RoleID(row.id)
