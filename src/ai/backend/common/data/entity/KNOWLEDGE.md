@@ -17,8 +17,8 @@ status: draft
 
 이 패키지는 종류마다 `EntityType` 또는 `FieldType` 서브클래스를 하나 둔다. 클래스는
 `name()`과 `description()`을 답하고, 필드 종류는 행을 소유하는 엔티티 종류를
-`owner_type()`으로 답한다. 소유자가 행의 값이라 고정되지 않는 필드 종류(audit_log,
-audit_log_scope, label)는 `DanglingFieldType`을 상속해 `None`을 답한다. 무엇을 소유하고
+`owner_type()`으로 답한다. 소유자 종류가 고정되지 않는 필드 종류(audit_log,
+audit_log_scope, label, secret)는 `DanglingFieldType`을 상속해 `None`을 답한다. 무엇을 소유하고
 무엇에 묶이는지는 이 문서에 적는다. 전부 개념 수준이며, 어느 테이블이 담는지는 `models`
 문서가 맡는다.
 
@@ -33,8 +33,9 @@ audit_log_scope, label)는 `DanglingFieldType`을 상속해 `None`을 답한다.
   만들지 않는다.
 - pydantic은 base로 선언한 필드면 문자열을 그대로 받고, 종류로 선언한 필드면 그 이름만
   받는다. 행에는 `name()` 문자열이 저장된다.
-- secret과 fair share 계열은 dangling field로 옮겨야 하나 아직 엔티티로 선언되고
-  배선되어 있다. 옮기려면 `FieldGroup`에 서비스 기반 배선이 필요하다.
+- secret은 여러 엔티티의 암호화된 컬럼에 저장된 필드이며 소유자 종류가 고정되지 않는다.
+  자체 행 없이 상태 조회와 재암호화를 수행한다.
+- fair share 계열은 dangling field로 옮겨야 하나 아직 엔티티로 선언되고 배선되어 있다.
 
 ## Entity
 
