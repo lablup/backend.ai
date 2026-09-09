@@ -9,8 +9,10 @@ from datetime import datetime
 import sqlalchemy as sa
 
 from ai.backend.common.data.app_config.types import AppConfigScopeType
-from ai.backend.common.data.entity.app_config import AppConfigFragmentEntityType
-from ai.backend.common.data.entity.app_config_fragment import AppConfigFragmentID
+from ai.backend.common.data.entity.app_config_fragment import (
+    AppConfigFragmentEntityType,
+    AppConfigFragmentID,
+)
 from ai.backend.common.data.entity.domain import DOMAIN_SCOPE_TYPE, DomainID
 from ai.backend.common.data.entity.user import USER_SCOPE_TYPE, UserID
 from ai.backend.common.data.filter_specs import StringMatchSpec, UUIDEqualMatchSpec
