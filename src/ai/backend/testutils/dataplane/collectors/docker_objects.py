@@ -19,7 +19,7 @@ from __future__ import annotations
 import json
 from collections.abc import Sequence
 
-from ai.backend.testutils.dataplane.collectors.base import Resource
+from ai.backend.testutils.dataplane.collectors.base import Resource, ResourceCollector
 from ai.backend.testutils.dataplane.nodes import CommandFailed, Node
 
 # The manager names cluster networks `bai-multinode-{ident}` (manager/network/overlay.py) and
@@ -198,7 +198,9 @@ class DockerSandboxCollector:
         return self.parse(listing.stdout, inspected.stdout)
 
 
-def docker_collectors(node: Node, *, netns_dir: str = "/var/run/docker/netns") -> Sequence[object]:
+def docker_collectors(
+    node: Node, *, netns_dir: str = "/var/run/docker/netns"
+) -> Sequence[ResourceCollector]:
     return (
         DockerNetworkCollector(node),
         DockerKernelContainerCollector(node),

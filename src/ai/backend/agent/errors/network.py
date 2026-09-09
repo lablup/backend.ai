@@ -38,6 +38,51 @@ class UnknownPrivnetBackend(BackendAIError, web.HTTPInternalServerError):
         )
 
 
+class PrivnetConfigurationInvalid(BackendAIError, web.HTTPInternalServerError):
+    """The privileged network daemon received an unsafe startup configuration."""
+
+    error_type = "https://api.backend.ai/probs/agent/privnet-configuration-invalid"
+    error_title = "The privnet startup configuration is invalid."
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.AGENT,
+            operation=ErrorOperation.START,
+            error_detail=ErrorDetail.INVALID_PARAMETERS,
+        )
+
+
+class PrivnetAlreadyRunning(BackendAIError, web.HTTPConflict):
+    """Another process is accepting requests on the configured privnet socket."""
+
+    error_type = "https://api.backend.ai/probs/agent/privnet-already-running"
+    error_title = "Another privnet process is already running."
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.AGENT,
+            operation=ErrorOperation.START,
+            error_detail=ErrorDetail.CONFLICT,
+        )
+
+
+class UnsafePrivnetSocket(BackendAIError, web.HTTPInternalServerError):
+    """The configured socket path cannot be replaced safely."""
+
+    error_type = "https://api.backend.ai/probs/agent/unsafe-privnet-socket"
+    error_title = "The privnet socket path is unsafe."
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.AGENT,
+            operation=ErrorOperation.START,
+            error_detail=ErrorDetail.INVALID_PARAMETERS,
+        )
+
+
 class HostAddressesUnreadable(BackendAIError, web.HTTPInternalServerError):
     """This node could not be asked which addresses it already carries.
 
@@ -399,6 +444,36 @@ class ContainerAttachFailed(BackendAIError, web.HTTPInternalServerError):
         return ErrorCode(
             domain=ErrorDomain.AGENT,
             operation=ErrorOperation.CREATE,
+            error_detail=ErrorDetail.INTERNAL_ERROR,
+        )
+
+
+class InvalidSessionNetworkDescriptor(BackendAIError, web.HTTPInternalServerError):
+    """The manager-provided session network descriptor cannot be applied."""
+
+    error_type = "https://api.backend.ai/probs/agent/invalid-session-network-descriptor"
+    error_title = "The session network descriptor is invalid."
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.AGENT,
+            operation=ErrorOperation.SETUP,
+            error_detail=ErrorDetail.INVALID_PARAMETERS,
+        )
+
+
+class NetworkOperationFailed(BackendAIError, web.HTTPInternalServerError):
+    """A host network operation failed without a more specific domain error."""
+
+    error_type = "https://api.backend.ai/probs/agent/network-operation-failed"
+    error_title = "A host network operation failed."
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.AGENT,
+            operation=ErrorOperation.EXECUTE,
             error_detail=ErrorDetail.INTERNAL_ERROR,
         )
 

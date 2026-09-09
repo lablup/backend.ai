@@ -22,6 +22,7 @@ from dataclasses import replace
 import pytest
 
 from ai.backend.common.dto.manager.v2.session.types import ClusterModeEnum
+from ai.backend.testutils.dataplane import probe
 from ai.backend.testutils.dataplane.guard import LeakGuard
 from ai.backend.testutils.dataplane.nodes import Node
 from ai.backend.testutils.dataplane.session import SessionDriver, SessionSpec
@@ -43,25 +44,8 @@ def single_node_cluster_spec(session_spec: SessionSpec, primary_agent_id: str) -
 
 
 async def _read_in_kernel(node: Node, container_id: str, path: str) -> str:
-    """Read a file from inside a running kernel.
-
-    Through the runtime rather than from the host: the point of these assertions is what the
-    *kernel* sees. A single-node cluster's /etc/hosts is written into the container, and reading
-    the host's copy would assert on the wrong file.
-    """
-    result = await node.run([
-        "ctr",
-        "-n",
-        "backend-ai",
-        "tasks",
-        "exec",
-        "--exec-id",
-        f"dp-read-{abs(hash(path)) % 100000}",
-        container_id,
-        "cat",
-        path,
-    ])
-    return result.stdout
+    """Read the file as seen inside the kernel, through its owning runtime."""
+    return await probe.read_container_file(node, container_id, path)
 
 
 class TestSingleNodeClusterSession:
@@ -81,7 +65,7 @@ class TestSingleNodeClusterSession:
         block's, not an overlay's.
         """
         async with session_driver.session(single_node_cluster_spec, "dp-g9") as handle:
-            container_ids = await _cluster_container_ids(node, handle.name)
+            container_ids = await probe.session_container_ids(node, handle)
             assert len(container_ids) == CLUSTER_SIZE, (
                 f"expected {CLUSTER_SIZE} kernels on this node, found {len(container_ids)}; "
                 "a single-node cluster session must not be spread"
@@ -117,29 +101,6 @@ class TestSingleNodeClusterSession:
                     f"kernel {cid} has its own hostname pinned to loopback -- the regression that "
                     f"made a torchrun master unreachable to its workers\n{contents}"
                 )
-
-
-async def _cluster_container_ids(node: Node, session_name: str) -> list[str]:
-    """Container ids of this node's kernels for a session.
-
-    Read from containerd's own labels rather than from the manager: the question this scenario
-    asks is where the kernels actually landed, and taking the manager's word for it would assume
-    the answer.
-    """
-    result = await node.run([
-        "ctr",
-        "-n",
-        "backend-ai",
-        "containers",
-        "list",
-        "-q",
-    ])
-    ids: list[str] = []
-    for cid in result.lines:
-        info = await node.run(["ctr", "-n", "backend-ai", "containers", "info", cid])
-        if session_name in info.stdout:
-            ids.append(cid)
-    return ids
 
 
 def _hosts_names(etc_hosts: str) -> set[str]:

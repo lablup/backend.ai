@@ -1002,7 +1002,8 @@ class TestScheduleCoordinatorStatusTransition:
             kernel=KernelStatus.PENDING,
         )
 
-        mock_coordinator._repository.update_with_history = AsyncMock(return_value=1)
+        mock_coordinator._repository.requeue_sessions_with_history = AsyncMock(return_value=(1, 1))
+        mock_coordinator._record_failed_agents = AsyncMock()
         mock_coordinator._apply_kernel_pending_resets = AsyncMock()
 
         # Act
@@ -1017,7 +1018,9 @@ class TestScheduleCoordinatorStatusTransition:
         )
 
         # Assert
-        mock_coordinator._apply_kernel_pending_resets.assert_awaited_once()
+        mock_coordinator._repository.requeue_sessions_with_history.assert_awaited_once()
+        mock_coordinator._record_failed_agents.assert_awaited_once()
+        mock_coordinator._apply_kernel_pending_resets.assert_not_awaited()
 
     async def test_no_kernel_reset_for_non_pending_transition(
         self,

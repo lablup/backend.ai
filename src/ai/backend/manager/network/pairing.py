@@ -1,15 +1,6 @@
-"""Pair the cluster-network driver against the agent backends that can actually serve it.
+"""Pair cluster-network drivers only with agent backends that implement them.
 
-A multi-node session's kernels only reach each other if every member agent puts them on the same
-fabric. The two fabrics are not interchangeable: 'overlay' is Docker Swarm, which only the docker
-backend speaks, and 'cni' is the BEP-1078 stack, which the containerd backend and its rootless
-subclass speak. Handing a driver to an agent of the other kind does not fail — the agent falls back
-to something node-local and the session comes up with kernels that cannot see each other, with
-nothing in the logs to say why. That is what this refuses.
-
-The check is deliberately one-sided: agents publish their backend at startup, and an agent whose
-backend is not published yet (an older agent, or one that has not finished starting) is treated as
-unknown-but-allowed. Refusing on absence would take out working deployments the moment this shipped.
+Missing legacy capability records remain allowed; published incompatible backends fail closed.
 """
 
 import json
@@ -32,34 +23,18 @@ from ai.backend.manager.errors.network import NetworkBackendMismatch
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
-#: How long a published capability record is taken as describing the node that is running now.
-#: The agent republishes every 60s, so this is many refreshes' worth of slack -- long enough that
-#: a slow or briefly disconnected agent is not thrown out, short enough that an advert left by a
-#: boot that is over stops being one.
+#: Maximum age of an agent capability record; agents refresh it every 60 seconds.
 CAPS_FRESH_FOR_SEC = 600.0
-#: How far ahead of this manager's clock a published record may be dated before it stops being
-#: evidence of anything. Agents and managers do not share a clock, so a little skew is ordinary;
-#: a lot of it is a record that no age check can ever expire.
+#: Maximum tolerated clock skew for capability records dated in the future.
 CAPS_CLOCK_SKEW_SEC = 60.0
 
-# Which agent backend can serve which inter-container network driver.
-#
-# What a backend has to provide for 'cni' is a container's netns by PID: the data plane is a
-# device moved into that netns, and a netns does not care which daemon made it. So the list is
-# the backends that offer that seam, not the ones anyone has measured. A backend that arrives
-# without it is rejected at `_require_members_cni_capable` on its published caps, not here.
+# Keep this list implementation-backed. Docker is currently the only agent discovery that exposes
+# a container locator and publishes cluster-network capabilities.
 DRIVER_COMPATIBLE_BACKENDS: dict[str, frozenset[str]] = {
-    "cni": frozenset({"containerd", "docker", "enroot", "singularity"}),
+    "cni": frozenset({"docker"}),
     "overlay": frozenset({"docker"}),
 }
-# ...and the inverse: the driver an agent backend needs when the operator has not named one it can
-# serve. Choosing the container runtime is the operator's decision; the network driver that goes
-# with it is not a second, independent choice they should have to get right as well.
-#
-# Docker is the one backend that can serve two, so it is listed explicitly rather than derived:
-# 'overlay' (Swarm) stays its default, because an existing Docker deployment that upgrades into
-# this must not have its fabric changed under it. An operator who wants the BEP-1078 one asks for
-# it by name — see resolve_driver_for_agents.
+# Docker defaults to the established Swarm overlay unless the operator explicitly selects CNI.
 BACKEND_DRIVER: dict[str, str] = {
     **{
         backend: driver
@@ -73,16 +48,9 @@ BACKEND_DRIVER: dict[str, str] = {
 async def resolve_driver_for_agents(
     etcd: AbstractKVStore, member_agents: Iterable[str], *, configured_driver: str | None
 ) -> str | None:
-    """The driver the member agents' backends actually need, or ``configured_driver`` if unknown.
+    """Resolve a supported driver, preserving the configured value for unknown backends.
 
-    The agents' runtime is ground truth: a containerd agent cannot speak Swarm and a docker agent
-    cannot speak Swarm, so for most backends there is exactly one right answer and no reason to
-    make the operator supply it. Docker is the exception — it can serve either — and there the
-    configured driver wins, defaulting to 'overlay' when nothing is configured. ``configured_driver`` stays the fallback for agents that have not published their
-    backend (older agents, or ones still starting), so this cannot strand an existing deployment.
-
-    Refuses a mixed cluster outright: a multi-node session needs one fabric, and there is no driver
-    that spans both.
+    Mixed published runtimes fail because a session requires one uniform network fabric.
     """
     backends: set[str] = set()
     for agent_id in member_agents:
@@ -102,8 +70,7 @@ async def resolve_driver_for_agents(
         configured_driver in DRIVER_COMPATIBLE_BACKENDS
         and backend in DRIVER_COMPATIBLE_BACKENDS[configured_driver]
     ):
-        # The operator named a driver this backend can actually serve: honour it. Only Docker can
-        # currently be told something other than its default, and only deliberately.
+        # The configured driver is authoritative only when this backend implements it.
         return configured_driver
     return BACKEND_DRIVER.get(backend, configured_driver)
 
@@ -124,8 +91,8 @@ async def require_members_can_serve_driver(
             raise NetworkBackendMismatch(
                 f"agent '{agent_id}' runs the '{backend}' backend, which cannot serve the "
                 f"'{driver}' cluster network driver (that driver needs: {expected}). A multi-node "
-                "session needs one uniform fabric: pair the containerd backend with "
-                "default_driver='cni', and the docker backend with 'overlay'."
+                "session needs one uniform fabric; select a driver implemented by that agent "
+                "backend."
             )
 
 

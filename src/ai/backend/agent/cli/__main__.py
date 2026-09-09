@@ -74,3 +74,12 @@ def health() -> None:
 @main.group(cls=LazyGroup, import_name="ai.backend.agent.cli.kernel:cli")
 def kernel() -> None:
     """Command set for driving kernel RPC on a running agent (parity verification)."""
+
+
+@main.command(name="start-privnet")
+@click.pass_obj
+def start_privnet(cli_ctx: CLIContext) -> None:
+    """Start the privileged session-network daemon."""
+    from ai.backend.agent.network.privnet.__main__ import main as privnet_main
+
+    privnet_main(cli_ctx.config_path)

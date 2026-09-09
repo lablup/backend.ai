@@ -624,35 +624,16 @@ class AgentRPCServer(aobject):
         self._transport_entered = True
 
     async def start_serving(self) -> None:
-        """Say this node is here, once it actually is.
-
-        Called after everything: the RPC transport entered, the HTTP listener up. Both things
-        that announce a node -- the started event and the heartbeat, either of which makes the
-        manager mark it ALIVE and schedule onto it -- happen here and nowhere earlier.
-
-        The check is not a formality. Registering RPC handlers is not serving, and the two were
-        far enough apart that announcing after the first read as announcing after the second:
-        handlers registered inside `__ainit__`, transport entered in `__aenter__`, an HTTP
-        listener set up in between. This makes the ordering something that fails rather than
-        something a reader has to keep true.
-
-        Raises:
-            RuntimeError: the RPC transport is not serving yet.
-        """
+        """Publish readiness only after the RPC transport is serving."""
         if not self._transport_entered:
-            raise RuntimeError(
+            raise AgentInitializationError(
                 "the agent cannot announce itself before its RPC transport is serving: the"
                 " manager marks a node ALIVE on the announcement and sends it work"
             )
         await self.runtime.start_serving()
 
     async def stop_serving(self) -> None:
-        """Take the announcement back, for a start that got this far and then failed.
-
-        `aobject.new` does not call cleanup when `__ainit__` raises, and neither does an exception
-        between entering the transport and serving traffic. Without this the manager is left
-        holding an ALIVE node with a fresh readiness advert over a process that is going away.
-        """
+        """Withdraw readiness after a partial or normal shutdown."""
         self._transport_entered = False
         await self.runtime.stop_serving()
 
