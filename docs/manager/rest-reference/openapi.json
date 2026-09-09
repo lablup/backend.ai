@@ -23804,8 +23804,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Updated name.",
+            "description": "Updated name. Omit to leave unchanged.",
             "title": "Name"
           },
           "resource_slots": {
@@ -23820,8 +23819,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Updated resource slot allocations.",
+            "description": "Updated resource slot allocations. Omit to leave unchanged.",
             "title": "Resource Slots"
           },
           "shared_memory": {

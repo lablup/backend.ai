@@ -22586,10 +22586,10 @@ input UpdateResourcePresetV2Input
   id: UUID!
 
   """Updated name."""
-  name: String = null
+  name: String
 
   """Updated resource slot allocations."""
-  resourceSlots: [ResourceSlotEntryInput!] = null
+  resourceSlots: [ResourceSlotEntryInput!]
 
   """Updated shared memory. Use null to clear."""
   sharedMemory: BinarySizeInput
