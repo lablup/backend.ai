@@ -21,7 +21,7 @@ class ReplicaFieldType(FieldType):
     @override
     @classmethod
     def description(cls) -> str:
-        return "One running copy of a deployment."
+        return "One session serving a deployment, taking a share of its traffic when healthy."
 
     @override
     @classmethod

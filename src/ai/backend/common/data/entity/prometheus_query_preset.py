@@ -17,7 +17,7 @@ class PrometheusQueryPresetEntityType(EntityType):
     @override
     @classmethod
     def description(cls) -> str:
-        return "A saved Prometheus query."
+        return "A named Prometheus query template with the time window it is run over."
 
 
 class PrometheusQueryPresetID(EntityIdentifier):

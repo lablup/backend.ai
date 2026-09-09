@@ -21,7 +21,10 @@ class ReplicaGroupFieldType(FieldType):
     @override
     @classmethod
     def description(cls) -> str:
-        return "A set of replicas of a deployment that share a revision."
+        return (
+            "A group of a deployment's replicas, rolling from one revision to the next and"
+            " taking a share of the traffic."
+        )
 
     @override
     @classmethod
