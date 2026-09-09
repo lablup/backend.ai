@@ -87,7 +87,7 @@ def app_config_adapter(app_config_processors: AppConfigProcessors) -> AppConfigA
     carrying the real processors on that attribute is enough."""
     processors = MagicMock()
     processors.app_config = app_config_processors
-    return AppConfigAdapter(processors)
+    return AppConfigAdapter(processors.app_config)
 
 
 @pytest.fixture()
@@ -96,7 +96,7 @@ def app_config_definition_adapter(
 ) -> AppConfigDefinitionAdapter:
     processors = MagicMock()
     processors.app_config = app_config_processors
-    return AppConfigDefinitionAdapter(processors)
+    return AppConfigDefinitionAdapter(processors.app_config)
 
 
 @pytest.fixture()
@@ -105,7 +105,7 @@ def app_config_allow_list_adapter(
 ) -> AppConfigAllowListAdapter:
     processors = MagicMock()
     processors.app_config = app_config_processors
-    return AppConfigAllowListAdapter(processors)
+    return AppConfigAllowListAdapter(processors.app_config)
 
 
 @pytest.fixture()

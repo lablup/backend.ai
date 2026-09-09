@@ -49,7 +49,7 @@ def server_module_registries(
 ) -> list[RouteRegistry]:
     processors = MagicMock(spec=Processors)
     processors.client_ip_masking = client_ip_masking_processors
-    adapter = ClientIPMaskingAdapter(processors)
+    adapter = ClientIPMaskingAdapter(processors.client_ip_masking)
     handler = V2ClientIPMaskingHandler(adapter=adapter)
     v2_reg = RouteRegistry.create("v2", route_deps.cors_options)
     v2_reg.add_subregistry(register_v2_client_ip_masking_routes(handler, route_deps))

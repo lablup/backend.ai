@@ -25,12 +25,12 @@ from ai.backend.logging.types import LogFormat
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.bootstrap import (  # noqa: F401
-    etcd_container,
-    postgres_container,
-    redis_container,
-)
 from ai.backend.testutils.fixtures import DomainFactory, DomainFixtureData
+
+pytest_plugins = [
+    "ai.backend.testutils.bootstrap",
+    "ai.backend.testutils.db_fixtures",
+]
 
 
 def create_test_password_info(password: str = "test_password") -> PasswordInfo:

@@ -212,7 +212,7 @@ class TestEnqueueActionBuilding:
 
     @pytest.fixture
     def adapter(self, mock_processors: MagicMock) -> SessionAdapter:
-        return SessionAdapter(mock_processors)
+        return SessionAdapter(mock_processors.session, mock_processors.idle_checker)
 
     async def test_enqueue_interactive(
         self,
@@ -370,7 +370,7 @@ class TestTerminateActionBuilding:
 
     @pytest.fixture
     def adapter(self, mock_processors: MagicMock) -> SessionAdapter:
-        return SessionAdapter(mock_processors)
+        return SessionAdapter(mock_processors.session, mock_processors.idle_checker)
 
     async def test_terminate_single(
         self,

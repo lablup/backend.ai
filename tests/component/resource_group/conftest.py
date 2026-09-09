@@ -110,7 +110,9 @@ def server_module_registries(
     processors.rbac = rbac_processors
 
     adapter = ResourceGroupAdapter(
-        processors,
+        processors.resource_group,
+        processors.rbac,
+        processors.domain,
         deployment_coordinator=MagicMock(),
         schedule_coordinator=MagicMock(),
     )

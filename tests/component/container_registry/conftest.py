@@ -90,7 +90,7 @@ def server_module_registries(
         register_container_registry_routes(
             ContainerRegistryHandler(
                 container_registry=container_registry_processors,
-                adapter=ContainerRegistryAdapter(processors),
+                adapter=ContainerRegistryAdapter(processors.container_registry, processors.rbac),
             ),
             route_deps,
         ),

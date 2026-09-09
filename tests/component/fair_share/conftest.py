@@ -14,7 +14,11 @@ from ai.backend.common.data.entity.fair_share import (
     PROJECT_FAIR_SHARE_ENTITY_TYPE,
     USER_FAIR_SHARE_ENTITY_TYPE,
 )
-from ai.backend.common.data.entity.resource_group import RESOURCE_GROUP_ENTITY_TYPE, ResourceGroupID
+from ai.backend.common.data.entity.resource_group import (
+    RESOURCE_GROUP_ENTITY_TYPE,
+    ResourceGroupID,
+    ResourceGroupName,
+)
 from ai.backend.common.data.entity.usage_bucket import (
     DOMAIN_USAGE_BUCKET_FIELD_TYPE,
     PROJECT_USAGE_BUCKET_FIELD_TYPE,
@@ -37,8 +41,13 @@ from ai.backend.manager.data.resource_usage_history.types import (
     ProjectUsageBucketData,
     UserUsageBucketData,
 )
+from ai.backend.manager.models.fair_share.row import (
+    DomainFairShareRow,
+    ProjectFairShareRow,
+    UserFairShareRow,
+)
 from ai.backend.manager.models.project import ProjectRow
-from ai.backend.manager.models.resource_group import sgroups_for_groups
+from ai.backend.manager.models.resource_group import resource_groups, sgroups_for_groups
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
 from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
@@ -117,6 +126,25 @@ def server_module_registries(
             route_deps,
         ),
     ]
+
+
+@pytest.fixture()
+async def resource_group_name(
+    db_engine: SAEngine,
+    resource_group_name: ResourceGroupName,
+) -> AsyncIterator[ResourceGroupName]:
+    """Drop the fair-share rows a test wrote; no FK removes them with the scaling group."""
+    yield resource_group_name
+    async with db_engine.begin() as conn:
+        sgroup_id = sa.select(resource_groups.c.id).where(
+            resource_groups.c.name == resource_group_name
+        )
+        for row_cls in (DomainFairShareRow, ProjectFairShareRow, UserFairShareRow):
+            await conn.execute(
+                row_cls.__table__.delete().where(
+                    row_cls.__table__.c.resource_group_id.in_(sgroup_id)
+                )
+            )
 
 
 @pytest.fixture()

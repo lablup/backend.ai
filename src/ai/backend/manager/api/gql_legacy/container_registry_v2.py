@@ -124,9 +124,9 @@ class CreateContainerRegistryNodeV2(graphene.Mutation):  # type: ignore[misc]
         )
         allowed_groups = props.to_allowed_groups()
         if allowed_groups is not None:
-            await ContainerRegistryAdapter(ctx.processors).apply_allowed_groups(
-                ContainerRegistryID(result.data.id), allowed_groups
-            )
+            await ContainerRegistryAdapter(
+                ctx.processors.container_registry, ctx.processors.rbac
+            ).apply_allowed_groups(ContainerRegistryID(result.data.id), allowed_groups)
 
         return cls(
             container_registry=ContainerRegistryNode.from_dataclass(result.data),
@@ -206,9 +206,9 @@ class ModifyContainerRegistryNodeV2(graphene.Mutation):  # type: ignore[misc]
 
         allowed_groups = props.to_allowed_groups()
         if allowed_groups is not None:
-            await ContainerRegistryAdapter(ctx.processors).apply_allowed_groups(
-                ContainerRegistryID(reg_id), allowed_groups
-            )
+            await ContainerRegistryAdapter(
+                ctx.processors.container_registry, ctx.processors.rbac
+            ).apply_allowed_groups(ContainerRegistryID(reg_id), allowed_groups)
         result = await ctx.processors.container_registry.update_container_registry.run(
             props.to_action(reg_id)
         )
