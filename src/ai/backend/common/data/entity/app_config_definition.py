@@ -17,7 +17,7 @@ class AppConfigDefinitionEntityType(EntityType):
     @override
     @classmethod
     def description(cls) -> str:
-        return "The declaration of an app config key and its value type."
+        return "An app config key registered for use."
 
 
 class AppConfigDefinitionID(EntityIdentifier):

@@ -16,7 +16,7 @@ class DeploymentEntityType(EntityType):
     @override
     @classmethod
     def description(cls) -> str:
-        return "A served model with its replicas and revisions."
+        return "A model service holding the replica count to keep and the replica group serving it."
 
 
 DEPLOYMENT_SCOPE_TYPE = ScopeType(DeploymentEntityType())

@@ -16,7 +16,7 @@ class ArtifactEntityType(EntityType):
     @override
     @classmethod
     def description(cls) -> str:
-        return "A model or dataset pulled from an artifact registry."
+        return "A model, package or image in an artifact registry."
 
 
 class ArtifactID(EntityIdentifier):

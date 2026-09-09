@@ -22,7 +22,7 @@ class KeyPairFieldType(FieldType):
     @override
     @classmethod
     def description(cls) -> str:
-        return "An access key and secret key pair of a user."
+        return "An access key and secret key a user signs API calls with."
 
     @override
     @classmethod

@@ -17,7 +17,10 @@ class SessionGroupEntityType(EntityType):
     @override
     @classmethod
     def description(cls) -> str:
-        return "A set of sessions placed together or apart."
+        return (
+            "A set of sessions packed onto the same agents or spread across them, strictly"
+            " or as a preference."
+        )
 
 
 class SessionGroupID(EntityIdentifier):

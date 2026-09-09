@@ -17,7 +17,7 @@ class NetworkEntityType(EntityType):
     @override
     @classmethod
     def description(cls) -> str:
-        return "An overlay network sessions of a project attach to."
+        return "A network a network plugin created for a project, that its sessions attach to."
 
 
 class NetworkID(EntityIdentifier):

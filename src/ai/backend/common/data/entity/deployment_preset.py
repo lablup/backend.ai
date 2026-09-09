@@ -17,7 +17,7 @@ class DeploymentPresetEntityType(EntityType):
     @override
     @classmethod
     def description(cls) -> str:
-        return "A reusable revision setting a deployment can start from."
+        return "A named template for one runtime variant, holding what a deployment starts with."
 
 
 class DeploymentPresetID(EntityIdentifier):

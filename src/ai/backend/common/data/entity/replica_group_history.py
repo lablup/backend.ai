@@ -21,7 +21,7 @@ class ReplicaGroupHistoryFieldType(FieldType):
     @override
     @classmethod
     def description(cls) -> str:
-        return "One state change of a replica group."
+        return "One run of a replica group handler, recording any status change and its result."
 
     @override
     @classmethod

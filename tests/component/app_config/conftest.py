@@ -12,11 +12,8 @@ from ai.backend.client.v2.auth import HMACAuth, NoAuth
 from ai.backend.client.v2.config import ClientConfig
 from ai.backend.client.v2.v2_registry import V2ClientRegistry
 from ai.backend.common.data.app_config.types import AppConfigScopeType
-from ai.backend.common.data.entity.app_config import (
-    AppConfigAllowListEntityType,
-    AppConfigEntityType,
-    AppConfigScopeID,
-)
+from ai.backend.common.data.entity.app_config import AppConfigEntityType, AppConfigScopeID
+from ai.backend.common.data.entity.app_config_allow_list import AppConfigAllowListEntityType
 from ai.backend.common.data.entity.app_config_definition import AppConfigDefinitionEntityType
 from ai.backend.manager.actions.monitors import ActionMonitors
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry

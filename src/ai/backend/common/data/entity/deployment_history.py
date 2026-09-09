@@ -21,7 +21,7 @@ class DeploymentHistoryFieldType(FieldType):
     @override
     @classmethod
     def description(cls) -> str:
-        return "One state change of a deployment."
+        return "One run of a deployment handler, recording any status change and its result."
 
     @override
     @classmethod

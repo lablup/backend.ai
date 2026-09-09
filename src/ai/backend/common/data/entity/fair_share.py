@@ -20,7 +20,7 @@ class DomainFairShareEntityType(EntityType):
     @override
     @classmethod
     def description(cls) -> str:
-        return "A domain's fair-share weight in a resource group."
+        return "A domain's scheduling priority in a resource group, from past usage and weight."
 
 
 class ProjectFairShareEntityType(EntityType):
@@ -32,7 +32,7 @@ class ProjectFairShareEntityType(EntityType):
     @override
     @classmethod
     def description(cls) -> str:
-        return "A project's fair-share weight in a resource group."
+        return "A project's scheduling priority in a resource group, from past usage and weight."
 
 
 class UserFairShareEntityType(EntityType):
@@ -44,4 +44,4 @@ class UserFairShareEntityType(EntityType):
     @override
     @classmethod
     def description(cls) -> str:
-        return "A user's fair-share weight in a resource group."
+        return "A user's scheduling priority in a resource group, from past usage and weight."

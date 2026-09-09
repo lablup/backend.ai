@@ -22,7 +22,7 @@ class DeploymentRevisionFieldType(FieldType):
     @override
     @classmethod
     def description(cls) -> str:
-        return "One configuration a deployment has run with."
+        return "One snapshot of a deployment's configuration, numbered within that deployment."
 
     @override
     @classmethod

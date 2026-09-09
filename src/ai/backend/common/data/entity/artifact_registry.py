@@ -16,7 +16,7 @@ class ArtifactRegistryEntityType(EntityType):
     @override
     @classmethod
     def description(cls) -> str:
-        return "A source artifacts are pulled from."
+        return "A named registry that artifacts are stored in and pulled from."
 
 
 class ArtifactRegistryID(EntityIdentifier):

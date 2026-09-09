@@ -22,7 +22,7 @@ class PermissionFieldType(FieldType):
     @override
     @classmethod
     def description(cls) -> str:
-        return "One permission a role grants."
+        return "One permission a role grants on one entity type, within one scope."
 
     @override
     @classmethod

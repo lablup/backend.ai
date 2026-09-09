@@ -21,7 +21,7 @@ class KernelSchedulingHistoryFieldType(FieldType):
     @override
     @classmethod
     def description(cls) -> str:
-        return "One scheduling step recorded for a kernel."
+        return "One step of a kernel's progress from image pull to termination, with the result."
 
     @override
     @classmethod

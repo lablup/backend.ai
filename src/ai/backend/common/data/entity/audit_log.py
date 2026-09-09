@@ -19,7 +19,7 @@ class AuditLogFieldType(DanglingFieldType):
     @override
     @classmethod
     def description(cls) -> str:
-        return "One record of an action, owned by whatever entity the action was about."
+        return "One record of an action, naming who ran it and what it acted on."
 
 
 class AuditLogScopeFieldType(DanglingFieldType):
@@ -31,7 +31,10 @@ class AuditLogScopeFieldType(DanglingFieldType):
     @override
     @classmethod
     def description(cls) -> str:
-        return "One scope an audit record sits in."
+        return (
+            "The scope a scope or relation action targeted. The record itself names the"
+            " entity that was touched, so only this makes a search by the scope find it."
+        )
 
 
 class AuditLogID(FieldIdentifier):

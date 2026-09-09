@@ -19,7 +19,10 @@ class ResourceGroupEntityType(EntityType):
     @override
     @classmethod
     def description(cls) -> str:
-        return "A pool of agents sessions are scheduled onto."
+        return (
+            "A pool of agents with its own scheduler, opened to the domains, projects and"
+            " keypairs allowed to use it."
+        )
 
 
 RESOURCE_GROUP_SCOPE_TYPE = ScopeType(ResourceGroupEntityType())

@@ -17,7 +17,7 @@ class ServiceCatalogEntityType(EntityType):
     @override
     @classmethod
     def description(cls) -> str:
-        return "A registered service and its endpoint."
+        return "One running component that announced itself to the manager."
 
 
 class ServiceCatalogID(EntityIdentifier):
