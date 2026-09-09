@@ -17052,36 +17052,36 @@
         "title": "UnassignUsersFromProjectInput",
         "type": "object"
       },
-      "EntityID": {
-        "format": "uuid",
-        "type": "string"
-      },
       "EntityShareRecipientInput": {
         "description": "Who an offer goes to, named exactly one of three ways.\n\nA project takes it directly, a person takes it into the project that is theirs\nalone, and an address reaches someone who may have no account yet.",
         "properties": {
           "project_id": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/EntityID"
+                "format": "uuid",
+                "type": "string"
               },
               {
                 "type": "null"
               }
             ],
             "default": null,
-            "description": "Project the offer goes to"
+            "description": "Project the offer goes to",
+            "title": "Project Id"
           },
           "user_id": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/EntityID"
+                "format": "uuid",
+                "type": "string"
               },
               {
                 "type": "null"
               }
             ],
             "default": null,
-            "description": "Person the offer goes to; it lands in their own project"
+            "description": "Person the offer goes to; it lands in their own project",
+            "title": "User Id"
           },
           "email": {
             "anyOf": [
@@ -17121,8 +17121,10 @@
             "type": "string"
           },
           "target_entity_id": {
-            "$ref": "#/components/schemas/EntityID",
-            "description": "Id of the entity being offered"
+            "description": "Id of the entity being offered",
+            "format": "uuid",
+            "title": "Target Entity Id",
+            "type": "string"
           },
           "recipient": {
             "$ref": "#/components/schemas/EntityShareRecipientInput",
@@ -17465,8 +17467,10 @@
             "type": "string"
           },
           "entity_id": {
-            "$ref": "#/components/schemas/EntityID",
-            "description": "Id of the entity being offered"
+            "description": "Id of the entity being offered",
+            "format": "uuid",
+            "title": "Entity Id",
+            "type": "string"
           }
         },
         "required": [
