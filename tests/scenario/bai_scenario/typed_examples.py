@@ -1,10 +1,12 @@
 """A scenario table with nothing named as text, and the type assertions that hold it.
 
-The four parts a scenario has are all named in the types of the thing they set:
+The parts a scenario has are all named in the types of the thing they set:
 
-- what is already there (``given``) — a creator spec, which answers the row's data type
-- the situation (``setup``) — a config field read off the config class, and what an
-  external client answers, checked against that client's own return type
+- who asks (``actor``) and what they hold (``holding``) — a preset role and the scope
+  its copy covers
+- the situation (``given``) — the rows already there, each a creator spec that answers
+  the row's data type; a config field read off the config class; and what an external
+  client answers, checked against that client's own return type
 - what is done (``when``) — an adapter method, with its arguments
 - what is expected (``then``) — a field of the payload that method answers
 
@@ -15,9 +17,9 @@ suppression.
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from datetime import UTC, datetime, timedelta
-from typing import Any, assert_type
+from typing import Any, assert_type, override
 from uuid import UUID
 
 from ai.backend.common.data.entity.domain import DomainID
@@ -46,10 +48,10 @@ from ai.backend.manager.errors.storage import VFolderCreationFailure
 from ai.backend.manager.models.domain.creators import DomainCreator
 from ai.backend.testutils.typed_scenario import (
     Answer,
+    Arrangement,
     Invocation,
     Override,
     TypedScenario,
-    TypedSetup,
     after,
     all_of_typed,
     at,
@@ -62,8 +64,9 @@ from ai.backend.testutils.typed_scenario import (
     ignored,
     op,
     recent,
+    situation,
 )
-from bai_kit.manager.seeding import Sown, creates
+from bai_scenario.seeds.seeding import Grown, SeedRoom, creates
 
 # ---------------------------------------------------------------------------
 # What this domain can do, bound once from the adapter and the classes involved
@@ -173,7 +176,7 @@ SCENARIOS: list[DomainScenario] = [
         "enforcement-off-lets-the-delete-through",
         when=delete_domain(DeleteDomainInput(name="d1")),
         then=at(lambda p: p.deleted, True),
-        setup=TypedSetup(
+        given=situation(
             config=[manager_config.set(lambda c: c.manager.rbac.enforcement_enabled, False)],
         ),
     ),
@@ -193,7 +196,7 @@ STORAGE_SCENARIOS: list[DomainScenario] = [
     TypedScenario.ok(
         "usage-is-read-from-the-storage-host",
         when=get_domain("d1"),
-        setup=TypedSetup(
+        given=situation(
             answers=[
                 storage.answers(
                     StorageProxyManagerFacingClient.get_folder_usage,
@@ -206,7 +209,7 @@ STORAGE_SCENARIOS: list[DomainScenario] = [
     TypedScenario.error(
         "a-refusing-storage-host-fails-the-call",
         when=get_domain("d1"),
-        setup=TypedSetup(
+        given=situation(
             answers=[
                 storage.raises(
                     StorageProxyManagerFacingClient.create_folder,
@@ -227,23 +230,37 @@ STORAGE_SCENARIOS: list[DomainScenario] = [
 def _a_seed_carries_the_data_type_its_creator_answers() -> None:
     """``DomainCreator`` answers ``DomainData``, so the seed does too. Which ops path
     writes it follows from the creator's type, not from a name given here."""
-    assert_type(creates(DomainCreator(name="dup")), Sown[DomainData])
+    assert_type(creates(DomainCreator(name="dup")), Grown[DomainData])
 
 
-existing_domain = creates(DomainCreator(name="dup"))
+class ADomainNamedDup(Arrangement[SeedRoom]):
+    """The set-up is an object: it holds each row, so a call reaches one by attribute
+    and never by a name repeated from the seed."""
+
+    domain: Grown[DomainData]
+
+    def __init__(self) -> None:
+        self.domain = creates(DomainCreator(name="dup"))
+
+    @override
+    def rows(self) -> Sequence[Grown[Any]]:
+        return [self.domain]
+
+
+SETUP = ADomainNamedDup()
 
 SEEDED_SCENARIOS: list[DomainScenario] = [
     TypedScenario.ok(
         "a-name-already-taken-is-refused",
-        given=[existing_domain],
+        given=situation(setup=SETUP),
         when=create_domain(CreateDomainInput(name="dup"), _actor()),
         then=at(lambda p: p.domain.basic_info.name, "dup"),
     ),
     TypedScenario.ok(
         "the-generated-id-is-reachable-after-the-seed",
-        given=[existing_domain],
+        given=situation(setup=SETUP),
         # The id is made by the database, so the call is written against the row.
-        when=after(existing_domain, lambda row: get_domain(row.name)),
+        when=after(SETUP.domain, lambda row: get_domain(row.name)),
         then=at(lambda node: node.basic_info.name, "dup"),
     ),
 ]

@@ -7,19 +7,10 @@ that a domain refuses, a folder allows, and the rows below are where that shows.
 
 from __future__ import annotations
 
-from typing import Any
-
 import pytest
-from bai_kit.manager.config import base_config_dict
-from bai_kit.manager.db import TemplateDatabase
-from bai_kit.manager.monitors import ActionRecorder
-from bai_kit.manager.personas import MEMBER, OTHER_MEMBER
-from bai_kit.manager.typed_runner import TypedRunner
-from bai_kit.manager.wiring.vfolder import (
-    create_vfolder,
-    my_vfolders,
-    vfolder_wiring,
-)
+from bai_scenario.infra.personas import MEMBER, OTHER_MEMBER
+from bai_scenario.runner.runner import ScenarioRunner
+from bai_scenario.seeds.seeding import USER_PRESET, holds, on_their_own_scope
 
 from ai.backend.common.dto.manager.v2.vfolder.request import (
     CreateVFolderInput,
@@ -27,66 +18,74 @@ from ai.backend.common.dto.manager.v2.vfolder.request import (
 )
 from ai.backend.manager.api.adapters.vfolder.adapter import VFolderAdapter
 from ai.backend.manager.config.unified import ManagerUnifiedConfig
-from ai.backend.testutils.typed_scenario import TypedScenario, at, every
+from ai.backend.manager.errors.permission import NotEnoughPermission
+from ai.backend.testutils.typed_scenario import (
+    TypedScenario,
+    at,
+    call,
+    every,
+)
 
 type VFolderScenario = TypedScenario[VFolderAdapter, ManagerUnifiedConfig]
 
+# What a plain user is given when an operator sets them up: CRUD over their own
+# folders, sessions and keys. Every row below that expects a folder to be made says so.
+THEIR_OWN_USER_ROLE = holds(USER_PRESET, on_their_own_scope())
+
 SCENARIOS: list[VFolderScenario] = [
-    TypedScenario.ok(
-        "a-member-creates-a-folder-of-their-own",
+    TypedScenario.error(
+        # The other half of the pair below: the same request, the same actor, and no
+        # grant. What changes the answer is the role, and the table says which.
+        "a-member-granted-nothing-may-not-create-a-folder",
         actor=MEMBER,
-        when=create_vfolder(CreateVFolderInput(name="mine")),
+        when=call(VFolderAdapter.create, CreateVFolderInput(name="ungranted")),
+        then=NotEnoughPermission,
+    ),
+    TypedScenario.ok(
+        "a-member-granted-their-own-user-role-creates-a-folder",
+        actor=MEMBER,
+        holding=[THEIR_OWN_USER_ROLE],
+        when=call(VFolderAdapter.create, CreateVFolderInput(name="mine")),
         then=at(lambda p: p.vfolder.metadata.name, "mine"),
     ),
     TypedScenario.ok(
         "the-new-folder-belongs-to-the-member-who-asked",
         actor=MEMBER,
-        when=create_vfolder(CreateVFolderInput(name="owned")),
+        holding=[THEIR_OWN_USER_ROLE],
+        when=call(VFolderAdapter.create, CreateVFolderInput(name="owned")),
         then=at(lambda p: p.vfolder.access_control.ownership_type, "user"),
     ),
     TypedScenario.ok(
         "the-folder-lands-on-the-configured-host",
         actor=MEMBER,
-        when=create_vfolder(CreateVFolderInput(name="hosted")),
+        holding=[THEIR_OWN_USER_ROLE],
+        when=call(VFolderAdapter.create, CreateVFolderInput(name="hosted")),
         then=at(lambda p: p.vfolder.host, "local:volume1"),
     ),
     TypedScenario.ok(
         "a-second-member-may-take-the-same-folder-name",
         actor=OTHER_MEMBER,
-        when=create_vfolder(CreateVFolderInput(name="mine")),
+        holding=[THEIR_OWN_USER_ROLE],
+        when=call(VFolderAdapter.create, CreateVFolderInput(name="mine")),
         then=at(lambda p: p.vfolder.metadata.name, "mine"),
     ),
     TypedScenario.ok(
         "a-member-who-has-made-nothing-lists-nothing",
         actor=MEMBER,
-        when=my_vfolders(SearchVFoldersInput()),
+        holding=[THEIR_OWN_USER_ROLE],
+        when=call(VFolderAdapter.my_search, SearchVFoldersInput()),
         then=at(lambda p: p.total_count, 0),
     ),
     TypedScenario.ok(
         "every-folder-a-member-lists-is-on-the-configured-host",
         actor=MEMBER,
-        when=my_vfolders(SearchVFoldersInput()),
+        holding=[THEIR_OWN_USER_ROLE],
+        when=call(VFolderAdapter.my_search, SearchVFoldersInput()),
         then=every(lambda p: p.items, at(lambda node: node.host, "local:volume1")),
     ),
 ]
 
 
-@pytest.fixture
-def run(
-    world_template: TemplateDatabase,
-    test_db: str,
-    engine: Any,
-    recorder: ActionRecorder,
-) -> TypedRunner:
-    return TypedRunner(
-        wiring=vfolder_wiring,
-        engine=engine,
-        world=world_template.world,
-        base_config=base_config_dict(world_template.addr, test_db, None),
-        recorder=recorder,
-    )
-
-
-@pytest.mark.parametrize("scenario", SCENARIOS, ids=lambda s: s.id)
-async def test_vfolder(scenario: VFolderScenario, run: TypedRunner) -> None:
+@pytest.mark.parametrize("scenario", SCENARIOS, ids=lambda s: s.summary)
+async def test_vfolder(scenario: VFolderScenario, run: ScenarioRunner) -> None:
     await run(scenario)

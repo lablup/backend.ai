@@ -13,10 +13,11 @@ side lives in the test kit.
 
 from __future__ import annotations
 
+from abc import ABC, abstractmethod
 from collections.abc import Awaitable, Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
-from typing import Any, Concatenate, cast, override
+from typing import Any, Concatenate, Final, cast, override
 
 from ai.backend.testutils.scenario import Persona
 
@@ -28,7 +29,12 @@ __all__ = (
     "Some",
     "TypedMatcher",
     "TypedScenario",
-    "TypedSetup",
+    "Situation",
+    "Arrangement",
+    "Sown",
+    "Held",
+    "situation",
+    "held",
     "Answer",
     "FakeOf",
     "Deferred",
@@ -49,6 +55,7 @@ __all__ = (
     "fake_of",
     "every",
     "op",
+    "call",
     "path_of",
     "some",
 )
@@ -72,6 +79,17 @@ class Invocation[A, R]:
 
 
 type Op[A, **P, R] = Callable[P, Invocation[A, R]]
+
+
+def call[A, **P, R](
+    method: Callable[Concatenate[A, P], Awaitable[R]], *args: P.args, **kwargs: P.kwargs
+) -> Invocation[A, R]:
+    """The call this row makes, named as the adapter's own method.
+
+    ``call(DomainAdapter.get, "d1")`` is checked the way ``adapter.get("d1")`` is, and
+    the row says which method it exercises without a stand-in for it.
+    """
+    return op(method)(*args, **kwargs)
 
 
 def op[A, **P, R](method: Callable[Concatenate[A, P], Awaitable[R]]) -> Op[A, P, R]:
@@ -321,16 +339,54 @@ def fake_of[F](cls: type[F]) -> FakeOf[F]:
     return FakeOf(cls)
 
 
-@dataclass(frozen=True)
-class TypedSetup[C]:
-    """The situation a scenario runs in: what the config says, and what the outside
-    answers. Both are named in the types of the thing being set, never as text."""
+type Sown = Mapping["Seed[Any, Any]", Any]
+"""What the seeds made, reached by holding the seed itself."""
 
+
+class Arrangement[S](ABC):
+    """A set-up that scenarios share: what is in the database before the call.
+
+    Subclasses hold their rows as attributes, so a scenario reaches one by attribute
+    and the report names the arrangement instead of listing anonymous rows. One
+    instance is reusable across a whole table: a seed is a recipe, and each run lays it
+    into its own database.
+    """
+
+    @abstractmethod
+    def rows(self) -> Sequence[Seed[S, Any]]:
+        """Every row this arrangement lays down, in the order it lays them."""
+        raise NotImplementedError
+
+
+@dataclass(frozen=True)
+class Situation[C]:
+    """What is already true when the call is made, on three axes: the arrangement in
+    the database, what the config says, and what the outside answers. Each is named in
+    the type of the thing being set, never as text.
+    """
+
+    setup: Arrangement[Any] | None = None
     config: Sequence[Override[C, Any]] = ()
     answers: Sequence[Answer[Any]] = ()
 
+    def rows(self) -> Sequence[Seed[Any, Any]]:
+        return self.setup.rows() if self.setup is not None else ()
+
+    def arrangement(self) -> str:
+        """What the set-up is called, for the report."""
+        return type(self.setup).__name__ if self.setup is not None else ""
+
     def dotted_config(self) -> dict[str, Any]:
         return {o.dotted(): o.value for o in self.config}
+
+
+def situation[C](
+    *,
+    setup: Arrangement[Any] | None = None,
+    config: Sequence[Override[C, Any]] = (),
+    answers: Sequence[Answer[Any]] = (),
+) -> Situation[C]:
+    return Situation(setup, tuple(config), tuple(answers))
 
 
 @dataclass(frozen=True)
@@ -358,9 +414,12 @@ def on_fake[T, F](fake: type[F], matcher: TypedMatcher[F]) -> OnFake[T, F]:
 # ---------------------------------------------------------------------------
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, eq=False)
 class Seed[S, D]:
     """One row to lay down before the call.
+
+    Compared by identity: a later part reaches the row this seed made by holding the
+    seed itself, so nothing is ever looked up by a name.
 
     ``S`` is whatever writes rows for the component under test, and ``D`` the data the
     write answers. Neither is named here: what a row is made with belongs to the
@@ -378,6 +437,29 @@ class Seed[S, D]:
 
 
 @dataclass(frozen=True)
+class Held[S]:
+    """Something the actor holds before the call.
+
+    Not a row the request acts on: a fact about who is asking, which is why it sits
+    beside ``actor`` rather than among the rows. It reaches the same writer the rows
+    do, and the persona it applies to is the scenario's actor unless ``by`` names
+    another.
+    """
+
+    apply: Callable[[S, Persona], Awaitable[None]]
+    label: str
+    holder: Persona | None = None
+
+    def by(self, holder: Persona) -> Held[S]:
+        """The same thing, held by somebody else."""
+        return Held(self.apply, self.label, holder)
+
+
+def held[S](apply: Callable[[S, Persona], Awaitable[None]], label: str) -> Held[S]:
+    return Held(apply, label)
+
+
+@dataclass(frozen=True)
 class ActorBound[A, R, I]:
     """A call that cannot be written until the actor is known, because the method takes
     something about the caller beside the request.
@@ -386,23 +468,37 @@ class ActorBound[A, R, I]:
     """
 
     build: Callable[[I], Invocation[A, R]]
+    label: str = ""
 
 
-def needs_actor[A, R, I](build: Callable[[I], Invocation[A, R]]) -> ActorBound[A, R, I]:
-    """Say the call needs the actor, and how to make it once the runner supplies one."""
-    return ActorBound(build)
+def needs_actor[A, R, I](
+    build: Callable[[I], Invocation[A, R]], label: str = ""
+) -> ActorBound[A, R, I]:
+    """Say the call needs the actor, and how to make it once the runner supplies one.
+
+    ``label`` names the method for a report, which cannot read it off a call that has
+    not been built yet.
+    """
+    return ActorBound(build, label)
 
 
 @dataclass(frozen=True)
 class Deferred[A, R]:
     """A call that cannot be written until a seeded row exists, because it names
-    something the database generated."""
+    something the database generated.
+
+    What it builds may itself still need the actor, so a call that wants both the row
+    and the caller is one of these too.
+    """
 
     seed: Seed[Any, Any]
-    build: Callable[[Any], Invocation[A, R]]
+    build: Callable[[Any], Invocation[A, R] | ActorBound[A, R, Any]]
 
 
-def after[S, D, A, R](seed: Seed[S, D], build: Callable[[D], Invocation[A, R]]) -> Deferred[A, R]:
+def after[S, D, A, R](
+    seed: Seed[S, D],
+    build: Callable[[D], Invocation[A, R] | ActorBound[A, R, Any]],
+) -> Deferred[A, R]:
     """Read the row the seed made, then say what to call with it.
 
     ``build`` receives the created data, typed, so an id the database generated is
@@ -468,17 +564,23 @@ def ignored[T, V](select: Callable[[T], V], why: str) -> Ignored[T, V]:
 type Taken[T] = Checked[T, Any] | Ignored[T, Any]
 
 
-def recent(within: timedelta) -> Callable[[datetime], bool]:
-    """A moment that has already happened and is no older than ``within``.
+SKEW: Final = timedelta(seconds=30)
+"""How far ahead of this process the database server's clock may be."""
+
+
+def recent(within: timedelta, *, skew: timedelta = SKEW) -> Callable[[datetime], bool]:
+    """A moment no older than ``within``, allowing for the two clocks disagreeing.
 
     What a timestamp field is usually held to: not the exact value, which nothing can
-    know, but that nothing absurd landed in it.
+    know, but that nothing absurd landed in it. The value is written by the database
+    server and read by this process, so a moment slightly ahead of here is a clock
+    difference, not a wrong value.
     """
 
     def condition(moment: datetime) -> bool:
         if moment.tzinfo is None:
             return False
-        return timedelta() <= datetime.now(UTC) - moment <= within
+        return -skew <= datetime.now(UTC) - moment <= within
 
     return condition
 
@@ -569,86 +671,145 @@ def exactly[T](expected: T, where: Sequence[Taken[T]] = ()) -> Exactly[T]:
 class TypedScenario[A, C]:
     """A scenario over adapter ``A`` and config ``C``.
 
-    The four parts are named in the types of what they set: the rows already there, the
-    situation, the call, and what the call must answer. The result type is checked where
-    the row is written and dropped afterwards, so a table of rows returning different
-    payloads is still one list.
+    Five parts, each named in the type of what it sets: who asks, what that actor
+    holds, the situation the call is made in, the call, and what it must answer. The
+    result type is checked where the row is written and dropped afterwards, so a table
+    of rows returning different payloads is still one list.
     """
 
-    id: str
-    invoke: Callable[[A, Mapping[str, Any], Any], Awaitable[Any]]
+    summary: str
+    invoke: Callable[[A, Sown, Any], Awaitable[Any]]
     then: TypedMatcher[Any] | type[BaseException] | None = None
     actor: Persona | None = None
-    given: tuple[Seed[Any, Any], ...] = ()
-    setup: TypedSetup[C] = field(default_factory=TypedSetup)
+    operation: str = ""
+    holding: tuple[Held[Any], ...] = ()
+    given: Situation[C] = field(default_factory=Situation)
+
+    def describe(self) -> dict[str, Any]:
+        """What this row says, as plain values a report can group and print."""
+        expects = (
+            self.then.__name__
+            if isinstance(self.then, type) and issubclass(self.then, BaseException)
+            else "answers"
+        )
+        return {
+            "summary": self.summary,
+            "operation": self.operation,
+            "actor": str(self.actor) if self.actor else "",
+            "expects": expects,
+            "holding": [item.label for item in self.holding],
+            "setup": self.given.arrangement(),
+            "rows": [seed.label for seed in self.given.rows()],
+            "situation": sorted(self.given.dotted_config()),
+        }
 
     @classmethod
     def ok[R](
         cls,
-        id: str,
+        summary: str,
         *,
         when: Invocation[A, R] | Deferred[A, R] | ActorBound[A, R, Any],
         then: TypedMatcher[R] | None = None,
         actor: Persona | None = None,
-        given: Sequence[Seed[Any, Any]] = (),
-        setup: TypedSetup[C] | None = None,
+        holding: Sequence[Held[Any]] = (),
+        given: Situation[C] | None = None,
     ) -> TypedScenario[A, C]:
-        return cls(id, _invoker(when), then, actor, tuple(given), setup or TypedSetup())
+        return cls(
+            summary,
+            _invoker(when),
+            then,
+            actor,
+            _operation_of(when),
+            tuple(holding),
+            given or Situation(),
+        )
 
     @classmethod
     def error[R](
         cls,
-        id: str,
+        summary: str,
         *,
         when: Invocation[A, R] | Deferred[A, R] | ActorBound[A, R, Any],
         then: type[BaseException],
         actor: Persona | None = None,
-        given: Sequence[Seed[Any, Any]] = (),
-        setup: TypedSetup[C] | None = None,
+        holding: Sequence[Held[Any]] = (),
+        given: Situation[C] | None = None,
     ) -> TypedScenario[A, C]:
-        return cls(id, _invoker(when), then, actor, tuple(given), setup or TypedSetup())
+        return cls(
+            summary,
+            _invoker(when),
+            then,
+            actor,
+            _operation_of(when),
+            tuple(holding),
+            given or Situation(),
+        )
 
 
 def _invoker[A, R](
     when: Invocation[A, R] | Deferred[A, R] | ActorBound[A, R, Any],
-) -> Callable[[A, Mapping[str, Any], Any], Awaitable[R]]:
+) -> Callable[[A, Sown, Any], Awaitable[R]]:
     """One shape for the three kinds of call. The runner hands over what the seeds made
     and what it knows about the actor; each kind takes what it needs."""
     if isinstance(when, Deferred):
         deferred = when
 
-        def run_deferred(adapter: A, sown: Mapping[str, Any], _actor: Any) -> Awaitable[R]:
-            return deferred.build(sown[deferred.seed.label]).call(adapter)
+        def run_deferred(adapter: A, sown: Sown, actor: Any) -> Awaitable[R]:
+            if deferred.seed not in sown:
+                raise LookupError(
+                    f"the call reads the row {deferred.seed.label!r}, "
+                    "which this scenario's set-up does not lay down"
+                )
+            built = deferred.build(sown[deferred.seed])
+            if isinstance(built, ActorBound):
+                return built.build(actor).call(adapter)
+            return built.call(adapter)
 
         return run_deferred
 
     if isinstance(when, ActorBound):
         bound = when
 
-        def run_bound(adapter: A, _sown: Mapping[str, Any], actor: Any) -> Awaitable[R]:
+        def run_bound(adapter: A, _sown: Sown, actor: Any) -> Awaitable[R]:
             return bound.build(actor).call(adapter)
 
         return run_bound
 
     invocation = when
 
-    def run(adapter: A, _sown: Mapping[str, Any], _actor: Any) -> Awaitable[R]:
+    def run(adapter: A, _sown: Sown, _actor: Any) -> Awaitable[R]:
         return invocation.call(adapter)
 
     return run
 
 
-def mismatches_of(matcher: TypedMatcher[Any], answered: Any, fakes: Mapping[str, Any]) -> list[str]:
+def mismatches_of(matcher: TypedMatcher[Any], answered: Any, fakes: Sequence[object]) -> list[str]:
     """What a matcher says about one answer.
 
     A matcher over an external fake is resolved here, because only the run knows which
-    fakes it wired.
+    fakes it wired. The fake is picked out by its class, so a renamed class is a type
+    error rather than a run that quietly finds nothing.
     """
     if isinstance(matcher, OnFake):
-        fake = fakes.get(matcher.fake.__name__)
-        if fake is None:
-            return [f"{matcher.fake.__name__} was not wired by this run"]
-        return matcher.matcher.mismatches(fake)
+        for candidate in fakes:
+            if isinstance(candidate, matcher.fake):
+                return matcher.matcher.mismatches(candidate)
+        return [f"{matcher.fake.__name__} was not wired by this run"]
     if isinstance(matcher, All):
         return [m for part in matcher.parts for m in mismatches_of(part, answered, fakes)]
     return matcher.mismatches(answered)
+
+
+def _operation_of(when: object) -> str:
+    """The name of the method a row calls, for the report.
+
+    A deferred or actor-bound call is built later, so the name is not reachable until
+    then; those say what kind of call they are instead.
+    """
+    if isinstance(when, Invocation):
+        return when.label
+    if isinstance(when, Deferred):
+        return f"{when.seed.label} then a call"
+    if isinstance(when, ActorBound):
+        return when.label or "a call needing the actor"
+    return ""

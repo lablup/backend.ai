@@ -6,34 +6,49 @@ names the ten dependencies a read never reaches.
 
 from __future__ import annotations
 
-from typing import Any
-
 import pytest
-from bai_kit.manager.config import base_config_dict
-from bai_kit.manager.db import TemplateDatabase
-from bai_kit.manager.monitors import ActionRecorder
-from bai_kit.manager.personas import DOMAIN_ADMIN, MEMBER, OTHER_MEMBER
-from bai_kit.manager.typed_runner import TypedRunner
-from bai_kit.manager.wiring.session import my_sessions, search_sessions, session_wiring
+from bai_scenario.infra.personas import DOMAIN_ADMIN, MEMBER, OTHER_MEMBER
+from bai_scenario.runner.runner import ScenarioRunner
+from bai_scenario.seeds.seeding import (
+    DOMAIN_ADMIN_PRESET,
+    USER_PRESET,
+    holds,
+    on_the_domain,
+    on_their_own_scope,
+)
 
 from ai.backend.common.dto.manager.v2.session.request import AdminSearchSessionsInput
 from ai.backend.manager.api.adapters.session.adapter import SessionAdapter
 from ai.backend.manager.config.unified import ManagerUnifiedConfig
 from ai.backend.manager.errors.permission import NotEnoughPermission
-from ai.backend.testutils.typed_scenario import TypedScenario, at
+from ai.backend.testutils.typed_scenario import (
+    TypedScenario,
+    at,
+    call,
+)
 
 type SessionScenario = TypedScenario[SessionAdapter, ManagerUnifiedConfig]
+
+# The premise that decides the answers below: CRUD over the actor's own sessions.
+THEIR_OWN_USER_ROLE = holds(USER_PRESET, on_their_own_scope())
 
 SCENARIOS: list[SessionScenario] = [
     TypedScenario.ok(
         "an-untouched-world-holds-no-sessions",
-        when=search_sessions(AdminSearchSessionsInput()),
+        when=call(SessionAdapter.admin_search, AdminSearchSessionsInput()),
         then=at(lambda p: p.total_count, 0),
+    ),
+    TypedScenario.error(
+        "a-member-granted-nothing-may-not-search-sessions",
+        actor=MEMBER,
+        when=call(SessionAdapter.admin_search, AdminSearchSessionsInput()),
+        then=NotEnoughPermission,
     ),
     TypedScenario.ok(
         "a-member-lists-their-own-sessions-and-has-none",
         actor=MEMBER,
-        when=my_sessions(AdminSearchSessionsInput()),
+        holding=[THEIR_OWN_USER_ROLE],
+        when=call(SessionAdapter.my_search, AdminSearchSessionsInput()),
         then=at(lambda p: p.total_count, 0),
     ),
     TypedScenario.ok(
@@ -42,43 +57,30 @@ SCENARIOS: list[SessionScenario] = [
         # their own scope, so the search runs and answers with what that scope holds.
         "a-member-may-search-sessions-because-their-own-scope-grants-it",
         actor=MEMBER,
-        when=search_sessions(AdminSearchSessionsInput()),
+        holding=[THEIR_OWN_USER_ROLE],
+        when=call(SessionAdapter.admin_search, AdminSearchSessionsInput()),
         then=at(lambda p: p.total_count, 0),
     ),
     TypedScenario.ok(
         "a-member-outside-every-project-may-still-search-their-own-scope",
         actor=OTHER_MEMBER,
-        when=search_sessions(AdminSearchSessionsInput()),
+        holding=[THEIR_OWN_USER_ROLE],
+        when=call(SessionAdapter.admin_search, AdminSearchSessionsInput()),
         then=at(lambda p: p.total_count, 0),
     ),
     TypedScenario.error(
-        # The domain admin preset covers users, not sessions, so the same request that
-        # a plain member may make is refused here. Holding an admin role is not the
-        # same as holding the permission the request needs.
-        "the-domain-admin-holds-nothing-on-sessions-and-is-refused",
+        # The domain admin preset covers users, not sessions, so even holding it the
+        # same request a plain member may make is refused. An admin role is not the
+        # same thing as the permission the request needs.
+        "the-domain-admin-role-does-not-reach-sessions",
         actor=DOMAIN_ADMIN,
-        when=search_sessions(AdminSearchSessionsInput()),
+        holding=[holds(DOMAIN_ADMIN_PRESET, on_the_domain())],
+        when=call(SessionAdapter.admin_search, AdminSearchSessionsInput()),
         then=NotEnoughPermission,
     ),
 ]
 
 
-@pytest.fixture
-def run(
-    world_template: TemplateDatabase,
-    test_db: str,
-    engine: Any,
-    recorder: ActionRecorder,
-) -> TypedRunner:
-    return TypedRunner(
-        wiring=session_wiring,
-        engine=engine,
-        world=world_template.world,
-        base_config=base_config_dict(world_template.addr, test_db, None),
-        recorder=recorder,
-    )
-
-
-@pytest.mark.parametrize("scenario", SCENARIOS, ids=lambda s: s.id)
-async def test_session(scenario: SessionScenario, run: TypedRunner) -> None:
+@pytest.mark.parametrize("scenario", SCENARIOS, ids=lambda s: s.summary)
+async def test_session(scenario: SessionScenario, run: ScenarioRunner) -> None:
     await run(scenario)

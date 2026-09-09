@@ -1,25 +1,28 @@
-"""Session wiring.
+"""The session adapter, assembled for one row.
 
-Third of the shapes tried, and the one that does not fit cheaply. Domain and model card
-answer reads straight from the ops path; session answers even a read through a service
-whose constructor demands eleven dependencies. Ten of them are named here as unwired,
-so a scenario that reaches one fails saying which, rather than passing against a mock
-that answered on its own.
+A session read answers through a service whose constructor demands eleven dependencies.
+Ten of them are named unwired here, so a row that reaches one fails saying which rather
+than passing against a mock that answered on its own.
 """
 
 from __future__ import annotations
 
 from typing import Any
 
+import pytest
+from bai_scenario.runner.unwired import unwired
+
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
 from ai.backend.common.data.entity.resource_group import ResourceGroupEntityType
 from ai.backend.common.data.entity.session import SessionEntityType
-from ai.backend.common.dto.manager.v2.session.request import AdminSearchSessionsInput
 from ai.backend.common.events.fetcher import EventFetcher
 from ai.backend.common.events.hub.hub import EventHub
 from ai.backend.common.plugin.monitor import ErrorPluginContext
+from ai.backend.manager.actions.monitors import ActionMonitors
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
 from ai.backend.manager.actions.registry.types import GroupMeta, ProcessorDependencies
+from ai.backend.manager.actions.v2.validators import ActionValidators as V2ActionValidators
+from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.api.adapters.session.adapter import SessionAdapter
 from ai.backend.manager.clients.appproxy.client import AppProxyClientPool
 from ai.backend.manager.idle import IdleCheckerHost
@@ -39,30 +42,28 @@ from ai.backend.manager.services.session.service import SessionService, SessionS
 from ai.backend.manager.sokovan.scheduling_controller.scheduling_controller import (
     SchedulingController,
 )
-from ai.backend.testutils.typed_scenario import op
-from bai_kit.manager.runner import Wired, WiringDeps
-from bai_kit.manager.unwired import unwired
-
-DISPATCH: dict[type, str] = {
-    AdminSearchSessionsInput: "admin_search",
-}
 
 
-def session_wiring(deps: WiringDeps) -> Wired:
-    provider = V2DBOpsProvider(deps.engine)
+@pytest.fixture
+async def adapter(
+    engine: Any,
+    validators: tuple[ActionValidators, V2ActionValidators],
+    monitors: ActionMonitors,
+) -> SessionAdapter:
+    _, v2_validators = validators
+    provider = V2DBOpsProvider(engine)
     registry: ProcessorRegistry[Any] = ProcessorRegistry(
         ProcessorDependencies(
-            monitors=deps.monitors,
-            validators=deps.v2_validators,
+            monitors=monitors,
+            validators=v2_validators,
             repository=OpsRepository(provider),
         )
     )
     service = SessionService(
         SessionServiceArgs(
             # The one a read reaches: get and search both go straight to it.
-            session_repository=SessionRepository(deps.engine, DBOpsProvider(deps.engine)),
-            # The ten it does not. Named rather than mocked, so a scenario that turns
-            # out to need one fails saying which.
+            session_repository=SessionRepository(engine, DBOpsProvider(engine)),
+            # The ten it does not.
             scheduler_repository=unwired(SchedulerRepository, "only scheduling reads it"),
             user_repository=unwired(UserRepository, "only writes resolve the owner"),
             agent_registry=unwired(AgentRegistry, "only session writes reach the agents"),
@@ -75,23 +76,12 @@ def session_wiring(deps: WiringDeps) -> Wired:
             appproxy_client_pool=unwired(AppProxyClientPool, "only app routes reach it"),
         )
     )
-    session = SessionProcessors(
-        registry.group(GroupMeta(SessionEntityType())),
-        registry.group(GroupMeta(ResourceGroupEntityType())),
-        unwired(ResourceAllocationProcessors, "only allocation reads reach it"),
-        service,
-    )
-    adapter = SessionAdapter(
-        session,
+    return SessionAdapter(
+        SessionProcessors(
+            registry.group(GroupMeta(SessionEntityType())),
+            registry.group(GroupMeta(ResourceGroupEntityType())),
+            unwired(ResourceAllocationProcessors, "only allocation reads reach it"),
+            service,
+        ),
         unwired(IdleCheckerProcessors, "only idle-check reads reach it"),
     )
-    return Wired(adapter=adapter, dispatch=DISPATCH, client_attr="session")
-
-
-# ---------------------------------------------------------------------------
-# The operations a session scenario may name
-# ---------------------------------------------------------------------------
-
-search_sessions = op(SessionAdapter.admin_search)
-my_sessions = op(SessionAdapter.my_search)
-get_session = op(SessionAdapter.get)

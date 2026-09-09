@@ -32,7 +32,6 @@ from ai.backend.common.types import (
 )
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.keypair.types import KeyPairSecrets
-from ai.backend.manager.data.permission.role import UserRoleAssignmentInput
 from ai.backend.manager.models.base import populate_fixture
 from ai.backend.manager.models.domain.creators import DomainCreator
 from ai.backend.manager.models.hasher.types import PasswordInfo
@@ -53,9 +52,6 @@ from ai.backend.manager.repositories.ops.repository import OpsRepository
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.ops.v2.user.provider import UserOpsProvider
 from ai.backend.manager.repositories.ops.v2.user.write import FullUserCreator
-from ai.backend.manager.repositories.permission_controller.repository import (
-    PermissionControllerRepository,
-)
 from ai.backend.manager.secret.types import SecretValue
 from ai.backend.testutils.scenario import Persona
 
@@ -125,6 +121,28 @@ class World:
     project_id: ProjectID
     project_name: str
     users: Mapping[Persona, SeededUser]
+    roles: Mapping[tuple[str, str], RoleID]
+    """The role each preset made in each scope, by preset name and scope id.
+
+    Creating a domain, a project or a user makes one role per preset that applies to it.
+    Reading them once here keeps a scenario that grants one from having to query.
+    """
+
+
+async def _preset_roles(engine: ExtendedAsyncSAEngine) -> dict[tuple[str, str], RoleID]:
+    """Every role a preset made, keyed by the preset and the scope it covers.
+
+    A preset role is discoverable by the permissions it carries: they name the scope,
+    and the role names the preset it came from.
+    """
+    async with engine.begin_readonly_session() as sess:
+        rows = await sess.execute(
+            sa.select(RolePresetRow.name, PermissionRow.scope_id, RoleRow.id)
+            .select_from(RoleRow)
+            .join(RolePresetRow, RolePresetRow.id == RoleRow.role_preset_id)
+            .join(PermissionRow, PermissionRow.role_id == RoleRow.id)
+        )
+    return {(preset, scope_id): RoleID(role_id) for preset, scope_id, role_id in rows}
 
 
 def _all_host_permissions() -> VFolderHostPermissionMap:
@@ -151,35 +169,6 @@ async def _seed_role_presets(engine: ExtendedAsyncSAEngine) -> None:
             "role_presets": [{**row, "deleted": False} for row in data["role_presets"]],
             "role_permission_presets": data["role_permission_presets"],
         },
-    )
-
-
-async def _role_of_preset(engine: ExtendedAsyncSAEngine, preset_name: str, scope_id: str) -> RoleID:
-    """The role a preset created in one scope.
-
-    A preset role is discoverable by the permissions it was created with: they name the
-    scope, and the role names the preset it came from.
-    """
-    async with engine.begin_readonly_session() as sess:
-        role_id = await sess.scalar(
-            sa.select(RoleRow.id)
-            .join(RolePresetRow, RolePresetRow.id == RoleRow.role_preset_id)
-            .join(PermissionRow, PermissionRow.role_id == RoleRow.id)
-            .where(RolePresetRow.name == preset_name, PermissionRow.scope_id == scope_id)
-            .limit(1)
-        )
-    if role_id is None:
-        raise LookupError(f"no role from preset {preset_name!r} in scope {scope_id}")
-    return RoleID(role_id)
-
-
-async def _grant(
-    engine: ExtendedAsyncSAEngine, user_id: UserID, preset_name: str, scope_id: str
-) -> None:
-    """Give the user the role a preset created in that scope, the way an operator would."""
-    role_id = await _role_of_preset(engine, preset_name, scope_id)
-    await PermissionControllerRepository(engine).assign_role(
-        UserRoleAssignmentInput(user_id=user_id, role_id=role_id)
     )
 
 
@@ -286,13 +275,10 @@ async def build_world(engine: ExtendedAsyncSAEngine, spec: WorldSpec = WORLD) ->
     async with UserOpsProvider(engine).write_ops() as w:
         await w.join_projects(member_id, domain.id, [project_id])
 
-    # The roles an operator assigns. ``preset_user`` and ``preset_domain_admin`` are not
-    # auto-assigned, so without this every persona but the superadmin holds nothing and
-    # no scenario could tell "allowed" from "refused".
-    await _grant(engine, users[Persona("domain-admin")].id, "preset_domain_admin", str(domain.id))
-    for persona in (Persona("member"), Persona("other-member")):
-        user_id = users[persona].id
-        await _grant(engine, user_id, "preset_user", str(user_id))
+    # Nothing beyond this is granted here. What a persona holds is the premise of a
+    # permission scenario, so the scenario states it in ``holding`` and the row beside
+    # it that omits the grant reads as the other half of the pair. The World only
+    # settles who exists, who sits where, and which roles the presets made.
 
     return World(
         domain_id=domain.id,
@@ -302,4 +288,5 @@ async def build_world(engine: ExtendedAsyncSAEngine, spec: WorldSpec = WORLD) ->
         project_id=project_id,
         project_name=spec.project_name,
         users=users,
+        roles=await _preset_roles(engine),
     )

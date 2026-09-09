@@ -21,8 +21,8 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.uuid7 import UUID_GENERATE_V7_DDL
 from ai.backend.manager.repositories.db.engine import create_async_engine
 from ai.backend.testutils.bootstrap import POSTGRES_MAINTENANCE_DB, POSTGRES_PASSWORD, POSTGRES_USER
-from bai_kit.manager import schema as _schema  # the full schema, statically named
-from bai_kit.manager.world import World, build_world
+from bai_scenario.infra import schema as _schema  # the full schema, statically named
+from bai_scenario.infra.world import World, build_world
 
 
 def db_url(addr: HostPortPairModel, dbname: str) -> str:
@@ -71,6 +71,8 @@ class TemplateDatabase:
     name: str
     world: World
     build_seconds: float
+    schema_seconds: float
+    world_seconds: float
 
 
 async def create_template(addr: HostPortPairModel, name: str) -> TemplateDatabase:
@@ -78,11 +80,22 @@ async def create_template(addr: HostPortPairModel, name: str) -> TemplateDatabas
     await _admin(addr, f'CREATE DATABASE "{name}";')
     engine = engine_for(addr, name)
     try:
+        schema_started = time.perf_counter()
         await create_schema(engine)
+        schema_seconds = time.perf_counter() - schema_started
+        world_started = time.perf_counter()
         world = await build_world(engine)
+        world_seconds = time.perf_counter() - world_started
     finally:
         await engine.dispose()
-    return TemplateDatabase(addr, name, world, time.perf_counter() - started)
+    return TemplateDatabase(
+        addr,
+        name,
+        world,
+        time.perf_counter() - started,
+        schema_seconds,
+        world_seconds,
+    )
 
 
 async def clone_database(template: TemplateDatabase, name: str) -> float:

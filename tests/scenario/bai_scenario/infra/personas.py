@@ -5,7 +5,7 @@ from __future__ import annotations
 from ai.backend.common.data.user.types import UserData, UserRole
 from ai.backend.manager.data.domain.types import UserInfo
 from ai.backend.testutils.scenario import Persona
-from bai_kit.manager.world import World
+from bai_scenario.infra.world import World
 
 SUPERADMIN = Persona("superadmin")
 DOMAIN_ADMIN = Persona("domain-admin")

@@ -1,7 +1,8 @@
-"""What every domain scenario module needs: a runner bound to the domain's wiring.
+"""The domain adapter, assembled for one row.
 
-The rows themselves stay in the test modules beside the behaviour they describe. Only
-the runner is shared, which is what a conftest is for.
+The only place in the domain scenarios that knows how a domain adapter is built. What
+it is built with — the config the row overrides, the validators that follow from it,
+the recorder — comes from the root conftest.
 """
 
 from __future__ import annotations
@@ -9,24 +10,48 @@ from __future__ import annotations
 from typing import Any
 
 import pytest
-from bai_kit.manager.config import base_config_dict
-from bai_kit.manager.db import TemplateDatabase
-from bai_kit.manager.monitors import ActionRecorder
-from bai_kit.manager.typed_runner import TypedRunner
-from bai_kit.manager.wiring.domain import domain_wiring
+
+from ai.backend.common.data.entity.domain import DomainEntityType
+from ai.backend.common.data.entity.resource_group import ResourceGroupEntityType
+from ai.backend.manager.actions.monitors import ActionMonitors
+from ai.backend.manager.actions.registry.registry import ProcessorRegistry
+from ai.backend.manager.actions.registry.types import GroupMeta, ProcessorDependencies
+from ai.backend.manager.actions.v2.validators import ActionValidators as V2ActionValidators
+from ai.backend.manager.actions.validators import ActionValidators
+from ai.backend.manager.api.adapters.domain.adapter import DomainAdapter
+from ai.backend.manager.repositories.domain.repository import DomainRepository
+from ai.backend.manager.repositories.ops.repository import OpsRepository
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
+from ai.backend.manager.repositories.resource_group.repository import ResourceGroupRepository
+from ai.backend.manager.services.domain.processors import DomainProcessors
+from ai.backend.manager.services.domain.service import DomainService
+from ai.backend.manager.services.resource_group.processors import ResourceGroupProcessors
+from ai.backend.manager.services.resource_group.service import ResourceGroupService
 
 
 @pytest.fixture
-def run(
-    world_template: TemplateDatabase,
-    test_db: str,
+async def adapter(
     engine: Any,
-    recorder: ActionRecorder,
-) -> TypedRunner:
-    return TypedRunner(
-        wiring=domain_wiring,
-        engine=engine,
-        world=world_template.world,
-        base_config=base_config_dict(world_template.addr, test_db, None),
-        recorder=recorder,
+    validators: tuple[ActionValidators, V2ActionValidators],
+    monitors: ActionMonitors,
+) -> DomainAdapter:
+    _, v2_validators = validators
+    provider = V2DBOpsProvider(engine)
+    registry: ProcessorRegistry[Any] = ProcessorRegistry(
+        ProcessorDependencies(
+            monitors=monitors,
+            validators=v2_validators,
+            repository=OpsRepository(provider),
+        )
+    )
+    return DomainAdapter(
+        DomainProcessors(
+            registry.group(GroupMeta(DomainEntityType())),
+            DomainService(DomainRepository(engine, provider)),
+            [],
+        ),
+        ResourceGroupProcessors(
+            registry.group(GroupMeta(ResourceGroupEntityType())),
+            ResourceGroupService(ResourceGroupRepository(engine, provider)),
+        ),
     )

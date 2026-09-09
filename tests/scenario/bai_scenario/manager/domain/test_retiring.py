@@ -3,69 +3,88 @@
 from __future__ import annotations
 
 import pytest
-from bai_kit.manager.personas import MEMBER, OTHER_MEMBER
-from bai_kit.manager.typed_runner import TypedRunner
-from bai_kit.manager.wiring.domain import (
+from bai_scenario.components.domain import (
+    ADomainIsThere,
     DomainScenario,
-    admin_delete,
-    admin_purge,
-    admin_restore,
-    already_there,
 )
+from bai_scenario.infra.personas import MEMBER, OTHER_MEMBER
+from bai_scenario.runner.runner import ScenarioRunner
 
 from ai.backend.common.dto.manager.v2.domain.request import (
     DeleteDomainInput,
     PurgeDomainInput,
     RestoreDomainInput,
 )
+from ai.backend.manager.api.adapters.domain.adapter import DomainAdapter
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.errors.repository import EntityNotFoundError
 from ai.backend.testutils.typed_scenario import (
     TypedScenario,
+    after,
     at,
+    call,
+    situation,
 )
+
+A_DOMAIN = ADomainIsThere()
 
 SCENARIOS: list[DomainScenario] = [
     TypedScenario.ok(
         "superadmin-retires-a-domain",
-        given=[already_there("to-delete")],
-        when=admin_delete(DeleteDomainInput(name="to-delete")),
+        given=situation(setup=A_DOMAIN),
+        when=after(
+            A_DOMAIN.domain,
+            lambda row: call(DomainAdapter.admin_delete, DeleteDomainInput(name=row.name)),
+        ),
         then=at(lambda p: p.deleted, True),
     ),
     TypedScenario.ok(
         "restoring-answers-that-it-restored",
-        given=[already_there("to-restore")],
-        when=admin_restore(RestoreDomainInput(name="to-restore")),
+        given=situation(setup=A_DOMAIN),
+        when=after(
+            A_DOMAIN.domain,
+            lambda row: call(DomainAdapter.admin_restore, RestoreDomainInput(name=row.name)),
+        ),
         then=at(lambda p: p.restored, True),
     ),
     TypedScenario.ok(
         "purging-a-domain-nothing-else-refers-to-succeeds",
-        given=[already_there("to-purge")],
-        when=admin_purge(PurgeDomainInput(name="to-purge")),
+        given=situation(setup=A_DOMAIN),
+        when=after(
+            A_DOMAIN.domain,
+            lambda row: call(DomainAdapter.admin_purge, PurgeDomainInput(name=row.name)),
+        ),
         then=at(lambda p: p.purged, True),
     ),
     TypedScenario.error(
         "retiring-a-name-nothing-answers-to-is-not-found",
-        when=admin_delete(DeleteDomainInput(name="no-such-domain")),
+        # The literal is the point here: nothing answers to it.
+        when=call(DomainAdapter.admin_delete, DeleteDomainInput(name="no-such-domain")),
         then=EntityNotFoundError,
     ),
     TypedScenario.error(
         "a-member-may-not-retire-a-domain",
         actor=MEMBER,
-        given=[already_there("member-cannot-delete")],
-        when=admin_delete(DeleteDomainInput(name="member-cannot-delete")),
+        given=situation(setup=A_DOMAIN),
+        when=after(
+            A_DOMAIN.domain,
+            lambda row: call(DomainAdapter.admin_delete, DeleteDomainInput(name=row.name)),
+        ),
         then=NotEnoughPermission,
     ),
     TypedScenario.error(
         "a-member-outside-everything-may-not-purge-a-domain",
         actor=OTHER_MEMBER,
-        given=[already_there("stranger-cannot-purge")],
-        when=admin_purge(PurgeDomainInput(name="stranger-cannot-purge")),
+        given=situation(setup=A_DOMAIN),
+        when=after(
+            A_DOMAIN.domain,
+            lambda row: call(DomainAdapter.admin_purge, PurgeDomainInput(name=row.name)),
+        ),
         then=NotEnoughPermission,
     ),
 ]
 
 
-@pytest.mark.parametrize("scenario", SCENARIOS, ids=lambda s: s.id)
-async def test_retiring(scenario: DomainScenario, run: TypedRunner) -> None:
+@pytest.mark.parametrize("scenario", SCENARIOS, ids=lambda s: s.summary)
+async def test_retiring(scenario: DomainScenario, run: ScenarioRunner) -> None:
     await run(scenario)

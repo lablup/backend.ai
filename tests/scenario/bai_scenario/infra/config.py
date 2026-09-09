@@ -32,7 +32,7 @@ class _KitLegacyEtcdLoader:
         return ManagerStatus.RUNNING
 
 
-class KitConfigProvider(ManagerConfigProvider):
+class ScenarioConfigProvider(ManagerConfigProvider):
     def __init__(
         self, config: ManagerUnifiedConfig, vfolder_types: Sequence[str] = ("user", "group")
     ) -> None:
