@@ -12,6 +12,7 @@ import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
 from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE, ProjectID
+from ai.backend.common.data.entity.resource_preset import ResourcePresetID
 from ai.backend.common.types import (
     AccessKey,
     DefaultForUnspecified,
@@ -41,6 +42,7 @@ from ai.backend.manager.models.project import groups
 from ai.backend.manager.models.resource_group import query_allowed_sgroups
 from ai.backend.manager.models.resource_preset import ResourcePresetRow
 from ai.backend.manager.models.resource_preset.creators import ResourcePresetCreator
+from ai.backend.manager.models.resource_preset.purgers import ResourcePresetPurger
 from ai.backend.manager.models.resource_preset.updaters import ResourcePresetUpdater
 from ai.backend.manager.models.resource_slot import (
     AgentResourceRow,
@@ -156,16 +158,16 @@ class ResourcePresetDBSource:
             raise ResourcePresetNotFound(f"Resource preset with ID {updater.preset_id} not found.")
         return preset
 
-    async def delete_preset(self, preset_id: UUID | None, name: str | None) -> ResourcePresetData:
+    async def delete_preset(self, preset_id: ResourcePresetID) -> ResourcePresetData:
         """
         Deletes a resource preset.
         Returns the deleted preset data.
         Raises ResourcePresetNotFound if the preset doesn't exist.
         """
-        async with self._db.begin_session() as session:
-            preset_row = await self._get_preset_by_id_or_name(session, preset_id, name)
-            data = preset_row.to_dataclass()
-            await session.delete(preset_row)
+        async with self._v2_ops.write_ops() as w:
+            data = await w.purge_entity(ResourcePresetPurger(preset_id=preset_id))
+        if data is None:
+            raise ResourcePresetNotFound(f"Resource preset with ID {preset_id} not found.")
         return data
 
     async def list_presets(

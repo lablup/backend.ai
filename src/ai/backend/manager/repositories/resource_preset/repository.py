@@ -9,6 +9,7 @@ from uuid import UUID
 import trafaret as t
 
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
+from ai.backend.common.data.entity.resource_preset import ResourcePresetID
 from ai.backend.common.exception import BackendAIError
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
@@ -144,19 +145,17 @@ class ResourcePresetRepository:
         return preset
 
     @resource_preset_repository_resilience.apply()
-    async def delete_preset_validated(
-        self, preset_id: UUID | None, name: str | None
-    ) -> ResourcePresetData:
+    async def delete_preset_validated(self, preset_id: ResourcePresetID) -> ResourcePresetData:
         """
         Deletes a resource preset.
         Returns the deleted preset data.
         Raises ObjectNotFound if the preset doesn't exist.
         """
-        preset = await self._db_source.delete_preset(preset_id, name)
+        preset = await self._db_source.delete_preset(preset_id)
         with suppress_with_log(
             [Exception], message="Failed to invalidate cache after preset deletion"
         ):
-            await self._cache_source.invalidate_preset(preset_id, name)
+            await self._cache_source.invalidate_preset(preset_id, None)
         return preset
 
     @resource_preset_repository_resilience.apply()
