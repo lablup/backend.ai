@@ -89,6 +89,32 @@ itself needs no `CAP_NET_ADMIN`. That is opt-in: `network-privnet-socket` select
 unset the agent performs the work in-process. Each agent owns one configured daemon socket; etcd
 claims still prevent two agents on one host from programming conflicting session state.
 
+#### 2.3.1 One daemon per node (planned)
+
+Today a node running several agents runs several daemons, one per agent. The target is one daemon
+per node serving every agent on it: the daemon exists to concentrate privilege, and N daemons are N
+copies of `CAP_NET_ADMIN`, N journals and N sockets. The three node-wide claim stores (VNI
+registry, ESP pair journal, LOCAL subnet) exist only because privilege is currently fragmented per
+agent.
+
+The one thing that must not be shared is identity. Every node-wide claim carries an owner, and a
+daemon serving N agents must stamp each with the agent that asked, not with its own name -- a
+reclaim that judged one runtime's containers by another runtime's listing takes a live kernel's
+published ports away.
+
+| Concern | Contract |
+|---|---|
+| Caller identity | One socket per agent, bound to an agent id in the daemon's config. A request field naming the agent is not accepted: any caller could then claim another's rules. |
+| Boundary strength | Distinct uid per agent makes the binding kernel-enforced. Agents sharing a uid are one principal to the kernel and can reach each other's sockets regardless, so the binding is an integrity boundary, not a security one. The daemon logs which it has. |
+| Ownership stamping | Every use of the daemon's own agent id becomes the caller's: VNI claims, ESP pair claims, port-forward tags, `owner_agent_id` comparisons. |
+| Container liveness | One `ContainerLocator` per agent. "Is this container still here" is only answerable by that agent's own runtime. |
+| Per-agent state | Sessions, journal and LOCAL subnet allocator are held per agent, not per daemon. |
+| LOCAL blocks | Stay per agent. A session spanning two co-located agents keeps a block, a `bailo` bridge and a subnet per agent, exactly as two daemons give it today. |
+| Journal layout | `<state_dir>/<agent_id>/...`. A pre-existing root is adopted into the single agent that wrote it; a daemon that cannot find its records recovers nothing. |
+
+Unchanged: the agent still holds no network privilege, and the node-wide claim stores keep their
+current on-disk shape and their owner tags -- the owner simply comes from the caller.
+
 ### 2.4 Cluster name resolution
 
 Each session gets a resolver on the node that answers `cluster_hostname -> overlay ip` from the
