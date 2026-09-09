@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
 
@@ -11,6 +12,7 @@ from bai_kit.manager.db import TemplateDatabase
 from bai_kit.manager.monitors import ActionRecorder
 from bai_kit.manager.personas import ALL_PERSONAS, MEMBER, SUPERADMIN
 from bai_kit.manager.runner import AdapterRunner, Wired, WiringDeps
+from bai_kit.manager.typed import At, Every, at, every, path_of
 
 from ai.backend.common.contexts.user import current_user
 from ai.backend.manager.models.domain.row import DomainRow
@@ -202,3 +204,31 @@ class TestWorldSeed:
         self, world_template: TemplateDatabase
     ) -> None:
         assert world_template.world.users[SUPERADMIN].role == "superadmin"
+
+
+# --- typed matchers: the accessor is read twice, for the value and for the path -------
+# Written outside a scenario, an accessor has no position to read its parameter type
+# from, so each matcher below is annotated. Inside a table the ``when`` supplies it.
+
+
+class TestTypedMatchers:
+    def test_path_is_recovered_from_the_accessor(self) -> None:
+        select: Callable[[_Outer], object] = lambda o: o.inner.name
+        assert path_of(select) == "inner.name"
+
+    def test_at_reports_the_path_it_read(self) -> None:
+        matcher: At[_Outer, str] = at(lambda o: o.inner.name, "b")
+        assert matcher.mismatches(_outer()) == ["inner.name: expected 'b', got 'a'"]
+
+    def test_at_passes_when_the_value_matches(self) -> None:
+        matcher: At[_Outer, int] = at(lambda o: o.inner.n, 1)
+        assert matcher.mismatches(_outer()) == []
+
+    def test_every_reports_the_index_and_the_field(self) -> None:
+        item: At[_Inner, int] = at(lambda i: i.n, 1)
+        matcher: Every[_Outer, _Inner] = every(lambda o: o.items, item)
+        assert matcher.mismatches(_outer()) == ["items[1].n: expected 1, got 2"]
+
+    def test_a_computed_accessor_still_answers_a_path(self) -> None:
+        select: Callable[[_Outer], object] = lambda o: len(o.items)
+        assert path_of(select) == "<computed>"
