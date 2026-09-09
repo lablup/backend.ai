@@ -108,10 +108,16 @@ def create(name: str, description: str | None) -> None:
 @click.argument("login_client_type_id", type=click.UUID)
 @click.option("--name", default=None, type=str, help="Updated name.")
 @click.option("--description", default=None, type=str, help="Updated description.")
+@click.option(
+    "--clear-description",
+    is_flag=True,
+    help="Clear the current description.",
+)
 def update(
     login_client_type_id: uuid.UUID,
     name: str | None,
     description: str | None,
+    clear_description: bool,
 ) -> None:
     """Update a login client type (superadmin only)."""
     from ai.backend.common.dto.manager.v2.login_client_type.request import (
@@ -119,15 +125,22 @@ def update(
     )
     from ai.backend.common.tristate.unset import UNSET
 
+    if description is not None and clear_description:
+        raise click.UsageError("--description and --clear-description cannot be used together")
+
+    input_ = UpdateLoginClientTypeInput(
+        name=name if name is not None else UNSET,
+        description=(
+            None if clear_description else description if description is not None else UNSET
+        ),
+    )
+
     async def _run() -> None:
         registry = await create_v2_registry(load_v2_config())
         try:
             result = await registry.login_client_type.admin_update(
                 login_client_type_id,
-                UpdateLoginClientTypeInput(
-                    name=name if name is not None else UNSET,
-                    description=description if description is not None else UNSET,
-                ),
+                input_,
             )
             print_result(result)
         finally:
