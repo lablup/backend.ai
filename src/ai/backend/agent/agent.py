@@ -80,7 +80,7 @@ from ai.backend.agent.metrics.metric import (
 )
 from ai.backend.agent.network.caps import publish_backend
 from ai.backend.agent.network.port_forward import PortPublisher, is_orphaned
-from ai.backend.agent.port_pool import PortPool
+from ai.backend.agent.port_pool import PortPool, ephemeral_overlap
 from ai.backend.agent.tasks import (
     CleanupReportedKernelsTask,
     CollectContainerStatTask,
@@ -960,6 +960,22 @@ class AbstractAgent[
             local_config.container.port_range,
             cooldown_sec=local_config.container.port_reuse_cooldown_sec,
         )
+        if (exposed := ephemeral_overlap(local_config.container.port_range)) is not None:
+            # Said once, loudly, because the failure it causes is otherwise unattributable: a
+            # session fails to start with EADDRINUSE on a port nothing of ours is using, the next
+            # one succeeds, and the pool's own bookkeeping is correct throughout.
+            log.warning(
+                "host ports {}..{} can also be handed out by the kernel as the source port of an"
+                " outgoing connection ({} covers them and ip_local_reserved_ports does not), so a"
+                " kernel's published port may fail to bind with EADDRINUSE through no fault of"
+                " this agent. Reserve them:"
+                " sysctl -w net.ipv4.ip_local_reserved_ports={}-{}",
+                exposed[0],
+                exposed[1],
+                "net.ipv4.ip_local_port_range",
+                local_config.container.port_range[0],
+                local_config.container.port_range[1],
+            )
         self.stats_monitor = stats_monitor
         self.error_monitor = error_monitor
         self._pending_creation_tasks = defaultdict(set)

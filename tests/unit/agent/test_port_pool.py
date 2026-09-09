@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import inspect
 from collections.abc import Iterator
+from pathlib import Path
 from typing import Any, cast
 from unittest.mock import patch
 
@@ -10,7 +11,7 @@ import pytest
 
 from ai.backend.agent.agent import AbstractAgent
 from ai.backend.agent.errors.resources import PortPoolExhaustedError
-from ai.backend.agent.port_pool import PortPool
+from ai.backend.agent.port_pool import PortPool, ephemeral_overlap
 
 
 @pytest.fixture
@@ -302,3 +303,53 @@ class TestTheStartupScanIsWiredIn:
         assert source.index("port_pool.discard(") < source.index(
             "_defer_ports_the_host_still_holds()"
         ), "the host scan must come after our own kernels' ports are claimed"
+
+
+class TestThePoolRangeAgainstTheKernelsEphemeralRange:
+    """The failure this exists to name. A published host port is bound by docker-proxy when the
+    kernel starts; if the same number is inside `ip_local_port_range` and not reserved, the kernel
+    may already have given it to some process as the SOURCE port of an outgoing connection, and
+    the bind fails with EADDRINUSE. Measured on a live node: dockerd held 33220 that way for nine
+    minutes while the pool's range was 33100-33600, and a dozen more sat in TIME_WAIT.
+
+    Nothing in the pool is wrong when it happens -- it never handed the port out twice -- so
+    without this the only symptom is a session that fails to start and a next one that does not.
+    """
+
+    @staticmethod
+    def _settings(tmp_path: Path, rng: str, reserved: str) -> tuple[Path, Path]:
+        (tmp_path / "range").write_text(rng)
+        (tmp_path / "reserved").write_text(reserved)
+        return tmp_path / "range", tmp_path / "reserved"
+
+    def test_an_unreserved_range_inside_the_ephemeral_one_is_reported(self, tmp_path: Path) -> None:
+        r, res = self._settings(tmp_path, "32768\t60999\n", "\n")
+        assert ephemeral_overlap((33100, 33600), range_path=r, reserved_path=res) == (33100, 33600)
+
+    def test_reserving_the_whole_range_clears_it(self, tmp_path: Path) -> None:
+        r, res = self._settings(tmp_path, "32768\t60999\n", "33100-33600")
+        assert ephemeral_overlap((33100, 33600), range_path=r, reserved_path=res) is None
+
+    def test_only_the_part_left_exposed_is_reported(self, tmp_path: Path) -> None:
+        """A half-done reservation is the shape an operator most easily leaves behind."""
+        r, res = self._settings(tmp_path, "32768\t60999\n", "33100-33500")
+        assert ephemeral_overlap((33100, 33600), range_path=r, reserved_path=res) == (33501, 33600)
+
+    def test_a_range_below_the_ephemeral_one_is_not_reported(self, tmp_path: Path) -> None:
+        r, res = self._settings(tmp_path, "32768\t60999\n", "\n")
+        assert ephemeral_overlap((20000, 21000), range_path=r, reserved_path=res) is None
+
+    def test_settings_that_cannot_be_read_are_not_a_refusal(self, tmp_path: Path) -> None:
+        """A node that cannot be asked is not a node to hold back; this only ever warns."""
+        missing = tmp_path / "nope"
+        assert ephemeral_overlap((33100, 33600), range_path=missing, reserved_path=missing) is None
+
+    def test_singles_and_ranges_both_parse(self, tmp_path: Path) -> None:
+        r, res = self._settings(tmp_path, "32768\t60999\n", "33100,33102-33104,33600")
+        assert ephemeral_overlap((33100, 33104), range_path=r, reserved_path=res) == (33101, 33101)
+
+    def test_startup_says_so(self) -> None:
+        """Wired into the agent, not merely available: the whole value is that it is said once at
+        startup instead of discovered from an intermittent EADDRINUSE hours later."""
+        source = inspect.getsource(AbstractAgent.__init__)
+        assert "ephemeral_overlap(" in source
