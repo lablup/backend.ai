@@ -17,6 +17,7 @@ from collections.abc import Mapping
 from typing import Any, cast, override
 
 from ai.backend.agent.kernel import AbstractKernel
+from ai.backend.agent.network import command
 from ai.backend.agent.network.backends.vxlan import (
     Runner,
     _run_command,
@@ -78,10 +79,17 @@ class BridgeNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
         return local_bridge_dev(await self._index(session_id))
 
     async def _delete_link_quiet(self, dev: str) -> None:
+        """Delete a link that may not be there. Absent is done; anything else propagates.
+
+        Same rule as the vxlan backend's: setup deletes leftovers under the names it is about to
+        build, so a permission error or a netlink failure swallowed here reports a clean host
+        while the device is still up, and the rebuild lands on top of it.
+        """
         try:
             await self._runner(link_del_args(dev))
-        except RuntimeError:
-            pass
+        except command.HOST_COMMAND_ERRORS as e:
+            if not command.is_absent_error(e):
+                raise
 
     @override
     async def init(self, context: Any = None) -> None:
