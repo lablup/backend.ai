@@ -8220,11 +8220,11 @@ Added in 26.9.0. Payload returned after excluding session pairs from idle checks
 type ExcludeSessionIdleChecksPayload
   @join__type(graph: STRAWBERRY)
 {
-  """Pairs excluded, null where the pair was not."""
-  items: [SessionIdleCheckTargetInfo]!
+  """Pairs successfully excluded."""
+  items: [SessionIdleCheckTargetInfo!]!
 
-  """Why a pair was not excluded, null where it was."""
-  failed: [ExcludeSessionIdleChecksFailureInfo]!
+  """Pairs that could not be excluded."""
+  failed: [ExcludeSessionIdleChecksFailureInfo!]!
 }
 
 """Added in 26.3.0. Options for executing a query definition."""
@@ -9598,11 +9598,11 @@ Added in 26.9.0. Payload returned after including session pairs into idle checks
 type IncludeSessionIdleChecksPayload
   @join__type(graph: STRAWBERRY)
 {
-  """Pairs included, null where the pair was not."""
-  items: [SessionIdleCheckTargetInfo]!
+  """Pairs successfully included."""
+  items: [SessionIdleCheckTargetInfo!]!
 
-  """Why a pair was not included, null where it was."""
-  failed: [IncludeSessionIdleChecksFailureInfo]!
+  """Pairs that could not be included."""
+  failed: [IncludeSessionIdleChecksFailureInfo!]!
 }
 
 type InferenceSessionError

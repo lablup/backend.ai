@@ -1074,19 +1074,17 @@ class SessionAdapter(BaseAdapter):
                     checker_id=item.pair.checker_id,
                     session_id=SessionID(item.pair.session_id),
                 )
-                if item.applied
-                else None
                 for item in result.results
+                if item.applied
             ],
             failed=[
-                None
-                if item.applied
-                else ExcludeSessionIdleChecksFailureInfo(
+                ExcludeSessionIdleChecksFailureInfo(
                     checker_id=item.pair.checker_id,
                     session_id=SessionID(item.pair.session_id),
                     message=str(item.error) if item.error is not None else "Not excluded.",
                 )
                 for item in result.results
+                if not item.applied
             ],
         )
 
@@ -1112,19 +1110,17 @@ class SessionAdapter(BaseAdapter):
                     checker_id=item.pair.checker_id,
                     session_id=SessionID(item.pair.session_id),
                 )
-                if item.applied
-                else None
                 for item in result.results
+                if item.applied
             ],
             failed=[
-                None
-                if item.applied
-                else IncludeSessionIdleChecksFailureInfo(
+                IncludeSessionIdleChecksFailureInfo(
                     checker_id=item.pair.checker_id,
                     session_id=SessionID(item.pair.session_id),
                     message=str(item.error) if item.error is not None else "Not included.",
                 )
                 for item in result.results
+                if not item.applied
             ],
         )
 

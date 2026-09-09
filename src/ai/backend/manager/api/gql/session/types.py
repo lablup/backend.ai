@@ -884,11 +884,11 @@ class IncludeSessionIdleChecksFailureInfoGQL:
     name="ExcludeSessionIdleChecksPayload",
 )
 class ExcludeSessionIdleChecksPayloadGQL:
-    items: list[SessionIdleCheckTargetInfoGQL | None] = gql_field(
-        description="Pairs excluded, null where the pair was not."
+    items: list[SessionIdleCheckTargetInfoGQL] = gql_field(
+        description="Pairs successfully excluded."
     )
-    failed: list[ExcludeSessionIdleChecksFailureInfoGQL | None] = gql_field(
-        description="Why a pair was not excluded, null where it was."
+    failed: list[ExcludeSessionIdleChecksFailureInfoGQL] = gql_field(
+        description="Pairs that could not be excluded."
     )
 
 
@@ -901,9 +901,9 @@ class ExcludeSessionIdleChecksPayloadGQL:
     name="IncludeSessionIdleChecksPayload",
 )
 class IncludeSessionIdleChecksPayloadGQL:
-    items: list[SessionIdleCheckTargetInfoGQL | None] = gql_field(
-        description="Pairs included, null where the pair was not."
+    items: list[SessionIdleCheckTargetInfoGQL] = gql_field(
+        description="Pairs successfully included."
     )
-    failed: list[IncludeSessionIdleChecksFailureInfoGQL | None] = gql_field(
-        description="Why a pair was not included, null where it was."
+    failed: list[IncludeSessionIdleChecksFailureInfoGQL] = gql_field(
+        description="Pairs that could not be included."
     )

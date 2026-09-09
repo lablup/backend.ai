@@ -23,14 +23,14 @@ __all__ = (
     "AdminSearchSessionsPayload",
     "CommitSessionPayload",
     "DestroySessionPayload",
+    "ExcludeSessionIdleChecksFailureInfo",
     "ExcludeSessionIdleChecksPayload",
     "ExecutePayload",
+    "IncludeSessionIdleChecksFailureInfo",
     "IncludeSessionIdleChecksPayload",
     "RestartSessionPayload",
     "SearchSessionsPayload",
     "SessionIdleCheckTargetInfo",
-    "ExcludeSessionIdleChecksFailureInfo",
-    "IncludeSessionIdleChecksFailureInfo",
     "SessionLifecycleInfo",
     "SessionLifecycleInfoGQLDTO",
     "SessionLogsPayload",
@@ -301,18 +301,13 @@ class ExcludeSessionIdleChecksFailureInfo(BaseResponseModel):
 
 
 class ExcludeSessionIdleChecksPayload(BaseResponseModel):
-    """Payload for idle-check exclusion with per-pair partial success.
+    """Payload for idle-check exclusion with per-pair partial success."""
 
-    Both lists run in the order the request named its pairs and are that long: a pair
-    lands in one of them and is null in the other, so an index reaches the same pair
-    in either.
-    """
-
-    items: list[SessionIdleCheckTargetInfo | None] = Field(
-        description=f"Added in {NEXT_RELEASE_VERSION}. Pairs excluded, null where the pair was not."
+    items: list[SessionIdleCheckTargetInfo] = Field(
+        description=f"Added in {NEXT_RELEASE_VERSION}. Pairs successfully excluded."
     )
-    failed: list[ExcludeSessionIdleChecksFailureInfo | None] = Field(
-        description=f"Added in {NEXT_RELEASE_VERSION}. Why a pair was not excluded, null where it was."
+    failed: list[ExcludeSessionIdleChecksFailureInfo] = Field(
+        description=f"Added in {NEXT_RELEASE_VERSION}. Pairs that could not be excluded."
     )
 
 
@@ -331,17 +326,13 @@ class IncludeSessionIdleChecksFailureInfo(BaseResponseModel):
 
 
 class IncludeSessionIdleChecksPayload(BaseResponseModel):
-    """Payload for idle-check inclusion with per-pair partial success.
+    """Payload for idle-check inclusion with per-pair partial success."""
 
-    Both lists run in the order the request named its pairs, as the exclusion payload's
-    do.
-    """
-
-    items: list[SessionIdleCheckTargetInfo | None] = Field(
-        description=f"Added in {NEXT_RELEASE_VERSION}. Pairs included, null where the pair was not."
+    items: list[SessionIdleCheckTargetInfo] = Field(
+        description=f"Added in {NEXT_RELEASE_VERSION}. Pairs successfully included."
     )
-    failed: list[IncludeSessionIdleChecksFailureInfo | None] = Field(
-        description=f"Added in {NEXT_RELEASE_VERSION}. Why a pair was not included, null where it was."
+    failed: list[IncludeSessionIdleChecksFailureInfo] = Field(
+        description=f"Added in {NEXT_RELEASE_VERSION}. Pairs that could not be included."
     )
 
 

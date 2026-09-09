@@ -224,8 +224,6 @@ async def exclude_session_idle_checks(
                 checker_id=ID(str(target.checker_id)),
                 session_id=ID(str(target.session_id)),
             )
-            if target is not None
-            else None
             for target in payload.items
         ],
         failed=[
@@ -234,8 +232,6 @@ async def exclude_session_idle_checks(
                 session_id=ID(str(failure.session_id)),
                 message=failure.message,
             )
-            if failure is not None
-            else None
             for failure in payload.failed
         ],
     )
@@ -263,8 +259,6 @@ async def include_session_idle_checks(
                 checker_id=ID(str(target.checker_id)),
                 session_id=ID(str(target.session_id)),
             )
-            if target is not None
-            else None
             for target in payload.items
         ],
         failed=[
@@ -273,8 +267,6 @@ async def include_session_idle_checks(
                 session_id=ID(str(failure.session_id)),
                 message=failure.message,
             )
-            if failure is not None
-            else None
             for failure in payload.failed
         ],
     )
