@@ -81,6 +81,7 @@ from pathlib import Path
 from typing import Any
 
 from ai.backend.agent.config.unified import AgentUnifiedConfig
+from ai.backend.agent.errors.agent import InvalidAgentConfigError
 from ai.backend.agent.errors.network import UnknownPrivnetBackend
 from ai.backend.agent.network.backends.bridge import BridgeNetworkPlugin
 from ai.backend.agent.network.backends.vxlan import VxlanNetworkPlugin
@@ -104,7 +105,7 @@ from ai.backend.common.network.types import NetworkBackendKind
 
 log = logging.getLogger("ai.backend.agent.network.privnet")
 
-_DEFAULT_SOCKET = "/run/backend.ai/net-privnet.sock"
+_DEFAULT_SOCKET = "/run/backend.ai/privnet/net-privnet.sock"
 
 
 def _default_uid() -> int:
@@ -112,12 +113,12 @@ def _default_uid() -> int:
     return int(sudo_uid) if sudo_uid else os.getuid()
 
 
-def _read_agent_config() -> Mapping[str, Any]:
+def _read_agent_config(config_path: Path | None = None) -> Mapping[str, Any]:
     """The agent's own config file, so the two processes cannot drift on the values they must
     agree about. Returns empty (and says so) when it cannot be read: every caller has a default."""
     try:
         cfg_path_env = os.environ.get("BACKENDAI_PRIVNET_CONFIG")
-        cfg_path = Path(cfg_path_env) if cfg_path_env else None
+        cfg_path = config_path or (Path(cfg_path_env) if cfg_path_env else None)
         raw_cfg, _ = common_config.read_from_file(cfg_path, "agent")
         return raw_cfg
     except Exception as e:
@@ -231,8 +232,8 @@ def _build_locator(raw_cfg: Mapping[str, Any]) -> ContainerLocator:
     return get_agent_discovery(backend).create_container_locator(local_config)
 
 
-async def _amain() -> None:
-    raw_cfg = _read_agent_config()
+async def _amain(config_path: Path | None = None) -> None:
+    raw_cfg = _read_agent_config(config_path)
     socket_path = _resolve_socket_path(raw_cfg)
     allowed_uid = int(os.environ.get("BACKENDAI_PRIVNET_UID") or _default_uid())
     # Required, not defaulted. The agent id is the OWNER half of every node-wide claim this
@@ -242,7 +243,7 @@ async def _amain() -> None:
     # devices of whatever is running on it.
     agent_id = os.environ.get("BACKENDAI_PRIVNET_AGENT_ID", "").strip()
     if not agent_id:
-        raise SystemExit(
+        raise InvalidAgentConfigError(
             "BACKENDAI_PRIVNET_AGENT_ID is required: it identifies this agent in the node-wide"
             " claims that keep two agents on one host from deleting each other's networks."
         )
@@ -310,13 +311,13 @@ async def _amain() -> None:
     await server.serve_forever()
 
 
-def main() -> None:
+def main(config_path: Path | None = None) -> None:
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s %(levelname)s %(name)s %(message)s",
     )
     try:
-        asyncio.run(_amain())
+        asyncio.run(_amain(config_path))
     except KeyboardInterrupt:
         pass
 

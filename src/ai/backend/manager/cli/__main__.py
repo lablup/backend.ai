@@ -412,6 +412,11 @@ def secret() -> None:
     """Command set for stored secret key encryption."""
 
 
+@main.group(cls=LazyGroup, import_name="ai.backend.manager.cli.network:cli")
+def network() -> None:
+    """Command set for cluster-network operations."""
+
+
 @main.group(cls=LazyGroup, import_name="ai.backend.manager.cli.ops:cli")
 def ops() -> None:
     """Command set for inspecting the wired domain operation catalog."""

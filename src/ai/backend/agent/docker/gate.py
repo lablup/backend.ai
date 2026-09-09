@@ -27,6 +27,7 @@ from collections.abc import MutableMapping
 from pathlib import Path
 from typing import Any, Final
 
+from ai.backend.agent.errors.agent import ContainerStartupFailedError
 from ai.backend.agent.gate import GATE_MNT, GO_FIFO, PAUSE_SCRIPT_NAME, READY_MARKER, write_gate
 
 __all__ = (
@@ -100,8 +101,7 @@ async def wait_gated_pid(
     from inside the final namespaces, by the process that is still there after the exec. A PID read
     before that could be a setup process that will not survive.
 
-    Raises ``TimeoutError`` if the wrapper never parks, and ``RuntimeError`` if the container exited
-    first -- which is a broken image or a bad command, not a slow one.
+    Raises ``TimeoutError`` if the wrapper never parks and a domain error if startup fails.
     """
     ready = gate_dir / READY_MARKER
 
@@ -117,11 +117,11 @@ async def wait_gated_pid(
     async with asyncio.timeout(timeout_sec):
         while not ready.exists():
             if (reason := await _failed()) is not None:
-                raise RuntimeError(reason)
+                raise ContainerStartupFailedError(reason)
             await asyncio.sleep(0.1)
     pid = int(((await container.show()).get("State") or {}).get("Pid") or 0)
     if pid <= 0:
-        raise RuntimeError("the container parked at the gate but reports no PID")
+        raise ContainerStartupFailedError("the container parked at the gate but reports no PID")
     return pid
 
 

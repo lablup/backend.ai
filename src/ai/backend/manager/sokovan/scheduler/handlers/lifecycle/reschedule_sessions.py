@@ -128,16 +128,9 @@ class RescheduleSessionsLifecycleHandler(SessionLifecycleHandler):
         log.info("Tearing down kernels of {} rescheduling sessions", len(session_ids))
 
     async def _requeue(self, session_ids: list[SessionId]) -> None:
-        """Put the sessions back in the queue now that their kernels are gone:
-        the kernels drop their placement first, then the sessions become PENDING
-        so the scheduling pass can pick them up."""
-        await self._repository.reset_kernels_to_pending_for_sessions(
+        """Atomically clear placement and put fully torn-down sessions in the queue."""
+        requeued = await self._repository.requeue_sessions_to_pending(
             session_ids, _RESCHEDULE_REASON
-        )
-        requeued = await self._scheduling_controller.mark_sessions_status(
-            session_ids,
-            SessionStatus.PENDING,
-            reason=_RESCHEDULE_REASON,
         )
         await self._scheduling_controller.mark_scheduling_needed([ScheduleType.SCHEDULE])
         log.info("Requeued {} rescheduling sessions to PENDING", len(requeued))

@@ -69,6 +69,7 @@ class ValidatedNetworkConfig:
     #: would write a policy that the actual traffic does not match.
     vxlan_port: int
     encryption_key: str | None
+    encryption_key_id: str | None
     #: Which incarnation of the session id this declaration is for, or None from an agent older
     #: than the field. The session id alone does not say: it is reused, and a request that arrives
     #: after the session was torn down and built again names the same one. See
@@ -246,6 +247,8 @@ def validate_network_config(raw: dict[str, Any]) -> ValidatedNetworkConfig:
             c in "0123456789abcdefABCDEF" for c in encryption_key
         ):
             raise PolicyViolation("invalid encryption_key")
+    key_id_raw = raw.get("encryption_key_id")
+    encryption_key_id = validate_generation(key_id_raw) if key_id_raw is not None else None
 
     port_raw = raw.get("vxlan_port")
     vxlan_port = DEFAULT_VXLAN_PORT
@@ -264,5 +267,6 @@ def validate_network_config(raw: dict[str, Any]) -> ValidatedNetworkConfig:
         mtu=mtu,
         vxlan_port=vxlan_port,
         encryption_key=encryption_key,
+        encryption_key_id=encryption_key_id,
         generation=generation,
     )

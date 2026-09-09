@@ -55,15 +55,13 @@ class TestOverlayDriver:
 
 class TestCniDriver:
     async def test_a_docker_agent_is_accepted(self) -> None:
-        # The BEP-1078 data plane is a vxlan device moved into the container's netns by PID, and a
-        # netns does not care which daemon made it. Docker was refused here while the agent code
-        # could only drive containerd; it can now.
         etcd = FakeEtcd({"agent-1": "docker"})
         await require_members_can_serve_driver(cast(AsyncEtcd, etcd), "cni", ["agent-1"])
 
-    async def test_a_containerd_agent_is_accepted(self) -> None:
+    async def test_a_containerd_agent_is_refused_until_implemented(self) -> None:
         etcd = FakeEtcd({"agent-1": "containerd"})
-        await require_members_can_serve_driver(cast(AsyncEtcd, etcd), "cni", ["agent-1"])
+        with pytest.raises(NetworkBackendMismatch, match="cannot serve"):
+            await require_members_can_serve_driver(cast(AsyncEtcd, etcd), "cni", ["agent-1"])
 
 
 class TestUnknownBackends:
@@ -89,7 +87,7 @@ class TestTheErrorSaysWhatToDo:
         assert "agent-7" in message
         assert "containerd" in message
         assert "overlay" in message
-        assert "cni" in message  # the fix: pair containerd with the cni driver
+        assert "implemented by that agent backend" in message
 
 
 class TestTheDriverFollowsTheAgentsBackend:
@@ -98,14 +96,12 @@ class TestTheDriverFollowsTheAgentsBackend:
     used to produce a session whose kernels silently could not reach each other.
     """
 
-    async def test_containerd_agents_get_cni_even_though_the_default_is_overlay(self) -> None:
-        # The out-of-the-box manager config says 'overlay'. A containerd deployment that changes
-        # nothing must still work.
+    async def test_unsupported_backend_does_not_get_an_unimplemented_driver(self) -> None:
         etcd = FakeEtcd({"a": "containerd", "b": "containerd"})
         driver = await resolve_driver_for_agents(
             cast(AsyncEtcd, etcd), ["a", "b"], configured_driver="overlay"
         )
-        assert driver == "cni"
+        assert driver == "overlay"
 
     async def test_docker_agents_get_overlay(self) -> None:
         etcd = FakeEtcd({"a": "docker"})
@@ -132,14 +128,14 @@ class TestTheDriverFollowsTheAgentsBackend:
             )
             assert driver == "overlay", configured
 
-    async def test_a_containerd_agent_is_not_talked_into_overlay(self) -> None:
-        # The exception is Docker's alone: containerd cannot speak Swarm, so a misconfiguration
-        # must still be corrected rather than honoured.
+    async def test_an_unsupported_backend_keeps_configured_driver_for_explicit_rejection(
+        self,
+    ) -> None:
         etcd = FakeEtcd({"a": "containerd"})
         driver = await resolve_driver_for_agents(
             cast(AsyncEtcd, etcd), ["a"], configured_driver="overlay"
         )
-        assert driver == "cni"
+        assert driver == "overlay"
 
     async def test_unpublished_backends_fall_back_to_the_configured_driver(self) -> None:
         # An older agent that does not publish must not be stranded: keep doing what the operator

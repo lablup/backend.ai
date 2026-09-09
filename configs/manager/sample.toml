@@ -522,9 +522,9 @@
   # Opt-in list: a read operation is recorded only if it is named here. The
   # default is an empty list, so successful reads are not recorded at all and
   # read volume stays off until an operator turns it on. A listed operation is
-  # recorded for every entity type. Must be 'get' or 'search': mutating
-  # operations are always recorded and listing them here is rejected. Failed and
-  # denied reads are recorded either way.
+  # recorded for every entity type. Must be 'get', 'search' or 'lookup':
+  # mutating operations are always recorded and listing them here is rejected.
+  # Failed and denied reads are recorded either way.
   # Added in 26.9.0
   record-read-operations = []
 
@@ -749,6 +749,19 @@
   # computing workloads.
   # Added in 25.8.0
   [network.inter-container]
+    # Pin the per-session data plane the CNI driver builds (BEP-1078), e.g.
+    # 'vxlan'. Unset lets the driver pick from what the session's member agents
+    # advertise, which is the right answer whenever the cluster is not
+    # deliberately homogeneous.
+    # Added in 26.9.0
+    ## forced-backend = "vxlan"
+    # Private IPv4 pool used by the CNI driver for multi-node session overlays.
+    # It must not overlap a route present on any participating agent.
+    # Added in 26.9.0
+    ipam-pool = "10.128.0.0/12"
+    # Prefix length of the allocation units carved from 'ipam-pool'.
+    # Added in 26.9.0
+    ipam-block-size = 24
     # Default network driver for inter-container communication in cluster
     # sessions. 'overlay' enables multi-host container networking for
     # distributed workloads. Container communication performance depends on this
@@ -841,6 +854,37 @@
   # older than this are considered expired.
   # Added in 26.4.2
   login-session-max-age = 604800
+
+# At-rest encryption for secret columns such as the keypair secret key. Names
+# which key provider writes new secrets and configures the providers. New
+# secrets are stored as plaintext until a write provider is named.
+# Added in 26.9.0
+[secret-encryption]
+  # The key provider new secrets are written through, named by its type. 'plain'
+  # stores them unencrypted; every other type is configured by the matching
+  # provider section below. Reads are decided by the stored value, so secrets
+  # written earlier keep decrypting through the provider they name, and a batch
+  # re-encryption normalizes stored secrets to whatever this names.
+  # Added in 26.9.0
+  write-provider-type = "config"
+
+  # The key provider that holds its key encryption keys in this file, under the
+  # id 'config'. Omit this section to leave that provider unconfigured, in which
+  # case no stored secret naming it can be read.
+  # Added in 26.9.0
+  [secret-encryption.config-provider]
+    # The key id new values are encrypted under. Rotating a key is adding a new
+    # id to the key list and pointing this at it; the previous ids stay so their
+    # values keep decrypting.
+    # Added in 26.9.0
+    active-key-id = "v1"
+    # Key encryption keys by id, each 32 random bytes in base64 as produced by
+    # `openssl rand -base64 32`; the standard and url-safe alphabets are both
+    # accepted. A key wraps the per-value data encryption keys rather than the
+    # values themselves, so an id may be retired only once no stored value still
+    # names it.
+    # Added in 26.9.0
+    keys = {}
 
 # JWT (JSON Web Token) authentication configuration. Controls JWT token signing
 # and verification settings used for stateless authentication between
@@ -1012,7 +1056,7 @@
   # Additional labels for service categorization and filtering.
   # Added in 26.3.0
   # Replace <name> with your actual key (e.g., 'default', 'local')
-  [service-discovery.extra-labels.<name>]
+  [service-discovery.extra-labels."<name>"]
 
   # List of endpoints exposed by this service instance.
   # Added in 26.3.0
@@ -1037,7 +1081,7 @@
     # Additional metadata for the endpoint.
     # Added in 26.3.0
     # Replace <name> with your actual key (e.g., 'default', 'local')
-    [service-discovery.endpoints.metadata.<name>]
+    [service-discovery.endpoints.metadata."<name>"]
 
 # Default artifact registry configuration. Specifies the default model registry
 # for artifact operations. When configured, enables model artifact management

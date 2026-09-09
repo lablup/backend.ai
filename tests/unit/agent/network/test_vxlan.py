@@ -11,10 +11,13 @@ from typing import Any, cast, override
 import pytest
 
 from ai.backend.agent.errors.network import (
+    InvalidSessionNetworkDescriptor,
+    NetworkOperationFailed,
     OverlayAddressNotAssigned,
     OverlayEncryptionUnavailable,
     OverlayMtuTooLarge,
     OverlayTeardownIncomplete,
+    UndescribableVxlanDevice,
 )
 from ai.backend.agent.network import command
 from ai.backend.agent.network.backends import vxlan as vx
@@ -415,7 +418,7 @@ class TestCommandBuilders:
             return _FailedProcess()
 
         monkeypatch.setattr(asyncio, "create_subprocess_exec", _failed_exec)
-        with pytest.raises(RuntimeError) as exc_info:
+        with pytest.raises(NetworkOperationFailed) as exc_info:
             await vx._run_command(argv)
 
         message = str(exc_info.value)
@@ -654,7 +657,7 @@ class TestSetupTeardown:
             backend=NetworkBackendKind.BRIDGE,
             mtu=1500,
         )
-        with pytest.raises(ValueError):
+        with pytest.raises(InvalidSessionNetworkDescriptor):
             await plugin.setup_session_network(bad, _SELF)
 
     async def test_teardown_deletes_bridge_and_vxlan(self) -> None:
@@ -4040,7 +4043,7 @@ class TestACommandThatNeverReturns:
 
     async def test_a_write_is_reported_as_a_failure(self, monkeypatch: pytest.MonkeyPatch) -> None:
         self._wedged(monkeypatch)
-        with pytest.raises(RuntimeError, match="timed out"):
+        with pytest.raises(NetworkOperationFailed, match="timed out"):
             await vx._run_command(["ip", "link", "show"])
 
     async def test_a_read_gives_up_and_says_nothing(self, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -4084,7 +4087,7 @@ class TestACommandThatNeverReturns:
         # Recovery fail-closes on surviving tunnels, so "I could not ask" must not read as "there
         # are none".
         self._wedged(monkeypatch)
-        with pytest.raises(RuntimeError, match="could not enumerate"):
+        with pytest.raises(UndescribableVxlanDevice, match="could not enumerate"):
             await vx._list_vxlan_devices()
 
     async def test_the_key_is_not_in_the_timeout_message(
@@ -4092,7 +4095,7 @@ class TestACommandThatNeverReturns:
     ) -> None:
         self._wedged(monkeypatch)
         argv = xfrm_state_add_args("10.0.0.1", "10.0.0.2", "ab" * 32)[0]
-        with pytest.raises(RuntimeError) as caught:
+        with pytest.raises(NetworkOperationFailed) as caught:
             await vx._run_command(argv)
         assert "REDACTED" in str(caught.value)
         assert argv[argv.index("aead") + 2] not in str(caught.value)

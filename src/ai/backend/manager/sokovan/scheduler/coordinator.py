@@ -1360,23 +1360,6 @@ class ScheduleCoordinator:
 
         session_ids = [s.session_id for s in session_infos]
 
-        # The kernels go back FIRST, before the session is moved. These are two transactions and
-        # they cannot be made one from here, so what is left is choosing which half-done state a
-        # manager that dies between them leaves behind.
-        #
-        # Session first was the dangerous order: a PENDING session whose kernels are still
-        # PREPARED, still bound to their agent and still holding its resources -- and the PENDING
-        # scheduler does not look at kernel status, so it schedules that session again on top of
-        # the allocation it never gave up.
-        #
-        # Kernels first leaves the opposite: kernels PENDING and unbound under a session that has
-        # not moved. That state has no allocation left to lose, and the start handler selects it
-        # -- its kernel filter includes PENDING for exactly this reason -- finds no agent on any
-        # kernel, and reports a placement to make again, which sends the session to PENDING and
-        # back through scheduling. Neither half is atomic; this is the one that recovers.
-        if transition.kernel == KernelStatus.PENDING:
-            await self._apply_kernel_pending_resets(handler_name, session_ids)
-
         # Session status update
         if transition.session:
             updater = SessionStatusBatchUpdater(
@@ -1400,7 +1383,21 @@ class ScheduleCoordinator:
                 )
                 for info in session_infos
             ]
-            updated = await self._repository.update_with_history(updater, histories)
+            if transition.kernel == KernelStatus.PENDING:
+                await self._record_failed_agents(handler_name, session_ids)
+                updated, reset_count = await self._repository.requeue_sessions_with_history(
+                    updater,
+                    histories,
+                    kernel_reason="EXCEEDED_MAX_RETRIES",
+                )
+                log.debug(
+                    "{}: Reset {} kernels while moving {} sessions to PENDING",
+                    handler_name,
+                    reset_count,
+                    updated,
+                )
+            else:
+                updated = await self._repository.update_with_history(updater, histories)
             log.debug(
                 "{}: Updated {} sessions to {} ({})",
                 handler_name,
@@ -1408,6 +1405,8 @@ class ScheduleCoordinator:
                 transition.session,
                 scheduling_result.value,
             )
+        elif transition.kernel == KernelStatus.PENDING:
+            await self._apply_kernel_pending_resets(handler_name, session_ids)
 
     async def _apply_kernel_pending_resets(
         self,
@@ -1427,6 +1426,26 @@ class ScheduleCoordinator:
         """
         if not session_ids:
             return
+
+        await self._record_failed_agents(handler_name, session_ids)
+
+        reset_count = await self._kernel_state_engine.reset_kernels_to_pending_for_sessions(
+            session_ids,
+            reason="EXCEEDED_MAX_RETRIES",
+        )
+        log.debug(
+            "{}: Reset {} kernels to PENDING for {} sessions",
+            handler_name,
+            reset_count,
+            len(session_ids),
+        )
+
+    async def _record_failed_agents(
+        self,
+        handler_name: str,
+        session_ids: list[SessionId],
+    ) -> None:
+        """Record placement hints before an atomic requeue clears them."""
 
         # Record current agent assignments before they are cleared by the reset.
         # This is best-effort: Valkey issues must not block kernel resets.
@@ -1449,17 +1468,6 @@ class ScheduleCoordinator:
                         session_id,
                         result,
                     )
-
-        reset_count = await self._kernel_state_engine.reset_kernels_to_pending_for_sessions(
-            session_ids,
-            reason="EXCEEDED_MAX_RETRIES",
-        )
-        log.debug(
-            "{}: Reset {} kernels to PENDING for {} sessions",
-            handler_name,
-            reset_count,
-            len(session_ids),
-        )
 
     async def _record_history_without_transition(
         self,

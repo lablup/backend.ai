@@ -19,6 +19,7 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
+from ai.backend.agent.errors.network import NetworkOperationFailed
 from ai.backend.logging import BraceStyleAdapter
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -102,7 +103,7 @@ class CniPluginRunner:
         return None
 
 
-class CniError(RuntimeError):
+class CniError(NetworkOperationFailed):
     @classmethod
     def from_output(
         cls, plugin_type: str, command: str, returncode: int | None, stdout: bytes, stderr: bytes
