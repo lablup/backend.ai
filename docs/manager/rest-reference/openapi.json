@@ -25611,6 +25611,20 @@
             ],
             "default": null
           },
+          "runtime_version": {
+            "anyOf": [
+              {
+                "pattern": "^[0-9]{1,9}([.][0-9]{1,9}){0,2}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Keep only presets valid at this runtime version (added_version <= version < deprecated_version).",
+            "title": "Runtime Version"
+          },
           "AND": {
             "anyOf": [
               {
@@ -25680,7 +25694,9 @@
         "enum": [
           "name",
           "rank",
-          "created_at"
+          "created_at",
+          "added_version",
+          "deprecated_version"
         ],
         "title": "RuntimeVariantPresetOrderField",
         "type": "string"
@@ -26062,6 +26078,34 @@
             "title": "Required",
             "type": "boolean"
           },
+          "added_version": {
+            "anyOf": [
+              {
+                "pattern": "^[0-9]{1,9}([.][0-9]{1,9}){0,2}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Runtime version this preset became available in; None means always.",
+            "title": "Added Version"
+          },
+          "deprecated_version": {
+            "anyOf": [
+              {
+                "pattern": "^[0-9]{1,9}([.][0-9]{1,9}){0,2}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Runtime version this preset was removed in, exclusive; None means not removed.",
+            "title": "Deprecated Version"
+          },
           "category": {
             "anyOf": [
               {
@@ -26227,6 +26271,30 @@
             "default": null,
             "description": "Toggle required flag; None = no change.",
             "title": "Required"
+          },
+          "added_version": {
+            "anyOf": [
+              {
+                "pattern": "^[0-9]{1,9}([.][0-9]{1,9}){0,2}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Added Version"
+          },
+          "deprecated_version": {
+            "anyOf": [
+              {
+                "pattern": "^[0-9]{1,9}([.][0-9]{1,9}){0,2}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Deprecated Version"
           },
           "category": {
             "anyOf": [

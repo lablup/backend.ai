@@ -7,7 +7,7 @@ from pydantic import Field, model_validator
 
 from ai.backend.common.api_handlers import SENTINEL, BaseRequestModel, Sentinel
 from ai.backend.common.dto.manager.query import StringFilter, UUIDFilter
-from ai.backend.common.dto.manager.v2.common import OrderDirection
+from ai.backend.common.dto.manager.v2.common import OrderDirection, SemVersion
 from ai.backend.common.dto.manager.v2.runtime_variant_preset.types import (
     VALUE_TYPE_VALIDATORS,
     PresetTarget,
@@ -15,6 +15,7 @@ from ai.backend.common.dto.manager.v2.runtime_variant_preset.types import (
     RuntimeVariantPresetOrderField,
     UIOption,
 )
+from ai.backend.common.tristate.unset import UNSET, Unset
 
 
 class CreateRuntimeVariantPresetInput(BaseRequestModel):
@@ -35,6 +36,16 @@ class CreateRuntimeVariantPresetInput(BaseRequestModel):
     required: bool = Field(
         default=False,
         description="Whether this preset param must be supplied on a deployment revision.",
+    )
+    added_version: SemVersion | None = Field(
+        default=None,
+        description="Runtime version this preset became available in; None means always.",
+    )
+    deprecated_version: SemVersion | None = Field(
+        default=None,
+        description=(
+            "Runtime version this preset was removed in, exclusive; None means not removed."
+        ),
     )
     category: str | None = Field(default=None, max_length=64, description="UI category group.")
     display_name: str | None = Field(default=None, max_length=256, description="UI display name.")
@@ -82,6 +93,8 @@ class UpdateRuntimeVariantPresetInput(BaseRequestModel):
     required: bool | None = Field(
         default=None, description="Toggle required flag; None = no change."
     )
+    added_version: SemVersion | None | Unset = Field(default=UNSET)
+    deprecated_version: SemVersion | None | Unset = Field(default=UNSET)
     category: str | Sentinel | None = Field(default=SENTINEL)
     display_name: str | Sentinel | None = Field(default=SENTINEL)
     ui_option: UIOption | Sentinel | None = Field(default=SENTINEL)
@@ -115,6 +128,13 @@ class UpdateRuntimeVariantPresetInput(BaseRequestModel):
 class RuntimeVariantPresetFilter(BaseRequestModel):
     name: StringFilter | None = Field(default=None)
     runtime_variant_id: UUIDFilter | None = Field(default=None)
+    runtime_version: SemVersion | None = Field(
+        default=None,
+        description=(
+            "Keep only presets valid at this runtime version "
+            "(added_version <= version < deprecated_version)."
+        ),
+    )
     AND: list[RuntimeVariantPresetFilter] | None = Field(default=None)
     OR: list[RuntimeVariantPresetFilter] | None = Field(default=None)
     NOT: list[RuntimeVariantPresetFilter] | None = Field(default=None)

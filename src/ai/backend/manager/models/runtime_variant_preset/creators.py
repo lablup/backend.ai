@@ -46,6 +46,8 @@ class RuntimeVariantPresetCreator(
     default_value: str | None
     key: str
     required: bool
+    added_version: str | None
+    deprecated_version: str | None
     category: str | None
     display_name: str | None
     ui_option: UIOption | None
@@ -77,6 +79,8 @@ class RuntimeVariantPresetCreator(
         row.default_value = self.default_value
         row.key = self.key
         row.required = self.required
+        row.added_version = self.added_version
+        row.deprecated_version = self.deprecated_version
         row.category = self.category
         row.display_name = self.display_name
         row.ui_option = self.ui_option
