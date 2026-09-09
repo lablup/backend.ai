@@ -4970,13 +4970,20 @@ input CreateRoleInput
 {
   name: String!
   description: String = null
-  source: RoleSource! = CUSTOM
+
+  """Deprecated and ignored: a created role is always custom."""
+  source: RoleSource = null @deprecated(reason: "Deprecated since 26.9.0. Ignored: a created role is always custom.")
 
   """
   Added in 26.4.4. When true, the role is automatically granted to a user when the user is added to a scope this role is registered in.
   """
   autoAssign: Boolean! = false
-  scopes: [ScopeInput!] = null
+
+  """Added in 26.9.0. The scope the role belongs to."""
+  scope: ScopeInput = null
+
+  """Deprecated: use `scope`. Accepts exactly one entry."""
+  scopes: [ScopeInput!] = null @deprecated(reason: "Deprecated since 26.9.0. Use `scope`.")
 }
 
 """Added in 26.4.4. Input for creating a new role preset."""
@@ -14368,8 +14375,13 @@ type Permission implements Node
   scopeType: RBACElementType!
   scopeId: String!
   entityType: RBACElementType!
-  operation: OperationType!
   createdAt: DateTime!
+
+  """Added in 26.9.0. The permission bit the row holds."""
+  permission: PermissionBit!
+
+  """Deprecated: use `permission`. The same bit named as an action."""
+  operation: OperationType! @deprecated(reason: "Deprecated since 26.9.0. Use `permission`.")
 
   """The role this permission belongs to."""
   role: Role
@@ -18918,6 +18930,12 @@ type Role implements Node
   """
   autoAssign: Boolean!
 
+  """Added in 26.9.0. Type of the scope the role belongs to."""
+  scopeType: String!
+
+  """Added in 26.9.0. ID of the scope the role belongs to."""
+  scopeId: UUID!
+
   """Added in 26.3.0. Permissions associated with this role."""
   permissions(filter: PermissionFilter = null, orderBy: [PermissionOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): PermissionConnection
 
@@ -19068,7 +19086,7 @@ input RoleMappedScopeNestedFilter
   @join__type(graph: STRAWBERRY)
 {
   scopeType: RBACElementTypeFilter = null
-  scopeId: StringFilter = null
+  scopeId: UUIDFilter = null
   AND: [RoleMappedScopeNestedFilter!] = null
   OR: [RoleMappedScopeNestedFilter!] = null
   NOT: [RoleMappedScopeNestedFilter!] = null
@@ -22014,8 +22032,10 @@ input UpdateDeploymentRevisionPresetInput
   """
   imageId: UUID
 
-  """Added in 26.9.0. Parsed model definition. Set to null to clear."""
-  modelDefinition: PresetModelDefinitionInput
+  """
+  Added in 26.9.0. Model definition patch. Set to null to clear the whole model definition.
+  """
+  modelDefinition: UpdatePresetModelDefinitionInput
 
   """Added in 26.4.4. Container startup command. Set to null to clear."""
   startupCommand: String
@@ -22404,6 +22424,159 @@ input UpdatePermissionInput
   scopeId: String = null
   entityType: RBACElementType = null
   operation: OperationType = null
+}
+
+"""
+Added in 26.9.0. Patch for a single preset model entry. Omit a field to keep its current stored value.
+"""
+input UpdatePresetModelConfigInput
+  @join__type(graph: STRAWBERRY)
+{
+  """Name of the model. Omit to keep the current value."""
+  name: String
+
+  """Path to the model file. Omit to keep the current value."""
+  modelPath: String
+
+  """Configuration for the model service. Omit to keep the current value."""
+  service: UpdatePresetModelServiceConfigInput
+
+  """Metadata about the model. Omit to keep the current value."""
+  metadata: UpdatePresetModelMetadataInput
+}
+
+"""
+Added in 26.9.0. Patch for a preset's model definition. Omit `models` to keep the current model entry.
+"""
+input UpdatePresetModelDefinitionInput
+  @join__type(graph: STRAWBERRY)
+{
+  """
+  Patch for the model definition's single model entry. Omit to keep the current model entry.
+  """
+  models: [UpdatePresetModelConfigInput!]
+}
+
+"""
+Added in 26.9.0. Patch for a preset model's health check. Omit a field to keep its current stored value.
+"""
+input UpdatePresetModelHealthCheckInput
+  @join__type(graph: STRAWBERRY)
+{
+  """
+  Whether the route should be health-checked. When false the route activates immediately and the remaining fields are ignored. Omit to keep the current value.
+  """
+  enable: Boolean
+
+  """
+  Interval in seconds between health checks. Omit to keep the current value.
+  """
+  interval: Float
+
+  """Path to check for health status. Omit to keep the current value."""
+  path: String
+
+  """
+  Maximum number of retries for health check. Omit to keep the current value.
+  """
+  maxRetries: Int
+
+  """
+  Maximum time in seconds to wait for a health check response. Omit to keep the current value.
+  """
+  maxWaitTime: Float
+
+  """
+  Expected HTTP status code for a healthy response. Omit to keep the current value.
+  """
+  expectedStatusCode: Int
+
+  """
+  Initial delay in seconds before the first health check. Omit to keep the current value.
+  """
+  initialDelay: Float
+}
+
+"""
+Added in 26.9.0. Patch for a preset model's metadata. Omit a field to keep its current stored value.
+"""
+input UpdatePresetModelMetadataInput
+  @join__type(graph: STRAWBERRY)
+{
+  """Author of the model. Omit to keep the current value."""
+  author: String
+
+  """Title of the model. Omit to keep the current value."""
+  title: String
+
+  """Version of the model. Omit to keep the current value."""
+  version: String
+
+  """Creation date of the model. Omit to keep the current value."""
+  created: String
+
+  """Description of the model. Omit to keep the current value."""
+  description: String
+
+  """Task type of the model. Omit to keep the current value."""
+  task: String
+
+  """Category of the model. Omit to keep the current value."""
+  category: String
+
+  """Architecture of the model. Omit to keep the current value."""
+  architecture: String
+
+  """Frameworks used by the model. Omit to keep the current value."""
+  framework: [String!]
+
+  """Labels for the model. Omit to keep the current value."""
+  label: [String!]
+
+  """License of the model. Omit to keep the current value."""
+  license: String
+
+  """
+  Minimum resource requirements for the model. Omit to keep the current value.
+  """
+  minResource: JSON
+}
+
+"""
+Added in 26.9.0. Patch for a preset model's service config. Omit a field to keep its current stored value.
+"""
+input UpdatePresetModelServiceConfigInput
+  @join__type(graph: STRAWBERRY)
+{
+  """
+  Pre-start actions to execute before starting the model service. Omit to keep the current list; provide the full replacement list to change it.
+  """
+  preStartActions: [PreStartActionInput!]
+
+  """
+  Single-string command to start the model service. Omit to keep the current value.
+  """
+  command: String
+
+  """
+  Deprecated. Command to start the model service. Use `command` instead. Omit to keep the current value.
+  """
+  startCommand: [String!] @deprecated(reason: "Use `command` instead.")
+
+  """
+  Shell used to run the command. If set, the kernel runs `[shell, '-c', command]`; null or empty disables shell wrapping. Omit to keep the current value.
+  """
+  shell: String
+
+  """
+  Port number for the model service. Must be greater than 1. Omit to keep the current value.
+  """
+  port: Int
+
+  """
+  Health check configuration for the model service. Omit to keep the current value.
+  """
+  healthCheck: UpdatePresetModelHealthCheckInput
 }
 
 """

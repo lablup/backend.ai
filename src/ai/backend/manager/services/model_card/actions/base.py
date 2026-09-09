@@ -2,7 +2,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.common.data.entity.model_card import MODEL_CARD_ENTITY_TYPE, ModelCardID
+from ai.backend.common.data.entity.model_card import ModelCardEntityType, ModelCardID
 from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
 from ai.backend.manager.actions.v2.global_scope.base import BaseGlobalAction
 from ai.backend.manager.actions.v2.scope.base import BaseScopeAction
@@ -17,7 +17,7 @@ class ModelCardAction(BaseGlobalAction):
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return MODEL_CARD_ENTITY_TYPE
+        return ModelCardEntityType()
 
 
 @dataclass
@@ -27,7 +27,7 @@ class ModelCardScopeAction(BaseScopeAction):
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return MODEL_CARD_ENTITY_TYPE
+        return ModelCardEntityType()
 
 
 @dataclass

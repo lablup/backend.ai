@@ -23,7 +23,7 @@ from ai.backend.common.data.entity.container_registry import (
 )
 from ai.backend.common.data.entity.domain import DOMAIN_SCOPE_TYPE, DomainID
 from ai.backend.common.data.entity.idle_checker import (
-    IDLE_CHECKER_ENTITY_TYPE,
+    IdleCheckerEntityType,
     IdleCheckerID,
 )
 from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE, ProjectID
@@ -179,7 +179,7 @@ class TestEveryPairBecomesTheRunsScopes:
                 ActionOperationType.DELETE,
                 [
                     (PROJECT_SCOPE_TYPE, _PROJECT_ID),
-                    (ScopeType(IDLE_CHECKER_ENTITY_TYPE), _IDLE_CHECKER_ID),
+                    (ScopeType(IdleCheckerEntityType()), _IDLE_CHECKER_ID),
                 ],
             ),
             (
@@ -190,7 +190,7 @@ class TestEveryPairBecomesTheRunsScopes:
                 ActionOperationType.RESTORE,
                 [
                     (PROJECT_SCOPE_TYPE, _PROJECT_ID),
-                    (ScopeType(IDLE_CHECKER_ENTITY_TYPE), _IDLE_CHECKER_ID),
+                    (ScopeType(IdleCheckerEntityType()), _IDLE_CHECKER_ID),
                 ],
             ),
         ],

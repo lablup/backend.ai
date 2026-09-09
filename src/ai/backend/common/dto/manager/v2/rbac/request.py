@@ -6,7 +6,7 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from pydantic import Field, field_validator
+from pydantic import Field, field_validator, model_validator
 
 from ai.backend.common.api_handlers import SENTINEL, BaseRequestModel, Sentinel
 from ai.backend.common.dto.manager.query import DateTimeFilter, StringFilter, UUIDFilter
@@ -15,7 +15,6 @@ from .types import (
     OperationTypeFilter,
     OrderDirection,
     RBACElementTypeFilter,
-    RoleSource,
     RoleSourceFilter,
     RoleStatus,
     RoleStatusFilter,
@@ -60,7 +59,6 @@ class CreateRoleInput(BaseRequestModel):
 
     name: str = Field(min_length=1, max_length=256, description="Role name")
     description: str | None = Field(default=None, description="Role description")
-    source: RoleSource = Field(default=RoleSource.CUSTOM, description="Role source")
     auto_assign: bool = Field(
         default=False,
         description=(
@@ -68,8 +66,10 @@ class CreateRoleInput(BaseRequestModel):
             "to a scope this role is registered in."
         ),
     )
+    scope: ScopeInputDTO | None = Field(default=None, description="The scope the role belongs to")
     scopes: list[ScopeInputDTO] | None = Field(
-        default=None, description="Scopes to register the role in"
+        default=None,
+        description="Deprecated: use `scope`. Accepts exactly one entry.",
     )
 
     @field_validator("name")
@@ -79,6 +79,26 @@ class CreateRoleInput(BaseRequestModel):
         if not stripped:
             raise ValueError("name must not be blank or whitespace-only")
         return stripped
+
+    @model_validator(mode="after")
+    def exactly_one_scope(self) -> CreateRoleInput:
+        if self.scope is not None:
+            if self.scopes:
+                raise ValueError("scope and scopes cannot both be given")
+            return self
+        if not self.scopes:
+            raise ValueError("scope is required")
+        if len(self.scopes) != 1:
+            raise ValueError("A role belongs to exactly one scope")
+        return self
+
+    def scope_input(self) -> ScopeInputDTO:
+        """The scope the role belongs to, from whichever field carried it."""
+        if self.scope is not None:
+            return self.scope
+        if not self.scopes:
+            raise ValueError("scope is required")
+        return self.scopes[0]
 
 
 class UpdateRoleInput(BaseRequestModel):
@@ -232,7 +252,7 @@ class MappedScopeNestedFilter(BaseRequestModel):
     """Filter roles by the scope they are mapped (registered) to."""
 
     scope_type: RBACElementTypeFilter | None = None
-    scope_id: StringFilter | None = None
+    scope_id: UUIDFilter | None = None
     AND: list[MappedScopeNestedFilter] | None = None
     OR: list[MappedScopeNestedFilter] | None = None
     NOT: list[MappedScopeNestedFilter] | None = None

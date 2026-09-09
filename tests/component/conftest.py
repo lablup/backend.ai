@@ -46,10 +46,10 @@ from ai.backend.common.clients.valkey_client.valkey_stream.client import ValkeyS
 from ai.backend.common.configs.etcd import EtcdConfig
 from ai.backend.common.configs.pyroscope import PyroscopeConfig
 from ai.backend.common.contexts.user import with_user
-from ai.backend.common.data.entity.auth import AUTH_ENTITY_TYPE
+from ai.backend.common.data.entity.auth import AuthEntityType
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID, ResourceGroupName
-from ai.backend.common.data.entity.user import USER_ENTITY_TYPE, UserID
+from ai.backend.common.data.entity.user import UserEntityType, UserID
 from ai.backend.common.data.permission.types import EntityType, ScopeType
 from ai.backend.common.data.user.types import UserData, UserRole
 from ai.backend.common.defs import (
@@ -170,6 +170,9 @@ from ai.backend.manager.secret.types import SecretValue
 from ai.backend.manager.services.auth.processors import AuthProcessors
 from ai.backend.manager.services.auth.service import AuthService
 from ai.backend.testutils.bootstrap import (  # noqa: F401
+    POSTGRES_MAINTENANCE_DB,
+    POSTGRES_PASSWORD,
+    POSTGRES_USER,
     etcd_container,
     postgres_container,
     redis_container,
@@ -314,8 +317,8 @@ def bootstrap_config(
         db=DatabaseConfig.model_validate({
             "addr": postgres_addr,
             "name": test_db,
-            "user": "postgres",
-            "password": "develove",
+            "user": POSTGRES_USER,
+            "password": POSTGRES_PASSWORD,
             "pool_size": 8,
             "pool_recycle": -1,
             "pool_pre_ping": False,
@@ -435,7 +438,7 @@ def database(
     and install the table schema using alembic.
     """
     db_url = (
-        yarl.URL(f"postgresql+asyncpg://{bootstrap_config.db.addr.host}/testing")
+        yarl.URL(f"postgresql+asyncpg://{bootstrap_config.db.addr.host}/{POSTGRES_MAINTENANCE_DB}")
         .with_port(bootstrap_config.db.addr.port)
         .with_user(bootstrap_config.db.user)
     )
@@ -472,7 +475,7 @@ def database(
             await conn.execute(
                 sa.text(
                     "SELECT pg_terminate_backend(pid) FROM pg_stat_activity "
-                    "WHERE pid <> pg_backend_pid();"
+                    f"WHERE datname = '{test_db}' AND pid <> pg_backend_pid();"
                 )
             )
             await conn.execute(sa.text(f'DROP DATABASE "{test_db}";'))
@@ -1570,8 +1573,8 @@ def auth_processors(
         key_provider_pool=KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
     )
     return AuthProcessors(
-        processor_registry.group(GroupMeta(AUTH_ENTITY_TYPE)),
-        processor_registry.group(GroupMeta(USER_ENTITY_TYPE)),
+        processor_registry.group(GroupMeta(AuthEntityType())),
+        processor_registry.group(GroupMeta(UserEntityType())),
         service,
     )
 

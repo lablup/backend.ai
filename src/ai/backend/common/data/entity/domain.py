@@ -8,22 +8,32 @@ from ai.backend.common.data.entity.types import (
 )
 
 __all__ = (
-    "DOMAIN_ENTITY_TYPE",
+    "DomainEntityType",
     "DOMAIN_SCOPE_TYPE",
     "DomainID",
     "DomainName",
 )
 
 
-# Raw string mirroring the RBAC-managed RBACElementType.DOMAIN value.
-DOMAIN_ENTITY_TYPE = EntityType("domain")
-DOMAIN_SCOPE_TYPE = ScopeType(DOMAIN_ENTITY_TYPE)
+class DomainEntityType(EntityType):
+    @override
+    @classmethod
+    def name(cls) -> str:
+        return "domain"
+
+    @override
+    @classmethod
+    def description(cls) -> str:
+        return "The top-level tenant holding projects and users."
+
+
+DOMAIN_SCOPE_TYPE = ScopeType(DomainEntityType())
 
 
 class DomainID(EntityIdentifier):
     @override
     def entity_type(self) -> EntityType:
-        return DOMAIN_ENTITY_TYPE
+        return DomainEntityType()
 
 
 class DomainName(NaturalKey):

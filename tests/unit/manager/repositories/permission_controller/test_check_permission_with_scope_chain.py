@@ -158,6 +158,8 @@ class TestCheckPermissionWithScopeChain:
             await db_sess.flush()
 
             role = RoleRow(
+                scope_type=EntityType("project"),
+                scope_id=uuid.uuid4(),
                 id=fixture_ids.role_id,
                 name="test-role",
                 description="Test role for scope chain",
@@ -494,6 +496,8 @@ class TestCheckPermissionWithScopeChain:
             await db_sess.flush()
 
             role = RoleRow(
+                scope_type=EntityType("project"),
+                scope_id=uuid.uuid4(),
                 id=fixture_ids.role_id,
                 name="inactive-role",
                 status=RoleStatus.INACTIVE,
@@ -689,6 +693,8 @@ class TestCheckPermissionWithScopeChain:
             await db_sess.flush()
 
             role = RoleRow(
+                scope_type=EntityType("project"),
+                scope_id=uuid.uuid4(),
                 id=fixture_ids.role_id,
                 name="deleted-role",
                 status=RoleStatus.DELETED,
@@ -742,6 +748,8 @@ class TestCheckPermissionWithScopeChain:
                 DomainRow(id=domain_id, name=domain_name, total_resource_slots=ResourceSlot())
             )
             role = RoleRow(
+                scope_type=EntityType("project"),
+                scope_id=uuid.uuid4(),
                 id=fixture_ids.role_id,
                 name="unassigned-role",
             )
@@ -812,10 +820,14 @@ class TestCheckPermissionWithScopeChain:
             await db_sess.flush()
 
             role1 = RoleRow(
+                scope_type=EntityType("project"),
+                scope_id=uuid.uuid4(),
                 id=fixture_ids.role_id,
                 name="role-1",
             )
             role2 = RoleRow(
+                scope_type=EntityType("project"),
+                scope_id=uuid.uuid4(),
                 id=second_role_id,
                 name="role-2",
             )
@@ -1119,6 +1131,8 @@ class TestCheckPermissionWithScopeChain:
             await db_sess.flush()
 
             role = RoleRow(
+                scope_type=EntityType("project"),
+                scope_id=uuid.uuid4(),
                 id=other_role_id,
                 name="other-user-role",
             )

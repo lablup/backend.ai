@@ -6,7 +6,7 @@ from typing import override
 
 from ai.backend.common.data.app_config.types import AppConfigScopeType
 from ai.backend.common.data.entity.app_config import (
-    APP_CONFIG_FRAGMENT_ENTITY_TYPE,
+    AppConfigFragmentEntityType,
     AppConfigScopeID,
 )
 from ai.backend.common.data.entity.types import (
@@ -41,7 +41,7 @@ class ScopedSearchAppConfigFragmentAction(
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return APP_CONFIG_FRAGMENT_ENTITY_TYPE
+        return AppConfigFragmentEntityType()
 
     @override
     @classmethod

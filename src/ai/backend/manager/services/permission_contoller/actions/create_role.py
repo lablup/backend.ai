@@ -2,7 +2,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.common.data.entity.role import ROLE_ENTITY_TYPE
+from ai.backend.common.data.entity.role import RoleEntityType
 from ai.backend.common.data.entity.types import EntityType, ScopeRef, ScopeType
 from ai.backend.manager.actions.v2.ops.base import CreateEntityOpsAction
 from ai.backend.manager.data.permission.role import RoleData
@@ -19,14 +19,12 @@ class CreateRoleAction(CreateEntityOpsAction[RoleRow, RoleData]):
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return ROLE_ENTITY_TYPE
+        return RoleEntityType()
 
     @override
     def scope_targets(self) -> Sequence[ScopeRef]:
-        return tuple(
-            ScopeRef(scope_type=ScopeType(scope.entity_type()), scope_id=scope)
-            for scope in self.creator.scopes
-        )
+        scope = self.creator.scope
+        return (ScopeRef(scope_type=ScopeType(scope.entity_type()), scope_id=scope),)
 
     @override
     @classmethod

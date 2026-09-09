@@ -3,6 +3,8 @@
         {
             "id": "942d7613-27f1-49c5-944a-5c79045346a1",
             "name": "role_superadmin",
+            "scope_type": "domain",
+            "scope_id": "b9e676dc-e23e-54c6-b350-e83fba4127e9",
             "description": "",
             "source": "system",
             "status": "active",
@@ -14,6 +16,8 @@
         {
             "id": "02d084f3-49e1-4fcb-bc62-e9d06637e60d",
             "name": "role_monitor",
+            "scope_type": "domain",
+            "scope_id": "b9e676dc-e23e-54c6-b350-e83fba4127e9",
             "description": "",
             "source": "system",
             "status": "active",
@@ -25,6 +29,8 @@
         {
             "id": "31f74f6d-04f7-418b-b375-ab0c39fa3058",
             "name": "role_user_user2",
+            "scope_type": "user",
+            "scope_id": "009fb1a4-487c-4f6e-9b1b-228b94b1d040",
             "description": "",
             "source": "system",
             "status": "active",
@@ -36,6 +42,8 @@
         {
             "id": "5e96b4ee-2296-495b-90b4-0fc845d13c67",
             "name": "role_user_monitor",
+            "scope_type": "user",
+            "scope_id": "2e10157d-20ca-4bd0-9806-3f909cbcd0e6",
             "description": "",
             "source": "system",
             "status": "active",
@@ -47,6 +55,8 @@
         {
             "id": "cb0768f1-3b35-415d-beef-8916a5c3c88b",
             "name": "role_user_domain-admin",
+            "scope_type": "user",
+            "scope_id": "4f13d193-f646-425a-a340-270c4d2b9860",
             "description": "",
             "source": "system",
             "status": "active",
@@ -58,6 +68,8 @@
         {
             "id": "fe53e90e-f619-43d8-99c8-574487485bab",
             "name": "role_user_user",
+            "scope_type": "user",
+            "scope_id": "dfa9da54-4b28-432f-be29-c0d680c7a412",
             "description": "",
             "source": "system",
             "status": "active",
@@ -69,6 +81,8 @@
         {
             "id": "72293d83-1849-4bb5-a555-80e561515428",
             "name": "role_user_admin",
+            "scope_type": "user",
+            "scope_id": "f38dea23-50fa-42a0-b5ae-338f5f4693f4",
             "description": "",
             "source": "system",
             "status": "active",
@@ -80,6 +94,8 @@
         {
             "id": "e79d7074-076d-4629-953d-55286b26490c",
             "name": "role_project_2de2b969_admin",
+            "scope_type": "project",
+            "scope_id": "2de2b969-1d04-48a6-af16-0bc8adb3c831",
             "description": "",
             "source": "system",
             "status": "active",
@@ -91,6 +107,8 @@
         {
             "id": "d1b9c1af-9b2f-447c-82bc-a5278e01f89e",
             "name": "role_project_8e32dd28_admin",
+            "scope_type": "project",
+            "scope_id": "8e32dd28-d319-4e3b-8851-ea37837699a5",
             "description": "",
             "source": "system",
             "status": "active",
@@ -102,6 +120,8 @@
         {
             "id": "08001cc1-1b3a-410b-a3a6-b312b8b78a52",
             "name": "role_project_2de2b969_member",
+            "scope_type": "project",
+            "scope_id": "2de2b969-1d04-48a6-af16-0bc8adb3c831",
             "description": "",
             "source": "custom",
             "status": "active",
@@ -113,6 +133,8 @@
         {
             "id": "254fef91-2574-46f5-afc6-c9b18cfa340b",
             "name": "role_project_8e32dd28_member",
+            "scope_type": "project",
+            "scope_id": "8e32dd28-d319-4e3b-8851-ea37837699a5",
             "description": "",
             "source": "custom",
             "status": "active",
@@ -124,6 +146,8 @@
         {
             "id": "416fca68-f247-457b-ac83-32a0a45bb7d1",
             "name": "role_domain_default_admin",
+            "scope_type": "domain",
+            "scope_id": "b9e676dc-e23e-54c6-b350-e83fba4127e9",
             "description": "",
             "source": "system",
             "status": "active",
@@ -135,6 +159,8 @@
         {
             "id": "bfb69730-1374-4ba4-bc26-0ea0b8dd2708",
             "name": "role_domain_default_member",
+            "scope_type": "domain",
+            "scope_id": "b9e676dc-e23e-54c6-b350-e83fba4127e9",
             "description": "",
             "source": "custom",
             "status": "active",
@@ -6314,6 +6340,51 @@
             "entity_id": "5e96b4ee-2296-495b-90b4-0fc845d13c67",
             "registered_at": "2025-09-12 09:51:58.265582+00",
             "relation_type": "auto"
+        },
+        {
+            "id": "7c85ff00-e5c2-5627-9d4a-75c48255e733",
+            "scope_type": "user",
+            "scope_id": "f38dea23-50fa-42a0-b5ae-338f5f4693f4",
+            "entity_type": "keypair",
+            "entity_id": "AKIAIOSFODNN7EXAMPLE",
+            "registered_at": "2025-09-12 09:51:58.265582+00",
+            "relation_type": "auto"
+        },
+        {
+            "id": "5953ba19-5290-525b-a691-21691b8c51f8",
+            "scope_type": "user",
+            "scope_id": "4f13d193-f646-425a-a340-270c4d2b9860",
+            "entity_type": "keypair",
+            "entity_id": "AKIAHUKCHDEZGEXAMPLE",
+            "registered_at": "2025-09-12 09:51:58.265582+00",
+            "relation_type": "auto"
+        },
+        {
+            "id": "ee04bdf2-5fc7-5f99-a5c9-dc8093bf9bca",
+            "scope_type": "user",
+            "scope_id": "dfa9da54-4b28-432f-be29-c0d680c7a412",
+            "entity_type": "keypair",
+            "entity_id": "AKIANABBDUSEREXAMPLE",
+            "registered_at": "2025-09-12 09:51:58.265582+00",
+            "relation_type": "auto"
+        },
+        {
+            "id": "3cfa4002-0d5a-529c-95c5-ea5b7ab692d8",
+            "scope_type": "user",
+            "scope_id": "009fb1a4-487c-4f6e-9b1b-228b94b1d040",
+            "entity_type": "keypair",
+            "entity_id": "AKIANATWOUSEREXAMPLE",
+            "registered_at": "2025-09-12 09:51:58.265582+00",
+            "relation_type": "auto"
+        },
+        {
+            "id": "8534b805-f576-54bf-acad-e5cbe083cede",
+            "scope_type": "user",
+            "scope_id": "2e10157d-20ca-4bd0-9806-3f909cbcd0e6",
+            "entity_type": "keypair",
+            "entity_id": "AKIANAMONITOREXAMPLE",
+            "registered_at": "2025-09-12 09:51:58.265582+00",
+            "relation_type": "auto"
         }
     ],
     "role_presets": [
@@ -6423,6 +6494,41 @@
             "role_preset_id": "06057849-3534-546f-b74c-b79d5d3ecf5e",
             "entity_type": "model_deployment",
             "operation": "read",
+            "created_at": "2025-09-12 09:51:58.265582+00"
+        },
+        {
+            "id": "bbc6fc69-63c3-59c7-93f0-f83ce26e7d1d",
+            "role_preset_id": "776c1366-dcf3-5abd-b8de-bc3ad3b759ad",
+            "entity_type": "keypair",
+            "operation": "create",
+            "created_at": "2025-09-12 09:51:58.265582+00"
+        },
+        {
+            "id": "025ee359-2400-5577-bfeb-9a1189ac8209",
+            "role_preset_id": "776c1366-dcf3-5abd-b8de-bc3ad3b759ad",
+            "entity_type": "keypair",
+            "operation": "hard-delete",
+            "created_at": "2025-09-12 09:51:58.265582+00"
+        },
+        {
+            "id": "fbbac31d-709f-51a5-b3a5-49f05d909db8",
+            "role_preset_id": "776c1366-dcf3-5abd-b8de-bc3ad3b759ad",
+            "entity_type": "keypair",
+            "operation": "read",
+            "created_at": "2025-09-12 09:51:58.265582+00"
+        },
+        {
+            "id": "db16eb2f-39e0-5b90-85aa-f3c3eac84177",
+            "role_preset_id": "776c1366-dcf3-5abd-b8de-bc3ad3b759ad",
+            "entity_type": "keypair",
+            "operation": "soft-delete",
+            "created_at": "2025-09-12 09:51:58.265582+00"
+        },
+        {
+            "id": "42a1d35d-784d-5061-8ed0-9388dc7e3153",
+            "role_preset_id": "776c1366-dcf3-5abd-b8de-bc3ad3b759ad",
+            "entity_type": "keypair",
+            "operation": "update",
             "created_at": "2025-09-12 09:51:58.265582+00"
         },
         {

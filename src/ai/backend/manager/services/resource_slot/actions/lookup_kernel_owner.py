@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from typing import Any, override
 
 from ai.backend.common.data.entity.kernel import KernelID
-from ai.backend.common.data.entity.session import SESSION_ENTITY_TYPE, SessionID
+from ai.backend.common.data.entity.session import SessionEntityType, SessionID
 from ai.backend.common.data.entity.types import EntityType
 from ai.backend.manager.actions.v2.field.lookup import LookupFieldOwnerByKeyOpsAction
 from ai.backend.manager.actions.v2.lookup.base import LookupKey
@@ -35,7 +35,7 @@ class LookupKernelOwnerAction(LookupFieldOwnerByKeyOpsAction[SessionID]):
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return SESSION_ENTITY_TYPE
+        return SessionEntityType()
 
     @override
     @classmethod

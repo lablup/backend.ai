@@ -13,7 +13,7 @@ from typing import override
 
 from ai.backend.common.data.entity.keypair import KeyPairID
 from ai.backend.common.data.entity.types import EntityIdentifier, EntityType, ScopeRef
-from ai.backend.common.data.entity.user import USER_ENTITY_TYPE, USER_SCOPE_TYPE, UserID
+from ai.backend.common.data.entity.user import USER_SCOPE_TYPE, UserEntityType, UserID
 from ai.backend.common.types import AccessKey
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.actions.v2.field.base import BaseSingleFieldAction
@@ -181,7 +181,7 @@ class SearchMyKeypairsAction(BaseScopeAction):
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return USER_ENTITY_TYPE
+        return UserEntityType()
 
     @override
     def scope_targets(self) -> Sequence[ScopeRef]:
@@ -265,7 +265,7 @@ class AdminSearchKeypairsAction(BaseGlobalAction):
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return USER_ENTITY_TYPE
+        return UserEntityType()
 
     @override
     @classmethod

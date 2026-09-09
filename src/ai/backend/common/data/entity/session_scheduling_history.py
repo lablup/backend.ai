@@ -2,11 +2,31 @@
 
 from typing import override
 
-from ai.backend.common.data.entity.types import FieldIdentifier, FieldType
+from ai.backend.common.data.entity.session import SessionEntityType
+from ai.backend.common.data.entity.types import (
+    EntityType,
+    FieldIdentifier,
+    FieldType,
+)
 
-__all__ = ("SESSION_SCHEDULING_HISTORY_FIELD_TYPE", "SessionSchedulingHistoryID")
+__all__ = ("SessionSchedulingHistoryFieldType", "SessionSchedulingHistoryID")
 
-SESSION_SCHEDULING_HISTORY_FIELD_TYPE = FieldType("session_scheduling_history")
+
+class SessionSchedulingHistoryFieldType(FieldType):
+    @override
+    @classmethod
+    def name(cls) -> str:
+        return "session_scheduling_history"
+
+    @override
+    @classmethod
+    def description(cls) -> str:
+        return "One scheduling step recorded for a session."
+
+    @override
+    @classmethod
+    def owner_type(cls) -> type[EntityType]:
+        return SessionEntityType
 
 
 class SessionSchedulingHistoryID(FieldIdentifier):
@@ -15,4 +35,4 @@ class SessionSchedulingHistoryID(FieldIdentifier):
     @override
     @classmethod
     def field_type(cls) -> FieldType:
-        return SESSION_SCHEDULING_HISTORY_FIELD_TYPE
+        return SessionSchedulingHistoryFieldType()

@@ -76,14 +76,14 @@ from ai.backend.manager.services.image.actions.forget_image import (
     ForgetImageAction,
     ForgetImageByIdAction,
 )
-from ai.backend.manager.services.image.actions.get_all_images import GetAllImagesAction
+from ai.backend.manager.services.image.actions.get_all_images import PublicGetAllImagesAction
 from ai.backend.manager.services.image.actions.get_image_installed_agents import (
     GetImageInstalledAgentsAction,
 )
 from ai.backend.manager.services.image.actions.get_images import (
-    GetImageByIdAction,
-    GetImageByIdentifierAction,
-    GetImagesByCanonicalsAction,
+    PublicGetImageByIdAction,
+    PublicGetImageByIdentifierAction,
+    PublicGetImagesByCanonicalsAction,
 )
 from ai.backend.manager.services.image.actions.purge_images import PurgeImageByIdAction
 from ai.backend.manager.services.image.actions.untag_image_from_registry import (
@@ -246,8 +246,8 @@ class Image(graphene.ObjectType):  # type: ignore[misc]
     ) -> list[Self]:
         if filter_by_statuses is None:
             filter_by_statuses = [ImageStatus.ALIVE]
-        result = await graph_ctx.processors.image.get_images_by_canonicals.run(
-            GetImagesByCanonicalsAction(
+        result = await graph_ctx.processors.image.public_get_images_by_canonicals.run(
+            PublicGetImagesByCanonicalsAction(
                 image_canonicals=list(image_names),
                 image_status=filter_by_statuses,
             )
@@ -278,8 +278,8 @@ class Image(graphene.ObjectType):  # type: ignore[misc]
     ) -> Image:
         if filter_by_statuses is None:
             filter_by_statuses = [ImageStatus.ALIVE]
-        result = await ctx.processors.image.get_image_by_id.run(
-            GetImageByIdAction(
+        result = await ctx.processors.image.public_get_image_by_id.run(
+            PublicGetImageByIdAction(
                 image_id=ImageID(id),
                 image_status=filter_by_statuses,
             )
@@ -296,8 +296,8 @@ class Image(graphene.ObjectType):  # type: ignore[misc]
     ) -> Image:
         if filter_by_statuses is None:
             filter_by_statuses = [ImageStatus.ALIVE]
-        result = await ctx.processors.image.get_image_by_identifier.run(
-            GetImageByIdentifierAction(
+        result = await ctx.processors.image.public_get_image_by_identifier.run(
+            PublicGetImageByIdentifierAction(
                 image_identifier=ImageIdentifier(reference, architecture),
                 image_status=filter_by_statuses,
             )
@@ -316,8 +316,8 @@ class Image(graphene.ObjectType):  # type: ignore[misc]
             filter_by_statuses = [ImageStatus.ALIVE]
         if types is None:
             types = set()
-        result = await ctx.processors.image.get_all_images.run(
-            GetAllImagesAction(status_filter=filter_by_statuses)
+        result = await ctx.processors.image.public_get_all_images.run(
+            PublicGetAllImagesAction(status_filter=filter_by_statuses)
         )
         all_items = [cls.from_image_with_agent_install_status(img) for img in result.data.values()]
         return [item for item in all_items if item.matches_filter(ctx, types)]
@@ -734,8 +734,8 @@ class ImageNode(graphene.ObjectType):  # type: ignore[misc]
     async def __resolve_reference(self, info: graphene.ResolveInfo, **kwargs: Any) -> Image:
         ctx: GraphQueryContext = info.context
         _, image_id = AsyncNode.resolve_global_id(info, self.id)
-        action_result = await ctx.processors.image.get_image_by_id.run(
-            GetImageByIdAction(
+        action_result = await ctx.processors.image.public_get_image_by_id.run(
+            PublicGetImageByIdAction(
                 image_id=ImageID(UUID(image_id)),
                 image_status=None,
             )

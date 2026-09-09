@@ -19,8 +19,8 @@ from ai.backend.client.v2.auth import HMACAuth
 from ai.backend.client.v2.config import ClientConfig
 from ai.backend.client.v2.exceptions import AuthenticationError, InvalidRequestError, NotFoundError
 from ai.backend.client.v2.registry import BackendAIClientRegistry
-from ai.backend.common.data.entity.project import PROJECT_ENTITY_TYPE, ProjectID
-from ai.backend.common.data.entity.user import USER_ENTITY_TYPE
+from ai.backend.common.data.entity.project import ProjectEntityType, ProjectID
+from ai.backend.common.data.entity.user import UserEntityType
 from ai.backend.common.dto.manager.auth.request import (
     AuthorizeRequest,
     GetRoleRequest,
@@ -1145,9 +1145,9 @@ class TestSignup:
                 .join(scope, scope.id == EntityMembershipRow.virtual_entity_id)
                 .join(member, member.id == EntityMembershipRow.member_entity_id)
                 .where(
-                    scope.entity_type == PROJECT_ENTITY_TYPE,
+                    scope.entity_type == ProjectEntityType(),
                     scope.entity_id == signup_default_project.project_id,
-                    member.entity_type == USER_ENTITY_TYPE,
+                    member.entity_type == UserEntityType(),
                     member.entity_id == user_uuid,
                 ),
             )
