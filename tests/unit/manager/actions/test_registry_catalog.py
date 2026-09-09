@@ -70,6 +70,7 @@ from ai.backend.common.data.entity.role import RoleEntityType
 from ai.backend.common.data.entity.role_preset import RolePresetEntityType
 from ai.backend.common.data.entity.runtime_variant import RuntimeVariantEntityType
 from ai.backend.common.data.entity.runtime_variant_preset import RuntimeVariantPresetEntityType
+from ai.backend.common.data.entity.secret import SecretFieldType
 from ai.backend.common.data.entity.service_catalog import ServiceCatalogEntityType
 from ai.backend.common.data.entity.session import SessionEntityType
 from ai.backend.common.data.entity.session_template import SessionTemplateEntityType
@@ -104,6 +105,7 @@ from ai.backend.manager.actions.v2.validators import ActionValidators
 from ai.backend.manager.data.artifact.types import ArtifactRevisionData
 from ai.backend.manager.data.audit_log.types import AuditLogData
 from ai.backend.manager.data.entity_label.types import EntityLabelData
+from ai.backend.manager.data.secret.types import SecretFieldData
 from ai.backend.manager.repositories.ops.repository import OpsRepository
 from ai.backend.manager.services.agent.actions.bulk_get import BulkGetAgentsAction
 from ai.backend.manager.services.agent.actions.bulk_load_container_counts import (
@@ -270,6 +272,7 @@ from ai.backend.manager.services.scheduling_history.actions.lookup_owner import 
 from ai.backend.manager.services.scheduling_history.processors import (
     SchedulingHistoryProcessors,
 )
+from ai.backend.manager.services.secret.processors import SecretProcessors
 from ai.backend.manager.services.service_catalog.processors import ServiceCatalogProcessors
 from ai.backend.manager.services.session.actions.compute_schedule import (
     ComputeScheduleAction,
@@ -419,6 +422,12 @@ def test_every_defined_v2_action_is_wired() -> None:
     )
     AuditLogProcessors(
         registry.dangling_field_group(FieldGroupMeta(AuditLogFieldType()), AuditLogData)
+    )
+    SecretProcessors(
+        registry.concern(ConcernMeta(Concern.SYSTEM)).dangling_field_group(
+            FieldGroupMeta(SecretFieldType()), SecretFieldData
+        ),
+        MagicMock(),
     )
     EntityLabelProcessors(
         registry.dangling_lookup_field_group(

@@ -7,7 +7,6 @@ import uuid
 import pytest
 from pydantic import ValidationError
 
-from ai.backend.common.api_handlers import SENTINEL, Sentinel
 from ai.backend.common.dto.manager.v2.vfolder.request import (
     AcceptInvitationInput,
     CloneVFolderInput,
@@ -31,6 +30,7 @@ from ai.backend.common.dto.manager.v2.vfolder.request import (
 )
 from ai.backend.common.dto.manager.v2.vfolder.types import VFolderPermissionField, VFolderUsageMode
 from ai.backend.common.exception import BackendAISchemaValidationFailed
+from ai.backend.common.tristate.unset import UNSET, Unset
 
 
 class TestCreateVFolderInput:
@@ -83,10 +83,10 @@ class TestCreateVFolderInput:
 class TestUpdateVFolderInput:
     """Tests for UpdateVFolderInput model."""
 
-    def test_default_name_is_sentinel(self) -> None:
+    def test_default_name_is_unset(self) -> None:
         req = UpdateVFolderInput()
-        assert req.name is SENTINEL
-        assert isinstance(req.name, Sentinel)
+        assert req.name is UNSET
+        assert isinstance(req.name, Unset)
 
     def test_name_none_means_no_change(self) -> None:
         req = UpdateVFolderInput(name=None)
@@ -100,9 +100,25 @@ class TestUpdateVFolderInput:
         with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             UpdateVFolderInput(name="   ")
 
+    def test_default_cloneable_is_unset(self) -> None:
+        req = UpdateVFolderInput()
+        assert req.cloneable is UNSET
+
+    def test_cloneable_none_stays_none(self) -> None:
+        req = UpdateVFolderInput(cloneable=None)
+        assert req.cloneable is None
+
     def test_cloneable_update(self) -> None:
         req = UpdateVFolderInput(cloneable=True)
         assert req.cloneable is True
+
+    def test_default_permission_is_unset(self) -> None:
+        req = UpdateVFolderInput()
+        assert req.permission is UNSET
+
+    def test_permission_none_stays_none(self) -> None:
+        req = UpdateVFolderInput(permission=None)
+        assert req.permission is None
 
     def test_permission_update(self) -> None:
         req = UpdateVFolderInput(permission=VFolderPermissionField.READ_ONLY)

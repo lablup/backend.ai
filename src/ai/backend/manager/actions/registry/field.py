@@ -45,6 +45,7 @@ from ai.backend.manager.actions.v2.field.processor import (
     OwnerLookupProcessor,
     SingleFieldActionProcessor,
 )
+from ai.backend.manager.actions.v2.global_scope.base import BaseGlobalAction
 from ai.backend.manager.actions.v2.global_scope.monitor import GlobalActionMonitor
 from ai.backend.manager.actions.v2.global_scope.processor import (
     GlobalActionProcessor,
@@ -196,6 +197,22 @@ class FieldGroup[TFieldData: FieldData]:
             AtomicEntityResultJudge(),
             monitors=(*self._deps.monitors.bulk, *monitors),
             validators=(*self._deps.validators.atomic_bulk, *validators),
+        )
+
+    def global_scope[TAction: BaseGlobalAction, TResult](
+        self,
+        action_cls: type[TAction],
+        func: Callable[[TAction], Awaitable[TResult]],
+        *,
+        validators: Sequence[GlobalActionValidator] = (),
+        monitors: Sequence[GlobalActionMonitor] = (),
+    ) -> GlobalActionProcessor[TAction, TResult]:
+        """Run a service over this field kind system-wide, behind the SUPERADMIN gate."""
+        self._record(action_cls, ActionKind.GLOBAL, ActionGate.PERMISSION, ActionBacking.CUSTOM)
+        return GlobalActionProcessor(
+            func,
+            monitors=(*self._deps.monitors.global_scope, *monitors),
+            validators=(*self._deps.validators.global_scope, *validators),
         )
 
     def global_search_ops[TAction: SearchGlobalOpsAction[Any, Any]](
