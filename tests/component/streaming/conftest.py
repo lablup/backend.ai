@@ -14,7 +14,7 @@ from dateutil.tz import tzutc
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
 from ai.backend.common.data.entity.resource_group import ResourceGroupID, ResourceGroupName
-from ai.backend.common.data.entity.session import SESSION_ENTITY_TYPE, SessionID
+from ai.backend.common.data.entity.session import SessionEntityType, SessionID
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.plugin.monitor import ErrorPluginContext
 from ai.backend.common.types import SessionTypes
@@ -83,7 +83,7 @@ def stream_processors(
         valkey_live=valkey_clients.live,
         etcd=async_etcd,
     )
-    return StreamProcessors(processor_registry.group(GroupMeta(SESSION_ENTITY_TYPE)), service)
+    return StreamProcessors(processor_registry.group(GroupMeta(SessionEntityType())), service)
 
 
 @pytest.fixture()
@@ -112,7 +112,7 @@ async def session_processors(
         )
     )
     processors = MagicMock()
-    group = processor_registry.group(GroupMeta(SESSION_ENTITY_TYPE))
+    group = processor_registry.group(GroupMeta(SessionEntityType()))
     processors.resolve_session_name = group.single_entity(
         ResolveSessionNameAction, service.resolve_session_name
     )

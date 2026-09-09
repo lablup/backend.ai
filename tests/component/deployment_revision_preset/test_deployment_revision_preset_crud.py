@@ -36,6 +36,9 @@ from ai.backend.common.dto.manager.v2.deployment_revision_preset.request import 
     PresetModelServiceConfigInput,
     SearchDeploymentRevisionPresetsInput,
     UpdateDeploymentRevisionPresetInput,
+    UpdatePresetModelConfigInput,
+    UpdatePresetModelDefinitionInput,
+    UpdatePresetModelServiceConfigInput,
 )
 from ai.backend.common.dto.manager.v2.resource_slot.types import ResourceOptsEntryDTO
 
@@ -260,6 +263,62 @@ class TestDeploymentRevisionPresetCRUD:
 
         get_result = await admin_v2_registry.deployment_revision_preset.get(preset_id)
         assert get_result.runtime_variant_id == other_runtime_variant_id
+
+    async def test_update_model_definition_partial_patch(
+        self,
+        admin_v2_registry: V2ClientRegistry,
+        runtime_variant_id: RuntimeVariantID,
+    ) -> None:
+        create_result = await admin_v2_registry.deployment_revision_preset.create(
+            CreateDeploymentRevisionPresetInput(
+                runtime_variant_id=runtime_variant_id,
+                name="patch-model-def-preset",
+                image_id=ImageID(uuid.uuid4()),
+                model_definition=PresetModelDefinitionInput(
+                    models=[
+                        PresetModelConfigInput(
+                            name="llama",
+                            model_path="/models/llama",
+                            service=PresetModelServiceConfigInput(
+                                command="python server.py",
+                                port=8080,
+                            ),
+                        ),
+                    ],
+                ),
+                resource_slots=[ResourceSlotEntryInput(resource_type="cpu", quantity="1")],
+                cluster_mode="single-node",
+                cluster_size=1,
+                replica_count=1,
+                deployment_strategy=DeploymentStrategyInput(type=DeploymentStrategy.ROLLING),
+            )
+        )
+        preset_id = create_result.preset.id
+
+        # Patch only service.port; name/model_path/command must survive from the stored preset.
+        update_result = await admin_v2_registry.deployment_revision_preset.update(
+            preset_id,
+            UpdateDeploymentRevisionPresetInput(
+                id=preset_id,
+                model_definition=UpdatePresetModelDefinitionInput(
+                    models=[
+                        UpdatePresetModelConfigInput(
+                            service=UpdatePresetModelServiceConfigInput(port=9090),
+                        ),
+                    ],
+                ),
+            ),
+        )
+        model_definition = update_result.preset.model_definition
+        assert model_definition is not None
+        model = model_definition.models[0]
+        assert model.name == "llama"
+        assert model.model_path == "/models/llama"
+        assert model.service is not None
+        assert model.service.command == "python server.py"
+        assert model.service.port == 9090
+
+        await admin_v2_registry.deployment_revision_preset.delete(preset_id)
 
     async def test_delete(
         self,

@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from typing import override
 
 from ai.backend.common.data.entity.domain import DOMAIN_SCOPE_TYPE, DomainID
-from ai.backend.common.data.entity.export import EXPORT_ENTITY_TYPE
+from ai.backend.common.data.entity.export import ExportEntityType
 from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE, ProjectID
 from ai.backend.common.data.entity.types import EntityIdentifier, EntityType, ScopeRef
 from ai.backend.common.data.entity.user import USER_SCOPE_TYPE, UserID
@@ -23,7 +23,7 @@ class ExportAction(BaseGlobalAction):
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return EXPORT_ENTITY_TYPE
+        return ExportEntityType()
 
 
 @dataclass
@@ -35,7 +35,7 @@ class ExportUserScopeAction(BaseScopeAction):
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return EXPORT_ENTITY_TYPE
+        return ExportEntityType()
 
     @override
     def scope_targets(self) -> Sequence[ScopeRef]:
@@ -51,7 +51,7 @@ class ExportProjectScopeAction(BaseScopeAction):
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return EXPORT_ENTITY_TYPE
+        return ExportEntityType()
 
     @override
     def scope_targets(self) -> Sequence[ScopeRef]:
@@ -68,7 +68,7 @@ class ExportDomainScopeAction(BaseScopeAction):
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return EXPORT_ENTITY_TYPE
+        return ExportEntityType()
 
     @override
     def scope_targets(self) -> Sequence[ScopeRef]:

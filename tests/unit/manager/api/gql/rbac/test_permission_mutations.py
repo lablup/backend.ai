@@ -12,7 +12,11 @@ import pytest
 from aiohttp.web_exceptions import HTTPForbidden
 
 from ai.backend.common.dto.manager.v2.rbac.response import PermissionNode
-from ai.backend.common.dto.manager.v2.rbac.types import OperationTypeDTO, RBACElementTypeDTO
+from ai.backend.common.dto.manager.v2.rbac.types import (
+    OperationTypeDTO,
+    PermissionBitDTO,
+    RBACElementTypeDTO,
+)
 from ai.backend.manager.api.gql.rbac.resolver import permission as permission_resolver
 from ai.backend.manager.api.gql.rbac.types import PermissionGQL, UpdatePermissionInput
 from ai.backend.manager.api.gql.rbac.types.permission import OperationTypeGQL
@@ -34,6 +38,7 @@ def _make_permission_node(
         scope_type=scope_type,
         scope_id=scope_id,
         entity_type=entity_type,
+        permission=PermissionBitDTO[operation.name],
         operation=operation,
         created_at=datetime.now(UTC),
     )

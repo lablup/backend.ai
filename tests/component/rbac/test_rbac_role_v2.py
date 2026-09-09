@@ -13,7 +13,7 @@ from ai.backend.client.v2.auth import HMACAuth
 from ai.backend.client.v2.config import ClientConfig
 from ai.backend.client.v2.exceptions import PermissionDeniedError
 from ai.backend.client.v2.v2_registry import V2ClientRegistry
-from ai.backend.common.data.entity.role import ROLE_ENTITY_TYPE
+from ai.backend.common.data.entity.role import RoleEntityType
 from ai.backend.common.dto.manager.v2.rbac.request import (
     AssignRoleInput,
     RevokeRoleInput,
@@ -66,7 +66,7 @@ def permission_controller_processors(
         rbac=RBACValidators(scope=AsyncMock()),
     )
     return PermissionControllerProcessors(
-        processor_registry.group(GroupMeta(ROLE_ENTITY_TYPE)),
+        processor_registry.group(GroupMeta(RoleEntityType())),
         service=service,
         action_monitors=[],
         validators=validators,
@@ -99,7 +99,7 @@ def server_module_registries(
     processors = MagicMock()
     processors.permission_controller = permission_controller_processors
     processors.rbac = rbac_processors
-    adapter = RBACAdapter(processors)
+    adapter = RBACAdapter(processors.rbac, processors.permission_controller)
     handler = V2RBACHandler(adapter=adapter)
     v2_reg = RouteRegistry.create("v2", route_deps.cors_options)
     v2_reg.add_subregistry(register_v2_rbac_routes(handler, route_deps))

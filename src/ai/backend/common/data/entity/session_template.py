@@ -4,9 +4,19 @@ from typing import override
 
 from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
 
-__all__ = ("SESSION_TEMPLATE_ENTITY_TYPE", "SessionTemplateID")
+__all__ = ("SessionTemplateEntityType", "SessionTemplateID")
 
-SESSION_TEMPLATE_ENTITY_TYPE = EntityType("session_template")
+
+class SessionTemplateEntityType(EntityType):
+    @override
+    @classmethod
+    def name(cls) -> str:
+        return "session_template"
+
+    @override
+    @classmethod
+    def description(cls) -> str:
+        return "A saved setting a session can be created from."
 
 
 class SessionTemplateID(EntityIdentifier):
@@ -14,4 +24,4 @@ class SessionTemplateID(EntityIdentifier):
 
     @override
     def entity_type(self) -> EntityType:
-        return SESSION_TEMPLATE_ENTITY_TYPE
+        return SessionTemplateEntityType()

@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from typing import Any, override
 from uuid import UUID
 
-from ai.backend.common.data.entity.project import PROJECT_ENTITY_TYPE
+from ai.backend.common.data.entity.project import ProjectEntityType
 from ai.backend.common.data.entity.types import EntityType
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.actions.v2.global_scope.base import BaseGlobalAction
@@ -19,7 +19,7 @@ class UsagePerPeriodAction(BaseGlobalAction):
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return PROJECT_ENTITY_TYPE
+        return ProjectEntityType()
 
     @override
     @classmethod

@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from typing import override
 
 from ai.backend.common.data.entity.prometheus_query_preset import (
-    PROMETHEUS_QUERY_PRESET_ENTITY_TYPE,
+    PrometheusQueryPresetEntityType,
 )
 from ai.backend.common.data.entity.types import EntityType
 from ai.backend.manager.actions.v2.global_scope.base import BaseGlobalAction
@@ -18,4 +18,4 @@ class PrometheusQueryPresetGlobalAction(BaseGlobalAction):
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return PROMETHEUS_QUERY_PRESET_ENTITY_TYPE
+        return PrometheusQueryPresetEntityType()

@@ -12,8 +12,11 @@ from http import HTTPStatus
 
 from ai.backend.common.api_handlers import APIResponse, BodyParam, PathParam
 from ai.backend.common.data.entity.role import RoleID
+from ai.backend.common.data.entity.types import RuntimeEntityID
 from ai.backend.common.data.permission.types import (
-    EntityType,
+    EntityType as LegacyEntityType,
+)
+from ai.backend.common.data.permission.types import (
     ScopeType,
 )
 from ai.backend.common.dto.manager.rbac import (
@@ -53,10 +56,10 @@ from ai.backend.common.exception import RBACTypeConversionError
 from ai.backend.manager.data.permission.role import UserRoleAssignmentInput, UserRoleRevocationInput
 from ai.backend.manager.dto.context import UserContext
 from ai.backend.manager.errors.permission import NotEnoughPermission
-from ai.backend.manager.models.rbac_models.role.creators import GlobalRoleCreator
+from ai.backend.manager.models.rbac_models.role.creators import RoleCreator
 from ai.backend.manager.models.rbac_models.role.updaters import RoleSoftDeleteUpdater
 from ai.backend.manager.services.permission_contoller.actions import (
-    CreateGlobalRoleAction,
+    CreateRoleAction,
     DeleteRoleAction,
     GetRoleDetailAction,
     SearchRolesAction,
@@ -116,11 +119,11 @@ class RBACHandler:
         if not ctx.is_superadmin:
             raise NotEnoughPermission("Only superadmin can create roles.")
 
-        result = await self._permission_controller.create_global_role.run(
-            CreateGlobalRoleAction(
-                creator=GlobalRoleCreator(
+        result = await self._permission_controller.create_role.run(
+            CreateRoleAction(
+                creator=RoleCreator(
                     name=body.parsed.name,
-                    source=body.parsed.source,
+                    scope=RuntimeEntityID(body.parsed.scope_type, body.parsed.scope_id),
                     status=body.parsed.status,
                     description=body.parsed.description,
                 )
@@ -352,7 +355,7 @@ class RBACHandler:
         action_result = await self._permission_controller.get_entity_types.wait_for_complete(
             GetEntityTypesAction()
         )
-        entity_types: list[EntityType] = []
+        entity_types: list[LegacyEntityType] = []
         for et in action_result.element_types:
             try:
                 entity_types.append(et.to_entity_type())

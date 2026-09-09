@@ -2,11 +2,31 @@
 
 from typing import override
 
-from ai.backend.common.data.entity.types import FieldIdentifier, FieldType
+from ai.backend.common.data.entity.deployment import DeploymentEntityType
+from ai.backend.common.data.entity.types import (
+    EntityType,
+    FieldIdentifier,
+    FieldType,
+)
 
-__all__ = ("REPLICA_GROUP_FIELD_TYPE", "ReplicaGroupID")
+__all__ = ("ReplicaGroupFieldType", "ReplicaGroupID")
 
-REPLICA_GROUP_FIELD_TYPE = FieldType("replica_group")
+
+class ReplicaGroupFieldType(FieldType):
+    @override
+    @classmethod
+    def name(cls) -> str:
+        return "replica_group"
+
+    @override
+    @classmethod
+    def description(cls) -> str:
+        return "A set of replicas of a deployment that share a revision."
+
+    @override
+    @classmethod
+    def owner_type(cls) -> type[EntityType]:
+        return DeploymentEntityType
 
 
 class ReplicaGroupID(FieldIdentifier):
@@ -19,4 +39,4 @@ class ReplicaGroupID(FieldIdentifier):
     @override
     @classmethod
     def field_type(cls) -> FieldType:
-        return REPLICA_GROUP_FIELD_TYPE
+        return ReplicaGroupFieldType()

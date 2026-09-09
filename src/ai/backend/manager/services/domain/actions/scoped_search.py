@@ -7,7 +7,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.common.data.entity.domain import DOMAIN_ENTITY_TYPE
+from ai.backend.common.data.entity.domain import DomainEntityType
 from ai.backend.common.data.entity.resource_group import (
     RESOURCE_GROUP_SCOPE_TYPE,
     ResourceGroupID,
@@ -64,7 +64,7 @@ class ScopedSearchDomainsAction(OperationScopeOpsAction[DomainRow, DomainData]):
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return DOMAIN_ENTITY_TYPE
+        return DomainEntityType()
 
     @override
     @classmethod

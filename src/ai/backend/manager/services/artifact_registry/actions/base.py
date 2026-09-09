@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from typing import override
 
 from ai.backend.common.data.entity.artifact_registry import (
-    ARTIFACT_REGISTRY_ENTITY_TYPE,
+    ArtifactRegistryEntityType,
     ArtifactRegistryID,
 )
 from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
@@ -17,7 +17,7 @@ class ArtifactRegistryAction(BaseGlobalAction):
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return ARTIFACT_REGISTRY_ENTITY_TYPE
+        return ArtifactRegistryEntityType()
 
 
 @dataclass

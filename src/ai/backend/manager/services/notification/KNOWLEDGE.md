@@ -3,7 +3,7 @@ name: notification-service-shapes
 type: decision-table
 description: notification knowledge: why channels and rules are two entity types in one package, which three operations keep a service and why, what a rule read returns
 scope: src/ai/backend/manager/services/notification
-keywords: [CreateChannelAction, CreateRuleAction, ValidateChannelAction, ValidateRuleAction, ProcessNotificationAction, MatchingNotificationRuleData, global_create_ops, global_scope, NOTIFICATION_CHANNEL_ENTITY_TYPE, NOTIFICATION_RULE_ENTITY_TYPE]
+keywords: [CreateChannelAction, CreateRuleAction, ValidateChannelAction, ValidateRuleAction, ProcessNotificationAction, MatchingNotificationRuleData, global_create_ops, global_scope, NotificationChannelEntityType, NotificationRuleEntityType]
 sources:
   - src/ai/backend/manager/services/notification
   - src/ai/backend/manager/api/rest/v2/notification

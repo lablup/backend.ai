@@ -1,11 +1,30 @@
 from typing import override
 
-from ai.backend.common.data.entity.types import FieldIdentifier, FieldType
+from ai.backend.common.data.entity.session import SessionEntityType
+from ai.backend.common.data.entity.types import (
+    EntityType,
+    FieldIdentifier,
+    FieldType,
+)
 
 __all__ = ("ResourceAllocationID",)
 
 
-RESOURCE_ALLOCATION_FIELD_TYPE = FieldType("resource_allocation")
+class ResourceAllocationFieldType(FieldType):
+    @override
+    @classmethod
+    def name(cls) -> str:
+        return "resource_allocation"
+
+    @override
+    @classmethod
+    def description(cls) -> str:
+        return "One slot's amount allocated to one kernel of a session."
+
+    @override
+    @classmethod
+    def owner_type(cls) -> type[EntityType]:
+        return SessionEntityType
 
 
 class ResourceAllocationID(FieldIdentifier):
@@ -17,4 +36,4 @@ class ResourceAllocationID(FieldIdentifier):
     @override
     @classmethod
     def field_type(cls) -> FieldType:
-        return RESOURCE_ALLOCATION_FIELD_TYPE
+        return ResourceAllocationFieldType()

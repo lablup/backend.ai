@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from typing import Any, override
 
 from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
-from ai.backend.common.data.entity.vfolder import VFOLDER_ENTITY_TYPE, VFolderUUID
+from ai.backend.common.data.entity.vfolder import VFolderEntityType, VFolderUUID
 from ai.backend.manager.actions.v2.lookup.base import (
     BaseLookupAction,
     BaseLookupActionResult,
@@ -43,7 +43,7 @@ class LookupVFolderAction(BaseLookupAction):
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return VFOLDER_ENTITY_TYPE
+        return VFolderEntityType()
 
     @override
     @classmethod
