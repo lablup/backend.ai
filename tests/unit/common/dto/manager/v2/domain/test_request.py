@@ -88,17 +88,14 @@ class TestUpdateDomainInput:
 
     def test_empty_update_has_unset_defaults(self) -> None:
         req = UpdateDomainInput()
+        assert req.name is UNSET
+        assert req.is_active is UNSET
         assert req.description is UNSET
         assert isinstance(req.description, Unset)
         assert req.allowed_docker_registries is UNSET
         assert isinstance(req.allowed_docker_registries, Unset)
         assert req.integration_name is UNSET
         assert isinstance(req.integration_name, Unset)
-
-    def test_non_sentinel_fields_default_to_none(self) -> None:
-        req = UpdateDomainInput()
-        assert req.name is None
-        assert req.is_active is None
 
     def test_explicit_none_description_signals_clear(self) -> None:
         req = UpdateDomainInput(description=None)

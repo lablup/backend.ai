@@ -229,11 +229,7 @@ class DomainAdapter(BaseAdapter):
         updater = DomainUpdater(
             domain_id=target.entity_id(),
             description=TriState.from_unset(input.description),
-            is_active=(
-                OptionalState.update(input.is_active)
-                if input.is_active is not None
-                else OptionalState.nop()
-            ),
+            is_active=OptionalState.from_unset(input.is_active),
             allowed_docker_registries=OptionalState.from_unset(input.allowed_docker_registries),
             integration_name=TriState.from_unset(input.integration_name),
         )
