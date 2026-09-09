@@ -54,7 +54,7 @@ from ai.backend.common.data.entity.role import RoleEntityType
 from ai.backend.common.data.entity.role_preset import RolePresetEntityType
 from ai.backend.common.data.entity.runtime_variant import RuntimeVariantEntityType
 from ai.backend.common.data.entity.runtime_variant_preset import RuntimeVariantPresetEntityType
-from ai.backend.common.data.entity.secret import SecretEntityType
+from ai.backend.common.data.entity.secret import SecretFieldType
 from ai.backend.common.data.entity.service_catalog import ServiceCatalogEntityType
 from ai.backend.common.data.entity.session import SessionEntityType
 from ai.backend.common.data.entity.session_template import SessionTemplateEntityType
@@ -89,6 +89,7 @@ from ai.backend.manager.data.resource_usage_history.types import (
     ProjectUsageBucketData,
     UserUsageBucketData,
 )
+from ai.backend.manager.data.secret.types import SecretFieldData
 from ai.backend.manager.repositories.ops.repository import OpsRepository
 from ai.backend.manager.repositories.resource_allocation.repository import (
     ResourceAllocationRepository,
@@ -648,7 +649,8 @@ def create_processors(
             system_groups.group(GroupMeta(ManagerAdminEntityType())), services.manager_admin
         ),
         secret=SecretProcessors(
-            system_groups.group(GroupMeta(SecretEntityType())), services.secret
+            system_groups.dangling_field_group(FieldGroupMeta(SecretFieldType()), SecretFieldData),
+            services.secret,
         ),
         user_resource_policy=UserResourcePolicyProcessors(
             resource_policy_groups.group(GroupMeta(UserResourcePolicyEntityType()))
