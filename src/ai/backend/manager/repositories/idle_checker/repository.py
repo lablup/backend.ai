@@ -4,6 +4,7 @@ from collections.abc import Collection, Sequence
 
 from ai.backend.common.data.entity.idle_checker import IdleCheckerAssignmentID, IdleCheckerID
 from ai.backend.common.data.entity.types import EntityIdentifier
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.filter_specs import UUIDEqualMatchSpec
 from ai.backend.common.data.idle_checker.types import IdleCheckPhase
 from ai.backend.common.data.permission.types import ScopeType
@@ -12,11 +13,9 @@ from ai.backend.manager.data.idle_checker.types import IdleCheckerAssignmentData
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.errors.idle_checker import IdleCheckerAssignmentNotFound
 from ai.backend.manager.models.idle_checker.conditions import IdleCheckerAssignmentConditions
-from ai.backend.manager.models.idle_checker.row import SessionIdleCheckRow
 from ai.backend.manager.models.idle_checker.searchers import IdleCheckerAssignmentSearcher
 from ai.backend.manager.models.scopes import OperationScope
 from ai.backend.manager.models.specs.pagination import OffsetPagination
-from ai.backend.manager.repositories.base import BulkUpserter
 from ai.backend.manager.repositories.idle_checker.db_source.db_source import IdleCheckerDBSource
 from ai.backend.manager.repositories.idle_checker.types import (
     ExpiredIdleCheckBatchData,
@@ -161,15 +160,17 @@ class IdleCheckerRepository:
 
     async def batch_exclude_session_idle_checks(
         self,
-        upserter: BulkUpserter[SessionIdleCheckRow],
+        pairs: Sequence[SessionIdleCheckPair],
+        user_id: UserID,
     ) -> SessionIdleCheckBatchResult:
-        return await self._db_source.batch_exclude_session_idle_checks(upserter)
+        return await self._db_source.batch_exclude_session_idle_checks(pairs, user_id)
 
     async def batch_include_session_idle_checks(
         self,
-        upserter: BulkUpserter[SessionIdleCheckRow],
+        pairs: Sequence[SessionIdleCheckPair],
+        user_id: UserID,
     ) -> SessionIdleCheckBatchResult:
-        return await self._db_source.batch_include_session_idle_checks(upserter)
+        return await self._db_source.batch_include_session_idle_checks(pairs, user_id)
 
     async def batch_apply_session_idle_check_judgments(
         self,

@@ -11,6 +11,7 @@ import sqlalchemy as sa
 
 from ai.backend.common.data.entity.idle_checker import IdleCheckerID
 from ai.backend.common.data.entity.session import SessionID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.idle_checker.types import (
     CheckerType,
     IdleCheckerSpec,
@@ -31,12 +32,15 @@ from ai.backend.manager.models.idle_checker.updaters import (
     SessionIdleCheckJudgmentBatchUpdater,
     SessionIdleCheckPhaseBatchUpdater,
 )
+from ai.backend.manager.models.idle_checker.upserters import (
+    SessionIdleCheckExcluder,
+    SessionIdleCheckIncluder,
+)
 from ai.backend.manager.models.session.conditions import SessionConditions
 from ai.backend.manager.models.session.row import SessionRow
 from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
-    BulkUpserter,
 )
 from ai.backend.manager.repositories.idle_checker.types import (
     ExpiredIdleCheckBatchData,
@@ -49,10 +53,7 @@ from ai.backend.manager.repositories.idle_checker.types import (
     SessionIdleCheckAssignmentData,
     SessionIdleCheckBatchResult,
     SessionIdleCheckPair,
-)
-from ai.backend.manager.repositories.idle_checker.upserters import (
-    SessionIdleCheckExcludeUpserterSpec,
-    SessionIdleCheckIncludeUpserterSpec,
+    SessionIdleCheckPairResult,
 )
 from ai.backend.manager.repositories.ops import DBOpsProvider
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
@@ -314,69 +315,45 @@ class IdleCheckerDBSource:
 
     async def batch_exclude_session_idle_checks(
         self,
-        upserter: BulkUpserter[SessionIdleCheckRow],
+        pairs: Sequence[SessionIdleCheckPair],
+        user_id: UserID,
     ) -> SessionIdleCheckBatchResult:
-        """Apply the pre-assembled exclusion upserts, one savepoint-isolated upsert per row.
+        """Exclude each named pair, one savepoint per pair, answering how each fared
+        in the order named.
 
-        Session and checker existence are enforced per row by the foreign keys (the
-        spec maps the violations to SessionNotFound / IdleCheckerNotFound), so a
-        failing row lands in ``failed`` with its reason instead of failing the batch.
+        An upsert: a pair the checker has not reached yet is written excluded, so the
+        exclusion is not lost when the sweep later links it.
         """
-        async with self._ops.write_ops() as w:
-            result = await w.bulk_upsert_partial(
-                upserter,
-                index_elements=["session_id", "idle_checker_id"],
+        async with self._relation_ops.write_ops() as w:
+            result = await w.partial_upsert_relations(
+                SessionIdleCheckExcluder(user_id=user_id),
+                [(SessionID(pair.session_id), pair.checker_id) for pair in pairs],
             )
-            success: list[SessionIdleCheckPair] = []
-            for row in result.successes:
-                success.append(
-                    SessionIdleCheckPair(
-                        session_id=row.session_id,
-                        checker_id=row.idle_checker_id,
-                    )
-                )
-            errors: dict[SessionIdleCheckPair, Exception] = {}
-            for error in result.errors:
-                spec = cast(SessionIdleCheckExcludeUpserterSpec, error.spec)
-                pair = SessionIdleCheckPair(
-                    session_id=SessionId(spec.session_id),
-                    checker_id=spec.checker_id,
-                )
-                errors[pair] = error.exception
-            return SessionIdleCheckBatchResult(success=success, errors=errors)
+        return SessionIdleCheckBatchResult(
+            results=[
+                SessionIdleCheckPairResult(pair=pair, applied=item.written, error=item.error)
+                for pair, item in zip(pairs, result.results, strict=True)
+            ]
+        )
 
     async def batch_include_session_idle_checks(
         self,
-        upserter: BulkUpserter[SessionIdleCheckRow],
+        pairs: Sequence[SessionIdleCheckPair],
+        user_id: UserID,
     ) -> SessionIdleCheckBatchResult:
-        """Apply the pre-assembled inclusion upserts, one savepoint-isolated upsert per row.
-
-        Session and checker existence are enforced per row by the foreign keys (the
-        spec maps the violations to SessionNotFound / IdleCheckerNotFound), so a
-        failing row lands in ``failed`` with its reason instead of failing the batch.
-        """
-        async with self._ops.write_ops() as w:
-            result = await w.bulk_upsert_partial(
-                upserter,
-                index_elements=["session_id", "idle_checker_id"],
+        """Put each named pair back under its checker, one savepoint per pair,
+        answering how each fared in the order named."""
+        async with self._relation_ops.write_ops() as w:
+            result = await w.partial_upsert_relations(
+                SessionIdleCheckIncluder(user_id=user_id),
+                [(SessionID(pair.session_id), pair.checker_id) for pair in pairs],
             )
-            success: list[SessionIdleCheckPair] = []
-            for row in result.successes:
-                success.append(
-                    SessionIdleCheckPair(
-                        session_id=row.session_id,
-                        checker_id=row.idle_checker_id,
-                    )
-                )
-            errors: dict[SessionIdleCheckPair, Exception] = {}
-            for error in result.errors:
-                spec = cast(SessionIdleCheckIncludeUpserterSpec, error.spec)
-                pair = SessionIdleCheckPair(
-                    session_id=SessionId(spec.session_id),
-                    checker_id=spec.checker_id,
-                )
-                errors[pair] = error.exception
-            return SessionIdleCheckBatchResult(success=success, errors=errors)
+        return SessionIdleCheckBatchResult(
+            results=[
+                SessionIdleCheckPairResult(pair=pair, applied=item.written, error=item.error)
+                for pair, item in zip(pairs, result.results, strict=True)
+            ]
+        )
 
     async def batch_apply_session_idle_check_judgments(
         self,

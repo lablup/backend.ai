@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping, Sequence
+from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import datetime
 
@@ -38,12 +38,27 @@ class IdleCheckBatchData:
 
 
 @dataclass(frozen=True)
-class SessionIdleCheckBatchResult:
-    """Per-pair outcome of a batch exclusion/inclusion: the pairs the write
-    was applied to and, for each failed one, the exception saying why."""
+class SessionIdleCheckPairResult:
+    """How one pair of a batch exclusion or inclusion fared.
 
-    success: Sequence[SessionIdleCheckPair]
-    errors: Mapping[SessionIdleCheckPair, Exception]
+    ``applied`` says whether the pair moved; a session the checker does not apply to
+    answers false with no error, because there was nothing to switch.
+    """
+
+    pair: SessionIdleCheckPair
+    applied: bool
+    error: Exception | None = None
+
+
+@dataclass(frozen=True)
+class SessionIdleCheckBatchResult:
+    """How each pair a batch exclusion or inclusion named fared, in the order named.
+
+    A list rather than a mapping keyed by the pair: the caller reads its own list
+    back, and naming a pair twice stays expressible.
+    """
+
+    results: Sequence[SessionIdleCheckPairResult]
 
 
 @dataclass(frozen=True)

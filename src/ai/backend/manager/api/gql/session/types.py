@@ -48,19 +48,13 @@ from ai.backend.common.dto.manager.v2.session.response import (
     EnqueueSessionPayload as EnqueueSessionPayloadDTO,
 )
 from ai.backend.common.dto.manager.v2.session.response import (
-    ExcludeSessionIdleChecksFailureInfo as ExcludeSessionIdleChecksFailureInfoDTO,
-)
-from ai.backend.common.dto.manager.v2.session.response import (
     ExcludeSessionIdleChecksPayload as ExcludeSessionIdleChecksPayloadDTO,
-)
-from ai.backend.common.dto.manager.v2.session.response import (
-    IncludeSessionIdleChecksFailureInfo as IncludeSessionIdleChecksFailureInfoDTO,
 )
 from ai.backend.common.dto.manager.v2.session.response import (
     IncludeSessionIdleChecksPayload as IncludeSessionIdleChecksPayloadDTO,
 )
 from ai.backend.common.dto.manager.v2.session.response import (
-    SessionIdleCheckTargetInfo as SessionIdleCheckTargetInfoDTO,
+    SessionIdleCheckResult as SessionIdleCheckResultDTO,
 )
 from ai.backend.common.dto.manager.v2.session.response import (
     SessionLifecycleInfoGQLDTO,
@@ -837,42 +831,16 @@ class IncludeSessionIdleChecksInputGQL(PydanticInputMixin[IncludeSessionIdleChec
 @gql_pydantic_type(
     BackendAIGQLMeta(
         added_version=NEXT_RELEASE_VERSION,
-        description="One (checker, session) pair an idle-check exclusion or inclusion applied to.",
+        description="How one (checker, session) pair an idle-check request named fared.",
     ),
-    model=SessionIdleCheckTargetInfoDTO,
-    name="SessionIdleCheckTargetInfo",
+    model=SessionIdleCheckResultDTO,
+    name="SessionIdleCheckResult",
 )
-class SessionIdleCheckTargetInfoGQL:
+class SessionIdleCheckResultGQL:
     checker_id: ID = gql_field(description="Idle checker UUID of the pair.")
     session_id: ID = gql_field(description="Session UUID of the pair.")
-
-
-@gql_pydantic_type(
-    BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
-        description="Why one pair could not be excluded from idle checks.",
-    ),
-    model=ExcludeSessionIdleChecksFailureInfoDTO,
-    name="ExcludeSessionIdleChecksFailureInfo",
-)
-class ExcludeSessionIdleChecksFailureInfoGQL:
-    checker_id: ID = gql_field(description="Idle checker of the pair the failure applies to.")
-    session_id: ID = gql_field(description="Session of the pair the failure applies to.")
-    message: str = gql_field(description="Why the pair was not excluded.")
-
-
-@gql_pydantic_type(
-    BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
-        description="Why one pair could not be included into idle checks.",
-    ),
-    model=IncludeSessionIdleChecksFailureInfoDTO,
-    name="IncludeSessionIdleChecksFailureInfo",
-)
-class IncludeSessionIdleChecksFailureInfoGQL:
-    checker_id: ID = gql_field(description="Idle checker of the pair the failure applies to.")
-    session_id: ID = gql_field(description="Session of the pair the failure applies to.")
-    message: str = gql_field(description="Why the pair was not included.")
+    applied: bool = gql_field(description="Whether the pair was written.")
+    message: str | None = gql_field(description="Why the pair was not written.")
 
 
 @gql_pydantic_type(
@@ -884,11 +852,8 @@ class IncludeSessionIdleChecksFailureInfoGQL:
     name="ExcludeSessionIdleChecksPayload",
 )
 class ExcludeSessionIdleChecksPayloadGQL:
-    items: list[SessionIdleCheckTargetInfoGQL] = gql_field(
-        description="Pairs successfully excluded."
-    )
-    failed: list[ExcludeSessionIdleChecksFailureInfoGQL] = gql_field(
-        description="Pairs that could not be excluded."
+    results: list[SessionIdleCheckResultGQL] = gql_field(
+        description="Each pair, in the order named."
     )
 
 
@@ -901,9 +866,6 @@ class ExcludeSessionIdleChecksPayloadGQL:
     name="IncludeSessionIdleChecksPayload",
 )
 class IncludeSessionIdleChecksPayloadGQL:
-    items: list[SessionIdleCheckTargetInfoGQL] = gql_field(
-        description="Pairs successfully included."
-    )
-    failed: list[IncludeSessionIdleChecksFailureInfoGQL] = gql_field(
-        description="Pairs that could not be included."
+    results: list[SessionIdleCheckResultGQL] = gql_field(
+        description="Each pair, in the order named."
     )

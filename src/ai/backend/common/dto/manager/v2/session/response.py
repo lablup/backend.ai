@@ -23,14 +23,12 @@ __all__ = (
     "AdminSearchSessionsPayload",
     "CommitSessionPayload",
     "DestroySessionPayload",
-    "ExcludeSessionIdleChecksFailureInfo",
     "ExcludeSessionIdleChecksPayload",
     "ExecutePayload",
-    "IncludeSessionIdleChecksFailureInfo",
     "IncludeSessionIdleChecksPayload",
     "RestartSessionPayload",
     "SearchSessionsPayload",
-    "SessionIdleCheckTargetInfo",
+    "SessionIdleCheckResult",
     "SessionLifecycleInfo",
     "SessionLifecycleInfoGQLDTO",
     "SessionLogsPayload",
@@ -275,8 +273,8 @@ class TerminateSessionsPayload(BaseResponseModel):
     )
 
 
-class SessionIdleCheckTargetInfo(BaseResponseModel):
-    """One (checker, session) pair an idle-check exclusion or inclusion applied to."""
+class SessionIdleCheckResult(BaseResponseModel):
+    """How one (checker, session) pair an idle-check request named fared."""
 
     checker_id: IdleCheckerID = Field(
         description=f"Added in {NEXT_RELEASE_VERSION}. Idle checker UUID of the pair."
@@ -284,55 +282,28 @@ class SessionIdleCheckTargetInfo(BaseResponseModel):
     session_id: SessionID = Field(
         description=f"Added in {NEXT_RELEASE_VERSION}. Session UUID of the pair."
     )
-
-
-class ExcludeSessionIdleChecksFailureInfo(BaseResponseModel):
-    """Why one pair could not be excluded from idle checks."""
-
-    checker_id: IdleCheckerID = Field(
-        description=f"Added in {NEXT_RELEASE_VERSION}. Idle checker of the pair the failure applies to."
+    applied: bool = Field(
+        description=f"Added in {NEXT_RELEASE_VERSION}. Whether the pair was written."
     )
-    session_id: SessionID = Field(
-        description=f"Added in {NEXT_RELEASE_VERSION}. Session of the pair the failure applies to."
-    )
-    message: str = Field(
-        description=f"Added in {NEXT_RELEASE_VERSION}. Why the pair was not excluded."
+    message: str | None = Field(
+        default=None,
+        description=f"Added in {NEXT_RELEASE_VERSION}. Why the pair was not written.",
     )
 
 
 class ExcludeSessionIdleChecksPayload(BaseResponseModel):
-    """Payload for idle-check exclusion with per-pair partial success."""
+    """Payload for idle-check exclusion, one entry per pair the request named."""
 
-    items: list[SessionIdleCheckTargetInfo] = Field(
-        description=f"Added in {NEXT_RELEASE_VERSION}. Pairs successfully excluded."
-    )
-    failed: list[ExcludeSessionIdleChecksFailureInfo] = Field(
-        description=f"Added in {NEXT_RELEASE_VERSION}. Pairs that could not be excluded."
-    )
-
-
-class IncludeSessionIdleChecksFailureInfo(BaseResponseModel):
-    """Why one pair could not be included into idle checks."""
-
-    checker_id: IdleCheckerID = Field(
-        description=f"Added in {NEXT_RELEASE_VERSION}. Idle checker of the pair the failure applies to."
-    )
-    session_id: SessionID = Field(
-        description=f"Added in {NEXT_RELEASE_VERSION}. Session of the pair the failure applies to."
-    )
-    message: str = Field(
-        description=f"Added in {NEXT_RELEASE_VERSION}. Why the pair was not included."
+    results: list[SessionIdleCheckResult] = Field(
+        description=f"Added in {NEXT_RELEASE_VERSION}. Each pair, in the order named."
     )
 
 
 class IncludeSessionIdleChecksPayload(BaseResponseModel):
-    """Payload for idle-check inclusion with per-pair partial success."""
+    """Payload for idle-check inclusion, one entry per pair the request named."""
 
-    items: list[SessionIdleCheckTargetInfo] = Field(
-        description=f"Added in {NEXT_RELEASE_VERSION}. Pairs successfully included."
-    )
-    failed: list[IncludeSessionIdleChecksFailureInfo] = Field(
-        description=f"Added in {NEXT_RELEASE_VERSION}. Pairs that could not be included."
+    results: list[SessionIdleCheckResult] = Field(
+        description=f"Added in {NEXT_RELEASE_VERSION}. Each pair, in the order named."
     )
 
 

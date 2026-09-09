@@ -68,11 +68,9 @@ from ai.backend.common.dto.manager.v2.session.request import (
 from ai.backend.common.dto.manager.v2.session.response import (
     AdminSearchSessionsPayload,
     EnqueueSessionPayload,
-    ExcludeSessionIdleChecksFailureInfo,
     ExcludeSessionIdleChecksPayload,
-    IncludeSessionIdleChecksFailureInfo,
     IncludeSessionIdleChecksPayload,
-    SessionIdleCheckTargetInfo,
+    SessionIdleCheckResult,
     SessionLifecycleInfoGQLDTO,
     SessionLogsPayload,
     SessionMetadataInfoGQLDTO,
@@ -1069,20 +1067,14 @@ class SessionAdapter(BaseAdapter):
             )
         )
         return ExcludeSessionIdleChecksPayload(
-            items=[
-                SessionIdleCheckTargetInfo(
-                    checker_id=pair.checker_id,
-                    session_id=SessionID(pair.session_id),
+            results=[
+                SessionIdleCheckResult(
+                    checker_id=item.pair.checker_id,
+                    session_id=SessionID(item.pair.session_id),
+                    applied=item.applied,
+                    message=None if item.error is None else str(item.error),
                 )
-                for pair in result.success
-            ],
-            failed=[
-                ExcludeSessionIdleChecksFailureInfo(
-                    checker_id=pair.checker_id,
-                    session_id=SessionID(pair.session_id),
-                    message=str(error),
-                )
-                for pair, error in result.errors.items()
+                for item in result.results
             ],
         )
 
@@ -1103,20 +1095,14 @@ class SessionAdapter(BaseAdapter):
             )
         )
         return IncludeSessionIdleChecksPayload(
-            items=[
-                SessionIdleCheckTargetInfo(
-                    checker_id=pair.checker_id,
-                    session_id=SessionID(pair.session_id),
+            results=[
+                SessionIdleCheckResult(
+                    checker_id=item.pair.checker_id,
+                    session_id=SessionID(item.pair.session_id),
+                    applied=item.applied,
+                    message=None if item.error is None else str(item.error),
                 )
-                for pair in result.success
-            ],
-            failed=[
-                IncludeSessionIdleChecksFailureInfo(
-                    checker_id=pair.checker_id,
-                    session_id=SessionID(pair.session_id),
-                    message=str(error),
-                )
-                for pair, error in result.errors.items()
+                for item in result.results
             ],
         )
 
