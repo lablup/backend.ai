@@ -8998,7 +8998,7 @@
                 "type": "null"
               }
             ],
-            "description": "New domain name.",
+            "description": "New domain name. Omit to leave unchanged.",
             "title": "Name"
           },
           "description": {
@@ -9022,7 +9022,7 @@
                 "type": "null"
               }
             ],
-            "description": "Updated active status.",
+            "description": "Updated active status. Omit to leave unchanged.",
             "title": "Is Active"
           },
           "allowed_docker_registries": {
