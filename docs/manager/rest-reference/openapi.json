@@ -22933,8 +22933,8 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Updated default resource allocation. Leave null to keep existing value."
+            "description": "Updated default resource allocation. Omit to leave unchanged.",
+            "title": "Default For Unspecified"
           },
           "total_resource_slots": {
             "anyOf": [
@@ -22945,14 +22945,10 @@
                 "type": "array"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
-            "description": "Updated resource slot limits. Set to null to clear.",
+            "description": "Updated resource slot limits. Omit to leave unchanged.",
             "title": "Total Resource Slots"
           },
           "max_session_lifetime": {
@@ -22964,8 +22960,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Updated maximum session lifetime in seconds. Leave null to keep existing.",
+            "description": "Updated maximum session lifetime in seconds. Omit to leave unchanged.",
             "title": "Max Session Lifetime"
           },
           "max_concurrent_sessions": {
@@ -22977,8 +22972,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Updated maximum concurrent sessions. Leave null to keep existing.",
+            "description": "Updated maximum concurrent sessions. Omit to leave unchanged.",
             "title": "Max Concurrent Sessions"
           },
           "max_pending_session_count": {
@@ -22987,14 +22981,10 @@
                 "type": "integer"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
-            "description": "Updated max pending sessions. Set to null to clear.",
+            "description": "Updated max pending sessions. Omit to leave unchanged; null clears.",
             "title": "Max Pending Session Count"
           },
           "max_priority": {
@@ -23003,14 +22993,10 @@
                 "type": "integer"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
-            "description": "Updated max priority. Set to null to clear.",
+            "description": "Updated max priority. Omit to leave unchanged; null clears.",
             "title": "Max Priority"
           },
           "max_pending_session_resource_slots": {
@@ -23022,14 +23008,10 @@
                 "type": "array"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
-            "description": "Updated max pending session resource slots. Set to null to clear.",
+            "description": "Updated max pending session resource slots. Omit to leave unchanged; null clears.",
             "title": "Max Pending Session Resource Slots"
           },
           "max_concurrent_sftp_sessions": {
@@ -23041,8 +23023,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Updated max concurrent SFTP sessions. Leave null to keep existing.",
+            "description": "Updated max concurrent SFTP sessions. Omit to leave unchanged.",
             "title": "Max Concurrent Sftp Sessions"
           },
           "max_containers_per_session": {
@@ -23054,8 +23035,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Updated max containers per session. Leave null to keep existing.",
+            "description": "Updated max containers per session. Omit to leave unchanged.",
             "title": "Max Containers Per Session"
           },
           "idle_timeout": {
@@ -23067,8 +23047,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Updated idle timeout in seconds. Leave null to keep existing.",
+            "description": "Updated idle timeout in seconds. Omit to leave unchanged.",
             "title": "Idle Timeout"
           },
           "allowed_vfolder_hosts": {
@@ -23080,14 +23059,10 @@
                 "type": "array"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
-            "description": "Updated vfolder host permissions. Set to null to clear.",
+            "description": "Updated vfolder host permissions. Omit to leave unchanged.",
             "title": "Allowed Vfolder Hosts"
           }
         },
@@ -23442,35 +23417,23 @@
                 "type": "integer"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
-            "description": "Updated max vfolder count. Use SENTINEL to clear, null to keep existing.",
+            "description": "Updated max vfolder count. Omit to leave unchanged.",
             "title": "Max Vfolder Count"
           },
           "max_concurrent_logins": {
             "anyOf": [
               {
-                "anyOf": [
-                  {
-                    "type": "integer"
-                  },
-                  {
-                    "$ref": "#/components/schemas/Sentinel"
-                  }
-                ],
-                "ge": 1
+                "ge": 1,
+                "type": "integer"
               },
               {
                 "type": "null"
               }
             ],
-            "default": 1,
-            "description": "Updated maximum number of concurrent authenticated login sessions per user. Set to null to clear (unlimited). Must be >= 1 when set. Distinct from keypair_resource_policies.max_concurrent_sessions which caps compute sessions.",
+            "description": "Updated maximum number of concurrent authenticated login sessions per user. Omit to leave unchanged; null clears (unlimited). Must be >= 1 when set. Distinct from keypair_resource_policies.max_concurrent_sessions which caps compute sessions.",
             "title": "Max Concurrent Logins"
           },
           "max_quota_scope_size": {
@@ -23479,14 +23442,10 @@
                 "$ref": "#/components/schemas/BinarySizeInput"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
-            "description": "Updated max quota scope size. Use SENTINEL to clear, null to keep existing.",
+            "description": "Updated max quota scope size. Omit to leave unchanged.",
             "title": "Max Quota Scope Size"
           },
           "max_session_count_per_model_session": {
@@ -23498,8 +23457,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Updated max sessions per model session. Leave null to keep existing.",
+            "description": "Updated max sessions per model session. Omit to leave unchanged.",
             "title": "Max Session Count Per Model Session"
           },
           "max_customized_image_count": {
@@ -23511,8 +23469,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Updated max customized image count. Leave null to keep existing.",
+            "description": "Updated max customized image count. Omit to leave unchanged.",
             "title": "Max Customized Image Count"
           }
         },
@@ -23821,14 +23778,10 @@
                 "type": "integer"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
-            "description": "Updated max vfolder count. Use SENTINEL to clear, null to keep existing.",
+            "description": "Updated max vfolder count. Omit to leave unchanged.",
             "title": "Max Vfolder Count"
           },
           "max_quota_scope_size": {
@@ -23837,14 +23790,10 @@
                 "$ref": "#/components/schemas/BinarySizeInput"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
-            "description": "Updated max quota scope size. Use SENTINEL to clear, null to keep existing.",
+            "description": "Updated max quota scope size. Omit to leave unchanged.",
             "title": "Max Quota Scope Size"
           },
           "max_network_count": {
@@ -23856,8 +23805,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Updated max network count. Leave null to keep existing.",
+            "description": "Updated max network count. Omit to leave unchanged.",
             "title": "Max Network Count"
           }
         },
