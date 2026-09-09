@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import uuid
 from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Any, override
@@ -15,7 +16,6 @@ from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.exception import UserNotFound
 from ai.backend.manager.errors.resource import DomainNotFound
 from ai.backend.manager.models.app_config_fragment.conditions import AppConfigFragmentConditions
-from ai.backend.manager.models.app_config_fragment.row import AppConfigFragmentRow
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.scopes import ExistenceCheck, OperationScope
@@ -47,12 +47,13 @@ class AppConfigFragmentOperationScope(OperationScope):
         scope_id = self.scope_id
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return sa.and_(
-                AppConfigFragmentRow.scope_type == scope_type,
-                AppConfigFragmentRow.scope_id.is_(None)
-                if scope_id is None
-                else AppConfigFragmentRow.scope_id == scope_id,
-            )
+            match scope_type, scope_id:
+                case AppConfigScopeType.DOMAIN, uuid.UUID() as owner_id:
+                    return AppConfigFragmentConditions.by_domain_visibility(DomainID(owner_id))()
+                case AppConfigScopeType.USER, uuid.UUID() as owner_id:
+                    return AppConfigFragmentConditions.by_user_visibility(UserID(owner_id))()
+                case _:
+                    return AppConfigFragmentConditions.by_public_visibility()()
 
         return inner
 

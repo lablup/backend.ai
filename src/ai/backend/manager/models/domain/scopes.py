@@ -8,11 +8,16 @@ from typing import Any, override
 
 import sqlalchemy as sa
 
-from ai.backend.common.data.entity.resource_group import ResourceGroupID
+from ai.backend.common.data.entity.domain import DOMAIN_ENTITY_TYPE
+from ai.backend.common.data.entity.resource_group import (
+    RESOURCE_GROUP_SCOPE_TYPE,
+    ResourceGroupID,
+)
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.resource_group.row import ResourceGroupForDomainRow
 from ai.backend.manager.models.scopes import ExistenceCheck, OperationScope
+from ai.backend.manager.models.virtual_entity.queries import scope_membership_exists
 
 __all__ = ("ResourceGroupDomainOperationScope",)
 
@@ -27,11 +32,20 @@ class ResourceGroupDomainOperationScope(OperationScope):
     def to_condition(self) -> QueryCondition:
         resource_group_id = self.resource_group_id
 
+        # TODO(BA-7571): drop the association term once the ownership backfill lands.
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return DomainRow.id.in_(
-                sa.select(ResourceGroupForDomainRow.domain_id).where(
-                    ResourceGroupForDomainRow.resource_group_id == resource_group_id
-                )
+            return sa.or_(
+                DomainRow.id.in_(
+                    sa.select(ResourceGroupForDomainRow.domain_id).where(
+                        ResourceGroupForDomainRow.resource_group_id == resource_group_id
+                    )
+                ),
+                scope_membership_exists(
+                    RESOURCE_GROUP_SCOPE_TYPE,
+                    resource_group_id,
+                    DOMAIN_ENTITY_TYPE,
+                    DomainRow.id,
+                ),
             )
 
         return inner
