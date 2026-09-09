@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.common.data.entity.app_config import AppConfigAllowListEntityType
+from ai.backend.common.data.entity.app_config_allow_list import AppConfigAllowListEntityType
 from ai.backend.common.data.entity.types import EntityType
 from ai.backend.manager.actions.v2.ops.base import SearchGlobalOpsAction
 from ai.backend.manager.data.app_config.types import AppConfigAllowListData

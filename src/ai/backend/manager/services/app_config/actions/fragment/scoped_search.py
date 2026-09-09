@@ -5,10 +5,8 @@ from dataclasses import dataclass
 from typing import override
 
 from ai.backend.common.data.app_config.types import AppConfigScopeType
-from ai.backend.common.data.entity.app_config import (
-    AppConfigFragmentEntityType,
-    AppConfigScopeID,
-)
+from ai.backend.common.data.entity.app_config import AppConfigScopeID
+from ai.backend.common.data.entity.app_config_fragment import AppConfigFragmentEntityType
 from ai.backend.common.data.entity.types import (
     EntityIdentifier,
     EntityType,

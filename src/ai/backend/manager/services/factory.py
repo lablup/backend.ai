@@ -1,12 +1,10 @@
 from typing import Any
 
 from ai.backend.common.data.entity.agent import AgentEntityType
-from ai.backend.common.data.entity.app_config import (
-    AppConfigAllowListEntityType,
-    AppConfigEntityType,
-    AppConfigFragmentEntityType,
-)
+from ai.backend.common.data.entity.app_config import AppConfigEntityType
+from ai.backend.common.data.entity.app_config_allow_list import AppConfigAllowListEntityType
 from ai.backend.common.data.entity.app_config_definition import AppConfigDefinitionEntityType
+from ai.backend.common.data.entity.app_config_fragment import AppConfigFragmentEntityType
 from ai.backend.common.data.entity.artifact import ArtifactEntityType
 from ai.backend.common.data.entity.artifact_registry import ArtifactRegistryEntityType
 from ai.backend.common.data.entity.artifact_revision import ArtifactRevisionFieldType
