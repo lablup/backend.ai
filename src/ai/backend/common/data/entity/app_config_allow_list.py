@@ -17,7 +17,7 @@ class AppConfigAllowListEntityType(EntityType):
     @override
     @classmethod
     def description(cls) -> str:
-        return "The set of app config keys a scope may set."
+        return "One app config key a scope type may set, and the rank its fragments merge at."
 
 
 class AppConfigAllowListID(EntityIdentifier):
