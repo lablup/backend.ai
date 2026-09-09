@@ -132,26 +132,40 @@ def _decode_ports(raw: Any) -> tuple[tuple[int, int, str | None, str], ...] | No
     return tuple(entries)
 
 
-def _decode_forwards(raw: Any) -> tuple[tuple[str, int, str, int], ...] | None:
+#: One LIST_PORTS row: the published rule, plus who installed it and when.
+ForwardEntry = tuple[str, int, str, int, str | None, int | None]
+
+
+def _decode_forwards(raw: Any) -> tuple[ForwardEntry, ...] | None:
+    """Decode LIST_PORTS entries, in the 6-field form and the 4-field one that preceded it.
+
+    The last two carry the rule's owner and install time. They are what a reclaim decides on, so a
+    daemon that still answers with four leaves both unknown -- and unknown owner means the reclaim
+    leaves the rule alone, which is the safe way to be out of date.
+    """
     if raw is None:
         return None
     if not isinstance(raw, list):
         raise ProtocolError("forwards must be an array")
-    out: list[tuple[str, int, str, int]] = []
+    out: list[ForwardEntry] = []
     for entry in raw:
-        if not isinstance(entry, list) or len(entry) != 4:
+        if not isinstance(entry, list) or len(entry) not in (4, 6):
             raise ProtocolError(
                 "each forward must be [container_id, host_port, ip, container_port]"
+                " (optionally followed by owner_agent_id, created_at)"
             )
-        container_id, host_port, ip, container_port = entry
+        container_id, host_port, ip, container_port = entry[:4]
+        owner_agent_id, created_at = entry[4:] if len(entry) == 6 else (None, None)
         if not (
             isinstance(container_id, str)
             and isinstance(host_port, int)
             and isinstance(ip, str)
             and isinstance(container_port, int)
+            and (owner_agent_id is None or isinstance(owner_agent_id, str))
+            and (created_at is None or isinstance(created_at, int))
         ):
             raise ProtocolError("malformed forward entry")
-        out.append((container_id, host_port, ip, container_port))
+        out.append((container_id, host_port, ip, container_port, owner_agent_id, created_at))
     return tuple(out)
 
 
@@ -303,8 +317,8 @@ class PrivNetResponse:
     ok: bool
     assigned: dict[str, str] | None = None
     host_ports: tuple[int, ...] | None = None
-    # LIST_PORTS: (container_id, host_port, container_ip, container_port) per published rule.
-    forwards: tuple[tuple[str, int, str, int], ...] | None = None
+    # LIST_PORTS: one ForwardEntry per published rule.
+    forwards: tuple[ForwardEntry, ...] | None = None
     # LOCAL_SUBNET: the session's node-local LOCAL CIDR, or None when it holds no block.
     subnet: str | None = None
     # RECOVERY_STATUS: {what could not be recovered: why}. Empty means this privnet is on top of

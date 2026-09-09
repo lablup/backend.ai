@@ -914,7 +914,12 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
         ]
         if forwards:
             await _port_publisher(self.local_config, self._session_network).install(
-                forwards_for(cid, self._container_ip, forwards)
+                forwards_for(
+                    cid,
+                    self._container_ip,
+                    forwards,
+                    owner_agent_id=str(self.local_config.agent.id),
+                )
             )
 
     async def _attach_session_network(
@@ -2323,6 +2328,11 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
             if isinstance(command, list):
                 return cast(list[str], command)
             return None
+
+    @override
+    def port_publisher(self) -> PortPublisher:
+        """This backend does publish host ports, so its rules are the reclaim's to collect."""
+        return _port_publisher(self.local_config, self._session_network)
 
     @override
     async def enumerate_containers(

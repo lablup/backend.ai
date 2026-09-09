@@ -669,8 +669,15 @@ class PrivNetPortForwarder:
             PrivNetRequest(op=PrivNetOp.LIST_PORTS, session_id=_LIST_LOCK_KEY)
         )
         forwards = [
-            PortForward(container_id=cid, host_port=hp, container_ip=ip, container_port=cp)
-            for cid, hp, ip, cp in (resp.forwards or ())
+            PortForward(
+                container_id=cid,
+                host_port=hp,
+                container_ip=ip,
+                container_port=cp,
+                owner_agent_id=owner,
+                created_at=created_at,
+            )
+            for cid, hp, ip, cp, owner, created_at in (resp.forwards or ())
         ]
         if container_id is None:
             return forwards
