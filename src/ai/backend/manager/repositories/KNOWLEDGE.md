@@ -48,8 +48,9 @@ pass-through would remain.
   scoped spec cannot flow through a registration-free path.
 - There is no `delete`: which column marks a row deleted is domain knowledge, so a
   delete action carries a `DataUpdater` and runs the update path.
-- `OpsRepository` turns a missing row into `EntityNotFoundError` rather than `None` —
-  that seam is the only thing it adds over ops.
+- `OpsRepository` turns a missing row into `EntityNotFoundError` / `FieldNotFoundError`
+  rather than `None` — that seam is the only thing it adds over ops. The error's domain
+  is read off the identifier the spec carries, or off the lookup for a row named by key.
 
 ## Gradual migration to the ops provider
 

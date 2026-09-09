@@ -33,9 +33,9 @@ from ai.backend.manager.actions.v2.bulk.result import (
 )
 from ai.backend.manager.actions.v2.bulk.trigger import BulkActionTriggerMeta
 from ai.backend.manager.actions.v2.bulk.validator.base import PartialBulkActionValidator
+from ai.backend.manager.errors.base.entity import EntityNotFoundError
 from ai.backend.manager.errors.common import ServerMisconfiguredError
 from ai.backend.manager.errors.permission import NotEnoughPermission
-from ai.backend.manager.errors.repository import EntityNotFoundError
 from ai.backend.manager.errors.user import UserNotFound
 
 _STORAGE_ENTITY_TYPE = ObjectStorageEntityType()
@@ -121,7 +121,9 @@ class _Reader:
             items=[
                 PartialBulkEntityResult[str].succeeded(entity_id, f"data:{entity_id}")
                 if entity_id in self._present
-                else PartialBulkEntityResult[str].failed(entity_id, EntityNotFoundError("gone"))
+                else PartialBulkEntityResult[str].failed(
+                    entity_id, EntityNotFoundError(entity_type=_STORAGE_ENTITY_TYPE)
+                )
                 for entity_id in entity_ids
             ]
         )

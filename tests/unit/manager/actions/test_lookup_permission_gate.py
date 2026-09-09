@@ -42,9 +42,10 @@ from ai.backend.manager.actions.v2.lookup.result import LookupActionProcessResul
 from ai.backend.manager.actions.v2.single_entity.trigger import SingleEntityActionTriggerMeta
 from ai.backend.manager.actions.v2.single_entity.validator import SingleEntityActionValidator
 from ai.backend.manager.actions.v2.validators import ActionValidators
+from ai.backend.manager.errors.base.entity import EntityNotFoundError
+from ai.backend.manager.errors.base.field import FieldNotFoundError
 from ai.backend.manager.errors.common import GenericBadRequest
 from ai.backend.manager.errors.permission import NotEnoughPermission
-from ai.backend.manager.errors.repository import EntityNotFoundError
 from ai.backend.manager.repositories.ops.repository import OpsRepository
 from ai.backend.manager.services.deployment.actions.lookup_owner import (
     LookupAutoScalingRuleDeploymentAction,
@@ -155,7 +156,7 @@ def action() -> _Action:
 
 
 async def _missing(_: _Action) -> _Result:
-    raise EntityNotFoundError("No Row matches the given key")
+    raise EntityNotFoundError("No Row matches the given key", entity_type=EntityType("row"))
 
 
 async def _resolved(_: _Action) -> _Result:
@@ -296,7 +297,10 @@ async def test_a_key_owner_lookup_merges_both_failures(
     denied_monitor = _RecordingMonitor()
 
     async def missing(*_: Any) -> EntityIdentifier:
-        raise EntityNotFoundError("No field row matches the given key")
+        raise FieldNotFoundError(
+            "No field row matches the given key",
+            field_type=KeyPairID.field_type(),
+        )
 
     async def found(*_: Any) -> EntityIdentifier:
         return owner_id
@@ -335,7 +339,10 @@ async def test_a_key_field_lookup_merges_both_failures(
     denied_monitor = _RecordingMonitor()
 
     async def missing(*_: Any) -> tuple[KeyPairID, UserID]:
-        raise EntityNotFoundError("No field row matches the given key")
+        raise FieldNotFoundError(
+            "No field row matches the given key",
+            field_type=KeyPairID.field_type(),
+        )
 
     async def found(*_: Any) -> tuple[KeyPairID, UserID]:
         return field_id, owner_id

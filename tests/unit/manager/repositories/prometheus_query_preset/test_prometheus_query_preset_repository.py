@@ -23,7 +23,7 @@ from ai.backend.manager.clients.prometheus.client import PrometheusClient
 from ai.backend.manager.data.prometheus_query_preset import (
     PrometheusQueryPresetData,
 )
-from ai.backend.manager.errors.repository import EntityNotFoundError
+from ai.backend.manager.errors.base.entity import EntityNotFoundError
 from ai.backend.manager.models.entity_label.row import EntityLabelRow
 from ai.backend.manager.models.prometheus_query_preset import PrometheusQueryPresetRow
 from ai.backend.manager.models.prometheus_query_preset.creators import (

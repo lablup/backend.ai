@@ -56,8 +56,8 @@ from ai.backend.manager.data.deployment.types import (
     ResourceConfigData,
 )
 from ai.backend.manager.errors.auth import InsufficientPrivilege
+from ai.backend.manager.errors.base.field import FieldNotFoundError
 from ai.backend.manager.errors.common import GenericForbidden
-from ai.backend.manager.errors.repository import EntityNotFoundError
 from ai.backend.manager.repositories.ops.repository import OpsRepository
 from ai.backend.manager.services.deployment.actions.scoped_search import (
     ScopedSearchDeploymentsActionResult,
@@ -314,7 +314,9 @@ class TestFieldBatchLoads:
     ) -> None:
         deployment_adapter, processors = adapter
         processors.deployment.bulk_get_access_tokens.run = AsyncMock(
-            side_effect=EntityNotFoundError("No field row matches the given ids")
+            side_effect=FieldNotFoundError(
+                field_type=DeploymentRevisionID.field_type(),
+            )
         )
 
         assert await deployment_adapter.batch_load_access_tokens_by_ids([

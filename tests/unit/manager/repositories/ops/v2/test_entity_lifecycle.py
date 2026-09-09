@@ -54,11 +54,9 @@ from ai.backend.manager.data.permission.types import (
 from ai.backend.manager.data.permission.types import (
     ScopeType as LegacyScopeType,
 )
+from ai.backend.manager.errors.base.entity import EntityNotFoundError
 from ai.backend.manager.errors.permission import VirtualEntityNotFound
-from ai.backend.manager.errors.repository import (
-    EntityNotFoundError,
-    RepositoryIntegrityError,
-)
+from ai.backend.manager.errors.repository import RepositoryIntegrityError
 from ai.backend.manager.models.base import GUID, Base
 from ai.backend.manager.models.entity_label.row import EntityLabelRow
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
@@ -955,12 +953,12 @@ _SIDECAR_FIELD_TYPE = _SidecarFieldType()
 
 
 class _SidecarID(FieldIdentifier):
+    """The id of a row that rides beside the graph."""
+
     @override
     @classmethod
     def field_type(cls) -> FieldType:
         return _SIDECAR_FIELD_TYPE
-
-    """The id of a row that rides beside the graph."""
 
 
 @dataclass(frozen=True)

@@ -18,7 +18,7 @@ from ai.backend.common.data.idle_checker.types import (
 )
 from ai.backend.common.types import SessionTypes
 from ai.backend.manager.data.idle_checker.types import IdleCheckerData
-from ai.backend.manager.errors.repository import EntityNotFoundError
+from ai.backend.manager.errors.base.entity import EntityNotFoundError
 from ai.backend.manager.models.entity_label.row import EntityLabelRow
 from ai.backend.manager.models.idle_checker.conditions import IdleCheckerConditions
 from ai.backend.manager.models.idle_checker.creators import IdleCheckerCreator

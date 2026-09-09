@@ -1,6 +1,9 @@
 """Tests for the action type system: ActionOperationType, EntityType, and enum enforcement."""
 
+import pytest
+
 from ai.backend.common.data.permission.types import EntityType, OperationType, Permission
+from ai.backend.common.exception import ErrorOperation
 from ai.backend.manager.actions.action.base import BaseAction
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.services.permission_contoller.actions.get_role_detail import (
@@ -46,6 +49,25 @@ class TestActionOperationType:
             "lookup",
         }
         assert {v.value for v in values} == expected
+
+    @pytest.mark.parametrize(
+        ("operation", "expected"),
+        [
+            (ActionOperationType.GET, ErrorOperation.READ),
+            (ActionOperationType.SEARCH, ErrorOperation.SEARCH),
+            (ActionOperationType.LOOKUP, ErrorOperation.READ),
+            (ActionOperationType.CREATE, ErrorOperation.CREATE),
+            (ActionOperationType.UPSERT, ErrorOperation.UPSERT),
+            (ActionOperationType.UPDATE, ErrorOperation.UPDATE),
+            (ActionOperationType.RESTORE, ErrorOperation.RESTORE),
+            (ActionOperationType.DELETE, ErrorOperation.SOFT_DELETE),
+            (ActionOperationType.PURGE, ErrorOperation.HARD_DELETE),
+        ],
+    )
+    def test_to_error_operation_mapping(
+        self, operation: ActionOperationType, expected: ErrorOperation
+    ) -> None:
+        assert operation.to_error_operation() is expected
 
     def test_to_permission_operation_mapping(self) -> None:
         assert ActionOperationType.GET.to_permission_operation() == OperationType.READ

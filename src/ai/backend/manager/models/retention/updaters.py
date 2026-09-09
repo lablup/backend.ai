@@ -4,7 +4,6 @@ from collections.abc import Sequence
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from typing import Any, override
-from uuid import UUID
 
 from sqlalchemy.orm import InstrumentedAttribute
 
@@ -36,7 +35,7 @@ class RetentionPolicyUpdater(DataUpdater[RetentionPolicyRow, RetentionPolicyData
         return RetentionPolicyRow.id
 
     @override
-    def target_id_value(self) -> UUID:
+    def target_id_value(self) -> RetentionPolicyID:
         return self.policy_id
 
     @property
@@ -74,7 +73,7 @@ class LastSweptAtUpdater(DataUpdater[RetentionPolicyRow, RetentionPolicyData]):
         return RetentionPolicyRow.id
 
     @override
-    def target_id_value(self) -> UUID:
+    def target_id_value(self) -> RetentionPolicyID:
         return self.policy_id
 
     @property

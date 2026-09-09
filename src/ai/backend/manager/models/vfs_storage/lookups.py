@@ -6,7 +6,8 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.common.data.entity.vfs_storage import VFSStorageID
+from ai.backend.common.data.entity.types import EntityType
+from ai.backend.common.data.entity.vfs_storage import VFSStorageEntityType, VFSStorageID
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.specs.lookup import DataLookup
 from ai.backend.manager.models.vfs_storage.row import VFSStorageRow
@@ -21,6 +22,10 @@ class VFSStorageLookup(DataLookup[VFSStorageRow, VFSStorageID]):
     @override
     def row_class(self) -> type[VFSStorageRow]:
         return VFSStorageRow
+
+    @override
+    def entity_type(self) -> EntityType:
+        return VFSStorageEntityType()
 
     @override
     def conditions(self) -> Sequence[QueryCondition]:
