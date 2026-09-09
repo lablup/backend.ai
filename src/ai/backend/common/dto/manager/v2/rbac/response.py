@@ -15,7 +15,6 @@ from ai.backend.common.data.entity.types import EntityID, EntityType
 from .types import (
     OperationTypeDTO,
     PermissionBitDTO,
-    RBACElementTypeDTO,
     RoleSourceDTO,
     RoleStatusDTO,
 )
@@ -155,8 +154,6 @@ class BulkAddRolePermissionFailureInfo(BaseResponseModel):
     """Failure detail for a single permission entry in bulk role-permission insertion."""
 
     role_id: UUID = Field(description="Role ID of the failed entry")
-    scope_type: str = Field(description="Scope element type of the failed entry")
-    scope_id: str = Field(description="Scope element ID of the failed entry")
     entity_type: str = Field(description="Entity element type of the failed entry")
     operation: str = Field(description="Operation type of the failed entry")
     message: str = Field(description="Error message describing the failure")
@@ -173,8 +170,6 @@ class ReplaceRolePermissionFailureInfo(BaseResponseModel):
     """Failure detail for a single permission entry in replace operation."""
 
     role_id: UUID = Field(description="Role ID of the failed entry")
-    scope_type: str = Field(description="Scope element type of the failed entry")
-    scope_id: str = Field(description="Scope element ID of the failed entry")
     entity_type: str = Field(description="Entity element type of the failed entry")
     operation: str = Field(description="Operation type of the failed entry")
     message: str = Field(description="Error message describing the failure")
@@ -222,9 +217,7 @@ class PermissionNode(BaseResponseModel):
 
     id: UUID = Field(description="Permission ID")
     role_id: UUID = Field(description="Role this permission belongs to")
-    scope_type: RBACElementTypeDTO = Field(description="Scope element type")
-    scope_id: str = Field(description="Scope element ID")
-    entity_type: RBACElementTypeDTO = Field(description="Entity element type")
+    entity_type: EntityType = Field(description="Entity element type")
     permission: PermissionBitDTO = Field(description="The permission bit the row holds")
     operation: OperationTypeDTO = Field(
         description="Deprecated: use `permission`. The same bit named as an action.",
@@ -291,8 +284,8 @@ class AdminSearchAssociationsPayload(BaseResponseModel):
 class ScopeEntityCombinationInfo(BaseResponseModel):
     """Valid scope-entity type combination for RBAC permissions."""
 
-    scope_type: RBACElementTypeDTO = Field(description="Scope element type")
-    valid_entity_types: list[RBACElementTypeDTO] = Field(
+    scope_type: EntityType = Field(description="Scope element type")
+    valid_entity_types: list[EntityType] = Field(
         description="Valid entity types for this scope type"
     )
 
@@ -308,14 +301,14 @@ class OperationInfo(BaseResponseModel):
 class EntityOperationCombinationInfo(BaseResponseModel):
     """Valid entity-operation combinations for RBAC actions."""
 
-    entity_type: RBACElementTypeDTO = Field(description="Entity element type")
+    entity_type: EntityType = Field(description="Entity element type")
     operations: list[OperationInfo] = Field(description="Valid operations for this entity")
 
 
 class EntityActionInfo(BaseResponseModel):
     """Entity type with its allowed actions within a specific scope."""
 
-    entity_type: RBACElementTypeDTO = Field(description="Entity element type")
+    entity_type: EntityType = Field(description="Entity element type")
     actions: list[OperationInfo] = Field(
         description="Valid operations for this entity in the given scope"
     )
@@ -324,7 +317,7 @@ class EntityActionInfo(BaseResponseModel):
 class ScopeEntityOperationCombinationInfo(BaseResponseModel):
     """Complete scope-entity-operation combination for RBAC permission matrix."""
 
-    scope_type: RBACElementTypeDTO = Field(description="Scope element type")
+    scope_type: EntityType = Field(description="Scope element type")
     entities: list[EntityActionInfo] = Field(
         description="Entities and their valid operations within this scope"
     )

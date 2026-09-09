@@ -6,12 +6,9 @@ from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.data.entity.role_permission_preset import RolePermissionPresetID
-from ai.backend.common.dto.manager.query import DateTimeFilter, UUIDFilter
+from ai.backend.common.dto.manager.query import DateTimeFilter, StringFilter, UUIDFilter
 from ai.backend.common.dto.manager.v2.common import OrderDirection
-from ai.backend.common.dto.manager.v2.rbac.types import (
-    OperationTypeFilter,
-    RBACElementTypeFilter,
-)
+from ai.backend.common.dto.manager.v2.rbac.types import OperationTypeFilter
 from ai.backend.common.dto.manager.v2.role_permission_preset.types import (
     RolePermissionPresetEntry,
     RolePermissionPresetOrderField,
@@ -53,7 +50,7 @@ class RolePermissionPresetFilter(BaseRequestModel):
     role_preset_id: UUIDFilter | None = Field(
         default=None, description="Filter by parent role preset ID."
     )
-    entity_type: RBACElementTypeFilter | None = Field(
+    entity_type: StringFilter | None = Field(
         default=None, description="Filter by entity type the permission applies to."
     )
     operation: OperationTypeFilter | None = Field(

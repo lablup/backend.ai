@@ -336,10 +336,6 @@ class V2EntityWriteOps(V2GraphWriteOpsBase):
         permission_rows = [
             PermissionRow(
                 role_id=row.id,
-                scope_type=self._scope_element_type(
-                    ScopeType(spec.entity.entity_type())
-                ).to_scope_type(),
-                scope_id=str(spec.entity),
                 entity_type=entity_type.to_entity_type(),
                 permission=Permission.from_operation(operation),
             )

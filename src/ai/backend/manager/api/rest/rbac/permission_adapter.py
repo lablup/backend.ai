@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import uuid
 
-from ai.backend.common.data.entity.types import EntityType, ScopeType
+from ai.backend.common.data.entity.types import EntityType
 from ai.backend.common.data.permission.types import Permission
 from ai.backend.common.dto.manager.rbac import (
     CreatePermissionRequest,
@@ -46,8 +46,6 @@ class PermissionAdapter:
         creator = Creator(
             spec=PermissionCreatorSpec(
                 role_id=request.role_id,
-                scope_type=ScopeType(EntityType(request.scope_type)),
-                scope_id=request.scope_id,
                 entity_type=EntityType(request.entity_type),
                 permission=single_bit(Permission.from_operation(request.operation)),
             )

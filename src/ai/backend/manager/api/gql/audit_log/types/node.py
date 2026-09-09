@@ -12,6 +12,8 @@ import strawberry
 from strawberry import Info
 from strawberry.relay import Connection, Edge, NodeID
 
+from ai.backend.common.data.entity.audit_log import AuditLogID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.dto.manager.v2.audit_log.response import AuditLogNode
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.decorators import (
@@ -110,7 +112,7 @@ class AuditLogV2GQL(PydanticNodeMixin[AuditLogNode]):
             user_uuid = UUID(self.triggered_by)
         except ValueError:
             return None
-        user_data = await info.context.data_loaders.user_loader.load(user_uuid)
+        user_data = await info.context.data_loaders.user_loader.load(UserID(user_uuid))
         if user_data is None:
             return None
         return user_data
@@ -136,7 +138,7 @@ class AuditLogV2GQL(PydanticNodeMixin[AuditLogNode]):
     ):
         if self.acted_as is None:
             return None
-        user_data = await info.context.data_loaders.user_loader.load(self.acted_as)
+        user_data = await info.context.data_loaders.user_loader.load(UserID(self.acted_as))
         if user_data is None:
             return None
         return user_data
@@ -151,7 +153,7 @@ class AuditLogV2GQL(PydanticNodeMixin[AuditLogNode]):
         required: bool = False,
     ) -> Iterable[Self | None]:
         results = await info.context.data_loaders.audit_log_loader.load_many([
-            UUID(nid) for nid in node_ids
+            AuditLogID(UUID(nid)) for nid in node_ids
         ])
         return cast(list[Self | None], results)
 

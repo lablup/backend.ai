@@ -8,6 +8,7 @@ from decimal import Decimal
 from functools import lru_cache
 
 from ai.backend.common.data.entity.artifact_registry import ArtifactRegistryID
+from ai.backend.common.data.entity.image_alias import ImageAliasID
 from ai.backend.common.dto.manager.v2.image.request import (
     AdminSearchImageAliasesInput,
     AdminSearchImagesInput,
@@ -127,7 +128,7 @@ class ImageAdapter(BaseAdapter):
         return [image_map.get(image_id) for image_id in image_ids]
 
     async def batch_load_aliases_by_ids(
-        self, alias_ids: Sequence[uuid.UUID]
+        self, alias_ids: Sequence[ImageAliasID]
     ) -> list[ImageAliasNode | None]:
         """Batch load image aliases by alias ID for DataLoader use.
 

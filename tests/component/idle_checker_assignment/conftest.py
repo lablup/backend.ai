@@ -410,8 +410,6 @@ async def _grant(
             db_sess.add(
                 PermissionRow(
                     role_id=role_id,
-                    scope_type=scope_type,
-                    scope_id=str(scope_id),
                     entity_type=entity_type,
                     permission=Permission.from_operation(operation),
                 )

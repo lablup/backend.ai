@@ -440,7 +440,7 @@ class ProjectV2GQL(PydanticNodeMixin[ProjectNode]):
         required: bool = False,
     ) -> Iterable[Self | None]:
         results = await info.context.data_loaders.project_loader.load_many([
-            UUID(nid) for nid in node_ids
+            ProjectID(UUID(nid)) for nid in node_ids
         ])
         return cast(list[Self | None], results)
 

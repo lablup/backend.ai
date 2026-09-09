@@ -9,6 +9,9 @@ import strawberry
 from strawberry import Info
 from strawberry.relay import Connection, Edge, NodeID
 
+from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.user import UserID
+from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.dto.manager.v2.common import OrderDirection
 from ai.backend.common.dto.manager.v2.deployment_revision_preset.request import (
     DeploymentRevisionPresetFilter,
@@ -242,7 +245,7 @@ class ModelCardGQL(PydanticNodeMixin[NodeDTO]):
         ]
         | None
     ):
-        return await info.context.data_loaders.vfolder_loader.load(self.vfolder_id)
+        return await info.context.data_loaders.vfolder_loader.load(VFolderUUID(self.vfolder_id))
 
     @gql_added_field(
         BackendAIGQLMeta(
@@ -278,7 +281,7 @@ class ModelCardGQL(PydanticNodeMixin[NodeDTO]):
         ]
         | None
     ):
-        return await info.context.data_loaders.project_loader.load(self.project_id)
+        return await info.context.data_loaders.project_loader.load(ProjectID(self.project_id))
 
     @gql_added_field(
         BackendAIGQLMeta(
@@ -296,7 +299,7 @@ class ModelCardGQL(PydanticNodeMixin[NodeDTO]):
         ]
         | None
     ):
-        return await info.context.data_loaders.user_loader.load(self.creator_id)
+        return await info.context.data_loaders.user_loader.load(UserID(self.creator_id))
 
     @gql_field(  # type: ignore[misc]
         description="Deployment revision presets that satisfy this model card's minimum resource requirements. Equivalent to the root `model_card_available_presets` query but scoped to this card."

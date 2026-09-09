@@ -13,7 +13,7 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.common.data.entity.types import EntityType, ScopeRef, ScopeType
+from ai.backend.common.data.entity.types import EntityType, ScopeRef
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.entity.virtual_entity import VirtualEntityID
 from ai.backend.manager.data.permission.bit import single_bit
@@ -43,8 +43,6 @@ class PermissionCreatorSpec(CreatorSpec[PermissionRow]):
     """
 
     role_id: uuid.UUID
-    scope_type: ScopeType
-    scope_id: str
     entity_type: EntityType
     permission: Permission
 
@@ -52,8 +50,6 @@ class PermissionCreatorSpec(CreatorSpec[PermissionRow]):
     def build_row(self) -> PermissionRow:
         return PermissionRow(
             role_id=self.role_id,
-            scope_type=self.scope_type,
-            scope_id=self.scope_id,
             entity_type=self.entity_type,
             permission=single_bit(self.permission),
         )

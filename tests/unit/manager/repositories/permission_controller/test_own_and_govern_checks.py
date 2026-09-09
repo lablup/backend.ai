@@ -33,9 +33,6 @@ from ai.backend.manager.data.permission.types import (
 from ai.backend.manager.data.permission.types import (
     OperationType,
 )
-from ai.backend.manager.data.permission.types import (
-    ScopeType as PermScopeType,
-)
 from ai.backend.manager.data.permission.virtual_entity import (
     GovernCheckKey,
     OwnCheckKey,
@@ -127,8 +124,6 @@ class VSChainSpec:
 def _single_bit_rows(
     *,
     role_id: uuid.UUID,
-    scope_type: object,
-    scope_id: str,
     entity_type: object,
     permission: Permission,
 ) -> list[PermissionRow]:
@@ -136,8 +131,6 @@ def _single_bit_rows(
     return [
         PermissionRow(
             role_id=role_id,
-            scope_type=scope_type,
-            scope_id=scope_id,
             entity_type=entity_type,
             permission=bit,
         )
@@ -222,13 +215,19 @@ class TestCheckPermissionViaVirtualEntity:
             db_sess.add(user)
             await db_sess.flush()
 
-            db_sess.add(VirtualEntityRow(entity_type=EntityType("domain"), entity_id=domain_id))
+            db_sess.add(
+                VirtualEntityRow(
+                    id=ids.bound_scope_node_id,
+                    entity_type=EntityType("project"),
+                    entity_id=ids.bound_scope_id,
+                )
+            )
             role = RoleRow(
                 id=ids.role_id,
                 name="test-role",
                 status=role_status,
-                scope_type=EntityType("domain"),
-                scope_id=domain_id,
+                scope_type=EntityType("project"),
+                scope_id=ids.bound_scope_id,
             )
             db_sess.add(role)
             await db_sess.flush()
@@ -242,18 +241,13 @@ class TestCheckPermissionViaVirtualEntity:
         scope_type: ScopeType,
         entity_type: EntityType,
     ) -> list[VirtualEntityRow]:
-        """The three nodes a chain names: the owner scope (the virtual entity itself),
-        the bound scope, and the member entity."""
+        """The nodes a chain names beyond the bound scope, which is made with the role:
+        the owner scope (the virtual entity itself) and the member entity."""
         return [
             VirtualEntityRow(
                 id=ids.virtual_entity_id,
                 entity_type=scope_type,
                 entity_id=ids.owner_scope_id,
-            ),
-            VirtualEntityRow(
-                id=ids.bound_scope_node_id,
-                entity_type=scope_type,
-                entity_id=ids.bound_scope_id,
             ),
             VirtualEntityRow(
                 id=ids.entity_node_id,
@@ -295,8 +289,6 @@ class TestCheckPermissionViaVirtualEntity:
             db_sess.add_all(
                 _single_bit_rows(
                     role_id=ids.role_id,
-                    scope_type=PermScopeType.PROJECT,
-                    scope_id=str(ids.bound_scope_id),
                     entity_type=PermEntityType.VFOLDER,
                     permission=spec.granted,
                 )
@@ -562,8 +554,6 @@ class TestCheckPermissionViaVirtualEntity:
             db_sess.add(
                 PermissionRow(
                     role_id=ids.role_id,
-                    scope_type=ScopeType(ProjectEntityType()),
-                    scope_id=str(ids.bound_scope_id),
                     entity_type=_UNMAPPED_ENTITY_TYPE,
                     permission=Permission.READ,
                 )
@@ -598,15 +588,11 @@ class TestCheckPermissionViaVirtualEntity:
         async with db_with_rbac_tables.begin_session() as db_sess:
             await db_sess.execute(
                 sa.text(
-                    "INSERT INTO permissions"
-                    " (role_id, scope_type, scope_id, entity_type, permission)"
-                    " VALUES"
-                    " (:role_id, :scope_type, :scope_id, :entity_type, :permission)"
+                    "INSERT INTO permissions (role_id, entity_type, permission)"
+                    " VALUES (:role_id, :entity_type, :permission)"
                 ),
                 {
                     "role_id": fixture_ids.role_id,
-                    "scope_type": str(ScopeType(ProjectEntityType())),
-                    "scope_id": str(fixture_ids.bound_scope_id),
                     "entity_type": str(_UNMAPPED_ENTITY_TYPE),
                     "permission": int(Permission.READ),
                 },
@@ -735,14 +721,17 @@ class TestUserRosterEnrollment:
                     resource_policy=project_policy_name,
                 )
             )
-            db_sess.add(VirtualEntityRow(entity_type=EntityType("domain"), entity_id=domain_id))
+            await self._provision_scope(
+                db_sess,
+                ScopeRef(scope_type=ScopeType(EntityType("project")), scope_id=project_id),
+            )
             db_sess.add(
                 RoleRow(
                     id=ids.role_id,
                     name="project-role",
                     status=RoleStatus.ACTIVE,
-                    scope_type=EntityType("domain"),
-                    scope_id=domain_id,
+                    scope_type=EntityType("project"),
+                    scope_id=project_id,
                 )
             )
             await db_sess.flush()
@@ -750,8 +739,6 @@ class TestUserRosterEnrollment:
             db_sess.add_all(
                 _single_bit_rows(
                     role_id=ids.role_id,
-                    scope_type=PermScopeType.PROJECT,
-                    scope_id=str(project_id),
                     entity_type=entity_type,
                     permission=permission,
                 )

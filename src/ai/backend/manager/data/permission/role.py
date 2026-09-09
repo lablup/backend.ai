@@ -12,7 +12,6 @@ from ai.backend.common.data.entity.types import (
     EntityID,
     EntityIdentifier,
     EntityType,
-    ScopeType,
 )
 from ai.backend.manager.data.common.types import SearchResult
 
@@ -254,8 +253,6 @@ class BulkRolePermissionAddFailure:
     """Failure information for a single permission entry in bulk add (or replace)."""
 
     role_id: uuid.UUID
-    scope_type: ScopeType
-    scope_id: str
     entity_type: EntityType
     permission: Permission
     message: str

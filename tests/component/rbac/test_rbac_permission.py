@@ -5,7 +5,8 @@ from typing import Any
 
 import pytest
 
-from ai.backend.common.data.entity.types import EntityType, ScopeType
+from ai.backend.common.data.entity.domain import DOMAIN_SCOPE_TYPE
+from ai.backend.common.data.entity.types import EntityType
 from ai.backend.common.data.permission.types import (
     OperationType,
     Permission,
@@ -72,8 +73,6 @@ class TestPermissionCreate:
         creator = Creator(
             spec=PermissionCreatorSpec(
                 role_id=target_role.role.id,
-                scope_type=ScopeType(EntityType(RBACElementType.DOMAIN)),
-                scope_id=domain_fixture.domain_name,
                 entity_type=EntityType(RBACElementType.SESSION),
                 permission=Permission.READ,
             )
@@ -84,7 +83,6 @@ class TestPermissionCreate:
 
         assert isinstance(result.data, PermissionData)
         assert result.data.role_id == target_role.role.id
-        assert result.data.scope_type == LegacyScopeType.DOMAIN.value
         assert result.data.entity_type == LegacyEntityType.SESSION.value
         assert result.data.permission == Permission.READ
 
@@ -130,8 +128,6 @@ class TestPermissionCreate:
                     creator=Creator(
                         spec=PermissionCreatorSpec(
                             role_id=target_role.role.id,
-                            scope_type=ScopeType(EntityType(scope_type)),
-                            scope_id=scope_id,
                             entity_type=EntityType(entity_type),
                             permission=Permission.from_operation(operation),
                         )
@@ -160,8 +156,6 @@ class TestPermissionCreate:
         """F-BIZ-4: Create duplicate permission → unique constraint error."""
         spec = PermissionCreatorSpec(
             role_id=target_role.role.id,
-            scope_type=ScopeType(EntityType(RBACElementType.DOMAIN)),
-            scope_id=domain_fixture.domain_name,
             entity_type=EntityType(RBACElementType.VFOLDER),
             permission=Permission.READ,
         )
@@ -199,8 +193,6 @@ class TestPermissionDelete:
                 creator=Creator(
                     spec=PermissionCreatorSpec(
                         role_id=target_role.role.id,
-                        scope_type=ScopeType(EntityType(RBACElementType.DOMAIN)),
-                        scope_id=domain_fixture.domain_name,
                         entity_type=EntityType(RBACElementType.SESSION),
                         permission=Permission.HARD_DELETE,
                     )
@@ -228,8 +220,6 @@ class TestPermissionDelete:
                 creator=Creator(
                     spec=PermissionCreatorSpec(
                         role_id=target_role.role.id,
-                        scope_type=ScopeType(EntityType(RBACElementType.DOMAIN)),
-                        scope_id=domain_fixture.domain_name,
                         entity_type=EntityType(RBACElementType.IMAGE),
                         permission=Permission.SOFT_DELETE,
                     )
@@ -296,7 +286,7 @@ class TestCheckPermissionInScope:
         domain_fixture: DomainFixtureData,
     ) -> None:
         """S-SCOPE-1: User has permission in target scope → True."""
-        role = await role_factory()
+        role = await role_factory(scope_type=DOMAIN_SCOPE_TYPE, scope_id=domain_fixture.domain_id)
         role_id = role.role.id
         user_id: uuid.UUID = admin_user_fixture.user_uuid
 
@@ -305,8 +295,6 @@ class TestCheckPermissionInScope:
                 creator=Creator(
                     spec=PermissionCreatorSpec(
                         role_id=role_id,
-                        scope_type=ScopeType(EntityType(RBACElementType.DOMAIN)),
-                        scope_id=domain_fixture.domain_name,
                         entity_type=EntityType(RBACElementType.SESSION),
                         permission=Permission.READ,
                     )
@@ -324,7 +312,8 @@ class TestCheckPermissionInScope:
                     user_id=user_id,
                     target_entity_type=LegacyEntityType.SESSION,
                     target_scope_id=ScopeId(
-                        scope_type=LegacyScopeType.DOMAIN, scope_id=domain_fixture.domain_name
+                        scope_type=LegacyScopeType.DOMAIN,
+                        scope_id=str(domain_fixture.domain_id),
                     ),
                     permission=Permission.READ,
                 )

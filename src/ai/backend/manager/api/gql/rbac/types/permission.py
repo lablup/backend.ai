@@ -12,9 +12,8 @@ import strawberry
 from strawberry import Info
 from strawberry.relay import Connection, Edge, NodeID
 
-from ai.backend.common.data.entity.domain import DomainID
-from ai.backend.common.data.entity.resource_group import ResourceGroupID
-from ai.backend.common.data.permission.types import RBACElementType
+from ai.backend.common.data.entity.permission import PermissionID
+from ai.backend.common.data.entity.role import RoleID
 from ai.backend.common.dto.manager.v2.rbac.request import (
     BulkAddRolePermissionsInput as BulkAddRolePermissionsInputDTO,
 )
@@ -80,7 +79,6 @@ from ai.backend.common.dto.manager.v2.rbac.types import (
     OperationTypeFilter as OperationTypeFilterDTO,
 )
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
-from ai.backend.common.types import SessionId
 from ai.backend.manager.api.gql.base import DateTimeFilter, OrderDirection, StringFilter, UUIDFilter
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
@@ -94,11 +92,8 @@ from ai.backend.manager.api.gql.decorators import (
     gql_pydantic_type,
 )
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin, PydanticOutputMixin
-from ai.backend.manager.api.gql.rbac.types.entity_node import EntityNode
 from ai.backend.manager.api.gql.rbac.types.scope import (
     PermissionBitGQL,
-    RBACElementTypeFilterGQL,
-    RBACElementTypeGQL,
 )
 from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy, StrawberryGQLContext
 
@@ -157,9 +152,7 @@ class PermissionOrderField(StrEnum):
 class PermissionGQL(PydanticNodeMixin[PermissionNodeDTO]):
     id: NodeID[str]
     role_id: UUID
-    scope_type: RBACElementTypeGQL
-    scope_id: str
-    entity_type: RBACElementTypeGQL
+    entity_type: str
     created_at: datetime
     permission: PermissionBitGQL = gql_added_field(
         BackendAIGQLMeta(
@@ -183,7 +176,7 @@ class PermissionGQL(PydanticNodeMixin[PermissionNodeDTO]):
     ) -> Iterable[Self | None]:
         # DataLoader already returns PermissionGQL | None via from_pydantic conversion
         results = await info.context.data_loaders.permission_loader.load_many([
-            UUID(nid) for nid in node_ids
+            PermissionID(UUID(nid)) for nid in node_ids
         ])
         return cast(list[Self | None], results)
 
@@ -198,84 +191,7 @@ class PermissionGQL(PydanticNodeMixin[PermissionNodeDTO]):
         | None
     ):
         # DataLoader already returns RoleGQL | None via from_pydantic conversion
-        return await info.context.data_loaders.role_loader.load(self.role_id)
-
-    @gql_field(description="The scope this permission applies to.")  # type: ignore[misc]
-    async def scope(
-        self,
-        *,
-        info: Info[StrawberryGQLContext],
-    ) -> EntityNode | None:
-        element_type = RBACElementType(self.scope_type.value)  # type: ignore[attr-defined]
-        data_loaders = info.context.data_loaders
-        match element_type:
-            case RBACElementType.USER:
-                # DataLoader already returns UserV2GQL | None via from_pydantic conversion
-                return await data_loaders.user_loader.load(UUID(self.scope_id))
-            case RBACElementType.PROJECT:
-                # DataLoader already returns ProjectV2GQL | None via from_pydantic conversion
-                return await data_loaders.project_loader.load(UUID(self.scope_id))
-            case RBACElementType.DOMAIN:
-                # DataLoader already returns DomainV2GQL | None via from_pydantic conversion
-                return await data_loaders.domain_by_id_loader.load(DomainID(UUID(self.scope_id)))
-            case RBACElementType.ROLE:
-                # DataLoader already returns RoleGQL | None via from_pydantic conversion
-                return await data_loaders.role_loader.load(UUID(self.scope_id))
-            case RBACElementType.RESOURCE_GROUP:
-                return await data_loaders.resource_group_by_id_loader.load(
-                    ResourceGroupID(UUID(self.scope_id))
-                )
-            case RBACElementType.MODEL_DEPLOYMENT:
-                # DataLoader already returns ModelDeployment | None via from_pydantic conversion
-                return await data_loaders.deployment_loader.load(UUID(self.scope_id))
-            case RBACElementType.ARTIFACT_REVISION:
-                # DataLoader already returns ArtifactRevision | None via from_pydantic
-                return await data_loaders.artifact_revision_loader.load(UUID(self.scope_id))
-            case RBACElementType.CONTAINER_REGISTRY:
-                # DataLoader already returns ContainerRegistryGQL | None via from_pydantic
-                return await data_loaders.container_registry_loader.load(UUID(self.scope_id))
-            case RBACElementType.SESSION:
-                # DataLoader already returns SessionV2GQL | None via from_pydantic conversion
-                return await data_loaders.session_loader.load(SessionId(UUID(self.scope_id)))
-            case (
-                RBACElementType.VFOLDER
-                | RBACElementType.KEYPAIR
-                | RBACElementType.NOTIFICATION_CHANNEL
-                | RBACElementType.NETWORK
-                | RBACElementType.STORAGE_HOST
-                | RBACElementType.IMAGE
-                | RBACElementType.ARTIFACT
-                | RBACElementType.ARTIFACT_REGISTRY
-                | RBACElementType.SESSION_TEMPLATE
-                | RBACElementType.APP_CONFIG
-                | RBACElementType.APP_CONFIG_DEFINITION
-                | RBACElementType.APP_CONFIG_ALLOW_LIST
-                | RBACElementType.APP_CONFIG_FRAGMENT
-                | RBACElementType.RESOURCE_PRESET
-                | RBACElementType.USER_RESOURCE_POLICY
-                | RBACElementType.KEYPAIR_RESOURCE_POLICY
-                | RBACElementType.PROJECT_RESOURCE_POLICY
-                | RBACElementType.AUDIT_LOG
-                | RBACElementType.KERNEL_HISTORY
-                | RBACElementType.EVENT_LOG
-                | RBACElementType.NOTIFICATION_RULE
-                | RBACElementType.AGENT
-                | RBACElementType.KERNEL
-                | RBACElementType.ROUTING
-                | RBACElementType.DEPLOYMENT_TOKEN
-                | RBACElementType.DEPLOYMENT_POLICY
-                | RBACElementType.DEPLOYMENT_REVISION
-                | RBACElementType.IMAGE_ALIAS
-                | RBACElementType.MODEL_CARD
-                | RBACElementType.PROJECT_ADMIN_PAGE
-                | RBACElementType.DOMAIN_ADMIN_PAGE
-                | RBACElementType.ROLE_ASSIGNMENT
-                | RBACElementType.VFOLDER_DATA
-                | RBACElementType.SESSION_APP_SERVICE
-                | RBACElementType.USER_EMAIL
-                | RBACElementType.IDLE_CHECKER_ASSIGNMENT
-            ):
-                return None
+        return await info.context.data_loaders.role_loader.load(RoleID(self.role_id))
 
 
 # ==================== Filter Types ====================
@@ -289,9 +205,7 @@ class PermissionGQL(PydanticNodeMixin[PermissionNodeDTO]):
     name="PermissionNestedFilter",
 )
 class PermissionNestedFilterGQL(PydanticInputMixin[PermissionNestedFilterDTO]):
-    scope_id: StringFilter | None = None
-    scope_type: RBACElementTypeFilterGQL | None = None
-    entity_type: RBACElementTypeFilterGQL | None = None
+    entity_type: StringFilter | None = None
     operation: OperationTypeFilterGQL | None = None
 
     AND: list[Self] | None = None
@@ -305,9 +219,7 @@ class PermissionNestedFilterGQL(PydanticInputMixin[PermissionNestedFilterDTO]):
 )
 class PermissionFilter(PydanticInputMixin[PermissionFilterDTO], GQLFilter):
     role_id: UUIDFilter | None = None
-    scope_type: RBACElementTypeFilterGQL | None = None
-    scope_id: StringFilter | None = None
-    entity_type: RBACElementTypeFilterGQL | None = None
+    entity_type: StringFilter | None = None
     created_at: DateTimeFilter | None = None
     AND: list[Self] | None = None
     OR: list[Self] | None = None
@@ -334,9 +246,7 @@ class PermissionOrderBy(PydanticInputMixin[PermissionOrderByDTO], GQLOrderBy):
 )
 class CreatePermissionInput(PydanticInputMixin[CreatePermissionInputDTO]):
     role_id: UUID
-    scope_type: RBACElementTypeGQL
-    scope_id: str
-    entity_type: RBACElementTypeGQL
+    entity_type: str
     operation: OperationTypeGQL
 
 
@@ -345,9 +255,7 @@ class CreatePermissionInput(PydanticInputMixin[CreatePermissionInputDTO]):
 )
 class UpdatePermissionInput(PydanticInputMixin[UpdatePermissionInputDTO]):
     id: UUID
-    scope_type: RBACElementTypeGQL | None = None
-    scope_id: str | None = None
-    entity_type: RBACElementTypeGQL | None = None
+    entity_type: str | None = None
     operation: OperationTypeGQL | None = None
 
 
@@ -422,8 +330,6 @@ class BulkAddRolePermissionFailureInfoGQL(
     PydanticOutputMixin[BulkAddRolePermissionFailureInfoDTO],
 ):
     role_id: UUID = gql_field(description="Role ID of the failed entry.")
-    scope_type: str = gql_field(description="Scope element type of the failed entry.")
-    scope_id: str = gql_field(description="Scope element ID of the failed entry.")
     entity_type: str = gql_field(description="Entity element type of the failed entry.")
     operation: str = gql_field(description="Operation type of the failed entry.")
     message: str = gql_field(description="Error message describing the failure.")
@@ -456,8 +362,6 @@ class ReplaceRolePermissionFailureInfoGQL(
     PydanticOutputMixin[ReplaceRolePermissionFailureInfoDTO],
 ):
     role_id: UUID = gql_field(description="Role ID of the failed entry.")
-    scope_type: str = gql_field(description="Scope element type of the failed entry.")
-    scope_id: str = gql_field(description="Scope element ID of the failed entry.")
     entity_type: str = gql_field(description="Entity element type of the failed entry.")
     operation: str = gql_field(description="Operation type of the failed entry.")
     message: str = gql_field(description="Error message describing the failure.")
@@ -526,8 +430,8 @@ class ReplaceRolePermissionsPayloadGQL(
     name="ScopeEntityCombination",
 )
 class ScopeEntityCombinationGQL(PydanticOutputMixin[ScopeEntityCombinationInfo]):
-    scope_type: RBACElementTypeGQL
-    valid_entity_types: list[RBACElementTypeGQL]
+    scope_type: str
+    valid_entity_types: list[str]
 
 
 @gql_pydantic_type(
@@ -553,7 +457,7 @@ class OperationInfoGQL(PydanticOutputMixin[OperationInfo]):
     name="EntityOperationCombination",
 )
 class EntityOperationCombinationGQL(PydanticOutputMixin[EntityOperationCombinationInfo]):
-    entity_type: RBACElementTypeGQL
+    entity_type: str
     operations: list[OperationInfoGQL]
 
 
@@ -566,7 +470,7 @@ class EntityOperationCombinationGQL(PydanticOutputMixin[EntityOperationCombinati
     name="EntityActionInfo",
 )
 class EntityActionInfoGQL(PydanticOutputMixin[EntityActionInfo]):
-    entity_type: RBACElementTypeGQL
+    entity_type: str
     actions: list[OperationInfoGQL]
 
 
@@ -581,7 +485,7 @@ class EntityActionInfoGQL(PydanticOutputMixin[EntityActionInfo]):
 class ScopeEntityOperationCombinationGQL(
     PydanticOutputMixin[ScopeEntityOperationCombinationInfo],
 ):
-    scope_type: RBACElementTypeGQL
+    scope_type: str
     entities: list[EntityActionInfoGQL]
 
 

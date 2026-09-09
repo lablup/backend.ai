@@ -78,7 +78,7 @@ class VFSStorageAdapter(BaseAdapter):
             has_previous_page=action_result.has_previous_page,
         )
 
-    async def batch_load_by_ids(self, ids: Sequence[UUID]) -> list[VFSStorageNode | None]:
+    async def batch_load_by_ids(self, ids: Sequence[VFSStorageID]) -> list[VFSStorageNode | None]:
         """Batch load VFS storages by IDs for DataLoader use.
 
         Returns VFSStorageNode DTOs in the same order as the input ids list.

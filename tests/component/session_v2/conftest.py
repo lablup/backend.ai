@@ -21,6 +21,7 @@ from ai.backend.client.v2.config import ClientConfig
 from ai.backend.client.v2.v2_registry import V2ClientRegistry
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
 from ai.backend.common.container_registry import ContainerRegistryType
+from ai.backend.common.data.entity.agent import AgentUUID
 from ai.backend.common.data.entity.domain import DomainEntityType, DomainID
 from ai.backend.common.data.entity.image import ImageID
 from ai.backend.common.data.entity.project import ProjectEntityType
@@ -295,8 +296,6 @@ async def user_system_role(
                 await conn.execute(
                     sa.insert(PermissionRow.__table__).values(
                         role_id=role_id,
-                        scope_type=ScopeType.USER,
-                        scope_id=str(user_uuid),
                         entity_type=entity_type,
                         permission=bit,
                     )
@@ -308,8 +307,6 @@ async def user_system_role(
             await conn.execute(
                 sa.insert(PermissionRow.__table__).values(
                     role_id=role_id,
-                    scope_type=ScopeType.USER,
-                    scope_id=str(user_uuid),
                     entity_type=EntityType.USER,
                     permission=bit,
                 )
@@ -603,10 +600,12 @@ async def agent_factory(
 
     async def _create(available_slots: dict[str, str]) -> str:
         agent_id = f"i-test-{secrets.token_hex(4)}"
+        agent_uuid = AgentUUID(uuid.uuid4())
         async with db_engine.begin() as conn:
             await conn.execute(
                 sa.insert(AgentRow.__table__).values(
                     id=agent_id,
+                    uuid=agent_uuid,
                     status=AgentStatus.ALIVE,
                     region="local",
                     scaling_group=resource_group_name,
@@ -625,6 +624,7 @@ async def agent_factory(
                 [
                     {
                         "agent_id": agent_id,
+                        "agent_uuid": agent_uuid,
                         "slot_name": slot_name,
                         "capacity": Decimal(quantity),
                         "reserved": Decimal(0),

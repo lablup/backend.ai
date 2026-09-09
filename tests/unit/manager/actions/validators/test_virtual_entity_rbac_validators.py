@@ -312,8 +312,6 @@ async def _seed_user_with_role(
 def _single_bit_rows(
     *,
     role_id: uuid.UUID,
-    scope_type: object,
-    scope_id: str,
     entity_type: object,
     permission: Permission,
 ) -> list[PermissionRow]:
@@ -321,8 +319,6 @@ def _single_bit_rows(
     return [
         PermissionRow(
             role_id=role_id,
-            scope_type=scope_type,
-            scope_id=scope_id,
             entity_type=entity_type,
             permission=bit,
         )
@@ -351,11 +347,14 @@ async def _grant_permission(
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
         domain_id = DomainID(uuid.uuid4())
         db_sess.add(DomainRow(id=domain_id, name=domain_name, total_resource_slots=ResourceSlot()))
+        await db_sess.execute(
+            sa.update(RoleRow)
+            .where(RoleRow.id == role_id)
+            .values(scope_type=EntityType(str(scope_type)), scope_id=scope_id)
+        )
         db_sess.add_all(
             _single_bit_rows(
                 role_id=role_id,
-                scope_type=scope_type,
-                scope_id=str(scope_id),
                 entity_type=entity_type,
                 permission=permission
                 if permission is not None

@@ -462,8 +462,6 @@ class TestUserGraphProvisioning:
                     await session.scalars(
                         sa.select(PermissionRow.entity_type).where(
                             PermissionRow.role_id == role.id,
-                            PermissionRow.scope_type == ScopeType.USER,
-                            PermissionRow.scope_id == str(user_id),
                         )
                     )
                 ).all()

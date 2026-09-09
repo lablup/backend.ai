@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import uuid
 from abc import ABC, abstractmethod
+from collections.abc import Iterator
 from dataclasses import dataclass
 from typing import Any, NewType, Self, override
 from uuid import UUID
@@ -49,6 +50,25 @@ class EntityType(str):
     @classmethod
     def description(cls) -> str:
         raise NotImplementedError
+
+    @classmethod
+    def from_name(cls, name: str) -> EntityType:
+        """The kind answering to ``name``, or the bare base when none does.
+
+        A kind is found only once its module is imported, so a caller matching on kinds
+        imports the ones it handles. What is left over is a type this build does not
+        declare, and the bare base is what it is.
+        """
+        for kind in cls._kinds():
+            if kind.name() == name:
+                return kind()
+        return EntityType(name)
+
+    @classmethod
+    def _kinds(cls) -> Iterator[type[EntityType]]:
+        for kind in cls.__subclasses__():
+            yield kind
+            yield from kind._kinds()
 
     @classmethod
     def __get_pydantic_core_schema__(cls, source: Any, handler: GetCoreSchemaHandler) -> CoreSchema:
@@ -193,12 +213,31 @@ class ScopeRef:
 class EntityIdentifier(UUID):
     """An entity's id, which knows the type it is an id of.
 
-    Subclassing `UUID` keeps every value comparable and hashable against the plain
-    ids already stored, so the change is additive at call sites.
+    An id is the pair, not the uuid: two ids of different kinds carrying the same uuid
+    are different ids, and a bare uuid is neither. That is what makes one usable as a
+    key — a loader keyed by these reaches the same entry whether the caller named its
+    kind statically or carried it as a value.
     """
 
     def __init__(self, value: UUID) -> None:
         super().__init__(int=value.int)
+
+    @override
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, EntityIdentifier):
+            return NotImplemented
+        return self.int == other.int and self.entity_type() == other.entity_type()
+
+    @override
+    def __hash__(self) -> int:
+        """The uuid alone, as `UUID` hashes it.
+
+        Two ids of different kinds carrying one uuid land in the same bucket and are
+        told apart by ``__eq__`` there. Hashing the pair instead would put an id and
+        the plain uuid a row answers with in different buckets, and a mapping keyed by
+        one could not be read with the other.
+        """
+        return super().__hash__()
 
     @abstractmethod
     def entity_type(self) -> EntityType:

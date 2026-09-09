@@ -1,4 +1,6 @@
-"""Permission writes: what a role holds per (scope, entity_type) key.
+"""Permission writes: what a role holds per entity type.
+
+A permission row names no scope; the role it belongs to does.
 
 Storage is one ``permissions`` row per operation bit. A READ or UPDATE row with
 ``all_fields`` grants the operation on every field; one without grants it on its
@@ -17,6 +19,7 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from ai.backend.common.data.entity.permission import PermissionID
 from ai.backend.common.data.entity.role import RoleID
+from ai.backend.common.data.entity.types import EntityType
 from ai.backend.common.data.permission.id import FieldPath
 from ai.backend.common.data.permission.types import Permission
 from ai.backend.manager.errors.permission import InvalidFieldPermission
@@ -24,7 +27,6 @@ from ai.backend.manager.models.rbac_models.permission.permission import Permissi
 from ai.backend.manager.models.rbac_models.permission.permission_field import PermissionFieldRow
 from ai.backend.manager.models.specs.permission import (
     PermissionEntry,
-    PermissionKey,
     PermissionRevocation,
 )
 from ai.backend.manager.repositories.ops.v2.cap import V2CapOps
@@ -47,7 +49,7 @@ class PermissionWriteOps(V2WriteOps, PermissionReadOps, V2CapOps):
     """The general v2 write ops plus the role permission writes."""
 
     async def set_permissions(self, role_id: RoleID, entries: Sequence[PermissionEntry]) -> None:
-        """State what each entry's key holds now; the key's previous rows go,
+        """State what each entry's entity type holds now; its previous rows go,
         their path rows with them."""
         if not entries:
             return
@@ -56,7 +58,7 @@ class PermissionWriteOps(V2WriteOps, PermissionReadOps, V2CapOps):
         await self._sess.execute(
             sa.delete(PermissionRow).where(
                 PermissionRow.role_id == role_id,
-                self._key_filter([e.key() for e in entries]),
+                PermissionRow.entity_type.in_([str(e.entity_type) for e in entries]),
             )
         )
         for entry in entries:
@@ -66,7 +68,7 @@ class PermissionWriteOps(V2WriteOps, PermissionReadOps, V2CapOps):
                 await self._insert_bit_row(role_id, entry, bit, False, paths)
 
     async def widen_permissions(self, role_id: RoleID, entries: Sequence[PermissionEntry]) -> None:
-        """Add each entry to what its key holds, never taking away.
+        """Add each entry to what its entity type holds, never taking away.
 
         A bit on every field makes that operation's path rows redundant, so they
         go; paths join an operation already scoped, and change nothing on one
@@ -77,7 +79,7 @@ class PermissionWriteOps(V2WriteOps, PermissionReadOps, V2CapOps):
         for entry in entries:
             self._validate_entry(entry)
         for entry in entries:
-            current = await self._locked_bit_rows(role_id, entry.key())
+            current = await self._locked_bit_rows(role_id, entry.entity_type)
             for bit in self._bits_of(entry.permission):
                 row = current.get(bit)
                 if row is None:
@@ -99,7 +101,7 @@ class PermissionWriteOps(V2WriteOps, PermissionReadOps, V2CapOps):
     async def revoke_permissions(
         self, role_id: RoleID, revocations: Sequence[PermissionRevocation]
     ) -> None:
-        """Take each revocation's bits back from its key.
+        """Take each revocation's bits back from its entity type.
 
         A ``permission`` bit removes its row, path rows with it. A ``fields`` bit
         removes the path and its descendants from that operation's row; a row
@@ -108,7 +110,7 @@ class PermissionWriteOps(V2WriteOps, PermissionReadOps, V2CapOps):
         for revocation in revocations:
             for name, bits in revocation.fields.items():
                 self._validate_field(name, bits)
-            current = await self._locked_bit_rows(role_id, revocation.key())
+            current = await self._locked_bit_rows(role_id, revocation.entity_type)
             for bit in self._bits_of(revocation.permission):
                 row = current.pop(bit, None)
                 if row is not None:
@@ -140,8 +142,6 @@ class PermissionWriteOps(V2WriteOps, PermissionReadOps, V2CapOps):
     ) -> None:
         row = PermissionRow(
             role_id=role_id,
-            scope_type=entry.scope.entity_type(),
-            scope_id=str(entry.scope),
             entity_type=entry.entity_type,
             permission=bit,
             all_fields=all_fields,
@@ -170,14 +170,17 @@ class PermissionWriteOps(V2WriteOps, PermissionReadOps, V2CapOps):
         )
 
     async def _locked_bit_rows(
-        self, role_id: RoleID, key: PermissionKey
+        self, role_id: RoleID, entity_type: EntityType
     ) -> dict[Permission, _BitRow]:
-        """The key's per-bit rows with their paths, row-locked for the
+        """The entity type's per-bit rows with their paths, row-locked for the
         read-merge-write."""
         rows = (
             await self._sess.execute(
                 sa.select(PermissionRow.id, PermissionRow.permission, PermissionRow.all_fields)
-                .where(PermissionRow.role_id == role_id, self._key_filter([key]))
+                .where(
+                    PermissionRow.role_id == role_id,
+                    PermissionRow.entity_type == entity_type,
+                )
                 .with_for_update()
             )
         ).all()

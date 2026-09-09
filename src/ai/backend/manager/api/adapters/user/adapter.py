@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import uuid
 from collections.abc import Mapping, Sequence
 from typing import TYPE_CHECKING
 from uuid import UUID
@@ -222,7 +221,7 @@ class UserAdapter(BaseAdapter):
 
     # ------------------------------------------------------------------ batch load (DataLoader)
 
-    async def batch_load_by_ids(self, user_ids: Sequence[uuid.UUID]) -> list[UserNode | None]:
+    async def batch_load_by_ids(self, user_ids: Sequence[UserID]) -> list[UserNode | None]:
         """Batch load users by UUID for DataLoader use.
 
         Returns UserNode DTOs in the same order as the input user_ids list.

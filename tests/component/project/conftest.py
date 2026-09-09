@@ -318,8 +318,6 @@ async def rbac_permission_fixture(
         await conn.execute(
             sa.insert(PermissionRow.__table__).values(
                 role_id=role_id,
-                scope_type=ScopeType.PROJECT,
-                scope_id=str(group_fixture),
                 entity_type=EntityType.PROJECT,
                 permission=Permission.UPDATE,
             )
@@ -373,8 +371,6 @@ async def admin_target_project_permission(
         await conn.execute(
             sa.insert(PermissionRow.__table__).values(
                 role_id=role_id,
-                scope_type=ScopeType.PROJECT,
-                scope_id=str(target_project_fixture),
                 entity_type=EntityType.PROJECT,
                 permission=Permission.UPDATE,
             )
@@ -538,8 +534,6 @@ async def member_role_fixture(
         await conn.execute(
             sa.insert(PermissionRow.__table__).values(
                 role_id=role_id,
-                scope_type=ScopeType.PROJECT,
-                scope_id=str(target_project_fixture),
                 entity_type=EntityType.USER,
                 permission=Permission.READ,
             )

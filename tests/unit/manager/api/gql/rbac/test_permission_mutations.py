@@ -11,33 +11,30 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from aiohttp.web_exceptions import HTTPForbidden
 
+from ai.backend.common.data.entity.types import EntityType
 from ai.backend.common.dto.manager.v2.rbac.response import PermissionNode
 from ai.backend.common.dto.manager.v2.rbac.types import (
     OperationTypeDTO,
     PermissionBitDTO,
-    RBACElementTypeDTO,
 )
 from ai.backend.manager.api.gql.rbac.resolver import permission as permission_resolver
 from ai.backend.manager.api.gql.rbac.types import PermissionGQL, UpdatePermissionInput
 from ai.backend.manager.api.gql.rbac.types.permission import OperationTypeGQL
-from ai.backend.manager.api.gql.rbac.types.scope import RBACElementTypeGQL
+
+_SCOPE_ID = uuid.UUID("11111111-1111-1111-1111-111111111111")
 
 
 def _make_permission_node(
     *,
     permission_id: uuid.UUID | None = None,
     role_id: uuid.UUID | None = None,
-    scope_type: RBACElementTypeDTO = RBACElementTypeDTO.DOMAIN,
-    scope_id: str = "default",
-    entity_type: RBACElementTypeDTO = RBACElementTypeDTO.VFOLDER,
+    entity_type: str = "vfolder",
     operation: OperationTypeDTO = OperationTypeDTO.READ,
 ) -> PermissionNode:
     return PermissionNode(
         id=permission_id or uuid.uuid4(),
         role_id=role_id or uuid.uuid4(),
-        scope_type=scope_type,
-        scope_id=scope_id,
-        entity_type=entity_type,
+        entity_type=EntityType(entity_type),
         permission=PermissionBitDTO[operation.name],
         operation=operation,
         created_at=datetime.now(UTC),
@@ -103,8 +100,6 @@ class TestAdminUpdatePermission:
 
         assert dto.id == permission_id
         assert dto.operation is not None
-        assert dto.scope_type is None
-        assert dto.scope_id is None
         assert dto.entity_type is None
 
         resolver_fn = cast(Any, permission_resolver.admin_update_permission).base_resolver
@@ -118,9 +113,7 @@ class TestAdminUpdatePermission:
         permission_id = uuid.uuid4()
         perm_node = _make_permission_node(
             permission_id=permission_id,
-            scope_type=RBACElementTypeDTO.PROJECT,
-            scope_id="project-1",
-            entity_type=RBACElementTypeDTO.SESSION,
+            entity_type=EntityType("session"),
             operation=OperationTypeDTO.CREATE,
         )
         mock_adapter_method.return_value = perm_node
@@ -128,16 +121,12 @@ class TestAdminUpdatePermission:
 
         input_data = UpdatePermissionInput(
             id=permission_id,
-            scope_type=RBACElementTypeGQL.PROJECT,
-            scope_id="project-1",
-            entity_type=RBACElementTypeGQL.SESSION,
+            entity_type="session",
             operation=OperationTypeGQL.CREATE,
         )
         dto = input_data.to_pydantic()
 
         assert dto.id == permission_id
-        assert dto.scope_type is not None
-        assert dto.scope_id == "project-1"
         assert dto.entity_type is not None
         assert dto.operation is not None
 
@@ -173,9 +162,7 @@ class TestAdminUpdatePermission:
         perm_node = _make_permission_node(
             permission_id=permission_id,
             role_id=role_id,
-            scope_type=RBACElementTypeDTO.DOMAIN,
-            scope_id="default",
-            entity_type=RBACElementTypeDTO.VFOLDER,
+            entity_type=EntityType("vfolder"),
             operation=OperationTypeDTO.READ,
         )
         mock_adapter_method.return_value = perm_node
@@ -191,9 +178,7 @@ class TestAdminUpdatePermission:
 
         assert isinstance(result, PermissionGQL)
         assert result.role_id == role_id
-        assert result.scope_type == RBACElementTypeGQL.DOMAIN
-        assert result.scope_id == "default"
-        assert result.entity_type == RBACElementTypeGQL.VFOLDER
+        assert result.entity_type == "vfolder"
         assert result.operation == OperationTypeGQL.READ
 
 

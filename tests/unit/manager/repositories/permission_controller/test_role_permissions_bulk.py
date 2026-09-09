@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING
 import pytest
 import sqlalchemy as sa
 
-from ai.backend.common.data.entity.types import EntityType, ScopeType
+from ai.backend.common.data.entity.types import EntityType
 from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.manager.data.permission.types import (
     OperationType,
@@ -66,13 +66,9 @@ def _spec(
     role_id: uuid.UUID,
     entity_type: RBACElementType,
     operation: OperationType,
-    scope_type: RBACElementType = RBACElementType.USER,
-    scope_id: str = USER_SCOPE_ID,
 ) -> PermissionCreatorSpec:
     return PermissionCreatorSpec(
         role_id=role_id,
-        scope_type=ScopeType(EntityType(scope_type)),
-        scope_id=scope_id,
         entity_type=EntityType(entity_type),
         permission=Permission.from_operation(operation),
     )
@@ -118,8 +114,6 @@ class TestBulkRolePermissions:
                 session.add(
                     PermissionRow(
                         role_id=role_id,
-                        scope_type=seed_permission.scope_type,
-                        scope_id=seed_permission.scope_id,
                         entity_type=seed_permission.entity_type,
                         permission=seed_permission.permission,
                     )
@@ -138,8 +132,6 @@ class TestBulkRolePermissions:
                 PermissionRow(
                     id=permission_id,
                     role_id=spec.role_id,
-                    scope_type=spec.scope_type,
-                    scope_id=spec.scope_id,
                     entity_type=spec.entity_type,
                     permission=spec.permission,
                 )
