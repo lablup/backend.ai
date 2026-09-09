@@ -19,7 +19,7 @@ from ai.backend.common.data.entity.container_registry import ContainerRegistryID
 from ai.backend.common.data.entity.domain import DomainID, DomainName
 from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE, ProjectID
 from ai.backend.common.data.entity.user import USER_SCOPE_TYPE, UserID
-from ai.backend.common.data.entity.vfolder import VFOLDER_ENTITY_TYPE, VFolderUUID
+from ai.backend.common.data.entity.vfolder import VFolderEntityType, VFolderUUID
 from ai.backend.common.types import (
     BinarySize,
     ClusterMode,
@@ -1103,7 +1103,7 @@ class TestVfolderRepositoryPurge:
                 status=status,
             )
             db_sess.add(vfolder)
-            db_sess.add(VirtualEntityRow(entity_type=VFOLDER_ENTITY_TYPE, entity_id=vfolder_id))
+            db_sess.add(VirtualEntityRow(entity_type=VFolderEntityType(), entity_id=vfolder_id))
             await db_sess.flush()
 
     async def _vfolder_exists(self, db: ExtendedAsyncSAEngine, vfolder_id: uuid.UUID) -> bool:

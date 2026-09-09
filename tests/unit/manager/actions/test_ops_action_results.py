@@ -24,7 +24,20 @@ from ai.backend.manager.actions.v2.ops.result import (
 )
 from ai.backend.manager.actions.v2.scope.result import BaseScopeActionResult
 
-_ENTITY_TYPE = EntityType("preset")
+
+class _PresetEntityType(EntityType):
+    @override
+    @classmethod
+    def name(cls) -> str:
+        return "preset"
+
+    @override
+    @classmethod
+    def description(cls) -> str:
+        return "The test preset entity."
+
+
+_ENTITY_TYPE = _PresetEntityType()
 
 
 class _PresetID(EntityIdentifier):

@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from typing import override
 
 from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
-from ai.backend.common.data.entity.user import USER_ENTITY_TYPE
+from ai.backend.common.data.entity.user import UserEntityType
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.actions.v2.global_scope.base import BaseGlobalAction
 from ai.backend.manager.actions.v2.single_entity.base import BaseSingleEntityAction
@@ -54,7 +54,7 @@ class BulkUpdateUserAction(BaseGlobalAction):
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return USER_ENTITY_TYPE
+        return UserEntityType()
 
     @override
     @classmethod

@@ -16,7 +16,7 @@ from ai.backend.client.v2.v2_registry import V2ClientRegistry
 if TYPE_CHECKING:
     from tests.component.conftest import ServerInfo, UserFixtureData
 
-from ai.backend.common.data.entity.secret import SECRET_ENTITY_TYPE
+from ai.backend.common.data.entity.secret import SecretEntityType
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
 from ai.backend.manager.actions.registry.types import GroupMeta
 from ai.backend.manager.api.adapters.secret.adapter import SecretAdapter
@@ -43,7 +43,7 @@ def secret_processors(
     pool = KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN)
     repository = SecretRepository(SecretOpsProvider(database_engine), pool)
     return SecretProcessors(
-        processor_registry.group(GroupMeta(SECRET_ENTITY_TYPE)),
+        processor_registry.group(GroupMeta(SecretEntityType())),
         SecretService(repository),
     )
 

@@ -13,6 +13,7 @@ from typing import override
 import pytest
 
 from ai.backend.common.data.entity.types import EntityID, EntityIdentifier, EntityType
+from ai.backend.common.data.entity.vfolder import VFolderEntityType
 from ai.backend.common.exception import PermissionDeniedError
 from ai.backend.manager.actions.types import ActionOperationType, OperationStatus
 from ai.backend.manager.actions.v2.single_entity.base import BaseSingleEntityAction
@@ -34,7 +35,7 @@ class _StubEntityID(EntityIdentifier):
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return EntityType("vfolder")
+        return VFolderEntityType()
 
 
 @dataclass

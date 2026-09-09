@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from typing import Any, override
 
 from ai.backend.common.data.entity.resource_slot import (
-    RESOURCE_SLOT_TYPE_ENTITY_TYPE,
+    ResourceSlotTypeEntityType,
     ResourceSlotTypeUUID,
 )
 from ai.backend.common.data.entity.types import EntityType
@@ -40,7 +40,7 @@ class LookupResourceSlotTypeAction(
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return RESOURCE_SLOT_TYPE_ENTITY_TYPE
+        return ResourceSlotTypeEntityType()
 
     @override
     @classmethod

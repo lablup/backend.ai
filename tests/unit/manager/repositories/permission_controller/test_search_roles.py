@@ -14,8 +14,8 @@ import pytest
 import sqlalchemy as sa
 
 from ai.backend.common.data.entity.domain import DomainID
-from ai.backend.common.data.entity.project import PROJECT_ENTITY_TYPE
-from ai.backend.common.data.entity.role import ROLE_ENTITY_TYPE
+from ai.backend.common.data.entity.project import ProjectEntityType
+from ai.backend.common.data.entity.role import RoleEntityType
 from ai.backend.common.data.filter_specs import (
     StringMatchSpec,
     UUIDEqualMatchSpec,
@@ -119,7 +119,7 @@ class TestSearchRoles:
 
         async with db_with_rbac_tables.begin_session() as db_sess:
             home = uuid.uuid4()
-            db_sess.add(VirtualEntityRow(entity_type=PROJECT_ENTITY_TYPE, entity_id=home))
+            db_sess.add(VirtualEntityRow(entity_type=ProjectEntityType(), entity_id=home))
             for i, (name, description) in enumerate([
                 ("admin-role", "Admin role"),
                 ("editor-role", "Editor role"),
@@ -130,7 +130,7 @@ class TestSearchRoles:
                     name=name,
                     description=description,
                     created_at=created_at,
-                    scope_type=PROJECT_ENTITY_TYPE,
+                    scope_type=ProjectEntityType(),
                     scope_id=home,
                 )
                 db_sess.add(role)
@@ -344,9 +344,9 @@ class TestSearchRoles:
         project_id = uuid.uuid4()
 
         async with db_with_rbac_tables.begin_session() as db_sess:
-            scope_node = VirtualEntityRow(entity_type=PROJECT_ENTITY_TYPE, entity_id=project_id)
+            scope_node = VirtualEntityRow(entity_type=ProjectEntityType(), entity_id=project_id)
             role_node = VirtualEntityRow(
-                entity_type=ROLE_ENTITY_TYPE, entity_id=created_roles[0].role_id
+                entity_type=RoleEntityType(), entity_id=created_roles[0].role_id
             )
             db_sess.add_all([scope_node, role_node])
             await db_sess.flush()
@@ -360,7 +360,7 @@ class TestSearchRoles:
             await db_sess.execute(
                 sa.update(RoleRow)
                 .where(RoleRow.id == created_roles[0].role_id)
-                .values(scope_type=PROJECT_ENTITY_TYPE, scope_id=project_id)
+                .values(scope_type=ProjectEntityType(), scope_id=project_id)
             )
             await db_sess.flush()
 
@@ -378,7 +378,7 @@ class TestSearchRoles:
         querier = BatchQuerier(
             conditions=[
                 RoleConditions.by_mapped_scope([
-                    RoleConditions.by_scope_type_equals(PROJECT_ENTITY_TYPE),
+                    RoleConditions.by_scope_type_equals(ProjectEntityType()),
                     RoleConditions.by_scope_id_equals(
                         UUIDEqualMatchSpec(value=uuid.UUID(project_scope_id), negated=False)
                     ),
@@ -436,13 +436,13 @@ class TestSearchRolesTotalCountNotInflated:
 
         async with db_with_rbac_tables.begin_session() as db_sess:
             home = uuid.uuid4()
-            db_sess.add(VirtualEntityRow(entity_type=PROJECT_ENTITY_TYPE, entity_id=home))
+            db_sess.add(VirtualEntityRow(entity_type=ProjectEntityType(), entity_id=home))
             # Role with multiple object permissions
             role_with_perms = RoleRow(
                 name="role-with-perms",
                 description="Role that has multiple object permissions",
                 created_at=base_time,
-                scope_type=PROJECT_ENTITY_TYPE,
+                scope_type=ProjectEntityType(),
                 scope_id=home,
             )
             db_sess.add(role_with_perms)
@@ -468,7 +468,7 @@ class TestSearchRolesTotalCountNotInflated:
             # Role with zero object permissions
             role_without_perms = RoleRow(
                 name="role-without-perms",
-                scope_type=PROJECT_ENTITY_TYPE,
+                scope_type=ProjectEntityType(),
                 scope_id=home,
                 description="Role that has no object permissions",
                 created_at=base_time + timedelta(minutes=1),

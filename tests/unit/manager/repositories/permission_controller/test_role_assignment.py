@@ -10,7 +10,7 @@ import sqlalchemy as sa
 
 from ai.backend.common.data.entity.domain import DomainID, DomainName
 from ai.backend.common.data.entity.project import ProjectID
-from ai.backend.common.data.entity.role import ROLE_ENTITY_TYPE
+from ai.backend.common.data.entity.role import RoleEntityType
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
@@ -554,7 +554,7 @@ class TestRoleAssignment:
                 )
             )
             await session.flush()
-            role_node = VirtualEntityRow(entity_type=ROLE_ENTITY_TYPE, entity_id=role_id)
+            role_node = VirtualEntityRow(entity_type=RoleEntityType(), entity_id=role_id)
             session.add(role_node)
             await session.flush()
             project_node_id = await session.scalar(

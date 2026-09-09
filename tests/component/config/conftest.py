@@ -10,9 +10,9 @@ import pytest
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
 from ai.backend.client.v2.registry import BackendAIClientRegistry
-from ai.backend.common.data.entity.domain import DOMAIN_ENTITY_TYPE
-from ai.backend.common.data.entity.project import PROJECT_ENTITY_TYPE
-from ai.backend.common.data.entity.user import USER_ENTITY_TYPE
+from ai.backend.common.data.entity.domain import DomainEntityType
+from ai.backend.common.data.entity.project import ProjectEntityType
+from ai.backend.common.data.entity.user import UserEntityType
 from ai.backend.common.dto.manager.config import (
     CreateDomainDotfileRequest,
     CreateDotfileResponse,
@@ -81,12 +81,12 @@ def server_module_registries(
     """Load only the modules required for config-domain tests."""
     v2_ops = V2DBOpsProvider(database_engine)
     domain = DomainProcessors(
-        config_registry.group(GroupMeta(DOMAIN_ENTITY_TYPE)),
+        config_registry.group(GroupMeta(DomainEntityType())),
         DomainService(DomainRepository(database_engine, v2_ops)),
         [],
     )
     project = ProjectProcessors(
-        config_registry.group(GroupMeta(PROJECT_ENTITY_TYPE)),
+        config_registry.group(GroupMeta(ProjectEntityType())),
         ProjectService(
             MagicMock(),
             MagicMock(),
@@ -99,7 +99,7 @@ def server_module_registries(
         ),
     )
     user = UserProcessors(
-        config_registry.group(GroupMeta(USER_ENTITY_TYPE)),
+        config_registry.group(GroupMeta(UserEntityType())),
         UserService(
             MagicMock(),
             MagicMock(),

@@ -10,7 +10,7 @@ import pytest
 import sqlalchemy as sa
 
 from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE, ProjectID
-from ai.backend.common.data.entity.role import ROLE_ENTITY_TYPE, RoleID
+from ai.backend.common.data.entity.role import RoleEntityType, RoleID
 from ai.backend.common.data.permission.types import RoleSource
 from ai.backend.manager.data.permission.role import RoleData
 from ai.backend.manager.data.permission.status import RoleStatus
@@ -169,7 +169,7 @@ class TestRoleCreate:
         role_node = (
             sa.select(VirtualEntityRow.id)
             .where(
-                VirtualEntityRow.entity_type == ROLE_ENTITY_TYPE,
+                VirtualEntityRow.entity_type == RoleEntityType(),
                 VirtualEntityRow.entity_id == role_id,
             )
             .scalar_subquery()

@@ -15,8 +15,8 @@ from ai.backend.client.v2.auth import HMACAuth
 from ai.backend.client.v2.config import ClientConfig
 from ai.backend.client.v2.registry import BackendAIClientRegistry
 from ai.backend.client.v2.v2_registry import V2ClientRegistry
-from ai.backend.common.data.entity.domain import DOMAIN_ENTITY_TYPE
-from ai.backend.common.data.entity.user import USER_ENTITY_TYPE
+from ai.backend.common.data.entity.domain import DomainEntityType
+from ai.backend.common.data.entity.user import UserEntityType
 from ai.backend.common.dto.manager.user import (
     CreateUserRequest,
     CreateUserResponse,
@@ -94,7 +94,7 @@ def user_processors(
         scheduling_controller=AsyncMock(),
     )
     return UserProcessors(
-        processor_registry.group(GroupMeta(USER_ENTITY_TYPE)),
+        processor_registry.group(GroupMeta(UserEntityType())),
         service,
     )
 
@@ -107,7 +107,7 @@ def domain_processors(
     service = DomainService(
         repository=DomainRepository(database_engine, V2DBOpsProvider(database_engine))
     )
-    return DomainProcessors(processor_registry.group(GroupMeta(DOMAIN_ENTITY_TYPE)), service, [])
+    return DomainProcessors(processor_registry.group(GroupMeta(DomainEntityType())), service, [])
 
 
 @pytest.fixture()

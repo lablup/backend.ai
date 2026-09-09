@@ -14,7 +14,7 @@ import sqlalchemy as sa
 from sqlalchemy.orm import InstrumentedAttribute, aliased
 
 from ai.backend.common.data.entity.types import EntityID, ScopeID, ScopeType
-from ai.backend.common.data.entity.user import USER_ENTITY_TYPE
+from ai.backend.common.data.entity.user import UserEntityType
 from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
 from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
 
@@ -44,7 +44,7 @@ def user_scope_membership_query(
         .join(member, EntityMembershipRow.member_entity_id == member.id)
         .where(
             VirtualEntityRow.entity_type == scope_type,
-            member.entity_type == USER_ENTITY_TYPE,
+            member.entity_type == UserEntityType(),
         )
     )
     if user_id is not None:
@@ -72,7 +72,7 @@ def user_scope_membership_exists(
         .where(
             VirtualEntityRow.entity_type == scope_type,
             VirtualEntityRow.entity_id == scope_id,
-            member.entity_type == USER_ENTITY_TYPE,
+            member.entity_type == UserEntityType(),
             member.entity_id == user_id,
         )
     )

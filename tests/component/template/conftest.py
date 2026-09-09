@@ -8,8 +8,8 @@ import pytest
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
-from ai.backend.common.data.entity.project import PROJECT_ENTITY_TYPE
-from ai.backend.common.data.entity.session_template import SESSION_TEMPLATE_ENTITY_TYPE
+from ai.backend.common.data.entity.project import ProjectEntityType
+from ai.backend.common.data.entity.session_template import SessionTemplateEntityType
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
 from ai.backend.manager.actions.registry.types import GroupMeta
 from ai.backend.manager.actions.validators import ActionValidators
@@ -51,7 +51,7 @@ def template_processors(
     repo = TemplateRepository(database_engine)
     service = TemplateService(repository=repo)
     return TemplateProcessors(
-        processor_registry.group(GroupMeta(SESSION_TEMPLATE_ENTITY_TYPE)), service
+        processor_registry.group(GroupMeta(SessionTemplateEntityType())), service
     )
 
 
@@ -72,7 +72,7 @@ def project_processors(
     )
     group_repos = ProjectRepositories(repository=group_repo)
     service = ProjectService(storage_manager, config_provider, valkey_clients.stat, group_repos)
-    return ProjectProcessors(processor_registry.group(GroupMeta(PROJECT_ENTITY_TYPE)), service)
+    return ProjectProcessors(processor_registry.group(GroupMeta(ProjectEntityType())), service)
 
 
 @pytest.fixture()

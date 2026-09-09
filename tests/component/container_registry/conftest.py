@@ -10,8 +10,8 @@ import sqlalchemy as sa
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
 from ai.backend.common.container_registry import ContainerRegistryType
-from ai.backend.common.data.entity.container_registry import CONTAINER_REGISTRY_ENTITY_TYPE
-from ai.backend.common.data.entity.user import USER_ENTITY_TYPE
+from ai.backend.common.data.entity.container_registry import ContainerRegistryEntityType
+from ai.backend.common.data.entity.user import UserEntityType
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
 from ai.backend.manager.actions.registry.types import Concern, ConcernMeta, GroupMeta
 from ai.backend.manager.api.adapters.container_registry.adapter import ContainerRegistryAdapter
@@ -52,7 +52,7 @@ def container_registry_processors(
     repo = ContainerRegistryRepository(database_engine, RelationOpsProvider(database_engine))
     service = ContainerRegistryService(database_engine, repo)
     return ContainerRegistryProcessors(
-        processor_registry.group(GroupMeta(CONTAINER_REGISTRY_ENTITY_TYPE)), service
+        processor_registry.group(GroupMeta(ContainerRegistryEntityType())), service
     )
 
 
@@ -65,7 +65,7 @@ def rbac_processors(
     rbac_groups = processor_registry.concern(ConcernMeta(Concern.RBAC))
     return RbacProcessors(
         rbac_groups.relation_group(),
-        rbac_groups.group(GroupMeta(USER_ENTITY_TYPE)),
+        rbac_groups.group(GroupMeta(UserEntityType())),
         RbacRelationService(RbacRelationRepository(RelationOpsProvider(database_engine))),
         RbacRosterService(RbacRosterRepository(RosterOpsProvider(database_engine))),
         RbacRoleService(

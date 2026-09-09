@@ -11,7 +11,7 @@ from dataclasses import dataclass
 
 import pytest
 
-from ai.backend.common.data.entity.vfolder import VFOLDER_ENTITY_TYPE
+from ai.backend.common.data.entity.vfolder import VFolderEntityType
 from ai.backend.manager.data.permission.types import (
     EntityType,
     OperationType,
@@ -141,7 +141,7 @@ class TestSearchPermissions:
     ) -> None:
         querier = BatchQuerier(
             conditions=[
-                ScopedPermissionConditions.by_entity_type(VFOLDER_ENTITY_TYPE),
+                ScopedPermissionConditions.by_entity_type(VFolderEntityType()),
             ],
             orders=[],
             pagination=OffsetPagination(limit=10, offset=0),

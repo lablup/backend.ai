@@ -13,11 +13,11 @@ from ai.backend.client.v2.config import ClientConfig
 from ai.backend.client.v2.v2_registry import V2ClientRegistry
 from ai.backend.common.data.app_config.types import AppConfigScopeType
 from ai.backend.common.data.entity.app_config import (
-    APP_CONFIG_ALLOW_LIST_ENTITY_TYPE,
-    APP_CONFIG_ENTITY_TYPE,
+    AppConfigAllowListEntityType,
+    AppConfigEntityType,
     AppConfigScopeID,
 )
-from ai.backend.common.data.entity.app_config_definition import APP_CONFIG_DEFINITION_ENTITY_TYPE
+from ai.backend.common.data.entity.app_config_definition import AppConfigDefinitionEntityType
 from ai.backend.manager.actions.monitors import ActionMonitors
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
 from ai.backend.manager.actions.registry.types import (
@@ -73,10 +73,10 @@ def app_config_processors(database_engine: ExtendedAsyncSAEngine) -> AppConfigPr
         )
     )
     return AppConfigProcessors(
-        registry.group(GroupMeta(APP_CONFIG_ENTITY_TYPE)),
-        ops_processor_group(database_engine, GroupMeta(APP_CONFIG_ENTITY_TYPE)),
-        registry.group(GroupMeta(APP_CONFIG_DEFINITION_ENTITY_TYPE)),
-        registry.group(GroupMeta(APP_CONFIG_ALLOW_LIST_ENTITY_TYPE)),
+        registry.group(GroupMeta(AppConfigEntityType())),
+        ops_processor_group(database_engine, GroupMeta(AppConfigEntityType())),
+        registry.group(GroupMeta(AppConfigDefinitionEntityType())),
+        registry.group(GroupMeta(AppConfigAllowListEntityType())),
         AppConfigService(OpsRepository(V2DBOpsProvider(database_engine))),
     )
 
