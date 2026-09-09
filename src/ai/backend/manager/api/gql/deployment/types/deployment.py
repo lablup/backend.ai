@@ -12,7 +12,7 @@ from strawberry import ID, UNSET, Info
 from strawberry.relay import Connection, Edge, NodeID, PageInfo
 
 from ai.backend.common.data.endpoint.types import ScalingState
-from ai.backend.common.data.entity.deployment import DEPLOYMENT_ENTITY_TYPE
+from ai.backend.common.data.entity.deployment import DeploymentEntityType
 from ai.backend.common.data.entity.types import RuntimeEntityID
 from ai.backend.common.data.model_deployment.types import (
     ModelDeploymentStatus,
@@ -701,7 +701,7 @@ class ModelDeployment(PydanticNodeMixin[DeploymentNodeDTO]):
     ) -> EntityLabelConnection | None:
         return await resolve_entity_labels(
             info,
-            RuntimeEntityID(DEPLOYMENT_ENTITY_TYPE, UUID(str(self.id))),
+            RuntimeEntityID(DeploymentEntityType(), UUID(str(self.id))),
             filter=filter,
             order_by=order_by,
             before=before,

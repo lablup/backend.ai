@@ -1,14 +1,33 @@
 from typing import override
 
-from ai.backend.common.data.entity.types import FieldIdentifier, FieldType
+from ai.backend.common.data.entity.role import RoleEntityType
+from ai.backend.common.data.entity.types import (
+    EntityType,
+    FieldIdentifier,
+    FieldType,
+)
 
 __all__ = (
-    "PERMISSION_FIELD_TYPE",
+    "PermissionFieldType",
     "PermissionID",
 )
 
 
-PERMISSION_FIELD_TYPE = FieldType("permission")
+class PermissionFieldType(FieldType):
+    @override
+    @classmethod
+    def name(cls) -> str:
+        return "permission"
+
+    @override
+    @classmethod
+    def description(cls) -> str:
+        return "One permission a role grants on one entity type, within one scope."
+
+    @override
+    @classmethod
+    def owner_type(cls) -> type[EntityType]:
+        return RoleEntityType
 
 
 class PermissionID(FieldIdentifier):
@@ -17,4 +36,4 @@ class PermissionID(FieldIdentifier):
     @override
     @classmethod
     def field_type(cls) -> FieldType:
-        return PERMISSION_FIELD_TYPE
+        return PermissionFieldType()

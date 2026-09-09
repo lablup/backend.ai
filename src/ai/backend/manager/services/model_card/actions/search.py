@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.common.data.entity.model_card import MODEL_CARD_ENTITY_TYPE
+from ai.backend.common.data.entity.model_card import ModelCardEntityType
 from ai.backend.common.data.entity.types import EntityType
 from ai.backend.manager.actions.v2.ops.base import SearchGlobalOpsAction
 from ai.backend.manager.data.model_card.types import ModelCardData
@@ -20,7 +20,7 @@ class GlobalSearchModelCardsAction(SearchGlobalOpsAction[ModelCardRow, ModelCard
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return MODEL_CARD_ENTITY_TYPE
+        return ModelCardEntityType()
 
     @override
     @classmethod

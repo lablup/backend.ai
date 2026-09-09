@@ -6,7 +6,7 @@ from collections.abc import Collection
 
 import sqlalchemy as sa
 
-from ai.backend.common.data.entity.agent import AGENT_ENTITY_TYPE
+from ai.backend.common.data.entity.agent import AgentEntityType
 from ai.backend.common.data.filter_specs import StringMatchSpec
 from ai.backend.manager.data.agent.types import AgentStatus
 from ai.backend.manager.models.clauses import QueryCondition
@@ -21,7 +21,7 @@ from .row import AgentRow
 class AgentConditions:
     """Query condition factories for filtering agent rows."""
 
-    labels = make_entity_label_nested_conditions(AgentRow, AgentRow.uuid, AGENT_ENTITY_TYPE)
+    labels = make_entity_label_nested_conditions(AgentRow, AgentRow.uuid, AgentEntityType())
     """The `labels` nested filter: some / every / none over the labels on a agent."""
 
     @staticmethod

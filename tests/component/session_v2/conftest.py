@@ -21,17 +21,17 @@ from ai.backend.client.v2.config import ClientConfig
 from ai.backend.client.v2.v2_registry import V2ClientRegistry
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
 from ai.backend.common.container_registry import ContainerRegistryType
-from ai.backend.common.data.entity.domain import DOMAIN_ENTITY_TYPE, DomainID
+from ai.backend.common.data.entity.domain import DomainEntityType, DomainID
 from ai.backend.common.data.entity.image import ImageID
-from ai.backend.common.data.entity.project import PROJECT_ENTITY_TYPE
+from ai.backend.common.data.entity.project import ProjectEntityType
 from ai.backend.common.data.entity.resource_group import (
-    RESOURCE_GROUP_ENTITY_TYPE,
+    ResourceGroupEntityType,
     ResourceGroupID,
     ResourceGroupName,
 )
-from ai.backend.common.data.entity.resource_preset import RESOURCE_PRESET_ENTITY_TYPE
-from ai.backend.common.data.entity.session import SESSION_ENTITY_TYPE, SessionID
-from ai.backend.common.data.entity.user import USER_ENTITY_TYPE
+from ai.backend.common.data.entity.resource_preset import ResourcePresetEntityType
+from ai.backend.common.data.entity.session import SessionEntityType, SessionID
+from ai.backend.common.data.entity.user import UserEntityType
 from ai.backend.common.data.permission.types import (
     EntityType,
     Permission,
@@ -167,15 +167,15 @@ async def session_processors(
     )
     service = SessionService(args)
     return SessionProcessors(
-        processor_registry.group(GroupMeta(SESSION_ENTITY_TYPE)),
-        processor_registry.group(GroupMeta(RESOURCE_GROUP_ENTITY_TYPE)),
+        processor_registry.group(GroupMeta(SessionEntityType())),
+        processor_registry.group(GroupMeta(ResourceGroupEntityType())),
         ResourceAllocationProcessors(
-            processor_registry.group(GroupMeta(USER_ENTITY_TYPE)),
-            processor_registry.group(GroupMeta(PROJECT_ENTITY_TYPE)),
-            processor_registry.group(GroupMeta(DOMAIN_ENTITY_TYPE)),
-            processor_registry.group(GroupMeta(RESOURCE_GROUP_ENTITY_TYPE)),
-            processor_registry.group(GroupMeta(SESSION_ENTITY_TYPE)),
-            processor_registry.group(GroupMeta(RESOURCE_PRESET_ENTITY_TYPE)),
+            processor_registry.group(GroupMeta(UserEntityType())),
+            processor_registry.group(GroupMeta(ProjectEntityType())),
+            processor_registry.group(GroupMeta(DomainEntityType())),
+            processor_registry.group(GroupMeta(ResourceGroupEntityType())),
+            processor_registry.group(GroupMeta(SessionEntityType())),
+            processor_registry.group(GroupMeta(ResourcePresetEntityType())),
             MagicMock(),
         ),
         service,
@@ -267,6 +267,8 @@ async def user_system_role(
                 id=role_id,
                 name=f"user-{str(user_uuid)[:8]}",
                 status=RoleStatus.ACTIVE,
+                scope_type=ScopeType.USER.value,
+                scope_id=user_uuid,
             )
         )
         await conn.execute(
@@ -716,15 +718,15 @@ async def compute_session_processors(
     )
     service = SessionService(args)
     return SessionProcessors(
-        processor_registry.group(GroupMeta(SESSION_ENTITY_TYPE)),
-        processor_registry.group(GroupMeta(RESOURCE_GROUP_ENTITY_TYPE)),
+        processor_registry.group(GroupMeta(SessionEntityType())),
+        processor_registry.group(GroupMeta(ResourceGroupEntityType())),
         ResourceAllocationProcessors(
-            processor_registry.group(GroupMeta(USER_ENTITY_TYPE)),
-            processor_registry.group(GroupMeta(PROJECT_ENTITY_TYPE)),
-            processor_registry.group(GroupMeta(DOMAIN_ENTITY_TYPE)),
-            processor_registry.group(GroupMeta(RESOURCE_GROUP_ENTITY_TYPE)),
-            processor_registry.group(GroupMeta(SESSION_ENTITY_TYPE)),
-            processor_registry.group(GroupMeta(RESOURCE_PRESET_ENTITY_TYPE)),
+            processor_registry.group(GroupMeta(UserEntityType())),
+            processor_registry.group(GroupMeta(ProjectEntityType())),
+            processor_registry.group(GroupMeta(DomainEntityType())),
+            processor_registry.group(GroupMeta(ResourceGroupEntityType())),
+            processor_registry.group(GroupMeta(SessionEntityType())),
+            processor_registry.group(GroupMeta(ResourcePresetEntityType())),
             MagicMock(),
         ),
         service,

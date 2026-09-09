@@ -4,7 +4,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.common.data.entity.role_preset import ROLE_PRESET_ENTITY_TYPE
+from ai.backend.common.data.entity.role_preset import RolePresetEntityType
 from ai.backend.common.data.entity.types import EntityType
 from ai.backend.manager.actions.v2.ops.base import CreateGlobalWithFieldsOpsAction
 from ai.backend.manager.data.role_preset.types import (
@@ -39,7 +39,7 @@ class CreateRolePresetAction(
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return ROLE_PRESET_ENTITY_TYPE
+        return RolePresetEntityType()
 
     @override
     @classmethod

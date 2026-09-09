@@ -19,7 +19,7 @@ from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 if TYPE_CHECKING:
     from tests.component.conftest import ServerInfo, UserFixtureData
 
-from ai.backend.common.data.entity.deployment_preset import DEPLOYMENT_PRESET_ENTITY_TYPE
+from ai.backend.common.data.entity.deployment_preset import DeploymentPresetEntityType
 from ai.backend.manager.actions.registry.types import (
     GroupMeta,
 )
@@ -71,7 +71,7 @@ def deployment_revision_preset_processors(
     repo = DeploymentPresetRepository(V2DBOpsProvider(database_engine))
     service = DeploymentPresetService(repo)
     return DeploymentPresetProcessors(
-        processor_registry.group(GroupMeta(DEPLOYMENT_PRESET_ENTITY_TYPE)), service
+        processor_registry.group(GroupMeta(DeploymentPresetEntityType())), service
     )
 
 

@@ -1,7 +1,17 @@
+from typing import override
+
 from ai.backend.common.data.entity.types import EntityType
 
-__all__ = ("ETCD_CONFIG_ENTITY_TYPE",)
+__all__ = ("EtcdConfigEntityType",)
 
 
-# Raw string mirroring the RBAC-managed EntityType.ETCD_CONFIG value.
-ETCD_CONFIG_ENTITY_TYPE = EntityType("etcd_config")
+class EtcdConfigEntityType(EntityType):
+    @override
+    @classmethod
+    def name(cls) -> str:
+        return "etcd_config"
+
+    @override
+    @classmethod
+    def description(cls) -> str:
+        return "The cluster configuration kept in etcd."

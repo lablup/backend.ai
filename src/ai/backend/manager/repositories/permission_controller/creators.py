@@ -18,10 +18,8 @@ from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.entity.virtual_entity import VirtualEntityID
 from ai.backend.manager.data.permission.bit import single_bit
 from ai.backend.manager.data.permission.id import ObjectId, ScopeId
-from ai.backend.manager.data.permission.status import RoleStatus
 from ai.backend.manager.data.permission.types import (
     Permission,
-    RoleSource,
 )
 from ai.backend.manager.errors.permission import RoleAlreadyAssigned
 from ai.backend.manager.errors.repository import UniqueConstraintViolationError
@@ -29,39 +27,11 @@ from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
 )
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
-from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck
 from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
 from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
 from ai.backend.manager.repositories.base.creator import CreatorSpec, DependentCreatorSpec
-
-
-@dataclass
-class RoleCreatorSpec(CreatorSpec[RoleRow]):
-    """CreatorSpec for role creation.
-
-    Deprecated: use ``RoleCreator`` in ``models/rbac_models/role/creators.py`` — BA-7204.
-
-    Only defines the role itself. Object permissions
-    are passed separately to create_role() for better separation of concerns.
-    """
-
-    name: str
-    source: RoleSource
-    status: RoleStatus
-    description: str | None = None
-    auto_assign: bool = False
-
-    @override
-    def build_row(self) -> RoleRow:
-        return RoleRow(
-            name=self.name,
-            source=self.source,
-            status=self.status,
-            description=self.description,
-            auto_assign=self.auto_assign,
-        )
 
 
 @dataclass

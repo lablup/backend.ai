@@ -22,6 +22,8 @@ import pytest
 import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, mapped_column
 
+from ai.backend.common.data.entity.project import ProjectEntityType
+from ai.backend.common.data.entity.resource_group import ResourceGroupEntityType
 from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
 from ai.backend.common.data.permission.types import Permission
 from ai.backend.manager.errors.common import ObjectNotFound
@@ -51,8 +53,8 @@ from ai.backend.manager.repositories.ops.v2.relation.provider import RelationOps
 from ai.backend.manager.repositories.ops.v2.share.provider import ShareOpsProvider
 from ai.backend.testutils.db import with_tables
 
-_SCOPE_TYPE = EntityType("project")
-_TARGET_TYPE = EntityType("resource_group")
+_SCOPE_TYPE = ProjectEntityType()
+_TARGET_TYPE = ResourceGroupEntityType()
 
 
 class _ScopeID(EntityIdentifier):

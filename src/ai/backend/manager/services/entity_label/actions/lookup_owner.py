@@ -6,8 +6,8 @@ from typing import Any, override
 
 from ai.backend.common.data.entity.entity_label import EntityLabelID
 from ai.backend.common.data.entity.types import (
-    GLOBAL_ENTITY_TYPE,
     EntityType,
+    GlobalEntityType,
 )
 from ai.backend.manager.actions.v2.field.bulk_lookup import (
     LookupBulkRuntimeFieldOwnerOpsAction,
@@ -46,7 +46,7 @@ class LookupEntityLabelOwnerAction(LookupRuntimeFieldOwnerOpsAction[EntityLabelI
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return GLOBAL_ENTITY_TYPE
+        return GlobalEntityType()
 
     @override
     @classmethod
@@ -75,7 +75,7 @@ class LookupBulkEntityLabelOwnerAction(LookupBulkRuntimeFieldOwnerOpsAction[Enti
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return GLOBAL_ENTITY_TYPE
+        return GlobalEntityType()
 
     @override
     @classmethod

@@ -8,9 +8,9 @@ from typing import Any, override
 
 import sqlalchemy as sa
 
-from ai.backend.common.data.entity.project import PROJECT_ENTITY_TYPE, ProjectID
+from ai.backend.common.data.entity.project import ProjectEntityType, ProjectID
 from ai.backend.common.data.entity.types import EntityIdentifier
-from ai.backend.common.data.entity.user import USER_ENTITY_TYPE, UserID
+from ai.backend.common.data.entity.user import UserEntityType, UserID
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.entity_share.row import EntityShareRow
 from ai.backend.manager.models.scopes import ExistenceCheck, OperationScope
@@ -49,7 +49,7 @@ class EntityShareRecipientScope(OperationScope):
                     .scalar_subquery()
                 ),
                 sa.and_(
-                    EntityShareRow.recipient_entity_type == USER_ENTITY_TYPE,
+                    EntityShareRow.recipient_entity_type == UserEntityType(),
                     EntityShareRow.recipient_entity_id == recipient_user_id,
                 ),
             )
@@ -75,7 +75,7 @@ class EntityShareRecipientProjectScope(OperationScope):
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return sa.and_(
-                EntityShareRow.recipient_entity_type == PROJECT_ENTITY_TYPE,
+                EntityShareRow.recipient_entity_type == ProjectEntityType(),
                 EntityShareRow.recipient_entity_id == project_id,
             )
 

@@ -3,16 +3,24 @@ from typing import override
 from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
 
 __all__ = (
-    "MODEL_CARD_ENTITY_TYPE",
+    "ModelCardEntityType",
     "ModelCardID",
 )
 
 
-# Raw string mirroring the RBAC-managed EntityType.MODEL_CARD value.
-MODEL_CARD_ENTITY_TYPE = EntityType("model_card")
+class ModelCardEntityType(EntityType):
+    @override
+    @classmethod
+    def name(cls) -> str:
+        return "model_card"
+
+    @override
+    @classmethod
+    def description(cls) -> str:
+        return "A description of a model kept in a vfolder."
 
 
 class ModelCardID(EntityIdentifier):
     @override
     def entity_type(self) -> EntityType:
-        return MODEL_CARD_ENTITY_TYPE
+        return ModelCardEntityType()

@@ -17,7 +17,7 @@ from ai.backend.client.v2.auth import HMACAuth
 from ai.backend.client.v2.config import ClientConfig
 from ai.backend.client.v2.v2_registry import V2ClientRegistry
 from ai.backend.common.data.entity.prometheus_query_preset import (
-    PROMETHEUS_QUERY_PRESET_ENTITY_TYPE,
+    PrometheusQueryPresetEntityType,
 )
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
 from ai.backend.manager.actions.registry.types import GroupMeta
@@ -93,7 +93,7 @@ def prometheus_query_preset_processors(
         ops_repository=OpsRepository(V2DBOpsProvider(database_engine)),
     )
     return PrometheusQueryPresetProcessors(
-        processor_registry.group(GroupMeta(PROMETHEUS_QUERY_PRESET_ENTITY_TYPE)), service
+        processor_registry.group(GroupMeta(PrometheusQueryPresetEntityType())), service
     )
 
 

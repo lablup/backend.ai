@@ -3,7 +3,7 @@ from __future__ import annotations
 import uuid
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Any, NewType, override
+from typing import Any, NewType, Self, override
 from uuid import UUID
 
 from pydantic import GetCoreSchemaHandler
@@ -22,22 +22,63 @@ class EntityType(str):
 
     A class rather than a `NewType` so a `NaturalKey` cannot be passed where this is
     expected: two `NewType`s over `str` are mutually assignable.
+
+    One subclass per kind, built with no argument: ``AgentEntityType()``. Do not
+    declare a module-level instance of one.
+
+    ``EntityType(value)`` rebuilds the bare base from a string and answers no `name()`
+    or `description()`. Reserved for a boundary that reads one -- a row column, a
+    legacy action, an RBAC element -- and written nowhere else.
     """
+
+    def __new__(cls, value: str | None = None) -> Self:
+        """A kind is built with no argument. Passing a value rebuilds the bare base from
+        a string, which the rules below reserve for a boundary reading one."""
+        return super().__new__(cls, cls.name() if value is None else value)
+
+    @override
+    def __reduce__(self) -> tuple[type[Any], tuple[Any, ...]]:
+        if type(self) is EntityType:
+            return (EntityType, (str(self),))
+        return (type(self), ())
+
+    @classmethod
+    def name(cls) -> str:
+        raise NotImplementedError
+
+    @classmethod
+    def description(cls) -> str:
+        raise NotImplementedError
 
     @classmethod
     def __get_pydantic_core_schema__(cls, source: Any, handler: GetCoreSchemaHandler) -> CoreSchema:
         """Validated as the string it is; pydantic builds no schema for a `str`
-        subclass on its own."""
-        return core_schema.no_info_after_validator_function(cls, core_schema.str_schema())
+        subclass on its own. A kind accepts its own name alone."""
+        if cls is EntityType:
+            return core_schema.no_info_after_validator_function(cls, core_schema.str_schema())
+        return core_schema.no_info_after_validator_function(
+            lambda _: cls(), core_schema.literal_schema([cls.name()])
+        )
 
 
 # Every entity doubles as a scope, so a scope type IS an entity type; the
 # reverse direction stays an explicit declaration (`ScopeType(<entity type>)`).
 ScopeType = NewType("ScopeType", EntityType)
 
-# The system itself, for a global operation that names nothing else. Wiring
-# only — see `manager/actions/AGENTS.md`.
-GLOBAL_ENTITY_TYPE = EntityType("global")
+
+class GlobalEntityType(EntityType):
+    """The system itself, for a global operation that names nothing else. Wiring
+    only — see `manager/actions/AGENTS.md`."""
+
+    @override
+    @classmethod
+    def name(cls) -> str:
+        return "global"
+
+    @override
+    @classmethod
+    def description(cls) -> str:
+        return "The system itself, recorded by a global operation that names no entity."
 
 
 class FieldType(str):
@@ -45,13 +86,55 @@ class FieldType(str):
 
     Kept apart from `EntityType` for the same reason that one is a class rather than a
     `NewType`: a field row is not an entity, and the two must not be interchangeable.
+
+    Subclassed per kind the same way `EntityType` is, with the same rule for a value
+    rebuilt from a string. A kind answers the entity kind owning its rows; a kind whose
+    owner is a value on the row is a :class:`DanglingFieldType`.
     """
+
+    def __new__(cls, value: str | None = None) -> Self:
+        """A kind is built with no argument. Passing a value rebuilds the bare base from
+        a string, which the rules below reserve for a boundary reading one."""
+        return super().__new__(cls, cls.name() if value is None else value)
+
+    @override
+    def __reduce__(self) -> tuple[type[Any], tuple[Any, ...]]:
+        if type(self) is FieldType:
+            return (FieldType, (str(self),))
+        return (type(self), ())
+
+    @classmethod
+    def name(cls) -> str:
+        raise NotImplementedError
+
+    @classmethod
+    def description(cls) -> str:
+        raise NotImplementedError
+
+    @classmethod
+    def owner_type(cls) -> type[EntityType] | None:
+        """The entity kind owning this kind's rows, or ``None`` when the owner is a
+        value on the row rather than one fixed kind."""
+        raise NotImplementedError
 
     @classmethod
     def __get_pydantic_core_schema__(cls, source: Any, handler: GetCoreSchemaHandler) -> CoreSchema:
         """Validated as the string it is; pydantic builds no schema for a `str`
-        subclass on its own."""
-        return core_schema.no_info_after_validator_function(cls, core_schema.str_schema())
+        subclass on its own. A kind accepts its own name alone."""
+        if cls is FieldType:
+            return core_schema.no_info_after_validator_function(cls, core_schema.str_schema())
+        return core_schema.no_info_after_validator_function(
+            lambda _: cls(), core_schema.literal_schema([cls.name()])
+        )
+
+
+class DanglingFieldType(FieldType):
+    """A field kind whose owner is a value on the row, not one fixed entity kind."""
+
+    @override
+    @classmethod
+    def owner_type(cls) -> None:
+        return None
 
 
 class NaturalKey(str):

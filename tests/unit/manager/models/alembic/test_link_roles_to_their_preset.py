@@ -132,6 +132,7 @@ async def _add_project(db: ExtendedAsyncSAEngine, domain: DomainFixture, name: s
                 type=ProjectType.GENERAL,
             )
         )
+        session.add(VirtualEntityRow(entity_type="project", entity_id=project_id))
     return project_id
 
 
@@ -147,15 +148,26 @@ async def _add_role(
     virtual entity graph when ``via_graph``."""
     role_id = uuid.uuid4()
     async with db.begin_session() as session:
-        session.add(RoleRow(id=role_id, name=name, source=source, status=RoleStatus.ACTIVE))
+        session.add(
+            RoleRow(
+                id=role_id,
+                name=name,
+                source=source,
+                status=RoleStatus.ACTIVE,
+                scope_type="project",
+                scope_id=project_id,
+            )
+        )
         if via_graph:
-            scope_node = VirtualEntityRow(entity_type="project", entity_id=project_id)
+            scope_node_id = await session.scalar(
+                sa.select(VirtualEntityRow.id).where(VirtualEntityRow.entity_id == project_id)
+            )
             role_node = VirtualEntityRow(entity_type="role", entity_id=role_id)
-            session.add_all([scope_node, role_node])
+            session.add(role_node)
             await session.flush()
             session.add(
                 EntityMembershipRow(
-                    virtual_entity_id=scope_node.id, member_entity_id=role_node.id, capped=False
+                    virtual_entity_id=scope_node_id, member_entity_id=role_node.id, capped=False
                 )
             )
         else:

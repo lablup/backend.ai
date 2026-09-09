@@ -20,7 +20,7 @@ import pytest
 import sqlalchemy as sa
 from sqlalchemy import text
 
-from ai.backend.common.data.entity.user import USER_ENTITY_TYPE
+from ai.backend.common.data.entity.user import UserEntityType
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.types import DefaultForUnspecified, ResourceSlot, VFolderHostPermissionMap
 from ai.backend.manager.data.user.types import UserStatus
@@ -291,7 +291,7 @@ async def admin_user_fixture(
         )
         await conn.execute(
             sa.insert(VirtualEntityRow.__table__).values(
-                entity_type=USER_ENTITY_TYPE,
+                entity_type=UserEntityType(),
                 entity_id=str(user_uuid),
             )
         )
@@ -346,7 +346,7 @@ async def regular_user_fixture(
         )
         await conn.execute(
             sa.insert(VirtualEntityRow.__table__).values(
-                entity_type=USER_ENTITY_TYPE,
+                entity_type=UserEntityType(),
                 entity_id=str(user_uuid),
             )
         )
