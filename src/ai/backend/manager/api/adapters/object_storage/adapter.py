@@ -6,7 +6,6 @@ import json
 from collections.abc import Sequence
 from uuid import UUID
 
-from ai.backend.common.api_handlers import Sentinel
 from ai.backend.common.data.entity.artifact_revision import ArtifactRevisionID
 from ai.backend.common.data.entity.object_storage import ObjectStorageID
 from ai.backend.common.dto.manager.v2.object_storage.request import (
@@ -194,28 +193,12 @@ class ObjectStorageAdapter(BaseAdapter):
         """Update an existing object storage."""
         updater = ObjectStorageUpdater(
             storage_id=ObjectStorageID(input.id),
-            name=OptionalState.update(input.name)
-            if input.name is not None
-            else OptionalState.nop(),
-            host=OptionalState.update(input.host)
-            if input.host is not None
-            else OptionalState.nop(),
-            access_key=OptionalState.update(input.access_key)
-            if input.access_key is not None
-            else OptionalState.nop(),
-            secret_key=OptionalState.update(input.secret_key)
-            if input.secret_key is not None
-            else OptionalState.nop(),
-            endpoint=OptionalState.update(input.endpoint)
-            if input.endpoint is not None
-            else OptionalState.nop(),
-            region=(
-                TriState.nop()
-                if isinstance(input.region, Sentinel)
-                else TriState.nullify()
-                if input.region is None
-                else TriState.update(input.region)
-            ),
+            name=OptionalState.from_unset(input.name),
+            host=OptionalState.from_unset(input.host),
+            access_key=OptionalState.from_unset(input.access_key),
+            secret_key=OptionalState.from_unset(input.secret_key),
+            endpoint=OptionalState.from_unset(input.endpoint),
+            region=TriState.from_unset(input.region),
         )
         action_result = await self._object_storage.update.run(
             UpdateObjectStorageAction(updater=updater)
