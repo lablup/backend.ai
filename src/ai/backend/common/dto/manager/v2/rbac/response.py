@@ -10,7 +10,7 @@ from uuid import UUID
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
-from ai.backend.common.data.entity.types import EntityID, EntityType
+from ai.backend.common.data.entity.types import EntityType
 
 from .types import (
     OperationTypeDTO,
@@ -71,7 +71,7 @@ class RoleNode(BaseResponseModel):
     updated_at: datetime = Field(description="Last update timestamp")
     deleted_at: datetime | None = Field(default=None, description="Deletion timestamp")
     scope_type: EntityType = Field(description="Type of the scope the role belongs to")
-    scope_id: EntityID = Field(description="ID of the scope the role belongs to")
+    scope_id: UUID = Field(description="ID of the scope the role belongs to")
 
 
 class CreateRolePayload(BaseResponseModel):

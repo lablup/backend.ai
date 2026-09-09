@@ -21,7 +21,6 @@ from sqlalchemy.sql.expression import SQLColumnExpression
 
 from ai.backend.common import msgpack
 from ai.backend.common.data.entity.domain import DomainID
-from ai.backend.common.data.entity.types import EntityID
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.domain.types import DomainData, DomainStatus
@@ -127,7 +126,7 @@ class DomainRow(LifecycleTimestampsMixin, Base):
     )
 
     @classmethod
-    def scope_id_expr(cls) -> SQLColumnExpression[EntityID]:
+    def scope_id_expr(cls) -> SQLColumnExpression[DomainID]:
         return cls.id
 
     @classmethod

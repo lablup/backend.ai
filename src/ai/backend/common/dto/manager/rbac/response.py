@@ -11,7 +11,7 @@ from uuid import UUID
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
-from ai.backend.common.data.entity.types import EntityID, EntityType
+from ai.backend.common.data.entity.types import EntityType
 from ai.backend.common.data.permission.types import ScopeType as LegacyScopeType
 from ai.backend.common.dto.manager.pagination import PaginationInfo
 from ai.backend.common.types import BackendAISchema
@@ -52,7 +52,7 @@ class RoleDTO(BackendAISchema):
     id: UUID = Field(description="Role ID")
     name: str = Field(description="Role name")
     scope_type: EntityType = Field(description="Type of the scope the role belongs to")
-    scope_id: EntityID = Field(description="ID of the scope the role belongs to")
+    scope_id: UUID = Field(description="ID of the scope the role belongs to")
     source: RoleSource = Field(description="Role source")
     status: RoleStatus = Field(description="Role status")
     created_at: datetime = Field(description="Creation timestamp")

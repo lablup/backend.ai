@@ -7,12 +7,7 @@ from typing import override
 
 from ai.backend.common.data.entity.role import RoleID
 from ai.backend.common.data.entity.role_preset import RolePresetID
-from ai.backend.common.data.entity.types import (
-    EntityData,
-    EntityID,
-    EntityIdentifier,
-    EntityType,
-)
+from ai.backend.common.data.entity.types import EntityData, EntityIdentifier, EntityType
 from ai.backend.manager.data.common.types import SearchResult
 
 from .id import ObjectId, ScopeId
@@ -48,7 +43,7 @@ class RoleData(EntityData):
     deleted_at: datetime | None
     # The one scope the role belongs to.
     scope_type: EntityType
-    scope_id: EntityID
+    scope_id: uuid.UUID
     auto_assign: bool = False
     description: str | None = None
     role_preset_id: RolePresetID | None = None
@@ -87,7 +82,7 @@ class RoleDetailData:
     updated_at: datetime
     deleted_at: datetime | None
     scope_type: EntityType
-    scope_id: EntityID
+    scope_id: uuid.UUID
     auto_assign: bool = False
     description: str | None = None
     role_preset_id: RolePresetID | None = None

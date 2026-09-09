@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import uuid
 from abc import ABC, abstractmethod
 from collections.abc import Iterator
 from typing import Any, Self, override
@@ -8,10 +7,6 @@ from uuid import UUID
 
 from pydantic import GetCoreSchemaHandler
 from pydantic_core import CoreSchema, core_schema
-
-# An entity's identifier. Polymorphic across entity kinds; the concrete kind is
-# discriminated by the accompanying entity_type.
-type EntityID = uuid.UUID
 
 
 class EntityType(str):
@@ -264,7 +259,7 @@ class EntityData(ABC):
 
     An abstract method rather than an ``id`` field: several domains key on a name
     (``domains.name``, ``scaling_groups.name``, ``keypairs.access_key``) and map it to
-    an ``EntityID`` themselves.
+    an ``EntityIdentifier`` themselves.
 
     MUST carry the columns of its own domain's row and nothing else: no relationship,
     no joined value. Rationale: ``manager/data/KNOWLEDGE.md``.

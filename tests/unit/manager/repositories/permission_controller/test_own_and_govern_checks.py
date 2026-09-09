@@ -20,7 +20,7 @@ from ai.backend.common.data.entity.project import ProjectEntityType, ProjectID
 from ai.backend.common.data.entity.resource_group import ResourceGroupEntityType
 from ai.backend.common.data.entity.role_preset import RolePresetEntityType, RolePresetID
 from ai.backend.common.data.entity.session import SessionEntityType, SessionID
-from ai.backend.common.data.entity.types import EntityID, EntityIdentifier, EntityType
+from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
 from ai.backend.common.data.entity.user import UserEntityType, UserID
 from ai.backend.common.data.entity.vfolder import VFolderEntityType, VFolderUUID
 from ai.backend.common.data.entity.virtual_entity import VirtualEntityID
@@ -106,7 +106,7 @@ class VSChainFixture:
     bound_scope_node_id: VirtualEntityID = field(
         default_factory=lambda: VirtualEntityID(uuid.uuid4())
     )
-    entity_id: EntityID = field(default_factory=uuid.uuid4)
+    entity_id: uuid.UUID = field(default_factory=uuid.uuid4)
     entity_node_id: VirtualEntityID = field(default_factory=lambda: VirtualEntityID(uuid.uuid4()))
 
 

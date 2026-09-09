@@ -17,7 +17,6 @@ from sqlalchemy.sql.expression import SQLColumnExpression
 
 from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.data.entity.container_registry import ContainerRegistryID
-from ai.backend.common.data.entity.types import EntityID
 from ai.backend.common.exception import UnknownImageRegistry
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.container_registry.types import ContainerRegistryData
@@ -253,7 +252,7 @@ class ContainerRegistryRow(Base):
         return result
 
     @classmethod
-    def scope_id_expr(cls) -> SQLColumnExpression[EntityID]:
+    def scope_id_expr(cls) -> SQLColumnExpression[ContainerRegistryID]:
         return cls.id
 
     @classmethod

@@ -32,7 +32,6 @@ from sqlalchemy.sql.expression import SQLColumnExpression, false, true
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
-from ai.backend.common.data.entity.types import EntityID
 from ai.backend.common.schema.resource_group import PreemptionConfig
 from ai.backend.common.types import (
     AgentSelectionStrategy,
@@ -313,7 +312,7 @@ class ResourceGroupRow(CreatedAtMixin, Base):
     )
 
     @classmethod
-    def scope_id_expr(cls) -> SQLColumnExpression[EntityID]:
+    def scope_id_expr(cls) -> SQLColumnExpression[ResourceGroupID]:
         return cls.id
 
     @classmethod
