@@ -22,16 +22,9 @@ import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
 from ai.backend.common.contexts.user import with_user
-from ai.backend.common.data.entity.domain import DomainEntityType, DomainID
+from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.project import ProjectEntityType
-from ai.backend.common.data.entity.types import (
-    EntityID,
-    EntityIdentifier,
-    EntityType,
-    ScopeID,
-    ScopeRef,
-    ScopeType,
-)
+from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
 from ai.backend.common.data.entity.vfolder import VFolderEntityType
 from ai.backend.common.data.entity.virtual_entity import VirtualEntityID
 from ai.backend.common.data.permission.types import (
@@ -112,12 +105,12 @@ _ORM_CLUSTER = (
     ResourceGroupForDomainRow,
 )
 
-_DOMAIN_ID: ScopeID = uuid.uuid4()
-_OTHER_DOMAIN_ID: ScopeID = uuid.uuid4()
-_PROJECT_ID: ScopeID = uuid.uuid4()
-_VFOLDER_ID: EntityID = uuid.uuid4()
-_BULK_VF_GRANTED: EntityID = uuid.uuid4()
-_BULK_VF_DENIED: EntityID = uuid.uuid4()
+_DOMAIN_ID: uuid.UUID = uuid.uuid4()
+_OTHER_DOMAIN_ID: uuid.UUID = uuid.uuid4()
+_PROJECT_ID: uuid.UUID = uuid.uuid4()
+_VFOLDER_ID: uuid.UUID = uuid.uuid4()
+_BULK_VF_GRANTED: uuid.UUID = uuid.uuid4()
+_BULK_VF_DENIED: uuid.UUID = uuid.uuid4()
 
 
 class _StubEntityID(EntityIdentifier):
@@ -130,9 +123,9 @@ class _StubEntityID(EntityIdentifier):
 class _ProjectCreateScopeAction(BaseScopeAction):
     """PROJECT:CREATE at domain scopes — subject type differs from the scope type."""
 
-    _scopes: Sequence[ScopeRef]
+    _scopes: Sequence[EntityIdentifier]
 
-    def __init__(self, scopes: Sequence[ScopeRef]) -> None:
+    def __init__(self, scopes: Sequence[EntityIdentifier]) -> None:
         self._scopes = scopes
 
     @classmethod
@@ -141,7 +134,7 @@ class _ProjectCreateScopeAction(BaseScopeAction):
         return ProjectEntityType()
 
     @override
-    def scope_targets(self) -> Sequence[ScopeRef]:
+    def scope_targets(self) -> Sequence[EntityIdentifier]:
         return self._scopes
 
     @classmethod
@@ -159,7 +152,7 @@ class _ProjectCreateScopeAction(BaseScopeAction):
 class _VfolderUpdateAction(BaseSingleEntityAction):
     """VFOLDER:UPDATE on a single vfolder — exercises the single-entity path."""
 
-    vfolder_id: EntityID = field(default_factory=lambda: _VFOLDER_ID)
+    vfolder_id: uuid.UUID = field(default_factory=lambda: _VFOLDER_ID)
 
     @classmethod
     @override
@@ -180,7 +173,7 @@ class _VfolderUpdateAction(BaseSingleEntityAction):
 class _VfolderUpsertAction(BaseSingleEntityAction):
     """VFOLDER:UPSERT on a single vfolder — requires the ``CREATE | UPDATE`` mask."""
 
-    vfolder_id: EntityID = field(default_factory=lambda: _VFOLDER_ID)
+    vfolder_id: uuid.UUID = field(default_factory=lambda: _VFOLDER_ID)
 
     @classmethod
     @override
@@ -201,7 +194,7 @@ class _VfolderUpsertAction(BaseSingleEntityAction):
 class _BulkVfolderUpdateAction(BaseBulkAction):
     """VFOLDER:UPDATE on multiple vfolders — exercises the bulk validator path."""
 
-    ids: list[EntityID]
+    ids: list[uuid.UUID]
 
     @classmethod
     @override
@@ -237,8 +230,8 @@ class _VfolderID(EntityIdentifier):
         return VFolderEntityType()
 
 
-def _domain_scope(scope_id: ScopeID) -> ScopeRef:
-    return ScopeRef(scope_type=ScopeType(DomainEntityType()), scope_id=scope_id)
+def _domain_scope(scope_id: uuid.UUID) -> EntityIdentifier:
+    return DomainID(scope_id)
 
 
 def _make_user_data(user_id: uuid.UUID, *, is_superadmin: bool) -> UserData:

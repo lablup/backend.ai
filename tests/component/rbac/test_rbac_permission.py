@@ -5,7 +5,7 @@ from typing import Any
 
 import pytest
 
-from ai.backend.common.data.entity.domain import DOMAIN_SCOPE_TYPE
+from ai.backend.common.data.entity.domain import DomainEntityType
 from ai.backend.common.data.entity.permission import PermissionID
 from ai.backend.common.data.entity.role import RoleID
 from ai.backend.common.data.entity.types import EntityType
@@ -247,7 +247,7 @@ class TestCheckPermissionInScope:
         domain_fixture: DomainFixtureData,
     ) -> None:
         """S-SCOPE-1: User has permission in target scope → True."""
-        role = await role_factory(scope_type=DOMAIN_SCOPE_TYPE, scope_id=domain_fixture.domain_id)
+        role = await role_factory(scope_type=DomainEntityType(), scope_id=domain_fixture.domain_id)
         role_id = role.role.id
         user_id: uuid.UUID = admin_user_fixture.user_uuid
 

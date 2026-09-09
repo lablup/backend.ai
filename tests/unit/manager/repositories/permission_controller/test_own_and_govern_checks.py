@@ -16,12 +16,12 @@ import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ai.backend.common.data.entity.domain import DomainID
-from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE, ProjectEntityType, ProjectID
+from ai.backend.common.data.entity.project import ProjectEntityType, ProjectID
 from ai.backend.common.data.entity.resource_group import ResourceGroupEntityType
 from ai.backend.common.data.entity.role_preset import RolePresetEntityType, RolePresetID
 from ai.backend.common.data.entity.session import SessionEntityType, SessionID
-from ai.backend.common.data.entity.types import EntityID, EntityType, ScopeRef, ScopeType
-from ai.backend.common.data.entity.user import USER_SCOPE_TYPE, UserID
+from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
+from ai.backend.common.data.entity.user import UserEntityType, UserID
 from ai.backend.common.data.entity.vfolder import VFolderEntityType, VFolderUUID
 from ai.backend.common.data.entity.virtual_entity import VirtualEntityID
 from ai.backend.common.data.permission.types import Permission
@@ -101,12 +101,12 @@ class VSChainFixture:
     virtual_entity_id: VirtualEntityID = field(
         default_factory=lambda: VirtualEntityID(uuid.uuid4())
     )
-    owner_scope_id: uuid.UUID = field(default_factory=uuid.uuid4)
+    owner_scope_id: ProjectID = field(default_factory=lambda: ProjectID(uuid.uuid4()))
     bound_scope_id: uuid.UUID = field(default_factory=uuid.uuid4)
     bound_scope_node_id: VirtualEntityID = field(
         default_factory=lambda: VirtualEntityID(uuid.uuid4())
     )
-    entity_id: EntityID = field(default_factory=uuid.uuid4)
+    entity_id: uuid.UUID = field(default_factory=uuid.uuid4)
     entity_node_id: VirtualEntityID = field(default_factory=lambda: VirtualEntityID(uuid.uuid4()))
 
 
@@ -238,7 +238,7 @@ class TestCheckPermissionViaVirtualEntity:
     def _chain_nodes(
         self,
         ids: VSChainFixture,
-        scope_type: ScopeType,
+        scope_type: EntityType,
         entity_type: EntityType,
     ) -> list[VirtualEntityRow]:
         """The nodes a chain names beyond the bound scope, which is made with the role:
@@ -270,9 +270,7 @@ class TestCheckPermissionViaVirtualEntity:
             db_sess.add(
                 DomainRow(id=domain_id, name=domain_name, total_resource_slots=ResourceSlot())
             )
-            db_sess.add_all(
-                self._chain_nodes(ids, ScopeType(ProjectEntityType()), _TARGET_ENTITY_TYPE)
-            )
+            db_sess.add_all(self._chain_nodes(ids, ProjectEntityType(), _TARGET_ENTITY_TYPE))
             await db_sess.flush()
 
             db_sess.add(
@@ -535,9 +533,7 @@ class TestCheckPermissionViaVirtualEntity:
         """The chain of :meth:`_build_chain`, over an entity type the legacy enum
         does not name."""
         async with db.begin_session() as db_sess:
-            db_sess.add_all(
-                self._chain_nodes(ids, ScopeType(ProjectEntityType()), _UNMAPPED_ENTITY_TYPE)
-            )
+            db_sess.add_all(self._chain_nodes(ids, ProjectEntityType(), _UNMAPPED_ENTITY_TYPE))
             await db_sess.flush()
             db_sess.add(
                 ScopeBindingRow(
@@ -665,7 +661,7 @@ class TestUserRosterEnrollment:
         self,
         db: ExtendedAsyncSAEngine,
         ids: VSChainFixture,
-        project_id: uuid.UUID,
+        project_id: ProjectID,
         entity_type: PermEntityType = PermEntityType.VFOLDER,
         operation: OperationType = OperationType.READ,
         permission: Permission = Permission.READ,
@@ -723,7 +719,7 @@ class TestUserRosterEnrollment:
             )
             await self._provision_scope(
                 db_sess,
-                ScopeRef(scope_type=ScopeType(EntityType("project")), scope_id=project_id),
+                project_id,
             )
             db_sess.add(
                 RoleRow(
@@ -755,7 +751,7 @@ class TestUserRosterEnrollment:
         async with db.begin_session() as db_sess:
             user_vs_id = await db_sess.scalar(
                 sa.select(VirtualEntityRow.id).where(
-                    VirtualEntityRow.entity_type == USER_SCOPE_TYPE,
+                    VirtualEntityRow.entity_type == UserEntityType(),
                     VirtualEntityRow.entity_id == ids.user_id,
                 )
             )
@@ -787,7 +783,7 @@ class TestUserRosterEnrollment:
         async with db.begin_session() as db_sess:
             project_ve_id = await db_sess.scalar(
                 sa.select(VirtualEntityRow.id).where(
-                    VirtualEntityRow.entity_type == PROJECT_SCOPE_TYPE,
+                    VirtualEntityRow.entity_type == ProjectEntityType(),
                     VirtualEntityRow.entity_id == project_id,
                 )
             )
@@ -807,28 +803,28 @@ class TestUserRosterEnrollment:
         self,
         db: ExtendedAsyncSAEngine,
         roster_provider: RosterOpsProvider,
-        project_scope: ScopeRef,
-        user_scope: ScopeRef,
+        project_scope: EntityIdentifier,
+        user_scope: EntityIdentifier,
         user_id: UserID,
     ) -> None:
         async with db.begin_session() as db_sess:
             for scope in (project_scope, user_scope):
                 await self._provision_scope(db_sess, scope)
         async with roster_provider.write_ops() as roster:
-            await roster.join_member(ProjectID(project_scope.scope_id), user_id)
+            await roster.join_member(ProjectID(project_scope), user_id)
 
-    async def _provision_scope(self, db_sess: AsyncSession, scope: ScopeRef) -> None:
+    async def _provision_scope(self, db_sess: AsyncSession, scope: EntityIdentifier) -> None:
         """The node a scope stands as, with the self membership and self binding an
         entity creation writes for it. Idempotent."""
         node_id = await db_sess.scalar(
             sa.select(VirtualEntityRow.id).where(
-                VirtualEntityRow.entity_type == scope.scope_type,
-                VirtualEntityRow.entity_id == scope.scope_id,
+                VirtualEntityRow.entity_type == scope.entity_type(),
+                VirtualEntityRow.entity_id == scope,
             )
         )
         if node_id is not None:
             return
-        node = VirtualEntityRow(entity_type=scope.scope_type, entity_id=scope.scope_id)
+        node = VirtualEntityRow(entity_type=scope.entity_type(), entity_id=scope)
         db_sess.add(node)
         await db_sess.flush()
         db_sess.add(
@@ -848,8 +844,8 @@ class TestUserRosterEnrollment:
     ) -> None:
         """A project-scope grant must not resolve onto a vfolder enrolled only in the
         member user's own virtual entity: no row binds that scope into the project."""
-        project_scope = ScopeRef(scope_type=PROJECT_SCOPE_TYPE, scope_id=ids.owner_scope_id)
-        user_scope = ScopeRef(scope_type=USER_SCOPE_TYPE, scope_id=ids.user_id)
+        project_scope = ids.owner_scope_id
+        user_scope = ids.user_id
         await self._grant_on_project(db_with_rbac_tables, ids, ids.owner_scope_id)
 
         await self._enroll_user_in_project(
@@ -877,8 +873,8 @@ class TestUserRosterEnrollment:
     ) -> None:
         """The same grant does reach a session enrolled in the project's virtual entity,
         so the check above fails for the intended reason and not by accident."""
-        project_scope = ScopeRef(scope_type=PROJECT_SCOPE_TYPE, scope_id=ids.owner_scope_id)
-        user_scope = ScopeRef(scope_type=USER_SCOPE_TYPE, scope_id=ids.user_id)
+        project_scope = ids.owner_scope_id
+        user_scope = ids.user_id
         session_id = uuid.uuid4()
         await self._grant_on_project(
             db_with_rbac_tables,
@@ -908,8 +904,8 @@ class TestUserRosterEnrollment:
     async def _put_vfolder_in_project_vs(
         self,
         db: ExtendedAsyncSAEngine,
-        project_id: uuid.UUID,
-        vfolder_id: uuid.UUID,
+        project_id: ProjectID,
+        vfolder_id: VFolderUUID,
         cap: Permission | None,
     ) -> None:
         """Put a vfolder into the project's virtual entity: shared under ``cap``, or
@@ -917,7 +913,7 @@ class TestUserRosterEnrollment:
         async with db.begin_session() as db_sess:
             project_ve_id = await db_sess.scalar(
                 sa.select(VirtualEntityRow.id).where(
-                    VirtualEntityRow.entity_type == PROJECT_SCOPE_TYPE,
+                    VirtualEntityRow.entity_type == ProjectEntityType(),
                     VirtualEntityRow.entity_id == project_id,
                 )
             )
@@ -947,9 +943,9 @@ class TestUserRosterEnrollment:
         """A project role holding session READ reaches sessions under a vfolder the
         project owns, and not under one merely shared into it: a share answers for
         the shared entity's own type only."""
-        project_scope = ScopeRef(scope_type=PROJECT_SCOPE_TYPE, scope_id=ids.owner_scope_id)
-        user_scope = ScopeRef(scope_type=USER_SCOPE_TYPE, scope_id=ids.user_id)
-        vfolder_id = uuid.uuid4()
+        project_scope = ids.owner_scope_id
+        user_scope = ids.user_id
+        vfolder_id = VFolderUUID(uuid.uuid4())
         await self._grant_on_project(
             db_with_rbac_tables,
             ids,
@@ -965,7 +961,7 @@ class TestUserRosterEnrollment:
 
         key = GovernCheckKey(
             user_id=ids.user_id,
-            scope=ScopeRef(scope_type=ScopeType(VFolderEntityType()), scope_id=vfolder_id),
+            scope=vfolder_id,
             entity_type=SessionEntityType(),
         )
         result = await repository.governed_permissions([key])
@@ -983,7 +979,7 @@ class TestUserRosterEnrollment:
         async with db.begin_session() as db_sess:
             project_ve_id = await db_sess.scalar(
                 sa.select(VirtualEntityRow.id).where(
-                    VirtualEntityRow.entity_type == PROJECT_SCOPE_TYPE,
+                    VirtualEntityRow.entity_type == ProjectEntityType(),
                     VirtualEntityRow.entity_id == project_id,
                 )
             )
@@ -1031,8 +1027,8 @@ class TestUserRosterEnrollment:
         """A project governing a resource group under READ reaches what the resource
         group owns, and not what was merely shared to the resource group: a share
         answers to the resource group's own scope only."""
-        project_scope = ScopeRef(scope_type=PROJECT_SCOPE_TYPE, scope_id=ids.owner_scope_id)
-        user_scope = ScopeRef(scope_type=USER_SCOPE_TYPE, scope_id=ids.user_id)
+        project_scope = ids.owner_scope_id
+        user_scope = ids.user_id
         other_project_id = uuid.uuid4()
         await self._grant_on_project(
             db_with_rbac_tables,
@@ -1064,8 +1060,8 @@ class TestUserRosterEnrollment:
     ) -> None:
         """A project role holding user UPDATE resolves to READ over the member user:
         the roster enrollment caps every project-to-user row to read."""
-        project_scope = ScopeRef(scope_type=PROJECT_SCOPE_TYPE, scope_id=ids.owner_scope_id)
-        user_scope = ScopeRef(scope_type=USER_SCOPE_TYPE, scope_id=ids.user_id)
+        project_scope = ids.owner_scope_id
+        user_scope = ids.user_id
         await self._grant_on_project(
             db_with_rbac_tables,
             ids,

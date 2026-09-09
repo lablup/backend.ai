@@ -5,8 +5,8 @@ from dataclasses import dataclass
 from typing import override
 
 from ai.backend.common.data.entity.model_card import ModelCardEntityType
-from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE, ProjectID
-from ai.backend.common.data.entity.types import EntityType, ScopeRef
+from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
 from ai.backend.manager.actions.v2.ops.base import OperationScopeOpsAction, ScopeItem
 from ai.backend.manager.data.model_card.types import ModelCardData
 from ai.backend.manager.models.model_card.row import ModelCardRow
@@ -27,8 +27,8 @@ class ModelCardScopeItem(ScopeItem):
     project_id: ProjectID
 
     @override
-    def scope_ref(self) -> ScopeRef:
-        return ScopeRef(scope_type=PROJECT_SCOPE_TYPE, scope_id=self.project_id)
+    def scope_id(self) -> EntityIdentifier:
+        return self.project_id
 
     @override
     def operation_scope(self) -> OperationScope:
@@ -53,8 +53,8 @@ class ScopedSearchModelCardsAction(OperationScopeOpsAction[ModelCardRow, ModelCa
         return "scoped_search_model_cards"
 
     @override
-    def scope_targets(self) -> Sequence[ScopeRef]:
-        return [item.scope_ref() for item in self.items]
+    def scope_targets(self) -> Sequence[EntityIdentifier]:
+        return [item.scope_id() for item in self.items]
 
     @override
     def operation_scopes(self) -> Sequence[OperationScope]:

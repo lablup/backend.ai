@@ -315,12 +315,12 @@ class KeyPair(graphene.ObjectType):  # type: ignore[misc]
         is_active: bool | None = None,
         filter: str | None = None,
     ) -> int:
-        from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE
+        from ai.backend.common.data.entity.project import ProjectEntityType
         from ai.backend.manager.models.project.row import groups
         from ai.backend.manager.models.user.row import users
         from ai.backend.manager.models.virtual_entity.queries import user_scope_membership_query
 
-        ms = user_scope_membership_query(PROJECT_SCOPE_TYPE).subquery()
+        ms = user_scope_membership_query(ProjectEntityType()).subquery()
         j = (
             sa.join(keypairs, users, keypairs.c.user == users.c.uuid)
             .outerjoin(ms, users.c.uuid == ms.c.user_id)
@@ -353,12 +353,12 @@ class KeyPair(graphene.ObjectType):  # type: ignore[misc]
         filter: str | None = None,
         order: str | None = None,
     ) -> Sequence[KeyPair]:
-        from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE
+        from ai.backend.common.data.entity.project import ProjectEntityType
         from ai.backend.manager.models.project.row import groups
         from ai.backend.manager.models.user.row import users
         from ai.backend.manager.models.virtual_entity.queries import user_scope_membership_query
 
-        ms = user_scope_membership_query(PROJECT_SCOPE_TYPE).subquery()
+        ms = user_scope_membership_query(ProjectEntityType()).subquery()
         j = (
             sa.join(keypairs, users, keypairs.c.user == users.c.uuid)
             .outerjoin(ms, users.c.uuid == ms.c.user_id)
@@ -406,12 +406,12 @@ class KeyPair(graphene.ObjectType):  # type: ignore[misc]
         domain_name: str | None = None,
         is_active: bool | None = None,
     ) -> Sequence[Sequence[KeyPair | None]]:
-        from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE
+        from ai.backend.common.data.entity.project import ProjectEntityType
         from ai.backend.manager.models.project.row import groups
         from ai.backend.manager.models.user.row import users
         from ai.backend.manager.models.virtual_entity.queries import user_scope_membership_query
 
-        ms = user_scope_membership_query(PROJECT_SCOPE_TYPE).subquery()
+        ms = user_scope_membership_query(ProjectEntityType()).subquery()
         j = (
             sa.join(keypairs, users, keypairs.c.user == users.c.uuid)
             .join(ms, users.c.uuid == ms.c.user_id)
@@ -450,12 +450,12 @@ class KeyPair(graphene.ObjectType):  # type: ignore[misc]
         *,
         domain_name: str | None = None,
     ) -> Sequence[KeyPair | None]:
-        from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE
+        from ai.backend.common.data.entity.project import ProjectEntityType
         from ai.backend.manager.models.project.row import groups
         from ai.backend.manager.models.user.row import users
         from ai.backend.manager.models.virtual_entity.queries import user_scope_membership_query
 
-        ms = user_scope_membership_query(PROJECT_SCOPE_TYPE).subquery()
+        ms = user_scope_membership_query(ProjectEntityType()).subquery()
         j = (
             sa.join(keypairs, users, keypairs.c.user == users.c.uuid)
             .join(ms, users.c.uuid == ms.c.user_id)

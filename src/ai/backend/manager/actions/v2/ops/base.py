@@ -2,12 +2,7 @@ from abc import ABC, abstractmethod
 from collections.abc import Mapping, Sequence
 from typing import Any, override
 
-from ai.backend.common.data.entity.types import (
-    EntityIdentifier,
-    FieldData,
-    FieldIdentifier,
-    ScopeRef,
-)
+from ai.backend.common.data.entity.types import EntityIdentifier, FieldData, FieldIdentifier
 from ai.backend.common.data.entity.types import EntityIdentifier as OwnerEntityID
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.actions.v2.bulk.base import BaseBulkAction, BasePartialBulkAction
@@ -228,7 +223,7 @@ class ScopeItem(ABC):
     """
 
     @abstractmethod
-    def scope_ref(self) -> ScopeRef:
+    def scope_id(self) -> EntityIdentifier:
         """The scope the read is answered for."""
         raise NotImplementedError
 

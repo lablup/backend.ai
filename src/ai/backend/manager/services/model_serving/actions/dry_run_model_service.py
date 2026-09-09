@@ -8,8 +8,8 @@ from typing import TYPE_CHECKING, override
 
 from pydantic import AnyUrl
 
-from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE, ProjectID
-from ai.backend.common.data.entity.types import ScopeRef
+from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.common.types import ClusterMode, RuntimeVariant
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.model_serving.types import ModelServicePrepareCtx, ServiceConfig
@@ -48,8 +48,8 @@ class DryRunModelServiceAction(ModelServiceScopeAction):
     model_service_prepare_ctx: ModelServicePrepareCtx
 
     @override
-    def scope_targets(self) -> Sequence[ScopeRef]:
-        return (ScopeRef(scope_type=PROJECT_SCOPE_TYPE, scope_id=self.project_id),)
+    def scope_targets(self) -> Sequence[EntityIdentifier]:
+        return (self.project_id,)
 
     @override
     @classmethod

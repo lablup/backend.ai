@@ -9,10 +9,9 @@ from typing import override
 
 from ai.backend.common.data.entity.domain import DomainEntityType
 from ai.backend.common.data.entity.resource_group import (
-    RESOURCE_GROUP_SCOPE_TYPE,
     ResourceGroupID,
 )
-from ai.backend.common.data.entity.types import EntityType, ScopeRef
+from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
 from ai.backend.manager.actions.v2.ops.base import OperationScopeOpsAction, ScopeItem
 from ai.backend.manager.data.domain.types import DomainData
 from ai.backend.manager.models.domain.row import DomainRow
@@ -32,8 +31,8 @@ class ResourceGroupDomainScopeItem(DomainScopeItem):
     resource_group_id: ResourceGroupID
 
     @override
-    def scope_ref(self) -> ScopeRef:
-        return ScopeRef(scope_type=RESOURCE_GROUP_SCOPE_TYPE, scope_id=self.resource_group_id)
+    def scope_id(self) -> EntityIdentifier:
+        return self.resource_group_id
 
     @override
     def operation_scope(self) -> OperationScope:
@@ -62,8 +61,8 @@ class ScopedSearchDomainsAction(OperationScopeOpsAction[DomainRow, DomainData]):
         return "scoped_search_domains"
 
     @override
-    def scope_targets(self) -> Sequence[ScopeRef]:
-        return [item.scope_ref() for item in self.items]
+    def scope_targets(self) -> Sequence[EntityIdentifier]:
+        return [item.scope_id() for item in self.items]
 
     @override
     def operation_scopes(self) -> Sequence[OperationScope]:

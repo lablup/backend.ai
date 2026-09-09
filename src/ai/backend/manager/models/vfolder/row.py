@@ -24,7 +24,7 @@ from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import Mapped, foreign, load_only, mapped_column, relationship, selectinload
 
-from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE, ProjectID
+from ai.backend.common.data.entity.project import ProjectEntityType, ProjectID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.defs import (
@@ -705,7 +705,7 @@ async def query_accessible_vfolders(
             grps = result.fetchall()
             group_ids = [g.id for g in grps]
         else:
-            query = user_scope_membership_query(PROJECT_SCOPE_TYPE, user_uuid)
+            query = user_scope_membership_query(ProjectEntityType(), user_uuid)
             result = await conn.execute(query)
             grps = result.fetchall()
             group_ids = [g.scope_id for g in grps]
@@ -842,7 +842,7 @@ async def get_allowed_vfolder_hosts_by_user(
         result_hosts: VFolderHostPermissionMap = allowed_hosts | values
         allowed_hosts = result_hosts
     # User's Groups' allowed_vfolder_hosts.
-    membership_cond = user_scope_membership_exists(PROJECT_SCOPE_TYPE, groups.c.id, user_uuid)
+    membership_cond = user_scope_membership_exists(ProjectEntityType(), groups.c.id, user_uuid)
     if group_id is not None:
         membership_cond = sa.and_(membership_cond, groups.c.id == group_id)
     query = sa.select(groups.c.allowed_vfolder_hosts).where(
@@ -1054,7 +1054,7 @@ async def ensure_quota_scope_accessible_by_user(
             case _:
                 membership_query = sa.select(
                     user_scope_membership_exists(
-                        PROJECT_SCOPE_TYPE, quota_scope_group.id, user["uuid"]
+                        ProjectEntityType(), quota_scope_group.id, user["uuid"]
                     )
                 )
                 if await conn.scalar(membership_query):
@@ -1354,7 +1354,7 @@ class VFolderPermissionContextBuilder(
             sa.select(ProjectRow)
             .where(
                 ProjectRow.domain_name == domain_name,
-                user_scope_membership_exists(PROJECT_SCOPE_TYPE, ProjectRow.id, ctx.user_id),
+                user_scope_membership_exists(ProjectEntityType(), ProjectRow.id, ctx.user_id),
             )
             .options(load_only(ProjectRow.id))
         )

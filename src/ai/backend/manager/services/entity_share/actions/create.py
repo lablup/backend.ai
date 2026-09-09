@@ -7,12 +7,7 @@ from dataclasses import dataclass
 from typing import override
 
 from ai.backend.common.data.entity.entity_share import EntityShareEntityType
-from ai.backend.common.data.entity.types import (
-    EntityIdentifier,
-    EntityType,
-    ScopeRef,
-    ScopeType,
-)
+from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.actions.v2.scope.base import BaseScopeAction
 from ai.backend.manager.actions.v2.scope.result import BaseScopeActionResult
@@ -52,9 +47,9 @@ class CreateEntityShareAction(BaseScopeAction):
         return "create_entity_share"
 
     @override
-    def scope_targets(self) -> Sequence[ScopeRef]:
+    def scope_targets(self) -> Sequence[EntityIdentifier]:
         target = self.creator.target
-        return (ScopeRef(scope_type=ScopeType(target.entity_type()), scope_id=target),)
+        return (target,)
 
 
 @dataclass

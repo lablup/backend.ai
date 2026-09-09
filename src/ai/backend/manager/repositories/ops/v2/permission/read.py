@@ -15,10 +15,7 @@ from dataclasses import dataclass
 import sqlalchemy as sa
 
 from ai.backend.common.data.entity.role import RoleID
-from ai.backend.common.data.entity.types import (
-    EntityID,
-    EntityType,
-)
+from ai.backend.common.data.entity.types import EntityType
 from ai.backend.common.data.permission.id import FieldPath
 from ai.backend.common.data.permission.types import Permission
 from ai.backend.manager.data.permission.status import RoleStatus
@@ -152,27 +149,27 @@ class PermissionReadOps(V2ReadOps):
             groups[
                 _GroupKey(
                     user_id=key.user_id,
-                    entity_type=EntityType(key.scope.scope_type),
+                    entity_type=key.scope.entity_type(),
                     subject_entity_type=key.entity_type,
                 )
             ].append(key)
 
         result: dict[GovernCheckKey, Permission] = {}
         for group_key, members in groups.items():
-            granted = await self._resolve_group(group_key, [k.scope.scope_id for k in members])
+            granted = await self._resolve_group(group_key, [k.scope for k in members])
             for key in members:
-                result[key] = granted.get(key.scope.scope_id, Permission.NONE)
+                result[key] = granted.get(key.scope, Permission.NONE)
         return result
 
     async def _resolve_group(
-        self, group_key: _GroupKey, entity_ids: Sequence[EntityID]
-    ) -> Mapping[EntityID, Permission]:
+        self, group_key: _GroupKey, entity_ids: Sequence[uuid.UUID]
+    ) -> Mapping[uuid.UUID, Permission]:
         result = await self._sess.execute(self._owned_query(group_key, entity_ids))
         return {row.entity_id: Permission(row.granted) for row in result}
 
     def _owned_query(
-        self, group_key: _GroupKey, entity_ids: Sequence[EntityID]
-    ) -> sa.Select[tuple[EntityID, int]]:
+        self, group_key: _GroupKey, entity_ids: Sequence[uuid.UUID]
+    ) -> sa.Select[tuple[uuid.UUID, int]]:
         """Run the virtual-entity-chain query for a single ``(user_id, entity_type,
         subject_entity_type)`` group with N entity_ids.
 

@@ -10,9 +10,9 @@ from typing import Any, override
 
 import sqlalchemy as sa
 
-from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE, ProjectID
-from ai.backend.common.data.entity.types import EntityIdentifier, ScopeRef
-from ai.backend.common.data.entity.user import USER_SCOPE_TYPE, UserID
+from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.types import EntityIdentifier
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.data.entity.vfolder_invitation import VFolderInvitationID
 from ai.backend.common.data.entity.vfolder_permission import VFolderPermissionID
@@ -81,7 +81,7 @@ class VFolderBaseCreator(GuardedEntityCreator[VFolderRow, VFolderData]):
     status: VFolderOperationStatus = VFolderOperationStatus.CREATING
 
     @abstractmethod
-    def scope_targets(self) -> Sequence[ScopeRef]:
+    def scope_targets(self) -> Sequence[EntityIdentifier]:
         """The scope the creation is authorized against.
 
         The project for a folder that project owns, the person's own scope for a folder
@@ -203,8 +203,8 @@ class PersonalVFolderCreator(VFolderBaseCreator):
     user: UserID
 
     @override
-    def scope_targets(self) -> Sequence[ScopeRef]:
-        return (ScopeRef(scope_type=USER_SCOPE_TYPE, scope_id=self.user),)
+    def scope_targets(self) -> Sequence[EntityIdentifier]:
+        return (self.user,)
 
     @override
     def build_row(self) -> VFolderRow:
@@ -244,8 +244,8 @@ class ProjectVFolderCreator(VFolderBaseCreator):
     project: ProjectID
 
     @override
-    def scope_targets(self) -> Sequence[ScopeRef]:
-        return (ScopeRef(scope_type=PROJECT_SCOPE_TYPE, scope_id=self.project),)
+    def scope_targets(self) -> Sequence[EntityIdentifier]:
+        return (self.project,)
 
     @override
     def precondition_checks(self) -> Sequence[PreconditionCheck]:

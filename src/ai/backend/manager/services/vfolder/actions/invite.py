@@ -6,8 +6,8 @@ from typing import (
     override,
 )
 
-from ai.backend.common.data.entity.types import EntityIdentifier, EntityType, ScopeRef
-from ai.backend.common.data.entity.user import USER_SCOPE_TYPE
+from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.entity.vfolder_invitation import (
     VFolderInvitationEntityType,
     VFolderInvitationID,
@@ -50,8 +50,8 @@ class VFolderInvitationScopeAction(BaseScopeAction):
         return VFolderInvitationEntityType()
 
     @override
-    def scope_targets(self) -> Sequence[ScopeRef]:
-        return (ScopeRef(scope_type=USER_SCOPE_TYPE, scope_id=self.user_uuid),)
+    def scope_targets(self) -> Sequence[EntityIdentifier]:
+        return (UserID(self.user_uuid),)
 
 
 @dataclass

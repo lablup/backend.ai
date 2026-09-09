@@ -6,11 +6,11 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.common.data.entity.domain import DOMAIN_SCOPE_TYPE, DomainID
+from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.export import ExportEntityType
-from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE, ProjectID
-from ai.backend.common.data.entity.types import EntityIdentifier, EntityType, ScopeRef
-from ai.backend.common.data.entity.user import USER_SCOPE_TYPE, UserID
+from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.manager.actions.v2.global_scope.base import BaseGlobalAction
 from ai.backend.manager.actions.v2.scope.base import BaseScopeAction
 from ai.backend.manager.actions.v2.scope.result import BaseScopeActionResult
@@ -38,8 +38,8 @@ class ExportUserScopeAction(BaseScopeAction):
         return ExportEntityType()
 
     @override
-    def scope_targets(self) -> Sequence[ScopeRef]:
-        return (ScopeRef(scope_type=USER_SCOPE_TYPE, scope_id=self.user_uuid),)
+    def scope_targets(self) -> Sequence[EntityIdentifier]:
+        return (self.user_uuid,)
 
 
 @dataclass
@@ -54,8 +54,8 @@ class ExportProjectScopeAction(BaseScopeAction):
         return ExportEntityType()
 
     @override
-    def scope_targets(self) -> Sequence[ScopeRef]:
-        return (ScopeRef(scope_type=PROJECT_SCOPE_TYPE, scope_id=self.project_id),)
+    def scope_targets(self) -> Sequence[EntityIdentifier]:
+        return (self.project_id,)
 
 
 @dataclass
@@ -71,8 +71,8 @@ class ExportDomainScopeAction(BaseScopeAction):
         return ExportEntityType()
 
     @override
-    def scope_targets(self) -> Sequence[ScopeRef]:
-        return (ScopeRef(scope_type=DOMAIN_SCOPE_TYPE, scope_id=self.domain_id),)
+    def scope_targets(self) -> Sequence[EntityIdentifier]:
+        return (self.domain_id,)
 
 
 @dataclass

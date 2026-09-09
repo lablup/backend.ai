@@ -8,7 +8,7 @@ from typing import Any, override
 
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.project import ProjectID
-from ai.backend.common.data.entity.resource_group import RESOURCE_GROUP_SCOPE_TYPE, ResourceGroupID
+from ai.backend.common.data.entity.resource_group import ResourceGroupEntityType, ResourceGroupID
 from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.exception import ResourceGroupConflict
@@ -59,7 +59,7 @@ class ResourceGroupCreator(RoleManagedGlobalEntityCreator[ResourceGroupRow, Reso
 
     @override
     def template_value(self, row: ResourceGroupRow) -> ScopeTemplateValue:
-        return ScopeTemplateValue(id=row.id, name=row.name, type=RESOURCE_GROUP_SCOPE_TYPE)
+        return ScopeTemplateValue(id=row.id, name=row.name, type=ResourceGroupEntityType())
 
     @override
     def integrity_error_checks(self) -> Sequence[IntegrityErrorCheck]:

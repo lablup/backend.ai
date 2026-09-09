@@ -8,8 +8,8 @@ from typing import override
 
 import sqlalchemy as sa
 
-from ai.backend.common.data.entity.domain import DOMAIN_SCOPE_TYPE, DomainID
-from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE, ProjectID
+from ai.backend.common.data.entity.domain import DomainEntityType, DomainID
+from ai.backend.common.data.entity.project import ProjectEntityType, ProjectID
 from ai.backend.common.data.entity.role import RoleID
 from ai.backend.manager.errors.permission import RoleNotFound
 from ai.backend.manager.errors.resource import DomainNotFound, ProjectNotFound
@@ -45,7 +45,7 @@ class DomainUserOperationScope(OperationScope):
         domain_id = self.domain_id
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return user_scope_membership_exists(DOMAIN_SCOPE_TYPE, domain_id, UserRow.uuid)
+            return user_scope_membership_exists(DomainEntityType(), domain_id, UserRow.uuid)
 
         return inner
 
@@ -80,7 +80,7 @@ class ProjectUserOperationScope(OperationScope):
         project_id = self.project_id
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return user_scope_membership_exists(PROJECT_SCOPE_TYPE, project_id, UserRow.uuid)
+            return user_scope_membership_exists(ProjectEntityType(), project_id, UserRow.uuid)
 
         return inner
 

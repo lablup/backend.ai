@@ -9,7 +9,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from ai.backend.client.v2.registry import BackendAIClientRegistry
-from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE
+from ai.backend.common.data.entity.project import ProjectEntityType
 from ai.backend.common.data.entity.role import RoleEntityType
 from ai.backend.common.data.entity.user import UserEntityType
 from ai.backend.common.dto.manager.rbac.request import (
@@ -125,7 +125,7 @@ async def role_factory(
         unique = secrets.token_hex(4)
         params: dict[str, Any] = {
             "name": f"test-role-{unique}",
-            "scope_type": PROJECT_SCOPE_TYPE,
+            "scope_type": ProjectEntityType(),
             "scope_id": group_fixture,
             "description": f"Test role {unique}",
         }

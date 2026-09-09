@@ -1,21 +1,12 @@
 from __future__ import annotations
 
-import uuid
 from abc import ABC, abstractmethod
 from collections.abc import Iterator
-from dataclasses import dataclass
-from typing import Any, NewType, Self, override
+from typing import Any, Self, override
 from uuid import UUID
 
 from pydantic import GetCoreSchemaHandler
 from pydantic_core import CoreSchema, core_schema
-
-# An entity's identifier. Polymorphic across entity kinds; the concrete kind is
-# discriminated by the accompanying entity_type.
-type EntityID = uuid.UUID
-# A scope's identifier. Every scope doubles as an entity, so this is an alias of
-# EntityID: the subset relation is visible in the type.
-type ScopeID = EntityID
 
 
 class EntityType(str):
@@ -79,11 +70,6 @@ class EntityType(str):
         return core_schema.no_info_after_validator_function(
             lambda _: cls(), core_schema.literal_schema([cls.name()])
         )
-
-
-# Every entity doubles as a scope, so a scope type IS an entity type; the
-# reverse direction stays an explicit declaration (`ScopeType(<entity type>)`).
-ScopeType = NewType("ScopeType", EntityType)
 
 
 class GlobalEntityType(EntityType):
@@ -175,41 +161,6 @@ class NaturalKey(str):
         return core_schema.no_info_after_validator_function(cls, core_schema.str_schema())
 
 
-@dataclass(frozen=True, slots=True)
-class EntityRef:
-    """An entity identified by its (open) type and id.
-
-    Deprecated: use :class:`EntityIdentifier` — BA-7204. This pair stays only where a
-    row's type is read at run time.
-
-    Both are values read at run time — the graph layer reads them off a row — so the id
-    is a bare one. Where the entity is known statically, pass an
-    :class:`EntityIdentifier`, which needs no separate type beside it.
-    """
-
-    entity_type: EntityType
-    entity_id: EntityID
-
-
-@dataclass(frozen=True, slots=True)
-class ScopeRef:
-    """A scope identified by its (open) type and id.
-
-    Deprecated: use :class:`EntityIdentifier` — BA-7204. This pair stays only where a
-    row's type is read at run time.
-
-    ``scope_type`` is a free-form string (NewType), not a fixed enum: the virtual
-    scope layer accepts any owner type without extending a hard-coded scope enum.
-    """
-
-    scope_type: ScopeType
-    scope_id: ScopeID
-
-    def to_entity_ref(self) -> EntityRef:
-        """An entity's scope identity is its entity identity: one pair serves both."""
-        return EntityRef(entity_type=self.scope_type, entity_id=self.scope_id)
-
-
 class EntityIdentifier(UUID):
     """An entity's id, which knows the type it is an id of.
 
@@ -248,9 +199,6 @@ class EntityIdentifier(UUID):
         """
         raise NotImplementedError
 
-    def entity_ref(self) -> EntityRef:
-        return EntityRef(entity_type=self.entity_type(), entity_id=self)
-
     @classmethod
     def __get_pydantic_core_schema__(cls, source: Any, handler: GetCoreSchemaHandler) -> CoreSchema:
         """Validated as the uuid it is; pydantic builds no schema for a `UUID`
@@ -279,7 +227,7 @@ class RuntimeEntityID(EntityIdentifier):
 class FieldIdentifier(UUID):
     """A field row's id.
 
-    No `entity_ref()`: a field row carries no membership of its own, so what it belongs
+    Names no entity: a field row carries no membership of its own, so what it belongs
     to is only knowable through the entity that owns it. Which entity that is comes from
     the owner lookup, not from this class: an owner may be another field row, and some
     kinds have none at all.
@@ -311,7 +259,7 @@ class EntityData(ABC):
 
     An abstract method rather than an ``id`` field: several domains key on a name
     (``domains.name``, ``scaling_groups.name``, ``keypairs.access_key``) and map it to
-    an ``EntityID`` themselves.
+    an ``EntityIdentifier`` themselves.
 
     MUST carry the columns of its own domain's row and nothing else: no relationship,
     no joined value. Rationale: ``manager/data/KNOWLEDGE.md``.
