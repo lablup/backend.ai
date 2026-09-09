@@ -90,47 +90,56 @@ class ModifyQueryDefinitionOptionsInput(BaseRequestModel):
     Each field is optional — only provided fields are updated.
     """
 
-    filter_labels: list[str] | None = Field(default=None, description="Allowed filter label keys")
-    group_labels: list[str] | None = Field(default=None, description="Allowed group-by label keys")
+    filter_labels: list[str] | None | Unset = Field(
+        default=UNSET, description="Allowed filter label keys. Omit to leave unchanged."
+    )
+    group_labels: list[str] | None | Unset = Field(
+        default=UNSET, description="Allowed group-by label keys. Omit to leave unchanged."
+    )
 
 
 class ModifyQueryDefinitionInput(BaseRequestModel):
     """Input for modifying a prometheus query definition.
 
-    Nullable DB columns (``time_window``, ``description``, ``category_id``) use the
-    ``Unset`` pattern so callers can distinguish "leave unchanged" from "clear to null".
-    Non-nullable fields use ``None`` to mean "do not update".
+    Every field defaults to ``Unset``; only fields the caller sends are updated.
     """
 
-    name: str | None = Field(default=None, description="Updated human-readable name")
+    name: str | None | Unset = Field(
+        default=UNSET, description="Updated human-readable name. Omit to leave unchanged."
+    )
     description: str | None | Unset = Field(
         default=UNSET,
         description="Updated description. Omit to leave unchanged; null clears.",
     )
-    rank: int | None = Field(default=None, ge=0, description="Updated sort rank")
+    rank: int | None | Unset = Field(
+        default=UNSET, ge=0, description="Updated sort rank. Omit to leave unchanged."
+    )
     category_id: UUID | None | Unset = Field(
         default=UNSET,
         description="Updated category ID. Omit to leave unchanged; null clears.",
     )
-    metric_name: str | None = Field(default=None, description="Updated Prometheus metric name")
-    query_template: str | None = Field(
-        default=None,
+    metric_name: str | None | Unset = Field(
+        default=UNSET, description="Updated Prometheus metric name. Omit to leave unchanged."
+    )
+    query_template: str | None | Unset = Field(
+        default=UNSET,
         description=(
-            "Updated PromQL template with placeholders (${{labels}}, ${{window}}, ${{group_by}})"
+            "Updated PromQL template with placeholders (${{labels}}, ${{window}}, ${{group_by}}). "
+            "Omit to leave unchanged."
         ),
     )
     time_window: str | None | Unset = Field(
         default=UNSET,
         description="Updated default time window. Omit to leave unchanged; null clears.",
     )
-    options: ModifyQueryDefinitionOptionsInput | None = Field(
-        default=None, description="Updated query definition options"
+    options: ModifyQueryDefinitionOptionsInput | None | Unset = Field(
+        default=UNSET, description="Updated query definition options. Omit to leave unchanged."
     )
 
     @field_validator("name")
     @classmethod
-    def name_must_not_be_blank(cls, v: str | None) -> str | None:
-        if v is None:
+    def name_must_not_be_blank(cls, v: str | None | Unset) -> str | None | Unset:
+        if not isinstance(v, str):
             return v
         stripped = v.strip()
         if not stripped:

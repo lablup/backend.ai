@@ -15,6 +15,7 @@ from ai.backend.common.dto.manager.v2.prometheus_query_preset.request import (
     CreateQueryDefinitionInput,
     DeleteQueryDefinitionInput,
     ModifyQueryDefinitionInput,
+    ModifyQueryDefinitionOptionsInput,
     PreviewQueryDefinitionInput,
     QueryDefinitionFilter,
     QueryDefinitionOrder,
@@ -311,37 +312,18 @@ class PrometheusQueryPresetAdapter(BaseAdapter):
     def _build_updater(
         preset_id: PrometheusQueryPresetID, input: ModifyQueryDefinitionInput
     ) -> PrometheusQueryPresetUpdater:
+        options = OptionalState[ModifyQueryDefinitionOptionsInput].from_unset(input.options)
         return PrometheusQueryPresetUpdater(
             preset_id=preset_id,
-            name=(
-                OptionalState.update(input.name) if input.name is not None else OptionalState.nop()
-            ),
+            name=OptionalState.from_unset(input.name),
             description=TriState.from_unset(input.description),
-            rank=(
-                OptionalState.update(input.rank) if input.rank is not None else OptionalState.nop()
-            ),
+            rank=OptionalState.from_unset(input.rank),
             category_id=TriState.from_unset(input.category_id).map(PrometheusQueryPresetCategoryID),
-            metric_name=(
-                OptionalState.update(input.metric_name)
-                if input.metric_name is not None
-                else OptionalState.nop()
-            ),
-            query_template=(
-                OptionalState.update(input.query_template)
-                if input.query_template is not None
-                else OptionalState.nop()
-            ),
+            metric_name=OptionalState.from_unset(input.metric_name),
+            query_template=OptionalState.from_unset(input.query_template),
             time_window=TriState.from_unset(input.time_window),
-            filter_labels=(
-                OptionalState.update(input.options.filter_labels)
-                if input.options is not None and input.options.filter_labels is not None
-                else OptionalState.nop()
-            ),
-            group_labels=(
-                OptionalState.update(input.options.group_labels)
-                if input.options is not None and input.options.group_labels is not None
-                else OptionalState.nop()
-            ),
+            filter_labels=options.and_optional(lambda o: o.filter_labels),
+            group_labels=options.and_optional(lambda o: o.group_labels),
         )
 
     @staticmethod
