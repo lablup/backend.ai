@@ -159,25 +159,13 @@ class ResourcePresetAdapter(BaseAdapter):
         input: UpdateResourcePresetInput,
     ) -> UpdateResourcePresetPayload:
         """Update an existing resource preset."""
-        resource_slots_state: OptionalState[ResourceSlot] = OptionalState.nop()
-        if input.resource_slots is not None:
-            resource_slots_state = OptionalState.update(
-                _resource_slot_entries_to_slot(input.resource_slots)
-            )
-
-        shared_memory_value = _resolve_shared_memory_for_update(input.shared_memory)
-
-        name_state: OptionalState[str] = OptionalState.nop()
-        if input.name is not None:
-            name_state = OptionalState.update(input.name)
-
-        resource_group_state: TriState[str] = TriState.from_unset(input.resource_group_name)
-
         updater_spec = ResourcePresetUpdaterSpec(
-            resource_slots=resource_slots_state,
-            name=name_state,
-            shared_memory=shared_memory_value,
-            resource_group_name=resource_group_state,
+            resource_slots=OptionalState.from_unset(input.resource_slots).map(
+                _resource_slot_entries_to_slot
+            ),
+            name=OptionalState.from_unset(input.name),
+            shared_memory=_resolve_shared_memory_for_update(input.shared_memory),
+            resource_group_name=TriState.from_unset(input.resource_group_name),
         )
         updater = Updater(spec=updater_spec, pk_value=input.id)
         result = await self._processors.resource_preset.update_preset.run(

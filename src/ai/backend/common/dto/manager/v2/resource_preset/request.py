@@ -45,9 +45,11 @@ class UpdateResourcePresetInput(BaseRequestModel):
     """Input for updating a resource preset. All fields optional for partial update."""
 
     id: UUID = Field(description="UUID of the resource preset to update.")
-    name: str | None = Field(default=None, description="Updated name.")
-    resource_slots: list[ResourceSlotEntryInput] | None = Field(
-        default=None, description="Updated resource slot allocations."
+    name: str | None | Unset = Field(
+        default=UNSET, description="Updated name. Omit to leave unchanged."
+    )
+    resource_slots: list[ResourceSlotEntryInput] | None | Unset = Field(
+        default=UNSET, description="Updated resource slot allocations. Omit to leave unchanged."
     )
     shared_memory: BinarySizeInput | None | Unset = Field(
         default=UNSET,
