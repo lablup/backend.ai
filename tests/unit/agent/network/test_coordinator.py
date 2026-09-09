@@ -454,6 +454,24 @@ class TestALateJoin:
             await coord.start(_META, _SELF)
         assert member_key("s1", "a1") not in etcd.store
 
+    async def test_a_record_from_before_the_state_field_is_still_joinable(self) -> None:
+        """`SESSION_META_STATE` says an absent state is a record written before the field existed
+        (or by an agent for its own session), not a session that is half-built. Reading absence as
+        "not ready" refused every session a pre-upgrade manager left behind: the node could not
+        resume them after a restart, and the departed-session pass could not finish their teardown
+        either -- so their member keys stayed and the manager held their VNIs for a node that was
+        not in them. Measured on a third node brought back onto this branch: two sessions from an
+        older manager, retried forever, member keys never withdrawn."""
+        etcd = FakeEtcd()
+        raw = json.loads(etcd.seed_session_meta())
+        del raw[SESSION_META_STATE]
+        etcd.store[session_meta_key("s1")] = json.dumps(raw)
+
+        coord = _coordinator(etcd, RecordingBackend())
+        await coord.start(_META, _SELF)
+
+        assert member_key("s1", "a1") in etcd.store
+
     async def test_a_record_that_changes_under_the_join_takes_the_membership_back(self) -> None:
         class _TornDownMidJoin(FakeEtcd):
             """The manager tombstones the session the moment this node publishes its member."""
