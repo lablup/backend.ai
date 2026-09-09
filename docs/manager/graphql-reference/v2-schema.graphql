@@ -3503,6 +3503,16 @@ input CreateRuntimeVariantPresetInput {
   """
   required: Boolean! = false
 
+  """
+  Added in 26.9.0. Runtime version this preset becomes available in. Dot-separated numbers.
+  """
+  addedVersion: String
+
+  """
+  Added in 26.9.0. Runtime version this preset is removed in, exclusive. Dot-separated numbers.
+  """
+  deprecatedVersion: String
+
   """Added in 26.9.0. UI category group for organizing parameters."""
   category: String
 
@@ -14239,6 +14249,16 @@ type RuntimeVariantPreset implements Node {
   """
   required: Boolean!
 
+  """
+  Added in 26.9.0. Runtime version this preset became available in; null means it always was.
+  """
+  addedVersion: String
+
+  """
+  Added in 26.9.0. Runtime version this preset was removed in, exclusive; null means it is still offered.
+  """
+  deprecatedVersion: String
+
   """UI category group for organizing parameters."""
   category: String
 
@@ -14302,6 +14322,11 @@ input RuntimeVariantPresetFilter {
   """Variant ID filter."""
   runtimeVariantId: UUIDFilter = null
 
+  """
+  Added in 26.9.0. Keep only presets valid at this runtime version, that is added_version <= version < deprecated_version. Dot-separated numbers.
+  """
+  runtimeVersion: String = null
+
   """Added in 26.7.0. Match all of the given sub-filters."""
   AND: [RuntimeVariantPresetFilter!] = null
 
@@ -14335,6 +14360,8 @@ enum RuntimeVariantPresetOrderField {
   NAME
   RANK
   CREATED_AT
+  ADDED_VERSION
+  DEPRECATED_VERSION
 }
 
 """Added in 26.9.0. Slider UI config input."""
@@ -16705,6 +16732,12 @@ input UpdateRuntimeVariantPresetInput {
 
   """Added in 26.4.4. New required flag."""
   required: Boolean = null
+
+  """Added in 26.9.0. New version this preset becomes available in."""
+  addedVersion: String
+
+  """Added in 26.9.0. New version this preset is removed in, exclusive."""
+  deprecatedVersion: String
 
   """Added in 26.9.0. New UI category group."""
   category: String

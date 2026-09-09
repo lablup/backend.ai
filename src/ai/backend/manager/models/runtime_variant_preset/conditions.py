@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 import uuid
 from collections.abc import Collection
 from uuid import UUID
@@ -13,11 +14,25 @@ from ai.backend.common.data.filter_specs import (
     UUIDEqualMatchSpec,
     UUIDInMatchSpec,
 )
+from ai.backend.common.dto.manager.v2.runtime_variant_preset.types import VERSION_PREFIX_PATTERN
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.condition_utils import make_string_in_factory
 from ai.backend.manager.models.runtime_variant_preset.row import RuntimeVariantPresetRow
 
 __all__ = ("RuntimeVariantPresetConditions",)
+
+
+_VERSION_PREFIX = re.compile(VERSION_PREFIX_PATTERN)
+
+
+def _version_segments(version: str) -> tuple[int, int, int] | None:
+    """Read a version the way the row's generated columns read theirs."""
+    prefix = _VERSION_PREFIX.match(version)
+    if prefix is None:
+        return None
+    segments = [int(segment) for segment in prefix.group().split(".")]
+    major, minor, patch = (segments + [0, 0, 0])[:3]
+    return major, minor, patch
 
 
 class RuntimeVariantPresetConditions:
@@ -108,6 +123,38 @@ class RuntimeVariantPresetConditions:
         return inner
 
     by_name_in = staticmethod(make_string_in_factory(RuntimeVariantPresetRow.name))
+
+    @staticmethod
+    def by_valid_at_version(version: str) -> QueryCondition:
+        """Half-open range: ``added_version <= version < deprecated_version``."""
+        target = _version_segments(version)
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if target is None:
+                return sa.false()
+            major, minor, patch = target
+            added = sa.tuple_(
+                RuntimeVariantPresetRow.added_version_major,
+                RuntimeVariantPresetRow.added_version_minor,
+                RuntimeVariantPresetRow.added_version_patch,
+            )
+            deprecated = sa.tuple_(
+                RuntimeVariantPresetRow.deprecated_version_major,
+                RuntimeVariantPresetRow.deprecated_version_minor,
+                RuntimeVariantPresetRow.deprecated_version_patch,
+            )
+            return sa.and_(
+                sa.or_(
+                    RuntimeVariantPresetRow.added_version.is_(None),
+                    added <= sa.tuple_(sa.literal(major), sa.literal(minor), sa.literal(patch)),
+                ),
+                sa.or_(
+                    RuntimeVariantPresetRow.deprecated_version.is_(None),
+                    deprecated > sa.tuple_(sa.literal(major), sa.literal(minor), sa.literal(patch)),
+                ),
+            )
+
+        return inner
 
     @staticmethod
     def by_cursor_forward(cursor_id: str) -> QueryCondition:
