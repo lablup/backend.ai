@@ -8,15 +8,18 @@ from typing import override
 
 import sqlalchemy as sa
 
-from ai.backend.common.data.entity.domain import DomainID
-from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE
+from ai.backend.common.data.entity.domain import DOMAIN_SCOPE_TYPE, DomainID
+from ai.backend.common.data.entity.project import PROJECT_ENTITY_TYPE, PROJECT_SCOPE_TYPE
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.manager.errors.resource import DomainNotFound
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.project.row import ProjectRow
 from ai.backend.manager.models.scopes import ExistenceCheck, OperationScope
-from ai.backend.manager.models.virtual_entity.queries import user_scope_membership_exists
+from ai.backend.manager.models.virtual_entity.queries import (
+    scope_membership_exists,
+    user_scope_membership_exists,
+)
 
 __all__ = (
     "DomainProjectOperationScope",
@@ -43,9 +46,14 @@ class DomainProjectOperationScope(OperationScope):
         """
         domain_id = self.domain_id
 
+        # TODO(BA-7571): drop the column term once the ownership backfill lands.
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return ProjectRow.domain_name == (
-                sa.select(DomainRow.name).where(DomainRow.id == domain_id).scalar_subquery()
+            return sa.or_(
+                ProjectRow.domain_name
+                == sa.select(DomainRow.name).where(DomainRow.id == domain_id).scalar_subquery(),
+                scope_membership_exists(
+                    DOMAIN_SCOPE_TYPE, domain_id, PROJECT_ENTITY_TYPE, ProjectRow.id
+                ),
             )
 
         return inner

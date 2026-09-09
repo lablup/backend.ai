@@ -8,7 +8,7 @@ from typing import override
 
 import sqlalchemy as sa
 
-from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.domain import DOMAIN_SCOPE_TYPE, DomainID
 from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE, ProjectID
 from ai.backend.common.data.entity.role import RoleID
 from ai.backend.manager.errors.permission import RoleNotFound
@@ -41,11 +41,11 @@ class DomainUserOperationScope(OperationScope):
 
     @override
     def to_condition(self) -> QueryCondition:
-        """Convert scope to a query condition for UserRow."""
+        """Membership predicate: the user is enrolled in the domain's virtual scope."""
         domain_id = self.domain_id
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return UserRow.domain_id == domain_id
+            return user_scope_membership_exists(DOMAIN_SCOPE_TYPE, domain_id, UserRow.uuid)
 
         return inner
 

@@ -8,6 +8,8 @@ from uuid import UUID
 
 import sqlalchemy as sa
 
+from ai.backend.common.data.entity.domain import DOMAIN_SCOPE_TYPE
+from ai.backend.common.data.entity.project import PROJECT_ENTITY_TYPE
 from ai.backend.common.data.filter_specs import StringMatchSpec, UUIDEqualMatchSpec, UUIDInMatchSpec
 from ai.backend.manager.data.project.types import ProjectStatus, ProjectType
 from ai.backend.manager.data.user.types import UserStatus
@@ -20,12 +22,31 @@ from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.project import AssocGroupUserRow
 from ai.backend.manager.models.project.row import ProjectRow
 from ai.backend.manager.models.user import UserRow
+from ai.backend.manager.models.virtual_entity.queries import scope_membership_exists
 
 __all__ = ("ProjectConditions",)
 
 
 class ProjectConditions:
     """Query conditions for filtering groups/projects."""
+
+    @staticmethod
+    def held_by_domain(domain_name: str) -> QueryCondition:
+        """Match the projects the named domain holds."""
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            domain_id = (
+                sa.select(DomainRow.id).where(DomainRow.name == domain_name).scalar_subquery()
+            )
+            # TODO(BA-7571): drop the column term once the ownership backfill lands.
+            return sa.or_(
+                ProjectRow.domain_name == domain_name,
+                scope_membership_exists(
+                    DOMAIN_SCOPE_TYPE, domain_id, PROJECT_ENTITY_TYPE, ProjectRow.id
+                ),
+            )
+
+        return inner
 
     @staticmethod
     def not_being_purged() -> QueryCondition:
