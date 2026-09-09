@@ -176,30 +176,14 @@ class RuntimeVariantPresetAdapter(BaseAdapter):
     ) -> UpdateRuntimeVariantPresetPayload:
         updater = RuntimeVariantPresetUpdater(
             preset_id=RuntimeVariantPresetID(input.id),
-            name=(
-                OptionalState.update(input.name) if input.name is not None else OptionalState.nop()
-            ),
+            name=OptionalState.from_unset(input.name),
             description=TriState.from_unset(input.description),
-            rank=(
-                OptionalState.update(input.rank) if input.rank is not None else OptionalState.nop()
-            ),
-            preset_target=(
-                OptionalState.update(input.preset_target)
-                if input.preset_target is not None
-                else OptionalState.nop()
-            ),
-            value_type=(
-                OptionalState.update(input.value_type)
-                if input.value_type is not None
-                else OptionalState.nop()
-            ),
+            rank=OptionalState.from_unset(input.rank),
+            preset_target=OptionalState.from_unset(input.preset_target),
+            value_type=OptionalState.from_unset(input.value_type),
             default_value=TriState.from_unset(input.default_value),
-            key=(OptionalState.update(input.key) if input.key is not None else OptionalState.nop()),
-            required=(
-                OptionalState.update(input.required)
-                if input.required is not None
-                else OptionalState.nop()
-            ),
+            key=OptionalState.from_unset(input.key),
+            required=OptionalState.from_unset(input.required),
             category=TriState.from_unset(input.category),
             display_name=TriState.from_unset(input.display_name),
             ui_option=TriState.from_unset(input.ui_option),

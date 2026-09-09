@@ -447,22 +447,20 @@ class CreateRuntimeVariantPresetInputGQL(PydanticInputMixin[CreateInputDTO]):
 )
 class UpdateRuntimeVariantPresetInputGQL(PydanticInputMixin[UpdateInputDTO]):
     id: UUID = gql_field(description="Preset ID.")
-    name: str | None = gql_field(default=None, description="New name.")
-    description: str | None = gql_field(default=None, description="New description.")
-    rank: int | None = gql_field(default=None, description="New rank.")
-    preset_target: PresetTargetGQL | None = gql_field(default=None, description="New target.")
+    name: str | None = gql_field(description="New name.")
+    description: str | None = gql_field(description="New description.")
+    rank: int | None = gql_field(description="New rank.")
+    preset_target: PresetTargetGQL | None = gql_field(description="New target.")
     value_type: PresetValueTypeGQL | None = gql_field(
-        default=None,
         description=(
             "New value type. 'flag' is only valid when the effective preset_target is 'args' "
             "(the stored target applies when preset_target is omitted)."
         ),
     )
-    default_value: str | None = gql_field(default=None, description="New default value.")
-    key: str | None = gql_field(default=None, description="New key.")
+    default_value: str | None = gql_field(description="New default value.")
+    key: str | None = gql_field(description="New key.")
     required: bool | None = gql_added_field(
         BackendAIGQLMeta(added_version="26.4.4", description="New required flag."),
-        default=None,
     )
     category: str | None = gql_added_field(
         BackendAIGQLMeta(

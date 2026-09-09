@@ -67,25 +67,31 @@ class CreateRuntimeVariantPresetInput(BaseRequestModel):
 
 class UpdateRuntimeVariantPresetInput(BaseRequestModel):
     id: UUID = Field(description="Preset ID.")
-    name: str | None = Field(default=None, min_length=1, max_length=256)
+    name: str | None | Unset = Field(
+        default=UNSET, min_length=1, max_length=256, description="Omit to leave unchanged."
+    )
     description: str | None | Unset = Field(
         default=UNSET, description="Description. Omit to leave unchanged; null clears."
     )
-    rank: int | None = Field(default=None, ge=0)
-    preset_target: PresetTarget | None = Field(default=None)
-    value_type: PresetValueType | None = Field(
-        default=None,
+    rank: int | None | Unset = Field(default=UNSET, ge=0, description="Omit to leave unchanged.")
+    preset_target: PresetTarget | None | Unset = Field(
+        default=UNSET, description="Omit to leave unchanged."
+    )
+    value_type: PresetValueType | None | Unset = Field(
+        default=UNSET,
         description=(
             "New value type. 'flag' is only valid when the effective preset_target is 'args' "
-            "(the stored target applies when preset_target is omitted)."
+            "(the stored target applies when preset_target is omitted). Omit to leave unchanged."
         ),
     )
     default_value: str | None | Unset = Field(
         default=UNSET, description="Default value. Omit to leave unchanged; null clears."
     )
-    key: str | None = Field(default=None, min_length=1, max_length=256)
-    required: bool | None = Field(
-        default=None, description="Toggle required flag; None = no change."
+    key: str | None | Unset = Field(
+        default=UNSET, min_length=1, max_length=256, description="Omit to leave unchanged."
+    )
+    required: bool | None | Unset = Field(
+        default=UNSET, description="Toggle required flag. Omit to leave unchanged."
     )
     category: str | None | Unset = Field(
         default=UNSET, description="UI category group. Omit to leave unchanged; null clears."
@@ -102,7 +108,7 @@ class UpdateRuntimeVariantPresetInput(BaseRequestModel):
     def validate_flag_requires_args(self) -> Self:
         if (
             self.value_type == PresetValueType.FLAG
-            and self.preset_target is not None
+            and isinstance(self.preset_target, PresetTarget)
             and self.preset_target != PresetTarget.ARGS
         ):
             raise ValueError("value_type 'flag' is only valid with preset_target 'args'.")
@@ -110,10 +116,8 @@ class UpdateRuntimeVariantPresetInput(BaseRequestModel):
 
     @model_validator(mode="after")
     def validate_default_value(self) -> Self:
-        if (
-            self.value_type is None
-            or isinstance(self.default_value, Unset)
-            or self.default_value is None
+        if not isinstance(self.value_type, PresetValueType) or not isinstance(
+            self.default_value, str
         ):
             return self
         validator = VALUE_TYPE_VALIDATORS.get(self.value_type)
