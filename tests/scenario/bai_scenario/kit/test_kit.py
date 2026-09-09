@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import pytest
@@ -18,11 +18,14 @@ from bai_kit.manager.typed import (
     Checked,
     Every,
     Exactly,
+    Ignored,
     at,
     checked,
     every,
     exactly,
+    ignored,
     path_of,
+    recent,
 )
 
 from ai.backend.common.contexts.user import current_user
@@ -257,6 +260,9 @@ class _Stamped:
     at: datetime
 
 
+_MOMENT = datetime.now(UTC)
+
+
 class TestExactly:
     def test_a_full_match_passes(self) -> None:
         moment = datetime.now(UTC)
@@ -292,3 +298,17 @@ class TestExactly:
         matcher: Exactly[_Stamped] = exactly(_Stamped("a", 1, datetime.now(UTC)), where=(rule,))
         naive = datetime.now(UTC).replace(tzinfo=None)
         assert matcher.mismatches(_Stamped("b", 1, naive)) == ["name: expected 'a', got 'b'"]
+
+    def test_a_field_can_be_left_out_with_a_reason(self) -> None:
+        rule: Ignored[_Stamped, int] = ignored(lambda s: s.n, "assigned by the writer")
+        matcher: Exactly[_Stamped] = exactly(_Stamped("a", 1, _MOMENT), where=(rule,))
+        # A different n passes; nothing else does.
+        assert matcher.mismatches(_Stamped("a", 99, _MOMENT)) == []
+        assert matcher.mismatches(_Stamped("b", 99, _MOMENT)) == ["name: expected 'a', got 'b'"]
+
+    def test_recent_accepts_now_and_refuses_a_naive_or_old_moment(self) -> None:
+        condition = recent(timedelta(minutes=1))
+        assert condition(datetime.now(UTC)) is True
+        assert condition(datetime.now(UTC).replace(tzinfo=None)) is False
+        assert condition(datetime.now(UTC) - timedelta(days=1)) is False
+        assert condition(datetime.now(UTC) + timedelta(days=1)) is False

@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from collections.abc import Awaitable, Callable, Mapping, Sequence
 from dataclasses import dataclass, field
+from datetime import UTC, datetime, timedelta
 from typing import Any, Concatenate, cast, overload, override
 
 from ai.backend.manager.models.base import Base
@@ -38,11 +39,15 @@ __all__ = (
     "after",
     "Checked",
     "Exactly",
+    "Ignored",
+    "Taken",
     "at",
     "checked",
     "config_of",
     "creates",
     "exactly",
+    "ignored",
+    "recent",
     "fake_of",
     "every",
     "op",
@@ -462,7 +467,48 @@ class Checked[T, V]:
 def checked[T, V](
     select: Callable[[T], V], condition: Callable[[V], bool], describe: str = ""
 ) -> Checked[T, V]:
+    """Take this field out of the comparison and hold it to a condition instead."""
     return Checked(select, condition, describe)
+
+
+@dataclass(frozen=True)
+class Ignored[T, V]:
+    """One field left out of the comparison entirely, with the reason written down.
+
+    For a value whose type is already the whole guarantee: a generated id arrives as an
+    id, and how it was generated is the writer's business, not the test's. A field that
+    could hold something wrong belongs in :func:`checked` instead.
+    """
+
+    select: Callable[[T], V]
+    why: str
+
+    def path(self) -> str:
+        return path_of(self.select)
+
+
+def ignored[T, V](select: Callable[[T], V], why: str) -> Ignored[T, V]:
+    """Leave this field out. The reason is required, so leaving one out stays a
+    deliberate act rather than a quiet hole."""
+    return Ignored(select, why)
+
+
+type Taken[T] = Checked[T, Any] | Ignored[T, Any]
+
+
+def recent(within: timedelta) -> Callable[[datetime], bool]:
+    """A moment that has already happened and is no older than ``within``.
+
+    What a timestamp field is usually held to: not the exact value, which nothing can
+    know, but that nothing absurd landed in it.
+    """
+
+    def condition(moment: datetime) -> bool:
+        if moment.tzinfo is None:
+            return False
+        return timedelta() <= datetime.now(UTC) - moment <= within
+
+    return condition
 
 
 def _fields_of(value: object) -> Sequence[str] | None:
@@ -514,26 +560,31 @@ class Exactly[T](TypedMatcher[T]):
 
     The default is exhaustive: a field the expected value does not mention is still
     compared, so a payload that grows a field fails until somebody looks at it. The
-    fields a test cannot state are named in ``where`` and checked by condition, which
-    is stricter than leaving them out.
+    fields a test cannot state are named in ``where``: held to a condition, or left out
+    with a reason when their type already says everything.
     """
 
     expected: T
-    where: tuple[Checked[T, Any], ...] = ()
+    where: tuple[Taken[T], ...] = ()
 
     @override
     def mismatches(self, actual: T) -> list[str]:
         covered = frozenset(rule.path() for rule in self.where)
         out = _compare(self.expected, actual, "", covered)
         for rule in self.where:
-            value = rule.select(actual)
-            if not rule.condition(value):
-                out.append(rule.failure(value))
+            if isinstance(rule, Checked):
+                value = rule.select(actual)
+                if not rule.condition(value):
+                    out.append(rule.failure(value))
         return out
 
 
-def exactly[T](expected: T, where: Sequence[Checked[T, Any]] = ()) -> Exactly[T]:
-    """Compare the whole answer. Anything generated goes in ``where``, with a condition."""
+def exactly[T](expected: T, where: Sequence[Taken[T]] = ()) -> Exactly[T]:
+    """Compare the whole answer.
+
+    A field the test cannot state goes in ``where``: held to a condition when a wrong
+    value is possible, left out when its type is already the whole guarantee.
+    """
     return Exactly(expected, tuple(where))
 
 
