@@ -20,6 +20,7 @@ from typing import override
 
 from aiodocker.docker import Docker
 
+from ai.backend.agent.errors.network import ContainerSourceUnwired
 from ai.backend.agent.network.locator import (
     OWNER_AGENT_LABEL,
     SESSION_ID_LABEL,
@@ -71,7 +72,7 @@ class DockerContainerLocator(ContainerLocator):
 
     def _client(self) -> Docker:
         if self._docker is None:
-            raise RuntimeError("the Docker locator was used before open()")
+            raise ContainerSourceUnwired("the Docker locator was used before open()")
         return self._docker
 
     @override

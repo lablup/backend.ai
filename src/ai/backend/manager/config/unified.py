@@ -175,6 +175,7 @@ from __future__ import annotations
 import base64
 import binascii
 import enum
+import ipaddress
 import logging
 import os
 import secrets
@@ -213,6 +214,11 @@ from ai.backend.common.meta import (
     BackendAIConfigMeta,
     CompositeType,
     ConfigExample,
+)
+from ai.backend.common.network.types import (
+    DEFAULT_CLUSTER_IPAM_BLOCK_PREFIXLEN,
+    DEFAULT_CLUSTER_IPAM_POOL,
+    NetworkBackendKind,
 )
 from ai.backend.common.typed_validators import (
     AutoDirectoryPath,
@@ -2000,7 +2006,7 @@ class PluginsConfig(BaseConfigSchema):
 
 class InterContainerNetworkConfig(BaseConfigSchema):
     forced_backend: Annotated[
-        str | None,
+        NetworkBackendKind | None,
         Field(
             default=None,
             validation_alias=AliasChoices("forced-backend", "forced_backend"),
@@ -2012,8 +2018,39 @@ class InterContainerNetworkConfig(BaseConfigSchema):
                 "Unset lets the driver pick from what the session's member agents advertise, "
                 "which is the right answer whenever the cluster is not deliberately homogeneous."
             ),
-            added_version="25.20.0",
-            example=ConfigExample(local=None, prod=None),
+            added_version=NEXT_RELEASE_VERSION,
+            example=ConfigExample(local="vxlan", prod="vxlan"),
+        ),
+    ]
+    ipam_pool: Annotated[
+        str,
+        Field(
+            default=DEFAULT_CLUSTER_IPAM_POOL,
+            validation_alias=AliasChoices("ipam-pool", "ipam_pool"),
+            serialization_alias="ipam-pool",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Private IPv4 pool used by the CNI driver for multi-node session overlays. "
+                "It must not overlap a route present on any participating agent."
+            ),
+            added_version=NEXT_RELEASE_VERSION,
+            example=ConfigExample(local="10.128.0.0/12", prod="10.128.0.0/12"),
+        ),
+    ]
+    ipam_block_size: Annotated[
+        int,
+        Field(
+            default=DEFAULT_CLUSTER_IPAM_BLOCK_PREFIXLEN,
+            ge=8,
+            le=30,
+            validation_alias=AliasChoices("ipam-block-size", "ipam_block_size"),
+            serialization_alias="ipam-block-size",
+        ),
+        BackendAIConfigMeta(
+            description="Prefix length of the allocation units carved from 'ipam-pool'.",
+            added_version=NEXT_RELEASE_VERSION,
+            example=ConfigExample(local="24", prod="24"),
         ),
     ]
 
@@ -2059,6 +2096,20 @@ class InterContainerNetworkConfig(BaseConfigSchema):
             example=ConfigExample(local="{}", prod="{}"),
         ),
     ]
+
+    @model_validator(mode="after")
+    def _validate_cni_settings(self) -> Self:
+        if self.forced_backend not in (None, NetworkBackendKind.VXLAN):
+            raise ValueError("forced-backend must be 'vxlan' for multi-node sessions")
+        try:
+            pool = ipaddress.ip_network(self.ipam_pool, strict=True)
+        except ValueError as e:
+            raise ValueError("ipam-pool must be a prefix-aligned IPv4 network") from e
+        if pool.version != 4 or not pool.is_private:
+            raise ValueError("ipam-pool must be a private IPv4 network")
+        if self.ipam_block_size < pool.prefixlen:
+            raise ValueError("ipam-block-size must be within ipam-pool")
+        return self
 
 
 class SubnetNetworkConfig(BaseConfigSchema):

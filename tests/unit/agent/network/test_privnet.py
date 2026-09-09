@@ -13,6 +13,7 @@ import contextlib
 import ipaddress
 import itertools
 import os
+import socket
 import subprocess
 import tempfile
 from collections.abc import AsyncIterator, Iterator, Mapping
@@ -24,6 +25,11 @@ import pytest
 
 import ai.backend.agent.network.privnet.client as client_mod
 import ai.backend.agent.network.privnet.server as server_mod
+from ai.backend.agent.errors.network import (
+    PrivnetAlreadyRunning,
+    PrivnetConfigurationInvalid,
+    UnsafePrivnetSocket,
+)
 from ai.backend.agent.network.local_subnet import LocalSubnetAllocator
 from ai.backend.agent.network.locator import ContainerLocator, LiveContainer
 from ai.backend.agent.network.native_attacher import HostLocalIpam
@@ -2317,7 +2323,7 @@ class TestAnAnonymousPrivnetOwnsNothing:
     def test_the_server_refuses_to_start_without_an_agent_id(self, tmp_path: Path) -> None:
         # The agent id is the owner half of every node-wide claim. An empty one writes claims no
         # reader can attribute, and a VNI whose holders cannot be counted reads as free.
-        with pytest.raises(ValueError, match="non-empty agent id"):
+        with pytest.raises(PrivnetConfigurationInvalid, match="non-empty agent id"):
             _Harness(_StubRuntime(), state_dir=tmp_path, agent_id="  ")
 
 
@@ -3436,3 +3442,51 @@ class TestWhatReachesTheManagerWhenThePrivnetIsDown:
         with pytest.raises(PrivNetUnreachable) as caught:
             await client.call(PrivNetRequest(PrivNetOp.RECOVERY_STATUS, "status"))
         assert caught.value.error_code().domain is ErrorDomain.AGENT
+
+
+class TestPrivnetSocketStartup:
+    async def test_regular_file_is_preserved(self, tmp_path: Path) -> None:
+        h = _Harness()
+        socket_path = tmp_path / "privnet.sock"
+        socket_path.write_text("operator data")
+
+        with pytest.raises(UnsafePrivnetSocket):
+            await h.server._prepare_socket_path(socket_path)
+
+        assert socket_path.read_text() == "operator data"
+
+    async def test_symlink_is_preserved(self, tmp_path: Path) -> None:
+        h = _Harness()
+        socket_path = tmp_path / "privnet.sock"
+        target = tmp_path / "target"
+        target.write_text("operator data")
+        socket_path.symlink_to(target)
+
+        with pytest.raises(UnsafePrivnetSocket):
+            await h.server._prepare_socket_path(socket_path)
+
+        assert socket_path.is_symlink()
+        assert target.read_text() == "operator data"
+
+    async def test_live_daemon_is_preserved(self, tmp_path: Path) -> None:
+        h = _Harness()
+        socket_path = tmp_path / "privnet.sock"
+        live_server = await asyncio.start_unix_server(lambda _r, _w: None, path=socket_path)
+        try:
+            with pytest.raises(PrivnetAlreadyRunning):
+                await h.server._prepare_socket_path(socket_path)
+            assert socket_path.exists()
+        finally:
+            live_server.close()
+            await live_server.wait_closed()
+            socket_path.unlink(missing_ok=True)
+
+    async def test_stale_owned_socket_is_removed(self, tmp_path: Path) -> None:
+        h = _Harness()
+        socket_path = tmp_path / "privnet.sock"
+        with socket.socket(socket.AF_UNIX) as stale_socket:
+            stale_socket.bind(str(socket_path))
+
+        await h.server._prepare_socket_path(socket_path)
+
+        assert not socket_path.exists()

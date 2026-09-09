@@ -1,0 +1,29 @@
+[Unit]
+Description=Backend.AI privileged network daemon
+Wants=network-online.target
+Requires=docker.service
+After=network-online.target docker.service
+Before=backendai-agent.service
+
+[Service]
+Type=simple
+User=backendai-privnet
+Group=backendai-privnet
+SupplementaryGroups=backendai-agent
+EnvironmentFile=/etc/backend.ai/privnet.env
+Environment=BACKENDAI_PRIVNET_SOCKET=/run/backend.ai/privnet/net-privnet.sock
+ExecStart=/usr/bin/backend.ai ag --config /etc/backend.ai/agent.toml start-privnet
+RuntimeDirectory=backend.ai/privnet
+RuntimeDirectoryMode=0750
+UMask=0077
+AmbientCapabilities=CAP_NET_ADMIN CAP_SYS_ADMIN CAP_SYS_PTRACE CAP_DAC_READ_SEARCH CAP_DAC_OVERRIDE
+CapabilityBoundingSet=CAP_NET_ADMIN CAP_SYS_ADMIN CAP_SYS_PTRACE CAP_DAC_READ_SEARCH CAP_DAC_OVERRIDE
+NoNewPrivileges=true
+RestrictAddressFamilies=AF_UNIX AF_NETLINK AF_INET AF_INET6
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=30
+KillSignal=SIGINT
+
+[Install]
+WantedBy=multi-user.target

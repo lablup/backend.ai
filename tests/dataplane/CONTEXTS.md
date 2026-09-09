@@ -6,7 +6,7 @@ Background for the guardrails in `AGENTS.md`. Read this before changing the harn
 
 `tests/unit/agent/network/` covers the pure logic well — argument construction, config assembly,
 allocator arithmetic. What it cannot cover is the thing that has actually broken: the host's kernel
-state after a real session has come and gone. Every defect the containerd/VXLAN work has shipped so
+state after a real session has come and gone. Every defect the agent/VXLAN work has shipped so
 far was a resource that survived teardown or a record that outlived its owner — a leaked subnet
 block, a stale VTEP key, a container the agent forgot, an fd nobody closed. None of those are
 visible to a mocked test, and all of them are visible to a diff of the host.
@@ -26,10 +26,9 @@ being reported. That is the right trade: the first test to leak it still fails.
 
 ## Why the guard polls
 
-Teardown is asynchronous through every layer — the API returns before the agent has finished, the
-agent returns before containerd has reaped the shim, containerd returns before the runner has torn
-down the bridge. A single sample taken right after teardown is flaky in the worst direction: it
-fails intermittently, someone adds a `sleep`, and the sleep hides a genuine slowdown later.
+Teardown is asynchronous through every layer: the API, agent, runtime, and runner. A single sample
+taken right after teardown is flaky in the worst direction: it fails intermittently, someone adds
+a `sleep`, and the sleep hides a genuine slowdown later.
 
 Polling to a deadline removes the flake and turns settle time into data. `LeakReport.elapsed` is
 worth watching: teardown that grew from 2s to 20s is a regression the pass/fail bit cannot show.
@@ -39,7 +38,7 @@ worth watching: teardown that grew from 2s to 20s is a regression the pass/fail 
 This is the only design rule in the suite that is not negotiable. A collector that returns an empty
 set when it cannot run reports a leaking host as clean, and no one would notice — the suite would
 be green while covering nothing. So `iptables-save` failing on a missing sudoers entry, `ip`
-returning something that is not JSON, and `ctr` failing to reach the socket all raise.
+returning something that is not JSON, and a runtime query failing all raise.
 
 The self-check suite (`test_harness_selfcheck.py`) exists for the same reason, and runs with no
 privileges so it cannot be skipped by accident.
