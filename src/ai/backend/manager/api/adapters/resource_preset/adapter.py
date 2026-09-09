@@ -6,7 +6,6 @@ from decimal import Decimal
 from typing import Any
 from uuid import UUID
 
-from ai.backend.common.api_handlers import SENTINEL
 from ai.backend.common.data.entity.resource_preset import ResourcePresetID
 from ai.backend.common.dto.manager.v2.common import (
     BinarySizeInput,
@@ -165,30 +164,15 @@ class ResourcePresetAdapter(BaseAdapter):
         input: UpdateResourcePresetInput,
     ) -> UpdateResourcePresetPayload:
         """Update an existing resource preset."""
-        resource_slots_state: OptionalState[ResourceSlot] = OptionalState.nop()
-        if input.resource_slots is not None:
-            resource_slots_state = OptionalState.update(
-                _resource_slot_entries_to_slot(input.resource_slots)
-            )
-
-        shared_memory_value = _resolve_shared_memory_for_update(input.shared_memory)
-
-        name_state: OptionalState[str] = OptionalState.nop()
-        if input.name is not None:
-            name_state = OptionalState.update(input.name)
-
-        resource_group_state: TriState[str] = TriState.nop()
-        if input.resource_group_name is not SENTINEL:
-            if input.resource_group_name is None:
-                resource_group_state = TriState.nullify()
-            else:
-                resource_group_state = TriState.update(input.resource_group_name)
-
         updater_spec = ResourcePresetUpdaterSpec(
-            resource_slots=resource_slots_state,
-            name=name_state,
-            shared_memory=shared_memory_value,
-            resource_group_name=resource_group_state,
+            resource_slots=OptionalState.from_unset(input.resource_slots).map(
+                _resource_slot_entries_to_slot
+            ),
+            name=OptionalState.from_unset(input.name),
+            shared_memory=TriState.from_unset(input.shared_memory).map(
+                lambda v: BinarySize(v.bytes)
+            ),
+            resource_group_name=TriState.from_unset(input.resource_group_name),
         )
         updater = Updater(spec=updater_spec, pk_value=input.id)
         result = await self._resource_preset.update_preset.run(
@@ -274,16 +258,3 @@ class ResourcePresetAdapter(BaseAdapter):
             ),
             resource_group_name=data.resource_group_name,
         )
-
-
-def _resolve_shared_memory_for_update(
-    shared_memory: BinarySizeInput | object | None,
-) -> TriState[BinarySize]:
-    """Resolve shared_memory BinarySizeInput for update operations."""
-    if shared_memory is SENTINEL:
-        return TriState.nop()
-    if shared_memory is None:
-        return TriState.nullify()
-    if not isinstance(shared_memory, BinarySizeInput):
-        return TriState.nop()
-    return TriState.update(BinarySize(shared_memory.bytes))
