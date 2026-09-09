@@ -2,7 +2,6 @@ python_tests(
     name="tests",
 )
 
-python_sources(
-    name="scenarios",
-    sources=["scenarios.py"],
+python_test_utils(
+    name="test_utils",
 )

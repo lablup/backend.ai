@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import timedelta
 from typing import Any
 
 from ai.backend.common.data.entity.domain import DomainEntityType
@@ -18,6 +19,7 @@ from ai.backend.common.dto.manager.v2.domain.response import DomainPayload
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
 from ai.backend.manager.actions.registry.types import GroupMeta, ProcessorDependencies
 from ai.backend.manager.api.adapters.domain.adapter import DomainAdapter
+from ai.backend.manager.config.unified import ManagerUnifiedConfig
 from ai.backend.manager.data.domain.types import DomainData, UserInfo
 from ai.backend.manager.models.domain.creators import DomainCreator
 from ai.backend.manager.repositories.domain.repository import DomainRepository
@@ -29,8 +31,17 @@ from ai.backend.manager.services.domain.service import DomainService
 from ai.backend.manager.services.resource_group.processors import ResourceGroupProcessors
 from ai.backend.manager.services.resource_group.service import ResourceGroupService
 from ai.backend.testutils.scenario import Seed
-from ai.backend.testutils.typed_scenario import ActorBound, needs_actor, op
+from ai.backend.testutils.typed_scenario import (
+    ActorBound,
+    TypedScenario,
+    TypedSetup,
+    config_of,
+    needs_actor,
+    op,
+    recent,
+)
 from bai_kit.manager.runner import SeedContext, Wired, WiringDeps
+from bai_kit.manager.seeding import Sown, creates
 
 DISPATCH: dict[type, str] = {
     CreateDomainInput: "admin_create",
@@ -111,3 +122,27 @@ def admin_update(
 ) -> ActorBound[DomainAdapter, DomainPayload, UserInfo]:
     """Editing a domain records who asked, as creating one does."""
     return needs_actor(lambda actor: _admin_update(name, request, actor))
+
+
+# ---------------------------------------------------------------------------
+# What a domain scenario says besides the call: the rows already there, and the
+# situations worth naming more than once
+# ---------------------------------------------------------------------------
+
+type DomainScenario = TypedScenario[DomainAdapter, ManagerUnifiedConfig]
+
+manager_config = config_of(ManagerUnifiedConfig)
+
+ENFORCEMENT_OFF = TypedSetup[ManagerUnifiedConfig](
+    config=[manager_config.set(lambda c: c.manager.rbac.enforcement_enabled, False)]
+)
+
+WITHIN_THE_RUN = recent(timedelta(minutes=5))
+
+# ``description`` is optional on the node, so what it is compared against has to be too.
+SEEDED_DESCRIPTION: str | None = "readable was already here"
+
+
+def already_there(name: str) -> Sown[DomainData]:
+    """A domain sitting in the database before the request arrives."""
+    return creates(DomainCreator(name=name, description=f"{name} was already here"))
