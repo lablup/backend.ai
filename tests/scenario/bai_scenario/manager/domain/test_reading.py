@@ -15,7 +15,7 @@ from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.testutils.typed_scenario import TypedScenario, at, call
 
 
-def the_superadmin_reads_a_domain(seed: Seeder) -> DomainScenario:
+def superadmin_reads_by_name(seed: Seeder) -> DomainScenario:
     domain = seed.creating(seed_domain(name_hint="host"))
     superadmin = seed_someone_of(seed, domain, role=UserRole.SUPERADMIN)
     return TypedScenario.ok(
@@ -28,7 +28,7 @@ def the_superadmin_reads_a_domain(seed: Seeder) -> DomainScenario:
     )
 
 
-def a_user_without_the_grant_is_refused(seed: Seeder) -> DomainScenario:
+def ungranted_user_is_refused(seed: Seeder) -> DomainScenario:
     domain = seed.creating(seed_domain(name_hint="host"))
     stranger = seed_someone_of(seed, domain)
     return TypedScenario.error(
@@ -44,7 +44,7 @@ def a_user_without_the_grant_is_refused(seed: Seeder) -> DomainScenario:
     )
 
 
-def a_name_nothing_answers_to(seed: Seeder) -> DomainScenario:
+def unknown_name_is_not_found(seed: Seeder) -> DomainScenario:
     domain = seed.creating(seed_domain(name_hint="host"))
     superadmin = seed_someone_of(seed, domain, role=UserRole.SUPERADMIN)
     return TypedScenario.error(
@@ -61,9 +61,9 @@ def a_name_nothing_answers_to(seed: Seeder) -> DomainScenario:
 
 
 BUILDERS = (
-    the_superadmin_reads_a_domain,
-    a_user_without_the_grant_is_refused,
-    a_name_nothing_answers_to,
+    superadmin_reads_by_name,
+    ungranted_user_is_refused,
+    unknown_name_is_not_found,
 )
 SCENARIOS: list[DomainScenario] = [build(Seeder()) for build in BUILDERS]
 

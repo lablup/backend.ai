@@ -39,7 +39,7 @@ from ai.backend.testutils.typed_scenario import (
 )
 
 
-def the_whole_node_comes_back(seed: Seeder) -> DomainScenario:
+def whole_node_comes_back(seed: Seeder) -> DomainScenario:
     home = seed.creating(seed_domain(name_hint="home"))
     superadmin = seed_someone_of(seed, home, role=UserRole.SUPERADMIN)
     return TypedScenario.ok(
@@ -83,7 +83,7 @@ def the_whole_node_comes_back(seed: Seeder) -> DomainScenario:
     )
 
 
-def a_name_already_taken(seed: Seeder) -> DomainScenario:
+def duplicate_name_is_refused(seed: Seeder) -> DomainScenario:
     home = seed.creating(seed_domain(name_hint="home"))
     taken = seed.creating(seed_domain(name_hint="taken"))
     superadmin = seed_someone_of(seed, home, role=UserRole.SUPERADMIN)
@@ -108,7 +108,7 @@ def a_name_already_taken(seed: Seeder) -> DomainScenario:
     )
 
 
-def a_blank_name(seed: Seeder) -> DomainScenario:
+def blank_name_is_refused(seed: Seeder) -> DomainScenario:
     home = seed.creating(seed_domain(name_hint="home"))
     superadmin = seed_someone_of(seed, home, role=UserRole.SUPERADMIN)
     return TypedScenario.error(
@@ -124,7 +124,7 @@ def a_blank_name(seed: Seeder) -> DomainScenario:
     )
 
 
-def a_plain_user_may_not(seed: Seeder) -> DomainScenario:
+def plain_user_is_refused(seed: Seeder) -> DomainScenario:
     home = seed.creating(seed_domain(name_hint="home"))
     someone = seed_someone_of(seed, home)
     return TypedScenario.error(
@@ -167,10 +167,10 @@ def enforcement_off_changes_nothing(seed: Seeder) -> DomainScenario:
 
 
 BUILDERS = (
-    the_whole_node_comes_back,
-    a_name_already_taken,
-    a_blank_name,
-    a_plain_user_may_not,
+    whole_node_comes_back,
+    duplicate_name_is_refused,
+    blank_name_is_refused,
+    plain_user_is_refused,
     enforcement_off_changes_nothing,
 )
 SCENARIOS: list[DomainScenario] = [build(Seeder()) for build in BUILDERS]

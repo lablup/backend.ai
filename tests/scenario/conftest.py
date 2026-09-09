@@ -75,30 +75,28 @@ def pytest_runtest_makereport(item: pytest.Item, call: pytest.CallInfo[None]) ->
 
 
 @pytest.fixture(scope="session")
-def world_template(postgres_container: tuple[str, HostPortPairModel]) -> Iterator[TemplateDatabase]:
+def template(postgres_container: tuple[str, HostPortPairModel]) -> Iterator[TemplateDatabase]:
     _, addr = postgres_container
     name = f"scenario_tpl_{secrets.token_hex(6)}"
     template = asyncio.run(create_template(addr, name))
     _note_time("template_build", template.build_seconds)
-    _note_time("schema", template.schema_seconds)
-    _note_time("world", template.world_seconds)
     yield template
     asyncio.run(drop_database(addr, name))
 
 
 @pytest.fixture
-async def test_db(world_template: TemplateDatabase) -> AsyncIterator[str]:
+async def test_db(template: TemplateDatabase) -> AsyncIterator[str]:
     """A fresh copy of the template for this test alone."""
     name = f"scenario_{secrets.token_hex(6)}"
-    seconds = await clone_database(world_template, name)
+    seconds = await clone_database(template, name)
     _note_time("clone", seconds)
     yield name
-    await drop_database(world_template.addr, name)
+    await drop_database(template.addr, name)
 
 
 @pytest.fixture
-async def engine(world_template: TemplateDatabase, test_db: str) -> AsyncIterator[Any]:
-    engine = engine_for(world_template.addr, test_db)
+async def engine(template: TemplateDatabase, test_db: str) -> AsyncIterator[Any]:
+    engine = engine_for(template.addr, test_db)
     yield engine
     await engine.dispose()
 
@@ -111,14 +109,14 @@ def recorder() -> ActionRecorder:
 @pytest.fixture
 def config(
     request: pytest.FixtureRequest,
-    world_template: TemplateDatabase,
+    template: TemplateDatabase,
     test_db: str,
 ) -> ManagerConfigProvider:
     """The config this row runs under: the base, plus what the row overrides."""
     scenario = request.node.callspec.params["scenario"]
     return ScenarioConfigProvider(
         make_config(
-            base_config_dict(world_template.addr, test_db, None),
+            base_config_dict(template.addr, test_db, None),
             scenario.given.dotted_config(),
         )
     )

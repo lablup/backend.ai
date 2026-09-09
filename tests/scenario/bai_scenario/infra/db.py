@@ -1,4 +1,4 @@
-"""Template database: schema + World built once, cloned per test.
+"""Template database: the schema built once, copied per test.
 
 ``CREATE DATABASE ... TEMPLATE`` refuses while anything is connected to the template,
 so the engine that built it is disposed before the first clone.
@@ -11,7 +11,6 @@ from dataclasses import dataclass
 
 import sqlalchemy as sa
 from bai_scenario.infra import schema as _schema  # the full schema, statically named
-from bai_scenario.infra.world import World, build_world
 
 from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
 from ai.backend.manager.models.base import (
@@ -69,10 +68,7 @@ async def create_schema(engine: ExtendedAsyncSAEngine) -> None:
 class TemplateDatabase:
     addr: HostPortPairModel
     name: str
-    world: World
     build_seconds: float
-    schema_seconds: float
-    world_seconds: float
 
 
 async def create_template(addr: HostPortPairModel, name: str) -> TemplateDatabase:
@@ -80,22 +76,10 @@ async def create_template(addr: HostPortPairModel, name: str) -> TemplateDatabas
     await _admin(addr, f'CREATE DATABASE "{name}";')
     engine = engine_for(addr, name)
     try:
-        schema_started = time.perf_counter()
         await create_schema(engine)
-        schema_seconds = time.perf_counter() - schema_started
-        world_started = time.perf_counter()
-        world = await build_world(engine)
-        world_seconds = time.perf_counter() - world_started
     finally:
         await engine.dispose()
-    return TemplateDatabase(
-        addr,
-        name,
-        world,
-        time.perf_counter() - started,
-        schema_seconds,
-        world_seconds,
-    )
+    return TemplateDatabase(addr, name, time.perf_counter() - started)
 
 
 async def clone_database(template: TemplateDatabase, name: str) -> float:

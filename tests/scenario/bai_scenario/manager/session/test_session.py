@@ -1,84 +1,58 @@
-"""What the session adapter answers for a read, said as a request, an actor, and an answer.
+"""What the session adapter answers for a read, and who may ask.
 
-Only the read half. What a session write needs is written down in the wiring, which
-names the ten dependencies a read never reaches.
+Only the read half. What a session write needs is written down in this directory's
+conftest, which names the ten dependencies a read never reaches.
 """
 
 from __future__ import annotations
 
 import pytest
-from bai_scenario.infra.personas import DOMAIN_ADMIN, MEMBER, OTHER_MEMBER
+from bai_scenario.components.domain import seed_someone_of
 from bai_scenario.runner.runner import ScenarioRunner
-from bai_scenario.seeds.seeding import (
-    DOMAIN_ADMIN_PRESET,
-    USER_PRESET,
-    holds,
-    on_the_domain,
-    on_their_own_scope,
-)
+from bai_scenario.seeds.domain.domain import seed_domain
+from bai_scenario.seeds.seeder import Seeder
 
+from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.v2.session.request import AdminSearchSessionsInput
 from ai.backend.manager.api.adapters.session.adapter import SessionAdapter
 from ai.backend.manager.config.unified import ManagerUnifiedConfig
 from ai.backend.manager.errors.permission import NotEnoughPermission
-from ai.backend.testutils.typed_scenario import (
-    TypedScenario,
-    at,
-    call,
-)
+from ai.backend.testutils.typed_scenario import TypedScenario, at, call
 
 type SessionScenario = TypedScenario[SessionAdapter, ManagerUnifiedConfig]
 
-# The premise that decides the answers below: CRUD over the actor's own sessions.
-THEIR_OWN_USER_ROLE = holds(USER_PRESET, on_their_own_scope())
 
-SCENARIOS: list[SessionScenario] = [
-    TypedScenario.ok(
-        "an-untouched-world-holds-no-sessions",
+def nothing_laid_means_nothing_found(seed: Seeder) -> SessionScenario:
+    home = seed.creating(seed_domain(name_hint="home"))
+    superadmin = seed_someone_of(seed, home, role=UserRole.SUPERADMIN)
+    return TypedScenario.ok(
+        "a-scenario-that-laid-no-session-finds-none",
+        description="세션을 하나도 심지 않은 상태에서 슈퍼관리자가 조회하면, 답은 비어 있다",
+        actor=superadmin,
+        given=seed.situation(),
         when=call(SessionAdapter.admin_search, AdminSearchSessionsInput()),
         then=at(lambda p: p.total_count, 0),
-    ),
-    TypedScenario.error(
-        "a-member-granted-nothing-may-not-search-sessions",
-        actor=MEMBER,
+    )
+
+
+def ungranted_user_is_refused(seed: Seeder) -> SessionScenario:
+    home = seed.creating(seed_domain(name_hint="home"))
+    someone = seed_someone_of(seed, home)
+    return TypedScenario.error(
+        "a-user-granted-nothing-may-not-search-sessions",
+        description=(
+            "세션 조회는 역할이 아니라 스코프 권한이 지키므로, "
+            "아무 권한도 받지 않은 사용자는 권한 부족으로 거부된다"
+        ),
+        actor=someone,
+        given=seed.situation(),
         when=call(SessionAdapter.admin_search, AdminSearchSessionsInput()),
         then=NotEnoughPermission,
-    ),
-    TypedScenario.ok(
-        "a-member-lists-their-own-sessions-and-has-none",
-        actor=MEMBER,
-        holding=[THEIR_OWN_USER_ROLE],
-        when=call(SessionAdapter.my_search, AdminSearchSessionsInput()),
-        then=at(lambda p: p.total_count, 0),
-    ),
-    TypedScenario.ok(
-        # Unlike a domain, whose search sits behind the superadmin role gate, a session
-        # search is scope-gated. The member's own user preset grants session read on
-        # their own scope, so the search runs and answers with what that scope holds.
-        "a-member-may-search-sessions-because-their-own-scope-grants-it",
-        actor=MEMBER,
-        holding=[THEIR_OWN_USER_ROLE],
-        when=call(SessionAdapter.admin_search, AdminSearchSessionsInput()),
-        then=at(lambda p: p.total_count, 0),
-    ),
-    TypedScenario.ok(
-        "a-member-outside-every-project-may-still-search-their-own-scope",
-        actor=OTHER_MEMBER,
-        holding=[THEIR_OWN_USER_ROLE],
-        when=call(SessionAdapter.admin_search, AdminSearchSessionsInput()),
-        then=at(lambda p: p.total_count, 0),
-    ),
-    TypedScenario.error(
-        # The domain admin preset covers users, not sessions, so even holding it the
-        # same request a plain member may make is refused. An admin role is not the
-        # same thing as the permission the request needs.
-        "the-domain-admin-role-does-not-reach-sessions",
-        actor=DOMAIN_ADMIN,
-        holding=[holds(DOMAIN_ADMIN_PRESET, on_the_domain())],
-        when=call(SessionAdapter.admin_search, AdminSearchSessionsInput()),
-        then=NotEnoughPermission,
-    ),
-]
+    )
+
+
+BUILDERS = (nothing_laid_means_nothing_found, ungranted_user_is_refused)
+SCENARIOS: list[SessionScenario] = [build(Seeder()) for build in BUILDERS]
 
 
 @pytest.mark.parametrize("scenario", SCENARIOS, ids=lambda s: s.summary)

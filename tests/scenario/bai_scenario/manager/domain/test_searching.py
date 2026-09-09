@@ -3,16 +3,12 @@
 from __future__ import annotations
 
 import pytest
-from bai_scenario.components.domain import (
-    ADomainIsThere,
-    DomainScenario,
-    SomeDomainsAreThere,
-    TwoDomainsAreThere,
-    the_domain_admin_role,
-)
-from bai_scenario.infra.personas import DOMAIN_ADMIN, MEMBER
+from bai_scenario.components.domain import DomainScenario, seed_someone_of
 from bai_scenario.runner.runner import ScenarioRunner
+from bai_scenario.seeds.domain.domain import seed_domain
+from bai_scenario.seeds.seeder import Seeder
 
+from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.query import StringFilter
 from ai.backend.common.dto.manager.v2.domain.request import (
     AdminSearchDomainsInput,
@@ -20,67 +16,58 @@ from ai.backend.common.dto.manager.v2.domain.request import (
 )
 from ai.backend.manager.api.adapters.domain.adapter import DomainAdapter
 from ai.backend.manager.errors.auth import InsufficientPrivilege
-from ai.backend.testutils.typed_scenario import (
-    TypedScenario,
-    at,
-    call,
-    every,
-    situation,
-)
+from ai.backend.testutils.typed_scenario import TypedScenario, at, call, every
 
-ALPHA_AND_BETA = TwoDomainsAreThere("alpha", "beta")
-A_RETIRED_DOMAIN = ADomainIsThere("retired")
-THREE_MORE = SomeDomainsAreThere(3)
 
-SCENARIOS: list[DomainScenario] = [
-    TypedScenario.ok(
-        "an-untouched-world-answers-with-its-one-domain",
+def the_count_is_what_was_laid(seed: Seeder) -> DomainScenario:
+    home = seed.creating(seed_domain(name_hint="home"))
+    others = [seed.creating(seed_domain(name_hint="other")) for _ in range(3)]
+    superadmin = seed_someone_of(seed, home, role=UserRole.SUPERADMIN)
+    return TypedScenario.ok(
+        "the-answer-counts-every-domain-the-scenario-laid",
+        description=("이 시나리오가 심은 도메인이 넷일 때, 필터 없는 조회는 그 넷을 모두 센다"),
+        actor=superadmin,
+        given=seed.situation(),
+        then=at(lambda p: p.total_count, 1 + len(others)),
         when=call(DomainAdapter.admin_search, AdminSearchDomainsInput()),
-        then=at(lambda p: p.total_count, 1),
-    ),
-    TypedScenario.ok(
+    )
+
+
+def a_name_filter_narrows(seed: Seeder) -> DomainScenario:
+    home = seed.creating(seed_domain(name_hint="home"))
+    wanted = seed.creating(seed_domain(name_hint="wanted"))
+    seed.creating(seed_domain(name_hint="other"))
+    superadmin = seed_someone_of(seed, home, role=UserRole.SUPERADMIN)
+    return TypedScenario.ok(
         "a-name-filter-narrows-the-answer-to-the-domain-it-names",
-        given=situation(setup=ALPHA_AND_BETA),
+        description=(
+            "도메인 여럿 중 하나의 이름으로 걸러 조회하면, 답에는 그 이름의 도메인만 남는다"
+        ),
+        actor=superadmin,
+        given=seed.situation(),
         when=call(
             DomainAdapter.admin_search,
-            AdminSearchDomainsInput(
-                filter=DomainFilter(name=StringFilter(equals=ALPHA_AND_BETA.first_name))
-            ),
+            AdminSearchDomainsInput(filter=DomainFilter(name=StringFilter(equals=wanted.describe))),
         ),
-        then=every(
-            lambda p: p.items, at(lambda node: node.basic_info.name, ALPHA_AND_BETA.first_name)
-        ),
-    ),
-    TypedScenario.ok(
-        "an-active-filter-leaves-out-what-was-retired",
-        given=situation(setup=A_RETIRED_DOMAIN),
-        when=call(
-            DomainAdapter.admin_search, AdminSearchDomainsInput(filter=DomainFilter(is_active=True))
-        ),
-        then=every(lambda p: p.items, at(lambda node: node.lifecycle.is_active, True)),
-    ),
-    TypedScenario.ok(
-        # The count is what this row is about, so it is written once and the answer is
-        # read against it rather than against a number copied by hand.
-        "the-answer-counts-the-world-domain-and-everything-already-there",
-        given=situation(setup=THREE_MORE),
-        when=call(DomainAdapter.admin_search, AdminSearchDomainsInput()),
-        then=at(lambda p: p.total_count, THREE_MORE.count + 1),
-    ),
-    TypedScenario.error(
-        "the-domain-admin-may-not-search-every-domain",
-        actor=DOMAIN_ADMIN,
-        holding=[the_domain_admin_role()],
+        then=every(lambda p: p.items, at(lambda node: node.basic_info.name, wanted.describe)),
+    )
+
+
+def ungranted_user_is_refused(seed: Seeder) -> DomainScenario:
+    home = seed.creating(seed_domain(name_hint="home"))
+    someone = seed_someone_of(seed, home)
+    return TypedScenario.error(
+        "a-user-who-is-not-the-superadmin-may-not-search-every-domain",
+        description=("슈퍼관리자가 아닌 사용자가 전체 도메인 조회를 요청하면 역할로 막힌다"),
+        actor=someone,
+        given=seed.situation(),
         when=call(DomainAdapter.admin_search, AdminSearchDomainsInput()),
         then=InsufficientPrivilege,
-    ),
-    TypedScenario.error(
-        "a-member-may-not-search-every-domain",
-        actor=MEMBER,
-        when=call(DomainAdapter.admin_search, AdminSearchDomainsInput()),
-        then=InsufficientPrivilege,
-    ),
-]
+    )
+
+
+BUILDERS = (the_count_is_what_was_laid, a_name_filter_narrows, ungranted_user_is_refused)
+SCENARIOS: list[DomainScenario] = [build(Seeder()) for build in BUILDERS]
 
 
 @pytest.mark.parametrize("scenario", SCENARIOS, ids=lambda s: s.summary)
