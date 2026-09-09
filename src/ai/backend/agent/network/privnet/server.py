@@ -71,6 +71,7 @@ from ai.backend.agent.network.privnet import policy
 from ai.backend.agent.network.privnet.journal import AttachRecord, PrivNetJournal
 from ai.backend.agent.network.privnet.protocol import (
     PROTOCOL_VERSION,
+    ForwardEntry,
     PrivNetOp,
     PrivNetRequest,
     PrivNetResponse,
@@ -2184,7 +2185,12 @@ class PrivNetServer:
         local_ip = entry.local_ips.get(container_id)
         if local_ip is None:
             raise PrivNetError("publish before attach")
-        await self._forwarder.install(forwards_for(container_id, local_ip, ports))
+        # Stamped with THIS privnet's agent id, not the caller's: the privnet is the process that
+        # installs the rule and the one that will reclaim it, and a node can carry several agents
+        # over different runtimes whose containers none of the others can see.
+        await self._forwarder.install(
+            forwards_for(container_id, local_ip, ports, owner_agent_id=self._agent_id)
+        )
 
     async def _unpublish_ports(self, req: PrivNetRequest) -> tuple[int, ...]:
         """Withdraw every rule tagged with this container, returning the host ports it held.
@@ -2197,10 +2203,21 @@ class PrivNetServer:
         container_id = policy.validate_container_id(req.container_id)
         return tuple(await self._forwarder.remove_container(container_id))
 
-    async def _list_ports(self) -> tuple[tuple[str, int, str, int], ...]:
-        """Every published port on this node, read back from the rules themselves."""
+    async def _list_ports(self) -> tuple[ForwardEntry, ...]:
+        """Every published port on this node, read back from the rules themselves.
+
+        Owner and install time travel with each row because the caller reclaims on them, and this
+        daemon is the only thing on the node that can read them -- the rules are root's.
+        """
         return tuple(
-            (f.container_id, f.host_port, f.container_ip, f.container_port)
+            (
+                f.container_id,
+                f.host_port,
+                f.container_ip,
+                f.container_port,
+                f.owner_agent_id,
+                f.created_at,
+            )
             for f in await self._forwarder.list_forwards()
         )
 

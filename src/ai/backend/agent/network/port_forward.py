@@ -20,7 +20,8 @@ function of the container id.
 from __future__ import annotations
 
 import contextlib
-from collections.abc import Awaitable, Callable, Iterable, Sequence
+import time
+from collections.abc import Awaitable, Callable, Container, Iterable, Sequence
 from dataclasses import dataclass
 from typing import Protocol
 
@@ -46,6 +47,21 @@ class PortForward:
     # TCP) or ``"udp"``. It is part of the rule's identity: iptables ``--dport`` needs a matching
     # ``-p``, and a ``-D`` must name the same protocol as the ``-A`` or the removal misses.
     protocol: str = "tcp"
+    # Which agent installed the rule. A node can carry several at once -- a docker agent and a
+    # containerd one, or two of either -- and each publishes ports for containers only its own
+    # runtime can see. So "the container is not in my runtime's listing" says nothing about
+    # somebody else's rule, and a reclaim that acted on it would cut a live kernel of another
+    # runtime off from its published ports. Owning it by name is what keeps each agent to its own.
+    # None for a rule written before this was recorded; those are nobody's to reclaim by owner.
+    owner_agent_id: str | None = None
+    # When the rule was installed, as whole unix seconds, carried in the comment beside the container
+    # id. It is what lets a reclaim wait before it acts: "this container is not in Docker" is not
+    # by itself a safe reason to delete a rule, because a rule is installed a moment before its
+    # container becomes visible and a sweep landing in that window would cut a starting kernel off
+    # from its own ports. With the age, only a rule that has been orphaned longer than any such
+    # window is taken. None for a rule written by an agent that predates this, which is old by
+    # definition -- it belongs to a process that is no longer running.
+    created_at: int | None = None
 
 
 # Host addresses that mean "bind to every local interface" rather than one specific address. Docker
@@ -60,8 +76,27 @@ def _binds_every_local_address(host_ip: str | None) -> bool:
     return not host_ip or host_ip in _WILDCARD_HOST_IPS
 
 
-def _comment(container_id: str) -> list[str]:
-    return ["-m", "comment", "--comment", f"{_COMMENT_PREFIX}{container_id}"]
+def _comment(container_id: str, owner_agent_id: str | None, created_at: int | None) -> list[str]:
+    """The ownership tag: whose rule this is, for what, and when it was made.
+
+    ``bai:<agent_id>:<container_id>:<unix seconds>``, with the older ``bai:<container_id>`` and
+    ``bai:<container_id>:<seconds>`` forms still read back so nothing written by a previous agent
+    becomes unremovable.
+
+    Three facts because a reclaim needs all three. The container id says what the rule is for; the
+    agent id says whose runtime can answer whether that container still exists -- a node may run a
+    docker agent beside a containerd one, and neither can see the other's containers; and the time
+    says whether it has been orphaned long enough to act on, since a rule exists for a moment
+    before its container does.
+
+    Well inside iptables' 256-character comment limit.
+    """
+    parts = [container_id]
+    if owner_agent_id is not None:
+        parts.insert(0, owner_agent_id)
+    if created_at is not None:
+        parts.append(str(created_at))
+    return ["-m", "comment", "--comment", _COMMENT_PREFIX + ":".join(parts)]
 
 
 def dnat_rule(chain: str, forward: PortForward) -> list[str]:
@@ -85,7 +120,7 @@ def dnat_rule(chain: str, forward: PortForward) -> list[str]:
         "-p", forward.protocol,
         *dst_match,
         "--dport", str(forward.host_port),
-        *_comment(forward.container_id),
+        *_comment(forward.container_id, forward.owner_agent_id, forward.created_at),
         "-j", "DNAT",
         "--to-destination", f"{forward.container_ip}:{forward.container_port}",
     ]  # fmt: skip
@@ -146,13 +181,27 @@ def _parse_line(line: str) -> PortForward | None:
     # protocol would fail to delete a udp rule and leak it). iptables -S always shows -p for a
     # --dport rule; default to tcp defensively.
     protocol = value_after("-p") or "tcp"
+    tag = comment.strip('"')[len(_COMMENT_PREFIX) :]
+    # ``<agent>:<container>:<seconds>``, and the two older forms it grew from: ``<container>`` and
+    # ``<container>:<seconds>``. Neither an agent id nor a container id contains a colon, so the
+    # split is unambiguous, and an all-digit tail is the timestamp. Anything unrecognised parses as
+    # "no owner, no time", which leaves the rule reclaimable rather than immortal -- the failure
+    # this whole tag exists to prevent.
+    parts = tag.split(":")
+    created_at: int | None = None
+    if len(parts) > 1 and parts[-1].isdigit():
+        created_at = int(parts.pop())
+    owner_agent_id: str | None = parts[0] if len(parts) == 2 else None
+    container_id = parts[-1]
     return PortForward(
-        container_id=comment.strip('"')[len(_COMMENT_PREFIX) :],
+        container_id=container_id,
+        owner_agent_id=owner_agent_id,
         host_port=int(dport),
         container_ip=ip,
         container_port=int(container_port),
         host_ip=host_ip,
         protocol=protocol,
+        created_at=created_at,
     )
 
 
@@ -176,11 +225,25 @@ def parse_forwards(
 
 
 def forwards_for(
-    container_id: str, container_ip: str, ports: Iterable[tuple[int, int, str | None, str]]
+    container_id: str,
+    container_ip: str,
+    ports: Iterable[tuple[int, int, str | None, str]],
+    *,
+    owner_agent_id: str | None = None,
 ) -> list[PortForward]:
     """``ports`` is the (host_port, container_port, host_ip, protocol) pairing the agent allocated.
     ``host_ip`` is the address the service is published on (None = every local address); ``protocol``
-    is ``"tcp"``/``"udp"``."""
+    is ``"tcp"``/``"udp"``.
+
+    Every rule is stamped with the moment it was built, so a later sweep can tell a rule that has
+    just been installed from one whose container has been gone for a while. One timestamp for the
+    whole batch: they are installed together and are one container's, so giving them separate times
+    would only add a second of skew for a reader to reason about.
+    """
+    # Whole seconds, so the value written into the comment is exactly the value read back:
+    # a rule's `-D` is regenerated from what was parsed, and a timestamp that did not round
+    # trip would leave a rule nothing could remove -- the very leak this exists against.
+    created_at = int(time.time())
     return [
         PortForward(
             container_id=container_id,
@@ -189,9 +252,50 @@ def forwards_for(
             container_port=container_port,
             host_ip=host_ip,
             protocol=protocol,
+            owner_agent_id=owner_agent_id,
+            created_at=created_at,
         )
         for host_port, container_port, host_ip, protocol in ports
     ]
+
+
+#: How long a rule whose container Docker no longer has is left alone before it is reclaimed.
+#:
+#: Not zero, because the two facts are read at different moments: a rule is installed just before
+#: its container becomes visible, and a sweep landing in that window would cut a starting kernel
+#: off from its own published ports. Not long either -- while the rule stands, its host port is a
+#: black hole for whatever is published on it next, which is how a node ends up unable to start
+#: any session on the low end of its port range.
+ORPHAN_GRACE_SEC: float = 60.0
+
+
+def is_orphaned(
+    forward: PortForward,
+    live_container_ids: Container[str],
+    *,
+    now: float,
+    owner_agent_id: str,
+) -> bool:
+    """Whether this rule is ours, belongs to nothing, and has for long enough to be sure.
+
+    Ownership first, and it is the part that matters on a shared node. ``live_container_ids`` can
+    only be the listing of ONE runtime, so a rule another agent installed for a container that
+    runtime cannot see would look orphaned to every caller. Reclaiming it would take a live
+    kernel's published ports away — so a rule is only ever reclaimed by the agent that wrote it.
+
+    A rule with no owner recorded predates this and is left alone: nobody can prove it is dead, and
+    leaking it costs a port while deleting it could cost a running session.
+
+    A rule with no timestamp was written by an agent that predates the stamp; its process is gone,
+    so it is old by definition.
+    """
+    if forward.owner_agent_id != owner_agent_id:
+        return False
+    if forward.container_id in live_container_ids:
+        return False
+    if forward.created_at is None:
+        return True
+    return now - forward.created_at >= ORPHAN_GRACE_SEC
 
 
 def host_ports_of(forwards: Sequence[PortForward]) -> list[int]:

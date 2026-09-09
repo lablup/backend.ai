@@ -16,6 +16,7 @@ import os
 import socket
 import subprocess
 import tempfile
+import time
 from collections.abc import AsyncIterator, Iterator, Mapping
 from dataclasses import replace
 from pathlib import Path
@@ -34,10 +35,12 @@ from ai.backend.agent.network.local_subnet import LocalSubnetAllocator
 from ai.backend.agent.network.locator import ContainerLocator, LiveContainer
 from ai.backend.agent.network.native_attacher import HostLocalIpam
 from ai.backend.agent.network.pair_journal import PairJournal
+from ai.backend.agent.network.port_forward import is_orphaned
 from ai.backend.agent.network.privnet.client import (
     PrivNetBackendProxy,
     PrivNetClient,
     PrivNetClientError,
+    PrivNetPortForwarder,
     PrivNetProvisioner,
     PrivNetUnreachable,
 )
@@ -368,6 +371,7 @@ class _Harness:
         # `_isolated_vni_registry`.
         self.vni_registry = VniRegistry()
         self.cni = _RecordingCni(self.ipam)
+        self.agent_id = agent_id
         # The stub reports containers as owned by whichever agent this harness is, unless the test
         # deliberately says otherwise.
         if runtime is not None and runtime._owner == "i-test" and agent_id != "i-test":
@@ -1210,7 +1214,65 @@ class TestPublishPorts:
             resp = await h.client().call(
                 PrivNetRequest(op=PrivNetOp.LIST_PORTS, session_id="list-ports")
             )
-            assert resp.forwards == (("c1", 30001, _LOCAL_IP, 8070),)
+            assert resp.forwards is not None
+            (row,) = resp.forwards
+            assert row[:4] == ("c1", 30001, _LOCAL_IP, 8070)
+
+    async def test_list_ports_carries_the_owner_and_the_install_time(self) -> None:
+        """The only two facts a reclaim decides on, and only this daemon can read them back -- the
+        rules are root's. Reporting a rule without them makes it unreclaimable on every node where
+        privilege is separated, which is every node that runs a privnet."""
+        async with _Harness() as h:
+            await self._setup(h)
+            before = int(time.time())
+            await _publish(h, ((30001, 8070, None, "tcp"),))
+            resp = await h.client().call(
+                PrivNetRequest(op=PrivNetOp.LIST_PORTS, session_id="list-ports")
+            )
+            assert resp.forwards is not None
+            (_cid, _hp, _ip, _cp, owner, created_at) = resp.forwards[0]
+            assert owner == h.agent_id
+            assert created_at is not None and created_at >= before
+
+
+class TestThePortForwarderTheAgentActuallyUses:
+    """`PrivNetPortForwarder` is what a node with separated privilege gets from
+    `_port_publisher` -- every node that runs a privnet. The reclaim was written and tested against
+    the direct `PortForwarder`, whose `list_forwards` parses iptables and keeps every field; this
+    one rebuilds each rule from the wire, and what it leaves out the reclaim can never act on.
+    Measured on a live node: the reclaim ran on every restart and collected nothing, because each
+    rule came back with no owner and no owner means not mine to remove."""
+
+    async def _setup(self, h: _Harness) -> None:
+        await h.client().call(
+            PrivNetRequest(op=PrivNetOp.SETUP_SESSION, session_id="s1", network_config=_NC)
+        )
+        h.server._sessions["s1"].local_ips["c1"] = _LOCAL_IP
+
+    def _forwarder(self, h: _Harness) -> PrivNetPortForwarder:
+        return PrivNetPortForwarder(h.client(), lambda _cid: "s1")
+
+    async def test_list_forwards_keeps_the_owner_and_the_install_time(self) -> None:
+        async with _Harness() as h:
+            await self._setup(h)
+            before = int(time.time())
+            await _publish(h, ((30001, 8070, None, "tcp"),))
+            (forward,) = await self._forwarder(h).list_forwards()
+            assert forward.container_id == "c1"
+            assert forward.host_port == 30001
+            assert forward.owner_agent_id == h.agent_id
+            assert forward.created_at is not None and forward.created_at >= before
+
+    async def test_what_it_returns_is_reclaimable(self) -> None:
+        """The end the agent cares about: a rule whose container this runtime no longer has, old
+        enough, is one `is_orphaned` says to take. Asserting the fields is not the same as
+        asserting the decision they feed."""
+        async with _Harness() as h:
+            await self._setup(h)
+            await _publish(h, ((30001, 8070, None, "tcp"),))
+            (forward,) = await self._forwarder(h).list_forwards()
+            aged = replace(forward, created_at=(forward.created_at or 0) - 3600)
+            assert is_orphaned(aged, set(), now=time.time(), owner_agent_id=h.agent_id)
 
 
 class TestSessionBinding:

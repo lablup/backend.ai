@@ -79,6 +79,7 @@ from ai.backend.agent.metrics.metric import (
     SyncContainerLifecycleObserver,
 )
 from ai.backend.agent.network.caps import publish_backend
+from ai.backend.agent.network.port_forward import PortPublisher, is_orphaned
 from ai.backend.agent.port_pool import PortPool
 from ai.backend.agent.tasks import (
     CleanupReportedKernelsTask,
@@ -1831,6 +1832,74 @@ class AbstractAgent[
         Enumerate the containers with the given status filter.
         """
 
+    def port_publisher(self) -> PortPublisher | None:
+        """The object that installs and withdraws this backend's host-port DNAT rules.
+
+        None for a backend that publishes none (Kubernetes reaches a pod through the cluster's own
+        service layer; the dummy backend touches no host state), and those need no reclaim either.
+        """
+        return None
+
+    async def _reclaim_stale_port_forwards(self) -> None:
+        """Give back the host ports of rules whose container this runtime no longer has.
+
+        `port_forward.py` makes iptables the record -- which is what lets a restarted agent find
+        published ports with no journal of its own -- but nothing collected a rule whose container
+        went away while the agent was down, so they accumulated for the life of the host.
+
+        They are not inert. The rule sits in nat PREROUTING, matched before Docker's own DNAT for
+        the same host port, so it wins and sends the connection to the address a long-dead session
+        had. That port is then a black hole for whatever is published on it next, and the port pool
+        hands the low ports out again from the start on every restart -- so the same ports are
+        poisoned every time. Measured on a live node: 153 stale rules over host ports 33100-33121;
+        every session that drew one failed to start after ~70s while its container sat healthy and
+        answering at its own address. It reads as a flaky agent, never as a firewall rule.
+
+        Here rather than in one backend because the rules are shared machinery: whoever publishes
+        through `port_forward` leaks the same way, and a backend added later would have to remember
+        to do this. Liveness is asked of `enumerate_containers`, so each backend answers for its own
+        runtime -- a docker agent must never judge a containerd agent's rules, and `is_orphaned`
+        refuses them anyway by owner.
+        """
+        publisher = self.port_publisher()
+        if publisher is None:
+            return
+        try:
+            forwards = await publisher.list_forwards()
+        except Exception as e:
+            # Best-effort: a node that cannot read the rules is no worse off than before this
+            # existed, and refusing to start over it would be worse than the leak.
+            log.warning("could not read the host port forwards to reclaim stale ones ({})", e)
+            return
+        if not forwards:
+            return
+        live = {
+            str(container.id)
+            for _kernel_id, container in await self.enumerate_containers(
+                ACTIVE_STATUS_SET | DEAD_STATUS_SET
+            )
+        }
+        owner = str(self.local_config.agent.id)
+        now = time.time()
+        orphans = [f for f in forwards if is_orphaned(f, live, now=now, owner_agent_id=owner)]
+        stale = sorted({f.container_id for f in orphans})
+        if not stale:
+            return
+        reclaimed: list[int] = []
+        for container_id in stale:
+            try:
+                reclaimed.extend(await publisher.remove_container(container_id))
+            except Exception:
+                # One container's rules refusing to go must not keep the rest poisoned.
+                log.exception("could not reclaim the port forwards of {}", container_id)
+        if reclaimed:
+            log.warning(
+                "reclaimed {} host port(s) from {} container(s) this runtime no longer has: {}",
+                len(reclaimed),
+                len(stale),
+                f"{min(reclaimed)}..{max(reclaimed)}" if len(reclaimed) > 1 else reclaimed[0],
+            )
+
     async def reconstruct_resource_usage(self) -> None:
         """
         Reconstruct the resource alloc maps for each compute plugin from
@@ -2387,6 +2456,9 @@ class AbstractAgent[
         # back when a cooldown lapses. What is left is what the HOST holds and we do not -- a
         # departing container's docker-proxy, a socket in TIME_WAIT -- and the pool was built
         # with every port marked never-used, so those would be handed straight out.
+        # Reclaim first, then defer: the reclaim removes rules and gives their ports back, and the
+        # defer decides which of the ports now in the pool the host is still using.
+        await self._reclaim_stale_port_forwards()
         self._defer_ports_the_host_still_holds()
 
         log.info("starting with resource allocations")
