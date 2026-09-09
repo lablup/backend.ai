@@ -17,7 +17,7 @@ class AppConfigFragmentEntityType(EntityType):
     @override
     @classmethod
     def description(cls) -> str:
-        return "One key and value of an app config, set in one scope."
+        return "One scope's contribution to an app config key, as a JSON document."
 
 
 class AppConfigFragmentID(EntityIdentifier):

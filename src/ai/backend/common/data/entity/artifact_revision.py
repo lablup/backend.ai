@@ -22,7 +22,7 @@ class ArtifactRevisionFieldType(FieldType):
     @override
     @classmethod
     def description(cls) -> str:
-        return "One version of an artifact."
+        return "A version of an artifact, created by a registry scan and imported on its own."
 
     @override
     @classmethod

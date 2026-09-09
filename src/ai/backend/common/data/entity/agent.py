@@ -17,7 +17,7 @@ class AgentEntityType(EntityType):
     @override
     @classmethod
     def description(cls) -> str:
-        return "A compute node that runs kernels and reports its resources."
+        return "A compute node that runs kernels, in one resource group."
 
 
 class AgentUUID(EntityIdentifier):
