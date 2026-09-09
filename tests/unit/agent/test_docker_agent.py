@@ -4,6 +4,7 @@ Unit tests for `ai.backend.agent.docker.agent` helpers.
 
 from __future__ import annotations
 
+import inspect
 from http import HTTPStatus
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock
@@ -17,6 +18,7 @@ from ai.backend.agent.config.unified import (
     ContainerLogsConfig,
 )
 from ai.backend.agent.docker.agent import (
+    DockerAgent,
     DockerKernelCreationContext,
     LogDriverOptions,
     _build_log_config,
@@ -347,3 +349,45 @@ class TestBuildLogConfig:
 
         assert dumped == expected
         assert type(dumped["Type"]) is str
+
+
+class TestAContainerAlreadyGoneStillReturnsItsScratch:
+    """`clean_kernel` deletes the container and then the scratch. A container that is already gone
+    is the state the delete wanted, but the 404 branch used to `return`, so the scratch below it
+    never ran -- and every kernel whose container died with its agent kept its scratch directory
+    for good. Measured on a live node: two per ungraceful restart, collected by nothing after.
+    """
+
+    @staticmethod
+    def _between_the_delete_and_the_scratch() -> str:
+        """The source between the delete's error handling and the scratch clean it must reach.
+
+        Anchored on the LAST `NOT_FOUND` before `_clean_scratch`: `clean_kernel` has an earlier
+        one (reading the container's logs) whose branch is unrelated, and the first version of
+        this guard checked that one and passed while the bug was still there.
+        """
+        source = inspect.getsource(DockerAgent.clean_kernel)
+        # The call, not the bare name: the branch's own comment names `_clean_scratch`, and
+        # anchoring on the name found that mention instead and cut the span short of the `return`
+        # it was meant to catch.
+        scratch = source.index("await _clean_scratch(")
+        delete_branch = source.rindex("HTTPStatus.NOT_FOUND", 0, scratch)
+        return source[delete_branch:scratch]
+
+    def test_nothing_between_them_bails_out(self) -> None:
+        span = self._between_the_delete_and_the_scratch()
+        offenders = [
+            line.strip()
+            for line in span.splitlines()
+            if line.strip() == "return" or line.strip().startswith("return ")
+        ]
+        assert not offenders, (
+            "clean_kernel returns between the container delete and `_clean_scratch`, so a kernel"
+            f" whose container is already gone leaks its scratch directory: {offenders}"
+        )
+
+    def test_the_two_are_still_in_that_order(self) -> None:
+        """Pins the assumption the guard above rests on: the scratch clean is downstream of the
+        delete. If that ever stops being true this guard is checking nothing."""
+        source = inspect.getsource(DockerAgent.clean_kernel)
+        assert source.index("container.delete(") < source.index("await _clean_scratch(")

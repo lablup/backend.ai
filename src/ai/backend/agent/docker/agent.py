@@ -2891,12 +2891,25 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                     if (
                         e.status == HTTPStatus.CONFLICT and "already in progress" in e.message
                     ) or e.status == HTTPStatus.NOT_FOUND:
-                        return
-                    log.exception(
-                        "unexpected docker error while deleting container (k:{}, c:{})",
-                        kernel_id,
-                        container_id,
-                    )
+                        # The container is gone, or on its way out under another deletion. That is
+                        # what this call wanted; it is not a reason to abandon the rest of the
+                        # clean. Returning here skipped `_clean_scratch` below, so every kernel
+                        # whose container died with its agent -- the whole of a SIGKILL restart --
+                        # kept its scratch directory for good. Measured: two scratch dirs left
+                        # behind per ungraceful restart, never collected by anything afterwards.
+                        # Nothing below depends on the delete having happened.
+                        log.debug(
+                            "container already gone while cleaning (k:{}, c:{}); continuing with"
+                            " the scratch",
+                            kernel_id,
+                            container_id,
+                        )
+                    else:
+                        log.exception(
+                            "unexpected docker error while deleting container (k:{}, c:{})",
+                            kernel_id,
+                            container_id,
+                        )
                 except TimeoutError:
                     log.warning("container deletion timeout (k:{}, c:{})", kernel_id, container_id)
 
