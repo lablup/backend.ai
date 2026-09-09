@@ -13,7 +13,6 @@ from ai.backend.manager.repositories.resource_usage_history.types import (
     UserUsageBucketSearchResult,
 )
 
-from .creators import KernelUsageRecordCreatorSpec
 from .options import (
     DomainUsageBucketConditions,
     DomainUsageBucketOrders,
@@ -42,7 +41,6 @@ __all__ = (
     "ProjectUsageBucketSearchResult",
     "UserUsageBucketSearchResult",
     # Creator specs
-    "KernelUsageRecordCreatorSpec",
     # Query conditions
     "KernelUsageRecordConditions",
     "DomainUsageBucketConditions",

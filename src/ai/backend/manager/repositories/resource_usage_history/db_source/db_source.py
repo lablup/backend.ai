@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 import uuid
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from datetime import date, datetime
 from decimal import Decimal
 from typing import TYPE_CHECKING, Any, cast
@@ -13,6 +13,7 @@ import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.engine import CursorResult
 
+from ai.backend.common.data.entity.kernel import KernelID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.types import ResourceSlot
 from ai.backend.logging.utils import BraceStyleAdapter
@@ -27,19 +28,18 @@ from ai.backend.manager.models.resource_usage_history import (
     UsageBucketEntryRow,
     UserUsageBucketRow,
 )
+from ai.backend.manager.models.resource_usage_history.creators import KernelUsageRecordCreator
 from ai.backend.manager.models.resource_usage_history.scopes import (
     DomainUsageBucketOperationScope,
     ProjectUsageBucketOperationScope,
     UserUsageBucketOperationScope,
 )
+from ai.backend.manager.models.specs.creator import NestedFieldToCreate
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
-    BulkCreator,
-    Creator,
     execute_batch_querier,
-    execute_bulk_creator,
-    execute_creator,
 )
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.resource_usage_history.types import (
     DomainUsageBucketSearchResult,
     KernelUsageRecordSearchResult,
@@ -68,36 +68,63 @@ class ResourceUsageHistoryDBSource:
 
     _db: ExtendedAsyncSAEngine
 
-    def __init__(self, db: ExtendedAsyncSAEngine) -> None:
+    def __init__(self, db: ExtendedAsyncSAEngine, v2_ops: V2DBOpsProvider) -> None:
         self._db = db
+        self._v2_ops = v2_ops
 
     # ==================== Kernel Usage Records ====================
 
     async def create_kernel_usage_record(
         self,
-        creator: Creator[KernelUsageRecordRow],
+        kernel_id: KernelID,
+        creator: KernelUsageRecordCreator,
     ) -> KernelUsageRecordData:
         """Create a single kernel usage record."""
-        async with self._db.begin_session() as db_sess:
-            result = await execute_creator(db_sess, creator)
-            return result.row.to_data()
+        async with self._v2_ops.write_ops() as w:
+            records = await w.atomic_create_nested_fields([
+                NestedFieldToCreate(owner_id=kernel_id, creator=creator)
+            ])
+        return records[0]
 
     async def bulk_create_kernel_usage_records(
         self,
-        bulk_creator: BulkCreator[KernelUsageRecordRow],
+        creations: Sequence[
+            NestedFieldToCreate[KernelID, KernelUsageRecordRow, KernelUsageRecordData]
+        ],
     ) -> list[KernelUsageRecordData]:
         """Bulk create kernel usage records.
 
         This is the primary method used by UsageAggregationService to record
         per-period usage slices for all running kernels.
         """
-        async with self._db.begin_session() as db_sess:
-            result = await execute_bulk_creator(db_sess, bulk_creator)
-            return [row.to_data() for row in result.rows]
+        async with self._v2_ops.write_ops() as w:
+            return await w.atomic_create_nested_fields(creations)
+
+    async def _add_usage_records(
+        self,
+        db_sess: SASession,
+        creations: Sequence[
+            NestedFieldToCreate[KernelID, KernelUsageRecordRow, KernelUsageRecordData]
+        ],
+    ) -> list[KernelUsageRecordData]:
+        """Write the usage slices into the caller's transaction.
+
+        The writes that follow have to land with these or not at all, and ops are handed
+        out session-bound, so the rows go in here rather than through the field write
+        path the other creates take.
+        """
+        if not creations:
+            return []
+        rows = [c.creator.build_row(c.owner_id) for c in creations]
+        db_sess.add_all(rows)
+        await db_sess.flush()
+        return [c.creator.to_data(row) for c, row in zip(creations, rows, strict=True)]
 
     async def bulk_create_kernel_usage_records_with_observation_update(
         self,
-        bulk_creator: BulkCreator[KernelUsageRecordRow],
+        creations: Sequence[
+            NestedFieldToCreate[KernelID, KernelUsageRecordRow, KernelUsageRecordData]
+        ],
         kernel_observation_times: Mapping[uuid.UUID, datetime],
     ) -> tuple[list[KernelUsageRecordData], int]:
         """Bulk create kernel usage records and update observation timestamps atomically.
@@ -115,8 +142,7 @@ class ResourceUsageHistoryDBSource:
         """
         async with self._db.begin_session() as db_sess:
             # Step 1: Bulk create kernel usage records
-            result = await execute_bulk_creator(db_sess, bulk_creator)
-            records = [row.to_data() for row in result.rows]
+            records = await self._add_usage_records(db_sess, creations)
 
             # Step 2: Update last_observed_at for kernels
             updated_count = 0
@@ -139,7 +165,9 @@ class ResourceUsageHistoryDBSource:
 
     async def record_fair_share_observation(
         self,
-        bulk_creator: BulkCreator[KernelUsageRecordRow],
+        creations: Sequence[
+            NestedFieldToCreate[KernelID, KernelUsageRecordRow, KernelUsageRecordData]
+        ],
         kernel_observation_times: Mapping[uuid.UUID, datetime],
         aggregation_result: UsageBucketAggregationResult,
         decay_unit_days: int = 1,
@@ -167,7 +195,7 @@ class ResourceUsageHistoryDBSource:
             "[DBSource] record_fair_share_observation: specs_count={}, "
             "kernel_observation_times_count={}, user_deltas={}, project_deltas={}, "
             "domain_deltas={}",
-            len(bulk_creator.specs),
+            len(creations),
             len(kernel_observation_times),
             len(aggregation_result.user_usage_deltas),
             len(aggregation_result.project_usage_deltas),
@@ -176,8 +204,7 @@ class ResourceUsageHistoryDBSource:
 
         async with self._db.begin_session() as db_sess:
             # Step 1: Bulk create kernel usage records
-            result = await execute_bulk_creator(db_sess, bulk_creator)
-            records = [row.to_data() for row in result.rows]
+            records = await self._add_usage_records(db_sess, creations)
 
             log.debug("[DBSource] Created {} kernel usage records", len(records))
 
