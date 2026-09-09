@@ -540,7 +540,16 @@ class SessionNetworkCoordinator:
         if meta.backend is not NetworkBackendKind.VXLAN:
             return None
         raw = await self._etcd.get(session_meta_key(meta.session_id))
-        if raw is None or json.loads(raw).get(SESSION_META_STATE) != SESSION_META_READY:
+        # Absent state reads as READY, for the reason the generation check below gives: a record
+        # written before the field existed carries none, and a reader that took absence for
+        # "not ready" would refuse every session a pre-upgrade manager left behind -- neither
+        # resuming them after a restart nor letting the departed-session pass finish their
+        # teardown, so their member keys stay and the manager holds their VNIs for a node that is
+        # not in them. `SESSION_META_STATE` says absence is exactly that case.
+        if (
+            raw is None
+            or json.loads(raw).get(SESSION_META_STATE, SESSION_META_READY) != SESSION_META_READY
+        ):
             raise SessionNetworkGone(
                 f"session {meta.session_id}'s network record is gone or no longer one this node"
                 " may act on; not joining a session the manager has stopped standing behind"
