@@ -61,7 +61,7 @@ class UpdateDomainInput(BaseRequestModel):
 
     name: str | None | Unset = Field(
         default=UNSET,
-        description="New domain name.",
+        description="New domain name. Omit to leave unchanged.",
         max_length=64,
     )
     description: str | None | Unset = Field(
@@ -70,7 +70,7 @@ class UpdateDomainInput(BaseRequestModel):
     )
     is_active: bool | None | Unset = Field(
         default=UNSET,
-        description="Updated active status.",
+        description="Updated active status. Omit to leave unchanged.",
     )
     allowed_docker_registries: list[str] | None | Unset = Field(
         default=UNSET,

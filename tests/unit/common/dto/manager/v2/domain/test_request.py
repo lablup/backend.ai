@@ -109,6 +109,10 @@ class TestUpdateDomainInput:
         req = UpdateDomainInput(name="new-name")
         assert req.name == "new-name"
 
+    def test_explicit_none_name_stays_none(self) -> None:
+        req = UpdateDomainInput(name=None)
+        assert req.name is None
+
     def test_name_max_length_enforced(self) -> None:
         with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             UpdateDomainInput(name="a" * 65)
@@ -116,6 +120,10 @@ class TestUpdateDomainInput:
     def test_is_active_update(self) -> None:
         req = UpdateDomainInput(is_active=False)
         assert req.is_active is False
+
+    def test_explicit_none_is_active_stays_none(self) -> None:
+        req = UpdateDomainInput(is_active=None)
+        assert req.is_active is None
 
     def test_allowed_docker_registries_none_clears(self) -> None:
         req = UpdateDomainInput(allowed_docker_registries=None)
