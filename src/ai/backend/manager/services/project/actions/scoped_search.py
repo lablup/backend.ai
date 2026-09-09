@@ -45,7 +45,7 @@ class DomainProjectScopeItem(ProjectScopeItem):
     domain_id: DomainID
 
     @override
-    def scope_ref(self) -> EntityIdentifier:
+    def scope_id(self) -> EntityIdentifier:
         return self.domain_id
 
     @override
@@ -60,7 +60,7 @@ class UserProjectScopeItem(ProjectScopeItem):
     user_id: UserID
 
     @override
-    def scope_ref(self) -> EntityIdentifier:
+    def scope_id(self) -> EntityIdentifier:
         return self.user_id
 
     @override
@@ -75,7 +75,7 @@ class ResourceGroupProjectScopeItem(ProjectScopeItem):
     resource_group_id: ResourceGroupID
 
     @override
-    def scope_ref(self) -> EntityIdentifier:
+    def scope_id(self) -> EntityIdentifier:
         return self.resource_group_id
 
     @override
@@ -106,7 +106,7 @@ class ScopedSearchProjectsAction(OperationScopeOpsAction[ProjectRow, ProjectData
 
     @override
     def scope_targets(self) -> Sequence[EntityIdentifier]:
-        return [item.scope_ref() for item in self.items]
+        return [item.scope_id() for item in self.items]
 
     @override
     def operation_scopes(self) -> Sequence[OperationScope]:

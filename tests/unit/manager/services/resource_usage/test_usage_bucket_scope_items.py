@@ -23,7 +23,7 @@ USER_UUID = uuid.uuid4()
 
 def test_domain_item_is_read_for_the_resource_group() -> None:
     item = DomainUsageBucketScopeItem(resource_group_id=RESOURCE_GROUP_ID, domain_name="default")
-    assert item.scope_ref() == RESOURCE_GROUP_ID
+    assert item.scope_id() == RESOURCE_GROUP_ID
     assert item.operation_scope() == DomainUsageBucketOperationScope(
         resource_group_id=RESOURCE_GROUP_ID, domain_name="default"
     )
@@ -33,7 +33,7 @@ def test_project_item_is_read_for_the_resource_group() -> None:
     item = ProjectUsageBucketScopeItem(
         resource_group_id=RESOURCE_GROUP_ID, domain_name="default", project_id=PROJECT_ID
     )
-    assert item.scope_ref() == RESOURCE_GROUP_ID
+    assert item.scope_id() == RESOURCE_GROUP_ID
     assert item.operation_scope() == ProjectUsageBucketOperationScope(
         resource_group_id=RESOURCE_GROUP_ID, domain_name="default", project_id=PROJECT_ID
     )
@@ -46,7 +46,7 @@ def test_user_item_is_read_for_the_resource_group() -> None:
         project_id=PROJECT_ID,
         user_uuid=USER_UUID,
     )
-    assert item.scope_ref() == RESOURCE_GROUP_ID
+    assert item.scope_id() == RESOURCE_GROUP_ID
     assert item.operation_scope() == UserUsageBucketOperationScope(
         resource_group_id=RESOURCE_GROUP_ID,
         domain_name="default",

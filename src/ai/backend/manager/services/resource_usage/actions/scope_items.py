@@ -34,7 +34,7 @@ class UsageBucketScopeItem(ScopeItem, ABC):
     resource_group_id: ResourceGroupID
 
     @override
-    def scope_ref(self) -> EntityIdentifier:
+    def scope_id(self) -> EntityIdentifier:
         return self.resource_group_id
 
 

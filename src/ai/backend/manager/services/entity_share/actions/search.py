@@ -44,7 +44,7 @@ class EntityShareRecipientScopeItem(EntityShareScopeItem):
     user_id: UserID
 
     @override
-    def scope_ref(self) -> EntityIdentifier:
+    def scope_id(self) -> EntityIdentifier:
         return self.user_id
 
     @override
@@ -59,7 +59,7 @@ class EntityShareSharerScopeItem(EntityShareScopeItem):
     user_id: UserID
 
     @override
-    def scope_ref(self) -> EntityIdentifier:
+    def scope_id(self) -> EntityIdentifier:
         return self.user_id
 
     @override
@@ -74,7 +74,7 @@ class EntityShareRecipientProjectScopeItem(EntityShareScopeItem):
     project_id: ProjectID
 
     @override
-    def scope_ref(self) -> EntityIdentifier:
+    def scope_id(self) -> EntityIdentifier:
         return self.project_id
 
     @override
@@ -89,7 +89,7 @@ class EntityShareTargetScopeItem(EntityShareScopeItem):
     target: EntityIdentifier
 
     @override
-    def scope_ref(self) -> EntityIdentifier:
+    def scope_id(self) -> EntityIdentifier:
         return self.target
 
     @override
@@ -120,7 +120,7 @@ class SearchEntitySharesAction(OperationScopeOpsAction[EntityShareRow, EntitySha
 
     @override
     def scope_targets(self) -> Sequence[EntityIdentifier]:
-        return [item.scope_ref() for item in self.items]
+        return [item.scope_id() for item in self.items]
 
     @override
     def operation_scopes(self) -> Sequence[OperationScope]:

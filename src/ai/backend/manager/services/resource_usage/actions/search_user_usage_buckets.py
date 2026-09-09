@@ -39,7 +39,7 @@ class SearchUserUsageBucketsAction(
 
     @override
     def scope_targets(self) -> Sequence[EntityIdentifier]:
-        return [item.scope_ref() for item in self.items]
+        return [item.scope_id() for item in self.items]
 
     @override
     def operation_scopes(self) -> Sequence[OperationScope]:

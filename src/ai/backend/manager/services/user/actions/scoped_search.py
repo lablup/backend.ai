@@ -40,7 +40,7 @@ class DomainUserScopeItem(UserScopeItem):
     domain_id: DomainID
 
     @override
-    def scope_ref(self) -> EntityIdentifier:
+    def scope_id(self) -> EntityIdentifier:
         return self.domain_id
 
     @override
@@ -55,7 +55,7 @@ class ProjectUserScopeItem(UserScopeItem):
     project_id: ProjectID
 
     @override
-    def scope_ref(self) -> EntityIdentifier:
+    def scope_id(self) -> EntityIdentifier:
         return self.project_id
 
     @override
@@ -86,7 +86,7 @@ class ScopedSearchUsersAction(OperationScopeOpsAction[UserRow, UserData]):
 
     @override
     def scope_targets(self) -> Sequence[EntityIdentifier]:
-        return [item.scope_ref() for item in self.items]
+        return [item.scope_id() for item in self.items]
 
     @override
     def operation_scopes(self) -> Sequence[OperationScope]:

@@ -50,7 +50,7 @@ class KernelKernelHistoryTarget(KernelHistoryTarget):
         return KernelKernelHistoryOperationScope(kernel_id=self.kernel_id)
 
     @override
-    def to_scope_ref(self) -> EntityIdentifier:
+    def to_scope_id(self) -> EntityIdentifier:
         return SessionID(self.kernel_id)
 
 
@@ -65,7 +65,7 @@ class SessionKernelHistoryTarget(KernelHistoryTarget):
         return SessionKernelHistoryOperationScope(session_id=self.session_id)
 
     @override
-    def to_scope_ref(self) -> EntityIdentifier:
+    def to_scope_id(self) -> EntityIdentifier:
         return SessionID(self.session_id)
 
 
@@ -81,7 +81,7 @@ class SearchKernelScopedHistoryAction(BaseScopeAction):
 
     @override
     def scope_targets(self) -> Sequence[EntityIdentifier]:
-        return (self.target.to_scope_ref(),)
+        return (self.target.to_scope_id(),)
 
     @override
     @classmethod

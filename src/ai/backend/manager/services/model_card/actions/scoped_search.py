@@ -27,7 +27,7 @@ class ModelCardScopeItem(ScopeItem):
     project_id: ProjectID
 
     @override
-    def scope_ref(self) -> EntityIdentifier:
+    def scope_id(self) -> EntityIdentifier:
         return self.project_id
 
     @override
@@ -54,7 +54,7 @@ class ScopedSearchModelCardsAction(OperationScopeOpsAction[ModelCardRow, ModelCa
 
     @override
     def scope_targets(self) -> Sequence[EntityIdentifier]:
-        return [item.scope_ref() for item in self.items]
+        return [item.scope_id() for item in self.items]
 
     @override
     def operation_scopes(self) -> Sequence[OperationScope]:

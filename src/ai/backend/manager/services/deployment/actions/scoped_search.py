@@ -44,7 +44,7 @@ class ProjectDeploymentScopeItem(DeploymentScopeItem):
     project_id: ProjectID
 
     @override
-    def scope_ref(self) -> EntityIdentifier:
+    def scope_id(self) -> EntityIdentifier:
         return self.project_id
 
     @override
@@ -59,7 +59,7 @@ class UserDeploymentScopeItem(DeploymentScopeItem):
     user_id: UserID
 
     @override
-    def scope_ref(self) -> EntityIdentifier:
+    def scope_id(self) -> EntityIdentifier:
         return self.user_id
 
     @override
@@ -80,7 +80,7 @@ class ScopedSearchDeploymentsAction(DeploymentScopeAction):
 
     @override
     def scope_targets(self) -> Sequence[EntityIdentifier]:
-        return [item.scope_ref() for item in self.items]
+        return [item.scope_id() for item in self.items]
 
     def operation_scopes(self) -> Sequence[OperationScope]:
         return [item.operation_scope() for item in self.items]

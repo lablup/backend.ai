@@ -16,7 +16,7 @@ class SearchableScopeTarget(ABC):
     """
 
     @abstractmethod
-    def to_scope_ref(self) -> EntityIdentifier:
+    def to_scope_id(self) -> EntityIdentifier:
         """Return the scope the read is answered for."""
         raise NotImplementedError
 

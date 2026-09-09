@@ -31,7 +31,7 @@ class ResourceGroupDomainScopeItem(DomainScopeItem):
     resource_group_id: ResourceGroupID
 
     @override
-    def scope_ref(self) -> EntityIdentifier:
+    def scope_id(self) -> EntityIdentifier:
         return self.resource_group_id
 
     @override
@@ -62,7 +62,7 @@ class ScopedSearchDomainsAction(OperationScopeOpsAction[DomainRow, DomainData]):
 
     @override
     def scope_targets(self) -> Sequence[EntityIdentifier]:
-        return [item.scope_ref() for item in self.items]
+        return [item.scope_id() for item in self.items]
 
     @override
     def operation_scopes(self) -> Sequence[OperationScope]:

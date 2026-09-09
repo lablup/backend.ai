@@ -41,7 +41,7 @@ class DeploymentReplicaGroupHistoryTarget(ReplicaGroupHistoryTarget):
         return DeploymentReplicaGroupHistoryOperationScope(deployment_id=self.deployment_id)
 
     @override
-    def to_scope_ref(self) -> EntityIdentifier:
+    def to_scope_id(self) -> EntityIdentifier:
         return self.deployment_id
 
 
@@ -57,7 +57,7 @@ class ScopedSearchReplicaGroupHistoryAction(BaseScopeAction):
 
     @override
     def scope_targets(self) -> Sequence[EntityIdentifier]:
-        return (self.target.to_scope_ref(),)
+        return (self.target.to_scope_id(),)
 
     @override
     @classmethod

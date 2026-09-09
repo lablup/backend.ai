@@ -223,7 +223,7 @@ class ScopeItem(ABC):
     """
 
     @abstractmethod
-    def scope_ref(self) -> EntityIdentifier:
+    def scope_id(self) -> EntityIdentifier:
         """The scope the read is answered for."""
         raise NotImplementedError
 
