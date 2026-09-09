@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 from abc import ABCMeta, abstractmethod
 from collections.abc import AsyncIterator, Mapping, Sequence
@@ -11,11 +12,14 @@ from typing import (
     final,
 )
 
+from ai.backend.common.cron.local_cron import LocalCron
+from ai.backend.common.data.storage.types import VolumeName
 from ai.backend.common.defs import DEFAULT_VFOLDER_PERMISSION_MODE
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.events.dispatcher import EventDispatcher, EventProducer
 from ai.backend.common.types import BinarySize, HardwareMetadata, QuotaScopeID
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.storage.config.unified import StorageProxyConfig
 from ai.backend.storage.errors import InvalidSubpathError, VFolderNotFoundError
 from ai.backend.storage.types import (
     CapacityUsage,
@@ -27,6 +31,12 @@ from ai.backend.storage.types import (
     VFolderID,
     VolumeInfo,
 )
+from ai.backend.storage.backend.health.abc import AbstractBackendProber
+from ai.backend.storage.backend.health.tasks import BackendProbeTask, BackendProbeTaskArgs
+from ai.backend.storage.backend.health.types import BackendHealthRecord
+from ai.backend.storage.volumes.health.abc import AbstractMountProber
+from ai.backend.storage.volumes.health.tasks import MountProbeTask, MountProbeTaskArgs
+from ai.backend.storage.volumes.health.types import MountHealthRecord
 from ai.backend.storage.watcher import WatcherClient
 
 # Available capabilities of a volume implementation
@@ -190,16 +200,31 @@ class AbstractFSOpModel(metaclass=ABCMeta):
         raise NotImplementedError
 
 
-class AbstractVolume(metaclass=ABCMeta):
+class AbstractVolume[
+    TMountProber: AbstractMountProber = AbstractMountProber,
+    TBackendProber: AbstractBackendProber = AbstractBackendProber,
+](metaclass=ABCMeta):
     quota_model: AbstractQuotaModel
     fsop_model: AbstractFSOpModel
+    _mount_prober: TMountProber
+    _backend_prober: TBackendProber
     name: ClassVar[str] = "undefined"
+
+    volume_name: VolumeName
+    _storage_proxy_config: StorageProxyConfig
+    _mount_health: MountHealthRecord
+    _backend_health: BackendHealthRecord
+    _mount_probe_task: MountProbeTask
+    _backend_probe_task: BackendProbeTask
+    _health_cron: LocalCron
 
     def __init__(
         self,
         local_config: Mapping[str, Any],
         mount_path: Path,
         *,
+        volume_name: VolumeName,
+        storage_proxy_config: StorageProxyConfig,
         etcd: AsyncEtcd,
         event_dispatcher: EventDispatcher,
         event_producer: EventProducer,
@@ -209,17 +234,81 @@ class AbstractVolume(metaclass=ABCMeta):
         self.local_config = local_config
         self.mount_path = mount_path
         self.config = options or {}
+        self.volume_name = volume_name
+        self._storage_proxy_config = storage_proxy_config
+        self._mount_health = MountHealthRecord()
+        self._backend_health = BackendHealthRecord()
         self.etcd = etcd
         self.event_dispatcher = event_dispatcher
         self.event_producer = event_producer
         self.watcher = watcher
 
     async def init(self) -> None:
+        # After the subclass has set up its client, which its own init() does before
+        # delegating here, so that a backend prober can be handed one.
+        self._mount_prober = self.create_mount_prober()
+        self._backend_prober = self.create_backend_prober()
+        await self._capture_mount_baseline()
         self.fsop_model = await self.create_fsop_model()
         self.quota_model = await self.create_quota_model()
+        # The mount and the backend probe on separate loops, both independent of the
+        # heartbeat, so that a slow or hung probe never delays a heartbeat.
+        health_config = self._storage_proxy_config.volume_health
+        self._mount_probe_task = MountProbeTask(
+            MountProbeTaskArgs(
+                volume_name=self.volume_name,
+                prober=self._mount_prober,
+                record=self._mount_health,
+                interval=health_config.mount_probe_interval,
+                timeout=health_config.mount_probe_timeout,
+            )
+        )
+        self._backend_probe_task = BackendProbeTask(
+            BackendProbeTaskArgs(
+                volume_name=self.volume_name,
+                prober=self._backend_prober,
+                record=self._backend_health,
+                interval=health_config.backend_probe_interval,
+                timeout=health_config.backend_probe_timeout,
+            )
+        )
+        self._health_cron = LocalCron([self._mount_probe_task, self._backend_probe_task])
+        await self._health_cron.start()
 
     async def shutdown(self) -> None:
-        pass
+        await self._health_cron.stop()
+        # Stopping the cron cancels the await, not the thread the probe blocks in.
+        self._mount_probe_task.shutdown()
+
+    # ------ mount and backend health -------
+
+    @abstractmethod
+    def create_mount_prober(self) -> TMountProber:
+        raise NotImplementedError
+
+    @abstractmethod
+    def create_backend_prober(self) -> TBackendProber:
+        raise NotImplementedError
+
+    async def _capture_mount_baseline(self) -> None:
+        """
+        Lets the mount prober record what its later probes compare against.
+        A failure is not fatal: the volume starts without a baseline and the first
+        successful probe adopts one.
+        """
+        timeout = self._storage_proxy_config.volume_health.mount_probe_timeout
+        try:
+            async with asyncio.timeout(timeout):
+                await asyncio.to_thread(self._mount_prober.capture_baseline)
+        except TimeoutError:
+            log.error(
+                "Timed out capturing the mount baseline of {} after {}s; "
+                "the volume starts without one",
+                self.mount_path,
+                timeout,
+            )
+        except OSError as e:
+            log.error("Failed to capture the mount baseline of {}: {}", self.mount_path, e)
 
     @abstractmethod
     def info(self) -> VolumeInfo:

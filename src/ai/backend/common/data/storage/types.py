@@ -1,11 +1,15 @@
 from __future__ import annotations
 
 import enum
+from typing import NewType
 
 from pydantic import ConfigDict
 
 from ai.backend.common.type_adapters import VFolderIDField
 from ai.backend.common.types import BackendAISchema
+
+# The operator-declared name of a storage volume, which is its configuration section key.
+VolumeName = NewType("VolumeName", str)
 
 
 class VFolderStorageTarget(BackendAISchema):

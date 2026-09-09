@@ -9,7 +9,9 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from ai.backend.common.data.storage.types import VolumeName
 from ai.backend.common.types import QuotaScopeID, QuotaScopeType
+from ai.backend.storage.config.unified import StorageProxyConfig
 from ai.backend.storage.errors import QuotaScopeCreationFailedError
 from ai.backend.storage.types import VFolderID
 from ai.backend.storage.volumes.vfs import BaseVolume
@@ -34,6 +36,11 @@ class TestBaseVolume:
     ) -> AsyncIterator[BaseVolume]:
         mock_event_dispatcher = MagicMock()
         mock_event_producer = MagicMock()
+        storage_proxy_config = StorageProxyConfig.model_validate({
+            "node-id": "test-storage-proxy",
+            "secret": "test-secret",
+            "session-expire": "1h",
+        })
         volume = BaseVolume(
             {
                 "storage-proxy": {
@@ -41,6 +48,8 @@ class TestBaseVolume:
                 },
             },
             temp_volume_path,
+            volume_name=VolumeName("test-volume"),
+            storage_proxy_config=storage_proxy_config,
             etcd=mock_etcd,
             options={},
             event_dispatcher=mock_event_dispatcher,

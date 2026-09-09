@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 import uuid
 from collections.abc import AsyncIterator, Mapping
@@ -7,6 +8,7 @@ from contextlib import asynccontextmanager as actxmgr
 from pathlib import Path
 from typing import Self
 
+from ai.backend.common.data.storage.types import VolumeName
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.events.dispatcher import EventDispatcher, EventProducer
 from ai.backend.common.types import VolumeID
@@ -79,29 +81,33 @@ class VolumePool:
             backends, local_config, etcd
         )
 
+        # Initialized concurrently: each volume's init probes its own mount under a
+        # timeout, so a sequential loop would sum those timeouts into the startup time.
+        raw_volume_ids = list(local_config.volume.keys())
+        initialized = await asyncio.gather(
+            *(
+                cls._init_volume(
+                    VolumeName(raw_volume_id),
+                    config,
+                    backends[config.backend],
+                    local_config,
+                    etcd,
+                    event_dispatcher,
+                    event_producer,
+                )
+                for raw_volume_id, config in local_config.volume.items()
+            )
+        )
+
         volumes: dict[VolumeID, AbstractVolume] = {}
         volumes_by_name: dict[str, AbstractVolume] = {}
-        for raw_volume_id, config in local_config.volume.items():
+        for raw_volume_id, volume in zip(raw_volume_ids, initialized, strict=False):
             try:
                 volume_id = VolumeID(uuid.UUID(raw_volume_id))
             except (ValueError, TypeError):
-                volumes_by_name[raw_volume_id] = await cls._init_volume(
-                    config,
-                    backends[config.backend],
-                    local_config,
-                    etcd,
-                    event_dispatcher,
-                    event_producer,
-                )
+                volumes_by_name[raw_volume_id] = volume
             else:
-                volumes[volume_id] = await cls._init_volume(
-                    config,
-                    backends[config.backend],
-                    local_config,
-                    etcd,
-                    event_dispatcher,
-                    event_producer,
-                )
+                volumes[volume_id] = volume
         return cls(
             volumes=volumes,
             volumes_by_name=volumes_by_name,
@@ -111,6 +117,7 @@ class VolumePool:
     @classmethod
     async def _init_volume(
         cls,
+        volume_name: VolumeName,
         volume_config: VolumeInfoConfig,
         volume_type: type[AbstractVolume],
         local_config: StorageProxyUnifiedConfig,
@@ -121,6 +128,8 @@ class VolumePool:
         volume_obj = volume_type(
             local_config=local_config.model_dump(by_alias=True),
             mount_path=Path(volume_config.path),
+            volume_name=volume_name,
+            storage_proxy_config=local_config.storage_proxy,
             etcd=etcd,
             event_dispatcher=event_dispatcher,
             event_producer=event_producer,
@@ -145,7 +154,7 @@ class VolumePool:
         return plugin_ctx
 
     async def shutdown(self) -> None:
-        for volume in self._volumes.values():
+        for volume in (*self._volumes.values(), *self._volumes_by_name.values()):
             await volume.shutdown()
         await self._storage_backend_plugin_ctx.cleanup()
 

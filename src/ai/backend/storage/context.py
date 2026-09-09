@@ -18,6 +18,7 @@ from ai.backend.common.clients.valkey_client.valkey_artifact.client import (
 from ai.backend.common.clients.valkey_client.valkey_tus.client import (
     ValkeyTusClient,
 )
+from ai.backend.common.data.storage.types import VolumeName
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.events.dispatcher import (
     EventDispatcher,
@@ -144,6 +145,8 @@ class RootContext:
             volume_obj = volume_cls(
                 local_config=self.local_config.model_dump(by_alias=True),
                 mount_path=Path(volume_config.path),
+                volume_name=VolumeName(name),
+                storage_proxy_config=self.local_config.storage_proxy,
                 options=volume_config.options or {},
                 etcd=self.etcd,
                 event_dispatcher=self.event_dispatcher,
