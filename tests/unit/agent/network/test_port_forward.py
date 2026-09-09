@@ -1,16 +1,21 @@
 """Host-port ingress (BEP-1078): the DNAT half of the LOCAL bridge's NAT."""
 
-from typing import Any, override
+import inspect
+from typing import Any, cast, override
 
 import pytest
 
+from ai.backend.agent.agent import AbstractAgent
+from ai.backend.agent.docker.agent import DockerAgent
 from ai.backend.agent.network.port_forward import (
+    ORPHAN_GRACE_SEC,
     PortForward,
     PortForwarder,
     dnat_rule,
     forwards_for,
     host_ports_of,
     install_args,
+    is_orphaned,
     parse_forwards,
     remove_args,
 )
@@ -251,3 +256,238 @@ class TestBindAddress:
     def test_an_unbound_rule_parses_back_to_none(self) -> None:
         (parsed,) = parse_forwards(_SAVE_OUTPUT.splitlines()[1], container_id=_CID)
         assert parsed.host_ip is None
+
+
+class _Publisher:
+    """A `PortPublisher` holding a fixed set of forwards, recording what is reclaimed."""
+
+    def __init__(self, forwards: list[PortForward]) -> None:
+        self._forwards = list(forwards)
+        self.removed: list[str] = []
+
+    async def install(self, forwards: Any) -> None:
+        raise AssertionError("recovery must not install anything")
+
+    async def remove_container(self, container_id: str) -> list[int]:
+        self.removed.append(container_id)
+        ports = [f.host_port for f in self._forwards if f.container_id == container_id]
+        self._forwards = [f for f in self._forwards if f.container_id != container_id]
+        return ports
+
+    async def list_forwards(self, *, container_id: str | None = None) -> list[PortForward]:
+        if container_id is None:
+            return list(self._forwards)
+        return [f for f in self._forwards if f.container_id == container_id]
+
+
+async def _reclaim(publisher: _Publisher, live: set[str]) -> list[int]:
+    """The decision `DockerAgent._reclaim_stale_port_forwards` makes, over an injected publisher.
+
+    The method itself opens a Docker connection to learn the live set; what is worth pinning is
+    which rules it decides to drop, so the set is supplied and the decision is exercised.
+    """
+    forwards = await publisher.list_forwards()
+    stale = sorted({f.container_id for f in forwards} - live)
+    reclaimed: list[int] = []
+    for cid in stale:
+        reclaimed.extend(await publisher.remove_container(cid))
+    return reclaimed
+
+
+class TestReclaimingRulesOfContainersThatAreGone:
+    """iptables is the record, and nothing collected a rule whose container went away while the
+    agent was down -- so they accumulated for the life of the host.
+
+    They are not inert: the rule sits in nat PREROUTING and is matched *before* Docker's own DNAT
+    for the same host port, so it wins and sends the connection to the address a dead session had.
+    The port becomes a black hole for whatever is published on it next, and the agent's pool hands
+    the low ports out again from the start on every restart -- so the same ports are poisoned
+    every time. Measured on a live node: 72 stale rules over host ports 33100-33121, and every
+    session that drew one failed to start while its container was healthy and reachable at its own
+    address.
+    """
+
+    _DEAD = PortForward(
+        container_id="dead-container",
+        host_port=33100,
+        container_ip="172.30.0.194",
+        container_port=2000,
+    )
+    _LIVE = PortForward(
+        container_id="live-container",
+        host_port=33200,
+        container_ip="172.30.1.5",
+        container_port=2000,
+    )
+
+    async def test_a_dead_containers_rules_are_dropped(self) -> None:
+        pub = _Publisher([self._DEAD])
+        assert await _reclaim(pub, live=set()) == [33100]
+        assert pub.removed == ["dead-container"]
+
+    async def test_a_live_containers_rules_are_left_alone(self) -> None:
+        """Including one that has not started yet: a container held at the creation gate needs its
+        rules, and Docker still knows about it."""
+        pub = _Publisher([self._LIVE])
+        assert await _reclaim(pub, live={"live-container"}) == []
+        assert pub.removed == []
+
+    async def test_only_the_dead_ones_go_when_both_are_present(self) -> None:
+        pub = _Publisher([self._DEAD, self._LIVE])
+        assert await _reclaim(pub, live={"live-container"}) == [33100]
+        assert [f.container_id for f in await pub.list_forwards()] == ["live-container"]
+
+    async def test_every_port_a_dead_container_held_comes_back(self) -> None:
+        """A kernel publishes seven ports; leaving any behind leaves that one poisoned."""
+        dead = [
+            PortForward(
+                container_id="dead-container",
+                host_port=33100 + i,
+                container_ip="172.30.0.194",
+                container_port=p,
+            )
+            for i, p in enumerate((2000, 2001, 2200, 7681, 8070, 8090, 8180))
+        ]
+        pub = _Publisher(dead)
+        assert await _reclaim(pub, live=set()) == list(range(33100, 33107))
+
+    async def test_startup_reclaims_before_it_serves(self) -> None:
+        """Order is the invariant: the reclaim has to happen while the agent is coming up, before
+        it can be handed work that draws one of the poisoned ports."""
+        source = inspect.getsource(AbstractAgent.scan_running_kernels)
+        assert "_reclaim_stale_port_forwards()" in source, (
+            "startup no longer reclaims the rules of containers that are gone, so the low host"
+            " ports stay black holes and the first sessions after a restart cannot start"
+        )
+        assert source.index("_reclaim_stale_port_forwards()") < source.index(
+            "_defer_ports_the_host_still_holds()"
+        ), "the reclaim gives ports back, so it has to run before the pool decides what to hold"
+
+    def test_every_backend_gets_it_not_just_docker(self) -> None:
+        """The rules are shared machinery: whoever publishes through `port_forward` leaks the same
+        way, and a backend added later would have to remember to do this. So the reclaim lives on
+        `AbstractAgent`, and a backend only says whether it publishes host ports at all."""
+        assert hasattr(AbstractAgent, "_reclaim_stale_port_forwards")
+        assert AbstractAgent.port_publisher(cast(Any, object())) is None, (
+            "a backend that publishes no host ports must opt out by default, not crash"
+        )
+        assert "port_publisher" in inspect.getsource(DockerAgent)
+
+
+class TestTheTagRecordsWhenAsWellAsWho:
+    """The comment is the record: `bai:<container_id>:<unix seconds>`. The id answers whose rule it
+    is, the time answers whether it has been orphaned long enough to act on."""
+
+    def test_a_new_rule_carries_all_three(self) -> None:
+        [fwd] = forwards_for(
+            _CID, "172.30.1.7", [(30001, 8070, None, "tcp")], owner_agent_id="i-dk-104"
+        )
+        assert fwd.created_at is not None
+        rule = " ".join(dnat_rule("PREROUTING", fwd))
+        assert f"bai:i-dk-104:{_CID}:{fwd.created_at}" in rule
+
+    def test_every_older_tag_form_still_parses(self) -> None:
+        """Nothing a previous agent wrote may become unremovable -- that is the leak itself."""
+        base = (
+            "-A PREROUTING -p tcp -m addrtype --dst-type LOCAL -m tcp --dport 30001 "
+            '-m comment --comment "{tag}" -j DNAT --to-destination 172.30.1.7:8070'
+        )
+        [old] = parse_forwards(base.format(tag=f"bai:{_CID}"))
+        assert (old.container_id, old.owner_agent_id, old.created_at) == (_CID, None, None)
+        [timed] = parse_forwards(base.format(tag=f"bai:{_CID}:1788900000"))
+        assert (timed.container_id, timed.owner_agent_id, timed.created_at) == (
+            _CID,
+            None,
+            1788900000,
+        )
+        [full] = parse_forwards(base.format(tag=f"bai:i-dk-104:{_CID}:1788900000"))
+        assert (full.container_id, full.owner_agent_id, full.created_at) == (
+            _CID,
+            "i-dk-104",
+            1788900000,
+        )
+
+    def test_it_parses_back_to_the_same_rule(self) -> None:
+        """`-D` regenerates the rule body from what was parsed, so a timestamp that did not round
+        trip would leave a rule that cannot be removed -- the very leak this is against."""
+        [fwd] = forwards_for(
+            _CID, "172.30.1.7", [(30001, 8070, None, "tcp")], owner_agent_id="i-dk-104"
+        )
+        line = "-A " + " ".join(dnat_rule("PREROUTING", fwd))
+        [parsed] = parse_forwards(line)
+        assert parsed == fwd
+        assert dnat_rule("PREROUTING", parsed) == dnat_rule("PREROUTING", fwd)
+
+    def test_a_rule_written_before_timestamps_still_parses(self) -> None:
+        """Rules from an older agent carry the id alone. They must stay removable by tag."""
+        line = (
+            "-A PREROUTING -p tcp -m addrtype --dst-type LOCAL -m tcp --dport 30001 "
+            f'-m comment --comment "bai:{_CID}" -j DNAT --to-destination 172.30.1.7:8070'
+        )
+        [parsed] = parse_forwards(line)
+        assert parsed.container_id == _CID
+        assert parsed.created_at is None
+
+
+class TestWhenAnOrphanedRuleMayBeTaken:
+    """ "Its container is not in Docker" is not on its own a safe reason to delete a rule: the rule
+    is installed a moment before the container becomes visible, and a sweep landing in that window
+    would cut a starting kernel off from its own published ports. The age is what closes that."""
+
+    _OWNER = "i-dk-104"
+
+    def _fwd(self, created_at: int | None, owner: str | None = _OWNER) -> PortForward:
+        return PortForward(
+            container_id="c1",
+            host_port=33100,
+            container_ip="172.30.0.194",
+            container_port=2000,
+            owner_agent_id=owner,
+            created_at=created_at,
+        )
+
+    def test_a_live_containers_rule_is_never_taken(self) -> None:
+        assert not is_orphaned(self._fwd(created_at=0), {"c1"}, now=1e9, owner_agent_id=self._OWNER)
+
+    def test_a_freshly_installed_rule_is_left_alone(self) -> None:
+        now = 1_000_000.0
+        assert not is_orphaned(
+            self._fwd(created_at=int(now) - 1), set(), now=now, owner_agent_id=self._OWNER
+        )
+
+    def test_it_is_taken_once_the_grace_has_passed(self) -> None:
+        now = 1_000_000.0
+        assert is_orphaned(
+            self._fwd(created_at=int(now - ORPHAN_GRACE_SEC)),
+            set(),
+            now=now,
+            owner_agent_id=self._OWNER,
+        )
+
+    def test_a_rule_with_no_timestamp_is_old_by_definition(self) -> None:
+        """It was written by an agent that predates the stamp, so its process is gone."""
+        assert is_orphaned(self._fwd(created_at=None), set(), now=1e9, owner_agent_id=self._OWNER)
+
+    def test_another_agents_rule_is_never_touched(self) -> None:
+        """The decisive one for a node running more than one runtime. `live_container_ids` is one
+        runtime's listing, so a docker agent cannot see a containerd/podman/apptainer container --
+        and a rule for one would look orphaned to it. Reclaiming that would take a live kernel's
+        published ports away."""
+        assert not is_orphaned(
+            self._fwd(created_at=0, owner="i-ctrd-104"),
+            set(),
+            now=1e9,
+            owner_agent_id=self._OWNER,
+        )
+
+    def test_a_rule_with_no_owner_recorded_is_left_alone(self) -> None:
+        """Written before the owner was recorded: nobody can prove it is dead, and leaking a port
+        is cheaper than cutting off a session that is still running."""
+        assert not is_orphaned(
+            self._fwd(created_at=0, owner=None), set(), now=1e9, owner_agent_id=self._OWNER
+        )
+
+    def test_the_grace_is_long_enough_to_cover_a_creation_but_not_a_session(self) -> None:
+        """Pinned so neither end drifts: too short and a starting kernel loses its ports, too long
+        and the black hole outlives the port pool's own reuse cooldown."""
+        assert 5.0 <= ORPHAN_GRACE_SEC <= 300.0

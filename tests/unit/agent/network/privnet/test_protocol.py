@@ -105,3 +105,42 @@ class TestTheProtocolVersion:
     def test_malformed_problems_are_refused(self) -> None:
         with pytest.raises(ProtocolError):
             PrivNetResponse.decode(b'{"ok": true, "problems": {"a": 1}}')
+
+
+class TestForwardsOnTheWire:
+    """LIST_PORTS is how an agent behind a privnet learns what is published on its node, and the
+    reclaim decides on two of the fields alone: who installed the rule and when. Dropping them here
+    is invisible -- the response is well formed and every port is listed -- and every stale rule
+    then becomes permanent, because "no owner recorded" means "not mine to remove"."""
+
+    def test_the_owner_and_the_install_time_survive_the_wire(self) -> None:
+        resp = PrivNetResponse(ok=True, forwards=(("c1", 30001, "172.30.0.5", 8070, "i-dk-1", 42),))
+        assert PrivNetResponse.decode(resp.encode()).forwards == (
+            ("c1", 30001, "172.30.0.5", 8070, "i-dk-1", 42),
+        )
+
+    def test_a_daemon_that_still_sends_four_fields_decodes_as_unowned(self) -> None:
+        """Older privnet, newer agent. Unknown owner leaves its rules alone, which is the safe way
+        to be out of date -- a leaked port costs one port, a wrong reclaim costs a live session."""
+        decoded = PrivNetResponse.decode(
+            b'{"ok": true, "forwards": [["c1", 30001, "1.2.3.4", 80]]}'
+        )
+        assert decoded.forwards == (("c1", 30001, "1.2.3.4", 80, None, None),)
+
+    def test_a_null_owner_or_time_is_accepted(self) -> None:
+        decoded = PrivNetResponse.decode(
+            b'{"ok": true, "forwards": [["c1", 30001, "1.2.3.4", 80, null, null]]}'
+        )
+        assert decoded.forwards == (("c1", 30001, "1.2.3.4", 80, None, None),)
+
+    @pytest.mark.parametrize(
+        "raw",
+        [
+            b'{"ok": true, "forwards": [["c1", 30001, "1.2.3.4", 80, 7, 42]]}',
+            b'{"ok": true, "forwards": [["c1", 30001, "1.2.3.4", 80, "i-dk-1", "42"]]}',
+            b'{"ok": true, "forwards": [["c1", 30001, "1.2.3.4", 80, "i-dk-1"]]}',
+        ],
+    )
+    def test_a_malformed_entry_is_refused(self, raw: bytes) -> None:
+        with pytest.raises(ProtocolError):
+            PrivNetResponse.decode(raw)
