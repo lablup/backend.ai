@@ -10,9 +10,9 @@ import sqlalchemy as sa
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
 from ai.backend.common.data.entity.fair_share import (
-    DomainFairShareEntityType,
-    ProjectFairShareEntityType,
-    UserFairShareEntityType,
+    DomainFairShareFieldType,
+    ProjectFairShareFieldType,
+    UserFairShareFieldType,
 )
 from ai.backend.common.data.entity.resource_group import (
     ResourceGroupEntityType,
@@ -36,6 +36,11 @@ from ai.backend.manager.api.rest.fair_share.handler import FairShareAPIHandler
 from ai.backend.manager.api.rest.fair_share.registry import register_fair_share_routes
 from ai.backend.manager.api.rest.routing import RouteRegistry
 from ai.backend.manager.api.rest.types import RouteDeps
+from ai.backend.manager.data.fair_share.types import (
+    DomainFairShareData,
+    ProjectFairShareData,
+    UserFairShareData,
+)
 from ai.backend.manager.data.resource_usage_history.types import (
     DomainUsageBucketData,
     ProjectUsageBucketData,
@@ -71,9 +76,15 @@ def fair_share_processors(
     service = FairShareService(FairShareRepository(database_engine))
     fair_share_groups = processor_registry.concern(ConcernMeta(Concern.RESOURCE_GROUP))
     return FairShareProcessors(
-        fair_share_groups.group(GroupMeta(DomainFairShareEntityType())),
-        fair_share_groups.group(GroupMeta(ProjectFairShareEntityType())),
-        fair_share_groups.group(GroupMeta(UserFairShareEntityType())),
+        fair_share_groups.dangling_field_group(
+            FieldGroupMeta(DomainFairShareFieldType()), DomainFairShareData
+        ),
+        fair_share_groups.dangling_field_group(
+            FieldGroupMeta(ProjectFairShareFieldType()), ProjectFairShareData
+        ),
+        fair_share_groups.dangling_field_group(
+            FieldGroupMeta(UserFairShareFieldType()), UserFairShareData
+        ),
         service,
     )
 
