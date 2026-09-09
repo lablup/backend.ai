@@ -14582,7 +14582,6 @@
                 "type": "null"
               }
             ],
-            "default": null,
             "description": "Updated channel name",
             "title": "Name"
           },
@@ -14607,8 +14606,8 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Updated channel specification"
+            "description": "Updated channel specification",
+            "title": "Spec"
           },
           "enabled": {
             "anyOf": [
@@ -14619,7 +14618,6 @@
                 "type": "null"
               }
             ],
-            "default": null,
             "description": "Updated enabled status",
             "title": "Enabled"
           }
@@ -14989,7 +14987,6 @@
                 "type": "null"
               }
             ],
-            "default": null,
             "description": "Updated rule name",
             "title": "Name"
           },
@@ -15015,7 +15012,6 @@
                 "type": "null"
               }
             ],
-            "default": null,
             "description": "Updated message template (max 64KB)",
             "title": "Message Template"
           },
@@ -15028,7 +15024,6 @@
                 "type": "null"
               }
             ],
-            "default": null,
             "description": "Updated enabled status",
             "title": "Enabled"
           }
