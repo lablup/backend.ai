@@ -8206,7 +8206,7 @@ Added in 26.9.0. Payload returned after excluding session pairs from idle checks
 type ExcludeSessionIdleChecksPayload
   @join__type(graph: STRAWBERRY)
 {
-  """Each pair, in the order named."""
+  """Added in 26.9.0. Each pair, in the order named."""
   results: [SessionIdleCheckResult!]!
 }
 
@@ -9567,7 +9567,7 @@ Added in 26.9.0. Payload returned after including session pairs into idle checks
 type IncludeSessionIdleChecksPayload
   @join__type(graph: STRAWBERRY)
 {
-  """Each pair, in the order named."""
+  """Added in 26.9.0. Each pair, in the order named."""
   results: [SessionIdleCheckResult!]!
 }
 

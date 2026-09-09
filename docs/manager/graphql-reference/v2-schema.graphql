@@ -5742,7 +5742,7 @@ input ExcludeSessionIdleChecksInput {
 Added in 26.9.0. Payload returned after excluding session pairs from idle checks.
 """
 type ExcludeSessionIdleChecksPayload {
-  """Each pair, in the order named."""
+  """Added in 26.9.0. Each pair, in the order named."""
   results: [SessionIdleCheckResult!]!
 }
 
@@ -6662,7 +6662,7 @@ input IncludeSessionIdleChecksInput {
 Added in 26.9.0. Payload returned after including session pairs into idle checks.
 """
 type IncludeSessionIdleChecksPayload {
-  """Each pair, in the order named."""
+  """Added in 26.9.0. Each pair, in the order named."""
   results: [SessionIdleCheckResult!]!
 }
 
