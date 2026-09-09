@@ -219,9 +219,13 @@ class TestUpdateServiceCatalogInput:
         assert inp.status is None
         assert inp.config_hash is None
 
-    def test_default_labels_is_unset(self) -> None:
+    def test_all_fields_default_to_unset(self) -> None:
         inp = UpdateServiceCatalogInput()
+        assert inp.display_name is UNSET
+        assert inp.version is UNSET
         assert inp.labels is UNSET
+        assert inp.status is UNSET
+        assert inp.config_hash is UNSET
         assert isinstance(inp.labels, Unset)
 
     def test_explicit_unset_labels_leaves_unchanged(self) -> None:
@@ -264,8 +268,18 @@ class TestUpdateServiceCatalogInput:
     def test_partial_update(self) -> None:
         inp = UpdateServiceCatalogInput(version="1.1.0")
         assert inp.version == "1.1.0"
-        assert inp.display_name is None
-        assert inp.status is None
+        assert inp.display_name is UNSET
+        assert inp.status is UNSET
+        assert inp.config_hash is UNSET
+
+    def test_omitted_fields_survive_round_trip_as_unset(self) -> None:
+        inp = UpdateServiceCatalogInput(version="1.1.0")
+        restored = UpdateServiceCatalogInput.model_validate_json(
+            inp.model_dump_json(exclude_unset=True)
+        )
+        assert restored.version == "1.1.0"
+        assert restored.display_name is UNSET
+        assert restored.labels is UNSET
 
     def test_round_trip_with_none_labels(self) -> None:
         inp = UpdateServiceCatalogInput(
