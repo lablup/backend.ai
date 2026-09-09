@@ -45,7 +45,7 @@ from ai.backend.agent.network.privnet.resolver import (
     ClusterResolver,
     make_upstream_forwarder,
 )
-from ai.backend.agent.network.provisioner import ContainerNetworkProvisioner
+from ai.backend.agent.network.provisioner import CniProvisioner, ContainerNetworkProvisioner
 from ai.backend.agent.network.runtime import ExecResult, OciRuntime
 from ai.backend.agent.network.session_tracker import SessionContainerTracker, TeardownScope
 from ai.backend.agent.network.vni_registry import VniRegistry
@@ -127,7 +127,9 @@ class SessionNetwork:
     # Builds the per-session container-attach provisioner (one per session, so it can name its
     # own session without having witnessed the attach). Overridable so the privileged network
     # privnet can supply a proxy that RPCs attach/detach instead of running them here.
-    _make_provisioner: Callable[[AbstractNetworkAgentPluginV2[Any], str], Any]
+    _make_provisioner: Callable[
+        [AbstractNetworkAgentPluginV2[Any], str], ContainerNetworkProvisioner
+    ]
     _coordinators: dict[str, SessionNetworkCoordinator]
     _orchestrators: dict[str, ContainerdKernelOrchestrator]
     # The resolved backend per session (privnet proxy or an in-process plugin), so the cluster-DNS
@@ -233,7 +235,7 @@ class SessionNetwork:
         self._cni_runner = cni_runner
         self._backends = backends
         self._make_provisioner = provisioner_factory or (
-            lambda backend, _session_id: ContainerNetworkProvisioner(backend, self._cni_runner)
+            lambda backend, _session_id: CniProvisioner(backend, self._cni_runner)
         )
         self._coordinators = {}
         self._orchestrators = {}
@@ -1826,7 +1828,9 @@ def build_session_network(
     # attach) is delegated to the CAP_NET_ADMIN/CAP_SYS_ADMIN privnet, so this (agent) process
     # needs no network privilege: the backend becomes a proxy and the per-container
     # provisioner RPCs the privnet. See ai.backend.agent.network.privnet.
-    make_provisioner: Callable[[AbstractNetworkAgentPluginV2[Any], str], Any] | None = None
+    make_provisioner: (
+        Callable[[AbstractNetworkAgentPluginV2[Any], str], ContainerNetworkProvisioner] | None
+    ) = None
     # Journals this process may reconcile on restart; left None under a privnet, which owns the
     # host state, keeps its own records, and outlives the agent.
     owned_local_subnets: LocalSubnetAllocator | None = None
@@ -1852,7 +1856,7 @@ def build_session_network(
 
         def _privnet_provisioner_factory(
             _backend: AbstractNetworkAgentPluginV2[Any], session_id: str
-        ) -> Any:
+        ) -> ContainerNetworkProvisioner:
             return PrivNetProvisioner(client, session_id)
 
         make_provisioner = _privnet_provisioner_factory

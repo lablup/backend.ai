@@ -10,7 +10,7 @@ config — so it holds no CAP_NET_ADMIN / CAP_SYS_ADMIN.
 - ``PrivNetBackendProxy`` — an ``AbstractNetworkAgentPluginV2`` whose privileged methods
   (setup/teardown) become RPCs; overlay peer/endpoint programming is handled privnet-side.
 - ``PrivNetProvisioner`` — the per-container attach/detach path, replacing
-  ``ContainerNetworkProvisioner`` when the privnet is enabled.
+  the in-process ``CniProvisioner`` when the privnet is enabled.
 """
 
 from __future__ import annotations
@@ -536,7 +536,7 @@ class PrivNetBackendProxy(AbstractNetworkAgentPluginV2["AbstractKernel"]):
 
 
 class PrivNetProvisioner:
-    """Drop-in for ``ContainerNetworkProvisioner`` that routes per-container attach/detach to
+    """The ``ContainerNetworkProvisioner`` that routes per-container attach/detach to
     the privnet. The agent-supplied ``task_pid`` is intentionally ignored: the privnet resolves
     the PID from containerd itself and pins the netns, so a stale/forged PID cannot mislead it.
 
@@ -560,7 +560,15 @@ class PrivNetProvisioner:
         meta: SessionNetMeta,
         container_id: str,
         task_pid: int,
+        on_planned: Callable[[EndpointPlan], None] | None = None,
     ) -> tuple[EndpointPlan, dict[NetworkRole, str]]:
+        # The concrete plan lives privnet-side (kept there for detach), so the agent's copy is an
+        # empty handle -- but it is handed over BEFORE the RPC, which is the whole point of the
+        # callback: detach names the container, and a call cancelled mid-RPC may already have
+        # attached it. Recorded first, that container is detachable; recorded after, it leaked.
+        plan = EndpointPlan(attachments=[])
+        if on_planned is not None:
+            on_planned(plan)
         # Relay the manager-assigned overlay IP (present for multi-node vxlan sessions) so the
         # privnet attaches the container at its central, disjoint address instead of a per-node
         # host-local one. The privnet re-validates it is within the session subnet; None (single
@@ -588,9 +596,7 @@ class PrivNetProvisioner:
                 assigned[NetworkRole(role_name)] = ip
             except ValueError:
                 continue
-        # The concrete plan lives privnet-side (kept for detach); the agent only needs a
-        # handle to pass back to detach, so an empty plan is sufficient.
-        return EndpointPlan(attachments=[]), assigned
+        return plan, assigned
 
     async def detach(self, plan: EndpointPlan, *, container_id: str, task_pid: int) -> None:
         # The plan is ignored: the privnet holds the real one (and re-derives it after its own
