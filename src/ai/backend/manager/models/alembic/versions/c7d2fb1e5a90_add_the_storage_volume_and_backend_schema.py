@@ -1,7 +1,7 @@
 """add the storage volume and backend schema
 
 Revision ID: c7d2fb1e5a90
-Revises: c7a4f1e9b023
+Revises: a7d2c9e41b58
 Create Date: 2026-09-04
 
 """
@@ -10,6 +10,7 @@ from typing import Any
 
 import sqlalchemy as sa
 from alembic import op
+from sqlalchemy.dialects import postgresql as pgsql
 
 from ai.backend.manager.models.base import GUID
 
@@ -17,7 +18,7 @@ from ai.backend.manager.models.base import GUID
 
 # revision identifiers, used by Alembic.
 revision = "c7d2fb1e5a90"
-down_revision = "c7a4f1e9b023"
+down_revision = "a7d2c9e41b58"
 branch_labels = None
 depends_on = None
 
@@ -65,8 +66,8 @@ def upgrade() -> None:
         sa.Column("name", sa.String(length=64), nullable=False),
         sa.Column(
             "capabilities",
-            sa.ARRAY(sa.String(length=64)),
-            server_default=sa.text("'{}'"),
+            pgsql.JSONB(),
+            server_default=sa.text("'{}'::jsonb"),
             nullable=False,
         ),
         *_timestamp_columns(),
@@ -87,7 +88,6 @@ def upgrade() -> None:
         ),
         *_timestamp_columns(),
         sa.PrimaryKeyConstraint("id", name=op.f("pk_storage_backends")),
-        sa.UniqueConstraint("name", name=op.f("uq_storage_backends_name")),
         sa.ForeignKeyConstraint(
             ["type_id"],
             ["storage_backend_types.id"],
@@ -138,7 +138,6 @@ def upgrade() -> None:
         sa.Column("expose_capacity_bytes", sa.Boolean(), server_default=sa.false(), nullable=False),
         *_timestamp_columns(),
         sa.PrimaryKeyConstraint("id", name=op.f("pk_storage_volumes")),
-        sa.UniqueConstraint("name", name=op.f("uq_storage_volumes_name")),
         sa.ForeignKeyConstraint(
             ["storage_backend_id"],
             ["storage_backends.id"],
@@ -221,12 +220,12 @@ def upgrade() -> None:
     storage_backend_types = sa.table(
         "storage_backend_types",
         sa.column("name", sa.String),
-        sa.column("capabilities", sa.ARRAY(sa.String)),
+        sa.column("capabilities", pgsql.JSONB),
     )
     op.bulk_insert(
         storage_backend_types,
         [
-            {"name": name, "capabilities": capabilities}
+            {"name": name, "capabilities": {"supported": capabilities}}
             for name, capabilities in _BUILTIN_BACKEND_TYPES
         ],
     )

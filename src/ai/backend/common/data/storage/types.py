@@ -4,7 +4,7 @@ import enum
 from datetime import timedelta
 from typing import Final, NewType
 
-from pydantic import ConfigDict
+from pydantic import ConfigDict, Field
 
 from ai.backend.common.type_adapters import VFolderIDField
 from ai.backend.common.types import BackendAISchema
@@ -60,6 +60,16 @@ class StorageBackendCapability(enum.StrEnum):
     FAST_FS_SIZE = "fast-fs-size"
     FAST_SCAN = "fast-scan"
     FAST_SIZE = "fast-size"
+
+
+class StorageBackendCapabilities(BackendAISchema):
+    """What a volume implementation reports through ``get_capabilities()``.
+
+    A capability absent from the set is not supported, so a capability added later
+    reads as absent on the rows written before it existed.
+    """
+
+    supported: frozenset[StorageBackendCapability] = Field(default_factory=frozenset)
 
 
 class ServiceStorageStatus(enum.StrEnum):
