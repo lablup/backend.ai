@@ -50,6 +50,7 @@ from uuid import UUID
 
 import aiotools
 import attrs
+import psutil
 import zmq
 import zmq.asyncio
 from async_timeout import timeout
@@ -2381,9 +2382,48 @@ class AbstractAgent[
                         container_id=container.id,
                     )
 
+        # After the container scan above, and only after it: that scan `discard`s the ports our
+        # own live kernels hold, and those must stay out of the pool entirely rather than come
+        # back when a cooldown lapses. What is left is what the HOST holds and we do not -- a
+        # departing container's docker-proxy, a socket in TIME_WAIT -- and the pool was built
+        # with every port marked never-used, so those would be handed straight out.
+        self._defer_ports_the_host_still_holds()
+
         log.info("starting with resource allocations")
         for computer_name, computer_ctx in self.computers.items():
             log.info("{}: {!r}", computer_name, dict(computer_ctx.alloc_map.allocations))
+
+    def _defer_ports_the_host_still_holds(self) -> None:
+        """Put the cooldown back on ports the OS is still using, at startup.
+
+        The pool's whole purpose is to keep a just-released port out of circulation until the
+        kernel has finished with it, and a fresh pool has no memory of that: every port starts as
+        never-used, so the first sessions after a restart bind against ports the host has not let
+        go and fail with EADDRINUSE. Measured on a restarted node: 9 of 12 sessions failed that
+        way, against 3 of 12 once the same node had settled.
+
+        Best-effort. Reading the host's sockets can be refused, and a node that cannot read them
+        is no worse off than before this existed -- so it says so and carries on rather than
+        refusing to start.
+        """
+        try:
+            in_use = {conn.laddr.port for conn in psutil.net_connections(kind="tcp") if conn.laddr}
+        except (psutil.Error, OSError) as e:
+            log.warning(
+                "could not read the host's sockets, so the port pool starts with no cooldown"
+                " on ports the host may still hold ({})",
+                e,
+            )
+            return
+        deferred = sorted(in_use & set(self.port_pool.remaining()))
+        if not deferred:
+            return
+        self.port_pool.defer_many(deferred)
+        log.info(
+            "{} host port(s) are still in use; holding them back for the reuse cooldown ({})",
+            len(deferred),
+            f"{deferred[0]}..{deferred[-1]}" if len(deferred) > 1 else deferred[0],
+        )
 
     @abstractmethod
     async def init_kernel_context(
