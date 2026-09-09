@@ -2299,8 +2299,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Whether the artifact should be readonly. None means no change.",
+            "description": "Whether the artifact should be readonly. Omit to leave unchanged.",
             "title": "Readonly"
           },
           "description": {
