@@ -42,7 +42,7 @@ class StorageVolumeRow(LifecycleTimestampsMixin, Base):
         primary_key=True,
         server_default=sa.text("uuid_generate_v7()"),
     )
-    name: Mapped[str] = mapped_column("name", sa.String(length=64), unique=True, nullable=False)
+    name: Mapped[str] = mapped_column("name", sa.String(length=64), nullable=False)
     storage_backend_id: Mapped[StorageBackendID] = mapped_column(
         "storage_backend_id",
         GUID(StorageBackendID),
