@@ -11,8 +11,6 @@ from ai.backend.manager.errors.vfs_storage import (
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfs_storage import VFSStorageRow
 from ai.backend.manager.repositories.base import BatchQuerier, execute_batch_querier
-from ai.backend.manager.repositories.base.creator import Creator, execute_creator
-from ai.backend.manager.repositories.base.updater import Updater, execute_updater
 
 
 class VFSStorageDBSource:
@@ -46,24 +44,6 @@ class VFSStorageDBSource:
             if row is None:
                 raise VFSStorageNotFoundError(f"VFS storage with ID {storage_id} not found.")
             return row.to_dataclass()
-
-    async def create(self, creator: Creator[VFSStorageRow]) -> VFSStorageData:
-        """
-        Create a new VFS storage configuration in the database.
-        """
-        async with self._db.begin_session() as db_session:
-            creator_result = await execute_creator(db_session, creator)
-            return creator_result.row.to_dataclass()
-
-    async def update(self, updater: Updater[VFSStorageRow]) -> VFSStorageData:
-        """
-        Update an existing VFS storage configuration in the database.
-        """
-        async with self._db.begin_session() as db_session:
-            result = await execute_updater(db_session, updater)
-            if result is None:
-                raise VFSStorageNotFoundError(f"VFS storage with ID {updater.pk_value} not found.")
-            return result.row.to_dataclass()
 
     async def list_vfs_storages(self) -> list[VFSStorageData]:
         """
