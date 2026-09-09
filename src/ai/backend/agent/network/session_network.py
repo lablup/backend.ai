@@ -49,7 +49,7 @@ from ai.backend.agent.network.provisioner import CniProvisioner, ContainerNetwor
 from ai.backend.agent.network.runtime import ExecResult, OciRuntime
 from ai.backend.agent.network.session_tracker import SessionContainerTracker, TeardownScope
 from ai.backend.agent.network.vni_registry import VniRegistry
-from ai.backend.common.network.keys import endpoint_key, session_meta_key
+from ai.backend.common.network.keys import endpoint_key, session_meta_key, sessions_root
 from ai.backend.common.network.types import (
     DEFAULT_VXLAN_PORT,
     SESSION_META_GENERATION,
@@ -446,8 +446,63 @@ class SessionNetwork:
             if not await self._resume_one(session_id, by_session[session_id]):
                 continue
             log.info("session network for {} recovered on a later attempt", session_id)
-        if not self._unresumed:
-            await self._reclaim_orphans(live)
+        await self._reclaim_orphans(live)
+
+    async def _finish_departed_sessions(self, resumed: set[str]) -> None:
+        """Tear down sessions this node is still a member of but has no kernels for.
+
+        The pass above walks the sessions of *live containers*. A session whose last container on
+        this node died while the agent was down has none, so nothing visits it and its member key
+        stays. The manager will not release the VNI while a member has not confirmed teardown, so
+        the session sits in TERMINATING for good: measured on two sessions with both kernels
+        already TERMINATED, the manager retrying `destroy_network` every fifteen seconds against a
+        node that was never going to answer, and their subnets never reused.
+
+        Resume-then-tear-down rather than deleting the member key: the withdrawal is fenced and
+        the same path also gives back the bridge, the LOCAL block and the ESP claim, none of which
+        removing a key would.
+
+        Only sessions whose meta reads back READY. Without a readable meta there is no data plane
+        to rebuild -- and the manager deletes the meta as the last step of `destroy_network`, so an
+        absent one means it is no longer waiting on anybody.
+
+        Safe here and nowhere else: recovery runs before the RPC transport serves, so a session
+        that is merely *starting* cannot be in this set — nothing can have joined since the read.
+        """
+        try:
+            departed = await self._sessions_naming_this_node() - resumed
+        except Exception as e:
+            log.exception("could not list the sessions this node is still a member of")
+            self._recovery_incomplete["departed-sessions"] = str(e)
+            return
+        for session_id in sorted(departed):
+            meta = await self._read_session_meta(session_id)
+            if meta is None:
+                continue
+            log.info(
+                "session {} still names this node but has no kernels here; finishing its teardown",
+                session_id,
+            )
+            try:
+                await self._resume_session(session_id, meta)
+                await self.teardown_session(session_id)
+            except Exception as e:
+                # One session that will not go must not stop the others, nor abort recovery. The
+                # retry task the teardown schedules keeps trying; this records why for readiness.
+                log.exception("could not finish the teardown of departed session {}", session_id)
+                self._recovery_incomplete[f"departed:{session_id}"] = str(e)
+
+    async def _sessions_naming_this_node(self) -> set[str]:
+        """Session ids whose etcd membership names this agent, from one prefix read."""
+        tree = await self._etcd.get_prefix(sessions_root())
+        joined: set[str] = set()
+        for session_id, node in (tree or {}).items():
+            if not isinstance(node, Mapping):
+                continue
+            members = node.get("members")
+            if isinstance(members, Mapping) and self._agent_id in members:
+                joined.add(session_id)
+        return joined
 
     async def _resume_one(self, session_id: str, container_ids: Sequence[str]) -> bool:
         """Resume one session AND re-derive its containers' tracking and detach plans.
@@ -574,6 +629,7 @@ class SessionNetwork:
             if attachment is not None:
                 self._attachments[container_id] = attachment
 
+        await self._finish_departed_sessions(set(ours.values()))
         await self._reclaim_orphans(live)
 
     async def _live_containers(self) -> dict[str, str]:

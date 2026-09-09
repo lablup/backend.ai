@@ -17,6 +17,7 @@ Layout:
 from __future__ import annotations
 
 __all__ = (
+    "sessions_root",
     "session_prefix",
     "session_meta_key",
     "members_prefix",
@@ -35,8 +36,14 @@ __all__ = (
 # --- per-session: network/session/{session_id}/... ---
 
 
+def sessions_root() -> str:
+    """Where every session's subtree lives, for the reads that are not about one session --
+    an agent asking which sessions still name it as a member."""
+    return "network/session/"
+
+
 def session_prefix(session_id: str) -> str:
-    return f"network/session/{session_id}/"
+    return f"{sessions_root()}{session_id}/"
 
 
 def session_meta_key(session_id: str) -> str:
