@@ -5,7 +5,7 @@ from typing import override
 
 from ai.backend.common.data.entity.keypair import KeyPairID
 from ai.backend.common.data.entity.types import EntityType
-from ai.backend.common.data.entity.user import USER_ENTITY_TYPE, UserID
+from ai.backend.common.data.entity.user import UserEntityType, UserID
 from ai.backend.common.types import AccessKey
 from ai.backend.manager.actions.v2.field.lookup import LookupFieldByKeyOpsAction
 from ai.backend.manager.actions.v2.lookup.base import LookupKey
@@ -22,7 +22,7 @@ class LookupKeypairByAccessKeyAction(LookupFieldByKeyOpsAction[KeyPairID, UserID
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return USER_ENTITY_TYPE
+        return UserEntityType()
 
     @override
     @classmethod

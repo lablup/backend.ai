@@ -20,9 +20,8 @@ import pytest
 import sqlalchemy as sa
 from sqlalchemy import text
 
-from ai.backend.common.data.entity.user import USER_ENTITY_TYPE
+from ai.backend.common.data.entity.user import UserEntityType
 from ai.backend.common.data.user.types import UserRole
-from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
 from ai.backend.common.types import DefaultForUnspecified, ResourceSlot, VFolderHostPermissionMap
 from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.models.agent import AgentRow
@@ -107,20 +106,15 @@ class UserFixtureData:
 
 
 @pytest.fixture
-async def database_engine(
-    postgres_container: tuple[str, HostPortPairModel],
-) -> AsyncIterator[ExtendedAsyncSAEngine]:
+async def database_engine(test_database_url: str) -> AsyncIterator[ExtendedAsyncSAEngine]:
     """Real database engine for scaling group integration tests.
 
     Overrides the guard fixture in tests/unit/manager/services/conftest.py to
     allow real DB access for scaling group service-direct tests that cannot be
     tested via the client SDK.
     """
-    _, addr = postgres_container
-    url = f"postgresql+asyncpg://postgres:develove@{addr.host}:{addr.port}/testing"
-
     engine = create_async_engine(
-        url,
+        test_database_url,
         pool_size=8,
         pool_pre_ping=False,
         max_overflow=64,
@@ -297,7 +291,7 @@ async def admin_user_fixture(
         )
         await conn.execute(
             sa.insert(VirtualEntityRow.__table__).values(
-                entity_type=USER_ENTITY_TYPE,
+                entity_type=UserEntityType(),
                 entity_id=str(user_uuid),
             )
         )
@@ -352,7 +346,7 @@ async def regular_user_fixture(
         )
         await conn.execute(
             sa.insert(VirtualEntityRow.__table__).values(
-                entity_type=USER_ENTITY_TYPE,
+                entity_type=UserEntityType(),
                 entity_id=str(user_uuid),
             )
         )

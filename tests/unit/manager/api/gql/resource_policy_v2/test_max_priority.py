@@ -6,7 +6,7 @@ from dataclasses import dataclass
 
 import pytest
 
-from ai.backend.common.api_handlers import SENTINEL
+from ai.backend.common.tristate.unset import UNSET
 from ai.backend.manager.api.gql.base import IntFilter
 from ai.backend.manager.api.gql.resource_policy_v2.types.filters import (
     KeypairResourcePolicyV2Filter,
@@ -71,7 +71,7 @@ class TestKeypairResourcePolicyMaxPriorityUpdateInput:
         """An update that does not mention max_priority must not clear it."""
         dto = UpdateKeypairResourcePolicyInputGQL().to_pydantic()
 
-        assert dto.max_priority is SENTINEL
+        assert dto.max_priority is UNSET
 
     @pytest.mark.parametrize(
         "case",

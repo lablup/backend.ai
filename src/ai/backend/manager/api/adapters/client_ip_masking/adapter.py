@@ -42,6 +42,7 @@ from ai.backend.manager.services.client_ip_masking.actions.search import (
 from ai.backend.manager.services.client_ip_masking.actions.upsert import (
     UpsertClientIPMaskingPolicyAction,
 )
+from ai.backend.manager.services.client_ip_masking.processors import ClientIPMaskingProcessors
 
 
 def _pagination_spec() -> PaginationSpec:
@@ -56,6 +57,11 @@ def _pagination_spec() -> PaginationSpec:
 
 class ClientIPMaskingAdapter(BaseAdapter):
     """Adapter for the client IP masking policies."""
+
+    _client_ip_masking: ClientIPMaskingProcessors
+
+    def __init__(self, client_ip_masking: ClientIPMaskingProcessors) -> None:
+        self._client_ip_masking = client_ip_masking
 
     async def admin_search(
         self, input: AdminSearchClientIPMaskingPoliciesInput
@@ -74,7 +80,7 @@ class ClientIPMaskingAdapter(BaseAdapter):
             limit=input.limit,
             offset=input.offset,
         )
-        result = await self._processors.client_ip_masking.global_search.run(
+        result = await self._client_ip_masking.global_search.run(
             SearchClientIPMaskingPoliciesAction(searcher=searcher)
         )
         return AdminSearchClientIPMaskingPoliciesPayload(
@@ -87,7 +93,7 @@ class ClientIPMaskingAdapter(BaseAdapter):
     async def admin_upsert(
         self, input: AdminUpsertClientIPMaskingPolicyInput
     ) -> ClientIPMaskingPolicyPayload:
-        result = await self._processors.client_ip_masking.global_upsert.run(
+        result = await self._client_ip_masking.global_upsert.run(
             UpsertClientIPMaskingPolicyAction(
                 target_type=ClientIPMaskingTarget(input.target_type.value),
                 mode=ClientIPMaskingMode(input.mode.value),
@@ -98,7 +104,7 @@ class ClientIPMaskingAdapter(BaseAdapter):
         return ClientIPMaskingPolicyPayload(policy=self._data_to_node(result.data))
 
     async def admin_purge(self, policy_id: ClientIPMaskingPolicyID) -> ClientIPMaskingPolicyPayload:
-        result = await self._processors.client_ip_masking.purge.run(
+        result = await self._client_ip_masking.purge.run(
             PurgeClientIPMaskingPolicyAction(id=policy_id)
         )
         return ClientIPMaskingPolicyPayload(policy=self._data_to_node(result.data))

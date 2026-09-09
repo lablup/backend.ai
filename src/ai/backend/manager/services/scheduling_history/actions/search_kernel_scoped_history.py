@@ -5,8 +5,8 @@ from dataclasses import dataclass
 from typing import override
 
 from ai.backend.common.data.entity.session import (
-    SESSION_ENTITY_TYPE,
     SESSION_SCOPE_TYPE,
+    SessionEntityType,
     SessionID,
 )
 from ai.backend.common.data.entity.types import EntityIdentifier, EntityType, ScopeRef
@@ -87,7 +87,7 @@ class SearchKernelScopedHistoryAction(BaseScopeAction):
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return SESSION_ENTITY_TYPE
+        return SessionEntityType()
 
     @override
     @classmethod

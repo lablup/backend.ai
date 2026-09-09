@@ -14,7 +14,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from ai.backend.common.contexts.user import with_user
-from ai.backend.common.data.entity.domain import DOMAIN_ENTITY_TYPE, DomainID
+from ai.backend.common.data.entity.domain import DomainEntityType, DomainID
 from ai.backend.common.data.entity.resource_group import (
     RESOURCE_GROUP_SCOPE_TYPE,
     ResourceGroupID,
@@ -83,7 +83,7 @@ async def test_rg_domain_search_is_answered_for_the_resource_group(
     denying_scope: _DenyingScopeValidator,
     regular_user: UserData,
 ) -> None:
-    processors = DomainProcessors(registry.group(GroupMeta(DOMAIN_ENTITY_TYPE)), MagicMock(), [])
+    processors = DomainProcessors(registry.group(GroupMeta(DomainEntityType())), MagicMock(), [])
     resource_group_id = ResourceGroupID(uuid.uuid4())
     action = ScopedSearchDomainsAction(
         items=[ResourceGroupDomainScopeItem(resource_group_id=resource_group_id)],

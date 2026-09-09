@@ -11,7 +11,7 @@ import sqlalchemy as sa
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
 from ai.backend.common.container_registry import ContainerRegistryType
-from ai.backend.common.data.entity.deployment import DEPLOYMENT_ENTITY_TYPE
+from ai.backend.common.data.entity.deployment import DeploymentEntityType
 from ai.backend.common.data.entity.image import ImageID
 from ai.backend.common.data.entity.runtime_variant import RuntimeVariantID
 from ai.backend.common.data.entity.vfolder import VFolderUUID
@@ -149,7 +149,7 @@ def deployment_processors(
         appproxy_client_pool=mock_appproxy_client_pool,
     )
     return DeploymentProcessors(
-        processor_registry.group(GroupMeta(DEPLOYMENT_ENTITY_TYPE)), service
+        processor_registry.group(GroupMeta(DeploymentEntityType())), service
     )
 
 

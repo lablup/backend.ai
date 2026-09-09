@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.common.data.entity.etcd_config import ETCD_CONFIG_ENTITY_TYPE
+from ai.backend.common.data.entity.etcd_config import EtcdConfigEntityType
 from ai.backend.common.data.entity.types import EntityType
 from ai.backend.common.types import AcceleratorMetadata
 from ai.backend.manager.actions.types import ActionOperationType
@@ -19,7 +19,7 @@ class GetResourceMetadataAction(BaseGlobalAction):
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return ETCD_CONFIG_ENTITY_TYPE
+        return EtcdConfigEntityType()
 
     @override
     @classmethod

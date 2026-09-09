@@ -4,7 +4,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.common.data.entity.artifact import ARTIFACT_ENTITY_TYPE, ArtifactID
+from ai.backend.common.data.entity.artifact import ArtifactEntityType, ArtifactID
 from ai.backend.common.data.entity.types import EntityType, ScopeRef, ScopeType
 from ai.backend.manager.actions.v2.ops.base import OperationScopeOpsAction
 from ai.backend.manager.data.artifact.types import ArtifactRevisionData
@@ -29,7 +29,7 @@ class GetArtifactRevisionsAction(
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return ARTIFACT_ENTITY_TYPE
+        return ArtifactEntityType()
 
     @override
     @classmethod
@@ -38,7 +38,7 @@ class GetArtifactRevisionsAction(
 
     @override
     def scope_targets(self) -> Sequence[ScopeRef]:
-        return (ScopeRef(scope_type=ScopeType(ARTIFACT_ENTITY_TYPE), scope_id=self.artifact_id),)
+        return (ScopeRef(scope_type=ScopeType(ArtifactEntityType()), scope_id=self.artifact_id),)
 
     @override
     def operation_scopes(self) -> Sequence[OperationScope]:

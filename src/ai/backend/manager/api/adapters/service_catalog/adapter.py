@@ -33,12 +33,18 @@ from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.services.service_catalog.actions.search import (
     SearchServiceCatalogsAction,
 )
+from ai.backend.manager.services.service_catalog.processors import ServiceCatalogProcessors
 
 DEFAULT_PAGINATION_LIMIT = 10
 
 
 class ServiceCatalogAdapter(BaseAdapter):
     """Adapter for service catalog domain operations."""
+
+    _service_catalog: ServiceCatalogProcessors
+
+    def __init__(self, service_catalog: ServiceCatalogProcessors) -> None:
+        self._service_catalog = service_catalog
 
     async def admin_search(
         self,
@@ -54,7 +60,7 @@ class ServiceCatalogAdapter(BaseAdapter):
         """
         searcher = self.build_searcher(input)
 
-        action_result = await self._processors.service_catalog.global_search_service_catalogs.run(
+        action_result = await self._service_catalog.global_search_service_catalogs.run(
             SearchServiceCatalogsAction(searcher=searcher)
         )
 

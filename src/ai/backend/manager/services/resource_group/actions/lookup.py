@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from typing import Any, override
 
 from ai.backend.common.data.entity.resource_group import (
-    RESOURCE_GROUP_ENTITY_TYPE,
+    ResourceGroupEntityType,
     ResourceGroupID,
     ResourceGroupName,
 )
@@ -39,7 +39,7 @@ class LookupResourceGroupAction(LookupEntityOpsAction[ResourceGroupRow, Resource
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return RESOURCE_GROUP_ENTITY_TYPE
+        return ResourceGroupEntityType()
 
     @override
     @classmethod

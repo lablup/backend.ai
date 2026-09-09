@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from typing import Any, override
 
 from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE, ProjectID
-from ai.backend.common.data.entity.session import SESSION_ENTITY_TYPE
+from ai.backend.common.data.entity.session import SessionEntityType
 from ai.backend.common.data.entity.types import EntityIdentifier, EntityType, ScopeRef
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.types import AccessKey
@@ -32,7 +32,7 @@ class GetEffectiveAllocationAction(BaseScopeAction):
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return SESSION_ENTITY_TYPE
+        return SessionEntityType()
 
     @override
     def scope_targets(self) -> Sequence[ScopeRef]:

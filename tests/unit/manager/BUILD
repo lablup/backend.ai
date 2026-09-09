@@ -5,6 +5,7 @@ python_test_utils(
     ],
     dependencies=[
         "//:reqs#aiosqlite",  # not auto-inferred
+        "src/ai/backend/testutils",  # pytest_plugins in conftest.py
     ],
 )
 

@@ -25,7 +25,8 @@ from sqlalchemy.orm import InstrumentedAttribute
 
 from ai.backend.common.contexts.user import with_user
 from ai.backend.common.data.entity.domain import DomainID
-from ai.backend.common.data.entity.role_preset import RolePresetID
+from ai.backend.common.data.entity.project import ProjectEntityType
+from ai.backend.common.data.entity.role_preset import RolePresetEntityType, RolePresetID
 from ai.backend.common.data.entity.types import (
     EntityData,
     EntityIdentifier,
@@ -36,6 +37,7 @@ from ai.backend.common.data.entity.types import (
     ScopeRef,
     ScopeType,
 )
+from ai.backend.common.data.entity.vfolder import VFolderEntityType
 from ai.backend.common.data.user.types import UserData, UserRole
 from ai.backend.manager.actions.types import ActionOperationType, OperationStatus
 from ai.backend.manager.actions.v2.bulk.base import BaseBulkAction
@@ -145,11 +147,28 @@ from ai.backend.manager.services.ops.service import (
     UpdateService,
 )
 
-_ENTITY_TYPE = EntityType("role_preset")
+_ENTITY_TYPE = RolePresetEntityType()
 _SCOPE_TYPE = ScopeType(_ENTITY_TYPE)
 
 
-_FIELD_TYPE = FieldType("test_field")
+class _TestFieldType(FieldType):
+    @override
+    @classmethod
+    def name(cls) -> str:
+        return "test_field"
+
+    @override
+    @classmethod
+    def description(cls) -> str:
+        return "A field row of the test entity."
+
+    @override
+    @classmethod
+    def owner_type(cls) -> type[EntityType] | None:
+        return None
+
+
+_FIELD_TYPE = _TestFieldType()
 
 
 class _FieldID(FieldIdentifier):
@@ -183,7 +202,7 @@ class _StubEntityID(EntityIdentifier):
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return EntityType("vfolder")
+        return VFolderEntityType()
 
 
 @dataclass(frozen=True)
@@ -1383,7 +1402,7 @@ def authenticated_user() -> UserData:
 
 @pytest.fixture
 def scope() -> ScopeRef:
-    return ScopeRef(scope_type=ScopeType(EntityType("project")), scope_id=uuid.uuid4())
+    return ScopeRef(scope_type=ScopeType(ProjectEntityType()), scope_id=uuid.uuid4())
 
 
 @pytest.fixture

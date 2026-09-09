@@ -16,6 +16,7 @@ import pytest
 from ai.backend.common.contexts.user import with_user
 from ai.backend.common.data.entity.deployment import DeploymentID
 from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.image import ImageEntityType
 from ai.backend.common.data.entity.kernel import KernelID
 from ai.backend.common.data.entity.keypair import KeyPairID
 from ai.backend.common.data.entity.session import SessionID
@@ -57,7 +58,7 @@ from ai.backend.manager.services.user.actions.lookup_keypair_owner import (
 )
 
 _ACCESS_KEY = AccessKey("AKIAIOSFODNN7EXAMPLE")
-_SECRET_ENTITY_TYPE = EntityType("image")
+_SECRET_ENTITY_TYPE = ImageEntityType()
 
 
 class _ImageID(EntityIdentifier):
