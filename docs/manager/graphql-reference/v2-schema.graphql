@@ -16383,19 +16383,19 @@ Added in 26.4.2. Input for updating project information. All fields optional.
 """
 input UpdateProjectInput {
   """New project name."""
-  name: String = null
+  name: String
 
   """New description."""
   description: String
 
   """Updated active status."""
-  isActive: Boolean = null
+  isActive: Boolean
 
   """New external integration identifier."""
   integrationName: String
 
   """New resource policy name."""
-  resourcePolicy: String = null
+  resourcePolicy: String
 }
 
 """

@@ -15759,8 +15759,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Updated name of the object storage",
+            "description": "Updated name of the object storage. Omit to leave unchanged.",
             "title": "Name"
           },
           "host": {
@@ -15772,8 +15771,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Updated host address",
+            "description": "Updated host address. Omit to leave unchanged.",
             "title": "Host"
           },
           "access_key": {
@@ -15785,8 +15783,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Updated access key",
+            "description": "Updated access key. Omit to leave unchanged.",
             "title": "Access Key"
           },
           "secret_key": {
@@ -15798,8 +15795,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Updated secret key",
+            "description": "Updated secret key. Omit to leave unchanged.",
             "title": "Secret Key"
           },
           "endpoint": {
@@ -15811,8 +15807,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Updated endpoint URL",
+            "description": "Updated endpoint URL. Omit to leave unchanged.",
             "title": "Endpoint"
           },
           "region": {
@@ -15821,14 +15816,10 @@
                 "type": "string"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
-            "description": "Updated region. Use SENTINEL (default) for no change, None to clear.",
+            "description": "Updated region. Omit to leave unchanged; null clears.",
             "title": "Region"
           }
         },
@@ -16580,8 +16571,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "New group name.",
+            "description": "New group name. Omit to leave unchanged.",
             "title": "Name"
           },
           "description": {
@@ -16590,14 +16580,10 @@
                 "type": "string"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
-            "description": "New group description. Set to null to clear.",
+            "description": "Updated group description. Omit to leave unchanged; null clears.",
             "title": "Description"
           },
           "is_active": {
@@ -16609,8 +16595,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Updated active status.",
+            "description": "Updated active status. Omit to leave unchanged.",
             "title": "Is Active"
           },
           "integration_name": {
@@ -16619,14 +16604,10 @@
                 "type": "string"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
-            "description": "New external integration identifier. Set to null to clear.",
+            "description": "Updated external integration identifier. Omit to leave unchanged; null clears.",
             "title": "Integration Name"
           },
           "resource_policy": {
@@ -16638,8 +16619,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Name of the updated resource policy to apply to this group.",
+            "description": "Name of the updated resource policy to apply to this group. Omit to leave unchanged.",
             "title": "Resource Policy"
           }
         },

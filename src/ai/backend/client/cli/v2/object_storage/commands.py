@@ -81,7 +81,13 @@ def get(storage_id: str) -> None:
 @click.option("--access-key", default=None, help="Updated access key.")
 @click.option("--secret-key", default=None, help="Updated secret key.")
 @click.option("--endpoint", default=None, help="Updated endpoint URL.")
-@click.option("--region", default=None, help="Updated region. Pass empty string to clear.")
+@click.option("--region", default=None, help="Updated region.")
+@click.option(
+    "--set-null-region",
+    is_flag=True,
+    default=False,
+    help="Clear the region. Mutually exclusive with --region.",
+)
 def update(
     storage_id: str,
     name: str | None,
@@ -90,19 +96,23 @@ def update(
     secret_key: str | None,
     endpoint: str | None,
     region: str | None,
+    set_null_region: bool,
 ) -> None:
     """Update an existing object storage."""
     from uuid import UUID
 
-    from ai.backend.common.api_handlers import SENTINEL, Sentinel
     from ai.backend.common.dto.manager.v2.object_storage.request import UpdateObjectStorageInput
+    from ai.backend.common.tristate.unset import UNSET, Unset
 
-    # SENTINEL means "no change", None means "clear the field".
-    # When the CLI user does not pass --region, keep SENTINEL (no change).
-    # When they pass an empty string, interpret as None (clear).
-    region_value: str | Sentinel | None = SENTINEL
-    if region is not None:
-        region_value = region if region else None
+    if region is not None and set_null_region:
+        raise click.UsageError("--region and --set-null-region are mutually exclusive.")
+
+    # An option the user did not pass stays UNSET so the field is left unchanged.
+    region_value: str | None | Unset = UNSET
+    if set_null_region:
+        region_value = None
+    elif region is not None:
+        region_value = region
 
     async def _run() -> None:
         registry = await create_v2_registry(load_v2_config())
