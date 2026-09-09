@@ -12089,8 +12089,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Updated canonical name.",
+            "description": "Updated canonical name. Omit to leave unchanged.",
             "title": "Name"
           },
           "registry": {
@@ -12102,8 +12101,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Updated registry hostname.",
+            "description": "Updated registry hostname. Omit to leave unchanged.",
             "title": "Registry"
           },
           "image": {
@@ -12115,8 +12113,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Updated namespace/path within registry.",
+            "description": "Updated namespace/path within registry. Omit to leave unchanged.",
             "title": "Image"
           },
           "tag": {
@@ -12128,8 +12125,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Updated image tag.",
+            "description": "Updated image tag. Omit to leave unchanged.",
             "title": "Tag"
           },
           "architecture": {
@@ -12141,8 +12137,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Updated CPU architecture.",
+            "description": "Updated CPU architecture. Omit to leave unchanged.",
             "title": "Architecture"
           },
           "is_local": {
@@ -12154,8 +12149,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Updated local-only status.",
+            "description": "Updated local-only status. Omit to leave unchanged.",
             "title": "Is Local"
           },
           "size_bytes": {
@@ -12167,8 +12161,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Updated image size in bytes.",
+            "description": "Updated image size in bytes. Omit to leave unchanged.",
             "title": "Size Bytes"
           },
           "type": {
@@ -12180,8 +12173,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Updated image type (compute, system, service).",
+            "description": "Updated image type (compute, system, service). Omit to leave unchanged.",
             "title": "Type"
           },
           "config_digest": {
@@ -12193,8 +12185,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Updated config digest.",
+            "description": "Updated config digest. Omit to leave unchanged.",
             "title": "Config Digest"
           },
           "labels": {
@@ -12209,8 +12200,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Updated labels dict.",
+            "description": "Updated labels dict. Omit to leave unchanged.",
             "title": "Labels"
           },
           "supported_accelerators": {
@@ -12235,8 +12225,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Updated resource limits dict.",
+            "description": "Updated resource limits dict. Omit to leave unchanged.",
             "title": "Resource Limits"
           }
         },
