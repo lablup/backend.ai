@@ -117,13 +117,17 @@ def update(
     from ai.backend.common.dto.manager.v2.login_client_type.request import (
         UpdateLoginClientTypeInput,
     )
+    from ai.backend.common.tristate.unset import UNSET
 
     async def _run() -> None:
         registry = await create_v2_registry(load_v2_config())
         try:
             result = await registry.login_client_type.admin_update(
                 login_client_type_id,
-                UpdateLoginClientTypeInput(name=name, description=description),
+                UpdateLoginClientTypeInput(
+                    name=name if name is not None else UNSET,
+                    description=description if description is not None else UNSET,
+                ),
             )
             print_result(result)
         finally:

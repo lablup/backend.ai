@@ -40,12 +40,11 @@ class CreateLoginClientTypeInput(BaseRequestModel):
 class UpdateLoginClientTypeInput(BaseRequestModel):
     """Input for updating a login client type.
 
-    Fields default to "no change". For ``description``, pass ``null`` to clear the
-    existing value; omit the field (UNSET) to leave it untouched.
+    Every field defaults to UNSET (no change). ``description`` accepts ``null`` to clear.
     """
 
-    name: str | None = Field(
-        default=None,
+    name: str | None | Unset = Field(
+        default=UNSET,
         min_length=1,
         max_length=64,
         description="Updated name. Omit to leave unchanged.",
