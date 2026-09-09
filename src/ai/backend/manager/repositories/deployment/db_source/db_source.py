@@ -125,6 +125,7 @@ from ai.backend.manager.errors.storage import VFolderNotFound
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.deployment_policy import DeploymentPolicyRow
 from ai.backend.manager.models.deployment_policy.creators import DeploymentPolicyCreator
+from ai.backend.manager.models.deployment_policy.purgers import DeploymentPolicyPurger
 from ai.backend.manager.models.deployment_policy.upserters import DeploymentPolicyUpserter
 from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
 from ai.backend.manager.models.deployment_revision.creators import DeploymentRevisionCreator
@@ -181,11 +182,6 @@ from ai.backend.manager.models.vfolder import VFolderRow, query_accessible_vfold
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
     execute_batch_querier,
-)
-from ai.backend.manager.repositories.base.purger import (
-    Purger,
-    PurgerResult,
-    execute_purger,
 )
 from ai.backend.manager.repositories.deployment.types import (
     DeploymentHistoryToCreate,
@@ -3049,18 +3045,15 @@ class DeploymentDBSource:
 
     async def delete_deployment_policy(
         self,
-        purger: Purger[DeploymentPolicyRow],
-    ) -> PurgerResult[DeploymentPolicyRow] | None:
-        """Delete the deployment policy by primary key.
-
-        Args:
-            purger: Purger containing the policy ID (primary key) to delete.
+        purger: DeploymentPolicyPurger,
+    ) -> DeploymentPolicyData | None:
+        """Delete the deployment policy the spec names.
 
         Returns:
-            PurgerResult containing the deleted row, or None if no policy existed.
+            The deleted policy, or None if no policy existed.
         """
-        async with self._begin_session_read_committed() as db_sess:
-            return await execute_purger(db_sess, purger)
+        async with self._reconcile_ops.write_ops() as w:
+            return await w.purge_field_entity(purger)
 
     # ========== Additional Search Operations ==========
 
