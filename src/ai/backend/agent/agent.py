@@ -1752,6 +1752,13 @@ class AbstractAgent[
         done_future: asyncio.Future[Any] | None = None,
         suppress_events: bool = False,
     ) -> None:
+        # The manager sends the session's `status_info` as this reason, and that column is free
+        # text: `rig-cleanup`, `All kernels cancelled`, `UNKNOWN`. It is annotated as the enum but
+        # arrives over RPC as whatever string was in the database, and `_handle_clean_event` puts
+        # it straight into a pydantic event -- which refuses it, kills the lifecycle task, and so
+        # never sends `KernelTerminatedAnycastEvent`. The kernel is gone and the manager is never
+        # told. Coerced here because this is the one funnel every lifecycle event passes through.
+        reason = KernelLifecycleEventReason.from_value(reason) or KernelLifecycleEventReason.UNKNOWN
         cid: ContainerId | None = None
         try:
             kernel_obj = self.kernel_registry[kernel_id]
