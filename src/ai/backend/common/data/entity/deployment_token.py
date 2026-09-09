@@ -21,7 +21,7 @@ class DeploymentTokenFieldType(FieldType):
     @override
     @classmethod
     def description(cls) -> str:
-        return "An access token issued for a deployment."
+        return "A token for calling a deployment, fixing the user it acts as."
 
     @override
     @classmethod

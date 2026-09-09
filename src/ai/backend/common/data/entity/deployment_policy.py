@@ -21,7 +21,7 @@ class DeploymentPolicyFieldType(FieldType):
     @override
     @classmethod
     def description(cls) -> str:
-        return "The scaling and routing policy of a deployment."
+        return "How a deployment rolls out a new revision, rolling update or blue-green."
 
     @override
     @classmethod
