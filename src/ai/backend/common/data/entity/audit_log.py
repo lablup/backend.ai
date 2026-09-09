@@ -1,17 +1,37 @@
 from typing import override
 
-from ai.backend.common.data.entity.types import FieldIdentifier, FieldType
+from ai.backend.common.data.entity.types import DanglingFieldType, FieldIdentifier, FieldType
 
 __all__ = (
-    "AUDIT_LOG_FIELD_TYPE",
-    "AUDIT_LOG_SCOPE_FIELD_TYPE",
+    "AuditLogFieldType",
+    "AuditLogScopeFieldType",
     "AuditLogID",
     "AuditLogScopeID",
 )
 
 
-AUDIT_LOG_FIELD_TYPE = FieldType("audit_log")
-AUDIT_LOG_SCOPE_FIELD_TYPE = FieldType("audit_log_scope")
+class AuditLogFieldType(DanglingFieldType):
+    @override
+    @classmethod
+    def name(cls) -> str:
+        return "audit_log"
+
+    @override
+    @classmethod
+    def description(cls) -> str:
+        return "One record of an action, owned by whatever entity the action was about."
+
+
+class AuditLogScopeFieldType(DanglingFieldType):
+    @override
+    @classmethod
+    def name(cls) -> str:
+        return "audit_log_scope"
+
+    @override
+    @classmethod
+    def description(cls) -> str:
+        return "One scope an audit record sits in."
 
 
 class AuditLogID(FieldIdentifier):
@@ -25,7 +45,7 @@ class AuditLogID(FieldIdentifier):
     @override
     @classmethod
     def field_type(cls) -> FieldType:
-        return AUDIT_LOG_FIELD_TYPE
+        return AuditLogFieldType()
 
 
 class AuditLogScopeID(FieldIdentifier):
@@ -34,4 +54,4 @@ class AuditLogScopeID(FieldIdentifier):
     @override
     @classmethod
     def field_type(cls) -> FieldType:
-        return AUDIT_LOG_SCOPE_FIELD_TYPE
+        return AuditLogScopeFieldType()

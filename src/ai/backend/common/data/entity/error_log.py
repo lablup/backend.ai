@@ -2,15 +2,34 @@
 
 from typing import override
 
-from ai.backend.common.data.entity.types import FieldIdentifier, FieldType
+from ai.backend.common.data.entity.types import (
+    EntityType,
+    FieldIdentifier,
+    FieldType,
+)
+from ai.backend.common.data.entity.user import UserEntityType
 
 __all__ = (
-    "ERROR_LOG_FIELD_TYPE",
+    "ErrorLogFieldType",
     "ErrorLogID",
 )
 
 
-ERROR_LOG_FIELD_TYPE = FieldType("error_log")
+class ErrorLogFieldType(FieldType):
+    @override
+    @classmethod
+    def name(cls) -> str:
+        return "error_log"
+
+    @override
+    @classmethod
+    def description(cls) -> str:
+        return "One error recorded for a user."
+
+    @override
+    @classmethod
+    def owner_type(cls) -> type[EntityType]:
+        return UserEntityType
 
 
 class ErrorLogID(FieldIdentifier):
@@ -23,4 +42,4 @@ class ErrorLogID(FieldIdentifier):
     @override
     @classmethod
     def field_type(cls) -> FieldType:
-        return ERROR_LOG_FIELD_TYPE
+        return ErrorLogFieldType()
