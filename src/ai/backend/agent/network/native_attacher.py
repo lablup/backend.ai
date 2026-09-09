@@ -494,7 +494,7 @@ class NativeBridgeAttachRunner:
         removed = True
         try:
             await _run(["ip", "link", "del", host_veth])
-        except RuntimeError as e:
+        except command.HOST_COMMAND_ERRORS as e:
             if not command.is_absent_error(e):
                 removed = False
                 log.warning(
@@ -539,7 +539,7 @@ class NativeBridgeAttachRunner:
         veth = _veth_name(container_id, ifname, "h")
         try:
             await _run(["ip", "link", "del", veth])
-        except RuntimeError as e:
+        except command.HOST_COMMAND_ERRORS as e:
             if not command.is_absent_error(e):
                 raise
         ipam = config.get("ipam") or {}

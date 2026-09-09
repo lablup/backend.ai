@@ -442,7 +442,7 @@ async def probe_encryption_support(
         netns = f"{_PROBE_NETNS_PREFIX}{os.getpid()}-{secrets.token_hex(4)}"
         try:
             await runner(["ip", "netns", "add", netns])
-        except (RuntimeError, OSError) as e:
+        except command.HOST_COMMAND_ERRORS as e:
             return [
                 f"this node cannot create a network namespace to test overlay encryption in ({e}),"
                 " so whether it could carry an encrypted session is unknown."
@@ -452,7 +452,7 @@ async def probe_encryption_support(
         finally:
             try:
                 await runner(["ip", "netns", "del", netns])
-            except (RuntimeError, OSError) as e:
+            except command.HOST_COMMAND_ERRORS as e:
                 # The next probe reaps it, and refuses to build if it cannot. Reported there
                 # rather than here: what this call was asked is whether the node can encrypt, and
                 # it found that out.
@@ -486,7 +486,7 @@ async def _reap_probe_netns(runner: Runner, stale: Sequence[str]) -> list[str]:
     for name in stale:
         try:
             await runner(["ip", "netns", "del", name])
-        except (RuntimeError, OSError) as e:
+        except command.HOST_COMMAND_ERRORS as e:
             problems.append(
                 f"this node has a leftover encryption probe namespace {name} that will not go"
                 f" ({e}); no further probe will run until it does, so they cannot accumulate."
@@ -538,7 +538,7 @@ async def _probe_in_netns(runner: Runner, reader: Reader, netns: str) -> list[st
     ):
         try:
             await runner(_in_netns(netns, argv))
-        except (RuntimeError, OSError) as e:
+        except command.HOST_COMMAND_ERRORS as e:
             problems.append(
                 f"this node cannot install the overlay's ESP state: `{_probe_verb(argv)}` failed"
                 f" ({e}). An encrypted session placed here would be refused at setup."
@@ -2144,7 +2144,13 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
         the head of our chain, above whatever displaced it.
         """
         if reinstall:
-            with contextlib.suppress(RuntimeError, OSError):
+            # `HOST_COMMAND_ERRORS`, not `(RuntimeError, OSError)`: the delete of a rule that is
+            # already gone raises `NetworkOperationFailed`, which is neither -- so the suppression
+            # was dead and the re-add below never ran. That is exactly the flushed-chain case this
+            # reinstall exists for: `iptables -F` emptied our chain, the drift pass found the drop
+            # rule missing, and restoring it failed on the delete of the rule the flush had just
+            # removed. Measured: the receive side stayed open for the life of the session.
+            with contextlib.suppress(*command.HOST_COMMAND_ERRORS):
                 await self._runner(_as_delete(add))
             await self._runner(add)
             return
@@ -2172,7 +2178,7 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
                 plaintext_drop_add_args(vni, dstport),
                 reinstall=reinstall,
             )
-        except (RuntimeError, OSError) as e:
+        except command.HOST_COMMAND_ERRORS as e:
             raise OverlayEncryptionUnavailable(
                 f"could not install the plaintext-drop rule for encrypted VNI {vni} on udp/"
                 f"{dstport}: {e}. Without it the overlay accepts injected clear-text frames on "
@@ -2202,7 +2208,7 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
                 egress_guard_add_args(vni, dstport),
                 reinstall=reinstall,
             )
-        except (RuntimeError, OSError) as e:
+        except command.HOST_COMMAND_ERRORS as e:
             raise OverlayEncryptionUnavailable(
                 f"could not install the egress guard for encrypted VNI {vni} on udp/{dstport}: "
                 f"{e}. Without it, anything that clears the OUTPUT mark sends this session's "
@@ -2223,7 +2229,7 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
                 output_mark_add_args(vni, dstport),
                 reinstall=reinstall,
             )
-        except (RuntimeError, OSError) as e:
+        except command.HOST_COMMAND_ERRORS as e:
             raise OverlayEncryptionUnavailable(
                 f"could not install the OUTPUT mark for encrypted VNI {vni} on udp/{dstport}: "
                 f"{e}. Without it the VNI-scoped XFRM policy cannot select outgoing packets, so "
@@ -3873,7 +3879,7 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
             self._remote_endpoints.get(session_id, {}).pop((ip, mac), None)
             try:
                 await self._remove(neigh_del_args(meta.vni, ip))
-            except (RuntimeError, OSError):
+            except command.HOST_COMMAND_ERRORS:
                 log.debug("could not remove the neighbour entry {} in {}", ip, session_id)
 
     @override
