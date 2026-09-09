@@ -162,25 +162,6 @@ class FieldGroup[TFieldData: FieldData]:
             validators=(*self._deps.validators.scope, *validators),
         )
 
-    def global_scope[TAction: BaseGlobalAction, TResult](
-        self,
-        action_cls: type[TAction],
-        func: Callable[[TAction], Awaitable[TResult]],
-        *,
-        validators: Sequence[GlobalActionValidator] = (),
-        monitors: Sequence[GlobalActionMonitor] = (),
-    ) -> GlobalActionProcessor[TAction, TResult]:
-        """Rows of this kind across every scope, behind the SUPERADMIN gate.
-
-        The service-backed counterpart of :meth:`global_search_ops`.
-        """
-        self._record(action_cls, ActionKind.GLOBAL, ActionGate.PERMISSION, ActionBacking.CUSTOM)
-        return GlobalActionProcessor(
-            func,
-            monitors=(*self._deps.monitors.global_scope, *monitors),
-            validators=(*self._deps.validators.global_scope, *validators),
-        )
-
     def search_ops[TAction: OperationScopeOpsAction[Any, Any]](
         self,
         action_cls: type[TAction],
