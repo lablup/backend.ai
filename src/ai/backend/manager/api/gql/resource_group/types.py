@@ -82,7 +82,6 @@ from ai.backend.common.dto.manager.v2.resource_group.response import (
 from ai.backend.common.dto.manager.v2.resource_group.response import (
     ReplaceResourceGroupDefaultSessionOptionsPayload as ReplaceResourceGroupDefaultSessionOptionsPayloadDTO,
 )
-from ai.backend.common.dto.manager.v2.resource_group.types import ResourceGroupScope
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.types import PreemptionOrder, PreemptionVictimScope
 from ai.backend.manager.api.gql.base import OrderDirection, StringFilter
@@ -107,7 +106,6 @@ from ai.backend.manager.api.gql.fair_share.types.common import (
     ResourceWeightEntryInputGQL,
 )
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin, PydanticOutputMixin
-from ai.backend.manager.api.gql.rbac.types.scope import UUIDScopeGQL
 from ai.backend.manager.api.gql.session_options.types import (
     DefaultSessionOptionsInfoGQL,
     DefaultSessionOptionsInputGQL,
@@ -1086,28 +1084,4 @@ class ReplaceResourceGroupDefaultSessionOptionsPayloadGQL(
     )
     default_session_options: DefaultSessionOptionsInfoGQL = gql_field(
         description="The newly persisted ``default_session_options`` surface.",
-    )
-
-
-@gql_pydantic_input(
-    BackendAIGQLMeta(
-        description=(
-            "Scope for the scoped resource group query. Each list is OR'd internally and "
-            "across lists, and every scope named is authorized before the read runs."
-        ),
-        added_version=NEXT_RELEASE_VERSION,
-    ),
-    name="ResourceGroupScope",
-)
-class ResourceGroupScopeGQL(PydanticInputMixin[ResourceGroupScope]):
-    """The scopes a resource group read is answered for."""
-
-    domain: list[UUIDScopeGQL] | None = gql_field(
-        default=None, description="Domains whose resource groups are being read."
-    )
-    project: list[UUIDScopeGQL] | None = gql_field(
-        default=None, description="Projects whose resource groups are being read."
-    )
-    user: list[UUIDScopeGQL] | None = gql_field(
-        default=None, description="Users whose resource groups are being read."
     )

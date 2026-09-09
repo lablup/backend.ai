@@ -3,13 +3,14 @@
 from __future__ import annotations
 
 from ai.backend.common.dto.manager.v2.audit_log.request import AuditLogScope
+from ai.backend.manager.api.gql.base import UUIDScopeGQL
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_field,
     gql_pydantic_input,
 )
 from ai.backend.manager.api.gql.pydantic_compat import PydanticInputMixin
-from ai.backend.manager.api.gql.rbac.types.scope import EntityTypeScopeGQL, UUIDScopeGQL
+from ai.backend.manager.api.gql.rbac.types.scope import EntityTypeScopeGQL
 
 
 @gql_pydantic_input(

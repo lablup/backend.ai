@@ -7,14 +7,11 @@ Both permission.py and role.py can safely import from this module.
 
 from __future__ import annotations
 
-from uuid import UUID
-
 from ai.backend.common.dto.manager.v2.rbac.types import (
     EntityTypeScope,
     PermissionBitDTO,
     RBACElementTypeDTO,
     ScopeInputDTO,
-    UUIDScope,
 )
 from ai.backend.common.dto.manager.v2.rbac.types import (
     RBACElementTypeFilter as RBACElementTypeFilterDTO,
@@ -34,7 +31,6 @@ __all__ = (
     "RBACElementTypeFilterGQL",
     "RBACElementTypeGQL",
     "ScopeInputGQL",
-    "UUIDScopeGQL",
 )
 
 # ==================== Enums ====================
@@ -76,19 +72,6 @@ class EntityTypeScopeGQL(PydanticInputMixin[EntityTypeScope]):
     )
     entity_id: str = gql_field(
         description="ID of the entity.",
-    )
-
-
-@gql_pydantic_input(
-    BackendAIGQLMeta(
-        description="Single-UUID scope item wrapper.",
-        added_version="26.4.4",
-    ),
-    name="UUIDScope",
-)
-class UUIDScopeGQL(PydanticInputMixin[UUIDScope]):
-    value: UUID = gql_field(
-        description="UUID value.",
     )
 
 

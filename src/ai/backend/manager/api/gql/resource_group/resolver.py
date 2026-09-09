@@ -24,6 +24,7 @@ from ai.backend.manager.api.gql.decorators import (
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.utils import check_admin_only
 
+from .scopes import ResourceGroupScopeGQL
 from .types import (
     AllowedDomainsPayloadGQL,
     AllowedProjectsPayloadGQL,
@@ -40,7 +41,6 @@ from .types import (
     ResourceGroupFilterGQL,
     ResourceGroupGQL,
     ResourceGroupOrderByGQL,
-    ResourceGroupScopeGQL,
     UpdateAllowedDomainsForResourceGroupInputGQL,
     UpdateAllowedProjectsForResourceGroupInputGQL,
     UpdateAllowedResourceGroupsForDomainInputGQL,

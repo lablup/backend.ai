@@ -81,6 +81,7 @@ from ai.backend.common.dto.manager.v2.model_card.types import (
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import StringFilter as StringFilterGQL
 from ai.backend.manager.api.gql.base import UUIDFilter as UUIDFilterGQL
+from ai.backend.manager.api.gql.base import UUIDScopeGQL
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     PydanticInputMixin,
@@ -100,7 +101,6 @@ from ai.backend.manager.api.gql.deployment.types.revision_preset import (
 )
 from ai.backend.manager.api.gql.model_card._preset_helpers import build_preset_connection
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin, PydanticOutputMixin
-from ai.backend.manager.api.gql.rbac.types.scope import UUIDScopeGQL
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 
 if TYPE_CHECKING:

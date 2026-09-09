@@ -10,13 +10,13 @@ from ai.backend.common.dto.manager.v2.user.types import (
     UserScope,
 )
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
+from ai.backend.manager.api.gql.base import UUIDScopeGQL
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_field,
     gql_pydantic_input,
 )
 from ai.backend.manager.api.gql.pydantic_compat import PydanticInputMixin
-from ai.backend.manager.api.gql.rbac.types.scope import UUIDScopeGQL
 
 
 @gql_pydantic_input(
