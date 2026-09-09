@@ -55,9 +55,9 @@ class UpdateDotfileInput(BaseRequestModel):
         default=UNSET,
         description="Updated dotfile content. Omit to leave unchanged; null clears.",
     )
-    permission: DotfilePermission | None = Field(
-        default=None,
-        description="Updated Unix file permission in octal (e.g., '755')",
+    permission: DotfilePermission | None | Unset = Field(
+        default=UNSET,
+        description="Updated Unix file permission in octal (e.g., '755'). Omit to leave unchanged.",
     )
 
     @field_validator("path")

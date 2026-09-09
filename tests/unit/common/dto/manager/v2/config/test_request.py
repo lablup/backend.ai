@@ -210,8 +210,17 @@ class TestUpdateDotfileInput:
         req = UpdateDotfileInput(path="/home/.bashrc", permission="755")
         assert req.permission == "755"
 
-    def test_permission_default_is_none(self) -> None:
+    def test_permission_default_is_unset(self) -> None:
         req = UpdateDotfileInput(path="/home/.bashrc")
+        assert req.permission is UNSET
+        assert isinstance(req.permission, Unset)
+
+    def test_explicit_unset_permission(self) -> None:
+        req = UpdateDotfileInput(path="/home/.bashrc", permission=UNSET)
+        assert req.permission is UNSET
+
+    def test_none_permission_stays_none(self) -> None:
+        req = UpdateDotfileInput(path="/home/.bashrc", permission=None)
         assert req.permission is None
 
     def test_path_whitespace_is_stripped(self) -> None:
@@ -233,7 +242,7 @@ class TestUpdateDotfileInput:
     def test_partial_update_data_only(self) -> None:
         req = UpdateDotfileInput(path="/home/.bashrc", data="updated content")
         assert req.data == "updated content"
-        assert req.permission is None
+        assert req.permission is UNSET
 
     def test_partial_update_permission_only(self) -> None:
         req = UpdateDotfileInput(path="/home/.bashrc", permission="644")
