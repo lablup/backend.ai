@@ -735,7 +735,7 @@ class RBACAdapter(BaseAdapter):
             offset=input.offset,
         )
         action_result: SearchRolesInScopeActionResult = (
-            await self._permission_controller.search_roles_in_scope.wait_for_complete(
+            await self._permission_controller.search_roles_in_scope.run(
                 SearchRolesInScopeAction(scope=scope, querier=querier)
             )
         )

@@ -1,7 +1,7 @@
 import logging
 from collections.abc import Sequence
 
-from ai.backend.common.data.permission.types import OperationType, RBACElementType, ScopeType
+from ai.backend.common.data.permission.types import OperationType, RBACElementType
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.actions.action.rbac import (
     BaseRBACAction,
@@ -139,11 +139,7 @@ class PermissionControllerService:
     ) -> SearchRolesInScopeActionResult:
         """Search roles registered in a given scope."""
         result = await self._repository.search_roles_in_scope(action.querier, action.scope)
-        return SearchRolesInScopeActionResult(
-            result=result,
-            _scope_type=ScopeType(action.scope.scope.entity_type()),
-            _scope_id=str(action.scope.scope),
-        )
+        return SearchRolesInScopeActionResult(result=result)
 
     async def search_permissions(
         self, action: SearchPermissionsAction

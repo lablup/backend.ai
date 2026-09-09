@@ -35,9 +35,6 @@ from ai.backend.manager.actions.registry.types import (
     ConcernMeta,
     GroupMeta,
 )
-from ai.backend.manager.actions.validators import ActionValidators
-from ai.backend.manager.actions.validators.rbac import RBACValidators
-from ai.backend.manager.actions.validators.rbac.scope import ScopeActionRBACValidator
 from ai.backend.manager.api.adapters.project.adapter import ProjectAdapter
 from ai.backend.manager.api.adapters.rbac.adapter import RBACAdapter
 from ai.backend.manager.api.adapters.user.adapter import UserAdapter
@@ -108,24 +105,10 @@ from ai.backend.manager.services.rbac.service import (
 )
 from ai.backend.manager.services.user.processors import UserProcessors
 from ai.backend.manager.services.user.service import UserService
-from ai.backend.testutils.action_validators import mock_virtual_entity_rbac_validators
 from ai.backend.testutils.fixtures import DomainFixtureData
 
 if TYPE_CHECKING:
     from tests.component.conftest import ServerInfo, UserFixtureData, VirtualEntitySeeder
-
-
-def _build_validators(
-    database_engine: ExtendedAsyncSAEngine,
-    config_provider: ManagerConfigProvider,
-) -> ActionValidators:
-    permission_repo = PermissionControllerRepository(database_engine)
-    return ActionValidators(
-        virtual_entity_rbac=mock_virtual_entity_rbac_validators(),
-        rbac=RBACValidators(
-            scope=ScopeActionRBACValidator(permission_repo, config_provider),
-        ),
-    )
 
 
 # ---------------------------------------------------------------------------
@@ -204,7 +187,6 @@ def permission_controller_processors(
         processor_registry.group(GroupMeta(RoleEntityType())),
         service=service,
         action_monitors=[],
-        validators=_build_validators(database_engine, config_provider),
     )
 
 
@@ -349,7 +331,7 @@ async def admin_target_project_permission(
     """Grant the admin user PROJECT:UPDATE on target_project_fixture.
 
     Required so admin's `project.assign_users` / `project.unassign_users`
-    against the target project pass ScopeActionRBACValidator.
+    against the target project pass the scope RBAC validator.
     """
     role_id = uuid.uuid4()
     async with db_engine.begin() as conn:
@@ -509,7 +491,7 @@ async def member_role_fixture(
 
     Registers the role itself in the project scope (ASE) so revoke_role()
     can detect it as project-scoped, and grants USER:READ permission so the
-    holder can pass ScopeActionRBACValidator on user.search_by_project.
+    holder can pass the scope RBAC validator on user.search_by_project.
     """
     role_id = uuid.uuid4()
     async with db_engine.begin() as conn:

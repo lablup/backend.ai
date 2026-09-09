@@ -27,8 +27,6 @@ from ai.backend.manager.actions.registry.registry import ProcessorRegistry
 from ai.backend.manager.actions.registry.types import (
     GroupMeta,
 )
-from ai.backend.manager.actions.validators import ActionValidators
-from ai.backend.manager.actions.validators.rbac import RBACValidators
 from ai.backend.manager.api.adapters.user.adapter import UserAdapter
 from ai.backend.manager.api.rest.admin.handler import AdminHandler
 from ai.backend.manager.api.rest.admin.registry import register_admin_routes
@@ -62,14 +60,6 @@ if TYPE_CHECKING:
     from tests.component.conftest import ServerInfo, UserFixtureData
 
 UserFactory = Callable[..., Coroutine[Any, Any, CreateUserResponse]]
-
-
-def _create_mock_validators() -> MagicMock:
-    mock_rbac = MagicMock(spec=RBACValidators)
-    mock_rbac.scope = AsyncMock()
-    mock_validators = MagicMock(spec=ActionValidators)
-    mock_validators.rbac = mock_rbac
-    return mock_validators
 
 
 @pytest.fixture()

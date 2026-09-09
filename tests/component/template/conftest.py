@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import uuid
 from typing import Any
-from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 import sqlalchemy as sa
@@ -12,8 +11,6 @@ from ai.backend.common.data.entity.project import ProjectEntityType
 from ai.backend.common.data.entity.session_template import SessionTemplateEntityType
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
 from ai.backend.manager.actions.registry.types import GroupMeta
-from ai.backend.manager.actions.validators import ActionValidators
-from ai.backend.manager.actions.validators.rbac import RBACValidators
 from ai.backend.manager.api.rest.cluster_template.handler import ClusterTemplateHandler
 from ai.backend.manager.api.rest.cluster_template.registry import register_cluster_template_routes
 from ai.backend.manager.api.rest.routing import RouteRegistry
@@ -34,14 +31,6 @@ from ai.backend.manager.services.project.processors import ProjectProcessors
 from ai.backend.manager.services.project.service import ProjectService
 from ai.backend.manager.services.template.processors import TemplateProcessors
 from ai.backend.manager.services.template.service import TemplateService
-
-
-def _mock_action_validators() -> MagicMock:
-    mock_rbac = MagicMock(spec=RBACValidators)
-    mock_rbac.scope = AsyncMock()
-    mock_validators = MagicMock(spec=ActionValidators)
-    mock_validators.rbac = mock_rbac
-    return mock_validators
 
 
 @pytest.fixture()

@@ -18,17 +18,14 @@ from ai.backend.manager.data.permission.permission import (
 )
 from ai.backend.manager.data.permission.role import (
     AssignedUserListResult,
-    BulkPermissionCheckInput,
     BulkRoleAssignmentResultData,
     BulkRolePermissionReplaceResultData,
     BulkRoleRevocationResultData,
     BulkUserRoleRevocationInput,
-    PermissionResolutionKey,
     RoleData,
     RoleDetailData,
     RoleListResult,
     RoleRevocationResult,
-    ScopeChainPermissionCheckInput,
     UserRoleAssignmentData,
     UserRoleAssignmentInput,
     UserRoleRevocationInput,
@@ -256,31 +253,6 @@ class PermissionControllerRepository:
             ElementAssociationListResult with full association row data.
         """
         return await self._db_source.search_element_associations_in_scope(querier)
-
-    @permission_controller_repository_resilience.apply()
-    async def check_permission_with_scope_chain(
-        self,
-        data: ScopeChainPermissionCheckInput,
-    ) -> bool:
-        """Permission check that traverses the scope chain via AUTO edges only.
-
-        Walks the association_scopes_entities hierarchy upward from the target
-        entity, checking if the user has the requested operation at any ancestor
-        scope. REF edges are not traversed.
-        """
-        return await self._db_source.check_permission_with_scope_chain(data)
-
-    @permission_controller_repository_resilience.apply()
-    async def check_bulk_permission_with_scope_chain(
-        self,
-        data: BulkPermissionCheckInput,
-    ) -> Mapping[PermissionResolutionKey, bool]:
-        """Batch permission check that traverses the scope chain via AUTO edges.
-
-        Same semantics as check_permission_with_scope_chain but for an
-        arbitrary collection of per-target keys in a single query.
-        """
-        return await self._db_source.check_bulk_permission_with_scope_chain(data)
 
     @permission_controller_repository_resilience.apply()
     async def owned_permissions(

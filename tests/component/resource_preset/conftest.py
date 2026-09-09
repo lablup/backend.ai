@@ -21,8 +21,6 @@ from ai.backend.manager.actions.registry.types import (
     GroupMeta,
 )
 from ai.backend.manager.actions.v2.bulk.validator.rbac import BulkOwnCheck
-from ai.backend.manager.actions.validators import ActionValidators
-from ai.backend.manager.actions.validators.rbac import RBACValidators
 from ai.backend.manager.api.rest.middleware import auth as _auth_api
 from ai.backend.manager.api.rest.resource.handler import ResourceHandler
 from ai.backend.manager.api.rest.resource.registry import register_resource_routes
@@ -67,14 +65,6 @@ _RESOURCE_PRESET_SERVER_SUBAPP_MODULES = (_auth_api,)
 
 PresetFixtureData = dict[str, Any]
 PresetFactory = Callable[..., Coroutine[Any, Any, PresetFixtureData]]
-
-
-def _create_mock_validators() -> MagicMock:
-    mock_rbac = MagicMock(spec=RBACValidators)
-    mock_rbac.scope = AsyncMock()
-    mock_validators = MagicMock(spec=ActionValidators)
-    mock_validators.rbac = mock_rbac
-    return mock_validators
 
 
 @pytest.fixture()
