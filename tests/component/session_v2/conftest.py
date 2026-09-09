@@ -189,7 +189,7 @@ def build_session_registries(
     """Build the v2 session route registries around the given processors."""
     processors = MagicMock(spec=Processors)
     processors.session = session_processors
-    adapter = SessionAdapter(processors)
+    adapter = SessionAdapter(processors.session, MagicMock())
     handler = V2SessionHandler(adapter=adapter)
     v2_reg = RouteRegistry.create("v2", route_deps.cors_options)
     v2_reg.add_subregistry(register_v2_session_routes(handler, route_deps))

@@ -20,7 +20,7 @@ from ai.backend.manager.models.rbac.exceptions import InvalidScope
 
 @pytest.fixture()
 def adapter() -> RBACAdapter:
-    return RBACAdapter(MagicMock())
+    return RBACAdapter(MagicMock(), MagicMock())
 
 
 class TestValidateScopeId:

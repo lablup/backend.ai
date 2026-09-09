@@ -104,7 +104,7 @@ def server_module_registries(
 ) -> list[RouteRegistry]:
     processors = MagicMock(spec=Processors)
     processors.prometheus_query_preset = prometheus_query_preset_processors
-    adapter = PrometheusQueryPresetAdapter(processors)
+    adapter = PrometheusQueryPresetAdapter(processors.prometheus_query_preset)
     handler = V2PrometheusQueryPresetHandler(adapter=adapter)
     v2_reg = RouteRegistry.create("v2", route_deps.cors_options)
     v2_reg.add_subregistry(register_v2_prometheus_query_preset_routes(handler, route_deps))

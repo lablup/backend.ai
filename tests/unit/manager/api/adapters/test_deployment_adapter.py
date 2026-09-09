@@ -212,7 +212,7 @@ class TestDeploymentSearchGates:
         processors.deployment = DeploymentProcessors(
             registry.group(GroupMeta(DEPLOYMENT_ENTITY_TYPE)), service
         )
-        return DeploymentAdapter(processors, MagicMock())
+        return DeploymentAdapter(processors.deployment, MagicMock())
 
     async def test_my_search_is_answered_for_the_user_scope(
         self,
@@ -279,7 +279,7 @@ class TestFieldBatchLoads:
                 errors={DENIED_TOKEN: denial},
             )
         )
-        return DeploymentAdapter(processors, MagicMock()), processors
+        return DeploymentAdapter(processors.deployment, MagicMock()), processors
 
     async def test_access_tokens_answer_per_id(
         self,
@@ -341,7 +341,7 @@ class TestFieldBatchLoads:
         processors.deployment.bulk_get_deployment_policies.run = AsyncMock(
             return_value=OwnedFieldsOpsResult(designated={deployment_id: policy})
         )
-        deployment_adapter = DeploymentAdapter(processors, MagicMock())
+        deployment_adapter = DeploymentAdapter(processors.deployment, MagicMock())
         without_policy = uuid4()
 
         nodes = await deployment_adapter.batch_load_policies_by_endpoint_ids([
