@@ -8,7 +8,7 @@ from ai.backend.common.data.filter_specs import UUIDEqualMatchSpec
 from ai.backend.common.data.idle_checker.types import IdleCheckPhase
 from ai.backend.common.data.permission.types import ScopeType
 from ai.backend.manager.data.common.types import SearchResult
-from ai.backend.manager.data.idle_checker.types import IdleCheckerAssignmentData
+from ai.backend.manager.data.idle_checker.types import IdleCheckerAssignmentData, IdleJudgmentData
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.errors.idle_checker import IdleCheckerAssignmentNotFound
 from ai.backend.manager.models.idle_checker.conditions import IdleCheckerAssignmentConditions
@@ -21,13 +21,13 @@ from ai.backend.manager.repositories.idle_checker.db_source.db_source import Idl
 from ai.backend.manager.repositories.idle_checker.types import (
     ExpiredIdleCheckBatchData,
     IdleCheckBatchData,
-    IdleJudgmentData,
     InitialGracePeriodBatchData,
     SessionIdleCheckAssignmentData,
     SessionIdleCheckBatchResult,
     SessionIdleCheckPair,
 )
 from ai.backend.manager.repositories.ops import DBOpsProvider
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.ops.v2.relation.provider import RelationOpsProvider
 
 __all__ = ("IdleCheckerRepository",)
@@ -41,9 +41,12 @@ class IdleCheckerRepository:
     _relation_ops: RelationOpsProvider
 
     def __init__(
-        self, ops_provider: DBOpsProvider, relation_ops_provider: RelationOpsProvider
+        self,
+        ops_provider: DBOpsProvider,
+        relation_ops_provider: RelationOpsProvider,
+        v2_ops_provider: V2DBOpsProvider,
     ) -> None:
-        self._db_source = IdleCheckerDBSource(ops_provider)
+        self._db_source = IdleCheckerDBSource(ops_provider, v2_ops_provider)
         self._relation_ops = relation_ops_provider
 
     async def get_assignment(

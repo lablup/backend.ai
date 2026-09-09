@@ -26,6 +26,7 @@ from ai.backend.common.types import (
     SessionResult,
     SessionTypes,
 )
+from ai.backend.manager.data.idle_checker.types import IdleJudgmentData
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.errors.idle_checker import IdleCheckerNotFound
 from ai.backend.manager.errors.kernel import SessionNotFound
@@ -47,7 +48,6 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base import BulkUpserter
 from ai.backend.manager.repositories.idle_checker.repository import IdleCheckerRepository
 from ai.backend.manager.repositories.idle_checker.types import (
-    IdleJudgmentData,
     SessionIdleCheckPair,
 )
 from ai.backend.manager.repositories.idle_checker.upserters import (
@@ -55,6 +55,7 @@ from ai.backend.manager.repositories.idle_checker.upserters import (
     SessionIdleCheckIncludeUpserterSpec,
 )
 from ai.backend.manager.repositories.ops import DBOpsProvider
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.ops.v2.relation.provider import RelationOpsProvider
 from ai.backend.testutils.db import with_tables
 
@@ -217,7 +218,11 @@ class TestFetchJudgmentBatch:
 
     @pytest.fixture
     def repository(self, database: ExtendedAsyncSAEngine) -> IdleCheckerRepository:
-        return IdleCheckerRepository(DBOpsProvider(database), RelationOpsProvider(database))
+        return IdleCheckerRepository(
+            DBOpsProvider(database),
+            RelationOpsProvider(database),
+            V2DBOpsProvider(database),
+        )
 
     @pytest.fixture
     async def judgment_rows(
@@ -869,7 +874,11 @@ class TestFetchExpiredIdleChecks:
 
     @pytest.fixture
     def repository(self, database: ExtendedAsyncSAEngine) -> IdleCheckerRepository:
-        return IdleCheckerRepository(DBOpsProvider(database), RelationOpsProvider(database))
+        return IdleCheckerRepository(
+            DBOpsProvider(database),
+            RelationOpsProvider(database),
+            V2DBOpsProvider(database),
+        )
 
     @pytest.fixture
     async def expired_check_session(
@@ -1056,7 +1065,11 @@ class TestSessionIdleCheckExclusion:
 
     @pytest.fixture
     def repository(self, database: ExtendedAsyncSAEngine) -> IdleCheckerRepository:
-        return IdleCheckerRepository(DBOpsProvider(database), RelationOpsProvider(database))
+        return IdleCheckerRepository(
+            DBOpsProvider(database),
+            RelationOpsProvider(database),
+            V2DBOpsProvider(database),
+        )
 
     @pytest.fixture
     async def exclusion_rows(
@@ -1549,7 +1562,11 @@ class TestUserScopeAssignments:
 
     @pytest.fixture
     def repository(self, database: ExtendedAsyncSAEngine) -> IdleCheckerRepository:
-        return IdleCheckerRepository(DBOpsProvider(database), RelationOpsProvider(database))
+        return IdleCheckerRepository(
+            DBOpsProvider(database),
+            RelationOpsProvider(database),
+            V2DBOpsProvider(database),
+        )
 
     @pytest.fixture
     async def user_scope_rows(

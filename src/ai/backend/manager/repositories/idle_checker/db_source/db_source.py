@@ -17,13 +17,16 @@ from ai.backend.common.data.idle_checker.types import (
 )
 from ai.backend.common.data.permission.types import ScopeType
 from ai.backend.common.types import SessionId, SessionTypes
-from ai.backend.manager.data.idle_checker.types import IdleCheckSession
+from ai.backend.manager.data.idle_checker.types import IdleCheckSession, IdleJudgmentData
 from ai.backend.manager.data.session.types import SessionStatus
-from ai.backend.manager.models.idle_checker.conditions import SessionIdleCheckConditions
 from ai.backend.manager.models.idle_checker.row import (
     IdleCheckerBindingRow,
     IdleCheckerRow,
     SessionIdleCheckRow,
+)
+from ai.backend.manager.models.idle_checker.updaters import (
+    SessionIdleCheckJudgmentBatchUpdater,
+    SessionIdleCheckPhaseBatchUpdater,
 )
 from ai.backend.manager.models.session.conditions import SessionConditions
 from ai.backend.manager.models.session.row import SessionRow
@@ -31,7 +34,6 @@ from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.repositories.base import (
     BatchPurger,
     BatchQuerier,
-    BatchUpdater,
     BulkCreator,
     BulkUpserter,
 )
@@ -45,22 +47,18 @@ from ai.backend.manager.repositories.idle_checker.types import (
     IdleCheckAssignmentData,
     IdleCheckBatchData,
     IdleCheckerDefinitionData,
-    IdleJudgmentData,
     InitialGracePeriodBatchData,
     InitialGracePeriodCheckData,
     SessionIdleCheckAssignmentData,
     SessionIdleCheckBatchResult,
     SessionIdleCheckPair,
 )
-from ai.backend.manager.repositories.idle_checker.updaters import (
-    SessionIdleCheckJudgmentBatchUpdaterSpec,
-    SessionIdleCheckPhaseBatchUpdaterSpec,
-)
 from ai.backend.manager.repositories.idle_checker.upserters import (
     SessionIdleCheckExcludeUpserterSpec,
     SessionIdleCheckIncludeUpserterSpec,
 )
 from ai.backend.manager.repositories.ops import DBOpsProvider
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 
 _ASSIGNMENT_DELETE_BATCH_SIZE = 1000
 
@@ -70,9 +68,11 @@ _IDLE_CHECK_UPDATE_BATCH_SIZE = 1000
 
 class IdleCheckerDBSource:
     _ops: DBOpsProvider
+    _v2_ops: V2DBOpsProvider
 
-    def __init__(self, ops_provider: DBOpsProvider) -> None:
+    def __init__(self, ops_provider: DBOpsProvider, v2_ops_provider: V2DBOpsProvider) -> None:
         self._ops = ops_provider
+        self._v2_ops = v2_ops_provider
 
     async def fetch_judgment_batch(
         self,
@@ -301,16 +301,13 @@ class IdleCheckerDBSource:
         from_phase: IdleCheckPhase,
         to_phase: IdleCheckPhase,
     ) -> None:
-        async with self._ops.write_ops() as w:
+        async with self._v2_ops.write_ops() as w:
             for pair_batch in batched(pairs, _IDLE_CHECK_UPDATE_BATCH_SIZE):
-                pair_values = [(pair.session_id, pair.checker_id) for pair in pair_batch]
-                await w.batch_update(
-                    BatchUpdater(
-                        spec=SessionIdleCheckPhaseBatchUpdaterSpec(to_phase=to_phase),
-                        conditions=[
-                            SessionIdleCheckConditions.by_pairs(pair_values),
-                            SessionIdleCheckConditions.by_status_equals(from_phase),
-                        ],
+                await w.batch_update_in_global(
+                    SessionIdleCheckPhaseBatchUpdater(
+                        pairs=[(pair.session_id, pair.checker_id) for pair in pair_batch],
+                        from_phase=from_phase,
+                        to_phase=to_phase,
                     )
                 )
 
@@ -384,19 +381,9 @@ class IdleCheckerDBSource:
         self,
         judgments: Sequence[IdleJudgmentData],
     ) -> None:
-        pairs = [(judgment.session_id, judgment.checker_id) for judgment in judgments]
-        async with self._ops.write_ops() as w:
-            if pairs:
-                await w.batch_update(
-                    BatchUpdater(
-                        spec=SessionIdleCheckJudgmentBatchUpdaterSpec(judgments),
-                        conditions=[
-                            SessionIdleCheckConditions.by_pairs(pairs),
-                            SessionIdleCheckConditions.by_statuses((
-                                IdleCheckPhase.READY_TO_CHECK,
-                                IdleCheckPhase.ACTIVE,
-                                IdleCheckPhase.IDLE,
-                            )),
-                        ],
-                    )
-                )
+        if not judgments:
+            return
+        async with self._v2_ops.write_ops() as w:
+            await w.batch_update_in_global(
+                SessionIdleCheckJudgmentBatchUpdater(judgments=judgments)
+            )

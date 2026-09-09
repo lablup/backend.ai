@@ -189,7 +189,11 @@ def idle_checker_assignment_processors(
 ) -> IdleCheckerAssignmentProcessors:
     """The binding reads; its writes are the rbac boundary's."""
     service = IdleCheckerAssignmentService(
-        IdleCheckerRepository(DBOpsProvider(database_engine), RelationOpsProvider(database_engine))
+        IdleCheckerRepository(
+            DBOpsProvider(database_engine),
+            RelationOpsProvider(database_engine),
+            V2DBOpsProvider(database_engine),
+        )
     )
     groups = action_registry.concern(ConcernMeta(Concern.SESSION))
     return IdleCheckerAssignmentProcessors(
@@ -338,7 +342,9 @@ async def assignment_seed(
     )
     checker_id = checker.id
     repository = IdleCheckerRepository(
-        DBOpsProvider(database_engine), RelationOpsProvider(database_engine)
+        DBOpsProvider(database_engine),
+        RelationOpsProvider(database_engine),
+        V2DBOpsProvider(database_engine),
     )
     relations = RbacRelationRepository(RelationOpsProvider(database_engine))
     assignments: list[IdleCheckerAssignmentData] = []

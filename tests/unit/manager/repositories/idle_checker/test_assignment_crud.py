@@ -126,7 +126,11 @@ class TestIdleCheckerAssignmentRepository:
 
     @pytest.fixture
     def repository(self, database: ExtendedAsyncSAEngine) -> IdleCheckerRepository:
-        return IdleCheckerRepository(DBOpsProvider(database), RelationOpsProvider(database))
+        return IdleCheckerRepository(
+            DBOpsProvider(database),
+            RelationOpsProvider(database),
+            V2DBOpsProvider(database),
+        )
 
     @pytest.fixture
     def relations(self, database: ExtendedAsyncSAEngine) -> RbacRelationRepository:
