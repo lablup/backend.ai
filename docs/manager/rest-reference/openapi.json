@@ -15400,8 +15400,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Updated name of the object storage",
+            "description": "Updated name of the object storage. Omit to leave unchanged.",
             "title": "Name"
           },
           "host": {
@@ -15413,8 +15412,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Updated host address",
+            "description": "Updated host address. Omit to leave unchanged.",
             "title": "Host"
           },
           "access_key": {
@@ -15426,8 +15424,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Updated access key",
+            "description": "Updated access key. Omit to leave unchanged.",
             "title": "Access Key"
           },
           "secret_key": {
@@ -15439,8 +15436,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Updated secret key",
+            "description": "Updated secret key. Omit to leave unchanged.",
             "title": "Secret Key"
           },
           "endpoint": {
@@ -15452,8 +15448,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Updated endpoint URL",
+            "description": "Updated endpoint URL. Omit to leave unchanged.",
             "title": "Endpoint"
           },
           "region": {
