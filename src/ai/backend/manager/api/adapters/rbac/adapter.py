@@ -135,18 +135,17 @@ from ai.backend.common.dto.manager.v2.rbac.request import (
     UserNestedFilter as UserNestedFilterDTO,
 )
 from ai.backend.common.dto.manager.v2.rbac.types import (
+    EntityTypeFilter,
     OperationTypeDTO,
     OperationTypeFilter,
     PermissionBitDTO,
-    RBACElementTypeDTO,
-    RBACElementTypeFilter,
     RoleSourceDTO,
     RoleStatusDTO,
 )
 from ai.backend.common.dto.manager.v2.rbac.types import (
     OrderDirection as OrderDirectionV2,
 )
-from ai.backend.common.exception import UnreachableError
+from ai.backend.common.exception import InvalidAPIParameters, UnreachableError
 from ai.backend.manager.actions.action import build_operation_description
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.api.adapters.base import BaseAdapter
@@ -593,11 +592,11 @@ class RBACAdapter(BaseAdapter):
         matrix = action_result.matrix
         return [
             ScopeEntityOperationCombinationInfo(
-                scope_type=RBACElementTypeDTO(scope.value),
+                scope_type=EntityType(scope.value),
                 entities=sorted(
                     [
                         EntityActionInfo(
-                            entity_type=RBACElementTypeDTO(entity.value),
+                            entity_type=EntityType(entity.value),
                             actions=sorted(
                                 [
                                     OperationInfo(
@@ -1185,54 +1184,57 @@ class RBACAdapter(BaseAdapter):
 
     # ------------------------------------------------------------------ helpers (GQL layer)
 
-    @staticmethod
+    def _rbac_element_type(self, name: str) -> RBACElementType:
+        """The element type answering to ``name``."""
+        try:
+            return RBACElementType(name)
+        except ValueError as e:
+            raise InvalidAPIParameters(f"{name!r} is not an RBAC element type") from e
+
     def _convert_rbac_element_type_filter(
-        f: RBACElementTypeFilter,
+        self,
+        f: EntityTypeFilter,
         *,
         equals_factory: Callable[[RBACElementType], QueryCondition],
         not_equals_factory: Callable[[RBACElementType], QueryCondition],
         in_factory: Callable[[Collection[RBACElementType]], QueryCondition],
         not_in_factory: Callable[[Collection[RBACElementType]], QueryCondition],
     ) -> list[QueryCondition]:
-        """Translate an ``RBACElementTypeFilter`` (equals / in / not_equals / not_in)
-        into the matching ``QueryCondition`` instances using factory callables.
-
-        Each factory accepts ``RBACElementType`` values (the internal enum), so
-        DTO values are converted via ``RBACElementType(value.value)`` before being
-        passed in. Returns an empty list when no filter field is set.
+        """Translate an ``EntityTypeFilter`` into the matching ``QueryCondition``
+        instances for a column still holding ``RBACElementType``. A name the enum
+        does not carry matches no row, so it is refused.
         """
         conditions: list[QueryCondition] = []
         if f.equals is not None:
-            conditions.append(equals_factory(RBACElementType(f.equals.value)))
+            conditions.append(equals_factory(self._rbac_element_type(f.equals)))
         if f.not_equals is not None:
-            conditions.append(not_equals_factory(RBACElementType(f.not_equals.value)))
+            conditions.append(not_equals_factory(self._rbac_element_type(f.not_equals)))
         if f.in_:
-            conditions.append(in_factory([RBACElementType(v.value) for v in f.in_]))
+            conditions.append(in_factory([self._rbac_element_type(v) for v in f.in_]))
         if f.not_in:
-            conditions.append(not_in_factory([RBACElementType(v.value) for v in f.not_in]))
+            conditions.append(not_in_factory([self._rbac_element_type(v) for v in f.not_in]))
         return conditions
 
-    @staticmethod
     def _convert_entity_type_filter(
-        f: RBACElementTypeFilter,
+        self,
+        f: EntityTypeFilter,
         *,
         equals_factory: Callable[[EntityType], QueryCondition],
         not_equals_factory: Callable[[EntityType], QueryCondition],
         in_factory: Callable[[Collection[EntityType]], QueryCondition],
         not_in_factory: Callable[[Collection[EntityType]], QueryCondition],
     ) -> list[QueryCondition]:
-        """Translate an ``RBACElementTypeFilter`` for a column holding an open entity
-        type. The DTO enumerates the types it offers; the column accepts any string,
-        so the value passes through unvalidated."""
+        """Translate an ``EntityTypeFilter`` for a column holding an entity type.
+        The column accepts any name, so the value passes through unvalidated."""
         conditions: list[QueryCondition] = []
         if f.equals is not None:
-            conditions.append(equals_factory(EntityType(f.equals.value)))
+            conditions.append(equals_factory(EntityType(f.equals)))
         if f.not_equals is not None:
-            conditions.append(not_equals_factory(EntityType(f.not_equals.value)))
+            conditions.append(not_equals_factory(EntityType(f.not_equals)))
         if f.in_:
-            conditions.append(in_factory([EntityType(v.value) for v in f.in_]))
+            conditions.append(in_factory([EntityType(v) for v in f.in_]))
         if f.not_in:
-            conditions.append(not_in_factory([EntityType(v.value) for v in f.not_in]))
+            conditions.append(not_in_factory([EntityType(v) for v in f.not_in]))
         return conditions
 
     def _permission_bit(self, operation: OperationTypeDTO | str) -> Permission:
@@ -1809,7 +1811,7 @@ class RBACAdapter(BaseAdapter):
         return PermissionNode(
             id=data.id,
             role_id=data.role_id,
-            entity_type=RBACElementTypeDTO(data.entity_type),
+            entity_type=EntityType(data.entity_type),
             permission=PermissionBitDTO[data.permission.to_operation().name],
             operation=OperationTypeDTO(data.permission.to_operation().value),
             created_at=data.created_at,

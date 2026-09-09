@@ -111,7 +111,7 @@ from ai.backend.manager.api.gql.decorators import (
 )
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin, PydanticOutputMixin
 from ai.backend.manager.api.gql.rbac.types.scope import (
-    RBACElementTypeFilterGQL,
+    EntityTypeFilterGQL,
     ScopeInputGQL,
 )
 from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy, StrawberryGQLContext
@@ -559,7 +559,7 @@ class RoleUserNestedFilterGQL(PydanticInputMixin[UserNestedFilterDTO]):
     name="RoleMappedScopeNestedFilter",
 )
 class RoleMappedScopeNestedFilterGQL(PydanticInputMixin[MappedScopeNestedFilterDTO]):
-    scope_type: RBACElementTypeFilterGQL | None = None
+    scope_type: EntityTypeFilterGQL | None = None
     scope_id: UUIDFilter | None = None
 
     AND: list[Self] | None = None

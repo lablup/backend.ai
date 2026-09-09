@@ -147,7 +147,7 @@ class AuditLogAdapter(BaseAdapter):
                 ) from e
             items.append(
                 EntityAuditLogScopeItem(
-                    owner=RuntimeEntityID(EntityType(entity_scope.entity_type.value), entity_id),
+                    owner=RuntimeEntityID(EntityType(entity_scope.entity_type), entity_id),
                 )
             )
         for user_scope in input.scope.triggered_user or []:

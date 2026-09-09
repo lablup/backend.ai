@@ -34,10 +34,7 @@ from ai.backend.manager.api.gql.decorators import (
 )
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
 from ai.backend.manager.api.gql.rbac.types.entity_node import EntityNode
-from ai.backend.manager.api.gql.rbac.types.scope import (
-    RBACElementTypeFilterGQL,
-    RBACElementTypeGQL,
-)
+from ai.backend.manager.api.gql.rbac.types.scope import EntityTypeFilterGQL
 from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy, StrawberryGQLContext
 
 # ==================== Enums ====================
@@ -61,9 +58,9 @@ class EntityOrderField(StrEnum):
 )
 class EntityRefGQL(PydanticNodeMixin[AssociationScopesEntitiesNode]):
     id: NodeID[str]
-    scope_type: RBACElementTypeGQL
+    scope_type: str
     scope_id: str
-    entity_type: RBACElementTypeGQL
+    entity_type: str
     entity_id: str
     registered_at: datetime
 
@@ -116,9 +113,9 @@ class EntityRefGQL(PydanticNodeMixin[AssociationScopesEntitiesNode]):
     name="EntityFilter",
 )
 class EntityFilter(PydanticInputMixin[EntityFilterDTO], GQLFilter):
-    entity_type: RBACElementTypeFilterGQL | None = None
+    entity_type: EntityTypeFilterGQL | None = None
     entity_id: StringFilter | None = None
-    scope_type: RBACElementTypeFilterGQL | None = gql_added_field(
+    scope_type: EntityTypeFilterGQL | None = gql_added_field(
         BackendAIGQLMeta(
             added_version="26.8.0",
             description="Filter by the type of scope the entity is registered in.",

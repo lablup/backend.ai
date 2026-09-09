@@ -50,7 +50,7 @@ def create(
     permissions: str | None,
 ) -> None:
     """Create a new role preset."""
-    from ai.backend.common.dto.manager.v2.rbac.types import RBACElementTypeDTO
+    from ai.backend.common.data.entity.types import EntityType
     from ai.backend.common.dto.manager.v2.role_permission_preset.types import (
         RolePermissionPresetEntry,
     )
@@ -66,7 +66,7 @@ def create(
             result = await registry.role_preset.create(
                 CreateRolePresetInput(
                     name=name,
-                    scope_type=RBACElementTypeDTO(scope_type),
+                    scope_type=EntityType(scope_type),
                     auto_assign=auto_assign,
                     permissions=entries,
                 ),
@@ -154,8 +154,8 @@ def search(
     order_by: tuple[str, ...],
 ) -> None:
     """Search role presets across the system."""
+    from ai.backend.common.data.entity.types import EntityType
     from ai.backend.common.dto.manager.query import StringFilter
-    from ai.backend.common.dto.manager.v2.rbac.types import RBACElementTypeDTO
     from ai.backend.common.dto.manager.v2.role_preset.request import (
         RolePresetFilter,
         RolePresetOrder,
@@ -167,7 +167,7 @@ def search(
     if any(v is not None for v in (name_contains, scope_type, auto_assign, deleted)):
         filter_dto = RolePresetFilter(
             name=StringFilter(contains=name_contains) if name_contains is not None else None,
-            scope_type=RBACElementTypeDTO(scope_type) if scope_type is not None else None,
+            scope_type=EntityType(scope_type) if scope_type is not None else None,
             auto_assign=auto_assign,
             deleted=deleted,
         )
@@ -313,10 +313,9 @@ def permission_search(
     """Search the permission entries belonging to a single role preset."""
     from ai.backend.common.data.entity.role_preset import RolePresetID
     from ai.backend.common.dto.manager.v2.rbac.types import (
+        EntityTypeFilter,
         OperationTypeDTO,
         OperationTypeFilter,
-        RBACElementTypeDTO,
-        RBACElementTypeFilter,
     )
     from ai.backend.common.dto.manager.v2.role_permission_preset.request import (
         RolePermissionPresetFilter,
@@ -330,11 +329,7 @@ def permission_search(
     filter_dto: RolePermissionPresetFilter | None = None
     if entity_type is not None or operation is not None:
         filter_dto = RolePermissionPresetFilter(
-            entity_type=(
-                RBACElementTypeFilter(equals=RBACElementTypeDTO(entity_type))
-                if entity_type is not None
-                else None
-            ),
+            entity_type=(EntityTypeFilter(equals=entity_type) if entity_type is not None else None),
             operation=(
                 OperationTypeFilter(equals=OperationTypeDTO(operation))
                 if operation is not None

@@ -93,9 +93,8 @@ from ai.backend.manager.api.gql.decorators import (
 )
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin, PydanticOutputMixin
 from ai.backend.manager.api.gql.rbac.types.scope import (
+    EntityTypeFilterGQL,
     PermissionBitGQL,
-    RBACElementTypeFilterGQL,
-    RBACElementTypeGQL,
 )
 from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy, StrawberryGQLContext
 
@@ -154,7 +153,7 @@ class PermissionOrderField(StrEnum):
 class PermissionGQL(PydanticNodeMixin[PermissionNodeDTO]):
     id: NodeID[str]
     role_id: UUID
-    entity_type: RBACElementTypeGQL
+    entity_type: str
     created_at: datetime
     permission: PermissionBitGQL = gql_added_field(
         BackendAIGQLMeta(
@@ -207,7 +206,7 @@ class PermissionGQL(PydanticNodeMixin[PermissionNodeDTO]):
     name="PermissionNestedFilter",
 )
 class PermissionNestedFilterGQL(PydanticInputMixin[PermissionNestedFilterDTO]):
-    entity_type: RBACElementTypeFilterGQL | None = None
+    entity_type: EntityTypeFilterGQL | None = None
     operation: OperationTypeFilterGQL | None = None
 
     AND: list[Self] | None = None
@@ -221,7 +220,7 @@ class PermissionNestedFilterGQL(PydanticInputMixin[PermissionNestedFilterDTO]):
 )
 class PermissionFilter(PydanticInputMixin[PermissionFilterDTO], GQLFilter):
     role_id: UUIDFilter | None = None
-    entity_type: RBACElementTypeFilterGQL | None = None
+    entity_type: EntityTypeFilterGQL | None = None
     created_at: DateTimeFilter | None = None
     AND: list[Self] | None = None
     OR: list[Self] | None = None
@@ -248,7 +247,7 @@ class PermissionOrderBy(PydanticInputMixin[PermissionOrderByDTO], GQLOrderBy):
 )
 class CreatePermissionInput(PydanticInputMixin[CreatePermissionInputDTO]):
     role_id: UUID
-    entity_type: RBACElementTypeGQL
+    entity_type: str
     operation: OperationTypeGQL
 
 
@@ -257,7 +256,7 @@ class CreatePermissionInput(PydanticInputMixin[CreatePermissionInputDTO]):
 )
 class UpdatePermissionInput(PydanticInputMixin[UpdatePermissionInputDTO]):
     id: UUID
-    entity_type: RBACElementTypeGQL | None = None
+    entity_type: str | None = None
     operation: OperationTypeGQL | None = None
 
 
@@ -432,8 +431,8 @@ class ReplaceRolePermissionsPayloadGQL(
     name="ScopeEntityCombination",
 )
 class ScopeEntityCombinationGQL(PydanticOutputMixin[ScopeEntityCombinationInfo]):
-    scope_type: RBACElementTypeGQL
-    valid_entity_types: list[RBACElementTypeGQL]
+    scope_type: str
+    valid_entity_types: list[str]
 
 
 @gql_pydantic_type(
@@ -459,7 +458,7 @@ class OperationInfoGQL(PydanticOutputMixin[OperationInfo]):
     name="EntityOperationCombination",
 )
 class EntityOperationCombinationGQL(PydanticOutputMixin[EntityOperationCombinationInfo]):
-    entity_type: RBACElementTypeGQL
+    entity_type: str
     operations: list[OperationInfoGQL]
 
 
@@ -472,7 +471,7 @@ class EntityOperationCombinationGQL(PydanticOutputMixin[EntityOperationCombinati
     name="EntityActionInfo",
 )
 class EntityActionInfoGQL(PydanticOutputMixin[EntityActionInfo]):
-    entity_type: RBACElementTypeGQL
+    entity_type: str
     actions: list[OperationInfoGQL]
 
 
@@ -487,7 +486,7 @@ class EntityActionInfoGQL(PydanticOutputMixin[EntityActionInfo]):
 class ScopeEntityOperationCombinationGQL(
     PydanticOutputMixin[ScopeEntityOperationCombinationInfo],
 ):
-    scope_type: RBACElementTypeGQL
+    scope_type: str
     entities: list[EntityActionInfoGQL]
 
 

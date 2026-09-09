@@ -1698,7 +1698,7 @@ Added in 26.4.4. Failure detail for a single permission entry in a bulk add oper
 """
 type BulkAddRolePermissionPresetFailureInfo {
   """Entity type of the permission entry that failed."""
-  entityType: RBACElementType!
+  entityType: String!
 
   """Operation of the permission entry that failed."""
   operation: OperationType!
@@ -3180,7 +3180,7 @@ type CreateObjectStoragePayload {
 """Added in 26.3.0. Input for creating a scoped permission"""
 input CreatePermissionInput {
   roleId: UUID!
-  entityType: RBACElementType!
+  entityType: String!
   operation: OperationType!
 }
 
@@ -3427,7 +3427,7 @@ input CreateRolePresetInput {
   name: String!
 
   """Scope type this preset targets (e.g., domain, project)."""
-  scopeType: RBACElementType!
+  scopeType: String!
 
   """
   Default value for the `auto_assign` flag on roles instantiated from this preset.
@@ -5333,7 +5333,7 @@ type EnqueueSessionPayload {
 """Added in 26.4.2. Entity with its allowed actions within a scope."""
 type EntityActionInfo {
   """Entity element type"""
-  entityType: RBACElementType!
+  entityType: String!
 
   """Valid operations for this entity in the given scope"""
   actions: [OperationInfo!]!
@@ -5351,13 +5351,13 @@ type EntityConnection {
 
 """Added in 26.3.0. Filter for entity associations"""
 input EntityFilter {
-  entityType: RBACElementTypeFilter = null
+  entityType: EntityTypeFilter = null
   entityId: StringFilter = null
 
   """
   Added in 26.8.0. Filter by the type of scope the entity is registered in.
   """
-  scopeType: RBACElementTypeFilter = null
+  scopeType: EntityTypeFilter = null
 
   """
   Added in 26.8.0. Filter by the id of scope the entity is registered in.
@@ -5448,12 +5448,12 @@ enum EntityLabelOrderField {
   CREATED_AT
 }
 
-union EntityNode = UserV2 | ProjectV2 | DomainV2 | VirtualFolderNode | ImageV2 | ComputeSessionNode | SessionV2 | Artifact | ArtifactRegistry | NotificationChannel | NotificationRule | ModelDeployment | ResourceGroup | ContainerRegistryV2 | ArtifactRevision | Role
+union EntityNode = UserV2 | ProjectV2 | DomainV2 | VirtualFolderNode | ImageV2 | ComputeSessionNode | SessionV2 | Artifact | ArtifactRegistry | NotificationChannel | NotificationRule | ModelDeployment | ResourceGroup | ContainerRegistryV2 | ArtifactRevision | Role | AgentV2 | AppConfigAllowList | AppConfigDefinition | AppConfigFragment | IdleChecker | ObjectStorage | RuntimeVariant | RuntimeVariantPreset | StorageNamespace | VFolder | VFSStorage
 
 """Added in 26.4.2. Valid entity-operation combination for RBAC actions."""
 type EntityOperationCombination {
   """Entity element type"""
-  entityType: RBACElementType!
+  entityType: String!
 
   """Valid operations for this entity"""
   operations: [OperationInfo!]!
@@ -5477,9 +5477,9 @@ Added in 26.3.0. Entity reference from the association_scopes_entities table.
 type EntityRef implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
-  scopeType: RBACElementType!
+  scopeType: String!
   scopeId: String!
-  entityType: RBACElementType!
+  entityType: String!
   entityId: String!
   registeredAt: DateTime!
 
@@ -5681,10 +5681,25 @@ type EntityType implements Node {
   name: String!
 }
 
+"""Added in 26.9.0. Filter for a field holding an entity type."""
+input EntityTypeFilter {
+  """Matches rows with this exact entity type."""
+  equals: String = null
+
+  """Matches rows whose entity type is in this list."""
+  in: [String!] = null
+
+  """Excludes rows with this exact entity type."""
+  notEquals: String = null
+
+  """Excludes rows whose entity type is in this list."""
+  notIn: [String!] = null
+}
+
 """Added in 26.4.4. Entity reference parametrized by RBAC element type."""
 input EntityTypeScope {
-  """RBAC element type of the entity."""
-  entityType: RBACElementType!
+  """Type of the entity."""
+  entityType: String!
 
   """ID of the entity."""
   entityId: String!
@@ -9926,7 +9941,7 @@ type Permission implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
   roleId: UUID!
-  entityType: RBACElementType!
+  entityType: String!
   createdAt: DateTime!
 
   """Added in 26.9.0. The permission bit the row holds."""
@@ -9972,7 +9987,7 @@ type PermissionEdge {
 """Added in 26.3.0. Filter for scoped permissions"""
 input PermissionFilter {
   roleId: UUIDFilter = null
-  entityType: RBACElementTypeFilter = null
+  entityType: EntityTypeFilter = null
   createdAt: DateTimeFilter = null
   AND: [PermissionFilter!] = null
   OR: [PermissionFilter!] = null
@@ -9983,7 +9998,7 @@ input PermissionFilter {
 Added in 26.4.0. Nested filter for permissions within a role assignment. Filters assignments where the assigned role has permissions matching all specified conditions.
 """
 input PermissionNestedFilter {
-  entityType: RBACElementTypeFilter = null
+  entityType: EntityTypeFilter = null
   operation: OperationTypeFilter = null
   AND: [PermissionNestedFilter!] = null
   OR: [PermissionNestedFilter!] = null
@@ -12269,74 +12284,6 @@ input QueryTimeRangeInput {
 }
 
 """
-Added in 26.3.0. Unified RBAC element type for scope-entity relationships
-"""
-enum RBACElementType {
-  DOMAIN
-  PROJECT
-  USER
-  SESSION
-  VFOLDER
-  MODEL_DEPLOYMENT
-  KEYPAIR
-  NOTIFICATION_CHANNEL
-  NETWORK
-  IDLE_CHECKER_ASSIGNMENT
-  RESOURCE_GROUP
-  CONTAINER_REGISTRY
-  STORAGE_HOST
-  AGENT
-  KERNEL
-  ROUTING
-  IMAGE
-  ARTIFACT
-  ARTIFACT_REGISTRY
-  SESSION_TEMPLATE
-  APP_CONFIG
-  APP_CONFIG_DEFINITION
-  APP_CONFIG_ALLOW_LIST
-  APP_CONFIG_FRAGMENT
-  MODEL_CARD
-  RESOURCE_PRESET
-  USER_RESOURCE_POLICY
-  KEYPAIR_RESOURCE_POLICY
-  PROJECT_RESOURCE_POLICY
-  ROLE
-  AUDIT_LOG
-  KERNEL_HISTORY
-  EVENT_LOG
-  PROJECT_ADMIN_PAGE
-  DOMAIN_ADMIN_PAGE
-  NOTIFICATION_RULE
-  DEPLOYMENT_TOKEN
-  DEPLOYMENT_POLICY
-  DEPLOYMENT_REVISION
-  IMAGE_ALIAS
-  ROLE_ASSIGNMENT
-  VFOLDER_DATA
-  SESSION_APP_SERVICE
-  USER_EMAIL
-  ARTIFACT_REVISION
-}
-
-"""
-Added in 26.4.4. Filter for RBAC element type fields (scope_type / entity_type). Supports equals / in / not_equals / not_in.
-"""
-input RBACElementTypeFilter {
-  """Matches rows with this exact element type."""
-  equals: RBACElementType = null
-
-  """Matches rows whose element type is in this list."""
-  in: [RBACElementType!] = null
-
-  """Excludes rows with this exact element type."""
-  notEquals: RBACElementType = null
-
-  """Excludes rows whose element type is in this list."""
-  notIn: [RBACElementType!] = null
-}
-
-"""
 Added in 26.2.0. Filter for domain fair shares within a resource group scope. References resource group membership columns to avoid excluding domains without fair share records.
 """
 input RGDomainFairShareFilter {
@@ -13647,7 +13594,7 @@ input RoleFilter {
 Added in 26.8.0. Filter roles by the scope they are mapped (registered) to.
 """
 input RoleMappedScopeNestedFilter {
-  scopeType: RBACElementTypeFilter = null
+  scopeType: EntityTypeFilter = null
   scopeId: UUIDFilter = null
   AND: [RoleMappedScopeNestedFilter!] = null
   OR: [RoleMappedScopeNestedFilter!] = null
@@ -13676,7 +13623,7 @@ type RolePermissionPreset implements Node {
   rolePresetId: UUID!
 
   """Entity type the permission applies to."""
-  entityType: RBACElementType!
+  entityType: String!
 
   """Operation granted by the permission."""
   operation: OperationType!
@@ -13713,7 +13660,7 @@ Added in 26.4.4. A single (entity_type, operation) pair carried by a role preset
 """
 input RolePermissionPresetEntryInput {
   """Entity type the permission applies to."""
-  entityType: RBACElementType!
+  entityType: String!
 
   """Operation granted by the permission."""
   operation: OperationType!
@@ -13727,7 +13674,7 @@ input RolePermissionPresetFilter {
   rolePresetId: UUIDFilter = null
 
   """Filter by entity type the permission applies to."""
-  entityType: RBACElementTypeFilter = null
+  entityType: EntityTypeFilter = null
 
   """Filter by granted operation."""
   operation: OperationTypeFilter = null
@@ -13778,7 +13725,7 @@ type RolePreset implements Node {
   name: String!
 
   """Scope type this preset targets (e.g., domain, project)."""
-  scopeType: RBACElementType!
+  scopeType: String!
 
   """
   Default value for the `auto_assign` flag copied onto roles instantiated from this preset.
@@ -13827,7 +13774,7 @@ input RolePresetFilter {
   name: StringFilter = null
 
   """Filter by scope type."""
-  scopeType: RBACElementTypeFilter = null
+  scopeType: EntityTypeFilter = null
 
   """Filter by auto-assign flag."""
   autoAssign: Boolean = null
@@ -14708,10 +14655,10 @@ Added in 26.3.0. Valid scope-entity type combination for RBAC permissions.
 """
 type ScopeEntityCombination {
   """Scope element type"""
-  scopeType: RBACElementType!
+  scopeType: String!
 
   """Valid entity types for this scope type"""
-  validEntityTypes: [RBACElementType!]!
+  validEntityTypes: [String!]!
 }
 
 """
@@ -14719,7 +14666,7 @@ Added in 26.4.2. Scope-entity-operation combination for RBAC permission matrix.
 """
 type ScopeEntityOperationCombination {
   """Scope element type"""
-  scopeType: RBACElementType!
+  scopeType: String!
 
   """Entities and their valid operations within this scope"""
   entities: [EntityActionInfo!]!
@@ -14729,7 +14676,7 @@ type ScopeEntityOperationCombination {
 Added in 26.4.2. Scope reference for associating an entity with a scope.
 """
 input ScopeInput {
-  scopeType: RBACElementType!
+  scopeType: String!
   scopeId: String!
 }
 
@@ -16317,7 +16264,7 @@ type UpdateObjectStoragePayload {
 """Added in 26.3.0. Input for updating a scoped permission"""
 input UpdatePermissionInput {
   id: UUID!
-  entityType: RBACElementType = null
+  entityType: String = null
   operation: OperationType = null
 }
 

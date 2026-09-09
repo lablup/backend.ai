@@ -19,7 +19,7 @@ from ai.backend.manager.api.gql.decorators import (
     gql_pydantic_input,
 )
 from ai.backend.manager.api.gql.pydantic_compat import PydanticInputMixin
-from ai.backend.manager.api.gql.rbac.types import RBACElementTypeFilterGQL
+from ai.backend.manager.api.gql.rbac.types.scope import EntityTypeFilterGQL
 
 
 @gql_pydantic_input(
@@ -31,7 +31,7 @@ from ai.backend.manager.api.gql.rbac.types import RBACElementTypeFilterGQL
 )
 class RolePresetFilterGQL(PydanticInputMixin[RolePresetFilterDTO]):
     name: StringFilter | None = gql_field(description="Filter by name.", default=None)
-    scope_type: RBACElementTypeFilterGQL | None = gql_field(
+    scope_type: EntityTypeFilterGQL | None = gql_field(
         description="Filter by scope type.", default=None
     )
     auto_assign: bool | None = gql_field(description="Filter by auto-assign flag.", default=None)

@@ -12,9 +12,9 @@ from ai.backend.common.api_handlers import SENTINEL, BaseRequestModel, Sentinel
 from ai.backend.common.dto.manager.query import DateTimeFilter, StringFilter, UUIDFilter
 
 from .types import (
+    EntityTypeFilter,
     OperationTypeFilter,
     OrderDirection,
-    RBACElementTypeFilter,
     RoleSourceFilter,
     RoleStatus,
     RoleStatusFilter,
@@ -247,7 +247,7 @@ UserNestedFilter.model_rebuild()
 class MappedScopeNestedFilter(BaseRequestModel):
     """Filter roles by the scope they are mapped (registered) to."""
 
-    scope_type: RBACElementTypeFilter | None = None
+    scope_type: EntityTypeFilter | None = None
     scope_id: UUIDFilter | None = None
     AND: list[MappedScopeNestedFilter] | None = None
     OR: list[MappedScopeNestedFilter] | None = None
@@ -290,7 +290,7 @@ RoleNestedFilter.model_rebuild()
 class PermissionNestedFilter(BaseRequestModel):
     """Nested filter for permissions within a role assignment."""
 
-    entity_type: RBACElementTypeFilter | None = None
+    entity_type: EntityTypeFilter | None = None
     operation: OperationTypeFilter | None = None
     AND: list[PermissionNestedFilter] | None = None
     OR: list[PermissionNestedFilter] | None = None
@@ -319,9 +319,9 @@ RoleAssignmentFilter.model_rebuild()
 class EntityFilter(BaseRequestModel):
     """Filter for entity associations."""
 
-    entity_type: RBACElementTypeFilter | None = None
+    entity_type: EntityTypeFilter | None = None
     entity_id: StringFilter | None = None
-    scope_type: RBACElementTypeFilter | None = None
+    scope_type: EntityTypeFilter | None = None
     scope_id: StringFilter | None = None
     AND: list[EntityFilter] | None = None
     OR: list[EntityFilter] | None = None
@@ -335,7 +335,7 @@ class PermissionFilter(BaseRequestModel):
     """Filter for scoped permissions."""
 
     role_id: UUIDFilter | None = None
-    entity_type: RBACElementTypeFilter | None = None
+    entity_type: EntityTypeFilter | None = None
     created_at: DateTimeFilter | None = None
     AND: list[PermissionFilter] | None = None
     OR: list[PermissionFilter] | None = None

@@ -2344,7 +2344,7 @@ type BulkAddRolePermissionPresetFailureInfo
   @join__type(graph: STRAWBERRY)
 {
   """Entity type of the permission entry that failed."""
-  entityType: RBACElementType!
+  entityType: String!
 
   """Operation of the permission entry that failed."""
   operation: OperationType!
@@ -4655,7 +4655,7 @@ input CreatePermissionInput
   @join__type(graph: STRAWBERRY)
 {
   roleId: UUID!
-  entityType: RBACElementType!
+  entityType: String!
   operation: OperationType!
 }
 
@@ -4986,7 +4986,7 @@ input CreateRolePresetInput
   name: String!
 
   """Scope type this preset targets (e.g., domain, project)."""
-  scopeType: RBACElementType!
+  scopeType: String!
 
   """
   Default value for the `auto_assign` flag on roles instantiated from this preset.
@@ -7703,7 +7703,7 @@ type EntityActionInfo
   @join__type(graph: STRAWBERRY)
 {
   """Entity element type"""
-  entityType: RBACElementType!
+  entityType: String!
 
   """Valid operations for this entity in the given scope"""
   actions: [OperationInfo!]!
@@ -7725,13 +7725,13 @@ type EntityConnection
 input EntityFilter
   @join__type(graph: STRAWBERRY)
 {
-  entityType: RBACElementTypeFilter = null
+  entityType: EntityTypeFilter = null
   entityId: StringFilter = null
 
   """
   Added in 26.8.0. Filter by the type of scope the entity is registered in.
   """
-  scopeType: RBACElementTypeFilter = null
+  scopeType: EntityTypeFilter = null
 
   """
   Added in 26.8.0. Filter by the id of scope the entity is registered in.
@@ -7855,14 +7855,25 @@ union EntityNode
   @join__unionMember(graph: STRAWBERRY, member: "ContainerRegistryV2")
   @join__unionMember(graph: STRAWBERRY, member: "ArtifactRevision")
   @join__unionMember(graph: STRAWBERRY, member: "Role")
- = UserV2 | ProjectV2 | DomainV2 | VirtualFolderNode | ImageV2 | ComputeSessionNode | SessionV2 | Artifact | ArtifactRegistry | NotificationChannel | NotificationRule | ModelDeployment | ResourceGroup | ContainerRegistryV2 | ArtifactRevision | Role
+  @join__unionMember(graph: STRAWBERRY, member: "AgentV2")
+  @join__unionMember(graph: STRAWBERRY, member: "AppConfigAllowList")
+  @join__unionMember(graph: STRAWBERRY, member: "AppConfigDefinition")
+  @join__unionMember(graph: STRAWBERRY, member: "AppConfigFragment")
+  @join__unionMember(graph: STRAWBERRY, member: "IdleChecker")
+  @join__unionMember(graph: STRAWBERRY, member: "ObjectStorage")
+  @join__unionMember(graph: STRAWBERRY, member: "RuntimeVariant")
+  @join__unionMember(graph: STRAWBERRY, member: "RuntimeVariantPreset")
+  @join__unionMember(graph: STRAWBERRY, member: "StorageNamespace")
+  @join__unionMember(graph: STRAWBERRY, member: "VFolder")
+  @join__unionMember(graph: STRAWBERRY, member: "VFSStorage")
+ = UserV2 | ProjectV2 | DomainV2 | VirtualFolderNode | ImageV2 | ComputeSessionNode | SessionV2 | Artifact | ArtifactRegistry | NotificationChannel | NotificationRule | ModelDeployment | ResourceGroup | ContainerRegistryV2 | ArtifactRevision | Role | AgentV2 | AppConfigAllowList | AppConfigDefinition | AppConfigFragment | IdleChecker | ObjectStorage | RuntimeVariant | RuntimeVariantPreset | StorageNamespace | VFolder | VFSStorage
 
 """Added in 26.4.2. Valid entity-operation combination for RBAC actions."""
 type EntityOperationCombination
   @join__type(graph: STRAWBERRY)
 {
   """Entity element type"""
-  entityType: RBACElementType!
+  entityType: String!
 
   """Valid operations for this entity"""
   operations: [OperationInfo!]!
@@ -7893,9 +7904,9 @@ type EntityRef implements Node
 {
   """The Globally Unique ID of this object"""
   id: ID!
-  scopeType: RBACElementType!
+  scopeType: String!
   scopeId: String!
-  entityType: RBACElementType!
+  entityType: String!
   entityId: String!
   registeredAt: DateTime!
 
@@ -8131,12 +8142,29 @@ type EntityType implements Node
   name: String!
 }
 
+"""Added in 26.9.0. Filter for a field holding an entity type."""
+input EntityTypeFilter
+  @join__type(graph: STRAWBERRY)
+{
+  """Matches rows with this exact entity type."""
+  equals: String = null
+
+  """Matches rows whose entity type is in this list."""
+  in: [String!] = null
+
+  """Excludes rows with this exact entity type."""
+  notEquals: String = null
+
+  """Excludes rows whose entity type is in this list."""
+  notIn: [String!] = null
+}
+
 """Added in 26.4.4. Entity reference parametrized by RBAC element type."""
 input EntityTypeScope
   @join__type(graph: STRAWBERRY)
 {
-  """RBAC element type of the entity."""
-  entityType: RBACElementType!
+  """Type of the entity."""
+  entityType: String!
 
   """ID of the entity."""
   entityId: String!
@@ -14397,7 +14425,7 @@ type Permission implements Node
   """The Globally Unique ID of this object"""
   id: ID!
   roleId: UUID!
-  entityType: RBACElementType!
+  entityType: String!
   createdAt: DateTime!
 
   """Added in 26.9.0. The permission bit the row holds."""
@@ -14451,7 +14479,7 @@ input PermissionFilter
   @join__type(graph: STRAWBERRY)
 {
   roleId: UUIDFilter = null
-  entityType: RBACElementTypeFilter = null
+  entityType: EntityTypeFilter = null
   createdAt: DateTimeFilter = null
   AND: [PermissionFilter!] = null
   OR: [PermissionFilter!] = null
@@ -14464,7 +14492,7 @@ Added in 26.4.0. Nested filter for permissions within a role assignment. Filters
 input PermissionNestedFilter
   @join__type(graph: STRAWBERRY)
 {
-  entityType: RBACElementTypeFilter = null
+  entityType: EntityTypeFilter = null
   operation: OperationTypeFilter = null
   AND: [PermissionNestedFilter!] = null
   OR: [PermissionNestedFilter!] = null
@@ -17508,78 +17536,6 @@ input QuotaScopeInput
 }
 
 """
-Added in 26.3.0. Unified RBAC element type for scope-entity relationships
-"""
-enum RBACElementType
-  @join__type(graph: STRAWBERRY)
-{
-  DOMAIN @join__enumValue(graph: STRAWBERRY)
-  PROJECT @join__enumValue(graph: STRAWBERRY)
-  USER @join__enumValue(graph: STRAWBERRY)
-  SESSION @join__enumValue(graph: STRAWBERRY)
-  VFOLDER @join__enumValue(graph: STRAWBERRY)
-  MODEL_DEPLOYMENT @join__enumValue(graph: STRAWBERRY)
-  KEYPAIR @join__enumValue(graph: STRAWBERRY)
-  NOTIFICATION_CHANNEL @join__enumValue(graph: STRAWBERRY)
-  NETWORK @join__enumValue(graph: STRAWBERRY)
-  IDLE_CHECKER_ASSIGNMENT @join__enumValue(graph: STRAWBERRY)
-  RESOURCE_GROUP @join__enumValue(graph: STRAWBERRY)
-  CONTAINER_REGISTRY @join__enumValue(graph: STRAWBERRY)
-  STORAGE_HOST @join__enumValue(graph: STRAWBERRY)
-  AGENT @join__enumValue(graph: STRAWBERRY)
-  KERNEL @join__enumValue(graph: STRAWBERRY)
-  ROUTING @join__enumValue(graph: STRAWBERRY)
-  IMAGE @join__enumValue(graph: STRAWBERRY)
-  ARTIFACT @join__enumValue(graph: STRAWBERRY)
-  ARTIFACT_REGISTRY @join__enumValue(graph: STRAWBERRY)
-  SESSION_TEMPLATE @join__enumValue(graph: STRAWBERRY)
-  APP_CONFIG @join__enumValue(graph: STRAWBERRY)
-  APP_CONFIG_DEFINITION @join__enumValue(graph: STRAWBERRY)
-  APP_CONFIG_ALLOW_LIST @join__enumValue(graph: STRAWBERRY)
-  APP_CONFIG_FRAGMENT @join__enumValue(graph: STRAWBERRY)
-  MODEL_CARD @join__enumValue(graph: STRAWBERRY)
-  RESOURCE_PRESET @join__enumValue(graph: STRAWBERRY)
-  USER_RESOURCE_POLICY @join__enumValue(graph: STRAWBERRY)
-  KEYPAIR_RESOURCE_POLICY @join__enumValue(graph: STRAWBERRY)
-  PROJECT_RESOURCE_POLICY @join__enumValue(graph: STRAWBERRY)
-  ROLE @join__enumValue(graph: STRAWBERRY)
-  AUDIT_LOG @join__enumValue(graph: STRAWBERRY)
-  KERNEL_HISTORY @join__enumValue(graph: STRAWBERRY)
-  EVENT_LOG @join__enumValue(graph: STRAWBERRY)
-  PROJECT_ADMIN_PAGE @join__enumValue(graph: STRAWBERRY)
-  DOMAIN_ADMIN_PAGE @join__enumValue(graph: STRAWBERRY)
-  NOTIFICATION_RULE @join__enumValue(graph: STRAWBERRY)
-  DEPLOYMENT_TOKEN @join__enumValue(graph: STRAWBERRY)
-  DEPLOYMENT_POLICY @join__enumValue(graph: STRAWBERRY)
-  DEPLOYMENT_REVISION @join__enumValue(graph: STRAWBERRY)
-  IMAGE_ALIAS @join__enumValue(graph: STRAWBERRY)
-  ROLE_ASSIGNMENT @join__enumValue(graph: STRAWBERRY)
-  VFOLDER_DATA @join__enumValue(graph: STRAWBERRY)
-  SESSION_APP_SERVICE @join__enumValue(graph: STRAWBERRY)
-  USER_EMAIL @join__enumValue(graph: STRAWBERRY)
-  ARTIFACT_REVISION @join__enumValue(graph: STRAWBERRY)
-}
-
-"""
-Added in 26.4.4. Filter for RBAC element type fields (scope_type / entity_type). Supports equals / in / not_equals / not_in.
-"""
-input RBACElementTypeFilter
-  @join__type(graph: STRAWBERRY)
-{
-  """Matches rows with this exact element type."""
-  equals: RBACElementType = null
-
-  """Matches rows whose element type is in this list."""
-  in: [RBACElementType!] = null
-
-  """Excludes rows with this exact element type."""
-  notEquals: RBACElementType = null
-
-  """Excludes rows whose element type is in this list."""
-  notIn: [RBACElementType!] = null
-}
-
-"""
 Added in 25.19.0. This enum represents the readiness status of a replica, indicating whether the deployment has been checked and its health state.
 """
 enum ReadinessStatus
@@ -19164,7 +19120,7 @@ Added in 26.8.0. Filter roles by the scope they are mapped (registered) to.
 input RoleMappedScopeNestedFilter
   @join__type(graph: STRAWBERRY)
 {
-  scopeType: RBACElementTypeFilter = null
+  scopeType: EntityTypeFilter = null
   scopeId: UUIDFilter = null
   AND: [RoleMappedScopeNestedFilter!] = null
   OR: [RoleMappedScopeNestedFilter!] = null
@@ -19200,7 +19156,7 @@ type RolePermissionPreset implements Node
   rolePresetId: UUID!
 
   """Entity type the permission applies to."""
-  entityType: RBACElementType!
+  entityType: String!
 
   """Operation granted by the permission."""
   operation: OperationType!
@@ -19243,7 +19199,7 @@ input RolePermissionPresetEntryInput
   @join__type(graph: STRAWBERRY)
 {
   """Entity type the permission applies to."""
-  entityType: RBACElementType!
+  entityType: String!
 
   """Operation granted by the permission."""
   operation: OperationType!
@@ -19259,7 +19215,7 @@ input RolePermissionPresetFilter
   rolePresetId: UUIDFilter = null
 
   """Filter by entity type the permission applies to."""
-  entityType: RBACElementTypeFilter = null
+  entityType: EntityTypeFilter = null
 
   """Filter by granted operation."""
   operation: OperationTypeFilter = null
@@ -19317,7 +19273,7 @@ type RolePreset implements Node
   name: String!
 
   """Scope type this preset targets (e.g., domain, project)."""
-  scopeType: RBACElementType!
+  scopeType: String!
 
   """
   Default value for the `auto_assign` flag copied onto roles instantiated from this preset.
@@ -19372,7 +19328,7 @@ input RolePresetFilter
   name: StringFilter = null
 
   """Filter by scope type."""
-  scopeType: RBACElementTypeFilter = null
+  scopeType: EntityTypeFilter = null
 
   """Filter by auto-assign flag."""
   autoAssign: Boolean = null
@@ -20502,10 +20458,10 @@ type ScopeEntityCombination
   @join__type(graph: STRAWBERRY)
 {
   """Scope element type"""
-  scopeType: RBACElementType!
+  scopeType: String!
 
   """Valid entity types for this scope type"""
-  validEntityTypes: [RBACElementType!]!
+  validEntityTypes: [String!]!
 }
 
 """
@@ -20515,7 +20471,7 @@ type ScopeEntityOperationCombination
   @join__type(graph: STRAWBERRY)
 {
   """Scope element type"""
-  scopeType: RBACElementType!
+  scopeType: String!
 
   """Entities and their valid operations within this scope"""
   entities: [EntityActionInfo!]!
@@ -20533,7 +20489,7 @@ Added in 26.4.2. Scope reference for associating an entity with a scope.
 input ScopeInput
   @join__type(graph: STRAWBERRY)
 {
-  scopeType: RBACElementType!
+  scopeType: String!
   scopeId: String!
 }
 
@@ -22516,7 +22472,7 @@ input UpdatePermissionInput
   @join__type(graph: STRAWBERRY)
 {
   id: UUID!
-  entityType: RBACElementType = null
+  entityType: String = null
   operation: OperationType = null
 }
 

@@ -35,8 +35,7 @@ from ai.backend.common.dto.manager.v2.rbac.response import (
     ReplaceRolePermissionsPayload,
 )
 from ai.backend.common.dto.manager.v2.rbac.types import (
-    RBACElementTypeDTO,
-    RBACElementTypeFilter,
+    EntityTypeFilter,
 )
 from ai.backend.manager.api.adapters.rbac.adapter import RBACAdapter
 from ai.backend.manager.api.rest.admin.handler import AdminHandler
@@ -157,7 +156,7 @@ class TestBulkAddRolePermissionsV2:
         assert isinstance(result, BulkAddRolePermissionsPayload)
         assert len(result.items) == 2
         assert result.failed == []
-        entity_ops = {(item.entity_type.value, item.operation.value) for item in result.items}
+        entity_ops = {(item.entity_type, item.operation.value) for item in result.items}
         assert entity_ops == {("session", "read"), ("image", "read")}
 
     async def test_duplicate_entry_appears_in_failed(
@@ -186,7 +185,7 @@ class TestBulkAddRolePermissionsV2:
             ),
         )
         assert len(result.items) == 1
-        assert result.items[0].entity_type.value == "agent"
+        assert result.items[0].entity_type == "agent"
         assert len(result.failed) == 1
         assert result.failed[0].entity_type == "vfolder"
         assert result.failed[0].operation == "read"
@@ -326,7 +325,7 @@ class TestReplaceRolePermissionsV2:
             ),
         )
         assert isinstance(result, ReplaceRolePermissionsPayload)
-        assert {(it.entity_type.value, it.operation.value) for it in result.items} == {
+        assert {(it.entity_type, it.operation.value) for it in result.items} == {
             ("vfolder", "read"),
             ("agent", "read"),
         }
@@ -413,12 +412,8 @@ class TestPermissionFilters:
         target_role: CreateRoleResponse,
         domain_fixture: DomainFixtureData,
     ) -> None:
-        """``PermissionRow.entity_type`` is a ``StrEnumType``-wrapped column.
-
-        ``RBACElementTypeFilter.equals`` carries an ``RBACElementTypeDTO`` enum
-        instance, which lets ``StrEnumType.process_bind_param`` accept the value
-        as-is without any column-cast workaround.
-        """
+        """``EntityTypeFilter.equals`` carries the entity type's name, which the
+        column takes as-is."""
         await admin_v2_registry.rbac.bulk_add_role_permissions(
             BulkAddRolePermissionsInput(
                 permissions=[
@@ -431,12 +426,12 @@ class TestPermissionFilters:
             AdminSearchPermissionsGQLInput(
                 filter=PermissionFilter(
                     role_id=UUIDFilter(equals=target_role.role.id),
-                    entity_type=RBACElementTypeFilter(equals=RBACElementTypeDTO.SESSION),
+                    entity_type=EntityTypeFilter(equals="session"),
                 ),
                 limit=100,
             ),
         )
-        assert {item.entity_type.value for item in result.items} == {"session"}
+        assert {item.entity_type for item in result.items} == {"session"}
 
     async def test_entity_type_in_filter(
         self,
@@ -444,7 +439,7 @@ class TestPermissionFilters:
         target_role: CreateRoleResponse,
         domain_fixture: DomainFixtureData,
     ) -> None:
-        """``RBACElementTypeFilter.in_`` returns rows whose entity_type is in the list."""
+        """``EntityTypeFilter.in_`` returns rows whose entity_type is in the list."""
         await admin_v2_registry.rbac.bulk_add_role_permissions(
             BulkAddRolePermissionsInput(
                 permissions=[
@@ -458,11 +453,9 @@ class TestPermissionFilters:
             AdminSearchPermissionsGQLInput(
                 filter=PermissionFilter(
                     role_id=UUIDFilter(equals=target_role.role.id),
-                    entity_type=RBACElementTypeFilter(
-                        in_=[RBACElementTypeDTO.SESSION, RBACElementTypeDTO.IMAGE]
-                    ),
+                    entity_type=EntityTypeFilter(in_=["session", "image"]),
                 ),
                 limit=100,
             ),
         )
-        assert {item.entity_type.value for item in result.items} == {"session", "image"}
+        assert {item.entity_type for item in result.items} == {"session", "image"}

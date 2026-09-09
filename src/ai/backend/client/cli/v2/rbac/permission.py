@@ -47,9 +47,8 @@ def search(
         PermissionOrderBy,
     )
     from ai.backend.common.dto.manager.v2.rbac.types import (
+        EntityTypeFilter,
         PermissionOrderField,
-        RBACElementTypeDTO,
-        RBACElementTypeFilter,
     )
 
     # Build filter only if any filter option is provided
@@ -57,11 +56,7 @@ def search(
     if any([role_id is not None, entity_type is not None]):
         filter_dto = PermissionFilter(
             role_id=UUIDFilter(equals=UUID(role_id)) if role_id is not None else None,
-            entity_type=(
-                RBACElementTypeFilter(equals=RBACElementTypeDTO(entity_type))
-                if entity_type is not None
-                else None
-            ),
+            entity_type=(EntityTypeFilter(equals=entity_type) if entity_type is not None else None),
         )
 
     # Build order only if --order-by is provided

@@ -15,7 +15,6 @@ from ai.backend.common.data.entity.types import EntityID, EntityType
 from .types import (
     OperationTypeDTO,
     PermissionBitDTO,
-    RBACElementTypeDTO,
     RoleSourceDTO,
     RoleStatusDTO,
 )
@@ -218,7 +217,7 @@ class PermissionNode(BaseResponseModel):
 
     id: UUID = Field(description="Permission ID")
     role_id: UUID = Field(description="Role this permission belongs to")
-    entity_type: RBACElementTypeDTO = Field(description="Entity element type")
+    entity_type: EntityType = Field(description="Entity element type")
     permission: PermissionBitDTO = Field(description="The permission bit the row holds")
     operation: OperationTypeDTO = Field(
         description="Deprecated: use `permission`. The same bit named as an action.",
@@ -285,8 +284,8 @@ class AdminSearchAssociationsPayload(BaseResponseModel):
 class ScopeEntityCombinationInfo(BaseResponseModel):
     """Valid scope-entity type combination for RBAC permissions."""
 
-    scope_type: RBACElementTypeDTO = Field(description="Scope element type")
-    valid_entity_types: list[RBACElementTypeDTO] = Field(
+    scope_type: EntityType = Field(description="Scope element type")
+    valid_entity_types: list[EntityType] = Field(
         description="Valid entity types for this scope type"
     )
 
@@ -302,14 +301,14 @@ class OperationInfo(BaseResponseModel):
 class EntityOperationCombinationInfo(BaseResponseModel):
     """Valid entity-operation combinations for RBAC actions."""
 
-    entity_type: RBACElementTypeDTO = Field(description="Entity element type")
+    entity_type: EntityType = Field(description="Entity element type")
     operations: list[OperationInfo] = Field(description="Valid operations for this entity")
 
 
 class EntityActionInfo(BaseResponseModel):
     """Entity type with its allowed actions within a specific scope."""
 
-    entity_type: RBACElementTypeDTO = Field(description="Entity element type")
+    entity_type: EntityType = Field(description="Entity element type")
     actions: list[OperationInfo] = Field(
         description="Valid operations for this entity in the given scope"
     )
@@ -318,7 +317,7 @@ class EntityActionInfo(BaseResponseModel):
 class ScopeEntityOperationCombinationInfo(BaseResponseModel):
     """Complete scope-entity-operation combination for RBAC permission matrix."""
 
-    scope_type: RBACElementTypeDTO = Field(description="Scope element type")
+    scope_type: EntityType = Field(description="Scope element type")
     entities: list[EntityActionInfo] = Field(
         description="Entities and their valid operations within this scope"
     )

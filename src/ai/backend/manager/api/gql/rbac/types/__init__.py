@@ -72,12 +72,10 @@ from .role import (
     RoleUserNestedFilterGQL,
     UpdateRoleInput,
 )
-from .scope import RBACElementTypeFilterGQL, RBACElementTypeGQL, ScopeInputGQL
+from .scope import ScopeInputGQL
 
 __all__ = [
     # Permission enums
-    "RBACElementTypeGQL",
-    "RBACElementTypeFilterGQL",
     "OperationTypeGQL",
     "OperationTypeFilterGQL",
     "PermissionOrderField",

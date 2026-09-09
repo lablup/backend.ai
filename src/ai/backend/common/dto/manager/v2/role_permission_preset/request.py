@@ -9,8 +9,8 @@ from ai.backend.common.data.entity.role_permission_preset import RolePermissionP
 from ai.backend.common.dto.manager.query import DateTimeFilter, UUIDFilter
 from ai.backend.common.dto.manager.v2.common import OrderDirection
 from ai.backend.common.dto.manager.v2.rbac.types import (
+    EntityTypeFilter,
     OperationTypeFilter,
-    RBACElementTypeFilter,
 )
 from ai.backend.common.dto.manager.v2.role_permission_preset.types import (
     RolePermissionPresetEntry,
@@ -53,7 +53,7 @@ class RolePermissionPresetFilter(BaseRequestModel):
     role_preset_id: UUIDFilter | None = Field(
         default=None, description="Filter by parent role preset ID."
     )
-    entity_type: RBACElementTypeFilter | None = Field(
+    entity_type: EntityTypeFilter | None = Field(
         default=None, description="Filter by entity type the permission applies to."
     )
     operation: OperationTypeFilter | None = Field(

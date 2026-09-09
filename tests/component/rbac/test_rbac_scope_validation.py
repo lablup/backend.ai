@@ -7,9 +7,10 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from ai.backend.common.data.entity.types import EntityType
 from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.dto.manager.v2.rbac import CreateRoleInput
-from ai.backend.common.dto.manager.v2.rbac.types import RBACElementTypeDTO, ScopeInputDTO
+from ai.backend.common.dto.manager.v2.rbac.types import ScopeInputDTO
 from ai.backend.manager.api.adapters.rbac.adapter import RBACAdapter
 from ai.backend.manager.models.rbac.exceptions import InvalidScope
 
@@ -59,9 +60,7 @@ class TestCreateRoleScopeValidation:
     async def test_rejects_email_in_user_scope(self, adapter: RBACAdapter) -> None:
         input_ = CreateRoleInput(
             name="bad-role",
-            scopes=[
-                ScopeInputDTO(scope_type=RBACElementTypeDTO.USER, scope_id="alice@example.com")
-            ],
+            scopes=[ScopeInputDTO(scope_type=EntityType("user"), scope_id="alice@example.com")],
         )
         with pytest.raises(InvalidScope):
             await adapter.create(input_)
@@ -70,7 +69,7 @@ class TestCreateRoleScopeValidation:
         input_ = CreateRoleInput(
             name="bad-role",
             scopes=[
-                ScopeInputDTO(scope_type=RBACElementTypeDTO.PROJECT, scope_id="not-a-uuid"),
+                ScopeInputDTO(scope_type=EntityType("project"), scope_id="not-a-uuid"),
             ],
         )
         with pytest.raises(InvalidScope):

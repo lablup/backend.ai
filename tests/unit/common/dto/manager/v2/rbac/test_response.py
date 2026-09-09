@@ -19,7 +19,6 @@ from ai.backend.common.dto.manager.v2.rbac.response import (
 from ai.backend.common.dto.manager.v2.rbac.types import (
     OperationTypeDTO,
     PermissionBitDTO,
-    RBACElementTypeDTO,
     RoleSourceDTO,
     RoleStatusDTO,
 )
@@ -417,7 +416,7 @@ class TestPermissionNodeBit:
         return PermissionNode(
             id=uuid.uuid4(),
             role_id=uuid.uuid4(),
-            entity_type=RBACElementTypeDTO.VFOLDER,
+            entity_type=EntityType("vfolder"),
             permission=permission,
             operation=operation,
             created_at=datetime.now(tz=UTC),
@@ -436,7 +435,7 @@ class TestPermissionNodeBit:
             PermissionNode.model_validate({
                 "id": str(uuid.uuid4()),
                 "role_id": str(uuid.uuid4()),
-                "entity_type": RBACElementTypeDTO.VFOLDER.value,
+                "entity_type": "vfolder",
                 "operation": OperationTypeDTO.READ.value,
                 "created_at": datetime.now(tz=UTC).isoformat(),
             })

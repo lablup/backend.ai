@@ -18,9 +18,9 @@ from ai.backend.manager.api.gql.rbac.types.role import (
     RoleStatusGQL,
     UpdateRoleInput,
 )
-from ai.backend.manager.api.gql.rbac.types.scope import RBACElementTypeGQL, ScopeInputGQL
+from ai.backend.manager.api.gql.rbac.types.scope import ScopeInputGQL
 
-_SCOPE = ScopeInputGQL(scope_type=RBACElementTypeGQL.PROJECT, scope_id=str(uuid.uuid4()))
+_SCOPE = ScopeInputGQL(scope_type="project", scope_id=str(uuid.uuid4()))
 
 
 class TestCreateRoleInputToPydantic:
