@@ -28,7 +28,6 @@ from ai.backend.common.dto.manager.v2.resource_preset.types import (
     ResourcePresetOrderDirection,
     ResourcePresetOrderField,
 )
-from ai.backend.common.tristate.unset import Unset
 from ai.backend.common.types import BinarySize, ResourceSlot
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.api.adapters.base import BaseAdapter
@@ -170,7 +169,9 @@ class ResourcePresetAdapter(BaseAdapter):
                 _resource_slot_entries_to_slot
             ),
             name=OptionalState.from_unset(input.name),
-            shared_memory=_resolve_shared_memory_for_update(input.shared_memory),
+            shared_memory=TriState.from_unset(input.shared_memory).map(
+                lambda v: BinarySize(v.bytes)
+            ),
             resource_group_name=TriState.from_unset(input.resource_group_name),
         )
         updater = Updater(spec=updater_spec, pk_value=input.id)
@@ -257,10 +258,3 @@ class ResourcePresetAdapter(BaseAdapter):
             ),
             resource_group_name=data.resource_group_name,
         )
-
-
-def _resolve_shared_memory_for_update(
-    shared_memory: BinarySizeInput | None | Unset,
-) -> TriState[BinarySize]:
-    """Resolve shared_memory BinarySizeInput for update operations."""
-    return TriState.from_unset(shared_memory).map(lambda v: BinarySize(v.bytes))
