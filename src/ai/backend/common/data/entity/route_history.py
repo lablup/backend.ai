@@ -21,7 +21,10 @@ class RouteHistoryFieldType(FieldType):
     @override
     @classmethod
     def description(cls) -> str:
-        return "One routing change recorded for a deployment."
+        return (
+            "One run of a route handler over one replica, recording any status change and"
+            " its result."
+        )
 
     @override
     @classmethod
