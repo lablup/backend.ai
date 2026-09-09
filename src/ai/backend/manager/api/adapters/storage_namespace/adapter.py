@@ -90,7 +90,7 @@ class StorageNamespaceAdapter(BaseAdapter):
         return [self._storage_namespace_data_to_dto(item) for item in action_result.items]
 
     async def batch_load_by_ids(
-        self, ids: Sequence[uuid.UUID]
+        self, ids: Sequence[StorageNamespaceID]
     ) -> list[StorageNamespaceNode | Exception | None]:
         """Batch load storage namespaces by id for DataLoader use.
 

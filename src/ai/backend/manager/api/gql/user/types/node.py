@@ -362,7 +362,7 @@ class UserV2GQL(PydanticNodeMixin[UserNode]):
         required: bool = False,
     ) -> Iterable[Self | None]:
         results = await info.context.data_loaders.user_loader.load_many([
-            UUID(nid) for nid in node_ids
+            UserID(UUID(nid)) for nid in node_ids
         ])
         return cast(list[Self | None], results)
 

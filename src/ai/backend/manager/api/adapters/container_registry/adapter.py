@@ -307,7 +307,7 @@ class ContainerRegistryAdapter(BaseAdapter):
         )
 
     async def batch_load_by_ids(
-        self, ids: Sequence[uuid.UUID]
+        self, ids: Sequence[ContainerRegistryID]
     ) -> list[ContainerRegistryNode | None]:
         """Batch load container registries by IDs for DataLoader use.
 

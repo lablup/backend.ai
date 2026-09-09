@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import secrets
+from collections.abc import Sequence
 from uuid import UUID
 
 from ai.backend.common.contexts.user import current_user
@@ -257,7 +258,7 @@ class VFolderAdapter(BaseAdapter):
     # Batch load (DataLoader)
     # -------------------------------------------------------------------------
 
-    async def batch_load_by_ids(self, ids: list[UUID]) -> list[VFolderNode | None]:
+    async def batch_load_by_ids(self, ids: Sequence[VFolderUUID]) -> list[VFolderNode | None]:
         """Batch fetch vfolders by IDs for GraphQL DataLoader.
 
         Used by field resolvers (e.g. ``ModelCardGQL.vfolder``) that surface a

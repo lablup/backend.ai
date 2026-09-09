@@ -288,10 +288,10 @@ class TestFieldBatchLoads:
         denial: GenericForbidden,
     ) -> None:
         deployment_adapter, processors = adapter
-        absent = uuid4()
+        absent = DeploymentTokenID(uuid4())
 
         nodes = await deployment_adapter.batch_load_access_tokens_by_ids([
-            token.id,
+            DeploymentTokenID(token.id),
             DENIED_TOKEN,
             absent,
         ])
@@ -317,7 +317,10 @@ class TestFieldBatchLoads:
             side_effect=EntityNotFoundError("No field row matches the given ids")
         )
 
-        assert await deployment_adapter.batch_load_access_tokens_by_ids([uuid4(), uuid4()]) == [
+        assert await deployment_adapter.batch_load_access_tokens_by_ids([
+            DeploymentTokenID(uuid4()),
+            DeploymentTokenID(uuid4()),
+        ]) == [
             None,
             None,
         ]
@@ -342,7 +345,7 @@ class TestFieldBatchLoads:
             return_value=OwnedFieldsOpsResult(designated={deployment_id: policy})
         )
         deployment_adapter = DeploymentAdapter(processors.deployment, MagicMock())
-        without_policy = uuid4()
+        without_policy = DeploymentID(uuid4())
 
         nodes = await deployment_adapter.batch_load_policies_by_endpoint_ids([
             deployment_id,

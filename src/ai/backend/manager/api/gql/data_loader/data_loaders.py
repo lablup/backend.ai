@@ -6,26 +6,73 @@ from typing import TYPE_CHECKING
 
 from strawberry.dataloader import DataLoader
 
-from ai.backend.common.data.entity.app_config_allow_list import AppConfigAllowListID
-from ai.backend.common.data.entity.app_config_definition import AppConfigDefinitionID
-from ai.backend.common.data.entity.app_config_fragment import AppConfigFragmentID
-from ai.backend.common.data.entity.container_registry import ContainerRegistryEntityType
+from ai.backend.common.data.entity.agent import AgentEntityType, AgentUUID
+from ai.backend.common.data.entity.app_config_allow_list import (
+    AppConfigAllowListEntityType,
+    AppConfigAllowListID,
+)
+from ai.backend.common.data.entity.app_config_definition import (
+    AppConfigDefinitionEntityType,
+    AppConfigDefinitionID,
+)
+from ai.backend.common.data.entity.app_config_fragment import (
+    AppConfigFragmentEntityType,
+    AppConfigFragmentID,
+)
+from ai.backend.common.data.entity.artifact_registry import (
+    ArtifactRegistryEntityType,
+    ArtifactRegistryID,
+)
+from ai.backend.common.data.entity.artifact_revision import ArtifactRevisionID
+from ai.backend.common.data.entity.audit_log import AuditLogID
+from ai.backend.common.data.entity.container_registry import (
+    ContainerRegistryEntityType,
+    ContainerRegistryID,
+)
 from ai.backend.common.data.entity.deployment import DeploymentEntityType, DeploymentID
+from ai.backend.common.data.entity.deployment_history import DeploymentHistoryID
+from ai.backend.common.data.entity.deployment_preset import DeploymentPresetID
+from ai.backend.common.data.entity.deployment_revision import DeploymentRevisionID
+from ai.backend.common.data.entity.deployment_token import DeploymentTokenID
 from ai.backend.common.data.entity.domain import DomainEntityType, DomainID
-from ai.backend.common.data.entity.idle_checker import IdleCheckerID
-from ai.backend.common.data.entity.image import ImageEntityType
+from ai.backend.common.data.entity.idle_checker import IdleCheckerEntityType, IdleCheckerID
+from ai.backend.common.data.entity.image import ImageEntityType, ImageID
+from ai.backend.common.data.entity.image_alias import ImageAliasID
+from ai.backend.common.data.entity.kernel import KernelID
 from ai.backend.common.data.entity.kernel_scheduling_history import KernelSchedulingHistoryID
 from ai.backend.common.data.entity.notification import (
     NotificationChannelEntityType,
+    NotificationChannelID,
     NotificationRuleEntityType,
+    NotificationRuleID,
 )
-from ai.backend.common.data.entity.project import ProjectEntityType
+from ai.backend.common.data.entity.object_storage import ObjectStorageEntityType, ObjectStorageID
+from ai.backend.common.data.entity.permission import PermissionID
+from ai.backend.common.data.entity.project import ProjectEntityType, ProjectID
+from ai.backend.common.data.entity.prometheus_query_preset import PrometheusQueryPresetID
+from ai.backend.common.data.entity.prometheus_query_preset_category import (
+    PrometheusQueryPresetCategoryID,
+)
+from ai.backend.common.data.entity.replica import ReplicaID
 from ai.backend.common.data.entity.resource_group import ResourceGroupEntityType, ResourceGroupID
-from ai.backend.common.data.entity.role import RoleEntityType
-from ai.backend.common.data.entity.session import SessionEntityType
+from ai.backend.common.data.entity.role import RoleEntityType, RoleID
+from ai.backend.common.data.entity.route_history import RouteHistoryID
+from ai.backend.common.data.entity.runtime_variant import RuntimeVariantEntityType, RuntimeVariantID
+from ai.backend.common.data.entity.runtime_variant_preset import (
+    RuntimeVariantPresetEntityType,
+    RuntimeVariantPresetID,
+)
+from ai.backend.common.data.entity.session import SessionEntityType, SessionID
+from ai.backend.common.data.entity.session_scheduling_history import SessionSchedulingHistoryID
+from ai.backend.common.data.entity.storage_namespace import (
+    StorageNamespaceEntityType,
+    StorageNamespaceID,
+)
 from ai.backend.common.data.entity.types import EntityIdentifier
-from ai.backend.common.data.entity.user import UserEntityType
-from ai.backend.common.types import AgentId, ImageID, KernelId, SessionId
+from ai.backend.common.data.entity.user import UserEntityType, UserID
+from ai.backend.common.data.entity.vfolder import VFolderEntityType, VFolderUUID
+from ai.backend.common.data.entity.vfs_storage import VFSStorageEntityType, VFSStorageID
+from ai.backend.common.types import AgentId
 from ai.backend.manager.data.permission.id import ObjectId
 
 if TYPE_CHECKING:
@@ -236,10 +283,10 @@ class DataLoaders:
     @cached_property
     def audit_log_loader(
         self,
-    ) -> DataLoader[uuid.UUID, AuditLogV2GQL | None]:
+    ) -> DataLoader[AuditLogID, AuditLogV2GQL | None]:
         adapter = self._adapters.audit_log
 
-        async def load_fn(ids: list[uuid.UUID]) -> list[AuditLogV2GQL | None]:
+        async def load_fn(ids: list[AuditLogID]) -> list[AuditLogV2GQL | None]:
             from ai.backend.manager.api.gql.audit_log.types.node import (  # pants: no-infer-dep
                 AuditLogV2GQL as AL,
             )
@@ -290,10 +337,10 @@ class DataLoaders:
     @cached_property
     def vfolder_loader(
         self,
-    ) -> DataLoader[uuid.UUID, VFolderGQL | None]:
+    ) -> DataLoader[VFolderUUID, VFolderGQL | None]:
         adapter = self._adapters.vfolder
 
-        async def load_fn(ids: list[uuid.UUID]) -> list[VFolderGQL | None]:
+        async def load_fn(ids: list[VFolderUUID]) -> list[VFolderGQL | None]:
             from ai.backend.manager.api.gql.vfolder_v2.types.node import (  # pants: no-infer-dep
                 VFolderGQL as VF,
             )
@@ -306,10 +353,12 @@ class DataLoaders:
     @cached_property
     def notification_channel_loader(
         self,
-    ) -> DataLoader[uuid.UUID, NotificationChannel | None]:
+    ) -> DataLoader[NotificationChannelID, NotificationChannel | None]:
         adapter = self._adapters.notification
 
-        async def load_fn(ids: list[uuid.UUID]) -> list[NotificationChannel | Exception | None]:
+        async def load_fn(
+            ids: list[NotificationChannelID],
+        ) -> list[NotificationChannel | Exception | None]:
             from ai.backend.manager.api.gql.notification.types import (  # pants: no-infer-dep
                 NotificationChannel as NC,
             )
@@ -325,10 +374,12 @@ class DataLoaders:
     @cached_property
     def notification_rule_loader(
         self,
-    ) -> DataLoader[uuid.UUID, NotificationRule | None]:
+    ) -> DataLoader[NotificationRuleID, NotificationRule | None]:
         adapter = self._adapters.notification
 
-        async def load_fn(ids: list[uuid.UUID]) -> list[NotificationRule | Exception | None]:
+        async def load_fn(
+            ids: list[NotificationRuleID],
+        ) -> list[NotificationRule | Exception | None]:
             from ai.backend.manager.api.gql.notification.types import (  # pants: no-infer-dep
                 NotificationRule as NR,
             )
@@ -344,10 +395,10 @@ class DataLoaders:
     @cached_property
     def artifact_registry_loader(
         self,
-    ) -> DataLoader[uuid.UUID, ArtifactRegistry | None]:
+    ) -> DataLoader[ArtifactRegistryID, ArtifactRegistry | None]:
         adapter = self._adapters.artifact_registry
 
-        async def load_fn(ids: list[uuid.UUID]) -> list[ArtifactRegistry | None]:
+        async def load_fn(ids: list[ArtifactRegistryID]) -> list[ArtifactRegistry | None]:
             from strawberry import ID  # pants: no-infer-dep
 
             from ai.backend.manager.api.gql.artifact_registry import (  # pants: no-infer-dep
@@ -372,10 +423,10 @@ class DataLoaders:
     @cached_property
     def container_registry_loader(
         self,
-    ) -> DataLoader[uuid.UUID, ContainerRegistryGQL | None]:
+    ) -> DataLoader[ContainerRegistryID, ContainerRegistryGQL | None]:
         adapter = self._adapters.container_registry
 
-        async def load_fn(ids: list[uuid.UUID]) -> list[ContainerRegistryGQL | None]:
+        async def load_fn(ids: list[ContainerRegistryID]) -> list[ContainerRegistryGQL | None]:
             from ai.backend.manager.api.gql.container_registry.types import (  # pants: no-infer-dep
                 ContainerRegistryGQL as CR,
             )
@@ -420,10 +471,12 @@ class DataLoaders:
     @cached_property
     def storage_namespace_loader(
         self,
-    ) -> DataLoader[uuid.UUID, StorageNamespace | None]:
+    ) -> DataLoader[StorageNamespaceID, StorageNamespace | None]:
         adapter = self._adapters.storage_namespace
 
-        async def load_fn(ids: list[uuid.UUID]) -> list[StorageNamespace | Exception | None]:
+        async def load_fn(
+            ids: list[StorageNamespaceID],
+        ) -> list[StorageNamespace | Exception | None]:
             from ai.backend.manager.api.gql.storage_namespace import (  # pants: no-infer-dep
                 StorageNamespace as SN,
             )
@@ -439,10 +492,10 @@ class DataLoaders:
     @cached_property
     def object_storage_loader(
         self,
-    ) -> DataLoader[uuid.UUID, ObjectStorage | None]:
+    ) -> DataLoader[ObjectStorageID, ObjectStorage | None]:
         adapter = self._adapters.object_storage
 
-        async def load_fn(ids: list[uuid.UUID]) -> list[ObjectStorage | Exception | None]:
+        async def load_fn(ids: list[ObjectStorageID]) -> list[ObjectStorage | Exception | None]:
             from ai.backend.manager.api.gql.object_storage import (  # pants: no-infer-dep
                 ObjectStorage as OS,
             )
@@ -458,10 +511,10 @@ class DataLoaders:
     @cached_property
     def vfs_storage_loader(
         self,
-    ) -> DataLoader[uuid.UUID, VFSStorage | None]:
+    ) -> DataLoader[VFSStorageID, VFSStorage | None]:
         adapter = self._adapters.vfs_storage
 
-        async def load_fn(ids: list[uuid.UUID]) -> list[VFSStorage | None]:
+        async def load_fn(ids: list[VFSStorageID]) -> list[VFSStorage | None]:
             from ai.backend.manager.api.gql.vfs_storage import (  # pants: no-infer-dep
                 VFSStorage as VS,
             )
@@ -474,10 +527,12 @@ class DataLoaders:
     @cached_property
     def artifact_revision_loader(
         self,
-    ) -> DataLoader[uuid.UUID, ArtifactRevision | None]:
+    ) -> DataLoader[ArtifactRevisionID, ArtifactRevision | None]:
         adapter = self._adapters.artifact
 
-        async def load_fn(ids: list[uuid.UUID]) -> list[ArtifactRevision | Exception | None]:
+        async def load_fn(
+            ids: list[ArtifactRevisionID],
+        ) -> list[ArtifactRevision | Exception | None]:
             from ai.backend.manager.api.gql.artifact.types import (  # pants: no-infer-dep
                 ArtifactRevision as ARev,
             )
@@ -512,15 +567,15 @@ class DataLoaders:
     @cached_property
     def deployment_loader(
         self,
-    ) -> DataLoader[uuid.UUID, ModelDeployment | None]:
+    ) -> DataLoader[DeploymentID, ModelDeployment | None]:
         adapter = self._adapters.deployment
 
-        async def load_fn(ids: list[uuid.UUID]) -> list[ModelDeployment | None]:
+        async def load_fn(ids: list[DeploymentID]) -> list[ModelDeployment | None]:
             from ai.backend.manager.api.gql.deployment.types.deployment import (  # pants: no-infer-dep
                 ModelDeployment as MD,
             )
 
-            dtos = await adapter.batch_load_by_ids([DeploymentID(i) for i in ids])
+            dtos = await adapter.batch_load_by_ids(ids)
             return [MD.from_pydantic(dto) if dto is not None else None for dto in dtos]
 
         return DataLoader(load_fn=load_fn)
@@ -528,10 +583,12 @@ class DataLoaders:
     @cached_property
     def revision_loader(
         self,
-    ) -> DataLoader[uuid.UUID, ModelRevision | None]:
+    ) -> DataLoader[DeploymentRevisionID, ModelRevision | None]:
         adapter = self._adapters.deployment
 
-        async def load_fn(ids: list[uuid.UUID]) -> list[ModelRevision | Exception | None]:
+        async def load_fn(
+            ids: list[DeploymentRevisionID],
+        ) -> list[ModelRevision | Exception | None]:
             from ai.backend.manager.api.gql.deployment.types.revision import (  # pants: no-infer-dep
                 ModelRevision as MRev,
             )
@@ -547,10 +604,12 @@ class DataLoaders:
     @cached_property
     def revision_preset_loader(
         self,
-    ) -> DataLoader[uuid.UUID, DeploymentRevisionPresetGQL | None]:
+    ) -> DataLoader[DeploymentPresetID, DeploymentRevisionPresetGQL | None]:
         adapter = self._adapters.deployment_revision_preset
 
-        async def load_fn(ids: list[uuid.UUID]) -> list[DeploymentRevisionPresetGQL | None]:
+        async def load_fn(
+            ids: list[DeploymentPresetID],
+        ) -> list[DeploymentRevisionPresetGQL | None]:
             from ai.backend.common.dto.manager.query import UUIDFilter
             from ai.backend.common.dto.manager.v2.deployment_revision_preset.request import (  # pants: no-infer-dep
                 DeploymentRevisionPresetFilter,
@@ -569,8 +628,8 @@ class DataLoaders:
                     limit=len(ids),
                 )
             )
-            node_map: dict[uuid.UUID, DeploymentRevisionPresetNode] = {
-                item.id: item for item in payload.items
+            node_map: dict[DeploymentPresetID, DeploymentRevisionPresetNode] = {
+                DeploymentPresetID(item.id): item for item in payload.items
             }
             return [DRP.from_pydantic(node) if (node := node_map.get(pid)) else None for pid in ids]
 
@@ -579,10 +638,10 @@ class DataLoaders:
     @cached_property
     def replica_loader(
         self,
-    ) -> DataLoader[uuid.UUID, ModelReplica | None]:
+    ) -> DataLoader[ReplicaID, ModelReplica | None]:
         adapter = self._adapters.deployment
 
-        async def load_fn(ids: list[uuid.UUID]) -> list[ModelReplica | Exception | None]:
+        async def load_fn(ids: list[ReplicaID]) -> list[ModelReplica | Exception | None]:
             from ai.backend.manager.api.gql.deployment.types.replica import (  # pants: no-infer-dep
                 ModelReplica as MRep,
             )
@@ -625,10 +684,10 @@ class DataLoaders:
     @cached_property
     def kernel_loader(
         self,
-    ) -> DataLoader[KernelId, KernelV2GQL | None]:
+    ) -> DataLoader[KernelID, KernelV2GQL | None]:
         adapter = self._adapters.session
 
-        async def load_fn(kernel_ids: list[KernelId]) -> list[KernelV2GQL | None]:
+        async def load_fn(kernel_ids: list[KernelID]) -> list[KernelV2GQL | None]:
             from ai.backend.manager.api.gql.kernel.types import (  # pants: no-infer-dep
                 KernelV2GQL as KG,
             )
@@ -641,10 +700,10 @@ class DataLoaders:
     @cached_property
     def session_loader(
         self,
-    ) -> DataLoader[SessionId, SessionV2GQL | None]:
+    ) -> DataLoader[SessionID, SessionV2GQL | None]:
         adapter = self._adapters.session
 
-        async def load_fn(session_ids: list[SessionId]) -> list[SessionV2GQL | None]:
+        async def load_fn(session_ids: list[SessionID]) -> list[SessionV2GQL | None]:
             from ai.backend.manager.api.gql.session.types import (  # pants: no-infer-dep
                 SessionV2GQL as SG,
             )
@@ -657,10 +716,10 @@ class DataLoaders:
     @cached_property
     def session_resource_allocation_loader(
         self,
-    ) -> DataLoader[SessionId, ResourceAllocationGQL]:
+    ) -> DataLoader[SessionID, ResourceAllocationGQL]:
         adapter = self._adapters.session
 
-        async def load_fn(session_ids: list[SessionId]) -> list[ResourceAllocationGQL]:
+        async def load_fn(session_ids: list[SessionID]) -> list[ResourceAllocationGQL]:
             from ai.backend.manager.api.gql.kernel.types import (  # pants: no-infer-dep
                 ResourceAllocationGQL as RA,
             )
@@ -673,10 +732,10 @@ class DataLoaders:
     @cached_property
     def kernel_resource_allocation_loader(
         self,
-    ) -> DataLoader[KernelId, ResourceAllocationGQL]:
+    ) -> DataLoader[KernelID, ResourceAllocationGQL]:
         adapter = self._adapters.session
 
-        async def load_fn(kernel_ids: list[KernelId]) -> list[ResourceAllocationGQL]:
+        async def load_fn(kernel_ids: list[KernelID]) -> list[ResourceAllocationGQL]:
             from ai.backend.manager.api.gql.kernel.types import (  # pants: no-infer-dep
                 ResourceAllocationGQL as RA,
             )
@@ -689,11 +748,11 @@ class DataLoaders:
     @cached_property
     def image_alias_loader(
         self,
-    ) -> DataLoader[uuid.UUID, ImageV2AliasGQL | None]:
+    ) -> DataLoader[ImageAliasID, ImageV2AliasGQL | None]:
         """Load a single alias by its own ID (ImageAliasRow.id)."""
         adapter = self._adapters.image
 
-        async def load_fn(ids: list[uuid.UUID]) -> list[ImageV2AliasGQL | None]:
+        async def load_fn(ids: list[ImageAliasID]) -> list[ImageV2AliasGQL | None]:
             from ai.backend.manager.api.gql.image.types import (  # pants: no-infer-dep
                 ImageV2AliasGQL as IAG,
             )
@@ -706,10 +765,10 @@ class DataLoaders:
     @cached_property
     def user_loader(
         self,
-    ) -> DataLoader[uuid.UUID, UserV2GQL | None]:
+    ) -> DataLoader[UserID, UserV2GQL | None]:
         adapter = self._adapters.user
 
-        async def load_fn(ids: list[uuid.UUID]) -> list[UserV2GQL | None]:
+        async def load_fn(ids: list[UserID]) -> list[UserV2GQL | None]:
             from ai.backend.manager.api.gql.user.types.node import (  # pants: no-infer-dep
                 UserV2GQL as U,
             )
@@ -760,10 +819,10 @@ class DataLoaders:
     @cached_property
     def project_loader(
         self,
-    ) -> DataLoader[uuid.UUID, ProjectV2GQL | None]:
+    ) -> DataLoader[ProjectID, ProjectV2GQL | None]:
         adapter = self._adapters.project
 
-        async def load_fn(ids: list[uuid.UUID]) -> list[ProjectV2GQL | None]:
+        async def load_fn(ids: list[ProjectID]) -> list[ProjectV2GQL | None]:
             from ai.backend.manager.api.gql.project_v2.types.node import (  # pants: no-infer-dep
                 ProjectV2GQL as PG,
             )
@@ -793,6 +852,25 @@ class DataLoaders:
         return DataLoader(load_fn=load_fn)
 
     @cached_property
+    def agent_by_uuid_loader(
+        self,
+    ) -> DataLoader[AgentUUID, AgentV2GQL | None]:
+        adapter = self._adapters.agent
+
+        async def load_fn(agent_uuids: list[AgentUUID]) -> list[AgentV2GQL | Exception | None]:
+            from ai.backend.manager.api.gql.agent.types import (  # pants: no-infer-dep
+                AgentV2GQL as AG,
+            )
+
+            dtos = await adapter.batch_load_by_uuids(agent_uuids)
+            return [
+                dto if dto is None or isinstance(dto, Exception) else AG.from_pydantic(dto)
+                for dto in dtos
+            ]
+
+        return DataLoader(load_fn=load_fn)
+
+    @cached_property
     def auto_scaling_rule_loader(
         self,
     ) -> DataLoader[uuid.UUID, AutoScalingRule | None]:
@@ -811,10 +889,10 @@ class DataLoaders:
     @cached_property
     def access_token_loader(
         self,
-    ) -> DataLoader[uuid.UUID, AccessToken | None]:
+    ) -> DataLoader[DeploymentTokenID, AccessToken | None]:
         adapter = self._adapters.deployment
 
-        async def load_fn(ids: list[uuid.UUID]) -> list[AccessToken | Exception | None]:
+        async def load_fn(ids: list[DeploymentTokenID]) -> list[AccessToken | Exception | None]:
             from ai.backend.manager.api.gql.deployment.types.access_token import (  # pants: no-infer-dep
                 AccessToken as AT,
             )
@@ -830,10 +908,10 @@ class DataLoaders:
     @cached_property
     def deployment_policy_by_endpoint_loader(
         self,
-    ) -> DataLoader[uuid.UUID, DeploymentPolicyGQL | None]:
+    ) -> DataLoader[DeploymentID, DeploymentPolicyGQL | None]:
         adapter = self._adapters.deployment
 
-        async def load_fn(ids: list[uuid.UUID]) -> list[DeploymentPolicyGQL | None]:
+        async def load_fn(ids: list[DeploymentID]) -> list[DeploymentPolicyGQL | None]:
             from ai.backend.manager.api.gql.deployment.types.policy import (  # pants: no-infer-dep
                 DeploymentPolicyGQL as DP,
             )
@@ -846,11 +924,11 @@ class DataLoaders:
     @cached_property
     def session_history_loader(
         self,
-    ) -> DataLoader[uuid.UUID, SessionSchedulingHistory | None]:
+    ) -> DataLoader[SessionSchedulingHistoryID, SessionSchedulingHistory | None]:
         adapter = self._adapters.scheduling_history
 
         async def load_fn(
-            ids: list[uuid.UUID],
+            ids: list[SessionSchedulingHistoryID],
         ) -> list[SessionSchedulingHistory | Exception | None]:
             from ai.backend.manager.api.gql.scheduling_history.types import (  # pants: no-infer-dep
                 SessionSchedulingHistory as SSH,
@@ -888,10 +966,12 @@ class DataLoaders:
     @cached_property
     def deployment_history_loader(
         self,
-    ) -> DataLoader[uuid.UUID, DeploymentHistory | None]:
+    ) -> DataLoader[DeploymentHistoryID, DeploymentHistory | None]:
         adapter = self._adapters.scheduling_history
 
-        async def load_fn(ids: list[uuid.UUID]) -> list[DeploymentHistory | Exception | None]:
+        async def load_fn(
+            ids: list[DeploymentHistoryID],
+        ) -> list[DeploymentHistory | Exception | None]:
             from ai.backend.manager.api.gql.scheduling_history.types import (  # pants: no-infer-dep
                 DeploymentHistory as DH,
             )
@@ -907,10 +987,10 @@ class DataLoaders:
     @cached_property
     def route_history_loader(
         self,
-    ) -> DataLoader[uuid.UUID, RouteHistory | None]:
+    ) -> DataLoader[RouteHistoryID, RouteHistory | None]:
         adapter = self._adapters.scheduling_history
 
-        async def load_fn(ids: list[uuid.UUID]) -> list[RouteHistory | Exception | None]:
+        async def load_fn(ids: list[RouteHistoryID]) -> list[RouteHistory | Exception | None]:
             from ai.backend.manager.api.gql.scheduling_history.types import (  # pants: no-infer-dep
                 RouteHistory as RH,
             )
@@ -926,10 +1006,10 @@ class DataLoaders:
     @cached_property
     def role_loader(
         self,
-    ) -> DataLoader[uuid.UUID, RoleGQL | None]:
+    ) -> DataLoader[RoleID, RoleGQL | None]:
         adapter = self._adapters.rbac
 
-        async def load_fn(ids: list[uuid.UUID]) -> list[RoleGQL | None]:
+        async def load_fn(ids: list[RoleID]) -> list[RoleGQL | None]:
             from ai.backend.manager.api.gql.rbac.types.role import (  # pants: no-infer-dep
                 RoleGQL as RG,
             )
@@ -942,10 +1022,10 @@ class DataLoaders:
     @cached_property
     def permission_loader(
         self,
-    ) -> DataLoader[uuid.UUID, PermissionGQL | None]:
+    ) -> DataLoader[PermissionID, PermissionGQL | None]:
         adapter = self._adapters.rbac
 
-        async def load_fn(ids: list[uuid.UUID]) -> list[PermissionGQL | None]:
+        async def load_fn(ids: list[PermissionID]) -> list[PermissionGQL | None]:
             from ai.backend.manager.api.gql.rbac.types.permission import (  # pants: no-infer-dep
                 PermissionGQL as PG,
             )
@@ -958,10 +1038,10 @@ class DataLoaders:
     @cached_property
     def permissions_by_role_loader(
         self,
-    ) -> DataLoader[uuid.UUID, list[PermissionGQL]]:
+    ) -> DataLoader[RoleID, list[PermissionGQL]]:
         adapter = self._adapters.rbac
 
-        async def load_fn(role_ids: list[uuid.UUID]) -> list[list[PermissionGQL]]:
+        async def load_fn(role_ids: list[RoleID]) -> list[list[PermissionGQL]]:
             from ai.backend.manager.api.gql.rbac.types.permission import (  # pants: no-infer-dep
                 PermissionGQL as PG,
             )
@@ -990,11 +1070,11 @@ class DataLoaders:
     @cached_property
     def role_assignment_by_role_and_user_loader(
         self,
-    ) -> DataLoader[tuple[uuid.UUID, uuid.UUID], RoleAssignmentGQL | None]:
+    ) -> DataLoader[tuple[RoleID, UserID], RoleAssignmentGQL | None]:
         adapter = self._adapters.rbac
 
         async def load_fn(
-            pairs: list[tuple[uuid.UUID, uuid.UUID]],
+            pairs: list[tuple[RoleID, UserID]],
         ) -> list[RoleAssignmentGQL | None]:
             from ai.backend.manager.api.gql.rbac.types.role import (  # pants: no-infer-dep
                 RoleAssignmentGQL as RAG,
@@ -1008,10 +1088,10 @@ class DataLoaders:
     @cached_property
     def role_assignments_by_user_loader(
         self,
-    ) -> DataLoader[uuid.UUID, list[RoleAssignmentGQL]]:
+    ) -> DataLoader[UserID, list[RoleAssignmentGQL]]:
         adapter = self._adapters.rbac
 
-        async def load_fn(user_ids: list[uuid.UUID]) -> list[list[RoleAssignmentGQL]]:
+        async def load_fn(user_ids: list[UserID]) -> list[list[RoleAssignmentGQL]]:
             from ai.backend.manager.api.gql.rbac.types.role import (  # pants: no-infer-dep
                 RoleAssignmentGQL as RAG,
             )
@@ -1053,10 +1133,10 @@ class DataLoaders:
     @cached_property
     def assignments_by_role_loader(
         self,
-    ) -> DataLoader[uuid.UUID, list[RoleAssignmentGQL]]:
+    ) -> DataLoader[RoleID, list[RoleAssignmentGQL]]:
         adapter = self._adapters.rbac
 
-        async def load_fn(role_ids: list[uuid.UUID]) -> list[list[RoleAssignmentGQL]]:
+        async def load_fn(role_ids: list[RoleID]) -> list[list[RoleAssignmentGQL]]:
             from ai.backend.manager.api.gql.rbac.types.role import (  # pants: no-infer-dep
                 RoleAssignmentGQL as RAG,
             )
@@ -1071,10 +1151,12 @@ class DataLoaders:
     @cached_property
     def runtime_variant_loader(
         self,
-    ) -> DataLoader[uuid.UUID, RuntimeVariantGQL | None]:
+    ) -> DataLoader[RuntimeVariantID, RuntimeVariantGQL | None]:
         adapter = self._adapters.runtime_variant
 
-        async def load_fn(ids: list[uuid.UUID]) -> list[RuntimeVariantGQL | Exception | None]:
+        async def load_fn(
+            ids: list[RuntimeVariantID],
+        ) -> list[RuntimeVariantGQL | Exception | None]:
             from ai.backend.manager.api.gql.runtime_variant.types import (  # pants: no-infer-dep
                 RuntimeVariantGQL as RV,
             )
@@ -1090,10 +1172,12 @@ class DataLoaders:
     @cached_property
     def runtime_variant_preset_loader(
         self,
-    ) -> DataLoader[uuid.UUID, RuntimeVariantPresetGQL | None]:
+    ) -> DataLoader[RuntimeVariantPresetID, RuntimeVariantPresetGQL | None]:
         adapter = self._adapters.runtime_variant_preset
 
-        async def load_fn(ids: list[uuid.UUID]) -> list[RuntimeVariantPresetGQL | None]:
+        async def load_fn(
+            ids: list[RuntimeVariantPresetID],
+        ) -> list[RuntimeVariantPresetGQL | None]:
             from ai.backend.manager.api.gql.runtime_variant_preset.types import (  # pants: no-infer-dep
                 RuntimeVariantPresetGQL as RVP,
             )
@@ -1106,10 +1190,10 @@ class DataLoaders:
     @cached_property
     def query_definition_loader(
         self,
-    ) -> DataLoader[uuid.UUID, QueryDefinitionGQL | None]:
+    ) -> DataLoader[PrometheusQueryPresetID, QueryDefinitionGQL | None]:
         adapter = self._adapters.prometheus_query_preset
 
-        async def load_fn(ids: list[uuid.UUID]) -> list[QueryDefinitionGQL | None]:
+        async def load_fn(ids: list[PrometheusQueryPresetID]) -> list[QueryDefinitionGQL | None]:
             from ai.backend.manager.api.gql.prometheus_query_preset.types.node import (  # pants: no-infer-dep
                 QueryDefinitionGQL as QD,
             )
@@ -1122,10 +1206,12 @@ class DataLoaders:
     @cached_property
     def category_loader(
         self,
-    ) -> DataLoader[uuid.UUID, CategoryGQL | None]:
+    ) -> DataLoader[PrometheusQueryPresetCategoryID, CategoryGQL | None]:
         adapter = self._adapters.prometheus_query_preset_category
 
-        async def load_fn(ids: list[uuid.UUID]) -> list[CategoryGQL | Exception | None]:
+        async def load_fn(
+            ids: list[PrometheusQueryPresetCategoryID],
+        ) -> list[CategoryGQL | Exception | None]:
             from ai.backend.manager.api.gql.prometheus_query_preset.types.category import (  # pants: no-infer-dep
                 CategoryGQL as CG,
             )
@@ -1155,30 +1241,56 @@ class DataLoaders:
         return DataLoader(load_fn=load_fn)
 
     async def _entity_node(self, entity_id: EntityIdentifier) -> EntityNodeGQL | None:
-        from ai.backend.common.types import ImageID, SessionId
-
         match entity_id.entity_type():
-            case UserEntityType():
-                return await self.user_loader.load(entity_id)
-            case ProjectEntityType():
-                return await self.project_loader.load(entity_id)
+            case AgentEntityType():
+                return await self.agent_by_uuid_loader.load(AgentUUID(entity_id))
+            case AppConfigAllowListEntityType():
+                return await self.app_config_allow_list_loader.load(AppConfigAllowListID(entity_id))
+            case AppConfigDefinitionEntityType():
+                return await self.app_config_definition_loader.load(
+                    AppConfigDefinitionID(entity_id)
+                )
+            case AppConfigFragmentEntityType():
+                return await self.app_config_fragment_loader.load(AppConfigFragmentID(entity_id))
+            case ArtifactRegistryEntityType():
+                return await self.artifact_registry_loader.load(ArtifactRegistryID(entity_id))
+            case ContainerRegistryEntityType():
+                return await self.container_registry_loader.load(ContainerRegistryID(entity_id))
+            case DeploymentEntityType():
+                return await self.deployment_loader.load(DeploymentID(entity_id))
             case DomainEntityType():
                 return await self.domain_by_id_loader.load(DomainID(entity_id))
-            case RoleEntityType():
-                return await self.role_loader.load(entity_id)
+            case IdleCheckerEntityType():
+                return await self.idle_checker_loader.load(IdleCheckerID(entity_id))
             case ImageEntityType():
                 return await self.image_loader.load(ImageID(entity_id))
-            case DeploymentEntityType():
-                return await self.deployment_loader.load(entity_id)
+            case NotificationChannelEntityType():
+                return await self.notification_channel_loader.load(NotificationChannelID(entity_id))
+            case NotificationRuleEntityType():
+                return await self.notification_rule_loader.load(NotificationRuleID(entity_id))
+            case ObjectStorageEntityType():
+                return await self.object_storage_loader.load(ObjectStorageID(entity_id))
+            case ProjectEntityType():
+                return await self.project_loader.load(ProjectID(entity_id))
             case ResourceGroupEntityType():
                 return await self.resource_group_by_id_loader.load(ResourceGroupID(entity_id))
-            case NotificationChannelEntityType():
-                return await self.notification_channel_loader.load(entity_id)
-            case NotificationRuleEntityType():
-                return await self.notification_rule_loader.load(entity_id)
-            case ContainerRegistryEntityType():
-                return await self.container_registry_loader.load(entity_id)
+            case RoleEntityType():
+                return await self.role_loader.load(RoleID(entity_id))
+            case RuntimeVariantEntityType():
+                return await self.runtime_variant_loader.load(RuntimeVariantID(entity_id))
+            case RuntimeVariantPresetEntityType():
+                return await self.runtime_variant_preset_loader.load(
+                    RuntimeVariantPresetID(entity_id)
+                )
             case SessionEntityType():
-                return await self.session_loader.load(SessionId(entity_id))
+                return await self.session_loader.load(SessionID(entity_id))
+            case StorageNamespaceEntityType():
+                return await self.storage_namespace_loader.load(StorageNamespaceID(entity_id))
+            case UserEntityType():
+                return await self.user_loader.load(UserID(entity_id))
+            case VFolderEntityType():
+                return await self.vfolder_loader.load(VFolderUUID(entity_id))
+            case VFSStorageEntityType():
+                return await self.vfs_storage_loader.load(VFSStorageID(entity_id))
             case _:
                 return None

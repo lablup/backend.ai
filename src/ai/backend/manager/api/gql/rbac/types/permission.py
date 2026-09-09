@@ -12,6 +12,8 @@ import strawberry
 from strawberry import Info
 from strawberry.relay import Connection, Edge, NodeID
 
+from ai.backend.common.data.entity.permission import PermissionID
+from ai.backend.common.data.entity.role import RoleID
 from ai.backend.common.dto.manager.v2.rbac.request import (
     BulkAddRolePermissionsInput as BulkAddRolePermissionsInputDTO,
 )
@@ -176,7 +178,7 @@ class PermissionGQL(PydanticNodeMixin[PermissionNodeDTO]):
     ) -> Iterable[Self | None]:
         # DataLoader already returns PermissionGQL | None via from_pydantic conversion
         results = await info.context.data_loaders.permission_loader.load_many([
-            UUID(nid) for nid in node_ids
+            PermissionID(UUID(nid)) for nid in node_ids
         ])
         return cast(list[Self | None], results)
 
@@ -191,7 +193,7 @@ class PermissionGQL(PydanticNodeMixin[PermissionNodeDTO]):
         | None
     ):
         # DataLoader already returns RoleGQL | None via from_pydantic conversion
-        return await info.context.data_loaders.role_loader.load(self.role_id)
+        return await info.context.data_loaders.role_loader.load(RoleID(self.role_id))
 
 
 # ==================== Filter Types ====================

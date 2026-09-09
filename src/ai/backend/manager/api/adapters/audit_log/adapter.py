@@ -60,7 +60,7 @@ class AuditLogAdapter(BaseAdapter):
     def __init__(self, audit_log: AuditLogProcessors) -> None:
         self._audit_log = audit_log
 
-    async def batch_load_by_ids(self, ids: Sequence[uuid.UUID]) -> list[AuditLogNode | None]:
+    async def batch_load_by_ids(self, ids: Sequence[AuditLogID]) -> list[AuditLogNode | None]:
         """Batch load audit logs by their IDs for DataLoader use.
 
         Returns AuditLogNode DTOs in the same order as the input ids list.

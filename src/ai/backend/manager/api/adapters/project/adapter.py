@@ -139,7 +139,7 @@ class ProjectAdapter(BaseAdapter):
 
     # ------------------------------------------------------------------ batch load (DataLoader)
 
-    async def batch_load_by_ids(self, group_ids: Sequence[UUID]) -> list[ProjectNode | None]:
+    async def batch_load_by_ids(self, group_ids: Sequence[ProjectID]) -> list[ProjectNode | None]:
         """Batch load projects by UUID for DataLoader use.
 
         Returns ProjectNode DTOs in the same order as the input group_ids list.

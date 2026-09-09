@@ -143,7 +143,9 @@ class RuntimeVariantPresetAdapter(BaseAdapter):
         )
         return self._data_to_node(result.data)
 
-    async def batch_load_by_ids(self, ids: Sequence[UUID]) -> list[RuntimeVariantPresetNode | None]:
+    async def batch_load_by_ids(
+        self, ids: Sequence[RuntimeVariantPresetID]
+    ) -> list[RuntimeVariantPresetNode | None]:
         """Batch-load presets by id, aligned to ``ids`` order (``None`` for missing)."""
         if not ids:
             return []

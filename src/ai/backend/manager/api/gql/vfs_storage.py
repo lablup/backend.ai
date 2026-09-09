@@ -8,6 +8,7 @@ import strawberry
 from strawberry import ID, UNSET, Info
 from strawberry.relay import Connection, Edge, NodeID
 
+from ai.backend.common.data.entity.vfs_storage import VFSStorageID
 from ai.backend.common.dto.manager.v2.vfs_storage.request import (
     CreateVFSStorageInput as CreateVFSStorageInputDTO,
 )
@@ -71,7 +72,7 @@ class VFSStorage(PydanticNodeMixin[VFSStorageNode]):
         required: bool = False,
     ) -> Iterable[Self | None]:
         results = await info.context.data_loaders.vfs_storage_loader.load_many([
-            UUID(nid) for nid in node_ids
+            VFSStorageID(UUID(nid)) for nid in node_ids
         ])
         return cast(list[Self | None], results)
 

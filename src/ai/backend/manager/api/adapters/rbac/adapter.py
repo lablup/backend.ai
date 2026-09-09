@@ -376,7 +376,7 @@ class RBACAdapter(BaseAdapter):
 
     # ------------------------------------------------------------------ batch load (DataLoader)
 
-    async def batch_load_roles_by_ids(self, role_ids: Sequence[UUID]) -> list[RoleNode | None]:
+    async def batch_load_roles_by_ids(self, role_ids: Sequence[RoleID]) -> list[RoleNode | None]:
         """Batch load roles by ID for DataLoader use.
 
         Returns RoleNode DTOs in the same order as the input role_ids list.
@@ -398,7 +398,7 @@ class RBACAdapter(BaseAdapter):
         return [role_map.get(role_id) for role_id in role_ids]
 
     async def batch_load_permissions_by_ids(
-        self, permission_ids: Sequence[UUID]
+        self, permission_ids: Sequence[PermissionID]
     ) -> list[PermissionNode | None]:
         """Batch load permissions by ID for DataLoader use.
 
@@ -491,7 +491,7 @@ class RBACAdapter(BaseAdapter):
         return [association_map.get(aid) for aid in association_ids]
 
     async def batch_load_permissions_by_role_ids(
-        self, role_ids: Sequence[UUID]
+        self, role_ids: Sequence[RoleID]
     ) -> list[list[PermissionNode]]:
         """Batch load permissions grouped by role_id for DataLoader use.
 
@@ -514,7 +514,7 @@ class RBACAdapter(BaseAdapter):
         return [result_map.get(role_id, []) for role_id in role_ids]
 
     async def batch_load_role_assignments_by_user_ids(
-        self, user_ids: Sequence[UUID]
+        self, user_ids: Sequence[UserID]
     ) -> list[list[RoleAssignmentNode]]:
         """Batch load role assignments grouped by user_id for DataLoader use.
 
@@ -537,7 +537,7 @@ class RBACAdapter(BaseAdapter):
         return [result_map.get(user_id, []) for user_id in user_ids]
 
     async def batch_load_assignments_by_role_ids(
-        self, role_ids: Sequence[UUID]
+        self, role_ids: Sequence[RoleID]
     ) -> list[list[RoleAssignmentNode]]:
         """Batch load role assignments grouped by role_id for DataLoader use.
 

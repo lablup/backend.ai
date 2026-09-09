@@ -170,7 +170,7 @@ class NotificationAdapter(BaseAdapter):
         self._notification = notification
 
     async def batch_load_channels_by_ids(
-        self, ids: Sequence[UUID]
+        self, ids: Sequence[NotificationChannelID]
     ) -> list[NotificationChannelNode | Exception | None]:
         """Batch load notification channels by ID for DataLoader use, checked per channel."""
         if not ids:
@@ -186,7 +186,7 @@ class NotificationAdapter(BaseAdapter):
         ]
 
     async def batch_load_rules_by_ids(
-        self, ids: Sequence[UUID]
+        self, ids: Sequence[NotificationRuleID]
     ) -> list[NotificationRuleNode | Exception | None]:
         """Batch load notification rules by ID for DataLoader use, checked per rule."""
         if not ids:

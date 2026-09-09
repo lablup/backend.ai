@@ -13,6 +13,8 @@ import strawberry.relay
 from strawberry import UNSET, Info
 from strawberry.relay import Connection, Edge, NodeID
 
+from ai.backend.common.data.entity.role import RoleID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.dto.manager.v2.rbac.request import (
     AdminSearchEntitiesGQLInput,
     AdminSearchPermissionsGQLInput,
@@ -196,7 +198,7 @@ class RoleGQL(PydanticNodeMixin[Any]):
     ) -> Iterable[Self | None]:
         # DataLoader already returns RoleGQL | None via from_pydantic conversion
         results = await info.context.data_loaders.role_loader.load_many([
-            UUID(nid) for nid in node_ids
+            RoleID(UUID(nid)) for nid in node_ids
         ])
         return cast(list[Self | None], results)
 
@@ -451,7 +453,7 @@ class RoleAssignmentGQL(PydanticNodeMixin[RoleAssignmentNode]):
     @gql_field(description="The assigned role.")  # type: ignore[misc]
     async def role(self, info: Info[StrawberryGQLContext]) -> RoleGQL | None:
         # DataLoader already returns RoleGQL | None via from_pydantic conversion
-        return await info.context.data_loaders.role_loader.load(self.role_id)
+        return await info.context.data_loaders.role_loader.load(RoleID(self.role_id))
 
     @gql_field(description="The assigned user.")  # type: ignore[misc]
     async def user(
@@ -464,7 +466,7 @@ class RoleAssignmentGQL(PydanticNodeMixin[RoleAssignmentNode]):
         | None
     ):
         # DataLoader already returns UserV2GQL | None via from_pydantic conversion
-        return await info.context.data_loaders.user_loader.load(self.user_id)
+        return await info.context.data_loaders.user_loader.load(UserID(self.user_id))
 
     @gql_added_field(
         BackendAIGQLMeta(
@@ -484,7 +486,7 @@ class RoleAssignmentGQL(PydanticNodeMixin[RoleAssignmentNode]):
     ):
         if self.granted_by is None:
             return None
-        return await info.context.data_loaders.user_loader.load(self.granted_by)
+        return await info.context.data_loaders.user_loader.load(UserID(self.granted_by))
 
 
 # ==================== Filter Types ====================

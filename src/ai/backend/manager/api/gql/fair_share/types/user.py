@@ -12,6 +12,8 @@ import strawberry
 from strawberry import Info
 from strawberry.relay import Connection, Edge, NodeID
 
+from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.dto.manager.v2.fair_share.request import (
     BulkUpsertUserFairShareWeightInput as BulkUpsertUserFairShareWeightInputDTO,
 )
@@ -108,7 +110,7 @@ class UserFairShareGQL(PydanticNodeMixin[UserFairShareNode]):
         ]
         | None
     ):
-        user_data = await info.context.data_loaders.user_loader.load(self.user_uuid)
+        user_data = await info.context.data_loaders.user_loader.load(UserID(self.user_uuid))
         if user_data is None:
             return None
         return user_data
@@ -147,7 +149,9 @@ class UserFairShareGQL(PydanticNodeMixin[UserFairShareNode]):
         ]
         | None
     ):
-        project_data = await info.context.data_loaders.project_loader.load(self.project_id)
+        project_data = await info.context.data_loaders.project_loader.load(
+            ProjectID(self.project_id)
+        )
         if project_data is None:
             return None
         return project_data
