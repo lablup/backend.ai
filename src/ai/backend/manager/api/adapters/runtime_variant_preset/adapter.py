@@ -68,6 +68,9 @@ from ai.backend.manager.services.runtime_variant_preset.actions.search import (
 from ai.backend.manager.services.runtime_variant_preset.actions.update import (
     UpdateRuntimeVariantPresetAction,
 )
+from ai.backend.manager.services.runtime_variant_preset.processors import (
+    RuntimeVariantPresetProcessors,
+)
 from ai.backend.manager.types import OptionalState, TriState
 
 
@@ -100,6 +103,11 @@ def _convert_ui_option_data(opt: UIOptionData | None) -> UIOption | None:
 
 
 class RuntimeVariantPresetAdapter(BaseAdapter):
+    _runtime_variant_preset: RuntimeVariantPresetProcessors
+
+    def __init__(self, runtime_variant_preset: RuntimeVariantPresetProcessors) -> None:
+        self._runtime_variant_preset = runtime_variant_preset
+
     async def search(
         self,
         input: SearchRuntimeVariantPresetsInput,
@@ -118,7 +126,7 @@ class RuntimeVariantPresetAdapter(BaseAdapter):
             limit=input.limit,
             offset=input.offset,
         )
-        result = await self._processors.runtime_variant_preset.public_search.run(
+        result = await self._runtime_variant_preset.public_search.run(
             SearchRuntimeVariantPresetsAction(searcher=searcher)
         )
         return SearchRuntimeVariantPresetsPayload(
@@ -129,7 +137,7 @@ class RuntimeVariantPresetAdapter(BaseAdapter):
         )
 
     async def get(self, preset_id: UUID) -> RuntimeVariantPresetNode:
-        result = await self._processors.runtime_variant_preset.public_get.run(
+        result = await self._runtime_variant_preset.public_get.run(
             GetRuntimeVariantPresetAction(preset_id=RuntimeVariantPresetID(preset_id))
         )
         return self._data_to_node(result.data)
@@ -142,7 +150,7 @@ class RuntimeVariantPresetAdapter(BaseAdapter):
             pagination=OffsetPagination(limit=len(ids)),
             conditions=[RuntimeVariantPresetConditions.by_ids(ids)],
         )
-        result = await self._processors.runtime_variant_preset.public_search.run(
+        result = await self._runtime_variant_preset.public_search.run(
             SearchRuntimeVariantPresetsAction(searcher=searcher)
         )
         node_map = {item.id: self._data_to_node(item) for item in result.items}
@@ -165,7 +173,7 @@ class RuntimeVariantPresetAdapter(BaseAdapter):
             display_name=input.display_name,
             ui_option=input.ui_option,
         )
-        result = await self._processors.runtime_variant_preset.global_create.run(
+        result = await self._runtime_variant_preset.global_create.run(
             CreateRuntimeVariantPresetAction(creator=creator)
         )
         return CreateRuntimeVariantPresetPayload(preset=self._data_to_node(result.data))
@@ -188,13 +196,13 @@ class RuntimeVariantPresetAdapter(BaseAdapter):
             display_name=TriState.from_unset(input.display_name),
             ui_option=TriState.from_unset(input.ui_option),
         )
-        result = await self._processors.runtime_variant_preset.update.run(
+        result = await self._runtime_variant_preset.update.run(
             UpdateRuntimeVariantPresetAction(updater=updater)
         )
         return UpdateRuntimeVariantPresetPayload(preset=self._data_to_node(result.preset))
 
     async def delete(self, preset_id: UUID) -> DeleteRuntimeVariantPresetPayload:
-        result = await self._processors.runtime_variant_preset.purge.run(
+        result = await self._runtime_variant_preset.purge.run(
             PurgeRuntimeVariantPresetAction(id=RuntimeVariantPresetID(preset_id))
         )
         return DeleteRuntimeVariantPresetPayload(id=result.data.id)

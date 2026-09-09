@@ -7,7 +7,6 @@ from collections.abc import Sequence
 from decimal import Decimal
 from functools import lru_cache
 
-from ai.backend.common.api_handlers import Sentinel
 from ai.backend.common.data.entity.artifact_registry import ArtifactRegistryID
 from ai.backend.common.dto.manager.v2.image.request import (
     AdminSearchImageAliasesInput,
@@ -70,6 +69,7 @@ from ai.backend.manager.services.image.actions.restore_image import RestoreImage
 from ai.backend.manager.services.image.actions.search_aliases import SearchAliasesAction
 from ai.backend.manager.services.image.actions.search_images import SearchImagesAction
 from ai.backend.manager.services.image.actions.update_image_by_id import UpdateImageByIdAction
+from ai.backend.manager.services.image.processors import ImageProcessors
 from ai.backend.manager.types import OptionalState, TriState
 
 DEFAULT_PAGINATION_LIMIT = 50
@@ -102,6 +102,11 @@ def _get_alias_pagination_spec() -> PaginationSpec:
 class ImageAdapter(BaseAdapter):
     """Adapter for image domain operations."""
 
+    _image: ImageProcessors
+
+    def __init__(self, image: ImageProcessors) -> None:
+        self._image = image
+
     # ------------------------------------------------------------------ batch load (DataLoader)
 
     async def batch_load_by_ids(self, image_ids: Sequence[ImageID]) -> list[ImageNode | None]:
@@ -115,9 +120,7 @@ class ImageAdapter(BaseAdapter):
             pagination=NoPagination(),
             conditions=[ImageConditions.by_ids(image_ids)],
         )
-        action_result = await self._processors.image.search_images.run(
-            SearchImagesAction(querier=querier)
-        )
+        action_result = await self._image.search_images.run(SearchImagesAction(querier=querier))
         image_map: dict[ImageID, ImageNode] = {
             ImageID(item.id): self._data_to_dto(item) for item in action_result.data
         }
@@ -136,9 +139,7 @@ class ImageAdapter(BaseAdapter):
             pagination=NoPagination(),
             conditions=[ImageAliasConditions.by_ids(alias_ids)],
         )
-        action_result = await self._processors.image.search_aliases.run(
-            SearchAliasesAction(querier=querier)
-        )
+        action_result = await self._image.search_aliases.run(SearchAliasesAction(querier=querier))
         alias_map: dict[uuid.UUID, ImageAliasNode] = {
             item.id: self._alias_data_to_dto(item) for item in action_result.data
         }
@@ -150,9 +151,7 @@ class ImageAdapter(BaseAdapter):
         """Search images with admin scope using offset pagination."""
         querier = self._build_offset_querier(input)
 
-        action_result = await self._processors.image.search_images.run(
-            SearchImagesAction(querier=querier)
-        )
+        action_result = await self._image.search_images.run(SearchImagesAction(querier=querier))
 
         return AdminSearchImagesPayload(
             items=[self._data_to_dto(item) for item in action_result.data],
@@ -182,9 +181,7 @@ class ImageAdapter(BaseAdapter):
             base_conditions=list(base_conditions) if base_conditions else None,
         )
 
-        action_result = await self._processors.image.search_images.run(
-            SearchImagesAction(querier=querier)
-        )
+        action_result = await self._image.search_images.run(SearchImagesAction(querier=querier))
 
         return AdminSearchImagesPayload(
             items=[self._data_to_dto(item) for item in action_result.data],
@@ -214,9 +211,7 @@ class ImageAdapter(BaseAdapter):
             base_conditions=list(base_conditions) if base_conditions else None,
         )
 
-        action_result = await self._processors.image.search_aliases.run(
-            SearchAliasesAction(querier=querier)
-        )
+        action_result = await self._image.search_aliases.run(SearchAliasesAction(querier=querier))
 
         return AdminSearchImageAliasesPayload(
             items=[self._alias_data_to_dto(item) for item in action_result.data],
@@ -229,28 +224,28 @@ class ImageAdapter(BaseAdapter):
 
     async def admin_forget(self, input: ForgetImageInput) -> ForgetImagePayload:
         """Forget (soft-delete) an image by ID."""
-        result = await self._processors.image.forget_image_by_id.run(
+        result = await self._image.forget_image_by_id.run(
             ForgetImageByIdAction(image_id=ImageID(input.image_id))
         )
         return ForgetImagePayload(item=self._data_to_dto(result.image))
 
     async def admin_restore(self, input: RestoreImageInput) -> RestoreImagePayload:
         """Restore a forgotten (soft-deleted) image by ID."""
-        result = await self._processors.image.restore_image_by_id.run(
+        result = await self._image.restore_image_by_id.run(
             RestoreImageByIdAction(image_id=ImageID(input.image_id))
         )
         return RestoreImagePayload(item=self._data_to_dto(result.image))
 
     async def admin_purge(self, input: PurgeImageInput) -> PurgeImagePayload:
         """Purge (hard-delete) an image by ID."""
-        result = await self._processors.image.purge_image_by_id.run(
+        result = await self._image.purge_image_by_id.run(
             PurgeImageByIdAction(image_id=ImageID(input.image_id))
         )
         return PurgeImagePayload(item=self._data_to_dto(result.image))
 
     async def admin_alias(self, input: AliasImageInput) -> AliasImagePayload:
         """Create an alias for an image."""
-        result = await self._processors.image.alias_image_by_id.run(
+        result = await self._image.alias_image_by_id.run(
             AliasImageByIdAction(image_id=ImageID(input.image_id), alias=input.alias)
         )
         return AliasImagePayload(
@@ -261,9 +256,7 @@ class ImageAdapter(BaseAdapter):
 
     async def admin_dealias(self, input: DealiasImageInput) -> AliasImagePayload:
         """Remove an image alias."""
-        result = await self._processors.image.dealias_image.run(
-            DealiasImageAction(alias=input.alias)
-        )
+        result = await self._image.dealias_image.run(DealiasImageAction(alias=input.alias))
         return AliasImagePayload(
             alias_id=result.image_alias.id,
             alias=result.image_alias.alias,
@@ -273,64 +266,20 @@ class ImageAdapter(BaseAdapter):
     async def admin_update(self, input: UpdateImageInput) -> UpdateImagePayload:
         """Update an image by ID (superadmin only)."""
         update = ImageUpdate(
-            name=(
-                OptionalState.update(input.name) if input.name is not None else OptionalState.nop()
-            ),
-            registry=(
-                OptionalState.update(input.registry)
-                if input.registry is not None
-                else OptionalState.nop()
-            ),
-            image=(
-                OptionalState.update(input.image)
-                if input.image is not None
-                else OptionalState.nop()
-            ),
-            tag=(OptionalState.update(input.tag) if input.tag is not None else OptionalState.nop()),
-            architecture=(
-                OptionalState.update(input.architecture)
-                if input.architecture is not None
-                else OptionalState.nop()
-            ),
-            is_local=(
-                OptionalState.update(input.is_local)
-                if input.is_local is not None
-                else OptionalState.nop()
-            ),
-            size_bytes=(
-                OptionalState.update(input.size_bytes)
-                if input.size_bytes is not None
-                else OptionalState.nop()
-            ),
-            image_type=(
-                OptionalState.update(ImageType(input.type))
-                if input.type is not None
-                else OptionalState.nop()
-            ),
-            config_digest=(
-                OptionalState.update(input.config_digest)
-                if input.config_digest is not None
-                else OptionalState.nop()
-            ),
-            labels=(
-                OptionalState.update(input.labels)
-                if input.labels is not None
-                else OptionalState.nop()
-            ),
-            accelerators=(
-                TriState.nop()
-                if isinstance(input.supported_accelerators, Sentinel)
-                else TriState.nullify()
-                if input.supported_accelerators is None
-                else TriState.update(input.supported_accelerators)
-            ),
-            resources=(
-                OptionalState.update(input.resource_limits)
-                if input.resource_limits is not None
-                else OptionalState.nop()
-            ),
+            name=OptionalState.from_unset(input.name),
+            registry=OptionalState.from_unset(input.registry),
+            image=OptionalState.from_unset(input.image),
+            tag=OptionalState.from_unset(input.tag),
+            architecture=OptionalState.from_unset(input.architecture),
+            is_local=OptionalState.from_unset(input.is_local),
+            size_bytes=OptionalState.from_unset(input.size_bytes),
+            image_type=OptionalState.from_unset(input.type).map(ImageType),
+            config_digest=OptionalState.from_unset(input.config_digest),
+            labels=OptionalState.from_unset(input.labels),
+            accelerators=TriState.from_unset(input.supported_accelerators),
+            resources=OptionalState.from_unset(input.resource_limits),
         )
-        result = await self._processors.image.update_image_by_id.run(
+        result = await self._image.update_image_by_id.run(
             UpdateImageByIdAction(image_id=ImageID(input.image_id), update=update)
         )
         return UpdateImagePayload(item=self._data_to_dto(result.image))

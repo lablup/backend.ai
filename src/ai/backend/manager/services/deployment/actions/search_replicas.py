@@ -4,7 +4,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.common.data.entity.deployment import DEPLOYMENT_ENTITY_TYPE, DeploymentID
+from ai.backend.common.data.entity.deployment import DeploymentEntityType, DeploymentID
 from ai.backend.common.data.entity.types import EntityType, ScopeRef, ScopeType
 from ai.backend.manager.actions.v2.ops.base import OperationScopeOpsAction
 from ai.backend.manager.data.deployment.types import ModelReplicaData
@@ -28,7 +28,7 @@ class SearchReplicasAction(OperationScopeOpsAction[RoutingRow, ModelReplicaData]
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return DEPLOYMENT_ENTITY_TYPE
+        return DeploymentEntityType()
 
     @override
     @classmethod
@@ -38,7 +38,7 @@ class SearchReplicasAction(OperationScopeOpsAction[RoutingRow, ModelReplicaData]
     @override
     def scope_targets(self) -> Sequence[ScopeRef]:
         return (
-            ScopeRef(scope_type=ScopeType(DEPLOYMENT_ENTITY_TYPE), scope_id=self.deployment_id),
+            ScopeRef(scope_type=ScopeType(DeploymentEntityType()), scope_id=self.deployment_id),
         )
 
     @override

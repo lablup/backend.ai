@@ -17,7 +17,9 @@ from unittest.mock import MagicMock
 import pytest
 
 from ai.backend.common.contexts.user import with_user
-from ai.backend.common.data.entity.types import EntityType, ScopeRef, ScopeType
+from ai.backend.common.data.entity.domain import DomainEntityType
+from ai.backend.common.data.entity.resource_group import ResourceGroupEntityType
+from ai.backend.common.data.entity.types import ScopeRef, ScopeType
 from ai.backend.common.data.permission.types import Permission
 from ai.backend.common.data.user.types import UserData, UserRole
 from ai.backend.common.exception import PermissionDeniedError
@@ -33,8 +35,8 @@ from ai.backend.manager.actions.v2.relation.validator.rbac import (
 )
 from ai.backend.manager.errors.permission import NotEnoughPermission
 
-_RESOURCE_GROUP = ScopeType(EntityType("resource_group"))
-_DOMAIN = ScopeType(EntityType("domain"))
+_RESOURCE_GROUP = ScopeType(ResourceGroupEntityType())
+_DOMAIN = ScopeType(DomainEntityType())
 
 _RG_ID = uuid.uuid5(uuid.NAMESPACE_OID, "rg")
 _DOMAIN_ID = uuid.uuid5(uuid.NAMESPACE_OID, "domain")

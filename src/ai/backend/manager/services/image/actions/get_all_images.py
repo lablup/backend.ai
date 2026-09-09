@@ -12,7 +12,7 @@ from ai.backend.manager.services.image.actions.base import ImageAction
 
 
 @dataclass
-class GetAllImagesAction(ImageAction):
+class PublicGetAllImagesAction(ImageAction):
     """
     Action to retrieve all images, optionally filtered by their status.
     Args:
@@ -25,7 +25,7 @@ class GetAllImagesAction(ImageAction):
     @override
     @classmethod
     def action_name(cls) -> str:
-        return "get_all_images"
+        return "public_get_all_images"
 
     @override
     @classmethod
@@ -34,5 +34,5 @@ class GetAllImagesAction(ImageAction):
 
 
 @dataclass
-class GetAllImagesActionResult:
+class PublicGetAllImagesActionResult:
     data: Mapping[ImageID, ImageWithAgentInstallStatus]

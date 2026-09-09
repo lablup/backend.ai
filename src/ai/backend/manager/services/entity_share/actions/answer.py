@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from typing import override
 
 from ai.backend.common.data.entity.entity_share import (
-    ENTITY_SHARE_ENTITY_TYPE,
+    EntityShareEntityType,
     EntityShareID,
 )
 from ai.backend.common.data.entity.types import EntityIdentifier, EntityType, ScopeRef, ScopeType
@@ -45,7 +45,7 @@ class _RecipientAnswerAction(BaseScopeAction):
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return ENTITY_SHARE_ENTITY_TYPE
+        return EntityShareEntityType()
 
     @override
     @classmethod

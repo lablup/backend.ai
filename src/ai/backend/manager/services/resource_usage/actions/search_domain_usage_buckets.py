@@ -4,7 +4,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.common.data.entity.domain import DOMAIN_ENTITY_TYPE
+from ai.backend.common.data.entity.domain import DomainEntityType
 from ai.backend.common.data.entity.types import EntityType, ScopeRef
 from ai.backend.manager.actions.v2.ops.base import OperationScopeOpsAction
 from ai.backend.manager.data.resource_usage_history.types import DomainUsageBucketData
@@ -30,7 +30,7 @@ class SearchDomainUsageBucketsAction(
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return DOMAIN_ENTITY_TYPE
+        return DomainEntityType()
 
     @override
     @classmethod

@@ -14,7 +14,7 @@ import pytest
 from ai.backend.common.api_handlers import SENTINEL
 from ai.backend.common.config import ModelConfig, ModelDefinition, ModelServiceConfig
 from ai.backend.common.contexts.user import with_user
-from ai.backend.common.data.entity.deployment import DEPLOYMENT_ENTITY_TYPE, DeploymentID
+from ai.backend.common.data.entity.deployment import DeploymentEntityType, DeploymentID
 from ai.backend.common.data.entity.deployment_revision import DeploymentRevisionID
 from ai.backend.common.data.entity.deployment_token import DeploymentTokenID
 from ai.backend.common.data.entity.domain import DomainID
@@ -210,9 +210,9 @@ class TestDeploymentSearchGates:
         )
         processors = MagicMock()
         processors.deployment = DeploymentProcessors(
-            registry.group(GroupMeta(DEPLOYMENT_ENTITY_TYPE)), service
+            registry.group(GroupMeta(DeploymentEntityType())), service
         )
-        return DeploymentAdapter(processors, MagicMock())
+        return DeploymentAdapter(processors.deployment, MagicMock())
 
     async def test_my_search_is_answered_for_the_user_scope(
         self,
@@ -279,7 +279,7 @@ class TestFieldBatchLoads:
                 errors={DENIED_TOKEN: denial},
             )
         )
-        return DeploymentAdapter(processors, MagicMock()), processors
+        return DeploymentAdapter(processors.deployment, MagicMock()), processors
 
     async def test_access_tokens_answer_per_id(
         self,
@@ -341,7 +341,7 @@ class TestFieldBatchLoads:
         processors.deployment.bulk_get_deployment_policies.run = AsyncMock(
             return_value=OwnedFieldsOpsResult(designated={deployment_id: policy})
         )
-        deployment_adapter = DeploymentAdapter(processors, MagicMock())
+        deployment_adapter = DeploymentAdapter(processors.deployment, MagicMock())
         without_policy = uuid4()
 
         nodes = await deployment_adapter.batch_load_policies_by_endpoint_ids([

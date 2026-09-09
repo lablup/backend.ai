@@ -4,9 +4,19 @@ from typing import override
 
 from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
 
-__all__ = ("ENTITY_SHARE_ENTITY_TYPE", "EntityShareID")
+__all__ = ("EntityShareEntityType", "EntityShareID")
 
-ENTITY_SHARE_ENTITY_TYPE = EntityType("entity_share")
+
+class EntityShareEntityType(EntityType):
+    @override
+    @classmethod
+    def name(cls) -> str:
+        return "entity_share"
+
+    @override
+    @classmethod
+    def description(cls) -> str:
+        return "A grant of one entity to another user or project."
 
 
 class EntityShareID(EntityIdentifier):
@@ -18,4 +28,4 @@ class EntityShareID(EntityIdentifier):
 
     @override
     def entity_type(self) -> EntityType:
-        return ENTITY_SHARE_ENTITY_TYPE
+        return EntityShareEntityType()

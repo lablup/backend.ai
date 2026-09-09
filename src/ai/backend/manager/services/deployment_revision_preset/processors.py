@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from ai.backend.common.data.entity.preset_resource_slot import (
-    DEPLOYMENT_PRESET_RESOURCE_SLOT_FIELD_TYPE,
+    DeploymentPresetResourceSlotFieldType,
 )
 from ai.backend.manager.actions.registry.field import LookupFieldGroup
 from ai.backend.manager.actions.registry.group import ProcessorGroup
@@ -81,7 +81,7 @@ class DeploymentPresetProcessors:
         self.purge = group.entity_purge_ops(PurgeDeploymentPresetAction)
 
         slots: LookupFieldGroup[PresetResourceSlotData] = group.field_group(
-            FieldGroupMeta(DEPLOYMENT_PRESET_RESOURCE_SLOT_FIELD_TYPE),
+            FieldGroupMeta(DeploymentPresetResourceSlotFieldType()),
             PresetResourceSlotData,
             LookupPresetResourceSlotOwnerAction,
             LookupBulkPresetResourceSlotOwnerAction,

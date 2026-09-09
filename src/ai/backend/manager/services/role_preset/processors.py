@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from ai.backend.common.data.entity.role_permission_preset import (
-    ROLE_PERMISSION_PRESET_FIELD_TYPE,
+    RolePermissionPresetFieldType,
 )
 from ai.backend.manager.actions.registry.field import LookupFieldGroup
 from ai.backend.manager.actions.registry.group import ProcessorGroup
@@ -100,7 +100,7 @@ class RolePresetProcessors:
         self.bulk_purge = preset_group.global_partial_bulk_purge_ops(BulkPurgeRolePresetsAction)
 
         permissions: LookupFieldGroup[RolePermissionPresetData] = preset_group.field_group(
-            FieldGroupMeta(ROLE_PERMISSION_PRESET_FIELD_TYPE),
+            FieldGroupMeta(RolePermissionPresetFieldType()),
             RolePermissionPresetData,
             LookupRolePermissionPresetOwnerAction,
             LookupBulkRolePermissionPresetOwnerAction,

@@ -10,9 +10,11 @@ from uuid import UUID
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
+from ai.backend.common.data.entity.types import EntityID, EntityType
 
 from .types import (
     OperationTypeDTO,
+    PermissionBitDTO,
     RBACElementTypeDTO,
     RoleSourceDTO,
     RoleStatusDTO,
@@ -69,6 +71,8 @@ class RoleNode(BaseResponseModel):
     created_at: datetime = Field(description="Creation timestamp")
     updated_at: datetime = Field(description="Last update timestamp")
     deleted_at: datetime | None = Field(default=None, description="Deletion timestamp")
+    scope_type: EntityType = Field(description="Type of the scope the role belongs to")
+    scope_id: EntityID = Field(description="ID of the scope the role belongs to")
 
 
 class CreateRolePayload(BaseResponseModel):
@@ -221,7 +225,11 @@ class PermissionNode(BaseResponseModel):
     scope_type: RBACElementTypeDTO = Field(description="Scope element type")
     scope_id: str = Field(description="Scope element ID")
     entity_type: RBACElementTypeDTO = Field(description="Entity element type")
-    operation: OperationTypeDTO = Field(description="Operation type")
+    permission: PermissionBitDTO = Field(description="The permission bit the row holds")
+    operation: OperationTypeDTO = Field(
+        description="Deprecated: use `permission`. The same bit named as an action.",
+        deprecated=True,
+    )
     created_at: datetime = Field(description="Creation timestamp")
 
 
