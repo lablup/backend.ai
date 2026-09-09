@@ -19,7 +19,10 @@ class ResourceAllocationFieldType(FieldType):
     @override
     @classmethod
     def description(cls) -> str:
-        return "One slot's amount allocated to one kernel of a session."
+        return (
+            "How much of one resource a kernel asked for, was given and actually used, each"
+            " with the time it happened."
+        )
 
     @override
     @classmethod
