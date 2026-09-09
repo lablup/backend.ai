@@ -828,6 +828,7 @@ class VfolderRepository:
             if succeeded_ids:
                 # Delete relation rows for succeeded vfolders only.
                 async with self._v2_ops.write_ops() as w:
+                    # TODO: scope this purge. A user operation must not use in_global.
                     await w.batch_purge_entities_in_global(
                         VFolderInvitationBatchPurger(vfolder_ids=succeeded_ids)
                     )
@@ -2226,6 +2227,7 @@ class VfolderRepository:
             # ownership below replaces it uncapped. Their legacy mount row is left
             # standing — accepting a later invitation reads it (BA-5277).
             async with self._v2_ops.write_ops() as w:
+                # TODO: scope this purge. A user operation must not use in_global.
                 await w.batch_purge_entities_in_global(
                     VFolderInviteeInvitationBatchPurger(
                         vfolder_ids=[vfolder_id], invitee_email=user_email

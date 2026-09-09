@@ -310,6 +310,7 @@ class ProjectDBSource:
 
         async with self._v2_ops.write_ops() as w:
             # Deployments go first (their routings cascade), then the sessions they routed.
+            # TODO: scope this purge. A user operation must not use in_global.
             await w.batch_purge_entities_in_global(ProjectEndpointPurger(project_id=project_id))
             if routed_session_ids:
                 await w.batch_purge_entities_in_global(

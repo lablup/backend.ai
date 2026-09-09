@@ -405,6 +405,7 @@ class UserDBSource:
             await w.batch_purge_field_entities(user_id, UserGroupAssociationPurger())
             # Placement groups the user still owns: their deployments were either
             # delegated (the groups moved with them) or deleted by now.
+            # TODO: scope this purge. A user operation must not use in_global.
             await w.batch_purge_entities_in_global(UserSessionGroupPurger(user_id=user_id))
             await w.batch_purge_field_entities(user_id, UserScopeAssociationPurger())
             # Finally the user itself as a scope: the row and the RBAC graph it left.
@@ -473,6 +474,7 @@ class UserDBSource:
         else:
             lifecycle_stages = frozenset(EndpointLifecycle)
         async with self._v2_ops.write_ops() as w:
+            # TODO: scope this purge. A user operation must not use in_global.
             await w.batch_purge_entities_in_global(
                 UserEndpointPurger(
                     user_id=UserID(user_uuid),
@@ -830,6 +832,7 @@ class UserDBSource:
             # invitation and shared permission for its own folder.
             migrate_vfolder_ids = [item["vid"] for item in migrate_updates]
             async with self._v2_ops.write_ops() as w:
+                # TODO: scope this purge. A user operation must not use in_global.
                 await w.batch_purge_entities_in_global(
                     VFolderInviteeInvitationBatchPurger(
                         vfolder_ids=migrate_vfolder_ids,
