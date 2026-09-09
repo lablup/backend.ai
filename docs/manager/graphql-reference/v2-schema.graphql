@@ -11415,6 +11415,11 @@ type Query {
   """Added in 26.2.0. List resource groups (admin only)"""
   adminResourceGroups(filter: ResourceGroupFilter = null, orderBy: [ResourceGroupOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ResourceGroupConnection
 
+  """
+  Added in 26.9.0. Page through the resource groups the named scopes reach, combined with OR. Every scope is authorized before the read runs.
+  """
+  scopedResourceGroups(scope: ResourceGroupScope!, filter: ResourceGroupFilter = null, orderBy: [ResourceGroupOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ResourceGroupConnection
+
   """Added in 26.4.2. Get a single resource group by name (admin only)."""
   adminResourceGroupV2(name: String!): ResourceGroup
 
@@ -12954,6 +12959,20 @@ type ResourceGroupSchedulerConfig {
 
   """Added in 26.3.0. Preemption configuration for this resource group."""
   preemption: PreemptionConfig!
+}
+
+"""
+Added in 26.9.0. Scope for the scoped resource group query. Each list is OR'd internally and across lists, and every scope named is authorized before the read runs.
+"""
+input ResourceGroupScope {
+  """Domains whose resource groups are being read."""
+  domain: [UUIDScope!] = null
+
+  """Projects whose resource groups are being read."""
+  project: [UUIDScope!] = null
+
+  """Users whose resource groups are being read."""
+  user: [UUIDScope!] = null
 }
 
 """Added in 26.2.0. Status information for a resource group."""

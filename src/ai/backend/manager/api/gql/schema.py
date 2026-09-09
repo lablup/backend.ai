@@ -394,6 +394,7 @@ from .resource_group import (
     replace_resource_group_default_deployment_options,
     replace_resource_group_default_session_options,
     resource_groups,
+    scoped_resource_groups,
     update_resource_group_fair_share_spec,
 )
 from .resource_group.federation import ResourceGroup as _ResourceGroupStub
@@ -604,6 +605,7 @@ class Query:
     image_alias = image_alias
     # Admin APIs
     admin_resource_groups = admin_resource_groups
+    scoped_resource_groups = scoped_resource_groups
     admin_resource_group_v2 = admin_resource_group_v2
     scheduling_handlers = scheduling_handlers
     compute_schedule = compute_schedule

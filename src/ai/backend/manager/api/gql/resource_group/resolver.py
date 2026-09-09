@@ -12,8 +12,10 @@ from ai.backend.common.dto.manager.v2.resource_group.request import (
     AdminSearchResourceGroupsInput,
     ReplaceResourceGroupDefaultDeploymentOptionsInput,
     ReplaceResourceGroupDefaultSessionOptionsInput,
+    ScopedSearchResourceGroupsInput,
 )
 from ai.backend.common.dto.manager.v2.resource_group.response import DeleteResourceGroupPayload
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
@@ -38,6 +40,7 @@ from .types import (
     ResourceGroupFilterGQL,
     ResourceGroupGQL,
     ResourceGroupOrderByGQL,
+    ResourceGroupScopeGQL,
     UpdateAllowedDomainsForResourceGroupInputGQL,
     UpdateAllowedProjectsForResourceGroupInputGQL,
     UpdateAllowedResourceGroupsForDomainInputGQL,
@@ -68,6 +71,54 @@ class ResourceGroupConnection(Connection[ResourceGroupGQL]):
 
 
 # Query fields
+
+
+@gql_root_field(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description=(
+            "Page through the resource groups the named scopes reach, combined with OR. "
+            "Every scope is authorized before the read runs."
+        ),
+    )
+)  # type: ignore[misc]
+async def scoped_resource_groups(
+    info: Info[StrawberryGQLContext],
+    scope: ResourceGroupScopeGQL,
+    filter: ResourceGroupFilterGQL | None = None,
+    order_by: list[ResourceGroupOrderByGQL] | None = None,
+    before: str | None = None,
+    after: str | None = None,
+    first: int | None = None,
+    last: int | None = None,
+    limit: int | None = None,
+    offset: int | None = None,
+) -> ResourceGroupConnection | None:
+    payload = await info.context.adapters.resource_group.scoped_search(
+        ScopedSearchResourceGroupsInput(
+            scope=scope.to_pydantic(),
+            filter=filter.to_pydantic() if filter else None,
+            order=[o.to_pydantic() for o in order_by] if order_by else None,
+            first=first,
+            after=after,
+            last=last,
+            before=before,
+            limit=limit,
+            offset=offset,
+        )
+    )
+    nodes = [ResourceGroupGQL.from_pydantic(data) for data in payload.items]
+    edges = [ResourceGroupEdge(node=node, cursor=encode_cursor(node.id)) for node in nodes]
+    return ResourceGroupConnection(
+        edges=edges,
+        page_info=PageInfo(
+            has_next_page=payload.has_next_page,
+            has_previous_page=payload.has_previous_page,
+            start_cursor=edges[0].cursor if edges else None,
+            end_cursor=edges[-1].cursor if edges else None,
+        ),
+        count=payload.total_count,
+    )
 
 
 @gql_root_field(
