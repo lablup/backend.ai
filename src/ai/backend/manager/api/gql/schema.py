@@ -317,6 +317,7 @@ from .project_v2 import (
     domain_projects_v2,
     project_domain_v2,
     project_v2,
+    scoped_projects_v2,
     unassign_users_from_project_v2,
 )
 from .prometheus_query_preset import (
@@ -740,6 +741,7 @@ class Query:
     project_v2 = project_v2
     admin_projects_v2 = admin_projects_v2
     domain_projects_v2 = domain_projects_v2
+    scoped_projects_v2 = scoped_projects_v2
     project_domain_v2 = project_domain_v2
     # Resource Policy V2 APIs
     admin_keypair_resource_policy_v2 = admin_keypair_resource_policy_v2
