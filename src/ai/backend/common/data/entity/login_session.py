@@ -24,7 +24,7 @@ class LoginSessionFieldType(FieldType):
     @override
     @classmethod
     def description(cls) -> str:
-        return "One live login of a user."
+        return "One login of a user, holding its session token and the client it came from."
 
     @override
     @classmethod
