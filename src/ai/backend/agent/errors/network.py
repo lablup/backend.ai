@@ -164,29 +164,6 @@ class LocalSubnetLayoutChanged(BackendAIError, web.HTTPInternalServerError):
         )
 
 
-class LocalSubnetOwnerChanged(BackendAIError, web.HTTPInternalServerError):
-    """One process asked for the node-local subnet store under two different agent ids.
-
-    The allocator is cached per directory, so the first caller decides the owner every claim is
-    written under. A second caller asking for its own id would silently be handed the first's,
-    and write claims naming an agent that is not the writer -- which is exactly what the owner
-    tag exists to prevent.
-    """
-
-    error_type = "https://api.backend.ai/probs/agent/local-subnet-owner-changed"
-    error_title = (
-        "The node-local subnet store is already held in this process under another agent id."
-    )
-
-    @override
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.AGENT,
-            operation=ErrorOperation.CREATE,
-            error_detail=ErrorDetail.CONFLICT,
-        )
-
-
 class OverlayAddressNotAssigned(BackendAIError, web.HTTPInternalServerError):
     """The manager did not assign an overlay IP for a multi-node vxlan endpoint.
 
