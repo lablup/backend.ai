@@ -1,4 +1,4 @@
-"""Tests for Fair Share bulk upsert operations using BulkUpserter."""
+"""Tests for Fair Share bulk upsert operations."""
 
 from __future__ import annotations
 
@@ -15,11 +15,17 @@ from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.types import ResourceSlot
+from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.fair_share import (
     DomainFairShareRow,
     ProjectFairShareRow,
     UserFairShareRow,
+)
+from ai.backend.manager.models.fair_share.upserters import (
+    DomainFairShareUpserter,
+    ProjectFairShareUpserter,
+    UserFairShareUpserter,
 )
 from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.project import ProjectRow
@@ -30,6 +36,7 @@ from ai.backend.manager.models.resource_policy import (
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,
 )
+from ai.backend.manager.models.resource_slot import AgentResourceRow, ResourceSlotTypeRow
 from ai.backend.manager.models.user import (
     PasswordHashAlgorithm,
     PasswordInfo,
@@ -38,14 +45,9 @@ from ai.backend.manager.models.user import (
     UserStatus,
 )
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.base import BulkUpserter
 from ai.backend.manager.repositories.fair_share import FairShareRepository
-from ai.backend.manager.repositories.fair_share.upserters import (
-    DomainFairShareBulkWeightUpserterSpec,
-    ProjectFairShareBulkWeightUpserterSpec,
-    UserFairShareBulkWeightUpserterSpec,
-)
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
+from ai.backend.manager.types import TriState
 from ai.backend.testutils.db import with_tables
 
 
@@ -104,6 +106,9 @@ class TestBulkUpsertDomainFairShare:
                 UserRow,
                 KeyPairRow,
                 ProjectRow,
+                AgentRow,
+                ResourceSlotTypeRow,
+                AgentResourceRow,
                 DomainFairShareRow,
                 ProjectFairShareRow,
                 UserFairShareRow,
@@ -283,19 +288,18 @@ class TestBulkUpsertDomainFairShare:
         """Test bulk upsert when all domains are new (insert case)."""
         ctx = context_all_new_domains
         specs = [
-            DomainFairShareBulkWeightUpserterSpec(
+            DomainFairShareUpserter(
                 resource_group=ctx.resource_group,
                 resource_group_id=ctx.resource_group_id,
                 domain_name=domain,
-                weight=Decimal(f"{i + 1}.0"),
+                weight=TriState.update(Decimal(f"{i + 1}.0")),
             )
             for i, domain in enumerate(ctx.domain_names)
         ]
-        bulk_upserter: BulkUpserter[DomainFairShareRow] = BulkUpserter(specs=specs)
 
-        result = await fair_share_repository.bulk_upsert_domain_fair_share(bulk_upserter)
+        result = await fair_share_repository.bulk_upsert_domain_fair_share(specs)
 
-        assert result.upserted_count == 3
+        assert len(result) == 3
 
         async with db_with_cleanup.begin_readonly_session() as db_sess:
             rows = await db_sess.execute(
@@ -317,19 +321,18 @@ class TestBulkUpsertDomainFairShare:
         """Test bulk upsert when all domains exist (update case)."""
         ctx = context_all_existing_domains
         specs = [
-            DomainFairShareBulkWeightUpserterSpec(
+            DomainFairShareUpserter(
                 resource_group=ctx.resource_group,
                 resource_group_id=ctx.resource_group_id,
                 domain_name=domain,
-                weight=Decimal(f"{i + 10}.0"),
+                weight=TriState.update(Decimal(f"{i + 10}.0")),
             )
             for i, domain in enumerate(ctx.domain_names)
         ]
-        bulk_upserter: BulkUpserter[DomainFairShareRow] = BulkUpserter(specs=specs)
 
-        result = await fair_share_repository.bulk_upsert_domain_fair_share(bulk_upserter)
+        result = await fair_share_repository.bulk_upsert_domain_fair_share(specs)
 
-        assert result.upserted_count == 3
+        assert len(result) == 3
 
         async with db_with_cleanup.begin_readonly_session() as db_sess:
             rows = await db_sess.execute(
@@ -353,19 +356,18 @@ class TestBulkUpsertDomainFairShare:
         """Test bulk upsert with mixed new and existing domains."""
         ctx = context_mixed_domains
         specs = [
-            DomainFairShareBulkWeightUpserterSpec(
+            DomainFairShareUpserter(
                 resource_group=ctx.resource_group,
                 resource_group_id=ctx.resource_group_id,
                 domain_name=domain,
-                weight=Decimal("5.0"),
+                weight=TriState.update(Decimal("5.0")),
             )
             for domain in ctx.domain_names
         ]
-        bulk_upserter: BulkUpserter[DomainFairShareRow] = BulkUpserter(specs=specs)
 
-        result = await fair_share_repository.bulk_upsert_domain_fair_share(bulk_upserter)
+        result = await fair_share_repository.bulk_upsert_domain_fair_share(specs)
 
-        assert result.upserted_count == 3
+        assert len(result) == 3
 
         async with db_with_cleanup.begin_readonly_session() as db_sess:
             rows = await db_sess.execute(
@@ -384,12 +386,11 @@ class TestBulkUpsertDomainFairShare:
         fair_share_repository: FairShareRepository,
     ) -> None:
         """Test bulk upsert with empty specs list."""
-        specs: list[DomainFairShareBulkWeightUpserterSpec] = []
-        bulk_upserter: BulkUpserter[DomainFairShareRow] = BulkUpserter(specs=specs)
+        specs: list[DomainFairShareUpserter] = []
 
-        result = await fair_share_repository.bulk_upsert_domain_fair_share(bulk_upserter)
+        result = await fair_share_repository.bulk_upsert_domain_fair_share(specs)
 
-        assert result.upserted_count == 0
+        assert len(result) == 0
 
 
 class TestBulkUpsertProjectFairShare:
@@ -414,6 +415,9 @@ class TestBulkUpsertProjectFairShare:
                 UserRow,
                 KeyPairRow,
                 ProjectRow,
+                AgentRow,
+                ResourceSlotTypeRow,
+                AgentResourceRow,
                 DomainFairShareRow,
                 ProjectFairShareRow,
                 UserFairShareRow,
@@ -582,20 +586,19 @@ class TestBulkUpsertProjectFairShare:
         """Test bulk upsert when all projects are new (insert case)."""
         ctx = context_all_new_projects
         specs = [
-            ProjectFairShareBulkWeightUpserterSpec(
+            ProjectFairShareUpserter(
                 resource_group=ctx.resource_group,
                 resource_group_id=ctx.resource_group_id,
                 project_id=pid,
                 domain_name=ctx.domain_name,
-                weight=Decimal(f"{i + 1}.5"),
+                weight=TriState.update(Decimal(f"{i + 1}.5")),
             )
             for i, pid in enumerate(ctx.project_ids)
         ]
-        bulk_upserter: BulkUpserter[ProjectFairShareRow] = BulkUpserter(specs=specs)
 
-        result = await fair_share_repository.bulk_upsert_project_fair_share(bulk_upserter)
+        result = await fair_share_repository.bulk_upsert_project_fair_share(specs)
 
-        assert result.upserted_count == 3
+        assert len(result) == 3
 
         async with db_with_cleanup.begin_readonly_session() as db_sess:
             rows = await db_sess.execute(
@@ -617,20 +620,19 @@ class TestBulkUpsertProjectFairShare:
         """Test bulk upsert when all projects exist (update case)."""
         ctx = context_all_existing_projects
         specs = [
-            ProjectFairShareBulkWeightUpserterSpec(
+            ProjectFairShareUpserter(
                 resource_group=ctx.resource_group,
                 resource_group_id=ctx.resource_group_id,
                 project_id=pid,
                 domain_name=ctx.domain_name,
-                weight=Decimal(f"{i + 20}.0"),
+                weight=TriState.update(Decimal(f"{i + 20}.0")),
             )
             for i, pid in enumerate(ctx.project_ids)
         ]
-        bulk_upserter: BulkUpserter[ProjectFairShareRow] = BulkUpserter(specs=specs)
 
-        result = await fair_share_repository.bulk_upsert_project_fair_share(bulk_upserter)
+        result = await fair_share_repository.bulk_upsert_project_fair_share(specs)
 
-        assert result.upserted_count == 3
+        assert len(result) == 3
 
         async with db_with_cleanup.begin_readonly_session() as db_sess:
             rows = await db_sess.execute(
@@ -668,6 +670,9 @@ class TestBulkUpsertUserFairShare:
                 UserRow,
                 KeyPairRow,
                 ProjectRow,
+                AgentRow,
+                ResourceSlotTypeRow,
+                AgentResourceRow,
                 DomainFairShareRow,
                 ProjectFairShareRow,
                 UserFairShareRow,
@@ -1005,21 +1010,20 @@ class TestBulkUpsertUserFairShare:
         """Test bulk upsert when all users are new (insert case)."""
         ctx = context_all_new_users
         specs = [
-            UserFairShareBulkWeightUpserterSpec(
+            UserFairShareUpserter(
                 resource_group=ctx.resource_group,
                 resource_group_id=ctx.resource_group_id,
                 user_uuid=uid,
                 project_id=ctx.project_id,
                 domain_name=ctx.domain_name,
-                weight=Decimal(f"{i + 1}.25"),
+                weight=TriState.update(Decimal(f"{i + 1}.25")),
             )
             for i, uid in enumerate(ctx.user_uuids)
         ]
-        bulk_upserter: BulkUpserter[UserFairShareRow] = BulkUpserter(specs=specs)
 
-        result = await fair_share_repository.bulk_upsert_user_fair_share(bulk_upserter)
+        result = await fair_share_repository.bulk_upsert_user_fair_share(specs)
 
-        assert result.upserted_count == 3
+        assert len(result) == 3
 
         async with db_with_cleanup.begin_readonly_session() as db_sess:
             rows = await db_sess.execute(
@@ -1041,21 +1045,20 @@ class TestBulkUpsertUserFairShare:
         """Test bulk upsert when all users exist (update case)."""
         ctx = context_all_existing_users
         specs = [
-            UserFairShareBulkWeightUpserterSpec(
+            UserFairShareUpserter(
                 resource_group=ctx.resource_group,
                 resource_group_id=ctx.resource_group_id,
                 user_uuid=uid,
                 project_id=ctx.project_id,
                 domain_name=ctx.domain_name,
-                weight=Decimal(f"{i + 30}.0"),
+                weight=TriState.update(Decimal(f"{i + 30}.0")),
             )
             for i, uid in enumerate(ctx.user_uuids)
         ]
-        bulk_upserter: BulkUpserter[UserFairShareRow] = BulkUpserter(specs=specs)
 
-        result = await fair_share_repository.bulk_upsert_user_fair_share(bulk_upserter)
+        result = await fair_share_repository.bulk_upsert_user_fair_share(specs)
 
-        assert result.upserted_count == 3
+        assert len(result) == 3
 
         async with db_with_cleanup.begin_readonly_session() as db_sess:
             rows = await db_sess.execute(
@@ -1079,21 +1082,20 @@ class TestBulkUpsertUserFairShare:
         """Test bulk upsert with None weight (uses resource group default)."""
         ctx = context_null_weight_users
         specs = [
-            UserFairShareBulkWeightUpserterSpec(
+            UserFairShareUpserter(
                 resource_group=ctx.resource_group,
                 resource_group_id=ctx.resource_group_id,
                 user_uuid=uid,
                 project_id=ctx.project_id,
                 domain_name=ctx.domain_name,
-                weight=None,
+                weight=TriState[Decimal].nullify(),
             )
             for uid in ctx.user_uuids
         ]
-        bulk_upserter: BulkUpserter[UserFairShareRow] = BulkUpserter(specs=specs)
 
-        result = await fair_share_repository.bulk_upsert_user_fair_share(bulk_upserter)
+        result = await fair_share_repository.bulk_upsert_user_fair_share(specs)
 
-        assert result.upserted_count == 3
+        assert len(result) == 3
 
         async with db_with_cleanup.begin_readonly_session() as db_sess:
             rows = await db_sess.execute(

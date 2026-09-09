@@ -37,8 +37,6 @@ from ai.backend.manager.models.fair_share.scopes import (
 )
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
-    BulkUpserter,
-    BulkUpserterResult,
 )
 from ai.backend.manager.repositories.fair_share.types import (
     DomainFairShareEntitySearchResult,
@@ -49,11 +47,6 @@ from ai.backend.manager.repositories.fair_share.types import (
 from .db_source import FairShareDBSource
 
 if TYPE_CHECKING:
-    from ai.backend.manager.models.fair_share import (
-        DomainFairShareRow,
-        ProjectFairShareRow,
-        UserFairShareRow,
-    )
     from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.fair_share.upserters import (
     DomainFairShareUpserter,
@@ -203,26 +196,26 @@ class FairShareRepository:
     @fair_share_repository_resilience.apply()
     async def bulk_upsert_domain_fair_share(
         self,
-        bulk_upserter: BulkUpserter[DomainFairShareRow],
-    ) -> BulkUpserterResult:
+        upserters: Sequence[DomainFairShareUpserter],
+    ) -> list[DomainFairShareData]:
         """Bulk upsert domain fair share records."""
-        return await self._db_source.bulk_upsert_domain_fair_share(bulk_upserter)
+        return await self._db_source.bulk_upsert_domain_fair_share(upserters)
 
     @fair_share_repository_resilience.apply()
     async def bulk_upsert_project_fair_share(
         self,
-        bulk_upserter: BulkUpserter[ProjectFairShareRow],
-    ) -> BulkUpserterResult:
+        upserters: Sequence[ProjectFairShareUpserter],
+    ) -> list[ProjectFairShareData]:
         """Bulk upsert project fair share records."""
-        return await self._db_source.bulk_upsert_project_fair_share(bulk_upserter)
+        return await self._db_source.bulk_upsert_project_fair_share(upserters)
 
     @fair_share_repository_resilience.apply()
     async def bulk_upsert_user_fair_share(
         self,
-        bulk_upserter: BulkUpserter[UserFairShareRow],
-    ) -> BulkUpserterResult:
+        upserters: Sequence[UserFairShareUpserter],
+    ) -> list[UserFairShareData]:
         """Bulk upsert user fair share records."""
-        return await self._db_source.bulk_upsert_user_fair_share(bulk_upserter)
+        return await self._db_source.bulk_upsert_user_fair_share(upserters)
 
     @fair_share_repository_resilience.apply()
     async def get_user_fair_share(

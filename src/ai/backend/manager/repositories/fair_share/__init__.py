@@ -18,20 +18,11 @@ from .types import (
     ProjectFairShareEntitySearchResult,
     UserFairShareEntitySearchResult,
 )
-from .upserters import (
-    DomainFairShareBulkWeightUpserterSpec,
-    ProjectFairShareBulkWeightUpserterSpec,
-    UserFairShareBulkWeightUpserterSpec,
-)
 
 __all__ = (
     # Repositories
     "FairShareRepositories",
     "FairShareRepository",
-    # Bulk weight upserter specs
-    "DomainFairShareBulkWeightUpserterSpec",
-    "ProjectFairShareBulkWeightUpserterSpec",
-    "UserFairShareBulkWeightUpserterSpec",
     # Query conditions
     "DomainFairShareConditions",
     "ProjectFairShareConditions",
