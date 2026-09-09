@@ -18,7 +18,6 @@ from ai.backend.common.data.entity.domain import DomainEntityType
 from ai.backend.common.data.entity.entity_label import EntityLabelFieldType
 from ai.backend.common.data.entity.entity_share import EntityShareEntityType
 from ai.backend.common.data.entity.etcd_config import EtcdConfigEntityType
-from ai.backend.common.data.entity.export import ExportEntityType
 from ai.backend.common.data.entity.fair_share import (
     DomainFairShareFieldType,
     ProjectFairShareFieldType,
@@ -59,6 +58,7 @@ from ai.backend.common.data.entity.service_catalog import ServiceCatalogEntityTy
 from ai.backend.common.data.entity.session import SessionEntityType
 from ai.backend.common.data.entity.session_template import SessionTemplateEntityType
 from ai.backend.common.data.entity.storage_namespace import StorageNamespaceEntityType
+from ai.backend.common.data.entity.types import GlobalEntityType
 from ai.backend.common.data.entity.usage_bucket import (
     DomainUsageBucketFieldType,
     ProjectUsageBucketFieldType,
@@ -590,7 +590,14 @@ def create_processors(
             system_groups.group(GroupMeta(EtcdConfigEntityType())), services.etcd_config
         ),
         export=ExportProcessors(
-            visibility_groups.group(GroupMeta(ExportEntityType())), services.export
+            visibility_groups.group(GroupMeta(UserEntityType())),
+            visibility_groups.group(GroupMeta(SessionEntityType())),
+            visibility_groups.group(GroupMeta(ProjectEntityType())),
+            visibility_groups.group(GroupMeta(GlobalEntityType())),
+            visibility_groups.dangling_field_group(
+                FieldGroupMeta(AuditLogFieldType()), AuditLogData
+            ),
+            services.export,
         ),
         fair_share=FairShareProcessors(
             resource_group_groups.dangling_field_group(
