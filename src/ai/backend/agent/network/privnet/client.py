@@ -576,7 +576,8 @@ class PrivNetProvisioner:
         # privnet-side, so it is not sent.
         overlay_ip = kernel_config.get("cluster_network_ip")
         # Single-node cluster: the deterministic LOCAL address this kernel must be pinned at so its
-        # real address matches the /etc/hosts map the agent wrote. Sent alongside the overlay IP; the
+        # real address matches the peer map the agent registered with the session resolver (the
+        # /etc/hosts peer map was dropped in f51f3d6038). Sent alongside the overlay IP; the
         # privnet re-validates it is within the session's LOCAL subnet. Without this the privnet takes
         # a host-local dynamic address that need not match the map, and peer resolution is wrong.
         # local_static_ip is an agent-added key, not part of the KernelCreationConfig TypedDict.

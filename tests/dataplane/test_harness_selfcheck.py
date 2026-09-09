@@ -13,9 +13,11 @@ from __future__ import annotations
 
 import asyncio
 import json
+from typing import Any, cast
 
 import pytest
 
+from ai.backend.testutils.dataplane import probe
 from ai.backend.testutils.dataplane.collectors.base import Resource
 from ai.backend.testutils.dataplane.collectors.containerd_objects import ContainerdObjectCollector
 from ai.backend.testutils.dataplane.collectors.docker_objects import (
@@ -947,3 +949,72 @@ class TestReapingAPrivilegedChild:
             await node.run(["sh", "-c", f": {self._MARKER}; sleep 60"])
         leftover = {task for task in asyncio.all_tasks() if task is not mine and task not in before}
         assert not leftover, f"a reap left {len(leftover)} task(s) running"
+
+
+class _RuntimeNode:
+    """A node whose `docker inspect` answer decides which runtime owns the container, and whose
+    other commands return a canned (returncode, stdout)."""
+
+    def __init__(self, *, docker_owns: bool, answers: dict[str, tuple[int, str]]) -> None:
+        self._docker_owns = docker_owns
+        self._answers = answers
+        self.calls: list[tuple[str, ...]] = []
+
+    @property
+    def name(self) -> str:
+        return "local"
+
+    async def run(self, argv: list[str], *, check: bool = True) -> CommandResult:
+        key = tuple(argv)
+        self.calls.append(key)
+        if argv[:2] == ["docker", "inspect"]:
+            return CommandResult(self.name, key, 0 if self._docker_owns else 1, "", "")
+        for needle, (rc, out) in self._answers.items():
+            if needle in argv:
+                if check and rc != 0:
+                    raise CommandFailed(f"rc={rc}")
+                return CommandResult(self.name, key, rc, out, "")
+        raise CommandFailed(f"unstubbed: {argv}")
+
+
+class TestResolvingAPeerFromInsideTheKernel:
+    """`f51f3d6038` dropped the `/etc/hosts` peer map: peers resolve through the session resolver
+    (dockerd's embedded DNS on the Docker backend) and that file names only the kernel itself. So
+    the question a cluster scenario asks has to be "does the name resolve", and it has to be asked
+    from *inside* the container -- `nsenter -n` enters the netns but leaves the lookup reading the
+    host's `/etc/resolv.conf`, which names a different resolver entirely.
+    """
+
+    async def test_a_name_that_resolves_is_reported_present(self) -> None:
+        node = _RuntimeNode(docker_owns=True, answers={"getent": (0, "172.20.0.4\tmain1\n")})
+        assert await probe.resolves_in_container(cast(Any, node), "c1", "main1")
+
+    async def test_a_name_that_does_not_resolve_is_not_an_error(self) -> None:
+        """`getent` exits non-zero for an unknown name. That is the answer, not a failure -- a
+        raising probe would report every isolation check as a broken harness."""
+        node = _RuntimeNode(docker_owns=True, answers={"getent": (2, "")})
+        assert not await probe.resolves_in_container(cast(Any, node), "c1", "nope")
+
+    async def test_an_empty_answer_with_a_zero_exit_is_not_a_resolution(self) -> None:
+        node = _RuntimeNode(docker_owns=True, answers={"getent": (0, "  \n")})
+        assert not await probe.resolves_in_container(cast(Any, node), "c1", "main1")
+
+    async def test_the_lookup_runs_inside_the_container_not_its_netns(self) -> None:
+        node = _RuntimeNode(docker_owns=True, answers={"getent": (0, "172.20.0.4\tmain1\n")})
+        await probe.resolves_in_container(cast(Any, node), "c1", "main1")
+        lookup = next(c for c in node.calls if "getent" in c)
+        assert lookup[:3] == ("docker", "exec", "c1")
+        assert "nsenter" not in lookup, (
+            "nsenter -n enters the netns but keeps the host's /etc/resolv.conf, so the lookup"
+            " would go to the wrong resolver and answer nothing"
+        )
+
+    async def test_a_containerd_container_is_asked_through_ctr(self) -> None:
+        node = _RuntimeNode(docker_owns=False, answers={"getent": (0, "10.128.5.2\tmain1\n")})
+        assert await probe.resolves_in_container(cast(Any, node), "c1", "main1")
+        lookup = next(c for c in node.calls if "getent" in c)
+        assert lookup[0] == "ctr" and "exec" in lookup
+
+    async def test_reading_a_file_goes_through_the_same_dispatch(self) -> None:
+        node = _RuntimeNode(docker_owns=True, answers={"cat": (0, "127.0.0.1 localhost\n")})
+        assert "localhost" in await probe.read_container_file(cast(Any, node), "c1", "/etc/hosts")

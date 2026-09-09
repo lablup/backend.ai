@@ -58,11 +58,14 @@ class TestSingleNodeClusterSession:
     ) -> None:
         """Three things at once, because they share one root cause when they break.
 
-        `/etc/hosts` must name every peer, and must not have the kernel's own hostname rewritten
-        to a loopback address -- that rewrite is what stranded torchrun. `BACKENDAI_CLUSTER_HOSTS`
-        must agree across kernels, since the manager generates it once per session and a kernel
-        that disagrees is reading a locally-derived copy. And the addresses must be the node-local
-        block's, not an overlay's.
+        Every peer must *resolve* from inside every kernel, and no kernel's own hostname may be
+        rewritten to a loopback address -- that rewrite is what stranded torchrun. Resolution, not
+        `/etc/hosts`: f51f3d6038 dropped the peer map in favour of the per-session resolver
+        (dockerd's embedded DNS on the Docker backend), so the file names only localhost and the
+        kernel itself, and asserting on its contents tests a contract that no longer exists.
+        `BACKENDAI_CLUSTER_HOSTS` must agree across kernels, since the manager generates it once
+        per session and a kernel that disagrees is reading a locally-derived copy. And the
+        addresses must be the node-local block's, not an overlay's.
         """
         async with session_driver.session(single_node_cluster_spec, "dp-g9") as handle:
             container_ids = await probe.session_container_ids(node, handle)
@@ -87,30 +90,18 @@ class TestSingleNodeClusterSession:
             peers = [p for p in next(iter(cluster_hosts_values)).split(",") if p]
             assert len(peers) == CLUSTER_SIZE, f"expected {CLUSTER_SIZE} peers, got {peers}"
 
-            hosts_files = {
-                cid: await _read_in_kernel(node, cid, "/etc/hosts") for cid in container_ids
-            }
-            for cid, contents in hosts_files.items():
-                resolved = _hosts_names(contents)
+            for cid in container_ids:
                 for peer in peers:
-                    assert peer in resolved, (
-                        f"kernel {cid} cannot resolve peer {peer}; /etc/hosts was written from an "
-                        f"incomplete peer map (peers={peers})\n{contents}"
+                    assert await probe.resolves_in_container(node, cid, peer), (
+                        f"kernel {cid} cannot resolve peer {peer}; the session resolver was not "
+                        f"registered with the whole peer map, or the container is not pointed at "
+                        f"it (peers={peers})"
                     )
+                contents = await _read_in_kernel(node, cid, "/etc/hosts")
                 assert "127.0.1.1" not in contents, (
                     f"kernel {cid} has its own hostname pinned to loopback -- the regression that "
                     f"made a torchrun master unreachable to its workers\n{contents}"
                 )
-
-
-def _hosts_names(etc_hosts: str) -> set[str]:
-    """The hostnames /etc/hosts actually resolves, so a peer check matches a whole name and not a
-    substring — ``main`` must not count as present just because ``main1`` is."""
-    names: set[str] = set()
-    for line in etc_hosts.splitlines():
-        parts = line.split()
-        names.update(parts[1:])  # every alias after the address column
-    return names
 
 
 def _env_value(raw_environ: str, key: str) -> str:
