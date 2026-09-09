@@ -922,29 +922,17 @@ class RBACAdapter(BaseAdapter):
 
     async def update_permission(self, input: UpdatePermissionInputDTO) -> PermissionNode:
         """Update an existing scoped permission."""
-        if input.scope_type is not None and input.scope_id is not None:
+        if isinstance(input.scope_type, str) and isinstance(input.scope_id, str):
             self._validate_scope_id(RBACElementType(input.scope_type), input.scope_id)
         spec = PermissionUpdaterSpec(
-            scope_type=(
-                OptionalState.update(ScopeType(EntityType(RBACElementType(input.scope_type))))
-                if input.scope_type is not None
-                else OptionalState.nop()
+            scope_type=OptionalState.from_unset(input.scope_type).map(
+                lambda v: ScopeType(EntityType(RBACElementType(v)))
             ),
-            scope_id=(
-                OptionalState.update(input.scope_id)
-                if input.scope_id is not None
-                else OptionalState.nop()
+            scope_id=OptionalState.from_unset(input.scope_id),
+            entity_type=OptionalState.from_unset(input.entity_type).map(
+                lambda v: EntityType(RBACElementType(v))
             ),
-            entity_type=(
-                OptionalState.update(EntityType(RBACElementType(input.entity_type)))
-                if input.entity_type is not None
-                else OptionalState.nop()
-            ),
-            permission=(
-                OptionalState.update(self._permission_bit(input.operation))
-                if input.operation is not None
-                else OptionalState.nop()
-            ),
+            permission=OptionalState.from_unset(input.operation).map(self._permission_bit),
         )
         action_result = (
             await self._processors.permission_controller.update_permission.wait_for_complete(
@@ -1824,17 +1812,11 @@ class RBACAdapter(BaseAdapter):
         return result
 
     def _build_updater(self, role_id: UUID, input: UpdateRoleInput) -> RoleUpdater:
-        name: OptionalState[str] = OptionalState.nop()
-        auto_assign: OptionalState[bool] = OptionalState.nop()
-
-        if input.name is not None:
-            name = OptionalState.update(input.name)
-        description = TriState.from_unset(input.description)
-        if input.auto_assign is not None:
-            auto_assign = OptionalState.update(input.auto_assign)
-
         return RoleUpdater(
-            role_id=RoleID(role_id), name=name, description=description, auto_assign=auto_assign
+            role_id=RoleID(role_id),
+            name=OptionalState.from_unset(input.name),
+            description=TriState.from_unset(input.description),
+            auto_assign=OptionalState.from_unset(input.auto_assign),
         )
 
     @staticmethod

@@ -13,6 +13,7 @@ from aiohttp.web_exceptions import HTTPForbidden
 
 from ai.backend.common.dto.manager.v2.rbac.response import PermissionNode
 from ai.backend.common.dto.manager.v2.rbac.types import OperationTypeDTO, RBACElementTypeDTO
+from ai.backend.common.tristate.unset import UNSET
 from ai.backend.manager.api.gql.rbac.resolver import permission as permission_resolver
 from ai.backend.manager.api.gql.rbac.types import PermissionGQL, UpdatePermissionInput
 from ai.backend.manager.api.gql.rbac.types.permission import OperationTypeGQL
@@ -98,9 +99,9 @@ class TestAdminUpdatePermission:
 
         assert dto.id == permission_id
         assert dto.operation is not None
-        assert dto.scope_type is None
-        assert dto.scope_id is None
-        assert dto.entity_type is None
+        assert dto.scope_type is UNSET
+        assert dto.scope_id is UNSET
+        assert dto.entity_type is UNSET
 
         resolver_fn = cast(Any, permission_resolver.admin_update_permission).base_resolver
         result = await resolver_fn(info=info, input=input_data)

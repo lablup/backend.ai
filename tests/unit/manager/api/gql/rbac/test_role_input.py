@@ -124,8 +124,8 @@ class TestUpdateRoleInputToPydantic:
         assert isinstance(dto, UpdateRoleInputDTO)
         assert dto.description == "some text"
 
-    def test_name_with_unset_produces_none_in_dto(self) -> None:
-        """UpdateRoleInput with name=UNSET → dto.name is None (no change)."""
+    def test_name_with_unset_produces_unset_in_dto(self) -> None:
+        """UpdateRoleInput with name=UNSET → dto.name is UNSET (no change)."""
         role_input = UpdateRoleInput(
             id=uuid.uuid4(),
             # name is omitted (UNSET by default)
@@ -133,7 +133,7 @@ class TestUpdateRoleInputToPydantic:
 
         dto = role_input.to_pydantic()
         assert isinstance(dto, UpdateRoleInputDTO)
-        assert dto.name is None
+        assert dto.name is UNSET
 
     def test_name_with_string_produces_string_in_dto(self) -> None:
         """UpdateRoleInput with name="new name" → dto.name == "new name"."""
@@ -146,8 +146,8 @@ class TestUpdateRoleInputToPydantic:
         assert isinstance(dto, UpdateRoleInputDTO)
         assert dto.name == "new name"
 
-    def test_status_with_unset_produces_none_in_dto(self) -> None:
-        """UpdateRoleInput with status=UNSET → dto.status is None (no change)."""
+    def test_status_with_unset_produces_unset_in_dto(self) -> None:
+        """UpdateRoleInput with status=UNSET → dto.status is UNSET (no change)."""
         role_input = UpdateRoleInput(
             id=uuid.uuid4(),
             # status is omitted (UNSET by default)
@@ -155,7 +155,7 @@ class TestUpdateRoleInputToPydantic:
 
         dto = role_input.to_pydantic()
         assert isinstance(dto, UpdateRoleInputDTO)
-        assert dto.status is None
+        assert dto.status is UNSET
 
     def test_status_with_active_produces_role_status_active(self) -> None:
         """UpdateRoleInput with status=RoleStatusGQL.ACTIVE → dto.status == RoleStatus.ACTIVE."""
@@ -179,8 +179,8 @@ class TestUpdateRoleInputToPydantic:
         assert isinstance(dto, UpdateRoleInputDTO)
         assert dto.status == RoleStatus.INACTIVE
 
-    def test_auto_assign_with_unset_produces_none_in_dto(self) -> None:
-        """UpdateRoleInput with auto_assign=UNSET → dto.auto_assign is None (no change)."""
+    def test_auto_assign_with_unset_produces_unset_in_dto(self) -> None:
+        """UpdateRoleInput with auto_assign=UNSET → dto.auto_assign is UNSET (no change)."""
         role_input = UpdateRoleInput(
             id=uuid.uuid4(),
             # auto_assign is omitted (UNSET by default)
@@ -188,7 +188,7 @@ class TestUpdateRoleInputToPydantic:
 
         dto = role_input.to_pydantic()
         assert isinstance(dto, UpdateRoleInputDTO)
-        assert dto.auto_assign is None
+        assert dto.auto_assign is UNSET
 
     def test_auto_assign_with_true_produces_true_in_dto(self) -> None:
         """UpdateRoleInput with auto_assign=True → dto.auto_assign is True."""
@@ -238,10 +238,10 @@ class TestUpdateRoleInputToPydantic:
 
         dto = role_input.to_pydantic()
         assert isinstance(dto, UpdateRoleInputDTO)
-        assert dto.name is None
+        assert dto.name is UNSET
         assert dto.description is UNSET
-        assert dto.status is None
-        assert dto.auto_assign is None
+        assert dto.status is UNSET
+        assert dto.auto_assign is UNSET
 
     def test_id_is_on_gql_input_not_in_dto(self) -> None:
         """id is a GQL input field used for routing but not included in the DTO."""

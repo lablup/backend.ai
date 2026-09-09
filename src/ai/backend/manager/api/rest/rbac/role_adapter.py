@@ -49,13 +49,11 @@ class RoleAdapter(BaseFilterAdapter):
 
     def build_updater(self, request: UpdateRoleRequest, role_id: UUID) -> RoleUpdater:
         """Convert update request to updater."""
-        name = OptionalState[str].nop()
-
-        if request.name is not None:
-            name = OptionalState.update(request.name)
-        description = TriState.from_unset(request.description)
-
-        return RoleUpdater(role_id=RoleID(role_id), name=name, description=description)
+        return RoleUpdater(
+            role_id=RoleID(role_id),
+            name=OptionalState.from_unset(request.name),
+            description=TriState.from_unset(request.description),
+        )
 
     def build_querier(self, request: SearchRolesRequest) -> BatchQuerier:
         """

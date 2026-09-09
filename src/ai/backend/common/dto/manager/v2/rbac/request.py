@@ -85,23 +85,28 @@ class CreateRoleInput(BaseRequestModel):
 class UpdateRoleInput(BaseRequestModel):
     """Input for updating a role."""
 
-    name: str | None = Field(default=None, description="Updated role name")
+    name: str | None | Unset = Field(
+        default=UNSET, description="Updated role name. Omit to leave unchanged."
+    )
     description: str | None | Unset = Field(
         default=UNSET, description="Updated role description. Omit to leave unchanged; null clears."
     )
-    status: RoleStatus | None = Field(default=None, description="Updated role status")
-    auto_assign: bool | None = Field(
-        default=None,
+    status: RoleStatus | None | Unset = Field(
+        default=UNSET, description="Updated role status. Omit to leave unchanged."
+    )
+    auto_assign: bool | None | Unset = Field(
+        default=UNSET,
         description=(
             "Updated value for the `auto_assign` flag. When true, the role is automatically "
-            "granted to a user when the user is added to a scope this role is registered in."
+            "granted to a user when the user is added to a scope this role is registered in. "
+            "Omit to leave unchanged."
         ),
     )
 
     @field_validator("name")
     @classmethod
-    def name_must_not_be_blank(cls, v: str | None) -> str | None:
-        if v is None:
+    def name_must_not_be_blank(cls, v: str | None | Unset) -> str | None | Unset:
+        if not isinstance(v, str):
             return v
         stripped = v.strip()
         if not stripped:
@@ -135,10 +140,18 @@ class UpdatePermissionInput(BaseRequestModel):
     """Input for updating a scoped permission."""
 
     id: UUID = Field(description="Permission ID to update")
-    scope_type: str | None = Field(default=None, description="Updated scope element type")
-    scope_id: str | None = Field(default=None, description="Updated scope element ID")
-    entity_type: str | None = Field(default=None, description="Updated entity element type")
-    operation: str | None = Field(default=None, description="Updated operation type")
+    scope_type: str | None | Unset = Field(
+        default=UNSET, description="Updated scope element type. Omit to leave unchanged."
+    )
+    scope_id: str | None | Unset = Field(
+        default=UNSET, description="Updated scope element ID. Omit to leave unchanged."
+    )
+    entity_type: str | None | Unset = Field(
+        default=UNSET, description="Updated entity element type. Omit to leave unchanged."
+    )
+    operation: str | None | Unset = Field(
+        default=UNSET, description="Updated operation type. Omit to leave unchanged."
+    )
 
 
 class DeletePermissionInput(BaseRequestModel):

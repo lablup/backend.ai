@@ -333,10 +333,10 @@ class CreatePermissionInput(PydanticInputMixin[CreatePermissionInputDTO]):
 )
 class UpdatePermissionInput(PydanticInputMixin[UpdatePermissionInputDTO]):
     id: UUID
-    scope_type: RBACElementTypeGQL | None = None
-    scope_id: str | None = None
-    entity_type: RBACElementTypeGQL | None = None
-    operation: OperationTypeGQL | None = None
+    scope_type: RBACElementTypeGQL | None = strawberry.UNSET
+    scope_id: str | None = strawberry.UNSET
+    entity_type: RBACElementTypeGQL | None = strawberry.UNSET
+    operation: OperationTypeGQL | None = strawberry.UNSET
 
 
 @gql_pydantic_input(
