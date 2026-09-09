@@ -48,7 +48,6 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
 from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
 from ai.backend.manager.repositories.base import BatchQuerier
-from ai.backend.manager.repositories.ops import DBOpsProvider
 from ai.backend.manager.repositories.session.repository import SessionRepository
 from ai.backend.manager.secret.types import SecretValue
 from ai.backend.testutils.db import with_tables
@@ -99,7 +98,7 @@ class TestSessionSearchInProject:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> SessionRepository:
-        return SessionRepository(db_with_cleanup, DBOpsProvider(db_with_cleanup))
+        return SessionRepository(db_with_cleanup)
 
     @pytest.fixture
     async def test_data(

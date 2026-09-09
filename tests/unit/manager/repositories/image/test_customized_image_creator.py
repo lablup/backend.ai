@@ -68,7 +68,6 @@ from ai.backend.manager.models.virtual_entity.entity_membership_field import (
 )
 from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
 from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
-from ai.backend.manager.repositories.ops import DBOpsProvider
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.ops.v2.reconciler.provider import ReconcileOpsProvider
 from ai.backend.manager.repositories.scheduler.db_source.db_source import ScheduleDBSource
@@ -352,7 +351,7 @@ class TestImageOwnershipGraph:
                 owner_user_id=user_id,
             )
 
-        db_source = SessionDBSource(db_with_cleanup, DBOpsProvider(db_with_cleanup))
+        db_source = SessionDBSource(db_with_cleanup)
 
         assert await db_source.get_customized_image_count(user_id) == 2
 
@@ -371,7 +370,7 @@ class TestImageOwnershipGraph:
             owner_user_id=other_id,
         )
 
-        db_source = SessionDBSource(db_with_cleanup, DBOpsProvider(db_with_cleanup))
+        db_source = SessionDBSource(db_with_cleanup)
 
         assert await db_source.get_customized_image_count(user_id) == 0
 
@@ -390,7 +389,7 @@ class TestImageOwnershipGraph:
             status=ImageStatus.DELETED,
         )
 
-        db_source = SessionDBSource(db_with_cleanup, DBOpsProvider(db_with_cleanup))
+        db_source = SessionDBSource(db_with_cleanup)
 
         assert await db_source.get_customized_image_count(user_id) == 0
 
@@ -403,7 +402,7 @@ class TestImageOwnershipGraph:
         user_id = await self._create_user(db_with_cleanup, domain_id, "owner@test.io")
         await self._create_image(db_with_cleanup, registry_id, "a")
 
-        db_source = SessionDBSource(db_with_cleanup, DBOpsProvider(db_with_cleanup))
+        db_source = SessionDBSource(db_with_cleanup)
 
         assert await db_source.get_customized_image_count(user_id) == 0
 

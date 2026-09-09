@@ -846,7 +846,7 @@ class DeleteService[TData]:
 
     Takes ``UpdateOpsAction`` rather than a delete-shaped base because a soft delete is
     a status transition: which column moves to which value is domain knowledge, and
-    ``DBOpsProvider`` has no delete operation to generalize. The action still declares
+    ``V2DBOpsProvider`` has no delete operation to generalize. The action still declares
     ``operation_type() == DELETE``, so RBAC and the audit trail see a delete; only the
     write underneath is an update.
     """

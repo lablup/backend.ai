@@ -66,7 +66,6 @@ from ai.backend.manager.models.virtual_entity.entity_membership_field import (
 from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
 from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
 from ai.backend.manager.repositories.idle_checker.repository import IdleCheckerRepository
-from ai.backend.manager.repositories.ops import DBOpsProvider
 from ai.backend.manager.repositories.ops.repository import OpsRepository
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.ops.v2.relation.provider import RelationOpsProvider
@@ -127,7 +126,7 @@ class TestIdleCheckerAssignmentRepository:
     @pytest.fixture
     def repository(self, database: ExtendedAsyncSAEngine) -> IdleCheckerRepository:
         return IdleCheckerRepository(
-            DBOpsProvider(database),
+            database,
             RelationOpsProvider(database),
             V2DBOpsProvider(database),
         )

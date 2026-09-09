@@ -34,9 +34,8 @@
   writes nothing on the first failure, `partial_*` isolates each item in a savepoint and
   answers per item. There is no unmarked default, and the two are never selected by an
   argument — the return type differs (`list` vs `BulkResultWithFailures`).
-- The new path for the standard six operations is `OpsRepository` (`V2DBOpsProvider`).
-  The legacy `DBOpsProvider` reads only; every write goes through the v2 ops. When a
-  write capability is missing there, report it as a v2 gap (see the demotion mapping in
+- The path for the standard six operations is `OpsRepository` (`V2DBOpsProvider`). When
+  a capability is missing there, report it as a v2 gap (see the demotion mapping in
   `services/KNOWLEDGE.md`).
 - ❌ MUST NOT construct an ops object. `V2WriteOps(session)`, `V2ReadOps(session)` and
   every form of it are forbidden, with no exception. ✅ Take ops from a provider's
