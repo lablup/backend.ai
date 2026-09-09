@@ -9,21 +9,26 @@ reads.
 from __future__ import annotations
 
 import uuid
+from typing import Any
 
 import sqlalchemy as sa
 from sqlalchemy.orm import InstrumentedAttribute, aliased
 
-from ai.backend.common.data.entity.types import EntityID, ScopeID, ScopeType
+from ai.backend.common.data.entity.types import EntityID, EntityType, ScopeID, ScopeType
 from ai.backend.common.data.entity.user import UserEntityType
 from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
 from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
 
 __all__ = (
+    "scope_membership_exists",
     "user_scope_membership_exists",
     "user_scope_membership_query",
 )
 
-type _UuidExpr = uuid.UUID | sa.ColumnElement[uuid.UUID] | InstrumentedAttribute[uuid.UUID]
+# The column element is parameterized loosely: an id newtype makes
+# `ColumnElement[DomainID]`, which is not a `ColumnElement[UUID]` under invariance,
+# and every such newtype is a UUID at the database.
+type _UuidExpr = uuid.UUID | sa.ColumnElement[Any] | InstrumentedAttribute[Any]
 
 
 def user_scope_membership_query(
@@ -52,16 +57,19 @@ def user_scope_membership_query(
     return query
 
 
-def user_scope_membership_exists(
+def scope_membership_exists(
     scope_type: ScopeType,
     scope_id: _UuidExpr,
-    user_id: _UuidExpr,
+    member_type: EntityType,
+    member_id: _UuidExpr,
 ) -> sa.ColumnElement[bool]:
-    """EXISTS predicate: the user is enrolled in the scope's virtual entity.
+    """EXISTS predicate: the scope's virtual entity holds the named member.
 
-    ``scope_id`` / ``user_id`` accept literal UUIDs or column expressions, so the
-    predicate works both as a direct filter and as a correlated condition inside a
-    larger query.
+    A cap bounds what the scope may do with the member, not whether the scope holds
+    it, so an own edge and a share both answer here.
+
+    Either id accepts a literal UUID or a column expression, so the predicate works
+    both as a direct filter and as a correlated condition inside a larger query.
     """
     member = aliased(VirtualEntityRow, name="member_virtual_entity")
     return sa.exists(
@@ -72,7 +80,16 @@ def user_scope_membership_exists(
         .where(
             VirtualEntityRow.entity_type == scope_type,
             VirtualEntityRow.entity_id == scope_id,
-            member.entity_type == UserEntityType(),
-            member.entity_id == user_id,
+            member.entity_type == member_type,
+            member.entity_id == member_id,
         )
     )
+
+
+def user_scope_membership_exists(
+    scope_type: ScopeType,
+    scope_id: _UuidExpr,
+    user_id: _UuidExpr,
+) -> sa.ColumnElement[bool]:
+    """EXISTS predicate: the user is enrolled in the scope's virtual entity."""
+    return scope_membership_exists(scope_type, scope_id, UserEntityType(), user_id)
