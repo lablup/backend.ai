@@ -40,12 +40,15 @@ from .conftest import MockAuth
 _DEFAULT_CONFIG = ClientConfig(endpoint=URL("https://api.example.com"))
 
 _ROLE_ID = UUID("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")
+_SCOPE_ID = UUID("dddddddd-dddd-dddd-dddd-dddddddddddd")
 _USER_ID = UUID("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb")
 _GRANTED_BY = UUID("cccccccc-cccc-cccc-cccc-cccccccccccc")
 
 _ROLE_PAYLOAD = {
     "id": str(_ROLE_ID),
     "name": "admin",
+    "scope_type": "project",
+    "scope_id": str(_SCOPE_ID),
     "source": "custom",
     "status": "active",
     "created_at": "2025-01-01T00:00:00+00:00",

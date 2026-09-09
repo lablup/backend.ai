@@ -9908,8 +9908,13 @@ type Permission implements Node {
   scopeType: RBACElementType!
   scopeId: String!
   entityType: RBACElementType!
-  operation: OperationType!
   createdAt: DateTime!
+
+  """Added in 26.9.0. The permission bit the row holds."""
+  permission: PermissionBit!
+
+  """Deprecated: use `permission`. The same bit named as an action."""
+  operation: OperationType! @deprecated(reason: "Deprecated since 26.9.0. Use `permission`.")
 
   """The role this permission belongs to."""
   role: Role
@@ -13438,6 +13443,12 @@ type Role implements Node {
   Added in 26.4.4. When true, the role is automatically granted to a user when the user is added to a scope this role is registered in.
   """
   autoAssign: Boolean!
+
+  """Added in 26.9.0. Type of the scope the role belongs to."""
+  scopeType: String!
+
+  """Added in 26.9.0. ID of the scope the role belongs to."""
+  scopeId: UUID!
 
   """Added in 26.3.0. Permissions associated with this role."""
   permissions(filter: PermissionFilter = null, orderBy: [PermissionOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): PermissionConnection

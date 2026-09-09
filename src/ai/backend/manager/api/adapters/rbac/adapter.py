@@ -138,6 +138,7 @@ from ai.backend.common.dto.manager.v2.rbac.request import (
 from ai.backend.common.dto.manager.v2.rbac.types import (
     OperationTypeDTO,
     OperationTypeFilter,
+    PermissionBitDTO,
     RBACElementTypeDTO,
     RBACElementTypeFilter,
     RoleSourceDTO,
@@ -1852,6 +1853,8 @@ class RBACAdapter(BaseAdapter):
             created_at=data.created_at,
             updated_at=data.updated_at,
             deleted_at=data.deleted_at,
+            scope_type=data.scope_type,
+            scope_id=data.scope_id,
         )
 
     @staticmethod
@@ -1866,6 +1869,8 @@ class RBACAdapter(BaseAdapter):
             created_at=data.created_at,
             updated_at=data.updated_at,
             deleted_at=data.deleted_at,
+            scope_type=data.scope_type,
+            scope_id=data.scope_id,
         )
 
     @staticmethod
@@ -1876,6 +1881,7 @@ class RBACAdapter(BaseAdapter):
             scope_type=RBACElementTypeDTO(data.scope_type),
             scope_id=data.scope_id,
             entity_type=RBACElementTypeDTO(data.entity_type),
+            permission=PermissionBitDTO[data.permission.to_operation().name],
             operation=OperationTypeDTO(data.permission.to_operation().value),
             created_at=data.created_at,
         )
@@ -1916,6 +1922,8 @@ class RBACAdapter(BaseAdapter):
         return RoleDTO(
             id=data.id,
             name=data.name,
+            scope_type=data.scope_type,
+            scope_id=data.scope_id,
             source=RoleSource(data.source.value),
             status=RoleStatus(data.status.value),
             created_at=data.created_at,
