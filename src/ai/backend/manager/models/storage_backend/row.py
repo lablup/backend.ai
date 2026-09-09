@@ -11,12 +11,13 @@ from ai.backend.common.data.entity.storage_backend_type import StorageBackendTyp
 from ai.backend.common.data.storage.types import (
     DEFAULT_STATUS_STALE_AFTER,
     ServiceStorageStatus,
-    StorageBackendCapability,
+    StorageBackendCapabilities,
     StorageBackendType,
 )
 from ai.backend.manager.models.base import (
     GUID,
     Base,
+    PydanticColumn,
     StrEnumType,
 )
 from ai.backend.manager.models.mixins.timestamp import LifecycleTimestampsMixin
@@ -46,11 +47,11 @@ class StorageBackendTypeRow(LifecycleTimestampsMixin, Base):
     name: Mapped[StorageBackendType] = mapped_column(
         "name", sa.String(length=64), unique=True, nullable=False
     )
-    capabilities: Mapped[list[StorageBackendCapability]] = mapped_column(
+    capabilities: Mapped[StorageBackendCapabilities] = mapped_column(
         "capabilities",
-        sa.ARRAY(StrEnumType(StorageBackendCapability)),
+        PydanticColumn(StorageBackendCapabilities),
         nullable=False,
-        server_default=sa.text("'{}'"),
+        server_default=sa.text("'{}'::jsonb"),
     )
 
 
@@ -70,7 +71,7 @@ class StorageBackendRow(LifecycleTimestampsMixin, Base):
         primary_key=True,
         server_default=sa.text("uuid_generate_v7()"),
     )
-    name: Mapped[str] = mapped_column("name", sa.String(length=64), unique=True, nullable=False)
+    name: Mapped[str] = mapped_column("name", sa.String(length=64), nullable=False)
     type_id: Mapped[StorageBackendTypeID] = mapped_column(
         "type_id",
         GUID(StorageBackendTypeID),
