@@ -106,6 +106,8 @@ class TestSearchPermissions:
 
         async with db_with_rbac_tables.begin_session() as db_sess:
             role = RoleRow(
+                scope_type=EntityType("project"),
+                scope_id=uuid.uuid4(),
                 id=role_id,
                 name="test-role-perms",
                 description="Test role for permissions",

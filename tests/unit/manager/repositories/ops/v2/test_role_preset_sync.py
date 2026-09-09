@@ -125,6 +125,8 @@ async def _add_role(
                 source=RoleSource.SYSTEM,
                 status=RoleStatus.ACTIVE,
                 role_preset_id=preset_id,
+                scope_type=EntityType("project"),
+                scope_id=project_id,
             )
         )
         await sess.flush()

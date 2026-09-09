@@ -57,6 +57,8 @@ class TestRolePermissionWrite:
         async with db_with_tables.begin_session() as db_sess:
             await db_sess.execute(
                 sa.insert(RoleRow).values(
+                    scope_type=EntityType("project"),
+                    scope_id=uuid.uuid4(),
                     id=role_id,
                     name="reader",
                     source=RoleSource.CUSTOM,

@@ -4970,13 +4970,20 @@ input CreateRoleInput
 {
   name: String!
   description: String = null
-  source: RoleSource! = CUSTOM
+
+  """Deprecated and ignored: a created role is always custom."""
+  source: RoleSource = null @deprecated(reason: "Deprecated since 26.9.0. Ignored: a created role is always custom.")
 
   """
   Added in 26.4.4. When true, the role is automatically granted to a user when the user is added to a scope this role is registered in.
   """
   autoAssign: Boolean! = false
-  scopes: [ScopeInput!] = null
+
+  """Added in 26.9.0. The scope the role belongs to."""
+  scope: ScopeInput = null
+
+  """Deprecated: use `scope`. Accepts exactly one entry."""
+  scopes: [ScopeInput!] = null @deprecated(reason: "Deprecated since 26.9.0. Use `scope`.")
 }
 
 """Added in 26.4.4. Input for creating a new role preset."""
@@ -19068,7 +19075,7 @@ input RoleMappedScopeNestedFilter
   @join__type(graph: STRAWBERRY)
 {
   scopeType: RBACElementTypeFilter = null
-  scopeId: StringFilter = null
+  scopeId: UUIDFilter = null
   AND: [RoleMappedScopeNestedFilter!] = null
   OR: [RoleMappedScopeNestedFilter!] = null
   NOT: [RoleMappedScopeNestedFilter!] = null

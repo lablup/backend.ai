@@ -473,6 +473,8 @@ class TestUserCreateAutoAssignRoles:
                 name=name,
                 status=RoleStatus.ACTIVE,
                 auto_assign=True,
+                scope_type=PROJECT_ENTITY_TYPE,
+                scope_id=project_id,
             )
         )
         role_node_id = uuid.uuid4()

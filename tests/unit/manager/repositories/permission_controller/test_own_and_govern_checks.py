@@ -222,7 +222,14 @@ class TestCheckPermissionViaVirtualEntity:
             db_sess.add(user)
             await db_sess.flush()
 
-            role = RoleRow(id=ids.role_id, name="test-role", status=role_status)
+            db_sess.add(VirtualEntityRow(entity_type=EntityType("domain"), entity_id=domain_id))
+            role = RoleRow(
+                id=ids.role_id,
+                name="test-role",
+                status=role_status,
+                scope_type=EntityType("domain"),
+                scope_id=domain_id,
+            )
             db_sess.add(role)
             await db_sess.flush()
 
@@ -728,7 +735,16 @@ class TestUserRosterEnrollment:
                     resource_policy=project_policy_name,
                 )
             )
-            db_sess.add(RoleRow(id=ids.role_id, name="project-role", status=RoleStatus.ACTIVE))
+            db_sess.add(VirtualEntityRow(entity_type=EntityType("domain"), entity_id=domain_id))
+            db_sess.add(
+                RoleRow(
+                    id=ids.role_id,
+                    name="project-role",
+                    status=RoleStatus.ACTIVE,
+                    scope_type=EntityType("domain"),
+                    scope_id=domain_id,
+                )
+            )
             await db_sess.flush()
             db_sess.add(UserRoleRow(user_id=ids.user_id, role_id=ids.role_id))
             db_sess.add_all(

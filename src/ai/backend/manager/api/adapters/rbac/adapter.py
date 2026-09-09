@@ -200,13 +200,12 @@ from ai.backend.manager.models.rbac_models.permission.orders import ScopedPermis
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.rbac_models.role.conditions import RoleConditions
-from ai.backend.manager.models.rbac_models.role.creators import GlobalRoleCreator, RoleCreator
+from ai.backend.manager.models.rbac_models.role.creators import RoleCreator
 from ai.backend.manager.models.rbac_models.role.orders import RoleOrders
 from ai.backend.manager.models.rbac_models.role.scopes import ScopedRoleOperationScope
 from ai.backend.manager.models.rbac_models.role.updaters import RoleSoftDeleteUpdater, RoleUpdater
 from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
 from ai.backend.manager.models.specs.pagination import NoPagination, OffsetPagination
-from ai.backend.manager.models.virtual_entity.conditions import OwningScopeConditions
 from ai.backend.manager.repositories.base import BatchQuerier, BulkCreator, Purger
 from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.base.updater import Updater
@@ -221,9 +220,6 @@ from ai.backend.manager.services.permission_contoller.actions.add_role_permissio
 )
 from ai.backend.manager.services.permission_contoller.actions.bulk_remove_role_permissions import (
     BulkRemoveRolePermissionsAction,
-)
-from ai.backend.manager.services.permission_contoller.actions.create_global_role import (
-    CreateGlobalRoleAction,
 )
 from ai.backend.manager.services.permission_contoller.actions.create_role import CreateRoleAction
 from ai.backend.manager.services.permission_contoller.actions.delete_role import DeleteRoleAction
@@ -627,35 +623,20 @@ class RBACAdapter(BaseAdapter):
     # ------------------------------------------------------------------ create
 
     async def create(self, input: CreateRoleInput) -> CreateRolePayload:
-        """Create a new role."""
-        scopes = [
-            self._scope_identifier(RBACElementType(s.scope_type), s.scope_id)
-            for s in (input.scopes or [])
-        ]
-        source = InternalRoleSource(input.source.value)
-        if scopes:
-            result = await self._permission_controller.create_role.run(
-                CreateRoleAction(
-                    creator=RoleCreator(
-                        name=input.name,
-                        scopes=scopes,
-                        source=source,
-                        description=input.description,
-                        auto_assign=input.auto_assign,
-                    )
+        """Create a new role in the one scope the input names."""
+        scope_input = input.scope_input()
+        result = await self._permission_controller.create_role.run(
+            CreateRoleAction(
+                creator=RoleCreator(
+                    name=input.name,
+                    scope=self._scope_identifier(
+                        RBACElementType(scope_input.scope_type), scope_input.scope_id
+                    ),
+                    description=input.description,
+                    auto_assign=input.auto_assign,
                 )
             )
-        else:
-            result = await self._permission_controller.create_global_role.run(
-                CreateGlobalRoleAction(
-                    creator=GlobalRoleCreator(
-                        name=input.name,
-                        source=source,
-                        description=input.description,
-                        auto_assign=input.auto_assign,
-                    )
-                )
-            )
+        )
         return CreateRolePayload(role=self._role_data_to_node(result.data))
 
     # ------------------------------------------------------------------ search
@@ -1514,29 +1495,24 @@ class RBACAdapter(BaseAdapter):
         if f.scope_type is not None:
             st = f.scope_type
             if st.equals is not None:
-                raw_conditions.append(
-                    OwningScopeConditions.by_scope_type_equals(EntityType(st.equals))
-                )
+                raw_conditions.append(RoleConditions.by_scope_type_equals(EntityType(st.equals)))
             if st.in_ is not None and st.in_:
                 raw_conditions.append(
-                    OwningScopeConditions.by_scope_type_in([EntityType(s) for s in st.in_])
+                    RoleConditions.by_scope_type_in([EntityType(s) for s in st.in_])
                 )
             if st.not_equals is not None:
                 raw_conditions.append(
-                    OwningScopeConditions.by_scope_type_not_equals(EntityType(st.not_equals))
+                    RoleConditions.by_scope_type_not_equals(EntityType(st.not_equals))
                 )
             if st.not_in is not None and st.not_in:
                 raw_conditions.append(
-                    OwningScopeConditions.by_scope_type_not_in([EntityType(s) for s in st.not_in])
+                    RoleConditions.by_scope_type_not_in([EntityType(s) for s in st.not_in])
                 )
         if f.scope_id is not None:
-            condition = self.convert_string_filter(
+            condition = self.convert_uuid_filter(
                 f.scope_id,
-                contains_factory=OwningScopeConditions.by_scope_id_contains,
-                equals_factory=OwningScopeConditions.by_scope_id_equals,
-                starts_with_factory=OwningScopeConditions.by_scope_id_starts_with,
-                ends_with_factory=OwningScopeConditions.by_scope_id_ends_with,
-                in_factory=OwningScopeConditions.by_scope_id_in,
+                equals_factory=RoleConditions.by_scope_id_equals,
+                in_factory=RoleConditions.by_scope_id_in,
             )
             if condition is not None:
                 raw_conditions.append(condition)

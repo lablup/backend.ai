@@ -394,6 +394,7 @@ async def vfolder_fixture(
 @pytest.fixture()
 async def role_fixture(
     db_engine: SAEngine,
+    model_store_project_fixture: uuid.UUID,
 ) -> AsyncIterator[uuid.UUID]:
     """Insert a project member role for assign_users SDK calls."""
     role_id = uuid.uuid4()
@@ -403,6 +404,8 @@ async def role_fixture(
                 id=role_id,
                 name=f"test-member-{secrets.token_hex(4)}",
                 status=RoleStatus.ACTIVE,
+                scope_type=ScopeType.PROJECT.value,
+                scope_id=model_store_project_fixture,
             )
         )
     yield role_id

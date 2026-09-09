@@ -495,8 +495,8 @@ async def _create_project(db: ExtendedAsyncSAEngine, domain_name: DomainName) ->
 
 
 async def _enrol_auto_assign_role(db: ExtendedAsyncSAEngine, project_id: ProjectID) -> RoleID:
-    """A role the project hands to whoever joins it, enrolled in the project's virtual
-    entity the way the preset-derived ones are."""
+    """A role the project hands to whoever joins it, on the row and enrolled in the
+    project's virtual entity the way the preset-derived ones are."""
     role_id = RoleID(uuid.uuid4())
     async with db.begin_session() as session:
         session.add(
@@ -505,6 +505,8 @@ async def _enrol_auto_assign_role(db: ExtendedAsyncSAEngine, project_id: Project
                 name=f"role-{role_id.hex[:8]}",
                 status=RoleStatus.ACTIVE,
                 auto_assign=True,
+                scope_type=PROJECT_SCOPE_TYPE,
+                scope_id=project_id,
             )
         )
         role_node = VirtualEntityRow(entity_type=ROLE_ENTITY_TYPE, entity_id=role_id)

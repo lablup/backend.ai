@@ -305,6 +305,8 @@ async def rbac_permission_fixture(
                 id=role_id,
                 name=f"test-project-admin-{secrets.token_hex(4)}",
                 status=RoleStatus.ACTIVE,
+                scope_type=ScopeType.PROJECT.value,
+                scope_id=group_fixture,
             )
         )
         await conn.execute(
@@ -358,6 +360,8 @@ async def admin_target_project_permission(
                 id=role_id,
                 name=f"test-target-admin-{secrets.token_hex(4)}",
                 status=RoleStatus.ACTIVE,
+                scope_type=ScopeType.PROJECT.value,
+                scope_id=target_project_fixture,
             )
         )
         await conn.execute(
@@ -518,6 +522,8 @@ async def member_role_fixture(
                 id=role_id,
                 name=f"test-member-{secrets.token_hex(4)}",
                 status=RoleStatus.ACTIVE,
+                scope_type=ScopeType.PROJECT.value,
+                scope_id=target_project_fixture,
             )
         )
         await conn.execute(
