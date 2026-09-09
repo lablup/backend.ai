@@ -30,7 +30,7 @@ class TestUpdateArtifactInput:
         req = UpdateArtifactInput(description=UNSET)
         assert req.description is UNSET
 
-    def test_none_description_means_no_change(self) -> None:
+    def test_none_description_stays_none(self) -> None:
         req = UpdateArtifactInput(description=None)
         assert req.description is None
 
@@ -46,8 +46,16 @@ class TestUpdateArtifactInput:
         req = UpdateArtifactInput(description="   ")
         assert req.description is None
 
-    def test_readonly_default_is_none(self) -> None:
+    def test_readonly_default_is_unset(self) -> None:
         req = UpdateArtifactInput()
+        assert req.readonly is UNSET
+
+    def test_explicit_unset_readonly_signals_no_change(self) -> None:
+        req = UpdateArtifactInput(readonly=UNSET)
+        assert req.readonly is UNSET
+
+    def test_none_readonly_stays_none(self) -> None:
+        req = UpdateArtifactInput(readonly=None)
         assert req.readonly is None
 
     def test_readonly_true(self) -> None:

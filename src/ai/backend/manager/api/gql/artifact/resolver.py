@@ -419,7 +419,7 @@ async def update_artifact(
     input: UpdateArtifactInput, info: Info[StrawberryGQLContext]
 ) -> UpdateArtifactPayload | None:
     pydantic_input = UpdateArtifactInputDTO(
-        readonly=input.readonly if input.readonly is not UNSET else None,
+        readonly=input.readonly if input.readonly is not UNSET else DTO_UNSET,
         description=input.description if input.description is not UNSET else DTO_UNSET,
     )
     payload = await info.context.adapters.artifact.update(pydantic_input, UUID(input.artifact_id))

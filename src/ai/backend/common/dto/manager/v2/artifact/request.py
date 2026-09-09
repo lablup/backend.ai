@@ -59,9 +59,9 @@ __all__ = (
 class UpdateArtifactInput(BaseRequestModel):
     """Input for updating artifact metadata."""
 
-    readonly: bool | None = Field(
-        default=None,
-        description="Whether the artifact should be readonly. None means no change.",
+    readonly: bool | None | Unset = Field(
+        default=UNSET,
+        description="Whether the artifact should be readonly. Omit to leave unchanged.",
     )
     description: str | None | Unset = Field(
         default=UNSET,
@@ -392,7 +392,11 @@ class UpdateArtifactGQLInput(BaseRequestModel):
     """GQL input for updating artifact metadata."""
 
     artifact_id: UUID = Field(description="ID of the artifact to update.")
-    readonly: bool | None = Field(
-        default=None, description="Whether the artifact should be readonly."
+    readonly: bool | None | Unset = Field(
+        default=UNSET,
+        description="Whether the artifact should be readonly. Omit to leave unchanged.",
     )
-    description: str | None = Field(default=None, description="Updated description.")
+    description: str | None | Unset = Field(
+        default=UNSET,
+        description="Updated description. Omit to leave unchanged; null clears.",
+    )

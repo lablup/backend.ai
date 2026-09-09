@@ -261,11 +261,7 @@ class ArtifactAdapter(BaseAdapter):
         """Update artifact metadata (readonly flag and description)."""
         updater = ArtifactUpdater(
             artifact_id=ArtifactID(artifact_id),
-            readonly=(
-                TriState.update(input.readonly)
-                if input.readonly is not None
-                else TriState[bool].nop()
-            ),
+            readonly=TriState.from_unset(input.readonly),
             description=TriState.from_unset(input.description),
         )
         action_result = await self._processors.artifact.update.run(
