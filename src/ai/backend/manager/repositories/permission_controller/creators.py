@@ -3,35 +3,28 @@
 Deprecated: roles and their permissions use the v2 specs under
 ``models/rbac_models/``; the graph rows (memberships, bindings, role grants) are
 written by the ops primitives in ``repositories/ops/v2/`` from whole declarations,
-with no spec lineage (BEP-1077). The remaining users move under BA-7204.
+with no spec lineage (BEP-1077).
 """
 
 from __future__ import annotations
 
 import uuid
-from collections.abc import Mapping, Sequence
+from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.common.data.entity.types import EntityType, ScopeRef
+from ai.backend.common.data.entity.types import EntityType
 from ai.backend.common.data.entity.user import UserID
-from ai.backend.common.data.entity.virtual_entity import VirtualEntityID
 from ai.backend.manager.data.permission.bit import single_bit
-from ai.backend.manager.data.permission.id import ObjectId, ScopeId
 from ai.backend.manager.data.permission.types import (
     Permission,
 )
 from ai.backend.manager.errors.permission import RoleAlreadyAssigned
 from ai.backend.manager.errors.repository import UniqueConstraintViolationError
-from ai.backend.manager.models.rbac_models.association_scopes_entities import (
-    AssociationScopesEntitiesRow,
-)
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck
-from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
-from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
-from ai.backend.manager.repositories.base.creator import CreatorSpec, DependentCreatorSpec
+from ai.backend.manager.repositories.base.creator import CreatorSpec
 
 
 @dataclass
@@ -88,69 +81,3 @@ class UserRoleCreatorSpec(CreatorSpec[UserRoleRow]):
         if self.granted_by is not None:
             row.granted_by = self.granted_by
         return row
-
-
-@dataclass
-class AssociationScopesEntitiesCreatorSpec(CreatorSpec[AssociationScopesEntitiesRow]):
-    """CreatorSpec for association between scopes and entities.
-
-    Deprecated: goes with the ``association_scopes_entities`` table; the own edge is
-    written by ``V2GraphWriteOpsBase`` in ``repositories/ops/v2/graph_write.py``.
-    """
-
-    scope_id: ScopeId
-    object_id: ObjectId
-
-    @override
-    def build_row(self) -> AssociationScopesEntitiesRow:
-        return AssociationScopesEntitiesRow(
-            scope_type=self.scope_id.scope_type,
-            scope_id=self.scope_id.scope_id,
-            entity_type=self.object_id.entity_type,
-            entity_id=self.object_id.entity_id,
-        )
-
-
-@dataclass
-class EntityMembershipCreatorSpec(DependentCreatorSpec[VirtualEntityID, EntityMembershipRow]):
-    """Membership of the entity behind ``member_entity_id`` in the virtual entity given
-    as the dependency.
-
-    Deprecated: memberships are written by ``V2GraphWriteOpsBase`` in
-    ``repositories/ops/v2/graph_write.py`` — BA-7204.
-    """
-
-    member_entity_id: VirtualEntityID
-    capped: bool = False
-
-    @override
-    def build_row(self, dependency: VirtualEntityID) -> EntityMembershipRow:
-        return EntityMembershipRow(
-            virtual_entity_id=dependency,
-            member_entity_id=self.member_entity_id,
-            capped=self.capped,
-        )
-
-
-@dataclass
-class ScopeBindingCreatorSpec(
-    DependentCreatorSpec[Mapping[ScopeRef, VirtualEntityID], ScopeBindingRow]
-):
-    """Binding of ``bound_scope`` into ``anchor_scope``'s virtual entity; the dependency
-    maps both scopes to their virtual entity ids.
-
-    Deprecated: bindings are written by ``V2GraphWriteOpsBase`` in
-    ``repositories/ops/v2/graph_write.py`` — BA-7204.
-    """
-
-    anchor_scope: ScopeRef
-    bound_scope: ScopeRef
-    permission_cap: Permission | None = None
-
-    @override
-    def build_row(self, dependency: Mapping[ScopeRef, VirtualEntityID]) -> ScopeBindingRow:
-        return ScopeBindingRow(
-            virtual_entity_id=dependency[self.anchor_scope],
-            scope_entity_id=dependency[self.bound_scope],
-            permission_cap=self.permission_cap,
-        )
