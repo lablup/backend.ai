@@ -78,9 +78,12 @@ class FailureDisposition(StrEnum):
     then the wrong terminal state.
     """
 
-    #: Nothing was asked of any agent, and this placement will not work. Give the placement up now
-    #: and let the session be scheduled again -- somewhere else, since the agent that refused it is
-    #: recorded against the session.
+    #: Nothing was asked of any agent, so nothing is running and the session could in principle
+    #: be placed somewhere else. It is NOT sent straight back to PENDING: the retry budget is
+    #: counted per phase, and a round trip through PENDING resets it, so that is a livelock rather
+    #: than a re-placement (see `ScheduleCoordinator._classify_failures`, which has the measured
+    #: numbers). It is classified normally -- retried, then given up -- while the agents that
+    #: refused it are recorded against the session so a later scheduling round avoids them.
     REPLACE = "replace"
     #: Work was already requested somewhere. There is no second placement to make: it has to be
     #: torn down.
