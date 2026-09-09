@@ -90,11 +90,15 @@ async def project_with_rbac_rows(
                     "id": admin_role_id,
                     "name": f"project-{scope_id[:8]}-admin",
                     "status": RoleStatus.ACTIVE,
+                    "scope_type": ScopeType.PROJECT.value,
+                    "scope_id": project_id,
                 },
                 {
                     "id": member_role_id,
                     "name": f"project-{scope_id[:8]}-member",
                     "status": RoleStatus.ACTIVE,
+                    "scope_type": ScopeType.PROJECT.value,
+                    "scope_id": project_id,
                 },
             ])
         )

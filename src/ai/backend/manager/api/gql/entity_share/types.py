@@ -37,7 +37,6 @@ from ai.backend.common.dto.manager.v2.entity_share.types import (
     EntityShareSideDTO,
     EntityShareStatusDTO,
 )
-from ai.backend.common.dto.manager.v2.rbac.types import PermissionBitDTO
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
@@ -50,7 +49,7 @@ from ai.backend.manager.api.gql.decorators import (
     gql_pydantic_type,
 )
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin, PydanticOutputMixin
-from ai.backend.manager.api.gql.rbac.types.scope import UUIDScopeGQL
+from ai.backend.manager.api.gql.rbac.types.scope import PermissionBitGQL, UUIDScopeGQL
 
 EntityShareStatusGQL: type[EntityShareStatusDTO] = gql_enum(
     BackendAIGQLMeta(added_version=NEXT_RELEASE_VERSION, description="Where a share stands."),
@@ -65,15 +64,6 @@ EntityShareSideGQL: type[EntityShareSideDTO] = gql_enum(
     ),
     EntityShareSideDTO,
     name="EntityShareSide",
-)
-
-PermissionBitGQL: type[PermissionBitDTO] = gql_enum(
-    BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
-        description="One bit of a permission mask; distinct from OperationType, which names an action.",
-    ),
-    PermissionBitDTO,
-    name="PermissionBit",
 )
 
 

@@ -167,6 +167,8 @@ class TestCheckBulkPermissionWithScopeChain:
             await db_sess.flush()
 
             role = RoleRow(
+                scope_type=EntityType("project"),
+                scope_id=uuid.uuid4(),
                 id=fixture_ids.role_id,
                 name="test-role",
                 description="Test role for batch scope chain",
@@ -219,6 +221,8 @@ class TestCheckBulkPermissionWithScopeChain:
             await db_sess.flush()
 
             role = RoleRow(
+                scope_type=EntityType("project"),
+                scope_id=uuid.uuid4(),
                 id=fixture_ids.role_id,
                 name="inactive-role",
                 status=RoleStatus.INACTIVE,
@@ -464,7 +468,14 @@ class TestCheckBulkPermissionWithScopeChain:
             )
             await db_sess.flush()
 
-            db_sess.add(RoleRow(id=other_role_id, name="other-role"))
+            db_sess.add(
+                RoleRow(
+                    scope_type=EntityType("project"),
+                    scope_id=uuid.uuid4(),
+                    id=other_role_id,
+                    name="other-role",
+                )
+            )
             await db_sess.flush()
 
             db_sess.add(UserRoleRow(user_id=other_user_id, role_id=other_role_id))

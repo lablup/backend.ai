@@ -6,7 +6,7 @@ from typing import override
 
 from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE, ProjectID
 from ai.backend.common.data.entity.session_template import (
-    SESSION_TEMPLATE_ENTITY_TYPE,
+    SessionTemplateEntityType,
     SessionTemplateID,
 )
 from ai.backend.common.data.entity.types import EntityIdentifier, EntityType, ScopeRef
@@ -37,7 +37,7 @@ class TemplateProjectScopeAction(BaseScopeAction):
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return SESSION_TEMPLATE_ENTITY_TYPE
+        return SessionTemplateEntityType()
 
     @override
     def scope_targets(self) -> Sequence[ScopeRef]:
@@ -53,7 +53,7 @@ class TemplateUserScopeAction(BaseScopeAction):
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return SESSION_TEMPLATE_ENTITY_TYPE
+        return SessionTemplateEntityType()
 
     @override
     def scope_targets(self) -> Sequence[ScopeRef]:

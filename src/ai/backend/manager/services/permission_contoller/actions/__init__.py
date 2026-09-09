@@ -1,6 +1,5 @@
 from .add_role_permission import AddRolePermissionAction
 from .bulk_remove_role_permissions import BulkRemoveRolePermissionsAction
-from .create_global_role import CreateGlobalRoleAction
 from .create_role import CreateRoleAction
 from .delete_role import DeleteRoleAction
 from .get_permission_matrix import GetPermissionMatrixAction, GetPermissionMatrixActionResult
@@ -29,7 +28,6 @@ from .update_role import UpdateRoleAction
 __all__ = [
     "AddRolePermissionAction",
     "BulkRemoveRolePermissionsAction",
-    "CreateGlobalRoleAction",
     "CreateRoleAction",
     "DeleteRoleAction",
     "GetPermissionMatrixAction",

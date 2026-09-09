@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 from typing import Any
 
-from ai.backend.common.data.entity.types import GLOBAL_ENTITY_TYPE, EntityData, FieldData
+from ai.backend.common.data.entity.types import EntityData, FieldData, GlobalEntityType
 from ai.backend.manager.actions.registry.field import FieldGroup, LookupFieldGroup
 from ai.backend.manager.actions.registry.group import (
     ProcessorGroup,
@@ -61,7 +61,7 @@ class ConcernGroups[TData: EntityData]:
     def dangling_field_group[TFieldData: FieldData](
         self, meta: FieldGroupMeta, data_cls: type[TFieldData]
     ) -> FieldGroup[TFieldData]:
-        return FieldGroup(self._deps, self._records, self._concern, meta, GLOBAL_ENTITY_TYPE)
+        return FieldGroup(self._deps, self._records, self._concern, meta, GlobalEntityType())
 
 
 class ProcessorRegistry[TData: EntityData]:
@@ -89,7 +89,7 @@ class ProcessorRegistry[TData: EntityData]:
         :meth:`ProcessorGroup.field_group`: the owner's type is a value on the row, and
         some rows have no owner at all.
         """
-        return FieldGroup(self._deps, self._records, meta.field_type, meta, GLOBAL_ENTITY_TYPE)
+        return FieldGroup(self._deps, self._records, meta.field_type, meta, GlobalEntityType())
 
     def dangling_lookup_field_group[TFieldData: FieldData](
         self,
@@ -127,7 +127,7 @@ class ProcessorRegistry[TData: EntityData]:
             self._records,
             meta.field_type,
             meta,
-            GLOBAL_ENTITY_TYPE,
+            GlobalEntityType(),
             owner_lookup,
             bulk_owner_lookup,
             partial_bulk_owner_lookup,
@@ -138,7 +138,7 @@ class ProcessorRegistry[TData: EntityData]:
         self._records.append(
             WiredProcessor(
                 concern=meta.field_type,
-                entity_type=GLOBAL_ENTITY_TYPE,
+                entity_type=GlobalEntityType(),
                 field_type=meta.field_type,
                 action_cls=action_cls,
                 kind=ActionKind.LOOKUP,

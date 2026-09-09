@@ -10,7 +10,7 @@ import sqlalchemy as sa
 
 from ai.backend.common.data.entity.domain import DomainID, DomainName
 from ai.backend.common.data.entity.project import ProjectID
-from ai.backend.common.data.entity.role import ROLE_ENTITY_TYPE
+from ai.backend.common.data.entity.role import RoleEntityType
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
@@ -249,13 +249,12 @@ class TestRoleAssignment:
     ) -> uuid.UUID:
         role_id = uuid.uuid4()
         async with db_with_cleanup.begin_session() as session:
-            session.add(RoleRow(id=role_id, name=f"project-role-{role_id.hex[:8]}"))
             session.add(
-                AssociationScopesEntitiesRow(
-                    scope_type=ScopeType.PROJECT,
-                    scope_id=str(test_project),
-                    entity_type=EntityType.ROLE,
-                    entity_id=str(role_id),
+                RoleRow(
+                    id=role_id,
+                    name=f"project-role-{role_id.hex[:8]}",
+                    scope_type=ScopeType.PROJECT.value,
+                    scope_id=test_project,
                 )
             )
             await session.commit()
@@ -269,23 +268,36 @@ class TestRoleAssignment:
     ) -> uuid.UUID:
         role_id = uuid.uuid4()
         async with db_with_cleanup.begin_session() as session:
-            session.add(RoleRow(id=role_id, name=f"project-role2-{role_id.hex[:8]}"))
             session.add(
-                AssociationScopesEntitiesRow(
-                    scope_type=ScopeType.PROJECT,
-                    scope_id=str(test_project),
-                    entity_type=EntityType.ROLE,
-                    entity_id=str(role_id),
+                RoleRow(
+                    id=role_id,
+                    name=f"project-role2-{role_id.hex[:8]}",
+                    scope_type=ScopeType.PROJECT.value,
+                    scope_id=test_project,
                 )
             )
             await session.commit()
         return role_id
 
     @pytest.fixture
-    async def global_role(self, db_with_cleanup: ExtendedAsyncSAEngine) -> uuid.UUID:
+    async def domain_role(
+        self, db_with_cleanup: ExtendedAsyncSAEngine, test_domain: DomainFixtureData
+    ) -> uuid.UUID:
         role_id = uuid.uuid4()
         async with db_with_cleanup.begin_session() as session:
-            session.add(RoleRow(id=role_id, name=f"global-role-{role_id.hex[:8]}"))
+            session.add(
+                VirtualEntityRow(
+                    entity_type=ScopeType.DOMAIN.value, entity_id=test_domain.domain_id
+                )
+            )
+            session.add(
+                RoleRow(
+                    id=role_id,
+                    name=f"domain-role-{role_id.hex[:8]}",
+                    scope_type=ScopeType.DOMAIN.value,
+                    scope_id=test_domain.domain_id,
+                )
+            )
             await session.commit()
         return role_id
 
@@ -341,18 +353,18 @@ class TestRoleAssignment:
         assert result.project_remaining_roles[0].project_id == test_project
         assert result.project_remaining_roles[0].remaining_count == 1
 
-    async def test_revoke_global_role_returns_empty_project_remaining(
+    async def test_revoke_domain_role_returns_empty_project_remaining(
         self,
         perm_db_source: PermissionDBSource,
-        global_role: uuid.UUID,
+        domain_role: uuid.UUID,
         user_1: uuid.UUID,
     ) -> None:
         """Revoking a non-project-scoped role returns empty project_remaining."""
         await perm_db_source.assign_role(
-            UserRoleAssignmentInput(user_id=user_1, role_id=global_role)
+            UserRoleAssignmentInput(user_id=user_1, role_id=domain_role)
         )
         result = await perm_db_source.revoke_role(
-            UserRoleRevocationInput(user_id=user_1, role_id=global_role)
+            UserRoleRevocationInput(user_id=user_1, role_id=domain_role)
         )
         assert result.project_remaining_roles == []
 
@@ -527,7 +539,8 @@ class TestRoleAssignment:
         auto_assign: bool = True,
         status: RoleStatus = RoleStatus.ACTIVE,
     ) -> uuid.UUID:
-        """Create a role and enrol its node under the project's, as a scope's roles are."""
+        """Create a role of the project and enrol its node under the project's, as a
+        scope's roles are."""
         role_id = uuid.uuid4()
         async with db.begin_session() as session:
             session.add(
@@ -536,10 +549,12 @@ class TestRoleAssignment:
                     name=f"auto-role-{role_id.hex[:8]}",
                     auto_assign=auto_assign,
                     status=status,
+                    scope_type=ScopeType.PROJECT.value,
+                    scope_id=project_id,
                 )
             )
             await session.flush()
-            role_node = VirtualEntityRow(entity_type=ROLE_ENTITY_TYPE, entity_id=role_id)
+            role_node = VirtualEntityRow(entity_type=RoleEntityType(), entity_id=role_id)
             session.add(role_node)
             await session.flush()
             project_node_id = await session.scalar(

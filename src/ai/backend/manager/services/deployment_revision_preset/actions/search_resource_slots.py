@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from typing import override
 
 from ai.backend.common.data.entity.deployment_preset import (
-    DEPLOYMENT_PRESET_ENTITY_TYPE,
+    DeploymentPresetEntityType,
     DeploymentPresetID,
 )
 from ai.backend.common.data.entity.types import EntityType, ScopeRef, ScopeType
@@ -37,12 +37,12 @@ class SearchPresetResourceSlotsAction(
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return DEPLOYMENT_PRESET_ENTITY_TYPE
+        return DeploymentPresetEntityType()
 
     @override
     def scope_targets(self) -> Sequence[ScopeRef]:
         return (
-            ScopeRef(scope_type=ScopeType(DEPLOYMENT_PRESET_ENTITY_TYPE), scope_id=self.preset_id),
+            ScopeRef(scope_type=ScopeType(DeploymentPresetEntityType()), scope_id=self.preset_id),
         )
 
     @override

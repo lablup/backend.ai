@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 import secrets
+import uuid
 from typing import Any
 
 import pytest
 
 from ai.backend.client.v2.exceptions import ConflictError, NotFoundError, PermissionDeniedError
 from ai.backend.client.v2.registry import BackendAIClientRegistry
+from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE
 from ai.backend.common.dto.manager.query import StringFilter
 from ai.backend.common.dto.manager.rbac.request import (
     AssignRoleRequest,
@@ -477,12 +479,15 @@ class TestRolePermissions:
     async def test_regular_user_cannot_create_role(
         self,
         user_registry: BackendAIClientRegistry,
+        group_fixture: uuid.UUID,
     ) -> None:
         unique = secrets.token_hex(4)
         with pytest.raises(PermissionDeniedError):
             await user_registry.rbac.create_role(
                 CreateRoleRequest(
                     name=f"denied-role-{unique}",
+                    scope_type=PROJECT_SCOPE_TYPE,
+                    scope_id=group_fixture,
                     description="Should be denied",
                 )
             )

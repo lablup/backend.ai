@@ -25,10 +25,16 @@ from ai.backend.manager.services.artifact_registry.actions.common.search import 
 from ai.backend.manager.services.artifact_registry.actions.lookup import (
     LookupArtifactRegistryAction,
 )
+from ai.backend.manager.services.artifact_registry.processors import ArtifactRegistryProcessors
 
 
 class ArtifactRegistryAdapter(BaseAdapter):
     """Adapter for artifact registry metadata operations."""
+
+    _artifact_registry: ArtifactRegistryProcessors
+
+    def __init__(self, artifact_registry: ArtifactRegistryProcessors) -> None:
+        self._artifact_registry = artifact_registry
 
     async def get_registry_meta(
         self, registry_name: str | None = None, registry_id: uuid.UUID | None = None
@@ -38,16 +44,16 @@ class ArtifactRegistryAdapter(BaseAdapter):
         The two are different reads: an id names the registry, a name resolves to it.
         """
         if registry_id is not None:
-            action_result = await self._processors.artifact_registry.get_registry_meta.run(
+            action_result = await self._artifact_registry.get_registry_meta.run(
                 GetArtifactRegistryMetaAction(registry_id=ArtifactRegistryID(registry_id))
             )
             return self._data_to_dto(action_result.result)
         if registry_name is None:
             raise InvalidAPIParameters("One of (`registry_id` or `registry_name`) is required")
-        resolved = await self._processors.artifact_registry.lookup.run(
+        resolved = await self._artifact_registry.lookup.run(
             LookupArtifactRegistryAction(name=registry_name)
         )
-        action_result = await self._processors.artifact_registry.get_registry_meta.run(
+        action_result = await self._artifact_registry.get_registry_meta.run(
             GetArtifactRegistryMetaAction(registry_id=resolved.entity_id())
         )
         return self._data_to_dto(action_result.result)
@@ -60,7 +66,7 @@ class ArtifactRegistryAdapter(BaseAdapter):
         An id the caller may not read is left out beside one matching no row, so the
         caller cannot tell a denied registry from an absent one.
         """
-        result = await self._processors.artifact_registry.get_registry_metas.run(
+        result = await self._artifact_registry.get_registry_metas.run(
             GetArtifactRegistryMetasAction(
                 registry_ids=[ArtifactRegistryID(registry_id) for registry_id in registry_ids]
             )
@@ -76,7 +82,7 @@ class ArtifactRegistryAdapter(BaseAdapter):
         """
         if not ids:
             return []
-        action_result = await self._processors.artifact_registry.search_artifact_registries.run(
+        action_result = await self._artifact_registry.search_artifact_registries.run(
             SearchArtifactRegistriesAction(
                 searcher=ArtifactRegistrySearcher(
                     pagination=OffsetPagination(limit=len(ids)),

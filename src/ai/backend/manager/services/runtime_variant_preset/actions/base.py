@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from typing import override
 
 from ai.backend.common.data.entity.runtime_variant_preset import (
-    RUNTIME_VARIANT_PRESET_ENTITY_TYPE,
+    RuntimeVariantPresetEntityType,
 )
 from ai.backend.common.data.entity.types import EntityType
 from ai.backend.manager.actions.v2.global_scope.base import BaseGlobalAction
@@ -21,4 +21,4 @@ class RuntimeVariantPresetGlobalAction(BaseGlobalAction):
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return RUNTIME_VARIANT_PRESET_ENTITY_TYPE
+        return RuntimeVariantPresetEntityType()

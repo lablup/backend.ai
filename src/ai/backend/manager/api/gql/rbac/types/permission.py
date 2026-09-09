@@ -79,11 +79,13 @@ from ai.backend.common.dto.manager.v2.rbac.types import (
 from ai.backend.common.dto.manager.v2.rbac.types import (
     OperationTypeFilter as OperationTypeFilterDTO,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.types import SessionId
 from ai.backend.manager.api.gql.base import DateTimeFilter, OrderDirection, StringFilter, UUIDFilter
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     PydanticInputMixin,
+    gql_added_field,
     gql_connection_type,
     gql_enum,
     gql_field,
@@ -94,6 +96,7 @@ from ai.backend.manager.api.gql.decorators import (
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin, PydanticOutputMixin
 from ai.backend.manager.api.gql.rbac.types.entity_node import EntityNode
 from ai.backend.manager.api.gql.rbac.types.scope import (
+    PermissionBitGQL,
     RBACElementTypeFilterGQL,
     RBACElementTypeGQL,
 )
@@ -157,8 +160,17 @@ class PermissionGQL(PydanticNodeMixin[PermissionNodeDTO]):
     scope_type: RBACElementTypeGQL
     scope_id: str
     entity_type: RBACElementTypeGQL
-    operation: OperationTypeGQL
     created_at: datetime
+    permission: PermissionBitGQL = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="The permission bit the row holds.",
+        )
+    )
+    operation: OperationTypeGQL = gql_field(
+        description="Deprecated: use `permission`. The same bit named as an action.",
+        deprecation_reason=f"Deprecated since {NEXT_RELEASE_VERSION}. Use `permission`.",
+    )
 
     @classmethod
     @override

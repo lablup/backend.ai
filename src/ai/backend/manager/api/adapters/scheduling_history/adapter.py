@@ -105,6 +105,7 @@ from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.services.resource_slot.actions.lookup_kernel_owner import (
     LookupKernelOwnerAction,
 )
+from ai.backend.manager.services.resource_slot.processors import ResourceSlotProcessors
 from ai.backend.manager.services.scheduling_history.actions.bulk_get_deployment_histories import (
     BulkGetDeploymentHistoriesAction,
 )
@@ -149,6 +150,7 @@ from ai.backend.manager.services.scheduling_history.actions.search_session_histo
 from ai.backend.manager.services.scheduling_history.actions.search_session_scoped_history import (
     SearchSessionScopedHistoryAction,
 )
+from ai.backend.manager.services.scheduling_history.processors import SchedulingHistoryProcessors
 
 _SESSION_HISTORY_PAGINATION_SPEC = PaginationSpec(
     forward_order=SESSION_DEFAULT_FORWARD_ORDER,
@@ -194,6 +196,17 @@ _ROUTE_HISTORY_PAGINATION_SPEC = PaginationSpec(
 class SchedulingHistoryAdapter(BaseAdapter):
     """Adapter for scheduling history domain operations."""
 
+    _scheduling_history: SchedulingHistoryProcessors
+    _resource_slot: ResourceSlotProcessors
+
+    def __init__(
+        self,
+        scheduling_history: SchedulingHistoryProcessors,
+        resource_slot: ResourceSlotProcessors,
+    ) -> None:
+        self._scheduling_history = scheduling_history
+        self._resource_slot = resource_slot
+
     # ========== Batch Load (DataLoader) ==========
 
     async def batch_load_session_histories_by_ids(
@@ -204,7 +217,7 @@ class SchedulingHistoryAdapter(BaseAdapter):
             return []
         history_ids = [SessionSchedulingHistoryID(history_id) for history_id in ids]
         return await self.batch_load_fields(
-            self._processors.scheduling_history.bulk_get_session_histories,
+            self._scheduling_history.bulk_get_session_histories,
             BulkGetSessionHistoriesAction(ids=history_ids),
             history_ids,
             self._session_data_to_dto,
@@ -217,7 +230,7 @@ class SchedulingHistoryAdapter(BaseAdapter):
         if not ids:
             return []
         return await self.batch_load_fields(
-            self._processors.scheduling_history.bulk_get_kernel_histories,
+            self._scheduling_history.bulk_get_kernel_histories,
             BulkGetKernelHistoriesAction(ids=ids),
             ids,
             self._kernel_data_to_dto,
@@ -231,7 +244,7 @@ class SchedulingHistoryAdapter(BaseAdapter):
             return []
         history_ids = [DeploymentHistoryID(history_id) for history_id in ids]
         return await self.batch_load_fields(
-            self._processors.scheduling_history.bulk_get_deployment_histories,
+            self._scheduling_history.bulk_get_deployment_histories,
             BulkGetDeploymentHistoriesAction(ids=history_ids),
             history_ids,
             self._deployment_data_to_dto,
@@ -245,7 +258,7 @@ class SchedulingHistoryAdapter(BaseAdapter):
             return []
         history_ids = [RouteHistoryID(history_id) for history_id in ids]
         return await self.batch_load_fields(
-            self._processors.scheduling_history.bulk_get_route_histories,
+            self._scheduling_history.bulk_get_route_histories,
             BulkGetRouteHistoriesAction(ids=history_ids),
             history_ids,
             self._route_data_to_dto,
@@ -259,7 +272,7 @@ class SchedulingHistoryAdapter(BaseAdapter):
     ) -> AdminSearchSessionHistoriesPayload:
         """Search session scheduling histories (admin, no scope)."""
         querier = self._build_session_querier(input)
-        action_result = await self._processors.scheduling_history.search_session_history.run(
+        action_result = await self._scheduling_history.search_session_history.run(
             SearchSessionHistoryAction(querier=querier)
         )
         return AdminSearchSessionHistoriesPayload(
@@ -277,7 +290,7 @@ class SchedulingHistoryAdapter(BaseAdapter):
         """Search session scheduling histories scoped to a session."""
         scope = SessionSchedulingHistoryOperationScope(session_id=session_id)
         querier = self._build_session_querier(input)
-        action_result = await self._processors.scheduling_history.search_session_scoped_history.run(
+        action_result = await self._scheduling_history.search_session_scoped_history.run(
             SearchSessionScopedHistoryAction(
                 session_id=SessionID(session_id), scope=scope, querier=querier
             )
@@ -442,7 +455,7 @@ class SchedulingHistoryAdapter(BaseAdapter):
             limit=input.limit,
             offset=input.offset,
         )
-        action_result = await self._processors.scheduling_history.search_kernel_history.run(
+        action_result = await self._scheduling_history.search_kernel_history.run(
             SearchKernelHistoryAction(querier=querier)
         )
         return SearchKernelHistoriesPayload(
@@ -475,7 +488,7 @@ class SchedulingHistoryAdapter(BaseAdapter):
         # owning session and narrowed back down with a kernel_id query condition.
         if kernel_items:
             kernel_id = KernelId(kernel_items[0].value)
-            owner = await self._processors.resource_slot.lookup_kernel_owner.run(
+            owner = await self._resource_slot.lookup_kernel_owner.run(
                 LookupKernelOwnerAction(kernel_id=KernelID(kernel_id))
             )
             session_id = SessionId(owner.entity_id())
@@ -497,7 +510,7 @@ class SchedulingHistoryAdapter(BaseAdapter):
             limit=input.limit,
             offset=input.offset,
         )
-        action_result = await self._processors.scheduling_history.search_kernel_scoped_history.run(
+        action_result = await self._scheduling_history.search_kernel_scoped_history.run(
             SearchKernelScopedHistoryAction(
                 target=SessionKernelHistoryTarget(session_id=session_id),
                 querier=querier,
@@ -644,7 +657,7 @@ class SchedulingHistoryAdapter(BaseAdapter):
     ) -> AdminSearchDeploymentHistoriesPayload:
         """Search deployment histories (admin, no scope)."""
         querier = self._build_deployment_querier(input)
-        action_result = await self._processors.scheduling_history.search_deployment_history.run(
+        action_result = await self._scheduling_history.search_deployment_history.run(
             SearchDeploymentHistoryAction(querier=querier)
         )
         return AdminSearchDeploymentHistoriesPayload(
@@ -662,11 +675,9 @@ class SchedulingHistoryAdapter(BaseAdapter):
         """Search deployment histories scoped to a deployment."""
         scope = DeploymentHistoryOperationScope(deployment_id=deployment_id)
         querier = self._build_deployment_querier(input)
-        action_result = (
-            await self._processors.scheduling_history.search_deployment_scoped_history.run(
-                SearchDeploymentScopedHistoryAction(
-                    deployment_id=DeploymentID(deployment_id), scope=scope, querier=querier
-                )
+        action_result = await self._scheduling_history.search_deployment_scoped_history.run(
+            SearchDeploymentScopedHistoryAction(
+                deployment_id=DeploymentID(deployment_id), scope=scope, querier=querier
             )
         )
         return AdminSearchDeploymentHistoriesPayload(
@@ -825,10 +836,8 @@ class SchedulingHistoryAdapter(BaseAdapter):
             limit=input.limit,
             offset=input.offset,
         )
-        action_result = (
-            await self._processors.scheduling_history.global_search_replica_group_history.run(
-                GlobalSearchReplicaGroupHistoryAction(querier=querier)
-            )
+        action_result = await self._scheduling_history.global_search_replica_group_history.run(
+            GlobalSearchReplicaGroupHistoryAction(querier=querier)
         )
         return SearchReplicaGroupHistoriesPayload(
             items=[self._replica_group_data_to_dto(h) for h in action_result.items],
@@ -871,12 +880,10 @@ class SchedulingHistoryAdapter(BaseAdapter):
             limit=input.limit,
             offset=input.offset,
         )
-        action_result = (
-            await self._processors.scheduling_history.scoped_search_replica_group_history.run(
-                ScopedSearchReplicaGroupHistoryAction(
-                    target=DeploymentReplicaGroupHistoryTarget(deployment_id=deployment_id),
-                    querier=querier,
-                )
+        action_result = await self._scheduling_history.scoped_search_replica_group_history.run(
+            ScopedSearchReplicaGroupHistoryAction(
+                target=DeploymentReplicaGroupHistoryTarget(deployment_id=deployment_id),
+                querier=querier,
             )
         )
         return SearchReplicaGroupHistoriesPayload(
@@ -1012,7 +1019,7 @@ class SchedulingHistoryAdapter(BaseAdapter):
     ) -> AdminSearchRouteHistoriesPayload:
         """Search route histories (admin, no scope)."""
         querier = self._build_route_querier(input)
-        action_result = await self._processors.scheduling_history.search_route_history.run(
+        action_result = await self._scheduling_history.search_route_history.run(
             SearchRouteHistoryAction(querier=querier)
         )
         return AdminSearchRouteHistoriesPayload(
@@ -1030,7 +1037,7 @@ class SchedulingHistoryAdapter(BaseAdapter):
         """Search route histories scoped to a route."""
         scope = RouteHistoryOperationScope(route_id=ReplicaID(route_id))
         querier = self._build_route_querier(input)
-        action_result = await self._processors.scheduling_history.search_route_scoped_history.run(
+        action_result = await self._scheduling_history.search_route_scoped_history.run(
             SearchRouteScopedHistoryAction(scope=scope, querier=querier)
         )
         return AdminSearchRouteHistoriesPayload(

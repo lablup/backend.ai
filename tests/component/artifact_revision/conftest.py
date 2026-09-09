@@ -12,8 +12,8 @@ from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
 from ai.backend.common.data.artifact.types import ArtifactRegistryType
-from ai.backend.common.data.entity.artifact import ARTIFACT_ENTITY_TYPE
-from ai.backend.common.data.entity.artifact_revision import ARTIFACT_REVISION_FIELD_TYPE
+from ai.backend.common.data.entity.artifact import ArtifactEntityType
+from ai.backend.common.data.entity.artifact_revision import ArtifactRevisionFieldType
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
 from ai.backend.manager.actions.registry.types import FieldGroupMeta, GroupMeta
 from ai.backend.manager.api.rest.artifact.handler import ArtifactHandler
@@ -103,17 +103,17 @@ def artifact_processors(
         storage_manager=storage_manager,
         config_provider=config_provider,
     )
-    artifact_revisions = processor_registry.group(GroupMeta(ARTIFACT_ENTITY_TYPE)).field_group(
-        FieldGroupMeta(ARTIFACT_REVISION_FIELD_TYPE),
+    artifact_revisions = processor_registry.group(GroupMeta(ArtifactEntityType())).field_group(
+        FieldGroupMeta(ArtifactRevisionFieldType()),
         ArtifactRevisionData,
         LookupArtifactRevisionOwnerAction,
         LookupBulkArtifactRevisionOwnerAction,
     )
     return ArtifactProcessors(
-        processor_registry.group(GroupMeta(ARTIFACT_ENTITY_TYPE)),
+        processor_registry.group(GroupMeta(ArtifactEntityType())),
         artifact_revisions,
         ArtifactRevisionProcessors(
-            processor_registry.group(GroupMeta(ARTIFACT_ENTITY_TYPE)),
+            processor_registry.group(GroupMeta(ArtifactEntityType())),
             artifact_revisions,
             MagicMock(),
         ),
@@ -160,9 +160,9 @@ def artifact_revision_processors(
         background_task_manager=background_task_manager,
     )
     return ArtifactRevisionProcessors(
-        processor_registry.group(GroupMeta(ARTIFACT_ENTITY_TYPE)),
-        processor_registry.group(GroupMeta(ARTIFACT_ENTITY_TYPE)).field_group(
-            FieldGroupMeta(ARTIFACT_REVISION_FIELD_TYPE),
+        processor_registry.group(GroupMeta(ArtifactEntityType())),
+        processor_registry.group(GroupMeta(ArtifactEntityType())).field_group(
+            FieldGroupMeta(ArtifactRevisionFieldType()),
             ArtifactRevisionData,
             LookupArtifactRevisionOwnerAction,
             LookupBulkArtifactRevisionOwnerAction,

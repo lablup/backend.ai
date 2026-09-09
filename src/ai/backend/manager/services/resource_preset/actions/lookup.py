@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from typing import Any, override
 
 from ai.backend.common.data.entity.resource_preset import (
-    RESOURCE_PRESET_ENTITY_TYPE,
+    ResourcePresetEntityType,
     ResourcePresetID,
 )
 from ai.backend.common.data.entity.types import EntityType
@@ -41,7 +41,7 @@ class LookupResourcePresetAction(LookupEntityOpsAction[ResourcePresetRow, Resour
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return RESOURCE_PRESET_ENTITY_TYPE
+        return ResourcePresetEntityType()
 
     @override
     @classmethod

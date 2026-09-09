@@ -105,7 +105,14 @@ class TestBulkRolePermissions:
     ) -> uuid.UUID:
         role_id = uuid.uuid4()
         async with db.begin_session() as session:
-            session.add(RoleRow(id=role_id, name=role_name))
+            session.add(
+                RoleRow(
+                    scope_type=EntityType("project"),
+                    scope_id=uuid.uuid4(),
+                    id=role_id,
+                    name=role_name,
+                )
+            )
             await session.flush()
             if seed_permission is not None:
                 session.add(
