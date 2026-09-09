@@ -17604,64 +17604,13 @@
         "title": "OperationTypeDTO",
         "type": "string"
       },
-      "RBACElementTypeDTO": {
-        "description": "Unified RBAC element type enum for DTO layer (matches GQL schema values).",
-        "enum": [
-          "domain",
-          "project",
-          "user",
-          "session",
-          "vfolder",
-          "model_deployment",
-          "keypair",
-          "notification_channel",
-          "network",
-          "idle_checker_assignment",
-          "resource_group",
-          "container_registry",
-          "storage_host",
-          "agent",
-          "kernel",
-          "routing",
-          "image",
-          "artifact",
-          "artifact_registry",
-          "session_template",
-          "app_config",
-          "app_config_definition",
-          "app_config_allow_list",
-          "app_config_fragment",
-          "model_card",
-          "resource_preset",
-          "user_resource_policy",
-          "keypair_resource_policy",
-          "project_resource_policy",
-          "role",
-          "audit_log",
-          "kernel:history",
-          "event_log",
-          "project_admin_page",
-          "domain_admin_page",
-          "notification_rule",
-          "deployment:token",
-          "deployment:policy",
-          "deployment:revision",
-          "image:alias",
-          "role:assignment",
-          "vfolder:data",
-          "session:app_service",
-          "user:email",
-          "artifact_revision"
-        ],
-        "title": "RBACElementTypeDTO",
-        "type": "string"
-      },
       "RolePermissionPresetEntry": {
         "description": "A single (entity_type, operation) pair carried by a role preset.",
         "properties": {
           "entity_type": {
-            "$ref": "#/components/schemas/RBACElementTypeDTO",
-            "description": "Entity type the permission applies to."
+            "description": "Entity type the permission applies to.",
+            "title": "Entity Type",
+            "type": "string"
           },
           "operation": {
             "$ref": "#/components/schemas/OperationTypeDTO",
@@ -17686,8 +17635,9 @@
             "type": "string"
           },
           "scope_type": {
-            "$ref": "#/components/schemas/RBACElementTypeDTO",
-            "description": "Scope type this preset targets (e.g., domain, project)."
+            "description": "Scope type this preset targets (e.g., domain, project).",
+            "title": "Scope Type",
+            "type": "string"
           },
           "auto_assign": {
             "default": false,
@@ -17729,7 +17679,7 @@
           "scope_type": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/RBACElementTypeDTO"
+                "$ref": "#/components/schemas/StringFilter"
               },
               {
                 "type": "null"
@@ -18129,65 +18079,6 @@
         "title": "OperationTypeFilter",
         "type": "object"
       },
-      "RBACElementTypeFilter": {
-        "description": "Filter for RBAC element type (scope_type / entity_type) columns.\n\nMirrors the Strawberry GQL EnumFilter pattern: equals / in / not_equals / not_in.\nUsed for both ``scope_type`` and ``entity_type`` fields, which share the\n``RBACElementTypeDTO`` value space at the API surface.",
-        "properties": {
-          "equals": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/RBACElementTypeDTO"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null
-          },
-          "in_": {
-            "anyOf": [
-              {
-                "items": {
-                  "$ref": "#/components/schemas/RBACElementTypeDTO"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "In"
-          },
-          "not_equals": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/RBACElementTypeDTO"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null
-          },
-          "not_in": {
-            "anyOf": [
-              {
-                "items": {
-                  "$ref": "#/components/schemas/RBACElementTypeDTO"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "Not In"
-          }
-        },
-        "title": "RBACElementTypeFilter",
-        "type": "object"
-      },
       "RolePermissionPresetFilter": {
         "description": "Filter criteria for role_permission_presets rows.\n\nDoubles as the input for the ``permissions`` field resolver under\n``RolePresetNode``: the resolver supplies ``role_preset_id`` from its parent\nand merges any caller-provided fields here.",
         "properties": {
@@ -18206,7 +18097,7 @@
           "entity_type": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/RBACElementTypeFilter"
+                "$ref": "#/components/schemas/StringFilter"
               },
               {
                 "type": "null"
@@ -19266,7 +19157,8 @@
         "description": "Scope reference for associating an entity with a scope.",
         "properties": {
           "scope_type": {
-            "$ref": "#/components/schemas/RBACElementTypeDTO"
+            "title": "Scope Type",
+            "type": "string"
           },
           "scope_id": {
             "title": "Scope Id",
@@ -19350,7 +19242,7 @@
           "scope_type": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/RBACElementTypeFilter"
+                "$ref": "#/components/schemas/StringFilter"
               },
               {
                 "type": "null"
@@ -19889,16 +19781,6 @@
             "title": "Role Id",
             "type": "string"
           },
-          "scope_type": {
-            "description": "Scope element type (e.g. 'domain', 'project')",
-            "title": "Scope Type",
-            "type": "string"
-          },
-          "scope_id": {
-            "description": "Scope element ID",
-            "title": "Scope Id",
-            "type": "string"
-          },
           "entity_type": {
             "description": "Entity element type (e.g. 'session', 'vfolder')",
             "title": "Entity Type",
@@ -19912,8 +19794,6 @@
         },
         "required": [
           "role_id",
-          "scope_type",
-          "scope_id",
           "entity_type",
           "operation"
         ],
@@ -19934,32 +19814,10 @@
             ],
             "default": null
           },
-          "scope_type": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/RBACElementTypeFilter"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null
-          },
-          "scope_id": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/StringFilter"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null
-          },
           "entity_type": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/RBACElementTypeFilter"
+                "$ref": "#/components/schemas/StringFilter"
               },
               {
                 "type": "null"
@@ -20159,32 +20017,6 @@
             "title": "Id",
             "type": "string"
           },
-          "scope_type": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Updated scope element type",
-            "title": "Scope Type"
-          },
-          "scope_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Updated scope element ID",
-            "title": "Scope Id"
-          },
           "entity_type": {
             "anyOf": [
               {
@@ -20359,32 +20191,10 @@
       "PermissionNestedFilter": {
         "description": "Nested filter for permissions within a role assignment.",
         "properties": {
-          "scope_id": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/StringFilter"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null
-          },
-          "scope_type": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/RBACElementTypeFilter"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null
-          },
           "entity_type": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/RBACElementTypeFilter"
+                "$ref": "#/components/schemas/StringFilter"
               },
               {
                 "type": "null"
@@ -20839,7 +20649,7 @@
           "entity_type": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/RBACElementTypeFilter"
+                "$ref": "#/components/schemas/StringFilter"
               },
               {
                 "type": "null"
@@ -20861,7 +20671,7 @@
           "scope_type": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/RBACElementTypeFilter"
+                "$ref": "#/components/schemas/StringFilter"
               },
               {
                 "type": "null"
