@@ -21,7 +21,9 @@ class SessionSchedulingHistoryFieldType(FieldType):
     @override
     @classmethod
     def description(cls) -> str:
-        return "One scheduling step recorded for a session."
+        return (
+            "One run of a session scheduling handler, recording any status change and its result."
+        )
 
     @override
     @classmethod
