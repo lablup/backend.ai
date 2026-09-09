@@ -21,6 +21,7 @@ from collections.abc import Awaitable, Callable, Sequence
 from typing import Any
 
 from ai.backend.common.data.entity.types import EntityData, FieldData
+from ai.backend.common.exception import UnreachableError
 from ai.backend.manager.actions.registry.field import LookupFieldGroup
 from ai.backend.manager.actions.registry.types import (
     FieldGroupMeta,
@@ -601,12 +602,15 @@ class ProcessorGroup[TData: EntityData]:
             BulkFieldOwnerLookupService(self._deps.repository).execute,
             monitors=self._deps.monitors.bulk_lookup,
         )
+        owner_entity_type = self._meta.entity_type
+        if owner_entity_type is None:
+            raise UnreachableError("a group answered for by no entity owns no field rows")
         return LookupFieldGroup(
             self._deps,
             self._records,
             self._concern,
             meta,
-            self._meta.entity_type,
+            owner_entity_type,
             owner_lookup,
             bulk_owner_lookup,
             partial_bulk_owner_lookup,

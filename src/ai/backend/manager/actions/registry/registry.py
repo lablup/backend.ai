@@ -6,6 +6,7 @@ from collections.abc import Sequence
 from typing import Any
 
 from ai.backend.common.data.entity.types import EntityData, FieldData, GlobalEntityType
+from ai.backend.common.exception import UnreachableError
 from ai.backend.manager.actions.registry.field import FieldGroup, LookupFieldGroup
 from ai.backend.manager.actions.registry.group import (
     ProcessorGroup,
@@ -78,6 +79,8 @@ class ProcessorRegistry[TData: EntityData]:
 
     def group(self, meta: GroupMeta) -> ProcessorGroup[TData]:
         """A group for a domain that is its own area, which its entity type names."""
+        if meta.entity_type is None:
+            raise UnreachableError("a group that is its own area is named by its entity type")
         return ProcessorGroup(self._deps, self._records, meta.entity_type, meta)
 
     def dangling_field_group[TFieldData: FieldData](

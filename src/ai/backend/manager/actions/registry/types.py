@@ -87,9 +87,13 @@ class ConcernMeta:
 
 @dataclass(frozen=True)
 class GroupMeta:
-    """What every operation of one group is answered for."""
+    """What every operation of one group is answered for.
 
-    entity_type: EntityType
+    ``None`` where they are answered for by no entity: the concern places them, the
+    catalog records no type, and the group owns no field rows.
+    """
+
+    entity_type: EntityType | None = None
 
 
 @dataclass(frozen=True)

@@ -5,7 +5,7 @@ description: 인증 도메인의 액션이 왜 auth 와 user 두 그룹으로 �
 scope: src/ai/backend/manager/services/auth
 keywords:
   - AuthProcessors
-  - AuthEntityType
+  - GroupMeta
   - anonymous_global
   - PublicActionProcessor
   - RevokeLoginSessionAction
@@ -23,6 +23,8 @@ status: draft
 ## 그룹이 둘인 이유
 
 `auth` 그룹은 어떤 사용자 행도 답하지 않는 상태 — 자격 증명과 로그인 세션 — 을 맡는다.
+답할 행이 없으므로 이 그룹은 엔티티 타입을 갖지 않고, relation 배선처럼 카탈로그에
+타입 없이 기록된다.
 로그인·로그아웃·비밀번호 재설정은 호출자가 아직 주체를 갖지 않은 채 들어오고, 관리자가
 전체 세션에 닿는 조회도 어떤 사용자를 지목하지 않는다. `user` 그룹은 한 사용자의 행,
 자격 증명, 로그인 기록이 답하는 것을 맡는다.

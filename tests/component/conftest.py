@@ -46,7 +46,6 @@ from ai.backend.common.clients.valkey_client.valkey_stream.client import ValkeyS
 from ai.backend.common.configs.etcd import EtcdConfig
 from ai.backend.common.configs.pyroscope import PyroscopeConfig
 from ai.backend.common.contexts.user import with_user
-from ai.backend.common.data.entity.auth import AuthEntityType
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID, ResourceGroupName
 from ai.backend.common.data.entity.user import UserEntityType, UserID
@@ -83,7 +82,12 @@ from ai.backend.logging.config import ConsoleConfig, LogDriver, LoggingConfig
 from ai.backend.logging.types import LogFormat
 from ai.backend.manager.actions.monitors import ActionMonitors
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
-from ai.backend.manager.actions.registry.types import GroupMeta, ProcessorDependencies
+from ai.backend.manager.actions.registry.types import (
+    Concern,
+    ConcernMeta,
+    GroupMeta,
+    ProcessorDependencies,
+)
 from ai.backend.manager.actions.v2.validators import ActionValidators as V2ActionValidators
 from ai.backend.manager.agent_cache import AgentRPCCache
 from ai.backend.manager.api.rest.app import build_root_app, mount_registries
@@ -1573,7 +1577,7 @@ def auth_processors(
         key_provider_pool=KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
     )
     return AuthProcessors(
-        processor_registry.group(GroupMeta(AuthEntityType())),
+        processor_registry.concern(ConcernMeta(Concern.ORGANIZATION)).group(GroupMeta()),
         processor_registry.group(GroupMeta(UserEntityType())),
         service,
     )

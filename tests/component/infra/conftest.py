@@ -12,7 +12,6 @@ from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 from ai.backend.common.data.entity.agent import AgentEntityType
 from ai.backend.common.data.entity.container_registry import ContainerRegistryEntityType
 from ai.backend.common.data.entity.domain import DomainEntityType
-from ai.backend.common.data.entity.etcd_config import EtcdConfigEntityType
 from ai.backend.common.data.entity.project import ProjectEntityType
 from ai.backend.common.data.entity.resource_group import ResourceGroupEntityType
 from ai.backend.common.data.entity.resource_preset import ResourcePresetEntityType
@@ -21,6 +20,8 @@ from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
 from ai.backend.manager.actions.registry.types import (
+    Concern,
+    ConcernMeta,
     GroupMeta,
 )
 from ai.backend.manager.actions.v2.bulk.validator.rbac import BulkOwnCheck
@@ -114,7 +115,7 @@ def etcd_config_processors(
         valkey_stat=valkey_clients.stat,
     )
     return EtcdConfigProcessors(
-        processor_registry.group(GroupMeta(EtcdConfigEntityType())), service
+        processor_registry.concern(ConcernMeta(Concern.SYSTEM)).group(GroupMeta()), service
     )
 
 

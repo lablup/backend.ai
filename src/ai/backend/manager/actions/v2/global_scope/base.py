@@ -13,8 +13,12 @@ class BaseGlobalAction(ABC):
 
     @classmethod
     @abstractmethod
-    def entity_type(cls) -> EntityType:
-        """Return the type of entity that this action applies to."""
+    def entity_type(cls) -> EntityType | None:
+        """The kind of entity this action is about, or ``None`` when it is about none.
+
+        A concern with no row behind it answers ``None`` rather than naming a type of
+        its own, the way a relation action names none.
+        """
         raise NotImplementedError
 
     @classmethod

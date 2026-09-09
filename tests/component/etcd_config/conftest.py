@@ -5,10 +5,13 @@ from typing import Any
 import pytest
 
 from ai.backend.common.data.entity.container_registry import ContainerRegistryEntityType
-from ai.backend.common.data.entity.etcd_config import EtcdConfigEntityType
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
-from ai.backend.manager.actions.registry.types import GroupMeta
+from ai.backend.manager.actions.registry.types import (
+    Concern,
+    ConcernMeta,
+    GroupMeta,
+)
 from ai.backend.manager.api.rest.etcd.handler import EtcdHandler
 from ai.backend.manager.api.rest.etcd.registry import register_etcd_routes
 from ai.backend.manager.api.rest.routing import RouteRegistry
@@ -55,7 +58,7 @@ def etcd_config_processors(
         valkey_stat=valkey_clients.stat,
     )
     return EtcdConfigProcessors(
-        processor_registry.group(GroupMeta(EtcdConfigEntityType())), service
+        processor_registry.concern(ConcernMeta(Concern.SYSTEM)).group(GroupMeta()), service
     )
 
 

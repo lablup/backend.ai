@@ -28,7 +28,6 @@ from ai.backend.common.data.entity.artifact import ArtifactEntityType
 from ai.backend.common.data.entity.artifact_registry import ArtifactRegistryEntityType
 from ai.backend.common.data.entity.artifact_revision import ArtifactRevisionFieldType
 from ai.backend.common.data.entity.audit_log import AuditLogFieldType
-from ai.backend.common.data.entity.auth import AuthEntityType
 from ai.backend.common.data.entity.container_registry import ContainerRegistryEntityType
 from ai.backend.common.data.entity.deployment import DeploymentEntityType
 from ai.backend.common.data.entity.deployment_preset import DeploymentPresetEntityType
@@ -443,7 +442,7 @@ def test_every_defined_v2_action_is_wired() -> None:
         MagicMock(),
     )
     AuthProcessors(
-        registry.group(GroupMeta(AuthEntityType())),
+        registry.concern(ConcernMeta(Concern.ORGANIZATION)).group(GroupMeta()),
         registry.group(GroupMeta(UserEntityType())),
         MagicMock(),
     )

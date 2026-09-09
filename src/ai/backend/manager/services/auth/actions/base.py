@@ -1,7 +1,6 @@
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.common.data.entity.auth import AuthEntityType
 from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
 from ai.backend.common.data.entity.user import UserEntityType, UserID
 from ai.backend.manager.actions.v2.global_scope.base import BaseGlobalAction
@@ -17,8 +16,8 @@ class AuthGlobalAction(BaseGlobalAction):
 
     @override
     @classmethod
-    def entity_type(cls) -> EntityType:
-        return AuthEntityType()
+    def entity_type(cls) -> EntityType | None:
+        return None
 
 
 class UserGlobalAction(BaseGlobalAction):
