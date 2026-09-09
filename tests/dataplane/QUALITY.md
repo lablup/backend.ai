@@ -76,3 +76,47 @@ Attach the following to the release decision:
 
 Unit or mocked tests cannot replace this record. A run from an earlier commit does not qualify the
 release candidate.
+
+Thirty-fifth round -- the first run against real nodes since `992faf053`, 169 commits ago.
+
+Rig: manager + i-dk-104 at this HEAD, i-dk-112 and i-dk-156 still on `aa2870fd9` (a mixed-version
+cluster, which is the shape a rolling upgrade actually has).
+
+**Two blockers had to be cleared before anything could run**, and both would stop a deployment:
+the exported venv had pydantic 2.11 while the branch needs >= 2.12 for `pydantic_core.MISSING`
+(#14312), so the manager would not import; and the database was 12 migrations behind, so
+`enqueue` failed on `column images.customized does not exist`. Neither is network code -- both
+come with the branch.
+
+**What worked, first time, on hardware**
+
+- Single-node session: PREPARED -> RUNNING.
+- The agent identity record: `caps` carrying backend/vtep_ip/boot_id/updated_at, a `ready` fence
+  beside it, and a `boot` key -- the shape the last several rounds built, written correctly.
+- The pid-file `flock`: a second agent under one id was refused with `AgentAlreadyRunning`.
+- The freshness gate: the two nodes on old code publish no `updated_at`, so the manager refused
+  them by name -- "capabilities are dated ...s ago (or never)". Mixed-version admission behaves
+  as designed, and the message says which node and why.
+
+**A11l -- what only hardware could find, and it was mine**
+
+Routing REPLACE to `expired` -- back to PENDING to be scheduled elsewhere -- is unbounded BY
+CONSTRUCTION, and the branch's own unit tests could not see it. The retry budget is read from
+`last_phase`, which `_carry_last_phase` attaches only while the session's most recent history
+record is still the same phase; a round trip through PENDING puts `schedule-sessions`,
+`check-precondition` and `promote-to-prepared` in between, so `last_phase` comes back None, every
+attempt starts at 1, and the budget never binds.
+
+Measured: 31 full scheduling cycles in four minutes, 128 history rows, no end. Before the change
+the same failure took five attempts in place and terminated with a reason the user could read.
+I had traded a bounded failure for a livelock.
+
+REPLACE now falls through to the ordinary classification. Same rig, same refusing node: one
+merged `start-sessions` row reaching `attempts=5`, then TERMINATING, then TERMINATED -- 7 history
+rows against 128. The refusing agents are still recorded against the session, so a later
+scheduling round avoids them; re-placement done properly needs a bound that survives the round
+trip, and that is a durable per-session counter this branch should not be inventing.
+
+`SCENARIOS.md` is not updated: what ran here is not the release gate. P2 (two-node connectivity),
+P4 (MTU), P5 (isolation) and the encryption-wire checks need two nodes on the SAME code, and two
+of the three are 169 commits behind.

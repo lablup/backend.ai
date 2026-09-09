@@ -15,7 +15,7 @@ from __future__ import annotations
 from collections.abc import Iterator
 from contextlib import contextmanager
 from datetime import datetime, timedelta
-from typing import Any, override
+from typing import Any, cast, override
 from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
 
@@ -45,6 +45,7 @@ from ai.backend.manager.sokovan.scheduler.handlers.kernel.base import (
 from ai.backend.manager.sokovan.scheduler.post_processors import PostProcessorContext
 from ai.backend.manager.sokovan.scheduler.recorder import SessionRecorderContext
 from ai.backend.manager.sokovan.scheduler.results import (
+    FailureDisposition,
     KernelExecutionResult,
     KernelTransitionInfo,
     SessionExecutionResult,
@@ -1406,6 +1407,43 @@ class _CoordinatorWithFailingGroups(ScheduleCoordinator):
     ) -> None:
         if str(resource_group_id) in self._failing:
             raise RuntimeError("the database was unreachable")
+
+
+class TestAFailureThatCannotBeRePlacedForever:
+    """Measured on a two-node rig: routing REPLACE straight back to PENDING produced 31 full
+    scheduling cycles in four minutes with no end. The retry budget is counted from `last_phase`,
+    which is carried only while the session's most recent history record is still this phase --
+    and a round trip through PENDING puts three other phases in between, so every attempt starts
+    at 1 and the budget never binds."""
+
+    def _classify(self, disposition: Any) -> Any:
+        coordinator = object.__new__(ScheduleCoordinator)
+        session = MagicMock()
+        session.session_info.identity.id = "s1"
+        session.session_info.handler_options.resolve.return_value = MagicMock(
+            is_retry_exhausted=MagicMock(return_value=False),
+            is_timed_out=MagicMock(return_value=False),
+        )
+        session.last_phase = None
+        failure = SessionTransitionInfo(
+            session_id=cast(Any, "s1"),
+            from_status=SessionStatus.PREPARED,
+            disposition=disposition,
+        )
+        return coordinator._classify_failures(
+            [failure], [session], datetime.now(tzutc()), "start-sessions"
+        )
+
+    def test_replace_is_retried_rather_than_sent_back_to_pending(self) -> None:
+        classified = self._classify(FailureDisposition.REPLACE)
+        assert not classified.expired, "a re-placement with no bound is a livelock, not a retry"
+        assert classified.need_retry
+
+    def test_abandon_is_given_up_at_once(self) -> None:
+        # Work was already requested somewhere: there is no second placement to make.
+        classified = self._classify(FailureDisposition.ABANDON)
+        assert classified.give_up
+        assert not classified.need_retry
 
 
 class TestTheManagerSweepMark:

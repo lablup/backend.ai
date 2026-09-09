@@ -1296,14 +1296,25 @@ class ScheduleCoordinator:
                 # Session not found - skip (shouldn't happen)
                 continue
 
-            # 0. What the handler knows and the counters cannot. A failure it has marked is one
-            # where trying again on this placement is pointless: either nothing was asked of any
-            # agent and the placement itself is the problem (give it up and be scheduled again),
-            # or work was already requested somewhere and there is no second placement to make
-            # (tear it down). Both are answered now rather than after five identical retries.
-            if failure.disposition is FailureDisposition.REPLACE:
-                expired_failures.append(failure)
-                continue
+            # 0. What the handler knows and the counters cannot: work was already requested
+            # somewhere, so there is no second placement to make and no point retrying this one.
+            # Given up now rather than after five identical retries.
+            #
+            # REPLACE is deliberately NOT answered here, and this is measured rather than
+            # reasoned. Sending it to `expired` -- back to PENDING, to be scheduled somewhere
+            # else -- is unbounded by construction: the retry budget is counted from
+            # `last_phase`, which is carried only while the session's most recent history record
+            # is still this phase, and a round trip through PENDING puts three other phases in
+            # between. So every attempt starts at 1 and the budget never binds. On a two-node rig
+            # with one node refusing the session, this produced 31 full scheduling cycles in four
+            # minutes with no end -- a livelock, where before the change the session failed five
+            # times and terminated with a reason the user could see.
+            #
+            # So REPLACE falls through to the ordinary classification: retried in place, and
+            # given up once the budget is spent. The refusing agents are still recorded against
+            # the session by the launcher, so a later scheduling round avoids them. Re-placing
+            # properly needs a bound that survives the round trip, which is a durable per-session
+            # counter this branch should not be inventing.
             if failure.disposition is FailureDisposition.ABANDON:
                 give_up_failures.append(failure)
                 continue
