@@ -54,7 +54,6 @@ from ai.backend.common.dto.manager.v2.rbac import (
     OperationInfo,
     PermissionNode,
     PurgeRolePayload,
-    ReplaceRolePermissionFailureInfo,
     ReplaceRolePermissionsPayload,
     RoleAssignmentNode,
     RoleNode,
@@ -206,12 +205,12 @@ from ai.backend.manager.models.rbac_models.role.scopes import ScopedRoleOperatio
 from ai.backend.manager.models.rbac_models.role.updaters import RoleSoftDeleteUpdater, RoleUpdater
 from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
 from ai.backend.manager.models.specs.pagination import NoPagination, OffsetPagination
+from ai.backend.manager.models.specs.permission import PermissionEntry
 from ai.backend.manager.models.virtual_entity.conditions import OwningScopeConditions
 from ai.backend.manager.repositories.base import BatchQuerier, BulkCreator, Purger
 from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.permission_controller.creators import (
-    PermissionCreatorSpec,
     UserRoleCreatorSpec,
 )
 from ai.backend.manager.services.permission_contoller.actions.add_role_permission import (
@@ -1070,40 +1069,40 @@ class RBACAdapter(BaseAdapter):
                 raise ReplaceRolePermissionRoleIdMismatch(
                     f"entry role_id {entry.role_id} does not match request role_id {input.role_id}",
                 )
-        specs = [self._permission_creator_spec(entry) for entry in input.permissions]
         action_result = (
             await self._permission_controller.replace_role_permissions.wait_for_complete(
                 ReplaceRolePermissionsAction(
-                    role_id=input.role_id,
-                    creator=BulkCreator(specs=specs),
+                    role_id=RoleID(input.role_id),
+                    entries=self._permission_entries(input.permissions),
                 )
             )
         )
         result: BulkRolePermissionReplaceResultData = action_result.data
         return ReplaceRolePermissionsPayload(
             items=[self._permission_data_to_node(item) for item in result.successes],
-            failed=[
-                ReplaceRolePermissionFailureInfo(
-                    role_id=f.role_id,
-                    entity_type=f.entity_type,
-                    operation=f.permission.to_operation().value,
-                    message=f.message,
-                )
-                for f in result.failures
-            ],
+            failed=[],
         )
+
+    def _permission_entries(
+        self, entries: Sequence[CreatePermissionInputDTO]
+    ) -> list[PermissionEntry]:
+        """One entry per entity type; an input names a single operation, and an entity
+        type named more than once holds every operation named on it."""
+        held: dict[EntityType, Permission] = {}
+        for entry in entries:
+            entity_type = EntityType(RBACElementType(entry.entity_type))
+            held[entity_type] = held.get(entity_type, Permission.NONE) | self._permission_bit(
+                entry.operation
+            )
+        return [
+            PermissionEntry(entity_type=entity_type, permission=permission)
+            for entity_type, permission in held.items()
+        ]
 
     def _role_permission_creator(self, entry: CreatePermissionInputDTO) -> RolePermissionCreator:
         return RolePermissionCreator(
             entity_type=EntityType(RBACElementType(entry.entity_type)),
             permission=Permission.from_operation(InternalOperationType(entry.operation)),
-        )
-
-    def _permission_creator_spec(self, entry: CreatePermissionInputDTO) -> PermissionCreatorSpec:
-        return PermissionCreatorSpec(
-            role_id=entry.role_id,
-            entity_type=EntityType(RBACElementType(entry.entity_type)),
-            permission=self._permission_bit(entry.operation),
         )
 
     async def bulk_revoke_role(self, input: BulkRevokeRoleInputDTO) -> BulkRevokeRoleResultPayload:

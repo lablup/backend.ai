@@ -78,6 +78,7 @@ from ai.backend.manager.models.rbac_models.permission.updaters import RolePermis
 from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.rbac_models.role.scopes import ScopedRoleOperationScope
 from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
+from ai.backend.manager.models.specs.permission import PermissionEntry
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base.creator import (
@@ -246,27 +247,25 @@ class PermissionDBSource:
 
     async def replace_role_permissions(
         self,
-        role_id: uuid.UUID,
-        creator: BulkCreator[PermissionRow],
-    ) -> BulkCreatorResultWithFailures[PermissionRow]:
-        """
-        Replace the role's entire scoped-permission set in a single transaction:
-        delete all existing rows for ``role_id``, then bulk-insert the rows
-        defined by ``creator.specs``. Passing a creator with no specs clears
-        the role's permissions.
+        role_id: RoleID,
+        entries: Sequence[PermissionEntry],
+    ) -> list[PermissionData]:
+        """State the role's whole scoped-permission set; keys it held and the entries
+        do not name are cleared. Answers the rows the role holds afterwards.
 
-        - The role's existence is verified first; raises ``RoleNotFound``
-          if the role does not exist.
-        - Each permission row in ``creator.specs`` is assumed to carry the
-          same ``role_id`` as the one passed to this method; the caller is
-          responsible for keeping them aligned.
+        Raises ``RoleNotFound`` if the role does not exist.
         """
-        async with self._db.begin_session_read_committed() as db_session:
-            await self._get_role(db_session, role_id)
-            await db_session.execute(
-                sa.delete(PermissionRow).where(PermissionRow.role_id == role_id)
-            )
-            return await execute_bulk_creator_partial(db_session, creator)
+        async with self._db.begin_readonly_session_read_committed() as read_sess:
+            await self._get_role(read_sess, role_id)
+        async with self._ops.write_ops() as w:
+            await w.replace_permissions(role_id, entries)
+        async with self._db.begin_readonly_session_read_committed() as read_sess:
+            rows = (
+                await read_sess.scalars(
+                    sa.select(PermissionRow).where(PermissionRow.role_id == role_id)
+                )
+            ).all()
+        return [row.to_data() for row in rows]
 
     async def get_role(self, role_id: uuid.UUID) -> RoleRow | None:
         async with self._db.begin_readonly_session_read_committed() as db_session:

@@ -5,9 +5,10 @@ from typing import Any
 
 import pytest
 
+from ai.backend.common.data.entity.domain import DOMAIN_SCOPE_TYPE
 from ai.backend.common.data.entity.permission import PermissionID
 from ai.backend.common.data.entity.role import RoleID
-from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
+from ai.backend.common.data.entity.types import EntityType
 from ai.backend.common.data.permission.types import (
     OperationType,
     Permission,
@@ -75,7 +76,6 @@ class TestPermissionCreate:
 
         assert isinstance(result.data, PermissionData)
         assert result.data.role_id == target_role.role.id
-        assert result.data.scope_type == LegacyScopeType.DOMAIN.value
         assert result.data.entity_type == LegacyEntityType.SESSION.value
         assert result.data.permission == Permission.READ
 
@@ -91,14 +91,14 @@ class TestPermissionCreate:
         domain_fixture: DomainFixtureData,
     ) -> None:
         """S-CREATE-2: Create permissions with various scope/entity/operation combinations."""
-        combos: list[tuple[EntityIdentifier, RBACElementType, OperationType]] = [
-            (domain_fixture.domain_id, RBACElementType.SESSION, OperationType.READ),
-            (domain_fixture.domain_id, RBACElementType.IMAGE, OperationType.UPDATE),
-            (domain_fixture.domain_id, RBACElementType.VFOLDER, OperationType.SOFT_DELETE),
+        combos: list[tuple[RBACElementType, OperationType]] = [
+            (RBACElementType.SESSION, OperationType.READ),
+            (RBACElementType.IMAGE, OperationType.UPDATE),
+            (RBACElementType.VFOLDER, OperationType.SOFT_DELETE),
         ]
         created_ids: list[uuid.UUID] = []
 
-        for scope, entity_type, operation in combos:
+        for entity_type, operation in combos:
             result = await permission_controller_processors.create_permission.wait_for_complete(
                 CreatePermissionAction(
                     role_id=RoleID(target_role.role.id),
@@ -247,7 +247,7 @@ class TestCheckPermissionInScope:
         domain_fixture: DomainFixtureData,
     ) -> None:
         """S-SCOPE-1: User has permission in target scope → True."""
-        role = await role_factory()
+        role = await role_factory(scope_type=DOMAIN_SCOPE_TYPE, scope_id=domain_fixture.domain_id)
         role_id = role.role.id
         user_id: uuid.UUID = admin_user_fixture.user_uuid
 

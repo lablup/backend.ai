@@ -167,7 +167,7 @@ class PermissionControllerService:
         """Replace the role's entire scoped-permission set."""
         result = await self._repository.replace_role_permissions(
             role_id=action.role_id,
-            creator=action.creator,
+            entries=action.entries,
         )
         return ReplaceRolePermissionsActionResult(data=result)
 
