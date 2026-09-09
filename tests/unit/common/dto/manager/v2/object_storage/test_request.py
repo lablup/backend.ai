@@ -105,8 +105,13 @@ class TestCreateObjectStorageInput:
 class TestUpdateObjectStorageInput:
     """Tests for UpdateObjectStorageInput model."""
 
-    def test_default_region_is_unset(self) -> None:
+    def test_all_fields_default_to_unset(self) -> None:
         req = UpdateObjectStorageInput(id=uuid.uuid4())
+        assert req.name is UNSET
+        assert req.host is UNSET
+        assert req.access_key is UNSET
+        assert req.secret_key is UNSET
+        assert req.endpoint is UNSET
         assert req.region is UNSET
         assert isinstance(req.region, Unset)
 
@@ -134,7 +139,12 @@ class TestUpdateObjectStorageInput:
     def test_partial_update_name_only(self) -> None:
         req = UpdateObjectStorageInput(id=uuid.uuid4(), name="new-name")
         assert req.name == "new-name"
+        assert req.host is UNSET
+
+    def test_omitted_fields_round_trip_as_unset(self) -> None:
+        req = UpdateObjectStorageInput.model_validate({"id": str(uuid.uuid4()), "host": None})
         assert req.host is None
+        assert req.name is UNSET
 
 
 class TestDeleteObjectStorageInput:
