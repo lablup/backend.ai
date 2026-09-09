@@ -273,56 +273,24 @@ async def admin_bulk_update_users_v2(
 
         updater = UserUpdater(
             user_id=UserID(user_item.user_id),
-            username=(
-                OptionalState.update(dto.username)
-                if dto.username is not None
-                else OptionalState.nop()
-            ),
-            password=(
-                OptionalState.update(
-                    PasswordInfo(
-                        password=dto.password,
-                        algorithm=auth_config.password_hash_algorithm,
-                        rounds=auth_config.password_hash_rounds,
-                        salt_size=auth_config.password_hash_salt_size,
-                    )
+            username=OptionalState.from_unset(dto.username),
+            password=OptionalState.from_unset(dto.password).map(
+                lambda raw: PasswordInfo(
+                    password=raw,
+                    algorithm=auth_config.password_hash_algorithm,
+                    rounds=auth_config.password_hash_rounds,
+                    salt_size=auth_config.password_hash_salt_size,
                 )
-                if dto.password is not None
-                else OptionalState.nop()
             ),
-            need_password_change=(
-                OptionalState.update(dto.need_password_change)
-                if dto.need_password_change is not None
-                else OptionalState.nop()
-            ),
+            need_password_change=OptionalState.from_unset(dto.need_password_change),
             full_name=TriState.from_unset(dto.full_name),
             description=TriState.from_unset(dto.description),
-            status=(
-                OptionalState.update(UserStatus(dto.status))
-                if dto.status is not None
-                else OptionalState.nop()
-            ),
-            domain_name=(
-                OptionalState.update(dto.domain_name)
-                if dto.domain_name is not None
-                else OptionalState.nop()
-            ),
-            role=(
-                OptionalState.update(UserRole(dto.role))
-                if dto.role is not None
-                else OptionalState.nop()
-            ),
+            status=OptionalState.from_unset(dto.status).map(UserStatus),
+            domain_name=OptionalState.from_unset(dto.domain_name),
+            role=OptionalState.from_unset(dto.role).map(UserRole),
             allowed_client_ip=TriState.from_unset(dto.allowed_client_ip),
-            resource_policy=(
-                OptionalState.update(dto.resource_policy)
-                if dto.resource_policy is not None
-                else OptionalState.nop()
-            ),
-            sudo_session_enabled=(
-                OptionalState.update(dto.sudo_session_enabled)
-                if dto.sudo_session_enabled is not None
-                else OptionalState.nop()
-            ),
+            resource_policy=OptionalState.from_unset(dto.resource_policy),
+            sudo_session_enabled=OptionalState.from_unset(dto.sudo_session_enabled),
             container_uid=TriState.from_unset(dto.container_uid),
             container_main_gid=TriState.from_unset(dto.container_main_gid),
             container_gids=TriState.from_unset(dto.container_gids),

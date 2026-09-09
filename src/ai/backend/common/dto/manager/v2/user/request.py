@@ -115,13 +115,13 @@ class CreateUserInput(BaseRequestModel):
 class UpdateUserInput(BaseRequestModel):
     """Input for updating user information. All fields optional — only provided fields will be updated."""
 
-    username: str | None = Field(
-        default=None,
-        description="New username.",
+    username: str | None | Unset = Field(
+        default=UNSET,
+        description="New username. Omit to leave unchanged.",
     )
-    password: str | None = Field(
-        default=None,
-        description="New password.",
+    password: str | None | Unset = Field(
+        default=UNSET,
+        description="New password. Omit to leave unchanged.",
     )
     full_name: str | None | Unset = Field(
         default=UNSET,
@@ -131,17 +131,17 @@ class UpdateUserInput(BaseRequestModel):
         default=UNSET,
         description="Updated description. Omit to leave unchanged; null clears.",
     )
-    status: UserStatus | None = Field(
-        default=None,
-        description="New account status.",
+    status: UserStatus | None | Unset = Field(
+        default=UNSET,
+        description="New account status. Omit to leave unchanged.",
     )
-    role: UserRole | None = Field(
-        default=None,
-        description="New user role.",
+    role: UserRole | None | Unset = Field(
+        default=UNSET,
+        description="New user role. Omit to leave unchanged.",
     )
-    domain_name: str | None = Field(
-        default=None,
-        description="New domain assignment.",
+    domain_name: str | None | Unset = Field(
+        default=UNSET,
+        description="New domain assignment. Omit to leave unchanged.",
     )
     group_ids: list[UUID] | None | Unset = Field(
         default=UNSET,
@@ -151,17 +151,17 @@ class UpdateUserInput(BaseRequestModel):
         default=UNSET,
         description="Updated allowed client IP addresses or CIDR ranges. Omit to leave unchanged; null allows all.",
     )
-    need_password_change: bool | None = Field(
-        default=None,
-        description="Set password change requirement.",
+    need_password_change: bool | None | Unset = Field(
+        default=UNSET,
+        description="Set password change requirement. Omit to leave unchanged.",
     )
-    resource_policy: str | None = Field(
-        default=None,
-        description="New user resource policy name.",
+    resource_policy: str | None | Unset = Field(
+        default=UNSET,
+        description="New user resource policy name. Omit to leave unchanged.",
     )
-    sudo_session_enabled: bool | None = Field(
-        default=None,
-        description="Enable or disable sudo session capability.",
+    sudo_session_enabled: bool | None | Unset = Field(
+        default=UNSET,
+        description="Enable or disable sudo session capability. Omit to leave unchanged.",
     )
     main_access_key: str | None | Unset = Field(
         default=UNSET,

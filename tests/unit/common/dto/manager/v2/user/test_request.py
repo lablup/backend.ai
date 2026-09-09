@@ -179,16 +179,27 @@ class TestUpdateUserInput:
         assert req.container_gids is UNSET
         assert req.integration_name is UNSET
 
-    def test_non_sentinel_fields_default_to_none(self) -> None:
+    def test_non_nullable_fields_default_to_unset(self) -> None:
         req = UpdateUserInput()
+        assert req.username is UNSET
+        assert req.password is UNSET
+        assert req.status is UNSET
+        assert req.role is UNSET
+        assert req.domain_name is UNSET
+        assert req.need_password_change is UNSET
+        assert req.resource_policy is UNSET
+        assert req.sudo_session_enabled is UNSET
+
+    def test_non_nullable_fields_explicit_none_stays_none(self) -> None:
+        req = UpdateUserInput(username=None, password=None, status=None, role=None)
         assert req.username is None
         assert req.password is None
         assert req.status is None
         assert req.role is None
-        assert req.domain_name is None
-        assert req.need_password_change is None
-        assert req.resource_policy is None
-        assert req.sudo_session_enabled is None
+
+    def test_explicit_unset_username(self) -> None:
+        req = UpdateUserInput(username=UNSET)
+        assert req.username is UNSET
 
     def test_explicit_none_full_name_means_clear(self) -> None:
         req = UpdateUserInput(full_name=None)

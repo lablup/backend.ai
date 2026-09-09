@@ -465,56 +465,24 @@ class UserAdapter(BaseAdapter):
         """Update a user by UUID."""
         updater = UserUpdater(
             user_id=UserID(user_id),
-            username=(
-                OptionalState.update(input.username)
-                if input.username is not None
-                else OptionalState.nop()
-            ),
-            password=(
-                OptionalState.update(
-                    PasswordInfo(
-                        password=input.password,
-                        algorithm=self._auth_config.password_hash_algorithm,
-                        rounds=self._auth_config.password_hash_rounds,
-                        salt_size=self._auth_config.password_hash_salt_size,
-                    )
+            username=OptionalState.from_unset(input.username),
+            password=OptionalState.from_unset(input.password).map(
+                lambda raw: PasswordInfo(
+                    password=raw,
+                    algorithm=self._auth_config.password_hash_algorithm,
+                    rounds=self._auth_config.password_hash_rounds,
+                    salt_size=self._auth_config.password_hash_salt_size,
                 )
-                if input.password is not None
-                else OptionalState.nop()
             ),
-            need_password_change=(
-                OptionalState.update(input.need_password_change)
-                if input.need_password_change is not None
-                else OptionalState.nop()
-            ),
+            need_password_change=OptionalState.from_unset(input.need_password_change),
             full_name=TriState.from_unset(input.full_name),
             description=TriState.from_unset(input.description),
-            status=(
-                OptionalState.update(UserStatus(input.status))
-                if input.status is not None
-                else OptionalState.nop()
-            ),
-            domain_name=(
-                OptionalState.update(input.domain_name)
-                if input.domain_name is not None
-                else OptionalState.nop()
-            ),
-            role=(
-                OptionalState.update(UserRoleModel(input.role))
-                if input.role is not None
-                else OptionalState.nop()
-            ),
+            status=OptionalState.from_unset(input.status).map(UserStatus),
+            domain_name=OptionalState.from_unset(input.domain_name),
+            role=OptionalState.from_unset(input.role).map(UserRoleModel),
             allowed_client_ip=TriState.from_unset(input.allowed_client_ip),
-            resource_policy=(
-                OptionalState.update(input.resource_policy)
-                if input.resource_policy is not None
-                else OptionalState.nop()
-            ),
-            sudo_session_enabled=(
-                OptionalState.update(input.sudo_session_enabled)
-                if input.sudo_session_enabled is not None
-                else OptionalState.nop()
-            ),
+            resource_policy=OptionalState.from_unset(input.resource_policy),
+            sudo_session_enabled=OptionalState.from_unset(input.sudo_session_enabled),
             container_uid=TriState.from_unset(input.container_uid),
             container_main_gid=TriState.from_unset(input.container_main_gid),
             container_gids=TriState.from_unset(input.container_gids),
