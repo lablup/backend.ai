@@ -20,21 +20,14 @@ from .types import (
 )
 from .upserters import (
     DomainFairShareBulkWeightUpserterSpec,
-    DomainFairShareUpserterSpec,
     ProjectFairShareBulkWeightUpserterSpec,
-    ProjectFairShareUpserterSpec,
     UserFairShareBulkWeightUpserterSpec,
-    UserFairShareUpserterSpec,
 )
 
 __all__ = (
     # Repositories
     "FairShareRepositories",
     "FairShareRepository",
-    # Upserter specs
-    "DomainFairShareUpserterSpec",
-    "ProjectFairShareUpserterSpec",
-    "UserFairShareUpserterSpec",
     # Bulk weight upserter specs
     "DomainFairShareBulkWeightUpserterSpec",
     "ProjectFairShareBulkWeightUpserterSpec",

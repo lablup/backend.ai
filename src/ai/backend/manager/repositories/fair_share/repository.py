@@ -39,7 +39,6 @@ from ai.backend.manager.repositories.base import (
     BatchQuerier,
     BulkUpserter,
     BulkUpserterResult,
-    Upserter,
 )
 from ai.backend.manager.repositories.fair_share.types import (
     DomainFairShareEntitySearchResult,
@@ -56,6 +55,11 @@ if TYPE_CHECKING:
         UserFairShareRow,
     )
     from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.models.fair_share.upserters import (
+    DomainFairShareUpserter,
+    ProjectFairShareUpserter,
+    UserFairShareUpserter,
+)
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 
 __all__ = ("FairShareRepository",)
@@ -89,8 +93,7 @@ class FairShareRepository:
 
     @fair_share_repository_resilience.apply()
     async def upsert_domain_fair_share(
-        self,
-        upserter: Upserter[DomainFairShareRow],
+        self, upserter: DomainFairShareUpserter
     ) -> DomainFairShareData:
         """Upsert a domain fair share record."""
         return await self._db_source.upsert_domain_fair_share(upserter)
@@ -141,8 +144,7 @@ class FairShareRepository:
 
     @fair_share_repository_resilience.apply()
     async def upsert_project_fair_share(
-        self,
-        upserter: Upserter[ProjectFairShareRow],
+        self, upserter: ProjectFairShareUpserter
     ) -> ProjectFairShareData:
         """Upsert a project fair share record."""
         return await self._db_source.upsert_project_fair_share(upserter)
@@ -192,10 +194,7 @@ class FairShareRepository:
     # ==================== User Fair Share ====================
 
     @fair_share_repository_resilience.apply()
-    async def upsert_user_fair_share(
-        self,
-        upserter: Upserter[UserFairShareRow],
-    ) -> UserFairShareData:
+    async def upsert_user_fair_share(self, upserter: UserFairShareUpserter) -> UserFairShareData:
         """Upsert a user fair share record."""
         return await self._db_source.upsert_user_fair_share(upserter)
 

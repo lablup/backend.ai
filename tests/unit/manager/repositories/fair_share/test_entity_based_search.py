@@ -42,6 +42,11 @@ from ai.backend.manager.models.fair_share.scopes import (
     ProjectFairShareOperationScope,
     UserFairShareOperationScope,
 )
+from ai.backend.manager.models.fair_share.upserters import (
+    DomainFairShareUpserter,
+    ProjectFairShareUpserter,
+    UserFairShareUpserter,
+)
 from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.project import AssocGroupUserRow, ProjectRow
 from ai.backend.manager.models.rbac_models import RoleRow, UserRoleRow
@@ -66,12 +71,9 @@ from ai.backend.manager.models.user import (
     UserStatus,
 )
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.base import BatchQuerier, Upserter
+from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.fair_share import (
-    DomainFairShareUpserterSpec,
     FairShareRepository,
-    ProjectFairShareUpserterSpec,
-    UserFairShareUpserterSpec,
 )
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.secret.types import SecretValue
@@ -176,14 +178,12 @@ class TestSearchDomainFairSharesEntityBased:
             await db_sess.commit()
 
         await fair_share_repository.upsert_domain_fair_share(
-            Upserter(
-                spec=DomainFairShareUpserterSpec(
-                    resource_group=resource_group,
-                    resource_group_id=RESOURCE_GROUP_ID,
-                    domain_name=domain_name,
-                    # Explicit weight for use_default=False
-                    weight=TriState.update(Decimal("2.0")),
-                )
+            DomainFairShareUpserter(
+                resource_group=resource_group,
+                resource_group_id=RESOURCE_GROUP_ID,
+                domain_name=domain_name,
+                # Explicit weight for use_default=False
+                weight=TriState.update(Decimal("2.0")),
             )
         )
         return DomainFixtureData(domain_name=DomainName(domain_name), domain_id=domain_id)
@@ -344,14 +344,12 @@ class TestSearchDomainFairSharesEntityBased:
 
         for name in domain_names[:2]:
             await fair_share_repository.upsert_domain_fair_share(
-                Upserter(
-                    spec=DomainFairShareUpserterSpec(
-                        resource_group=resource_group,
-                        resource_group_id=RESOURCE_GROUP_ID,
-                        domain_name=name,
-                        # Explicit weight for use_default=False
-                        weight=TriState.update(Decimal("2.0")),
-                    )
+                DomainFairShareUpserter(
+                    resource_group=resource_group,
+                    resource_group_id=RESOURCE_GROUP_ID,
+                    domain_name=name,
+                    # Explicit weight for use_default=False
+                    weight=TriState.update(Decimal("2.0")),
                 )
             )
         return domain_names
@@ -787,15 +785,13 @@ class TestSearchProjectFairSharesEntityBased:
             await db_sess.commit()
 
         await fair_share_repository.upsert_project_fair_share(
-            Upserter(
-                spec=ProjectFairShareUpserterSpec(
-                    resource_group=resource_group,
-                    resource_group_id=RESOURCE_GROUP_ID,
-                    project_id=project_id,
-                    domain_name=domain_name,
-                    # Explicit weight for use_default=False
-                    weight=TriState.update(Decimal("2.0")),
-                )
+            ProjectFairShareUpserter(
+                resource_group=resource_group,
+                resource_group_id=RESOURCE_GROUP_ID,
+                project_id=project_id,
+                domain_name=domain_name,
+                # Explicit weight for use_default=False
+                weight=TriState.update(Decimal("2.0")),
             )
         )
         return project_id
@@ -1264,16 +1260,14 @@ class TestSearchUserFairSharesEntityBased:
         user_uuid = await self._create_user(db_with_cleanup, domain_name, project_id)
 
         await fair_share_repository.upsert_user_fair_share(
-            Upserter(
-                spec=UserFairShareUpserterSpec(
-                    resource_group=resource_group,
-                    resource_group_id=RESOURCE_GROUP_ID,
-                    user_uuid=user_uuid,
-                    project_id=project_id,
-                    domain_name=domain_name,
-                    # Explicit weight for use_default=False
-                    weight=TriState.update(Decimal("2.0")),
-                )
+            UserFairShareUpserter(
+                resource_group=resource_group,
+                resource_group_id=RESOURCE_GROUP_ID,
+                user_uuid=user_uuid,
+                project_id=project_id,
+                domain_name=domain_name,
+                # Explicit weight for use_default=False
+                weight=TriState.update(Decimal("2.0")),
             )
         )
         return user_uuid
