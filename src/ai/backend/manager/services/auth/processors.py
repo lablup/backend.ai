@@ -11,6 +11,7 @@ from ai.backend.manager.actions.v2.global_scope.processor import (
     GlobalActionProcessor,
     PublicActionProcessor,
 )
+from ai.backend.manager.actions.v2.lookup.processor import LookupActionProcessor
 from ai.backend.manager.actions.v2.ops.result import (
     BatchOpsResult,
     ScopedFieldsOpsResult,
@@ -90,19 +91,19 @@ from ai.backend.manager.services.auth.service import AuthService
 
 
 class AuthProcessors:
-    """Every auth operation, split by what answers for it.
+    """Every auth operation, answered for by the user it reaches.
 
-    Neither group is typed on one ``EntityData``: the login rows a user owns are read
-    through the user group, so its ops wirings answer with more than one kind.
+    The group is not typed on one ``EntityData``: the login rows a user owns are read
+    through it, so its ops wirings answer with more than one kind.
 
-    ``auth_group`` holds the credential and login-session state that names no entity:
-    the caller of a sign-in, a sign-out or a password reset holds no principal yet, and
-    an administrator reaching every session names none either. ``user_group`` holds what
-    one user's row, credentials or login rows answer for.
+    The two scope resolutions are lookups: each turns what the request named -- an
+    email, an access key, or nothing at all -- into the user it acts for, and the audit
+    row names that user.
 
     The three anonymous wirings are the sign-in path itself. Each authenticates its caller
     inside the service, against the password the row stores or the hook plugins' verdict,
-    which is what a gate would otherwise have done.
+    which is what a gate would otherwise have done. They run before a principal exists,
+    so they name no id; the user kind they declare is what the run was about.
     """
 
     authorize: AnonymousGlobalActionProcessor[AuthorizeAction, AuthorizeActionResult]
@@ -111,10 +112,10 @@ class AuthProcessors:
         UpdatePasswordNoAuthAction, UpdatePasswordNoAuthActionResult
     ]
     public_get_role: PublicActionProcessor[PublicGetRoleAction, PublicGetRoleActionResult]
-    public_resolve_access_key_scope: PublicActionProcessor[
+    public_resolve_access_key_scope: LookupActionProcessor[
         PublicResolveAccessKeyScopeAction, PublicResolveAccessKeyScopeResult
     ]
-    public_resolve_user_scope: PublicActionProcessor[
+    public_resolve_user_scope: LookupActionProcessor[
         PublicResolveUserScopeAction, PublicResolveUserScopeResult
     ]
     global_revoke_login_session: GlobalActionProcessor[
@@ -154,25 +155,24 @@ class AuthProcessors:
 
     def __init__(
         self,
-        auth_group: ProcessorGroup[Any],
         user_group: ProcessorGroup[Any],
         service: AuthService,
     ) -> None:
-        self.authorize = auth_group.anonymous_global(AuthorizeAction, service.authorize)
-        self.update_password_no_auth = auth_group.anonymous_global(
+        self.authorize = user_group.anonymous_global(AuthorizeAction, service.authorize)
+        self.update_password_no_auth = user_group.anonymous_global(
             UpdatePasswordNoAuthAction, service.update_password_no_auth
         )
-        self.public_get_role = auth_group.public(PublicGetRoleAction, service.get_role)
-        self.public_resolve_access_key_scope = auth_group.public(
+        self.public_get_role = user_group.public(PublicGetRoleAction, service.get_role)
+        self.public_resolve_access_key_scope = user_group.public_lookup(
             PublicResolveAccessKeyScopeAction, service.resolve_access_key_scope
         )
-        self.public_resolve_user_scope = auth_group.public(
+        self.public_resolve_user_scope = user_group.public_lookup(
             PublicResolveUserScopeAction, service.resolve_user_scope
         )
-        self.global_revoke_login_session = auth_group.global_scope(
+        self.global_revoke_login_session = user_group.global_scope(
             GlobalRevokeLoginSessionAction, service.global_revoke_login_session
         )
-        self.global_unblock_user = auth_group.global_scope(
+        self.global_unblock_user = user_group.global_scope(
             GlobalUnblockUserAction, service.global_unblock_user
         )
         self.signup = user_group.anonymous_global(SignupAction, service.signup)

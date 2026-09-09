@@ -1,31 +1,33 @@
 ---
 name: auth-service-composition
 type: decision-table
-description: 인증 도메인의 액션이 왜 auth 와 user 두 그룹으로 갈리는지, 게이트 없는 네 배선이 무엇으로 호출자를 확인하는지, 로그인 세션과 SSH 키페어 조작이 왜 사용자 단위로 기록되는지
+description: 인증 도메인의 모든 액션이 왜 user 하나로 답하는지, 게이트 없는 세 배선이 무엇으로 호출자를 확인하는지, 스코프 해석이 왜 lookup 인지, 로그인 세션과 SSH 키페어 조작이 왜 사용자 단위로 기록되는지
 scope: src/ai/backend/manager/services/auth
 keywords:
   - AuthProcessors
-  - AuthEntityType
+  - UserGlobalAction
   - anonymous_global
-  - PublicActionProcessor
+  - public_lookup
+  - PublicResolveUserScopeAction
   - RevokeLoginSessionAction
 sources:
   - src/ai/backend/manager/services/auth/processors.py
   - src/ai/backend/manager/api/rest/auth/registry.py
 generated:
   by: claude-code/opus-5
-  at: 2026-08-23
+  at: 2026-09-09
 status: draft
 ---
 
 # 인증 서비스
 
-## 그룹이 둘인 이유
+## 그룹이 하나인 이유
 
-`auth` 그룹은 어떤 사용자 행도 답하지 않는 상태 — 자격 증명과 로그인 세션 — 을 맡는다.
-로그인·로그아웃·비밀번호 재설정은 호출자가 아직 주체를 갖지 않은 채 들어오고, 관리자가
-전체 세션에 닿는 조회도 어떤 사용자를 지목하지 않는다. `user` 그룹은 한 사용자의 행,
-자격 증명, 로그인 기록이 답하는 것을 맡는다.
+- 이 도메인의 액션은 전부 사용자 행이나 사용자가 소유한 행을 다루므로 `user` 하나로 답한다.
+- 로그인·인증 없는 비밀번호 변경은 실행 전에 대상 id 가 없지만, 전역 동작은 원래 식별자를
+  답하지 않으므로 종류만 user 로 선언한다. 회원가입이 같은 형태다.
+- 관리자용 세션 강제 만료와 로그인 차단 해제도 소유자를 읽지 않아 id 가 없다. SUPERADMIN
+  게이트 뒤의 전역 동작으로 두고, 무엇을 대상으로 했는지만 user 로 기록한다.
 
 ## 게이트 없는 세 배선
 
@@ -41,10 +43,22 @@ status: draft
 
 ## 인증만 요구하는 세 읽기
 
-`public_get_role`, `public_resolve_access_key_scope`, `public_resolve_user_scope` 는
-호출자 맥락에서 대상이 정해진다. 호출자가 지목할 수 있는 대상이 자기 자신뿐이므로
-권한 확인이 더할 것이 없고, 인증만 확인한다. 위임 대상을 지목하는 경우는 서비스가
-요청자와 대상의 역할·도메인을 비교해 판정한다.
+- `public_get_role`, `public_resolve_access_key_scope`, `public_resolve_user_scope` 는
+  호출자 맥락에서 대상이 정해진다. 지목할 수 있는 대상이 자기 자신뿐이라 권한 확인이
+  더할 것이 없고, 인증만 확인한다.
+- 위임 대상을 지목하는 경우는 서비스가 요청자와 대상의 역할·도메인을 비교해 판정한다.
+  RBAC 이 대신할 수 없어서 `public_lookup` 으로 배선한다 — post-validator 가 붙으면
+  이 판정과 이중으로 걸린다.
+
+## 스코프 해석 두 건은 lookup 이다
+
+- 둘 다 요청이 이름 지은 것 — 이메일, 액세스 키, 또는 아무것도 아닌 것 — 을 그 요청이
+  대행하는 user 로 바꾼다. 외부 키를 내부 id 로 바꾸는 일이므로 lookup 이다.
+- 아무것도 지목하지 않은 요청은 호출자 자신을 뜻하므로 키의 shape 이 다르다.
+  `ActingUserKey` · `ActingKeypairKey` 가 그 경우를 맡고, 값을 담는 키와 `kind()` 가
+  갈린다.
+- 액세스 키 쪽 결과는 키페어의 소유자인 user 를 답한다. 키페어는 field row 라 감사 기록이
+  지목할 엔티티가 되지 못한다.
 
 ## 로그인 세션과 SSH 키페어는 사용자로 기록된다
 

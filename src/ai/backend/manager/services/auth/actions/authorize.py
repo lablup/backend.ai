@@ -7,11 +7,11 @@ from aiohttp import web
 from ai.backend.common.dto.manager.auth.types import AuthTokenType
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.auth.types import AuthorizationResult
-from ai.backend.manager.services.auth.actions.base import AuthGlobalAction
+from ai.backend.manager.services.auth.actions.base import UserGlobalAction
 
 
 @dataclass(frozen=True)
-class AuthorizeAction(AuthGlobalAction):
+class AuthorizeAction(UserGlobalAction):
     request: web.Request
     type: AuthTokenType
     domain_name: str

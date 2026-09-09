@@ -9,7 +9,6 @@ from ai.backend.common.data.entity.artifact import ArtifactEntityType
 from ai.backend.common.data.entity.artifact_registry import ArtifactRegistryEntityType
 from ai.backend.common.data.entity.artifact_revision import ArtifactRevisionFieldType
 from ai.backend.common.data.entity.audit_log import AuditLogFieldType
-from ai.backend.common.data.entity.auth import AuthEntityType
 from ai.backend.common.data.entity.client_ip_masking import ClientIPMaskingPolicyEntityType
 from ai.backend.common.data.entity.container_registry import ContainerRegistryEntityType
 from ai.backend.common.data.entity.deployment import DeploymentEntityType
@@ -753,7 +752,6 @@ def create_processors(
             services.model_serving_auto_scaling,
         ),
         auth=AuthProcessors(
-            organization_groups.group(GroupMeta(AuthEntityType())),
             organization_groups.group(GroupMeta(UserEntityType())),
             services.auth,
         ),

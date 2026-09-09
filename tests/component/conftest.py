@@ -46,7 +46,6 @@ from ai.backend.common.clients.valkey_client.valkey_stream.client import ValkeyS
 from ai.backend.common.configs.etcd import EtcdConfig
 from ai.backend.common.configs.pyroscope import PyroscopeConfig
 from ai.backend.common.contexts.user import with_user
-from ai.backend.common.data.entity.auth import AuthEntityType
 from ai.backend.common.data.entity.domain import DomainEntityType, DomainID
 from ai.backend.common.data.entity.project import ProjectEntityType
 from ai.backend.common.data.entity.resource_group import ResourceGroupID, ResourceGroupName
@@ -1538,7 +1537,6 @@ def auth_processors(
         key_provider_pool=KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
     )
     return AuthProcessors(
-        processor_registry.group(GroupMeta(AuthEntityType())),
         processor_registry.group(GroupMeta(UserEntityType())),
         service,
     )

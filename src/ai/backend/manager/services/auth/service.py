@@ -787,12 +787,14 @@ class AuthService:
             return PublicResolveAccessKeyScopeResult(
                 requester_access_key=requester_ak,
                 owner_access_key=requester_ak,
+                owner_user_id=UserID(acting.user_id),
             )
         owner_ak = AccessKey(action.owner_access_key)
         try:
             (
-                owner_domain,
+                owner_uuid,
                 owner_role,
+                owner_domain,
             ) = await self._auth_repository.get_delegation_target_by_access_key(
                 action.owner_access_key,
             )
@@ -810,6 +812,7 @@ class AuthService:
         return PublicResolveAccessKeyScopeResult(
             requester_access_key=requester_ak,
             owner_access_key=owner_ak,
+            owner_user_id=owner_uuid,
         )
 
     async def resolve_user_scope(
@@ -818,7 +821,7 @@ class AuthService:
         acting = self._acting_user()
         if action.owner_user_email is None:
             return PublicResolveUserScopeResult(
-                owner_uuid=acting.user_id,
+                owner_uuid=UserID(acting.user_id),
                 owner_role=acting.role,
             )
         if not acting.is_superadmin:

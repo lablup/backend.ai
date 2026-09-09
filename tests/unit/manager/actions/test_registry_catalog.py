@@ -28,7 +28,6 @@ from ai.backend.common.data.entity.artifact import ArtifactEntityType
 from ai.backend.common.data.entity.artifact_registry import ArtifactRegistryEntityType
 from ai.backend.common.data.entity.artifact_revision import ArtifactRevisionFieldType
 from ai.backend.common.data.entity.audit_log import AuditLogFieldType
-from ai.backend.common.data.entity.auth import AuthEntityType
 from ai.backend.common.data.entity.container_registry import ContainerRegistryEntityType
 from ai.backend.common.data.entity.deployment import DeploymentEntityType
 from ai.backend.common.data.entity.deployment_preset import DeploymentPresetEntityType
@@ -152,6 +151,21 @@ from ai.backend.manager.services.artifact_registry.actions.common.get_multi impo
 )
 from ai.backend.manager.services.artifact_registry.processors import ArtifactRegistryProcessors
 from ai.backend.manager.services.audit_log.processors import AuditLogProcessors
+from ai.backend.manager.services.auth.actions.authorize import AuthorizeAction
+from ai.backend.manager.services.auth.actions.get_role import PublicGetRoleAction
+from ai.backend.manager.services.auth.actions.resolve_access_key_scope import (
+    PublicResolveAccessKeyScopeAction,
+)
+from ai.backend.manager.services.auth.actions.resolve_user_scope import (
+    PublicResolveUserScopeAction,
+)
+from ai.backend.manager.services.auth.actions.revoke_login_session import (
+    GlobalRevokeLoginSessionAction,
+)
+from ai.backend.manager.services.auth.actions.unblock_user import GlobalUnblockUserAction
+from ai.backend.manager.services.auth.actions.update_password_no_auth import (
+    UpdatePasswordNoAuthAction,
+)
 from ai.backend.manager.services.auth.processors import AuthProcessors
 from ai.backend.manager.services.container_registry.processors import ContainerRegistryProcessors
 from ai.backend.manager.services.deployment.actions.access_token.bulk_get_access_tokens import (
@@ -455,7 +469,6 @@ def test_every_defined_v2_action_is_wired() -> None:
         MagicMock(),
     )
     AuthProcessors(
-        registry.group(GroupMeta(AuthEntityType())),
         registry.group(GroupMeta(UserEntityType())),
         MagicMock(),
     )
@@ -855,3 +868,37 @@ def test_entity_data_loader_reads_are_checked_per_entity_except_domains() -> Non
         ActionKind.LOOKUP,
         ActionGate.PUBLIC,
     )
+
+
+def test_auth_operations_are_answered_for_by_the_user() -> None:
+    """Pins the seven wirings BA-7789 moved off the entity kind that named no row.
+
+    Four run before or beside a principal and stay global; the two scope resolutions
+    are lookups, so the audit row carries the user each one resolved.
+    """
+    registry = _ops_registry()
+    AuthProcessors(registry.group(GroupMeta(UserEntityType())), MagicMock())
+
+    judged = {
+        AuthorizeAction: (UserEntityType(), ActionKind.GLOBAL, ActionGate.ANONYMOUS),
+        UpdatePasswordNoAuthAction: (UserEntityType(), ActionKind.GLOBAL, ActionGate.ANONYMOUS),
+        GlobalRevokeLoginSessionAction: (
+            UserEntityType(),
+            ActionKind.GLOBAL,
+            ActionGate.PERMISSION,
+        ),
+        GlobalUnblockUserAction: (UserEntityType(), ActionKind.GLOBAL, ActionGate.PERMISSION),
+        PublicGetRoleAction: (UserEntityType(), ActionKind.GLOBAL, ActionGate.PUBLIC),
+        PublicResolveUserScopeAction: (UserEntityType(), ActionKind.LOOKUP, ActionGate.PUBLIC),
+        PublicResolveAccessKeyScopeAction: (
+            UserEntityType(),
+            ActionKind.LOOKUP,
+            ActionGate.PUBLIC,
+        ),
+    }
+    recorded = {
+        record.action_cls: (record.entity_type, record.kind, record.gate)
+        for record in registry.wired_processors()
+        if record.action_cls in judged
+    }
+    assert recorded == judged

@@ -6,6 +6,7 @@ import pytest
 
 from ai.backend.common.contexts.user import with_user
 from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.user.types import UserData
 from ai.backend.common.exception import InvalidAPIParameters
 from ai.backend.common.types import AccessKey
@@ -56,8 +57,8 @@ def auth_service(
 
 REQUESTER_AK = "AKIAIOSFODNN7EXAMPLE"
 OWNER_AK = "AKIAI44QH8DHBEXAMPLE"
-REQUESTER_UUID = uuid.UUID("11111111-1111-1111-1111-111111111111")
-OWNER_UUID = uuid.UUID("22222222-2222-2222-2222-222222222222")
+REQUESTER_UUID = UserID(uuid.UUID("11111111-1111-1111-1111-111111111111"))
+OWNER_UUID = UserID(uuid.UUID("22222222-2222-2222-2222-222222222222"))
 DOMAIN_ID = DomainID(uuid.UUID("33333333-3333-3333-3333-333333333333"))
 
 
@@ -89,6 +90,7 @@ class TestResolveAccessKeyScope:
             result = await auth_service.resolve_access_key_scope(action)
         assert result.requester_access_key == AccessKey(REQUESTER_AK)
         assert result.owner_access_key == AccessKey(REQUESTER_AK)
+        assert result.entity_id() == REQUESTER_UUID
 
     async def test_owner_equals_requester_returns_same_key(
         self,
@@ -99,6 +101,7 @@ class TestResolveAccessKeyScope:
         with with_user(acting_user(UserRole.ADMIN)):
             result = await auth_service.resolve_access_key_scope(action)
         assert result.owner_access_key == AccessKey(REQUESTER_AK)
+        assert result.entity_id() == REQUESTER_UUID
 
     async def test_regular_user_delegation_raises_forbidden(
         self,
@@ -107,8 +110,9 @@ class TestResolveAccessKeyScope:
         default_keypair: None,
     ) -> None:
         mock_auth_repository.get_delegation_target_by_access_key.return_value = (
-            "default",
+            OWNER_UUID,
             UserRole.ADMIN,
+            "default",
         )
         action = PublicResolveAccessKeyScopeAction(owner_access_key=OWNER_AK)
         with with_user(acting_user(UserRole.USER)):
@@ -136,8 +140,9 @@ class TestResolveAccessKeyScope:
         default_keypair: None,
     ) -> None:
         mock_auth_repository.get_delegation_target_by_access_key.return_value = (
-            "other-domain",
+            OWNER_UUID,
             UserRole.USER,
+            "other-domain",
         )
         action = PublicResolveAccessKeyScopeAction(owner_access_key=OWNER_AK)
         with with_user(acting_user(UserRole.ADMIN)):
@@ -152,8 +157,9 @@ class TestResolveAccessKeyScope:
     ) -> None:
         """A super admin acting as a regular user (BEP-1058) may not delegate."""
         mock_auth_repository.get_delegation_target_by_access_key.return_value = (
-            "default",
+            OWNER_UUID,
             UserRole.USER,
+            "default",
         )
         action = PublicResolveAccessKeyScopeAction(owner_access_key=OWNER_AK)
         with with_user(acting_user(UserRole.USER)):
@@ -171,6 +177,7 @@ class TestResolveUserScope:
             result = await auth_service.resolve_user_scope(action)
         assert result.owner_uuid == REQUESTER_UUID
         assert result.owner_role == UserRole.USER
+        assert result.entity_id() == REQUESTER_UUID
 
     async def test_non_superadmin_specifying_email_raises_invalid_params(
         self,
@@ -196,6 +203,7 @@ class TestResolveUserScope:
             result = await auth_service.resolve_user_scope(action)
         assert result.owner_uuid == OWNER_UUID
         assert result.owner_role == UserRole.USER
+        assert result.entity_id() == OWNER_UUID
 
     async def test_nonexistent_email_raises_invalid_params(
         self,

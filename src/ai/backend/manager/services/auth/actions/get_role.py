@@ -3,11 +3,11 @@ from dataclasses import dataclass
 from typing import override
 
 from ai.backend.manager.actions.types import ActionOperationType
-from ai.backend.manager.services.auth.actions.base import AuthGlobalAction
+from ai.backend.manager.services.auth.actions.base import UserGlobalAction
 
 
 @dataclass(frozen=True)
-class PublicGetRoleAction(AuthGlobalAction):
+class PublicGetRoleAction(UserGlobalAction):
     group_id: uuid.UUID | None
 
     @override
