@@ -134,9 +134,7 @@ class RuntimeVariantAdapter(BaseAdapter):
     ) -> UpdateRuntimeVariantPayload:
         updater = RuntimeVariantUpdater(
             variant_id=RuntimeVariantID(input.id),
-            name=OptionalState.update(input.name)
-            if input.name is not None
-            else OptionalState.nop(),
+            name=OptionalState.from_unset(input.name),
             description=TriState.from_unset(input.description),
         )
         result = await self._processors.runtime_variant.update.run(

@@ -20,7 +20,12 @@ class CreateRuntimeVariantInput(BaseRequestModel):
 
 class UpdateRuntimeVariantInput(BaseRequestModel):
     id: UUID = Field(description="ID of the runtime variant to update.")
-    name: str | None = Field(default=None, min_length=1, max_length=128, description="New name.")
+    name: str | None | Unset = Field(
+        default=UNSET,
+        min_length=1,
+        max_length=128,
+        description="New name. Omit to leave unchanged.",
+    )
     description: str | None | Unset = Field(
         default=UNSET, description="Updated description. Omit to leave unchanged; null clears."
     )
