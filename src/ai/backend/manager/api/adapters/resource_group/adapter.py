@@ -26,10 +26,12 @@ from ai.backend.common.dto.manager.v2.fair_share.types import (
 from ai.backend.common.dto.manager.v2.resource_group.request import (
     AdminSearchResourceGroupsInput,
     CreateResourceGroupInput,
+    PreemptionConfigInputDTO,
     ReplaceResourceGroupDefaultDeploymentOptionsInput,
     ReplaceResourceGroupDefaultSessionOptionsInput,
     ResourceGroupFilter,
     ResourceGroupOrder,
+    ResourceWeightEntryInput,
     UpdateAllowedDomainsForResourceGroupInput,
     UpdateAllowedProjectsForResourceGroupInput,
     UpdateAllowedResourceGroupsForDomainInput,
@@ -201,6 +203,26 @@ def _resource_group_pagination_spec() -> PaginationSpec:
         forward_condition_factory=ResourceGroupConditions.by_cursor_forward,
         backward_condition_factory=ResourceGroupConditions.by_cursor_backward,
         tiebreaker_order=ResourceGroupRow.name.asc(),
+    )
+
+
+def _resource_weights_to_domain(
+    entries: Sequence[ResourceWeightEntryInput],
+) -> list[ResourceWeightInput]:
+    return [
+        ResourceWeightInput(resource_type=entry.resource_type, weight=entry.weight)
+        for entry in entries
+    ]
+
+
+def _preemption_input_to_domain(preemption: PreemptionConfigInputDTO) -> DataPreemptionConfig:
+    return DataPreemptionConfig(
+        enabled=preemption.enabled,
+        preemptible_priority=preemption.preemptible_priority,
+        order=PreemptionOrder(preemption.order),
+        mode=PreemptionMode(preemption.mode),
+        preemption_min_runtime=timedelta(seconds=preemption.preemption_min_runtime),
+        victim_scope=preemption.victim_scope,
     )
 
 
@@ -439,12 +461,8 @@ class ResourceGroupAdapter(BaseAdapter):
         """
         updater = ResourceGroupUpdater(
             resource_group_id=await self._resolve_resource_group_id(name),
-            is_active=(
-                OptionalState.update(input.is_active)
-                if input.is_active is not None
-                else OptionalState.nop()
-            ),
-            is_default=OptionalState.from_nullable(input.is_default),
+            is_active=OptionalState.from_unset(input.is_active),
+            is_default=OptionalState.from_unset(input.is_default),
             description=TriState.from_unset(input.description),
         )
         action_result = await self._processors.resource_group.update_resource_group.run(
@@ -550,25 +568,17 @@ class ResourceGroupAdapter(BaseAdapter):
         Returns:
             Payload DTO containing the updated resource group.
         """
-        resource_weights = None
-        if input.resource_weights is not None:
-            resource_weights = [
-                ResourceWeightInput(
-                    resource_type=entry.resource_type,
-                    weight=entry.weight,
-                )
-                for entry in input.resource_weights
-            ]
-
         action_result = await self._processors.resource_group.update_fair_share_spec.run(
             UpdateFairShareSpecAction(
                 resource_group_id=await self._resolve_resource_group_id(input.resource_group_name),
                 resource_group=input.resource_group_name,
-                half_life_days=input.half_life_days,
-                lookback_days=input.lookback_days,
-                decay_unit_days=input.decay_unit_days,
-                default_weight=input.default_weight,
-                resource_weights=resource_weights,
+                half_life_days=OptionalState.from_unset(input.half_life_days).optional_value(),
+                lookback_days=OptionalState.from_unset(input.lookback_days).optional_value(),
+                decay_unit_days=OptionalState.from_unset(input.decay_unit_days).optional_value(),
+                default_weight=OptionalState.from_unset(input.default_weight).optional_value(),
+                resource_weights=OptionalState.from_unset(input.resource_weights)
+                .map(_resource_weights_to_domain)
+                .optional_value(),
             )
         )
         return UpdateResourceGroupFairShareSpecPayloadNode(
@@ -587,64 +597,21 @@ class ResourceGroupAdapter(BaseAdapter):
         Returns:
             Payload DTO containing the updated resource group.
         """
-        scheduler_value: str | None = None
-        if input.scheduler_type is not None:
-            scheduler_value = SchedulerType(input.scheduler_type).value
-
-        preemption_config_state: OptionalState[DataPreemptionConfig] = OptionalState.nop()
-        if input.preemption is not None:
-            preemption_config_state = OptionalState.update(
-                DataPreemptionConfig(
-                    enabled=input.preemption.enabled,
-                    preemptible_priority=input.preemption.preemptible_priority,
-                    order=PreemptionOrder(input.preemption.order),
-                    mode=PreemptionMode(input.preemption.mode),
-                    preemption_min_runtime=timedelta(
-                        seconds=input.preemption.preemption_min_runtime
-                    ),
-                    victim_scope=input.preemption.victim_scope,
-                )
-            )
-
         updater = ResourceGroupUpdater(
             resource_group_id=await self._resolve_resource_group_id(input.resource_group_name),
-            is_active=(
-                OptionalState.update(input.is_active)
-                if input.is_active is not None
-                else OptionalState.nop()
+            is_active=OptionalState.from_unset(input.is_active),
+            is_public=OptionalState.from_unset(input.is_public),
+            is_default=OptionalState.from_unset(input.is_default),
+            description=TriState.from_unset(input.description),
+            wsproxy_addr=TriState.from_unset(input.app_proxy_addr),
+            wsproxy_api_token=TriState.from_unset(input.appproxy_api_token),
+            use_host_network=OptionalState.from_unset(input.use_host_network),
+            scheduler=OptionalState.from_unset(input.scheduler_type).map(
+                lambda v: SchedulerType(v).value
             ),
-            is_public=(
-                OptionalState.update(input.is_public)
-                if input.is_public is not None
-                else OptionalState.nop()
+            preemption_config=OptionalState.from_unset(input.preemption).map(
+                _preemption_input_to_domain
             ),
-            is_default=OptionalState.from_nullable(input.is_default),
-            description=(
-                TriState.update(input.description)
-                if input.description is not None
-                else TriState.nop()
-            ),
-            wsproxy_addr=(
-                TriState.update(input.app_proxy_addr)
-                if input.app_proxy_addr is not None
-                else TriState.nop()
-            ),
-            wsproxy_api_token=(
-                TriState.update(input.appproxy_api_token)
-                if input.appproxy_api_token is not None
-                else TriState.nop()
-            ),
-            use_host_network=(
-                OptionalState.update(input.use_host_network)
-                if input.use_host_network is not None
-                else OptionalState.nop()
-            ),
-            scheduler=(
-                OptionalState.update(scheduler_value)
-                if scheduler_value is not None
-                else OptionalState.nop()
-            ),
-            preemption_config=preemption_config_state,
         )
 
         action_result = await self._processors.resource_group.update_resource_group.run(

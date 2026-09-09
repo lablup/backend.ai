@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import uuid
+from decimal import Decimal
 
 import pytest
 from pydantic import ValidationError
@@ -10,6 +11,9 @@ from pydantic import ValidationError
 from ai.backend.common.dto.manager.v2.resource_group.request import (
     CreateResourceGroupInput,
     DeleteResourceGroupInput,
+    ResourceWeightEntryInput,
+    UpdateResourceGroupConfigInput,
+    UpdateResourceGroupFairShareSpecInput,
     UpdateResourceGroupInput,
 )
 from ai.backend.common.exception import BackendAISchemaValidationFailed
@@ -91,6 +95,9 @@ class TestUpdateResourceGroupInput:
 
     def test_default_unset_fields(self) -> None:
         req = UpdateResourceGroupInput()
+        assert req.name is UNSET
+        assert req.is_active is UNSET
+        assert req.is_default is UNSET
         assert req.description is UNSET
         assert isinstance(req.description, Unset)
         assert req.total_resource_slots is UNSET
@@ -132,6 +139,83 @@ class TestUpdateResourceGroupInput:
         restored = UpdateResourceGroupInput.model_validate_json(json_data)
         assert restored.name is None
         assert restored.description is None
+
+    def test_omitted_fields_survive_round_trip(self) -> None:
+        req = UpdateResourceGroupInput(is_active=True)
+        restored = UpdateResourceGroupInput.model_validate_json(req.model_dump_json())
+        assert restored.is_active is True
+        assert restored.name is UNSET
+        assert restored.description is UNSET
+
+
+class TestUpdateResourceGroupFairShareSpecInput:
+    """Tests for UpdateResourceGroupFairShareSpecInput omitted-vs-null semantics."""
+
+    def test_default_unset_fields(self) -> None:
+        req = UpdateResourceGroupFairShareSpecInput(resource_group_name="rg")
+        assert req.half_life_days is UNSET
+        assert req.lookback_days is UNSET
+        assert req.decay_unit_days is UNSET
+        assert req.default_weight is UNSET
+        assert req.resource_weights is UNSET
+
+    def test_none_stays_none(self) -> None:
+        req = UpdateResourceGroupFairShareSpecInput(
+            resource_group_name="rg",
+            half_life_days=None,
+            resource_weights=None,
+        )
+        assert req.half_life_days is None
+        assert req.resource_weights is None
+        assert req.lookback_days is UNSET
+
+    def test_value_update(self) -> None:
+        req = UpdateResourceGroupFairShareSpecInput(
+            resource_group_name="rg",
+            half_life_days=14,
+            resource_weights=[ResourceWeightEntryInput(resource_type="cpu", weight=Decimal("2"))],
+        )
+        assert req.half_life_days == 14
+        assert req.resource_weights is not None
+        assert not isinstance(req.resource_weights, Unset)
+        assert req.resource_weights[0].resource_type == "cpu"
+
+
+class TestUpdateResourceGroupConfigInput:
+    """Tests for UpdateResourceGroupConfigInput omitted-vs-null semantics."""
+
+    def test_default_unset_fields(self) -> None:
+        req = UpdateResourceGroupConfigInput(resource_group_name="rg")
+        assert req.is_active is UNSET
+        assert req.is_public is UNSET
+        assert req.is_default is UNSET
+        assert req.description is UNSET
+        assert req.app_proxy_addr is UNSET
+        assert req.appproxy_api_token is UNSET
+        assert req.use_host_network is UNSET
+        assert req.scheduler_type is UNSET
+        assert req.preemption is UNSET
+
+    def test_none_stays_none(self) -> None:
+        req = UpdateResourceGroupConfigInput(
+            resource_group_name="rg",
+            description=None,
+            app_proxy_addr=None,
+            preemption=None,
+        )
+        assert req.description is None
+        assert req.app_proxy_addr is None
+        assert req.preemption is None
+        assert req.appproxy_api_token is UNSET
+
+    def test_omitted_fields_survive_json_round_trip(self) -> None:
+        req = UpdateResourceGroupConfigInput.model_validate_json(
+            '{"resource_group_name": "rg", "is_active": false, "description": null}'
+        )
+        assert req.is_active is False
+        assert req.description is None
+        assert req.is_public is UNSET
+        assert req.scheduler_type is UNSET
 
 
 class TestDeleteResourceGroupInput:

@@ -8,7 +8,7 @@ from enum import StrEnum
 from typing import Self, override
 from uuid import UUID
 
-from strawberry import Info
+from strawberry import UNSET, Info
 from strawberry.relay import NodeID
 
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
@@ -555,23 +555,23 @@ class UpdateResourceGroupFairShareSpecInput(
 
     resource_group_name: str = gql_field(description="Name of the resource group to update.")
     half_life_days: int | None = gql_field(
-        description="Half-life for exponential decay in days. Leave null to keep existing value.",
-        default=None,
+        description="Half-life for exponential decay in days. Omit to leave unchanged.",
+        default=UNSET,
     )
     lookback_days: int | None = gql_field(
-        description="Total lookback period in days. Leave null to keep existing value.",
-        default=None,
+        description="Total lookback period in days. Omit to leave unchanged.",
+        default=UNSET,
     )
     decay_unit_days: int | None = gql_field(
-        description="Granularity of decay buckets in days. Leave null to keep existing value.",
-        default=None,
+        description="Granularity of decay buckets in days. Omit to leave unchanged.",
+        default=UNSET,
     )
     default_weight: Decimal | None = gql_field(
-        description="Default weight for entities. Leave null to keep existing value.", default=None
+        description="Default weight for entities. Omit to leave unchanged.", default=UNSET
     )
     resource_weights: list[ResourceWeightEntryInputGQL] | None = gql_field(
-        description="Resource weights for fair share calculation. Each entry specifies a resource type and its weight multiplier. Only provided resource types are updated (partial update). Set weight to null to remove that resource type (revert to default). Leave the entire list null to keep all existing values.",
-        default=None,
+        description="Resource weights for fair share calculation. Each entry specifies a resource type and its weight multiplier. Only provided resource types are updated (partial update). Set weight to null to remove that resource type (revert to default). Omit the entire list to keep all existing values.",
+        default=UNSET,
     )
 
 
@@ -607,12 +607,12 @@ class UpdateResourceGroupInput(PydanticInputMixin[UpdateResourceGroupConfigInput
 
     # Status fields
     is_active: bool | None = gql_field(
-        description="Whether the resource group is active. Leave null to keep existing value.",
-        default=None,
+        description="Whether the resource group is active. Omit to leave unchanged.",
+        default=UNSET,
     )
     is_public: bool | None = gql_field(
-        description="Whether the resource group is public. Leave null to keep existing value.",
-        default=None,
+        description="Whether the resource group is public. Omit to leave unchanged.",
+        default=UNSET,
     )
     is_default: bool | None = gql_added_field(
         BackendAIGQLMeta(
@@ -620,40 +620,41 @@ class UpdateResourceGroupInput(PydanticInputMixin[UpdateResourceGroupConfigInput
             description=(
                 "Whether this is the default resource group. At most one resource group may"
                 " hold the flag, so setting it to true is rejected while another one holds it;"
-                " clear that one first. Leave null to keep existing value."
+                " clear that one first. Omit to leave unchanged."
             ),
         ),
-        default=None,
+        default=UNSET,
     )
 
     # Metadata fields
     description: str | None = gql_field(
-        description="Human-readable description. Leave null to keep existing value.", default=None
+        description="Human-readable description. Omit to leave unchanged; null clears.",
+        default=UNSET,
     )
 
     # Network config fields
     app_proxy_addr: str | None = gql_field(
-        description="App proxy address. Leave null to keep existing value.", default=None
+        description="App proxy address. Omit to leave unchanged; null clears.", default=UNSET
     )
     appproxy_api_token: str | None = gql_field(
-        description="App proxy API token. Leave null to keep existing value.", default=None
+        description="App proxy API token. Omit to leave unchanged; null clears.", default=UNSET
     )
     use_host_network: bool | None = gql_field(
-        description="Whether to use host network mode. Leave null to keep existing value.",
-        default=None,
+        description="Whether to use host network mode. Omit to leave unchanged.",
+        default=UNSET,
     )
 
     # Scheduler config fields
     scheduler_type: SchedulerTypeGQL | None = gql_field(
-        description="Scheduler type (FIFO, LIFO, DRF, FAIR_SHARE). Leave null to keep existing value.",
-        default=None,
+        description="Scheduler type (FIFO, LIFO, DRF, FAIR_SHARE). Omit to leave unchanged.",
+        default=UNSET,
     )
     preemption: PreemptionConfigInput | None = gql_added_field(
         BackendAIGQLMeta(
             added_version="26.3.0",
-            description="Preemption configuration. When provided, replaces the entire preemption config. Leave null to keep existing value.",
+            description="Preemption configuration. When provided, replaces the entire preemption config. Omit to leave unchanged.",
         ),
-        default=None,
+        default=UNSET,
     )
 
 

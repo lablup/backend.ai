@@ -96,24 +96,24 @@ class CreateResourceGroupInput(BaseRequestModel):
 class UpdateResourceGroupInput(BaseRequestModel):
     """Input for updating a resource group. All fields optional for partial update."""
 
-    name: str | None = Field(
-        default=None,
-        description="Updated resource group name. Leave null to keep existing value.",
+    name: str | None | Unset = Field(
+        default=UNSET,
+        description="Updated resource group name. Omit to leave unchanged.",
     )
     description: str | None | Unset = Field(
         default=UNSET,
         description="Updated description. Omit to leave unchanged; null clears.",
     )
-    is_active: bool | None = Field(
-        default=None,
-        description="Whether the resource group is active. Leave null to keep existing value.",
+    is_active: bool | None | Unset = Field(
+        default=UNSET,
+        description="Whether the resource group is active. Omit to leave unchanged.",
     )
-    is_default: bool | None = Field(
-        default=None,
+    is_default: bool | None | Unset = Field(
+        default=UNSET,
         description=(
             "Whether this is the default resource group. At most one resource group may hold"
             " the flag, so setting it to true is rejected while another one holds it; clear"
-            " that one first. Leave null to keep existing value."
+            " that one first. Omit to leave unchanged."
         ),
     )
     total_resource_slots: dict[str, Any] | None | Unset = Field(
@@ -235,25 +235,25 @@ class UpdateResourceGroupFairShareSpecInput(BaseRequestModel):
     """Input for updating resource group fair share configuration (GQL-aligned)."""
 
     resource_group_name: str = Field(description="Name of the resource group to update.")
-    half_life_days: int | None = Field(
-        default=None,
-        description="Half-life for exponential decay in days. Leave null to keep existing value.",
+    half_life_days: int | None | Unset = Field(
+        default=UNSET,
+        description="Half-life for exponential decay in days. Omit to leave unchanged.",
     )
-    lookback_days: int | None = Field(
-        default=None,
-        description="Total lookback period in days. Leave null to keep existing value.",
+    lookback_days: int | None | Unset = Field(
+        default=UNSET,
+        description="Total lookback period in days. Omit to leave unchanged.",
     )
-    decay_unit_days: int | None = Field(
-        default=None,
-        description="Granularity of decay buckets in days. Leave null to keep existing value.",
+    decay_unit_days: int | None | Unset = Field(
+        default=UNSET,
+        description="Granularity of decay buckets in days. Omit to leave unchanged.",
     )
-    default_weight: Decimal | None = Field(
-        default=None,
-        description="Default weight for entities. Leave null to keep existing value.",
+    default_weight: Decimal | None | Unset = Field(
+        default=UNSET,
+        description="Default weight for entities. Omit to leave unchanged.",
     )
-    resource_weights: list[ResourceWeightEntryInput] | None = Field(
-        default=None,
-        description="Resource weights for fair share calculation. Leave null to keep existing values.",
+    resource_weights: list[ResourceWeightEntryInput] | None | Unset = Field(
+        default=UNSET,
+        description="Resource weights for fair share calculation. Omit to leave unchanged.",
     )
 
 
@@ -261,45 +261,45 @@ class UpdateResourceGroupConfigInput(BaseRequestModel):
     """Input for updating resource group configuration via GQL (all fields optional)."""
 
     resource_group_name: str = Field(description="Name of the resource group to update.")
-    is_active: bool | None = Field(
-        default=None,
-        description="Whether the resource group is active. Leave null to keep existing value.",
+    is_active: bool | None | Unset = Field(
+        default=UNSET,
+        description="Whether the resource group is active. Omit to leave unchanged.",
     )
-    is_public: bool | None = Field(
-        default=None,
-        description="Whether the resource group is public. Leave null to keep existing value.",
+    is_public: bool | None | Unset = Field(
+        default=UNSET,
+        description="Whether the resource group is public. Omit to leave unchanged.",
     )
-    is_default: bool | None = Field(
-        default=None,
+    is_default: bool | None | Unset = Field(
+        default=UNSET,
         description=(
             "Whether this is the default resource group. At most one resource group may hold"
             " the flag, so setting it to true is rejected while another one holds it; clear"
-            " that one first. Leave null to keep existing value."
+            " that one first. Omit to leave unchanged."
         ),
     )
-    description: str | None = Field(
-        default=None,
-        description="Human-readable description. Leave null to keep existing value.",
+    description: str | None | Unset = Field(
+        default=UNSET,
+        description="Human-readable description. Omit to leave unchanged; null clears.",
     )
-    app_proxy_addr: str | None = Field(
-        default=None,
-        description="App proxy address. Leave null to keep existing value.",
+    app_proxy_addr: str | None | Unset = Field(
+        default=UNSET,
+        description="App proxy address. Omit to leave unchanged; null clears.",
     )
-    appproxy_api_token: str | None = Field(
-        default=None,
-        description="App proxy API token. Leave null to keep existing value.",
+    appproxy_api_token: str | None | Unset = Field(
+        default=UNSET,
+        description="App proxy API token. Omit to leave unchanged; null clears.",
     )
-    use_host_network: bool | None = Field(
-        default=None,
-        description="Whether to use host network mode. Leave null to keep existing value.",
+    use_host_network: bool | None | Unset = Field(
+        default=UNSET,
+        description="Whether to use host network mode. Omit to leave unchanged.",
     )
-    scheduler_type: str | None = Field(
-        default=None,
-        description="Scheduler type value (fifo/lifo/drf/fair-share). Leave null to keep existing.",
+    scheduler_type: str | None | Unset = Field(
+        default=UNSET,
+        description="Scheduler type value (fifo/lifo/drf/fair-share). Omit to leave unchanged.",
     )
-    preemption: PreemptionConfigInputDTO | None = Field(
-        default=None,
-        description="Preemption configuration. Leave null to keep existing value.",
+    preemption: PreemptionConfigInputDTO | None | Unset = Field(
+        default=UNSET,
+        description="Preemption configuration. Omit to leave unchanged.",
     )
 
 

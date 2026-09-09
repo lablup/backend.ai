@@ -173,6 +173,7 @@ def update(
     from ai.backend.common.dto.manager.v2.resource_group.request import (
         UpdateResourceGroupConfigInput,
     )
+    from ai.backend.common.tristate.unset import UNSET
 
     async def _run() -> None:
         registry = await create_v2_registry(load_v2_config())
@@ -181,7 +182,7 @@ def update(
                 name,
                 UpdateResourceGroupConfigInput(
                     resource_group_name=name,
-                    description=description,
+                    description=UNSET if description is None else description,
                     is_active=is_active,
                     is_public=is_public,
                     is_default=is_default,
