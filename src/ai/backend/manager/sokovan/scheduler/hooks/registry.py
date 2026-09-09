@@ -61,7 +61,16 @@ class HookRegistry:
             network_plugin_ctx=args.network_plugin_ctx,
             config_provider=args.config_provider,
         )
-        self._status_hooks[SessionStatus.TERMINATED] = TerminatedTransitionHook(terminated_deps)
+        terminated_hook = TerminatedTransitionHook(terminated_deps)
+        self._status_hooks[SessionStatus.TERMINATED] = terminated_hook
+        # CANCELLED reaches the same end and owes the same cleanup. The volatile network is
+        # created before any kernel starts, so a session cancelled during start-sessions has one
+        # and used to keep it: measured on a live node, every cancelled session left its
+        # `bai-singlenode-<id>` bridge behind with no containers on it. Docker hands out a /16 per
+        # network from a pool of about fifteen, so the leak is self-amplifying -- once the pool is
+        # gone the next session's kernels land on a subnet the host already routes elsewhere,
+        # become unreachable, fail to start, get cancelled, and leak one more.
+        self._status_hooks[SessionStatus.CANCELLED] = terminated_hook
 
     def get_hook(self, status: SessionStatus) -> StatusTransitionHook | None:
         """Get the hook for a specific status transition.

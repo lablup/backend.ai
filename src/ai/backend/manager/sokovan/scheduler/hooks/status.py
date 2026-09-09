@@ -21,7 +21,6 @@ from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.clients.agent.pool import AgentClientPool
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.errors.common import ServerMisconfiguredError
-from ai.backend.manager.errors.resource import AgentNotAllocated
 from ai.backend.manager.models.network import NetworkType
 from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.sokovan.recorder.context import RecorderContext
@@ -183,7 +182,15 @@ class TerminatedTransitionHook(StatusTransitionHook):
         session_id = session.session_info.identity.id
         agent_id = session.main_kernel.resource.agent
         if agent_id is None:
-            raise AgentNotAllocated(f"Main kernel has no agent assigned for session {session_id}")
+            # Nothing to destroy, and saying so rather than raising is what lets a CANCELLED
+            # session finish: the launcher creates the agent-local network only after the kernels
+            # are bound (it raises `AgentNotAllocated` first otherwise), so no agent means the
+            # network was never made. Hooks block the transition they run on, and one that raised
+            # here would leave the session stuck short of CANCELLED forever.
+            log.debug(
+                "No agent assigned for session {}; its local network was never created", session_id
+            )
+            return
         async with self._deps.agent_client_pool.acquire(AgentId(agent_id)) as client:
             try:
                 await client.destroy_local_network(network_id)
