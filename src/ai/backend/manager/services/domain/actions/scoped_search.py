@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from abc import ABC, abstractmethod
+from abc import ABC
 from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import override
@@ -13,7 +13,7 @@ from ai.backend.common.data.entity.resource_group import (
     ResourceGroupID,
 )
 from ai.backend.common.data.entity.types import EntityType, ScopeRef
-from ai.backend.manager.actions.v2.ops.base import OperationScopeOpsAction
+from ai.backend.manager.actions.v2.ops.base import OperationScopeOpsAction, ScopeItem
 from ai.backend.manager.data.domain.types import DomainData
 from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.domain.scopes import ResourceGroupDomainOperationScope
@@ -21,18 +21,8 @@ from ai.backend.manager.models.domain.searchers import DomainSearcher
 from ai.backend.manager.models.scopes import OperationScope
 
 
-class DomainScopeItem(ABC):
+class DomainScopeItem(ScopeItem, ABC):
     """One side a domain is reachable from."""
-
-    @abstractmethod
-    def scope_ref(self) -> ScopeRef:
-        """The scope the read is answered for."""
-        raise NotImplementedError
-
-    @abstractmethod
-    def operation_scope(self) -> OperationScope:
-        """The rows the read is restricted to."""
-        raise NotImplementedError
 
 
 @dataclass(frozen=True)

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from abc import ABC, abstractmethod
+from abc import ABC
 from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import override
@@ -11,7 +11,7 @@ from ai.backend.common.data.entity.domain import DOMAIN_SCOPE_TYPE, DomainID
 from ai.backend.common.data.entity.project import ProjectEntityType
 from ai.backend.common.data.entity.types import EntityType, ScopeRef
 from ai.backend.common.data.entity.user import USER_SCOPE_TYPE, UserID
-from ai.backend.manager.actions.v2.ops.base import OperationScopeOpsAction
+from ai.backend.manager.actions.v2.ops.base import OperationScopeOpsAction, ScopeItem
 from ai.backend.manager.data.project.types import ProjectData
 from ai.backend.manager.models.project.row import ProjectRow
 from ai.backend.manager.models.project.scopes import (
@@ -29,22 +29,8 @@ __all__ = (
 )
 
 
-class ProjectScopeItem(ABC):
-    """One side a project is reachable from.
-
-    The scope the read is answered for and the rows it is restricted to are declared
-    together, so a read cannot be authorized against one thing and served another.
-    """
-
-    @abstractmethod
-    def scope_ref(self) -> ScopeRef:
-        """The scope the read is answered for."""
-        raise NotImplementedError
-
-    @abstractmethod
-    def operation_scope(self) -> OperationScope:
-        """The rows the read is restricted to."""
-        raise NotImplementedError
+class ProjectScopeItem(ScopeItem, ABC):
+    """One side a project is reachable from."""
 
 
 @dataclass(frozen=True)
