@@ -20,9 +20,9 @@ from ai.backend.common.data.entity.entity_share import EntityShareEntityType
 from ai.backend.common.data.entity.etcd_config import EtcdConfigEntityType
 from ai.backend.common.data.entity.export import ExportEntityType
 from ai.backend.common.data.entity.fair_share import (
-    DomainFairShareEntityType,
-    ProjectFairShareEntityType,
-    UserFairShareEntityType,
+    DomainFairShareFieldType,
+    ProjectFairShareFieldType,
+    UserFairShareFieldType,
 )
 from ai.backend.common.data.entity.idle_checker import IdleCheckerEntityType
 from ai.backend.common.data.entity.image import ImageEntityType
@@ -84,6 +84,11 @@ from ai.backend.manager.clients.prometheus.preset import PromQLTemplateRenderer
 from ai.backend.manager.data.artifact.types import ArtifactRevisionData
 from ai.backend.manager.data.audit_log.types import AuditLogData
 from ai.backend.manager.data.entity_label.types import EntityLabelData
+from ai.backend.manager.data.fair_share.types import (
+    DomainFairShareData,
+    ProjectFairShareData,
+    UserFairShareData,
+)
 from ai.backend.manager.data.resource_usage_history.types import (
     DomainUsageBucketData,
     ProjectUsageBucketData,
@@ -588,9 +593,15 @@ def create_processors(
             visibility_groups.group(GroupMeta(ExportEntityType())), services.export
         ),
         fair_share=FairShareProcessors(
-            resource_group_groups.group(GroupMeta(DomainFairShareEntityType())),
-            resource_group_groups.group(GroupMeta(ProjectFairShareEntityType())),
-            resource_group_groups.group(GroupMeta(UserFairShareEntityType())),
+            resource_group_groups.dangling_field_group(
+                FieldGroupMeta(DomainFairShareFieldType()), DomainFairShareData
+            ),
+            resource_group_groups.dangling_field_group(
+                FieldGroupMeta(ProjectFairShareFieldType()), ProjectFairShareData
+            ),
+            resource_group_groups.dangling_field_group(
+                FieldGroupMeta(UserFairShareFieldType()), UserFairShareData
+            ),
             services.fair_share,
         ),
         project=ProjectProcessors(
