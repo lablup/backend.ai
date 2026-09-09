@@ -48,7 +48,9 @@ from ai.backend.manager.actions.v2.field.processor import (
 from ai.backend.manager.actions.v2.global_scope.base import BaseGlobalAction
 from ai.backend.manager.actions.v2.global_scope.monitor import GlobalActionMonitor
 from ai.backend.manager.actions.v2.global_scope.processor import (
+    AnonymousGlobalActionProcessor,
     GlobalActionProcessor,
+    PublicActionProcessor,
 )
 from ai.backend.manager.actions.v2.global_scope.validator import GlobalActionValidator
 from ai.backend.manager.actions.v2.ops.base import (
@@ -157,6 +159,45 @@ class FieldGroup[TFieldData: FieldData]:
             func,
             monitors=(*self._deps.monitors.global_scope, *monitors),
             validators=(*self._deps.validators.global_scope, *validators),
+        )
+
+    def public[TAction: BaseGlobalAction, TResult](
+        self,
+        action_cls: type[TAction],
+        func: Callable[[TAction], Awaitable[TResult]],
+        *,
+        validators: Sequence[GlobalActionValidator] = (),
+        monitors: Sequence[GlobalActionMonitor] = (),
+    ) -> PublicActionProcessor[TAction, TResult]:
+        """The same reach every authenticated caller may read.
+
+        The SUPERADMIN gate is replaced by an authentication check; the constructor
+        rejects anything that is not a read.
+        """
+        self._record(action_cls, ActionKind.GLOBAL, ActionGate.PUBLIC, ActionBacking.CUSTOM)
+        return PublicActionProcessor(
+            action_cls,
+            func,
+            monitors=(*self._deps.monitors.global_scope, *monitors),
+            validators=list(validators),
+        )
+
+    def anonymous_global[TAction: BaseGlobalAction, TResult](
+        self,
+        action_cls: type[TAction],
+        func: Callable[[TAction], Awaitable[TResult]],
+        *,
+        monitors: Sequence[GlobalActionMonitor] = (),
+    ) -> AnonymousGlobalActionProcessor[TAction, TResult]:
+        """The same reach with no gate at all, writes included.
+
+        Read the rule on `ProcessorGroup.anonymous_global` before wiring one: nothing
+        here verifies that the service checks the caller itself.
+        """
+        self._record(action_cls, ActionKind.GLOBAL, ActionGate.ANONYMOUS, ActionBacking.CUSTOM)
+        return AnonymousGlobalActionProcessor(
+            func,
+            monitors=(*self._deps.monitors.global_scope, *monitors),
         )
 
     def search_ops[TAction: OperationScopeOpsAction[Any, Any]](

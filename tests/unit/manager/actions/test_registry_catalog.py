@@ -28,6 +28,7 @@ from ai.backend.common.data.entity.artifact import ArtifactEntityType
 from ai.backend.common.data.entity.artifact_registry import ArtifactRegistryEntityType
 from ai.backend.common.data.entity.artifact_revision import ArtifactRevisionFieldType
 from ai.backend.common.data.entity.audit_log import AuditLogFieldType
+from ai.backend.common.data.entity.auth import AuthFieldType
 from ai.backend.common.data.entity.container_registry import ContainerRegistryEntityType
 from ai.backend.common.data.entity.deployment import DeploymentEntityType
 from ai.backend.common.data.entity.deployment_preset import DeploymentPresetEntityType
@@ -73,7 +74,6 @@ from ai.backend.common.data.entity.service_catalog import ServiceCatalogEntityTy
 from ai.backend.common.data.entity.session import SessionEntityType
 from ai.backend.common.data.entity.session_template import SessionTemplateEntityType
 from ai.backend.common.data.entity.storage_namespace import StorageNamespaceEntityType
-from ai.backend.common.data.entity.types import GlobalEntityType
 from ai.backend.common.data.entity.user import UserEntityType
 from ai.backend.common.data.entity.vfolder import VFolderEntityType
 from ai.backend.common.data.entity.vfolder_invitation import VFolderInvitationEntityType
@@ -443,7 +443,7 @@ def test_every_defined_v2_action_is_wired() -> None:
         MagicMock(),
     )
     AuthProcessors(
-        registry.group(GroupMeta(GlobalEntityType())),
+        registry.dangling_field_group(FieldGroupMeta(AuthFieldType())),
         registry.group(GroupMeta(UserEntityType())),
         MagicMock(),
     )
