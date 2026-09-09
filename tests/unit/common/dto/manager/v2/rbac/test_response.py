@@ -417,8 +417,6 @@ class TestPermissionNodeBit:
         return PermissionNode(
             id=uuid.uuid4(),
             role_id=uuid.uuid4(),
-            scope_type=RBACElementTypeDTO.PROJECT,
-            scope_id=str(_SCOPE_ID),
             entity_type=RBACElementTypeDTO.VFOLDER,
             permission=permission,
             operation=operation,
@@ -438,8 +436,6 @@ class TestPermissionNodeBit:
             PermissionNode.model_validate({
                 "id": str(uuid.uuid4()),
                 "role_id": str(uuid.uuid4()),
-                "scope_type": RBACElementTypeDTO.PROJECT.value,
-                "scope_id": str(_SCOPE_ID),
                 "entity_type": RBACElementTypeDTO.VFOLDER.value,
                 "operation": OperationTypeDTO.READ.value,
                 "created_at": datetime.now(tz=UTC).isoformat(),

@@ -133,15 +133,11 @@ async def project_with_rbac_rows(
             sa.insert(PermissionRow.__table__).values([
                 {
                     "role_id": admin_role_id,
-                    "scope_type": ScopeType.PROJECT,
-                    "scope_id": scope_id,
                     "entity_type": EntityType.PROJECT,
                     "permission": Permission.UPDATE,
                 },
                 {
                     "role_id": member_role_id,
-                    "scope_type": ScopeType.PROJECT,
-                    "scope_id": scope_id,
                     "entity_type": EntityType.PROJECT,
                     "permission": Permission.READ,
                 },
@@ -221,11 +217,12 @@ class TestProjectPurgeRBACCleanup:
             permissions_after = await conn.scalar(
                 sa.select(sa.func.count())
                 .select_from(PermissionRow)
+                .join(RoleRow, RoleRow.id == PermissionRow.role_id)
                 .where(
-                    PermissionRow.scope_type == RBACElementType.PROJECT,
-                    PermissionRow.scope_id == scope_id,
+                    RoleRow.scope_type == RBACElementType.PROJECT,
+                    RoleRow.scope_id == project_id,
                 )
             )
         assert group_row == 0, "Group row should be removed after purge"
         assert ase_after == 0, "association_scopes_entities rows should be cleaned up after purge"
-        assert permissions_after == 0, "scope-bound permissions should be cleaned up after purge"
+        assert permissions_after == 0, "the roles permissions should be gone after purge"

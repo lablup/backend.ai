@@ -87,7 +87,6 @@ class RolePresetWriteOps(PermissionWriteOps):
         for role_id, entity in entities.items():
             entries = [
                 PermissionEntry(
-                    scope=entity,
                     entity_type=entity_type,
                     permission=granted.get(entity_type, Permission.NONE),
                 )

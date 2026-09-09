@@ -460,8 +460,6 @@ async def _grant_model_card_read_permission(
         await conn.execute(
             sa.insert(PermissionRow.__table__).values(
                 role_id=role_fixture,
-                scope_type=ScopeType.PROJECT,
-                scope_id=str(model_store_project_fixture),
                 entity_type=EntityType.MODEL_CARD,
                 permission=Permission.READ,
             )

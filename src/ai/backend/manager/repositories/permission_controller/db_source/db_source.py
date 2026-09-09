@@ -346,10 +346,7 @@ class PermissionDBSource:
                 sa.and_(
                     RoleRow.status == RoleStatus.ACTIVE,
                     UserRoleRow.user_id == user_id,
-                    sa.or_(
-                        PermissionRow.scope_type == LegacyScopeType.GLOBAL,
-                        PermissionRow.scope_id == scope_id.scope_id,
-                    ),
+                    sa.cast(RoleRow.scope_id, sa.String) == scope_id.scope_id,
                     PermissionRow.permission == permission,
                     PermissionRow.all_fields.is_(True),
                 )
@@ -375,8 +372,9 @@ class PermissionDBSource:
                 .join(
                     AssociationScopesEntitiesRow,
                     sa.and_(
-                        PermissionRow.scope_id == AssociationScopesEntitiesRow.scope_id,
-                        PermissionRow.scope_type == AssociationScopesEntitiesRow.scope_type,
+                        sa.cast(RoleRow.scope_id, sa.String)
+                        == AssociationScopesEntitiesRow.scope_id,
+                        RoleRow.scope_type == AssociationScopesEntitiesRow.scope_type,
                     ),
                     isouter=True,
                 )
@@ -387,11 +385,6 @@ class PermissionDBSource:
                     RoleRow.status == RoleStatus.ACTIVE,
                     UserRoleRow.user_id == user_id,
                     sa.or_(
-                        sa.and_(
-                            PermissionRow.scope_type == LegacyScopeType.GLOBAL,
-                            PermissionRow.permission == Permission.from_operation(operation),
-                            PermissionRow.all_fields.is_(True),
-                        ),
                         sa.and_(
                             AssociationScopesEntitiesRow.entity_id.in_(object_id_for_cond),
                             PermissionRow.permission == Permission.from_operation(operation),
@@ -906,13 +899,13 @@ class PermissionDBSource:
                     ),
                 )
                 .join(
-                    perm,
+                    roles,
                     sa.and_(
-                        perm.c.scope_type == scope_walk_cte.c.scope_type,
-                        perm.c.scope_id == scope_walk_cte.c.scope_id,
+                        roles.c.scope_type == scope_walk_cte.c.scope_type,
+                        sa.cast(roles.c.scope_id, sa.String) == scope_walk_cte.c.scope_id,
                     ),
                 )
-                .join(roles, roles.c.id == perm.c.role_id)
+                .join(perm, perm.c.role_id == roles.c.id)
                 .join(user_roles, user_roles.c.role_id == roles.c.id)
             )
             .where(sa.and_(*filters))
@@ -924,8 +917,8 @@ class PermissionDBSource:
         entity_ids: Sequence[str],
         permission_filter: Permission | None,
     ) -> sa.Select[Any]:
-        """Build the self-scope branch: pick up permissions whose scope IS
-        the target entity itself.
+        """Build the self-scope branch: pick up permissions held by a role that sits
+        in the target entity itself.
         """
         perm = PermissionRow.__table__
         user_roles = UserRoleRow.__table__
@@ -934,8 +927,8 @@ class PermissionDBSource:
         filters: list[sa.ColumnElement[bool]] = [
             user_roles.c.user_id == group_key.user_id,
             roles.c.status == RoleStatus.ACTIVE,
-            perm.c.scope_type == group_key.element_type.to_scope_type(),
-            perm.c.scope_id.in_(entity_ids),
+            roles.c.scope_type == group_key.element_type.to_scope_type(),
+            sa.cast(roles.c.scope_id, sa.String).in_(entity_ids),
             perm.c.entity_type == group_key.subject_entity_type.to_entity_type(),
             perm.c.all_fields.is_(True),
         ]
@@ -944,7 +937,7 @@ class PermissionDBSource:
 
         return (
             sa.select(
-                perm.c.scope_id.label("entity_id"),
+                sa.cast(roles.c.scope_id, sa.String).label("entity_id"),
                 perm.c.permission,
             )
             .select_from(

@@ -428,8 +428,6 @@ class TestCheckBulkPermissionWithScopeChain:
                 db_sess.add(
                     PermissionRow(
                         role_id=fixture_ids.role_id,
-                        scope_type=scope_type,
-                        scope_id=scope_id,
                         entity_type=entry.entity_type,
                         permission=Permission.from_operation(entry.operation),
                     )
@@ -482,8 +480,6 @@ class TestCheckBulkPermissionWithScopeChain:
             db_sess.add(
                 PermissionRow(
                     role_id=other_role_id,
-                    scope_type=ScopeType.PROJECT,
-                    scope_id=fixture_ids.project_id,
                     entity_type=EntityType.VFOLDER,
                     permission=Permission.READ,
                 )

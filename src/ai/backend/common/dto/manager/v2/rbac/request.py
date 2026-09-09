@@ -144,8 +144,6 @@ class CreatePermissionInput(BaseRequestModel):
     """Input for creating a scoped permission."""
 
     role_id: UUID = Field(description="Role ID to assign this permission to")
-    scope_type: str = Field(description="Scope element type (e.g. 'domain', 'project')")
-    scope_id: str = Field(description="Scope element ID")
     entity_type: str = Field(description="Entity element type (e.g. 'session', 'vfolder')")
     operation: str = Field(description="Operation type (e.g. 'read', 'create')")
 
@@ -154,8 +152,6 @@ class UpdatePermissionInput(BaseRequestModel):
     """Input for updating a scoped permission."""
 
     id: UUID = Field(description="Permission ID to update")
-    scope_type: str | None = Field(default=None, description="Updated scope element type")
-    scope_id: str | None = Field(default=None, description="Updated scope element ID")
     entity_type: str | None = Field(default=None, description="Updated entity element type")
     operation: str | None = Field(default=None, description="Updated operation type")
 
@@ -294,8 +290,6 @@ RoleNestedFilter.model_rebuild()
 class PermissionNestedFilter(BaseRequestModel):
     """Nested filter for permissions within a role assignment."""
 
-    scope_id: StringFilter | None = None
-    scope_type: RBACElementTypeFilter | None = None
     entity_type: RBACElementTypeFilter | None = None
     operation: OperationTypeFilter | None = None
     AND: list[PermissionNestedFilter] | None = None
@@ -341,8 +335,6 @@ class PermissionFilter(BaseRequestModel):
     """Filter for scoped permissions."""
 
     role_id: UUIDFilter | None = None
-    scope_type: RBACElementTypeFilter | None = None
-    scope_id: StringFilter | None = None
     entity_type: RBACElementTypeFilter | None = None
     created_at: DateTimeFilter | None = None
     AND: list[PermissionFilter] | None = None

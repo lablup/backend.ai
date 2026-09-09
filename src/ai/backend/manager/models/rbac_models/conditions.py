@@ -18,7 +18,6 @@ from ai.backend.manager.data.permission.id import ObjectId
 from ai.backend.manager.data.permission.types import (
     EntityType,
     Permission,
-    ScopeType,
 )
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.condition_utils import make_string_in_factory
@@ -38,20 +37,6 @@ from ai.backend.manager.models.user import UserRow
 
 class PermissionConditions:
     """Query conditions for permissions."""
-
-    @staticmethod
-    def by_scope_id(scope_id: str) -> QueryCondition:
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return PermissionRow.scope_id == scope_id
-
-        return inner
-
-    @staticmethod
-    def by_scope_types(scope_types: list[ScopeType]) -> QueryCondition:
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return PermissionRow.scope_type.in_(scope_types)
-
-        return inner
 
     @staticmethod
     def by_entity_types(entity_types: list[EntityType]) -> QueryCondition:

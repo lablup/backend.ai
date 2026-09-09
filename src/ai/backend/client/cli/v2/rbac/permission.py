@@ -29,7 +29,6 @@ def permission() -> None:
     help="Order by field:direction (e.g., id:asc, entity_type:desc).",
 )
 @click.option("--role-id", type=str, default=None, help="Filter by role UUID.")
-@click.option("--scope-type", type=str, default=None, help="Filter by scope type (e.g., domain).")
 @click.option(
     "--entity-type", type=str, default=None, help="Filter by entity type (e.g., session)."
 )
@@ -38,7 +37,6 @@ def search(
     offset: int | None,
     order_by: tuple[str, ...],
     role_id: str | None,
-    scope_type: str | None,
     entity_type: str | None,
 ) -> None:
     """Search permissions."""
@@ -56,14 +54,9 @@ def search(
 
     # Build filter only if any filter option is provided
     filter_dto: PermissionFilter | None = None
-    if any([role_id is not None, scope_type is not None, entity_type is not None]):
+    if any([role_id is not None, entity_type is not None]):
         filter_dto = PermissionFilter(
             role_id=UUIDFilter(equals=UUID(role_id)) if role_id is not None else None,
-            scope_type=(
-                RBACElementTypeFilter(equals=RBACElementTypeDTO(scope_type))
-                if scope_type is not None
-                else None
-            ),
             entity_type=(
                 RBACElementTypeFilter(equals=RBACElementTypeDTO(entity_type))
                 if entity_type is not None

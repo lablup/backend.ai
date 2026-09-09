@@ -9,11 +9,22 @@ from strawberry.dataloader import DataLoader
 from ai.backend.common.data.entity.app_config_allow_list import AppConfigAllowListID
 from ai.backend.common.data.entity.app_config_definition import AppConfigDefinitionID
 from ai.backend.common.data.entity.app_config_fragment import AppConfigFragmentID
-from ai.backend.common.data.entity.deployment import DeploymentID
-from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.container_registry import ContainerRegistryEntityType
+from ai.backend.common.data.entity.deployment import DeploymentEntityType, DeploymentID
+from ai.backend.common.data.entity.domain import DomainEntityType, DomainID
 from ai.backend.common.data.entity.idle_checker import IdleCheckerID
+from ai.backend.common.data.entity.image import ImageEntityType
 from ai.backend.common.data.entity.kernel_scheduling_history import KernelSchedulingHistoryID
-from ai.backend.common.data.entity.resource_group import ResourceGroupID
+from ai.backend.common.data.entity.notification import (
+    NotificationChannelEntityType,
+    NotificationRuleEntityType,
+)
+from ai.backend.common.data.entity.project import ProjectEntityType
+from ai.backend.common.data.entity.resource_group import ResourceGroupEntityType, ResourceGroupID
+from ai.backend.common.data.entity.role import RoleEntityType
+from ai.backend.common.data.entity.session import SessionEntityType
+from ai.backend.common.data.entity.types import EntityIdentifier
+from ai.backend.common.data.entity.user import UserEntityType
 from ai.backend.common.types import AgentId, ImageID, KernelId, SessionId
 from ai.backend.manager.data.permission.id import ObjectId
 
@@ -90,6 +101,9 @@ if TYPE_CHECKING:
         QueryDefinitionGQL,
     )
     from ai.backend.manager.api.gql.rbac.types.entity import EntityRefGQL  # pants: no-infer-dep
+    from ai.backend.manager.api.gql.rbac.types.entity_node import (  # pants: no-infer-dep
+        EntityNode as EntityNodeGQL,
+    )
     from ai.backend.manager.api.gql.rbac.types.permission import (  # pants: no-infer-dep
         PermissionGQL,
     )
@@ -1123,3 +1137,48 @@ class DataLoaders:
             ]
 
         return DataLoader(load_fn=load_fn)
+
+    @cached_property
+    def entity_node_loader(self) -> DataLoader[EntityIdentifier, EntityNodeGQL | None]:
+        """Resolves an entity from its id alone.
+
+        An :class:`EntityIdentifier` carries the kind it is an id of, so every read
+        holding one resolves it here rather than choosing a loader itself. A kind with
+        no loader answers ``None``.
+        """
+
+        async def load_fn(
+            ids: list[EntityIdentifier],
+        ) -> list[EntityNodeGQL | Exception | None]:
+            return [await self._entity_node(entity_id) for entity_id in ids]
+
+        return DataLoader(load_fn=load_fn)
+
+    async def _entity_node(self, entity_id: EntityIdentifier) -> EntityNodeGQL | None:
+        from ai.backend.common.types import ImageID, SessionId
+
+        match entity_id.entity_type():
+            case UserEntityType():
+                return await self.user_loader.load(entity_id)
+            case ProjectEntityType():
+                return await self.project_loader.load(entity_id)
+            case DomainEntityType():
+                return await self.domain_by_id_loader.load(DomainID(entity_id))
+            case RoleEntityType():
+                return await self.role_loader.load(entity_id)
+            case ImageEntityType():
+                return await self.image_loader.load(ImageID(entity_id))
+            case DeploymentEntityType():
+                return await self.deployment_loader.load(entity_id)
+            case ResourceGroupEntityType():
+                return await self.resource_group_by_id_loader.load(ResourceGroupID(entity_id))
+            case NotificationChannelEntityType():
+                return await self.notification_channel_loader.load(entity_id)
+            case NotificationRuleEntityType():
+                return await self.notification_rule_loader.load(entity_id)
+            case ContainerRegistryEntityType():
+                return await self.container_registry_loader.load(entity_id)
+            case SessionEntityType():
+                return await self.session_loader.load(SessionId(entity_id))
+            case _:
+                return None

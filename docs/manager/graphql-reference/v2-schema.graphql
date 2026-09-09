@@ -1683,12 +1683,6 @@ type BulkAddRolePermissionFailureInfo {
   """Role ID of the failed entry."""
   roleId: UUID!
 
-  """Scope element type of the failed entry."""
-  scopeType: String!
-
-  """Scope element ID of the failed entry."""
-  scopeId: String!
-
   """Entity element type of the failed entry."""
   entityType: String!
 
@@ -3186,8 +3180,6 @@ type CreateObjectStoragePayload {
 """Added in 26.3.0. Input for creating a scoped permission"""
 input CreatePermissionInput {
   roleId: UUID!
-  scopeType: RBACElementType!
-  scopeId: String!
   entityType: RBACElementType!
   operation: OperationType!
 }
@@ -9934,8 +9926,6 @@ type Permission implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
   roleId: UUID!
-  scopeType: RBACElementType!
-  scopeId: String!
   entityType: RBACElementType!
   createdAt: DateTime!
 
@@ -9947,9 +9937,6 @@ type Permission implements Node {
 
   """The role this permission belongs to."""
   role: Role
-
-  """The scope this permission applies to."""
-  scope: EntityNode
 }
 
 """
@@ -9985,8 +9972,6 @@ type PermissionEdge {
 """Added in 26.3.0. Filter for scoped permissions"""
 input PermissionFilter {
   roleId: UUIDFilter = null
-  scopeType: RBACElementTypeFilter = null
-  scopeId: StringFilter = null
   entityType: RBACElementTypeFilter = null
   createdAt: DateTimeFilter = null
   AND: [PermissionFilter!] = null
@@ -9998,8 +9983,6 @@ input PermissionFilter {
 Added in 26.4.0. Nested filter for permissions within a role assignment. Filters assignments where the assigned role has permissions matching all specified conditions.
 """
 input PermissionNestedFilter {
-  scopeId: StringFilter = null
-  scopeType: RBACElementTypeFilter = null
   entityType: RBACElementTypeFilter = null
   operation: OperationTypeFilter = null
   AND: [PermissionNestedFilter!] = null
@@ -12521,12 +12504,6 @@ Added in 26.4.4. Failure detail for a single permission entry in replace
 type ReplaceRolePermissionFailureInfo {
   """Role ID of the failed entry."""
   roleId: UUID!
-
-  """Scope element type of the failed entry."""
-  scopeType: String!
-
-  """Scope element ID of the failed entry."""
-  scopeId: String!
 
   """Entity element type of the failed entry."""
   entityType: String!
@@ -16340,8 +16317,6 @@ type UpdateObjectStoragePayload {
 """Added in 26.3.0. Input for updating a scoped permission"""
 input UpdatePermissionInput {
   id: UUID!
-  scopeType: RBACElementType = null
-  scopeId: String = null
   entityType: RBACElementType = null
   operation: OperationType = null
 }

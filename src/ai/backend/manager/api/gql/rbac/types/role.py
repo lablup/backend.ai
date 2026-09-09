@@ -246,7 +246,6 @@ class RoleGQL(PydanticNodeMixin[Any]):
             # Merge with user-provided filter
             combined_filter = PermissionFilter(
                 role_id=role_filter.role_id,
-                scope_type=filter.scope_type,
                 entity_type=filter.entity_type,
             )
         else:

@@ -155,8 +155,6 @@ class BulkAddRolePermissionFailureInfo(BaseResponseModel):
     """Failure detail for a single permission entry in bulk role-permission insertion."""
 
     role_id: UUID = Field(description="Role ID of the failed entry")
-    scope_type: str = Field(description="Scope element type of the failed entry")
-    scope_id: str = Field(description="Scope element ID of the failed entry")
     entity_type: str = Field(description="Entity element type of the failed entry")
     operation: str = Field(description="Operation type of the failed entry")
     message: str = Field(description="Error message describing the failure")
@@ -173,8 +171,6 @@ class ReplaceRolePermissionFailureInfo(BaseResponseModel):
     """Failure detail for a single permission entry in replace operation."""
 
     role_id: UUID = Field(description="Role ID of the failed entry")
-    scope_type: str = Field(description="Scope element type of the failed entry")
-    scope_id: str = Field(description="Scope element ID of the failed entry")
     entity_type: str = Field(description="Entity element type of the failed entry")
     operation: str = Field(description="Operation type of the failed entry")
     message: str = Field(description="Error message describing the failure")
@@ -222,8 +218,6 @@ class PermissionNode(BaseResponseModel):
 
     id: UUID = Field(description="Permission ID")
     role_id: UUID = Field(description="Role this permission belongs to")
-    scope_type: RBACElementTypeDTO = Field(description="Scope element type")
-    scope_id: str = Field(description="Scope element ID")
     entity_type: RBACElementTypeDTO = Field(description="Entity element type")
     permission: PermissionBitDTO = Field(description="The permission bit the row holds")
     operation: OperationTypeDTO = Field(

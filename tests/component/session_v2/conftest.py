@@ -295,8 +295,6 @@ async def user_system_role(
                 await conn.execute(
                     sa.insert(PermissionRow.__table__).values(
                         role_id=role_id,
-                        scope_type=ScopeType.USER,
-                        scope_id=str(user_uuid),
                         entity_type=entity_type,
                         permission=bit,
                     )
@@ -308,8 +306,6 @@ async def user_system_role(
             await conn.execute(
                 sa.insert(PermissionRow.__table__).values(
                     role_id=role_id,
-                    scope_type=ScopeType.USER,
-                    scope_id=str(user_uuid),
                     entity_type=EntityType.USER,
                     permission=bit,
                 )

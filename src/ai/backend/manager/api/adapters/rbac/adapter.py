@@ -19,7 +19,6 @@ from ai.backend.common.data.entity.types import (
     EntityIdentifier,
     EntityType,
     RuntimeEntityID,
-    ScopeType,
 )
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.filter_specs import StringMatchSpec
@@ -909,14 +908,10 @@ class RBACAdapter(BaseAdapter):
     # ------------------------------------------------------------------ create_permission / update_permission
 
     async def create_permission(self, input: CreatePermissionInputDTO) -> PermissionNode:
-        """Create a new scoped permission."""
-        scope_type = RBACElementType(input.scope_type)
-        self._validate_scope_id(scope_type, input.scope_id)
+        """Create a permission on the role; it holds in the scope the role sits in."""
         creator: Creator[PermissionRow] = Creator(
             spec=PermissionCreatorSpec(
                 role_id=input.role_id,
-                scope_type=ScopeType(EntityType(scope_type)),
-                scope_id=input.scope_id,
                 entity_type=EntityType(RBACElementType(input.entity_type)),
                 permission=self._permission_bit(input.operation),
             )
@@ -927,20 +922,8 @@ class RBACAdapter(BaseAdapter):
         return self._permission_data_to_node(action_result.data)
 
     async def update_permission(self, input: UpdatePermissionInputDTO) -> PermissionNode:
-        """Update an existing scoped permission."""
-        if input.scope_type is not None and input.scope_id is not None:
-            self._validate_scope_id(RBACElementType(input.scope_type), input.scope_id)
+        """Update an existing permission."""
         spec = PermissionUpdaterSpec(
-            scope_type=(
-                OptionalState.update(ScopeType(EntityType(RBACElementType(input.scope_type))))
-                if input.scope_type is not None
-                else OptionalState.nop()
-            ),
-            scope_id=(
-                OptionalState.update(input.scope_id)
-                if input.scope_id is not None
-                else OptionalState.nop()
-            ),
             entity_type=(
                 OptionalState.update(EntityType(RBACElementType(input.entity_type)))
                 if input.entity_type is not None
@@ -1046,8 +1029,6 @@ class RBACAdapter(BaseAdapter):
                 failed.append(
                     BulkAddRolePermissionFailureInfo(
                         role_id=entry.role_id,
-                        scope_type=entry.scope_type,
-                        scope_id=entry.scope_id,
                         entity_type=entry.entity_type,
                         operation=entry.operation,
                         message=str(e),
@@ -1110,8 +1091,6 @@ class RBACAdapter(BaseAdapter):
             failed=[
                 ReplaceRolePermissionFailureInfo(
                     role_id=f.role_id,
-                    scope_type=f.scope_type,
-                    scope_id=f.scope_id,
                     entity_type=f.entity_type,
                     operation=f.permission.to_operation().value,
                     message=f.message,
@@ -1121,20 +1100,14 @@ class RBACAdapter(BaseAdapter):
         )
 
     def _role_permission_creator(self, entry: CreatePermissionInputDTO) -> RolePermissionCreator:
-        scope_type = RBACElementType(entry.scope_type)
         return RolePermissionCreator(
-            scope=self._scope_identifier(scope_type, entry.scope_id),
             entity_type=EntityType(RBACElementType(entry.entity_type)),
             permission=Permission.from_operation(InternalOperationType(entry.operation)),
         )
 
     def _permission_creator_spec(self, entry: CreatePermissionInputDTO) -> PermissionCreatorSpec:
-        scope_type = RBACElementType(entry.scope_type)
-        self._validate_scope_id(scope_type, entry.scope_id)
         return PermissionCreatorSpec(
             role_id=entry.role_id,
-            scope_type=ScopeType(EntityType(scope_type)),
-            scope_id=entry.scope_id,
             entity_type=EntityType(RBACElementType(entry.entity_type)),
             permission=self._permission_bit(entry.operation),
         )
@@ -1321,27 +1294,6 @@ class RBACAdapter(BaseAdapter):
                 f.role_id,
                 equals_factory=ScopedPermissionConditions.by_role_id_equals,
                 in_factory=ScopedPermissionConditions.by_role_id_in,
-            )
-            if condition is not None:
-                conditions.append(condition)
-        if f.scope_type is not None:
-            conditions.extend(
-                self._convert_entity_type_filter(
-                    f.scope_type,
-                    equals_factory=ScopedPermissionConditions.by_scope_type_equals,
-                    not_equals_factory=ScopedPermissionConditions.by_scope_type_not_equals,
-                    in_factory=ScopedPermissionConditions.by_scope_type_in,
-                    not_in_factory=ScopedPermissionConditions.by_scope_type_not_in,
-                )
-            )
-        if f.scope_id is not None:
-            condition = self.convert_string_filter(
-                f.scope_id,
-                contains_factory=ScopedPermissionConditions.by_scope_id_contains,
-                equals_factory=ScopedPermissionConditions.by_scope_id_equals,
-                starts_with_factory=ScopedPermissionConditions.by_scope_id_starts_with,
-                ends_with_factory=ScopedPermissionConditions.by_scope_id_ends_with,
-                in_factory=ScopedPermissionConditions.by_scope_id_in,
             )
             if condition is not None:
                 conditions.append(condition)
@@ -1623,27 +1575,6 @@ class RBACAdapter(BaseAdapter):
         self, f: PermissionNestedFilterDTO
     ) -> list[QueryCondition]:
         raw_conditions: list[QueryCondition] = []
-        if f.scope_id is not None:
-            condition = self.convert_string_filter(
-                f.scope_id,
-                contains_factory=ScopedPermissionConditions.by_scope_id_contains,
-                equals_factory=ScopedPermissionConditions.by_scope_id_equals,
-                starts_with_factory=ScopedPermissionConditions.by_scope_id_starts_with,
-                ends_with_factory=ScopedPermissionConditions.by_scope_id_ends_with,
-                in_factory=ScopedPermissionConditions.by_scope_id_in,
-            )
-            if condition is not None:
-                raw_conditions.append(condition)
-        if f.scope_type is not None:
-            raw_conditions.extend(
-                self._convert_entity_type_filter(
-                    f.scope_type,
-                    equals_factory=ScopedPermissionConditions.by_scope_type_equals,
-                    not_equals_factory=ScopedPermissionConditions.by_scope_type_not_equals,
-                    in_factory=ScopedPermissionConditions.by_scope_type_in,
-                    not_in_factory=ScopedPermissionConditions.by_scope_type_not_in,
-                )
-            )
         if f.entity_type is not None:
             raw_conditions.extend(
                 self._convert_entity_type_filter(
@@ -1878,8 +1809,6 @@ class RBACAdapter(BaseAdapter):
         return PermissionNode(
             id=data.id,
             role_id=data.role_id,
-            scope_type=RBACElementTypeDTO(data.scope_type),
-            scope_id=data.scope_id,
             entity_type=RBACElementTypeDTO(data.entity_type),
             permission=PermissionBitDTO[data.permission.to_operation().name],
             operation=OperationTypeDTO(data.permission.to_operation().value),

@@ -144,8 +144,6 @@ class PermissionControllerRepository:
         failures = [
             BulkRolePermissionAddFailure(
                 role_id=(spec := cast(PermissionCreatorSpec, error.spec)).role_id,
-                scope_type=spec.scope_type,
-                scope_id=spec.scope_id,
                 entity_type=spec.entity_type,
                 permission=spec.permission,
                 message=str(error.exception),

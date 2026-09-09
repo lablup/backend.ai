@@ -24,7 +24,6 @@ from ai.backend.common.data.permission.id import EntityMembershipID, FieldPath
 from ai.backend.common.data.permission.types import Permission
 from ai.backend.manager.errors.permission import InvalidFieldPermission, VirtualEntityNotFound
 from ai.backend.manager.models.entity_label.row import EntityLabelRow
-from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
 from ai.backend.manager.models.virtual_entity.entity_membership_cap import (
     EntityMembershipCapRow,
@@ -75,11 +74,11 @@ class V2GraphWriteOpsBase(V2WriteOpsBase):
         )
 
     async def _teardown(self, entity: EntityIdentifier) -> None:
-        """Remove what the entity left: permissions granted on it, its virtual entity
-        (every relation naming it goes with it by FK), and the labels put on it."""
-        await self._sess.execute(
-            sa.delete(PermissionRow).where(PermissionRow.scope_id == str(entity))
-        )
+        """Remove what the entity left: its virtual entity (every relation naming it
+        goes with it by FK), and the labels put on it.
+
+        The permissions granted in the entity's scope belong to roles the scope holds,
+        and those roles go with the virtual entity by FK, taking their permissions."""
         await self._sess.execute(
             sa.delete(VirtualEntityRow).where(
                 VirtualEntityRow.entity_type == entity.entity_type(),

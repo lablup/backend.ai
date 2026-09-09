@@ -9,10 +9,6 @@ import pytest
 
 from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.dto.manager.v2.rbac import CreateRoleInput
-from ai.backend.common.dto.manager.v2.rbac.request import (
-    CreatePermissionInput,
-    UpdatePermissionInput,
-)
 from ai.backend.common.dto.manager.v2.rbac.types import RBACElementTypeDTO, ScopeInputDTO
 from ai.backend.manager.api.adapters.rbac.adapter import RBACAdapter
 from ai.backend.manager.models.rbac.exceptions import InvalidScope
@@ -79,31 +75,3 @@ class TestCreateRoleScopeValidation:
         )
         with pytest.raises(InvalidScope):
             await adapter.create(input_)
-
-
-class TestCreatePermissionScopeValidation:
-    """create_permission() rejects invalid scope_id before calling processor."""
-
-    async def test_rejects_email_in_user_scope(self, adapter: RBACAdapter) -> None:
-        input_ = CreatePermissionInput(
-            role_id=uuid.uuid4(),
-            scope_type="user",
-            scope_id="alice@example.com",
-            entity_type="session",
-            operation="read",
-        )
-        with pytest.raises(InvalidScope):
-            await adapter.create_permission(input_)
-
-
-class TestUpdatePermissionScopeValidation:
-    """update_permission() rejects invalid scope_id before calling processor."""
-
-    async def test_rejects_email_in_user_scope(self, adapter: RBACAdapter) -> None:
-        input_ = UpdatePermissionInput(
-            id=uuid.uuid4(),
-            scope_type="user",
-            scope_id="alice@example.com",
-        )
-        with pytest.raises(InvalidScope):
-            await adapter.update_permission(input_)

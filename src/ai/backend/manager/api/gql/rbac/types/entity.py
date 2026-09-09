@@ -11,9 +11,7 @@ from typing import Any, Self, cast, override
 from strawberry import Info
 from strawberry.relay import Connection, Edge, NodeID
 
-from ai.backend.common.data.entity.domain import DomainID
-from ai.backend.common.data.entity.resource_group import ResourceGroupID
-from ai.backend.common.data.permission.types import RBACElementType
+from ai.backend.common.data.entity.types import EntityType, RuntimeEntityID
 from ai.backend.common.dto.manager.v2.rbac.request import (
     EntityFilter as EntityFilterDTO,
 )
@@ -54,45 +52,6 @@ class EntityOrderField(StrEnum):
 # ==================== Node Types ====================
 
 
-async def _load_rbac_element(
-    info: Info[StrawberryGQLContext],
-    element_type: RBACElementType,
-    element_id: str,
-) -> EntityNode | None:
-    from ai.backend.common.types import ImageID, SessionId
-
-    data_loaders = info.context.data_loaders
-    match element_type:
-        case RBACElementType.USER:
-            return await data_loaders.user_loader.load(uuid.UUID(element_id))
-        case RBACElementType.PROJECT:
-            return await data_loaders.project_loader.load(uuid.UUID(element_id))
-        case RBACElementType.DOMAIN:
-            return await data_loaders.domain_by_id_loader.load(DomainID(uuid.UUID(element_id)))
-        case RBACElementType.ROLE:
-            return await data_loaders.role_loader.load(uuid.UUID(element_id))
-        case RBACElementType.IMAGE:
-            return await data_loaders.image_loader.load(ImageID(uuid.UUID(element_id)))
-        case RBACElementType.MODEL_DEPLOYMENT:
-            return await data_loaders.deployment_loader.load(uuid.UUID(element_id))
-        case RBACElementType.RESOURCE_GROUP:
-            return await data_loaders.resource_group_by_id_loader.load(
-                ResourceGroupID(uuid.UUID(element_id))
-            )
-        case RBACElementType.NOTIFICATION_CHANNEL:
-            return await data_loaders.notification_channel_loader.load(uuid.UUID(element_id))
-        case RBACElementType.NOTIFICATION_RULE:
-            return await data_loaders.notification_rule_loader.load(uuid.UUID(element_id))
-        case RBACElementType.ARTIFACT_REVISION:
-            return await data_loaders.artifact_revision_loader.load(uuid.UUID(element_id))
-        case RBACElementType.CONTAINER_REGISTRY:
-            return await data_loaders.container_registry_loader.load(uuid.UUID(element_id))
-        case RBACElementType.SESSION:
-            return await data_loaders.session_loader.load(SessionId(uuid.UUID(element_id)))
-        case _:
-            return None
-
-
 @gql_node_type(
     BackendAIGQLMeta(
         added_version="26.3.0",
@@ -114,8 +73,9 @@ class EntityRefGQL(PydanticNodeMixin[AssociationScopesEntitiesNode]):
         *,
         info: Info[StrawberryGQLContext],
     ) -> EntityNode | None:
-        element_type = RBACElementType(self.entity_type.value)  # type: ignore[attr-defined]
-        return await _load_rbac_element(info, element_type, self.entity_id)
+        return await info.context.data_loaders.entity_node_loader.load(
+            RuntimeEntityID(EntityType(str(self.entity_type)), uuid.UUID(self.entity_id))
+        )
 
     @gql_added_field(
         BackendAIGQLMeta(
@@ -128,8 +88,9 @@ class EntityRefGQL(PydanticNodeMixin[AssociationScopesEntitiesNode]):
         *,
         info: Info[StrawberryGQLContext],
     ) -> EntityNode | None:
-        element_type = RBACElementType(self.scope_type.value)  # type: ignore[attr-defined]
-        return await _load_rbac_element(info, element_type, self.scope_id)
+        return await info.context.data_loaders.entity_node_loader.load(
+            RuntimeEntityID(EntityType(str(self.scope_type)), uuid.UUID(self.scope_id))
+        )
 
     @classmethod
     @override

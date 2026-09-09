@@ -164,8 +164,6 @@ def _permission_rows(
     return [
         PermissionRow(
             role_id=role_id,
-            scope_type=scope_type,
-            scope_id=str(scope_id),
             entity_type=entity_type,
             permission=bit,
         )
@@ -337,15 +335,20 @@ def _previous_statement(
             .join(sb, sb.c.virtual_entity_id == em.c.virtual_entity_id)
             .join(scope, scope.c.id == sb.c.scope_entity_id)
             .join(
+                roles,
+                sa.and_(
+                    roles.c.scope_type == scope.c.entity_type,
+                    roles.c.scope_id == scope.c.entity_id,
+                ),
+            )
+            .join(
                 perm,
                 sa.and_(
-                    perm.c.scope_type == scope.c.entity_type,
-                    perm.c.scope_id == sa.cast(scope.c.entity_id, sa.String),
+                    perm.c.role_id == roles.c.id,
                     perm.c.entity_type == entity_type,
                     perm.c.all_fields.is_(True),
                 ),
             )
-            .join(roles, roles.c.id == perm.c.role_id)
             .join(user_roles, user_roles.c.role_id == roles.c.id)
             .outerjoin(
                 emc,
