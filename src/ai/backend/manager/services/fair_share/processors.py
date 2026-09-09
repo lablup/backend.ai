@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from ai.backend.manager.actions.registry.group import ProcessorGroup
+from ai.backend.manager.actions.registry.field import FieldGroup
 from ai.backend.manager.actions.v2.global_scope.processor import GlobalActionProcessor
 from ai.backend.manager.actions.v2.scope.processor import ScopeActionProcessor
 
@@ -105,9 +105,9 @@ class FairShareProcessors:
         self,
         # A fair share is keyed by a resource group and a domain, project or user
         # together, so no one entity's data type names these rows.
-        domain: ProcessorGroup[Any],
-        project: ProcessorGroup[Any],
-        user: ProcessorGroup[Any],
+        domain: FieldGroup[Any],
+        project: FieldGroup[Any],
+        user: FieldGroup[Any],
         service: FairShareService,
     ) -> None:
         # Domain Fair Share

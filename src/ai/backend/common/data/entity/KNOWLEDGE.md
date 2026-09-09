@@ -33,9 +33,9 @@ audit_log_scope, label)는 `DanglingFieldType`을 상속해 `None`을 답한다.
   만들지 않는다.
 - pydantic은 base로 선언한 필드면 문자열을 그대로 받고, 종류로 선언한 필드면 그 이름만
   받는다. 행에는 `name()` 문자열이 저장된다.
-- fair share 계열은 dangling field로 옮겨야 하나 아직 엔티티로 선언되고 배선되어 있다.
-  auth, etcd_config, manager_admin, secret은 옮겼고, 그때 `FieldGroup`이 받게 된
-  서비스 기반 배선을 그대로 쓰면 된다.
+- 행이 없거나 소유자가 고정되지 않는 종류는 `DanglingFieldType`으로 선언하고 dangling
+  field group으로 배선한다. 카탈로그가 entity_type에 global 을 적고 field_type 에 그
+  이름을 남기므로, 감사 기록이 엔티티를 지목하지 않으면서 이름은 남는다.
 
 ## Entity
 

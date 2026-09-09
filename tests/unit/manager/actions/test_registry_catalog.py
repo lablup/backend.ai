@@ -37,9 +37,9 @@ from ai.backend.common.data.entity.entity_label import EntityLabelFieldType
 from ai.backend.common.data.entity.entity_share import EntityShareEntityType
 from ai.backend.common.data.entity.export import ExportEntityType
 from ai.backend.common.data.entity.fair_share import (
-    DomainFairShareEntityType,
-    ProjectFairShareEntityType,
-    UserFairShareEntityType,
+    DomainFairShareFieldType,
+    ProjectFairShareFieldType,
+    UserFairShareFieldType,
 )
 from ai.backend.common.data.entity.idle_checker import IdleCheckerEntityType
 from ai.backend.common.data.entity.image import ImageEntityType
@@ -448,9 +448,9 @@ def test_every_defined_v2_action_is_wired() -> None:
         MagicMock(),
     )
     FairShareProcessors(
-        fair_share_groups.group(GroupMeta(DomainFairShareEntityType())),
-        fair_share_groups.group(GroupMeta(ProjectFairShareEntityType())),
-        fair_share_groups.group(GroupMeta(UserFairShareEntityType())),
+        fair_share_groups.dangling_field_group(FieldGroupMeta(DomainFairShareFieldType())),
+        fair_share_groups.dangling_field_group(FieldGroupMeta(ProjectFairShareFieldType())),
+        fair_share_groups.dangling_field_group(FieldGroupMeta(UserFairShareFieldType())),
         MagicMock(),
     )
     ResourcePresetProcessors(registry.group(GroupMeta(ResourcePresetEntityType())), MagicMock())

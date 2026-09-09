@@ -71,8 +71,10 @@ from ai.backend.manager.actions.v2.ops.result import (
     OwnedFieldsOpsResult,
     ScopedFieldsOpsResult,
 )
+from ai.backend.manager.actions.v2.scope.base import BaseScopeAction
 from ai.backend.manager.actions.v2.scope.monitor import ScopeActionMonitor
 from ai.backend.manager.actions.v2.scope.processor import ScopeActionProcessor
+from ai.backend.manager.actions.v2.scope.result import BaseScopeActionResult
 from ai.backend.manager.actions.v2.scope.validator import ScopeActionValidator
 from ai.backend.manager.actions.v2.single_entity.monitor import SingleEntityActionMonitor
 from ai.backend.manager.actions.v2.single_entity.processor import (
@@ -159,6 +161,26 @@ class FieldGroup[TFieldData: FieldData]:
             func,
             monitors=(*self._deps.monitors.global_scope, *monitors),
             validators=(*self._deps.validators.global_scope, *validators),
+        )
+
+    def scope[TAction: BaseScopeAction, TResult: BaseScopeActionResult](
+        self,
+        action_cls: type[TAction],
+        func: Callable[[TAction], Awaitable[TResult]],
+        *,
+        validators: Sequence[ScopeActionValidator] = (),
+        monitors: Sequence[ScopeActionMonitor] = (),
+    ) -> ScopeActionProcessor[TAction, TResult]:
+        """Rows of this kind within one scope, answered for by that scope.
+
+        The service-backed counterpart of :meth:`search_ops`, for a read or a write the
+        ops specs do not cover.
+        """
+        self._record(action_cls, ActionKind.SCOPE, ActionGate.PERMISSION, ActionBacking.CUSTOM)
+        return ScopeActionProcessor(
+            func,
+            monitors=(*self._deps.monitors.scope, *monitors),
+            validators=(*self._deps.validators.scope, *validators),
         )
 
     def public[TAction: BaseGlobalAction, TResult](

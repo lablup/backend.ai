@@ -20,9 +20,9 @@ from ai.backend.common.data.entity.entity_share import EntityShareEntityType
 from ai.backend.common.data.entity.etcd_config import EtcdConfigFieldType
 from ai.backend.common.data.entity.export import ExportEntityType
 from ai.backend.common.data.entity.fair_share import (
-    DomainFairShareEntityType,
-    ProjectFairShareEntityType,
-    UserFairShareEntityType,
+    DomainFairShareFieldType,
+    ProjectFairShareFieldType,
+    UserFairShareFieldType,
 )
 from ai.backend.common.data.entity.idle_checker import IdleCheckerEntityType
 from ai.backend.common.data.entity.image import ImageEntityType
@@ -588,9 +588,9 @@ def create_processors(
             visibility_groups.group(GroupMeta(ExportEntityType())), services.export
         ),
         fair_share=FairShareProcessors(
-            resource_group_groups.group(GroupMeta(DomainFairShareEntityType())),
-            resource_group_groups.group(GroupMeta(ProjectFairShareEntityType())),
-            resource_group_groups.group(GroupMeta(UserFairShareEntityType())),
+            resource_group_groups.dangling_field_group(FieldGroupMeta(DomainFairShareFieldType())),
+            resource_group_groups.dangling_field_group(FieldGroupMeta(ProjectFairShareFieldType())),
+            resource_group_groups.dangling_field_group(FieldGroupMeta(UserFairShareFieldType())),
             services.fair_share,
         ),
         project=ProjectProcessors(
