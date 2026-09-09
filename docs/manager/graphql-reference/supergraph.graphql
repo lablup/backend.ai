@@ -22247,43 +22247,43 @@ input UpdateModelCardV2Input
   id: UUID!
 
   """New name."""
-  name: String = null
+  name: String
 
   """Author."""
-  author: String = null
+  author: String
 
   """Title."""
-  title: String = null
+  title: String
 
   """Version."""
-  modelVersion: String = null
+  modelVersion: String
 
   """Description."""
-  description: String = null
+  description: String
 
   """ML task."""
-  task: String = null
+  task: String
 
   """Category."""
-  category: String = null
+  category: String
 
   """Architecture."""
-  architecture: String = null
+  architecture: String
 
   """Frameworks."""
-  framework: [String!] = null
+  framework: [String!]
 
   """Labels."""
-  label: [String!] = null
+  label: [String!]
 
   """License."""
-  license: String = null
+  license: String
 
   """README content."""
-  readme: String = null
+  readme: String
 
   """Access level (public or internal)."""
-  accessLevel: ModelCardV2AccessLevel = null
+  accessLevel: ModelCardV2AccessLevel
 }
 
 """

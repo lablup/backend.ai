@@ -26423,7 +26423,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
+            "description": "Model card name. Omit to leave unchanged.",
             "title": "Name"
           },
           "author": {
@@ -26522,7 +26522,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
+            "description": "Frameworks. Omit to leave unchanged.",
             "title": "Framework"
           },
           "label": {
@@ -26537,7 +26537,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
+            "description": "Labels. Omit to leave unchanged.",
             "title": "Label"
           },
           "license": {
