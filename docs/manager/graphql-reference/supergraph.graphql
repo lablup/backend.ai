@@ -22586,19 +22586,19 @@ input UpdateProjectInput
   @join__type(graph: STRAWBERRY)
 {
   """New project name."""
-  name: String = null
+  name: String
 
   """New description."""
   description: String
 
   """Updated active status."""
-  isActive: Boolean = null
+  isActive: Boolean
 
   """New external integration identifier."""
   integrationName: String
 
   """New resource policy name."""
-  resourcePolicy: String = null
+  resourcePolicy: String
 }
 
 """

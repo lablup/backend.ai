@@ -16571,8 +16571,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "New group name.",
+            "description": "New group name. Omit to leave unchanged.",
             "title": "Name"
           },
           "description": {
@@ -16581,14 +16580,10 @@
                 "type": "string"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
-            "description": "New group description. Set to null to clear.",
+            "description": "Updated group description. Omit to leave unchanged; null clears.",
             "title": "Description"
           },
           "is_active": {
@@ -16600,8 +16595,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Updated active status.",
+            "description": "Updated active status. Omit to leave unchanged.",
             "title": "Is Active"
           },
           "integration_name": {
@@ -16610,14 +16604,10 @@
                 "type": "string"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
-            "description": "New external integration identifier. Set to null to clear.",
+            "description": "Updated external integration identifier. Omit to leave unchanged; null clears.",
             "title": "Integration Name"
           },
           "resource_policy": {
@@ -16629,8 +16619,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Name of the updated resource policy to apply to this group.",
+            "description": "Name of the updated resource policy to apply to this group. Omit to leave unchanged.",
             "title": "Resource Policy"
           }
         },
