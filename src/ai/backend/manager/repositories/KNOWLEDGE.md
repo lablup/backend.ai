@@ -53,7 +53,8 @@ pass-through would remain.
 
 ## Gradual migration to the ops provider
 
-`DBOpsProvider` in `ops/base/provider.py` is the standard path. db_source is gradually migrating to ops —
+`V2DBOpsProvider` in `ops/v2/provider.py` is the standard path; `DBOpsProvider` in
+`ops/base/provider.py` reads only. db_source is gradually migrating to ops —
 use ops for new/modified code, and leave existing code until you touch it. Isolate the engine so a raw session does not leak to the caller,
 and take only spec types so arbitrary SQL cannot cross layers.
 
