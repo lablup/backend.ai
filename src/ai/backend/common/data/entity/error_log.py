@@ -24,7 +24,7 @@ class ErrorLogFieldType(FieldType):
     @override
     @classmethod
     def description(cls) -> str:
-        return "One error recorded for a user."
+        return "One error surfaced to a user, which they can mark read or clear away."
 
     @override
     @classmethod
