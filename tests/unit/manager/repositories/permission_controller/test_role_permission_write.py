@@ -10,9 +10,9 @@ import pytest
 import sqlalchemy as sa
 
 from ai.backend.common.data.entity.permission import PermissionID
-from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.project import ProjectEntityType, ProjectID
 from ai.backend.common.data.entity.role import RoleID
-from ai.backend.common.data.entity.types import EntityType
+from ai.backend.common.data.entity.session import SessionEntityType
 from ai.backend.manager.data.permission.permission import PermissionData
 from ai.backend.manager.data.permission.status import RoleStatus
 from ai.backend.manager.data.permission.types import Permission, RoleSource
@@ -57,7 +57,7 @@ class TestRolePermissionWrite:
         async with db_with_tables.begin_session() as db_sess:
             await db_sess.execute(
                 sa.insert(RoleRow).values(
-                    scope_type=EntityType("project"),
+                    scope_type=ProjectEntityType(),
                     scope_id=uuid.uuid4(),
                     id=role_id,
                     name="reader",
@@ -69,7 +69,7 @@ class TestRolePermissionWrite:
 
     def _read_sessions_in(self, project_id: ProjectID) -> RolePermissionCreator:
         return RolePermissionCreator(
-            scope=project_id, entity_type=EntityType("session"), permission=Permission.READ
+            scope=project_id, entity_type=SessionEntityType(), permission=Permission.READ
         )
 
     async def test_create_and_purge_are_answered_by_the_role(

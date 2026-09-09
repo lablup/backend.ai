@@ -1,4 +1,4 @@
-from ai.backend.common.data.entity.permission import PERMISSION_FIELD_TYPE
+from ai.backend.common.data.entity.permission import PermissionFieldType
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
 from ai.backend.manager.actions.processor.scope import ScopeActionProcessor
@@ -142,7 +142,7 @@ class PermissionControllerProcessors:
             service.search_users_assigned_to_role, action_monitors
         )
         permissions: LookupFieldGroup[PermissionData] = role_group.field_group(
-            FieldGroupMeta(PERMISSION_FIELD_TYPE),
+            FieldGroupMeta(PermissionFieldType()),
             PermissionData,
             LookupRolePermissionOwnerAction,
             LookupBulkRolePermissionOwnerAction,

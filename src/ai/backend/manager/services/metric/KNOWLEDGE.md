@@ -10,7 +10,7 @@ keywords:
   - PublicSearchContainerMetricMetadataAction
   - BatchGetKernelLiveStatsAction
   - LookupBulkKernelOwnerAction
-  - PROMETHEUS_QUERY_PRESET_ENTITY_TYPE
+  - PrometheusQueryPresetEntityType
   - PublicActionProcessor
   - Concern.METRIC
 sources:

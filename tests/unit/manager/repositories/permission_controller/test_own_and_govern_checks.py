@@ -16,13 +16,13 @@ import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ai.backend.common.data.entity.domain import DomainID
-from ai.backend.common.data.entity.project import PROJECT_ENTITY_TYPE, PROJECT_SCOPE_TYPE, ProjectID
-from ai.backend.common.data.entity.resource_group import RESOURCE_GROUP_ENTITY_TYPE
-from ai.backend.common.data.entity.role_preset import ROLE_PRESET_ENTITY_TYPE, RolePresetID
-from ai.backend.common.data.entity.session import SESSION_ENTITY_TYPE, SessionID
+from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE, ProjectEntityType, ProjectID
+from ai.backend.common.data.entity.resource_group import ResourceGroupEntityType
+from ai.backend.common.data.entity.role_preset import RolePresetEntityType, RolePresetID
+from ai.backend.common.data.entity.session import SessionEntityType, SessionID
 from ai.backend.common.data.entity.types import EntityID, EntityType, ScopeRef, ScopeType
 from ai.backend.common.data.entity.user import USER_SCOPE_TYPE, UserID
-from ai.backend.common.data.entity.vfolder import VFOLDER_ENTITY_TYPE, VFolderUUID
+from ai.backend.common.data.entity.vfolder import VFolderEntityType, VFolderUUID
 from ai.backend.common.data.entity.virtual_entity import VirtualEntityID
 from ai.backend.common.data.permission.types import Permission
 from ai.backend.common.types import ResourceSlot
@@ -90,9 +90,9 @@ _ORM_CLUSTER = (
     ResourceGroupForDomainRow,
 )
 
-_TARGET_ENTITY_TYPE = EntityType("vfolder")
+_TARGET_ENTITY_TYPE = VFolderEntityType()
 # Wired, but not a member of the legacy RBAC enum the permissions table used to carry.
-_UNMAPPED_ENTITY_TYPE = ROLE_PRESET_ENTITY_TYPE
+_UNMAPPED_ENTITY_TYPE = RolePresetEntityType()
 
 
 @dataclass
@@ -277,7 +277,7 @@ class TestCheckPermissionViaVirtualEntity:
                 DomainRow(id=domain_id, name=domain_name, total_resource_slots=ResourceSlot())
             )
             db_sess.add_all(
-                self._chain_nodes(ids, ScopeType(EntityType("project")), _TARGET_ENTITY_TYPE)
+                self._chain_nodes(ids, ScopeType(ProjectEntityType()), _TARGET_ENTITY_TYPE)
             )
             await db_sess.flush()
 
@@ -544,7 +544,7 @@ class TestCheckPermissionViaVirtualEntity:
         does not name."""
         async with db.begin_session() as db_sess:
             db_sess.add_all(
-                self._chain_nodes(ids, ScopeType(EntityType("project")), _UNMAPPED_ENTITY_TYPE)
+                self._chain_nodes(ids, ScopeType(ProjectEntityType()), _UNMAPPED_ENTITY_TYPE)
             )
             await db_sess.flush()
             db_sess.add(
@@ -562,7 +562,7 @@ class TestCheckPermissionViaVirtualEntity:
             db_sess.add(
                 PermissionRow(
                     role_id=ids.role_id,
-                    scope_type=ScopeType(EntityType("project")),
+                    scope_type=ScopeType(ProjectEntityType()),
                     scope_id=str(ids.bound_scope_id),
                     entity_type=_UNMAPPED_ENTITY_TYPE,
                     permission=Permission.READ,
@@ -605,7 +605,7 @@ class TestCheckPermissionViaVirtualEntity:
                 ),
                 {
                     "role_id": fixture_ids.role_id,
-                    "scope_type": str(ScopeType(EntityType("project"))),
+                    "scope_type": str(ScopeType(ProjectEntityType())),
                     "scope_id": str(fixture_ids.bound_scope_id),
                     "entity_type": str(_UNMAPPED_ENTITY_TYPE),
                     "permission": int(Permission.READ),
@@ -804,7 +804,7 @@ class TestUserRosterEnrollment:
                     VirtualEntityRow.entity_id == project_id,
                 )
             )
-            session_node = VirtualEntityRow(entity_type=SESSION_ENTITY_TYPE, entity_id=session_id)
+            session_node = VirtualEntityRow(entity_type=SessionEntityType(), entity_id=session_id)
             db_sess.add(session_node)
             await db_sess.flush()
             db_sess.add(
@@ -935,7 +935,7 @@ class TestUserRosterEnrollment:
                 )
             )
             assert project_ve_id is not None
-            vfolder_node = VirtualEntityRow(entity_type=VFOLDER_ENTITY_TYPE, entity_id=vfolder_id)
+            vfolder_node = VirtualEntityRow(entity_type=VFolderEntityType(), entity_id=vfolder_id)
             db_sess.add(vfolder_node)
             await db_sess.flush()
             await VirtualEntitySeeder().cap_edge(db_sess, project_ve_id, vfolder_node.id, cap)
@@ -978,8 +978,8 @@ class TestUserRosterEnrollment:
 
         key = GovernCheckKey(
             user_id=ids.user_id,
-            scope=ScopeRef(scope_type=ScopeType(VFOLDER_ENTITY_TYPE), scope_id=vfolder_id),
-            entity_type=SESSION_ENTITY_TYPE,
+            scope=ScopeRef(scope_type=ScopeType(VFolderEntityType()), scope_id=vfolder_id),
+            entity_type=SessionEntityType(),
         )
         result = await repository.governed_permissions([key])
         assert result[key] == (Permission.READ if reaches else Permission.NONE)
@@ -1002,10 +1002,10 @@ class TestUserRosterEnrollment:
             )
             assert project_ve_id is not None
             rg_node = VirtualEntityRow(
-                entity_type=RESOURCE_GROUP_ENTITY_TYPE, entity_id=uuid.uuid4()
+                entity_type=ResourceGroupEntityType(), entity_id=uuid.uuid4()
             )
             other_node = VirtualEntityRow(
-                entity_type=PROJECT_ENTITY_TYPE, entity_id=other_project_id
+                entity_type=ProjectEntityType(), entity_id=other_project_id
             )
             db_sess.add_all([rg_node, other_node])
             await db_sess.flush()

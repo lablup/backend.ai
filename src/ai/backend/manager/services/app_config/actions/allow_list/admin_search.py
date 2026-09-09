@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.common.data.entity.app_config import APP_CONFIG_ALLOW_LIST_ENTITY_TYPE
+from ai.backend.common.data.entity.app_config import AppConfigAllowListEntityType
 from ai.backend.common.data.entity.types import EntityType
 from ai.backend.manager.actions.v2.ops.base import SearchGlobalOpsAction
 from ai.backend.manager.data.app_config.types import AppConfigAllowListData
@@ -24,7 +24,7 @@ class AdminSearchAppConfigAllowListAction(
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return APP_CONFIG_ALLOW_LIST_ENTITY_TYPE
+        return AppConfigAllowListEntityType()
 
     @override
     @classmethod

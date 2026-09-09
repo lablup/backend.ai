@@ -3,25 +3,44 @@ from typing import override
 from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
 
 __all__ = (
-    "NOTIFICATION_CHANNEL_ENTITY_TYPE",
-    "NOTIFICATION_RULE_ENTITY_TYPE",
+    "NotificationChannelEntityType",
+    "NotificationRuleEntityType",
     "NotificationChannelID",
     "NotificationRuleID",
 )
 
 
-# Raw strings mirroring the RBAC-managed EntityType values.
-NOTIFICATION_CHANNEL_ENTITY_TYPE = EntityType("notification_channel")
-NOTIFICATION_RULE_ENTITY_TYPE = EntityType("notification_rule")
+class NotificationChannelEntityType(EntityType):
+    @override
+    @classmethod
+    def name(cls) -> str:
+        return "notification_channel"
+
+    @override
+    @classmethod
+    def description(cls) -> str:
+        return "A destination notifications are sent to."
+
+
+class NotificationRuleEntityType(EntityType):
+    @override
+    @classmethod
+    def name(cls) -> str:
+        return "notification_rule"
+
+    @override
+    @classmethod
+    def description(cls) -> str:
+        return "A rule choosing which events reach a notification channel."
 
 
 class NotificationChannelID(EntityIdentifier):
     @override
     def entity_type(self) -> EntityType:
-        return NOTIFICATION_CHANNEL_ENTITY_TYPE
+        return NotificationChannelEntityType()
 
 
 class NotificationRuleID(EntityIdentifier):
     @override
     def entity_type(self) -> EntityType:
-        return NOTIFICATION_RULE_ENTITY_TYPE
+        return NotificationRuleEntityType()

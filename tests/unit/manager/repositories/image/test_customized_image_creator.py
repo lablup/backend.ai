@@ -17,14 +17,14 @@ import sqlalchemy as sa
 
 from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.data.entity.container_registry import (
-    CONTAINER_REGISTRY_ENTITY_TYPE,
+    ContainerRegistryEntityType,
     ContainerRegistryID,
 )
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.image import ImageID
 from ai.backend.common.data.entity.project import (
-    PROJECT_ENTITY_TYPE,
     PROJECT_SCOPE_TYPE,
+    ProjectEntityType,
     ProjectID,
 )
 from ai.backend.common.data.entity.user import UserID
@@ -189,7 +189,7 @@ class TestImageOwnershipGraph:
                 )
             )
             await VirtualEntitySeeder().get_or_create_node(
-                sess, CONTAINER_REGISTRY_ENTITY_TYPE, registry_id
+                sess, ContainerRegistryEntityType(), registry_id
             )
             await sess.commit()
         return registry_id
@@ -239,7 +239,7 @@ class TestImageOwnershipGraph:
                     resource_policy=PROJECT_RESOURCE_POLICY_NAME,
                 )
             )
-            await VirtualEntitySeeder().get_or_create_node(sess, PROJECT_ENTITY_TYPE, project_id)
+            await VirtualEntitySeeder().get_or_create_node(sess, ProjectEntityType(), project_id)
             await sess.commit()
         return project_id
 

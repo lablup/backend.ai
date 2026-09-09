@@ -1,9 +1,9 @@
 import uuid
 
-from ai.backend.common.data.entity.permission import PERMISSION_FIELD_TYPE, PermissionID
+from ai.backend.common.data.entity.permission import PermissionFieldType, PermissionID
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.role import RoleID
-from ai.backend.common.data.entity.types import EntityType
+from ai.backend.common.data.entity.session import SessionEntityType
 from ai.backend.manager.data.permission.types import Permission
 from ai.backend.manager.models.rbac_models.permission.creators import RolePermissionCreator
 from ai.backend.manager.models.rbac_models.permission.lookups import RolePermissionOwnerLookup
@@ -17,7 +17,7 @@ class TestRolePermissionCreator:
         role_id = RoleID(uuid.uuid4())
         scope = ProjectID(uuid.uuid4())
         creator = RolePermissionCreator(
-            scope=scope, entity_type=EntityType("session"), permission=Permission.READ
+            scope=scope, entity_type=SessionEntityType(), permission=Permission.READ
         )
 
         row = creator.build_row(role_id)
@@ -31,7 +31,7 @@ class TestRolePermissionCreator:
     def test_a_duplicate_entry_is_mapped_to_a_domain_error(self) -> None:
         creator = RolePermissionCreator(
             scope=ProjectID(uuid.uuid4()),
-            entity_type=EntityType("session"),
+            entity_type=SessionEntityType(),
             permission=Permission.READ,
         )
 
@@ -43,14 +43,14 @@ class TestRolePermissionCreator:
         permission_id = PermissionID(uuid.uuid4())
         creator = RolePermissionCreator(
             scope=ProjectID(uuid.uuid4()),
-            entity_type=EntityType("session"),
+            entity_type=SessionEntityType(),
             permission=Permission.READ,
         )
 
         field_id = creator.field_id(PermissionRow(id=permission_id))
 
         assert field_id == permission_id
-        assert PermissionID.field_type() == PERMISSION_FIELD_TYPE
+        assert PermissionID.field_type() == PermissionFieldType()
 
 
 class TestRolePermissionReadSpecs:

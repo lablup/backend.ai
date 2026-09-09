@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from typing import Any, override
 
 from ai.backend.common.data.entity.storage_namespace import (
-    STORAGE_NAMESPACE_ENTITY_TYPE,
+    StorageNamespaceEntityType,
     StorageNamespaceID,
 )
 from ai.backend.common.data.entity.types import EntityType
@@ -47,7 +47,7 @@ class LookupStorageNamespaceAction(LookupEntityOpsAction[StorageNamespaceRow, St
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return STORAGE_NAMESPACE_ENTITY_TYPE
+        return StorageNamespaceEntityType()
 
     @override
     @classmethod

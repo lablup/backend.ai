@@ -15,8 +15,8 @@ import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
 from ai.backend.common.data.entity.domain import DomainID
-from ai.backend.common.data.entity.project import PROJECT_ENTITY_TYPE, ProjectID
-from ai.backend.common.data.entity.role import ROLE_ENTITY_TYPE
+from ai.backend.common.data.entity.project import ProjectEntityType, ProjectID
+from ai.backend.common.data.entity.role import RoleEntityType
 from ai.backend.common.data.entity.types import EntityType
 from ai.backend.manager.models.agent import AgentRow
 
@@ -72,7 +72,7 @@ async def _add_role(
     role = RoleRow(name=name, description=name, scope_type=scope_type, scope_id=scope_id)
     db_sess.add(role)
     await db_sess.flush()
-    role_node = VirtualEntityRow(entity_type=ROLE_ENTITY_TYPE, entity_id=role.id)
+    role_node = VirtualEntityRow(entity_type=RoleEntityType(), entity_id=role.id)
     db_sess.add(role_node)
     await db_sess.flush()
     db_sess.add(EntityMembershipRow(virtual_entity_id=role_node.id, member_entity_id=role_node.id))
@@ -115,9 +115,9 @@ class TestSearchRolesInScope:
         project_id = uuid.uuid4()
 
         async with db_with_tables.begin_session() as db_sess:
-            role_in = await _add_role(db_sess, "role-in-scope", PROJECT_ENTITY_TYPE, project_id)
+            role_in = await _add_role(db_sess, "role-in-scope", ProjectEntityType(), project_id)
             role_out = await _add_role(
-                db_sess, "role-outside-scope", PROJECT_ENTITY_TYPE, uuid.uuid4()
+                db_sess, "role-outside-scope", ProjectEntityType(), uuid.uuid4()
             )
 
         return ScopedRoleFixture(
@@ -190,7 +190,7 @@ class TestSearchRolesInScope:
         scope_id = uuid.uuid4()
 
         async with db_with_tables.begin_session() as db_sess:
-            await _add_role(db_sess, "project-only-role", PROJECT_ENTITY_TYPE, scope_id)
+            await _add_role(db_sess, "project-only-role", ProjectEntityType(), scope_id)
 
         querier = BatchQuerier(
             conditions=[],

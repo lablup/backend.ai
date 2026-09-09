@@ -15,6 +15,7 @@ import pytest
 
 from ai.backend.common.contexts.user import with_user
 from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.resource_slot import ResourceSlotTypeEntityType
 from ai.backend.common.data.entity.types import EntityType
 from ai.backend.common.data.user.types import UserData, UserRole
 from ai.backend.manager.actions.action import BaseActionTriggerMeta
@@ -36,7 +37,7 @@ class _SearchAction(BaseGlobalAction):
     @classmethod
     @override
     def entity_type(cls) -> EntityType:
-        return EntityType("resource_slot_type")
+        return ResourceSlotTypeEntityType()
 
     @classmethod
     @override

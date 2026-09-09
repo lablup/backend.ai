@@ -2,11 +2,31 @@
 
 from typing import override
 
-from ai.backend.common.data.entity.types import FieldIdentifier, FieldType
+from ai.backend.common.data.entity.deployment import DeploymentEntityType
+from ai.backend.common.data.entity.types import (
+    EntityType,
+    FieldIdentifier,
+    FieldType,
+)
 
-__all__ = ("DEPLOYMENT_POLICY_FIELD_TYPE", "DeploymentPolicyID")
+__all__ = ("DeploymentPolicyFieldType", "DeploymentPolicyID")
 
-DEPLOYMENT_POLICY_FIELD_TYPE = FieldType("deployment_policy")
+
+class DeploymentPolicyFieldType(FieldType):
+    @override
+    @classmethod
+    def name(cls) -> str:
+        return "deployment_policy"
+
+    @override
+    @classmethod
+    def description(cls) -> str:
+        return "The scaling and routing policy of a deployment."
+
+    @override
+    @classmethod
+    def owner_type(cls) -> type[EntityType]:
+        return DeploymentEntityType
 
 
 class DeploymentPolicyID(FieldIdentifier):
@@ -19,4 +39,4 @@ class DeploymentPolicyID(FieldIdentifier):
     @override
     @classmethod
     def field_type(cls) -> FieldType:
-        return DEPLOYMENT_POLICY_FIELD_TYPE
+        return DeploymentPolicyFieldType()

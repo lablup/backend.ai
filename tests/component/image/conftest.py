@@ -10,7 +10,7 @@ import sqlalchemy as sa
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
 from ai.backend.common.container_registry import ContainerRegistryType
-from ai.backend.common.data.entity.image import IMAGE_ENTITY_TYPE
+from ai.backend.common.data.entity.image import ImageEntityType
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
 from ai.backend.manager.actions.registry.types import GroupMeta
 from ai.backend.manager.actions.validators.rbac.scope import ScopeActionRBACValidator
@@ -53,7 +53,7 @@ def image_processors(
     service = ImageService(agent_registry, repo, config_provider)
     mock_scope = MagicMock(spec=ScopeActionRBACValidator)
     mock_scope.validate = AsyncMock()
-    return ImageProcessors(processor_registry.group(GroupMeta(IMAGE_ENTITY_TYPE)), service)
+    return ImageProcessors(processor_registry.group(GroupMeta(ImageEntityType())), service)
 
 
 @pytest.fixture()

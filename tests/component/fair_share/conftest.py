@@ -10,19 +10,19 @@ import sqlalchemy as sa
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
 from ai.backend.common.data.entity.fair_share import (
-    DOMAIN_FAIR_SHARE_ENTITY_TYPE,
-    PROJECT_FAIR_SHARE_ENTITY_TYPE,
-    USER_FAIR_SHARE_ENTITY_TYPE,
+    DomainFairShareEntityType,
+    ProjectFairShareEntityType,
+    UserFairShareEntityType,
 )
 from ai.backend.common.data.entity.resource_group import (
-    RESOURCE_GROUP_ENTITY_TYPE,
+    ResourceGroupEntityType,
     ResourceGroupID,
     ResourceGroupName,
 )
 from ai.backend.common.data.entity.usage_bucket import (
-    DOMAIN_USAGE_BUCKET_FIELD_TYPE,
-    PROJECT_USAGE_BUCKET_FIELD_TYPE,
-    USER_USAGE_BUCKET_FIELD_TYPE,
+    DomainUsageBucketFieldType,
+    ProjectUsageBucketFieldType,
+    UserUsageBucketFieldType,
 )
 from ai.backend.common.data.permission.types import ScopeType
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
@@ -71,9 +71,9 @@ def fair_share_processors(
     service = FairShareService(FairShareRepository(database_engine))
     fair_share_groups = processor_registry.concern(ConcernMeta(Concern.RESOURCE_GROUP))
     return FairShareProcessors(
-        fair_share_groups.group(GroupMeta(DOMAIN_FAIR_SHARE_ENTITY_TYPE)),
-        fair_share_groups.group(GroupMeta(PROJECT_FAIR_SHARE_ENTITY_TYPE)),
-        fair_share_groups.group(GroupMeta(USER_FAIR_SHARE_ENTITY_TYPE)),
+        fair_share_groups.group(GroupMeta(DomainFairShareEntityType())),
+        fair_share_groups.group(GroupMeta(ProjectFairShareEntityType())),
+        fair_share_groups.group(GroupMeta(UserFairShareEntityType())),
         service,
     )
 
@@ -84,13 +84,13 @@ def resource_usage_processors(
 ) -> ResourceUsageProcessors:
     return ResourceUsageProcessors(
         processor_registry.dangling_field_group(
-            FieldGroupMeta(DOMAIN_USAGE_BUCKET_FIELD_TYPE), DomainUsageBucketData
+            FieldGroupMeta(DomainUsageBucketFieldType()), DomainUsageBucketData
         ),
         processor_registry.dangling_field_group(
-            FieldGroupMeta(PROJECT_USAGE_BUCKET_FIELD_TYPE), ProjectUsageBucketData
+            FieldGroupMeta(ProjectUsageBucketFieldType()), ProjectUsageBucketData
         ),
         processor_registry.dangling_field_group(
-            FieldGroupMeta(USER_USAGE_BUCKET_FIELD_TYPE), UserUsageBucketData
+            FieldGroupMeta(UserUsageBucketFieldType()), UserUsageBucketData
         ),
     )
 
@@ -104,7 +104,7 @@ def resource_group_processors(
         ResourceGroupRepository(database_engine, V2DBOpsProvider(database_engine))
     )
     return ResourceGroupProcessors(
-        processor_registry.group(GroupMeta(RESOURCE_GROUP_ENTITY_TYPE)), service
+        processor_registry.group(GroupMeta(ResourceGroupEntityType())), service
     )
 
 

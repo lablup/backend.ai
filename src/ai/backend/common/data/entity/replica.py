@@ -2,11 +2,31 @@
 
 from typing import override
 
-from ai.backend.common.data.entity.types import FieldIdentifier, FieldType
+from ai.backend.common.data.entity.deployment import DeploymentEntityType
+from ai.backend.common.data.entity.types import (
+    EntityType,
+    FieldIdentifier,
+    FieldType,
+)
 
-__all__ = ("REPLICA_FIELD_TYPE", "ReplicaID")
+__all__ = ("ReplicaFieldType", "ReplicaID")
 
-REPLICA_FIELD_TYPE = FieldType("replica")
+
+class ReplicaFieldType(FieldType):
+    @override
+    @classmethod
+    def name(cls) -> str:
+        return "replica"
+
+    @override
+    @classmethod
+    def description(cls) -> str:
+        return "One running copy of a deployment."
+
+    @override
+    @classmethod
+    def owner_type(cls) -> type[EntityType]:
+        return DeploymentEntityType
 
 
 class ReplicaID(FieldIdentifier):
@@ -19,4 +39,4 @@ class ReplicaID(FieldIdentifier):
     @override
     @classmethod
     def field_type(cls) -> FieldType:
-        return REPLICA_FIELD_TYPE
+        return ReplicaFieldType()

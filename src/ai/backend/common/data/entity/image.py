@@ -4,9 +4,19 @@ from typing import override
 
 from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
 
-__all__ = ("IMAGE_ENTITY_TYPE", "ImageID")
+__all__ = ("ImageEntityType", "ImageID")
 
-IMAGE_ENTITY_TYPE = EntityType("image")
+
+class ImageEntityType(EntityType):
+    @override
+    @classmethod
+    def name(cls) -> str:
+        return "image"
+
+    @override
+    @classmethod
+    def description(cls) -> str:
+        return "A container image known to a container registry."
 
 
 class ImageID(EntityIdentifier):
@@ -14,4 +24,4 @@ class ImageID(EntityIdentifier):
 
     @override
     def entity_type(self) -> EntityType:
-        return IMAGE_ENTITY_TYPE
+        return ImageEntityType()

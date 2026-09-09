@@ -11,9 +11,9 @@ from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
 from ai.backend.client.v2.exceptions import ConflictError, NotFoundError
 from ai.backend.client.v2.registry import BackendAIClientRegistry
-from ai.backend.common.data.entity.project import PROJECT_ENTITY_TYPE
-from ai.backend.common.data.entity.role import ROLE_ENTITY_TYPE
-from ai.backend.common.data.entity.user import USER_ENTITY_TYPE
+from ai.backend.common.data.entity.project import ProjectEntityType
+from ai.backend.common.data.entity.role import RoleEntityType
+from ai.backend.common.data.entity.user import UserEntityType
 from ai.backend.common.data.entity.virtual_entity import VirtualEntityID
 from ai.backend.common.data.permission.id import EntityMembershipID
 from ai.backend.common.dto.manager.user import (
@@ -124,7 +124,7 @@ class TestUserCreateCrud:
             membership = (
                 await conn.execute(
                     _membership_query(
-                        PROJECT_ENTITY_TYPE, group_fixture, USER_ENTITY_TYPE, result.user.id
+                        ProjectEntityType(), group_fixture, UserEntityType(), result.user.id
                     )
                 )
             ).fetchone()
@@ -156,8 +156,8 @@ class TestUserCreateCrud:
                     .join(EntityMembershipRow, EntityMembershipRow.member_entity_id == member.id)
                     .where(
                         EntityMembershipRow.virtual_entity_id
-                        == _node_id(PROJECT_ENTITY_TYPE, project_id),
-                        member.entity_type == USER_ENTITY_TYPE,
+                        == _node_id(ProjectEntityType(), project_id),
+                        member.entity_type == UserEntityType(),
                     )
                 )
             ).all()
@@ -473,7 +473,7 @@ class TestUserCreateAutoAssignRoles:
                 name=name,
                 status=RoleStatus.ACTIVE,
                 auto_assign=True,
-                scope_type=PROJECT_ENTITY_TYPE,
+                scope_type=ProjectEntityType(),
                 scope_id=project_id,
             )
         )
@@ -481,13 +481,13 @@ class TestUserCreateAutoAssignRoles:
         await conn.execute(
             sa.insert(VirtualEntityRow.__table__).values(
                 id=role_node_id,
-                entity_type=ROLE_ENTITY_TYPE,
+                entity_type=RoleEntityType(),
                 entity_id=role_id,
             )
         )
         await conn.execute(
             sa.insert(EntityMembershipRow.__table__).values(
-                virtual_entity_id=_node_id(PROJECT_ENTITY_TYPE, project_id),
+                virtual_entity_id=_node_id(ProjectEntityType(), project_id),
                 member_entity_id=role_node_id,
                 capped=False,
             )
@@ -501,7 +501,7 @@ class TestUserCreateAutoAssignRoles:
         )
         await conn.execute(
             VirtualEntityRow.__table__.delete().where(
-                VirtualEntityRow.__table__.c.entity_type == ROLE_ENTITY_TYPE,
+                VirtualEntityRow.__table__.c.entity_type == RoleEntityType(),
                 VirtualEntityRow.__table__.c.entity_id == role_id,
             )
         )
@@ -606,7 +606,7 @@ class TestUserCreateAutoAssignRoles:
             membership = (
                 await conn.execute(
                     _membership_query(
-                        PROJECT_ENTITY_TYPE, group_fixture, USER_ENTITY_TYPE, result.user.id
+                        ProjectEntityType(), group_fixture, UserEntityType(), result.user.id
                     )
                 )
             ).fetchone()
@@ -636,7 +636,7 @@ class TestUserCreateAutoAssignRoles:
             membership = (
                 await conn.execute(
                     _membership_query(
-                        PROJECT_ENTITY_TYPE, model_store_project, USER_ENTITY_TYPE, result.user.id
+                        ProjectEntityType(), model_store_project, UserEntityType(), result.user.id
                     )
                 )
             ).fetchone()

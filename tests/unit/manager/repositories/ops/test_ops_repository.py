@@ -21,7 +21,9 @@ import pytest
 import sqlalchemy as sa
 from sqlalchemy.orm import InstrumentedAttribute
 
+from ai.backend.common.data.entity.domain import DomainEntityType
 from ai.backend.common.data.entity.role_preset import (
+    RolePresetEntityType,
     RolePresetID,
 )
 from ai.backend.common.data.entity.types import (
@@ -191,11 +193,28 @@ class _PresetBulkQuerier(BulkEntityQuerier[RolePresetRow, RolePresetData]):
         return row.to_data()
 
 
+class _PresetFieldType(FieldType):
+    @override
+    @classmethod
+    def name(cls) -> str:
+        return "test_preset_field"
+
+    @override
+    @classmethod
+    def description(cls) -> str:
+        return "A field row of the test preset."
+
+    @override
+    @classmethod
+    def owner_type(cls) -> type[EntityType] | None:
+        return None
+
+
 class _PresetFieldID(FieldIdentifier):
     @override
     @classmethod
     def field_type(cls) -> FieldType:
-        return FieldType("test_preset_field")
+        return _PresetFieldType()
 
 
 @dataclass(frozen=True)
@@ -718,7 +737,7 @@ class _SearchPresetsAction(BaseScopeAction, SearchOpsAction[RolePresetRow, _Pres
     @classmethod
     @override
     def entity_type(cls) -> EntityType:
-        return EntityType("role_preset")
+        return RolePresetEntityType()
 
     @classmethod
     @override
@@ -781,7 +800,7 @@ class TestFullStack:
             service.execute
         )
         action = _SearchPresetsAction(
-            scope=ScopeRef(scope_type=ScopeType(EntityType("domain")), scope_id=uuid.uuid4()),
+            scope=ScopeRef(scope_type=ScopeType(DomainEntityType()), scope_id=uuid.uuid4()),
             scopes=(_NamedScope(name="default"),),
         )
 

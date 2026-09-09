@@ -2,11 +2,31 @@
 
 from typing import override
 
-from ai.backend.common.data.entity.types import FieldIdentifier, FieldType
+from ai.backend.common.data.entity.deployment import DeploymentEntityType
+from ai.backend.common.data.entity.types import (
+    EntityType,
+    FieldIdentifier,
+    FieldType,
+)
 
-__all__ = ("REPLICA_GROUP_HISTORY_FIELD_TYPE", "ReplicaGroupHistoryID")
+__all__ = ("ReplicaGroupHistoryFieldType", "ReplicaGroupHistoryID")
 
-REPLICA_GROUP_HISTORY_FIELD_TYPE = FieldType("replica_group_history")
+
+class ReplicaGroupHistoryFieldType(FieldType):
+    @override
+    @classmethod
+    def name(cls) -> str:
+        return "replica_group_history"
+
+    @override
+    @classmethod
+    def description(cls) -> str:
+        return "One state change of a replica group."
+
+    @override
+    @classmethod
+    def owner_type(cls) -> type[EntityType]:
+        return DeploymentEntityType
 
 
 class ReplicaGroupHistoryID(FieldIdentifier):
@@ -15,4 +35,4 @@ class ReplicaGroupHistoryID(FieldIdentifier):
     @override
     @classmethod
     def field_type(cls) -> FieldType:
-        return REPLICA_GROUP_HISTORY_FIELD_TYPE
+        return ReplicaGroupHistoryFieldType()

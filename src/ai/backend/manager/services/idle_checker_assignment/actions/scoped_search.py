@@ -6,7 +6,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.common.data.entity.idle_checker import IDLE_CHECKER_ENTITY_TYPE
+from ai.backend.common.data.entity.idle_checker import IdleCheckerEntityType
 from ai.backend.common.data.entity.types import EntityIdentifier, EntityType, ScopeRef, ScopeType
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.actions.v2.scope.base import BaseScopeAction
@@ -31,7 +31,7 @@ class ScopedSearchIdleCheckerAssignmentsAction(BaseScopeAction):
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return IDLE_CHECKER_ENTITY_TYPE
+        return IdleCheckerEntityType()
 
     @override
     @classmethod

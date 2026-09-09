@@ -3,16 +3,24 @@ from typing import override
 from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
 
 __all__ = (
-    "SERVICE_CATALOG_ENTITY_TYPE",
+    "ServiceCatalogEntityType",
     "ServiceCatalogID",
 )
 
 
-# Raw string mirroring the RBAC-managed EntityType.SERVICE_CATALOG value.
-SERVICE_CATALOG_ENTITY_TYPE = EntityType("service_catalog")
+class ServiceCatalogEntityType(EntityType):
+    @override
+    @classmethod
+    def name(cls) -> str:
+        return "service_catalog"
+
+    @override
+    @classmethod
+    def description(cls) -> str:
+        return "A registered service and its endpoint."
 
 
 class ServiceCatalogID(EntityIdentifier):
     @override
     def entity_type(self) -> EntityType:
-        return SERVICE_CATALOG_ENTITY_TYPE
+        return ServiceCatalogEntityType()
