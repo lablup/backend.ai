@@ -8,8 +8,8 @@ sources:
   - src/ai/backend/common/data/entity
   - src/ai/backend/manager/models
 generated:
-  by: codex/gpt-6
-  at: 2026-09-09
+  by: claude-code/opus-5
+  at: 2026-08-16
 status: draft
 ---
 
