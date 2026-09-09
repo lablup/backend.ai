@@ -107,7 +107,11 @@ def server_module_registries(
     processors.user_resource_policy = up_proc
     processors.project_resource_policy = pp_proc
 
-    adapter = ResourcePolicyAdapter(processors)
+    adapter = ResourcePolicyAdapter(
+        processors.keypair_resource_policy,
+        processors.user_resource_policy,
+        processors.project_resource_policy,
+    )
     handler = V2ResourcePolicyHandler(adapter=adapter)
 
     v2_reg = RouteRegistry.create("v2", route_deps.cors_options)

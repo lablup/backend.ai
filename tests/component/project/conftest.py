@@ -258,15 +258,22 @@ def server_module_registries(
     processors.permission_controller = permission_controller_processors
     processors.rbac = rbac_processors
 
-    proj_handler = V2ProjectHandler(adapter=ProjectAdapter(processors))
+    proj_handler = V2ProjectHandler(
+        adapter=ProjectAdapter(
+            processors.project, processors.rbac, processors.domain, processors.user
+        )
+    )
     user_handler = V2UserHandler(
         adapter=UserAdapter(
-            processors,
+            processors.user,
+            processors.domain,
             config_provider.config.auth,
             KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
         )
     )
-    rbac_handler = V2RBACHandler(adapter=RBACAdapter(processors))
+    rbac_handler = V2RBACHandler(
+        adapter=RBACAdapter(processors.rbac, processors.permission_controller)
+    )
 
     v2_reg = RouteRegistry.create("v2", route_deps.cors_options)
     v2_reg.add_subregistry(register_v2_project_routes(proj_handler, route_deps))

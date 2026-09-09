@@ -59,6 +59,7 @@ from ai.backend.manager.services.resource_preset.actions.search_presets import (
 from ai.backend.manager.services.resource_preset.actions.update_preset import (
     UpdateResourcePresetAction,
 )
+from ai.backend.manager.services.resource_preset.processors import ResourcePresetProcessors
 from ai.backend.manager.types import OptionalState, TriState
 
 
@@ -89,6 +90,11 @@ def _resource_preset_pagination_spec() -> PaginationSpec:
 class ResourcePresetAdapter(BaseAdapter):
     """Adapter for resource preset operations."""
 
+    _resource_preset: ResourcePresetProcessors
+
+    def __init__(self, resource_preset: ResourcePresetProcessors) -> None:
+        self._resource_preset = resource_preset
+
     async def search(
         self,
         input: AdminSearchResourcePresetsInput,
@@ -108,7 +114,7 @@ class ResourcePresetAdapter(BaseAdapter):
             limit=input.limit,
             offset=input.offset,
         )
-        result = await self._processors.resource_preset.search_presets_v2.run(
+        result = await self._resource_preset.search_presets_v2.run(
             SearchResourcePresetsV2Action(querier=querier)
         )
         return AdminSearchResourcePresetsPayload(
@@ -121,7 +127,7 @@ class ResourcePresetAdapter(BaseAdapter):
     async def get(self, preset_id: UUID) -> ResourcePresetNode:
         """Get a single resource preset by ID."""
         try:
-            result = await self._processors.resource_preset.get_preset.run(
+            result = await self._resource_preset.get_preset.run(
                 GetResourcePresetAction(preset_id=ResourcePresetID(preset_id))
             )
         except EntityNotFoundError as e:
@@ -147,7 +153,7 @@ class ResourcePresetAdapter(BaseAdapter):
                 resource_group_name=resource_group_name,
             )
         )
-        result = await self._processors.resource_preset.create_preset.run(
+        result = await self._resource_preset.create_preset.run(
             CreateResourcePresetAction(creator=creator)
         )
         return CreateResourcePresetPayload(
@@ -185,7 +191,7 @@ class ResourcePresetAdapter(BaseAdapter):
             resource_group_name=resource_group_state,
         )
         updater = Updater(spec=updater_spec, pk_value=input.id)
-        result = await self._processors.resource_preset.update_preset.run(
+        result = await self._resource_preset.update_preset.run(
             UpdateResourcePresetAction(preset_id=ResourcePresetID(input.id), updater=updater)
         )
         return UpdateResourcePresetPayload(
@@ -194,7 +200,7 @@ class ResourcePresetAdapter(BaseAdapter):
 
     async def delete(self, preset_id: UUID) -> DeleteResourcePresetPayload:
         """Delete a resource preset by ID."""
-        result = await self._processors.resource_preset.delete_preset.run(
+        result = await self._resource_preset.delete_preset.run(
             DeleteResourcePresetAction(preset_id=ResourcePresetID(preset_id))
         )
         return DeleteResourcePresetPayload(id=result.resource_preset.id)

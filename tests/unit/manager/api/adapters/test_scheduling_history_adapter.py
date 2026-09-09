@@ -61,7 +61,7 @@ def processors(readable: SessionSchedulingHistoryData, denial: GenericForbidden)
 
 @pytest.fixture
 def adapter(processors: MagicMock) -> SchedulingHistoryAdapter:
-    return SchedulingHistoryAdapter(processors)
+    return SchedulingHistoryAdapter(processors.scheduling_history, processors.resource_slot)
 
 
 async def test_session_histories_answer_per_id(
@@ -122,7 +122,7 @@ async def test_kernel_histories_keep_the_given_order(processors: MagicMock) -> N
     processors.scheduling_history.bulk_get_kernel_histories.run = AsyncMock(
         return_value=BulkFieldOpsResult(successes={second.id: second, first.id: first}, errors={})
     )
-    adapter = SchedulingHistoryAdapter(processors)
+    adapter = SchedulingHistoryAdapter(processors.scheduling_history, processors.resource_slot)
 
     nodes = await adapter.batch_load_kernel_histories_by_ids([first.id, second.id])
 

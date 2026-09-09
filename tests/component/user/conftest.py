@@ -141,7 +141,8 @@ def server_module_registries(
     processors.user = user_processors
     v2_handler = V2UserHandler(
         adapter=UserAdapter(
-            processors,
+            processors.user,
+            MagicMock(),
             auth_config=MagicMock(),
             key_provider_pool=KeyProviderPool(
                 providers=[], write_provider_type=KeyProviderType.PLAIN
