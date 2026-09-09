@@ -100,9 +100,25 @@ class TestUpdateVFolderInput:
         with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             UpdateVFolderInput(name="   ")
 
+    def test_default_cloneable_is_unset(self) -> None:
+        req = UpdateVFolderInput()
+        assert req.cloneable is UNSET
+
+    def test_cloneable_none_stays_none(self) -> None:
+        req = UpdateVFolderInput(cloneable=None)
+        assert req.cloneable is None
+
     def test_cloneable_update(self) -> None:
         req = UpdateVFolderInput(cloneable=True)
         assert req.cloneable is True
+
+    def test_default_permission_is_unset(self) -> None:
+        req = UpdateVFolderInput()
+        assert req.permission is UNSET
+
+    def test_permission_none_stays_none(self) -> None:
+        req = UpdateVFolderInput(permission=None)
+        assert req.permission is None
 
     def test_permission_update(self) -> None:
         req = UpdateVFolderInput(permission=VFolderPermissionField.READ_ONLY)

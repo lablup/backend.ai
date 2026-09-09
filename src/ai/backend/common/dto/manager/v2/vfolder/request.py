@@ -147,15 +147,19 @@ class UpdateVFolderInput(BaseRequestModel):
         default=UNSET,
         description="Updated vfolder name. Omit to leave unchanged.",
     )
-    cloneable: bool | None = Field(default=None, description="Updated cloneable setting")
-    permission: VFolderPermissionField | None = Field(
-        default=None, description="Updated permission level"
+    cloneable: bool | None | Unset = Field(
+        default=UNSET,
+        description="Updated cloneable setting. Omit to leave unchanged.",
+    )
+    permission: VFolderPermissionField | None | Unset = Field(
+        default=UNSET,
+        description="Updated permission level. Omit to leave unchanged.",
     )
 
     @field_validator("name")
     @classmethod
-    def strip_and_validate_name(cls, v: str | Unset | None) -> str | Unset | None:
-        if v is None or isinstance(v, Unset):
+    def strip_and_validate_name(cls, v: str | None | Unset) -> str | None | Unset:
+        if not isinstance(v, str):
             return v
         stripped = v.strip()
         if not stripped:
