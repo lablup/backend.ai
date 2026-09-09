@@ -43,15 +43,23 @@ class _Runner:
 
 
 @pytest.fixture
-def plugin() -> BridgeNetworkPlugin:
-    return BridgeNetworkPlugin({}, {}, runner=_Runner())
+def plugin(local_subnet_state_dir: Path) -> BridgeNetworkPlugin:
+    # The SAME store `_restarted_plugin` reads: a post-restart plugin sharing this one's index
+    # space is what the restart cases are about. The allocator used to be resolvable without an
+    # owner, so both sides picked up the process-wide one and shared it by accident.
+    return BridgeNetworkPlugin(
+        {},
+        {},
+        runner=_Runner(),
+        local_subnets=LocalSubnetAllocator(local_subnet_state_dir, owner="i-test"),
+    )
 
 
 def _restarted_plugin(state_dir: Path) -> BridgeNetworkPlugin:
     """A plugin as a fresh agent process would build it: a brand-new allocator whose only memory
     of prior sessions is the on-disk store."""
     return BridgeNetworkPlugin(
-        {}, {}, runner=_Runner(), local_subnets=LocalSubnetAllocator(state_dir)
+        {}, {}, runner=_Runner(), local_subnets=LocalSubnetAllocator(state_dir, owner="i-test")
     )
 
 

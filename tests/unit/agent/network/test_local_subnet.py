@@ -9,6 +9,7 @@ import pytest
 from ai.backend.agent.errors.network import (
     HostAddressesUnreadable,
     LocalSubnetLayoutChanged,
+    LocalSubnetOwnerChanged,
     LocalSubnetPoolExhausted,
 )
 from ai.backend.agent.network.local_subnet import (
@@ -33,25 +34,36 @@ def tiny_pool() -> LocalSubnetLayout:
     return LocalSubnetLayout.parse("172.30.0.0/29", 30)
 
 
-def _journal(state_dir: Path, claims: dict[str, str], *, layout: LocalSubnetLayout) -> None:
-    """Write a store by hand, as a surviving pre-restart agent would have left it."""
+def _journal(
+    state_dir: Path,
+    claims: dict[str, str],
+    *,
+    layout: LocalSubnetLayout,
+    owner: str | None = "i-test",
+) -> None:
+    """Write a store by hand, as a surviving pre-restart agent would have left it.
+
+    ``owner=None`` writes the record UNTAGGED, which nothing this code has ever written does --
+    it is how a test asks what happens to a record whose owner cannot be established.
+    """
     state_dir.mkdir(parents=True, exist_ok=True)
     (state_dir / ".layout").write_text(layout.serialize())
     for index, session_id in claims.items():
-        (state_dir / index).write_text(session_id)
+        record = session_id if owner is None else f"{session_id}\n{owner}"
+        (state_dir / index).write_text(record)
 
 
 class TestAllocate:
     async def test_idempotent_per_session(self, state_dir: Path) -> None:
-        alloc = LocalSubnetAllocator(state_dir)
+        alloc = LocalSubnetAllocator(state_dir, owner="i-test")
         assert await alloc.allocate("s1") == await alloc.allocate("s1")
 
     async def test_distinct_sessions_get_distinct_indices(self, state_dir: Path) -> None:
-        alloc = LocalSubnetAllocator(state_dir)
+        alloc = LocalSubnetAllocator(state_dir, owner="i-test")
         assert await alloc.allocate("s1") != await alloc.allocate("s2")
 
     async def test_fills_the_lowest_free_index(self, state_dir: Path) -> None:
-        alloc = LocalSubnetAllocator(state_dir)
+        alloc = LocalSubnetAllocator(state_dir, owner="i-test")
         for session_id in ("s0", "s1", "s2"):
             await alloc.allocate(session_id)
         await alloc.release("s1")
@@ -60,7 +72,7 @@ class TestAllocate:
     async def test_pool_exhaustion_raises(
         self, state_dir: Path, tiny_pool: LocalSubnetLayout
     ) -> None:
-        alloc = LocalSubnetAllocator(state_dir, layout=tiny_pool)
+        alloc = LocalSubnetAllocator(state_dir, layout=tiny_pool, owner="i-test")
         await alloc.allocate("s1")
         await alloc.allocate("s2")
         with pytest.raises(LocalSubnetPoolExhausted):
@@ -71,7 +83,7 @@ class TestAllocate:
     ) -> None:
         # An operator reading this in a log has to know which setting to change; "pool exhausted"
         # on its own does not tell them the pool is theirs to widen.
-        alloc = LocalSubnetAllocator(state_dir, layout=tiny_pool)
+        alloc = LocalSubnetAllocator(state_dir, layout=tiny_pool, owner="i-test")
         await alloc.allocate("s1")
         await alloc.allocate("s2")
 
@@ -105,7 +117,9 @@ class TestTheLayout:
             LocalSubnetLayout.parse("172.30.0.0/24", 16)
 
     async def test_the_allocator_hands_out_subnets_from_it(self, state_dir: Path) -> None:
-        alloc = LocalSubnetAllocator(state_dir, layout=LocalSubnetLayout.parse("10.42.0.0/16", 26))
+        alloc = LocalSubnetAllocator(
+            state_dir, layout=LocalSubnetLayout.parse("10.42.0.0/16", 26), owner="i-test"
+        )
         assert await alloc.allocate_subnet("s1") == "10.42.0.0/26"
         assert await alloc.allocate_subnet("s2") == "10.42.0.64/26"
         assert await alloc.allocate_subnet("s1") == "10.42.0.0/26"  # idempotent
@@ -118,11 +132,11 @@ class TestRecuttingThePool:
 
     async def test_a_changed_pool_under_live_sessions_is_refused(self, state_dir: Path) -> None:
         await LocalSubnetAllocator(
-            state_dir, layout=LocalSubnetLayout.parse("172.30.0.0/16", 26)
+            state_dir, layout=LocalSubnetLayout.parse("172.30.0.0/16", 26), owner="i-test"
         ).allocate("live")
 
         restarted = LocalSubnetAllocator(
-            state_dir, layout=LocalSubnetLayout.parse("10.42.0.0/16", 26)
+            state_dir, layout=LocalSubnetLayout.parse("10.42.0.0/16", 26), owner="i-test"
         )
         with pytest.raises(LocalSubnetLayoutChanged):
             await restarted.allocate("newcomer")
@@ -131,21 +145,25 @@ class TestRecuttingThePool:
         self, state_dir: Path
     ) -> None:
         await LocalSubnetAllocator(
-            state_dir, layout=LocalSubnetLayout.parse("172.30.0.0/16", 26)
+            state_dir, layout=LocalSubnetLayout.parse("172.30.0.0/16", 26), owner="i-test"
         ).allocate("live")
 
         restarted = LocalSubnetAllocator(
-            state_dir, layout=LocalSubnetLayout.parse("172.30.0.0/16", 24)
+            state_dir, layout=LocalSubnetLayout.parse("172.30.0.0/16", 24), owner="i-test"
         )
         with pytest.raises(LocalSubnetLayoutChanged):
             await restarted.load()
 
     async def test_a_drained_node_adopts_the_new_pool(self, state_dir: Path) -> None:
-        alloc = LocalSubnetAllocator(state_dir, layout=LocalSubnetLayout.parse("172.30.0.0/16", 26))
+        alloc = LocalSubnetAllocator(
+            state_dir, layout=LocalSubnetLayout.parse("172.30.0.0/16", 26), owner="i-test"
+        )
         await alloc.allocate("s1")
         await alloc.release("s1")  # drained
 
-        recut = LocalSubnetAllocator(state_dir, layout=LocalSubnetLayout.parse("10.42.0.0/16", 28))
+        recut = LocalSubnetAllocator(
+            state_dir, layout=LocalSubnetLayout.parse("10.42.0.0/16", 28), owner="i-test"
+        )
         assert await recut.allocate_subnet("s2") == "10.42.0.0/28"
 
     async def test_an_unmarked_store_is_held_to_the_pool_it_was_written_from(
@@ -155,20 +173,22 @@ class TestRecuttingThePool:
         # ambiguous: that allocator always cut 172.30.0.0/16 into /24s. Under today's /26 default
         # its index 1 would name 172.30.0.64/26, which is not where that session's bridge is.
         state_dir.mkdir(parents=True, exist_ok=True)
-        (state_dir / "1").write_text("survivor-of-the-old-agent")
+        (state_dir / "1").write_text("survivor-of-the-old-agent\ni-test")
 
         with pytest.raises(LocalSubnetLayoutChanged):
-            await LocalSubnetAllocator(state_dir, layout=DEFAULT_LAYOUT).load()
+            await LocalSubnetAllocator(state_dir, layout=DEFAULT_LAYOUT, owner="i-test").load()
 
         legacy = LocalSubnetAllocator(
-            state_dir, layout=LocalSubnetLayout.parse("172.30.0.0/16", 24)
+            state_dir, layout=LocalSubnetLayout.parse("172.30.0.0/16", 24), owner="i-test"
         )
         assert await legacy.allocate_subnet("survivor-of-the-old-agent") == "172.30.1.0/24"
 
     async def test_the_same_pool_replays_normally(self, state_dir: Path) -> None:
         layout = LocalSubnetLayout.parse("10.42.0.0/16", 26)
-        held = await LocalSubnetAllocator(state_dir, layout=layout).allocate_subnet("survivor")
-        restarted = LocalSubnetAllocator(state_dir, layout=layout)
+        held = await LocalSubnetAllocator(state_dir, layout=layout, owner="i-test").allocate_subnet(
+            "survivor"
+        )
+        restarted = LocalSubnetAllocator(state_dir, layout=layout, owner="i-test")
         assert await restarted.allocate_subnet("survivor") == held
 
 
@@ -250,20 +270,37 @@ class TestSeveralAgentsOnOneNode:
 
         assert await apptainer.allocate("s-sg") == freed
 
-    async def test_a_claim_written_before_owner_tagging_is_read_as_ours(
-        self, state_dir: Path
-    ) -> None:
-        """A single-agent node upgrading in place over its own journal: those records name no
-        owner, and losing track of them would leak the blocks their live sessions still hold."""
+    async def test_a_claim_naming_no_owner_is_not_taken_as_ours(self, state_dir: Path) -> None:
+        """Nothing this code has ever written is untagged -- the node-wide store and the owner tag
+        arrived in one commit, and the store has never shipped -- so an untagged record is either
+        a co-located agent's or corrupt. Reading it as ours is what would let this agent release
+        another's block, and hand its subnet to the next session while that bridge is still up.
+
+        Held, not handed out: the index stays reserved, and the session it names is not one this
+        agent can look up, release, or re-attach a second kernel onto.
+        """
         state_dir.mkdir(parents=True, exist_ok=True)
         # The layout marker too: without it the store reads as pre-marker, which is a separate
         # (already covered) refusal and would hide what this case is about.
         (state_dir / ".layout").write_text(DEFAULT_LAYOUT.serialize())
-        (state_dir / "0").write_text("s-old")
+        (state_dir / "0").write_text("s-untagged")
 
         alloc = LocalSubnetAllocator(state_dir, owner="i-cd-104")
 
-        assert await alloc.lookup("s-old") == 0
+        assert await alloc.lookup("s-untagged") is None
+        assert await alloc.allocate("s-new") == 1
+
+    async def test_an_untagged_claim_is_not_ours_to_release(self, state_dir: Path) -> None:
+        """The half of it that actually costs something if it is wrong: releasing frees the index
+        for the next session, whose bridge would then land on a subnet still carrying traffic."""
+        state_dir.mkdir(parents=True, exist_ok=True)
+        (state_dir / ".layout").write_text(DEFAULT_LAYOUT.serialize())
+        (state_dir / "0").write_text("s-untagged")
+
+        alloc = LocalSubnetAllocator(state_dir, owner="i-cd-104")
+        await alloc.release("s-untagged")
+
+        assert (state_dir / "0").exists(), "released a claim this agent cannot prove is its own"
         assert await alloc.allocate("s-new") == 1
 
     async def test_the_shared_directory_is_writable_by_a_co_located_agent(
@@ -281,7 +318,7 @@ class TestSeveralAgentsOnOneNode:
 
 class TestJournalReplay:
     async def test_load_is_idempotent(self, state_dir: Path) -> None:
-        alloc = LocalSubnetAllocator(state_dir)
+        alloc = LocalSubnetAllocator(state_dir, owner="i-test")
         await alloc.allocate("s1")
         await alloc.load()
         await alloc.load()
@@ -291,7 +328,7 @@ class TestJournalReplay:
         _journal(state_dir, {"0": "s1"}, layout=DEFAULT_LAYOUT)
         (state_dir / "not-an-index").write_text("junk")
 
-        alloc = LocalSubnetAllocator(state_dir)
+        alloc = LocalSubnetAllocator(state_dir, owner="i-test")
         assert await alloc.lookup("s1") == 0
         assert await alloc.allocate("s2") == 1
 
@@ -301,7 +338,7 @@ class TestJournalReplay:
         # A store written by an older, racy allocator can name one session twice.
         _journal(state_dir, {"1": "s1", "3": "s1"}, layout=DEFAULT_LAYOUT)
 
-        alloc = LocalSubnetAllocator(state_dir)
+        alloc = LocalSubnetAllocator(state_dir, owner="i-test")
         assert await alloc.lookup("s1") == 1
 
 
@@ -311,18 +348,35 @@ class TestSingleOwnership:
     serialize nothing, so the store has a single owner per process instead."""
 
     def test_one_allocator_per_store(self, state_dir: Path) -> None:
-        assert get_local_subnet_allocator(state_dir) is get_local_subnet_allocator(state_dir)
+        assert get_local_subnet_allocator(state_dir, owner="i-test") is (
+            get_local_subnet_allocator(state_dir, owner="i-test")
+        )
 
     def test_distinct_stores_get_distinct_allocators(self, state_dir: Path, tmp_path: Path) -> None:
-        assert get_local_subnet_allocator(state_dir) is not get_local_subnet_allocator(
-            tmp_path / "other"
-        )
+        assert get_local_subnet_allocator(
+            state_dir, owner="i-test"
+        ) is not get_local_subnet_allocator(tmp_path / "other", owner="i-test")
+
+    def test_the_store_cannot_be_held_under_two_owners(self, state_dir: Path) -> None:
+        """The cache is keyed on the directory alone, so whichever collaborator constructed the
+        allocator FIRST decided the owner -- and a later caller asking for its own id was handed
+        the other's, silently, and wrote claims naming an agent that was not the writer. Refused
+        for the same reason a differing layout is."""
+        get_local_subnet_allocator(state_dir, owner="i-cd-104")
+        with pytest.raises(LocalSubnetOwnerChanged):
+            get_local_subnet_allocator(state_dir, owner="i-sg-104")
+
+    def test_an_allocator_with_no_owner_cannot_be_built(self, state_dir: Path) -> None:
+        """The construction that produced untagged claims in the first place. It was reachable
+        from three backend fallbacks, any of which running first made the whole process unowned."""
+        with pytest.raises(ValueError):
+            LocalSubnetAllocator(state_dir, owner="")
 
     async def test_the_shared_owner_serializes_concurrent_agents(self, state_dir: Path) -> None:
         # primary and auxiliary agents resolve the same owner, so their concurrent session setups
         # are serialized by its lock: one session gets one index, distinct sessions get distinct.
-        primary = get_local_subnet_allocator(state_dir)
-        auxiliary = get_local_subnet_allocator(state_dir)
+        primary = get_local_subnet_allocator(state_dir, owner="i-test")
+        auxiliary = get_local_subnet_allocator(state_dir, owner="i-test")
 
         same = await asyncio.gather(primary.allocate("shared"), auxiliary.allocate("shared"))
         assert same[0] == same[1]
@@ -333,32 +387,34 @@ class TestSingleOwnership:
 
 class TestDurability:
     async def test_allocation_survives_a_restart(self, state_dir: Path) -> None:
-        held = await LocalSubnetAllocator(state_dir).allocate("survivor")
+        held = await LocalSubnetAllocator(state_dir, owner="i-test").allocate("survivor")
 
-        restarted = LocalSubnetAllocator(state_dir)  # fresh process, same on-disk store
+        restarted = LocalSubnetAllocator(
+            state_dir, owner="i-test"
+        )  # fresh process, same on-disk store
         assert await restarted.allocate("survivor") == held
         assert await restarted.allocate("newcomer") != held
 
     async def test_release_survives_a_restart(self, state_dir: Path) -> None:
-        held = await LocalSubnetAllocator(state_dir).allocate("s1")
-        await LocalSubnetAllocator(state_dir).release("s1")
-        assert await LocalSubnetAllocator(state_dir).allocate("s-new") == held
+        held = await LocalSubnetAllocator(state_dir, owner="i-test").allocate("s1")
+        await LocalSubnetAllocator(state_dir, owner="i-test").release("s1")
+        assert await LocalSubnetAllocator(state_dir, owner="i-test").allocate("s-new") == held
 
 
 class TestLookup:
     async def test_lookup_does_not_allocate(self, state_dir: Path) -> None:
-        alloc = LocalSubnetAllocator(state_dir)
+        alloc = LocalSubnetAllocator(state_dir, owner="i-test")
         assert await alloc.lookup("never-seen") is None
         # the absent lookup must not have consumed index 0
         assert await alloc.allocate("s1") == 0
 
     async def test_lookup_finds_an_allocated_session(self, state_dir: Path) -> None:
-        alloc = LocalSubnetAllocator(state_dir)
+        alloc = LocalSubnetAllocator(state_dir, owner="i-test")
         index = await alloc.allocate("s1")
         assert await alloc.lookup("s1") == index
 
     async def test_lookup_after_release_is_none(self, state_dir: Path) -> None:
-        alloc = LocalSubnetAllocator(state_dir)
+        alloc = LocalSubnetAllocator(state_dir, owner="i-test")
         await alloc.allocate("s1")
         await alloc.release("s1")
         assert await alloc.lookup("s1") is None
@@ -595,7 +651,7 @@ class TestTheHostIsTheLastWord:
     def test_the_production_factory_wires_the_real_reader(self, tmp_path: Path) -> None:
         """The class stays pure so tests are hermetic; the composition root is where the host
         coupling belongs, and forgetting it there is what the guard exists to prevent."""
-        alloc = get_local_subnet_allocator(tmp_path / "prod-store")
+        alloc = get_local_subnet_allocator(tmp_path / "prod-store", owner="i-test")
         try:
             assert alloc._host_addresses is host_ipv4_addresses
         finally:
