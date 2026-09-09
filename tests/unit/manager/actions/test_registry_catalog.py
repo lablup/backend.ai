@@ -73,6 +73,7 @@ from ai.backend.common.data.entity.service_catalog import ServiceCatalogEntityTy
 from ai.backend.common.data.entity.session import SessionEntityType
 from ai.backend.common.data.entity.session_template import SessionTemplateEntityType
 from ai.backend.common.data.entity.storage_namespace import StorageNamespaceEntityType
+from ai.backend.common.data.entity.types import GlobalEntityType
 from ai.backend.common.data.entity.user import UserEntityType
 from ai.backend.common.data.entity.vfolder import VFolderEntityType
 from ai.backend.common.data.entity.vfolder_invitation import VFolderInvitationEntityType
@@ -442,7 +443,7 @@ def test_every_defined_v2_action_is_wired() -> None:
         MagicMock(),
     )
     AuthProcessors(
-        registry.concern(ConcernMeta(Concern.ORGANIZATION)).unowned_group(),
+        registry.group(GroupMeta(GlobalEntityType())),
         registry.group(GroupMeta(UserEntityType())),
         MagicMock(),
     )

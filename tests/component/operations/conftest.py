@@ -10,13 +10,12 @@ from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
 from ai.backend.common.data.entity.error_log import ErrorLogFieldType
 from ai.backend.common.data.entity.resource_group import ResourceGroupID, ResourceGroupName
+from ai.backend.common.data.entity.types import GlobalEntityType
 from ai.backend.common.data.entity.user import UserEntityType
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
 from ai.backend.common.types import HostPortPair
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
 from ai.backend.manager.actions.registry.types import (
-    Concern,
-    ConcernMeta,
     FieldGroupMeta,
     GroupMeta,
 )
@@ -89,9 +88,7 @@ def manager_admin_processors(
         db=database_engine,
         valkey_stat=valkey_clients.stat,
     )
-    return ManagerAdminProcessors(
-        processor_registry.concern(ConcernMeta(Concern.SYSTEM)).unowned_group(), service
-    )
+    return ManagerAdminProcessors(processor_registry.group(GroupMeta(GlobalEntityType())), service)
 
 
 @pytest.fixture()

@@ -5,7 +5,6 @@ from ai.backend.common.data.entity.login_session import LoginSessionFieldType
 from ai.backend.manager.actions.registry.field import LookupFieldGroup
 from ai.backend.manager.actions.registry.group import ProcessorGroup
 from ai.backend.manager.actions.registry.types import FieldGroupMeta
-from ai.backend.manager.actions.registry.unowned import UnownedGroup
 from ai.backend.manager.actions.v2.field.processor import SingleFieldActionProcessor
 from ai.backend.manager.actions.v2.global_scope.processor import (
     AnonymousGlobalActionProcessor,
@@ -155,7 +154,7 @@ class AuthProcessors:
 
     def __init__(
         self,
-        auth_group: UnownedGroup,
+        auth_group: ProcessorGroup[Any],
         user_group: ProcessorGroup[Any],
         service: AuthService,
     ) -> None:

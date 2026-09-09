@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from ai.backend.manager.actions.registry.unowned import UnownedGroup
+from typing import Any
+
+from ai.backend.manager.actions.registry.group import ProcessorGroup
 from ai.backend.manager.actions.v2.global_scope.processor import (
     GlobalActionProcessor,
     PublicActionProcessor,
@@ -50,7 +52,7 @@ class ManagerAdminProcessors:
     ]
     get_db_cxn_status: GlobalActionProcessor[GetDbCxnStatusAction, GetDbCxnStatusActionResult]
 
-    def __init__(self, group: UnownedGroup, service: ManagerAdminService) -> None:
+    def __init__(self, group: ProcessorGroup[Any], service: ManagerAdminService) -> None:
         self.fetch_status = group.global_scope(FetchManagerStatusAction, service.fetch_status)
         self.update_status = group.global_scope(UpdateManagerStatusAction, service.update_status)
         self.get_announcement = group.public(GetAnnouncementAction, service.get_announcement)

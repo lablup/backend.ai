@@ -5,11 +5,10 @@ from typing import Any
 import pytest
 
 from ai.backend.common.data.entity.container_registry import ContainerRegistryEntityType
+from ai.backend.common.data.entity.types import GlobalEntityType
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
 from ai.backend.manager.actions.registry.types import (
-    Concern,
-    ConcernMeta,
     GroupMeta,
 )
 from ai.backend.manager.api.rest.etcd.handler import EtcdHandler
@@ -57,9 +56,7 @@ def etcd_config_processors(
         etcd=async_etcd,
         valkey_stat=valkey_clients.stat,
     )
-    return EtcdConfigProcessors(
-        processor_registry.concern(ConcernMeta(Concern.SYSTEM)).unowned_group(), service
-    )
+    return EtcdConfigProcessors(processor_registry.group(GroupMeta(GlobalEntityType())), service)
 
 
 @pytest.fixture()

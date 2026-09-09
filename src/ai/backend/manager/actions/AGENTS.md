@@ -203,8 +203,10 @@ decides the shape. Do not create new subclasses of the legacy `BaseAction` bases
   different permission from the write that follows — the lookup asks for read, the
   write for write.
 - `BaseGlobalAction` declares no `entity_id()`.
-- `GlobalEntityType` is what a global operation records when it names no other
-  entity. Wiring only — service and domain code never reference it.
+- `GlobalEntityType` is what a global operation names when it is about no other
+  entity — authentication, the etcd configuration, the manager itself, the secret
+  store. Do NOT invent an entity type for a concern that has no table; there is
+  nothing for it to identify.
 
 ## Monitors
 

@@ -48,6 +48,7 @@ from ai.backend.common.configs.pyroscope import PyroscopeConfig
 from ai.backend.common.contexts.user import with_user
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID, ResourceGroupName
+from ai.backend.common.data.entity.types import GlobalEntityType
 from ai.backend.common.data.entity.user import UserEntityType, UserID
 from ai.backend.common.data.permission.types import EntityType, ScopeType
 from ai.backend.common.data.user.types import UserData, UserRole
@@ -83,8 +84,6 @@ from ai.backend.logging.types import LogFormat
 from ai.backend.manager.actions.monitors import ActionMonitors
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
 from ai.backend.manager.actions.registry.types import (
-    Concern,
-    ConcernMeta,
     GroupMeta,
     ProcessorDependencies,
 )
@@ -1577,7 +1576,7 @@ def auth_processors(
         key_provider_pool=KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
     )
     return AuthProcessors(
-        processor_registry.concern(ConcernMeta(Concern.ORGANIZATION)).unowned_group(),
+        processor_registry.group(GroupMeta(GlobalEntityType())),
         processor_registry.group(GroupMeta(UserEntityType())),
         service,
     )
