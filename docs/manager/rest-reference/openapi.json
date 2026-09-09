@@ -8407,7 +8407,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
+            "description": "Omit to leave unchanged.",
             "title": "Runtime Variant Id"
           },
           "name": {
@@ -8421,7 +8421,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
+            "description": "Omit to leave unchanged.",
             "title": "Name"
           },
           "description": {
@@ -8438,14 +8438,14 @@
           "rank": {
             "anyOf": [
               {
-                "minimum": 0,
+                "ge": 0,
                 "type": "integer"
               },
               {
                 "type": "null"
               }
             ],
-            "default": null,
+            "description": "Omit to leave unchanged.",
             "title": "Rank"
           },
           "image_id": {
@@ -8483,7 +8483,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
+            "description": "Omit to leave unchanged.",
             "title": "Resource Slots"
           },
           "resource_opts": {
@@ -8498,7 +8498,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
+            "description": "Omit to leave unchanged.",
             "title": "Resource Opts"
           },
           "cluster_mode": {
@@ -8511,20 +8511,20 @@
                 "type": "null"
               }
             ],
-            "default": null,
+            "description": "Omit to leave unchanged.",
             "title": "Cluster Mode"
           },
           "cluster_size": {
             "anyOf": [
               {
-                "minimum": 1,
+                "ge": 1,
                 "type": "integer"
               },
               {
                 "type": "null"
               }
             ],
-            "default": null,
+            "description": "Omit to leave unchanged.",
             "title": "Cluster Size"
           },
           "startup_command": {
@@ -8561,7 +8561,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
+            "description": "Omit to leave unchanged.",
             "title": "Environ"
           },
           "preset_values": {
@@ -8576,7 +8576,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
+            "description": "Omit to leave unchanged.",
             "title": "Preset Values"
           },
           "open_to_public": {

@@ -15837,16 +15837,16 @@ input UpdateDeploymentRevisionPresetInput {
   """
   Added in 26.4.4. New runtime variant for the preset. Omit to leave unchanged.
   """
-  runtimeVariantId: UUID = null
+  runtimeVariantId: UUID
 
   """New name."""
-  name: String = null
+  name: String
 
   """New description."""
-  description: String = null
+  description: String
 
   """New rank."""
-  rank: Int = null
+  rank: Int
 
   """
   Default open_to_public for deployments created from this preset. Set to null to clear.
@@ -15887,28 +15887,28 @@ input UpdateDeploymentRevisionPresetInput {
   """
   Added in 26.4.4. Replace resource slot allocations. Omit to leave unchanged.
   """
-  resourceSlots: [ResourceSlotEntryInput!] = null
+  resourceSlots: [ResourceSlotEntryInput!]
 
   """
   Added in 26.4.4. Replace additional resource options. Omit to leave unchanged.
   """
-  resourceOpts: [ResourceOptsEntryInput!] = null
+  resourceOpts: [ResourceOptsEntryInput!]
 
   """Added in 26.4.4. New cluster topology mode. Omit to leave unchanged."""
-  clusterMode: ClusterMode = null
+  clusterMode: ClusterMode
 
   """Added in 26.4.4. New cluster size. Omit to leave unchanged."""
-  clusterSize: Int = null
+  clusterSize: Int
 
   """
   Added in 26.4.4. Replace environment variables. Omit to leave unchanged.
   """
-  environ: [EnvironEntryInput!] = null
+  environ: [EnvironEntryInput!]
 
   """
   Added in 26.4.4. Replace runtime variant preset values. Omit to leave unchanged.
   """
-  presetValues: [RuntimeVariantPresetValueEntryInput!] = null
+  presetValues: [RuntimeVariantPresetValueEntryInput!]
 }
 
 """Added in 26.4.2. Update deployment revision preset payload."""
