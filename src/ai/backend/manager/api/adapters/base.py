@@ -30,6 +30,7 @@ if TYPE_CHECKING:
         EntityLabelFilter,
         EntityLabelNestedFilter,
     )
+    from ai.backend.manager.services.processors import Processors  # pants: no-infer-dep
 
 
 class BaseAdapter(BaseFilterAdapter):
@@ -44,6 +45,9 @@ class BaseAdapter(BaseFilterAdapter):
     Adapters do NOT contain business logic — they translate between
     the DTO layer and the Processor/Action layer.
     """
+
+    def __init__(self, processors: Processors) -> None:
+        self._processors = processors
 
     def _convert_entity_label_filter(self, f: EntityLabelFilter) -> list[QueryCondition]:
         """Conditions matching a single label row.
