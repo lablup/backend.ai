@@ -1577,7 +1577,7 @@ def auth_processors(
         key_provider_pool=KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
     )
     return AuthProcessors(
-        processor_registry.concern(ConcernMeta(Concern.ORGANIZATION)).group(GroupMeta()),
+        processor_registry.concern(ConcernMeta(Concern.ORGANIZATION)).unowned_group(),
         processor_registry.group(GroupMeta(UserEntityType())),
         service,
     )

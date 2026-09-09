@@ -576,7 +576,7 @@ def create_processors(
             services.domain,
             action_monitors,
         ),
-        etcd_config=EtcdConfigProcessors(system_groups.group(GroupMeta()), services.etcd_config),
+        etcd_config=EtcdConfigProcessors(system_groups.unowned_group(), services.etcd_config),
         export=ExportProcessors(
             visibility_groups.group(GroupMeta(ExportEntityType())), services.export
         ),
@@ -638,10 +638,8 @@ def create_processors(
         keypair_resource_policy=KeypairResourcePolicyProcessors(
             resource_policy_groups.group(GroupMeta(KeyPairResourcePolicyEntityType()))
         ),
-        manager_admin=ManagerAdminProcessors(
-            system_groups.group(GroupMeta()), services.manager_admin
-        ),
-        secret=SecretProcessors(system_groups.group(GroupMeta()), services.secret),
+        manager_admin=ManagerAdminProcessors(system_groups.unowned_group(), services.manager_admin),
+        secret=SecretProcessors(system_groups.unowned_group(), services.secret),
         user_resource_policy=UserResourcePolicyProcessors(
             resource_policy_groups.group(GroupMeta(UserResourcePolicyEntityType()))
         ),
@@ -729,7 +727,7 @@ def create_processors(
             services.model_serving_auto_scaling,
         ),
         auth=AuthProcessors(
-            organization_groups.group(GroupMeta()),
+            organization_groups.unowned_group(),
             organization_groups.group(GroupMeta(UserEntityType())),
             services.auth,
         ),

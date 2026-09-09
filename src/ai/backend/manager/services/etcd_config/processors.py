@@ -1,8 +1,6 @@
 from __future__ import annotations
 
-from typing import Any
-
-from ai.backend.manager.actions.registry.group import ProcessorGroup
+from ai.backend.manager.actions.registry.unowned import UnownedGroup
 from ai.backend.manager.actions.v2.global_scope.processor import (
     GlobalActionProcessor,
     PublicActionProcessor,
@@ -52,7 +50,7 @@ class EtcdConfigProcessors:
     set_config: GlobalActionProcessor[SetConfigAction, SetConfigActionResult]
     delete_config: GlobalActionProcessor[DeleteConfigAction, DeleteConfigActionResult]
 
-    def __init__(self, group: ProcessorGroup[Any], service: EtcdConfigService) -> None:
+    def __init__(self, group: UnownedGroup, service: EtcdConfigService) -> None:
         self.get_resource_slots = group.public(GetResourceSlotsAction, service.get_resource_slots)
         self.get_resource_metadata = group.public(
             GetResourceMetadataAction, service.get_resource_metadata

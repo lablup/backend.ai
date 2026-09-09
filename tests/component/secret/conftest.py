@@ -20,7 +20,6 @@ from ai.backend.manager.actions.registry.registry import ProcessorRegistry
 from ai.backend.manager.actions.registry.types import (
     Concern,
     ConcernMeta,
-    GroupMeta,
 )
 from ai.backend.manager.api.adapters.secret.adapter import SecretAdapter
 from ai.backend.manager.api.rest.routing import RouteRegistry
@@ -46,7 +45,7 @@ def secret_processors(
     pool = KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN)
     repository = SecretRepository(SecretOpsProvider(database_engine), pool)
     return SecretProcessors(
-        processor_registry.concern(ConcernMeta(Concern.SYSTEM)).group(GroupMeta()),
+        processor_registry.concern(ConcernMeta(Concern.SYSTEM)).unowned_group(),
         SecretService(repository),
     )
 

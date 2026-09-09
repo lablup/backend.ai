@@ -6,7 +6,6 @@ from collections.abc import Sequence
 from typing import Any
 
 from ai.backend.common.data.entity.types import EntityData, FieldData, GlobalEntityType
-from ai.backend.common.exception import UnreachableError
 from ai.backend.manager.actions.registry.field import FieldGroup, LookupFieldGroup
 from ai.backend.manager.actions.registry.group import (
     ProcessorGroup,
@@ -19,6 +18,7 @@ from ai.backend.manager.actions.registry.types import (
     ProcessorDependencies,
     WiredProcessor,
 )
+from ai.backend.manager.actions.registry.unowned import UnownedGroup
 from ai.backend.manager.actions.types import ActionBacking, ActionGate, ActionKind
 from ai.backend.manager.actions.v2.field.bulk_lookup import (
     LookupBulkRuntimeFieldOwnerOpsAction,
@@ -59,6 +59,15 @@ class ConcernGroups[TData: EntityData]:
         """
         return RelationGroup(self._deps, self._records, self._concern)
 
+    def unowned_group(self) -> UnownedGroup:
+        """The operations of this area that name no entity.
+
+        Reached from here rather than an entity group, for the reason
+        :meth:`relation_group` is: a group is answered for by an entity type and these
+        are answered for by none, so there is no group meta to fix.
+        """
+        return UnownedGroup(self._deps, self._records, self._concern)
+
     def dangling_field_group[TFieldData: FieldData](
         self, meta: FieldGroupMeta, data_cls: type[TFieldData]
     ) -> FieldGroup[TFieldData]:
@@ -79,8 +88,6 @@ class ProcessorRegistry[TData: EntityData]:
 
     def group(self, meta: GroupMeta) -> ProcessorGroup[TData]:
         """A group for a domain that is its own area, which its entity type names."""
-        if meta.entity_type is None:
-            raise UnreachableError("a group that is its own area is named by its entity type")
         return ProcessorGroup(self._deps, self._records, meta.entity_type, meta)
 
     def dangling_field_group[TFieldData: FieldData](

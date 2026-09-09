@@ -4,6 +4,7 @@ from typing import override
 
 from ai.backend.common.contexts.request_id import current_request_id
 from ai.backend.common.contexts.user import current_user, triggered_user
+from ai.backend.common.data.entity.types import GlobalEntityType
 from ai.backend.manager.actions.action import BaseActionTriggerMeta
 from ai.backend.manager.actions.types import BLANK_ID
 from ai.backend.manager.actions.v2.global_scope.base import BaseGlobalAction
@@ -33,7 +34,7 @@ class GlobalActionReporterMonitor(GlobalActionMonitor):
             action_id=meta.action_id,
             action_type=action.action_name(),
             entity_id=None,
-            entity_type=action.entity_type(),
+            entity_type=action.entity_type() or GlobalEntityType(),
             request_id=current_request_id(),
             triggered_by=str(trigger.user_id) if trigger else None,
             acted_as=acting.user_id if acting else None,
@@ -54,7 +55,7 @@ class GlobalActionReporterMonitor(GlobalActionMonitor):
             request_id=current_request_id() or BLANK_ID,
             triggered_by=str(trigger.user_id) if trigger else None,
             acted_as=acting.user_id if acting else None,
-            entity_type=action.entity_type(),
+            entity_type=action.entity_type() or GlobalEntityType(),
             operation_type=action.operation_type(),
             status=meta.status,
             description=meta.description,

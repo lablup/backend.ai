@@ -58,7 +58,7 @@ def etcd_config_processors(
         valkey_stat=valkey_clients.stat,
     )
     return EtcdConfigProcessors(
-        processor_registry.concern(ConcernMeta(Concern.SYSTEM)).group(GroupMeta()), service
+        processor_registry.concern(ConcernMeta(Concern.SYSTEM)).unowned_group(), service
     )
 
 

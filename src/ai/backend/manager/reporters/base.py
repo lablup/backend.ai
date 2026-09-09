@@ -18,7 +18,7 @@ class StartedActionMessage:
     request_id: str | None
     triggered_by: str | None
     acted_as: uuid.UUID | None
-    entity_type: EntityType | None
+    entity_type: EntityType
     operation_type: ActionOperationType
     created_at: datetime
 
@@ -33,7 +33,7 @@ class FinishedActionMessage:
     request_id: str | None
     triggered_by: str | None
     acted_as: uuid.UUID | None
-    entity_type: EntityType | None
+    entity_type: EntityType
     operation_type: ActionOperationType
     status: OperationStatus
     description: str

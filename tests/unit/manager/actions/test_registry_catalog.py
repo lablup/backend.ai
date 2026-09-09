@@ -442,7 +442,7 @@ def test_every_defined_v2_action_is_wired() -> None:
         MagicMock(),
     )
     AuthProcessors(
-        registry.concern(ConcernMeta(Concern.ORGANIZATION)).group(GroupMeta()),
+        registry.concern(ConcernMeta(Concern.ORGANIZATION)).unowned_group(),
         registry.group(GroupMeta(UserEntityType())),
         MagicMock(),
     )

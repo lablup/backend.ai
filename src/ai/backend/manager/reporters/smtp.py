@@ -79,7 +79,7 @@ class SMTPReporter(AbstractReporter):
             "{{ entity_id }}", str(message.entity_id) if message.entity_id else _UNDEFINED_VALUE
         )
         template = template.replace("{{ request_id }}", message.request_id or _UNDEFINED_VALUE)
-        template = template.replace("{{ entity_type }}", message.entity_type or _UNDEFINED_VALUE)
+        template = template.replace("{{ entity_type }}", message.entity_type)
         template = template.replace("{{ operation_type }}", message.operation_type)
         template = template.replace("{{ created_at }}", str(message.created_at))
         template = template.replace("{{ ended_at }}", str(message.ended_at))
