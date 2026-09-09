@@ -110,21 +110,21 @@ class CreateKeypairResourcePolicyInput(BaseRequestModel):
 class UpdateKeypairResourcePolicyInput(BaseRequestModel):
     """Input for updating a keypair resource policy. All fields optional for partial update."""
 
-    default_for_unspecified: DefaultForUnspecified | None = Field(
-        default=None,
-        description="Updated default resource allocation. Leave null to keep existing value.",
+    default_for_unspecified: DefaultForUnspecified | None | Unset = Field(
+        default=UNSET,
+        description="Updated default resource allocation. Omit to leave unchanged.",
     )
     total_resource_slots: list[ResourceSlotEntryInput] | None | Unset = Field(
         default=UNSET,
         description="Updated resource slot limits. Omit to leave unchanged.",
     )
-    max_session_lifetime: int | None = Field(
-        default=None,
-        description="Updated maximum session lifetime in seconds. Leave null to keep existing.",
+    max_session_lifetime: int | None | Unset = Field(
+        default=UNSET,
+        description="Updated maximum session lifetime in seconds. Omit to leave unchanged.",
     )
-    max_concurrent_sessions: int | None = Field(
-        default=None,
-        description="Updated maximum concurrent sessions. Leave null to keep existing.",
+    max_concurrent_sessions: int | None | Unset = Field(
+        default=UNSET,
+        description="Updated maximum concurrent sessions. Omit to leave unchanged.",
     )
     max_pending_session_count: int | None | Unset = Field(
         default=UNSET,
@@ -140,17 +140,17 @@ class UpdateKeypairResourcePolicyInput(BaseRequestModel):
             "Updated max pending session resource slots. Omit to leave unchanged; null clears."
         ),
     )
-    max_concurrent_sftp_sessions: int | None = Field(
-        default=None,
-        description="Updated max concurrent SFTP sessions. Leave null to keep existing.",
+    max_concurrent_sftp_sessions: int | None | Unset = Field(
+        default=UNSET,
+        description="Updated max concurrent SFTP sessions. Omit to leave unchanged.",
     )
-    max_containers_per_session: int | None = Field(
-        default=None,
-        description="Updated max containers per session. Leave null to keep existing.",
+    max_containers_per_session: int | None | Unset = Field(
+        default=UNSET,
+        description="Updated max containers per session. Omit to leave unchanged.",
     )
-    idle_timeout: int | None = Field(
-        default=None,
-        description="Updated idle timeout in seconds. Leave null to keep existing.",
+    idle_timeout: int | None | Unset = Field(
+        default=UNSET,
+        description="Updated idle timeout in seconds. Omit to leave unchanged.",
     )
     allowed_vfolder_hosts: list[VFolderHostPermissionEntryInput] | None | Unset = Field(
         default=UNSET,
@@ -224,13 +224,13 @@ class UpdateUserResourcePolicyInput(BaseRequestModel):
         default=UNSET,
         description="Updated max quota scope size. Omit to leave unchanged.",
     )
-    max_session_count_per_model_session: int | None = Field(
-        default=None,
-        description="Updated max sessions per model session. Leave null to keep existing.",
+    max_session_count_per_model_session: int | None | Unset = Field(
+        default=UNSET,
+        description="Updated max sessions per model session. Omit to leave unchanged.",
     )
-    max_customized_image_count: int | None = Field(
-        default=None,
-        description="Updated max customized image count. Leave null to keep existing.",
+    max_customized_image_count: int | None | Unset = Field(
+        default=UNSET,
+        description="Updated max customized image count. Omit to leave unchanged.",
     )
 
 
@@ -279,9 +279,9 @@ class UpdateProjectResourcePolicyInput(BaseRequestModel):
         default=UNSET,
         description="Updated max quota scope size. Omit to leave unchanged.",
     )
-    max_network_count: int | None = Field(
-        default=None,
-        description="Updated max network count. Leave null to keep existing.",
+    max_network_count: int | None | Unset = Field(
+        default=UNSET,
+        description="Updated max network count. Omit to leave unchanged.",
     )
 
 

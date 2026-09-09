@@ -150,13 +150,22 @@ class TestUpdateKeypairResourcePolicyInput:
             idle_timeout=None,
         )
         assert req.default_for_unspecified is None
+        assert req.max_session_lifetime is None
+        assert req.idle_timeout is None
 
     def test_default_sentinel_fields(self) -> None:
         req = UpdateKeypairResourcePolicyInput()
+        assert req.default_for_unspecified is UNSET
         assert req.total_resource_slots is UNSET
         assert isinstance(req.total_resource_slots, Unset)
+        assert req.max_session_lifetime is UNSET
+        assert req.max_concurrent_sessions is UNSET
         assert req.max_pending_session_count is UNSET
+        assert req.max_priority is UNSET
         assert req.max_pending_session_resource_slots is UNSET
+        assert req.max_concurrent_sftp_sessions is UNSET
+        assert req.max_containers_per_session is UNSET
+        assert req.idle_timeout is UNSET
         assert req.allowed_vfolder_hosts is UNSET
 
     def test_sentinel_signals_clear(self) -> None:
@@ -239,16 +248,28 @@ class TestUpdateUserResourcePolicyInput:
     def test_all_default_sentinel_fields(self) -> None:
         req = UpdateUserResourcePolicyInput()
         assert req.max_vfolder_count is UNSET
+        assert req.max_concurrent_logins is UNSET
         assert req.max_quota_scope_size is UNSET
+        assert req.max_session_count_per_model_session is UNSET
+        assert req.max_customized_image_count is UNSET
 
     def test_all_sentinel_fields_is_valid(self) -> None:
         req = UpdateUserResourcePolicyInput(
             max_vfolder_count=UNSET,
             max_quota_scope_size=UNSET,
+            max_session_count_per_model_session=UNSET,
+            max_customized_image_count=UNSET,
+        )
+        assert req.max_vfolder_count is UNSET
+        assert req.max_session_count_per_model_session is UNSET
+
+    def test_none_stays_none(self) -> None:
+        req = UpdateUserResourcePolicyInput(
             max_session_count_per_model_session=None,
             max_customized_image_count=None,
         )
-        assert req.max_vfolder_count is UNSET
+        assert req.max_session_count_per_model_session is None
+        assert req.max_customized_image_count is None
 
     def test_update_specific_field(self) -> None:
         req = UpdateUserResourcePolicyInput(max_session_count_per_model_session=10)
@@ -319,14 +340,20 @@ class TestUpdateProjectResourcePolicyInput:
         req = UpdateProjectResourcePolicyInput()
         assert req.max_vfolder_count is UNSET
         assert req.max_quota_scope_size is UNSET
+        assert req.max_network_count is UNSET
 
     def test_all_sentinel_fields_is_valid(self) -> None:
         req = UpdateProjectResourcePolicyInput(
             max_vfolder_count=UNSET,
             max_quota_scope_size=UNSET,
-            max_network_count=None,
+            max_network_count=UNSET,
         )
         assert req.max_vfolder_count is UNSET
+        assert req.max_network_count is UNSET
+
+    def test_none_stays_none(self) -> None:
+        req = UpdateProjectResourcePolicyInput(max_network_count=None)
+        assert req.max_network_count is None
 
     def test_update_specific_field(self) -> None:
         req = UpdateProjectResourcePolicyInput(max_network_count=10)

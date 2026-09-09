@@ -266,44 +266,22 @@ class ResourcePolicyAdapter(BaseAdapter):
         )
         updater = KeyPairResourcePolicyUpdater(
             policy_id=target.entity_id(),
-            default_for_unspecified=(
-                OptionalState.update(input.default_for_unspecified)
-                if input.default_for_unspecified is not None
-                else OptionalState.nop()
-            ),
+            default_for_unspecified=OptionalState.from_unset(input.default_for_unspecified),
             total_resource_slots=OptionalState.from_unset(input.total_resource_slots).map(
                 self._entries_to_resource_slot
             ),
-            max_session_lifetime=(
-                OptionalState.update(input.max_session_lifetime)
-                if input.max_session_lifetime is not None
-                else OptionalState.nop()
-            ),
-            max_concurrent_sessions=(
-                OptionalState.update(input.max_concurrent_sessions)
-                if input.max_concurrent_sessions is not None
-                else OptionalState.nop()
-            ),
+            max_session_lifetime=OptionalState.from_unset(input.max_session_lifetime),
+            max_concurrent_sessions=OptionalState.from_unset(input.max_concurrent_sessions),
             max_pending_session_count=TriState.from_unset(input.max_pending_session_count),
             max_pending_session_resource_slots=TriState.from_unset(
                 input.max_pending_session_resource_slots
             ).map(self._entries_to_resource_slot),
             max_priority=TriState.from_unset(input.max_priority),
-            max_concurrent_sftp_sessions=(
-                OptionalState.update(input.max_concurrent_sftp_sessions)
-                if input.max_concurrent_sftp_sessions is not None
-                else OptionalState.nop()
+            max_concurrent_sftp_sessions=OptionalState.from_unset(
+                input.max_concurrent_sftp_sessions
             ),
-            max_containers_per_session=(
-                OptionalState.update(input.max_containers_per_session)
-                if input.max_containers_per_session is not None
-                else OptionalState.nop()
-            ),
-            idle_timeout=(
-                OptionalState.update(input.idle_timeout)
-                if input.idle_timeout is not None
-                else OptionalState.nop()
-            ),
+            max_containers_per_session=OptionalState.from_unset(input.max_containers_per_session),
+            idle_timeout=OptionalState.from_unset(input.idle_timeout),
             allowed_vfolder_hosts=OptionalState.from_unset(input.allowed_vfolder_hosts).map(
                 self._entries_to_vfolder_hosts
             ),
@@ -406,16 +384,10 @@ class ResourcePolicyAdapter(BaseAdapter):
             max_quota_scope_size=OptionalState.from_unset(input.max_quota_scope_size).map(
                 lambda x: x.bytes
             ),
-            max_session_count_per_model_session=(
-                OptionalState.update(input.max_session_count_per_model_session)
-                if input.max_session_count_per_model_session is not None
-                else OptionalState.nop()
+            max_session_count_per_model_session=OptionalState.from_unset(
+                input.max_session_count_per_model_session
             ),
-            max_customized_image_count=(
-                OptionalState.update(input.max_customized_image_count)
-                if input.max_customized_image_count is not None
-                else OptionalState.nop()
-            ),
+            max_customized_image_count=OptionalState.from_unset(input.max_customized_image_count),
         )
         result = await self._processors.user_resource_policy.update.run(
             UpdateUserResourcePolicyAction(updater=updater)
@@ -512,11 +484,7 @@ class ResourcePolicyAdapter(BaseAdapter):
             max_quota_scope_size=OptionalState.from_unset(input.max_quota_scope_size).map(
                 lambda x: x.bytes
             ),
-            max_network_count=(
-                OptionalState.update(input.max_network_count)
-                if input.max_network_count is not None
-                else OptionalState.nop()
-            ),
+            max_network_count=OptionalState.from_unset(input.max_network_count),
         )
         result = await self._processors.project_resource_policy.update.run(
             UpdateProjectResourcePolicyAction(updater=updater)
