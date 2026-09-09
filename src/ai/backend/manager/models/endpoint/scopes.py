@@ -9,7 +9,9 @@ from uuid import UUID
 
 import sqlalchemy as sa
 
-from ai.backend.common.data.entity.deployment import DeploymentID
+from ai.backend.common.data.entity.deployment import DeploymentEntityType, DeploymentID
+from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE
+from ai.backend.common.data.entity.user import USER_SCOPE_TYPE
 from ai.backend.manager.errors.resource import ProjectNotFound
 from ai.backend.manager.errors.user import UserNotFound
 from ai.backend.manager.models.clauses import QueryCondition
@@ -17,6 +19,7 @@ from ai.backend.manager.models.endpoint.row import EndpointRow, EndpointTokenRow
 from ai.backend.manager.models.project.row import ProjectRow
 from ai.backend.manager.models.scopes import ExistenceCheck, OperationScope
 from ai.backend.manager.models.user.row import UserRow
+from ai.backend.manager.models.virtual_entity.queries import scope_membership_exists
 
 
 @dataclass(frozen=True)
@@ -32,8 +35,14 @@ class ProjectDeploymentOperationScope(OperationScope):
     def to_condition(self) -> QueryCondition:
         project_id = self.project_id
 
+        # TODO(BA-7571): drop the column term once the ownership backfill lands.
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return EndpointRow.project == project_id
+            return sa.or_(
+                EndpointRow.project == project_id,
+                scope_membership_exists(
+                    PROJECT_SCOPE_TYPE, project_id, DeploymentEntityType(), EndpointRow.id
+                ),
+            )
 
         return inner
 
@@ -59,8 +68,14 @@ class UserDeploymentOperationScope(OperationScope):
     def to_condition(self) -> QueryCondition:
         user_id = self.user_id
 
+        # TODO(BA-7571): drop the column term once the ownership backfill lands.
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return EndpointRow.created_user == user_id
+            return sa.or_(
+                EndpointRow.created_user == user_id,
+                scope_membership_exists(
+                    USER_SCOPE_TYPE, user_id, DeploymentEntityType(), EndpointRow.id
+                ),
+            )
 
         return inner
 

@@ -66,6 +66,7 @@ from ai.backend.manager.api.gql.base import (
     OrderDirection,
     StringFilter,
     UUIDFilter,
+    UUIDScopeGQL,
 )
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
@@ -81,7 +82,6 @@ from ai.backend.manager.api.gql.pydantic_compat import (
     PydanticNodeMixin,
     PydanticOutputMixin,
 )
-from ai.backend.manager.api.gql.rbac.types.scope import UUIDScopeGQL
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 
 if TYPE_CHECKING:

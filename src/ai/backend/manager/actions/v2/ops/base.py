@@ -2,7 +2,12 @@ from abc import ABC, abstractmethod
 from collections.abc import Mapping, Sequence
 from typing import Any, override
 
-from ai.backend.common.data.entity.types import EntityIdentifier, FieldData, FieldIdentifier
+from ai.backend.common.data.entity.types import (
+    EntityIdentifier,
+    FieldData,
+    FieldIdentifier,
+    ScopeRef,
+)
 from ai.backend.common.data.entity.types import EntityIdentifier as OwnerEntityID
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.actions.v2.bulk.base import BaseBulkAction, BasePartialBulkAction
@@ -48,6 +53,7 @@ __all__ = (
     "FieldGetOpsAction",
     "LookupOpsAction",
     "BulkLookupOpsAction",
+    "ScopeItem",
     "SearchOpsAction",
     "GlobalSearchOpsAction",
     "GlobalEntityCreateOpsAction",
@@ -210,6 +216,25 @@ class BulkLookupOpsAction[TKey, TEntityID: EntityIdentifier](OpsBackendAction):
     @abstractmethod
     def to_lookup(self) -> BulkDataLookup[TKey, TEntityID]:
         """Return the key-resolution spec this action executes."""
+        raise NotImplementedError
+
+
+class ScopeItem(ABC):
+    """One scope a scoped read is answered for.
+
+    The scope the read is authorized against and the rows it is restricted to are
+    declared together, so a read cannot be authorized against one thing and served
+    another.
+    """
+
+    @abstractmethod
+    def scope_ref(self) -> ScopeRef:
+        """The scope the read is answered for."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def operation_scope(self) -> OperationScope:
+        """The rows the read is restricted to."""
         raise NotImplementedError
 
 

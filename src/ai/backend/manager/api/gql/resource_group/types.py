@@ -5,11 +5,12 @@ from __future__ import annotations
 from collections.abc import Iterable
 from decimal import Decimal
 from enum import StrEnum
-from typing import Self, override
+from typing import TYPE_CHECKING, Annotated, Any, Self, override
 from uuid import UUID
 
+import strawberry
 from strawberry import Info
-from strawberry.relay import NodeID
+from strawberry.relay import Connection, Edge, NodeID
 
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.dto.manager.v2.resource_group.request import (
@@ -88,6 +89,7 @@ from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     PydanticInputMixin,
     gql_added_field,
+    gql_connection_type,
     gql_enum,
     gql_field,
     gql_node_type,
@@ -447,6 +449,177 @@ class ResourceGroupGQL(PydanticNodeMixin[ResourceGroupDetailNode]):
         ctx = info.context
         resource_info_dto = await ctx.adapters.resource_group.get_resource_info(self.name)
         return ResourceInfoGQL.from_pydantic(resource_info_dto)
+
+    @gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Domains this resource group serves.",
+        )
+    )  # type: ignore[misc]
+    async def domains(
+        self,
+        info: Info[StrawberryGQLContext],
+        filter: Annotated[
+            DomainV2Filter, strawberry.lazy("ai.backend.manager.api.gql.domain_v2.types.filters")
+        ]
+        | None = None,
+        order_by: list[
+            Annotated[
+                DomainV2OrderBy,
+                strawberry.lazy("ai.backend.manager.api.gql.domain_v2.types.filters"),
+            ]
+        ]
+        | None = None,
+        before: str | None = None,
+        after: str | None = None,
+        first: int | None = None,
+        last: int | None = None,
+        limit: int | None = None,
+        offset: int | None = None,
+    ) -> (
+        Annotated[
+            DomainV2Connection, strawberry.lazy("ai.backend.manager.api.gql.domain_v2.types.node")
+        ]
+        | None
+    ):
+        from strawberry.relay import Edge, PageInfo
+
+        from ai.backend.common.dto.manager.v2.domain.request import ScopedSearchDomainsInput
+        from ai.backend.common.dto.manager.v2.domain.types import DomainScope
+        from ai.backend.common.dto.manager.v2.rbac.types import UUIDScope
+        from ai.backend.manager.api.gql.base import encode_cursor
+        from ai.backend.manager.api.gql.domain_v2.types.node import (
+            DomainV2Connection,
+            DomainV2GQL,
+        )
+
+        payload = await info.context.adapters.domain.scoped_search(
+            ScopedSearchDomainsInput(
+                scope=DomainScope(resource_group=[UUIDScope(value=self.id)]),
+                filter=filter.to_pydantic() if filter else None,
+                order=[o.to_pydantic() for o in order_by] if order_by else None,
+                first=first,
+                after=after,
+                last=last,
+                before=before,
+                limit=limit,
+                offset=offset,
+            )
+        )
+        nodes = [DomainV2GQL.from_pydantic(node) for node in payload.items]
+        edges = [Edge(node=node, cursor=encode_cursor(str(node.id))) for node in nodes]
+        return DomainV2Connection(
+            edges=edges,
+            page_info=PageInfo(
+                has_next_page=payload.has_next_page,
+                has_previous_page=payload.has_previous_page,
+                start_cursor=edges[0].cursor if edges else None,
+                end_cursor=edges[-1].cursor if edges else None,
+            ),
+            count=payload.total_count,
+        )
+
+    @gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Projects this resource group serves.",
+        )
+    )  # type: ignore[misc]
+    async def projects(
+        self,
+        info: Info[StrawberryGQLContext],
+        filter: Annotated[
+            ProjectV2Filter,
+            strawberry.lazy("ai.backend.manager.api.gql.project_v2.types.filters"),
+        ]
+        | None = None,
+        order_by: list[
+            Annotated[
+                ProjectV2OrderBy,
+                strawberry.lazy("ai.backend.manager.api.gql.project_v2.types.filters"),
+            ]
+        ]
+        | None = None,
+        before: str | None = None,
+        after: str | None = None,
+        first: int | None = None,
+        last: int | None = None,
+        limit: int | None = None,
+        offset: int | None = None,
+    ) -> (
+        Annotated[
+            ProjectV2Connection,
+            strawberry.lazy("ai.backend.manager.api.gql.project_v2.types.node"),
+        ]
+        | None
+    ):
+        from strawberry.relay import PageInfo
+
+        from ai.backend.common.dto.manager.v2.group.request import ScopedSearchProjectsInput
+        from ai.backend.common.dto.manager.v2.group.types import ProjectScope
+        from ai.backend.common.dto.manager.v2.rbac.types import UUIDScope
+        from ai.backend.manager.api.gql.base import encode_cursor
+        from ai.backend.manager.api.gql.project_v2.types.node import (
+            ProjectV2Connection,
+            ProjectV2Edge,
+            ProjectV2GQL,
+        )
+
+        payload = await info.context.adapters.project.scoped_search(
+            ScopedSearchProjectsInput(
+                scope=ProjectScope(resource_group=[UUIDScope(value=self.id)]),
+                filter=filter.to_pydantic() if filter else None,
+                order=[o.to_pydantic() for o in order_by] if order_by else None,
+                first=first,
+                after=after,
+                last=last,
+                before=before,
+                limit=limit,
+                offset=offset,
+            )
+        )
+        nodes = [ProjectV2GQL.from_pydantic(node) for node in payload.items]
+        edges = [ProjectV2Edge(node=node, cursor=encode_cursor(str(node.id))) for node in nodes]
+        return ProjectV2Connection(
+            edges=edges,
+            page_info=PageInfo(
+                has_next_page=payload.has_next_page,
+                has_previous_page=payload.has_previous_page,
+                start_cursor=edges[0].cursor if edges else None,
+                end_cursor=edges[-1].cursor if edges else None,
+            ),
+            count=payload.total_count,
+        )
+
+
+ResourceGroupEdge = Edge[ResourceGroupGQL]
+
+
+@gql_connection_type(
+    BackendAIGQLMeta(
+        added_version="26.2.0",
+        description="Resource group connection",
+    )
+)
+class ResourceGroupConnection(Connection[ResourceGroupGQL]):
+    count: int
+
+    def __init__(self, *args: Any, count: int, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        self.count = count
+
+
+if TYPE_CHECKING:
+    from ai.backend.manager.api.gql.domain_v2.types.filters import (
+        DomainV2Filter,
+        DomainV2OrderBy,
+    )
+    from ai.backend.manager.api.gql.domain_v2.types.node import DomainV2Connection
+    from ai.backend.manager.api.gql.project_v2.types.filters import (
+        ProjectV2Filter,
+        ProjectV2OrderBy,
+    )
+    from ai.backend.manager.api.gql.project_v2.types.node import ProjectV2Connection
 
 
 # Filter and OrderBy types

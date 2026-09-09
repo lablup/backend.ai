@@ -4932,6 +4932,14 @@ type DomainResourceAllocationV2 {
 }
 
 """
+Added in 26.9.0. Scope for the scoped domain query. Each list is OR'd internally, and every scope named is authorized before the read runs.
+"""
+input DomainScope {
+  """Resource groups whose domains are being read."""
+  resourceGroup: [UUIDScope!] = null
+}
+
+"""
 Added in 26.1.0. Domain-level usage bucket representing aggregated resource consumption for a specific time period. Usage buckets store historical data used to calculate fair share factors.
 """
 type DomainUsageBucket implements Node {
@@ -5113,6 +5121,9 @@ type DomainV2 implements Node @key(fields: "id") {
 
   """Users belonging to this domain."""
   users(filter: UserV2Filter = null, orderBy: [UserV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): UserV2Connection
+
+  """Added in 26.9.0. Resource groups this domain may schedule on."""
+  resourceGroups(filter: ResourceGroupFilter = null, orderBy: [ResourceGroupOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ResourceGroupConnection
 }
 
 """
@@ -7734,6 +7745,14 @@ Added in 26.4.2. Scope for querying available presets that satisfy a model card'
 input ModelCardAvailablePresetsScope {
   """Model card UUID to check resource requirements against."""
   modelCardId: UUID!
+}
+
+"""
+Added in 26.9.0. Scope for the scoped model card query. Each list is OR'd internally, and every scope named is authorized before the read runs.
+"""
+input ModelCardScope {
+  """Projects whose model cards are being read."""
+  project: [UUIDScope!] = null
 }
 
 """
@@ -10779,6 +10798,20 @@ enum ProjectResourcePolicyV2OrderField {
 }
 
 """
+Added in 26.9.0. Scope for the scoped project query. Each list is OR'd internally and across lists, and every scope named is authorized before the read runs.
+"""
+input ProjectScope {
+  """Domains whose projects are being read."""
+  domain: [UUIDScope!] = null
+
+  """Users whose project memberships are being read."""
+  user: [UUIDScope!] = null
+
+  """Resource groups whose projects are being read."""
+  resourceGroup: [UUIDScope!] = null
+}
+
+"""
 Added in 26.4.2. Scope for session operations within a specific project.
 """
 input ProjectSessionV2Scope {
@@ -11017,6 +11050,12 @@ type ProjectV2 implements Node @key(fields: "id") {
 
   """Users who are members of this project."""
   users(filter: UserV2Filter = null, orderBy: [UserV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): UserV2Connection
+
+  """Added in 26.9.0. Resource groups this project may schedule on."""
+  resourceGroups(filter: ResourceGroupFilter = null, orderBy: [ResourceGroupOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ResourceGroupConnection
+
+  """Added in 26.9.0. Model cards belonging to this project."""
+  modelCards(filter: ModelCardV2Filter = null, orderBy: [ModelCardV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ModelCardV2Connection
 }
 
 """
@@ -11395,6 +11434,11 @@ type Query {
 
   """Added in 26.2.0. List resource groups (admin only)"""
   adminResourceGroups(filter: ResourceGroupFilter = null, orderBy: [ResourceGroupOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ResourceGroupConnection
+
+  """
+  Added in 26.9.0. Page through the resource groups the named scopes reach, combined with OR. Every scope is authorized before the read runs.
+  """
+  scopedResourceGroups(scope: ResourceGroupScope!, filter: ResourceGroupFilter = null, orderBy: [ResourceGroupOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ResourceGroupConnection
 
   """Added in 26.4.2. Get a single resource group by name (admin only)."""
   adminResourceGroupV2(name: String!): ResourceGroup
@@ -11840,6 +11884,11 @@ type Query {
   projectUsersV2(scope: ProjectUserV2Scope!, filter: UserV2Filter = null, orderBy: [UserV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): UserV2Connection
 
   """
+  Added in 26.9.0. Page through the users the named scopes reach, combined with OR. Every scope is authorized before the read runs.
+  """
+  scopedUsersV2(scope: UserScope!, filter: UserV2Filter = null, orderBy: [UserV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): UserV2Connection
+
+  """
   Added in 26.2.0. Get a single domain by name. Returns an error if domain is not found.
   """
   domainV2(domainName: String!): DomainV2
@@ -11851,6 +11900,11 @@ type Query {
 
   """Added in 26.2.0. List domains within resource group scope."""
   rgDomainsV2(scope: ResourceGroupDomainScope!, filter: DomainV2Filter = null, orderBy: [DomainV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): DomainV2Connection
+
+  """
+  Added in 26.9.0. Page through the domains the named scopes reach, combined with OR. Every scope is authorized before the read runs.
+  """
+  scopedDomainsV2(scope: DomainScope!, filter: DomainV2Filter = null, orderBy: [DomainV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): DomainV2Connection
 
   """
   Added in 26.2.0. Get a single project by ID. Returns an error if project is not found.
@@ -11866,6 +11920,11 @@ type Query {
   Added in 26.2.0. List projects within a specific domain. Requires domain admin privileges or higher.
   """
   domainProjectsV2(scope: DomainProjectV2Scope!, filter: ProjectV2Filter = null, orderBy: [ProjectV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ProjectV2Connection
+
+  """
+  Added in 26.9.0. Page through the projects the named scopes reach, combined with OR. Every scope is authorized before the read runs.
+  """
+  scopedProjectsV2(scope: ProjectScope!, filter: ProjectV2Filter = null, orderBy: [ProjectV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ProjectV2Connection
 
   """
   Added in 26.2.0. Get the domain that a project belongs to. Returns an error if project or domain is not found.
@@ -11988,6 +12047,11 @@ type Query {
 
   """Added in 26.4.2. Search model cards within a MODEL_STORE project."""
   projectModelCardsV2(scope: ProjectModelCardV2Scope!, filter: ModelCardV2Filter = null, orderBy: [ModelCardV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ModelCardV2Connection
+
+  """
+  Added in 26.9.0. Page through the model cards the named scopes reach, combined with OR. Every scope is authorized before the read runs.
+  """
+  scopedModelCardsV2(scope: ModelCardScope!, filter: ModelCardV2Filter = null, orderBy: [ModelCardV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ModelCardV2Connection
 
   """Added in 26.4.2. Get a single model card by ID."""
   modelCardV2(id: UUID!): ModelCardV2
@@ -12822,6 +12886,12 @@ type ResourceGroup implements Node {
   Added in 26.1.0. Resource usage information for this resource group. Provides aggregated metrics for capacity, used, and free resources. This is a lazy-loaded field that queries agent and kernel data on demand.
   """
   resourceInfo: ResourceInfo
+
+  """Added in 26.9.0. Domains this resource group serves."""
+  domains(filter: DomainV2Filter = null, orderBy: [DomainV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): DomainV2Connection
+
+  """Added in 26.9.0. Projects this resource group serves."""
+  projects(filter: ProjectV2Filter = null, orderBy: [ProjectV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ProjectV2Connection
 }
 
 """Added in 26.2.0. Resource group connection"""
@@ -12920,6 +12990,20 @@ type ResourceGroupSchedulerConfig {
 
   """Added in 26.3.0. Preemption configuration for this resource group."""
   preemption: PreemptionConfig!
+}
+
+"""
+Added in 26.9.0. Scope for the scoped resource group query. Each list is OR'd internally and across lists, and every scope named is authorized before the read runs.
+"""
+input ResourceGroupScope {
+  """Domains whose resource groups are being read."""
+  domain: [UUIDScope!] = null
+
+  """Projects whose resource groups are being read."""
+  project: [UUIDScope!] = null
+
+  """Users whose resource groups are being read."""
+  user: [UUIDScope!] = null
 }
 
 """Added in 26.2.0. Status information for a resource group."""
@@ -17314,6 +17398,17 @@ input UserRoleV2EnumFilter {
 }
 
 """
+Added in 26.9.0. Scope for the scoped user query. Each list is OR'd internally and across lists, and every scope named is authorized before the read runs.
+"""
+input UserScope {
+  """Domains whose users are being read."""
+  domain: [UUIDScope!] = null
+
+  """Projects whose users are being read."""
+  project: [UUIDScope!] = null
+}
+
+"""
 Added in 26.2.0. User account status. ACTIVE: User can log in and use the system. INACTIVE: User account is disabled but preserved. DELETED: User has been soft-deleted. BEFORE_VERIFICATION: User account is pending email verification.
 """
 enum UserStatusV2 {
@@ -17521,6 +17616,9 @@ type UserV2 implements Node @key(fields: "id") {
 
   """Projects this user is a member of."""
   projects(filter: ProjectV2Filter = null, orderBy: [ProjectV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ProjectV2Connection
+
+  """Added in 26.9.0. Resource groups this user may schedule on."""
+  resourceGroups(filter: ResourceGroupFilter = null, orderBy: [ResourceGroupOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ResourceGroupConnection
 }
 
 """

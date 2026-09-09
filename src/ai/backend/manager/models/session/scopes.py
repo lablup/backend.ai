@@ -9,11 +9,14 @@ from uuid import UUID
 
 import sqlalchemy as sa
 
+from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE
+from ai.backend.common.data.entity.session import SessionEntityType
 from ai.backend.manager.errors.resource import ProjectNotFound
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.project.row import ProjectRow
 from ai.backend.manager.models.scopes import ExistenceCheck, OperationScope
 from ai.backend.manager.models.session.row import SessionRow
+from ai.backend.manager.models.virtual_entity.queries import scope_membership_exists
 
 __all__ = ("ProjectSessionOperationScope",)
 
@@ -33,8 +36,14 @@ class ProjectSessionOperationScope(OperationScope):
         """Convert scope to a query condition for SessionRow."""
         project_id = self.project_id
 
+        # TODO(BA-7571): drop the column term once the ownership backfill lands.
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return SessionRow.group_id == project_id
+            return sa.or_(
+                SessionRow.group_id == project_id,
+                scope_membership_exists(
+                    PROJECT_SCOPE_TYPE, project_id, SessionEntityType(), SessionRow.id
+                ),
+            )
 
         return inner
 

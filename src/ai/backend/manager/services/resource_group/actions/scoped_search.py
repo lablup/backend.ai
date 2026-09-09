@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from abc import ABC, abstractmethod
+from abc import ABC
 from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import override
@@ -12,7 +12,7 @@ from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE, ProjectID
 from ai.backend.common.data.entity.resource_group import ResourceGroupEntityType
 from ai.backend.common.data.entity.types import EntityType, ScopeRef
 from ai.backend.common.data.entity.user import USER_SCOPE_TYPE, UserID
-from ai.backend.manager.actions.v2.ops.base import OperationScopeOpsAction
+from ai.backend.manager.actions.v2.ops.base import OperationScopeOpsAction, ScopeItem
 from ai.backend.manager.data.resource_group.types import ResourceGroupData
 from ai.backend.manager.models.resource_group.row import ResourceGroupRow
 from ai.backend.manager.models.resource_group.scopes import (
@@ -24,22 +24,12 @@ from ai.backend.manager.models.resource_group.searchers import ResourceGroupSear
 from ai.backend.manager.models.scopes import OperationScope
 
 
-class ResourceGroupScopeItem(ABC):
+class ResourceGroupScopeItem(ScopeItem, ABC):
     """One side a resource group is reachable from.
 
     A resource group is associated with domains, projects and keypairs independently,
     so which side a read comes in through is a value rather than a separate action.
     """
-
-    @abstractmethod
-    def scope_ref(self) -> ScopeRef:
-        """The scope the read is answered for."""
-        raise NotImplementedError
-
-    @abstractmethod
-    def operation_scope(self) -> OperationScope:
-        """The rows the read is restricted to."""
-        raise NotImplementedError
 
 
 @dataclass(frozen=True)

@@ -3,18 +3,18 @@
 from __future__ import annotations
 
 import uuid
-from abc import ABC, abstractmethod
+from abc import ABC
 from dataclasses import dataclass
 from typing import override
 
 from ai.backend.common.data.entity.resource_group import RESOURCE_GROUP_SCOPE_TYPE, ResourceGroupID
 from ai.backend.common.data.entity.types import ScopeRef
+from ai.backend.manager.actions.v2.ops.base import ScopeItem
 from ai.backend.manager.models.resource_usage_history.scopes import (
     DomainUsageBucketOperationScope,
     ProjectUsageBucketOperationScope,
     UserUsageBucketOperationScope,
 )
-from ai.backend.manager.models.scopes import OperationScope
 
 __all__ = (
     "DomainUsageBucketScopeItem",
@@ -24,23 +24,18 @@ __all__ = (
 )
 
 
-class UsageBucketScopeItem(ABC):
+class UsageBucketScopeItem(ScopeItem, ABC):
     """One resource group a usage bucket read is answered for.
 
-    The scope the read is authorized against and the rows it is restricted to name
-    the same resource group id, so a read cannot be authorized for one and served
-    another.
+    Both sides name the same resource group id, so the scope is read off the item
+    rather than declared per kind.
     """
 
     resource_group_id: ResourceGroupID
 
+    @override
     def scope_ref(self) -> ScopeRef:
         return ScopeRef(scope_type=RESOURCE_GROUP_SCOPE_TYPE, scope_id=self.resource_group_id)
-
-    @abstractmethod
-    def operation_scope(self) -> OperationScope:
-        """The rows the read is restricted to."""
-        raise NotImplementedError
 
 
 @dataclass(frozen=True)

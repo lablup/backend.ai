@@ -454,7 +454,7 @@ async def _grant_model_card_read_permission(
     """Grant model_card:read permission to the test role at the project scope.
 
     Required for the regular user to pass RBAC enforcement on
-    search_in_project (ScopeActionRBACValidator checks this permission).
+    scoped_search (ScopeActionRBACValidator checks this permission).
     """
     async with db_engine.begin() as conn:
         await conn.execute(

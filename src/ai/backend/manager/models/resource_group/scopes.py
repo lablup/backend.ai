@@ -17,9 +17,10 @@ from typing import Any, override
 
 import sqlalchemy as sa
 
-from ai.backend.common.data.entity.domain import DomainID
-from ai.backend.common.data.entity.project import ProjectID
-from ai.backend.common.data.entity.user import UserID
+from ai.backend.common.data.entity.domain import DomainEntityType, DomainID
+from ai.backend.common.data.entity.project import ProjectEntityType, ProjectID
+from ai.backend.common.data.entity.resource_group import RESOURCE_GROUP_SCOPE_TYPE
+from ai.backend.common.data.entity.user import UserEntityType, UserID
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.keypair.row import KeyPairRow
 from ai.backend.manager.models.resource_group.row import (
@@ -29,6 +30,7 @@ from ai.backend.manager.models.resource_group.row import (
     ResourceGroupRow,
 )
 from ai.backend.manager.models.scopes import ExistenceCheck, OperationScope
+from ai.backend.manager.models.virtual_entity.queries import scope_membership_exists
 
 __all__ = (
     "DomainResourceGroupOperationScope",
@@ -47,11 +49,20 @@ class DomainResourceGroupOperationScope(OperationScope):
     def to_condition(self) -> QueryCondition:
         domain_id = self.domain_id
 
+        # TODO(BA-7571): drop the association term once the ownership backfill lands.
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return ResourceGroupRow.id.in_(
-                sa.select(ResourceGroupForDomainRow.resource_group_id).where(
-                    ResourceGroupForDomainRow.domain_id == domain_id
-                )
+            return sa.or_(
+                ResourceGroupRow.id.in_(
+                    sa.select(ResourceGroupForDomainRow.resource_group_id).where(
+                        ResourceGroupForDomainRow.domain_id == domain_id
+                    )
+                ),
+                scope_membership_exists(
+                    RESOURCE_GROUP_SCOPE_TYPE,
+                    ResourceGroupRow.id,
+                    DomainEntityType(),
+                    domain_id,
+                ),
             )
 
         return inner
@@ -72,11 +83,20 @@ class ProjectResourceGroupOperationScope(OperationScope):
     def to_condition(self) -> QueryCondition:
         project_id = self.project_id
 
+        # TODO(BA-7571): drop the association term once the ownership backfill lands.
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return ResourceGroupRow.id.in_(
-                sa.select(ResourceGroupForProjectRow.resource_group_id).where(
-                    ResourceGroupForProjectRow.group == project_id
-                )
+            return sa.or_(
+                ResourceGroupRow.id.in_(
+                    sa.select(ResourceGroupForProjectRow.resource_group_id).where(
+                        ResourceGroupForProjectRow.group == project_id
+                    )
+                ),
+                scope_membership_exists(
+                    RESOURCE_GROUP_SCOPE_TYPE,
+                    ResourceGroupRow.id,
+                    ProjectEntityType(),
+                    project_id,
+                ),
             )
 
         return inner
@@ -101,13 +121,22 @@ class UserResourceGroupOperationScope(OperationScope):
     def to_condition(self) -> QueryCondition:
         user_id = self.user_id
 
+        # TODO(BA-7571): drop the association term once the ownership backfill lands.
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return ResourceGroupRow.id.in_(
-                sa.select(ResourceGroupForKeypairsRow.resource_group_id).where(
-                    ResourceGroupForKeypairsRow.access_key.in_(
-                        sa.select(KeyPairRow.access_key).where(KeyPairRow.user == user_id)
+            return sa.or_(
+                ResourceGroupRow.id.in_(
+                    sa.select(ResourceGroupForKeypairsRow.resource_group_id).where(
+                        ResourceGroupForKeypairsRow.access_key.in_(
+                            sa.select(KeyPairRow.access_key).where(KeyPairRow.user == user_id)
+                        )
                     )
-                )
+                ),
+                scope_membership_exists(
+                    RESOURCE_GROUP_SCOPE_TYPE,
+                    ResourceGroupRow.id,
+                    UserEntityType(),
+                    user_id,
+                ),
             )
 
         return inner

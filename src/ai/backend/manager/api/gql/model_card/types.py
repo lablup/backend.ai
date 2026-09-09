@@ -73,10 +73,15 @@ from ai.backend.common.dto.manager.v2.model_card.types import (
     ModelCardAvailablePresetsScope as AvailablePresetsScopeDTO,
 )
 from ai.backend.common.dto.manager.v2.model_card.types import (
+    ModelCardScope,
+)
+from ai.backend.common.dto.manager.v2.model_card.types import (
     ProjectModelCardScope as ProjectModelCardScopeDTO,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import StringFilter as StringFilterGQL
 from ai.backend.manager.api.gql.base import UUIDFilter as UUIDFilterGQL
+from ai.backend.manager.api.gql.base import UUIDScopeGQL
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     PydanticInputMixin,
@@ -606,4 +611,22 @@ class BulkDeleteModelCardsV2PayloadGQL:
     )
     failed: list[BulkDeleteModelCardV2ErrorGQL] = gql_field(
         description="List of errors for model cards that failed to delete.",
+    )
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description=(
+            "Scope for the scoped model card query. Each list is OR'd internally, and "
+            "every scope named is authorized before the read runs."
+        ),
+    ),
+    name="ModelCardScope",
+)
+class ModelCardScopeGQL(PydanticInputMixin[ModelCardScope]):
+    """The scopes a model card read is answered for."""
+
+    project: list[UUIDScopeGQL] | None = gql_field(
+        default=None, description="Projects whose model cards are being read."
     )

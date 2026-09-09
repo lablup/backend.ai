@@ -16,6 +16,7 @@ from ai.backend.common.dto.manager.v2.fair_share.types import (
     ProjectUsageScopeDTO,
 )
 from ai.backend.common.dto.manager.v2.group.response import ProjectNode
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_added_field,
@@ -43,6 +44,16 @@ from .nested import (
 
 if TYPE_CHECKING:
     from ai.backend.manager.api.gql.domain_v2.types.node import DomainV2GQL
+    from ai.backend.manager.api.gql.model_card.types import (
+        ModelCardFilterGQL,
+        ModelCardOrderByGQL,
+        ModelCardV2Connection,
+    )
+    from ai.backend.manager.api.gql.resource_group.types import (
+        ResourceGroupConnection,
+        ResourceGroupFilterGQL,
+        ResourceGroupOrderByGQL,
+    )
     from ai.backend.manager.api.gql.user.types.filters import UserFilterGQL, UserOrderByGQL
     from ai.backend.manager.api.gql.user.types.node import UserV2Connection
 
@@ -263,6 +274,152 @@ class ProjectV2GQL(PydanticNodeMixin[ProjectNode]):
         nodes = [UserV2GQL.from_pydantic(item) for item in payload.items]
         edges = [UserV2Edge(node=node, cursor=encode_cursor(str(node.id))) for node in nodes]
         return UserV2Connection(
+            edges=edges,
+            page_info=PageInfo(
+                has_next_page=payload.has_next_page,
+                has_previous_page=payload.has_previous_page,
+                start_cursor=edges[0].cursor if edges else None,
+                end_cursor=edges[-1].cursor if edges else None,
+            ),
+            count=payload.total_count,
+        )
+
+    @gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Resource groups this project may schedule on.",
+        )
+    )  # type: ignore[misc]
+    async def resource_groups(
+        self,
+        info: Info[StrawberryGQLContext],
+        filter: Annotated[
+            ResourceGroupFilterGQL,
+            strawberry.lazy("ai.backend.manager.api.gql.resource_group.types"),
+        ]
+        | None = None,
+        order_by: list[
+            Annotated[
+                ResourceGroupOrderByGQL,
+                strawberry.lazy("ai.backend.manager.api.gql.resource_group.types"),
+            ]
+        ]
+        | None = None,
+        before: str | None = None,
+        after: str | None = None,
+        first: int | None = None,
+        last: int | None = None,
+        limit: int | None = None,
+        offset: int | None = None,
+    ) -> (
+        Annotated[
+            ResourceGroupConnection,
+            strawberry.lazy("ai.backend.manager.api.gql.resource_group.types"),
+        ]
+        | None
+    ):
+        from strawberry.relay import PageInfo
+
+        from ai.backend.common.dto.manager.v2.rbac.types import UUIDScope
+        from ai.backend.common.dto.manager.v2.resource_group.request import (
+            ScopedSearchResourceGroupsInput,
+        )
+        from ai.backend.common.dto.manager.v2.resource_group.types import ResourceGroupScope
+        from ai.backend.manager.api.gql.base import encode_cursor
+        from ai.backend.manager.api.gql.resource_group.types import (
+            ResourceGroupConnection,
+            ResourceGroupEdge,
+            ResourceGroupGQL,
+        )
+
+        payload = await info.context.adapters.resource_group.scoped_search(
+            ScopedSearchResourceGroupsInput(
+                scope=ResourceGroupScope(project=[UUIDScope(value=UUID(str(self.id)))]),
+                filter=filter.to_pydantic() if filter else None,
+                order=[o.to_pydantic() for o in order_by] if order_by else None,
+                first=first,
+                after=after,
+                last=last,
+                before=before,
+                limit=limit,
+                offset=offset,
+            )
+        )
+        nodes = [ResourceGroupGQL.from_pydantic(data) for data in payload.items]
+        edges = [ResourceGroupEdge(node=node, cursor=encode_cursor(node.id)) for node in nodes]
+        return ResourceGroupConnection(
+            edges=edges,
+            page_info=PageInfo(
+                has_next_page=payload.has_next_page,
+                has_previous_page=payload.has_previous_page,
+                start_cursor=edges[0].cursor if edges else None,
+                end_cursor=edges[-1].cursor if edges else None,
+            ),
+            count=payload.total_count,
+        )
+
+    @gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Model cards belonging to this project.",
+        )
+    )  # type: ignore[misc]
+    async def model_cards(
+        self,
+        info: Info,
+        filter: Annotated[
+            ModelCardFilterGQL, strawberry.lazy("ai.backend.manager.api.gql.model_card.types")
+        ]
+        | None = None,
+        order_by: list[
+            Annotated[
+                ModelCardOrderByGQL,
+                strawberry.lazy("ai.backend.manager.api.gql.model_card.types"),
+            ]
+        ]
+        | None = None,
+        before: str | None = None,
+        after: str | None = None,
+        first: int | None = None,
+        last: int | None = None,
+        limit: int | None = None,
+        offset: int | None = None,
+    ) -> (
+        Annotated[
+            ModelCardV2Connection, strawberry.lazy("ai.backend.manager.api.gql.model_card.types")
+        ]
+        | None
+    ):
+        from strawberry.relay import PageInfo
+
+        from ai.backend.common.dto.manager.v2.model_card.request import (
+            ScopedSearchModelCardsInput,
+        )
+        from ai.backend.common.dto.manager.v2.model_card.types import ModelCardScope
+        from ai.backend.common.dto.manager.v2.rbac.types import UUIDScope
+        from ai.backend.manager.api.gql.base import encode_cursor
+        from ai.backend.manager.api.gql.model_card.types import (
+            ModelCardGQL,
+            ModelCardV2Connection,
+            ModelCardV2Edge,
+        )
+
+        payload = await info.context.adapters.model_card.scoped_search(
+            ScopedSearchModelCardsInput(
+                scope=ModelCardScope(project=[UUIDScope(value=UUID(str(self.id)))]),
+                filter=filter.to_pydantic() if filter else None,
+                order=[o.to_pydantic() for o in order_by] if order_by else None,
+                first=first,
+                after=after,
+                last=last,
+                before=before,
+                limit=limit,
+                offset=offset,
+            )
+        )
+        nodes = [ModelCardGQL.from_pydantic(node) for node in payload.items]
+        edges = [ModelCardV2Edge(node=node, cursor=encode_cursor(str(node.id))) for node in nodes]
+        return ModelCardV2Connection(
             edges=edges,
             page_info=PageInfo(
                 has_next_page=payload.has_next_page,

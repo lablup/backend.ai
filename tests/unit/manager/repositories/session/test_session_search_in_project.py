@@ -45,6 +45,8 @@ from ai.backend.manager.models.session.scopes import ProjectSessionOperationScop
 from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
+from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
 from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.ops import DBOpsProvider
 from ai.backend.manager.repositories.session.repository import SessionRepository
@@ -86,6 +88,8 @@ class TestSessionSearchInProject:
                 KernelRow,
                 ResourceSlotTypeRow,
                 ResourceAllocationRow,
+                VirtualEntityRow,
+                EntityMembershipRow,
             ],
         ):
             yield database_connection

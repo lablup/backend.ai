@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from abc import ABC, abstractmethod
+from abc import ABC
 from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import override
@@ -11,6 +11,7 @@ from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE, ProjectID
 from ai.backend.common.data.entity.types import ScopeRef
 from ai.backend.common.data.entity.user import USER_SCOPE_TYPE, UserID
 from ai.backend.manager.actions.types import ActionOperationType
+from ai.backend.manager.actions.v2.ops.base import ScopeItem
 from ai.backend.manager.data.deployment.types import ModelDeploymentData
 from ai.backend.manager.models.endpoint.scopes import (
     ProjectDeploymentOperationScope,
@@ -32,22 +33,8 @@ __all__ = (
 )
 
 
-class DeploymentScopeItem(ABC):
-    """One side a deployment is reachable from.
-
-    The scope the read is answered for and the rows it is restricted to are declared
-    together, so a read cannot be authorized against one thing and served another.
-    """
-
-    @abstractmethod
-    def scope_ref(self) -> ScopeRef:
-        """The scope the read is answered for."""
-        raise NotImplementedError
-
-    @abstractmethod
-    def operation_scope(self) -> OperationScope:
-        """The rows the read is restricted to."""
-        raise NotImplementedError
+class DeploymentScopeItem(ScopeItem, ABC):
+    """One side a deployment is reachable from."""
 
 
 @dataclass(frozen=True)
