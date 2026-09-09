@@ -21954,8 +21954,8 @@ input UpdateDeploymentPolicyInput
 {
   deploymentId: ID!
   strategy: DeploymentStrategyType!
-  rollingUpdate: RollingUpdateConfigInput = null
-  blueGreen: BlueGreenConfigInput = null
+  rollingUpdate: RollingUpdateConfigInput
+  blueGreen: BlueGreenConfigInput
 }
 
 """
