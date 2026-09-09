@@ -59,13 +59,13 @@ class PreemptionConfigInput(BaseRequestModel):
 class UpdateScalingGroupInput(BaseRequestModel):
     """Input for updating a scaling group. All fields optional for partial update."""
 
-    is_active: bool | None = Field(
-        default=None,
-        description="Whether the scaling group is active. Leave null to keep existing value.",
+    is_active: bool | None | Unset = Field(
+        default=UNSET,
+        description="Whether the scaling group is active. Omit to leave unchanged.",
     )
-    is_public: bool | None = Field(
-        default=None,
-        description="Whether the scaling group is public. Leave null to keep existing value.",
+    is_public: bool | None | Unset = Field(
+        default=UNSET,
+        description="Whether the scaling group is public. Omit to leave unchanged.",
     )
     description: str | None | Unset = Field(
         default=UNSET,
@@ -79,18 +79,18 @@ class UpdateScalingGroupInput(BaseRequestModel):
         default=UNSET,
         description="WebSocket proxy API token. Omit to leave unchanged; null clears.",
     )
-    use_host_network: bool | None = Field(
-        default=None,
-        description="Whether to use host network mode. Leave null to keep existing value.",
+    use_host_network: bool | None | Unset = Field(
+        default=UNSET,
+        description="Whether to use host network mode. Omit to leave unchanged.",
     )
-    scheduler: SchedulerType | None = Field(
-        default=None,
-        description="Scheduler type. Leave null to keep existing value.",
+    scheduler: SchedulerType | None | Unset = Field(
+        default=UNSET,
+        description="Scheduler type. Omit to leave unchanged.",
     )
-    preemption_config: PreemptionConfigInput | None = Field(
-        default=None,
+    preemption_config: PreemptionConfigInput | None | Unset = Field(
+        default=UNSET,
         description=(
             "Preemption configuration. When provided, replaces the entire preemption config. "
-            "Leave null to keep existing value."
+            "Omit to leave unchanged."
         ),
     )

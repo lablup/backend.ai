@@ -94,18 +94,29 @@ class TestUpdateScalingGroupInput:
         assert req.is_active is None
         assert req.is_public is None
 
-    def test_default_sentinel_fields(self) -> None:
+    def test_default_unset_fields(self) -> None:
         req = UpdateScalingGroupInput()
+        assert req.is_active is UNSET
+        assert req.is_public is UNSET
         assert req.description is UNSET
         assert isinstance(req.description, Unset)
         assert req.wsproxy_addr is UNSET
         assert req.wsproxy_api_token is UNSET
+        assert req.use_host_network is UNSET
+        assert req.scheduler is UNSET
+        assert req.preemption_config is UNSET
 
-    def test_sentinel_description_signals_clear(self) -> None:
+    def test_none_fields_stay_none(self) -> None:
+        req = UpdateScalingGroupInput(is_active=None, scheduler=None, preemption_config=None)
+        assert req.is_active is None
+        assert req.scheduler is None
+        assert req.preemption_config is None
+
+    def test_unset_description_leaves_unchanged(self) -> None:
         req = UpdateScalingGroupInput(description=UNSET)
         assert req.description is UNSET
 
-    def test_none_description_means_no_change(self) -> None:
+    def test_none_description_clears(self) -> None:
         req = UpdateScalingGroupInput(description=None)
         assert req.description is None
 
@@ -124,7 +135,7 @@ class TestUpdateScalingGroupInput:
     def test_nested_preemption_config(self) -> None:
         preemption = PreemptionConfigInput(preemptible_priority=3)
         req = UpdateScalingGroupInput(preemption_config=preemption)
-        assert req.preemption_config is not None
+        assert isinstance(req.preemption_config, PreemptionConfigInput)
         assert req.preemption_config.preemptible_priority == 3
 
     def test_round_trip_with_all_none(self) -> None:
