@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 from bai_scenario.components.domain import seed_someone_of
+from bai_scenario.seeds.domain.domain import seed_domain
 from bai_scenario.seeds.rbac.role import seed_permission, seed_role
-from bai_scenario.seeds.seeder import Given, Seeder
+from bai_scenario.seeds.seeder import Given, Seeder, Spec
 
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.entity.vfolder import VFolderEntityType
@@ -17,6 +18,14 @@ from ai.backend.testutils.typed_scenario import TypedScenario
 
 type VFolderScenario = TypedScenario[VFolderAdapter, ManagerUnifiedConfig]
 
+STORAGE_HOST = "local:volume1"
+"""The one host the faked storage manager answers for."""
+
+
+def seed_domain_with_storage() -> Spec[DomainData]:
+    """A domain whose folders may land on the host the fake answers for."""
+    return seed_domain(name_hint="home", vfolder_hosts=[STORAGE_HOST])
+
 
 def seed_someone_making_folders(
     seed: Seeder, domain: Given[DomainData]
@@ -26,7 +35,7 @@ def seed_someone_making_folders(
     The scope is the user themselves: a personal folder is created in the maker's own
     scope, so that is where the role has to sit.
     """
-    someone = seed_someone_of(seed, domain)
+    someone = seed_someone_of(seed, domain, vfolder_hosts=[STORAGE_HOST])
     role = seed.creating(seed_role(lambda u: UserID(u.id), name_hint="folder-owner"), someone)
     seed.adding(
         seed_permission(entity_type=VFolderEntityType(), permission=Permission.CREATE), role

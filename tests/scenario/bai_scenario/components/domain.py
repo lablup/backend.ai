@@ -7,12 +7,14 @@ against, and the situations worth naming more than once.
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from datetime import datetime, timedelta
 
 from bai_scenario.seeds.rbac.role import seed_permission, seed_role
+from bai_scenario.seeds.resource_policy.keypair import seed_keypair_policy
 from bai_scenario.seeds.resource_policy.user import seed_user_policy
 from bai_scenario.seeds.seeder import Given, Seeder
+from bai_scenario.seeds.user.keypair import seed_default_keypair
 from bai_scenario.seeds.user.user import seed_user
 
 from ai.backend.common.data.entity.domain import DomainEntityType
@@ -36,11 +38,22 @@ MANAGER_CONFIG = config_of(ManagerUnifiedConfig)
 
 
 def seed_someone_of(
-    seed: Seeder, domain: Given[DomainData], *, role: UserRole = UserRole.USER
+    seed: Seeder,
+    domain: Given[DomainData],
+    *,
+    role: UserRole = UserRole.USER,
+    vfolder_hosts: Sequence[str] = (),
 ) -> Given[UserData]:
-    """A user of that domain, held to a policy of their own and granted nothing."""
+    """A user of that domain, with the key they authorize with, granted nothing.
+
+    The keypair is not optional scenery: a request that resolves the caller's key
+    finds nothing without it, and fails before any permission is looked at.
+    """
     policy = seed.creating(seed_user_policy())
-    return seed.creating(seed_user(role=role), domain, policy)
+    key_policy = seed.creating(seed_keypair_policy(vfolder_hosts=vfolder_hosts))
+    someone = seed.creating(seed_user(role=role), domain, policy)
+    seed.adding(seed_default_keypair(key_policy.describe), someone)
+    return someone
 
 
 def seed_someone_reading_domains(

@@ -4,17 +4,22 @@ from __future__ import annotations
 
 import pytest
 from bai_scenario.components.domain import seed_someone_of
-from bai_scenario.components.vfolder import VFolderScenario
+from bai_scenario.components.vfolder import (
+    VFolderScenario,
+    seed_domain_with_storage,
+    seed_someone_making_folders,
+)
 from bai_scenario.runner.runner import ScenarioRunner
 from bai_scenario.seeds.domain.domain import seed_domain
 from bai_scenario.seeds.seeder import Seeder
 
 from ai.backend.common.dto.manager.v2.vfolder.request import (
     CreateVFolderInput,
+    SearchVFoldersInput,
 )
 from ai.backend.manager.api.adapters.vfolder.adapter import VFolderAdapter
 from ai.backend.manager.errors.permission import NotEnoughPermission
-from ai.backend.testutils.typed_scenario import TypedScenario, call
+from ai.backend.testutils.typed_scenario import TypedScenario, at, call
 
 
 def ungranted_user_is_refused(seed: Seeder) -> VFolderScenario:
@@ -30,13 +35,25 @@ def ungranted_user_is_refused(seed: Seeder) -> VFolderScenario:
     )
 
 
-# The other half of this pair is missing. A role scoped to the maker's own scope, with
-# vfolder CREATE on it, does not let the maker create: the govern query wants the scope
-# entity to be governed by the scope the role sits in, and a hand-made role does not
-# arrive at that. Whether a scenario may state such a grant at all is an open question;
-# until it is answered this table can only say who is refused.
+def granted_user_lists_none(seed: Seeder) -> VFolderScenario:
+    home = seed.creating(seed_domain_with_storage())
+    maker, _ = seed_someone_making_folders(seed, home)
+    return TypedScenario.ok(
+        "a-user-who-has-made-no-folder-lists-none",
+        description="폴더를 하나도 만들지 않은 사용자가 자기 폴더를 조회하면, 답은 비어 있다",
+        actor=maker,
+        given=seed.situation(),
+        when=call(VFolderAdapter.my_search, SearchVFoldersInput()),
+        then=at(lambda p: p.total_count, 0),
+    )
 
-BUILDERS = (ungranted_user_is_refused,)
+
+# Making a folder is not covered yet. Each attempt named one more thing the user needs
+# and the scenario had not laid: the key they authorize with, a keypair policy that
+# allows the host, a domain that allows it. What it asks for now is the owner a personal
+# folder is created under, which the user's own personal project used to supply.
+
+BUILDERS = (ungranted_user_is_refused, granted_user_lists_none)
 SCENARIOS: list[VFolderScenario] = [build(Seeder()) for build in BUILDERS]
 
 

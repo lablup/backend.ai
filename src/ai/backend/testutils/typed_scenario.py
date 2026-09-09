@@ -13,13 +13,10 @@ side lives in the test kit.
 
 from __future__ import annotations
 
-from abc import ABC, abstractmethod
 from collections.abc import Awaitable, Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from typing import Any, Concatenate, Final, cast, override
-
-from ai.backend.testutils.scenario import Persona
 
 __all__ = (
     "At",
@@ -338,8 +335,6 @@ type Sown = Mapping[Any, Any]
 """What the seeds made, reached by holding the seed itself."""
 
 
-
-
 @dataclass(frozen=True)
 class Situation[C]:
     """What is already true when the call is made, on three axes: the rows in the
@@ -391,12 +386,6 @@ def on_fake[T, F](fake: type[F], matcher: TypedMatcher[F]) -> OnFake[T, F]:
 # ---------------------------------------------------------------------------
 
 
-
-
-
-
-
-
 @dataclass(frozen=True)
 class ActorBound[A, R, I]:
     """A call that cannot be written until the actor is known, because the method takes
@@ -431,8 +420,6 @@ class Deferred[A, R]:
 
     row: object
     build: Callable[[Any], Invocation[A, R] | ActorBound[A, R, Any]]
-
-
 
 
 # ---------------------------------------------------------------------------

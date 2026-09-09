@@ -185,7 +185,9 @@ class Seeder:
         async def write(ops: V2WriteOps, values: Sequence[Any]) -> Any:
             return await ops.create_field(spec.owner_id(values[0]), spec.spec)
 
-        return Given(describe=f"{spec.hint} on {owner.describe}", sources=(owner,), write=write)
+        return self._remember(
+            Given(describe=f"{spec.hint} on {owner.describe}", sources=(owner,), write=write)
+        )
 
     def granting[R, U](
         self,
