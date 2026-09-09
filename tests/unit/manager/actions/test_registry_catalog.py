@@ -35,7 +35,6 @@ from ai.backend.common.data.entity.deployment_preset import DeploymentPresetEnti
 from ai.backend.common.data.entity.domain import DomainEntityType
 from ai.backend.common.data.entity.entity_label import EntityLabelFieldType
 from ai.backend.common.data.entity.entity_share import EntityShareEntityType
-from ai.backend.common.data.entity.export import ExportEntityType
 from ai.backend.common.data.entity.fair_share import (
     DomainFairShareFieldType,
     ProjectFairShareFieldType,
@@ -75,6 +74,7 @@ from ai.backend.common.data.entity.service_catalog import ServiceCatalogEntityTy
 from ai.backend.common.data.entity.session import SessionEntityType
 from ai.backend.common.data.entity.session_template import SessionTemplateEntityType
 from ai.backend.common.data.entity.storage_namespace import StorageNamespaceEntityType
+from ai.backend.common.data.entity.types import GlobalEntityType
 from ai.backend.common.data.entity.user import UserEntityType
 from ai.backend.common.data.entity.vfolder import VFolderEntityType
 from ai.backend.common.data.entity.vfolder_invitation import VFolderInvitationEntityType
@@ -491,7 +491,14 @@ def test_every_defined_v2_action_is_wired() -> None:
         registry.group(GroupMeta(ContainerRegistryEntityType())), MagicMock()
     )
     ImageProcessors(registry.group(GroupMeta(ImageEntityType())), MagicMock())
-    ExportProcessors(registry.group(GroupMeta(ExportEntityType())), MagicMock())
+    ExportProcessors(
+        registry.group(GroupMeta(UserEntityType())),
+        registry.group(GroupMeta(SessionEntityType())),
+        registry.group(GroupMeta(ProjectEntityType())),
+        registry.group(GroupMeta(GlobalEntityType())),
+        registry.dangling_field_group(FieldGroupMeta(AuditLogFieldType()), AuditLogData),
+        MagicMock(),
+    )
     TemplateProcessors(registry.group(GroupMeta(SessionTemplateEntityType())), MagicMock())
     SchedulingHistoryProcessors(
         scheduling_history_groups.group(GroupMeta(SessionEntityType())),
