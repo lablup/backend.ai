@@ -17,7 +17,7 @@ class ObjectStorageEntityType(EntityType):
     @override
     @classmethod
     def description(cls) -> str:
-        return "An object storage backend behind a storage namespace."
+        return "An S3-compatible object storage, with the endpoint and credentials to reach it."
 
 
 class ObjectStorageID(EntityIdentifier):

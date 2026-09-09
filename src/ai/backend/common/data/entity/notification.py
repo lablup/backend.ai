@@ -31,7 +31,7 @@ class NotificationRuleEntityType(EntityType):
     @override
     @classmethod
     def description(cls) -> str:
-        return "A rule choosing which events reach a notification channel."
+        return "A rule sending one kind of event to a channel, with the message it writes."
 
 
 class NotificationChannelID(EntityIdentifier):
