@@ -4,6 +4,7 @@ import uuid
 from collections.abc import Collection, Mapping
 from typing import cast
 
+from ai.backend.common.data.entity.role import RoleID
 from ai.backend.common.data.permission.types import Permission, RBACElementType
 from ai.backend.common.exception import BackendAIError
 from ai.backend.common.metrics.metric import DomainType, LayerType
@@ -45,18 +46,18 @@ from ai.backend.manager.data.permission.virtual_entity import (
     GovernCheckKey,
     OwnCheckKey,
 )
+from ai.backend.manager.models.rbac_models.permission.creators import RolePermissionCreator
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
+from ai.backend.manager.models.rbac_models.permission.purgers import RolePermissionPurger
 from ai.backend.manager.models.rbac_models.permission.scopes import PermissionOperationScope
+from ai.backend.manager.models.rbac_models.permission.updaters import RolePermissionUpdater
 from ai.backend.manager.models.rbac_models.role.scopes import ScopedRoleOperationScope
 from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base.creator import (
     BulkCreator,
-    Creator,
 )
-from ai.backend.manager.repositories.base.purger import Purger
 from ai.backend.manager.repositories.base.querier import BatchQuerier
-from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.permission_controller.creators import (
     PermissionCreatorSpec,
     UserRoleCreatorSpec,
@@ -92,20 +93,20 @@ class PermissionControllerRepository:
     @permission_controller_repository_resilience.apply()
     async def create_permission(
         self,
-        creator: Creator[PermissionRow],
+        role_id: RoleID,
+        creator: RolePermissionCreator,
     ) -> PermissionData:
         """
         Create a new permission in the database.
 
         Returns the created permission data.
         """
-        row = await self._db_source.create_permission(creator)
-        return row.to_data()
+        return await self._db_source.create_permission(role_id, creator)
 
     @permission_controller_repository_resilience.apply()
     async def delete_permission(
         self,
-        purger: Purger[PermissionRow],
+        purger: RolePermissionPurger,
     ) -> PermissionData:
         """
         Delete a permission from the database.
@@ -115,13 +116,12 @@ class PermissionControllerRepository:
         Raises:
             ObjectNotFound: If permission does not exist.
         """
-        row = await self._db_source.delete_permission(purger)
-        return row.to_data()
+        return await self._db_source.delete_permission(purger)
 
     @permission_controller_repository_resilience.apply()
     async def update_permission(
         self,
-        updater: Updater[PermissionRow],
+        updater: RolePermissionUpdater,
     ) -> PermissionData:
         """
         Update a permission in the database.
@@ -131,8 +131,7 @@ class PermissionControllerRepository:
         Raises:
             ObjectNotFound: If permission does not exist.
         """
-        row = await self._db_source.update_permission(updater)
-        return row.to_data()
+        return await self._db_source.update_permission(updater)
 
     @permission_controller_repository_resilience.apply()
     async def replace_role_permissions(

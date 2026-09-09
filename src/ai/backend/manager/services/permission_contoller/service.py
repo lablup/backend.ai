@@ -103,7 +103,7 @@ class PermissionControllerService:
         """
         Creates a new permission in the repository.
         """
-        result = await self._repository.create_permission(action.creator)
+        result = await self._repository.create_permission(action.role_id, action.creator)
         return CreatePermissionActionResult(data=result)
 
     async def delete_permission(

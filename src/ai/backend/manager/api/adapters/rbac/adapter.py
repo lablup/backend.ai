@@ -196,6 +196,8 @@ from ai.backend.manager.models.rbac_models.permission.conditions import (
 from ai.backend.manager.models.rbac_models.permission.creators import RolePermissionCreator
 from ai.backend.manager.models.rbac_models.permission.orders import ScopedPermissionOrders
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
+from ai.backend.manager.models.rbac_models.permission.purgers import RolePermissionPurger
+from ai.backend.manager.models.rbac_models.permission.updaters import RolePermissionUpdater
 from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.rbac_models.role.conditions import RoleConditions
 from ai.backend.manager.models.rbac_models.role.creators import RoleCreator
@@ -204,6 +206,7 @@ from ai.backend.manager.models.rbac_models.role.scopes import ScopedRoleOperatio
 from ai.backend.manager.models.rbac_models.role.updaters import RoleSoftDeleteUpdater, RoleUpdater
 from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
 from ai.backend.manager.models.specs.pagination import NoPagination, OffsetPagination
+from ai.backend.manager.models.virtual_entity.conditions import OwningScopeConditions
 from ai.backend.manager.repositories.base import BatchQuerier, BulkCreator, Purger
 from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.base.updater import Updater
@@ -211,8 +214,6 @@ from ai.backend.manager.repositories.permission_controller.creators import (
     PermissionCreatorSpec,
     UserRoleCreatorSpec,
 )
-from ai.backend.manager.repositories.permission_controller.purgers import PermissionPurgerSpec
-from ai.backend.manager.repositories.permission_controller.updaters import PermissionUpdaterSpec
 from ai.backend.manager.services.permission_contoller.actions.add_role_permission import (
     AddRolePermissionAction,
 )
@@ -895,11 +896,8 @@ class RBACAdapter(BaseAdapter):
 
     async def delete_permission(self, permission_id: UUID) -> DeletePermissionPayloadDTO:
         """Hard-delete a scoped permission."""
-        purger: Purger[PermissionRow] = Purger(
-            spec=PermissionPurgerSpec(permission_id=permission_id)
-        )
         await self._permission_controller.delete_permission.wait_for_complete(
-            DeletePermissionAction(purger=purger)
+            DeletePermissionAction(purger=RolePermissionPurger(PermissionID(permission_id)))
         )
         return DeletePermissionPayloadDTO(id=permission_id)
 
@@ -907,21 +905,19 @@ class RBACAdapter(BaseAdapter):
 
     async def create_permission(self, input: CreatePermissionInputDTO) -> PermissionNode:
         """Create a permission on the role; it holds in the scope the role sits in."""
-        creator: Creator[PermissionRow] = Creator(
-            spec=PermissionCreatorSpec(
-                role_id=input.role_id,
-                entity_type=EntityType(RBACElementType(input.entity_type)),
-                permission=self._permission_bit(input.operation),
-            )
+        creator = RolePermissionCreator(
+            entity_type=EntityType(RBACElementType(input.entity_type)),
+            permission=self._permission_bit(input.operation),
         )
         action_result = await self._permission_controller.create_permission.wait_for_complete(
-            CreatePermissionAction(creator=creator)
+            CreatePermissionAction(role_id=RoleID(input.role_id), creator=creator)
         )
         return self._permission_data_to_node(action_result.data)
 
     async def update_permission(self, input: UpdatePermissionInputDTO) -> PermissionNode:
         """Update an existing permission."""
-        spec = PermissionUpdaterSpec(
+        updater = RolePermissionUpdater(
+            permission_id=PermissionID(input.id),
             entity_type=(
                 OptionalState.update(EntityType(RBACElementType(input.entity_type)))
                 if input.entity_type is not None
@@ -934,7 +930,7 @@ class RBACAdapter(BaseAdapter):
             ),
         )
         action_result = await self._permission_controller.update_permission.wait_for_complete(
-            UpdatePermissionAction(updater=Updater(spec=spec, pk_value=input.id))
+            UpdatePermissionAction(updater=updater)
         )
         return self._permission_data_to_node(action_result.data)
 

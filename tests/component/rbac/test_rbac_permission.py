@@ -5,8 +5,9 @@ from typing import Any
 
 import pytest
 
-from ai.backend.common.data.entity.domain import DOMAIN_SCOPE_TYPE
-from ai.backend.common.data.entity.types import EntityType
+from ai.backend.common.data.entity.permission import PermissionID
+from ai.backend.common.data.entity.role import RoleID
+from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
 from ai.backend.common.data.permission.types import (
     OperationType,
     Permission,
@@ -26,16 +27,10 @@ from ai.backend.manager.data.permission.role import (
 )
 from ai.backend.manager.data.permission.types import EntityType as LegacyEntityType
 from ai.backend.manager.errors.common import ObjectNotFound
-from ai.backend.manager.errors.repository import (
-    UniqueConstraintViolationError,
-)
+from ai.backend.manager.errors.permission import PermissionAlreadyGranted
+from ai.backend.manager.models.rbac_models.permission.creators import RolePermissionCreator
+from ai.backend.manager.models.rbac_models.permission.purgers import RolePermissionPurger
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.base.creator import Creator
-from ai.backend.manager.repositories.base.purger import Purger
-from ai.backend.manager.repositories.permission_controller.creators import (
-    PermissionCreatorSpec,
-)
-from ai.backend.manager.repositories.permission_controller.purgers import PermissionPurgerSpec
 from ai.backend.manager.repositories.permission_controller.repository import (
     PermissionControllerRepository,
 )
@@ -70,27 +65,23 @@ class TestPermissionCreate:
         domain_fixture: DomainFixtureData,
     ) -> None:
         """S-CREATE-1: Create basic permission with valid params → PermissionData returned."""
-        creator = Creator(
-            spec=PermissionCreatorSpec(
-                role_id=target_role.role.id,
-                entity_type=EntityType(RBACElementType.SESSION),
-                permission=Permission.READ,
-            )
+        creator = RolePermissionCreator(
+            entity_type=EntityType(RBACElementType.SESSION),
+            permission=Permission.READ,
         )
         result = await permission_controller_processors.create_permission.wait_for_complete(
-            CreatePermissionAction(creator=creator)
+            CreatePermissionAction(role_id=RoleID(target_role.role.id), creator=creator)
         )
 
         assert isinstance(result.data, PermissionData)
         assert result.data.role_id == target_role.role.id
+        assert result.data.scope_type == LegacyScopeType.DOMAIN.value
         assert result.data.entity_type == LegacyEntityType.SESSION.value
         assert result.data.permission == Permission.READ
 
         # Cleanup
         await permission_controller_processors.delete_permission.wait_for_complete(
-            DeletePermissionAction(
-                purger=Purger(spec=PermissionPurgerSpec(permission_id=result.data.id))
-            )
+            DeletePermissionAction(purger=RolePermissionPurger(PermissionID(result.data.id)))
         )
 
     async def test_create_permissions_with_various_combinations(
@@ -100,38 +91,21 @@ class TestPermissionCreate:
         domain_fixture: DomainFixtureData,
     ) -> None:
         """S-CREATE-2: Create permissions with various scope/entity/operation combinations."""
-        combos: list[tuple[RBACElementType, str, RBACElementType, OperationType]] = [
-            (
-                RBACElementType.DOMAIN,
-                domain_fixture.domain_name,
-                RBACElementType.SESSION,
-                OperationType.READ,
-            ),
-            (
-                RBACElementType.DOMAIN,
-                domain_fixture.domain_name,
-                RBACElementType.IMAGE,
-                OperationType.UPDATE,
-            ),
-            (
-                RBACElementType.DOMAIN,
-                domain_fixture.domain_name,
-                RBACElementType.VFOLDER,
-                OperationType.SOFT_DELETE,
-            ),
+        combos: list[tuple[EntityIdentifier, RBACElementType, OperationType]] = [
+            (domain_fixture.domain_id, RBACElementType.SESSION, OperationType.READ),
+            (domain_fixture.domain_id, RBACElementType.IMAGE, OperationType.UPDATE),
+            (domain_fixture.domain_id, RBACElementType.VFOLDER, OperationType.SOFT_DELETE),
         ]
         created_ids: list[uuid.UUID] = []
 
-        for scope_type, scope_id, entity_type, operation in combos:
+        for scope, entity_type, operation in combos:
             result = await permission_controller_processors.create_permission.wait_for_complete(
                 CreatePermissionAction(
-                    creator=Creator(
-                        spec=PermissionCreatorSpec(
-                            role_id=target_role.role.id,
-                            entity_type=EntityType(entity_type),
-                            permission=Permission.from_operation(operation),
-                        )
-                    )
+                    role_id=RoleID(target_role.role.id),
+                    creator=RolePermissionCreator(
+                        entity_type=EntityType(entity_type),
+                        permission=Permission.from_operation(operation),
+                    ),
                 )
             )
             assert result.data.entity_type == entity_type.value
@@ -142,9 +116,7 @@ class TestPermissionCreate:
         # Cleanup
         for perm_id in created_ids:
             await permission_controller_processors.delete_permission.wait_for_complete(
-                DeletePermissionAction(
-                    purger=Purger(spec=PermissionPurgerSpec(permission_id=perm_id))
-                )
+                DeletePermissionAction(purger=RolePermissionPurger(PermissionID(perm_id)))
             )
 
     async def test_create_duplicate_permission_raises_unique_constraint(
@@ -154,27 +126,24 @@ class TestPermissionCreate:
         domain_fixture: DomainFixtureData,
     ) -> None:
         """F-BIZ-4: Create duplicate permission → unique constraint error."""
-        spec = PermissionCreatorSpec(
-            role_id=target_role.role.id,
+        spec = RolePermissionCreator(
             entity_type=EntityType(RBACElementType.VFOLDER),
             permission=Permission.READ,
         )
 
         result = await permission_controller_processors.create_permission.wait_for_complete(
-            CreatePermissionAction(creator=Creator(spec=spec))
+            CreatePermissionAction(role_id=RoleID(target_role.role.id), creator=spec)
         )
         perm_id = result.data.id
 
         try:
-            with pytest.raises(UniqueConstraintViolationError):
+            with pytest.raises(PermissionAlreadyGranted):
                 await permission_controller_processors.create_permission.wait_for_complete(
-                    CreatePermissionAction(creator=Creator(spec=spec))
+                    CreatePermissionAction(role_id=RoleID(target_role.role.id), creator=spec)
                 )
         finally:
             await permission_controller_processors.delete_permission.wait_for_complete(
-                DeletePermissionAction(
-                    purger=Purger(spec=PermissionPurgerSpec(permission_id=perm_id))
-                )
+                DeletePermissionAction(purger=RolePermissionPurger(PermissionID(perm_id)))
             )
 
 
@@ -190,19 +159,17 @@ class TestPermissionDelete:
         """S-DELETE-1: Delete existing permission → deletion response."""
         create_result = await permission_controller_processors.create_permission.wait_for_complete(
             CreatePermissionAction(
-                creator=Creator(
-                    spec=PermissionCreatorSpec(
-                        role_id=target_role.role.id,
-                        entity_type=EntityType(RBACElementType.SESSION),
-                        permission=Permission.HARD_DELETE,
-                    )
-                )
+                role_id=RoleID(target_role.role.id),
+                creator=RolePermissionCreator(
+                    entity_type=EntityType(RBACElementType.SESSION),
+                    permission=Permission.HARD_DELETE,
+                ),
             )
         )
         perm_id = create_result.data.id
 
         delete_result = await permission_controller_processors.delete_permission.wait_for_complete(
-            DeletePermissionAction(purger=Purger(spec=PermissionPurgerSpec(permission_id=perm_id)))
+            DeletePermissionAction(purger=RolePermissionPurger(PermissionID(perm_id)))
         )
 
         assert isinstance(delete_result.data, PermissionData)
@@ -217,27 +184,23 @@ class TestPermissionDelete:
         """S-DELETE-2: Verify deleted permission no longer exists."""
         create_result = await permission_controller_processors.create_permission.wait_for_complete(
             CreatePermissionAction(
-                creator=Creator(
-                    spec=PermissionCreatorSpec(
-                        role_id=target_role.role.id,
-                        entity_type=EntityType(RBACElementType.IMAGE),
-                        permission=Permission.SOFT_DELETE,
-                    )
-                )
+                role_id=RoleID(target_role.role.id),
+                creator=RolePermissionCreator(
+                    entity_type=EntityType(RBACElementType.IMAGE),
+                    permission=Permission.SOFT_DELETE,
+                ),
             )
         )
         perm_id = create_result.data.id
 
         await permission_controller_processors.delete_permission.wait_for_complete(
-            DeletePermissionAction(purger=Purger(spec=PermissionPurgerSpec(permission_id=perm_id)))
+            DeletePermissionAction(purger=RolePermissionPurger(PermissionID(perm_id)))
         )
 
         # Second delete must raise ObjectNotFound
         with pytest.raises(ObjectNotFound):
             await permission_controller_processors.delete_permission.wait_for_complete(
-                DeletePermissionAction(
-                    purger=Purger(spec=PermissionPurgerSpec(permission_id=perm_id))
-                )
+                DeletePermissionAction(purger=RolePermissionPurger(PermissionID(perm_id)))
             )
 
     async def test_delete_nonexistent_permission_raises_not_found(
@@ -247,9 +210,7 @@ class TestPermissionDelete:
         """F-BIZ-2: Delete non-existent permission_id → ObjectNotFound."""
         with pytest.raises(ObjectNotFound):
             await permission_controller_processors.delete_permission.wait_for_complete(
-                DeletePermissionAction(
-                    purger=Purger(spec=PermissionPurgerSpec(permission_id=uuid.uuid4()))
-                )
+                DeletePermissionAction(purger=RolePermissionPurger(PermissionID(uuid.uuid4())))
             )
 
 
@@ -286,19 +247,17 @@ class TestCheckPermissionInScope:
         domain_fixture: DomainFixtureData,
     ) -> None:
         """S-SCOPE-1: User has permission in target scope → True."""
-        role = await role_factory(scope_type=DOMAIN_SCOPE_TYPE, scope_id=domain_fixture.domain_id)
+        role = await role_factory()
         role_id = role.role.id
         user_id: uuid.UUID = admin_user_fixture.user_uuid
 
         perm_result = await permission_controller_processors.create_permission.wait_for_complete(
             CreatePermissionAction(
-                creator=Creator(
-                    spec=PermissionCreatorSpec(
-                        role_id=role_id,
-                        entity_type=EntityType(RBACElementType.SESSION),
-                        permission=Permission.READ,
-                    )
-                )
+                role_id=RoleID(role_id),
+                creator=RolePermissionCreator(
+                    entity_type=EntityType(RBACElementType.SESSION),
+                    permission=Permission.READ,
+                ),
             )
         )
 
@@ -325,7 +284,7 @@ class TestCheckPermissionInScope:
             )
             await permission_controller_processors.delete_permission.wait_for_complete(
                 DeletePermissionAction(
-                    purger=Purger(spec=PermissionPurgerSpec(permission_id=perm_result.data.id))
+                    purger=RolePermissionPurger(PermissionID(perm_result.data.id))
                 )
             )
 

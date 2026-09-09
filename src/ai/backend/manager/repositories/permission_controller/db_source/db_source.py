@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import contains_eager, selectinload
 
 from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE
+from ai.backend.common.data.entity.role import RoleID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.permission.types import (
     RBACElementType,
@@ -23,6 +24,7 @@ from ai.backend.manager.data.permission.entity import (
 )
 from ai.backend.manager.data.permission.id import ObjectId, ScopeId
 from ai.backend.manager.data.permission.permission import (
+    PermissionData,
     PermissionListResult,
 )
 from ai.backend.manager.data.permission.role import (
@@ -67,9 +69,12 @@ from ai.backend.manager.models.project.row import ProjectRow
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
 )
+from ai.backend.manager.models.rbac_models.permission.creators import RolePermissionCreator
 from ai.backend.manager.models.rbac_models.permission.object_permission import ObjectPermissionRow
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
+from ai.backend.manager.models.rbac_models.permission.purgers import RolePermissionPurger
 from ai.backend.manager.models.rbac_models.permission.scopes import PermissionOperationScope
+from ai.backend.manager.models.rbac_models.permission.updaters import RolePermissionUpdater
 from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.rbac_models.role.scopes import ScopedRoleOperationScope
 from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
@@ -82,12 +87,7 @@ from ai.backend.manager.repositories.base.creator import (
     execute_bulk_creator_partial,
     execute_creator,
 )
-from ai.backend.manager.repositories.base.purger import (
-    Purger,
-    execute_purger,
-)
 from ai.backend.manager.repositories.base.querier import BatchQuerier, execute_batch_querier
-from ai.backend.manager.repositories.base.updater import Updater, execute_updater
 from ai.backend.manager.repositories.ops.v2.permission.provider import PermissionOpsProvider
 from ai.backend.manager.repositories.permission_controller.creators import (
     UserRoleCreatorSpec,
@@ -122,65 +122,50 @@ class PermissionDBSource:
 
     async def create_permission(
         self,
-        creator: Creator[PermissionRow],
-    ) -> PermissionRow:
+        role_id: RoleID,
+        creator: RolePermissionCreator,
+    ) -> PermissionData:
         """
-        Create a permission.
-
-        Args:
-            creator: Permission creator defining the permission to create
-
-        Returns:
-            Created permission row
+        Create a permission entry of the named role.
         """
-        async with self._db.begin_session() as db_session:
-            perm_row = await self._add_permission_to_group(db_session, creator)
-            await db_session.refresh(perm_row)
-            return perm_row
+        async with self._ops.write_ops() as w:
+            return await w.create_field(role_id, creator)
 
     async def delete_permission(
         self,
-        purger: Purger[PermissionRow],
-    ) -> PermissionRow:
+        purger: RolePermissionPurger,
+    ) -> PermissionData:
         """
-        Delete a permission.
-
-        Args:
-            purger: Purger with permission ID
-
-        Returns:
-            Deleted permission row
+        Delete a permission entry.
 
         Raises:
             ObjectNotFound: If permission does not exist
         """
-        async with self._db.begin_session() as db_session:
-            result = await execute_purger(db_session, purger)
-            if result is None:
-                raise ObjectNotFound(f"Permission with ID {purger.spec.pk_value()} does not exist.")
-            return result.row
+        async with self._ops.write_ops() as w:
+            data = await w.purge_field_entity(purger)
+            if data is None:
+                raise ObjectNotFound(
+                    f"Permission with ID {purger.target_id_value()} does not exist."
+                )
+            return data
 
     async def update_permission(
         self,
-        updater: Updater[PermissionRow],
-    ) -> PermissionRow:
+        updater: RolePermissionUpdater,
+    ) -> PermissionData:
         """
-        Update a permission.
-
-        Args:
-            updater: Updater with permission ID and fields to update
-
-        Returns:
-            Updated permission row
+        Update a permission entry.
 
         Raises:
             ObjectNotFound: If permission does not exist
         """
-        async with self._db.begin_session() as db_session:
-            result = await execute_updater(db_session, updater)
-            if result is None:
-                raise ObjectNotFound(f"Permission with ID {updater.pk_value} does not exist.")
-            return result.row
+        async with self._ops.write_ops() as w:
+            data = await w.update_data(updater)
+            if data is None:
+                raise ObjectNotFound(
+                    f"Permission with ID {updater.target_id_value()} does not exist."
+                )
+            return data
 
     async def _get_role(self, db_session: SASession, role_id: uuid.UUID) -> RoleRow:
         stmt = sa.select(RoleRow).where(RoleRow.id == role_id)
@@ -192,15 +177,6 @@ class PermissionDBSource:
     # ============================================================
     # Private Helper Functions (for use within transactions)
     # ============================================================
-
-    async def _add_permission_to_group(
-        self,
-        db_session: SASession,
-        creator: Creator[PermissionRow],
-    ) -> PermissionRow:
-        """Add a permission (private, within transaction)."""
-        result = await execute_creator(db_session, creator)
-        return result.row
 
     async def assign_role(self, data: UserRoleAssignmentInput) -> UserRoleRow:
         async with self._db.begin_session() as db_session:
