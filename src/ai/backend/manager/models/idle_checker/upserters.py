@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from typing import Any, override
 
 from ai.backend.common.data.entity.idle_checker import IdleCheckerID
@@ -72,7 +73,11 @@ class SessionIdleCheckExcluder(RelationUpserter[SessionID, IdleCheckerID, Sessio
 
 @dataclass
 class SessionIdleCheckIncluder(SessionIdleCheckExcluder):
-    """Put a pair back under the checker, restarting its checks from the grace period."""
+    """Put a pair back under the checker, restarting its checks from the grace period.
+
+    The write stamps ``updated_at`` itself: the grace period counts from here, and an
+    ON CONFLICT UPDATE does not run the column's ``onupdate``.
+    """
 
     @override
     def _values(self) -> dict[str, Any]:
@@ -82,4 +87,5 @@ class SessionIdleCheckIncluder(SessionIdleCheckExcluder):
             "last_message": "Not checked yet.",
             "is_manual": True,
             "manually_triggered_by": self.user_id,
+            "updated_at": datetime.now(UTC),
         }

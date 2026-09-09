@@ -1198,7 +1198,7 @@ class TestSessionIdleCheckExclusion:
             )
         return rows
 
-    async def test_exclude_leaves_a_pair_it_does_not_apply_to(
+    async def test_exclude_writes_a_pair_the_checker_has_not_reached(
         self,
         database: ExtendedAsyncSAEngine,
         repository: IdleCheckerRepository,
@@ -1212,14 +1212,19 @@ class TestSessionIdleCheckExclusion:
         result = await repository.batch_exclude_session_idle_checks([pair], exclusion_rows.user_id)
 
         assert [(item.pair, item.applied, item.error) for item in result.results] == [
-            (pair, False, None)
+            (pair, True, None)
         ]
         async with database.begin_readonly_session() as db_sess:
             row = await db_sess.get(
                 SessionIdleCheckRow,
                 (exclusion_rows.unassigned_session_id, exclusion_rows.checker_id),
             )
-        assert row is None
+        assert row is not None
+        assert row.last_status is IdleCheckPhase.EXCLUDED
+        assert row.expire_at is None
+        assert row.last_message == "Excluded from idle checks."
+        assert row.is_manual is True
+        assert row.manually_triggered_by == exclusion_rows.user_id
 
     async def test_exclude_overwrites_any_phase(
         self,
@@ -1323,7 +1328,7 @@ class TestSessionIdleCheckExclusion:
         assert refused.applied is False
         assert isinstance(refused.error, IdleCheckerNotFound)
 
-    async def test_include_leaves_a_pair_it_does_not_apply_to(
+    async def test_include_writes_a_pair_the_checker_has_not_reached(
         self,
         database: ExtendedAsyncSAEngine,
         repository: IdleCheckerRepository,
@@ -1337,14 +1342,19 @@ class TestSessionIdleCheckExclusion:
         result = await repository.batch_include_session_idle_checks([pair], exclusion_rows.user_id)
 
         assert [(item.pair, item.applied, item.error) for item in result.results] == [
-            (pair, False, None)
+            (pair, True, None)
         ]
         async with database.begin_readonly_session() as db_sess:
             row = await db_sess.get(
                 SessionIdleCheckRow,
                 (exclusion_rows.unassigned_session_id, exclusion_rows.checker_id),
             )
-        assert row is None
+        assert row is not None
+        assert row.last_status is IdleCheckPhase.NOT_CHECKED
+        assert row.expire_at is None
+        assert row.last_message == "Not checked yet."
+        assert row.is_manual is True
+        assert row.manually_triggered_by == exclusion_rows.user_id
 
     async def test_include_overwrites_any_phase(
         self,

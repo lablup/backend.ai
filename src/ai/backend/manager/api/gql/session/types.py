@@ -853,7 +853,7 @@ class SessionIdleCheckResultGQL:
 )
 class ExcludeSessionIdleChecksPayloadGQL:
     results: list[SessionIdleCheckResultGQL] = gql_field(
-        description="Each pair, in the order named."
+        description=f"Added in {NEXT_RELEASE_VERSION}. Each pair, in the order named."
     )
 
 
@@ -867,5 +867,5 @@ class ExcludeSessionIdleChecksPayloadGQL:
 )
 class IncludeSessionIdleChecksPayloadGQL:
     results: list[SessionIdleCheckResultGQL] = gql_field(
-        description="Each pair, in the order named."
+        description=f"Added in {NEXT_RELEASE_VERSION}. Each pair, in the order named."
     )
