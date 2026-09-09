@@ -569,10 +569,11 @@ def cluster_host_ips(subnet: str, hostnames: Sequence[str]) -> dict[str, str]:
     """Lay peer hostnames out at deterministic addresses in a session's LOCAL subnet.
 
     Single-node cluster sessions have no manager-assigned overlay IPs (those are the multi-node
-    path), and containerd has no built-in cluster DNS, so peers can only find each other if every
-    kernel writes the same ``hostname -> IP`` map into /etc/hosts. The map has to be computable by
-    each kernel independently, before any of them has attached — so it is a pure function of the
-    (session-wide, identical for every kernel) ordered hostname list and the session's subnet.
+    path), so this is where their peer names come from: the agent registers this map with the
+    session resolver (`register_static_names`), the analog of Docker's network aliases feeding its
+    embedded DNS. The map has to be computable by each kernel independently, before any of them has
+    attached — so it is a pure function of the (session-wide, identical for every kernel) ordered
+    hostname list and the session's subnet.
 
     Address ``i`` is the ``i``-th usable host after the gateway (``.1``); the caller pins each
     kernel's own attachment at its address so the mapping is real, not just advertised. Raises if
