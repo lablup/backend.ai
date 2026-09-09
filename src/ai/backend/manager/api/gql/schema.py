@@ -268,6 +268,7 @@ from .model_card import (
     model_card_v2,
     project_model_cards_v2,
     scan_project_model_cards_v2,
+    scoped_model_cards_v2,
 )
 from .node_field import node
 from .notification import (
@@ -786,6 +787,7 @@ class Query:
     # Model Card APIs
     admin_model_cards_v2 = admin_model_cards_v2
     project_model_cards_v2 = project_model_cards_v2
+    scoped_model_cards_v2 = scoped_model_cards_v2
     model_card_v2 = model_card_v2
     model_card_available_presets = model_card_available_presets
     # Resource Allocation V2 APIs

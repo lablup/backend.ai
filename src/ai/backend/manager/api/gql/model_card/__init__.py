@@ -9,6 +9,7 @@ from .resolver import (
     model_card_v2,
     project_model_cards_v2,
     scan_project_model_cards_v2,
+    scoped_model_cards_v2,
 )
 
 __all__ = (
@@ -21,5 +22,6 @@ __all__ = (
     "model_card_available_presets",
     "model_card_v2",
     "project_model_cards_v2",
+    "scoped_model_cards_v2",
     "scan_project_model_cards_v2",
 )

@@ -44,6 +44,11 @@ from .nested import (
 
 if TYPE_CHECKING:
     from ai.backend.manager.api.gql.domain_v2.types.node import DomainV2GQL
+    from ai.backend.manager.api.gql.model_card.types import (
+        ModelCardFilterGQL,
+        ModelCardOrderByGQL,
+        ModelCardV2Connection,
+    )
     from ai.backend.manager.api.gql.resource_group.types import (
         ResourceGroupConnection,
         ResourceGroupFilterGQL,
@@ -343,6 +348,78 @@ class ProjectV2GQL(PydanticNodeMixin[ProjectNode]):
         nodes = [ResourceGroupGQL.from_pydantic(data) for data in payload.items]
         edges = [ResourceGroupEdge(node=node, cursor=encode_cursor(node.id)) for node in nodes]
         return ResourceGroupConnection(
+            edges=edges,
+            page_info=PageInfo(
+                has_next_page=payload.has_next_page,
+                has_previous_page=payload.has_previous_page,
+                start_cursor=edges[0].cursor if edges else None,
+                end_cursor=edges[-1].cursor if edges else None,
+            ),
+            count=payload.total_count,
+        )
+
+    @gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Model cards belonging to this project.",
+        )
+    )  # type: ignore[misc]
+    async def model_cards(
+        self,
+        info: Info,
+        filter: Annotated[
+            ModelCardFilterGQL, strawberry.lazy("ai.backend.manager.api.gql.model_card.types")
+        ]
+        | None = None,
+        order_by: list[
+            Annotated[
+                ModelCardOrderByGQL,
+                strawberry.lazy("ai.backend.manager.api.gql.model_card.types"),
+            ]
+        ]
+        | None = None,
+        before: str | None = None,
+        after: str | None = None,
+        first: int | None = None,
+        last: int | None = None,
+        limit: int | None = None,
+        offset: int | None = None,
+    ) -> (
+        Annotated[
+            ModelCardV2Connection, strawberry.lazy("ai.backend.manager.api.gql.model_card.types")
+        ]
+        | None
+    ):
+        from strawberry.relay import PageInfo
+
+        from ai.backend.common.dto.manager.v2.model_card.request import (
+            ScopedSearchModelCardsInput,
+        )
+        from ai.backend.common.dto.manager.v2.model_card.types import ModelCardScope
+        from ai.backend.common.dto.manager.v2.rbac.types import UUIDScope
+        from ai.backend.manager.api.gql.base import encode_cursor
+        from ai.backend.manager.api.gql.model_card.types import (
+            ModelCardGQL,
+            ModelCardV2Connection,
+            ModelCardV2Edge,
+        )
+
+        payload = await info.context.adapters.model_card.scoped_search(
+            ScopedSearchModelCardsInput(
+                scope=ModelCardScope(project=[UUIDScope(value=UUID(str(self.id)))]),
+                filter=filter.to_pydantic() if filter else None,
+                order=[o.to_pydantic() for o in order_by] if order_by else None,
+                first=first,
+                after=after,
+                last=last,
+                before=before,
+                limit=limit,
+                offset=offset,
+            )
+        )
+        nodes = [ModelCardGQL.from_pydantic(node) for node in payload.items]
+        edges = [ModelCardV2Edge(node=node, cursor=encode_cursor(str(node.id))) for node in nodes]
+        return ModelCardV2Connection(
             edges=edges,
             page_info=PageInfo(
                 has_next_page=payload.has_next_page,
