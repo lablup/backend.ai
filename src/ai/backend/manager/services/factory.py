@@ -51,6 +51,7 @@ from ai.backend.common.data.entity.role import RoleEntityType
 from ai.backend.common.data.entity.role_preset import RolePresetEntityType
 from ai.backend.common.data.entity.runtime_variant import RuntimeVariantEntityType
 from ai.backend.common.data.entity.runtime_variant_preset import RuntimeVariantPresetEntityType
+from ai.backend.common.data.entity.secret import SecretFieldType
 from ai.backend.common.data.entity.service_catalog import ServiceCatalogEntityType
 from ai.backend.common.data.entity.session import SessionEntityType
 from ai.backend.common.data.entity.session_template import SessionTemplateEntityType
@@ -645,7 +646,8 @@ def create_processors(
             system_groups.group(GroupMeta(GlobalEntityType())), services.manager_admin
         ),
         secret=SecretProcessors(
-            system_groups.group(GroupMeta(GlobalEntityType())), services.secret
+            system_groups.dangling_field_group(FieldGroupMeta(SecretFieldType())),
+            services.secret,
         ),
         user_resource_policy=UserResourcePolicyProcessors(
             resource_policy_groups.group(GroupMeta(UserResourcePolicyEntityType()))

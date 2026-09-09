@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from typing import Any
+from typing import Any, overload
 
 from ai.backend.common.data.entity.types import EntityData, FieldData, GlobalEntityType
 from ai.backend.manager.actions.registry.field import FieldGroup, LookupFieldGroup
@@ -58,9 +58,22 @@ class ConcernGroups[TData: EntityData]:
         """
         return RelationGroup(self._deps, self._records, self._concern)
 
+    @overload
     def dangling_field_group[TFieldData: FieldData](
         self, meta: FieldGroupMeta, data_cls: type[TFieldData]
-    ) -> FieldGroup[TFieldData]:
+    ) -> FieldGroup[TFieldData]: ...
+
+    @overload
+    def dangling_field_group(self, meta: FieldGroupMeta) -> FieldGroup[Any]: ...
+
+    def dangling_field_group(
+        self, meta: FieldGroupMeta, data_cls: type[FieldData] | None = None
+    ) -> FieldGroup[Any]:
+        """The operations over a field kind whose owner is not fixed.
+
+        ``data_cls`` is omitted by a kind with no row of its own: it types the ops
+        factories, and such a kind wires none of them.
+        """
         return FieldGroup(self._deps, self._records, self._concern, meta, GlobalEntityType())
 
 
@@ -80,14 +93,25 @@ class ProcessorRegistry[TData: EntityData]:
         """A group for a domain that is its own area, which its entity type names."""
         return ProcessorGroup(self._deps, self._records, meta.entity_type, meta)
 
+    @overload
     def dangling_field_group[TFieldData: FieldData](
         self, meta: FieldGroupMeta, data_cls: type[TFieldData]
-    ) -> FieldGroup[TFieldData]:
+    ) -> FieldGroup[TFieldData]: ...
+
+    @overload
+    def dangling_field_group(self, meta: FieldGroupMeta) -> FieldGroup[Any]: ...
+
+    def dangling_field_group(
+        self, meta: FieldGroupMeta, data_cls: type[FieldData] | None = None
+    ) -> FieldGroup[Any]:
         """The operations over a field kind whose owner is not fixed.
 
         Reached from the registry rather than an entity group, unlike
         :meth:`ProcessorGroup.field_group`: the owner's type is a value on the row, and
         some rows have no owner at all.
+
+        ``data_cls`` is omitted by a kind with no row of its own: it types the ops
+        factories, and such a kind wires none of them.
         """
         return FieldGroup(self._deps, self._records, meta.field_type, meta, GlobalEntityType())
 
