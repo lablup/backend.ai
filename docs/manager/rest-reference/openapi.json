@@ -25827,7 +25827,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
+            "description": "Omit to leave unchanged.",
             "title": "Name"
           },
           "description": {
@@ -25845,14 +25845,14 @@
           "rank": {
             "anyOf": [
               {
-                "minimum": 0,
+                "ge": 0,
                 "type": "integer"
               },
               {
                 "type": "null"
               }
             ],
-            "default": null,
+            "description": "Omit to leave unchanged.",
             "title": "Rank"
           },
           "preset_target": {
@@ -25864,7 +25864,8 @@
                 "type": "null"
               }
             ],
-            "default": null
+            "description": "Omit to leave unchanged.",
+            "title": "Preset Target"
           },
           "value_type": {
             "anyOf": [
@@ -25875,8 +25876,8 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "New value type. 'flag' is only valid when the effective preset_target is 'args' (the stored target applies when preset_target is omitted)."
+            "description": "New value type. 'flag' is only valid when the effective preset_target is 'args' (the stored target applies when preset_target is omitted). Omit to leave unchanged.",
+            "title": "Value Type"
           },
           "default_value": {
             "anyOf": [
@@ -25901,7 +25902,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
+            "description": "Omit to leave unchanged.",
             "title": "Key"
           },
           "required": {
@@ -25913,8 +25914,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Toggle required flag; None = no change.",
+            "description": "Toggle required flag. Omit to leave unchanged.",
             "title": "Required"
           },
           "category": {
