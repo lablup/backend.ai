@@ -9,7 +9,6 @@ import pytest
 from ai.backend.agent.errors.network import (
     HostAddressesUnreadable,
     LocalSubnetLayoutChanged,
-    LocalSubnetOwnerChanged,
     LocalSubnetPoolExhausted,
 )
 from ai.backend.agent.network.local_subnet import (
@@ -357,14 +356,29 @@ class TestSingleOwnership:
             state_dir, owner="i-test"
         ) is not get_local_subnet_allocator(tmp_path / "other", owner="i-test")
 
-    def test_the_store_cannot_be_held_under_two_owners(self, state_dir: Path) -> None:
-        """The cache is keyed on the directory alone, so whichever collaborator constructed the
-        allocator FIRST decided the owner -- and a later caller asking for its own id was handed
-        the other's, silently, and wrote claims naming an agent that was not the writer. Refused
-        for the same reason a differing layout is."""
-        get_local_subnet_allocator(state_dir, owner="i-cd-104")
-        with pytest.raises(LocalSubnetOwnerChanged):
-            get_local_subnet_allocator(state_dir, owner="i-sg-104")
+    def test_each_owner_of_a_store_gets_its_own_allocator(self, state_dir: Path) -> None:
+        """One privileged daemon serves every agent on the node, so holding the same store under
+        several owners is legitimate -- what is not is handing a caller an allocator stamped with
+        somebody else's id, which is what a cache keyed on the directory alone used to do."""
+        containerd = get_local_subnet_allocator(state_dir, owner="i-cd-104")
+        apptainer = get_local_subnet_allocator(state_dir, owner="i-sg-104")
+
+        assert containerd is not apptainer
+        assert containerd.owner == "i-cd-104"
+        assert apptainer.owner == "i-sg-104"
+        assert get_local_subnet_allocator(state_dir, owner="i-cd-104") is containerd
+
+    async def test_one_owners_claim_is_not_the_others_to_release(self, state_dir: Path) -> None:
+        """The point of keeping them apart. Both write into one node-wide store, and the index
+        each holds is a bridge and a subnet the other must not take away."""
+        containerd = get_local_subnet_allocator(state_dir, owner="i-cd-104")
+        apptainer = get_local_subnet_allocator(state_dir, owner="i-sg-104")
+        held = await containerd.allocate("s-cd")
+
+        await apptainer.release("s-cd")
+
+        assert await containerd.lookup("s-cd") == held
+        assert await apptainer.allocate("s-sg") != held
 
     def test_an_allocator_with_no_owner_cannot_be_built(self, state_dir: Path) -> None:
         """The construction that produced untagged claims in the first place. It was reachable
@@ -655,4 +669,4 @@ class TestTheHostIsTheLastWord:
         try:
             assert alloc._host_addresses is host_ipv4_addresses
         finally:
-            _allocators.pop(tmp_path / "prod-store", None)
+            _allocators.pop((tmp_path / "prod-store", "i-test"), None)
