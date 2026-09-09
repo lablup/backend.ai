@@ -306,9 +306,7 @@ class ModelCardAdapter(BaseAdapter):
     ) -> UpdateModelCardPayload:
         updater = ModelCardUpdater(
             card_id=ModelCardID(input.id),
-            name=(
-                OptionalState.update(input.name) if input.name is not None else OptionalState.nop()
-            ),
+            name=OptionalState.from_unset(input.name),
             author=TriState.from_unset(input.author),
             title=TriState.from_unset(input.title),
             model_version=TriState.from_unset(input.model_version),
@@ -316,16 +314,8 @@ class ModelCardAdapter(BaseAdapter):
             task=TriState.from_unset(input.task),
             category=TriState.from_unset(input.category),
             architecture=TriState.from_unset(input.architecture),
-            framework=(
-                OptionalState.update(input.framework)
-                if input.framework is not None
-                else OptionalState.nop()
-            ),
-            label=(
-                OptionalState.update(input.label)
-                if input.label is not None
-                else OptionalState.nop()
-            ),
+            framework=OptionalState.from_unset(input.framework),
+            label=OptionalState.from_unset(input.label),
             license=TriState.from_unset(input.license),
             min_resource=TriState.from_unset(input.min_resource).map(_entries_to_requirements),
             readme=TriState.from_unset(input.readme),

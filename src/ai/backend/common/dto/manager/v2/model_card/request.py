@@ -57,7 +57,12 @@ class CreateModelCardInput(BaseRequestModel):
 
 class UpdateModelCardInput(BaseRequestModel):
     id: UUID = Field(description="Model card ID.")
-    name: str | None = Field(default=None, min_length=1, max_length=512)
+    name: str | None | Unset = Field(
+        default=UNSET,
+        min_length=1,
+        max_length=512,
+        description="Model card name. Omit to leave unchanged.",
+    )
     author: str | None | Unset = Field(
         default=UNSET, description="Model card author. Omit to leave unchanged; null clears."
     )
@@ -79,8 +84,12 @@ class UpdateModelCardInput(BaseRequestModel):
     architecture: str | None | Unset = Field(
         default=UNSET, description="Model architecture. Omit to leave unchanged; null clears."
     )
-    framework: list[str] | None = Field(default=None)
-    label: list[str] | None = Field(default=None)
+    framework: list[str] | None | Unset = Field(
+        default=UNSET, description="Frameworks. Omit to leave unchanged."
+    )
+    label: list[str] | None | Unset = Field(
+        default=UNSET, description="Labels. Omit to leave unchanged."
+    )
     license: str | None | Unset = Field(
         default=UNSET, description="Model license. Omit to leave unchanged; null clears."
     )
