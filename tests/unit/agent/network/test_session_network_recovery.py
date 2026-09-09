@@ -510,3 +510,217 @@ class TestWhatAFailedSetupStillOwes:
         network = _network(vxlan=backend)
         await network.retry_recovery_fail_close()
         assert "vxlan" not in network._recovery_incomplete
+
+
+class _PrefixEtcd(_Etcd):
+    """`_Etcd` plus the prefix read the departed-session sweep makes."""
+
+    def __init__(self, store: dict[str, str], tree: dict[str, Any] | None = None) -> None:
+        super().__init__(store)
+        self.tree = tree or {}
+        self.prefixes_read: list[str] = []
+
+    async def get_prefix(self, prefix: str) -> dict[str, Any]:
+        self.prefixes_read.append(prefix)
+        return self.tree
+
+
+class TestSessionsThisNodeIsStillAMemberOf:
+    """`recover` walks the sessions of *live containers*. A session whose last container here died
+    while the agent was down has none, so nothing visited it and its member key stayed -- and the
+    manager will not release the VNI while a member has not confirmed teardown. Measured: two
+    sessions stuck in TERMINATING with both kernels already TERMINATED, the manager retrying
+    `destroy_network` every fifteen seconds against a node that was never going to answer.
+    """
+
+    def _network_seeing(self, tree: dict[str, Any]) -> tuple[SessionNetwork, _PrefixEtcd]:
+        network = _network(vxlan=_Backend())
+        etcd = _PrefixEtcd({}, tree)
+        network._etcd = cast(Any, etcd)
+        return network, etcd
+
+    async def test_a_session_naming_this_agent_is_found(self) -> None:
+        network, _etcd = self._network_seeing({
+            "s1": {"members": {"i-test": "{}"}},
+            "s2": {"members": {"i-other": "{}"}},
+        })
+        assert await network._sessions_naming_this_node() == {"s1"}
+
+    async def test_a_session_with_no_members_at_all_is_not(self) -> None:
+        network, _etcd = self._network_seeing({"s1": {"meta": "{}"}})
+        assert await network._sessions_naming_this_node() == set()
+
+    async def test_the_whole_subtree_is_read_once(self) -> None:
+        """One prefix read for the node, not one per session: the sweep runs on every restart."""
+        network, etcd = self._network_seeing({"s1": {"members": {"i-test": "{}"}}})
+        await network._sessions_naming_this_node()
+        assert etcd.prefixes_read == ["network/session/"]
+
+    async def test_a_malformed_subtree_is_skipped_not_raised(self) -> None:
+        """etcd hands back whatever is there. A node that cannot finish this sweep would abort its
+        own recovery, which is worse than missing one stale membership."""
+        network, _etcd = self._network_seeing({
+            "s1": "not-a-mapping",
+            "s2": {"members": "also-not-a-mapping"},
+            "s3": {"members": {"i-test": "{}"}},
+        })
+        assert await network._sessions_naming_this_node() == {"s3"}
+
+
+class TestFinishingWhatTheRestartInterrupted:
+    """What the sweep does with what it found. Resume-then-tear-down rather than deleting the
+    member key: the withdrawal is fenced, and the same path gives back the bridge, the LOCAL block
+    and the ESP claim, none of which removing a key would."""
+
+    _READY = {
+        "subnet": "10.128.5.0/24",
+        "vni": 4097,
+        "backend": "vxlan",
+        "mtu": 1450,
+        "_state": "ready",
+    }
+
+    def _network_with(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        joined: set[str],
+        metas: dict[str, dict[str, Any]],
+    ) -> tuple[SessionNetwork, list[str], list[str]]:
+        network = _network(vxlan=_Backend())
+        store = {f"network/session/{s}/meta": json.dumps(m) for s, m in metas.items()}
+        tree = {s: {"members": {"i-test": "{}"}} for s in joined}
+        network._etcd = cast(Any, _PrefixEtcd(store, tree))
+        resumed: list[str] = []
+        torn: list[str] = []
+
+        async def _resume(session_id: str, meta: Any) -> None:
+            resumed.append(session_id)
+
+        async def _teardown(session_id: str) -> None:
+            torn.append(session_id)
+
+        monkeypatch.setattr(network, "_resume_session", _resume)
+        monkeypatch.setattr(network, "teardown_session", _teardown)
+        return network, resumed, torn
+
+    async def test_a_departed_session_is_resumed_then_torn_down(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        network, resumed, torn = self._network_with(monkeypatch, {"s1"}, {"s1": self._READY})
+        await network._finish_departed_sessions(set())
+        assert resumed == ["s1"], "without resuming there is no coordinator to withdraw through"
+        assert torn == ["s1"]
+
+    async def test_a_session_this_node_still_runs_is_left_alone(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """The argument is what `recover` already resumed from live containers. Tearing one of
+        those down would take the data plane out from under running kernels."""
+        network, resumed, torn = self._network_with(monkeypatch, {"s1"}, {"s1": self._READY})
+        await network._finish_departed_sessions({"s1"})
+        assert (resumed, torn) == ([], [])
+
+    async def test_a_session_with_no_readable_meta_is_left_alone(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """The manager deletes the meta as the last step of `destroy_network`, so an absent one
+        means it is no longer waiting on anybody -- and there is no data plane to rebuild."""
+        network, resumed, torn = self._network_with(monkeypatch, {"s1"}, {})
+        await network._finish_departed_sessions(set())
+        assert (resumed, torn) == ([], [])
+
+    async def test_a_meta_the_manager_has_not_finished_is_left_alone(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        network, resumed, torn = self._network_with(
+            monkeypatch, {"s1"}, {"s1": {**self._READY, "_state": "deleting"}}
+        )
+        await network._finish_departed_sessions(set())
+        assert (resumed, torn) == ([], [])
+
+    async def test_one_that_will_not_go_does_not_stop_the_others(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        network, resumed, torn = self._network_with(
+            monkeypatch, {"s1", "s2"}, {"s1": self._READY, "s2": self._READY}
+        )
+        original = network.teardown_session
+
+        async def _teardown(session_id: str) -> None:
+            if session_id == "s1":
+                raise RuntimeError("still holding a container")
+            await original(session_id)
+
+        monkeypatch.setattr(network, "teardown_session", _teardown)
+        await network._finish_departed_sessions(set())
+        assert torn == ["s2"], "s2's teardown must still have run"
+        assert any("s1" in key for key in network.recovery_problems()), (
+            "a session that could not be finished has to reach readiness, or the node keeps"
+            " taking overlay work while the manager waits on it forever"
+        )
+
+    async def test_an_unreadable_etcd_does_not_abort_recovery(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        network, resumed, torn = self._network_with(monkeypatch, {"s1"}, {"s1": self._READY})
+
+        async def _boom(prefix: str) -> dict[str, Any]:
+            raise RuntimeError("etcd is down")
+
+        monkeypatch.setattr(network._etcd, "get_prefix", _boom)
+        await network._finish_departed_sessions(set())
+        assert (resumed, torn) == ([], [])
+        assert "departed-sessions" in network.recovery_problems()
+
+
+class _EmptyLocator:
+    """A node with no kernel containers left on it -- which is exactly the state that hid the
+    stranded sessions: nothing live means nothing for `recover` to walk."""
+
+    async def live_sessions(self) -> dict[str, Any]:
+        return {}
+
+
+class TestTheSweepIsWiredIntoRecovery:
+    """The methods above are only worth having if `recover` calls them. It did not, for the whole
+    life of the branch, and the sessions it should have finished sat in TERMINATING for good."""
+
+    async def test_recover_finishes_the_sessions_it_did_not_walk(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        network = _network(vxlan=_Backend())
+        network._locator = cast(Any, _EmptyLocator())
+        network._etcd = cast(Any, _PrefixEtcd({}, {"s1": {"members": {"i-test": "{}"}}}))
+        swept: list[frozenset[str]] = []
+
+        async def _sweep(resumed: set[str]) -> None:
+            swept.append(frozenset(resumed))
+
+        monkeypatch.setattr(network, "_finish_departed_sessions", _sweep)
+        await network.recover()
+        assert swept == [frozenset()], (
+            "recover did not sweep the sessions that still name this node, so a membership left"
+            " by an interrupted teardown is never withdrawn"
+        )
+
+    async def test_the_sweep_is_told_what_recovery_already_resumed(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """It must not tear down a session whose kernels are running here."""
+
+        class _OneLiveKernel:
+            async def live_sessions(self) -> dict[str, Any]:
+                container = type("C", (), {"session_id": "s-live", "owner_agent_id": "i-test"})()
+                return {"c1": container}
+
+        network = _network(vxlan=_Backend())
+        network._locator = cast(Any, _OneLiveKernel())
+        network._etcd = cast(Any, _PrefixEtcd({}, {}))
+        swept: list[frozenset[str]] = []
+
+        async def _sweep(resumed: set[str]) -> None:
+            swept.append(frozenset(resumed))
+
+        monkeypatch.setattr(network, "_finish_departed_sessions", _sweep)
+        await network.recover()
+        assert swept == [frozenset({"s-live"})]
