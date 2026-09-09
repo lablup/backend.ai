@@ -628,6 +628,85 @@ class TestEtcdNetworkKeyCollector:
             != await EtcdNetworkKeyCollector(bad).collect()
         )
 
+    async def test_a_restart_is_not_a_change(self) -> None:
+        """A restart rotates the agent's boot id, the `boot_id` inside `caps`, and the readiness
+        digest computed over it. Every scenario that restarts the agent -- which is most of the
+        recovery suite -- reported the node's own identity record as leaked *and* as collateral."""
+
+        def agent(boot: str) -> FakeEtcd:
+            return FakeEtcd({
+                "network/session/": {},
+                "network/agent/": {
+                    "i-1": {
+                        "boot": boot,
+                        "ready": f"digest-over-{boot}",
+                        "vtep": "192.168.0.20",
+                        "caps": f'{{"vtep_ip": "192.168.0.20", "boot_id": "{boot}"}}',
+                    }
+                },
+            })
+
+        assert (
+            await EtcdNetworkKeyCollector(agent("4406ad12")).collect()
+            == await EtcdNetworkKeyCollector(agent("e38a8d0c")).collect()
+        )
+
+    async def test_an_agent_record_that_vanished_is_still_a_change(self) -> None:
+        """The incarnation is dropped from the value, never the key: a node whose VTEP key is gone
+        -- or whose VTEP changed -- is exactly what this collector exists to catch."""
+        present = FakeEtcd({
+            "network/session/": {},
+            "network/agent/": {"i-1": {"boot": "b1", "vtep": "192.168.0.20"}},
+        })
+        moved = FakeEtcd({
+            "network/session/": {},
+            "network/agent/": {"i-1": {"boot": "b1", "vtep": "192.168.0.21"}},
+        })
+        gone = FakeEtcd({"network/session/": {}, "network/agent/": {"i-1": {"boot": "b1"}}})
+        base = await EtcdNetworkKeyCollector(present).collect()
+        assert base != await EtcdNetworkKeyCollector(moved).collect()
+        assert base != await EtcdNetworkKeyCollector(gone).collect()
+
+    async def test_a_heartbeat_is_not_a_change(self) -> None:
+        """`caps` carries `updated_at`, which the agent rewrites every thirty seconds. Folded into
+        the ident it made every run report both agents' caps as leaked and as collateral at once,
+        so no scenario using the guard could ever pass."""
+
+        def caps(updated_at: float) -> FakeEtcd:
+            return FakeEtcd({
+                "network/session/": {},
+                "network/agent/": {
+                    "i-1": {
+                        "caps": (
+                            '{"vtep_ip": "192.168.0.20", "backends": ["vxlan"],'
+                            f' "updated_at": {updated_at}}}'
+                        )
+                    }
+                },
+            })
+
+        assert (
+            await EtcdNetworkKeyCollector(caps(1788937953.7)).collect()
+            == await EtcdNetworkKeyCollector(caps(1788938074.0)).collect()
+        )
+
+    async def test_a_real_field_still_changes_the_record(self) -> None:
+        """The heartbeat is dropped; nothing else is. A caps record that lost its VTEP is a
+        different record, heartbeat or no heartbeat."""
+
+        def caps(vtep: str) -> FakeEtcd:
+            return FakeEtcd({
+                "network/session/": {},
+                "network/agent/": {
+                    "i-1": {"caps": f'{{"vtep_ip": {vtep}, "updated_at": 1788937953.7}}'}
+                },
+            })
+
+        assert (
+            await EtcdNetworkKeyCollector(caps('"192.168.0.20"')).collect()
+            != await EtcdNetworkKeyCollector(caps("null")).collect()
+        )
+
     async def test_etcd_resources_are_cluster_scoped(self) -> None:
         collector = EtcdNetworkKeyCollector(
             FakeEtcd({"network/session/": {"s": {"meta": "{}"}}, "network/agent/": {}})
