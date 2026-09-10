@@ -30,6 +30,7 @@ from ai.backend.manager.models.specs.creator import (
     RoleManagedEntityCreator,
     RoleManagedGlobalEntityCreator,
 )
+from ai.backend.manager.models.specs.relation import RelationCreator
 from ai.backend.manager.models.specs.updater import GuardedDataUpdater
 from ai.backend.manager.repositories.ops.v2.user.write import FullUserCreator
 from ai.backend.testutils.typed_scenario import (
@@ -112,6 +113,21 @@ class FieldOf[A, D: FieldData]:
     kind: str
     owner_id: Callable[[A], Any]
     spec: FieldCreator[Any, Any, D]
+
+
+@dataclass(frozen=True)
+class Link[S, T]:
+    """A row that links two entities and belongs to neither.
+
+    A resource group reaches a session only through one of these: the group is linked
+    to a domain, a project, or a user's keypair, and the session's scope has to find it
+    on one of those three paths.
+    """
+
+    kind: str
+    creator: RelationCreator[Any, Any, Any]
+    scope_id: Callable[[S], Any]
+    target_id: Callable[[T], Any]
 
 
 @dataclass(frozen=True, eq=False)
@@ -244,6 +260,23 @@ class Seeder:
                 name=owner.name,
                 describe=f"{spec.kind} on {owner.describe}",
                 sources=(owner,),
+                write=write,
+            )
+        )
+
+    def linking[S, T](self, link: Link[S, T], scope: Given[S], target: Given[T], /) -> Given[None]:
+        """Link the two rows this scenario laid, the way an operator would."""
+
+        async def write(ops: SeedOps, values: Sequence[Any]) -> None:
+            await ops.create_relations(
+                link.creator, [(link.scope_id(values[0]), link.target_id(values[1]))]
+            )
+
+        return self._remember(
+            Given(
+                name=target.name,
+                describe=f"{target.describe} {link.kind} {scope.describe}",
+                sources=(scope, target),
                 write=write,
             )
         )

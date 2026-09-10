@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from typing import Any
+from unittest.mock import MagicMock
 
 import pytest
 from bai_scenario.fakes.storage_proxy import (
@@ -22,6 +23,7 @@ from ai.backend.common.clients.valkey_client.valkey_schedule.client import Valke
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.data.entity.resource_group import ResourceGroupEntityType
 from ai.backend.common.data.entity.session import SessionEntityType
+from ai.backend.common.etcd import AbstractKVStore
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.events.fetcher import EventFetcher
 from ai.backend.common.events.hub.hub import EventHub
@@ -114,7 +116,8 @@ async def adapter(
                     network_plugin_ctx=unwired(
                         NetworkPluginContext, "no session asks for a network"
                     ),
-                    hook_plugin_ctx=unwired(HookPluginContext, "no hook is installed here"),
+                    # No plugin is loaded, so the pre-enqueue hook dispatches to nobody.
+                    hook_plugin_ctx=HookPluginContext(MagicMock(spec=AbstractKVStore), {}),
                     agent_selector=unwired(AgentSelector, "only scheduling picks an agent"),
                 )
             ),

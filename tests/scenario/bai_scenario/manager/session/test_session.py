@@ -16,7 +16,10 @@ from bai_scenario.seeds.domain.domain import seed_domain
 from bai_scenario.seeds.image.image import seed_image
 from bai_scenario.seeds.image.registry import seed_container_registry
 from bai_scenario.seeds.project.project import seed_project
-from bai_scenario.seeds.resource_group.resource_group import seed_resource_group
+from bai_scenario.seeds.resource_group.resource_group import (
+    link_to_domain,
+    seed_resource_group,
+)
 from bai_scenario.seeds.seeder import Seeder, after
 
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
@@ -63,6 +66,7 @@ def ungranted_user_is_refused(seed: Seeder) -> SessionScenario:
 def granted_user_enqueues_a_session(seed: Seeder) -> SessionScenario:
     home = seed.creating(seed_domain(name_hint="home"))
     group = seed.creating(seed_resource_group(name_hint="compute"))
+    seed.linking(link_to_domain(), home, group)
     registry = seed.creating(seed_container_registry())
     image = seed.creating(seed_image(name_hint="python"), registry)
     policy = seed_personal_project_policy(seed)
@@ -104,10 +108,11 @@ def granted_user_enqueues_a_session(seed: Seeder) -> SessionScenario:
     )
 
 
-# Enqueueing is one hop from covered. The controller is wired and the row below runs
-# until the resource group is refused as not accessible: a group reaches a session only
-# once it is allowed for the domain, the project or the keypair, and that association is
-# written by the domain's own create path rather than by any spec a seed can name.
+# Enqueueing runs the whole way now: the controller is wired, the resource group is
+# allowed for the domain, the image and the project are there, and the pre-enqueue hook
+# dispatches to nobody. What it stops on is that the group serves no resource slot,
+# which wants an agent — and an agent has no write spec at all. One registers itself by
+# heartbeat, so a scenario cannot lay one the way it lays every other row.
 
 BUILDERS = (nothing_laid_means_nothing_found, ungranted_user_is_refused)
 SCENARIOS: list[SessionScenario] = [build(Seeder()) for build in BUILDERS]
