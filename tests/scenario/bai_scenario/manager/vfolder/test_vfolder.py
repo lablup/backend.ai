@@ -48,12 +48,23 @@ def granted_user_lists_none(seed: Seeder) -> VFolderScenario:
     )
 
 
-# Making a folder is not covered yet. Each attempt named one more thing the user needs
-# and the scenario had not laid: the key they authorize with, a keypair policy that
-# allows the host, a domain that allows it. What it asks for now is the owner a personal
-# folder is created under, which the user's own personal project used to supply.
+def granted_user_makes_a_folder(seed: Seeder) -> VFolderScenario:
+    home = seed.creating(seed_domain_with_storage())
+    maker, _ = seed_someone_making_folders(seed, home)
+    return TypedScenario.ok(
+        "a-user-granted-folder-create-makes-one-of-their-own",
+        description=(
+            "자기 스코프에서 폴더 생성 권한을 받은 사용자가 폴더를 만들면, "
+            "그 폴더의 소유는 그 사용자에게 있다"
+        ),
+        actor=maker,
+        given=seed.situation(),
+        when=call(VFolderAdapter.create, CreateVFolderInput(name="work")),
+        then=at(lambda p: p.vfolder.access_control.ownership_type, "user"),
+    )
 
-BUILDERS = (ungranted_user_is_refused, granted_user_lists_none)
+
+BUILDERS = (granted_user_makes_a_folder, ungranted_user_is_refused, granted_user_lists_none)
 SCENARIOS: list[VFolderScenario] = [build(Seeder()) for build in BUILDERS]
 
 

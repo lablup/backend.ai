@@ -12,9 +12,9 @@ from datetime import datetime, timedelta
 
 from bai_scenario.seeds.rbac.role import seed_permission, seed_role
 from bai_scenario.seeds.resource_policy.keypair import seed_keypair_policy
+from bai_scenario.seeds.resource_policy.project import seed_project_policy
 from bai_scenario.seeds.resource_policy.user import seed_user_policy
 from bai_scenario.seeds.seeder import Given, Seeder
-from bai_scenario.seeds.user.keypair import seed_default_keypair
 from bai_scenario.seeds.user.user import seed_user
 
 from ai.backend.common.data.entity.domain import DomainEntityType
@@ -44,16 +44,16 @@ def seed_someone_of(
     role: UserRole = UserRole.USER,
     vfolder_hosts: Sequence[str] = (),
 ) -> Given[UserData]:
-    """A user of that domain, with the key they authorize with, granted nothing.
+    """A user of that domain, provisioned the way the manager provisions one.
 
-    The keypair is not optional scenery: a request that resolves the caller's key
-    finds nothing without it, and fails before any permission is looked at.
+    That brings the key they authorize with and the personal project their own folders
+    live in. Neither is optional scenery: a request that resolves the caller, or makes
+    a folder they own, fails before any permission is looked at without them.
     """
+    seed.creating(seed_project_policy())
     policy = seed.creating(seed_user_policy())
     key_policy = seed.creating(seed_keypair_policy(vfolder_hosts=vfolder_hosts))
-    someone = seed.creating(seed_user(role=role), domain, policy)
-    seed.adding(seed_default_keypair(key_policy.describe), someone)
-    return someone
+    return seed.provisioning(seed_user(role=role), domain, policy, key_policy)
 
 
 def seed_someone_reading_domains(

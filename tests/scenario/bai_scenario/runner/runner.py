@@ -11,6 +11,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 from typing import Any
 
+from bai_scenario.seeds.ops import SeedOpsProvider
 from bai_scenario.seeds.seeder import Given, lay, steps_of
 
 from ai.backend.common.contexts.user import with_user
@@ -18,7 +19,6 @@ from ai.backend.common.data.user.types import UserData, UserRole
 from ai.backend.manager.data.domain.types import UserInfo
 from ai.backend.manager.data.user.types import UserData as SeededUser
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.testutils.typed_scenario import TypedMatcher, TypedScenario, mismatches_of
 
 
@@ -61,7 +61,7 @@ class ScenarioRunner:
         wanted = [row for row in scenario.given.rows if isinstance(row, Given)]
         if isinstance(scenario.actor, Given):
             wanted.append(scenario.actor)
-        async with V2DBOpsProvider(self._engine).write_ops() as ops:
+        async with SeedOpsProvider(self._engine).write_ops() as ops:
             return await lay(ops, wanted)
 
     async def __call__(self, scenario: TypedScenario[Any, Any]) -> None:

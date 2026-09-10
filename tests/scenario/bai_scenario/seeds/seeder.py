@@ -19,9 +19,12 @@ from collections.abc import Awaitable, Callable, Sequence
 from dataclasses import dataclass, field
 from typing import Any, overload
 
+from bai_scenario.seeds.ops import SeedOps
+
 from ai.backend.common.data.entity.role import RoleID
 from ai.backend.common.data.entity.types import FieldData
 from ai.backend.common.data.entity.user import UserID
+from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.models.specs.creator import (
     FieldCreator,
     GlobalEntityCreator,
@@ -30,7 +33,7 @@ from ai.backend.manager.models.specs.creator import (
     RoleManagedGlobalEntityCreator,
 )
 from ai.backend.manager.models.specs.updater import GuardedDataUpdater
-from ai.backend.manager.repositories.ops.v2.write import V2WriteOps
+from ai.backend.manager.repositories.ops.v2.user.write import FullUserCreator
 from ai.backend.testutils.typed_scenario import (
     ActorBound,
     Answer,
@@ -83,6 +86,18 @@ class SpecFromThree[A, B, C, D]:
 
 
 @dataclass(frozen=True)
+class ProvisionFrom[A, B, C, D]:
+    """A row the manager provisions through a path of its own rather than one spec.
+
+    A user is the case: the row, its graph, its preset roles, its keypair and its
+    personal project are one operation, and a seed takes that operation whole.
+    """
+
+    hint: str
+    build: Callable[[str, A, B, C], FullUserCreator]
+
+
+@dataclass(frozen=True)
 class FieldOf[A, D: FieldData]:
     """A field row written under an owner the scenario already laid.
 
@@ -105,10 +120,10 @@ class Given[D]:
 
     describe: str
     sources: tuple[Given[Any], ...]
-    write: Callable[[V2WriteOps, Sequence[Any]], Awaitable[D]]
+    write: Callable[[SeedOps, Sequence[Any]], Awaitable[D]]
 
 
-async def _write(ops: V2WriteOps, spec: WriteSpec[Any]) -> Any:
+async def _write(ops: SeedOps, spec: WriteSpec[Any]) -> Any:
     """Run one spec down the ops path its own type calls for."""
     if isinstance(spec, RoleManagedGlobalEntityCreator):
         return await ops.create_role_managed_global_entity(spec)
@@ -174,15 +189,32 @@ class Seeder:
         name = self.name(spec.hint)
         build: Callable[..., WriteSpec[Any]] = spec.build
 
-        async def write(ops: V2WriteOps, values: Sequence[Any]) -> Any:
+        async def write(ops: SeedOps, values: Sequence[Any]) -> Any:
             return await _write(ops, build(name, *values))
 
         return self._remember(Given(describe=name, sources=tuple(sources), write=write))
 
+    def provisioning[A, B, C, D](
+        self,
+        spec: ProvisionFrom[A, B, C, D],
+        a: Given[A],
+        b: Given[B],
+        c: Given[C],
+        /,
+    ) -> Given[UserData]:
+        """Provision what the manager provisions as one operation."""
+        name = self.name(spec.hint)
+
+        async def write(ops: SeedOps, values: Sequence[Any]) -> UserData:
+            result = await ops.create_user(spec.build(name, *values))
+            return result.user
+
+        return self._remember(Given(describe=name, sources=(a, b, c), write=write))
+
     def adding[A, D: FieldData](self, spec: FieldOf[A, D], owner: Given[A], /) -> Given[D]:
         """Lay one field row under the owner the scenario already laid."""
 
-        async def write(ops: V2WriteOps, values: Sequence[Any]) -> Any:
+        async def write(ops: SeedOps, values: Sequence[Any]) -> Any:
             return await ops.create_field(spec.owner_id(values[0]), spec.spec)
 
         return self._remember(
@@ -199,7 +231,7 @@ class Seeder:
     ) -> Given[None]:
         """Give the user the role, the way an operator would."""
 
-        async def write(ops: V2WriteOps, values: Sequence[Any]) -> None:
+        async def write(ops: SeedOps, values: Sequence[Any]) -> None:
             await ops.grant_roles(user_id(values[1]), [role_id(values[0])])
 
         return self._remember(
@@ -211,7 +243,7 @@ class Seeder:
         )
 
 
-async def lay(ops: V2WriteOps, wanted: Sequence[Given[Any]]) -> dict[Given[Any], Any]:
+async def lay(ops: SeedOps, wanted: Sequence[Given[Any]]) -> dict[Given[Any], Any]:
     """Write every row the wanted rows rest on, each once, in this session."""
     made: dict[Given[Any], Any] = {}
 
