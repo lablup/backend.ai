@@ -10,7 +10,7 @@ from __future__ import annotations
 import asyncio
 from collections.abc import Sequence
 
-from ai.backend.agent.network.privnet.gossip import Endpoint, Intent
+from ai.backend.agent.network.privnet.gossip import Endpoint, Intent, decode
 from ai.backend.agent.network.privnet.gossip_runner import EndpointGossip
 
 _KEY = "fda91fcdff70a287ce06dd57c2723324701c7ece94c53747ad8d4410483d639b"
@@ -26,17 +26,31 @@ class FakeHost:
         peers: dict[str, list[str]],
         key: str | None = _KEY,
         generation: str | None = None,
+        keys_by_session: dict[str, str] | None = None,
     ) -> None:
         self._sessions = sessions
         self._peers = peers
         self._key = key
+        #: Per-session overrides, for the state a root rotation leaves a node in: sessions created
+        #: under the old root keep its key while later ones carry the new one.
+        self._keys_by_session = keys_by_session or {}
         self._generation = generation
         self.programmed: list[tuple[str, str, Endpoint, str]] = []
         #: Container ids the host refuses to program, so a caller can drive the retry path.
         self.refuse: set[str] = set()
 
-    def gossip_key(self) -> str | None:
-        return self._key
+    def gossip_key(self, session_id: str) -> str | None:
+        return self._keys_by_session.get(session_id, self._key)
+
+    def gossip_keys(self) -> Sequence[str]:
+        return sorted({
+            k
+            for k in (
+                self._key,
+                *(self._keys_by_session.get(s) for s in self._sessions),
+            )
+            if k
+        })
 
     def gossip_sessions(self) -> Sequence[str]:
         return list(self._sessions)
@@ -342,3 +356,76 @@ class _FakeTransport:
 
     def close(self) -> None:
         pass
+
+
+class TestAKeyBelongsToASessionAndNotToTheNode:
+    """The state a root rotation leaves behind. The manager derives the announce key from the
+    cluster root, so sessions created under one root share a value and later ones carry a
+    different one. A node hosting both used to sign everything with whichever session it happened
+    to hold first, and the other session's peers dropped every announcement it ever sent -- with
+    nothing to see, because an announcement that does not verify is indistinguishable from noise.
+    """
+
+    _OLD = "1" * 64
+    _NEW = "2" * 64
+
+    def _rotating_host(self) -> FakeHost:
+        return FakeHost(
+            sessions={"old": [_endpoint(1)], "new": [_endpoint(2)]},
+            peers={"old": ["10.0.0.2"], "new": ["10.0.0.2"]},
+            key=None,
+            keys_by_session={"old": self._OLD, "new": self._NEW},
+        )
+
+    async def test_each_session_is_signed_under_its_own_key(self) -> None:
+        host = self._rotating_host()
+        sent: list[tuple[bytes, tuple[str, int]]] = []
+        gossip = EndpointGossip(host, vtep="10.0.0.1")
+        gossip._transport = _FakeTransport(sent)  # type: ignore[assignment]
+
+        gossip.announce("old")
+        gossip.announce("new")
+
+        assert len(sent) == 2
+        by_session = {}
+        for datagram, _addr in sent:
+            for name, key in (("old", self._OLD), ("new", self._NEW)):
+                if (a := decode(datagram, key)) is not None:
+                    by_session[a.session_id] = name
+        assert by_session == {"old": "old", "new": "new"}
+
+    async def test_the_other_sessions_key_does_not_verify_it(self) -> None:
+        """The check that makes the previous case mean something."""
+        host = self._rotating_host()
+        sent: list[tuple[bytes, tuple[str, int]]] = []
+        gossip = EndpointGossip(host, vtep="10.0.0.1")
+        gossip._transport = _FakeTransport(sent)  # type: ignore[assignment]
+
+        gossip.announce("old")
+
+        (datagram, _addr) = sent[0]
+        assert decode(datagram, self._OLD) is not None
+        assert decode(datagram, self._NEW) is None
+
+    async def test_a_receiver_verifies_either_key(self) -> None:
+        """A node carrying both must accept announcements for both, or half its sessions go
+        unprogrammed for as long as the rotation is being drained."""
+        sender = FakeHost(
+            sessions={"new": [_endpoint(2)]},
+            peers={"new": ["10.0.0.1"]},
+            key=self._NEW,
+        )
+        receiver = self._rotating_host()
+        receiver._peers = {"old": ["10.0.0.1", "10.0.0.2"], "new": ["10.0.0.1", "10.0.0.2"]}
+        gossip = EndpointGossip(receiver, vtep="10.0.0.1")
+
+        await gossip.on_datagram(_one_datagram(sender, "new", vtep="10.0.0.2"), ("10.0.0.2", 7947))
+
+        assert receiver.added() == {_endpoint(2).container_id}
+
+    async def test_a_session_this_node_does_not_hold_has_no_key(self) -> None:
+        host = self._rotating_host()
+        assert host.gossip_key("gone") is None
+
+    async def test_the_keyring_is_every_key_the_node_holds(self) -> None:
+        assert self._rotating_host().gossip_keys() == sorted({self._OLD, self._NEW})

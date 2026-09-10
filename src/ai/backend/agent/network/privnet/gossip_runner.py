@@ -65,14 +65,22 @@ PENDING_SNAPSHOT_TTL_SEC: Final = ANNOUNCE_INTERVAL_SEC * 3
 class GossipHost(Protocol):
     """What the runner needs from the privnet, and nothing else."""
 
-    def gossip_key(self) -> str | None:
-        """The key announcements are signed under, or None while this node has none.
+    def gossip_key(self, session_id: str) -> str | None:
+        """The key THIS session's announcements are signed under, or None if it has none.
 
-        Cluster-wide, the same one the overlay's ESP uses: ESP policies select on the outer packet,
-        which carries no session id, so there is one key for the cluster rather than one per
-        session. A node that holds it can already inject and read overlay traffic, so signing with
-        it adds no trust that was not already assumed -- what it stops is anything that does NOT
-        hold it, which is every other host that can reach the port.
+        Per session, not per node. The manager derives it from the cluster root, so sessions
+        created under one root share a value -- but a root rotation gives later sessions a
+        different one, and a node carrying both would otherwise sign everything with whichever it
+        happened to find first, leaving the other session's peers unable to verify a word of it.
+        """
+        ...
+
+    def gossip_keys(self) -> Sequence[str]:
+        """Every key this node could have to verify an incoming announcement with.
+
+        The receive side cannot know which session a datagram names until it has verified it, so
+        it tries the keys of the sessions it carries. One in the ordinary case, two across a
+        rotation.
         """
         ...
 
@@ -197,7 +205,7 @@ class EndpointGossip:
         Called on the timer and again whenever what this node holds changes, so a peer learns
         about a new kernel in the time a datagram takes rather than at the next interval.
         """
-        key = self._host.gossip_key()
+        key = self._host.gossip_key(session_id)
         if key is None:
             return
         peers = peers_to_notify(self._host.gossip_peers(session_id), self._vtep)
@@ -225,10 +233,10 @@ class EndpointGossip:
                     log.debug("could not announce to {}: {}", peer, e)
 
     async def on_datagram(self, data: bytes, addr: tuple[str, int]) -> None:
-        key = self._host.gossip_key()
-        if key is None:
+        keys = self._host.gossip_keys()
+        if not keys:
             return
-        announcement = decode(data, key)
+        announcement = decode(data, keys)
         if announcement is None:
             return
         if announcement.session_id not in set(self._host.gossip_sessions()):
