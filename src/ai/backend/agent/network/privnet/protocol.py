@@ -195,6 +195,11 @@ class PrivNetRequest:
     # address); a single-node session has no overlay. Opaque — the privnet validates it is within the
     # session's own LOCAL subnet before pinning.
     local_ip: str | None = None
+    # ATTACH_CONTAINER only: the kernel's in-cluster hostname (``main1``, ``sub1``, …). The privnet
+    # announces it with the container's overlay address, which is what lets a peer answer the
+    # session's cluster names without any node reading another node's records. Opaque -- the
+    # privnet bounds it to a DNS label, and it never reaches a command line.
+    cluster_hostname: str | None = None
     # PUBLISH_PORTS only: the (host_port, container_port, host_ip, protocol) pairing the agent's port
     # pool produced. host_ip is the interface the service is published on (None = every local
     # address); protocol is "tcp"/"udp"; the DNAT *destination* is never sent — the privnet uses its
@@ -237,7 +242,7 @@ class PrivNetRequest:
             payload["cgroup_limits"] = self.cgroup_limits
         if self.generation is not None:
             payload["generation"] = self.generation
-        for key in ("vtep_ip", "ip", "mac", "local_ip"):
+        for key in ("vtep_ip", "ip", "mac", "local_ip", "cluster_hostname"):
             value = getattr(self, key)
             if value is not None:
                 payload[key] = value
@@ -265,7 +270,7 @@ class PrivNetRequest:
         if network_config is not None and not isinstance(network_config, dict):
             raise ProtocolError("network_config must be an object")
         fields: dict[str, str | None] = {}
-        for key in ("vtep_ip", "ip", "mac", "local_ip"):
+        for key in ("vtep_ip", "ip", "mac", "local_ip", "cluster_hostname"):
             value = data.get(key)
             if value is not None and not isinstance(value, str):
                 raise ProtocolError(f"{key} must be a string")

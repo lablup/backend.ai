@@ -197,6 +197,24 @@ class TestAttachments:
 
         assert (await journal.attachments())["c1"].overlay_ip is None
 
+    async def test_the_cluster_hostname_survives_a_restart(self, journal: PrivNetJournal) -> None:
+        """It is announced with the address. Lost across a restart, this node's kernels come back
+        nameless and every peer's resolver quietly stops answering for them."""
+        await journal.record_attachment("c1", "sess-a", "10.128.7.1", "sub1")
+
+        assert (await journal.attachments())["c1"].cluster_hostname == "sub1"
+
+    async def test_a_record_written_before_the_field_reads_back_nameless(
+        self, journal: PrivNetJournal, tmp_path: Path
+    ) -> None:
+        """Not a failure: an unnamed kernel is simply not resolvable by name, which is what a
+        rolling upgrade and a single-node session both produce."""
+        path = tmp_path / "net-privnet" / "attachments"
+        path.mkdir(parents=True, exist_ok=True)
+        (path / "c1").write_text(json.dumps({"session_id": "sess-a", "overlay_ip": "10.128.7.1"}))
+
+        assert (await journal.attachments())["c1"].cluster_hostname is None
+
     async def test_the_record_is_json_a_human_can_read(
         self, journal: PrivNetJournal, tmp_path: Path
     ) -> None:

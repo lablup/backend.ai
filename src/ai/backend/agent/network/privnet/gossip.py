@@ -338,13 +338,16 @@ def endpoints_of(
     attached: Mapping[str, Any],
     *,
     overlay_role: Any,
+    hostnames: Mapping[str, str] | None = None,
 ) -> list[Endpoint]:
     """This node's own endpoints for a session, read from what its attach recorded.
 
     The privnet assigned or validated every one of these itself, which is what makes it the right
     thing to announce: it is the only process that can say, of its own knowledge, which addresses
-    this host holds.
+    this host holds. ``hostnames`` names them, so a peer can resolve the session's cluster names
+    from the same announcement instead of from a table it would have to read somewhere else.
     """
+    hostnames = hostnames or {}
     out: list[Endpoint] = []
     for container_id, plan in attached.items():
         for spec in getattr(plan, "attachments", ()):
@@ -355,5 +358,12 @@ def endpoints_of(
             mac = args.get("mac") if isinstance(args, Mapping) else None
             if not ip or not mac:
                 continue
-            out.append(Endpoint(container_id=container_id, ip=str(ip), mac=str(mac)))
+            out.append(
+                Endpoint(
+                    container_id=container_id,
+                    ip=str(ip),
+                    mac=str(mac),
+                    cluster_hostname=hostnames.get(container_id),
+                )
+            )
     return out

@@ -81,6 +81,11 @@ class AttachRecord:
 
     session_id: str
     overlay_ip: str | None
+    #: The kernel's in-cluster hostname, so a restarted privnet keeps announcing the name with the
+    #: address. Without it the node's kernels come back nameless and every peer's resolver quietly
+    #: stops answering for them. ``None`` for a record written before the field, and for a kernel
+    #: that never had one.
+    cluster_hostname: str | None = None
 
 
 class PrivNetJournal:
@@ -266,13 +271,21 @@ class PrivNetJournal:
         return records
 
     async def record_attachment(
-        self, container_id: str, session_id: str, overlay_ip: str | None
+        self,
+        container_id: str,
+        session_id: str,
+        overlay_ip: str | None,
+        cluster_hostname: str | None = None,
     ) -> None:
         await asyncio.to_thread(
             self._write,
             _ATTACHMENTS,
             container_id,
-            {"session_id": session_id, "overlay_ip": overlay_ip},
+            {
+                "session_id": session_id,
+                "overlay_ip": overlay_ip,
+                "cluster_hostname": cluster_hostname,
+            },
         )
 
     async def forget_attachment(self, container_id: str) -> None:
@@ -291,8 +304,10 @@ class PrivNetJournal:
                     f"privnet attach record for container {container_id} names no session"
                 )
             overlay_ip = payload.get("overlay_ip")
+            hostname = payload.get("cluster_hostname")
             records[container_id] = AttachRecord(
                 session_id=session_id,
                 overlay_ip=overlay_ip if isinstance(overlay_ip, str) else None,
+                cluster_hostname=hostname if isinstance(hostname, str) else None,
             )
         return records

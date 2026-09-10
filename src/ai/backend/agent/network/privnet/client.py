@@ -585,6 +585,11 @@ class PrivNetProvisioner:
         # a host-local dynamic address that need not match the map, and peer resolution is wrong.
         # local_static_ip is an agent-added key, not part of the KernelCreationConfig TypedDict.
         local_ip: str | None = cast(Any, kernel_config).get("local_static_ip")
+        # The kernel's in-cluster name, sent so the privnet can announce it alongside the address.
+        # It is what lets a peer resolve `sub1` without any node reading another node's endpoint
+        # records -- the name and the address it belongs to travel together, from the node that
+        # holds both.
+        cluster_hostname = kernel_config.get("cluster_hostname")
         resp = await self._client.call(
             PrivNetRequest(
                 op=PrivNetOp.ATTACH_CONTAINER,
@@ -592,6 +597,7 @@ class PrivNetProvisioner:
                 container_id=container_id,
                 ip=overlay_ip,
                 local_ip=local_ip,
+                cluster_hostname=str(cluster_hostname) if cluster_hostname else None,
             )
         )
         assigned: dict[NetworkRole, str] = {}
