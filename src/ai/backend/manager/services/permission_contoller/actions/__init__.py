@@ -13,8 +13,8 @@ from .replace_role_permissions import (
     ReplaceRolePermissionsActionResult,
 )
 from .search_permissions import (
-    SearchPermissionsAction,
-    SearchPermissionsActionResult,
+    GlobalSearchPermissionsAction,
+    GlobalSearchPermissionsActionResult,
 )
 from .search_roles import GlobalSearchRolesAction, GlobalSearchRolesActionResult
 from .search_roles_in_scope import (
@@ -44,8 +44,8 @@ __all__ = [
     "GlobalSearchRolesActionResult",
     "SearchRolesInScopeAction",
     "SearchRolesInScopeActionResult",
-    "SearchPermissionsAction",
-    "SearchPermissionsActionResult",
+    "GlobalSearchPermissionsAction",
+    "GlobalSearchPermissionsActionResult",
     "SearchUsersAssignedToRoleAction",
     "SearchUsersAssignedToRoleActionResult",
     "UpdatePermissionAction",

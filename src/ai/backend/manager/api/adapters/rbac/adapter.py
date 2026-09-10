@@ -175,6 +175,7 @@ from ai.backend.manager.models.rbac_models.permission.conditions import (
 from ai.backend.manager.models.rbac_models.permission.creators import RolePermissionCreator
 from ai.backend.manager.models.rbac_models.permission.orders import ScopedPermissionOrders
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
+from ai.backend.manager.models.rbac_models.permission.searchers import RolePermissionSearcher
 from ai.backend.manager.models.rbac_models.permission.updaters import RolePermissionUpdater
 from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.rbac_models.role.conditions import RoleConditions
@@ -188,6 +189,9 @@ from ai.backend.manager.models.specs.permission import PermissionEntry
 from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.services.permission_contoller.actions.add_role_permission import (
     AddRolePermissionAction,
+)
+from ai.backend.manager.services.permission_contoller.actions.bulk_get_permissions import (
+    BulkGetPermissionsAction,
 )
 from ai.backend.manager.services.permission_contoller.actions.bulk_get_roles import (
     BulkGetRolesAction,
@@ -211,8 +215,10 @@ from ai.backend.manager.services.permission_contoller.actions.replace_role_permi
     ReplaceRolePermissionsAction,
 )
 from ai.backend.manager.services.permission_contoller.actions.search_permissions import (
-    SearchPermissionsAction,
-    SearchPermissionsActionResult,
+    GlobalSearchPermissionsAction,
+)
+from ai.backend.manager.services.permission_contoller.actions.search_role_permissions import (
+    SearchRolePermissionsAction,
 )
 from ai.backend.manager.services.permission_contoller.actions.search_roles import (
     GlobalSearchRolesAction,
@@ -353,19 +359,14 @@ class RBACAdapter(BaseAdapter):
         """
         if not permission_ids:
             return []
-        querier = BatchQuerier(
-            pagination=NoPagination(),
-            conditions=[ScopedPermissionConditions.by_ids(permission_ids)],
+        got = await self._permission_controller.bulk_get_permissions.run(
+            BulkGetPermissionsAction(permission_ids=[PermissionID(pid) for pid in permission_ids])
         )
-        action_result: SearchPermissionsActionResult = (
-            await self._permission_controller.search_permissions.wait_for_complete(
-                SearchPermissionsAction(querier=querier)
-            )
-        )
-        permission_map: dict[UUID, PermissionNode] = {
-            data.id: self._permission_data_to_node(data) for data in action_result.result.items
+        permission_map = {
+            field_id: self._permission_data_to_node(data)
+            for field_id, data in got.successes.items()
         }
-        return [permission_map.get(pid) for pid in permission_ids]
+        return [permission_map.get(PermissionID(pid)) for pid in permission_ids]
 
     async def batch_load_role_assignments_by_ids(
         self, assignment_ids: Sequence[UUID]
@@ -399,17 +400,13 @@ class RBACAdapter(BaseAdapter):
         """
         if not role_ids:
             return []
-        querier = BatchQuerier(
-            pagination=NoPagination(),
-            conditions=[ScopedPermissionConditions.by_role_ids(role_ids)],
-        )
-        action_result: SearchPermissionsActionResult = (
-            await self._permission_controller.search_permissions.wait_for_complete(
-                SearchPermissionsAction(querier=querier)
+        found = await self._permission_controller.search_role_permissions.run(
+            SearchRolePermissionsAction(
+                role_ids=list(role_ids), searcher=RolePermissionSearcher(pagination=NoPagination())
             )
         )
         result_map: dict[UUID, list[PermissionNode]] = defaultdict(list)
-        for item in action_result.result.items:
+        for item in found.items:
             result_map[item.role_id].append(self._permission_data_to_node(item))
         return [result_map.get(role_id, []) for role_id in role_ids]
 
@@ -615,10 +612,8 @@ class RBACAdapter(BaseAdapter):
             offset=input.offset,
             base_conditions=base_conditions,
         )
-        action_result: SearchPermissionsActionResult = (
-            await self._permission_controller.search_permissions.wait_for_complete(
-                SearchPermissionsAction(querier=querier)
-            )
+        action_result = await self._permission_controller.global_search_permissions.run(
+            GlobalSearchPermissionsAction(querier=querier)
         )
         raw = action_result.result
         return SearchResult(

@@ -33,8 +33,8 @@ from ai.backend.manager.services.permission_contoller.actions.replace_role_permi
     ReplaceRolePermissionsActionResult,
 )
 from ai.backend.manager.services.permission_contoller.actions.search_permissions import (
-    SearchPermissionsAction,
-    SearchPermissionsActionResult,
+    GlobalSearchPermissionsAction,
+    GlobalSearchPermissionsActionResult,
 )
 from ai.backend.manager.services.permission_contoller.actions.search_roles import (
     GlobalSearchRolesAction,
@@ -86,11 +86,11 @@ class PermissionControllerService:
         return SearchRolesInScopeActionResult(result=result)
 
     async def search_permissions(
-        self, action: SearchPermissionsAction
-    ) -> SearchPermissionsActionResult:
+        self, action: GlobalSearchPermissionsAction
+    ) -> GlobalSearchPermissionsActionResult:
         """Search scoped permissions with pagination and filtering."""
         result = await self._repository.search_permissions(action.querier)
-        return SearchPermissionsActionResult(result=result)
+        return GlobalSearchPermissionsActionResult(result=result)
 
     async def search_users_assigned_to_role(
         self, action: SearchUsersAssignedToRoleAction

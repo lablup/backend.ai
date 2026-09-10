@@ -48,7 +48,7 @@ from ai.backend.manager.services.permission_contoller.actions.get_scope_types im
     GlobalGetScopeTypesAction,
 )
 from ai.backend.manager.services.permission_contoller.actions.search_permissions import (
-    SearchPermissionsAction,
+    GlobalSearchPermissionsAction,
 )
 from ai.backend.manager.services.permission_contoller.actions.search_roles import (
     GlobalSearchRolesAction,
@@ -341,7 +341,7 @@ class TestSearchPermissions:
         mock_repository.search_permissions.return_value = mock_result
 
         querier = _make_querier()
-        action = SearchPermissionsAction(querier=querier)
+        action = GlobalSearchPermissionsAction(querier=querier)
         result = await service.search_permissions(action)
 
         mock_repository.search_permissions.assert_called_once_with(querier)
@@ -360,7 +360,7 @@ class TestSearchPermissions:
         )
         mock_repository.search_permissions.return_value = mock_result
 
-        action = SearchPermissionsAction(querier=_make_querier(limit=10, offset=20))
+        action = GlobalSearchPermissionsAction(querier=_make_querier(limit=10, offset=20))
         result = await service.search_permissions(action)
 
         assert result.result.has_next_page is True

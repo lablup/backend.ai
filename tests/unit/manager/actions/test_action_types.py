@@ -13,8 +13,8 @@ from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.services.permission_contoller.actions.replace_role_permissions import (
     ReplaceRolePermissionsAction,
 )
-from ai.backend.manager.services.permission_contoller.actions.search_permissions import (
-    SearchPermissionsAction,
+from ai.backend.manager.services.permission_contoller.actions.search_users_assigned_to_role import (
+    SearchUsersAssignedToRoleAction,
 )
 
 # Legacy-family actions only. The v2 families answer with
@@ -22,7 +22,7 @@ from ai.backend.manager.services.permission_contoller.actions.search_permissions
 # them in would conflate two type systems rather than test either one.
 _REPRESENTATIVE_ACTION_CLASSES: list[type[BaseAction]] = [
     ReplaceRolePermissionsAction,
-    SearchPermissionsAction,
+    SearchUsersAssignedToRoleAction,
 ]
 
 
