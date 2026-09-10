@@ -62,7 +62,6 @@ from ai.backend.manager.models.keypair.row import (
 )
 from ai.backend.manager.models.keypair.scopes import UserKeypairOperationScope
 from ai.backend.manager.models.project.lookups import PersonalProjectOfUserLookup
-from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
 from ai.backend.manager.models.resource_policy import UserResourcePolicyRow
 from ai.backend.manager.models.resource_policy.row import KeyPairResourcePolicyRow
 from ai.backend.manager.models.resource_slot.aggregates import kernel_allocated_slots_expr
@@ -84,11 +83,6 @@ from ai.backend.manager.models.user.purgers import (
     UserPurger,
     UserSessionGroupPurger,
     UserVFolderPermissionPurger,
-)
-from ai.backend.manager.models.user.scopes import (
-    DomainUserOperationScope,
-    ProjectUserOperationScope,
-    RoleUserOperationScope,
 )
 from ai.backend.manager.models.user.updaters import UserUpdater
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -873,89 +867,6 @@ class UserDBSource:
         async with self._db.begin_readonly_session() as db_session:
             query = sa.select(UserRow)
             result = await execute_batch_querier(db_session, query, querier)
-
-            items = [row.UserRow.to_data() for row in result.rows]
-            return UserSearchResult(
-                items=items,
-                total_count=result.total_count,
-                has_next_page=result.has_next_page,
-                has_previous_page=result.has_previous_page,
-            )
-
-    async def search_users_by_domain(
-        self,
-        scope: DomainUserOperationScope,
-        querier: BatchQuerier,
-    ) -> UserSearchResult:
-        """Search users within a domain.
-
-        Args:
-            scope: DomainUserOperationScope defining the domain to search within.
-            querier: BatchQuerier containing conditions, orders, and pagination.
-
-        Returns:
-            UserSearchResult with matching users and pagination info.
-        """
-        async with self._db.begin_readonly_session() as db_session:
-            query = sa.select(UserRow)
-            result = await execute_batch_querier(db_session, query, querier, scopes=[scope])
-
-            items = [row.UserRow.to_data() for row in result.rows]
-            return UserSearchResult(
-                items=items,
-                total_count=result.total_count,
-                has_next_page=result.has_next_page,
-                has_previous_page=result.has_previous_page,
-            )
-
-    async def search_users_by_project(
-        self,
-        scope: ProjectUserOperationScope,
-        querier: BatchQuerier,
-    ) -> UserSearchResult:
-        """Search users within a project.
-
-        Membership comes from the project's virtual entity; the scope supplies
-        the membership predicate.
-
-        Args:
-            scope: ProjectUserOperationScope defining the project to search within.
-            querier: BatchQuerier containing conditions, orders, and pagination.
-
-        Returns:
-            UserSearchResult with matching users and pagination info.
-        """
-        async with self._db.begin_readonly_session() as db_session:
-            query = sa.select(UserRow).select_from(UserRow)
-            result = await execute_batch_querier(db_session, query, querier, scopes=[scope])
-
-            items = [row.UserRow.to_data() for row in result.rows]
-            return UserSearchResult(
-                items=items,
-                total_count=result.total_count,
-                has_next_page=result.has_next_page,
-                has_previous_page=result.has_previous_page,
-            )
-
-    async def search_users_by_role(
-        self,
-        scope: RoleUserOperationScope,
-        querier: BatchQuerier,
-    ) -> UserSearchResult:
-        """Search users assigned to a role.
-
-        Joins with user_roles to find users assigned to the role.
-        """
-        async with self._db.begin_readonly_session() as db_session:
-            query = (
-                sa.select(UserRow)
-                .select_from(UserRow)
-                .join(
-                    UserRoleRow,
-                    UserRow.uuid == UserRoleRow.user_id,
-                )
-            )
-            result = await execute_batch_querier(db_session, query, querier, scopes=[scope])
 
             items = [row.UserRow.to_data() for row in result.rows]
             return UserSearchResult(
