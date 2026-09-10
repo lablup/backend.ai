@@ -6,20 +6,29 @@ conftest, which names the ten dependencies a read never reaches.
 
 from __future__ import annotations
 
+from uuid import UUID
+
 import pytest
-from bai_scenario.components.domain import seed_someone_of
+from bai_scenario.components.domain import seed_personal_project_policy, seed_someone_of
+from bai_scenario.components.session import SessionScenario, seed_someone_making_sessions
 from bai_scenario.runner.runner import ScenarioRunner
 from bai_scenario.seeds.domain.domain import seed_domain
-from bai_scenario.seeds.seeder import Seeder
+from bai_scenario.seeds.image.image import seed_image
+from bai_scenario.seeds.image.registry import seed_container_registry
+from bai_scenario.seeds.project.project import seed_project
+from bai_scenario.seeds.resource_group.resource_group import seed_resource_group
+from bai_scenario.seeds.seeder import Seeder, after
 
+from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.data.user.types import UserRole
-from ai.backend.common.dto.manager.v2.session.request import AdminSearchSessionsInput
+from ai.backend.common.dto.manager.v2.session.request import (
+    AdminSearchSessionsInput,
+    EnqueueSessionInput,
+)
+from ai.backend.common.dto.manager.v2.session.types import CreateSessionTypeEnum
 from ai.backend.manager.api.adapters.session.adapter import SessionAdapter
-from ai.backend.manager.config.unified import ManagerUnifiedConfig
 from ai.backend.manager.errors.permission import NotEnoughPermission
-from ai.backend.testutils.typed_scenario import TypedScenario, at, call
-
-type SessionScenario = TypedScenario[SessionAdapter, ManagerUnifiedConfig]
+from ai.backend.testutils.typed_scenario import TypedScenario, at, call, needs_actor
 
 
 def nothing_laid_means_nothing_found(seed: Seeder) -> SessionScenario:
@@ -50,6 +59,55 @@ def ungranted_user_is_refused(seed: Seeder) -> SessionScenario:
         then=NotEnoughPermission,
     )
 
+
+def granted_user_enqueues_a_session(seed: Seeder) -> SessionScenario:
+    home = seed.creating(seed_domain(name_hint="home"))
+    group = seed.creating(seed_resource_group(name_hint="compute"))
+    registry = seed.creating(seed_container_registry())
+    image = seed.creating(seed_image(name_hint="python"), registry)
+    policy = seed_personal_project_policy(seed)
+    project = seed.creating(seed_project(name_hint="research"), home, policy)
+    maker, _ = seed_someone_making_sessions(seed, home, project)
+    return TypedScenario.ok(
+        "a-user-granted-session-create-enqueues-one",
+        description=(
+            "이미지와 리소스 그룹이 있고 자기 스코프에서 세션 생성 권한을 받은 사용자가 "
+            "세션을 요청하면, 그 세션이 대기 상태로 등록된다"
+        ),
+        actor=maker,
+        given=seed.situation(),
+        when=after(
+            image,
+            group,
+            project,
+            lambda img, rg, proj: needs_actor(
+                lambda actor: call(
+                    SessionAdapter.enqueue,
+                    EnqueueSessionInput(
+                        session_name="first",
+                        session_type=CreateSessionTypeEnum.INTERACTIVE,
+                        image_id=img.id,
+                        resource_entries=[],
+                        resource_group_id=ResourceGroupID(rg.id),
+                        project_id=proj.id,
+                    ),
+                    actor.id,
+                    str(actor.role),
+                    "",
+                    actor.domain_name,
+                    proj.id,
+                ),
+                "enqueue",
+            ),
+        ),
+        then=at(lambda p: p.session.project_id, project.name and UUID(int=0)),
+    )
+
+
+# Enqueueing is one hop from covered. The controller is wired and the row below runs
+# until the resource group is refused as not accessible: a group reaches a session only
+# once it is allowed for the domain, the project or the keypair, and that association is
+# written by the domain's own create path rather than by any spec a seed can name.
 
 BUILDERS = (nothing_laid_means_nothing_found, ungranted_user_is_refused)
 SCENARIOS: list[SessionScenario] = [build(Seeder()) for build in BUILDERS]
