@@ -62,7 +62,6 @@ type is what reopens the decision.
 | `NotificationProcessingFailure` | the destination a channel points at refused the message; the failure is the external system's, not the row's |
 | `InvalidSecretKeyMaterial`, `SecretEncryptionMisconfigured` | the configured encryption keys and key providers, which no stored secret is read to reach |
 | `ExportReportNotFound`, `InvalidExportFieldKeys` | a report is a `ReportDef` in a code-declared registry, not a row, and its field keys with it |
-| `TooManyConcurrentExports` | a cap on how many exports run at once, about no one row |
 | `RetentionCategoryNotSupportedError` | a `RetentionCategory` with no cleanup wired — a gap in this build, not in a row |
 
 ## The legacy neighbor is a different kind

@@ -49,21 +49,3 @@ class InvalidExportFieldKeys(BackendAIError, web.HTTPBadRequest):
             operation=ErrorOperation.READ,
             error_detail=ErrorDetail.BAD_REQUEST,
         )
-
-
-class TooManyConcurrentExports(BackendAIError, web.HTTPServiceUnavailable):
-    """Raised when concurrent export limit is exceeded."""
-
-    error_type = "https://api.backend.ai/probs/too-many-concurrent-exports"
-    error_title = "Too many concurrent exports."
-
-    def __init__(self) -> None:
-        super().__init__(extra_msg="Too many concurrent export requests. Please try again later.")
-
-    @override
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.BACKENDAI,
-            operation=ErrorOperation.GENERIC,
-            error_detail=ErrorDetail.UNAVAILABLE,
-        )
