@@ -109,7 +109,7 @@ def create(name: str, description: str | None) -> None:
 @click.option("--name", default=None, type=str, help="Updated name.")
 @click.option("--description", default=None, type=str, help="Updated description.")
 @click.option(
-    "--clear-description",
+    "--set-null-description",
     is_flag=True,
     help="Clear the current description.",
 )
@@ -117,7 +117,7 @@ def update(
     login_client_type_id: uuid.UUID,
     name: str | None,
     description: str | None,
-    clear_description: bool,
+    set_null_description: bool,
 ) -> None:
     """Update a login client type (superadmin only)."""
     from ai.backend.common.dto.manager.v2.login_client_type.request import (
@@ -125,13 +125,13 @@ def update(
     )
     from ai.backend.common.tristate.unset import UNSET
 
-    if description is not None and clear_description:
-        raise click.UsageError("--description and --clear-description cannot be used together")
+    if description is not None and set_null_description:
+        raise click.UsageError("--description and --set-null-description cannot be used together")
 
     input_ = UpdateLoginClientTypeInput(
         name=name if name is not None else UNSET,
         description=(
-            None if clear_description else description if description is not None else UNSET
+            None if set_null_description else description if description is not None else UNSET
         ),
     )
 
