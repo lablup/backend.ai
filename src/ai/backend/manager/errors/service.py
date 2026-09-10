@@ -151,7 +151,7 @@ class ModelServiceDependencyNotCleared(EntityError, web.HTTPBadRequest):
     @override
     def entity_error_code(self) -> EntityErrorCode:
         return EntityErrorCode(
-            VFolderEntityType(), ActionOperationType.DELETE, ErrorDetail.CONFLICT
+            VFolderEntityType(), ActionOperationType.DELETE, ErrorDetail.BAD_REQUEST
         )
 
 
