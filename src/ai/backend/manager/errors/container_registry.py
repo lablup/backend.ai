@@ -24,9 +24,17 @@ class InvalidContainerRegistryProjectOnModify(EntityError, web.HTTPBadRequest):
         )
 
 
-class InvalidContainerRegistryURL(EntityError, web.HTTPBadRequest):
+class InvalidContainerRegistryURLOnCreate(EntityError, web.HTTPBadRequest):
     @override
     def entity_error_code(self) -> EntityErrorCode:
         return EntityErrorCode(
             ContainerRegistryEntityType(), ActionOperationType.CREATE, ErrorDetail.BAD_REQUEST
+        )
+
+
+class InvalidContainerRegistryURLOnModify(EntityError, web.HTTPBadRequest):
+    @override
+    def entity_error_code(self) -> EntityErrorCode:
+        return EntityErrorCode(
+            ContainerRegistryEntityType(), ActionOperationType.UPDATE, ErrorDetail.BAD_REQUEST
         )

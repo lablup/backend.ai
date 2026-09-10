@@ -23,7 +23,8 @@ from ai.backend.manager.data.container_registry.types import ContainerRegistryDa
 from ai.backend.manager.errors.container_registry import (
     InvalidContainerRegistryProjectOnCreate,
     InvalidContainerRegistryProjectOnModify,
-    InvalidContainerRegistryURL,
+    InvalidContainerRegistryURLOnCreate,
+    InvalidContainerRegistryURLOnModify,
 )
 from ai.backend.manager.models.base import (
     GUID,
@@ -94,7 +95,7 @@ class ContainerRegistryValidator:
 
     def validate_on_create(self) -> None:
         if not self._is_valid_url(self._url):
-            raise InvalidContainerRegistryURL(f"Invalid URL format: {self._url}")
+            raise InvalidContainerRegistryURLOnCreate(f"Invalid URL format: {self._url}")
 
         rejection = self._project_rejection()
         if rejection is not None:
@@ -102,7 +103,7 @@ class ContainerRegistryValidator:
 
     def validate_on_modify(self) -> None:
         if not self._is_valid_url(self._url):
-            raise InvalidContainerRegistryURL(f"Invalid URL format: {self._url}")
+            raise InvalidContainerRegistryURLOnModify(f"Invalid URL format: {self._url}")
 
         rejection = self._project_rejection()
         if rejection is not None:
