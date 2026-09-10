@@ -1,9 +1,9 @@
 ---
 name: error-code-and-status-axes
 type: design-rationale
-description: The error-code triple and its no-underscore constraint, error code and HTTP status as independent axes, mixin-less base errors, GraphQL carrying only the code, absence of a central code registry, the separation from common/exception.py and the legacy manager/exceptions.py
+description: The error-code triple and its no-underscore constraint, error code and HTTP status as independent axes, mixin-less base errors, GraphQL carrying only the code, absence of a central code registry, the separation from common/exception.py and the legacy manager/exceptions.py, the permission and share errors that stay on BackendAIError for want of a declared row type
 scope: src/ai/backend/manager/errors
-keywords: [BackendAIError, ErrorCode, ErrorDomain, ErrorOperation, ErrorDetail, ObjectNotFound, problem+json, exceptions.py]
+keywords: [BackendAIError, ErrorCode, ErrorDomain, ErrorOperation, ErrorDetail, ObjectNotFound, EntityError, FieldError, problem+json, exceptions.py]
 sources:
   - src/ai/backend/common/exception.py
   - src/ai/backend/manager/api/rest/middleware/exception.py
@@ -43,6 +43,18 @@ one place per domain.
 
 - `ObjectNotFound` builds its title from `object_name`, and about 20 domain not-found errors inherit it setting only `object_name`.
 - When the meaning fits, extend an existing concrete error rather than deriving fresh from `BackendAIError`.
+
+## Some permission and share errors stay on `BackendAIError`
+
+These name no declared row type, so they keep an `ErrorDomain`. Declaring the
+type is what reopens the decision.
+
+| Error | Why it stays |
+|---|---|
+| `RoleAlreadyAssigned`, `RoleNotAssigned` | the `user_roles` row has no `EntityType` or `FieldType` |
+| `InvalidFieldPermission` | validates a requested field scope for both permission entries and entity shares, so it names no one row kind |
+| `VirtualEntityNotFound` | `data/entity/virtual_entity.py` declares an id alone, no `EntityType` |
+| `NotEnoughPermission` | an authorization denial about the caller, not about a row |
 
 ## The legacy neighbor is a different kind
 
