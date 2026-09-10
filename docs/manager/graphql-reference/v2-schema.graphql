@@ -15787,8 +15787,8 @@ If a policy already exists for the deployment, it is replaced entirely.
 input UpdateDeploymentPolicyInput {
   deploymentId: ID!
   strategy: DeploymentStrategyType!
-  rollingUpdate: RollingUpdateConfigInput
-  blueGreen: BlueGreenConfigInput
+  rollingUpdate: RollingUpdateConfigInput = null
+  blueGreen: BlueGreenConfigInput = null
 }
 
 """
