@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import override
+from uuid import UUID
 
 import pytest
 from bai_scenario.components.answers import NothingIsFound, TheCallIsRefused
@@ -36,6 +37,7 @@ from ai.backend.testutils.scenario_steps import (
     Held,
     Refused,
     Same,
+    SameAs,
     Scenario,
     Skipped,
     Then,
@@ -109,12 +111,20 @@ class TheFolderBelongsToTheMaker(Then[AFolderMakerAndTheirDomain, Answer]):
             Same("metadata.cloneable", node.metadata.cloneable, False),
             Same("metadata.last_used", node.metadata.last_used, None),
             Same("access_control.ownership_type", node.access_control.ownership_type, "user"),
-            Same("ownership.user_id", node.ownership.user_id, laid.caller.id),
+            Held(
+                "ownership.user_id",
+                node.ownership.user_id,
+                SameAs[UUID | None](laid.caller.id, "만든 사람"),
+            ),
             Skipped(
                 "ownership.project_id",
                 "개인 폴더는 그 사람의 개인 프로젝트에 붙는다. 그 id는 사용자를 만들 때 생긴다",
             ),
-            Same("ownership.creator_id", node.ownership.creator_id, laid.caller.id),
+            Held(
+                "ownership.creator_id",
+                node.ownership.creator_id,
+                SameAs[UUID | None](laid.caller.id, "만든 사람"),
+            ),
             Same("ownership.creator_email", node.ownership.creator_email, laid.caller.email),
             Same("unmanaged_path", node.unmanaged_path, None),
             Skipped("id", "데이터베이스가 만든다"),

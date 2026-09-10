@@ -14,6 +14,7 @@ from abc import ABC, abstractmethod
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from typing import Any, override
+from uuid import UUID
 
 
 @dataclass(frozen=True)
@@ -72,21 +73,48 @@ class Verdict(ABC):
 
 
 @dataclass(frozen=True)
+class SameAs[V](Condition[V]):
+    """다른 자리에서 온 값과 같아야 한다.
+
+    그 값이 실행마다 달라지는 것일 때 쓴다. 값 대신 어디서 온 것인지로 말하므로 레포트가
+    실행마다 달라지지 않는다.
+    """
+
+    wanted: V
+    came_from: str
+
+    @override
+    def says(self) -> str:
+        return f"{self.came_from}와 같다"
+
+    @override
+    def holds(self, got: V) -> bool:
+        return bool(got == self.wanted)
+
+
+@dataclass(frozen=True)
 class Same[V](Verdict):
-    """이 값이어야 한다. 시나리오가 정한 값이므로 레포트에 그대로 적는다."""
+    """이 값이어야 한다. 시나리오가 정한 값이므로 레포트에 그대로 적는다.
+
+    생성된 id는 값으로 적지 않는다. 실행마다 달라 레포트가 흔들린다. 그런 자리는
+    :class:`SameAs`를 조건으로 걸어 어디서 온 값인지로 말한다.
+    """
 
     called: str
     got: V
     wanted: V
 
+    def _shows(self) -> str:
+        if isinstance(self.wanted, UUID):
+            raise ValueError(f"{self.called}: 생성된 id를 값으로 적을 수 없다. SameAs 조건을 쓴다")
+        return f"{self.called} = {self.wanted!r}"
+
     @override
     def told(self) -> Told:
+        says = self._shows()
         if self.got == self.wanted:
-            return Told(f"{self.called} = {self.wanted!r}")
-        return Told(
-            f"{self.called} = {self.wanted!r}",
-            problems=(f"{self.called}: {self.wanted!r} 이어야 하는데 {self.got!r}",),
-        )
+            return Told(says)
+        return Told(says, problems=(f"{self.called}: {self.wanted!r} 이어야 하는데 {self.got!r}",))
 
 
 @dataclass(frozen=True)

@@ -45,6 +45,7 @@ from ai.backend.testutils.scenario_steps import (
     Held,
     Refused,
     Same,
+    SameAs,
     Scenario,
     Skipped,
     Then,
@@ -218,7 +219,11 @@ class TheRosterHoldsTheMember(Then[AProjectAMemberAndACaller, Answer]):
         if not isinstance(payload, AssignUsersToProjectPayload):
             return [Refused(NotEnoughPermission, answered.raised)]
         return [
-            Same("items", [one.id for one in payload.items], [laid.member.id]),
+            Held(
+                "items",
+                [one.id for one in payload.items],
+                SameAs([laid.member.id], "배정한 사람 하나"),
+            ),
         ]
 
 
