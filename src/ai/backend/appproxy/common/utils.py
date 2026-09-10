@@ -340,11 +340,11 @@ class BackendAIAccessLogger(AccessLogger):
                     extra[key] = value
                 else:
                     k1, k2 = key
-                    nested = extra.get(k1)
-                    if not isinstance(nested, dict):
-                        nested = {}
-                        extra[k1] = nested
-                    nested[k2] = value
+                    dct = extra.get(k1, {})
+                    if not isinstance(dct, dict):
+                        dct = {}
+                    dct[k2] = value
+                    extra[k1] = dct
 
             self.logger.info((prepend_to_log + self._log_format) % tuple(values), extra=extra)
         except Exception:
