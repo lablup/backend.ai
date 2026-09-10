@@ -561,7 +561,10 @@ jobs:
         # A shard holds only part of a component, so the check needs every shard's
         # record together. A component that did not run at all is not checked here;
         # it is checked by the run that does hold it.
-        found=$(find dist -name scenarios.jsonl)
+        # download-artifact leaves no dist/ when the run matched no artifact, and
+        # this step runs under `set -e`, so an unguarded find would abort before the
+        # nothing-ran check below.
+        found=$(find dist -name scenarios.jsonl 2>/dev/null || true)
         if [ -z "$found" ]; then
           echo "no scenario ran; nothing to check"
           exit 0
