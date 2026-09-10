@@ -264,7 +264,8 @@ class DeploymentRevisionPresetAdapter(BaseAdapter):
             if input.model_definition is not None
             else None
         )
-        strategy, strategy_spec = self._convert_required_strategy_input(input.deployment_strategy)
+        strategy = input.deployment_strategy.type
+        strategy_spec = self._convert_strategy_spec(input.deployment_strategy)
 
         creator = DeploymentPresetCreator(
             runtime_variant_id=input.runtime_variant_id,
@@ -337,11 +338,11 @@ class DeploymentRevisionPresetAdapter(BaseAdapter):
             open_to_public=TriState.from_unset(input.open_to_public),
             replica_count=TriState.from_unset(input.replica_count),
             revision_history_limit=TriState.from_unset(input.revision_history_limit),
-            deployment_strategy=TriState.from_unset(input.deployment_strategy).map(
-                lambda si: self._convert_required_strategy_input(si)[0]
+            deployment_strategy=OptionalState.from_unset(input.deployment_strategy).map(
+                lambda si: si.type
             ),
-            deployment_strategy_spec=TriState.from_unset(input.deployment_strategy).map(
-                lambda si: self._convert_required_strategy_input(si)[1]
+            deployment_strategy_spec=OptionalState.from_unset(input.deployment_strategy).map(
+                self._convert_strategy_spec
             ),
         )
         result = await self._deployment_revision_preset.update.run(
@@ -539,22 +540,18 @@ class DeploymentRevisionPresetAdapter(BaseAdapter):
 
         return TriState.from_unset(value).map(_merge)
 
-    def _convert_required_strategy_input(
+    def _convert_strategy_spec(
         self,
         strategy_input: DeploymentStrategyInput,
-    ) -> tuple[DeploymentStrategy, dict[str, Any]]:
-        """Convert a non-null DeploymentStrategyInput to (strategy, strategy_spec dict)."""
+    ) -> dict[str, Any]:
+        """Convert a non-null DeploymentStrategyInput to its strategy_spec dict."""
         match strategy_input.type:
             case DeploymentStrategy.ROLLING:
                 rolling = strategy_input.rolling_update
-                spec_dict: dict[str, Any] = (
-                    rolling.model_dump(mode="json") if rolling is not None else {}
-                )
-                return DeploymentStrategy.ROLLING, spec_dict
+                return rolling.model_dump(mode="json") if rolling is not None else {}
             case DeploymentStrategy.BLUE_GREEN:
                 bg = strategy_input.blue_green
-                spec_dict = bg.model_dump(mode="json") if bg is not None else {}
-                return DeploymentStrategy.BLUE_GREEN, spec_dict
+                return bg.model_dump(mode="json") if bg is not None else {}
 
     @staticmethod
     def _data_to_node(
