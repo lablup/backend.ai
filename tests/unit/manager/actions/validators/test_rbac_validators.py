@@ -79,12 +79,13 @@ _ORM_CLUSTER = (
 )
 
 
-_TARGET_DOMAIN = "default"
-_TARGET_VFOLDER = "vf-1"
+_TARGET_DOMAIN_NAME = "default"
+_TARGET_DOMAIN = uuid.uuid4()
+_TARGET_VFOLDER = uuid.uuid4()
 
 
 class _ProjectCreateAction(BaseScopeAction):
-    """PROJECT:CREATE at DOMAIN('default') — matches the BA-5721 reproduction."""
+    """PROJECT:CREATE at the target domain — matches the BA-5721 reproduction."""
 
     @classmethod
     @override
@@ -102,13 +103,13 @@ class _ProjectCreateAction(BaseScopeAction):
 
     @override
     def scope_id(self) -> str:
-        return _TARGET_DOMAIN
+        return str(_TARGET_DOMAIN)
 
     @override
     def target_element(self) -> RBACElementRef:
         return RBACElementRef(
             element_type=RBACElementType.DOMAIN,
-            element_id=_TARGET_DOMAIN,
+            element_id=str(_TARGET_DOMAIN),
         )
 
 
@@ -127,13 +128,13 @@ class _VfolderUpdateAction(BaseSingleEntityAction):
 
     @override
     def target_entity_id(self) -> str:
-        return _TARGET_VFOLDER
+        return str(_TARGET_VFOLDER)
 
     @override
     def target_element(self) -> RBACElementRef:
         return RBACElementRef(
             element_type=RBACElementType.VFOLDER,
-            element_id=_TARGET_VFOLDER,
+            element_id=str(_TARGET_VFOLDER),
         )
 
     @override
@@ -148,7 +149,7 @@ def _make_user_data(user_id: uuid.UUID, *, is_superadmin: bool) -> UserData:
         is_admin=is_superadmin,
         is_superadmin=is_superadmin,
         role=UserRole.SUPERADMIN if is_superadmin else UserRole.USER,
-        domain_name=_TARGET_DOMAIN,
+        domain_name=_TARGET_DOMAIN_NAME,
         domain_id=DomainID(uuid.uuid4()),
     )
 
@@ -158,6 +159,8 @@ async def _seed_user_with_role(
     *,
     user_id: uuid.UUID,
     role_id: uuid.UUID,
+    role_scope_type: EntityType = EntityType.PROJECT,
+    role_scope_id: uuid.UUID | None = None,
 ) -> None:
     suffix = user_id.hex[:8]
     policy_name = f"policy-{suffix}"
@@ -190,6 +193,8 @@ async def _seed_user_with_role(
         await db_sess.flush()
         db_sess.add(
             RoleRow(
+                scope_type=EntityType(role_scope_type.value),
+                scope_id=role_scope_id or uuid.uuid4(),
                 id=role_id,
                 name=f"role-{suffix}",
                 description="rbac validator test role",
@@ -216,8 +221,6 @@ async def _grant_permission(
         db_sess.add(
             PermissionRow(
                 role_id=role_id,
-                scope_type=scope_type,
-                scope_id=scope_id,
                 entity_type=entity_type,
                 permission=Permission.from_operation(operation),
             )
@@ -294,12 +297,18 @@ async def regular_user_with_project_create(
 ) -> UserData:
     user_id = uuid.uuid4()
     role_id = uuid.uuid4()
-    await _seed_user_with_role(db_with_rbac_tables, user_id=user_id, role_id=role_id)
+    await _seed_user_with_role(
+        db_with_rbac_tables,
+        user_id=user_id,
+        role_id=role_id,
+        role_scope_type=EntityType.DOMAIN,
+        role_scope_id=_TARGET_DOMAIN,
+    )
     await _grant_permission(
         db_with_rbac_tables,
         role_id=role_id,
         scope_type=ScopeType.DOMAIN,
-        scope_id=_TARGET_DOMAIN,
+        scope_id=str(_TARGET_DOMAIN),
         entity_type=EntityType.PROJECT,
         operation=OperationType.CREATE,
     )
@@ -312,12 +321,18 @@ async def regular_user_with_vfolder_update(
 ) -> UserData:
     user_id = uuid.uuid4()
     role_id = uuid.uuid4()
-    await _seed_user_with_role(db_with_rbac_tables, user_id=user_id, role_id=role_id)
+    await _seed_user_with_role(
+        db_with_rbac_tables,
+        user_id=user_id,
+        role_id=role_id,
+        role_scope_type=EntityType.VFOLDER,
+        role_scope_id=_TARGET_VFOLDER,
+    )
     await _grant_permission(
         db_with_rbac_tables,
         role_id=role_id,
         scope_type=ScopeType.VFOLDER,
-        scope_id=_TARGET_VFOLDER,
+        scope_id=str(_TARGET_VFOLDER),
         entity_type=EntityType.VFOLDER,
         operation=OperationType.UPDATE,
     )

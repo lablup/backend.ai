@@ -8,8 +8,9 @@ from uuid import UUID
 
 import sqlalchemy as sa
 
-from ai.backend.common.data.permission.types import EntityType, OperationType
+from ai.backend.common.data.permission.types import OperationType
 from ai.backend.manager.models.clauses import QueryCondition
+from ai.backend.manager.models.condition_utils import StringConditions
 from ai.backend.manager.models.rbac_models.role_permission_preset.row import (
     RolePermissionPresetRow,
 )
@@ -32,33 +33,9 @@ class RolePermissionPresetConditions:
 
         return inner
 
-    @staticmethod
-    def by_entity_type_equals(entity_type: EntityType) -> QueryCondition:
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return RolePermissionPresetRow.entity_type == entity_type
-
-        return inner
-
-    @staticmethod
-    def by_entity_type_not_equals(entity_type: EntityType) -> QueryCondition:
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return RolePermissionPresetRow.entity_type != entity_type
-
-        return inner
-
-    @staticmethod
-    def by_entity_type_in(entity_types: Collection[EntityType]) -> QueryCondition:
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return RolePermissionPresetRow.entity_type.in_(entity_types)
-
-        return inner
-
-    @staticmethod
-    def by_entity_type_not_in(entity_types: Collection[EntityType]) -> QueryCondition:
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return RolePermissionPresetRow.entity_type.notin_(entity_types)
-
-        return inner
+    by_entity_type_match = StringConditions(
+        sa.type_coerce(RolePermissionPresetRow.entity_type, sa.String())
+    )
 
     @staticmethod
     def by_operation_equals(operation: OperationType) -> QueryCondition:

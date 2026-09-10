@@ -1,4 +1,4 @@
-from ai.backend.common.data.entity.permission import PERMISSION_FIELD_TYPE
+from ai.backend.common.data.entity.permission import PermissionFieldType
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
 from ai.backend.manager.actions.processor.scope import ScopeActionProcessor
@@ -6,7 +6,6 @@ from ai.backend.manager.actions.registry.field import LookupFieldGroup
 from ai.backend.manager.actions.registry.group import ProcessorGroup
 from ai.backend.manager.actions.registry.types import FieldGroupMeta
 from ai.backend.manager.actions.v2.field.bulk_processor import PartialBulkFieldActionProcessor
-from ai.backend.manager.actions.v2.global_scope.processor import GlobalActionProcessor
 from ai.backend.manager.actions.v2.ops.result import (
     CreatedEntityOpsResult,
     CreatedFieldOpsResult,
@@ -23,7 +22,6 @@ from ai.backend.manager.data.permission.role import RoleData
 from .actions import (
     AddRolePermissionAction,
     BulkRemoveRolePermissionsAction,
-    CreateGlobalRoleAction,
     CreateRoleAction,
     DeleteRoleAction,
     GetRoleDetailAction,
@@ -88,9 +86,6 @@ class PermissionControllerProcessors:
     """Processor package for RBAC permission controller operations."""
 
     create_role: V2ScopeActionProcessor[CreateRoleAction, CreatedEntityOpsResult[RoleData]]
-    create_global_role: GlobalActionProcessor[
-        CreateGlobalRoleAction, CreatedEntityOpsResult[RoleData]
-    ]
     update_role: SingleEntityActionProcessor[UpdateRoleAction, EntityOpsResult[RoleData]]
     delete_role: SingleEntityActionProcessor[DeleteRoleAction, EntityOpsResult[RoleData]]
     purge_role: SingleEntityActionProcessor[PurgeRoleAction, EntityOpsResult[RoleData]]
@@ -134,7 +129,6 @@ class PermissionControllerProcessors:
         validators: ActionValidators,
     ) -> None:
         self.create_role = role_group.entity_create_ops(CreateRoleAction)
-        self.create_global_role = role_group.global_create_ops(CreateGlobalRoleAction)
         self.update_role = role_group.single_update_ops(UpdateRoleAction)
         self.delete_role = role_group.single_delete_ops(DeleteRoleAction)
         self.purge_role = role_group.entity_purge_ops(PurgeRoleAction)
@@ -148,7 +142,7 @@ class PermissionControllerProcessors:
             service.search_users_assigned_to_role, action_monitors
         )
         permissions: LookupFieldGroup[PermissionData] = role_group.field_group(
-            FieldGroupMeta(PERMISSION_FIELD_TYPE),
+            FieldGroupMeta(PermissionFieldType()),
             PermissionData,
             LookupRolePermissionOwnerAction,
             LookupBulkRolePermissionOwnerAction,

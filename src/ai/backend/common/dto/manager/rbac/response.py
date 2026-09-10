@@ -51,6 +51,8 @@ class RoleDTO(BackendAISchema):
 
     id: UUID = Field(description="Role ID")
     name: str = Field(description="Role name")
+    scope_type: EntityType = Field(description="Type of the scope the role belongs to")
+    scope_id: UUID = Field(description="ID of the scope the role belongs to")
     source: RoleSource = Field(description="Role source")
     status: RoleStatus = Field(description="Role status")
     created_at: datetime = Field(description="Creation timestamp")

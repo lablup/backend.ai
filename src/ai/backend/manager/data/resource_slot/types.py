@@ -43,7 +43,7 @@ class ResourceSlotTypeData(EntityData):
     """One registered resource slot type.
 
     ``slot_name`` is the primary key and the five referencing tables' FK target;
-    ``uuid`` is the unique alternate key that gives the entity its ``EntityID``.
+    ``uuid`` is the unique alternate key that gives the entity its ``EntityIdentifier``.
     """
 
     uuid: ResourceSlotTypeUUID

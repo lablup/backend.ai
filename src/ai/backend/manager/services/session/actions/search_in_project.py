@@ -4,8 +4,8 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE, ProjectID
-from ai.backend.common.data.entity.types import ScopeRef
+from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.session.types import SessionData
 from ai.backend.manager.models.session.scopes import ProjectSessionOperationScope
@@ -28,8 +28,8 @@ class SearchSessionsInProjectAction(SessionScopeAction):
     querier: BatchQuerier
 
     @override
-    def scope_targets(self) -> Sequence[ScopeRef]:
-        return (ScopeRef(scope_type=PROJECT_SCOPE_TYPE, scope_id=ProjectID(self.scope.project_id)),)
+    def scope_targets(self) -> Sequence[EntityIdentifier]:
+        return (ProjectID(self.scope.project_id),)
 
     @override
     @classmethod

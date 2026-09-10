@@ -21,17 +21,18 @@ from ai.backend.client.v2.config import ClientConfig
 from ai.backend.client.v2.v2_registry import V2ClientRegistry
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
 from ai.backend.common.container_registry import ContainerRegistryType
-from ai.backend.common.data.entity.domain import DOMAIN_ENTITY_TYPE, DomainID
+from ai.backend.common.data.entity.agent import AgentUUID
+from ai.backend.common.data.entity.domain import DomainEntityType, DomainID
 from ai.backend.common.data.entity.image import ImageID
-from ai.backend.common.data.entity.project import PROJECT_ENTITY_TYPE
+from ai.backend.common.data.entity.project import ProjectEntityType
 from ai.backend.common.data.entity.resource_group import (
-    RESOURCE_GROUP_ENTITY_TYPE,
+    ResourceGroupEntityType,
     ResourceGroupID,
     ResourceGroupName,
 )
-from ai.backend.common.data.entity.resource_preset import RESOURCE_PRESET_ENTITY_TYPE
-from ai.backend.common.data.entity.session import SESSION_ENTITY_TYPE, SessionID
-from ai.backend.common.data.entity.user import USER_ENTITY_TYPE
+from ai.backend.common.data.entity.resource_preset import ResourcePresetEntityType
+from ai.backend.common.data.entity.session import SessionEntityType, SessionID
+from ai.backend.common.data.entity.user import UserEntityType
 from ai.backend.common.data.permission.types import (
     EntityType,
     Permission,
@@ -71,7 +72,6 @@ from ai.backend.manager.models.resource_slot.row import AgentResourceRow
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.plugin.network import NetworkPluginContext
-from ai.backend.manager.repositories.ops import DBOpsProvider
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.ops.v2.reconciler.provider import ReconcileOpsProvider
 from ai.backend.manager.repositories.ops.v2.share.provider import ShareOpsProvider
@@ -128,7 +128,7 @@ def rbac_permission_repo(
 def session_repository(
     database_engine: ExtendedAsyncSAEngine,
 ) -> SessionRepository:
-    return SessionRepository(database_engine, DBOpsProvider(database_engine))
+    return SessionRepository(database_engine)
 
 
 @pytest.fixture()
@@ -167,15 +167,15 @@ async def session_processors(
     )
     service = SessionService(args)
     return SessionProcessors(
-        processor_registry.group(GroupMeta(SESSION_ENTITY_TYPE)),
-        processor_registry.group(GroupMeta(RESOURCE_GROUP_ENTITY_TYPE)),
+        processor_registry.group(GroupMeta(SessionEntityType())),
+        processor_registry.group(GroupMeta(ResourceGroupEntityType())),
         ResourceAllocationProcessors(
-            processor_registry.group(GroupMeta(USER_ENTITY_TYPE)),
-            processor_registry.group(GroupMeta(PROJECT_ENTITY_TYPE)),
-            processor_registry.group(GroupMeta(DOMAIN_ENTITY_TYPE)),
-            processor_registry.group(GroupMeta(RESOURCE_GROUP_ENTITY_TYPE)),
-            processor_registry.group(GroupMeta(SESSION_ENTITY_TYPE)),
-            processor_registry.group(GroupMeta(RESOURCE_PRESET_ENTITY_TYPE)),
+            processor_registry.group(GroupMeta(UserEntityType())),
+            processor_registry.group(GroupMeta(ProjectEntityType())),
+            processor_registry.group(GroupMeta(DomainEntityType())),
+            processor_registry.group(GroupMeta(ResourceGroupEntityType())),
+            processor_registry.group(GroupMeta(SessionEntityType())),
+            processor_registry.group(GroupMeta(ResourcePresetEntityType())),
             MagicMock(),
         ),
         service,
@@ -267,6 +267,8 @@ async def user_system_role(
                 id=role_id,
                 name=f"user-{str(user_uuid)[:8]}",
                 status=RoleStatus.ACTIVE,
+                scope_type=ScopeType.USER.value,
+                scope_id=user_uuid,
             )
         )
         await conn.execute(
@@ -293,8 +295,6 @@ async def user_system_role(
                 await conn.execute(
                     sa.insert(PermissionRow.__table__).values(
                         role_id=role_id,
-                        scope_type=ScopeType.USER,
-                        scope_id=str(user_uuid),
                         entity_type=entity_type,
                         permission=bit,
                     )
@@ -306,8 +306,6 @@ async def user_system_role(
             await conn.execute(
                 sa.insert(PermissionRow.__table__).values(
                     role_id=role_id,
-                    scope_type=ScopeType.USER,
-                    scope_id=str(user_uuid),
                     entity_type=EntityType.USER,
                     permission=bit,
                 )
@@ -601,10 +599,12 @@ async def agent_factory(
 
     async def _create(available_slots: dict[str, str]) -> str:
         agent_id = f"i-test-{secrets.token_hex(4)}"
+        agent_uuid = AgentUUID(uuid.uuid4())
         async with db_engine.begin() as conn:
             await conn.execute(
                 sa.insert(AgentRow.__table__).values(
                     id=agent_id,
+                    uuid=agent_uuid,
                     status=AgentStatus.ALIVE,
                     region="local",
                     scaling_group=resource_group_name,
@@ -623,6 +623,7 @@ async def agent_factory(
                 [
                     {
                         "agent_id": agent_id,
+                        "agent_uuid": agent_uuid,
                         "slot_name": slot_name,
                         "capacity": Decimal(quantity),
                         "reserved": Decimal(0),
@@ -703,7 +704,7 @@ async def compute_session_processors(
         event_hub=AsyncMock(),
         error_monitor=error_monitor,
         idle_checker_host=AsyncMock(),
-        session_repository=SessionRepository(database_engine, DBOpsProvider(database_engine)),
+        session_repository=SessionRepository(database_engine),
         scheduler_repository=scheduler_repository,
         scheduling_controller=scheduling_controller,
         appproxy_client_pool=AsyncMock(),
@@ -716,15 +717,15 @@ async def compute_session_processors(
     )
     service = SessionService(args)
     return SessionProcessors(
-        processor_registry.group(GroupMeta(SESSION_ENTITY_TYPE)),
-        processor_registry.group(GroupMeta(RESOURCE_GROUP_ENTITY_TYPE)),
+        processor_registry.group(GroupMeta(SessionEntityType())),
+        processor_registry.group(GroupMeta(ResourceGroupEntityType())),
         ResourceAllocationProcessors(
-            processor_registry.group(GroupMeta(USER_ENTITY_TYPE)),
-            processor_registry.group(GroupMeta(PROJECT_ENTITY_TYPE)),
-            processor_registry.group(GroupMeta(DOMAIN_ENTITY_TYPE)),
-            processor_registry.group(GroupMeta(RESOURCE_GROUP_ENTITY_TYPE)),
-            processor_registry.group(GroupMeta(SESSION_ENTITY_TYPE)),
-            processor_registry.group(GroupMeta(RESOURCE_PRESET_ENTITY_TYPE)),
+            processor_registry.group(GroupMeta(UserEntityType())),
+            processor_registry.group(GroupMeta(ProjectEntityType())),
+            processor_registry.group(GroupMeta(DomainEntityType())),
+            processor_registry.group(GroupMeta(ResourceGroupEntityType())),
+            processor_registry.group(GroupMeta(SessionEntityType())),
+            processor_registry.group(GroupMeta(ResourcePresetEntityType())),
             MagicMock(),
         ),
         service,

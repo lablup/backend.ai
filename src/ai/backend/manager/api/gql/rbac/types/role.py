@@ -13,6 +13,8 @@ import strawberry.relay
 from strawberry import UNSET, Info
 from strawberry.relay import Connection, Edge, NodeID
 
+from ai.backend.common.data.entity.role import RoleID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.dto.manager.v2.rbac.request import (
     AdminSearchEntitiesGQLInput,
     AdminSearchPermissionsGQLInput,
@@ -94,6 +96,7 @@ from ai.backend.common.dto.manager.v2.rbac.types import (
 from ai.backend.common.dto.manager.v2.rbac.types import (
     RoleStatusFilter as RoleStatusFilterDTO,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import OrderDirection, StringFilter, UUIDFilter, encode_cursor
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
@@ -107,7 +110,9 @@ from ai.backend.manager.api.gql.decorators import (
     gql_pydantic_type,
 )
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin, PydanticOutputMixin
-from ai.backend.manager.api.gql.rbac.types.scope import RBACElementTypeFilterGQL, ScopeInputGQL
+from ai.backend.manager.api.gql.rbac.types.scope import (
+    ScopeInputGQL,
+)
 from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy, StrawberryGQLContext
 
 if TYPE_CHECKING:
@@ -168,6 +173,18 @@ class RoleGQL(PydanticNodeMixin[Any]):
             ),
         )
     )
+    scope_type: str = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Type of the scope the role belongs to.",
+        )
+    )
+    scope_id: UUID = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="ID of the scope the role belongs to.",
+        )
+    )
 
     @classmethod
     @override
@@ -180,7 +197,7 @@ class RoleGQL(PydanticNodeMixin[Any]):
     ) -> Iterable[Self | None]:
         # DataLoader already returns RoleGQL | None via from_pydantic conversion
         results = await info.context.data_loaders.role_loader.load_many([
-            UUID(nid) for nid in node_ids
+            RoleID(UUID(nid)) for nid in node_ids
         ])
         return cast(list[Self | None], results)
 
@@ -230,7 +247,6 @@ class RoleGQL(PydanticNodeMixin[Any]):
             # Merge with user-provided filter
             combined_filter = PermissionFilter(
                 role_id=role_filter.role_id,
-                scope_type=filter.scope_type,
                 entity_type=filter.entity_type,
             )
         else:
@@ -436,7 +452,7 @@ class RoleAssignmentGQL(PydanticNodeMixin[RoleAssignmentNode]):
     @gql_field(description="The assigned role.")  # type: ignore[misc]
     async def role(self, info: Info[StrawberryGQLContext]) -> RoleGQL | None:
         # DataLoader already returns RoleGQL | None via from_pydantic conversion
-        return await info.context.data_loaders.role_loader.load(self.role_id)
+        return await info.context.data_loaders.role_loader.load(RoleID(self.role_id))
 
     @gql_field(description="The assigned user.")  # type: ignore[misc]
     async def user(
@@ -449,7 +465,7 @@ class RoleAssignmentGQL(PydanticNodeMixin[RoleAssignmentNode]):
         | None
     ):
         # DataLoader already returns UserV2GQL | None via from_pydantic conversion
-        return await info.context.data_loaders.user_loader.load(self.user_id)
+        return await info.context.data_loaders.user_loader.load(UserID(self.user_id))
 
     @gql_added_field(
         BackendAIGQLMeta(
@@ -469,7 +485,7 @@ class RoleAssignmentGQL(PydanticNodeMixin[RoleAssignmentNode]):
     ):
         if self.granted_by is None:
             return None
-        return await info.context.data_loaders.user_loader.load(self.granted_by)
+        return await info.context.data_loaders.user_loader.load(UserID(self.granted_by))
 
 
 # ==================== Filter Types ====================
@@ -542,8 +558,8 @@ class RoleUserNestedFilterGQL(PydanticInputMixin[UserNestedFilterDTO]):
     name="RoleMappedScopeNestedFilter",
 )
 class RoleMappedScopeNestedFilterGQL(PydanticInputMixin[MappedScopeNestedFilterDTO]):
-    scope_type: RBACElementTypeFilterGQL | None = None
-    scope_id: StringFilter | None = None
+    scope_type: StringFilter | None = None
+    scope_id: UUIDFilter | None = None
 
     AND: list[Self] | None = None
     OR: list[Self] | None = None
@@ -644,7 +660,13 @@ class RoleAssignmentOrderBy(PydanticInputMixin[RoleAssignmentOrderByDTO], GQLOrd
 class CreateRoleInput(PydanticInputMixin[CreateRoleInputDTO]):
     name: str
     description: str | None = None
-    source: RoleSourceGQL = RoleSourceGQL.CUSTOM
+    source: RoleSourceGQL | None = gql_field(
+        description="Deprecated and ignored: a created role is always custom.",
+        default=None,
+        deprecation_reason=(
+            f"Deprecated since {NEXT_RELEASE_VERSION}. Ignored: a created role is always custom."
+        ),
+    )
     auto_assign: bool = gql_added_field(
         BackendAIGQLMeta(
             added_version="26.4.4",
@@ -655,7 +677,18 @@ class CreateRoleInput(PydanticInputMixin[CreateRoleInputDTO]):
         ),
         default=False,
     )
-    scopes: list[ScopeInputGQL] | None = None
+    scope: ScopeInputGQL | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="The scope the role belongs to.",
+        ),
+        default=None,
+    )
+    scopes: list[ScopeInputGQL] | None = gql_field(
+        description="Deprecated: use `scope`. Accepts exactly one entry.",
+        default=None,
+        deprecation_reason=f"Deprecated since {NEXT_RELEASE_VERSION}. Use `scope`.",
+    )
 
 
 @gql_pydantic_input(
@@ -778,7 +811,10 @@ class BulkAssignRolePayloadGQL(PydanticOutputMixin[BulkAssignRoleResultPayloadDT
         description="List of successfully created role assignments."
     )
     failed: list[BulkAssignRoleErrorGQL] = gql_field(
-        description="List of errors for users that failed to be assigned."
+        description="List of errors for users that failed to be assigned.",
+        deprecation_reason=(
+            "Always empty. A user already holding the role keeps it; every other refusal raises."
+        ),
     )
 
 

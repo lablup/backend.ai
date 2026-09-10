@@ -14,12 +14,10 @@ from unittest.mock import MagicMock
 import pytest
 
 from ai.backend.common.contexts.user import with_user
-from ai.backend.common.data.entity.domain import DOMAIN_ENTITY_TYPE, DomainID
+from ai.backend.common.data.entity.domain import DomainEntityType, DomainID
 from ai.backend.common.data.entity.resource_group import (
-    RESOURCE_GROUP_SCOPE_TYPE,
     ResourceGroupID,
 )
-from ai.backend.common.data.entity.types import ScopeRef
 from ai.backend.common.data.user.types import UserData, UserRole
 from ai.backend.manager.actions.action import BaseActionTriggerMeta
 from ai.backend.manager.actions.monitors import ActionMonitors
@@ -83,7 +81,7 @@ async def test_rg_domain_search_is_answered_for_the_resource_group(
     denying_scope: _DenyingScopeValidator,
     regular_user: UserData,
 ) -> None:
-    processors = DomainProcessors(registry.group(GroupMeta(DOMAIN_ENTITY_TYPE)), MagicMock(), [])
+    processors = DomainProcessors(registry.group(GroupMeta(DomainEntityType())), MagicMock(), [])
     resource_group_id = ResourceGroupID(uuid.uuid4())
     action = ScopedSearchDomainsAction(
         items=[ResourceGroupDomainScopeItem(resource_group_id=resource_group_id)],
@@ -93,6 +91,4 @@ async def test_rg_domain_search_is_answered_for_the_resource_group(
     with with_user(regular_user), pytest.raises(NotEnoughPermission):
         await processors.scoped_search.run(action)
 
-    assert [seen.scope_targets() for seen in denying_scope.seen] == [
-        [ScopeRef(scope_type=RESOURCE_GROUP_SCOPE_TYPE, scope_id=resource_group_id)]
-    ]
+    assert [seen.scope_targets() for seen in denying_scope.seen] == [[resource_group_id]]

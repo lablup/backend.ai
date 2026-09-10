@@ -131,6 +131,39 @@ class AgentAdapter(BaseAdapter):
             )
         return nodes
 
+    async def batch_load_by_uuids(
+        self, agent_uuids: Sequence[AgentUUID]
+    ) -> list[AgentNode | Exception | None]:
+        """Batch load agents by entity id for DataLoader use.
+
+        Answers the way :meth:`batch_load_by_ids` does, taking the uuid each agent is
+        checked by instead of its name.
+        """
+        if not agent_uuids:
+            return []
+        got = await self._agent.bulk_get.run(BulkGetAgentsAction(ids=list(agent_uuids)))
+        agents = got.values()
+        errors = got.errors()
+        permitted = [agent.uuid for agent in agents.values()]
+        resources = await self._load_resources(permitted)
+        permissions = await self._load_permissions(permitted)
+        nodes: list[AgentNode | Exception | None] = []
+        for agent_uuid in agent_uuids:
+            agent = agents.get(agent_uuid)
+            if agent is None:
+                nodes.append(self.batch_load_failure(errors.get(agent_uuid)))
+                continue
+            nodes.append(
+                self._data_to_dto(
+                    AgentDetailData(
+                        agent=agent,
+                        resources=resources.get(agent.id, []),
+                        permissions=permissions.get(agent_uuid, []),
+                    )
+                )
+            )
+        return nodes
+
     async def _load_permissions(
         self, agent_uuids: Sequence[AgentUUID]
     ) -> Mapping[EntityIdentifier, list[AgentPermission]]:

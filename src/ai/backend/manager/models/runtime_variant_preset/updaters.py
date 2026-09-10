@@ -3,7 +3,6 @@ from __future__ import annotations
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import Any, override
-from uuid import UUID
 
 from sqlalchemy.orm import InstrumentedAttribute
 
@@ -35,6 +34,8 @@ class RuntimeVariantPresetUpdater(DataUpdater[RuntimeVariantPresetRow, RuntimeVa
     default_value: TriState[str] = field(default_factory=TriState[str].nop)
     key: OptionalState[str] = field(default_factory=OptionalState[str].nop)
     required: OptionalState[bool] = field(default_factory=OptionalState[bool].nop)
+    added_version: TriState[str] = field(default_factory=TriState[str].nop)
+    deprecated_version: TriState[str] = field(default_factory=TriState[str].nop)
     category: TriState[str] = field(default_factory=TriState[str].nop)
     display_name: TriState[str] = field(default_factory=TriState[str].nop)
     ui_option: TriState[UIOption] = field(default_factory=TriState[UIOption].nop)
@@ -49,7 +50,7 @@ class RuntimeVariantPresetUpdater(DataUpdater[RuntimeVariantPresetRow, RuntimeVa
         return RuntimeVariantPresetRow.id
 
     @override
-    def target_id_value(self) -> UUID:
+    def target_id_value(self) -> RuntimeVariantPresetID:
         return self.preset_id
 
     @property
@@ -68,6 +69,8 @@ class RuntimeVariantPresetUpdater(DataUpdater[RuntimeVariantPresetRow, RuntimeVa
         self.default_value.update_dict(to_update, "default_value")
         self.key.update_dict(to_update, "key")
         self.required.update_dict(to_update, "required")
+        self.added_version.update_dict(to_update, "added_version")
+        self.deprecated_version.update_dict(to_update, "deprecated_version")
         self.category.update_dict(to_update, "category")
         self.display_name.update_dict(to_update, "display_name")
         self.ui_option.update_dict(to_update, "ui_option")

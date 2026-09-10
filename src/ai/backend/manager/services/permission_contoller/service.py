@@ -103,7 +103,7 @@ class PermissionControllerService:
         """
         Creates a new permission in the repository.
         """
-        result = await self._repository.create_permission(action.creator)
+        result = await self._repository.create_permission(action.role_id, action.creator)
         return CreatePermissionActionResult(data=result)
 
     async def delete_permission(
@@ -167,7 +167,7 @@ class PermissionControllerService:
         """Replace the role's entire scoped-permission set."""
         result = await self._repository.replace_role_permissions(
             role_id=action.role_id,
-            creator=action.creator,
+            entries=action.entries,
         )
         return ReplaceRolePermissionsActionResult(data=result)
 

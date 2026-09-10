@@ -8,7 +8,6 @@ from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.events.dispatcher import EventDispatcher, EventProducer
 from ai.backend.common.types import VolumeID
 from ai.backend.storage.errors import InvalidVolumeError
-from ai.backend.storage.plugin import StoragePluginContext
 from ai.backend.storage.types import VolumeInfo
 from ai.backend.storage.volumes.abc import AbstractVolume
 from ai.backend.storage.volumes.pool import VolumePool
@@ -43,16 +42,7 @@ def mock_volume() -> AsyncMock:
     return volume
 
 
-@pytest.fixture
-def mock_storage_plugin_ctx() -> AsyncMock:
-    ctx = AsyncMock(spec=StoragePluginContext)
-    ctx.init = AsyncMock()
-    ctx.cleanup = AsyncMock()
-    ctx.plugins = {}
-    return ctx
-
-
-async def test_get_volume(mock_volume: AsyncMock, mock_storage_plugin_ctx: AsyncMock) -> None:
+async def test_get_volume(mock_volume: AsyncMock) -> None:
     # Create a VolumePool with mocked volumes
     volume_id = VolumeID(uuid.UUID("550e8400-e29b-41d4-a716-446655440000"))
     volumes = {volume_id: mock_volume}
@@ -61,7 +51,6 @@ async def test_get_volume(mock_volume: AsyncMock, mock_storage_plugin_ctx: Async
     pool = VolumePool(
         volumes=volumes,
         volumes_by_name=volumes_by_name,
-        storage_backend_plugin_ctx=mock_storage_plugin_ctx,
     )
 
     # Test get_volume with valid volume ID

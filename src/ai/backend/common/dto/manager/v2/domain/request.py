@@ -13,6 +13,7 @@ from ai.backend.common.dto.manager.query import DateTimeFilter, StringFilter, UU
 from ai.backend.common.dto.manager.v2.domain.types import (
     DomainOrderField,
     DomainProjectFilter,
+    DomainScope,
     DomainUserFilter,
     OrderDirection,
 )
@@ -25,6 +26,7 @@ __all__ = (
     "DomainFilter",
     "DomainOrder",
     "PurgeDomainInput",
+    "ScopedSearchDomainsInput",
     "SearchDomainsRequest",
     "UpdateDomainInput",
 )
@@ -146,6 +148,20 @@ class SearchDomainsRequest(BaseRequestModel):
         description="Maximum items to return.",
     )
     offset: int = Field(default=0, ge=0, description="Number of items to skip.")
+
+
+class ScopedSearchDomainsInput(BaseRequestModel):
+    """Input for searching the domains the named scopes reach."""
+
+    scope: DomainScope = Field(description="Scope (OR across all items).")
+    filter: DomainFilter | None = Field(default=None, description="Filter conditions.")
+    order: list[DomainOrder] | None = Field(default=None, description="Order specifications.")
+    first: int | None = Field(default=None, description="Cursor pagination: number of items.")
+    after: str | None = Field(default=None, description="Cursor pagination: after cursor.")
+    last: int | None = Field(default=None, description="Cursor pagination: last N items.")
+    before: str | None = Field(default=None, description="Cursor pagination: before cursor.")
+    limit: int | None = Field(default=None, description="Offset pagination: maximum items.")
+    offset: int | None = Field(default=None, description="Offset pagination: number to skip.")
 
 
 class AdminSearchDomainsInput(BaseRequestModel):

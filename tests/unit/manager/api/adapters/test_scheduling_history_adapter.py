@@ -16,8 +16,8 @@ from ai.backend.manager.actions.v2.ops.result import BulkFieldOpsResult
 from ai.backend.manager.api.adapters.scheduling_history.adapter import SchedulingHistoryAdapter
 from ai.backend.manager.data.kernel.types import KernelSchedulingHistoryData
 from ai.backend.manager.data.session.types import SchedulingResult, SessionSchedulingHistoryData
+from ai.backend.manager.errors.base.field import FieldNotFoundError
 from ai.backend.manager.errors.common import GenericForbidden
-from ai.backend.manager.errors.repository import EntityNotFoundError
 
 READABLE = SessionSchedulingHistoryID(uuid.uuid4())
 DENIED = SessionSchedulingHistoryID(uuid.uuid4())
@@ -54,7 +54,9 @@ def processors(readable: SessionSchedulingHistoryData, denial: GenericForbidden)
         return_value=BulkFieldOpsResult(successes={READABLE: readable}, errors={DENIED: denial})
     )
     processors.scheduling_history.bulk_get_kernel_histories.run = AsyncMock(
-        side_effect=EntityNotFoundError("No field row matches the given ids")
+        side_effect=FieldNotFoundError(
+            field_type=KernelSchedulingHistoryID.field_type(),
+        )
     )
     return processors
 

@@ -21,6 +21,7 @@ from .query import (
     my_client_ip,
     my_user_v2,
     project_users_v2,
+    scoped_users_v2,
 )
 
 __all__ = [
@@ -31,6 +32,7 @@ __all__ = [
     "my_client_ip",
     "my_user_v2",
     "project_users_v2",
+    "scoped_users_v2",
     # Mutations
     "admin_create_user_v2",
     "admin_bulk_create_users_v2",

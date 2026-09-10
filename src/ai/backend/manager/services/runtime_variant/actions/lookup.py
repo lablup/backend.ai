@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from typing import Any, override
 
 from ai.backend.common.data.entity.runtime_variant import (
-    RUNTIME_VARIANT_ENTITY_TYPE,
+    RuntimeVariantEntityType,
     RuntimeVariantID,
 )
 from ai.backend.common.data.entity.types import EntityType
@@ -42,7 +42,7 @@ class LookupRuntimeVariantAction(LookupEntityOpsAction[RuntimeVariantRow, Runtim
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return RUNTIME_VARIANT_ENTITY_TYPE
+        return RuntimeVariantEntityType()
 
     @override
     @classmethod

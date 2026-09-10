@@ -1452,7 +1452,7 @@ class DeploymentAdapter(BaseAdapter):
 
     async def batch_load_revisions_by_ids(
         self,
-        revision_ids: Sequence[uuid.UUID],
+        revision_ids: Sequence[DeploymentRevisionID],
     ) -> list[RevisionNode | Exception | None]:
         """Batch load revisions by ID for DataLoader use, checked per owning deployment."""
         if not revision_ids:
@@ -1467,7 +1467,7 @@ class DeploymentAdapter(BaseAdapter):
 
     async def batch_load_replicas_by_ids(
         self,
-        replica_ids: Sequence[uuid.UUID],
+        replica_ids: Sequence[ReplicaID],
     ) -> list[ReplicaNode | Exception | None]:
         """Batch load replicas by ID for DataLoader use, checked per owning deployment."""
         if not replica_ids:
@@ -1497,7 +1497,7 @@ class DeploymentAdapter(BaseAdapter):
 
     async def batch_load_access_tokens_by_ids(
         self,
-        token_ids: Sequence[uuid.UUID],
+        token_ids: Sequence[DeploymentTokenID],
     ) -> list[AccessTokenNode | Exception | None]:
         """Batch load access tokens by ID for DataLoader use, checked per owning deployment."""
         if not token_ids:
@@ -1534,7 +1534,7 @@ class DeploymentAdapter(BaseAdapter):
 
     async def batch_load_policies_by_endpoint_ids(
         self,
-        endpoint_ids: Sequence[uuid.UUID],
+        endpoint_ids: Sequence[DeploymentID],
     ) -> list[DeploymentPolicyNode | None]:
         """Batch load deployment policies by deployment ID for DataLoader use.
 

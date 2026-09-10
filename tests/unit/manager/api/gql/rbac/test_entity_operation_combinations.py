@@ -96,7 +96,7 @@ class TestRbacEntityOperationCombinationsResolver:
         info = MagicMock()
         resolver_fn = permission_resolver.rbac_entity_operation_combinations.base_resolver
         result = await resolver_fn(info)
-        entity_values = [combo.entity_type.value for combo in result]
+        entity_values = [combo.entity_type for combo in result]
         assert entity_values == sorted(entity_values)
 
     async def test_registry_entries_are_present(self) -> None:
@@ -107,7 +107,7 @@ class TestRbacEntityOperationCombinationsResolver:
         result_pairs: set[tuple[str, str]] = set()
         for combo in result:
             for op in combo.operations:
-                result_pairs.add((combo.entity_type.value, op.operation))
+                result_pairs.add((combo.entity_type, op.operation))
         # Every registry entry must appear in the result
         for action_cls in RBAC_ACTION_REGISTRY:
             perm = action_cls.required_permission()

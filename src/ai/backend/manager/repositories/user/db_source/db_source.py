@@ -48,7 +48,8 @@ from ai.backend.manager.errors.user import (
     UserPurgeInProgress,
 )
 from ai.backend.manager.models.domain import DomainRow
-from ai.backend.manager.models.endpoint import EndpointLifecycle, EndpointRow, EndpointTokenRow
+from ai.backend.manager.models.endpoint import EndpointLifecycle, EndpointRow
+from ai.backend.manager.models.endpoint.purgers import UserEndpointPurger
 from ai.backend.manager.models.kernel import (
     AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES,
     RESOURCE_USAGE_KERNEL_STATUSES,
@@ -96,12 +97,14 @@ from ai.backend.manager.models.vfolder import (
     VFolderDeletionInfo,
     VFolderRow,
     VFolderStatusSet,
-    vfolder_invitations,
     vfolder_permissions,
     vfolder_status_map,
     vfolders,
 )
-from ai.backend.manager.models.vfolder.purgers import VFolderUserPermissionBatchPurger
+from ai.backend.manager.models.vfolder.purgers import (
+    VFolderInviteeInvitationBatchPurger,
+    VFolderUserPermissionBatchPurger,
+)
 from ai.backend.manager.repositories.base.querier import BatchQuerier, execute_batch_querier
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.ops.v2.share.provider import ShareOpsProvider
@@ -402,6 +405,7 @@ class UserDBSource:
             await w.batch_purge_field_entities(user_id, UserGroupAssociationPurger())
             # Placement groups the user still owns: their deployments were either
             # delegated (the groups moved with them) or deleted by now.
+            # TODO: scope this purge. A user operation must not use in_global.
             await w.batch_purge_entities_in_global(UserSessionGroupPurger(user_id=user_id))
             await w.batch_purge_field_entities(user_id, UserScopeAssociationPurger())
             # Finally the user itself as a scope: the row and the RBAC graph it left.
@@ -464,9 +468,19 @@ class UserDBSource:
         user_uuid: UUID,
         delete_destroyed_only: bool = False,
     ) -> None:
-        """Delete user's endpoints."""
-        async with self._db.begin_session() as session:
-            await self._delete_endpoints(session, user_uuid, delete_destroyed_only)
+        """Delete user's endpoints; their tokens cascade with them."""
+        if delete_destroyed_only:
+            lifecycle_stages = frozenset({EndpointLifecycle.DESTROYED})
+        else:
+            lifecycle_stages = frozenset(EndpointLifecycle)
+        async with self._v2_ops.write_ops() as w:
+            # TODO: scope this purge. A user operation must not use in_global.
+            await w.batch_purge_entities_in_global(
+                UserEndpointPurger(
+                    user_id=UserID(user_uuid),
+                    lifecycle_stages=lifecycle_stages,
+                )
+            )
 
     async def get_kernel_rows_for_monthly_stats(
         self,
@@ -817,11 +831,14 @@ class UserDBSource:
             # Target user will be the new owner, and it does not make sense to have
             # invitation and shared permission for its own folder.
             migrate_vfolder_ids = [item["vid"] for item in migrate_updates]
-            delete_query = sa.delete(vfolder_invitations).where(
-                (vfolder_invitations.c.invitee == target_user_email)
-                & (vfolder_invitations.c.vfolder.in_(migrate_vfolder_ids))
-            )
-            await conn.execute(delete_query)
+            async with self._v2_ops.write_ops() as w:
+                # TODO: scope this purge. A user operation must not use in_global.
+                await w.batch_purge_entities_in_global(
+                    VFolderInviteeInvitationBatchPurger(
+                        vfolder_ids=migrate_vfolder_ids,
+                        invitee_email=target_user_email,
+                    )
+                )
             # The target user becomes the owner, so what they held as an invitee goes:
             # the mount row and the share cap alike.
             await self._revoke_shared_vfolders(target_user_uuid, migrate_vfolder_ids)
@@ -840,38 +857,6 @@ class UserDBSource:
                 rowcount += result.rowcount
             return rowcount
         return 0
-
-    async def _delete_endpoints(
-        self,
-        session: SASession,
-        user_uuid: UUID,
-        delete_destroyed_only: bool = False,
-    ) -> None:
-        """Private method to delete user's endpoints."""
-        if delete_destroyed_only:
-            status_filter = {EndpointLifecycle.DESTROYED}
-        else:
-            status_filter = {status for status in EndpointLifecycle}
-
-        endpoint_rows = await EndpointRow.list_endpoint(
-            session, user_uuid=user_uuid, load_tokens=True, status_filter=status_filter
-        )
-
-        token_ids_to_delete = []
-        endpoint_ids_to_delete = []
-        for row in endpoint_rows:
-            token_ids_to_delete.extend([token.id for token in row.tokens])
-            endpoint_ids_to_delete.append(row.id)
-
-        if token_ids_to_delete:
-            await session.execute(
-                sa.delete(EndpointTokenRow).where(EndpointTokenRow.id.in_(token_ids_to_delete))
-            )
-
-        if endpoint_ids_to_delete:
-            await session.execute(
-                sa.delete(EndpointRow).where(EndpointRow.id.in_(endpoint_ids_to_delete))
-            )
 
     # ==================== Search Methods ====================
 

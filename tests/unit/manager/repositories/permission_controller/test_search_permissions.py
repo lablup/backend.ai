@@ -11,12 +11,11 @@ from dataclasses import dataclass
 
 import pytest
 
-from ai.backend.common.data.entity.vfolder import VFOLDER_ENTITY_TYPE
+from ai.backend.common.data.entity.vfolder import VFolderEntityType
 from ai.backend.manager.data.permission.types import (
     EntityType,
     OperationType,
     Permission,
-    ScopeType,
 )
 from ai.backend.manager.models.agent import AgentRow
 
@@ -106,6 +105,8 @@ class TestSearchPermissions:
 
         async with db_with_rbac_tables.begin_session() as db_sess:
             role = RoleRow(
+                scope_type=EntityType("project"),
+                scope_id=uuid.uuid4(),
                 id=role_id,
                 name="test-role-perms",
                 description="Test role for permissions",
@@ -121,8 +122,6 @@ class TestSearchPermissions:
             ]:
                 perm = PermissionRow(
                     role_id=role_id,
-                    scope_type=ScopeType.DOMAIN,
-                    scope_id="test-domain",
                     entity_type=entity_type,
                     permission=Permission.from_operation(operation),
                 )
@@ -139,7 +138,7 @@ class TestSearchPermissions:
     ) -> None:
         querier = BatchQuerier(
             conditions=[
-                ScopedPermissionConditions.by_entity_type(VFOLDER_ENTITY_TYPE),
+                ScopedPermissionConditions.by_entity_type(VFolderEntityType()),
             ],
             orders=[],
             pagination=OffsetPagination(limit=10, offset=0),

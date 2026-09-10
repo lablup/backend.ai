@@ -5,7 +5,6 @@ from __future__ import annotations
 from collections.abc import Sequence
 from uuid import UUID
 
-from ai.backend.common.api_handlers import Sentinel
 from ai.backend.common.data.entity.notification import (
     NotificationChannelID,
     NotificationRuleID,
@@ -171,7 +170,7 @@ class NotificationAdapter(BaseAdapter):
         self._notification = notification
 
     async def batch_load_channels_by_ids(
-        self, ids: Sequence[UUID]
+        self, ids: Sequence[NotificationChannelID]
     ) -> list[NotificationChannelNode | Exception | None]:
         """Batch load notification channels by ID for DataLoader use, checked per channel."""
         if not ids:
@@ -187,7 +186,7 @@ class NotificationAdapter(BaseAdapter):
         ]
 
     async def batch_load_rules_by_ids(
-        self, ids: Sequence[UUID]
+        self, ids: Sequence[NotificationRuleID]
     ) -> list[NotificationRuleNode | Exception | None]:
         """Batch load notification rules by ID for DataLoader use, checked per rule."""
         if not ids:
@@ -473,24 +472,10 @@ class NotificationAdapter(BaseAdapter):
     ) -> NotificationChannelUpdater:
         return NotificationChannelUpdater(
             channel_id=channel_id,
-            name=(
-                OptionalState.update(input.name) if input.name is not None else OptionalState.nop()
-            ),
-            description=(
-                TriState[str].nop()
-                if isinstance(input.description, Sentinel)
-                else TriState[str].from_graphql(input.description)
-            ),
-            spec=(
-                OptionalState.update(_spec_input_to_domain(input.spec))
-                if input.spec is not None
-                else OptionalState.nop()
-            ),
-            enabled=(
-                OptionalState.update(input.enabled)
-                if input.enabled is not None
-                else OptionalState.nop()
-            ),
+            name=OptionalState.from_unset(input.name),
+            description=TriState.from_unset(input.description),
+            spec=OptionalState.from_unset(input.spec).map(_spec_input_to_domain),
+            enabled=OptionalState.from_unset(input.enabled),
         )
 
     @staticmethod
@@ -500,24 +485,10 @@ class NotificationAdapter(BaseAdapter):
     ) -> NotificationRuleUpdater:
         return NotificationRuleUpdater(
             rule_id=rule_id,
-            name=(
-                OptionalState.update(input.name) if input.name is not None else OptionalState.nop()
-            ),
-            description=(
-                TriState[str].nop()
-                if isinstance(input.description, Sentinel)
-                else TriState[str].from_graphql(input.description)
-            ),
-            message_template=(
-                OptionalState.update(input.message_template)
-                if input.message_template is not None
-                else OptionalState.nop()
-            ),
-            enabled=(
-                OptionalState.update(input.enabled)
-                if input.enabled is not None
-                else OptionalState.nop()
-            ),
+            name=OptionalState.from_unset(input.name),
+            description=TriState.from_unset(input.description),
+            message_template=OptionalState.from_unset(input.message_template),
+            enabled=OptionalState.from_unset(input.enabled),
         )
 
     @staticmethod

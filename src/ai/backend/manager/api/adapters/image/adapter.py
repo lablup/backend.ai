@@ -7,8 +7,8 @@ from collections.abc import Sequence
 from decimal import Decimal
 from functools import lru_cache
 
-from ai.backend.common.api_handlers import Sentinel
 from ai.backend.common.data.entity.artifact_registry import ArtifactRegistryID
+from ai.backend.common.data.entity.image_alias import ImageAliasID
 from ai.backend.common.dto.manager.v2.image.request import (
     AdminSearchImageAliasesInput,
     AdminSearchImagesInput,
@@ -128,7 +128,7 @@ class ImageAdapter(BaseAdapter):
         return [image_map.get(image_id) for image_id in image_ids]
 
     async def batch_load_aliases_by_ids(
-        self, alias_ids: Sequence[uuid.UUID]
+        self, alias_ids: Sequence[ImageAliasID]
     ) -> list[ImageAliasNode | None]:
         """Batch load image aliases by alias ID for DataLoader use.
 
@@ -267,62 +267,18 @@ class ImageAdapter(BaseAdapter):
     async def admin_update(self, input: UpdateImageInput) -> UpdateImagePayload:
         """Update an image by ID (superadmin only)."""
         update = ImageUpdate(
-            name=(
-                OptionalState.update(input.name) if input.name is not None else OptionalState.nop()
-            ),
-            registry=(
-                OptionalState.update(input.registry)
-                if input.registry is not None
-                else OptionalState.nop()
-            ),
-            image=(
-                OptionalState.update(input.image)
-                if input.image is not None
-                else OptionalState.nop()
-            ),
-            tag=(OptionalState.update(input.tag) if input.tag is not None else OptionalState.nop()),
-            architecture=(
-                OptionalState.update(input.architecture)
-                if input.architecture is not None
-                else OptionalState.nop()
-            ),
-            is_local=(
-                OptionalState.update(input.is_local)
-                if input.is_local is not None
-                else OptionalState.nop()
-            ),
-            size_bytes=(
-                OptionalState.update(input.size_bytes)
-                if input.size_bytes is not None
-                else OptionalState.nop()
-            ),
-            image_type=(
-                OptionalState.update(ImageType(input.type))
-                if input.type is not None
-                else OptionalState.nop()
-            ),
-            config_digest=(
-                OptionalState.update(input.config_digest)
-                if input.config_digest is not None
-                else OptionalState.nop()
-            ),
-            labels=(
-                OptionalState.update(input.labels)
-                if input.labels is not None
-                else OptionalState.nop()
-            ),
-            accelerators=(
-                TriState.nop()
-                if isinstance(input.supported_accelerators, Sentinel)
-                else TriState.nullify()
-                if input.supported_accelerators is None
-                else TriState.update(input.supported_accelerators)
-            ),
-            resources=(
-                OptionalState.update(input.resource_limits)
-                if input.resource_limits is not None
-                else OptionalState.nop()
-            ),
+            name=OptionalState.from_unset(input.name),
+            registry=OptionalState.from_unset(input.registry),
+            image=OptionalState.from_unset(input.image),
+            tag=OptionalState.from_unset(input.tag),
+            architecture=OptionalState.from_unset(input.architecture),
+            is_local=OptionalState.from_unset(input.is_local),
+            size_bytes=OptionalState.from_unset(input.size_bytes),
+            image_type=OptionalState.from_unset(input.type).map(ImageType),
+            config_digest=OptionalState.from_unset(input.config_digest),
+            labels=OptionalState.from_unset(input.labels),
+            accelerators=TriState.from_unset(input.supported_accelerators),
+            resources=OptionalState.from_unset(input.resource_limits),
         )
         result = await self._image.update_image_by_id.run(
             UpdateImageByIdAction(image_id=ImageID(input.image_id), update=update)

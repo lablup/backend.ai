@@ -5,17 +5,22 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import override
 
+from ai.backend.common.data.entity.types import EntityType, GlobalEntityType
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.repositories.base.export import ReportDef
+from ai.backend.manager.services.export.actions.base import ExportAction
 
-from .base import ExportAction
 
-
-@dataclass
+@dataclass(frozen=True)
 class GetReportAction(ExportAction):
     """Action to get a specific export report by key."""
 
     report_key: str
+
+    @override
+    @classmethod
+    def entity_type(cls) -> EntityType:
+        return GlobalEntityType()
 
     @override
     @classmethod
@@ -28,7 +33,7 @@ class GetReportAction(ExportAction):
         return ActionOperationType.GET
 
 
-@dataclass
+@dataclass(frozen=True)
 class GetReportActionResult:
     """Result of getting an export report."""
 

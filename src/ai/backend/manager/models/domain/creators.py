@@ -6,7 +6,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import ClassVar, override
 
-from ai.backend.common.data.entity.domain import DOMAIN_SCOPE_TYPE, DomainID
+from ai.backend.common.data.entity.domain import DomainEntityType, DomainID
 from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.common.exception import InvalidAPIParameters
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
@@ -46,7 +46,7 @@ class DomainCreator(RoleManagedGlobalEntityCreator[DomainRow, DomainData]):
 
     @override
     def template_value(self, row: DomainRow) -> ScopeTemplateValue:
-        return ScopeTemplateValue(id=row.id, name=row.name, type=DOMAIN_SCOPE_TYPE)
+        return ScopeTemplateValue(id=row.id, name=row.name, type=DomainEntityType())
 
     @override
     def integrity_error_checks(self) -> Sequence[IntegrityErrorCheck]:

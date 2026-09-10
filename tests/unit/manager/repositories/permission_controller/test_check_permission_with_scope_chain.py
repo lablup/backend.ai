@@ -10,6 +10,7 @@ from collections.abc import AsyncGenerator
 from dataclasses import dataclass, field
 
 import pytest
+import sqlalchemy as sa
 
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.permission.types import (
@@ -158,6 +159,8 @@ class TestCheckPermissionWithScopeChain:
             await db_sess.flush()
 
             role = RoleRow(
+                scope_type=EntityType("project"),
+                scope_id=uuid.uuid4(),
                 id=fixture_ids.role_id,
                 name="test-role",
                 description="Test role for scope chain",
@@ -250,32 +253,40 @@ class TestCheckPermissionWithScopeChain:
         fixture_ids: ScopeChainFixture,
         request: pytest.FixtureRequest,
     ) -> None:
-        scope_map: dict[str, tuple[ScopeType, str]] = {
-            "vfolder": (ScopeType.VFOLDER, fixture_ids.vfolder_id),
-            "project": (ScopeType.PROJECT, fixture_ids.project_id),
-            "domain": (ScopeType.DOMAIN, fixture_ids.domain_id),
-            "user_scope": (ScopeType.USER, fixture_ids.user_scope_id),
+        """Grant the entries from the user's role, moved into the scope they name.
+
+        A permission row carries no scope of its own, so the role is what places
+        the grant. Every parameter set here names one scope.
+        """
+        scope_map: dict[str, tuple[EntityType, str]] = {
+            "vfolder": (EntityType.VFOLDER, fixture_ids.vfolder_id),
+            "project": (EntityType.PROJECT, fixture_ids.project_id),
+            "domain": (EntityType.DOMAIN, fixture_ids.domain_id),
+            "user_scope": (EntityType.USER, fixture_ids.user_scope_id),
         }
         for entry in request.param:
-            domain_id = DomainID(uuid.uuid4())
             if not isinstance(entry, PermissionEntry):
                 raise TypeError(f"Expected PermissionEntry, got {type(entry).__name__}: {entry!r}")
-            scope_type, scope_id = scope_map[entry.scope_key]
-            async with db_with_rbac_tables.begin_session() as db_sess:
-                domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
-                domain_id = DomainID(uuid.uuid4())
+        scope_keys = {entry.scope_key for entry in request.param}
+        if len(scope_keys) > 1:
+            raise ValueError(f"One role holds one scope, but the entries name {scope_keys}")
+        async with db_with_rbac_tables.begin_session() as db_sess:
+            if scope_keys:
+                scope_type, scope_id = scope_map[scope_keys.pop()]
+                await db_sess.execute(
+                    sa.update(RoleRow)
+                    .where(RoleRow.id == fixture_ids.role_id)
+                    .values(scope_type=scope_type, scope_id=uuid.UUID(scope_id))
+                )
+            for entry in request.param:
                 db_sess.add(
-                    DomainRow(id=domain_id, name=domain_name, total_resource_slots=ResourceSlot())
+                    PermissionRow(
+                        role_id=fixture_ids.role_id,
+                        entity_type=entry.entity_type,
+                        permission=Permission.from_operation(entry.operation),
+                    )
                 )
-                perm = PermissionRow(
-                    role_id=fixture_ids.role_id,
-                    scope_type=scope_type,
-                    scope_id=scope_id,
-                    entity_type=entry.entity_type,
-                    permission=Permission.from_operation(entry.operation),
-                )
-                db_sess.add(perm)
-                await db_sess.flush()
+            await db_sess.flush()
 
     # ── Helpers ──
 
@@ -494,6 +505,8 @@ class TestCheckPermissionWithScopeChain:
             await db_sess.flush()
 
             role = RoleRow(
+                scope_type=EntityType("project"),
+                scope_id=uuid.uuid4(),
                 id=fixture_ids.role_id,
                 name="inactive-role",
                 status=RoleStatus.INACTIVE,
@@ -689,6 +702,8 @@ class TestCheckPermissionWithScopeChain:
             await db_sess.flush()
 
             role = RoleRow(
+                scope_type=EntityType("project"),
+                scope_id=uuid.uuid4(),
                 id=fixture_ids.role_id,
                 name="deleted-role",
                 status=RoleStatus.DELETED,
@@ -742,6 +757,8 @@ class TestCheckPermissionWithScopeChain:
                 DomainRow(id=domain_id, name=domain_name, total_resource_slots=ResourceSlot())
             )
             role = RoleRow(
+                scope_type=EntityType("project"),
+                scope_id=uuid.uuid4(),
                 id=fixture_ids.role_id,
                 name="unassigned-role",
             )
@@ -750,8 +767,6 @@ class TestCheckPermissionWithScopeChain:
 
             perm = PermissionRow(
                 role_id=fixture_ids.role_id,
-                scope_type=ScopeType.PROJECT,
-                scope_id=fixture_ids.project_id,
                 entity_type=EntityType.VFOLDER,
                 permission=Permission.READ,
             )
@@ -812,10 +827,14 @@ class TestCheckPermissionWithScopeChain:
             await db_sess.flush()
 
             role1 = RoleRow(
+                scope_type=EntityType("project"),
+                scope_id=uuid.uuid4(),
                 id=fixture_ids.role_id,
                 name="role-1",
             )
             role2 = RoleRow(
+                scope_type=EntityType("project"),
+                scope_id=uuid.uuid4(),
                 id=second_role_id,
                 name="role-2",
             )
@@ -849,28 +868,26 @@ class TestCheckPermissionWithScopeChain:
             "first": fixture_ids.role_id,
             "second": second_role_id,
         }
-        scope_map: dict[str, tuple[ScopeType, str]] = {
-            "project": (ScopeType.PROJECT, fixture_ids.project_id),
-            "domain": (ScopeType.DOMAIN, fixture_ids.domain_id),
+        scope_map: dict[str, tuple[EntityType, str]] = {
+            "project": (EntityType.PROJECT, fixture_ids.project_id),
+            "domain": (EntityType.DOMAIN, fixture_ids.domain_id),
         }
         for role_key, scope_key, operation in request.param:
-            domain_id = DomainID(uuid.uuid4())
             role_id = role_map[role_key]
             scope_type, scope_id = scope_map[scope_key]
             async with db_with_rbac_tables.begin_session() as db_sess:
-                domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
-                domain_id = DomainID(uuid.uuid4())
+                await db_sess.execute(
+                    sa.update(RoleRow)
+                    .where(RoleRow.id == role_id)
+                    .values(scope_type=scope_type, scope_id=uuid.UUID(scope_id))
+                )
                 db_sess.add(
-                    DomainRow(id=domain_id, name=domain_name, total_resource_slots=ResourceSlot())
+                    PermissionRow(
+                        role_id=role_id,
+                        entity_type=EntityType.VFOLDER,
+                        permission=Permission.from_operation(operation),
+                    )
                 )
-                perm = PermissionRow(
-                    role_id=role_id,
-                    scope_type=scope_type,
-                    scope_id=scope_id,
-                    entity_type=EntityType.VFOLDER,
-                    permission=Permission.from_operation(operation),
-                )
-                db_sess.add(perm)
                 await db_sess.flush()
 
     @pytest.mark.parametrize(
@@ -1119,6 +1136,8 @@ class TestCheckPermissionWithScopeChain:
             await db_sess.flush()
 
             role = RoleRow(
+                scope_type=EntityType("project"),
+                scope_id=uuid.uuid4(),
                 id=other_role_id,
                 name="other-user-role",
             )
@@ -1134,8 +1153,6 @@ class TestCheckPermissionWithScopeChain:
 
             perm = PermissionRow(
                 role_id=other_role_id,
-                scope_type=ScopeType.PROJECT,
-                scope_id=fixture_ids.project_id,
                 entity_type=EntityType.VFOLDER,
                 permission=Permission.READ,
             )

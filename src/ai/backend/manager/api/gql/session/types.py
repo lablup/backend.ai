@@ -13,8 +13,11 @@ from strawberry import ID, Info
 from strawberry.relay import Connection, Edge, NodeID
 
 from ai.backend.common.contexts.user import current_user
-from ai.backend.common.data.entity.session import SESSION_ENTITY_TYPE
+from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.replica import ReplicaID
+from ai.backend.common.data.entity.session import SessionEntityType, SessionID
 from ai.backend.common.data.entity.types import RuntimeEntityID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.dto.manager.v2.common import (
     ResourceSlotEntryInput as ResourceSlotEntryInputDTO,
 )
@@ -408,7 +411,9 @@ class SessionV2GQL(PydanticNodeMixin[SessionNode]):
         BackendAIGQLMeta(added_version="26.3.0", description="The user who owns this session.")
     )  # type: ignore[misc]
     async def user(self, info: Info[StrawberryGQLContext]) -> UserV2GQL | None:
-        user_data = await info.context.data_loaders.user_loader.load(UUID(str(self.user_id)))
+        user_data = await info.context.data_loaders.user_loader.load(
+            UserID(UUID(str(self.user_id)))
+        )
         if user_data is None:
             return None
         return user_data
@@ -418,7 +423,7 @@ class SessionV2GQL(PydanticNodeMixin[SessionNode]):
     )  # type: ignore[misc]
     async def project(self, info: Info[StrawberryGQLContext]) -> ProjectV2GQL | None:
         project_data = await info.context.data_loaders.project_loader.load(
-            UUID(str(self.project_id))
+            ProjectID(UUID(str(self.project_id)))
         )
         if project_data is None:
             return None
@@ -523,7 +528,9 @@ class SessionV2GQL(PydanticNodeMixin[SessionNode]):
     ):
         if self.replica_id is None:
             return None
-        return await info.context.data_loaders.replica_loader.load(UUID(str(self.replica_id)))
+        return await info.context.data_loaders.replica_loader.load(
+            ReplicaID(UUID(str(self.replica_id)))
+        )
 
     @gql_added_field(
         BackendAIGQLMeta(
@@ -538,7 +545,7 @@ class SessionV2GQL(PydanticNodeMixin[SessionNode]):
     )  # type: ignore[misc]
     async def resource_allocation(self, info: Info[StrawberryGQLContext]) -> ResourceAllocationGQL:
         return await info.context.data_loaders.session_resource_allocation_loader.load(
-            SessionId(UUID(str(self.id)))
+            SessionID(UUID(str(self.id)))
         )
 
     @gql_added_field(
@@ -561,7 +568,7 @@ class SessionV2GQL(PydanticNodeMixin[SessionNode]):
     ) -> EntityLabelConnection | None:
         return await resolve_entity_labels(
             info,
-            RuntimeEntityID(SESSION_ENTITY_TYPE, UUID(str(self.id))),
+            RuntimeEntityID(SessionEntityType(), UUID(str(self.id))),
             filter=filter,
             order_by=order_by,
             before=before,
@@ -584,7 +591,7 @@ class SessionV2GQL(PydanticNodeMixin[SessionNode]):
         required: bool = False,
     ) -> Iterable[Self | None]:
         results = await info.context.data_loaders.session_loader.load_many([
-            SessionId(UUID(nid)) for nid in node_ids
+            SessionID(SessionId(UUID(nid))) for nid in node_ids
         ])
         return cast(list[Self | None], results)
 

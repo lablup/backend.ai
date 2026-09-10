@@ -21,7 +21,6 @@ from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.data.kernel.types import KernelInfo
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.kernel.conditions import KernelConditions
-from ai.backend.manager.repositories.base import BulkCreator
 from ai.backend.manager.sokovan.scheduler.fair_share import (
     FairShareAggregator,
     FairShareFactorCalculator,
@@ -155,11 +154,11 @@ class FairShareObserver(KernelObserver):
 
         log.debug(
             "[FairShareObserver] Preparation result: specs_count={}, observed_count={}",
-            len(preparation_result.specs),
+            len(preparation_result.creations),
             preparation_result.observed_count,
         )
 
-        if not preparation_result.specs:
+        if not preparation_result.creations:
             log.debug("[FairShareObserver] No specs prepared, returning early")
             return ObservationResult(observed_count=0)
 
@@ -177,9 +176,8 @@ class FairShareObserver(KernelObserver):
         )
 
         # Atomic DB write for usage records
-        bulk_creator = BulkCreator(specs=preparation_result.specs)
         await self._resource_usage_repository.record_fair_share_observation(
-            bulk_creator,
+            preparation_result.creations,
             preparation_result.kernel_observation_times,
             aggregation_result,
         )

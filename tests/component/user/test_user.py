@@ -53,6 +53,7 @@ from ai.backend.manager.models.rbac_models.association_scopes_entities import (
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.user import users
+from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
 from ai.backend.testutils.fixtures import DomainFixtureData
 
 from .conftest import (
@@ -417,10 +418,17 @@ async def user_with_rbac_rows(
             )
         )
         await conn.execute(
+            sa.insert(VirtualEntityRow.__table__).values(
+                entity_type=ScopeType.USER.value, entity_id=user_id
+            )
+        )
+        await conn.execute(
             sa.insert(RoleRow.__table__).values(
                 id=role_id,
                 name=f"user-{scope_id[:8]}",
                 status=RoleStatus.ACTIVE,
+                scope_type=ScopeType.USER.value,
+                scope_id=user_id,
             )
         )
         # Role registered in the user's own scope (the per-user SYSTEM role binding).
@@ -446,8 +454,6 @@ async def user_with_rbac_rows(
         await conn.execute(
             sa.insert(PermissionRow.__table__).values(
                 role_id=role_id,
-                scope_type=ScopeType.USER,
-                scope_id=scope_id,
                 entity_type=EntityType.USER,
                 permission=Permission.READ,
             )
@@ -469,6 +475,12 @@ async def user_with_rbac_rows(
             )
         )
         await conn.execute(RoleRow.__table__.delete().where(RoleRow.__table__.c.id == role_id))
+        await conn.execute(
+            VirtualEntityRow.__table__.delete().where(
+                VirtualEntityRow.__table__.c.entity_type == ScopeType.USER.value,
+                VirtualEntityRow.__table__.c.entity_id == user_id,
+            )
+        )
         await conn.execute(users.delete().where(users.c.uuid == str(user_id)))
 
 
@@ -499,9 +511,8 @@ class TestUserPurge:
         user_with_rbac_rows: tuple[uuid.UUID, str],
         db_engine: SAEngine,
     ) -> None:
-        """Purge must remove scope-entity associations and scope-bound permissions
-        for the user, so the per-user SYSTEM role does not end up with dangling
-        scope references that resolve to NULL via GraphQL.
+        """Purge must remove the scope-entity associations and the roles the user's
+        scope holds, so no permission is left pointing at a scope that is gone.
         """
         user_id, scope_id = user_with_rbac_rows
 
@@ -527,13 +538,11 @@ class TestUserPurge:
             permissions_after = await conn.scalar(
                 sa.select(sa.func.count())
                 .select_from(PermissionRow)
-                .where(
-                    PermissionRow.scope_type == RBACElementType.USER,
-                    PermissionRow.scope_id == scope_id,
-                )
+                .join(RoleRow, RoleRow.id == PermissionRow.role_id)
+                .where(RoleRow.scope_id == user_id)
             )
         assert ase_after == 0, "association_scopes_entities rows should be cleaned up after purge"
-        assert permissions_after == 0, "scope-bound permissions should be cleaned up after purge"
+        assert permissions_after == 0, "the role permissions should be gone after purge"
 
 
 class TestUserBulkOperations:

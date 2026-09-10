@@ -143,7 +143,9 @@ class RuntimeVariantPresetAdapter(BaseAdapter):
         )
         return self._data_to_node(result.data)
 
-    async def batch_load_by_ids(self, ids: Sequence[UUID]) -> list[RuntimeVariantPresetNode | None]:
+    async def batch_load_by_ids(
+        self, ids: Sequence[RuntimeVariantPresetID]
+    ) -> list[RuntimeVariantPresetNode | None]:
         """Batch-load presets by id, aligned to ``ids`` order (``None`` for missing)."""
         if not ids:
             return []
@@ -170,6 +172,8 @@ class RuntimeVariantPresetAdapter(BaseAdapter):
             default_value=input.default_value,
             key=input.key,
             required=input.required,
+            added_version=input.added_version,
+            deprecated_version=input.deprecated_version,
             category=input.category,
             display_name=input.display_name,
             ui_option=input.ui_option,
@@ -221,6 +225,8 @@ class RuntimeVariantPresetAdapter(BaseAdapter):
                 if input.required is not None
                 else OptionalState.nop()
             ),
+            added_version=TriState.from_unset(input.added_version),
+            deprecated_version=TriState.from_unset(input.deprecated_version),
             category=(
                 TriState.nop()
                 if input.category is SENTINEL
@@ -275,6 +281,10 @@ class RuntimeVariantPresetAdapter(BaseAdapter):
             )
             if cond:
                 conditions.append(cond)
+        if filter_.runtime_version is not None:
+            conditions.append(
+                RuntimeVariantPresetConditions.by_valid_at_version(filter_.runtime_version)
+            )
         if filter_.AND:
             for sub in filter_.AND:
                 conditions.extend(self._convert_filter(sub))
@@ -303,6 +313,10 @@ class RuntimeVariantPresetAdapter(BaseAdapter):
                     result.append(RuntimeVariantPresetOrders.rank(ascending))
                 case RuntimeVariantPresetOrderField.CREATED_AT:
                     result.append(RuntimeVariantPresetOrders.created_at(ascending))
+                case RuntimeVariantPresetOrderField.ADDED_VERSION:
+                    result.extend(RuntimeVariantPresetOrders.added_version(ascending))
+                case RuntimeVariantPresetOrderField.DEPRECATED_VERSION:
+                    result.extend(RuntimeVariantPresetOrders.deprecated_version(ascending))
         return result
 
     @staticmethod
@@ -320,6 +334,8 @@ class RuntimeVariantPresetAdapter(BaseAdapter):
                 key=data.key,
             ),
             required=data.required,
+            added_version=data.added_version,
+            deprecated_version=data.deprecated_version,
             category=data.category,
             ui_type=data.ui_type,
             display_name=data.display_name,

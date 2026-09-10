@@ -32,7 +32,6 @@ from ai.backend.manager.api.gql.rbac.types import (
     PermissionFilter,
     PermissionGQL,
     PermissionOrderBy,
-    RBACElementTypeGQL,
     ReplaceRolePermissionsInputGQL,
     ReplaceRolePermissionsPayloadGQL,
     ScopeEntityCombinationGQL,
@@ -105,9 +104,9 @@ async def rbac_scope_entity_combinations(
 ) -> list[ScopeEntityCombinationGQL] | None:
     return [
         ScopeEntityCombinationGQL(
-            scope_type=RBACElementTypeGQL(scope.value),
+            scope_type=scope.value,
             valid_entity_types=sorted(
-                [RBACElementTypeGQL(entity.value) for entity in entities],
+                [entity.value for entity in entities],
                 key=lambda e: e.value,  # type: ignore[attr-defined]
             ),
         )
@@ -138,7 +137,7 @@ async def rbac_entity_operation_combinations(
         )
     return [
         EntityOperationCombinationGQL(
-            entity_type=RBACElementTypeGQL(entity.value),
+            entity_type=entity.value,
             operations=sorted(ops, key=lambda o: o.operation),
         )
         for entity, ops in sorted(entity_ops.items(), key=lambda e: e[0].value)

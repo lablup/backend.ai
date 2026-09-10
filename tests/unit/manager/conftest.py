@@ -13,7 +13,7 @@ import pytest
 import sqlalchemy as sa
 
 from ai.backend.common.data.entity.domain import (
-    DOMAIN_ENTITY_TYPE,
+    DomainEntityType,
     DomainID,
     DomainName,
 )
@@ -180,7 +180,7 @@ def domain_factory() -> DomainFactory:
             # sides to be in the graph already.
             await conn.execute(
                 sa.insert(VirtualEntityRow.__table__).values(
-                    entity_type=DOMAIN_ENTITY_TYPE, entity_id=row.id
+                    entity_type=DomainEntityType(), entity_id=row.id
                 )
             )
         return DomainFixtureData(domain_name=DomainName(row.name), domain_id=DomainID(row.id))

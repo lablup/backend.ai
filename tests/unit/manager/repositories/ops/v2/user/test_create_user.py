@@ -9,14 +9,10 @@ import pytest
 import sqlalchemy as sa
 from sqlalchemy import Table
 
-from ai.backend.common.data.entity.domain import DOMAIN_ENTITY_TYPE, DomainID, DomainName
-from ai.backend.common.data.entity.project import (
-    PROJECT_ENTITY_TYPE,
-    PROJECT_SCOPE_TYPE,
-    ProjectID,
-)
-from ai.backend.common.data.entity.role import ROLE_ENTITY_TYPE, RoleID
-from ai.backend.common.data.entity.user import USER_ENTITY_TYPE, UserID
+from ai.backend.common.data.entity.domain import DomainEntityType, DomainID, DomainName
+from ai.backend.common.data.entity.project import ProjectEntityType, ProjectID
+from ai.backend.common.data.entity.role import RoleEntityType, RoleID
+from ai.backend.common.data.entity.user import UserEntityType, UserID
 from ai.backend.common.data.entity.virtual_entity import VirtualEntityID
 from ai.backend.common.data.permission.types import RoleStatus
 from ai.backend.common.types import AccessKey, ResourceSlot, VFolderHostPermissionMap
@@ -229,8 +225,8 @@ async def _project_member_ids(db: ExtendedAsyncSAEngine, project_id: ProjectID) 
                     )
                     .where(
                         EntityMembershipRow.virtual_entity_id
-                        == _node_of(PROJECT_ENTITY_TYPE, project_id),
-                        VirtualEntityRow.entity_type == USER_ENTITY_TYPE,
+                        == _node_of(ProjectEntityType(), project_id),
+                        VirtualEntityRow.entity_type == UserEntityType(),
                     )
                 )
             ).all()
@@ -313,9 +309,9 @@ class TestPersonalProjectProvisioning:
                 .select_from(EntityMembershipRow)
                 .where(
                     EntityMembershipRow.virtual_entity_id
-                    == _node_of(DOMAIN_ENTITY_TYPE, domain.domain_id),
+                    == _node_of(DomainEntityType(), domain.domain_id),
                     EntityMembershipRow.member_entity_id
-                    == _node_of(PROJECT_ENTITY_TYPE, project_id),
+                    == _node_of(ProjectEntityType(), project_id),
                 )
             )
         assert owned == 1
@@ -412,8 +408,8 @@ class TestUserGraphProvisioning:
         """``created_in`` puts the user on the domain's list and under its roles."""
         user_id = await _create_user(provider, domain.domain_id, "alice")
 
-        domain_node = (DOMAIN_ENTITY_TYPE, domain.domain_id)
-        user_node = (USER_ENTITY_TYPE, user_id)
+        domain_node = (DomainEntityType(), domain.domain_id)
+        user_node = (UserEntityType(), user_id)
         assert await _owns(db, domain_node, user_node)
         assert await _governs(db, domain_node, user_node)
 
@@ -462,8 +458,6 @@ class TestUserGraphProvisioning:
                     await session.scalars(
                         sa.select(PermissionRow.entity_type).where(
                             PermissionRow.role_id == role.id,
-                            PermissionRow.scope_type == ScopeType.USER,
-                            PermissionRow.scope_id == str(user_id),
                         )
                     )
                 ).all()
@@ -495,8 +489,8 @@ async def _create_project(db: ExtendedAsyncSAEngine, domain_name: DomainName) ->
 
 
 async def _enrol_auto_assign_role(db: ExtendedAsyncSAEngine, project_id: ProjectID) -> RoleID:
-    """A role the project hands to whoever joins it, enrolled in the project's virtual
-    entity the way the preset-derived ones are."""
+    """A role the project hands to whoever joins it, on the row and enrolled in the
+    project's virtual entity the way the preset-derived ones are."""
     role_id = RoleID(uuid.uuid4())
     async with db.begin_session() as session:
         session.add(
@@ -505,14 +499,16 @@ async def _enrol_auto_assign_role(db: ExtendedAsyncSAEngine, project_id: Project
                 name=f"role-{role_id.hex[:8]}",
                 status=RoleStatus.ACTIVE,
                 auto_assign=True,
+                scope_type=ProjectEntityType(),
+                scope_id=project_id,
             )
         )
-        role_node = VirtualEntityRow(entity_type=ROLE_ENTITY_TYPE, entity_id=role_id)
+        role_node = VirtualEntityRow(entity_type=RoleEntityType(), entity_id=role_id)
         session.add(role_node)
         await session.flush()
         project_node_id = await session.scalar(
             sa.select(VirtualEntityRow.id).where(
-                VirtualEntityRow.entity_type == PROJECT_SCOPE_TYPE,
+                VirtualEntityRow.entity_type == ProjectEntityType(),
                 VirtualEntityRow.entity_id == project_id,
             )
         )

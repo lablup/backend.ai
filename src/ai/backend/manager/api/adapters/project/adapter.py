@@ -5,7 +5,6 @@ from __future__ import annotations
 from collections.abc import Sequence
 from uuid import UUID
 
-from ai.backend.common.api_handlers import Sentinel
 from ai.backend.common.data.entity.domain import DomainID, DomainName
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.role import RoleID
@@ -21,6 +20,7 @@ from ai.backend.common.dto.manager.v2.group.request import (
     ProjectOrder,
     PurgeProjectInput,
     RestoreProjectInput,
+    ScopedSearchProjectsInput,
     UnassignUsersFromProjectInput,
     UpdateProjectInput,
 )
@@ -43,6 +43,7 @@ from ai.backend.common.dto.manager.v2.group.response import (
 from ai.backend.common.dto.manager.v2.group.types import (
     OrderDirection,
     ProjectOrderField,
+    ProjectScope,
     ProjectType,
     ProjectTypeFilter,
     ProjectUserFilter,
@@ -78,6 +79,7 @@ from ai.backend.manager.services.project.actions.purge_project import PurgeProje
 from ai.backend.manager.services.project.actions.restore_project import RestoreProjectAction
 from ai.backend.manager.services.project.actions.scoped_search import (
     DomainProjectScopeItem,
+    ProjectScopeItem,
     ScopedSearchProjectsAction,
     UserProjectScopeItem,
 )
@@ -137,7 +139,7 @@ class ProjectAdapter(BaseAdapter):
 
     # ------------------------------------------------------------------ batch load (DataLoader)
 
-    async def batch_load_by_ids(self, group_ids: Sequence[UUID]) -> list[ProjectNode | None]:
+    async def batch_load_by_ids(self, group_ids: Sequence[ProjectID]) -> list[ProjectNode | None]:
         """Batch load projects by UUID for DataLoader use.
 
         Returns ProjectNode DTOs in the same order as the input group_ids list.
@@ -219,33 +221,11 @@ class ProjectAdapter(BaseAdapter):
         """Update an existing project (superadmin only)."""
         updater = ProjectUpdater(
             project_id=ProjectID(project_id),
-            name=(
-                OptionalState.update(input.name) if input.name is not None else OptionalState.nop()
-            ),
-            description=(
-                TriState.nop()
-                if isinstance(input.description, Sentinel)
-                else TriState.nullify()
-                if input.description is None
-                else TriState.update(input.description)
-            ),
-            is_active=(
-                OptionalState.update(input.is_active)
-                if input.is_active is not None
-                else OptionalState.nop()
-            ),
-            integration_name=(
-                TriState.nop()
-                if isinstance(input.integration_name, Sentinel)
-                else TriState.nullify()
-                if input.integration_name is None
-                else TriState.update(input.integration_name)
-            ),
-            resource_policy=(
-                OptionalState.update(input.resource_policy)
-                if input.resource_policy is not None
-                else OptionalState.nop()
-            ),
+            name=OptionalState.from_unset(input.name),
+            description=TriState.from_unset(input.description),
+            is_active=OptionalState.from_unset(input.is_active),
+            integration_name=TriState.from_unset(input.integration_name),
+            resource_policy=OptionalState.from_unset(input.resource_policy),
         )
         result = await self._project.update_project.run(UpdateProjectAction(updater=updater))
         if result.data is None:
@@ -320,6 +300,45 @@ class ProjectAdapter(BaseAdapter):
             )
         )
 
+        return AdminSearchGroupsPayload(
+            items=[self._group_data_to_node(item) for item in result.items],
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+        )
+
+    def _scope_items(self, scope: ProjectScope) -> list[ProjectScopeItem]:
+        """The scope items the request named, in the order the input lists them."""
+        items: list[ProjectScopeItem] = [
+            DomainProjectScopeItem(domain_id=DomainID(entry.value)) for entry in scope.domain or ()
+        ]
+        items.extend(
+            UserProjectScopeItem(user_id=UserID(entry.value)) for entry in scope.user or ()
+        )
+        return items
+
+    async def scoped_search(
+        self,
+        input: ScopedSearchProjectsInput,
+    ) -> AdminSearchGroupsPayload:
+        """Search the projects the named scopes reach, combined with OR."""
+        conditions = self._convert_group_filter(input.filter) if input.filter else []
+        orders = self._convert_orders(input.order) if input.order else []
+        searcher = self._build_searcher(
+            ProjectSearcher,
+            conditions=conditions,
+            orders=orders,
+            pagination_spec=_PROJECT_PAGINATION_SPEC,
+            first=input.first,
+            after=input.after,
+            last=input.last,
+            before=input.before,
+            limit=input.limit,
+            offset=input.offset,
+        )
+        result = await self._project.scoped_search.run(
+            ScopedSearchProjectsAction(items=self._scope_items(input.scope), searcher=searcher)
+        )
         return AdminSearchGroupsPayload(
             items=[self._group_data_to_node(item) for item in result.items],
             total_count=result.total_count,

@@ -11,6 +11,7 @@ from yarl import URL
 from ai.backend.client.v2.base_client import BackendAIAuthClient
 from ai.backend.client.v2.config import ClientConfig
 from ai.backend.client.v2.domains.rbac import RBACClient
+from ai.backend.common.data.entity.project import ProjectEntityType
 from ai.backend.common.dto.manager.query import StringFilter
 from ai.backend.common.dto.manager.rbac.request import (
     AssignRoleRequest,
@@ -46,6 +47,7 @@ from .conftest import MockAuth
 _DEFAULT_CONFIG = ClientConfig(endpoint=URL("https://api.example.com"))
 
 _SAMPLE_ROLE_ID = str(uuid.uuid4())
+_SAMPLE_SCOPE_ID = str(uuid.uuid4())
 _SAMPLE_USER_ID = str(uuid.uuid4())
 _NOW_ISO = "2025-01-01T00:00:00+00:00"
 
@@ -83,6 +85,8 @@ def _sample_role_dict(role_id: str = _SAMPLE_ROLE_ID) -> dict[str, Any]:
     return {
         "id": role_id,
         "name": "test-role",
+        "scope_type": "project",
+        "scope_id": _SAMPLE_SCOPE_ID,
         "source": RoleSource.CUSTOM.value,
         "status": RoleStatus.ACTIVE.value,
         "created_at": _NOW_ISO,
@@ -100,9 +104,9 @@ class TestRoleCreate:
 
         result = await rc.create_role(
             CreateRoleRequest(
+                scope_type=ProjectEntityType(),
+                scope_id=uuid.uuid4(),
                 name="test-role",
-                source=RoleSource.CUSTOM,
-                status=RoleStatus.ACTIVE,
                 description="A test role",
             )
         )
