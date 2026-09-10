@@ -7,7 +7,10 @@ from ai.backend.common.data.entity.types import (
     FieldType,
 )
 
-__all__ = ("RolePermissionPresetID",)
+__all__ = (
+    "RolePermissionPresetFieldType",
+    "RolePermissionPresetID",
+)
 
 
 class RolePermissionPresetFieldType(FieldType):
