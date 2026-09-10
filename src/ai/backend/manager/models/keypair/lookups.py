@@ -10,7 +10,8 @@ from uuid import UUID
 import sqlalchemy as sa
 
 from ai.backend.common.data.entity.keypair import KeyPairID
-from ai.backend.common.data.entity.user import UserID
+from ai.backend.common.data.entity.types import EntityType, FieldType
+from ai.backend.common.data.entity.user import UserEntityType, UserID
 from ai.backend.common.types import AccessKey
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.keypair.row import KeyPairRow
@@ -42,6 +43,10 @@ class KeypairAccessKeyOwnerLookup(FieldOwnerKeyLookup[UserID]):
     access_key: AccessKey
 
     @override
+    def field_type(self) -> FieldType:
+        return KeyPairID.field_type()
+
+    @override
     def build_query(self) -> sa.sql.Select[Any]:
         return sa.select(KeyPairRow.user).where(KeyPairRow.access_key == self.access_key)
 
@@ -55,6 +60,10 @@ class KeypairAccessKeyLookup(FieldKeyLookup[KeyPairID, UserID]):
     """Reads the keypair an access key names, and the user that owns it."""
 
     access_key: AccessKey
+
+    @override
+    def field_type(self) -> FieldType:
+        return KeyPairID.field_type()
 
     @override
     def build_query(self) -> sa.sql.Select[Any]:
@@ -80,6 +89,10 @@ class KeypairAccessKeyUserLookup(DataLookup[KeyPairRow, UserID]):
     @override
     def row_class(self) -> type[KeyPairRow]:
         return KeyPairRow
+
+    @override
+    def entity_type(self) -> EntityType:
+        return UserEntityType()
 
     @override
     def conditions(self) -> Sequence[QueryCondition]:

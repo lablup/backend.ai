@@ -11,7 +11,7 @@ from uuid import UUID
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
-from ai.backend.common.data.entity.types import EntityID, EntityType
+from ai.backend.common.data.entity.types import EntityType
 from ai.backend.common.data.permission.types import ScopeType as LegacyScopeType
 from ai.backend.common.dto.manager.pagination import PaginationInfo
 from ai.backend.common.types import BackendAISchema
@@ -28,7 +28,6 @@ __all__ = (
     "DeleteObjectPermissionResponse",
     "DeletePermissionResponse",
     "DeleteRoleResponse",
-    "EntityDTO",
     "GetEntityTypesResponse",
     "GetRoleResponse",
     "GetScopeTypesResponse",
@@ -38,7 +37,6 @@ __all__ = (
     "RevokeRoleResponse",
     "RoleDTO",
     "ScopeDTO",
-    "SearchEntitiesResponse",
     "SearchRolesResponse",
     "SearchScopesResponse",
     "SearchUsersAssignedToRoleResponse",
@@ -52,7 +50,7 @@ class RoleDTO(BackendAISchema):
     id: UUID = Field(description="Role ID")
     name: str = Field(description="Role name")
     scope_type: EntityType = Field(description="Type of the scope the role belongs to")
-    scope_id: EntityID = Field(description="ID of the scope the role belongs to")
+    scope_id: UUID = Field(description="ID of the scope the role belongs to")
     source: RoleSource = Field(description="Role source")
     status: RoleStatus = Field(description="Role status")
     created_at: datetime = Field(description="Creation timestamp")
@@ -135,7 +133,7 @@ class ObjectPermissionDTO(BackendAISchema):
 
     id: UUID = Field(description="Object permission ID")
     role_id: UUID = Field(description="Role ID")
-    entity_type: LegacyEntityType = Field(description="Entity type")
+    entity_type: str = Field(description="Entity type")
     entity_id: str = Field(description="Entity ID")
     operation: OperationType = Field(description="Operation type")
 
@@ -189,17 +187,3 @@ class GetEntityTypesResponse(BaseResponseModel):
     """Response for getting available entity types."""
 
     items: list[LegacyEntityType] = Field(description="List of available entity types")
-
-
-class EntityDTO(BackendAISchema):
-    """DTO for entity data."""
-
-    entity_type: LegacyEntityType = Field(description="Entity type")
-    entity_id: str = Field(description="Entity ID")
-
-
-class SearchEntitiesResponse(BaseResponseModel):
-    """Response for searching entities within a scope."""
-
-    items: list[EntityDTO] = Field(description="List of entities")
-    pagination: PaginationInfo = Field(description="Pagination information")

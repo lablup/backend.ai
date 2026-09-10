@@ -11,6 +11,7 @@ from uuid import UUID
 from sqlalchemy.orm import InstrumentedAttribute
 
 from ai.backend.common.data.endpoint.types import ScalingState
+from ai.backend.common.data.entity.auto_scaling_rule import AutoScalingRuleID
 from ai.backend.common.data.entity.deployment import DeploymentID
 from ai.backend.common.data.entity.replica_group import ReplicaGroupID
 from ai.backend.common.data.entity.runtime_variant import RuntimeVariantID
@@ -62,7 +63,7 @@ class DeploymentUpdater(DataUpdater[EndpointRow, DeploymentInfo]):
         return EndpointRow.id
 
     @override
-    def target_id_value(self) -> UUID:
+    def target_id_value(self) -> DeploymentID:
         return self.deployment_id
 
     @property
@@ -114,7 +115,7 @@ class EndpointReplicaGroupUpdater(DataUpdater[EndpointRow, DeploymentInfo]):
         return EndpointRow.id
 
     @override
-    def target_id_value(self) -> UUID:
+    def target_id_value(self) -> DeploymentID:
         return self.deployment_id
 
     @property
@@ -174,7 +175,7 @@ class LegacyEndpointUpdater(DataUpdater[EndpointRow, DeploymentInfo]):
         return EndpointRow.id
 
     @override
-    def target_id_value(self) -> UUID:
+    def target_id_value(self) -> DeploymentID:
         return self.deployment_id
 
     @property
@@ -286,8 +287,8 @@ class AutoScalingRuleUpdater(DataUpdater[EndpointAutoScalingRuleRow, EndpointAut
         return EndpointAutoScalingRuleRow.id
 
     @override
-    def target_id_value(self) -> UUID:
-        return self.rule_id
+    def target_id_value(self) -> AutoScalingRuleID:
+        return AutoScalingRuleID(self.rule_id)
 
     @property
     @override

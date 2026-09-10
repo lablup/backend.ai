@@ -8,6 +8,7 @@ import pytest
 from pydantic import ValidationError
 
 from ai.backend.common.api_handlers import SENTINEL, Sentinel
+from ai.backend.common.data.entity.types import EntityType
 from ai.backend.common.data.permission.types import RoleStatus
 from ai.backend.common.dto.manager.v2.rbac.request import (
     CreateRoleInput,
@@ -15,10 +16,10 @@ from ai.backend.common.dto.manager.v2.rbac.request import (
     PurgeRoleInput,
     UpdateRoleInput,
 )
-from ai.backend.common.dto.manager.v2.rbac.types import RBACElementTypeDTO, ScopeInputDTO
+from ai.backend.common.dto.manager.v2.rbac.types import ScopeInputDTO
 from ai.backend.common.exception import BackendAISchemaValidationFailed
 
-_SCOPE = ScopeInputDTO(scope_type=RBACElementTypeDTO.PROJECT, scope_id=str(uuid.uuid4()))
+_SCOPE = ScopeInputDTO(scope_type=EntityType("project"), scope_id=str(uuid.uuid4()))
 
 
 class TestCreateRoleInput:

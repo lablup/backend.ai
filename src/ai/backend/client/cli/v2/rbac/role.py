@@ -88,8 +88,6 @@ def search(
         UserNestedFilter,
     )
     from ai.backend.common.dto.manager.v2.rbac.types import (
-        RBACElementTypeDTO,
-        RBACElementTypeFilter,
         RoleOrderField,
         RoleSourceFilter,
         RoleStatusFilter,
@@ -99,9 +97,7 @@ def search(
     mapped_scope_dto: MappedScopeNestedFilter | None = None
     if scope_type is not None or scope_id is not None:
         mapped_scope_dto = MappedScopeNestedFilter(
-            scope_type=RBACElementTypeFilter(equals=RBACElementTypeDTO(scope_type))
-            if scope_type is not None
-            else None,
+            scope_type=StringFilter(equals=scope_type) if scope_type is not None else None,
             scope_id=StringFilter(equals=scope_id) if scope_id is not None else None,
         )
 
@@ -254,8 +250,9 @@ def create(
     name: str, scope_type: str, scope_id: str, description: str | None, auto_assign: bool
 ) -> None:
     """Create a new role."""
+    from ai.backend.common.data.entity.types import EntityType
     from ai.backend.common.dto.manager.v2.rbac.request import CreateRoleInput
-    from ai.backend.common.dto.manager.v2.rbac.types import RBACElementTypeDTO, ScopeInputDTO
+    from ai.backend.common.dto.manager.v2.rbac.types import ScopeInputDTO
 
     async def _run() -> None:
         registry = await create_v2_registry(load_v2_config())
@@ -263,9 +260,7 @@ def create(
             result = await registry.rbac.create_role(
                 CreateRoleInput(
                     name=name,
-                    scope=ScopeInputDTO(
-                        scope_type=RBACElementTypeDTO(scope_type), scope_id=scope_id
-                    ),
+                    scope=ScopeInputDTO(scope_type=EntityType(scope_type), scope_id=scope_id),
                     description=description,
                     auto_assign=auto_assign,
                 ),

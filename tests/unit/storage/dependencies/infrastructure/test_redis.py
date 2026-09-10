@@ -13,8 +13,10 @@ from ai.backend.storage.config.loaders import make_etcd
 from ai.backend.storage.config.unified import StorageProxyUnifiedConfig
 from ai.backend.storage.dependencies.infrastructure.redis import (
     RedisProvider,
+    RedisProviderInput,
     StorageProxyValkeyClients,
 )
+from ai.backend.storage.dependencies.infrastructure.redis_config import RedisConfigProvider
 
 
 class TestRedisProvider:
@@ -67,13 +69,16 @@ class TestRedisProvider:
         etcd_client: AsyncEtcd,
     ) -> None:
         """Provider should create and cleanup all Valkey clients."""
-        provider = RedisProvider()
+        async with RedisConfigProvider().provide(etcd_client) as redis_config:
+            provider_input = RedisProviderInput(redis_config=redis_config, pidx=0)
 
-        async with provider.provide(etcd_client) as clients:
-            assert isinstance(clients, StorageProxyValkeyClients)
-            # Verify clients are created
-            assert clients.bgtask is not None
-            assert clients.artifact is not None
+            async with RedisProvider().provide(provider_input) as clients:
+                assert isinstance(clients, StorageProxyValkeyClients)
+                # Verify clients are created
+                assert clients.bgtask is not None
+                assert clients.artifact is not None
+                assert clients.tus is not None
+                assert clients.volume_stats is not None
 
     @pytest.mark.integration
     async def test_cleanup_on_exception(
@@ -81,12 +86,13 @@ class TestRedisProvider:
         etcd_client: AsyncEtcd,
     ) -> None:
         """Provider should cleanup clients even on exception."""
-        provider = RedisProvider()
+        async with RedisConfigProvider().provide(etcd_client) as redis_config:
+            provider_input = RedisProviderInput(redis_config=redis_config, pidx=0)
 
-        with pytest.raises(RuntimeError):
-            async with provider.provide(etcd_client) as clients:
-                assert isinstance(clients, StorageProxyValkeyClients)
-                raise RuntimeError("Test error")
+            with pytest.raises(RuntimeError):
+                async with RedisProvider().provide(provider_input) as clients:
+                    assert isinstance(clients, StorageProxyValkeyClients)
+                    raise RuntimeError("Test error")
 
         # Clients should be closed - we can't easily verify this,
         # but the test should complete without hanging

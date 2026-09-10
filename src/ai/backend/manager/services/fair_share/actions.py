@@ -13,16 +13,10 @@ from dataclasses import dataclass
 from decimal import Decimal
 from typing import override
 
-from ai.backend.common.data.entity.fair_share import (
-    DomainFairShareEntityType,
-    ProjectFairShareEntityType,
-    UserFairShareEntityType,
-)
 from ai.backend.common.data.entity.resource_group import (
-    RESOURCE_GROUP_SCOPE_TYPE,
     ResourceGroupID,
 )
-from ai.backend.common.data.entity.types import EntityIdentifier, EntityType, ScopeRef
+from ai.backend.common.data.entity.types import EntityIdentifier, EntityType, GlobalEntityType
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.actions.v2.global_scope.base import BaseGlobalAction
 from ai.backend.manager.actions.v2.scope.base import BaseScopeAction
@@ -60,11 +54,11 @@ class DomainFairShareAction(BaseScopeAction):
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return DomainFairShareEntityType()
+        return GlobalEntityType()
 
     @override
-    def scope_targets(self) -> Sequence[ScopeRef]:
-        return (ScopeRef(scope_type=RESOURCE_GROUP_SCOPE_TYPE, scope_id=self.resource_group_id),)
+    def scope_targets(self) -> Sequence[EntityIdentifier]:
+        return (self.resource_group_id,)
 
 
 @dataclass(frozen=True)
@@ -100,7 +94,7 @@ class GlobalSearchDomainFairSharesAction(BaseGlobalAction):
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return DomainFairShareEntityType()
+        return GlobalEntityType()
 
     @override
     @classmethod
@@ -207,11 +201,11 @@ class ProjectFairShareAction(BaseScopeAction):
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return ProjectFairShareEntityType()
+        return GlobalEntityType()
 
     @override
-    def scope_targets(self) -> Sequence[ScopeRef]:
-        return (ScopeRef(scope_type=RESOURCE_GROUP_SCOPE_TYPE, scope_id=self.resource_group_id),)
+    def scope_targets(self) -> Sequence[EntityIdentifier]:
+        return (self.resource_group_id,)
 
 
 @dataclass(frozen=True)
@@ -247,7 +241,7 @@ class GlobalSearchProjectFairSharesAction(BaseGlobalAction):
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return ProjectFairShareEntityType()
+        return GlobalEntityType()
 
     @override
     @classmethod
@@ -356,11 +350,11 @@ class UserFairShareAction(BaseScopeAction):
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return UserFairShareEntityType()
+        return GlobalEntityType()
 
     @override
-    def scope_targets(self) -> Sequence[ScopeRef]:
-        return (ScopeRef(scope_type=RESOURCE_GROUP_SCOPE_TYPE, scope_id=self.resource_group_id),)
+    def scope_targets(self) -> Sequence[EntityIdentifier]:
+        return (self.resource_group_id,)
 
 
 @dataclass(frozen=True)
@@ -397,7 +391,7 @@ class GlobalSearchUserFairSharesAction(BaseGlobalAction):
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return UserFairShareEntityType()
+        return GlobalEntityType()
 
     @override
     @classmethod

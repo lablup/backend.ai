@@ -15,7 +15,7 @@ from uuid import UUID
 import pytest
 
 from ai.backend.common.data.entity.domain import DomainID
-from ai.backend.common.data.permission.types import EntityType, RelationType, ScopeType
+from ai.backend.common.data.permission.types import EntityType, ScopeType
 from ai.backend.common.types import AccessKey, ResourceSlot
 from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.auth import AccessKeyNotFound
@@ -33,9 +33,6 @@ from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.project import ProjectRow
 from ai.backend.manager.models.rbac_models import RoleRow, UserRoleRow
-from ai.backend.manager.models.rbac_models.association_scopes_entities import (
-    AssociationScopesEntitiesRow,
-)
 from ai.backend.manager.models.replica_group import ReplicaGroupRow
 from ai.backend.manager.models.resource_group import ResourceGroupRow
 from ai.backend.manager.models.resource_policy import (
@@ -73,7 +70,6 @@ ALL_ROWS: list[TableOrORM] = [
     UserRow,
     KeyPairRow,
     ProjectRow,
-    AssociationScopesEntitiesRow,
     VirtualEntityRow,
     EntityMembershipRow,
     EntityMembershipCapRow,
@@ -215,15 +211,6 @@ class TestQueryUserinfo:
                 )
             )
             await sess.flush()
-            sess.add(
-                AssociationScopesEntitiesRow(
-                    scope_type=ScopeType.PROJECT,
-                    scope_id=str(group_id),
-                    entity_type=EntityType.USER,
-                    entity_id=str(user_uuid),
-                    relation_type=RelationType.AUTO,
-                )
-            )
             # Membership read model: the project's virtual entity with the user
             # enrolled in it.
             project_ve_id = uuid.uuid4()
@@ -619,15 +606,6 @@ class TestQueryUserinfoFromSession:
                 )
             )
             await sess.flush()
-            sess.add(
-                AssociationScopesEntitiesRow(
-                    scope_type=ScopeType.PROJECT,
-                    scope_id=str(group_id),
-                    entity_type=EntityType.USER,
-                    entity_id=str(user_uuid),
-                    relation_type=RelationType.AUTO,
-                )
-            )
             # Membership read model: the project's virtual entity with the user
             # enrolled in it.
             project_ve_id = uuid.uuid4()

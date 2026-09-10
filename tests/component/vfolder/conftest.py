@@ -15,7 +15,6 @@ from ai.backend.common.data.entity.vfolder_invitation import VFolderInvitationEn
 from ai.backend.common.data.permission.types import (
     EntityType,
     Permission,
-    RelationType,
     RoleStatus,
     ScopeType,
 )
@@ -52,9 +51,6 @@ from ai.backend.manager.data.vfolder.types import (
 from ai.backend.manager.dependencies.infrastructure.redis import ValkeyClients
 from ai.backend.manager.models.domain import domains
 from ai.backend.manager.models.project import ProjectRow, ProjectType
-from ai.backend.manager.models.rbac_models.association_scopes_entities import (
-    AssociationScopesEntitiesRow,
-)
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
@@ -464,15 +460,6 @@ async def user_system_role(
                 role_id=role_id,
             )
         )
-        await conn.execute(
-            sa.insert(AssociationScopesEntitiesRow.__table__).values(
-                scope_type=ScopeType.USER,
-                scope_id=str(user_uuid),
-                entity_type=EntityType.ROLE,
-                entity_id=str(role_id),
-                relation_type=RelationType.AUTO,
-            )
-        )
         for entity_type in EntityType.owner_accessible_entity_types_in_user():
             for bit in Permission:
                 if not bit:
@@ -480,8 +467,6 @@ async def user_system_role(
                 await conn.execute(
                     sa.insert(PermissionRow.__table__).values(
                         role_id=role_id,
-                        scope_type=ScopeType.USER,
-                        scope_id=str(user_uuid),
                         entity_type=entity_type,
                         permission=bit,
                     )
@@ -492,11 +477,6 @@ async def user_system_role(
     async with db_engine.begin() as conn:
         await conn.execute(
             PermissionRow.__table__.delete().where(PermissionRow.__table__.c.role_id == role_id)
-        )
-        await conn.execute(
-            AssociationScopesEntitiesRow.__table__.delete().where(
-                AssociationScopesEntitiesRow.__table__.c.entity_id == str(role_id)
-            )
         )
         await conn.execute(
             UserRoleRow.__table__.delete().where(UserRoleRow.__table__.c.role_id == role_id)

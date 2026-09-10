@@ -6,13 +6,17 @@ from collections.abc import AsyncIterator, Sequence
 from dataclasses import dataclass
 from typing import Any, override
 
+from ai.backend.common.data.entity.session import SessionEntityType
+from ai.backend.common.data.entity.types import EntityType
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.repositories.base.export import StreamingExportQuery
+from ai.backend.manager.services.export.actions.base import (
+    ExportProjectScopeAction,
+    ExportScopeActionResult,
+)
 
-from .base import ExportProjectScopeAction, ExportScopeActionResult
 
-
-@dataclass
+@dataclass(frozen=True)
 class ExportSessionsByProjectCSVAction(ExportProjectScopeAction):
     """Export session CSV scoped to a specific project."""
 
@@ -22,16 +26,21 @@ class ExportSessionsByProjectCSVAction(ExportProjectScopeAction):
 
     @override
     @classmethod
+    def entity_type(cls) -> EntityType:
+        return SessionEntityType()
+
+    @override
+    @classmethod
     def action_name(cls) -> str:
         return "export_sessions_by_project_c_s_v"
 
     @override
     @classmethod
     def operation_type(cls) -> ActionOperationType:
-        return ActionOperationType.CREATE
+        return ActionOperationType.SEARCH
 
 
-@dataclass
+@dataclass(frozen=True)
 class ExportSessionsByProjectCSVActionResult(ExportScopeActionResult):
     """Result of project-scoped session CSV export action."""
 

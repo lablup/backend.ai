@@ -355,6 +355,32 @@ class TestSwitchRelation:
         assert await _off(database) is False
 
 
+class TestPartialSwitchRelations:
+    async def test_answers_each_pair_in_the_order_named(
+        self,
+        database: ExtendedAsyncSAEngine,
+        provider: RelationOpsProvider,
+        pair: tuple[_ScopeID, _TargetID],
+        other_target: _TargetID,
+    ) -> None:
+        """A pair standing in no relation is answered false with no error, beside the
+        one that moved."""
+        scope, target = pair
+        async with provider.write_ops() as ops:
+            await ops.create_relations(_Creator(), [(scope, target)])
+
+        async with provider.write_ops() as ops:
+            result = await ops.partial_switch_relations(
+                _SwitchOff(), [(scope, other_target), (scope, target)]
+            )
+
+        assert [(item.target, item.written, item.error) for item in result.results] == [
+            (other_target, False, None),
+            (target, True, None),
+        ]
+        assert await _off(database) is True
+
+
 class TestPurgeRelation:
     async def test_unlink_removes_the_row_the_govern_and_the_share(
         self,

@@ -4,6 +4,7 @@ from datetime import datetime
 from typing import (
     TYPE_CHECKING,
 )
+from uuid import UUID
 
 import sqlalchemy as sa
 from sqlalchemy.orm import (
@@ -15,12 +16,7 @@ from sqlalchemy.orm import (
 
 from ai.backend.common.data.entity.role import RoleID
 from ai.backend.common.data.entity.role_preset import RolePresetID
-from ai.backend.common.data.entity.types import (
-    EntityID,
-    EntityIdentifier,
-    EntityType,
-    RuntimeEntityID,
-)
+from ai.backend.common.data.entity.types import EntityIdentifier, EntityType, RuntimeEntityID
 from ai.backend.manager.data.permission.role import (
     RoleData,
     RoleDetailData,
@@ -110,7 +106,7 @@ class RoleRow(LifecycleTimestampsMixin, Base):
     scope_type: Mapped[EntityType] = mapped_column(
         "scope_type", sa.String(length=32), nullable=False
     )
-    scope_id: Mapped[EntityID] = mapped_column("scope_id", GUID(), nullable=False)
+    scope_id: Mapped[UUID] = mapped_column("scope_id", GUID(), nullable=False)
     # The preset this role was instantiated from; NULL for roles made by hand or
     # before presets were recorded. `use_alter` keeps the FK out of the CREATE TABLE
     # so table subsets that omit ``role_presets`` still build.

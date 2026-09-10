@@ -30,9 +30,6 @@ from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.project import ProjectRow
 from ai.backend.manager.models.rbac_models import RoleRow, UserRoleRow
-from ai.backend.manager.models.rbac_models.association_scopes_entities import (
-    AssociationScopesEntitiesRow,
-)
 from ai.backend.manager.models.replica_group import ReplicaGroupRow
 from ai.backend.manager.models.resource_group import ResourceGroupRow
 from ai.backend.manager.models.resource_policy import (
@@ -105,7 +102,6 @@ class TestEnrollUsersInProject:
                 UserRow,
                 KeyPairRow,
                 ProjectRow,
-                AssociationScopesEntitiesRow,
                 ContainerRegistryRow,
                 ImageRow,
                 VFolderRow,
@@ -540,16 +536,6 @@ class TestEnrollUsersInProject:
                 )
             ).all()
             assert set(caps) == {Permission.READ}
-            associations = (
-                await session.scalars(
-                    sa.select(AssociationScopesEntitiesRow).where(
-                        AssociationScopesEntitiesRow.scope_type == ScopeType.PROJECT,
-                        AssociationScopesEntitiesRow.scope_id == str(test_project),
-                        AssociationScopesEntitiesRow.entity_id == str(same_domain_user_1),
-                    )
-                )
-            ).all()
-            assert associations == []
 
     async def test_enroll_does_not_bind_project_into_user_scope(
         self,
@@ -649,7 +635,6 @@ class TestWithdrawUsersFromProject:
                 UserRow,
                 KeyPairRow,
                 ProjectRow,
-                AssociationScopesEntitiesRow,
                 ContainerRegistryRow,
                 ImageRow,
                 VFolderRow,

@@ -146,7 +146,7 @@ class ObjectStorageAdapter(BaseAdapter):
         )
 
     async def batch_load_by_ids(
-        self, ids: Sequence[UUID]
+        self, ids: Sequence[ObjectStorageID]
     ) -> list[ObjectStorageNode | Exception | None]:
         """Batch load object storages by id for DataLoader use.
 

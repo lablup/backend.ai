@@ -1,10 +1,10 @@
-"""Entity type, scope type and id of the deployments table."""
+"""Entity type and id of the deployments table."""
 
 from typing import override
 
-from ai.backend.common.data.entity.types import EntityIdentifier, EntityType, ScopeType
+from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
 
-__all__ = ("DeploymentEntityType", "DEPLOYMENT_SCOPE_TYPE", "DeploymentID")
+__all__ = ("DeploymentEntityType", "DeploymentID")
 
 
 class DeploymentEntityType(EntityType):
@@ -17,9 +17,6 @@ class DeploymentEntityType(EntityType):
     @classmethod
     def description(cls) -> str:
         return "A model service holding the replica count to keep and the replica group serving it."
-
-
-DEPLOYMENT_SCOPE_TYPE = ScopeType(DeploymentEntityType())
 
 
 class DeploymentID(EntityIdentifier):

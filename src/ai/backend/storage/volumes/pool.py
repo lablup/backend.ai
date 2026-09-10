@@ -13,58 +13,24 @@ from ai.backend.common.types import VolumeID
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.storage.config.unified import StorageProxyUnifiedConfig, VolumeInfoConfig
 from ai.backend.storage.errors import InvalidVolumeError
-from ai.backend.storage.plugin import StoragePluginContext
 from ai.backend.storage.types import VolumeInfo
 
 from .abc import AbstractVolume
-from .cephfs import CephFSVolume
-from .ddn import EXAScalerFSVolume
-from .dellemc import DellEMCOneFSVolume
-from .gpfs import GPFSVolume
-from .hammerspace.volume.base import BaseHammerspaceVolume
-from .hammerspace.volume.extended import HammerspaceVolume
-from .netapp import NetAppVolume
-from .purestorage import FlashBladeVolume
-from .vast import VASTVolume
-from .vfs import BaseVolume
-from .weka import WekaVolume
-from .xfs import XfsVolume
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
-
-_DEFAULT_BACKENDS: Mapping[str, type[AbstractVolume]] = {
-    FlashBladeVolume.name: FlashBladeVolume,
-    BaseVolume.name: BaseVolume,
-    XfsVolume.name: XfsVolume,
-    NetAppVolume.name: NetAppVolume,
-    # NOTE: Dell EMC has two different storage: PowerStore and PowerScale (OneFS).
-    #       We support the latter only for now.
-    DellEMCOneFSVolume.name: DellEMCOneFSVolume,
-    WekaVolume.name: WekaVolume,
-    GPFSVolume.name: GPFSVolume,  # IBM SpectrumScale or GPFS
-    "spectrumscale": GPFSVolume,  # IBM SpectrumScale or GPFS
-    CephFSVolume.name: CephFSVolume,
-    VASTVolume.name: VASTVolume,
-    EXAScalerFSVolume.name: EXAScalerFSVolume,
-    HammerspaceVolume.name: HammerspaceVolume,
-    BaseHammerspaceVolume.name: BaseHammerspaceVolume,
-}
 
 
 class VolumePool:
     _volumes: Mapping[VolumeID, AbstractVolume]
     _volumes_by_name: Mapping[str, AbstractVolume]
-    _storage_backend_plugin_ctx: StoragePluginContext
 
     def __init__(
         self,
         volumes: Mapping[VolumeID, AbstractVolume],
         volumes_by_name: Mapping[str, AbstractVolume],
-        storage_backend_plugin_ctx: StoragePluginContext,
     ) -> None:
         self._volumes = volumes
         self._volumes_by_name = volumes_by_name
-        self._storage_backend_plugin_ctx = storage_backend_plugin_ctx
 
     @classmethod
     async def create(
@@ -73,12 +39,8 @@ class VolumePool:
         etcd: AsyncEtcd,
         event_dispatcher: EventDispatcher,
         event_producer: EventProducer,
+        backends: Mapping[str, type[AbstractVolume]],
     ) -> Self:
-        backends = {**_DEFAULT_BACKENDS}
-        storage_backend_plugin_ctx = await cls._init_storage_backend_plugin(
-            backends, local_config, etcd
-        )
-
         volumes: dict[VolumeID, AbstractVolume] = {}
         volumes_by_name: dict[str, AbstractVolume] = {}
         for raw_volume_id, config in local_config.volume.items():
@@ -105,7 +67,6 @@ class VolumePool:
         return cls(
             volumes=volumes,
             volumes_by_name=volumes_by_name,
-            storage_backend_plugin_ctx=storage_backend_plugin_ctx,
         )
 
     @classmethod
@@ -129,25 +90,9 @@ class VolumePool:
         await volume_obj.init()
         return volume_obj
 
-    @classmethod
-    async def _init_storage_backend_plugin(
-        cls,
-        backends: dict[str, type[AbstractVolume]],
-        local_config: StorageProxyUnifiedConfig,
-        etcd: AsyncEtcd,
-    ) -> StoragePluginContext:
-        plugin_ctx = StoragePluginContext(etcd, local_config.model_dump())
-        await plugin_ctx.init()
-        for plugin_name, plugin_instance in plugin_ctx.plugins.items():
-            log.info("Loading storage plugin: {0}", plugin_name)
-            volume_cls = plugin_instance.get_volume_class()
-            backends[plugin_name] = volume_cls
-        return plugin_ctx
-
     async def shutdown(self) -> None:
         for volume in self._volumes.values():
             await volume.shutdown()
-        await self._storage_backend_plugin_ctx.cleanup()
 
     def list_volumes(self) -> Mapping[str, VolumeInfo]:
         return {str(volume_id): volume.info() for volume_id, volume in self._volumes.items()}

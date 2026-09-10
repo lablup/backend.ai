@@ -9,6 +9,7 @@ from typing import Any, override
 
 from aiohttp import web
 
+from ai.backend.common.data.entity.vfolder import VFolderEntityType
 from ai.backend.common.exception import (
     BackendAIError,
     ErrorCode,
@@ -16,6 +17,8 @@ from ai.backend.common.exception import (
     ErrorDomain,
     ErrorOperation,
 )
+from ai.backend.manager.actions.types import ActionOperationType
+from ai.backend.manager.errors.base.entity import EntityError, EntityErrorCode
 
 from .common import ObjectNotFound
 
@@ -155,16 +158,14 @@ class VFolderOperationFailed(BackendAIError, web.HTTPBadRequest):
         )
 
 
-class VFolderFilterStatusFailed(BackendAIError, web.HTTPBadRequest):
+class VFolderFilterStatusFailed(EntityError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/vfolder-filter-status-failed"
     error_title = "Virtual folder status filtering has failed."
 
     @override
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.VFOLDER,
-            operation=ErrorOperation.READ,
-            error_detail=ErrorDetail.BAD_REQUEST,
+    def entity_error_code(self) -> EntityErrorCode:
+        return EntityErrorCode(
+            VFolderEntityType(), ActionOperationType.GET, ErrorDetail.BAD_REQUEST
         )
 
 

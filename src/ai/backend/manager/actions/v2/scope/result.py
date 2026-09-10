@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 
 from ai.backend.common.data.entity.action import ActionID
-from ai.backend.common.data.entity.types import EntityIdentifier, ScopeRef
+from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.common.exception import ErrorCode
 from ai.backend.manager.actions.types import OperationStatus
 
@@ -36,7 +36,7 @@ class ScopeActionResultMeta:
     """
 
     action_id: ActionID
-    scope_targets: Sequence[ScopeRef]
+    scope_targets: Sequence[EntityIdentifier]
     entity_ids: Sequence[EntityIdentifier]
     status: OperationStatus
     description: str

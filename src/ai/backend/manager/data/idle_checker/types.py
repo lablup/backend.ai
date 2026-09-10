@@ -13,9 +13,11 @@ from ai.backend.common.data.entity.types import (
     EntityType,
     RuntimeEntityID,
 )
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.idle_checker.types import (
     CheckerType,
     IdleCheckerSpec,
+    IdleCheckPhase,
     UtilizationThresholdEntry,
 )
 from ai.backend.common.data.permission.types import ScopeType
@@ -81,3 +83,27 @@ class IdleCheckerData(EntityData):
     @override
     def entity_id(self) -> EntityIdentifier:
         return self.id
+
+
+@dataclass(frozen=True)
+class SessionIdleCheckData:
+    """One checker's state on one session."""
+
+    session_id: SessionId
+    idle_checker_id: IdleCheckerID
+    expire_at: datetime | None
+    last_status: IdleCheckPhase
+    last_message: str
+    is_manual: bool
+    manually_triggered_by: UserID | None
+
+
+@dataclass(frozen=True)
+class IdleJudgmentData:
+    """One session's judgment from one checker, persisted onto its session_idle_checks row."""
+
+    session_id: SessionId
+    checker_id: IdleCheckerID
+    status: IdleCheckPhase
+    expire_at: datetime
+    message: str

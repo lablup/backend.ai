@@ -28,10 +28,6 @@ from ai.backend.manager.repositories.idle_checker.types import (
     SessionIdleCheckBatchResult,
     SessionIdleCheckPair,
 )
-from ai.backend.manager.repositories.idle_checker.upserters import (
-    SessionIdleCheckExcludeUpserterSpec,
-    SessionIdleCheckIncludeUpserterSpec,
-)
 from ai.backend.manager.repositories.ops.repository import OpsRepository
 from ai.backend.manager.repositories.prometheus_query_preset.repository import (
     PrometheusQueryPresetRepository,
@@ -205,11 +201,11 @@ class TestIdleCheckerSpecLabelValidation:
         ops_repository.update.assert_awaited_once()
 
 
-class TestSessionIdleCheckUpserterAssembly:
+class TestSessionIdleCheckTargetHandoff:
     @pytest.fixture()
     def repository(self) -> MagicMock:
         repository = MagicMock(spec=IdleCheckerRepository)
-        empty_result = SessionIdleCheckBatchResult(success=[], errors={})
+        empty_result = SessionIdleCheckBatchResult(results=[])
         repository.batch_exclude_session_idle_checks = AsyncMock(return_value=empty_result)
         repository.batch_include_session_idle_checks = AsyncMock(return_value=empty_result)
         return repository
@@ -222,11 +218,13 @@ class TestSessionIdleCheckUpserterAssembly:
             MagicMock(spec=OpsRepository),
         )
 
-    async def test_exclude_assembles_deduplicated_manual_specs(
+    async def test_exclude_hands_the_pairs_over_as_named(
         self,
         service: IdleCheckerService,
         repository: MagicMock,
     ) -> None:
+        """The pairs reach the repository in the order named, a repeat included: the
+        result answers per named pair, so the service drops nothing."""
         checker_id = IdleCheckerID(uuid4())
         user_id = UserID(uuid4())
         first_pair = SessionIdleCheckPair(session_id=SessionId(uuid4()), checker_id=checker_id)
@@ -239,18 +237,11 @@ class TestSessionIdleCheckUpserterAssembly:
             )
         )
 
-        repository.batch_exclude_session_idle_checks.assert_awaited_once()
-        (upserter,) = repository.batch_exclude_session_idle_checks.await_args.args
-        assert [spec.session_id for spec in upserter.specs] == [
-            first_pair.session_id,
-            second_pair.session_id,
-        ]
-        for spec in upserter.specs:
-            assert isinstance(spec, SessionIdleCheckExcludeUpserterSpec)
-            assert spec.checker_id == checker_id
-            assert spec.user_id == user_id
+        repository.batch_exclude_session_idle_checks.assert_awaited_once_with(
+            [first_pair, second_pair, first_pair], user_id
+        )
 
-    async def test_include_assembles_include_specs(
+    async def test_include_hands_the_pairs_over_as_named(
         self,
         service: IdleCheckerService,
         repository: MagicMock,
@@ -266,10 +257,4 @@ class TestSessionIdleCheckUpserterAssembly:
             )
         )
 
-        repository.batch_include_session_idle_checks.assert_awaited_once()
-        (upserter,) = repository.batch_include_session_idle_checks.await_args.args
-        spec = upserter.specs[0]
-        assert isinstance(spec, SessionIdleCheckIncludeUpserterSpec)
-        assert spec.session_id == pair.session_id
-        assert spec.checker_id == checker_id
-        assert spec.user_id == user_id
+        repository.batch_include_session_idle_checks.assert_awaited_once_with([pair], user_id)

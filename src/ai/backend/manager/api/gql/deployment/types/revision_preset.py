@@ -14,6 +14,7 @@ from strawberry.scalars import JSON
 
 from ai.backend.common.config import DEFAULT_SHELL
 from ai.backend.common.data.entity.image import ImageID
+from ai.backend.common.data.entity.runtime_variant import RuntimeVariantID
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
 from ai.backend.common.dto.manager.v2.deployment.request import (
     DeploymentStrategyInput as DeploymentStrategyInputDTO,
@@ -418,7 +419,9 @@ class DeploymentRevisionPresetGQL(PydanticNodeMixin[NodeDTO]):
         ]
         | None
     ):
-        return await info.context.data_loaders.runtime_variant_loader.load(self.runtime_variant_id)
+        return await info.context.data_loaders.runtime_variant_loader.load(
+            RuntimeVariantID(self.runtime_variant_id)
+        )
 
     @gql_added_field(
         BackendAIGQLMeta(

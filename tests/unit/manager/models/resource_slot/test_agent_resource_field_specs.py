@@ -38,20 +38,29 @@ async def agent_uuid(
         db_sess.add(ResourceSlotTypeRow(slot_name="cpu", slot_type="count", rank=40))
         db_sess.add(ResourceSlotTypeRow(slot_name="mem", slot_type="bytes", rank=10))
         await db_sess.flush()
+        found = await db_sess.scalar(sa.select(AgentRow.uuid).where(AgentRow.id == agent_id))
+        assert found is not None
+        owner = AgentUUID(found)
         db_sess.add(
             AgentResourceRow(
-                agent_id=agent_id, slot_name="cpu", capacity=Decimal(4), used=Decimal(1)
+                agent_id=agent_id,
+                agent_uuid=owner,
+                slot_name="cpu",
+                capacity=Decimal(4),
+                used=Decimal(1),
             )
         )
         db_sess.add(
             AgentResourceRow(
-                agent_id=agent_id, slot_name="mem", capacity=Decimal(1024), used=Decimal(512)
+                agent_id=agent_id,
+                agent_uuid=owner,
+                slot_name="mem",
+                capacity=Decimal(1024),
+                used=Decimal(512),
             )
         )
         await db_sess.flush()
-        found = await db_sess.scalar(sa.select(AgentRow.uuid).where(AgentRow.id == agent_id))
-        assert found is not None
-        return AgentUUID(found)
+        return owner
 
 
 @pytest.fixture

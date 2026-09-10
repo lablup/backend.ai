@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from ai.backend.manager.api.rest.middleware.auth import superadmin_required
+from ai.backend.manager.api.rest.middleware.auth import auth_required, superadmin_required
 from ai.backend.manager.api.rest.routing import RouteRegistry
 
 from .handler import V2ResourceGroupHandler
@@ -20,6 +20,12 @@ def register_v2_resource_group_routes(
     """Register all REST v2 resource group routes and return the sub-registry."""
     registry = RouteRegistry.create("resource-groups", route_deps.cors_options)
 
+    registry.add(
+        "POST",
+        "/scoped/search",
+        handler.scoped_search,
+        middlewares=[auth_required],
+    )
     registry.add(
         "POST",
         "/search",

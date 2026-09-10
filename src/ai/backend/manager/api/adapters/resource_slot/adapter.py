@@ -4,10 +4,12 @@ from __future__ import annotations
 
 import uuid
 
+from ai.backend.common.data.entity.agent import AgentUUID
 from ai.backend.common.data.entity.domain import DomainName
 from ai.backend.common.data.entity.kernel import KernelID
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.session import SessionID
+from ai.backend.common.dto.manager.defs import DEFAULT_PAGE_LIMIT
 from ai.backend.common.dto.manager.query import StringFilter, UUIDFilter
 from ai.backend.common.dto.manager.v2.fair_share.types import (
     ResourceSlotEntryInfo,
@@ -25,6 +27,7 @@ from ai.backend.common.dto.manager.v2.resource_slot.request import (
     ResourceAllocationOrder,
     ResourceSlotTypeFilter,
     ResourceSlotTypeOrder,
+    ScopedSearchAgentResourcesInput,
     UpdateResourceSlotTypeInput,
 )
 from ai.backend.common.dto.manager.v2.resource_slot.response import (
@@ -69,12 +72,18 @@ from ai.backend.manager.models.resource_slot.orders import (
     resolve_slot_type_order,
 )
 from ai.backend.manager.models.resource_slot.purgers import ResourceSlotTypePurger
-from ai.backend.manager.models.resource_slot.searchers import ResourceSlotTypeSearcher
+from ai.backend.manager.models.resource_slot.searchers import (
+    AgentResourceSearcher,
+    ResourceSlotTypeSearcher,
+)
 from ai.backend.manager.models.resource_slot.types import NumberFormat
 from ai.backend.manager.models.resource_slot.updaters import ResourceSlotTypeUpdater
 from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.services.agent.actions.lookup import LookupAgentAction
+from ai.backend.manager.services.agent.actions.scoped_search_resources import (
+    ScopedSearchAgentResourcesAction,
+)
 from ai.backend.manager.services.agent.processors import AgentProcessors
 from ai.backend.manager.services.domain.actions.lookup import LookupDomainAction
 from ai.backend.manager.services.domain.processors import DomainProcessors
@@ -332,6 +341,32 @@ class ResourceSlotAdapter(BaseAdapter):
             total_count=action_result.total_count,
             has_next_page=action_result.has_next_page,
             has_previous_page=action_result.has_previous_page,
+        )
+
+    async def scoped_search_agent_resources(
+        self,
+        input: ScopedSearchAgentResourcesInput,
+    ) -> AdminSearchAgentResourcesPayload:
+        """Read the slot rows the named agents carry, combined with OR."""
+        conditions = self._convert_agent_resource_filter(input.filter) if input.filter else []
+        orders = self._convert_agent_resource_orders(input.order) if input.order else []
+        result = await self._agent.scoped_search_resources.run(
+            ScopedSearchAgentResourcesAction(
+                agent_uuids=[AgentUUID(entry.value) for entry in input.scope.agent or ()],
+                searcher=AgentResourceSearcher(
+                    conditions=conditions,
+                    orders=orders,
+                    pagination=OffsetPagination(
+                        limit=input.limit or DEFAULT_PAGE_LIMIT, offset=input.offset or 0
+                    ),
+                ),
+            )
+        )
+        return AdminSearchAgentResourcesPayload(
+            items=[self._agent_resource_data_to_node(item) for item in result.items],
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
         )
 
     def _build_agent_resource_querier(self, input: AdminSearchAgentResourcesInput) -> BatchQuerier:

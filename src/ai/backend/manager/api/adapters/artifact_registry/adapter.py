@@ -74,7 +74,7 @@ class ArtifactRegistryAdapter(BaseAdapter):
         return [self._data_to_dto(item.value) for item in result.items if item.value is not None]
 
     async def batch_load_by_ids(
-        self, ids: Sequence[uuid.UUID]
+        self, ids: Sequence[ArtifactRegistryID]
     ) -> list[ArtifactRegistryGQLNode | None]:
         """Batch load artifact registries by IDs for DataLoader use.
 

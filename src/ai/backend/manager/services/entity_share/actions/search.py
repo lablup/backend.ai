@@ -2,21 +2,16 @@
 
 from __future__ import annotations
 
-from abc import ABC, abstractmethod
+from abc import ABC
 from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import override
 
 from ai.backend.common.data.entity.entity_share import EntityShareEntityType
-from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE, ProjectID
-from ai.backend.common.data.entity.types import (
-    EntityIdentifier,
-    EntityType,
-    ScopeRef,
-    ScopeType,
-)
-from ai.backend.common.data.entity.user import USER_SCOPE_TYPE, UserID
-from ai.backend.manager.actions.v2.ops.base import OperationScopeOpsAction
+from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
+from ai.backend.common.data.entity.user import UserID
+from ai.backend.manager.actions.v2.ops.base import OperationScopeOpsAction, ScopeItem
 from ai.backend.manager.data.entity_share.types import EntityShareData
 from ai.backend.manager.models.entity_share.row import EntityShareRow
 from ai.backend.manager.models.entity_share.scopes import (
@@ -38,22 +33,8 @@ __all__ = (
 )
 
 
-class EntityShareScopeItem(ABC):
-    """One side invitations are read from.
-
-    The scope the read is answered for and the rows it is restricted to are declared
-    together, so a read cannot be authorized against one thing and served another.
-    """
-
-    @abstractmethod
-    def scope_ref(self) -> ScopeRef:
-        """The scope the read is answered for."""
-        raise NotImplementedError
-
-    @abstractmethod
-    def operation_scope(self) -> OperationScope:
-        """The rows the read is restricted to."""
-        raise NotImplementedError
+class EntityShareScopeItem(ScopeItem, ABC):
+    """One side invitations are read from."""
 
 
 @dataclass(frozen=True)
@@ -63,8 +44,8 @@ class EntityShareRecipientScopeItem(EntityShareScopeItem):
     user_id: UserID
 
     @override
-    def scope_ref(self) -> ScopeRef:
-        return ScopeRef(scope_type=USER_SCOPE_TYPE, scope_id=self.user_id)
+    def scope_id(self) -> EntityIdentifier:
+        return self.user_id
 
     @override
     def operation_scope(self) -> OperationScope:
@@ -78,8 +59,8 @@ class EntityShareSharerScopeItem(EntityShareScopeItem):
     user_id: UserID
 
     @override
-    def scope_ref(self) -> ScopeRef:
-        return ScopeRef(scope_type=USER_SCOPE_TYPE, scope_id=self.user_id)
+    def scope_id(self) -> EntityIdentifier:
+        return self.user_id
 
     @override
     def operation_scope(self) -> OperationScope:
@@ -93,8 +74,8 @@ class EntityShareRecipientProjectScopeItem(EntityShareScopeItem):
     project_id: ProjectID
 
     @override
-    def scope_ref(self) -> ScopeRef:
-        return ScopeRef(scope_type=PROJECT_SCOPE_TYPE, scope_id=self.project_id)
+    def scope_id(self) -> EntityIdentifier:
+        return self.project_id
 
     @override
     def operation_scope(self) -> OperationScope:
@@ -108,8 +89,8 @@ class EntityShareTargetScopeItem(EntityShareScopeItem):
     target: EntityIdentifier
 
     @override
-    def scope_ref(self) -> ScopeRef:
-        return ScopeRef(scope_type=ScopeType(self.target.entity_type()), scope_id=self.target)
+    def scope_id(self) -> EntityIdentifier:
+        return self.target
 
     @override
     def operation_scope(self) -> OperationScope:
@@ -138,8 +119,8 @@ class SearchEntitySharesAction(OperationScopeOpsAction[EntityShareRow, EntitySha
         return "search_entity_shares"
 
     @override
-    def scope_targets(self) -> Sequence[ScopeRef]:
-        return [item.scope_ref() for item in self.items]
+    def scope_targets(self) -> Sequence[EntityIdentifier]:
+        return [item.scope_id() for item in self.items]
 
     @override
     def operation_scopes(self) -> Sequence[OperationScope]:

@@ -134,8 +134,6 @@ async def _add_role(
         sess.add(
             PermissionRow(
                 role_id=role_id,
-                scope_type=ProjectEntityType(),
-                scope_id=str(project_id),
                 entity_type=VFolderEntityType(),
                 permission=Permission.READ,
                 all_fields=True,

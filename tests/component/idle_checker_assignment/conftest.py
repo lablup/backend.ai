@@ -89,7 +89,6 @@ from ai.backend.manager.models.virtual_entity.entity_membership import EntityMem
 from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
 from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
 from ai.backend.manager.repositories.idle_checker.repository import IdleCheckerRepository
-from ai.backend.manager.repositories.ops import DBOpsProvider
 from ai.backend.manager.repositories.ops.repository import OpsRepository
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.ops.v2.relation.provider import RelationOpsProvider
@@ -189,7 +188,11 @@ def idle_checker_assignment_processors(
 ) -> IdleCheckerAssignmentProcessors:
     """The binding reads; its writes are the rbac boundary's."""
     service = IdleCheckerAssignmentService(
-        IdleCheckerRepository(DBOpsProvider(database_engine), RelationOpsProvider(database_engine))
+        IdleCheckerRepository(
+            database_engine,
+            RelationOpsProvider(database_engine),
+            V2DBOpsProvider(database_engine),
+        )
     )
     groups = action_registry.concern(ConcernMeta(Concern.SESSION))
     return IdleCheckerAssignmentProcessors(
@@ -338,7 +341,9 @@ async def assignment_seed(
     )
     checker_id = checker.id
     repository = IdleCheckerRepository(
-        DBOpsProvider(database_engine), RelationOpsProvider(database_engine)
+        database_engine,
+        RelationOpsProvider(database_engine),
+        V2DBOpsProvider(database_engine),
     )
     relations = RbacRelationRepository(RelationOpsProvider(database_engine))
     assignments: list[IdleCheckerAssignmentData] = []
@@ -404,8 +409,6 @@ async def _grant(
             db_sess.add(
                 PermissionRow(
                     role_id=role_id,
-                    scope_type=scope_type,
-                    scope_id=str(scope_id),
                     entity_type=entity_type,
                     permission=Permission.from_operation(operation),
                 )

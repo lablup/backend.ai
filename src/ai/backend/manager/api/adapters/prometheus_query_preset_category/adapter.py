@@ -72,7 +72,9 @@ class PrometheusQueryPresetCategoryAdapter(BaseAdapter):
     ) -> None:
         self._prometheus_query_preset_category = prometheus_query_preset_category
 
-    async def batch_load_by_ids(self, ids: Sequence[UUID]) -> list[CategoryNode | Exception | None]:
+    async def batch_load_by_ids(
+        self, ids: Sequence[PrometheusQueryPresetCategoryID]
+    ) -> list[CategoryNode | Exception | None]:
         """Batch load categories by id for DataLoader use.
 
         One answer per id in the given order: the node, ``None`` for an id matching no

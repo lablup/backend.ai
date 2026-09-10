@@ -1,10 +1,9 @@
 from typing import override
 
-from ai.backend.common.data.entity.types import EntityIdentifier, EntityType, NaturalKey, ScopeType
+from ai.backend.common.data.entity.types import EntityIdentifier, EntityType, NaturalKey
 
 __all__ = (
     "ResourceGroupEntityType",
-    "RESOURCE_GROUP_SCOPE_TYPE",
     "ResourceGroupID",
     "ResourceGroupName",
 )
@@ -23,9 +22,6 @@ class ResourceGroupEntityType(EntityType):
             "A pool of agents with its own scheduler, opened to the domains, projects and"
             " keypairs allowed to use it."
         )
-
-
-RESOURCE_GROUP_SCOPE_TYPE = ScopeType(ResourceGroupEntityType())
 
 
 class ResourceGroupID(EntityIdentifier):

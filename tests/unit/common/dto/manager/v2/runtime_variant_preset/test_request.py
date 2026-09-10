@@ -10,12 +10,14 @@ from pydantic import ValidationError
 
 from ai.backend.common.dto.manager.v2.runtime_variant_preset.request import (
     CreateRuntimeVariantPresetInput,
+    RuntimeVariantPresetFilter,
     UpdateRuntimeVariantPresetInput,
 )
 from ai.backend.common.dto.manager.v2.runtime_variant_preset.types import (
     PresetTarget,
     PresetValueType,
 )
+from ai.backend.common.tristate.unset import Unset
 
 
 class TestCreateRuntimeVariantPresetInputFlagValidation:
@@ -149,3 +151,44 @@ class TestUpdateRuntimeVariantPresetInputDefaultValueValidation:
             id=preset_id, value_type=value_type, default_value=default_value
         )
         assert result.id == preset_id
+
+
+class TestVersionFormatValidation:
+    """A bad version must fail at the boundary rather than in the SQL that compares it."""
+
+    @pytest.mark.parametrize(
+        "version",
+        [
+            pytest.param("0.9.0rc1", id="a_segment_that_is_not_a_number"),
+            pytest.param("2147483648.0", id="a_segment_past_the_int_it_is_cast_to"),
+            pytest.param("1.2.3.4", id="a_fourth_segment_the_padding_would_drop"),
+        ],
+    )
+    def test_the_filter_rejects(self, version: str) -> None:
+        with pytest.raises(ValidationError):
+            RuntimeVariantPresetFilter(runtime_version=version)
+
+    def test_create_rejects_a_bad_version(self) -> None:
+        with pytest.raises(ValidationError):
+            CreateRuntimeVariantPresetInput(
+                runtime_variant_id=uuid4(),
+                name="p",
+                preset_target=PresetTarget.ARGS,
+                value_type=PresetValueType.STR,
+                key="--p",
+                added_version="0.9.0rc1",
+            )
+
+    def test_update_rejects_a_bad_version(self) -> None:
+        with pytest.raises(ValidationError):
+            UpdateRuntimeVariantPresetInput(id=uuid4(), deprecated_version="0.9.0rc1")
+
+    def test_the_filter_accepts_a_dotted_numeric_version(self) -> None:
+        result = RuntimeVariantPresetFilter(runtime_version="0.10.0")
+        assert result.runtime_version == "0.10.0"
+
+    def test_an_omitted_version_stays_unset(self) -> None:
+        """UNSET leaves the column alone; a None default would read as 'clear it'."""
+        result = UpdateRuntimeVariantPresetInput(id=uuid4())
+        assert isinstance(result.added_version, Unset)
+        assert isinstance(result.deprecated_version, Unset)

@@ -55,6 +55,10 @@ if TYPE_CHECKING:
     )
     from ai.backend.manager.api.gql.session.types import SessionV2GQL
 
+from ai.backend.common.data.entity.kernel import KernelID
+from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.session import SessionID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.types import ImageID
 from ai.backend.manager.api.gql.agent.types import AgentV2GQL
 from ai.backend.manager.api.gql.common.types import (
@@ -376,7 +380,7 @@ class KernelV2GQL(PydanticNodeMixin[KernelNode]):
     async def user(self, info: Info[StrawberryGQLContext]) -> UserV2GQL | None:
         if self.user_info.user_id is None:
             return None
-        user_data = await info.context.data_loaders.user_loader.load(self.user_info.user_id)
+        user_data = await info.context.data_loaders.user_loader.load(UserID(self.user_info.user_id))
         if user_data is None:
             return None
         return user_data
@@ -387,7 +391,9 @@ class KernelV2GQL(PydanticNodeMixin[KernelNode]):
     async def project(self, info: Info[StrawberryGQLContext]) -> ProjectV2GQL | None:
         if self.user_info.group_id is None:
             return None
-        project_data = await info.context.data_loaders.project_loader.load(self.user_info.group_id)
+        project_data = await info.context.data_loaders.project_loader.load(
+            ProjectID(self.user_info.group_id)
+        )
         if project_data is None:
             return None
         return project_data
@@ -428,7 +434,7 @@ class KernelV2GQL(PydanticNodeMixin[KernelNode]):
     )  # type: ignore[misc]
     async def resource_allocation(self, info: Info[StrawberryGQLContext]) -> ResourceAllocationGQL:
         return await info.context.data_loaders.kernel_resource_allocation_loader.load(
-            KernelId(UUID(str(self.id)))
+            KernelID(UUID(str(self.id)))
         )
 
     @gql_added_field(
@@ -444,10 +450,8 @@ class KernelV2GQL(PydanticNodeMixin[KernelNode]):
         ]
         | None
     ):
-        from ai.backend.common.types import SessionId
-
         return await info.context.data_loaders.session_loader.load(
-            SessionId(self.session_info.session_id)
+            SessionID(self.session_info.session_id)
         )
 
     @gql_added_field(
@@ -654,7 +658,7 @@ class KernelV2GQL(PydanticNodeMixin[KernelNode]):
         required: bool = False,
     ) -> Iterable[Self | None]:
         results = await info.context.data_loaders.kernel_loader.load_many([
-            KernelId(UUID(nid)) for nid in node_ids
+            KernelID(KernelId(UUID(nid))) for nid in node_ids
         ])
         return cast(list[Self | None], results)
 

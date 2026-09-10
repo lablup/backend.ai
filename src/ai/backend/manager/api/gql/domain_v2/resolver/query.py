@@ -6,13 +6,18 @@ import strawberry
 from strawberry import Info
 from strawberry.relay import PageInfo
 
-from ai.backend.common.dto.manager.v2.domain.request import AdminSearchDomainsInput
+from ai.backend.common.dto.manager.v2.domain.request import (
+    AdminSearchDomainsInput,
+    ScopedSearchDomainsInput,
+)
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_root_field,
 )
 from ai.backend.manager.api.gql.domain_v2.types import (
+    DomainScopeGQL,
     DomainV2Connection,
     DomainV2Filter,
     DomainV2GQL,
@@ -56,6 +61,54 @@ async def admin_domains_v2(
     check_admin_only()
     payload = await info.context.adapters.domain.admin_search(
         AdminSearchDomainsInput(
+            filter=filter.to_pydantic() if filter else None,
+            order=[o.to_pydantic() for o in order_by] if order_by else None,
+            first=first,
+            after=after,
+            last=last,
+            before=before,
+            limit=limit,
+            offset=offset,
+        )
+    )
+    nodes = [DomainV2GQL.from_pydantic(node) for node in payload.items]
+    edges = [strawberry.relay.Edge(node=node, cursor=encode_cursor(str(node.id))) for node in nodes]
+    return DomainV2Connection(
+        edges=edges,
+        page_info=PageInfo(
+            has_next_page=payload.has_next_page,
+            has_previous_page=payload.has_previous_page,
+            start_cursor=edges[0].cursor if edges else None,
+            end_cursor=edges[-1].cursor if edges else None,
+        ),
+        count=payload.total_count,
+    )
+
+
+@gql_root_field(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description=(
+            "Page through the domains the named scopes reach, combined with OR. "
+            "Every scope is authorized before the read runs."
+        ),
+    )
+)  # type: ignore[misc]
+async def scoped_domains_v2(
+    info: Info[StrawberryGQLContext],
+    scope: DomainScopeGQL,
+    filter: DomainV2Filter | None = None,
+    order_by: list[DomainV2OrderBy] | None = None,
+    before: str | None = None,
+    after: str | None = None,
+    first: int | None = None,
+    last: int | None = None,
+    limit: int | None = None,
+    offset: int | None = None,
+) -> DomainV2Connection | None:
+    payload = await info.context.adapters.domain.scoped_search(
+        ScopedSearchDomainsInput(
+            scope=scope.to_pydantic(),
             filter=filter.to_pydantic() if filter else None,
             order=[o.to_pydantic() for o in order_by] if order_by else None,
             first=first,

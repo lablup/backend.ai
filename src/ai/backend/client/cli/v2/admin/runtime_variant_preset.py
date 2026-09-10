@@ -56,6 +56,12 @@ def runtime_variant_preset() -> None:
 @click.option("--offset", type=int, default=0)
 @click.option("--runtime-variant-id", default=None, type=click.UUID, help="Filter by variant ID.")
 @click.option("--name-contains", default=None, type=str)
+@click.option(
+    "--runtime-version",
+    default=None,
+    type=str,
+    help="Keep only presets valid at this runtime version (e.g., 0.9.1).",
+)
 @click.option("--order-by", multiple=True, help="e.g., rank:asc")
 @click.option("--json", "json_str", default=None, help="Full search input as JSON.")
 def search(
@@ -63,6 +69,7 @@ def search(
     offset: int,
     runtime_variant_id: uuid.UUID | None,
     name_contains: str | None,
+    runtime_version: str | None,
     order_by: tuple[str, ...],
     json_str: str | None,
 ) -> None:
@@ -80,7 +87,11 @@ def search(
         search_input = _build_dto(SearchRuntimeVariantPresetsInput, json.loads(json_str))
     else:
         filter_dto: RuntimeVariantPresetFilter | None = None
-        if runtime_variant_id is not None or name_contains is not None:
+        if (
+            runtime_variant_id is not None
+            or name_contains is not None
+            or runtime_version is not None
+        ):
             from ai.backend.common.dto.manager.query import StringFilter, UUIDFilter
 
             filter_dto = RuntimeVariantPresetFilter(
@@ -88,6 +99,7 @@ def search(
                 if runtime_variant_id is not None
                 else None,
                 name=StringFilter(contains=name_contains) if name_contains is not None else None,
+                runtime_version=runtime_version,
             )
         orders = (
             parse_order_options(order_by, RuntimeVariantPresetOrderField, RuntimeVariantPresetOrder)
