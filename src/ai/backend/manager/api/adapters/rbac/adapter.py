@@ -217,8 +217,8 @@ from ai.backend.manager.services.permission_contoller.actions.search_permissions
     SearchPermissionsActionResult,
 )
 from ai.backend.manager.services.permission_contoller.actions.search_roles import (
-    SearchRolesAction,
-    SearchRolesActionResult,
+    GlobalSearchRolesAction,
+    GlobalSearchRolesActionResult,
 )
 from ai.backend.manager.services.permission_contoller.actions.search_roles_in_scope import (
     SearchRolesInScopeAction,
@@ -582,8 +582,8 @@ class RBACAdapter(BaseAdapter):
     async def admin_search(self, input: SearchRolesRequest) -> SearchRolesResponse:
         """Search roles with no scope restriction (admin only)."""
         querier = self._build_search_querier(input)
-        action_result = await self._permission_controller.search_roles.wait_for_complete(
-            SearchRolesAction(querier=querier)
+        action_result = await self._permission_controller.global_search_roles.run(
+            GlobalSearchRolesAction(querier=querier)
         )
         result = action_result.result
         return SearchRolesResponse(
@@ -648,9 +648,9 @@ class RBACAdapter(BaseAdapter):
             limit=input.limit,
             offset=input.offset,
         )
-        action_result: SearchRolesActionResult = (
-            await self._permission_controller.search_roles.wait_for_complete(
-                SearchRolesAction(querier=querier)
+        action_result: GlobalSearchRolesActionResult = (
+            await self._permission_controller.global_search_roles.run(
+                GlobalSearchRolesAction(querier=querier)
             )
         )
         raw = action_result.result

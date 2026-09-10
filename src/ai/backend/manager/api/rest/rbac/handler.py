@@ -53,7 +53,7 @@ from ai.backend.manager.services.permission_contoller.actions import (
     CreateRoleAction,
     DeleteRoleAction,
     GetRoleDetailAction,
-    SearchRolesAction,
+    GlobalSearchRolesAction,
     SearchUsersAssignedToRoleAction,
     UpdateRoleAction,
 )
@@ -128,8 +128,8 @@ class RBACHandler:
             raise NotEnoughPermission("Only superadmin can search roles.")
 
         querier = self._role_adapter.build_querier(body.parsed)
-        action_result = await self._permission_controller.search_roles.wait_for_complete(
-            SearchRolesAction(querier=querier)
+        action_result = await self._permission_controller.global_search_roles.run(
+            GlobalSearchRolesAction(querier=querier)
         )
         resp = SearchRolesResponse(
             roles=[self._role_adapter.convert_to_dto(role) for role in action_result.result.items],

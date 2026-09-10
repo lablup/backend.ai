@@ -54,7 +54,9 @@ from ai.backend.manager.services.permission_contoller.actions.permission import 
 from ai.backend.manager.services.permission_contoller.actions.search_permissions import (
     SearchPermissionsAction,
 )
-from ai.backend.manager.services.permission_contoller.actions.search_roles import SearchRolesAction
+from ai.backend.manager.services.permission_contoller.actions.search_roles import (
+    GlobalSearchRolesAction,
+)
 from ai.backend.manager.services.permission_contoller.actions.search_users_assigned_to_role import (
     SearchUsersAssignedToRoleAction,
 )
@@ -189,7 +191,7 @@ class TestSearchRoles:
         mock_repository.search_roles.return_value = mock_result
 
         querier = _make_querier()
-        action = SearchRolesAction(querier=querier)
+        action = GlobalSearchRolesAction(querier=querier)
         result = await service.search_roles(action)
 
         mock_repository.search_roles.assert_called_once_with(querier)
@@ -209,7 +211,7 @@ class TestSearchRoles:
         )
         mock_repository.search_roles.return_value = mock_result
 
-        action = SearchRolesAction(querier=_make_querier())
+        action = GlobalSearchRolesAction(querier=_make_querier())
         result = await service.search_roles(action)
 
         assert result.result.total_count == 0
@@ -229,7 +231,7 @@ class TestSearchRoles:
         mock_repository.search_roles.return_value = mock_result
 
         querier = _make_querier(limit=1, offset=5)
-        action = SearchRolesAction(querier=querier)
+        action = GlobalSearchRolesAction(querier=querier)
         result = await service.search_roles(action)
 
         assert result.result.total_count == 10

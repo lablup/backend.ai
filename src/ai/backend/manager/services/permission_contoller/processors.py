@@ -24,10 +24,10 @@ from .actions import (
     DeleteRoleAction,
     GetRoleDetailAction,
     GetRoleDetailActionResult,
+    GlobalSearchRolesAction,
+    GlobalSearchRolesActionResult,
     ReplaceRolePermissionsAction,
     ReplaceRolePermissionsActionResult,
-    SearchRolesAction,
-    SearchRolesActionResult,
     SearchRolesInScopeAction,
     SearchRolesInScopeActionResult,
     SearchUsersAssignedToRoleAction,
@@ -82,7 +82,9 @@ class PermissionControllerProcessors:
     purge_role: SingleEntityActionProcessor[PurgeRoleAction, EntityOpsResult[RoleData]]
     get_role_detail: SingleEntityActionProcessor[GetRoleDetailAction, GetRoleDetailActionResult]
     bulk_get_roles: PartialBulkActionProcessor[BulkGetRolesAction, RoleData]
-    search_roles: ActionProcessor[SearchRolesAction, SearchRolesActionResult]
+    global_search_roles: GlobalActionProcessor[
+        GlobalSearchRolesAction, GlobalSearchRolesActionResult
+    ]
     search_roles_in_scope: ScopeActionProcessor[
         SearchRolesInScopeAction, SearchRolesInScopeActionResult
     ]
@@ -127,7 +129,9 @@ class PermissionControllerProcessors:
             GetRoleDetailAction, service.get_role_detail
         )
         self.bulk_get_roles = role_group.partial_bulk_get_ops(BulkGetRolesAction)
-        self.search_roles = ActionProcessor(service.search_roles, action_monitors)
+        self.global_search_roles = role_group.global_scope(
+            GlobalSearchRolesAction, service.search_roles
+        )
         self.search_roles_in_scope = role_group.scope(
             SearchRolesInScopeAction, service.search_roles_in_scope
         )
