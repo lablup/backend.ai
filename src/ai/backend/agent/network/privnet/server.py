@@ -2487,26 +2487,39 @@ class PrivNetServer:
             return
         entry.peer_vteps = {vtep for vtep in vteps if vtep}
 
-    def gossip_key(self) -> str | None:
-        """The key announcements are signed under.
+    def gossip_key(self, session_id: str) -> str | None:
+        """The key THIS session's announcements are signed under.
 
-        Cluster-wide, taken from any session that carries one: the exchange runs on one UDP port
-        for the whole node, and a receiver must be able to verify a datagram before it knows which
-        session it names. The manager derives it from the cluster root and publishes it on every
-        VXLAN session, encrypted or not -- a plaintext overlay still has endpoints to announce, and
-        an unsigned announcement is one any host that can reach the port could have written.
+        The manager derives it from the cluster root and publishes it on every VXLAN session,
+        encrypted or not -- a plaintext overlay still has endpoints to announce, and an unsigned
+        announcement is one any host that can reach the port could have written.
 
-        Falls back to the session's ESP key for a session whose meta predates the field, so a
-        rolling upgrade keeps announcing rather than going silent. None when nothing on this node
-        has either, and then nothing is announced.
+        Taken from the session rather than from whichever session this node happened to hold
+        first. A root rotation gives later sessions a different key while the ones already running
+        keep theirs, so a node carrying both would sign one session's announcements under the
+        other's key and its peers would drop every one of them, silently.
+
+        Falls back to that session's own ESP key where its meta predates the field, so a rolling
+        upgrade keeps announcing rather than going silent.
         """
-        for entry in self._sessions.values():
-            if entry.meta.gossip_key:
-                return entry.meta.gossip_key
-        for entry in self._sessions.values():
-            if entry.meta.encryption_key:
-                return entry.meta.encryption_key
-        return None
+        entry = self._sessions.get(session_id)
+        if entry is None:
+            return None
+        return entry.meta.gossip_key or entry.meta.encryption_key
+
+    def gossip_keys(self) -> Sequence[str]:
+        """Every key this node could have to verify an incoming announcement with.
+
+        A receiver cannot know which session a datagram names before it has verified it, so it
+        offers the keys of the sessions it carries -- one in the ordinary case, two while a
+        rotation is being drained. Ordered, so the try is deterministic.
+        """
+        keys = {
+            key
+            for entry in self._sessions.values()
+            if (key := entry.meta.gossip_key or entry.meta.encryption_key)
+        }
+        return sorted(keys)
 
     def gossip_sessions(self) -> Sequence[str]:
         """Sessions whose data plane this node carries, and only the ones with a tunnel: a

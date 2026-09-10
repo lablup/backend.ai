@@ -144,17 +144,25 @@ def _sign(body: bytes, key: str) -> bytes:
     return hmac.new(key.encode("utf-8"), body, hashlib.sha256).hexdigest().encode("ascii")
 
 
-def decode(datagram: bytes, key: str, *, now: float | None = None) -> Announcement | None:
+def decode(
+    datagram: bytes, key: str | Iterable[str], *, now: float | None = None
+) -> Announcement | None:
     """Parse and authenticate one announcement, or None with the reason logged at debug.
 
     Verified BEFORE parsing: an unauthenticated datagram is not input this daemon reasons about,
     it is noise from whoever can reach the port. The privnet holds CAP_NET_ADMIN, so the cheapest
     possible rejection is the right one.
+
+    Several keys because one node can hold sessions created under different cluster roots -- a
+    rotation gives later sessions a different key while the ones already running keep theirs, and
+    both are this node's to verify. The candidates are the keys of the sessions it carries, so the
+    set is one or two, and each costs one HMAC over at most a datagram.
     """
+    keys = [key] if isinstance(key, str) else list(key)
     signature, _, body = datagram.partition(b".")
     if not body:
         return None
-    if not hmac.compare_digest(signature, _sign(body, key)):
+    if not any(hmac.compare_digest(signature, _sign(body, k)) for k in keys):
         return None
     try:
         raw = json.loads(body)
