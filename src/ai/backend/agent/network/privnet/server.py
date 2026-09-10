@@ -94,6 +94,7 @@ from ai.backend.common.network.types import (
     NetworkBackendKind,
     NetworkRole,
     SessionNetMeta,
+    mac_for_ip,
 )
 from ai.backend.logging import BraceStyleAdapter
 
@@ -201,6 +202,11 @@ class _SessionEntry:
     #: Announced with the address so a peer can resolve the name from the node that holds it.
     hostnames: dict[str, str]
 
+    #: container_id -> the OVERLAY address this privnet validated and attached the container at.
+    #: The announcement is built from these rather than from the attach plans, which keep the
+    #: address inside their CNI config.
+    overlay_ips: dict[str, str]
+
     #: The configuration digest this session's VNI is bound to node-wide, so the binding is
     #: released under the same name it was made under.
     digest: str
@@ -228,6 +234,7 @@ class _SessionEntry:
         self.attached = {}
         self.local_ips = {}
         self.hostnames = {}
+        self.overlay_ips = {}
         self.peer_vteps = set()
 
 
@@ -1269,6 +1276,8 @@ class PrivNetServer:
             entry.attached[container_id] = plan
             if record.cluster_hostname is not None:
                 entry.hostnames[container_id] = record.cluster_hostname
+            if record.overlay_ip is not None:
+                entry.overlay_ips[container_id] = record.overlay_ip
             if (local_ip := await self._local_ip_of(plan, container_id)) is not None:
                 entry.local_ips[container_id] = local_ip
         self._sessions[session_id] = entry
@@ -2222,6 +2231,8 @@ class PrivNetServer:
             entry.attached[container_id] = plan
             if cluster_hostname is not None:
                 entry.hostnames[container_id] = cluster_hostname
+            if (overlay := kernel_config.get("cluster_network_ip")) is not None:
+                entry.overlay_ips[container_id] = str(overlay)
             if (local_ip := assigned.get(NetworkRole.LOCAL)) is not None:
                 entry.local_ips[container_id] = local_ip
             # Straight away rather than at the next interval: a kernel is at rendezvous the
@@ -2313,7 +2324,7 @@ class PrivNetServer:
         if self._gossip is not None:
             names.update(self._gossip.cluster_names(session_id))
         for endpoint in endpoints_of(
-            entry.attached, overlay_role=NetworkRole.OVERLAY, hostnames=entry.hostnames
+            entry.overlay_ips, mac_of=mac_for_ip, hostnames=entry.hostnames
         ):
             if endpoint.cluster_hostname:
                 names[endpoint.cluster_hostname.lower()] = endpoint.ip
@@ -2355,6 +2366,7 @@ class PrivNetServer:
         entry.attached.pop(container_id, None)
         entry.local_ips.pop(container_id, None)
         entry.hostnames.pop(container_id, None)
+        entry.overlay_ips.pop(container_id, None)
         await self._journal.forget_attachment(container_id)
         # The withdrawal, and it is the same message: whole state without this container in it.
         self._announce_now(session_id)
@@ -2500,9 +2512,7 @@ class PrivNetServer:
         entry = self._sessions.get(session_id)
         if entry is None:
             return []
-        return endpoints_of(
-            entry.attached, overlay_role=NetworkRole.OVERLAY, hostnames=entry.hostnames
-        )
+        return endpoints_of(entry.overlay_ips, mac_of=mac_for_ip, hostnames=entry.hostnames)
 
     def gossip_generation(self, session_id: str) -> str | None:
         entry = self._sessions.get(session_id)

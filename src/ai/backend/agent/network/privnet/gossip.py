@@ -35,7 +35,7 @@ import hmac
 import json
 import logging
 import time
-from collections.abc import Iterable, Mapping, Sequence
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any, Final
 
@@ -348,35 +348,29 @@ def peers_to_notify(peer_vteps: Sequence[str] | None, self_vtep: str) -> list[st
 
 
 def endpoints_of(
-    attached: Mapping[str, Any],
+    overlay_ips: Mapping[str, str],
     *,
-    overlay_role: Any,
+    mac_of: Callable[[str], str],
     hostnames: Mapping[str, str] | None = None,
 ) -> list[Endpoint]:
-    """This node's own endpoints for a session, read from what its attach recorded.
+    """This node's own endpoints for a session, from the addresses its attach validated.
 
-    The privnet assigned or validated every one of these itself, which is what makes it the right
-    thing to announce: it is the only process that can say, of its own knowledge, which addresses
-    this host holds. ``hostnames`` names them, so a peer can resolve the session's cluster names
-    from the same announcement instead of from a table it would have to read somewhere else.
+    Taken from the privnet's own record of what it assigned, not from the attach plan: the plan
+    keeps the overlay address inside its CNI config rather than on the spec, so reading it there
+    found nothing and this node announced an empty table -- every peer's FDB left unprogrammed by
+    the exchange while it looked, on the wire, like a node that simply holds no kernels.
+
+    The MAC is derived from the address, exactly as the attach derives the one it pins the NIC to,
+    so what is announced is what a peer's FDB must carry. ``hostnames`` names them, so a peer can
+    resolve the session's cluster names from the same announcement.
     """
     hostnames = hostnames or {}
-    out: list[Endpoint] = []
-    for container_id, plan in attached.items():
-        for spec in getattr(plan, "attachments", ()):
-            if getattr(spec, "role", None) is not overlay_role:
-                continue
-            ip = getattr(spec, "ip", None)
-            args = getattr(spec, "cni_capability_args", None) or {}
-            mac = args.get("mac") if isinstance(args, Mapping) else None
-            if not ip or not mac:
-                continue
-            out.append(
-                Endpoint(
-                    container_id=container_id,
-                    ip=str(ip),
-                    mac=str(mac),
-                    cluster_hostname=hostnames.get(container_id),
-                )
-            )
-    return out
+    return [
+        Endpoint(
+            container_id=container_id,
+            ip=ip,
+            mac=mac_of(ip),
+            cluster_hostname=hostnames.get(container_id),
+        )
+        for container_id, ip in sorted(overlay_ips.items())
+    ]

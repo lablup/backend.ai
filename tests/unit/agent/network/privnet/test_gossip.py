@@ -19,8 +19,10 @@ from ai.backend.agent.network.privnet.gossip import (
     _sign,
     announcements_for,
     decode,
+    endpoints_of,
     peers_to_notify,
 )
+from ai.backend.common.network.types import mac_for_ip
 
 _KEY = "fda91fcdff70a287ce06dd57c2723324701c7ece94c53747ad8d4410483d639b"
 _OTHER_KEY = "0" * 64
@@ -217,6 +219,33 @@ class TestConvergence:
         held.apply(Announcement("s1", _PEER, (_endpoint(1),), 1000.0), now=1000.0)
         assert held.silent_peers("s1", now=1100.0, older_than=30.0) == {_PEER}
         assert set(held.held("s1")) == {_endpoint(1).container_id}
+
+
+class TestWhatANodeAnnouncesAboutItself:
+    """Built from the addresses the privnet validated at attach, not from the attach plan. The
+    plan keeps the overlay address inside its CNI config rather than on the spec, so reading it
+    there found nothing: measured on three nodes, every announcement went out with an empty
+    endpoint list and no peer's FDB was ever programmed by the exchange, while on the wire it
+    looked exactly like a node holding no kernels."""
+
+    def test_an_attached_container_is_announced(self) -> None:
+        out = endpoints_of({"c1": "10.128.2.4"}, mac_of=mac_for_ip)
+        assert [(e.container_id, e.ip, e.mac) for e in out] == [
+            ("c1", "10.128.2.4", mac_for_ip("10.128.2.4"))
+        ]
+
+    def test_the_mac_is_the_one_a_peer_must_program(self) -> None:
+        """Derived from the address, exactly as the attach derives the one it pins the NIC to."""
+        (only,) = endpoints_of({"c1": "10.128.2.4"}, mac_of=mac_for_ip)
+        assert only.mac == mac_for_ip("10.128.2.4")
+
+    def test_names_are_attached_where_known(self) -> None:
+        (only,) = endpoints_of({"c1": "10.128.2.4"}, mac_of=mac_for_ip, hostnames={"c1": "sub1"})
+        assert only.cluster_hostname == "sub1"
+
+    def test_a_node_holding_nothing_announces_an_empty_table(self) -> None:
+        """Which is a real statement -- it withdraws this node's last kernel from every peer."""
+        assert endpoints_of({}, mac_of=mac_for_ip) == []
 
 
 class TestNamesTravelWithAddresses:
