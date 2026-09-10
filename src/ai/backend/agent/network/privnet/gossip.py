@@ -20,6 +20,12 @@ anti-entropy tree -- only:
   A receiver replaces what it holds for that sender. An endpoint that stops being announced is
   gone, so nothing has to deliver a removal, and a lost datagram costs one interval rather than a
   permanently missing entry.
+- **A snapshot is applied whole or not at all.** A sender with more endpoints than fit one
+  datagram sends several, all carrying the same `sent_at`. The receiver assembles them and adopts
+  the result only once every slice is in, so it never holds a state made of two snapshots -- which
+  is how an endpoint deleted in the newer one gets re-installed from the older.
+- **Desired and applied are separate.** What a peer says is not what this node managed to
+  program. The difference between them is the retry: nothing is recorded as applied until it was.
 - **Idempotent application.** `add_endpoint`/`del_endpoint` already are; a repeat announcement
   programs nothing.
 - **Authenticated by the session's own key.** The privnet's only input has until now been a 0600
@@ -37,7 +43,7 @@ import logging
 import time
 from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass
-from typing import Any, Final
+from typing import Any, Final, Literal
 
 from ai.backend.logging import BraceStyleAdapter
 
@@ -109,14 +115,10 @@ class Announcement:
     generation: str | None = None
     #: Which slice of the sender's endpoints this datagram carries, and how many slices there are.
     #:
-    #: Whole state is what makes a lost datagram cost one interval instead of a missing entry, and
-    #: a node with more endpoints than fit one datagram cannot put its whole state in one. So the
-    #: unit of "whole" is the SLICE: a receiver replaces what it holds for (sender, part), not for
-    #: the sender outright. Splitting without this loses every slice but the last, because each
-    #: would replace the one before it.
-    #:
-    #: `parts` travels too so a receiver can drop slices that no longer exist: a node that goes
-    #: from three slices to one must not leave the other two programmed forever.
+    #: A node with more endpoints than fit one datagram cannot put its whole state in one, so the
+    #: state is sliced and every slice of one snapshot carries that snapshot's `sent_at`. `parts`
+    #: is how a receiver knows when it has them all; until then the snapshot is not adopted, and
+    #: the sender's previous one stays in force.
     part: int = 0
     parts: int = 1
 
@@ -225,117 +227,218 @@ def announcements_for(
     ]
 
 
-class PeerEndpoints:
-    """What every peer last said it holds, and what that means to program.
+def _fdb_identity(endpoint: Endpoint | None) -> tuple[str, str] | None:
+    """What a peer's endpoint is to the data plane: one FDB and ARP entry, keyed by address and
+    MAC. Everything else it carries -- the cluster name -- is answered from memory."""
+    return None if endpoint is None else (endpoint.ip, endpoint.mac)
 
-    Keyed by the announcing VTEP rather than by container: an endpoint moves when its kernel is
-    re-created on another node, and both nodes then name the same container. Replacing per sender
-    is what makes the move converge -- the old holder's next announcement no longer lists it, and
-    the entry it left goes with that.
+
+@dataclass(frozen=True)
+class Intent:
+    """One programming action the convergence asks for, and the peer it is on behalf of."""
+
+    action: Literal["add", "remove"]
+    endpoint: Endpoint
+    vtep: str
+
+
+@dataclass(frozen=True)
+class SessionHealth:
+    """What the exchange can say about one session's peers, for the readiness surface."""
+
+    #: Peers the membership names that have never been heard from at all.
+    never_heard: frozenset[str]
+    #: Peers that were heard from once and have since gone quiet.
+    silent: frozenset[str]
+
+
+@dataclass
+class _Pending:
+    """A snapshot being assembled. Applied only once every slice of it has arrived."""
+
+    sent_at: float
+    parts: int
+    slices: dict[int, tuple[Endpoint, ...]]
+    started: float
+
+
+@dataclass
+class _Peer:
+    """One peer's receive state for one session.
+
+    Created by MEMBERSHIP, never by a datagram: a sender this session does not name has no state
+    here, so there is no transition for it to drive. That is the admission rule, not a check.
     """
 
-    #: (session_id, vtep, part) -> what that node last announced in that slice, by container id.
-    #: Per slice, not per sender: a node too big for one datagram sends several, and replacing per
-    #: sender would leave only the last of them. See `Announcement.part`.
-    _held: dict[tuple[str, str, int], dict[str, Endpoint]]
-    #: (session_id, vtep) -> when. A peer that has stopped announcing is not the same as one that
-    #: announced nothing, and only the second is a withdrawal.
-    _heard_at: dict[tuple[str, str], float]
+    expected_since: float
+    heard_at: float | None = None
+    #: The last snapshot received whole, by container id. None until one completes.
+    snapshot: dict[str, Endpoint] | None = None
+    #: The `sent_at` of that snapshot. Its identity and its order: slices of one snapshot carry
+    #: the same value, and anything older than it is a datagram that lost a race.
+    snapshot_at: float = 0.0
+    pending: _Pending | None = None
+
+
+class GossipState:
+    """What peers have said they hold, what this node has actually programmed, and the difference.
+
+    The two are separate on purpose. Held as one, a failed `ip` call is indistinguishable from a
+    successful one -- the sender's next announcement is the same whole state, diffs to nothing,
+    and the endpoint is never programmed again. Kept apart, the difference IS the retry: nothing
+    is recorded as applied until it was, and the next convergence re-offers exactly the rest.
+    """
+
+    #: (session_id, vtep) -> that peer's receive state.
+    _peers: dict[tuple[str, str], _Peer]
+    #: session_id -> {(vtep, container_id): endpoint} that this node has programmed and confirmed.
+    _applied: dict[str, dict[tuple[str, str], Endpoint]]
 
     def __init__(self) -> None:
-        self._held = {}
-        self._heard_at = {}
+        self._peers = {}
+        self._applied = {}
 
-    def apply(
-        self, announcement: Announcement, *, now: float
-    ) -> tuple[set[Endpoint], set[Endpoint]]:
-        """Record what a peer announced. Returns ``(to_add, to_remove)`` for this sender.
+    # --- inputs -------------------------------------------------------------------------------
 
-        Both are computed against what that same sender said last, so a caller programs only the
-        difference -- the whole point of announcing whole state is that the receiver, not the
-        network, works out what changed.
+    def on_membership(self, session_id: str, peer_vteps: Iterable[str], *, now: float) -> None:
+        """Bring the peer set in line with what the manager published.
+
+        A node leaving is the manager's statement, and this is the only thing that removes a peer.
+        Silence never does: a peer that has merely paused would have its live kernels cut.
         """
-        session_id, vtep = announcement.session_id, announcement.vtep
-        key = (session_id, vtep, announcement.part)
-        previous = self._held.get(key, {})
-        current = {e.container_id: e for e in announcement.endpoints}
-        self._held[key] = current
-        self._heard_at[(session_id, vtep)] = now
-        added = {e for cid, e in current.items() if previous.get(cid) != e}
-        removed = {e for cid, e in previous.items() if current.get(cid) != e}
-        # A sender that shrank from three slices to one must not leave the other two programmed:
-        # they are whole state for indices it no longer sends, so nothing would ever replace them.
-        for stale in [
-            k
-            for k in self._held
-            if k[0] == session_id and k[1] == vtep and k[2] >= announcement.parts
-        ]:
-            removed |= set(self._held.pop(stale).values())
-        # An endpoint that merely moved between this sender's own slices is not a removal.
-        still_held = {
-            e.container_id
-            for k, held in self._held.items()
-            if k[0] == session_id and k[1] == vtep
-            for e in held.values()
-        }
-        removed = {e for e in removed if e.container_id not in still_held}
-        return added, removed
+        wanted = {vtep for vtep in peer_vteps if vtep}
+        for vtep in wanted:
+            self._peers.setdefault((session_id, vtep), _Peer(expected_since=now))
+        for key in [k for k in self._peers if k[0] == session_id and k[1] not in wanted]:
+            self._peers.pop(key)
 
-    def forget_endpoints(self, session_id: str, vtep: str, container_ids: Iterable[str]) -> None:
-        """Drop specific endpoints of one peer from what is held, without touching the rest.
+    def on_datagram(self, announcement: Announcement, *, now: float) -> None:
+        """Record one slice. A snapshot becomes this peer's state only once every slice is in.
 
-        For an endpoint the caller could not program. Held, it looks applied: the sender's next
-        announcement carries the same whole state, diffs to nothing, and the endpoint is never
-        programmed again -- a peer's kernel unreachable for the life of the session over one
-        failed `ip` call. Dropped, the very next announcement re-adds it.
+        Applying a slice as it lands mixes snapshots: a receiver that took part 0 of the new one
+        and part 1 of the old holds a state no sender ever had, and an endpoint deleted in the new
+        one is re-installed from the old. Assembling first costs at most one interval when a
+        datagram is lost -- the sender re-announces whole state anyway -- and cannot mix.
         """
-        wanted = set(container_ids)
-        for key in [k for k in self._held if k[0] == session_id and k[1] == vtep]:
-            for container_id in wanted:
-                self._held[key].pop(container_id, None)
+        peer = self._peers.get((announcement.session_id, announcement.vtep))
+        if peer is None:
+            # No membership, no state, no transition. A sender this session does not name cannot
+            # reach the programming path, whatever key it holds.
+            return
+        peer.heard_at = now
+        if announcement.sent_at <= peer.snapshot_at:
+            return
+        pending = peer.pending
+        if pending is None or announcement.sent_at > pending.sent_at:
+            pending = _Pending(
+                sent_at=announcement.sent_at, parts=announcement.parts, slices={}, started=now
+            )
+            peer.pending = pending
+        elif announcement.sent_at < pending.sent_at:
+            return
+        pending.slices[announcement.part] = announcement.endpoints
+        if len(pending.slices) < pending.parts:
+            return
+        peer.snapshot = {e.container_id: e for slice_ in pending.slices.values() for e in slice_}
+        peer.snapshot_at = pending.sent_at
+        peer.pending = None
 
-    def forget_peer(self, session_id: str, vtep: str) -> set[Endpoint]:
-        """Drop a peer the session no longer names, returning what it had been holding.
+    def tick(self, *, now: float, pending_ttl: float) -> None:
+        """Discard snapshots that never completed, so a lost slice does not hold memory for good."""
+        for peer in self._peers.values():
+            if peer.pending is not None and now - peer.pending.started > pending_ttl:
+                peer.pending = None
 
-        Called when the membership itself changes -- a node leaving is the manager's statement,
-        not something silence can establish. Silence is a node that may simply be busy, and
-        withdrawing its kernels' addresses on a timeout would cut a live session over a pause.
+    def confirm(self, session_id: str, *, applied: Iterable[Intent]) -> None:
+        """Record the intents that actually took. Anything left out stays owed.
+
+        Called with what the host confirmed, never with what it was asked to do. That distinction
+        is the whole reason the applied state is kept apart from the desired one.
         """
-        self._heard_at.pop((session_id, vtep), None)
-        gone: set[Endpoint] = set()
-        for key in [k for k in self._held if k[0] == session_id and k[1] == vtep]:
-            gone |= set(self._held.pop(key).values())
-        return gone
+        state = self._applied.setdefault(session_id, {})
+        for intent in applied:
+            key = (intent.vtep, intent.endpoint.container_id)
+            if intent.action == "add":
+                state[key] = intent.endpoint
+            else:
+                state.pop(key, None)
 
     def forget_session(self, session_id: str) -> None:
-        for held_key in [k for k in self._held if k[0] == session_id]:
-            self._held.pop(held_key, None)
-        for heard_key in [k for k in self._heard_at if k[0] == session_id]:
-            self._heard_at.pop(heard_key, None)
+        """Drop a session whole. Nothing is unprogrammed: its devices are going or gone."""
+        for key in [k for k in self._peers if k[0] == session_id]:
+            self._peers.pop(key)
+        self._applied.pop(session_id, None)
 
-    def held(self, session_id: str) -> dict[str, tuple[Endpoint, str]]:
-        """``{container_id: (endpoint, vtep)}`` across every peer of this session."""
-        out: dict[str, tuple[Endpoint, str]] = {}
-        for (sid, vtep, _part), endpoints in self._held.items():
-            if sid != session_id:
+    # --- outputs ------------------------------------------------------------------------------
+
+    def desired(self, session_id: str) -> dict[tuple[str, str], Endpoint]:
+        """``{(vtep, container_id): endpoint}`` this session's peers have announced whole."""
+        out: dict[tuple[str, str], Endpoint] = {}
+        for (sid, vtep), peer in sorted(self._peers.items()):
+            if sid != session_id or peer.snapshot is None:
                 continue
-            for container_id, endpoint in endpoints.items():
-                out[container_id] = (endpoint, vtep)
+            for container_id, endpoint in peer.snapshot.items():
+                out[(vtep, container_id)] = endpoint
         return out
 
-    def silent_peers(self, session_id: str, *, now: float, older_than: float) -> set[str]:
-        """Peers of this session that have not been heard from recently.
+    def converge(self, session_id: str) -> list[Intent]:
+        """The difference between what peers say and what this node has programmed.
 
-        Reported, never acted on here: see `forget_peer` for why silence is not a withdrawal. It
-        is worth surfacing because a peer that has gone quiet while the manager still names it is
-        a node whose privnet is wedged or unreachable, and its kernels are about to be
-        unreachable too.
+        Compared on what a peer's entry actually IS to the data plane -- its address and MAC --
+        and not on the whole record. A kernel that is only renamed keeps the same FDB entry, and
+        re-deriving it would delete the entry and re-add it under the same MAC for nothing, with a
+        window in between where the kernel is unreachable.
+
+        Removals first, for the reason the whole data plane orders them that way: an endpoint that
+        moved must have its old entry withdrawn before the new one is installed, or the FDB
+        carries two claims on one MAC.
         """
-        return {
-            vtep
-            for (sid, vtep), heard in self._heard_at.items()
-            if sid == session_id and now - heard > older_than
-        }
+        desired = self.desired(session_id)
+        applied = self._applied.get(session_id, {})
+        removals = [
+            Intent("remove", endpoint, vtep)
+            for (vtep, cid), endpoint in sorted(applied.items())
+            if _fdb_identity(desired.get((vtep, cid))) != _fdb_identity(endpoint)
+        ]
+        additions = [
+            Intent("add", endpoint, vtep)
+            for (vtep, cid), endpoint in sorted(desired.items())
+            if _fdb_identity(applied.get((vtep, cid))) != _fdb_identity(endpoint)
+        ]
+        return removals + additions
+
+    def held(self, session_id: str) -> dict[str, tuple[Endpoint, str]]:
+        """``{container_id: (endpoint, vtep)}`` across every peer of this session.
+
+        From what peers announced, not from what programming succeeded: a name that resolves to an
+        address whose FDB entry is still owed is a peer that is briefly unreachable, while no
+        answer at all is a peer that does not exist.
+        """
+        out: dict[str, tuple[Endpoint, str]] = {}
+        for (vtep, container_id), endpoint in sorted(self.desired(session_id).items()):
+            out[container_id] = (endpoint, vtep)
+        return out
+
+    def health(
+        self, session_id: str, *, now: float, silent_after: float, expect_within: float
+    ) -> SessionHealth:
+        """Peers that are not saying what they should, in the two ways that differ.
+
+        A peer heard once and now quiet may be wedged. A peer never heard at all is more often a
+        path that was never open -- a firewall, a route -- and it is invisible to a silence check
+        because there is no last-heard time to age.
+        """
+        never: set[str] = set()
+        silent: set[str] = set()
+        for (sid, vtep), peer in self._peers.items():
+            if sid != session_id:
+                continue
+            if peer.heard_at is None:
+                if now - peer.expected_since > expect_within:
+                    never.add(vtep)
+            elif now - peer.heard_at > silent_after:
+                silent.add(vtep)
+        return SessionHealth(never_heard=frozenset(never), silent=frozenset(silent))
 
 
 def peers_to_notify(peer_vteps: Sequence[str] | None, self_vtep: str) -> list[str]:
