@@ -46,3 +46,23 @@ class KernelRecoveryDataParseError(BackendAIError):
             operation=ErrorOperation.PARSING,
             error_detail=ErrorDetail.INVALID_DATA_FORMAT,
         )
+
+
+class UnsupportedKernelType(BackendAIError):
+    """A kernel this registry cannot write down, or a record it cannot rebuild.
+
+    Raised rather than skipped. A backend whose kernels are silently left out of the registry
+    still starts, still runs sessions, and loses every one of them at the next restart -- and says
+    nothing at any point, because "wrote no entries" and "had no entries" look the same.
+    """
+
+    error_type = "https://api.backend.ai/probs/unsupported-kernel-type"
+    error_title = "Unsupported kernel type for recovery"
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.KERNEL,
+            operation=ErrorOperation.PARSING,
+            error_detail=ErrorDetail.NOT_IMPLEMENTED,
+        )

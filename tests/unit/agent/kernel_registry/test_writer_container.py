@@ -9,7 +9,10 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from ai.backend.agent.kernel import AbstractKernel
-from ai.backend.agent.kernel_registry.exception import KernelRecoveryDataParseError
+from ai.backend.agent.kernel_registry.exception import (
+    KernelRecoveryDataParseError,
+    UnsupportedKernelType,
+)
 from ai.backend.agent.kernel_registry.writer.container import ContainerBasedKernelRegistryWriter
 from ai.backend.agent.kernel_registry.writer.types import KernelRegistrySaveMetadata
 from ai.backend.agent.types import KernelOwnershipData
@@ -109,27 +112,34 @@ class TestSaveKernelRegistry:
             # Should not raise, just skip the kernel
             await writer.save_kernel_registry(kernel_registry_data, metadata)
 
-    async def test_save_kernel_registry_skips_none_recovery_data(
+    async def test_a_kernel_it_cannot_write_down_is_raised_not_skipped(
         self,
         writer: ContainerBasedKernelRegistryWriter,
         kernel_registry_data: MutableMapping[KernelId, AbstractKernel],
         metadata: KernelRegistrySaveMetadata,
         mock_config_mgr: MagicMock,
     ) -> None:
-        """Skip kernels that return None from parse method."""
+        """A backend whose kernels this registry cannot record must not be skipped in silence.
+
+        Skipped, the agent starts, runs sessions, loses every one of them at the next restart, and
+        reports the same "saved" it does when it saved them -- and the first time anybody finds
+        out is a production upgrade with live sessions.
+        """
         with (
             patch.object(
                 writer,
                 "_parse_recovery_data_from_kernel",
-                return_value=None,
+                side_effect=UnsupportedKernelType(
+                    "a kernel from a backend this build cannot record"
+                ),
             ),
             patch("ai.backend.agent.kernel_registry.writer.container.ScratchUtils"),
             patch(
                 "ai.backend.agent.kernel_registry.writer.container.ScratchConfig",
                 return_value=mock_config_mgr,
             ),
+            pytest.raises(UnsupportedKernelType),
         ):
             await writer.save_kernel_registry(kernel_registry_data, metadata)
 
-        # Verify save was not called since recovery data was None
         mock_config_mgr.save_json_recovery_data.assert_not_called()
