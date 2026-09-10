@@ -32,8 +32,9 @@ from ai.backend.manager.actions.v2.validators import ActionValidators as V2Actio
 from ai.backend.manager.actions.validators.build import build_action_validators
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.permission_controller.repository import (
-    PermissionControllerRepository,
+from ai.backend.manager.repositories.ops.v2.permission.provider import PermissionOpsProvider
+from ai.backend.manager.repositories.rbac.permission_check_repository import (
+    RbacPermissionCheckRepository,
 )
 from ai.backend.testutils.scenario_steps import Configured
 
@@ -102,7 +103,9 @@ def config(
 
 @pytest.fixture
 def validators(engine: Any, config: ManagerConfigProvider) -> V2ActionValidators:
-    return build_action_validators(PermissionControllerRepository(engine), config)
+    return build_action_validators(
+        RbacPermissionCheckRepository(PermissionOpsProvider(engine)), config
+    )
 
 
 @pytest.fixture

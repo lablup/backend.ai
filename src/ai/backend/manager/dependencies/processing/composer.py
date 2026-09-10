@@ -369,7 +369,7 @@ class ProcessingComposer(DependencyComposer[ProcessingInput, ProcessingResources
         )
 
         v2_validators = build_action_validators(
-            setup_input.repositories.permission_controller.repository,
+            setup_input.repositories.rbac.permission_check,
             setup_input.config_provider,
         )
 

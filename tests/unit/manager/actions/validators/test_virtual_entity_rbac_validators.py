@@ -1,6 +1,6 @@
 """Tests for the virtual-entity-chain RBAC action validators (BA-6876 scope).
 
-These tests drive the validators against a real ``PermissionControllerRepository``
+These tests drive the validators against a real ``RbacPermissionCheckRepository``
 backed by a real Postgres connection. Permissions are seeded through the
 virtual-entity chain (``virtual_entities`` / ``scope_bindings`` /
 ``entity_memberships``) with a self scope_binding on the owner scope, so the
@@ -80,8 +80,9 @@ from ai.backend.manager.models.virtual_entity.entity_membership_field import (
 )
 from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
 from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
-from ai.backend.manager.repositories.permission_controller.repository import (
-    PermissionControllerRepository,
+from ai.backend.manager.repositories.ops.v2.permission.provider import PermissionOpsProvider
+from ai.backend.manager.repositories.rbac.permission_check_repository import (
+    RbacPermissionCheckRepository,
 )
 from ai.backend.testutils.db import with_tables
 from ai.backend.testutils.virtual_entity import VirtualEntitySeeder
@@ -490,27 +491,27 @@ async def db_with_rbac_tables(
 @pytest.fixture
 def repository(
     db_with_rbac_tables: ExtendedAsyncSAEngine,
-) -> PermissionControllerRepository:
-    return PermissionControllerRepository(db_with_rbac_tables)
+) -> RbacPermissionCheckRepository:
+    return RbacPermissionCheckRepository(PermissionOpsProvider(db_with_rbac_tables))
 
 
 @pytest.fixture
 def scope_validator(
-    repository: PermissionControllerRepository,
+    repository: RbacPermissionCheckRepository,
 ) -> VirtualEntityScopeActionRBACValidator:
     return VirtualEntityScopeActionRBACValidator(repository, _make_config_provider())
 
 
 @pytest.fixture
 def single_entity_validator(
-    repository: PermissionControllerRepository,
+    repository: RbacPermissionCheckRepository,
 ) -> VirtualEntitySingleEntityActionRBACValidator:
     return VirtualEntitySingleEntityActionRBACValidator(repository, _make_config_provider())
 
 
 @pytest.fixture
 def bulk_validator(
-    repository: PermissionControllerRepository,
+    repository: RbacPermissionCheckRepository,
 ) -> VirtualEntityAtomicBulkActionRBACValidator:
     return VirtualEntityAtomicBulkActionRBACValidator(repository, _make_config_provider())
 
@@ -705,7 +706,7 @@ class TestVirtualEntityScopeActionRBACValidator:
 
     async def test_enforcement_disabled_skips_check(
         self,
-        repository: PermissionControllerRepository,
+        repository: RbacPermissionCheckRepository,
         scope_action: _ProjectCreateScopeAction,
         trigger_meta: ActionTriggerMeta,
     ) -> None:
