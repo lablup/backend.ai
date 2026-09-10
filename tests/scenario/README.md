@@ -50,8 +50,16 @@ pants test tests/scenario::
 
 ```bash
 BACKEND_SCENARIO_LOG=dist/scenarios.jsonl pants test tests/scenario::
-python scripts/scenario-report.py dist/scenarios.jsonl > dist/scenarios.md
+python scripts/scenario-report.py dist/scenarios.jsonl -o dist/scenarios.md
 ```
+
+세 가지 형식으로 나온다.
+
+| `--format` | 무엇 |
+|---|---|
+| `markdown` (기본) | 사람이 읽는 문서. 릴리스 PR에 붙인다 |
+| `json` | 도구가 읽는 같은 내용 |
+| `summary` | 개수만. 빌드 로그 한 줄 |
 
 한 행이 이렇게 나온다. 첫 문장만 사람이 쓴 것이고 나머지는 실행에서 뽑은 것이다.
 
