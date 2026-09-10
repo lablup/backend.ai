@@ -9,7 +9,6 @@ from typing import TYPE_CHECKING, Final
 from ai.backend.common.api_handlers import APIResponse, BaseRootResponseModel, BodyParam, PathParam
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.dto.manager.v2.rbac.request import (
-    AdminSearchEntitiesGQLInput,
     AdminSearchPermissionsGQLInput,
     AssignRoleInput,
     BulkAddRolePermissionsInput,
@@ -29,7 +28,6 @@ from ai.backend.common.dto.manager.v2.rbac.request import (
     UpdateRoleInput,
 )
 from ai.backend.common.dto.manager.v2.rbac.response import (
-    AdminSearchAssociationsPayload,
     AdminSearchPermissionsPayload,
     AdminSearchRolesPayload,
     ScopeEntityOperationCombinationInfo,
@@ -268,19 +266,3 @@ class V2RBACHandler:
         return APIResponse.build(
             status_code=HTTPStatus.OK, response_model=PermissionMatrixPayload(result)
         )
-
-    # ------------------------------------------------------------------ Entities
-
-    async def search_entities(
-        self,
-        body: BodyParam[AdminSearchEntitiesGQLInput],
-    ) -> APIResponse:
-        """Search entity associations with filters, orders, and pagination."""
-        result = await self._adapter.admin_search_entities_gql(body.parsed)
-        payload = AdminSearchAssociationsPayload(
-            items=result.items,
-            total_count=result.total_count,
-            has_next_page=result.has_next_page,
-            has_previous_page=result.has_previous_page,
-        )
-        return APIResponse.build(status_code=HTTPStatus.OK, response_model=payload)

@@ -5,7 +5,6 @@ from __future__ import annotations
 from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Any, override
-from uuid import UUID
 
 import sqlalchemy as sa
 from sqlalchemy.orm import InstrumentedAttribute
@@ -17,15 +16,11 @@ from ai.backend.common.data.entity.session_group import SessionGroupID
 from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.entity.vfolder import VFolderUUID
-from ai.backend.manager.data.permission.types import EntityType, ScopeType
 from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.errors.user import UserPurgeFailure
 from ai.backend.manager.models.error_log.row import ErrorLogRow
 from ai.backend.manager.models.keypair.row import KeyPairRow
 from ai.backend.manager.models.project.row import AssocGroupUserRow
-from ai.backend.manager.models.rbac_models.association_scopes_entities import (
-    AssociationScopesEntitiesRow,
-)
 from ai.backend.manager.models.replica_group.row import ReplicaGroupRow
 from ai.backend.manager.models.session.row import (
     AGENT_RESOURCE_OCCUPYING_SESSION_STATUSES,
@@ -113,36 +108,6 @@ class UserGroupAssociationPurger(FieldBatchPurger[UserID, AssocGroupUserRow, Pro
     @override
     def to_data(self, row: AssocGroupUserRow) -> ProjectID:
         return row.group_id
-
-
-@dataclass
-class UserScopeAssociationPurger(FieldBatchPurger[UserID, AssociationScopesEntitiesRow, UUID]):
-    """Clears the legacy scope associations a user leaves behind, on both sides: the
-    rows enrolling the user under other scopes, and the rows enrolled under the scope
-    the user is."""
-
-    @override
-    def build_subquery(self, owner_id: UserID) -> sa.sql.Select[Any]:
-        return sa.select(AssociationScopesEntitiesRow).where(
-            sa.or_(
-                sa.and_(
-                    AssociationScopesEntitiesRow.entity_type == EntityType.USER,
-                    AssociationScopesEntitiesRow.entity_id == str(owner_id),
-                ),
-                sa.and_(
-                    AssociationScopesEntitiesRow.scope_type == ScopeType.USER,
-                    AssociationScopesEntitiesRow.scope_id == str(owner_id),
-                ),
-            )
-        )
-
-    @override
-    def conflict_checks(self) -> Sequence[ConflictCheck]:
-        return ()
-
-    @override
-    def to_data(self, row: AssociationScopesEntitiesRow) -> UUID:
-        return row.id
 
 
 @dataclass

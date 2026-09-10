@@ -25,9 +25,6 @@ from ai.backend.common.data.permission.types import EntityType, Permission, Scop
 from ai.backend.common.types import QuotaScopeID, QuotaScopeType, VFolderUsageMode
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
 from ai.backend.manager.actions.registry.types import Concern, ConcernMeta, GroupMeta
-from ai.backend.manager.actions.validators import ActionValidators
-from ai.backend.manager.actions.validators.rbac import RBACValidators
-from ai.backend.manager.actions.validators.rbac.scope import ScopeActionRBACValidator
 from ai.backend.manager.api.adapters.model_card.adapter import ModelCardAdapter
 from ai.backend.manager.api.adapters.project.adapter import ProjectAdapter
 from ai.backend.manager.api.adapters.rbac.adapter import RBACAdapter
@@ -46,9 +43,6 @@ from ai.backend.manager.data.secret.types import KeyProviderType
 from ai.backend.manager.dependencies.infrastructure.redis import ValkeyClients
 from ai.backend.manager.models.model_card.row import ModelCardRow
 from ai.backend.manager.models.project.row import ProjectRow
-from ai.backend.manager.models.rbac_models.association_scopes_entities import (
-    AssociationScopesEntitiesRow,
-)
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -87,24 +81,10 @@ from ai.backend.manager.services.rbac.service import (
 )
 from ai.backend.manager.services.user.processors import UserProcessors
 from ai.backend.manager.services.user.service import UserService
-from ai.backend.testutils.action_validators import mock_virtual_entity_rbac_validators
 from ai.backend.testutils.fixtures import DomainFixtureData
 
 if TYPE_CHECKING:
     from tests.component.conftest import ServerInfo, UserFixtureData
-
-
-def _build_validators(
-    database_engine: ExtendedAsyncSAEngine,
-    config_provider: ManagerConfigProvider,
-) -> ActionValidators:
-    permission_repo = PermissionControllerRepository(database_engine)
-    return ActionValidators(
-        virtual_entity_rbac=mock_virtual_entity_rbac_validators(),
-        rbac=RBACValidators(
-            scope=ScopeActionRBACValidator(permission_repo, config_provider),
-        ),
-    )
 
 
 @pytest.fixture()
@@ -164,7 +144,6 @@ def permission_controller_processors(
         processor_registry.group(GroupMeta(RoleEntityType())),
         service=service,
         action_monitors=[],
-        validators=_build_validators(database_engine, config_provider),
     )
 
 
@@ -414,38 +393,6 @@ async def role_fixture(
 
 
 @pytest.fixture(autouse=True)
-async def _register_role_in_project(
-    db_engine: SAEngine,
-    role_fixture: uuid.UUID,
-    model_store_project_fixture: uuid.UUID,
-) -> AsyncIterator[None]:
-    """Register the test role in the primary project scope via ASE.
-
-    This ensures revoke_role() can detect the role as project-scoped
-    and properly calls unbind_user_from_project() to clean up agus entries.
-    """
-    async with db_engine.begin() as conn:
-        await conn.execute(
-            sa.insert(AssociationScopesEntitiesRow.__table__).values(
-                scope_type=ScopeType.PROJECT,
-                scope_id=str(model_store_project_fixture),
-                entity_type=EntityType.ROLE,
-                entity_id=str(role_fixture),
-            )
-        )
-    yield
-    async with db_engine.begin() as conn:
-        await conn.execute(
-            AssociationScopesEntitiesRow.__table__.delete().where(
-                sa.and_(
-                    AssociationScopesEntitiesRow.__table__.c.entity_type == EntityType.ROLE,
-                    AssociationScopesEntitiesRow.__table__.c.entity_id == str(role_fixture),
-                )
-            )
-        )
-
-
-@pytest.fixture(autouse=True)
 async def _grant_model_card_read_permission(
     db_engine: SAEngine,
     role_fixture: uuid.UUID,
@@ -454,7 +401,7 @@ async def _grant_model_card_read_permission(
     """Grant model_card:read permission to the test role at the project scope.
 
     Required for the regular user to pass RBAC enforcement on
-    scoped_search (ScopeActionRBACValidator checks this permission).
+    scoped_search (the scope RBAC validator checks this permission).
     """
     async with db_engine.begin() as conn:
         await conn.execute(

@@ -43,7 +43,7 @@ from ai.backend.manager.api.gql.vfs_storage import VFSStorage
 # does not support the combination of lazy types with union type definitions.
 # See: https://github.com/strawberry-graphql/strawberry/issues/3381
 #      https://github.com/strawberry-graphql/strawberry/issues/2302
-EntityNode = Annotated[
+EntityNodeGQL = Annotated[
     UserV2GQL
     | ProjectV2GQL
     | DomainV2GQL

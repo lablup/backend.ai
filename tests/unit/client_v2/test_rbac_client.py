@@ -14,7 +14,6 @@ from ai.backend.common.dto.manager.rbac.request import (
     DeleteRoleRequest,
     PurgeRoleRequest,
     RevokeRoleRequest,
-    SearchEntitiesRequest,
     SearchRolesRequest,
     SearchScopesRequest,
     SearchUsersAssignedToRoleRequest,
@@ -28,7 +27,6 @@ from ai.backend.common.dto.manager.rbac.response import (
     GetRoleResponse,
     GetScopeTypesResponse,
     RevokeRoleResponse,
-    SearchEntitiesResponse,
     SearchRolesResponse,
     SearchScopesResponse,
     SearchUsersAssignedToRoleResponse,
@@ -367,28 +365,3 @@ class TestRBACClient:
         assert call_args.args[0] == "GET"
         assert "/admin/rbac/entity-types" in str(call_args.args[1])
         assert call_args.kwargs["json"] is None
-
-    async def test_search_entities(self) -> None:
-        mock_resp = AsyncMock()
-        mock_resp.status = 200
-        mock_resp.json = AsyncMock(
-            return_value={
-                "items": [{"entity_type": "session", "entity_id": "sess-001"}],
-                "pagination": {"total": 1, "offset": 0, "limit": 20},
-            }
-        )
-
-        mock_session = _make_request_session(mock_resp)
-        client = _make_client(mock_session)
-        rbac = RBACClient(client)
-
-        request = SearchEntitiesRequest()
-        result = await rbac.search_entities("domain", "default", "session", request)
-
-        assert isinstance(result, SearchEntitiesResponse)
-        assert len(result.items) == 1
-        assert result.items[0].entity_id == "sess-001"
-
-        call_args = mock_session.request.call_args
-        assert call_args.args[0] == "POST"
-        assert "/admin/rbac/scopes/domain/default/entities/session/search" in str(call_args.args[1])

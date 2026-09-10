@@ -45,7 +45,6 @@ from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.project import ProjectRow
 from ai.backend.manager.models.rbac_models import (
-    AssociationScopesEntitiesRow,
     EntityFieldRow,
     RoleRow,
     UserRoleRow,
@@ -96,7 +95,6 @@ class TestForceTerminateResourceDeallocation:
                 UserRow,
                 KeyPairRow,
                 ProjectRow,
-                AssociationScopesEntitiesRow,
                 EntityFieldRow,
                 AgentRow,
                 ContainerRegistryRow,
@@ -673,7 +671,6 @@ class TestBulkTerminateResourceDeallocation:
                 UserRow,
                 KeyPairRow,
                 ProjectRow,
-                AssociationScopesEntitiesRow,
                 EntityFieldRow,
                 AgentRow,
                 ContainerRegistryRow,
@@ -1127,7 +1124,6 @@ class TestNegativeValueGuard:
                 UserRow,
                 KeyPairRow,
                 ProjectRow,
-                AssociationScopesEntitiesRow,
                 EntityFieldRow,
                 AgentRow,
                 ContainerRegistryRow,

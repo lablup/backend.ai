@@ -1,4 +1,4 @@
-"""build_action_validators fills every v2 slot and every ActionValidators bundle."""
+"""build_action_validators fills every v2 validator slot."""
 
 from __future__ import annotations
 
@@ -18,11 +18,6 @@ from ai.backend.manager.actions.v2.single_entity.validator.rbac import (
     VirtualEntitySingleEntityActionRBACValidator,
 )
 from ai.backend.manager.actions.validators.build import build_action_validators
-from ai.backend.manager.actions.validators.rbac import (
-    LegacyRBACValidators,
-    RBACValidators,
-    VirtualEntityRBACValidators,
-)
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.repositories.permission_controller.repository import (
     PermissionControllerRepository,
@@ -31,7 +26,7 @@ from ai.backend.manager.repositories.permission_controller.repository import (
 
 class TestBuildActionValidators:
     def test_every_v2_slot_holds_its_validator(self) -> None:
-        _, v2_validators = build_action_validators(
+        v2_validators = build_action_validators(
             MagicMock(spec=PermissionControllerRepository),
             MagicMock(spec=ManagerConfigProvider),
         )
@@ -50,14 +45,3 @@ class TestBuildActionValidators:
         assert isinstance(v2_validators.scope[0], VirtualEntityScopeActionRBACValidator)
         assert len(v2_validators.relation) == 1
         assert isinstance(v2_validators.relation[0], VirtualEntityRelationActionRBACValidator)
-
-    def test_action_validators_holds_three_bundles(self) -> None:
-        validators, v2_validators = build_action_validators(
-            MagicMock(spec=PermissionControllerRepository),
-            MagicMock(spec=ManagerConfigProvider),
-        )
-
-        assert isinstance(validators.rbac, RBACValidators)
-        assert isinstance(validators.legacy_rbac, LegacyRBACValidators)
-        assert isinstance(validators.virtual_entity_rbac, VirtualEntityRBACValidators)
-        assert v2_validators.scope == [validators.virtual_entity_rbac.scope]

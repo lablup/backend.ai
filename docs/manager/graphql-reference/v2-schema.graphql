@@ -1503,6 +1503,11 @@ type AuditLogV2 implements Node {
   clientIp: String
 
   """
+  Added in 26.9.0. The entity the logged operation acted on. Null when the log names no entity, or when the recorded id does not name one that still exists.
+  """
+  entity: EntityNode
+
+  """
   The user who triggered this audit log entry, resolved from triggered_by UUID.
   """
   user: UserV2
@@ -5339,35 +5344,6 @@ type EntityActionInfo {
   actions: [OperationInfo!]!
 }
 
-"""Added in 26.3.0. Entity connection."""
-type EntityConnection {
-  """Pagination data for this connection"""
-  pageInfo: PageInfo!
-
-  """Contains the nodes in this connection"""
-  edges: [EntityRefEdge!]!
-  count: Int!
-}
-
-"""Added in 26.3.0. Filter for entity associations"""
-input EntityFilter {
-  entityType: StringFilter = null
-  entityId: StringFilter = null
-
-  """
-  Added in 26.8.0. Filter by the type of scope the entity is registered in.
-  """
-  scopeType: StringFilter = null
-
-  """
-  Added in 26.8.0. Filter by the id of scope the entity is registered in.
-  """
-  scopeId: StringFilter = null
-  AND: [EntityFilter!] = null
-  OR: [EntityFilter!] = null
-  NOT: [EntityFilter!] = null
-}
-
 """Added in 26.9.0. One `key=value` label and the entity carrying it."""
 type EntityLabel implements Node {
   """The Globally Unique ID of this object"""
@@ -5390,6 +5366,9 @@ type EntityLabel implements Node {
 
   """When the label's value was last replaced."""
   updatedAt: DateTime!
+
+  """Added in 26.9.0. The labeled entity."""
+  entity: EntityNode
 }
 
 """Added in 26.9.0. Paginated connection for label records."""
@@ -5457,48 +5436,6 @@ type EntityOperationCombination {
 
   """Valid operations for this entity"""
   operations: [OperationInfo!]!
-}
-
-"""Added in 26.3.0. Order by specification for entity associations"""
-input EntityOrderBy {
-  field: EntityOrderField!
-  direction: OrderDirection! = DESC
-}
-
-"""Added in 26.3.0. Entity ordering field"""
-enum EntityOrderField {
-  ENTITY_TYPE
-  REGISTERED_AT
-}
-
-"""
-Added in 26.3.0. Entity reference from the association_scopes_entities table.
-"""
-type EntityRef implements Node {
-  """The Globally Unique ID of this object"""
-  id: ID!
-  scopeType: String!
-  scopeId: String!
-  entityType: String!
-  entityId: String!
-  registeredAt: DateTime!
-
-  """The resolved entity object."""
-  entity: EntityNode
-
-  """
-  Added in 26.4.3. The resolved scope object in which the entity is registered.
-  """
-  scope: EntityNode
-}
-
-"""An edge in a connection."""
-type EntityRefEdge {
-  """A cursor for use in pagination"""
-  cursor: String!
-
-  """The item at the end of the edge"""
-  node: EntityRef!
 }
 
 """
@@ -11656,11 +11593,6 @@ type Query {
   adminRoleAssignments(filter: RoleAssignmentFilter = null, orderBy: [RoleAssignmentOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RoleAssignmentConnection
 
   """
-  Added in 26.3.0. Search entity associations (admin only). Optionally filter by entity_type and entity_id.
-  """
-  adminEntities(filter: EntityFilter = null, orderBy: [EntityOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): EntityConnection
-
-  """
   Added in 26.4.2. List keypairs owned by the current authenticated user. Supports filtering, ordering, and both cursor-based and offset-based pagination.
   """
   myKeypairs(filter: KeypairFilter = null, orderBy: [KeypairOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): KeyPairConnection
@@ -13453,14 +13385,14 @@ type Role implements Node {
   """Added in 26.9.0. ID of the scope the role belongs to."""
   scopeId: UUID!
 
+  """Added in 26.9.0. The scope the role belongs to."""
+  scope: EntityNode
+
   """Added in 26.3.0. Permissions associated with this role."""
   permissions(filter: PermissionFilter = null, orderBy: [PermissionOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): PermissionConnection
 
   """Added in 26.3.0. Users assigned to this role."""
   users(filter: RoleAssignmentFilter = null, orderBy: [RoleAssignmentOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RoleAssignmentConnection
-
-  """Added in 26.4.2. Scopes this role is registered in."""
-  scopes(filter: EntityFilter = null, orderBy: [EntityOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): EntityConnection
 }
 
 """Added in 26.3.0. RBAC role assignment (user-role association)."""

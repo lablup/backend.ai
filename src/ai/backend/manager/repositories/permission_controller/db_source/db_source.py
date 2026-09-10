@@ -1,28 +1,16 @@
 import logging
 import uuid
-from collections import defaultdict
-from collections.abc import Collection, Iterable, Mapping, Sequence
-from dataclasses import dataclass
-from typing import Any
+from collections.abc import Collection, Mapping, Sequence
 
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
-from sqlalchemy.orm import contains_eager, selectinload
+from sqlalchemy.orm import selectinload
 
 from ai.backend.common.data.entity.project import ProjectEntityType
 from ai.backend.common.data.entity.role import RoleID
 from ai.backend.common.data.entity.user import UserID
-from ai.backend.common.data.permission.types import (
-    RBACElementType,
-    RelationType,
-)
 from ai.backend.logging.utils import BraceStyleAdapter
-from ai.backend.manager.data.permission.entity import (
-    ElementAssociationListResult,
-    EntityData,
-    EntityListResult,
-)
-from ai.backend.manager.data.permission.id import ObjectId, ScopeId
+from ai.backend.manager.data.permission.id import ScopeId
 from ai.backend.manager.data.permission.permission import (
     PermissionData,
     PermissionListResult,
@@ -30,27 +18,17 @@ from ai.backend.manager.data.permission.permission import (
 from ai.backend.manager.data.permission.role import (
     AssignedUserData,
     AssignedUserListResult,
-    BulkPermissionCheckInput,
     BulkRoleRevocationFailure,
     BulkRoleRevocationResultData,
     BulkUserRoleRevocationInput,
-    PermissionResolutionKey,
     ProjectRoleCount,
     RoleListResult,
     RoleRevocationResult,
-    ScopeChainPermissionCheckInput,
     UserRoleAssignmentInput,
     UserRoleRevocationData,
     UserRoleRevocationInput,
 )
-from ai.backend.manager.data.permission.status import (
-    RoleStatus,
-)
 from ai.backend.manager.data.permission.types import (
-    EntityType as LegacyEntityType,
-)
-from ai.backend.manager.data.permission.types import (
-    OperationType,
     Permission,
     ScopeData,
     ScopeListResult,
@@ -70,11 +48,7 @@ from ai.backend.manager.errors.permission import (
 )
 from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.project.row import ProjectRow
-from ai.backend.manager.models.rbac_models.association_scopes_entities import (
-    AssociationScopesEntitiesRow,
-)
 from ai.backend.manager.models.rbac_models.permission.creators import RolePermissionCreator
-from ai.backend.manager.models.rbac_models.permission.object_permission import ObjectPermissionRow
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.rbac_models.permission.purgers import RolePermissionPurger
 from ai.backend.manager.models.rbac_models.permission.scopes import PermissionOperationScope
@@ -89,20 +63,6 @@ from ai.backend.manager.repositories.base.querier import BatchQuerier, execute_b
 from ai.backend.manager.repositories.ops.v2.permission.provider import PermissionOpsProvider
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
-
-
-@dataclass(frozen=True)
-class _PermissionGroupKey:
-    """Group key for batching ``PermissionResolutionKey`` inputs.
-
-    Keys sharing the same ``(user_id, element_type, subject_entity_type)`` are
-    resolved by a single SQL round-trip differing only in the per-row
-    ``entity_id`` IN-list.
-    """
-
-    user_id: uuid.UUID
-    element_type: RBACElementType
-    subject_entity_type: RBACElementType
 
 
 class PermissionDBSource:
@@ -278,128 +238,6 @@ class PermissionDBSource:
                 return None
             return result
 
-    async def get_user_roles(self, user_id: uuid.UUID) -> list[RoleRow]:
-        async with self._db.begin_readonly_session_read_committed() as db_session:
-            j = (
-                sa.join(
-                    RoleRow,
-                    UserRoleRow,
-                    RoleRow.id == UserRoleRow.role_id,
-                )
-                .join(
-                    ObjectPermissionRow,
-                    RoleRow.id == ObjectPermissionRow.role_id,
-                )
-                .join(
-                    PermissionRow,
-                    RoleRow.id == PermissionRow.role_id,
-                )
-            )
-            stmt = (
-                sa.select(RoleRow)
-                .select_from(j)
-                .where(UserRoleRow.user_id == user_id)
-                .options(
-                    selectinload(RoleRow.object_permission_rows),
-                )
-            )
-
-            result = await db_session.scalars(stmt)
-            return list(result.all())
-
-    async def check_scope_permission_exist(
-        self,
-        user_id: uuid.UUID,
-        scope_id: ScopeId,
-        permission: Permission,
-    ) -> bool:
-        inner_query = (
-            sa.select(sa.literal(1))
-            .select_from(
-                sa.join(RoleRow, UserRoleRow, RoleRow.id == UserRoleRow.role_id).join(
-                    PermissionRow, RoleRow.id == PermissionRow.role_id
-                )
-            )
-            .where(
-                sa.and_(
-                    RoleRow.status == RoleStatus.ACTIVE,
-                    UserRoleRow.user_id == user_id,
-                    sa.cast(RoleRow.scope_id, sa.String) == scope_id.scope_id,
-                    PermissionRow.permission == permission,
-                    PermissionRow.all_fields.is_(True),
-                )
-            )
-        )
-        role_query = sa.select(sa.exists(inner_query))
-        async with self._db.begin_readonly_session_read_committed() as db_session:
-            result = await db_session.scalar(role_query)
-            return result or False
-
-    def _make_query_statement_for_object_permissions(
-        self,
-        user_id: uuid.UUID,
-        object_ids: Iterable[ObjectId],
-        operation: OperationType,
-    ) -> sa.sql.Select[Any]:
-        object_id_for_cond = [obj_id.entity_id for obj_id in object_ids]
-        return (
-            sa.select(RoleRow)
-            .select_from(
-                sa.join(RoleRow, UserRoleRow, RoleRow.id == UserRoleRow.role_id)
-                .join(PermissionRow, RoleRow.id == PermissionRow.role_id)
-                .join(
-                    AssociationScopesEntitiesRow,
-                    sa.and_(
-                        sa.cast(RoleRow.scope_id, sa.String)
-                        == AssociationScopesEntitiesRow.scope_id,
-                        RoleRow.scope_type == AssociationScopesEntitiesRow.scope_type,
-                    ),
-                    isouter=True,
-                )
-                .join(ObjectPermissionRow, RoleRow.id == ObjectPermissionRow.role_id)
-            )
-            .where(
-                sa.and_(
-                    RoleRow.status == RoleStatus.ACTIVE,
-                    UserRoleRow.user_id == user_id,
-                    sa.or_(
-                        sa.and_(
-                            AssociationScopesEntitiesRow.entity_id.in_(object_id_for_cond),
-                            PermissionRow.permission == Permission.from_operation(operation),
-                            PermissionRow.all_fields.is_(True),
-                        ),
-                        sa.and_(
-                            ObjectPermissionRow.entity_id.in_(object_id_for_cond),
-                            ObjectPermissionRow.operation == operation,
-                        ),
-                    ),
-                )
-            )
-            .options(
-                contains_eager(RoleRow.object_permission_rows),
-            )
-        )
-
-    async def check_batch_object_permission_exist(
-        self,
-        user_id: uuid.UUID,
-        object_ids: Iterable[ObjectId],
-        operation: OperationType,
-    ) -> dict[ObjectId, bool]:
-        result: dict[ObjectId, bool] = dict.fromkeys(object_ids, False)
-        role_query = self._make_query_statement_for_object_permissions(
-            user_id, object_ids, operation
-        )
-        async with self._db.begin_readonly_session_read_committed() as db_session:
-            role_rows_result = await db_session.scalars(role_query)
-            role_rows = list(role_rows_result.unique().all())
-
-            for role in role_rows:
-                for op in role.object_permission_rows:
-                    object_id = op.object_id()
-                    result[object_id] = True
-        return result
-
     async def search_roles(
         self,
         querier: BatchQuerier,
@@ -428,7 +266,7 @@ class PermissionDBSource:
         querier: BatchQuerier,
         scope: ScopedRoleOperationScope,
     ) -> RoleListResult:
-        """Search roles registered in a given scope via association_scopes_entities."""
+        """Search the roles that sit in a given scope."""
         async with self._db.begin_readonly_session() as db_sess:
             query = sa.select(RoleRow)
 
@@ -612,319 +450,6 @@ class PermissionDBSource:
                 has_next_page=result.has_next_page,
                 has_previous_page=result.has_previous_page,
             )
-
-    async def search_entities_in_scope(
-        self,
-        querier: BatchQuerier,
-    ) -> EntityListResult:
-        """Search entities within a scope."""
-        async with self._db.begin_readonly_session() as db_sess:
-            query = sa.select(
-                AssociationScopesEntitiesRow.entity_id,
-                AssociationScopesEntitiesRow.entity_type,
-            )
-
-            result = await execute_batch_querier(
-                db_sess,
-                query,
-                querier,
-            )
-
-            items = [
-                EntityData(
-                    entity_type=row.entity_type,
-                    entity_id=row.entity_id,
-                )
-                for row in result.rows
-            ]
-
-            return EntityListResult(
-                items=items,
-                total_count=result.total_count,
-                has_next_page=result.has_next_page,
-                has_previous_page=result.has_previous_page,
-            )
-
-    async def search_element_associations_in_scope(
-        self,
-        querier: BatchQuerier,
-    ) -> ElementAssociationListResult:
-        """Search element associations (full association rows) within a scope."""
-        async with self._db.begin_readonly_session() as db_sess:
-            query = sa.select(AssociationScopesEntitiesRow)
-
-            result = await execute_batch_querier(
-                db_sess,
-                query,
-                querier,
-            )
-
-            items = [row.AssociationScopesEntitiesRow.to_data() for row in result.rows]
-
-            return ElementAssociationListResult(
-                items=items,
-                total_count=result.total_count,
-                has_next_page=result.has_next_page,
-                has_previous_page=result.has_previous_page,
-            )
-
-    def _build_direct_scopes_cte(
-        self,
-        entity_type: LegacyEntityType,
-        entity_ids: Sequence[str],
-    ) -> sa.CTE:
-        """Build the ``direct_scopes`` CTE for one ``(entity_type, entity_ids)`` group.
-
-        Each input id → its direct AUTO parent scope(s). Result columns:
-        ``(entity_id, scope_type, scope_id)``. Seeds :meth:`_build_scope_walk_cte`.
-        """
-        ase = AssociationScopesEntitiesRow.__table__
-        return (
-            sa.select(
-                ase.c.entity_id,
-                ase.c.scope_type,
-                ase.c.scope_id,
-            )
-            .where(
-                sa.and_(
-                    ase.c.entity_type == entity_type,
-                    ase.c.entity_id.in_(entity_ids),
-                    ase.c.relation_type == RelationType.AUTO,
-                )
-            )
-            .cte("direct_scopes")
-        )
-
-    def _build_scope_walk_cte(self, direct_scopes_cte: sa.CTE) -> sa.CTE:
-        """Walk parent scopes upward from the unique scopes in ``direct_scopes_cte``.
-
-        Carries only ``(start_scope_type, start_scope_id)`` through the
-        recursion — entity_id is not carried. Keying the recursion on
-        unique direct scopes keeps the working set at
-        ``O(unique_direct_scopes * D)`` rather than ``O(K * D)`` when many
-        input entities share the same direct parent scope.
-        """
-        ase = AssociationScopesEntitiesRow.__table__
-
-        # Base case: unique direct scopes; start_scope == current scope.
-        walk_base = sa.select(
-            direct_scopes_cte.c.scope_type.label("start_scope_type"),
-            direct_scopes_cte.c.scope_id.label("start_scope_id"),
-            direct_scopes_cte.c.scope_type.label("scope_type"),
-            direct_scopes_cte.c.scope_id.label("scope_id"),
-        ).distinct()
-        walk_cte = walk_base.cte("scope_walk", recursive=True)
-
-        parent = ase.alias("parent")
-        walk_recursive = (
-            sa.select(
-                walk_cte.c.start_scope_type,
-                walk_cte.c.start_scope_id,
-                parent.c.scope_type,
-                parent.c.scope_id,
-            )
-            .select_from(
-                parent.join(
-                    walk_cte,
-                    sa.and_(
-                        parent.c.entity_type == walk_cte.c.scope_type,
-                        parent.c.entity_id == walk_cte.c.scope_id,
-                    ),
-                )
-            )
-            .where(
-                parent.c.relation_type == RelationType.AUTO,
-            )
-        )
-        return walk_cte.union(walk_recursive)
-
-    async def check_permission_with_scope_chain(
-        self,
-        data: ScopeChainPermissionCheckInput,
-    ) -> bool:
-        """Return whether the user holds every bit of ``permission`` on the target."""
-        granted = await self._resolve_permissions_via_direct_scope_walk(
-            [data.key], permission_filter=data.permission
-        )
-        return granted.get(data.key, Permission.NONE).covers(data.permission)
-
-    async def check_bulk_permission_with_scope_chain(
-        self,
-        data: BulkPermissionCheckInput,
-    ) -> Mapping[PermissionResolutionKey, bool]:
-        """Check whether the user holds *operation* on each target key in one go.
-
-        Returns a mapping from each input key to whether every bit of
-        ``permission`` is granted.
-        """
-        if not data.keys:
-            return {}
-        granted = await self._resolve_permissions_via_direct_scope_walk(
-            data.keys, permission_filter=data.permission
-        )
-        return {key: granted.get(key, Permission.NONE).covers(data.permission) for key in data.keys}
-
-    async def _resolve_permissions_via_direct_scope_walk(
-        self,
-        keys: Collection[PermissionResolutionKey],
-        *,
-        permission_filter: Permission | None = None,
-    ) -> Mapping[PermissionResolutionKey, Permission]:
-        """Resolve granted operations for a collection of per-target keys.
-
-        Groups input keys by ``(user_id, element_type, subject_entity_type)``
-        and dispatches one SQL round-trip per group. Each group's query unions
-        a scope-chain branch (walks parent AUTO scopes upward from each entity)
-        and a self-scope branch (permission whose scope IS the entity itself).
-        Returns a mapping keyed by the original ``PermissionResolutionKey``
-        objects. Keys that received no grant map to ``Permission.NONE``.
-
-        When ``permission_filter`` is set, only the bits of that mask are
-        considered; otherwise every granted bit is returned.
-        """
-        if not keys:
-            return {}
-
-        groups: defaultdict[_PermissionGroupKey, list[PermissionResolutionKey]] = defaultdict(list)
-        for key in keys:
-            groups[
-                _PermissionGroupKey(
-                    user_id=key.user_id,
-                    element_type=key.element_type,
-                    subject_entity_type=key.subject_entity_type,
-                )
-            ].append(key)
-
-        result: dict[PermissionResolutionKey, Permission] = {}
-        async with self._db.begin_readonly_session_read_committed() as db_session:
-            for group_key, members in groups.items():
-                entity_ids = [k.entity_id for k in members]
-                granted = await self._resolve_permissions_for_group(
-                    db_session=db_session,
-                    group_key=group_key,
-                    entity_ids=entity_ids,
-                    permission_filter=permission_filter,
-                )
-                for key in members:
-                    result[key] = granted.get(key.entity_id, Permission.NONE)
-        return result
-
-    async def _resolve_permissions_for_group(
-        self,
-        *,
-        db_session: SASession,
-        group_key: _PermissionGroupKey,
-        entity_ids: Sequence[str],
-        permission_filter: Permission | None,
-    ) -> Mapping[str, Permission]:
-        """Run the scope-chain + self-scope query for a single
-        ``(user_id, element_type, subject_entity_type)`` group with N entity_ids.
-
-        Returns a mapping from entity_id to the granted bits. Entities that
-        received no grant are absent from the returned mapping.
-        """
-        direct_scopes_cte = self._build_direct_scopes_cte(
-            group_key.element_type.to_entity_type(), entity_ids
-        )
-        scope_walk_cte = self._build_scope_walk_cte(direct_scopes_cte)
-
-        scope_chain_query = self._build_scope_chain_query(
-            direct_scopes_cte, scope_walk_cte, group_key, permission_filter
-        )
-        self_scope_query = self._build_self_scope_query(group_key, entity_ids, permission_filter)
-        combined_query = sa.union_all(scope_chain_query, self_scope_query)
-
-        granted: defaultdict[str, Permission] = defaultdict(lambda: Permission.NONE)
-        result = await db_session.execute(combined_query)
-        for row in result:
-            granted[row.entity_id] |= Permission(row.permission)
-        return granted
-
-    def _build_scope_chain_query(
-        self,
-        direct_scopes_cte: sa.CTE,
-        scope_walk_cte: sa.CTE,
-        group_key: _PermissionGroupKey,
-        permission_filter: Permission | None,
-    ) -> sa.Select[Any]:
-        """Build the scope-chain branch: walk parent AUTO scopes upward from
-        each entity's direct scope and pick up permissions along the way.
-        """
-        perm = PermissionRow.__table__
-        user_roles = UserRoleRow.__table__
-        roles = RoleRow.__table__
-
-        filters: list[sa.ColumnElement[bool]] = [
-            user_roles.c.user_id == group_key.user_id,
-            roles.c.status == RoleStatus.ACTIVE,
-            perm.c.entity_type == group_key.subject_entity_type.to_entity_type(),
-            perm.c.all_fields.is_(True),
-        ]
-        if permission_filter is not None:
-            filters.append(perm.c.permission.op("&")(permission_filter) != 0)
-
-        return (
-            sa.select(
-                direct_scopes_cte.c.entity_id,
-                perm.c.permission,
-            )
-            .select_from(
-                direct_scopes_cte.join(
-                    scope_walk_cte,
-                    sa.and_(
-                        scope_walk_cte.c.start_scope_type == direct_scopes_cte.c.scope_type,
-                        scope_walk_cte.c.start_scope_id == direct_scopes_cte.c.scope_id,
-                    ),
-                )
-                .join(
-                    roles,
-                    sa.and_(
-                        roles.c.scope_type == scope_walk_cte.c.scope_type,
-                        sa.cast(roles.c.scope_id, sa.String) == scope_walk_cte.c.scope_id,
-                    ),
-                )
-                .join(perm, perm.c.role_id == roles.c.id)
-                .join(user_roles, user_roles.c.role_id == roles.c.id)
-            )
-            .where(sa.and_(*filters))
-        )
-
-    def _build_self_scope_query(
-        self,
-        group_key: _PermissionGroupKey,
-        entity_ids: Sequence[str],
-        permission_filter: Permission | None,
-    ) -> sa.Select[Any]:
-        """Build the self-scope branch: pick up permissions held by a role that sits
-        in the target entity itself.
-        """
-        perm = PermissionRow.__table__
-        user_roles = UserRoleRow.__table__
-        roles = RoleRow.__table__
-
-        filters: list[sa.ColumnElement[bool]] = [
-            user_roles.c.user_id == group_key.user_id,
-            roles.c.status == RoleStatus.ACTIVE,
-            roles.c.scope_type == group_key.element_type.to_scope_type(),
-            sa.cast(roles.c.scope_id, sa.String).in_(entity_ids),
-            perm.c.entity_type == group_key.subject_entity_type.to_entity_type(),
-            perm.c.all_fields.is_(True),
-        ]
-        if permission_filter is not None:
-            filters.append(perm.c.permission.op("&")(permission_filter) != 0)
-
-        return (
-            sa.select(
-                sa.cast(roles.c.scope_id, sa.String).label("entity_id"),
-                perm.c.permission,
-            )
-            .select_from(
-                perm.join(roles, roles.c.id == perm.c.role_id).join(
-                    user_roles, user_roles.c.role_id == roles.c.id
-                )
-            )
-            .where(sa.and_(*filters))
-        )
 
     # ------------------------------------------------ virtual-entity-chain checks
 

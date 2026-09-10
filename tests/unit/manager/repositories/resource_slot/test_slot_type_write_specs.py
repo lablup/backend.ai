@@ -34,9 +34,6 @@ from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.model_card.row import ModelCardRow
 from ai.backend.manager.models.project import ProjectRow
 from ai.backend.manager.models.rbac_models import RoleRow, UserRoleRow
-from ai.backend.manager.models.rbac_models.association_scopes_entities import (
-    AssociationScopesEntitiesRow,
-)
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.replica_group import ReplicaGroupRow
 from ai.backend.manager.models.resource_group import ResourceGroupOpts, ResourceGroupRow
@@ -119,7 +116,6 @@ async def db_with_referencing_tables(
             KernelRow,
             RoutingRow,
             ModelCardRow,
-            AssociationScopesEntitiesRow,
             ResourceSlotTypeRow,
             AgentResourceRow,
             ResourceAllocationRow,

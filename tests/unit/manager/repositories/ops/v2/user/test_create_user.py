@@ -24,9 +24,6 @@ from ai.backend.manager.models.entity_label.row import EntityLabelRow
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.project import ProjectRow, ProjectType
-from ai.backend.manager.models.rbac_models.association_scopes_entities import (
-    AssociationScopesEntitiesRow,
-)
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.rbac_models.role_permission_preset.row import (
@@ -70,7 +67,6 @@ _TABLES: list[Table | type[HasTable]] = [
     UserRow,
     KeyPairRow,
     ProjectRow,
-    AssociationScopesEntitiesRow,
     VirtualEntityRow,
     ScopeBindingRow,
     EntityLabelRow,
@@ -412,27 +408,6 @@ class TestUserGraphProvisioning:
         user_node = (UserEntityType(), user_id)
         assert await _owns(db, domain_node, user_node)
         assert await _governs(db, domain_node, user_node)
-
-    async def test_no_legacy_scope_association_is_written(
-        self,
-        db: ExtendedAsyncSAEngine,
-        provider: UserOpsProvider,
-        domain: DomainFixtureData,
-    ) -> None:
-        """Placement is the graph's answer alone; the legacy association table is
-        left untouched."""
-        user_id = await _create_user(provider, domain.domain_id, "alice")
-
-        async with db.begin_readonly_session() as session:
-            associations = await session.scalar(
-                sa.select(sa.func.count())
-                .select_from(AssociationScopesEntitiesRow)
-                .where(
-                    AssociationScopesEntitiesRow.entity_type == EntityType.USER,
-                    AssociationScopesEntitiesRow.entity_id == str(user_id),
-                )
-            )
-        assert associations == 0
 
     async def test_the_user_holds_the_roles_its_scope_presets_call_for(
         self,

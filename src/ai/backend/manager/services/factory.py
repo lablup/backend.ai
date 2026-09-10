@@ -77,7 +77,6 @@ from ai.backend.manager.actions.registry.types import (
     ProcessorDependencies,
 )
 from ai.backend.manager.actions.v2.bulk.validator.rbac import BulkOwnCheck
-from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.clients.prometheus.preset import PromQLTemplateRenderer
 from ai.backend.manager.data.artifact.types import ArtifactRevisionData
 from ai.backend.manager.data.audit_log.types import AuditLogData
@@ -525,7 +524,6 @@ def create_services(args: ServiceArgs) -> Services:
 def create_processors(
     args: ProcessorArgs,
     monitors: ActionMonitors,
-    validators: ActionValidators,
 ) -> ProcessorsBundle:
     services = create_services(args.service_args)
     repositories = args.service_args.repositories
@@ -776,7 +774,6 @@ def create_processors(
             rbac_groups.group(GroupMeta(RoleEntityType())),
             services.permission_controller,
             action_monitors,
-            validators,
         ),
         vfs_storage=VFSStorageProcessors(
             artifact_groups.group(GroupMeta(VFSStorageEntityType())), services.vfs_storage
