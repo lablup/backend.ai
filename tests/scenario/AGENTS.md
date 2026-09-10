@@ -1,8 +1,17 @@
 # 시나리오 테스트 — 가드레일
 
 배경과 근거는 이 디렉터리의 `KNOWLEDGE.md`, 구성은 `README.md`에 있다.
-시나리오는 엔티티 패키지의 `KNOWLEDGE.md`에 먼저 적는다. 그 규칙은
-`src/ai/backend/manager/api/adapters/AGENTS.md`에 있다.
+
+## 무엇을 옮겨 적는가
+
+- 시나리오는 여기서 짓지 않는다. 엔티티 패키지의 `KNOWLEDGE.md`에 적힌 것을 옮겨 적는다.
+  그 규칙은 `src/ai/backend/manager/api/adapters/AGENTS.md`에 있다.
+- 한 엔티티를 맡으면 그 패키지의 `KNOWLEDGE.md`와 `adapter.py`를 함께 읽고, 거기 적힌
+  시나리오를 하나도 빠뜨리지 않고 옮긴다. 어댑터가 내놓는데 문서에 없는 호출을 보면 문서를
+  먼저 고친다.
+- 문서에 `TODO`만 있는 엔티티는 시나리오가 아직 없다는 뜻이다. 테스트부터 짓지 않는다.
+- 옮긴 뒤 실행 결과를 `--split`으로 뽑아 그 문서에 되붙인다. 둘이 어긋나면 문장을 먼저
+  의심한다.
 
 ## 한 행이 말하는 것
 
