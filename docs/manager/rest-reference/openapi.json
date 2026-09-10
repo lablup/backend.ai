@@ -26417,30 +26417,6 @@
             "description": "Toggle required flag. Omit to leave unchanged.",
             "title": "Required"
           },
-          "added_version": {
-            "anyOf": [
-              {
-                "pattern": "^[0-9]{1,9}([.][0-9]{1,9}){0,2}$",
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Added Version"
-          },
-          "deprecated_version": {
-            "anyOf": [
-              {
-                "pattern": "^[0-9]{1,9}([.][0-9]{1,9}){0,2}$",
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Deprecated Version"
-          },
           "category": {
             "anyOf": [
               {
@@ -26476,6 +26452,30 @@
             ],
             "description": "UI rendering option. Omit to leave unchanged; null clears.",
             "title": "Ui Option"
+          },
+          "added_version": {
+            "anyOf": [
+              {
+                "pattern": "^[0-9]{1,9}([.][0-9]{1,9}){0,2}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Added Version"
+          },
+          "deprecated_version": {
+            "anyOf": [
+              {
+                "pattern": "^[0-9]{1,9}([.][0-9]{1,9}){0,2}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Deprecated Version"
           }
         },
         "required": [
