@@ -67,6 +67,14 @@ class ScenarioRecord:
     def failed(self) -> bool:
         return self.outcome == "failed"
 
+    def source(self) -> str:
+        """이 행이 사는 파일. 레포트가 거기로 걸어준다."""
+        return "/tests/scenario/" + self.module.replace(".", "/") + ".py"
+
+    def called(self) -> str:
+        """어느 엔티티의 어느 호출인지. 이름만으로는 잘 안 보인다."""
+        return f"{self.adapter}.{self.operation}" if self.adapter else self.operation
+
     @property
     def mark(self) -> str:
         return MARKS.get(self.outcome, self.outcome)
@@ -109,6 +117,13 @@ class ComponentReport:
     adapter: str
     behaviours: tuple[BehaviourReport, ...]
     unexercised: tuple[str, ...]
+
+    def knowledge(self) -> str:
+        """그 엔티티가 무엇을 보장하는지 적어둔 자리."""
+        return f"/src/ai/backend/manager/api/adapters/{self.component}/KNOWLEDGE.md"
+
+    def adapter_source(self) -> str:
+        return f"/src/ai/backend/manager/api/adapters/{self.component}/adapter.py"
 
     @property
     def rows(self) -> tuple[ScenarioRecord, ...]:
@@ -241,6 +256,10 @@ class MarkdownFormat(ReportFormat):
 
     def _component(self, component: ComponentReport) -> list[str]:
         out = [f"## {component.component}", ""]
+        out.append(
+            f"[무엇을 보장하는가]({component.knowledge()}) · [어댑터]({component.adapter_source()})"
+        )
+        out.append("")
         if component.unexercised:
             out.append(f"Not exercised by any scenario: {', '.join(component.unexercised)}.")
             out.append("")
@@ -252,9 +271,16 @@ class MarkdownFormat(ReportFormat):
         return out
 
     def _row(self, row: ScenarioRecord) -> list[str]:
-        out = [f"#### {row.summary} — {row.mark}", "", row.description, "", "Given", ""]
+        out = [
+            f"#### [{row.summary}]({row.source()}) — {row.mark}",
+            "",
+            row.description,
+            "",
+            "Given",
+            "",
+        ]
         out.extend(self._situation(row))
-        out.extend(["", "When", "", f"- {row.when}"])
+        out.extend(["", "When", "", f"- {row.called()} — {row.when}"])
         out.extend(f"  - {one}" for one in row.shows)
         out.extend(["", "Then", "", f"- {row.then}"])
         out.extend(self._nested(row.seen, depth=1))

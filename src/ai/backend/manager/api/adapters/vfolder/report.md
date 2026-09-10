@@ -1,10 +1,12 @@
 ## vfolder
 
+[무엇을 보장하는가](/src/ai/backend/manager/api/adapters/vfolder/KNOWLEDGE.md) · [어댑터](/src/ai/backend/manager/api/adapters/vfolder/adapter.py)
+
 Not exercised by any scenario: admin_search, batch_load_by_ids, batch_load_fields, bulk_delete, bulk_purge, clone, create_download_session, create_in_project, create_upload_session, delete, delete_files, deploy, get, get_folder_usage, list_files, mkdir, move_file, project_search, purge, restore.
 
 ### vfolder
 
-#### a-user-granted-folder-create-makes-one-of-their-own — pass
+#### [a-user-granted-folder-create-makes-one-of-their-own](/tests/scenario/bai_scenario/manager/vfolder/test_vfolder.py) — pass
 
 자기 스코프에서 폴더 생성 권한을 받은 사용자가 폴더를 만들면, 그 폴더의 소유는 그 사용자에게 있다
 
@@ -24,14 +26,14 @@ Given
 
 When
 
-- 일반 사용자 user-1의 create 호출
+- VFolderAdapter.create — 일반 사용자 user-1
   - CreateVFolderInput(name='work')
 
 Then
 
 - vfolder.access_control.ownership_type = 'user'
 
-#### a-user-granted-nothing-may-not-make-a-folder — pass
+#### [a-user-granted-nothing-may-not-make-a-folder](/tests/scenario/bai_scenario/manager/vfolder/test_vfolder.py) — pass
 
 아무 권한도 받지 않은 사용자가 폴더를 만들려 하면 권한 부족으로 거부된다
 
@@ -46,14 +48,14 @@ Given
 
 When
 
-- 일반 사용자 user-1의 create 호출
+- VFolderAdapter.create — 일반 사용자 user-1
   - CreateVFolderInput(name='denied')
 
 Then
 
 - 거부: NotEnoughPermission
 
-#### a-user-who-has-made-no-folder-lists-none — pass
+#### [a-user-who-has-made-no-folder-lists-none](/tests/scenario/bai_scenario/manager/vfolder/test_vfolder.py) — pass
 
 폴더를 하나도 만들지 않은 사용자가 자기 폴더를 조회하면, 답은 비어 있다
 
@@ -73,7 +75,7 @@ Given
 
 When
 
-- 일반 사용자 user-1의 my_search 호출
+- VFolderAdapter.my_search — 일반 사용자 user-1
   - SearchVFoldersInput()
 
 Then

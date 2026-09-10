@@ -699,7 +699,7 @@ class TypedScenario[A, C]:
             actor=actor,
             caller=str(getattr(self.actor, "name", "")),
             operation=operation,
-            when=f"{actor or '호출자'}의 {operation} 호출",
+            when=actor or "호출자",
             shows=self.called.shows,
             then=(
                 f"거부: {cast(type, self.then).__name__}"

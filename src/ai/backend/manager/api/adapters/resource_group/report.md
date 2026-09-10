@@ -1,10 +1,12 @@
 ## resource_group
 
+[무엇을 보장하는가](/src/ai/backend/manager/api/adapters/resource_group/KNOWLEDGE.md) · [어댑터](/src/ai/backend/manager/api/adapters/resource_group/adapter.py)
+
 Not exercised by any scenario: admin_replace_default_deployment_options, admin_replace_default_session_options, batch_load_by_ids, batch_load_by_names, batch_load_fields, get_allowed_domains_for_resource_group, get_allowed_projects_for_resource_group, get_allowed_resource_groups_for_domain, get_allowed_resource_groups_for_project, get_fair_share_spec, get_resource_info, purge, scoped_search, search, update, update_allowed_domains_for_resource_group, update_allowed_projects_for_resource_group, update_allowed_resource_groups_for_domain, update_allowed_resource_groups_for_project, update_config, update_fair_share_spec.
 
 ### resource_group
 
-#### a-resource-group-already-there-is-read-back-by-name — pass
+#### [a-resource-group-already-there-is-read-back-by-name](/tests/scenario/bai_scenario/manager/resource_group/test_resource_group.py) — pass
 
 리소스 그룹이 이미 있을 때 이름으로 조회하면, 그 그룹이 답으로 온다
 
@@ -20,14 +22,14 @@ Given
 
 When
 
-- 슈퍼관리자 user-1의 get 호출
+- ResourceGroupAdapter.get — 슈퍼관리자 user-1
   - 리소스 그룹: compute-1
 
 Then
 
 - name = 'compute-1'
 
-#### a-user-who-is-not-the-superadmin-may-not-make-a-resource-group — pass
+#### [a-user-who-is-not-the-superadmin-may-not-make-a-resource-group](/tests/scenario/bai_scenario/manager/resource_group/test_resource_group.py) — pass
 
 리소스 그룹 생성은 도메인 생성과 같이 전역 역할이 지키므로, 슈퍼관리자가 아닌 사용자는 권한을 얼마나 받았는지와 무관하게 막힌다
 
@@ -42,14 +44,14 @@ Given
 
 When
 
-- 일반 사용자 user-1의 create 호출
+- ResourceGroupAdapter.create — 일반 사용자 user-1
   - CreateResourceGroupInput(name='refused', domain_name=도메인: home-1)
 
 Then
 
 - 거부: InsufficientPrivilege
 
-#### the-superadmin-makes-a-resource-group-in-a-domain — pass
+#### [the-superadmin-makes-a-resource-group-in-a-domain](/tests/scenario/bai_scenario/manager/resource_group/test_resource_group.py) — pass
 
 슈퍼관리자가 도메인 아래에 리소스 그룹을 만들면, 그 이름의 그룹이 답으로 온다
 
@@ -64,7 +66,7 @@ Given
 
 When
 
-- 슈퍼관리자 user-1의 create 호출
+- ResourceGroupAdapter.create — 슈퍼관리자 user-1
   - CreateResourceGroupInput(name='compute', domain_name=도메인: home-1)
 
 Then
