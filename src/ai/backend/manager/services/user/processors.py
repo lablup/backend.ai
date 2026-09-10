@@ -101,7 +101,6 @@ from ai.backend.manager.services.user.actions.scoped_search import (
     ScopedSearchUsersAction,
 )
 from ai.backend.manager.services.user.actions.search_users import GlobalSearchUsersAction
-from ai.backend.manager.services.user.actions.search_users_by_role import SearchUsersByRoleAction
 from ai.backend.manager.services.user.actions.update_keypair_dotfile import (
     UpdateKeypairDotfileAction,
     UpdateKeypairDotfileActionResult,
@@ -133,7 +132,6 @@ class UserProcessors:
     error_log: ErrorLogProcessors
     global_search: GlobalActionProcessor[GlobalSearchUsersAction, BatchOpsResult[UserData]]
     scoped_search: ScopeActionProcessor[ScopedSearchUsersAction, ScopedBatchOpsResult[UserData]]
-    search_users_by_role: GlobalActionProcessor[SearchUsersByRoleAction, BatchOpsResult[UserData]]
     create_user: ScopeActionProcessor[CreateUserAction, CreateUserActionResult]
     get_user: SingleEntityActionProcessor[GetUserAction, GetUserActionResult]
     update_user: SingleEntityActionProcessor[UpdateUserAction, UpdateUserActionResult]
@@ -197,7 +195,6 @@ class UserProcessors:
         self.lookup_keypair_owner = group.key_owner_lookup_ops(LookupKeypairOwnerByAccessKeyAction)
         self.global_search = group.global_search_ops(GlobalSearchUsersAction)
         self.scoped_search = group.scope_search_ops(ScopedSearchUsersAction)
-        self.search_users_by_role = group.global_search_ops(SearchUsersByRoleAction)
         self.create_user = group.scope(CreateUserAction, user_service.create_user)
         self.get_user = group.single_entity(GetUserAction, user_service.get_user)
         self.update_user = group.single_entity(UpdateUserAction, user_service.update_user)
