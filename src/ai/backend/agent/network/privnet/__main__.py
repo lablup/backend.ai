@@ -96,6 +96,7 @@ from ai.backend.agent.network.native_attacher import (
     NativeBridgeAttachRunner,
     get_host_local_ipam,
 )
+from ai.backend.agent.network.privnet.gossip_runner import DEFAULT_GOSSIP_PORT
 from ai.backend.agent.network.privnet.journal import PrivNetJournal
 from ai.backend.agent.network.privnet.server import PrivNetServer
 from ai.backend.agent.network.vtep import uplink_for_ip, usable_vtep
@@ -186,6 +187,26 @@ def _resolve_local_subnet_layout(raw_cfg: Mapping[str, Any]) -> LocalSubnetLayou
     return LocalSubnetLayout.parse(
         str(pool or DEFAULT_LOCAL_POOL), int(block or DEFAULT_BLOCK_PREFIXLEN)
     )
+
+
+def _resolve_gossip_port(raw_cfg: Mapping[str, Any]) -> int:
+    """The UDP port privnets announce endpoints on.
+
+    An operator setting, because the port has to be open between nodes and a site may already use
+    the default. `BACKENDAI_PRIVNET_GOSSIP_PORT` overrides it for a node whose neighbour on the
+    same host already holds it -- which is every multi-backend node until one daemon serves them
+    all.
+    """
+    raw = os.environ.get("BACKENDAI_PRIVNET_GOSSIP_PORT") or (
+        (raw_cfg.get("container") or {}).get("network-gossip-port")
+    )
+    if raw is None:
+        return DEFAULT_GOSSIP_PORT
+    try:
+        return int(raw)
+    except (TypeError, ValueError):
+        log.warning("ignoring an unreadable endpoint-exchange port {!r}", raw)
+        return DEFAULT_GOSSIP_PORT
 
 
 def _is_rootless(raw_cfg: Mapping[str, Any]) -> bool:
@@ -307,6 +328,7 @@ async def _amain(config_path: Path | None = None) -> None:
         # Only the rootless backends need it: containerd's PID comes from a root-owned daemon the
         # agent cannot forge, and its kernels' namespaces are owned by uid 0 like the host's.
         netns_owner_uid=allowed_uid if _is_rootless(raw_cfg) else None,
+        gossip_port=_resolve_gossip_port(raw_cfg),
     )
     await server.serve_forever()
 
