@@ -866,7 +866,7 @@ class RBACAdapter(BaseAdapter):
 
     async def bulk_assign_role(self, input: BulkAssignRoleInputDTO) -> BulkAssignRoleResultPayload:
         """Bulk-assign a role to multiple users."""
-        action_result = await self._rbac.bulk_assign_role.wait_for_complete(
+        action_result = await self._rbac.bulk_assign_role.run(
             BulkAssignRoleAction(
                 role_id=RoleID(input.role_id),
                 user_ids=[UserID(uid) for uid in input.user_ids],
@@ -993,7 +993,7 @@ class RBACAdapter(BaseAdapter):
 
     async def bulk_revoke_role(self, input: BulkRevokeRoleInputDTO) -> BulkRevokeRoleResultPayload:
         """Bulk-revoke a role from multiple users."""
-        action_result = await self._rbac.bulk_revoke_role.wait_for_complete(
+        action_result = await self._rbac.bulk_revoke_role.run(
             BulkRevokeRoleAction(
                 input=BulkUserRoleRevocationInput(role_id=input.role_id, user_ids=input.user_ids)
             )

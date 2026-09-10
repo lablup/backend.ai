@@ -3,7 +3,6 @@ from __future__ import annotations
 from typing import Any
 
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
-from ai.backend.manager.actions.processor import ActionProcessor
 from ai.backend.manager.actions.registry.group import ProcessorGroup
 from ai.backend.manager.actions.registry.relation import RelationGroup
 from ai.backend.manager.actions.v2.relation.processor import RelationActionProcessor
@@ -87,8 +86,8 @@ class RbacProcessors:
     leave_project: ScopeActionProcessor[LeaveProjectAction, LeaveProjectActionResult]
     assign_role: RelationActionProcessor[AssignRoleAction, AssignRoleActionResult]
     revoke_role: RelationActionProcessor[RevokeRoleAction, RevokeRoleActionResult]
-    bulk_assign_role: ActionProcessor[BulkAssignRoleAction, BulkAssignRoleActionResult]
-    bulk_revoke_role: ActionProcessor[BulkRevokeRoleAction, BulkRevokeRoleActionResult]
+    bulk_assign_role: RelationActionProcessor[BulkAssignRoleAction, BulkAssignRoleActionResult]
+    bulk_revoke_role: RelationActionProcessor[BulkRevokeRoleAction, BulkRevokeRoleActionResult]
 
     def __init__(
         self,
@@ -107,5 +106,5 @@ class RbacProcessors:
         self.leave_project = roster_group.scope(LeaveProjectAction, roster_service.leave)
         self.assign_role = group.relation(AssignRoleAction, role_service.assign_role)
         self.revoke_role = group.relation(RevokeRoleAction, role_service.revoke_role)
-        self.bulk_assign_role = ActionProcessor(role_service.bulk_assign_role, action_monitors)
-        self.bulk_revoke_role = ActionProcessor(role_service.bulk_revoke_role, action_monitors)
+        self.bulk_assign_role = group.relation(BulkAssignRoleAction, role_service.bulk_assign_role)
+        self.bulk_revoke_role = group.relation(BulkRevokeRoleAction, role_service.bulk_revoke_role)
