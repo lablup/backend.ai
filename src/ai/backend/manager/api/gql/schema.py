@@ -953,62 +953,6 @@ schema = CustomizedSchema(
     subscription=Subscription,
     config=StrawberryConfig(auto_camel_case=True),
     federation_version="2.7",
-<<<<<<< HEAD
-=======
-    # Federation stubs bridging legacy graphene Node types into the Strawberry-owned
-    # node(id:) resolver. Listed explicitly so they are part of the schema (and the Node
-    # interface's possible types) even when no V2 field references them.
-    types=[
-        _SessionStub,
-        _DomainStub,
-        _ProjectStub,
-        _ImageStub,
-        _VFolderStub,
-        _UserStub,
-        _ResourceGroupStub,
-        _AgentNodeStub,
-        _NetworkNodeStub,
-        _ModelCardStub,
-        _ContainerRegistryNodeStub,
-    ],
-    extensions=[
-        GQLLoggingExtension,
-        GQLMetricExtension,
-        GQLValidationExtension,
-        QueryDepthLimiter(max_depth=MAX_QUERY_DEPTH),
-        MaxAliasesLimiter(max_alias_count=MAX_ALIAS_COUNT),
-        GQLExceptionHandlerExtension,
-    ],
-)
-
-
-@gql_root_field(BackendAIGQLMeta(added_version=NEXT_RELEASE_VERSION, description="Returns 'pong'"))  # type: ignore[misc]
-async def ping() -> str:
-    return "pong"
-
-
-@strawberry.type(name="Query")
-class PublicQueries:
-    """Query root of the ``public`` subgraph, served without authentication at
-    ``POST /admin/gql/strawberry/public``.
-
-    Contains ONLY fields that are safe to expose without authentication; private fields are
-    physically absent, so they cannot be queried (no runtime gate needed). A public field belongs
-    here and nowhere else: declaring it on ``Query`` as well would let the router resolve it
-    against the authenticated subgraph, which answers 401 to an anonymous caller.
-    """
-
-    ping = ping
-    public_app_configs = public_app_configs
-
-
-# A subgraph of the same supergraph as `schema`, kept separate only so that its routing URL
-# carries no auth middleware: anonymous queries compose against this subgraph alone.
-public_schema = Schema(
-    query=PublicQueries,
-    config=StrawberryConfig(auto_camel_case=True),
-    federation_version="2.7",
->>>>>>> efe4d151 (feat(BA-7810): cap GraphQL query depth and alias count (#14483))
     extensions=[
         GQLLoggingExtension,
         GQLMetricExtension,
