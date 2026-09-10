@@ -35,10 +35,9 @@ entity type, shape, operation, gate and backing.
   UPDATE permission alone let a caller write the row and the project was never asked.
 - A relation names two scopes and no entity type, so both are asked and neither answers
   for the other.
-- The resource group's four association operations carried a binder that wrote
-  `association_scopes_entities` beside the mapping row. The relation ops write the
-  graph instead: the scope governs the target under READ, the target holds the scope
-  under a READ share.
+- The resource group's four association operations carried a binder that wrote a second
+  row beside the mapping row. The relation ops write the graph instead: the scope
+  governs the target under READ, the target holds the scope under a READ share.
 
 ## Four actions cover every relation
 
@@ -85,9 +84,8 @@ entity type, shape, operation, gate and backing.
 
 ## The roster is the graph and nothing else
 
-- A roster place is the graph edge and its caps. `association_scopes_entities` is not
-  written or deleted here: the roster reads answer from the graph, so a row an earlier
-  release wrote is the retirement's to clear (BA-7204), not this path's.
+- A roster place is the graph edge and its caps. The graph is where a roster read
+  answers from, and since BA-7796 there is nothing else it could answer from.
 
 ## A role grant is a roster place as well
 

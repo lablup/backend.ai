@@ -70,7 +70,6 @@ from ai.backend.manager.models.model_card.row import ModelCardRow
 from ai.backend.manager.models.project import ProjectRow
 from ai.backend.manager.models.rbac_models import UserRoleRow
 from ai.backend.manager.models.rbac_models.entity_field import EntityFieldRow
-from ai.backend.manager.models.rbac_models.permission.object_permission import ObjectPermissionRow
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.replica_group import ReplicaGroupRow
@@ -185,7 +184,6 @@ class TestVfolderRepository:
                 EntityMembershipFieldRow,
                 ScopeBindingRow,
                 EntityLabelRow,
-                ObjectPermissionRow,
                 PermissionRow,
             ],
         ):
@@ -970,7 +968,6 @@ class TestVfolderRepositoryPurge:
                 RoutingRow,
                 ModelCardRow,
                 EntityFieldRow,
-                ObjectPermissionRow,
                 PermissionRow,
             ],
         ):

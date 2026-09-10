@@ -8,7 +8,7 @@ from uuid import UUID
 
 import sqlalchemy as sa
 
-from ai.backend.common.data.permission.types import OperationType
+from ai.backend.common.data.permission.types import Permission
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.condition_utils import StringConditions
 from ai.backend.manager.models.rbac_models.role_permission_preset.row import (
@@ -38,30 +38,30 @@ class RolePermissionPresetConditions:
     )
 
     @staticmethod
-    def by_operation_equals(operation: OperationType) -> QueryCondition:
+    def by_permission_equals(permission: Permission) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return RolePermissionPresetRow.operation == operation
+            return RolePermissionPresetRow.permission == permission
 
         return inner
 
     @staticmethod
-    def by_operation_not_equals(operation: OperationType) -> QueryCondition:
+    def by_permission_not_equals(permission: Permission) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return RolePermissionPresetRow.operation != operation
+            return RolePermissionPresetRow.permission != permission
 
         return inner
 
     @staticmethod
-    def by_operation_in(operations: Collection[OperationType]) -> QueryCondition:
+    def by_permission_in(permissions: Collection[Permission]) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return RolePermissionPresetRow.operation.in_(operations)
+            return RolePermissionPresetRow.permission.in_(permissions)
 
         return inner
 
     @staticmethod
-    def by_operation_not_in(operations: Collection[OperationType]) -> QueryCondition:
+    def by_permission_not_in(permissions: Collection[Permission]) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return RolePermissionPresetRow.operation.notin_(operations)
+            return RolePermissionPresetRow.permission.notin_(permissions)
 
         return inner
 

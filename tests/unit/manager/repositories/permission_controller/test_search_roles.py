@@ -20,10 +20,7 @@ from ai.backend.common.data.filter_specs import (
     StringMatchSpec,
     UUIDEqualMatchSpec,
 )
-from ai.backend.common.data.permission.types import (
-    EntityType,
-    OperationType,
-)
+from ai.backend.common.data.permission.types import Permission
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.models.agent import AgentRow
@@ -40,7 +37,6 @@ from ai.backend.manager.models.rbac_models import UserRoleRow
 from ai.backend.manager.models.rbac_models.conditions import (
     AssignedUserConditions,
 )
-from ai.backend.manager.models.rbac_models.permission.object_permission import ObjectPermissionRow
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.rbac_models.role.conditions import RoleConditions
@@ -94,7 +90,6 @@ class TestSearchRoles:
                 UserRow,
                 KeyPairRow,
                 PermissionRow,
-                ObjectPermissionRow,
                 VirtualEntityRow,
                 EntityMembershipRow,
             ],
@@ -395,7 +390,7 @@ class TestSearchRoles:
 
 
 class TestSearchRolesTotalCountNotInflated:
-    """Regression tests for BA-5749: total_count must not be inflated by ObjectPermissionRow JOIN."""
+    """Regression tests for BA-5749: total_count counts roles, not the rows they own."""
 
     @pytest.fixture
     async def db_with_rbac_tables(
@@ -413,7 +408,6 @@ class TestSearchRolesTotalCountNotInflated:
                 UserRow,
                 KeyPairRow,
                 PermissionRow,
-                ObjectPermissionRow,
             ],
         ):
             yield database_connection
@@ -426,11 +420,11 @@ class TestSearchRolesTotalCountNotInflated:
         return PermissionControllerRepository(db_with_rbac_tables)
 
     @pytest.fixture
-    async def roles_with_object_permissions(
+    async def roles_with_permissions(
         self,
         db_with_rbac_tables: ExtendedAsyncSAEngine,
     ) -> list[CreatedRole]:
-        """Create 2 roles: one with 3 ObjectPermissionRows, one with 0."""
+        """Create 2 roles: one holding 3 permission rows, one holding none."""
         created: list[CreatedRole] = []
         base_time = datetime(2026, 1, 1, tzinfo=UTC)
 
@@ -455,22 +449,21 @@ class TestSearchRolesTotalCountNotInflated:
                 )
             )
 
-            # Add 3 ObjectPermissionRow entries for this role
-            for op_type in [OperationType.READ, OperationType.UPDATE, OperationType.CREATE]:
-                obj_perm = ObjectPermissionRow(
-                    role_id=role_with_perms.id,
-                    entity_type=EntityType.PROJECT,
-                    entity_id=str(uuid.uuid4()),
-                    operation=op_type,
+            for permission in [Permission.READ, Permission.UPDATE, Permission.CREATE]:
+                db_sess.add(
+                    PermissionRow(
+                        role_id=role_with_perms.id,
+                        entity_type=ProjectEntityType(),
+                        permission=permission,
+                    )
                 )
-                db_sess.add(obj_perm)
 
             # Role with zero object permissions
             role_without_perms = RoleRow(
                 name="role-without-perms",
                 scope_type=ProjectEntityType(),
                 scope_id=home,
-                description="Role that has no object permissions",
+                description="Role that holds no permissions",
                 created_at=base_time + timedelta(minutes=1),
             )
             db_sess.add(role_without_perms)
@@ -488,7 +481,7 @@ class TestSearchRolesTotalCountNotInflated:
     async def test_total_count_not_inflated_with_offset_pagination(
         self,
         repository: PermissionControllerRepository,
-        roles_with_object_permissions: list[CreatedRole],
+        roles_with_permissions: list[CreatedRole],
     ) -> None:
         """BA-5749: offset pagination total_count must equal distinct role count, not JOIN-inflated count."""
         querier = BatchQuerier(
@@ -505,7 +498,7 @@ class TestSearchRolesTotalCountNotInflated:
     async def test_total_count_not_inflated_with_cursor_pagination(
         self,
         repository: PermissionControllerRepository,
-        roles_with_object_permissions: list[CreatedRole],
+        roles_with_permissions: list[CreatedRole],
     ) -> None:
         """BA-5749: cursor pagination total_count must equal distinct role count, not JOIN-inflated count."""
         querier = BatchQuerier(

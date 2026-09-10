@@ -7,7 +7,6 @@ from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.filter_specs import UUIDEqualMatchSpec
 from ai.backend.common.data.idle_checker.types import IdleCheckPhase
-from ai.backend.common.data.permission.types import ScopeType
 from ai.backend.manager.data.common.types import SearchResult
 from ai.backend.manager.data.idle_checker.types import IdleCheckerAssignmentData, IdleJudgmentData
 from ai.backend.manager.data.session.types import SessionStatus
@@ -70,9 +69,7 @@ class IdleCheckerRepository:
                 IdleCheckerAssignmentSearcher(
                     pagination=OffsetPagination(limit=1),
                     conditions=[
-                        IdleCheckerAssignmentConditions.by_scope_type_equals(
-                            ScopeType(scope.entity_type())
-                        ),
+                        IdleCheckerAssignmentConditions.by_scope_type_equals(scope.entity_type()),
                         IdleCheckerAssignmentConditions.by_scope_id_equals(
                             UUIDEqualMatchSpec(value=scope, negated=False)
                         ),

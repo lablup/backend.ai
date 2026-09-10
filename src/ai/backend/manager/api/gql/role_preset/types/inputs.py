@@ -34,19 +34,19 @@ from ai.backend.manager.api.gql.decorators import (
     gql_pydantic_input,
 )
 from ai.backend.manager.api.gql.pydantic_compat import PydanticInputMixin
-from ai.backend.manager.api.gql.rbac.types import OperationTypeGQL
+from ai.backend.manager.api.gql.rbac.types import PermissionBitGQL
 
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
-        description="A single (entity_type, operation) pair carried by a role preset.",
+        description="A single (entity_type, permission) pair carried by a role preset.",
         added_version="26.4.4",
     ),
     name="RolePermissionPresetEntryInput",
 )
 class RolePermissionPresetEntryInputGQL(PydanticInputMixin[RolePermissionPresetEntryDTO]):
     entity_type: str = gql_field(description="Entity type the permission applies to.")
-    operation: OperationTypeGQL = gql_field(description="Operation granted by the permission.")
+    permission: PermissionBitGQL = gql_field(description="The operation bit the entry grants.")
 
 
 @gql_pydantic_input(

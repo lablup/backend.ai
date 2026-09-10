@@ -154,3 +154,19 @@ class ProcessorRegistry[TData: EntityData]:
     def wired_actions(self) -> Sequence[type[Any]]:
         """Every action class wired through this registry's groups, in wiring order."""
         return tuple(r.action_cls for r in self._records)
+
+    def role_grantable_wirings(self) -> Sequence[WiredProcessor]:
+        """Every wiring a role may permit — the ones asking the caller for a permission
+        on an entity a permission row can name.
+
+        Leaves out the global ones, which a SUPERADMIN gate answers rather than a role,
+        and the relations, which name no entity to hold a permission on.
+        """
+        return tuple(
+            record
+            for record in self._records
+            if record.gate is ActionGate.PERMISSION
+            and record.kind is not ActionKind.GLOBAL
+            and record.entity_type is not None
+            and record.entity_type != GlobalEntityType()
+        )

@@ -21,7 +21,7 @@ from ai.backend.common.data.entity.project import ProjectEntityType
 from ai.backend.common.data.entity.role import RoleEntityType
 from ai.backend.common.data.entity.user import UserEntityType
 from ai.backend.common.data.entity.vfolder import VFolderUUID
-from ai.backend.common.data.permission.types import EntityType, Permission, ScopeType
+from ai.backend.common.data.permission.types import Permission
 from ai.backend.common.types import QuotaScopeID, QuotaScopeType, VFolderUsageMode
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
 from ai.backend.manager.actions.registry.types import Concern, ConcernMeta, GroupMeta
@@ -138,7 +138,7 @@ def permission_controller_processors(
     perm_repo = PermissionControllerRepository(database_engine)
     service = PermissionControllerService(
         perm_repo,
-        rbac_action_registry=[],
+        action_registry=processor_registry,
     )
     return PermissionControllerProcessors(
         processor_registry.group(GroupMeta(RoleEntityType())),
@@ -249,7 +249,7 @@ async def model_store_project_fixture(
         await conn.execute(
             sa.insert(VirtualEntityRow.__table__).values(
                 id=virtual_entity_id,
-                entity_type=ScopeType.PROJECT,
+                entity_type=ProjectEntityType(),
                 entity_id=project_id,
             )
         )
@@ -274,7 +274,7 @@ async def model_store_project_fixture(
         )
         await conn.execute(
             VirtualEntityRow.__table__.delete().where(
-                VirtualEntityRow.__table__.c.entity_type == ScopeType.PROJECT,
+                VirtualEntityRow.__table__.c.entity_type == ProjectEntityType(),
                 VirtualEntityRow.__table__.c.entity_id == project_id,
             )
         )
@@ -307,7 +307,7 @@ async def second_project_fixture(
         await conn.execute(
             sa.insert(VirtualEntityRow.__table__).values(
                 id=virtual_entity_id,
-                entity_type=ScopeType.PROJECT,
+                entity_type=ProjectEntityType(),
                 entity_id=project_id,
             )
         )
@@ -332,7 +332,7 @@ async def second_project_fixture(
         )
         await conn.execute(
             VirtualEntityRow.__table__.delete().where(
-                VirtualEntityRow.__table__.c.entity_type == ScopeType.PROJECT,
+                VirtualEntityRow.__table__.c.entity_type == ProjectEntityType(),
                 VirtualEntityRow.__table__.c.entity_id == project_id,
             )
         )
@@ -383,7 +383,7 @@ async def role_fixture(
                 id=role_id,
                 name=f"test-member-{secrets.token_hex(4)}",
                 status=RoleStatus.ACTIVE,
-                scope_type=ScopeType.PROJECT.value,
+                scope_type=ProjectEntityType(),
                 scope_id=model_store_project_fixture,
             )
         )
@@ -407,7 +407,7 @@ async def _grant_model_card_read_permission(
         await conn.execute(
             sa.insert(PermissionRow.__table__).values(
                 role_id=role_fixture,
-                entity_type=EntityType.MODEL_CARD,
+                entity_type=ModelCardEntityType(),
                 permission=Permission.READ,
             )
         )

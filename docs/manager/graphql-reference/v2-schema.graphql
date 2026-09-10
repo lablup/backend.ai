@@ -1691,8 +1691,8 @@ type BulkAddRolePermissionFailureInfo {
   """Entity element type of the failed entry."""
   entityType: String!
 
-  """Operation type of the failed entry."""
-  operation: String!
+  """Operation bit of the failed entry."""
+  permission: PermissionBit!
 
   """Error message describing the failure."""
   message: String!
@@ -1705,8 +1705,8 @@ type BulkAddRolePermissionPresetFailureInfo {
   """Entity type of the permission entry that failed."""
   entityType: String!
 
-  """Operation of the permission entry that failed."""
-  operation: OperationType!
+  """The operation bit of the permission entry that failed."""
+  permission: PermissionBit!
 
   """Error message describing the failure."""
   message: String!
@@ -3186,7 +3186,7 @@ type CreateObjectStoragePayload {
 input CreatePermissionInput {
   roleId: UUID!
   entityType: String!
-  operation: OperationType!
+  permission: PermissionBit!
 }
 
 """Added in 26.4.2. Input for creating a new project."""
@@ -9802,39 +9802,8 @@ type OperationInfo {
   """Human-readable description"""
   description: String!
 
-  """Required RBAC permission"""
-  requiredPermission: OperationType!
-}
-
-"""Added in 26.3.0. RBAC operation type"""
-enum OperationType {
-  CREATE
-  READ
-  UPDATE
-  SOFT_DELETE
-  HARD_DELETE
-  GRANT_ALL
-  GRANT_READ
-  GRANT_UPDATE
-  GRANT_SOFT_DELETE
-  GRANT_HARD_DELETE
-}
-
-"""
-Added in 26.4.4. Filter for permission operation columns. Supports equals / in / not_equals / not_in.
-"""
-input OperationTypeFilter {
-  """Matches rows with this exact operation."""
-  equals: OperationType = null
-
-  """Matches rows whose operation is in this list."""
-  in: [OperationType!] = null
-
-  """Excludes rows with this exact operation."""
-  notEquals: OperationType = null
-
-  """Excludes rows whose operation is in this list."""
-  notIn: [OperationType!] = null
+  """The permission bit required"""
+  requiredPermission: PermissionBit!
 }
 
 """Added in 24.09.0. Sort direction for ordering"""
@@ -9869,22 +9838,34 @@ type Permission implements Node {
   """Added in 26.9.0. The permission bit the row holds."""
   permission: PermissionBit!
 
-  """Deprecated: use `permission`. The same bit named as an action."""
-  operation: OperationType! @deprecated(reason: "Deprecated since 26.9.0. Use `permission`.")
-
   """The role this permission belongs to."""
   role: Role
 }
 
-"""
-Added in 26.9.0. One bit of a permission mask; distinct from OperationType, which names an action.
-"""
+"""Added in 26.9.0. One bit of a permission mask."""
 enum PermissionBit {
   READ
   UPDATE
   CREATE
   SOFT_DELETE
   HARD_DELETE
+}
+
+"""
+Added in 26.9.0. Filter for a permission-bit column. Supports equals / in / not_equals / not_in.
+"""
+input PermissionBitFilter {
+  """Matches rows with this exact bit."""
+  equals: PermissionBit = null
+
+  """Matches rows whose bit is in this list."""
+  in: [PermissionBit!] = null
+
+  """Excludes rows with this exact bit."""
+  notEquals: PermissionBit = null
+
+  """Excludes rows whose bit is in this list."""
+  notIn: [PermissionBit!] = null
 }
 
 """Added in 26.3.0. Permission connection."""
@@ -9921,7 +9902,7 @@ Added in 26.4.0. Nested filter for permissions within a role assignment. Filters
 """
 input PermissionNestedFilter {
   entityType: StringFilter = null
-  operation: OperationTypeFilter = null
+  permission: PermissionBitFilter = null
   AND: [PermissionNestedFilter!] = null
   OR: [PermissionNestedFilter!] = null
   NOT: [PermissionNestedFilter!] = null
@@ -12372,8 +12353,8 @@ type ReplaceRolePermissionFailureInfo {
   """Entity element type of the failed entry."""
   entityType: String!
 
-  """Operation type of the failed entry."""
-  operation: String!
+  """Operation bit of the failed entry."""
+  permission: PermissionBit!
 
   """Error message describing the failure."""
   message: String!
@@ -13542,8 +13523,8 @@ type RolePermissionPreset implements Node {
   """Entity type the permission applies to."""
   entityType: String!
 
-  """Operation granted by the permission."""
-  operation: OperationType!
+  """The operation bit the entry grants."""
+  permission: PermissionBit!
 
   """Creation timestamp."""
   createdAt: DateTime!
@@ -13573,14 +13554,14 @@ type RolePermissionPresetEdge {
 }
 
 """
-Added in 26.4.4. A single (entity_type, operation) pair carried by a role preset.
+Added in 26.4.4. A single (entity_type, permission) pair carried by a role preset.
 """
 input RolePermissionPresetEntryInput {
   """Entity type the permission applies to."""
   entityType: String!
 
-  """Operation granted by the permission."""
-  operation: OperationType!
+  """The operation bit the entry grants."""
+  permission: PermissionBit!
 }
 
 """
@@ -13593,8 +13574,8 @@ input RolePermissionPresetFilter {
   """Filter by entity type the permission applies to."""
   entityType: StringFilter = null
 
-  """Filter by granted operation."""
-  operation: OperationTypeFilter = null
+  """Filter by the operation bit granted."""
+  permission: PermissionBitFilter = null
 
   """Filter by creation timestamp."""
   createdAt: DateTimeFilter = null
@@ -13627,7 +13608,7 @@ Added in 26.4.4. Fields available for ordering role permission preset entries.
 """
 enum RolePermissionPresetOrderField {
   ENTITY_TYPE
-  OPERATION
+  PERMISSION
   CREATED_AT
 }
 
@@ -16182,7 +16163,7 @@ type UpdateObjectStoragePayload {
 input UpdatePermissionInput {
   id: UUID!
   entityType: String = null
-  operation: OperationType = null
+  permission: PermissionBit = null
 }
 
 """

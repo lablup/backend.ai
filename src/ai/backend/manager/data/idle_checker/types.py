@@ -20,7 +20,6 @@ from ai.backend.common.data.idle_checker.types import (
     IdleCheckPhase,
     UtilizationThresholdEntry,
 )
-from ai.backend.common.data.permission.types import ScopeType
 from ai.backend.common.types import SessionId, SessionTypes
 
 
@@ -56,7 +55,7 @@ class SessionUtilizationQuery:
 @dataclass(frozen=True)
 class IdleCheckerAssignmentData:
     id: IdleCheckerAssignmentID
-    scope_type: ScopeType
+    scope_type: EntityType
     scope_id: uuid.UUID
     idle_checker_id: IdleCheckerID
     enabled: bool
@@ -65,7 +64,7 @@ class IdleCheckerAssignmentData:
 
     def scope_entity(self) -> EntityIdentifier:
         """The scope the checker is bound to, as the entity it is."""
-        return RuntimeEntityID(EntityType(self.scope_type.value), self.scope_id)
+        return RuntimeEntityID(self.scope_type, self.scope_id)
 
 
 @dataclass(frozen=True)

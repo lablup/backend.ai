@@ -1,17 +1,12 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import (
-    TYPE_CHECKING,
-)
 from uuid import UUID
 
 import sqlalchemy as sa
 from sqlalchemy.orm import (
     Mapped,
-    foreign,
     mapped_column,
-    relationship,
 )
 
 from ai.backend.common.data.entity.role import RoleID
@@ -31,19 +26,6 @@ from ai.backend.manager.models.base import (
     StrEnumType,
 )
 from ai.backend.manager.models.mixins.timestamp import LifecycleTimestampsMixin
-
-if TYPE_CHECKING:
-    from ai.backend.manager.models.rbac_models.permission.object_permission import (
-        ObjectPermissionRow,
-    )
-
-
-def _get_object_permission_rows_join_condition() -> sa.ColumnElement[bool]:
-    from ai.backend.manager.models.rbac_models.permission.object_permission import (
-        ObjectPermissionRow,
-    )
-
-    return RoleRow.id == foreign(ObjectPermissionRow.role_id)
 
 
 class RoleRow(LifecycleTimestampsMixin, Base):
@@ -123,12 +105,6 @@ class RoleRow(LifecycleTimestampsMixin, Base):
         nullable=True,
     )
 
-    object_permission_rows: Mapped[list[ObjectPermissionRow]] = relationship(
-        "ObjectPermissionRow",
-        primaryjoin=_get_object_permission_rows_join_condition,
-        viewonly=True,
-    )
-
     def scope(self) -> EntityIdentifier:
         """The scope the role belongs to."""
         return RuntimeEntityID(EntityType(self.scope_type), self.scope_id)
@@ -164,5 +140,4 @@ class RoleRow(LifecycleTimestampsMixin, Base):
             role_preset_id=self.role_preset_id,
             scope_type=self.scope_type,
             scope_id=self.scope_id,
-            object_permissions=[op_row.to_data() for op_row in self.object_permission_rows],
         )

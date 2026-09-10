@@ -7,12 +7,11 @@ from sqlalchemy.orm import (
 )
 
 from ai.backend.common.data.entity.role_preset import RolePresetID
-from ai.backend.manager.data.permission.types import ScopeType
+from ai.backend.common.data.entity.types import EntityType
 from ai.backend.manager.data.role_preset.types import RolePresetData
 from ai.backend.manager.models.base import (
     GUID,
     Base,
-    StrEnumType,
 )
 from ai.backend.manager.models.mixins.timestamp import LifecycleTimestampsMixin
 
@@ -34,8 +33,8 @@ class RolePresetRow(LifecycleTimestampsMixin, Base):
     role_name_template: Mapped[str | None] = mapped_column(
         "role_name_template", sa.Text, nullable=True
     )
-    scope_type: Mapped[ScopeType] = mapped_column(
-        "scope_type", StrEnumType(ScopeType, length=32), nullable=False
+    scope_type: Mapped[EntityType] = mapped_column(
+        "scope_type", sa.String(length=32), nullable=False
     )
     # Default for the ``auto_assign`` flag copied onto roles instantiated from this preset.
     auto_assign: Mapped[bool] = mapped_column(
@@ -52,7 +51,7 @@ class RolePresetRow(LifecycleTimestampsMixin, Base):
             id=self.id,
             name=self.name,
             role_name_template=self.role_name_template,
-            scope_type=self.scope_type.to_element(),
+            scope_type=self.scope_type,
             auto_assign=self.auto_assign,
             deleted=self.deleted,
             created_at=self.created_at,

@@ -5,10 +5,9 @@ Tests verify that condition factories produce correct SQLAlchemy expressions.
 
 from __future__ import annotations
 
-from ai.backend.manager.data.permission.types import (
-    EntityType,
-    Permission,
-)
+from ai.backend.common.data.entity.session import SessionEntityType
+from ai.backend.common.data.entity.vfolder import VFolderEntityType
+from ai.backend.manager.data.permission.types import Permission
 from ai.backend.manager.models.rbac_models.conditions import (
     AssignedUserConditions,
     PermissionConditions,
@@ -20,7 +19,7 @@ class TestPermissionConditions:
 
     def test_by_entity_types_produces_in_clause(self) -> None:
         """by_entity_types should generate entity_type IN (...) clause."""
-        condition = PermissionConditions.by_entity_types([EntityType.SESSION])
+        condition = PermissionConditions.by_entity_types([SessionEntityType()])
         clause = condition()
 
         compiled = str(clause.compile(compile_kwargs={"literal_binds": True}))
@@ -46,7 +45,7 @@ class TestExistsPermissionCombined:
         # Create sample permission conditions
         permission_conditions = [
             PermissionConditions.by_permissions([Permission.READ]),
-            PermissionConditions.by_entity_types([EntityType.SESSION]),
+            PermissionConditions.by_entity_types([SessionEntityType()]),
         ]
 
         condition = AssignedUserConditions.exists_permission_combined(permission_conditions)
@@ -70,7 +69,7 @@ class TestExistsPermissionCombined:
     def test_exists_permission_combined_with_multiple_operations(self) -> None:
         """exists_permission_combined should combine multiple operation filters."""
         permission_conditions = [
-            PermissionConditions.by_entity_types([EntityType.SESSION, EntityType.VFOLDER]),
+            PermissionConditions.by_entity_types([SessionEntityType(), VFolderEntityType()]),
             PermissionConditions.by_permissions([Permission.READ, Permission.UPDATE]),
         ]
 

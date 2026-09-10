@@ -17547,39 +17547,22 @@
         "title": "ScopedSearchEntitySharesInput",
         "type": "object"
       },
-      "OperationTypeDTO": {
-        "description": "RBAC operation type enum for DTO layer.",
-        "enum": [
-          "create",
-          "read",
-          "update",
-          "soft-delete",
-          "hard-delete",
-          "grant:all",
-          "grant:read",
-          "grant:update",
-          "grant:soft-delete",
-          "grant:hard-delete"
-        ],
-        "title": "OperationTypeDTO",
-        "type": "string"
-      },
       "RolePermissionPresetEntry": {
-        "description": "A single (entity_type, operation) pair carried by a role preset.",
+        "description": "A single (entity_type, permission) pair carried by a role preset.",
         "properties": {
           "entity_type": {
             "description": "Entity type the permission applies to.",
             "title": "Entity Type",
             "type": "string"
           },
-          "operation": {
-            "$ref": "#/components/schemas/OperationTypeDTO",
-            "description": "Operation granted by the permission."
+          "permission": {
+            "$ref": "#/components/schemas/PermissionBitDTO",
+            "description": "The operation bit the entry grants."
           }
         },
         "required": [
           "entity_type",
-          "operation"
+          "permission"
         ],
         "title": "RolePermissionPresetEntry",
         "type": "object"
@@ -17980,13 +17963,13 @@
         "title": "UpdateRolePresetBody",
         "type": "object"
       },
-      "OperationTypeFilter": {
-        "description": "Filter for permission operation columns over ``OperationTypeDTO``.",
+      "PermissionBitFilter": {
+        "description": "Filter for a permission-bit column over ``PermissionBitDTO``.",
         "properties": {
           "equals": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/OperationTypeDTO"
+                "$ref": "#/components/schemas/PermissionBitDTO"
               },
               {
                 "type": "null"
@@ -17998,7 +17981,7 @@
             "anyOf": [
               {
                 "items": {
-                  "$ref": "#/components/schemas/OperationTypeDTO"
+                  "$ref": "#/components/schemas/PermissionBitDTO"
                 },
                 "type": "array"
               },
@@ -18012,7 +17995,7 @@
           "not_equals": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/OperationTypeDTO"
+                "$ref": "#/components/schemas/PermissionBitDTO"
               },
               {
                 "type": "null"
@@ -18024,7 +18007,7 @@
             "anyOf": [
               {
                 "items": {
-                  "$ref": "#/components/schemas/OperationTypeDTO"
+                  "$ref": "#/components/schemas/PermissionBitDTO"
                 },
                 "type": "array"
               },
@@ -18036,7 +18019,7 @@
             "title": "Not In"
           }
         },
-        "title": "OperationTypeFilter",
+        "title": "PermissionBitFilter",
         "type": "object"
       },
       "RolePermissionPresetFilter": {
@@ -18066,17 +18049,17 @@
             "default": null,
             "description": "Filter by entity type the permission applies to."
           },
-          "operation": {
+          "permission": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/OperationTypeFilter"
+                "$ref": "#/components/schemas/PermissionBitFilter"
               },
               {
                 "type": "null"
               }
             ],
             "default": null,
-            "description": "Filter by granted operation."
+            "description": "Filter by the operation bit granted."
           },
           "created_at": {
             "anyOf": [
@@ -18165,7 +18148,7 @@
         "description": "Fields available for ordering role permission preset entries.",
         "enum": [
           "entity_type",
-          "operation",
+          "permission",
           "created_at"
         ],
         "title": "RolePermissionPresetOrderField",
@@ -19742,20 +19725,19 @@
             "type": "string"
           },
           "entity_type": {
-            "description": "Entity element type (e.g. 'session', 'vfolder')",
+            "description": "Entity type (e.g. 'session', 'vfolder')",
             "title": "Entity Type",
             "type": "string"
           },
-          "operation": {
-            "description": "Operation type (e.g. 'read', 'create')",
-            "title": "Operation",
-            "type": "string"
+          "permission": {
+            "$ref": "#/components/schemas/PermissionBitDTO",
+            "description": "The operation bit the row holds"
           }
         },
         "required": [
           "role_id",
           "entity_type",
-          "operation"
+          "permission"
         ],
         "title": "CreatePermissionInput",
         "type": "object"
@@ -19987,21 +19969,20 @@
               }
             ],
             "default": null,
-            "description": "Updated entity element type",
+            "description": "Updated entity type",
             "title": "Entity Type"
           },
-          "operation": {
+          "permission": {
             "anyOf": [
               {
-                "type": "string"
+                "$ref": "#/components/schemas/PermissionBitDTO"
               },
               {
                 "type": "null"
               }
             ],
             "default": null,
-            "description": "Updated operation type",
-            "title": "Operation"
+            "description": "Updated operation bit"
           }
         },
         "required": [
@@ -20162,10 +20143,10 @@
             ],
             "default": null
           },
-          "operation": {
+          "permission": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/OperationTypeFilter"
+                "$ref": "#/components/schemas/PermissionBitFilter"
               },
               {
                 "type": "null"

@@ -44,7 +44,6 @@ from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.project import AssocGroupUserRow, ProjectRow
 from ai.backend.manager.models.rbac_models import UserRoleRow
-from ai.backend.manager.models.rbac_models.permission.object_permission import ObjectPermissionRow
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.resource_policy import (
@@ -152,7 +151,6 @@ class TestVFolderOwnershipTransferRBACCleanup:
                 VFolderRow,
                 VFolderInvitationRow,
                 VFolderPermissionRow,
-                ObjectPermissionRow,
                 PermissionRow,
                 VirtualEntityRow,
                 EntityMembershipRow,

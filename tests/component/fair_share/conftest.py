@@ -14,6 +14,7 @@ from ai.backend.common.data.entity.fair_share import (
     ProjectFairShareFieldType,
     UserFairShareFieldType,
 )
+from ai.backend.common.data.entity.project import ProjectEntityType
 from ai.backend.common.data.entity.resource_group import (
     ResourceGroupEntityType,
     ResourceGroupID,
@@ -24,7 +25,6 @@ from ai.backend.common.data.entity.usage_bucket import (
     ProjectUsageBucketFieldType,
     UserUsageBucketFieldType,
 )
-from ai.backend.common.data.permission.types import ScopeType
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
 from ai.backend.manager.actions.registry.types import (
     Concern,
@@ -185,7 +185,7 @@ async def group_fixture(
         await conn.execute(
             sa.insert(VirtualEntityRow.__table__).values(
                 id=virtual_entity_id,
-                entity_type=ScopeType.PROJECT,
+                entity_type=ProjectEntityType(),
                 entity_id=group_id,
             )
         )
@@ -216,7 +216,7 @@ async def group_fixture(
         )
         await conn.execute(
             VirtualEntityRow.__table__.delete().where(
-                VirtualEntityRow.__table__.c.entity_type == ScopeType.PROJECT,
+                VirtualEntityRow.__table__.c.entity_type == ProjectEntityType(),
                 VirtualEntityRow.__table__.c.entity_id == group_id,
             )
         )

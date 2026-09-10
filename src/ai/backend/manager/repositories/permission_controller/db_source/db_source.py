@@ -4,11 +4,11 @@ from collections.abc import Collection, Mapping, Sequence
 
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
-from sqlalchemy.orm import selectinload
 
+from ai.backend.common.data.entity.domain import DomainEntityType
 from ai.backend.common.data.entity.project import ProjectEntityType
 from ai.backend.common.data.entity.role import RoleID
-from ai.backend.common.data.entity.user import UserID
+from ai.backend.common.data.entity.user import UserEntityType, UserID
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.data.permission.id import ScopeId
 from ai.backend.manager.data.permission.permission import (
@@ -32,9 +32,6 @@ from ai.backend.manager.data.permission.types import (
     Permission,
     ScopeData,
     ScopeListResult,
-)
-from ai.backend.manager.data.permission.types import (
-    ScopeType as LegacyScopeType,
 )
 from ai.backend.manager.data.permission.virtual_entity import (
     GovernCheckKey,
@@ -312,15 +309,9 @@ class PermissionDBSource:
             )
 
     async def get_role_with_permissions(self, role_id: uuid.UUID) -> RoleRow:
-        """Get role with eagerly loaded permissions only (no users)."""
+        """Get the role a detail read answers with."""
         async with self._db.begin_readonly_session_read_committed() as db_sess:
-            stmt = (
-                sa.select(RoleRow)
-                .where(RoleRow.id == role_id)
-                .options(
-                    selectinload(RoleRow.object_permission_rows),
-                )
-            )
+            stmt = sa.select(RoleRow).where(RoleRow.id == role_id)
             result = await db_sess.execute(stmt)
             role_row = result.scalar_one_or_none()
             if role_row is None:
@@ -380,7 +371,7 @@ class PermissionDBSource:
 
             items = [
                 ScopeData(
-                    id=ScopeId(scope_type=LegacyScopeType.DOMAIN, scope_id=str(row.id)),
+                    id=ScopeId(scope_type=DomainEntityType(), scope_id=str(row.id)),
                     name=row.name,
                 )
                 for row in result.rows
@@ -409,7 +400,7 @@ class PermissionDBSource:
 
             items = [
                 ScopeData(
-                    id=ScopeId(scope_type=LegacyScopeType.PROJECT, scope_id=str(row.id)),
+                    id=ScopeId(scope_type=ProjectEntityType(), scope_id=str(row.id)),
                     name=row.name,
                 )
                 for row in result.rows
@@ -438,7 +429,7 @@ class PermissionDBSource:
 
             items = [
                 ScopeData(
-                    id=ScopeId(scope_type=LegacyScopeType.USER, scope_id=str(row.uuid)),
+                    id=ScopeId(scope_type=UserEntityType(), scope_id=str(row.uuid)),
                     name=row.username if row.username is not None else row.email,
                 )
                 for row in result.rows

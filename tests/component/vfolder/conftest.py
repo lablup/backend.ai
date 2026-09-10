@@ -10,14 +10,22 @@ import sqlalchemy as sa
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
+from ai.backend.common.data.entity.app_config_fragment import AppConfigFragmentEntityType
+from ai.backend.common.data.entity.artifact import ArtifactEntityType
+from ai.backend.common.data.entity.artifact_registry import ArtifactRegistryEntityType
+from ai.backend.common.data.entity.deployment import DeploymentEntityType
+from ai.backend.common.data.entity.image import ImageEntityType
+from ai.backend.common.data.entity.model_card import ModelCardEntityType
+from ai.backend.common.data.entity.notification import (
+    NotificationChannelEntityType,
+    NotificationRuleEntityType,
+)
+from ai.backend.common.data.entity.session import SessionEntityType
+from ai.backend.common.data.entity.types import EntityType
+from ai.backend.common.data.entity.user import UserEntityType
 from ai.backend.common.data.entity.vfolder import VFolderEntityType
 from ai.backend.common.data.entity.vfolder_invitation import VFolderInvitationEntityType
-from ai.backend.common.data.permission.types import (
-    EntityType,
-    Permission,
-    RoleStatus,
-    ScopeType,
-)
+from ai.backend.common.data.permission.types import Permission, RoleStatus
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
 from ai.backend.common.types import (
     HostPortPair,
@@ -86,6 +94,20 @@ VFolderFixtureData = dict[str, Any]
 VFolderFactory = Callable[..., Coroutine[Any, Any, VFolderFixtureData]]
 InvitationFixtureData = dict[str, Any]
 InvitationFactory = Callable[..., Coroutine[Any, Any, InvitationFixtureData]]
+
+
+_OWNER_ACCESSIBLE_ENTITY_TYPES: tuple[EntityType, ...] = (
+    VFolderEntityType(),
+    ImageEntityType(),
+    SessionEntityType(),
+    ArtifactEntityType(),
+    ArtifactRegistryEntityType(),
+    AppConfigFragmentEntityType(),
+    NotificationChannelEntityType(),
+    NotificationRuleEntityType(),
+    DeploymentEntityType(),
+    ModelCardEntityType(),
+)
 
 
 @pytest.fixture()
@@ -450,7 +472,7 @@ async def user_system_role(
                 name=f"user-{str(user_uuid)[:8]}",
                 source=RoleSource.SYSTEM,
                 status=RoleStatus.ACTIVE,
-                scope_type=ScopeType.USER.value,
+                scope_type=UserEntityType(),
                 scope_id=user_uuid,
             )
         )
@@ -460,7 +482,7 @@ async def user_system_role(
                 role_id=role_id,
             )
         )
-        for entity_type in EntityType.owner_accessible_entity_types_in_user():
+        for entity_type in _OWNER_ACCESSIBLE_ENTITY_TYPES:
             for bit in Permission:
                 if not bit:
                     continue

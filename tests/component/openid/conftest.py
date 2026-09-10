@@ -31,7 +31,7 @@ from authlib.jose import jwt as jose_jwt  # pants: no-infer-dep
 from sqlalchemy.ext.asyncio import create_async_engine
 
 from ai.backend.common.data.entity.domain import DomainID
-from ai.backend.common.data.permission.types import ScopeType
+from ai.backend.common.data.entity.project import ProjectEntityType
 from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
 from ai.backend.common.types import (
     ResourceSlot,
@@ -472,7 +472,7 @@ async def seed_data(
         await conn.execute(
             sa.insert(VirtualEntityRow.__table__).values(
                 id=virtual_entity_id,
-                entity_type=ScopeType.PROJECT,
+                entity_type=ProjectEntityType(),
                 entity_id=project.id,
             )
         )
@@ -501,7 +501,7 @@ async def seed_data(
         await conn.execute(users.delete())
         await conn.execute(
             VirtualEntityRow.__table__.delete().where(
-                VirtualEntityRow.__table__.c.entity_type == ScopeType.PROJECT,
+                VirtualEntityRow.__table__.c.entity_type == ProjectEntityType(),
                 VirtualEntityRow.__table__.c.entity_id == project.id,
             )
         )

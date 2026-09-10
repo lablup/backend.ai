@@ -66,7 +66,6 @@ from ai.backend.common.data.entity.user import UserEntityType
 from ai.backend.common.data.entity.vfolder import VFolderEntityType
 from ai.backend.common.data.entity.vfolder_invitation import VFolderInvitationEntityType
 from ai.backend.common.data.entity.vfs_storage import VFSStorageEntityType
-from ai.backend.manager.actions.action import RBAC_ACTION_REGISTRY
 from ai.backend.manager.actions.monitors import ActionMonitors
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
 from ai.backend.manager.actions.registry.types import (
@@ -263,7 +262,7 @@ from ai.backend.manager.services.vfs_storage.processors import VFSStorageProcess
 from ai.backend.manager.services.vfs_storage.service import VFSStorageService
 
 
-def create_services(args: ServiceArgs) -> Services:
+def create_services(args: ServiceArgs, action_registry: ProcessorRegistry[Any]) -> Services:
     repositories = args.repositories
     return Services(
         agent=AgentService(
@@ -456,7 +455,7 @@ def create_services(args: ServiceArgs) -> Services:
         ),
         permission_controller=PermissionControllerService(
             repository=repositories.permission_controller.repository,
-            rbac_action_registry=RBAC_ACTION_REGISTRY,
+            action_registry=action_registry,
         ),
         vfs_storage=VFSStorageService(
             vfs_storage_repository=repositories.vfs_storage.repository,
@@ -525,14 +524,14 @@ def create_processors(
     args: ProcessorArgs,
     monitors: ActionMonitors,
 ) -> ProcessorsBundle:
-    services = create_services(args.service_args)
     repositories = args.service_args.repositories
     # Legacy BaseAction-era packages consume the flat monitor list; packages migrated
     # to the pure-ABC frameworks pick the per-type monitors from `monitors` instead.
     action_monitors = monitors.legacy
     # One registry shared by every v2-wired package: each package wires through its
     # own group, and the registry's wired_specs() is the catalog of every
-    # registered action.
+    # registered action. Built before the services because the permission controller
+    # reads the catalog to answer what a role may permit.
     registry: ProcessorRegistry[Any] = ProcessorRegistry(
         ProcessorDependencies(
             monitors=monitors,
@@ -540,6 +539,7 @@ def create_processors(
             repository=OpsRepository(repositories.v2_ops_provider),
         )
     )
+    services = create_services(args.service_args, registry)
     # Every group is made through the area it belongs to, so every wiring names one.
     app_config_groups = registry.concern(ConcernMeta(Concern.APP_CONFIG))
     artifact_groups = registry.concern(ConcernMeta(Concern.ARTIFACT_REGISTRY))

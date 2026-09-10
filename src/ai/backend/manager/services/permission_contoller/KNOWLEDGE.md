@@ -36,9 +36,8 @@ the entity type, shape, operation, gate and backing.
 - Two shapes because the scope validator checks nothing when `scope_targets()` is
   empty. Taking the scope-less request through the scope action would leave the gate
   open.
-- The role is registered in the virtual entity graph, not in
-  `association_scopes_entities`. The readers still on that table — the project
-  remaining-role count a revocation makes — do not see a role created this way.
+- The role is registered in the virtual entity graph, which is the only place a
+  scope's roles are recorded (BA-7796).
 - Granting a role to a user and taking it back are not here. Each writes a roster place
   beside the role row, so they sit with the other graph writes in `../rbac`.
 

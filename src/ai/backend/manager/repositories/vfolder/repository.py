@@ -12,7 +12,7 @@ from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
 from ai.backend.common.contexts.user import current_user
 from ai.backend.common.data.entity.model_card import ModelCardID
 from ai.backend.common.data.entity.project import ProjectEntityType, ProjectID
-from ai.backend.common.data.entity.user import UserID
+from ai.backend.common.data.entity.user import UserEntityType, UserID
 from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.data.entity.vfolder_permission import VFolderPermissionID
 from ai.backend.common.exception import BackendAIError
@@ -30,10 +30,6 @@ from ai.backend.manager.clients.storage_proxy.session_manager import StorageSess
 from ai.backend.manager.data.agent.types import AgentStatus
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.permission.id import ScopeId
-from ai.backend.manager.data.permission.types import (
-    Permission,
-    ScopeType,
-)
 from ai.backend.manager.data.project.types import ProjectResourceInfo
 from ai.backend.manager.data.vfolder.dto import UserIdentity
 from ai.backend.manager.data.vfolder.types import (
@@ -173,14 +169,6 @@ class _VFolderWithLinkedModelCards:
 
     vfolder_row: VFolderRow
     model_card_rows: list[ModelCardRow]
-
-
-def _mount_permission_cap(permission: VFolderMountPermission) -> Permission:
-    """The ceiling a mount permission puts on the grantee's own permissions."""
-    cap = Permission.NONE
-    for operation in permission.to_rbac_operation():
-        cap |= Permission.from_operation(operation)
-    return cap
 
 
 class VfolderRepository:
@@ -942,7 +930,7 @@ class VfolderRepository:
         await w.replace_share(
             await self._landing_project(w, user_id),
             vfolder_id,
-            _mount_permission_cap(permission),
+            permission.to_permission_cap(),
         )
         return created
 
@@ -972,7 +960,7 @@ class VfolderRepository:
         await w.replace_share(
             await self._landing_project(w, user_id),
             vfolder_id,
-            _mount_permission_cap(permission),
+            permission.to_permission_cap(),
         )
         return updated
 
@@ -1237,9 +1225,9 @@ class VfolderRepository:
     def _get_vfolder_scope(self, vfolder: VFolderData) -> ScopeId:
         """Determine scope from vfolder ownership."""
         if vfolder.ownership_type == VFolderOwnershipType.USER:
-            return ScopeId(ScopeType.USER, str(vfolder.user))
+            return ScopeId(UserEntityType(), str(vfolder.user))
         # GROUP ownership
-        return ScopeId(ScopeType.PROJECT, str(vfolder.group))
+        return ScopeId(ProjectEntityType(), str(vfolder.group))
 
     async def _validate_vfolder_ownership(
         self, session: SASession, vfolder_id: uuid.UUID, user_id: uuid.UUID
