@@ -425,6 +425,10 @@ jobs:
           pants test --changed-since=$BASE_REF --changed-dependents=direct \
             --shard='${{ matrix.shard }}' \
             --filter-address-regex='tests/unit/' -- -v
+          # The installer bundles manager fixtures and halfstack configs by
+          # symlink, which no dependency graph crosses, so changing one selects
+          # no installer test. Run them unconditionally instead.
+          pants test tests/unit/install:: -- -v
         fi
     - name: Upload pants log
       uses: actions/upload-artifact@v5
