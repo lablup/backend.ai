@@ -6,7 +6,10 @@ from ai.backend.manager.actions.registry.group import ProcessorGroup
 from ai.backend.manager.actions.registry.types import FieldGroupMeta
 from ai.backend.manager.actions.v2.bulk.partial_processor import PartialBulkActionProcessor
 from ai.backend.manager.actions.v2.field.bulk_processor import PartialBulkFieldActionProcessor
-from ai.backend.manager.actions.v2.global_scope.processor import GlobalActionProcessor
+from ai.backend.manager.actions.v2.global_scope.processor import (
+    GlobalActionProcessor,
+    PublicActionProcessor,
+)
 from ai.backend.manager.actions.v2.ops.result import (
     CreatedEntityOpsResult,
     CreatedFieldOpsResult,
@@ -40,8 +43,8 @@ from .actions.get_entity_types import (
     GlobalGetEntityTypesActionResult,
 )
 from .actions.get_permission_matrix import (
-    GetPermissionMatrixAction,
-    GetPermissionMatrixActionResult,
+    PublicGetPermissionMatrixAction,
+    PublicGetPermissionMatrixActionResult,
 )
 from .actions.get_scope_types import (
     GlobalGetScopeTypesAction,
@@ -109,8 +112,8 @@ class PermissionControllerProcessors:
     global_get_entity_types: GlobalActionProcessor[
         GlobalGetEntityTypesAction, GlobalGetEntityTypesActionResult
     ]
-    get_permission_matrix: ActionProcessor[
-        GetPermissionMatrixAction, GetPermissionMatrixActionResult
+    public_get_permission_matrix: PublicActionProcessor[
+        PublicGetPermissionMatrixAction, PublicGetPermissionMatrixActionResult
     ]
     search_permissions: ActionProcessor[SearchPermissionsAction, SearchPermissionsActionResult]
     create_permission: ActionProcessor[CreatePermissionAction, CreatePermissionActionResult]
@@ -162,7 +165,9 @@ class PermissionControllerProcessors:
         self.global_get_entity_types = role_group.global_scope(
             GlobalGetEntityTypesAction, service.get_entity_types
         )
-        self.get_permission_matrix = ActionProcessor(service.get_permission_matrix, action_monitors)
+        self.public_get_permission_matrix = role_group.public(
+            PublicGetPermissionMatrixAction, service.get_permission_matrix
+        )
         self.search_permissions = ActionProcessor(service.search_permissions, action_monitors)
         self.create_permission = ActionProcessor(service.create_permission, action_monitors)
         self.update_permission = ActionProcessor(service.update_permission, action_monitors)

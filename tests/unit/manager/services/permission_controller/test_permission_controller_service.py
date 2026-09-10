@@ -39,7 +39,7 @@ from ai.backend.manager.services.permission_contoller.actions.get_entity_types i
     GlobalGetEntityTypesAction,
 )
 from ai.backend.manager.services.permission_contoller.actions.get_permission_matrix import (
-    GetPermissionMatrixAction,
+    PublicGetPermissionMatrixAction,
 )
 from ai.backend.manager.services.permission_contoller.actions.get_role_detail import (
     GetRoleDetailAction,
@@ -494,7 +494,7 @@ class TestPermissionCatalog:
         self,
         service: PermissionControllerService,
     ) -> None:
-        result = await service.get_permission_matrix(GetPermissionMatrixAction())
+        result = await service.get_permission_matrix(PublicGetPermissionMatrixAction())
 
         assert set(result.matrix) == set(role_scope_types())
         entity_maps = [sorted(entity_map) for entity_map in result.matrix.values()]
@@ -504,7 +504,7 @@ class TestPermissionCatalog:
         self,
         service: PermissionControllerService,
     ) -> None:
-        matrix = (await service.get_permission_matrix(GetPermissionMatrixAction())).matrix
+        matrix = (await service.get_permission_matrix(PublicGetPermissionMatrixAction())).matrix
         entity_types = (await service.get_entity_types(GlobalGetEntityTypesAction())).entity_types
 
         for entity_map in matrix.values():
@@ -514,7 +514,7 @@ class TestPermissionCatalog:
         self,
         service: PermissionControllerService,
     ) -> None:
-        matrix = (await service.get_permission_matrix(GetPermissionMatrixAction())).matrix
+        matrix = (await service.get_permission_matrix(PublicGetPermissionMatrixAction())).matrix
 
         operations = matrix[DomainEntityType()][RoleEntityType()]
         assert operations

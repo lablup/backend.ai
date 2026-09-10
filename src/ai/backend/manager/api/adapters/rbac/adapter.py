@@ -199,7 +199,7 @@ from ai.backend.manager.services.permission_contoller.actions.bulk_remove_role_p
 from ai.backend.manager.services.permission_contoller.actions.create_role import CreateRoleAction
 from ai.backend.manager.services.permission_contoller.actions.delete_role import DeleteRoleAction
 from ai.backend.manager.services.permission_contoller.actions.get_permission_matrix import (
-    GetPermissionMatrixAction,
+    PublicGetPermissionMatrixAction,
 )
 from ai.backend.manager.services.permission_contoller.actions.get_role_detail import (
     GetRoleDetailAction,
@@ -490,8 +490,8 @@ class RBACAdapter(BaseAdapter):
     async def _permission_matrix(
         self,
     ) -> Mapping[EntityType, Mapping[EntityType, Sequence[GrantableOperation]]]:
-        action_result = await self._permission_controller.get_permission_matrix.wait_for_complete(
-            GetPermissionMatrixAction()
+        action_result = await self._permission_controller.public_get_permission_matrix.run(
+            PublicGetPermissionMatrixAction()
         )
         return action_result.matrix
 

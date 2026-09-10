@@ -17,8 +17,8 @@ from ai.backend.manager.services.permission_contoller.actions.get_entity_types i
     GlobalGetEntityTypesActionResult,
 )
 from ai.backend.manager.services.permission_contoller.actions.get_permission_matrix import (
-    GetPermissionMatrixAction,
-    GetPermissionMatrixActionResult,
+    PublicGetPermissionMatrixAction,
+    PublicGetPermissionMatrixActionResult,
 )
 from ai.backend.manager.services.permission_contoller.actions.get_role_detail import (
     GetRoleDetailAction,
@@ -191,12 +191,14 @@ class PermissionControllerService:
         }
 
     async def get_permission_matrix(
-        self, _action: GetPermissionMatrixAction
-    ) -> GetPermissionMatrixActionResult:
+        self, _action: PublicGetPermissionMatrixAction
+    ) -> PublicGetPermissionMatrixActionResult:
         """The scope-entity-operation matrix a role editor offers.
 
         A permission row names an entity type and no scope, so every scope carries the
         same entities; the scope axis is there because a role sits in one.
         """
         operations = self._grantable_operations()
-        return GetPermissionMatrixActionResult(matrix=dict.fromkeys(role_scope_types(), operations))
+        return PublicGetPermissionMatrixActionResult(
+            matrix=dict.fromkeys(role_scope_types(), operations)
+        )
