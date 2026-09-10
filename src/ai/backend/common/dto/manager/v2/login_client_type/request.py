@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Self
+from typing import Annotated, Self
 
 from pydantic import Field
 
@@ -43,10 +43,8 @@ class UpdateLoginClientTypeInput(BaseRequestModel):
     Every field defaults to UNSET (no change). ``description`` accepts ``null`` to clear.
     """
 
-    name: str | None | Unset = Field(
+    name: Annotated[str, Field(min_length=1, max_length=64)] | None | Unset = Field(
         default=UNSET,
-        min_length=1,
-        max_length=64,
         description="Updated name. Omit to leave unchanged.",
     )
     description: str | None | Unset = Field(
