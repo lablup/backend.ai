@@ -52,7 +52,7 @@ class ReplicaUpdater(DataUpdater[RoutingRow, RoutingData]):
         return RoutingRow.id
 
     @override
-    def target_id_value(self) -> UUID:
+    def target_id_value(self) -> ReplicaID:
         return self.replica_id
 
     @property

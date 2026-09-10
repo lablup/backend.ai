@@ -1,17 +1,17 @@
-"""Entity types of the fair share tables."""
+"""Field types of the fair share tables."""
 
 from typing import override
 
-from ai.backend.common.data.entity.types import EntityType
+from ai.backend.common.data.entity.types import DanglingFieldType
 
 __all__ = (
-    "DomainFairShareEntityType",
-    "ProjectFairShareEntityType",
-    "UserFairShareEntityType",
+    "DomainFairShareFieldType",
+    "ProjectFairShareFieldType",
+    "UserFairShareFieldType",
 )
 
 
-class DomainFairShareEntityType(EntityType):
+class DomainFairShareFieldType(DanglingFieldType):
     @override
     @classmethod
     def name(cls) -> str:
@@ -23,7 +23,7 @@ class DomainFairShareEntityType(EntityType):
         return "A domain's scheduling priority in a resource group, from past usage and weight."
 
 
-class ProjectFairShareEntityType(EntityType):
+class ProjectFairShareFieldType(DanglingFieldType):
     @override
     @classmethod
     def name(cls) -> str:
@@ -35,7 +35,7 @@ class ProjectFairShareEntityType(EntityType):
         return "A project's scheduling priority in a resource group, from past usage and weight."
 
 
-class UserFairShareEntityType(EntityType):
+class UserFairShareFieldType(DanglingFieldType):
     @override
     @classmethod
     def name(cls) -> str:

@@ -13,7 +13,7 @@ import sys
 import traceback
 from collections.abc import AsyncGenerator, AsyncIterator, Callable, Sequence
 from contextlib import AsyncExitStack, asynccontextmanager
-from datetime import UTC, datetime
+from dataclasses import dataclass
 from pathlib import Path
 from pprint import pformat, pprint
 from typing import Any
@@ -26,64 +26,19 @@ from aiohttp import web
 from aiohttp.typedefs import Middleware
 from setproctitle import setproctitle
 
-from ai.backend.common.bgtask.bgtask import BackgroundTaskManager, BackgroundTaskManagerArgs
-from ai.backend.common.clients.valkey_client.valkey_artifact.client import (
-    ValkeyArtifactDownloadTrackingClient,
-)
-from ai.backend.common.clients.valkey_client.valkey_bgtask.client import ValkeyBgtaskClient
-from ai.backend.common.clients.valkey_client.valkey_tus.client import (
-    ValkeyTusClient,
-)
-from ai.backend.common.clients.valkey_client.valkey_volume_stats import ValkeyVolumeStatsClient
 from ai.backend.common.config import (
     ConfigurationError,
 )
-from ai.backend.common.configs.redis import RedisConfig
-from ai.backend.common.data.artifact.types import ArtifactRegistryType
 from ai.backend.common.defs import (
     NOOP_STORAGE_VOLUME_NAME,
-    REDIS_BGTASK_DB,
-    REDIS_STATISTICS_DB,
-    REDIS_STREAM_DB,
-    REDIS_TUS_DB,
-    RedisRole,
 )
+from ai.backend.common.dependencies import DependencyBuilderStack
 from ai.backend.common.etcd import AsyncEtcd
-from ai.backend.common.events.dispatcher import EventDispatcher, EventProducer
-from ai.backend.common.health_checker.checkers.etcd import EtcdHealthChecker
-from ai.backend.common.health_checker.checkers.valkey import ValkeyHealthChecker
-from ai.backend.common.health_checker.probe import HealthProbe, HealthProbeOptions
-from ai.backend.common.health_checker.types import ComponentId
-from ai.backend.common.message_queue.queue import AbstractMessageQueue
-from ai.backend.common.message_queue.redis_queue import RedisMQArgs, RedisQueue
-from ai.backend.common.metrics.metric import CommonMetricRegistry
 from ai.backend.common.metrics.multiprocess_setup import cleanup_prometheus_multiprocess_dir
 from ai.backend.common.metrics.profiler import Profiler, PyroscopeArgs
 from ai.backend.common.msgpack import DEFAULT_PACK_OPTS, DEFAULT_UNPACK_OPTS
 from ai.backend.common.networking import force_threaded_dns_resolver
 from ai.backend.common.plugin import AbstractPlugin, BasePluginContext
-from ai.backend.common.runner.types import Runner
-from ai.backend.common.service_discovery.etcd_discovery.service_discovery import (
-    ETCDServiceDiscovery,
-    ETCDServiceDiscoveryArgs,
-)
-from ai.backend.common.service_discovery.event_publisher import ServiceDiscoveryEventPublisher
-from ai.backend.common.service_discovery.redis_discovery.service_discovery import (
-    RedisServiceDiscovery,
-    RedisServiceDiscoveryArgs,
-)
-from ai.backend.common.service_discovery.service_discovery import (
-    ServiceDiscovery,
-    ServiceDiscoveryLoop,
-    ServiceEndpoint,
-    ServiceMetadata,
-)
-from ai.backend.common.types import (
-    AGENTID_STORAGE,
-    RedisProfileTarget,
-    ServiceDiscoveryType,
-    safe_print_redis_config,
-)
 from ai.backend.common.types import HostPortPair as CommonHostPortPair
 from ai.backend.common.utils import env_info
 from ai.backend.logging import BraceStyleAdapter, Logger, LogLevel
@@ -98,28 +53,21 @@ except ImportError:
 from . import __version__ as VERSION
 from .api.client import init_client_app
 from .api.manager import init_internal_app, init_manager_app
-from .bgtask.registry import BgtaskHandlerRegistryCreator
-from .client.manager import ManagerHTTPClientPool
-from .config.loaders import load_local_config, make_etcd
+from .config.loaders import load_local_config
 from .config.unified import (
     EventLoopType,
-    LegacyReservoirConfig,
-    ReservoirConfig,
     StorageProxyUnifiedConfig,
 )
-from .context import DEFAULT_BACKENDS, EVENT_DISPATCHER_CONSUMER_GROUP, RootContext
+from .context import RootContext
+from .dependencies.composer import DependencyInput, StorageDependencyComposer
 from .errors import InvalidConfigurationSourceError, InvalidSocketPathError
 from .migration import check_latest
 from .plugin import (
     StorageClientWebappPluginContext,
     StorageManagerWebappPluginContext,
-    StoragePluginContext,
 )
-from .storages.storage_pool import StoragePool
 from .volumes.noop import init_noop_volume
-from .volumes.pool import VolumePool
-from .volumes.stats import VolumeState, VolumeStatsObserver, VolumeStatsObserverOptions
-from .watcher import WatcherClient, main_job
+from .watcher import main_job
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -128,19 +76,31 @@ def _is_root() -> bool:
     return os.geteuid() == 0
 
 
+@dataclass
+class ServerMainArgs:
+    local_config: StorageProxyUnifiedConfig
+    config_path: Path | None
+    log_endpoint: str
+    log_level: LogLevel
+
+
 @aiotools.server_context
 async def server_main_logwrapper(
     loop: asyncio.AbstractEventLoop,
     pidx: int,
-    _args: Sequence[Any],
+    tuple_args: Sequence[Any],
 ) -> AsyncGenerator[None, signal.Signals]:
     setproctitle(f"backend.ai: storage-proxy worker-{pidx}")
-    local_config: StorageProxyUnifiedConfig = _args[0]
-    log_endpoint = _args[1]
+    args = ServerMainArgs(
+        local_config=tuple_args[0],
+        config_path=tuple_args[1],
+        log_endpoint=tuple_args[2],
+        log_level=tuple_args[3],
+    )
     logger = Logger(
-        local_config.logging,
+        args.local_config.logging,
         is_master=False,
-        log_endpoint=log_endpoint,
+        log_endpoint=args.log_endpoint,
         msgpack_options={
             "pack_opts": DEFAULT_PACK_OPTS,
             "unpack_opts": DEFAULT_UNPACK_OPTS,
@@ -148,7 +108,7 @@ async def server_main_logwrapper(
     )
     try:
         with logger:
-            async with server_main(loop, pidx, _args):
+            async with server_main(loop, pidx, args):
                 yield
     except Exception:
         traceback.print_exc(file=sys.stderr)
@@ -194,186 +154,11 @@ async def aiomonitor_ctx(
 
 
 @asynccontextmanager
-async def etcd_ctx(local_config: StorageProxyUnifiedConfig) -> AsyncGenerator[AsyncEtcd]:
-    async with make_etcd(local_config) as etcd:
-        yield etcd
-
-
-@asynccontextmanager
-async def redis_ctx(etcd: AsyncEtcd, pidx: int) -> AsyncGenerator[RedisConfig]:
-    raw_redis_config = await etcd.get_prefix("config/redis")
-    redis_config = RedisConfig.model_validate(raw_redis_config)
-    log.info(
-        "PID: {0} - configured redis_config: {1}",
-        pidx,
-        safe_print_redis_config(redis_config),
-    )
-    yield redis_config
-
-
-@asynccontextmanager
-async def bgtask_ctx(
-    local_config: StorageProxyUnifiedConfig,
-    redis_config: RedisConfig,
-    event_producer: EventProducer,
-    volume_pool: VolumePool,
-) -> AsyncGenerator[BackgroundTaskManager]:
-    redis_profile_target = redis_config.to_redis_profile_target()
-    valkey_client = await ValkeyBgtaskClient.create(
-        redis_profile_target.profile_target(RedisRole.BGTASK).to_valkey_target(),
-        human_readable_name="storage_bgtask",
-        db_id=REDIS_BGTASK_DB,
-    )
-    bgtask_registry_creator = BgtaskHandlerRegistryCreator(volume_pool, event_producer)
-    registry = bgtask_registry_creator.create()
-    bgtask_mgr = BackgroundTaskManager(
-        BackgroundTaskManagerArgs(
-            event_producer=event_producer,
-            task_registry=registry,
-            valkey_client=valkey_client,
-            server_id=local_config.storage_proxy.node_id,
-        )
-    )
-    await bgtask_mgr.init()
-
-    try:
-        yield bgtask_mgr
-    finally:
-        await bgtask_mgr.shutdown()
-        await valkey_client.close()
-
-
-async def _make_message_queue(
-    local_config: StorageProxyUnifiedConfig,
-    redis_profile_target: RedisProfileTarget,
-) -> AbstractMessageQueue:
-    stream_redis_target = redis_profile_target.profile_target(RedisRole.STREAM)
-    node_id = local_config.storage_proxy.node_id
-    args = RedisMQArgs(
-        anycast_stream_key="events",
-        broadcast_channel="events_all",
-        consume_stream_keys=None,
-        subscribe_channels={
-            "events_all",
-        },
-        group_name=EVENT_DISPATCHER_CONSUMER_GROUP,
-        node_id=node_id,
-        db=REDIS_STREAM_DB,
-    )
-    return await RedisQueue.create(
-        stream_redis_target,
-        args,
-    )
-
-
-@asynccontextmanager
-async def event_ctx(
-    local_config: StorageProxyUnifiedConfig,
-    redis_config: RedisConfig,
-    pidx: int,
-    metric_registry: CommonMetricRegistry,
-) -> AsyncGenerator[tuple[EventDispatcher, EventProducer]]:
-    redis_profile_target = redis_config.to_redis_profile_target()
-    mq = await _make_message_queue(
-        local_config,
-        redis_profile_target,
-    )
-    event_producer = EventProducer(
-        mq,
-        source=AGENTID_STORAGE,
-        log_events=local_config.debug.log_events,
-    )
-    log.info(
-        "PID: {0} - Event producer created. (redis_config: {1})",
-        pidx,
-        safe_print_redis_config(redis_config),
-    )
-    event_dispatcher = EventDispatcher(
-        mq,
-        log_events=local_config.debug.log_events,
-        event_observer=metric_registry.event,
-    )
-    log.info(
-        "PID: {0} - Event dispatcher created. (redis_config: {1})",
-        pidx,
-        safe_print_redis_config(redis_config),
-    )
-    await event_dispatcher.start()
-    try:
-        yield event_dispatcher, event_producer
-    finally:
-        await event_producer.close()
-        await event_dispatcher.close()
-
-
-@asynccontextmanager
-async def watcher_ctx(
-    local_config: StorageProxyUnifiedConfig,
-    pidx: int,
-) -> AsyncGenerator[WatcherClient | None]:
-    if local_config.storage_proxy.use_watcher:
-        if not _is_root():
-            raise InvalidConfigurationSourceError(
-                "Storage proxy must be run as root if watcher is enabled. Else, set"
-                " `use-watcher` to false in your local config file."
-            )
-        insock_path: str | None = local_config.storage_proxy.watcher_insock_path_prefix
-        outsock_path: str | None = local_config.storage_proxy.watcher_outsock_path_prefix
-        if insock_path is None or outsock_path is None:
-            raise InvalidSocketPathError(
-                "Socket path must be not null. Please set valid socket path to"
-                " `watcher-insock-path-prefix` and `watcher-outsock-path-prefix` in your local"
-                " config file."
-            )
-        watcher_client = WatcherClient(pidx, insock_path, outsock_path)
-        await watcher_client.init()
-    else:
-        watcher_client = None
-    try:
-        yield watcher_client
-    finally:
-        if watcher_client is not None:
-            await watcher_client.close()
-
-
-@asynccontextmanager
-async def volume_ctx(
-    local_config: StorageProxyUnifiedConfig,
-    etcd: AsyncEtcd,
-    event_dispatcher: EventDispatcher,
-    event_producer: EventProducer,
-) -> AsyncGenerator[VolumePool]:
-    volume_pool = await VolumePool.create(
-        local_config=local_config,
-        etcd=etcd,
-        event_dispatcher=event_dispatcher,
-        event_producer=event_producer,
-    )
-    try:
-        yield volume_pool
-    finally:
-        await volume_pool.shutdown()
-
-
-@asynccontextmanager
 async def api_ctx(
     local_config: StorageProxyUnifiedConfig,
     etcd: AsyncEtcd,
     root_ctx: RootContext,
 ) -> AsyncGenerator[tuple[web.Application, web.Application, web.Application]]:
-    @asynccontextmanager
-    async def _init_storage_plugin() -> AsyncGenerator[StoragePluginContext]:
-        plugin_ctx = StoragePluginContext(etcd, local_config.model_dump())
-        await plugin_ctx.init()
-        for plugin_name, plugin_instance in plugin_ctx.plugins.items():
-            log.info("Loading storage plugin: {0}", plugin_name)
-            volume_cls = plugin_instance.get_volume_class()
-            root_ctx.backends[plugin_name] = volume_cls
-        try:
-            yield plugin_ctx
-        finally:
-            await plugin_ctx.cleanup()
-
     @asynccontextmanager
     async def _init_storage_webapp_plugin(
         plugin_ctx: BasePluginContext[AbstractPlugin], root_app: web.Application
@@ -468,7 +253,6 @@ async def api_ctx(
             await internal_api_runner.cleanup()
 
     async with AsyncExitStack() as api_init_stack:
-        await api_init_stack.enter_async_context(_init_storage_plugin())
         client_api_app = await api_init_stack.enter_async_context(client_api_ctx())
         manager_api_app = await api_init_stack.enter_async_context(manager_api_ctx())
         internal_api_app = await api_init_stack.enter_async_context(internal_api_ctx())
@@ -489,87 +273,6 @@ async def api_ctx(
         finally:
             # volume instances are lazily initialized upon their first usage by the API layers.
             await root_ctx.shutdown_volumes()
-            await root_ctx.shutdown_manager_http_clients()
-
-
-@asynccontextmanager
-async def service_discovery_ctx(
-    local_config: StorageProxyUnifiedConfig,
-    etcd: AsyncEtcd,
-    redis_config: RedisConfig,
-    event_producer: EventProducer | None = None,
-) -> AsyncGenerator[None]:
-    announce_addr_config = local_config.api.manager.announce_addr
-    announce_addr = CommonHostPortPair(
-        host=announce_addr_config.host,
-        port=announce_addr_config.port,
-    )
-    announce_internal_addr_config = local_config.api.manager.announce_internal_addr
-    announce_internal_addr = CommonHostPortPair(
-        host=announce_internal_addr_config.host,
-        port=announce_internal_addr_config.port,
-    )
-
-    sd_type = local_config.service_discovery.type
-
-    service_discovery: ServiceDiscovery
-    match sd_type:
-        case ServiceDiscoveryType.ETCD:
-            service_discovery = ETCDServiceDiscovery(ETCDServiceDiscoveryArgs(etcd))
-        case ServiceDiscoveryType.REDIS:
-            valkey_profile_target = redis_config.to_valkey_profile_target()
-            live_valkey_target = valkey_profile_target.profile_target(RedisRole.LIVE)
-            service_discovery = await RedisServiceDiscovery.create(
-                args=RedisServiceDiscoveryArgs(valkey_target=live_valkey_target)
-            )
-
-    sd_loop = ServiceDiscoveryLoop(
-        sd_type,
-        service_discovery,
-        ServiceMetadata(
-            display_name=f"storage-{local_config.storage_proxy.node_id}",
-            service_group="storage-proxy",
-            version=VERSION,
-            endpoint=ServiceEndpoint(
-                address=str(announce_addr),
-                port=announce_addr.port,
-                protocol="http",
-                prometheus_address=str(announce_internal_addr),
-            ),
-        ),
-    )
-    if local_config.otel.enabled:
-        meta = sd_loop.metadata
-        otel_spec = OpenTelemetrySpec(
-            service_name=meta.service_group,
-            service_version=meta.version,
-            log_level=local_config.otel.log_level,
-            endpoint=local_config.otel.endpoint,
-            service_instance_id=meta.id,
-            service_instance_name=meta.display_name,
-            max_queue_size=local_config.otel.max_queue_size,
-            max_export_batch_size=local_config.otel.max_export_batch_size,
-        )
-        BraceStyleAdapter.apply_otel(otel_spec)
-
-    # Start event-based SD publishing if config has service_group set
-    sd_config = local_config.service_discovery
-    sd_event_publisher: ServiceDiscoveryEventPublisher | None = None
-    if sd_config.service_group and event_producer is not None:
-        sd_event_publisher = ServiceDiscoveryEventPublisher(
-            event_producer=event_producer,
-            config=sd_config,
-            component_version=VERSION,
-            startup_time=datetime.now(tz=UTC),
-        )
-        await sd_event_publisher.start()
-
-    try:
-        yield
-    finally:
-        if sd_event_publisher is not None:
-            await sd_event_publisher.stop()
-        sd_loop.close()
 
 
 async def _on_prepare(_request: web.Request, response: web.StreamResponse) -> None:
@@ -602,114 +305,32 @@ def _init_subapp(
 async def server_main(
     loop: asyncio.AbstractEventLoop,
     pidx: int,
-    _args: Sequence[Any],
+    args: ServerMainArgs,
 ) -> AsyncIterator[None]:
-    local_config: StorageProxyUnifiedConfig = _args[0]
-    loop.set_debug(local_config.debug.asyncio)
+    loop.set_debug(args.local_config.debug.asyncio)
 
     storage_init_stack = AsyncExitStack()
     await storage_init_stack.__aenter__()
     try:
-        metric_registry = CommonMetricRegistry()
-        monitor = await storage_init_stack.enter_async_context(aiomonitor_ctx(local_config, pidx))
-        etcd = await storage_init_stack.enter_async_context(etcd_ctx(local_config))
-        redis_config = await storage_init_stack.enter_async_context(redis_ctx(etcd, pidx))
-        event_dispatcher, event_producer = await storage_init_stack.enter_async_context(
-            event_ctx(local_config, redis_config, pidx, metric_registry)
+        monitor = await storage_init_stack.enter_async_context(
+            aiomonitor_ctx(args.local_config, pidx)
         )
 
-        # Create StoragePool with both object storage and VFS storage
-        volume_pool = await storage_init_stack.enter_async_context(
-            volume_ctx(local_config, etcd, event_dispatcher, event_producer)
-        )
-        storage_pool = StoragePool.from_config(local_config)
-
-        # Clean up temporary storages only on the first process
-        if pidx == 0:
-            storage_pool.cleanup_temporary_storages()
-
-        bgtask_mgr = await storage_init_stack.enter_async_context(
-            bgtask_ctx(local_config, redis_config, event_producer, volume_pool)
-        )
-        watcher_client = await storage_init_stack.enter_async_context(
-            watcher_ctx(local_config, pidx)
+        dep_stack = DependencyBuilderStack()
+        await storage_init_stack.enter_async_context(dep_stack)
+        dep_resources = await dep_stack.enter_composer(
+            StorageDependencyComposer(),
+            DependencyInput(
+                config_path=args.config_path,
+                pidx=pidx,
+                log_level=args.log_level,
+            ),
         )
 
-        # Create ValkeyArtifactDownloadTrackingClient
-        valkey_target = redis_config.to_valkey_target()
-        valkey_artifact_client = await ValkeyArtifactDownloadTrackingClient.create(
-            valkey_target=valkey_target,
-            db_id=REDIS_STATISTICS_DB,
-            human_readable_name=f"storage-proxy-artifact-download-tracker-{pidx}",
-        )
-        storage_init_stack.push_async_callback(valkey_artifact_client.close)
-
-        valkey_tus_client = await ValkeyTusClient.create(
-            valkey_target=valkey_target,
-            db_id=REDIS_TUS_DB,
-            human_readable_name=f"storage-proxy-tus-{pidx}",
-        )
-        storage_init_stack.push_async_callback(valkey_tus_client.close)
-
-        # Initialize health probe
-        health_probe = HealthProbe(options=HealthProbeOptions(check_interval=60))
-        # Liveness-registered: also surfaced in readiness — connection-stuck
-        # issues observed where restart is the actual recovery path.
-        await health_probe.register_liveness(EtcdHealthChecker(etcd=etcd))
-        await health_probe.register_liveness(
-            ValkeyHealthChecker(
-                clients={
-                    ComponentId("bgtask"): bgtask_mgr._valkey_client,
-                    ComponentId("artifact"): valkey_artifact_client,
-                }
-            )
-        )
-        await health_probe.start()
-        storage_init_stack.push_async_callback(health_probe.stop)
-
-        # Initialize volume stats observer
-        volume_stats_options = VolumeStatsObserverOptions(
-            observe_interval=local_config.storage_proxy.volume_stats.observe_interval,
-            timeout_per_volume=local_config.storage_proxy.volume_stats.observe_timeout,
-            cache_ttl=local_config.storage_proxy.volume_stats.cache_ttl,
-        )
-        valkey_volume_stats_client = await ValkeyVolumeStatsClient.create(
-            valkey_target=valkey_target,
-            db_id=REDIS_STATISTICS_DB,
-            human_readable_name=f"storage-proxy-volume-stats-{pidx}",
-        )
-        storage_init_stack.push_async_callback(valkey_volume_stats_client.close)
-
-        volume_stats_observer = VolumeStatsObserver(
-            volume_pool=volume_pool,
-            valkey_client=valkey_volume_stats_client,
-            options=volume_stats_options,
-        )
-        volume_stats_runner = Runner(resources=[])
-        await volume_stats_runner.register_observer(volume_stats_observer)
-        await volume_stats_runner.start()
-        storage_init_stack.push_async_callback(volume_stats_runner.close)
-
-        volume_stats_state = VolumeState(
-            volume_pool=volume_pool,
-            valkey_client=valkey_volume_stats_client,
-            options=volume_stats_options,
-        )
-
-        # Build reservoir registry configs for ManagerHTTPClientPool
-        reservoir_registry_configs: dict[str, ReservoirConfig] = {
-            name: r.reservoir
-            for name, r in local_config.artifact_registries.items()
-            if r.registry_type == ArtifactRegistryType.RESERVOIR and r.reservoir is not None
-        }
-        for legacy_registry in local_config.registries:
-            if isinstance(legacy_registry.config, LegacyReservoirConfig):
-                reservoir_registry_configs[legacy_registry.name] = legacy_registry.config
-
-        manager_client_pool = ManagerHTTPClientPool(
-            reservoir_registry_configs,
-            local_config.reservoir_client,
-        )
+        local_config = dep_resources.bootstrap.config
+        etcd = dep_resources.infrastructure.etcd
+        event_dispatcher = dep_resources.messaging.event_dispatcher
+        event_producer = dep_resources.messaging.event_producer
 
         root_ctx = RootContext(
             pid=os.getpid(),
@@ -717,25 +338,25 @@ async def server_main(
             node_id=local_config.storage_proxy.node_id,
             local_config=local_config,
             etcd=etcd,
-            volume_pool=volume_pool,
-            storage_pool=storage_pool,
-            background_task_manager=bgtask_mgr,
+            volume_pool=dep_resources.storage.volume_pool,
+            storage_pool=dep_resources.storage.storage_pool,
+            background_task_manager=dep_resources.storage.background_task_manager,
             event_producer=event_producer,
             event_dispatcher=event_dispatcher,
-            watcher=watcher_client,
-            metric_registry=metric_registry,
+            watcher=dep_resources.storage.watcher,
+            metric_registry=dep_resources.bootstrap.metric_registry,
             cors_options={
                 "*": aiohttp_cors.ResourceOptions(  # type: ignore[no-untyped-call]
                     allow_credentials=False, expose_headers="*", allow_headers="*"
                 ),
             },
-            manager_client_pool=manager_client_pool,
-            valkey_artifact_client=valkey_artifact_client,
-            valkey_tus_client=valkey_tus_client,
-            health_probe=health_probe,
-            volume_stats_observer=volume_stats_observer,
-            volume_stats_state=volume_stats_state,
-            backends={**DEFAULT_BACKENDS},
+            manager_client_pool=dep_resources.storage.manager_client_pool,
+            valkey_artifact_client=dep_resources.infrastructure.valkey.artifact,
+            valkey_tus_client=dep_resources.infrastructure.valkey.tus,
+            health_probe=dep_resources.system.health_probe,
+            volume_stats_observer=dep_resources.storage.volume_stats.observer,
+            volume_stats_state=dep_resources.storage.volume_stats.state,
+            backends={**dep_resources.plugins.backends},
             volumes={
                 NOOP_STORAGE_VOLUME_NAME: init_noop_volume(etcd, event_dispatcher, event_producer)
             },
@@ -744,6 +365,20 @@ async def server_main(
         await root_ctx.init_storage_artifact_verifier_plugin()
         if pidx == 0:
             await check_latest(root_ctx)
+
+        if local_config.otel.enabled:
+            meta = dep_resources.system.service_discovery.sd_loop.metadata
+            otel_spec = OpenTelemetrySpec(
+                service_name=meta.service_group,
+                service_version=meta.version,
+                log_level=local_config.otel.log_level,
+                endpoint=local_config.otel.endpoint,
+                service_instance_id=meta.id,
+                service_instance_name=meta.display_name,
+                max_queue_size=local_config.otel.max_queue_size,
+                max_export_batch_size=local_config.otel.max_export_batch_size,
+            )
+            BraceStyleAdapter.apply_otel(otel_spec)
 
         (
             client_api_app,
@@ -754,10 +389,6 @@ async def server_main(
         monitor.console_locals["client_api_app"] = client_api_app
         monitor.console_locals["manager_api_app"] = manager_api_app
         monitor.console_locals["internal_api_app"] = internal_api_app
-
-        await storage_init_stack.enter_async_context(
-            service_discovery_ctx(local_config, etcd, redis_config, event_producer)
-        )
 
         if _is_root():
             uid = local_config.storage_proxy.user
@@ -814,8 +445,9 @@ def main(
     """Start the storage-proxy service as a foreground process."""
     force_threaded_dns_resolver()
     log_level = LogLevel.DEBUG if debug else log_level
+    resolved_config_path = config_path.resolve() if config_path is not None else None
     try:
-        local_config = load_local_config(config_path, log_level=log_level)
+        local_config = load_local_config(resolved_config_path, log_level=log_level)
     except ConfigurationError as e:
         print(
             "ConfigurationError: Could not read or validate the storage-proxy local config:",
@@ -902,7 +534,7 @@ def main(
                         server_main_logwrapper,
                         num_workers=num_workers,
                         extra_procs=extra_procs,
-                        args=(local_config, log_endpoint),
+                        args=(local_config, resolved_config_path, log_endpoint, log_level),
                         runner=runner,
                     )
                 finally:

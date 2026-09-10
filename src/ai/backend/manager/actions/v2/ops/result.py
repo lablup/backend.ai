@@ -44,6 +44,8 @@ __all__ = (
     "EntitiesOpsResult",
     "BatchOpsResult",
     "ScopedBatchOpsResult",
+    "RelationWriteResult",
+    "BulkRelationResult",
 )
 
 
@@ -265,3 +267,29 @@ class ScopedBatchOpsResult[TData: EntityData](BatchOpsResult[TData], BaseScopeAc
         settle by returning less than the run knows.
         """
         return tuple(item.entity_id() for item in self.items)
+
+
+@dataclass(frozen=True)
+class RelationWriteResult:
+    """How one pair of a bulk relation write fared.
+
+    ``written`` says whether the row moved; a pair the write had nothing to do for
+    answers ``False`` with no error. ``error`` carries why a pair was refused.
+    """
+
+    scope: EntityIdentifier
+    target: EntityIdentifier
+    written: bool
+    error: Exception | None = None
+
+
+@dataclass
+class BulkRelationResult:
+    """How each pair a bulk relation write named fared, in the order named.
+
+    A list rather than a mapping, unlike :class:`BulkFieldOpsResult`: a relation is
+    named by a pair and never by an id, so there is no key to hold the answer under,
+    and the caller reads its own list back in order.
+    """
+
+    results: Sequence[RelationWriteResult]

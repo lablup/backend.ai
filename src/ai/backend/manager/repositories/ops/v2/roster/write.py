@@ -17,7 +17,7 @@ from typing import ClassVar
 
 import sqlalchemy as sa
 
-from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE, ProjectID
+from ai.backend.common.data.entity.project import ProjectEntityType, ProjectID
 from ai.backend.common.data.entity.role import RoleID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.permission.types import Permission
@@ -111,7 +111,7 @@ class V2RosterWriteOps(V2WriteOps, V2CapOps):
             await self._sess.scalars(
                 sa.select(UserRow).where(
                     UserRow.uuid.in_(requested),
-                    user_scope_membership_exists(PROJECT_SCOPE_TYPE, project_id, UserRow.uuid),
+                    user_scope_membership_exists(ProjectEntityType(), project_id, UserRow.uuid),
                 )
             )
         ).all()
@@ -148,7 +148,9 @@ class V2RosterWriteOps(V2WriteOps, V2CapOps):
                     sa.select(UserRow).where(
                         UserRow.uuid.in_(user_ids),
                         UserRow.domain_name == project_domain,
-                        ~user_scope_membership_exists(PROJECT_SCOPE_TYPE, project_id, UserRow.uuid),
+                        ~user_scope_membership_exists(
+                            ProjectEntityType(), project_id, UserRow.uuid
+                        ),
                     )
                 )
             ).all()
@@ -176,7 +178,7 @@ class V2RosterWriteOps(V2WriteOps, V2CapOps):
         """Unmap the user from every role of the project — the reverse of what joining
         granted, read the same way."""
         project_role_ids = sa.select(RoleRow.id).where(
-            RoleRow.scope_type == PROJECT_SCOPE_TYPE,
+            RoleRow.scope_type == ProjectEntityType(),
             RoleRow.scope_id == project_id,
         )
         await self._sess.execute(

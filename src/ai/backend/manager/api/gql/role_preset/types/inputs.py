@@ -34,7 +34,7 @@ from ai.backend.manager.api.gql.decorators import (
     gql_pydantic_input,
 )
 from ai.backend.manager.api.gql.pydantic_compat import PydanticInputMixin
-from ai.backend.manager.api.gql.rbac.types import OperationTypeGQL, RBACElementTypeGQL
+from ai.backend.manager.api.gql.rbac.types import OperationTypeGQL
 
 
 @gql_pydantic_input(
@@ -45,9 +45,7 @@ from ai.backend.manager.api.gql.rbac.types import OperationTypeGQL, RBACElementT
     name="RolePermissionPresetEntryInput",
 )
 class RolePermissionPresetEntryInputGQL(PydanticInputMixin[RolePermissionPresetEntryDTO]):
-    entity_type: RBACElementTypeGQL = gql_field(
-        description="Entity type the permission applies to."
-    )
+    entity_type: str = gql_field(description="Entity type the permission applies to.")
     operation: OperationTypeGQL = gql_field(description="Operation granted by the permission.")
 
 
@@ -60,7 +58,7 @@ class RolePermissionPresetEntryInputGQL(PydanticInputMixin[RolePermissionPresetE
 )
 class CreateRolePresetInputGQL(PydanticInputMixin[CreateRolePresetInputDTO]):
     name: str = gql_field(description="Role preset name.")
-    scope_type: RBACElementTypeGQL = gql_field(
+    scope_type: str = gql_field(
         description="Scope type this preset targets (e.g., domain, project)."
     )
     auto_assign: bool = gql_field(

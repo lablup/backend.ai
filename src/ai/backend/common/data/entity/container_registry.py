@@ -1,10 +1,9 @@
 from typing import override
 
-from ai.backend.common.data.entity.types import EntityIdentifier, EntityType, ScopeType
+from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
 
 __all__ = (
     "ContainerRegistryEntityType",
-    "CONTAINER_REGISTRY_SCOPE_TYPE",
     "ContainerRegistryID",
 )
 
@@ -19,9 +18,6 @@ class ContainerRegistryEntityType(EntityType):
     @classmethod
     def description(cls) -> str:
         return "A registry that container images are pulled from, with the credentials to reach it."
-
-
-CONTAINER_REGISTRY_SCOPE_TYPE = ScopeType(ContainerRegistryEntityType())
 
 
 class ContainerRegistryID(EntityIdentifier):

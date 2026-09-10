@@ -8,7 +8,6 @@ from __future__ import annotations
 from ai.backend.manager.data.permission.types import (
     EntityType,
     Permission,
-    ScopeType,
 )
 from ai.backend.manager.models.rbac_models.conditions import (
     AssignedUserConditions,
@@ -18,25 +17,6 @@ from ai.backend.manager.models.rbac_models.conditions import (
 
 class TestPermissionConditions:
     """Tests for PermissionConditions query condition factories."""
-
-    def test_by_scope_id_produces_equality_clause(self) -> None:
-        """by_scope_id should generate scope_id == 'global' clause."""
-        condition = PermissionConditions.by_scope_id("global")
-        clause = condition()
-
-        # Compile to SQL and check for expected pattern
-        compiled = str(clause.compile(compile_kwargs={"literal_binds": True}))
-        assert "permissions.scope_id = 'global'" in compiled
-
-    def test_by_scope_types_produces_in_clause(self) -> None:
-        """by_scope_types should generate scope_type IN (...) clause."""
-        condition = PermissionConditions.by_scope_types([ScopeType.DOMAIN, ScopeType.PROJECT])
-        clause = condition()
-
-        compiled = str(clause.compile(compile_kwargs={"literal_binds": True}))
-        assert "permissions.scope_type IN" in compiled
-        assert "domain" in compiled.lower()
-        assert "project" in compiled.lower()
 
     def test_by_entity_types_produces_in_clause(self) -> None:
         """by_entity_types should generate entity_type IN (...) clause."""
@@ -65,7 +45,7 @@ class TestExistsPermissionCombined:
         """exists_permission_combined should produce EXISTS subquery with role_id join."""
         # Create sample permission conditions
         permission_conditions = [
-            PermissionConditions.by_scope_id("global"),
+            PermissionConditions.by_permissions([Permission.READ]),
             PermissionConditions.by_entity_types([EntityType.SESSION]),
         ]
 
@@ -83,14 +63,14 @@ class TestExistsPermissionCombined:
         assert "permissions.role_id = user_roles.role_id" in compiled
 
         # Verify both conditions are present
-        assert "permissions.scope_id = 'global'" in compiled
+        assert "permissions.permission IN" in compiled
         assert "permissions.entity_type IN" in compiled
         assert "session" in compiled.lower()
 
     def test_exists_permission_combined_with_multiple_operations(self) -> None:
         """exists_permission_combined should combine multiple operation filters."""
         permission_conditions = [
-            PermissionConditions.by_scope_types([ScopeType.DOMAIN, ScopeType.PROJECT]),
+            PermissionConditions.by_entity_types([EntityType.SESSION, EntityType.VFOLDER]),
             PermissionConditions.by_permissions([Permission.READ, Permission.UPDATE]),
         ]
 
@@ -99,11 +79,11 @@ class TestExistsPermissionCombined:
 
         compiled = str(clause.compile(compile_kwargs={"literal_binds": True}))
 
-        # Verify both scope_types and operations are in the WHERE clause
-        assert "permissions.scope_type IN" in compiled
+        # Verify both entity types and operations are in the WHERE clause
+        assert "permissions.entity_type IN" in compiled
         assert "permissions.permission IN" in compiled
-        assert "domain" in compiled.lower()
-        assert "project" in compiled.lower()
+        assert "session" in compiled.lower()
+        assert "vfolder" in compiled.lower()
         assert str(int(Permission.READ)) in compiled
         assert str(int(Permission.UPDATE)) in compiled
 

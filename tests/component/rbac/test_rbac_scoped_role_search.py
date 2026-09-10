@@ -5,7 +5,7 @@ from __future__ import annotations
 import uuid
 from collections.abc import AsyncIterator
 from typing import TYPE_CHECKING, Any
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import MagicMock
 
 import pytest
 import yarl
@@ -13,14 +13,12 @@ import yarl
 from ai.backend.client.v2.auth import HMACAuth
 from ai.backend.client.v2.config import ClientConfig
 from ai.backend.client.v2.v2_registry import V2ClientRegistry
-from ai.backend.common.data.entity.domain import DOMAIN_SCOPE_TYPE
+from ai.backend.common.data.entity.domain import DomainEntityType
 from ai.backend.common.data.entity.role import RoleEntityType
 from ai.backend.common.dto.manager.v2.rbac.request import SearchRolesInput
 from ai.backend.common.dto.manager.v2.rbac.response import AdminSearchRolesPayload
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
 from ai.backend.manager.actions.registry.types import GroupMeta
-from ai.backend.manager.actions.validators import ActionValidators
-from ai.backend.manager.actions.validators.rbac import RBACValidators
 from ai.backend.manager.api.adapters.rbac.adapter import RBACAdapter
 from ai.backend.manager.api.rest.admin.handler import AdminHandler
 from ai.backend.manager.api.rest.admin.registry import register_admin_routes
@@ -39,7 +37,6 @@ from ai.backend.manager.services.permission_contoller.processors import (
 )
 from ai.backend.manager.services.permission_contoller.service import PermissionControllerService
 from ai.backend.manager.services.rbac.processors import RbacProcessors
-from ai.backend.testutils.action_validators import mock_virtual_entity_rbac_validators
 from ai.backend.testutils.fixtures import DomainFixtureData
 
 if TYPE_CHECKING:
@@ -60,15 +57,10 @@ def permission_controller_processors(
         repo,
         rbac_action_registry=[],
     )
-    validators = ActionValidators(
-        virtual_entity_rbac=mock_virtual_entity_rbac_validators(),
-        rbac=RBACValidators(scope=AsyncMock()),
-    )
     return PermissionControllerProcessors(
         processor_registry.group(GroupMeta(RoleEntityType())),
         service=service,
         action_monitors=[],
-        validators=validators,
     )
 
 
@@ -165,7 +157,7 @@ class TestScopedRoleSearch:
         """Roles of another scope should NOT appear in project search."""
         not_in_project = await role_factory(
             name=f"not-in-proj-{uuid.uuid4().hex[:8]}",
-            scope_type=DOMAIN_SCOPE_TYPE,
+            scope_type=DomainEntityType(),
             scope_id=domain_fixture.domain_id,
         )
 

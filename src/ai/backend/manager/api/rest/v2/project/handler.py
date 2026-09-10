@@ -14,6 +14,7 @@ from ai.backend.common.dto.manager.v2.group.request import (
     DeleteProjectInput,
     PurgeProjectInput,
     RestoreProjectInput,
+    ScopedSearchProjectsInput,
     UnassignUsersFromProjectInput,
     UpdateProjectInput,
 )
@@ -46,6 +47,14 @@ class V2ProjectHandler:
     ) -> APIResponse:
         """Search projects with filters, orders, and pagination (superadmin only)."""
         result = await self._adapter.admin_search(body.parsed)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def scoped_search(
+        self,
+        body: BodyParam[ScopedSearchProjectsInput],
+    ) -> APIResponse:
+        """Search the projects the named scopes reach, combined with OR."""
+        result = await self._adapter.scoped_search(body.parsed)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
     async def admin_create(

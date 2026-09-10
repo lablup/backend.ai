@@ -31,8 +31,8 @@ import pytest
 import sqlalchemy as sa
 from sqlalchemy.orm import InstrumentedAttribute, Mapped, aliased, mapped_column
 
-from ai.backend.common.data.entity.domain import DOMAIN_SCOPE_TYPE
-from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE
+from ai.backend.common.data.entity.domain import DomainEntityType
+from ai.backend.common.data.entity.project import ProjectEntityType
 from ai.backend.common.data.entity.role import RoleEntityType
 from ai.backend.common.data.entity.types import (
     EntityIdentifier,
@@ -40,7 +40,6 @@ from ai.backend.common.data.entity.types import (
     FieldData,
     FieldIdentifier,
     FieldType,
-    ScopeType,
 )
 from ai.backend.manager.data.permission.scope_template import ScopeTemplateValue
 from ai.backend.manager.data.permission.status import RoleStatus
@@ -54,11 +53,9 @@ from ai.backend.manager.data.permission.types import (
 from ai.backend.manager.data.permission.types import (
     ScopeType as LegacyScopeType,
 )
+from ai.backend.manager.errors.base.entity import EntityNotFoundError
 from ai.backend.manager.errors.permission import VirtualEntityNotFound
-from ai.backend.manager.errors.repository import (
-    EntityNotFoundError,
-    RepositoryIntegrityError,
-)
+from ai.backend.manager.errors.repository import RepositoryIntegrityError
 from ai.backend.manager.models.base import GUID, Base
 from ai.backend.manager.models.entity_label.row import EntityLabelRow
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
@@ -117,8 +114,8 @@ class _EntityData:
     note: str | None
 
 
-_SCOPE_TYPE = PROJECT_SCOPE_TYPE
-_PARENT_SCOPE_TYPE = DOMAIN_SCOPE_TYPE
+_SCOPE_TYPE = ProjectEntityType()
+_PARENT_SCOPE_TYPE = DomainEntityType()
 
 
 # A scope type outside every permission-layer enum — the chain accepts it as-is.
@@ -134,7 +131,7 @@ class _OpenEntityType(EntityType):
         return "A kind outside every permission-layer enum."
 
 
-_OPEN_SCOPE_TYPE = ScopeType(_OpenEntityType())
+_OPEN_SCOPE_TYPE = _OpenEntityType()
 
 
 class _EntityID(EntityIdentifier):
@@ -429,7 +426,7 @@ async def _preset_id(database: ExtendedAsyncSAEngine, name: str) -> UUID:
 
 
 async def _virtual_entity_id(
-    database: ExtendedAsyncSAEngine, scope_id: UUID, scope_type: ScopeType = _SCOPE_TYPE
+    database: ExtendedAsyncSAEngine, scope_id: UUID, scope_type: EntityType = _SCOPE_TYPE
 ) -> UUID | None:
     async with database.begin_readonly_session() as sess:
         result = await sess.execute(
@@ -441,7 +438,7 @@ async def _virtual_entity_id(
         return result.scalar_one_or_none()
 
 
-def _node_id(scope_type: ScopeType, scope_id: UUID) -> sa.ScalarSelect[Any]:
+def _node_id(scope_type: EntityType, scope_id: UUID) -> sa.ScalarSelect[Any]:
     return (
         sa.select(VirtualEntityRow.id)
         .where(
@@ -453,7 +450,7 @@ def _node_id(scope_type: ScopeType, scope_id: UUID) -> sa.ScalarSelect[Any]:
 
 
 async def _self_membership_exists(
-    database: ExtendedAsyncSAEngine, scope_id: UUID, scope_type: ScopeType = _SCOPE_TYPE
+    database: ExtendedAsyncSAEngine, scope_id: UUID, scope_type: EntityType = _SCOPE_TYPE
 ) -> bool:
     async with database.begin_readonly_session() as sess:
         node = _node_id(scope_type, scope_id)
@@ -467,7 +464,7 @@ async def _self_membership_exists(
 
 
 async def _self_binding_exists(
-    database: ExtendedAsyncSAEngine, scope_id: UUID, scope_type: ScopeType = _SCOPE_TYPE
+    database: ExtendedAsyncSAEngine, scope_id: UUID, scope_type: EntityType = _SCOPE_TYPE
 ) -> bool:
     async with database.begin_readonly_session() as sess:
         node = _node_id(scope_type, scope_id)
@@ -572,7 +569,7 @@ async def _scope_governs_role(
     async with database.begin_readonly_session() as sess:
         row = await sess.scalar(
             sa.select(ScopeBindingRow.scope_entity_id).where(
-                ScopeBindingRow.virtual_entity_id == _node_id(ScopeType(RoleEntityType()), role_id),
+                ScopeBindingRow.virtual_entity_id == _node_id(RoleEntityType(), role_id),
                 ScopeBindingRow.scope_entity_id == _node_id(_SCOPE_TYPE, scope_id),
             )
         )
@@ -955,12 +952,12 @@ _SIDECAR_FIELD_TYPE = _SidecarFieldType()
 
 
 class _SidecarID(FieldIdentifier):
+    """The id of a row that rides beside the graph."""
+
     @override
     @classmethod
     def field_type(cls) -> FieldType:
         return _SIDECAR_FIELD_TYPE
-
-    """The id of a row that rides beside the graph."""
 
 
 @dataclass(frozen=True)

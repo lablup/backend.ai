@@ -13,6 +13,7 @@ from strawberry.scalars import JSON
 from ai.backend.common.data.artifact.types import (
     ArtifactRegistryType,
 )
+from ai.backend.common.data.entity.artifact_revision import ArtifactRevisionID
 from ai.backend.common.dto.manager.v2.artifact.request import (
     AdminSearchArtifactRevisionsInput,
     ArtifactGQLFilterInputDTO,
@@ -759,7 +760,7 @@ class ArtifactRevision(PydanticNodeMixin[ArtifactRevisionNode]):
         # cast is required because mypy cannot unify list[ArtifactRevision | None]
         # with Iterable[Self | None] across generic DataLoader[UUID, ArtifactRevision | None].
         results = await info.context.data_loaders.artifact_revision_loader.load_many([
-            uuid.UUID(nid) for nid in node_ids
+            ArtifactRevisionID(uuid.UUID(nid)) for nid in node_ids
         ])
         return cast(list[Self | None], results)
 

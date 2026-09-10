@@ -19,7 +19,11 @@ from ai.backend.common.config import (
 from ai.backend.common.config import (
     PreStartAction as PreStartActionDTO,
 )
+from ai.backend.common.data.entity.deployment import DeploymentID
+from ai.backend.common.data.entity.deployment_preset import DeploymentPresetID
 from ai.backend.common.data.entity.deployment_revision import DeploymentRevisionID
+from ai.backend.common.data.entity.runtime_variant import RuntimeVariantID
+from ai.backend.common.data.entity.runtime_variant_preset import RuntimeVariantPresetID
 from ai.backend.common.dto.manager.v2.deployment.request import (
     ActivateRevisionInput as ActivateRevisionInputDTO,
 )
@@ -253,7 +257,9 @@ class RuntimeVariantPresetValueGQL:
         ]
         | None
     ):
-        return await info.context.data_loaders.runtime_variant_preset_loader.load(self.preset_id)
+        return await info.context.data_loaders.runtime_variant_preset_loader.load(
+            RuntimeVariantPresetID(self.preset_id)
+        )
 
 
 @gql_pydantic_type(
@@ -297,7 +303,9 @@ class ModelRuntimeConfig:
         ]
         | None
     ):
-        return await info.context.data_loaders.runtime_variant_loader.load(self.runtime_variant_id)
+        return await info.context.data_loaders.runtime_variant_loader.load(
+            RuntimeVariantID(self.runtime_variant_id)
+        )
 
 
 @gql_pydantic_type(
@@ -629,7 +637,9 @@ class ModelRevision(PydanticNodeMixin[RevisionNodeDTO]):
     ):
         if self.revision_preset_id is None:
             return None
-        return await info.context.data_loaders.revision_preset_loader.load(self.revision_preset_id)
+        return await info.context.data_loaders.revision_preset_loader.load(
+            DeploymentPresetID(self.revision_preset_id)
+        )
 
     @gql_added_field(
         BackendAIGQLMeta(
@@ -640,7 +650,9 @@ class ModelRevision(PydanticNodeMixin[RevisionNodeDTO]):
     async def deployment(
         self, info: Info[StrawberryGQLContext]
     ) -> Annotated[ModelDeployment, strawberry.lazy(".deployment")] | None:
-        return await info.context.data_loaders.deployment_loader.load(UUID(str(self.deployment_id)))
+        return await info.context.data_loaders.deployment_loader.load(
+            DeploymentID(UUID(str(self.deployment_id)))
+        )
 
     @gql_added_field(
         BackendAIGQLMeta(
@@ -678,7 +690,7 @@ class ModelRevision(PydanticNodeMixin[RevisionNodeDTO]):
         required: bool = False,
     ) -> Iterable[Self | None]:
         results = await info.context.data_loaders.revision_loader.load_many([
-            UUID(nid) for nid in node_ids
+            DeploymentRevisionID(UUID(nid)) for nid in node_ids
         ])
         return cast(list[Self | None], results)
 

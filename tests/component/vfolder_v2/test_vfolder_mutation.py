@@ -235,8 +235,6 @@ async def regular_user_vfolder_create_permission(
         await conn.execute(
             sa.insert(PermissionRow.__table__).values(
                 role_id=role_id,
-                scope_type=ScopeType.PROJECT,
-                scope_id=str(group_fixture),
                 entity_type=EntityType.VFOLDER,
                 permission=Permission.CREATE,
             )

@@ -10,14 +10,14 @@ import pytest
 import sqlalchemy as sa
 
 from ai.backend.common.data.entity.permission import PermissionID
-from ai.backend.common.data.entity.project import ProjectEntityType, ProjectID
+from ai.backend.common.data.entity.project import ProjectEntityType
 from ai.backend.common.data.entity.role import RoleID
 from ai.backend.common.data.entity.session import SessionEntityType
 from ai.backend.manager.data.permission.permission import PermissionData
 from ai.backend.manager.data.permission.status import RoleStatus
 from ai.backend.manager.data.permission.types import Permission, RoleSource
+from ai.backend.manager.errors.base.field import FieldNotFoundError
 from ai.backend.manager.errors.permission import PermissionAlreadyGranted
-from ai.backend.manager.errors.repository import EntityNotFoundError
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.rbac_models.permission.creators import RolePermissionCreator
 from ai.backend.manager.models.rbac_models.permission.lookups import RolePermissionOwnerLookup
@@ -67,10 +67,8 @@ class TestRolePermissionWrite:
             )
         return role_id
 
-    def _read_sessions_in(self, project_id: ProjectID) -> RolePermissionCreator:
-        return RolePermissionCreator(
-            scope=project_id, entity_type=SessionEntityType(), permission=Permission.READ
-        )
+    def _read_sessions(self) -> RolePermissionCreator:
+        return RolePermissionCreator(entity_type=SessionEntityType(), permission=Permission.READ)
 
     async def test_create_and_purge_are_answered_by_the_role(
         self,
@@ -78,11 +76,9 @@ class TestRolePermissionWrite:
         db_with_tables: ExtendedAsyncSAEngine,
         role_id: RoleID,
     ) -> None:
-        project_id = ProjectID(uuid.uuid4())
-        created = await repository.create_field(role_id, self._read_sessions_in(project_id))
+        created = await repository.create_field(role_id, self._read_sessions())
 
         assert created.role_id == role_id
-        assert created.scope_id == str(project_id)
         assert created.permission == Permission.READ
         owners = await repository.field_owners(RolePermissionOwnerLookup(), [created.id])
         assert owners == {created.id: role_id}
@@ -97,18 +93,15 @@ class TestRolePermissionWrite:
     async def test_duplicate_entry_is_refused(
         self, repository: OpsRepository[PermissionData], role_id: RoleID
     ) -> None:
-        project_id = ProjectID(uuid.uuid4())
-        await repository.create_field(role_id, self._read_sessions_in(project_id))
+        await repository.create_field(role_id, self._read_sessions())
 
         with pytest.raises(PermissionAlreadyGranted):
-            await repository.create_field(role_id, self._read_sessions_in(project_id))
+            await repository.create_field(role_id, self._read_sessions())
 
     async def test_partial_purge_answers_for_each_entry(
         self, repository: OpsRepository[PermissionData], role_id: RoleID
     ) -> None:
-        created = await repository.create_field(
-            role_id, self._read_sessions_in(ProjectID(uuid.uuid4()))
-        )
+        created = await repository.create_field(role_id, self._read_sessions())
         unknown = PermissionID(uuid.uuid4())
 
         result = await repository.partial_bulk_purge_field_entities({
@@ -117,4 +110,4 @@ class TestRolePermissionWrite:
         })
 
         assert set(result.successes) == {created.id}
-        assert isinstance(result.errors[unknown], EntityNotFoundError)
+        assert isinstance(result.errors[unknown], FieldNotFoundError)

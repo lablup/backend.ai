@@ -24,7 +24,7 @@ from ai.backend.client.v2.config import ClientConfig
 from ai.backend.client.v2.registry import BackendAIClientRegistry
 from ai.backend.client.v2.v2_registry import V2ClientRegistry
 from ai.backend.common.bgtask.types import TaskID
-from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE
+from ai.backend.common.data.entity.project import ProjectEntityType
 from ai.backend.common.data.entity.vfolder import VFolderEntityType
 from ai.backend.common.dto.manager.v2.vfolder.request import CloneVFolderInput
 from ai.backend.common.dto.manager.vfolder import CloneVFolderReq
@@ -196,7 +196,7 @@ async def _fetch_scope_graph(
                 .where(
                     members.c.entity_type == VFolderEntityType(),
                     members.c.entity_id == vfolder_id,
-                    scopes.c.entity_type == PROJECT_SCOPE_TYPE,
+                    scopes.c.entity_type == ProjectEntityType(),
                     scopes.c.entity_id == owner_project_id,
                 )
             )

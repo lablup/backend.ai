@@ -29,8 +29,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ai.backend.common.data.entity.domain import DomainEntityType, DomainID
 from ai.backend.common.data.entity.project import ProjectEntityType
 from ai.backend.common.data.entity.session import SessionEntityType, SessionID
-from ai.backend.common.data.entity.types import EntityID, EntityIdentifier, EntityType
-from ai.backend.common.data.entity.user import USER_SCOPE_TYPE, UserID
+from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
+from ai.backend.common.data.entity.user import UserEntityType, UserID
 from ai.backend.common.data.entity.vfolder import VFolderEntityType, VFolderUUID
 from ai.backend.common.data.permission.types import Permission
 from ai.backend.common.types import ResourceSlot
@@ -76,7 +76,7 @@ class _Seed:
 
 
 type _Plant = Callable[[AsyncSession], Awaitable[_Seed]]
-type _Run = Callable[[], Awaitable[Mapping[EntityID, Permission]]]
+type _Run = Callable[[], Awaitable[Mapping[uuid.UUID, Permission]]]
 
 
 @pytest.fixture
@@ -164,8 +164,6 @@ def _permission_rows(
     return [
         PermissionRow(
             role_id=role_id,
-            scope_type=scope_type,
-            scope_id=str(scope_id),
             entity_type=entity_type,
             permission=bit,
         )
@@ -205,7 +203,7 @@ async def _user_in_domain(sess: AsyncSession) -> tuple[UserID, DomainID, uuid.UU
     )
     await sess.flush()
     domain_node = await _node(sess, _DOMAIN, domain_id)
-    user_node = await _node(sess, USER_SCOPE_TYPE, user_id)
+    user_node = await _node(sess, UserEntityType(), user_id)
     await _govern(sess, domain_node, user_node)
     return user_id, domain_id, user_node, domain_node
 
@@ -214,7 +212,7 @@ async def _role(sess: AsyncSession, user_id: UserID, rows: Sequence[PermissionRo
     role = RoleRow(
         name=f"role-{uuid.uuid4().hex[:8]}",
         status=RoleStatus.ACTIVE,
-        scope_type=USER_SCOPE_TYPE,
+        scope_type=UserEntityType(),
         scope_id=user_id,
     )
     sess.add(role)
@@ -266,7 +264,7 @@ async def seed_shares(sess: AsyncSession, count: int) -> _Seed:
         user_id,
         _permission_rows(
             uuid.uuid4(),
-            USER_SCOPE_TYPE,
+            UserEntityType(),
             user_id,
             VFolderEntityType(),
             Permission.READ | Permission.UPDATE,
@@ -307,12 +305,12 @@ async def _previous_query(
     user_id: UserID,
     entity_type: EntityType,
     entity_ids: Sequence[EntityIdentifier],
-) -> Mapping[EntityID, Permission]:
+) -> Mapping[uuid.UUID, Permission]:
     """The own check as it stood before the ``held`` CTE and the SQL-side OR: one row
     per path and bit, clipped and combined in Python."""
     query = _previous_statement(user_id, entity_type, entity_ids)
     full_cap = Permission.full()
-    granted: defaultdict[EntityID, Permission] = defaultdict(lambda: Permission.NONE)
+    granted: defaultdict[uuid.UUID, Permission] = defaultdict(lambda: Permission.NONE)
     for row in await sess.execute(query):
         scope_cap = row.scope_cap if row.scope_cap is not None else full_cap
         granted[row.entity_id] |= row.permission & scope_cap
@@ -337,15 +335,20 @@ def _previous_statement(
             .join(sb, sb.c.virtual_entity_id == em.c.virtual_entity_id)
             .join(scope, scope.c.id == sb.c.scope_entity_id)
             .join(
+                roles,
+                sa.and_(
+                    roles.c.scope_type == scope.c.entity_type,
+                    roles.c.scope_id == scope.c.entity_id,
+                ),
+            )
+            .join(
                 perm,
                 sa.and_(
-                    perm.c.scope_type == scope.c.entity_type,
-                    perm.c.scope_id == sa.cast(scope.c.entity_id, sa.String),
+                    perm.c.role_id == roles.c.id,
                     perm.c.entity_type == entity_type,
                     perm.c.all_fields.is_(True),
                 ),
             )
-            .join(roles, roles.c.id == perm.c.role_id)
             .join(user_roles, user_roles.c.role_id == roles.c.id)
             .outerjoin(
                 emc,
@@ -409,12 +412,12 @@ def _runs(database: ExtendedAsyncSAEngine, seed: _Seed) -> tuple[_Run, _Run]:
     keys = [OwnCheckKey(user_id=seed.user_id, entity=e) for e in seed.entity_ids]
     provider = PermissionOpsProvider(database)
 
-    async def current() -> Mapping[EntityID, Permission]:
+    async def current() -> Mapping[uuid.UUID, Permission]:
         async with provider.read_ops() as r:
             answered = await r.owned_permissions(keys)
         return {key.entity: bits for key, bits in answered.items()}
 
-    async def previous() -> Mapping[EntityID, Permission]:
+    async def previous() -> Mapping[uuid.UUID, Permission]:
         async with database.begin_readonly_session() as sess:
             return dict(
                 await _previous_query(sess, seed.user_id, seed.entity_type, seed.entity_ids)
@@ -517,7 +520,7 @@ async def seed_at_scale(database: ExtendedAsyncSAEngine, scale: _Scale) -> _Scal
         for kind, ids in (
             (str(_DOMAIN), domain_ids),
             (str(ProjectEntityType()), project_ids),
-            (str(USER_SCOPE_TYPE), user_ids),
+            (str(UserEntityType()), user_ids),
             (str(SessionEntityType()), session_ids),
             (str(VFolderEntityType()), vfolder_ids),
         ):
@@ -614,7 +617,7 @@ async def seed_at_scale(database: ExtendedAsyncSAEngine, scale: _Scale) -> _Scal
         for bit in (Permission.READ, Permission.UPDATE):
             yield (
                 vfolder_role,
-                str(USER_SCOPE_TYPE),
+                str(UserEntityType()),
                 str(measured),
                 str(VFolderEntityType()),
                 int(bit),
@@ -771,14 +774,14 @@ async def test_benchmark_at_scale(database: ExtendedAsyncSAEngine) -> None:
     for name, (entity_type, entity_ids) in cases.items():
         keys = [OwnCheckKey(user_id=seed.user_id, entity=e) for e in entity_ids]
 
-        async def current() -> Mapping[EntityID, Permission]:
+        async def current() -> Mapping[uuid.UUID, Permission]:
             async with provider.read_ops() as r:
                 answered = await r.owned_permissions(keys)
             # The previous query left unreached entities out; the current one maps
             # them to NONE. Compare what is reached.
             return {key.entity: bits for key, bits in answered.items() if bits}
 
-        async def previous() -> Mapping[EntityID, Permission]:
+        async def previous() -> Mapping[uuid.UUID, Permission]:
             async with database.begin_readonly_session() as sess:
                 return dict(await _previous_query(sess, seed.user_id, entity_type, entity_ids))
 

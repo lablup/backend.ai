@@ -40,7 +40,7 @@ class ScopeActionReporterMonitor(ScopeActionMonitor):
             message = StartedActionMessage(
                 action_id=meta.action_id,
                 action_type=action.action_name(),
-                entity_id=scope.scope_id,
+                entity_id=scope,
                 entity_type=action.entity_type(),
                 request_id=request_id,
                 triggered_by=str(trigger.user_id) if trigger else None,
@@ -60,7 +60,7 @@ class ScopeActionReporterMonitor(ScopeActionMonitor):
             message = FinishedActionMessage(
                 action_id=meta.action_id,
                 action_type=action.action_name(),
-                entity_id=scope.scope_id,
+                entity_id=scope,
                 request_id=request_id,
                 triggered_by=str(trigger.user_id) if trigger else None,
                 acted_as=acting.user_id if acting else None,

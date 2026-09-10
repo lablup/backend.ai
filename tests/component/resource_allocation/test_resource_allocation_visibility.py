@@ -52,6 +52,7 @@ from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.config.unified import ManagerUnifiedConfig
 from ai.backend.manager.dependencies.infrastructure.redis import ValkeyClients
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.resource_allocation.repository import (
     ResourceAllocationRepository,
 )
@@ -159,6 +160,7 @@ class TestHideAgentsVisibility:
             db=database_engine,
             valkey_stat=valkey_clients.stat,
             config_provider=config_provider_hide_agents,
+            v2_ops_provider=V2DBOpsProvider(database_engine),
         )
         service = ResourceAllocationService(
             resource_allocation_repository=ra_repo,
@@ -295,6 +297,7 @@ class TestGroupResourceVisibility:
             db=database_engine,
             valkey_stat=valkey_clients.stat,
             config_provider=config_provider_no_grv,
+            v2_ops_provider=V2DBOpsProvider(database_engine),
         )
         service = ResourceAllocationService(
             resource_allocation_repository=ra_repo,

@@ -19,10 +19,8 @@ from ai.backend.common.data.entity.deployment_revision import DeploymentRevision
 from ai.backend.common.data.entity.deployment_token import DeploymentTokenID
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.image import ImageID
-from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE
 from ai.backend.common.data.entity.runtime_variant import RuntimeVariantID
-from ai.backend.common.data.entity.types import ScopeRef
-from ai.backend.common.data.entity.user import USER_SCOPE_TYPE
+from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
 from ai.backend.common.data.user.types import UserData, UserRole
@@ -56,8 +54,8 @@ from ai.backend.manager.data.deployment.types import (
     ResourceConfigData,
 )
 from ai.backend.manager.errors.auth import InsufficientPrivilege
+from ai.backend.manager.errors.base.field import FieldNotFoundError
 from ai.backend.manager.errors.common import GenericForbidden
-from ai.backend.manager.errors.repository import EntityNotFoundError
 from ai.backend.manager.repositories.ops.repository import OpsRepository
 from ai.backend.manager.services.deployment.actions.scoped_search import (
     ScopedSearchDeploymentsActionResult,
@@ -159,7 +157,7 @@ class _RecordingScopeValidator(ScopeActionValidator):
     """Lets every scoped read through and keeps the scopes it was asked about."""
 
     def __init__(self) -> None:
-        self.seen: list[Sequence[ScopeRef]] = []
+        self.seen: list[Sequence[EntityIdentifier]] = []
 
     @override
     async def validate(self, action: BaseScopeAction, meta: BaseActionTriggerMeta) -> None:
@@ -224,9 +222,7 @@ class TestDeploymentSearchGates:
             payload = await adapter.my_search(AdminSearchDeploymentsInput(limit=10, offset=0))
 
         assert payload.total_count == 0
-        assert scope_gate.seen == [
-            [ScopeRef(scope_type=USER_SCOPE_TYPE, scope_id=regular_user.user_id)]
-        ]
+        assert scope_gate.seen == [[regular_user.user_id]]
 
     async def test_project_search_is_answered_for_the_project_scope(
         self,
@@ -241,7 +237,7 @@ class TestDeploymentSearchGates:
             )
 
         assert payload.total_count == 0
-        assert scope_gate.seen == [[ScopeRef(scope_type=PROJECT_SCOPE_TYPE, scope_id=project_id)]]
+        assert scope_gate.seen == [[project_id]]
 
     async def test_admin_search_keeps_the_superadmin_gate(
         self,
@@ -288,10 +284,10 @@ class TestFieldBatchLoads:
         denial: GenericForbidden,
     ) -> None:
         deployment_adapter, processors = adapter
-        absent = uuid4()
+        absent = DeploymentTokenID(uuid4())
 
         nodes = await deployment_adapter.batch_load_access_tokens_by_ids([
-            token.id,
+            DeploymentTokenID(token.id),
             DENIED_TOKEN,
             absent,
         ])
@@ -314,10 +310,15 @@ class TestFieldBatchLoads:
     ) -> None:
         deployment_adapter, processors = adapter
         processors.deployment.bulk_get_access_tokens.run = AsyncMock(
-            side_effect=EntityNotFoundError("No field row matches the given ids")
+            side_effect=FieldNotFoundError(
+                field_type=DeploymentRevisionID.field_type(),
+            )
         )
 
-        assert await deployment_adapter.batch_load_access_tokens_by_ids([uuid4(), uuid4()]) == [
+        assert await deployment_adapter.batch_load_access_tokens_by_ids([
+            DeploymentTokenID(uuid4()),
+            DeploymentTokenID(uuid4()),
+        ]) == [
             None,
             None,
         ]
@@ -342,7 +343,7 @@ class TestFieldBatchLoads:
             return_value=OwnedFieldsOpsResult(designated={deployment_id: policy})
         )
         deployment_adapter = DeploymentAdapter(processors.deployment, MagicMock())
-        without_policy = uuid4()
+        without_policy = DeploymentID(uuid4())
 
         nodes = await deployment_adapter.batch_load_policies_by_endpoint_ids([
             deployment_id,

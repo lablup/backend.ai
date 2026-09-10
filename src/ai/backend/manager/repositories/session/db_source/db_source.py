@@ -62,7 +62,6 @@ from ai.backend.manager.repositories.base import (
     BatchQuerier,
     execute_batch_querier,
 )
-from ai.backend.manager.repositories.ops import DBOpsProvider
 from ai.backend.manager.repositories.ops.v2.write import V2WriteOps
 from ai.backend.manager.repositories.session.dependency_graph import find_dependency_sessions
 from ai.backend.manager.utils import query_userinfo
@@ -70,11 +69,9 @@ from ai.backend.manager.utils import query_userinfo
 
 class SessionDBSource:
     _db: ExtendedAsyncSAEngine
-    _ops: DBOpsProvider
 
-    def __init__(self, db: ExtendedAsyncSAEngine, ops_provider: DBOpsProvider) -> None:
+    def __init__(self, db: ExtendedAsyncSAEngine) -> None:
         self._db = db
-        self._ops = ops_provider
 
     async def resolve_session_id(
         self,
@@ -99,8 +96,10 @@ class SessionDBSource:
             & (SessionRow.user_uuid == user_id)
             & (~SessionRow.status.in_(TERMINAL_SESSION_STATUSES))
         )
-        async with self._ops.read_ops() as r:
-            result = await r.batch_query_in_global(query, BatchQuerier(pagination=NoPagination()))
+        async with self._db.begin_readonly_session_read_committed() as db_sess:
+            result = await execute_batch_querier(
+                db_sess, query, BatchQuerier(pagination=NoPagination())
+            )
         rows: list[SessionRow] = [row.SessionRow for row in result.rows]
         if not rows:
             raise SessionNotFound(f"Session (name={session_name}) does not exist for the user.")
@@ -582,8 +581,10 @@ class SessionDBSource:
                 joinedload(SessionRow.user),
             )
         )
-        async with self._ops.read_ops() as r:
-            result = await r.batch_query_in_global(query, BatchQuerier(pagination=NoPagination()))
+        async with self._db.begin_readonly_session_read_committed() as db_sess:
+            result = await execute_batch_querier(
+                db_sess, query, BatchQuerier(pagination=NoPagination())
+            )
         rows: list[SessionRow] = [row.SessionRow for row in result.rows]
         if not rows:
             raise SessionNotFound(f"Session (id={session_id}) does not exist.")

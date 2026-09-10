@@ -21,6 +21,7 @@ from ai.backend.client.v2.config import ClientConfig
 from ai.backend.client.v2.v2_registry import V2ClientRegistry
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
 from ai.backend.common.container_registry import ContainerRegistryType
+from ai.backend.common.data.entity.agent import AgentUUID
 from ai.backend.common.data.entity.domain import DomainEntityType, DomainID
 from ai.backend.common.data.entity.image import ImageID
 from ai.backend.common.data.entity.project import ProjectEntityType
@@ -35,7 +36,6 @@ from ai.backend.common.data.entity.user import UserEntityType
 from ai.backend.common.data.permission.types import (
     EntityType,
     Permission,
-    RelationType,
     RoleStatus,
     ScopeType,
 )
@@ -61,9 +61,6 @@ from ai.backend.manager.models.agent.row import AgentRow
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.image.row import ImageRow
 from ai.backend.manager.models.kernel import kernels
-from ai.backend.manager.models.rbac_models.association_scopes_entities import (
-    AssociationScopesEntitiesRow,
-)
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
@@ -71,7 +68,6 @@ from ai.backend.manager.models.resource_slot.row import AgentResourceRow
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.plugin.network import NetworkPluginContext
-from ai.backend.manager.repositories.ops import DBOpsProvider
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.ops.v2.reconciler.provider import ReconcileOpsProvider
 from ai.backend.manager.repositories.ops.v2.share.provider import ShareOpsProvider
@@ -128,7 +124,7 @@ def rbac_permission_repo(
 def session_repository(
     database_engine: ExtendedAsyncSAEngine,
 ) -> SessionRepository:
-    return SessionRepository(database_engine, DBOpsProvider(database_engine))
+    return SessionRepository(database_engine)
 
 
 @pytest.fixture()
@@ -278,15 +274,6 @@ async def user_system_role(
             )
         )
         # Scope the role to the user
-        await conn.execute(
-            sa.insert(AssociationScopesEntitiesRow.__table__).values(
-                scope_type=ScopeType.USER,
-                scope_id=str(user_uuid),
-                entity_type=EntityType.ROLE,
-                entity_id=str(role_id),
-                relation_type=RelationType.AUTO,
-            )
-        )
         # Grant owner permissions for all owner-accessible entity types in user scope
         for entity_type in EntityType.owner_accessible_entity_types_in_user():
             for bit in Permission:
@@ -295,8 +282,6 @@ async def user_system_role(
                 await conn.execute(
                     sa.insert(PermissionRow.__table__).values(
                         role_id=role_id,
-                        scope_type=ScopeType.USER,
-                        scope_id=str(user_uuid),
                         entity_type=entity_type,
                         permission=bit,
                     )
@@ -308,8 +293,6 @@ async def user_system_role(
             await conn.execute(
                 sa.insert(PermissionRow.__table__).values(
                     role_id=role_id,
-                    scope_type=ScopeType.USER,
-                    scope_id=str(user_uuid),
                     entity_type=EntityType.USER,
                     permission=bit,
                 )
@@ -320,12 +303,6 @@ async def user_system_role(
     async with db_engine.begin() as conn:
         await conn.execute(
             PermissionRow.__table__.delete().where(PermissionRow.__table__.c.role_id == role_id)
-        )
-        await conn.execute(
-            AssociationScopesEntitiesRow.__table__.delete().where(
-                (AssociationScopesEntitiesRow.__table__.c.entity_type == EntityType.ROLE)
-                & (AssociationScopesEntitiesRow.__table__.c.entity_id == str(role_id))
-            )
         )
         await conn.execute(
             UserRoleRow.__table__.delete().where(UserRoleRow.__table__.c.role_id == role_id)
@@ -353,7 +330,7 @@ async def _seed_session(
     """Insert a session + kernel row with RBAC scope association.
 
     Replicates what the scheduler does at session creation:
-    SessionRow + kernel + AssociationScopesEntitiesRow (session → user scope, session → project scope).
+    SessionRow + kernel, with the session placed under the user and project scopes.
     """
     unique = secrets.token_hex(4)
     session_id = SessionID(uuid.uuid4())
@@ -416,25 +393,7 @@ async def _seed_session(
             )
         )
         # RBAC scope association: session → user scope (AUTO)
-        await conn.execute(
-            sa.insert(AssociationScopesEntitiesRow.__table__).values(
-                scope_type=ScopeType.USER,
-                scope_id=str(user_uuid),
-                entity_type=EntityType.SESSION,
-                entity_id=str(session_id),
-                relation_type=RelationType.AUTO,
-            )
-        )
         # RBAC scope association: session → project scope (AUTO)
-        await conn.execute(
-            sa.insert(AssociationScopesEntitiesRow.__table__).values(
-                scope_type=ScopeType.PROJECT,
-                scope_id=str(group_id),
-                entity_type=EntityType.SESSION,
-                entity_id=str(session_id),
-                relation_type=RelationType.AUTO,
-            )
-        )
 
     return SessionSeedData(
         session_id=session_id,
@@ -449,12 +408,6 @@ async def _seed_session(
 async def _cleanup_session(db_engine: SAEngine, session_id: SessionID) -> None:
     """Remove session, kernel, and RBAC association rows."""
     async with db_engine.begin() as conn:
-        await conn.execute(
-            AssociationScopesEntitiesRow.__table__.delete().where(
-                (AssociationScopesEntitiesRow.__table__.c.entity_type == EntityType.SESSION)
-                & (AssociationScopesEntitiesRow.__table__.c.entity_id == str(session_id))
-            )
-        )
         await conn.execute(kernels.delete().where(kernels.c.session_id == session_id))
         await conn.execute(
             SessionRow.__table__.delete().where(SessionRow.__table__.c.id == session_id)
@@ -603,10 +556,12 @@ async def agent_factory(
 
     async def _create(available_slots: dict[str, str]) -> str:
         agent_id = f"i-test-{secrets.token_hex(4)}"
+        agent_uuid = AgentUUID(uuid.uuid4())
         async with db_engine.begin() as conn:
             await conn.execute(
                 sa.insert(AgentRow.__table__).values(
                     id=agent_id,
+                    uuid=agent_uuid,
                     status=AgentStatus.ALIVE,
                     region="local",
                     scaling_group=resource_group_name,
@@ -625,6 +580,7 @@ async def agent_factory(
                 [
                     {
                         "agent_id": agent_id,
+                        "agent_uuid": agent_uuid,
                         "slot_name": slot_name,
                         "capacity": Decimal(quantity),
                         "reserved": Decimal(0),
@@ -705,7 +661,7 @@ async def compute_session_processors(
         event_hub=AsyncMock(),
         error_monitor=error_monitor,
         idle_checker_host=AsyncMock(),
-        session_repository=SessionRepository(database_engine, DBOpsProvider(database_engine)),
+        session_repository=SessionRepository(database_engine),
         scheduler_repository=scheduler_repository,
         scheduling_controller=scheduling_controller,
         appproxy_client_pool=AsyncMock(),

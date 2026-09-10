@@ -368,7 +368,7 @@ class ProcessingComposer(DependencyComposer[ProcessingInput, ProcessingResources
             registry_quota_service=setup_input.registry_quota_service,
         )
 
-        validators, v2_validators = build_action_validators(
+        v2_validators = build_action_validators(
             setup_input.repositories.permission_controller.repository,
             setup_input.config_provider,
         )
@@ -380,7 +380,6 @@ class ProcessingComposer(DependencyComposer[ProcessingInput, ProcessingResources
                 action_monitors=action_monitors,
                 event_hub=setup_input.event_hub,
                 event_fetcher=setup_input.event_fetcher,
-                validators=validators,
                 v2_validators=v2_validators,
             ),
         )

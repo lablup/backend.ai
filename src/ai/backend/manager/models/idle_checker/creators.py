@@ -11,9 +11,10 @@ from ai.backend.common.data.entity.domain import DomainEntityType
 from ai.backend.common.data.entity.idle_checker import IdleCheckerID
 from ai.backend.common.data.entity.project import ProjectEntityType
 from ai.backend.common.data.entity.resource_group import ResourceGroupEntityType
+from ai.backend.common.data.entity.session import SessionID
 from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
 from ai.backend.common.data.entity.user import UserEntityType
-from ai.backend.common.data.idle_checker.types import IdleCheckerSpec
+from ai.backend.common.data.idle_checker.types import IdleCheckerSpec, IdleCheckPhase
 from ai.backend.common.types import SessionTypes
 from ai.backend.manager.data.idle_checker.types import IdleCheckerData
 from ai.backend.manager.errors.idle_checker import (
@@ -26,7 +27,11 @@ from ai.backend.manager.errors.repository import (
     UniqueConstraintViolationError,
 )
 from ai.backend.manager.models.domain.row import DomainRow
-from ai.backend.manager.models.idle_checker.row import IdleCheckerBindingRow, IdleCheckerRow
+from ai.backend.manager.models.idle_checker.row import (
+    IdleCheckerBindingRow,
+    IdleCheckerRow,
+    SessionIdleCheckRow,
+)
 from ai.backend.manager.models.project.row import ProjectRow
 from ai.backend.manager.models.resource_group.row import ResourceGroupRow
 from ai.backend.manager.models.specs.creator import GlobalEntityCreator
@@ -129,3 +134,35 @@ class IdleCheckerAssignmentCreator(
                 constraint_name="fk_idle_checker_bindings_idle_checker_id",
             ),
         )
+
+
+@dataclass
+class SessionIdleCheckLink(RelationCreator[SessionID, IdleCheckerID, SessionIdleCheckRow]):
+    """Links a session to a checker that applies to it. The row starts unchecked; what
+    the checker later decides is written by the judgment update."""
+
+    @override
+    def precondition_checks(
+        self, scope: SessionID, target: IdleCheckerID
+    ) -> Sequence[PreconditionCheck]:
+        return ()
+
+    @override
+    def row_class(self) -> type[SessionIdleCheckRow]:
+        return SessionIdleCheckRow
+
+    @override
+    def build_row(self, scope: SessionID, target: IdleCheckerID) -> SessionIdleCheckRow:
+        return SessionIdleCheckRow(
+            session_id=scope,
+            idle_checker_id=target,
+            expire_at=None,
+            last_status=IdleCheckPhase.NOT_CHECKED,
+            last_message="Not checked yet.",
+            is_manual=False,
+            manually_triggered_by=None,
+        )
+
+    @override
+    def integrity_error_checks(self) -> Sequence[IntegrityErrorCheck]:
+        return ()

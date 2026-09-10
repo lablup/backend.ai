@@ -16,7 +16,6 @@ from ai.backend.manager.data.permission.types import (
     EntityType,
     OperationType,
     Permission,
-    ScopeType,
 )
 from ai.backend.manager.models.agent import AgentRow
 
@@ -123,8 +122,6 @@ class TestSearchPermissions:
             ]:
                 perm = PermissionRow(
                     role_id=role_id,
-                    scope_type=ScopeType.DOMAIN,
-                    scope_id="test-domain",
                     entity_type=entity_type,
                     permission=Permission.from_operation(operation),
                 )

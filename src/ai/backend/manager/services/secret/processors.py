@@ -1,9 +1,8 @@
 from __future__ import annotations
 
-from typing import Any
-
-from ai.backend.manager.actions.registry.group import ProcessorGroup
+from ai.backend.manager.actions.registry.field import FieldGroup
 from ai.backend.manager.actions.v2.global_scope.processor import GlobalActionProcessor
+from ai.backend.manager.data.secret.types import SecretFieldData
 from ai.backend.manager.services.secret.actions.reencrypt import (
     ReencryptSecretsAction,
     ReencryptSecretsActionResult,
@@ -22,6 +21,6 @@ class SecretProcessors:
     reencrypt: GlobalActionProcessor[ReencryptSecretsAction, ReencryptSecretsActionResult]
     get_status: GlobalActionProcessor[GetSecretStatusAction, GetSecretStatusActionResult]
 
-    def __init__(self, group: ProcessorGroup[Any], service: SecretService) -> None:
+    def __init__(self, group: FieldGroup[SecretFieldData], service: SecretService) -> None:
         self.reencrypt = group.global_scope(ReencryptSecretsAction, service.reencrypt)
         self.get_status = group.global_scope(GetSecretStatusAction, service.get_status)

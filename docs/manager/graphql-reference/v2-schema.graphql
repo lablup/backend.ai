@@ -1503,6 +1503,11 @@ type AuditLogV2 implements Node {
   clientIp: String
 
   """
+  Added in 26.9.0. The entity the logged operation acted on. Null when the log names no entity, or when the recorded id does not name one that still exists.
+  """
+  entity: EntityNode
+
+  """
   The user who triggered this audit log entry, resolved from triggered_by UUID.
   """
   user: UserV2
@@ -1683,12 +1688,6 @@ type BulkAddRolePermissionFailureInfo {
   """Role ID of the failed entry."""
   roleId: UUID!
 
-  """Scope element type of the failed entry."""
-  scopeType: String!
-
-  """Scope element ID of the failed entry."""
-  scopeId: String!
-
   """Entity element type of the failed entry."""
   entityType: String!
 
@@ -1704,7 +1703,7 @@ Added in 26.4.4. Failure detail for a single permission entry in a bulk add oper
 """
 type BulkAddRolePermissionPresetFailureInfo {
   """Entity type of the permission entry that failed."""
-  entityType: RBACElementType!
+  entityType: String!
 
   """Operation of the permission entry that failed."""
   operation: OperationType!
@@ -1775,7 +1774,7 @@ type BulkAssignRolePayload {
   assigned: [RoleAssignment!]!
 
   """List of errors for users that failed to be assigned."""
-  failed: [BulkAssignRoleError!]!
+  failed: [BulkAssignRoleError!]! @deprecated(reason: "Always empty. A user already holding the role keeps it; every other refusal raises.")
 }
 
 """Added in 26.2.0. Error information for a failed user in bulk creation."""
@@ -3186,9 +3185,7 @@ type CreateObjectStoragePayload {
 """Added in 26.3.0. Input for creating a scoped permission"""
 input CreatePermissionInput {
   roleId: UUID!
-  scopeType: RBACElementType!
-  scopeId: String!
-  entityType: RBACElementType!
+  entityType: String!
   operation: OperationType!
 }
 
@@ -3435,7 +3432,7 @@ input CreateRolePresetInput {
   name: String!
 
   """Scope type this preset targets (e.g., domain, project)."""
-  scopeType: RBACElementType!
+  scopeType: String!
 
   """
   Default value for the `auto_assign` flag on roles instantiated from this preset.
@@ -3502,6 +3499,16 @@ input CreateRuntimeVariantPresetInput {
   Added in 26.4.4. Whether this preset parameter must be supplied when building a deployment revision.
   """
   required: Boolean! = false
+
+  """
+  Added in 26.9.0. Runtime version this preset becomes available in. Dot-separated numbers.
+  """
+  addedVersion: String
+
+  """
+  Added in 26.9.0. Runtime version this preset is removed in, exclusive. Dot-separated numbers.
+  """
+  deprecatedVersion: String
 
   """Added in 26.9.0. UI category group for organizing parameters."""
   category: String
@@ -4922,6 +4929,14 @@ type DomainResourceAllocationV2 {
 }
 
 """
+Added in 26.9.0. Scope for the scoped domain query. Each list is OR'd internally, and every scope named is authorized before the read runs.
+"""
+input DomainScope {
+  """Resource groups whose domains are being read."""
+  resourceGroup: [UUIDScope!] = null
+}
+
+"""
 Added in 26.1.0. Domain-level usage bucket representing aggregated resource consumption for a specific time period. Usage buckets store historical data used to calculate fair share factors.
 """
 type DomainUsageBucket implements Node {
@@ -5103,6 +5118,9 @@ type DomainV2 implements Node @key(fields: "id") {
 
   """Users belonging to this domain."""
   users(filter: UserV2Filter = null, orderBy: [UserV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): UserV2Connection
+
+  """Added in 26.9.0. Resource groups this domain may schedule on."""
+  resourceGroups(filter: ResourceGroupFilter = null, orderBy: [ResourceGroupOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ResourceGroupConnection
 }
 
 """
@@ -5320,39 +5338,10 @@ type EnqueueSessionPayload {
 """Added in 26.4.2. Entity with its allowed actions within a scope."""
 type EntityActionInfo {
   """Entity element type"""
-  entityType: RBACElementType!
+  entityType: String!
 
   """Valid operations for this entity in the given scope"""
   actions: [OperationInfo!]!
-}
-
-"""Added in 26.3.0. Entity connection."""
-type EntityConnection {
-  """Pagination data for this connection"""
-  pageInfo: PageInfo!
-
-  """Contains the nodes in this connection"""
-  edges: [EntityRefEdge!]!
-  count: Int!
-}
-
-"""Added in 26.3.0. Filter for entity associations"""
-input EntityFilter {
-  entityType: RBACElementTypeFilter = null
-  entityId: StringFilter = null
-
-  """
-  Added in 26.8.0. Filter by the type of scope the entity is registered in.
-  """
-  scopeType: RBACElementTypeFilter = null
-
-  """
-  Added in 26.8.0. Filter by the id of scope the entity is registered in.
-  """
-  scopeId: StringFilter = null
-  AND: [EntityFilter!] = null
-  OR: [EntityFilter!] = null
-  NOT: [EntityFilter!] = null
 }
 
 """Added in 26.9.0. One `key=value` label and the entity carrying it."""
@@ -5377,6 +5366,9 @@ type EntityLabel implements Node {
 
   """When the label's value was last replaced."""
   updatedAt: DateTime!
+
+  """Added in 26.9.0. The labeled entity."""
+  entity: EntityNode
 }
 
 """Added in 26.9.0. Paginated connection for label records."""
@@ -5435,57 +5427,15 @@ enum EntityLabelOrderField {
   CREATED_AT
 }
 
-union EntityNode = UserV2 | ProjectV2 | DomainV2 | VirtualFolderNode | ImageV2 | ComputeSessionNode | SessionV2 | Artifact | ArtifactRegistry | NotificationChannel | NotificationRule | ModelDeployment | ResourceGroup | ContainerRegistryV2 | ArtifactRevision | Role
+union EntityNode = UserV2 | ProjectV2 | DomainV2 | VirtualFolderNode | ImageV2 | ComputeSessionNode | SessionV2 | Artifact | ArtifactRegistry | NotificationChannel | NotificationRule | ModelDeployment | ResourceGroup | ContainerRegistryV2 | ArtifactRevision | Role | AgentV2 | AppConfigAllowList | AppConfigDefinition | AppConfigFragment | IdleChecker | ObjectStorage | RuntimeVariant | RuntimeVariantPreset | StorageNamespace | VFolder | VFSStorage
 
 """Added in 26.4.2. Valid entity-operation combination for RBAC actions."""
 type EntityOperationCombination {
   """Entity element type"""
-  entityType: RBACElementType!
+  entityType: String!
 
   """Valid operations for this entity"""
   operations: [OperationInfo!]!
-}
-
-"""Added in 26.3.0. Order by specification for entity associations"""
-input EntityOrderBy {
-  field: EntityOrderField!
-  direction: OrderDirection! = DESC
-}
-
-"""Added in 26.3.0. Entity ordering field"""
-enum EntityOrderField {
-  ENTITY_TYPE
-  REGISTERED_AT
-}
-
-"""
-Added in 26.3.0. Entity reference from the association_scopes_entities table.
-"""
-type EntityRef implements Node {
-  """The Globally Unique ID of this object"""
-  id: ID!
-  scopeType: RBACElementType!
-  scopeId: String!
-  entityType: RBACElementType!
-  entityId: String!
-  registeredAt: DateTime!
-
-  """The resolved entity object."""
-  entity: EntityNode
-
-  """
-  Added in 26.4.3. The resolved scope object in which the entity is registered.
-  """
-  scope: EntityNode
-}
-
-"""An edge in a connection."""
-type EntityRefEdge {
-  """A cursor for use in pagination"""
-  cursor: String!
-
-  """The item at the end of the edge"""
-  node: EntityRef!
 }
 
 """
@@ -5670,8 +5620,8 @@ type EntityType implements Node {
 
 """Added in 26.4.4. Entity reference parametrized by RBAC element type."""
 input EntityTypeScope {
-  """RBAC element type of the entity."""
-  entityType: RBACElementType!
+  """Type of the entity."""
+  entityType: String!
 
   """ID of the entity."""
   entityId: String!
@@ -7724,6 +7674,14 @@ Added in 26.4.2. Scope for querying available presets that satisfy a model card'
 input ModelCardAvailablePresetsScope {
   """Model card UUID to check resource requirements against."""
   modelCardId: UUID!
+}
+
+"""
+Added in 26.9.0. Scope for the scoped model card query. Each list is OR'd internally, and every scope named is authorized before the read runs.
+"""
+input ModelCardScope {
+  """Projects whose model cards are being read."""
+  project: [UUIDScope!] = null
 }
 
 """
@@ -9905,9 +9863,7 @@ type Permission implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
   roleId: UUID!
-  scopeType: RBACElementType!
-  scopeId: String!
-  entityType: RBACElementType!
+  entityType: String!
   createdAt: DateTime!
 
   """Added in 26.9.0. The permission bit the row holds."""
@@ -9918,9 +9874,6 @@ type Permission implements Node {
 
   """The role this permission belongs to."""
   role: Role
-
-  """The scope this permission applies to."""
-  scope: EntityNode
 }
 
 """
@@ -9956,9 +9909,7 @@ type PermissionEdge {
 """Added in 26.3.0. Filter for scoped permissions"""
 input PermissionFilter {
   roleId: UUIDFilter = null
-  scopeType: RBACElementTypeFilter = null
-  scopeId: StringFilter = null
-  entityType: RBACElementTypeFilter = null
+  entityType: StringFilter = null
   createdAt: DateTimeFilter = null
   AND: [PermissionFilter!] = null
   OR: [PermissionFilter!] = null
@@ -9969,9 +9920,7 @@ input PermissionFilter {
 Added in 26.4.0. Nested filter for permissions within a role assignment. Filters assignments where the assigned role has permissions matching all specified conditions.
 """
 input PermissionNestedFilter {
-  scopeId: StringFilter = null
-  scopeType: RBACElementTypeFilter = null
-  entityType: RBACElementTypeFilter = null
+  entityType: StringFilter = null
   operation: OperationTypeFilter = null
   AND: [PermissionNestedFilter!] = null
   OR: [PermissionNestedFilter!] = null
@@ -10769,6 +10718,20 @@ enum ProjectResourcePolicyV2OrderField {
 }
 
 """
+Added in 26.9.0. Scope for the scoped project query. Each list is OR'd internally and across lists, and every scope named is authorized before the read runs.
+"""
+input ProjectScope {
+  """Domains whose projects are being read."""
+  domain: [UUIDScope!] = null
+
+  """Users whose project memberships are being read."""
+  user: [UUIDScope!] = null
+
+  """Resource groups whose projects are being read."""
+  resourceGroup: [UUIDScope!] = null
+}
+
+"""
 Added in 26.4.2. Scope for session operations within a specific project.
 """
 input ProjectSessionV2Scope {
@@ -11007,6 +10970,12 @@ type ProjectV2 implements Node @key(fields: "id") {
 
   """Users who are members of this project."""
   users(filter: UserV2Filter = null, orderBy: [UserV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): UserV2Connection
+
+  """Added in 26.9.0. Resource groups this project may schedule on."""
+  resourceGroups(filter: ResourceGroupFilter = null, orderBy: [ResourceGroupOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ResourceGroupConnection
+
+  """Added in 26.9.0. Model cards belonging to this project."""
+  modelCards(filter: ModelCardV2Filter = null, orderBy: [ModelCardV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ModelCardV2Connection
 }
 
 """
@@ -11386,6 +11355,11 @@ type Query {
   """Added in 26.2.0. List resource groups (admin only)"""
   adminResourceGroups(filter: ResourceGroupFilter = null, orderBy: [ResourceGroupOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ResourceGroupConnection
 
+  """
+  Added in 26.9.0. Page through the resource groups the named scopes reach, combined with OR. Every scope is authorized before the read runs.
+  """
+  scopedResourceGroups(scope: ResourceGroupScope!, filter: ResourceGroupFilter = null, orderBy: [ResourceGroupOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ResourceGroupConnection
+
   """Added in 26.4.2. Get a single resource group by name (admin only)."""
   adminResourceGroupV2(name: String!): ResourceGroup
 
@@ -11619,11 +11593,6 @@ type Query {
   adminRoleAssignments(filter: RoleAssignmentFilter = null, orderBy: [RoleAssignmentOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RoleAssignmentConnection
 
   """
-  Added in 26.3.0. Search entity associations (admin only). Optionally filter by entity_type and entity_id.
-  """
-  adminEntities(filter: EntityFilter = null, orderBy: [EntityOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): EntityConnection
-
-  """
   Added in 26.4.2. List keypairs owned by the current authenticated user. Supports filtering, ordering, and both cursor-based and offset-based pagination.
   """
   myKeypairs(filter: KeypairFilter = null, orderBy: [KeypairOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): KeyPairConnection
@@ -11830,6 +11799,11 @@ type Query {
   projectUsersV2(scope: ProjectUserV2Scope!, filter: UserV2Filter = null, orderBy: [UserV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): UserV2Connection
 
   """
+  Added in 26.9.0. Page through the users the named scopes reach, combined with OR. Every scope is authorized before the read runs.
+  """
+  scopedUsersV2(scope: UserScope!, filter: UserV2Filter = null, orderBy: [UserV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): UserV2Connection
+
+  """
   Added in 26.2.0. Get a single domain by name. Returns an error if domain is not found.
   """
   domainV2(domainName: String!): DomainV2
@@ -11841,6 +11815,11 @@ type Query {
 
   """Added in 26.2.0. List domains within resource group scope."""
   rgDomainsV2(scope: ResourceGroupDomainScope!, filter: DomainV2Filter = null, orderBy: [DomainV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): DomainV2Connection
+
+  """
+  Added in 26.9.0. Page through the domains the named scopes reach, combined with OR. Every scope is authorized before the read runs.
+  """
+  scopedDomainsV2(scope: DomainScope!, filter: DomainV2Filter = null, orderBy: [DomainV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): DomainV2Connection
 
   """
   Added in 26.2.0. Get a single project by ID. Returns an error if project is not found.
@@ -11856,6 +11835,11 @@ type Query {
   Added in 26.2.0. List projects within a specific domain. Requires domain admin privileges or higher.
   """
   domainProjectsV2(scope: DomainProjectV2Scope!, filter: ProjectV2Filter = null, orderBy: [ProjectV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ProjectV2Connection
+
+  """
+  Added in 26.9.0. Page through the projects the named scopes reach, combined with OR. Every scope is authorized before the read runs.
+  """
+  scopedProjectsV2(scope: ProjectScope!, filter: ProjectV2Filter = null, orderBy: [ProjectV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ProjectV2Connection
 
   """
   Added in 26.2.0. Get the domain that a project belongs to. Returns an error if project or domain is not found.
@@ -11978,6 +11962,11 @@ type Query {
 
   """Added in 26.4.2. Search model cards within a MODEL_STORE project."""
   projectModelCardsV2(scope: ProjectModelCardV2Scope!, filter: ModelCardV2Filter = null, orderBy: [ModelCardV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ModelCardV2Connection
+
+  """
+  Added in 26.9.0. Page through the model cards the named scopes reach, combined with OR. Every scope is authorized before the read runs.
+  """
+  scopedModelCardsV2(scope: ModelCardScope!, filter: ModelCardV2Filter = null, orderBy: [ModelCardV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ModelCardV2Connection
 
   """Added in 26.4.2. Get a single model card by ID."""
   modelCardV2(id: UUID!): ModelCardV2
@@ -12212,74 +12201,6 @@ input QueryTimeRangeInput {
 }
 
 """
-Added in 26.3.0. Unified RBAC element type for scope-entity relationships
-"""
-enum RBACElementType {
-  DOMAIN
-  PROJECT
-  USER
-  SESSION
-  VFOLDER
-  MODEL_DEPLOYMENT
-  KEYPAIR
-  NOTIFICATION_CHANNEL
-  NETWORK
-  IDLE_CHECKER_ASSIGNMENT
-  RESOURCE_GROUP
-  CONTAINER_REGISTRY
-  STORAGE_HOST
-  AGENT
-  KERNEL
-  ROUTING
-  IMAGE
-  ARTIFACT
-  ARTIFACT_REGISTRY
-  SESSION_TEMPLATE
-  APP_CONFIG
-  APP_CONFIG_DEFINITION
-  APP_CONFIG_ALLOW_LIST
-  APP_CONFIG_FRAGMENT
-  MODEL_CARD
-  RESOURCE_PRESET
-  USER_RESOURCE_POLICY
-  KEYPAIR_RESOURCE_POLICY
-  PROJECT_RESOURCE_POLICY
-  ROLE
-  AUDIT_LOG
-  KERNEL_HISTORY
-  EVENT_LOG
-  PROJECT_ADMIN_PAGE
-  DOMAIN_ADMIN_PAGE
-  NOTIFICATION_RULE
-  DEPLOYMENT_TOKEN
-  DEPLOYMENT_POLICY
-  DEPLOYMENT_REVISION
-  IMAGE_ALIAS
-  ROLE_ASSIGNMENT
-  VFOLDER_DATA
-  SESSION_APP_SERVICE
-  USER_EMAIL
-  ARTIFACT_REVISION
-}
-
-"""
-Added in 26.4.4. Filter for RBAC element type fields (scope_type / entity_type). Supports equals / in / not_equals / not_in.
-"""
-input RBACElementTypeFilter {
-  """Matches rows with this exact element type."""
-  equals: RBACElementType = null
-
-  """Matches rows whose element type is in this list."""
-  in: [RBACElementType!] = null
-
-  """Excludes rows with this exact element type."""
-  notEquals: RBACElementType = null
-
-  """Excludes rows whose element type is in this list."""
-  notIn: [RBACElementType!] = null
-}
-
-"""
 Added in 26.2.0. Filter for domain fair shares within a resource group scope. References resource group membership columns to avoid excluding domains without fair share records.
 """
 input RGDomainFairShareFilter {
@@ -12448,12 +12369,6 @@ type ReplaceRolePermissionFailureInfo {
   """Role ID of the failed entry."""
   roleId: UUID!
 
-  """Scope element type of the failed entry."""
-  scopeType: String!
-
-  """Scope element ID of the failed entry."""
-  scopeId: String!
-
   """Entity element type of the failed entry."""
   entityType: String!
 
@@ -12480,7 +12395,7 @@ type ReplaceRolePermissionsPayload {
   items: [Permission!]!
 
   """Permission entries that failed to insert."""
-  failed: [ReplaceRolePermissionFailureInfo!]!
+  failed: [ReplaceRolePermissionFailureInfo!]! @deprecated(reason: "Always empty. The write states the whole set or raises; a later API reports what it refused.")
 }
 
 """Added in 25.19.0. """
@@ -12812,6 +12727,12 @@ type ResourceGroup implements Node {
   Added in 26.1.0. Resource usage information for this resource group. Provides aggregated metrics for capacity, used, and free resources. This is a lazy-loaded field that queries agent and kernel data on demand.
   """
   resourceInfo: ResourceInfo
+
+  """Added in 26.9.0. Domains this resource group serves."""
+  domains(filter: DomainV2Filter = null, orderBy: [DomainV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): DomainV2Connection
+
+  """Added in 26.9.0. Projects this resource group serves."""
+  projects(filter: ProjectV2Filter = null, orderBy: [ProjectV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ProjectV2Connection
 }
 
 """Added in 26.2.0. Resource group connection"""
@@ -12910,6 +12831,20 @@ type ResourceGroupSchedulerConfig {
 
   """Added in 26.3.0. Preemption configuration for this resource group."""
   preemption: PreemptionConfig!
+}
+
+"""
+Added in 26.9.0. Scope for the scoped resource group query. Each list is OR'd internally and across lists, and every scope named is authorized before the read runs.
+"""
+input ResourceGroupScope {
+  """Domains whose resource groups are being read."""
+  domain: [UUIDScope!] = null
+
+  """Projects whose resource groups are being read."""
+  project: [UUIDScope!] = null
+
+  """Users whose resource groups are being read."""
+  user: [UUIDScope!] = null
 }
 
 """Added in 26.2.0. Status information for a resource group."""
@@ -13450,14 +13385,14 @@ type Role implements Node {
   """Added in 26.9.0. ID of the scope the role belongs to."""
   scopeId: UUID!
 
+  """Added in 26.9.0. The scope the role belongs to."""
+  scope: EntityNode
+
   """Added in 26.3.0. Permissions associated with this role."""
   permissions(filter: PermissionFilter = null, orderBy: [PermissionOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): PermissionConnection
 
   """Added in 26.3.0. Users assigned to this role."""
   users(filter: RoleAssignmentFilter = null, orderBy: [RoleAssignmentOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RoleAssignmentConnection
-
-  """Added in 26.4.2. Scopes this role is registered in."""
-  scopes(filter: EntityFilter = null, orderBy: [EntityOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): EntityConnection
 }
 
 """Added in 26.3.0. RBAC role assignment (user-role association)."""
@@ -13576,7 +13511,7 @@ input RoleFilter {
 Added in 26.8.0. Filter roles by the scope they are mapped (registered) to.
 """
 input RoleMappedScopeNestedFilter {
-  scopeType: RBACElementTypeFilter = null
+  scopeType: StringFilter = null
   scopeId: UUIDFilter = null
   AND: [RoleMappedScopeNestedFilter!] = null
   OR: [RoleMappedScopeNestedFilter!] = null
@@ -13605,7 +13540,7 @@ type RolePermissionPreset implements Node {
   rolePresetId: UUID!
 
   """Entity type the permission applies to."""
-  entityType: RBACElementType!
+  entityType: String!
 
   """Operation granted by the permission."""
   operation: OperationType!
@@ -13642,7 +13577,7 @@ Added in 26.4.4. A single (entity_type, operation) pair carried by a role preset
 """
 input RolePermissionPresetEntryInput {
   """Entity type the permission applies to."""
-  entityType: RBACElementType!
+  entityType: String!
 
   """Operation granted by the permission."""
   operation: OperationType!
@@ -13656,7 +13591,7 @@ input RolePermissionPresetFilter {
   rolePresetId: UUIDFilter = null
 
   """Filter by entity type the permission applies to."""
-  entityType: RBACElementTypeFilter = null
+  entityType: StringFilter = null
 
   """Filter by granted operation."""
   operation: OperationTypeFilter = null
@@ -13707,7 +13642,7 @@ type RolePreset implements Node {
   name: String!
 
   """Scope type this preset targets (e.g., domain, project)."""
-  scopeType: RBACElementType!
+  scopeType: String!
 
   """
   Default value for the `auto_assign` flag copied onto roles instantiated from this preset.
@@ -13756,7 +13691,7 @@ input RolePresetFilter {
   name: StringFilter = null
 
   """Filter by scope type."""
-  scopeType: RBACElementTypeFilter = null
+  scopeType: StringFilter = null
 
   """Filter by auto-assign flag."""
   autoAssign: Boolean = null
@@ -14239,6 +14174,16 @@ type RuntimeVariantPreset implements Node {
   """
   required: Boolean!
 
+  """
+  Added in 26.9.0. Runtime version this preset became available in; null means it always was.
+  """
+  addedVersion: String
+
+  """
+  Added in 26.9.0. Runtime version this preset was removed in, exclusive; null means it is still offered.
+  """
+  deprecatedVersion: String
+
   """UI category group for organizing parameters."""
   category: String
 
@@ -14302,6 +14247,11 @@ input RuntimeVariantPresetFilter {
   """Variant ID filter."""
   runtimeVariantId: UUIDFilter = null
 
+  """
+  Added in 26.9.0. Keep only presets valid at this runtime version, that is added_version <= version < deprecated_version. Dot-separated numbers.
+  """
+  runtimeVersion: String = null
+
   """Added in 26.7.0. Match all of the given sub-filters."""
   AND: [RuntimeVariantPresetFilter!] = null
 
@@ -14335,6 +14285,8 @@ enum RuntimeVariantPresetOrderField {
   NAME
   RANK
   CREATED_AT
+  ADDED_VERSION
+  DEPRECATED_VERSION
 }
 
 """Added in 26.9.0. Slider UI config input."""
@@ -14620,10 +14572,10 @@ Added in 26.3.0. Valid scope-entity type combination for RBAC permissions.
 """
 type ScopeEntityCombination {
   """Scope element type"""
-  scopeType: RBACElementType!
+  scopeType: String!
 
   """Valid entity types for this scope type"""
-  validEntityTypes: [RBACElementType!]!
+  validEntityTypes: [String!]!
 }
 
 """
@@ -14631,7 +14583,7 @@ Added in 26.4.2. Scope-entity-operation combination for RBAC permission matrix.
 """
 type ScopeEntityOperationCombination {
   """Scope element type"""
-  scopeType: RBACElementType!
+  scopeType: String!
 
   """Entities and their valid operations within this scope"""
   entities: [EntityActionInfo!]!
@@ -14641,7 +14593,7 @@ type ScopeEntityOperationCombination {
 Added in 26.4.2. Scope reference for associating an entity with a scope.
 """
 input ScopeInput {
-  scopeType: RBACElementType!
+  scopeType: String!
   scopeId: String!
 }
 
@@ -16229,9 +16181,7 @@ type UpdateObjectStoragePayload {
 """Added in 26.3.0. Input for updating a scoped permission"""
 input UpdatePermissionInput {
   id: UUID!
-  scopeType: RBACElementType = null
-  scopeId: String = null
-  entityType: RBACElementType = null
+  entityType: String = null
   operation: OperationType = null
 }
 
@@ -16705,6 +16655,12 @@ input UpdateRuntimeVariantPresetInput {
 
   """Added in 26.4.4. New required flag."""
   required: Boolean
+
+  """Added in 26.9.0. New version this preset becomes available in."""
+  addedVersion: String
+
+  """Added in 26.9.0. New version this preset is removed in, exclusive."""
+  deprecatedVersion: String
 
   """Added in 26.9.0. New UI category group."""
   category: String
@@ -17281,6 +17237,17 @@ input UserRoleV2EnumFilter {
 }
 
 """
+Added in 26.9.0. Scope for the scoped user query. Each list is OR'd internally and across lists, and every scope named is authorized before the read runs.
+"""
+input UserScope {
+  """Domains whose users are being read."""
+  domain: [UUIDScope!] = null
+
+  """Projects whose users are being read."""
+  project: [UUIDScope!] = null
+}
+
+"""
 Added in 26.2.0. User account status. ACTIVE: User can log in and use the system. INACTIVE: User account is disabled but preserved. DELETED: User has been soft-deleted. BEFORE_VERIFICATION: User account is pending email verification.
 """
 enum UserStatusV2 {
@@ -17488,6 +17455,9 @@ type UserV2 implements Node @key(fields: "id") {
 
   """Projects this user is a member of."""
   projects(filter: ProjectV2Filter = null, orderBy: [ProjectV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ProjectV2Connection
+
+  """Added in 26.9.0. Resource groups this user may schedule on."""
+  resourceGroups(filter: ResourceGroupFilter = null, orderBy: [ResourceGroupOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ResourceGroupConnection
 }
 
 """

@@ -72,10 +72,17 @@ log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
 class _CSVExportResult(Protocol):
     """Structural type shared by all CSV export action results."""
 
-    field_names: list[str]
-    row_iterator: AsyncIterator[Sequence[Sequence[Any]]]
-    encoding: str
-    filename: str
+    @property
+    def field_names(self) -> list[str]: ...
+
+    @property
+    def row_iterator(self) -> AsyncIterator[Sequence[Sequence[Any]]]: ...
+
+    @property
+    def encoding(self) -> str: ...
+
+    @property
+    def filename(self) -> str: ...
 
 
 USERS_REPORT_KEY = "users"

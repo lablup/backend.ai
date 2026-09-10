@@ -17,8 +17,8 @@ from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
 from ai.backend.common.data.entity.container_registry import ContainerRegistryID
 from ai.backend.common.data.entity.domain import DomainID, DomainName
-from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE, ProjectID
-from ai.backend.common.data.entity.user import USER_SCOPE_TYPE, UserID
+from ai.backend.common.data.entity.project import ProjectEntityType, ProjectID
+from ai.backend.common.data.entity.user import UserEntityType, UserID
 from ai.backend.common.data.entity.vfolder import VFolderEntityType, VFolderUUID
 from ai.backend.common.types import (
     BinarySize,
@@ -69,9 +69,6 @@ from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.model_card.row import ModelCardRow
 from ai.backend.manager.models.project import ProjectRow
 from ai.backend.manager.models.rbac_models import UserRoleRow
-from ai.backend.manager.models.rbac_models.association_scopes_entities import (
-    AssociationScopesEntitiesRow,
-)
 from ai.backend.manager.models.rbac_models.entity_field import EntityFieldRow
 from ai.backend.manager.models.rbac_models.permission.object_permission import ObjectPermissionRow
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
@@ -182,7 +179,6 @@ class TestVfolderRepository:
                 RoutingRow,
                 ResourcePresetRow,
                 VFolderPermissionRow,
-                AssociationScopesEntitiesRow,
                 VirtualEntityRow,
                 EntityMembershipRow,
                 EntityMembershipCapRow,
@@ -300,7 +296,7 @@ class TestVfolderRepository:
                 id=role_id,
                 name=f"user-role-{user_uuid.hex[:8]}",
                 source=RoleSource.SYSTEM,
-                scope_type=USER_SCOPE_TYPE,
+                scope_type=UserEntityType(),
                 scope_id=user_uuid,
             )
             db_sess.add(role)
@@ -319,7 +315,7 @@ class TestVfolderRepository:
             db_sess.add(
                 VirtualEntityRow(
                     id=uuid.uuid4(),
-                    entity_type=USER_SCOPE_TYPE,
+                    entity_type=UserEntityType(),
                     entity_id=UserID(user_uuid),
                 )
             )
@@ -357,7 +353,7 @@ class TestVfolderRepository:
             db_sess.add(
                 VirtualEntityRow(
                     id=uuid.uuid4(),
-                    entity_type=PROJECT_SCOPE_TYPE,
+                    entity_type=ProjectEntityType(),
                     entity_id=ProjectID(group_uuid),
                 )
             )
@@ -974,7 +970,6 @@ class TestVfolderRepositoryPurge:
                 RoutingRow,
                 ModelCardRow,
                 EntityFieldRow,
-                AssociationScopesEntitiesRow,
                 ObjectPermissionRow,
                 PermissionRow,
             ],

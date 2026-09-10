@@ -5,14 +5,19 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
+from ai.backend.common.data.entity.audit_log import AuditLogFieldType
 from ai.backend.common.data.entity.domain import DomainEntityType
-from ai.backend.common.data.entity.export import ExportEntityType
+from ai.backend.common.data.entity.project import ProjectEntityType
+from ai.backend.common.data.entity.session import SessionEntityType
+from ai.backend.common.data.entity.types import GlobalEntityType
+from ai.backend.common.data.entity.user import UserEntityType
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
-from ai.backend.manager.actions.registry.types import GroupMeta
+from ai.backend.manager.actions.registry.types import FieldGroupMeta, GroupMeta
 from ai.backend.manager.api.rest.export.handler import ExportHandler
 from ai.backend.manager.api.rest.export.registry import register_export_routes
 from ai.backend.manager.api.rest.routing import RouteRegistry
 from ai.backend.manager.api.rest.types import RouteDeps
+from ai.backend.manager.data.audit_log.types import AuditLogData
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.export.db_source.db_source import ExportDBSource
 from ai.backend.manager.repositories.export.registry.base import ExportReportRegistry
@@ -30,7 +35,14 @@ def export_processors(
     registry = ExportReportRegistry.create_default()
     repo = ExportRepository(db_source, registry)
     service = ExportService(repo)
-    return ExportProcessors(processor_registry.group(GroupMeta(ExportEntityType())), service)
+    return ExportProcessors(
+        processor_registry.group(GroupMeta(UserEntityType())),
+        processor_registry.group(GroupMeta(SessionEntityType())),
+        processor_registry.group(GroupMeta(ProjectEntityType())),
+        processor_registry.group(GroupMeta(GlobalEntityType())),
+        processor_registry.dangling_field_group(FieldGroupMeta(AuditLogFieldType()), AuditLogData),
+        service,
+    )
 
 
 @pytest.fixture()

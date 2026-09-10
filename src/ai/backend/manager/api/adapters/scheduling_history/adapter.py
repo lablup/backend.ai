@@ -210,7 +210,7 @@ class SchedulingHistoryAdapter(BaseAdapter):
     # ========== Batch Load (DataLoader) ==========
 
     async def batch_load_session_histories_by_ids(
-        self, ids: Sequence[UUID]
+        self, ids: Sequence[SessionSchedulingHistoryID]
     ) -> list[SessionHistoryNode | Exception | None]:
         """Batch load session scheduling histories for DataLoader use, checked per session."""
         if not ids:
@@ -237,7 +237,7 @@ class SchedulingHistoryAdapter(BaseAdapter):
         )
 
     async def batch_load_deployment_histories_by_ids(
-        self, ids: Sequence[UUID]
+        self, ids: Sequence[DeploymentHistoryID]
     ) -> list[DeploymentHistoryNode | Exception | None]:
         """Batch load deployment histories for DataLoader use, checked per deployment."""
         if not ids:
@@ -251,7 +251,7 @@ class SchedulingHistoryAdapter(BaseAdapter):
         )
 
     async def batch_load_route_histories_by_ids(
-        self, ids: Sequence[UUID]
+        self, ids: Sequence[RouteHistoryID]
     ) -> list[RouteHistoryNode | Exception | None]:
         """Batch load route histories for DataLoader use, checked per deployment."""
         if not ids:

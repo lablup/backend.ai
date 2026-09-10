@@ -21,7 +21,7 @@ import pytest
 import sqlalchemy as sa
 from sqlalchemy.orm import InstrumentedAttribute
 
-from ai.backend.common.data.entity.domain import DomainEntityType
+from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.role_preset import (
     RolePresetEntityType,
     RolePresetID,
@@ -33,8 +33,6 @@ from ai.backend.common.data.entity.types import (
     FieldData,
     FieldIdentifier,
     FieldType,
-    ScopeRef,
-    ScopeType,
 )
 from ai.backend.common.data.permission.types import ScopeType as RBACScopeType
 from ai.backend.manager.actions.types import ActionOperationType
@@ -42,11 +40,8 @@ from ai.backend.manager.actions.v2.ops.base import SearchOpsAction
 from ai.backend.manager.actions.v2.scope.base import BaseScopeAction
 from ai.backend.manager.actions.v2.scope.processor import ScopeActionProcessor
 from ai.backend.manager.data.role_preset.types import RolePresetData
-from ai.backend.manager.errors.repository import (
-    AmbiguousEntityKeyError,
-    EmptyOperationScopeError,
-    EntityNotFoundError,
-)
+from ai.backend.manager.errors.base.entity import EntityNotFoundError
+from ai.backend.manager.errors.repository import AmbiguousEntityKeyError, EmptyOperationScopeError
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.entity_label.row import EntityLabelRow
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
@@ -206,8 +201,8 @@ class _PresetFieldType(FieldType):
 
     @override
     @classmethod
-    def owner_type(cls) -> type[EntityType] | None:
-        return None
+    def owner_type(cls) -> type[EntityType]:
+        return RolePresetEntityType
 
 
 class _PresetFieldID(FieldIdentifier):
@@ -330,6 +325,10 @@ class _PresetByName(DataLookup[RolePresetRow, RolePresetID]):
     @override
     def row_class(self) -> type[RolePresetRow]:
         return RolePresetRow
+
+    @override
+    def entity_type(self) -> EntityType:
+        return RolePresetEntityType()
 
     @override
     def conditions(self) -> Sequence[QueryCondition]:
@@ -719,7 +718,7 @@ class _NamedScope(OperationScope):
 class _SearchPresetsAction(BaseScopeAction, SearchOpsAction[RolePresetRow, _PresetView]):
     """The only file a pass-through domain still writes: the action."""
 
-    scope: ScopeRef
+    scope: EntityIdentifier
     scopes: tuple[OperationScope, ...] = ()
 
     @override
@@ -731,7 +730,7 @@ class _SearchPresetsAction(BaseScopeAction, SearchOpsAction[RolePresetRow, _Pres
         return self.scopes
 
     @override
-    def scope_targets(self) -> Sequence[ScopeRef]:
+    def scope_targets(self) -> Sequence[EntityIdentifier]:
         return (self.scope,)
 
     @classmethod
@@ -800,7 +799,7 @@ class TestFullStack:
             service.execute
         )
         action = _SearchPresetsAction(
-            scope=ScopeRef(scope_type=ScopeType(DomainEntityType()), scope_id=uuid.uuid4()),
+            scope=DomainID(uuid.uuid4()),
             scopes=(_NamedScope(name="default"),),
         )
 

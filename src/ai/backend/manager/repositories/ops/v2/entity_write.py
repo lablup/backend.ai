@@ -20,17 +20,16 @@ from typing import TYPE_CHECKING, ClassVar
 import jinja2
 import jinja2.sandbox
 import sqlalchemy as sa
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from ai.backend.common.data.entity.role import RoleID
 from ai.backend.common.data.entity.role_preset import RolePresetID
-from ai.backend.common.data.entity.types import (
-    EntityIdentifier,
-    ScopeType,
-)
+from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.exception import RBACTypeConversionError
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.permission.scope_template import ScopeTemplateValue
 from ai.backend.manager.data.permission.status import RoleStatus
 from ai.backend.manager.data.permission.types import (
@@ -41,7 +40,7 @@ from ai.backend.manager.data.permission.types import (
 from ai.backend.manager.data.permission.types import (
     ScopeType as LegacyScopeType,
 )
-from ai.backend.manager.errors.repository import EntityNotFoundError
+from ai.backend.manager.errors.base.entity import EntityNotFoundError
 from ai.backend.manager.errors.role_preset import InvalidRoleNameTemplate
 from ai.backend.manager.models.base import Base
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
@@ -220,7 +219,9 @@ class V2EntityWriteOps(V2GraphWriteOpsBase):
                     data = await self.purge_entity(purger)
                     if data is None:
                         raise EntityNotFoundError(
-                            f"{purger.row_class().__name__} {purger.entity_id()} not found"
+                            entity_type=entity_id.entity_type(),
+                            operation=ActionOperationType.PURGE,
+                            extra_msg=f"{purger.row_class().__name__} {entity_id} not found",
                         )
                     successes[entity_id] = data
             except Exception as e:
@@ -272,6 +273,32 @@ class V2EntityWriteOps(V2GraphWriteOpsBase):
             await self._created_in(upserter.created_in(row), entity)
         return [upserter.to_data(row) for upserter, row in zip(upserters, rows, strict=True)]
 
+    async def grant_roles(
+        self,
+        user_id: UserID,
+        role_ids: Sequence[RoleID],
+        granted_by: UserID | None = None,
+    ) -> list[bool]:
+        """Map the user to each role, answering per role, in the order given, whether
+        the grant was written. A role the user already holds is left as it stands and
+        answers False."""
+        if not role_ids:
+            return []
+        granted = set(
+            (
+                await self._sess.scalars(
+                    pg_insert(UserRoleRow)
+                    .values([
+                        {"user_id": user_id, "role_id": role_id, "granted_by": granted_by}
+                        for role_id in role_ids
+                    ])
+                    .on_conflict_do_nothing()
+                    .returning(UserRoleRow.role_id)
+                )
+            ).all()
+        )
+        return [role_id in granted for role_id in role_ids]
+
     async def _grant_auto_assign_roles(
         self, entities: Collection[EntityIdentifier], user_id: UserID
     ) -> None:
@@ -299,7 +326,7 @@ class V2EntityWriteOps(V2GraphWriteOpsBase):
 
     # -- Preset-derived roles (role-managed paths only) ---------------------------
 
-    def _scope_element_type(self, scope_type: ScopeType) -> RBACElementType:
+    def _scope_element_type(self, scope_type: EntityType) -> RBACElementType:
         try:
             return RBACElementType(scope_type)
         except ValueError as e:
@@ -336,10 +363,6 @@ class V2EntityWriteOps(V2GraphWriteOpsBase):
         permission_rows = [
             PermissionRow(
                 role_id=row.id,
-                scope_type=self._scope_element_type(
-                    ScopeType(spec.entity.entity_type())
-                ).to_scope_type(),
-                scope_id=str(spec.entity),
                 entity_type=entity_type.to_entity_type(),
                 permission=Permission.from_operation(operation),
             )
@@ -363,8 +386,7 @@ class V2EntityWriteOps(V2GraphWriteOpsBase):
             await self._sess.scalars(
                 sa.select(RolePresetRow).where(
                     RolePresetRow.scope_type.in_({
-                        self._scope_element_type(ScopeType(e.entity_type())).to_scope_type()
-                        for e in entities
+                        self._scope_element_type(e.entity_type()).to_scope_type() for e in entities
                     }),
                     RolePresetRow.deleted.is_(False),
                 )
@@ -404,7 +426,7 @@ class V2EntityWriteOps(V2GraphWriteOpsBase):
             )
             for entity in entities
             for preset in presets_by_scope_type[
-                self._scope_element_type(ScopeType(entity.entity_type())).to_scope_type()
+                self._scope_element_type(entity.entity_type()).to_scope_type()
             ]
         ]
 

@@ -9,6 +9,7 @@ import strawberry
 from strawberry import Info
 from strawberry.relay import Connection, Edge, NodeID
 
+from ai.backend.common.data.entity.runtime_variant import RuntimeVariantID
 from ai.backend.common.dto.manager.v2.runtime_variant_preset.request import (
     CreateRuntimeVariantPresetInput as CreateInputDTO,
 )
@@ -128,6 +129,8 @@ class RuntimeVariantPresetOrderFieldGQL(StrEnum):
     NAME = "name"
     RANK = "rank"
     CREATED_AT = "created_at"
+    ADDED_VERSION = "added_version"
+    DEPRECATED_VERSION = "deprecated_version"
 
 
 @gql_pydantic_type(
@@ -313,6 +316,18 @@ class RuntimeVariantPresetGQL(PydanticNodeMixin[NodeDTO]):
             description="Whether this preset parameter must be supplied when building a deployment revision.",
         )
     )
+    added_version: str | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Runtime version this preset became available in; null means it always was.",
+        )
+    )
+    deprecated_version: str | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Runtime version this preset was removed in, exclusive; null means it is still offered.",
+        )
+    )
     category: str | None = gql_field(description="UI category group for organizing parameters.")
     display_name: str | None = gql_field(description="Human-readable display label for the UI.")
     ui_option: UIOptionGQL | None = gql_field(description="UI rendering options.")
@@ -337,7 +352,9 @@ class RuntimeVariantPresetGQL(PydanticNodeMixin[NodeDTO]):
         ]
         | None
     ):
-        return await info.context.data_loaders.runtime_variant_loader.load(self.runtime_variant_id)
+        return await info.context.data_loaders.runtime_variant_loader.load(
+            RuntimeVariantID(self.runtime_variant_id)
+        )
 
 
 RuntimeVariantPresetEdge = Edge[RuntimeVariantPresetGQL]
@@ -365,6 +382,16 @@ class RuntimeVariantPresetFilterGQL(PydanticInputMixin[FilterDTO]):
     name: StringFilterGQL | None = gql_field(default=None, description="Name filter.")
     runtime_variant_id: UUIDFilterGQL | None = gql_field(
         default=None, description="Variant ID filter."
+    )
+    runtime_version: str | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description=(
+                "Keep only presets valid at this runtime version, that is "
+                "added_version <= version < deprecated_version. Dot-separated numbers."
+            ),
+        ),
+        default=None,
     )
     AND: list[Self] | None = gql_added_field(
         BackendAIGQLMeta(added_version="26.7.0", description="Match all of the given sub-filters."),
@@ -421,6 +448,18 @@ class CreateRuntimeVariantPresetInputGQL(PydanticInputMixin[CreateInputDTO]):
         ),
         default=False,
     )
+    added_version: str | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Runtime version this preset becomes available in. Dot-separated numbers.",
+        )
+    )
+    deprecated_version: str | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Runtime version this preset is removed in, exclusive. Dot-separated numbers.",
+        )
+    )
     category: str | None = gql_added_field(
         BackendAIGQLMeta(
             added_version=NEXT_RELEASE_VERSION,
@@ -461,6 +500,18 @@ class UpdateRuntimeVariantPresetInputGQL(PydanticInputMixin[UpdateInputDTO]):
     key: str | None = gql_field(description="New key.")
     required: bool | None = gql_added_field(
         BackendAIGQLMeta(added_version="26.4.4", description="New required flag."),
+    )
+    added_version: str | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="New version this preset becomes available in.",
+        )
+    )
+    deprecated_version: str | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="New version this preset is removed in, exclusive.",
+        )
     )
     category: str | None = gql_added_field(
         BackendAIGQLMeta(
