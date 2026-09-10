@@ -160,7 +160,7 @@ class EndpointGossip:
         while True:
             try:
                 await asyncio.sleep(self._interval)
-                self.announce_all()
+                await self.sweep()
             except asyncio.CancelledError:
                 raise
             except Exception:
@@ -169,8 +169,16 @@ class EndpointGossip:
                 # heard, forever.
                 log.exception("the endpoint announce pass raised")
 
-    def announce_all(self) -> None:
+    async def sweep(self) -> None:
+        """One pass: settle who the peers are, then say what this node holds.
+
+        The membership check runs here rather than where the manager's change lands, because every
+        path that records a membership change is already holding that session's lock and
+        unprogramming takes it again. A departed peer is therefore unprogrammed within an interval
+        rather than instantly, which is the same latency every other part of this exchange has.
+        """
         for session_id in list(self._host.gossip_sessions()):
+            await self.drop_departed_peers(session_id)
             self.announce(session_id)
 
     def announce(self, session_id: str) -> None:
@@ -251,8 +259,13 @@ class EndpointGossip:
         )
         return False
 
-    async def forget_session(self, session_id: str) -> None:
-        """Drop everything held for a session this node no longer carries."""
+    def forget(self, session_id: str) -> None:
+        """Drop everything held for a session this node no longer carries.
+
+        Nothing is unprogrammed: the session's devices are going or gone, and what was programmed
+        against them goes with them. This only stops the exchange from diffing a later session
+        that reuses the id against a stranger's table.
+        """
         self._held.forget_session(session_id)
         self._known_peers.pop(session_id, None)
 
