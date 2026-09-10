@@ -772,6 +772,22 @@ class ProxyWorkerConfig(BaseSchema):
         ),
     ]
 
+    backend_connect_timeout: Annotated[
+        float,
+        Field(default=10.0, ge=0),
+        BackendAIConfigMeta(
+            description=(
+                "The timeout in seconds for acquiring a connection to a backend, covering both "
+                "the wait for a free slot in the connection pool and establishing the connection. "
+                "When concurrent requests exceed the pool limit, requests queued longer than this "
+                "fail with Gateway Timeout. Set to 0 to let them wait for a free slot indefinitely; "
+                "an unreachable backend is still detected by the 10-second socket connect timeout."
+            ),
+            added_version="26.8.0",
+            example=ConfigExample(local="10.0", prod="10.0"),
+        ),
+    ]
+
     announce_addr: Annotated[
         HostPortPair | None,
         Field(default=None),
