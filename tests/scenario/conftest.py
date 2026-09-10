@@ -24,7 +24,7 @@ from bai_scenario.infra.db import (
 )
 from bai_scenario.infra.monitors import ActionRecorder
 from bai_scenario.infra.validators import build_action_validators
-from bai_scenario.runner.runner import ScenarioRunner
+from bai_scenario.runner.runner import ScenarioRunner, offered_by, scenario_steps
 
 from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
 from ai.backend.manager.actions.monitors import ActionMonitors
@@ -34,6 +34,7 @@ from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.repositories.permission_controller.repository import (
     PermissionControllerRepository,
 )
+from ai.backend.testutils.typed_scenario import TypedScenario
 
 pytest_plugins = [
     "ai.backend.testutils.bootstrap",
@@ -56,18 +57,17 @@ def pytest_runtest_makereport(item: pytest.Item, call: pytest.CallInfo[None]) ->
         return report
     callspec = getattr(item, "callspec", None)
     scenario = callspec.params.get("scenario") if callspec is not None else None
-    described = getattr(scenario, "describe", None)
-    if described is None:
+    if not isinstance(scenario, TypedScenario):
         return report
     result = report.get_result()
-    module = getattr(item, "module", None)
-    kit = getattr(module, "KIT", None)
+    adapter = getattr(item, "funcargs", {}).get("adapter")
     row = {
-        **described(),
-        "module": getattr(module, "__name__", ""),
+        **scenario.describe(),
+        "module": getattr(getattr(item, "module", None), "__name__", ""),
         "outcome": result.outcome,
-        "adapter": kit.adapter_type.__name__ if kit is not None else "",
-        "offers": sorted(kit.operations()) if kit is not None else [],
+        "steps": scenario_steps(scenario),
+        "adapter": type(adapter).__name__ if adapter is not None else "",
+        "offers": sorted(offered_by(adapter)) if adapter is not None else [],
     }
     with open(path, "a", encoding="utf8") as f:
         f.write(json.dumps(row) + "\n")

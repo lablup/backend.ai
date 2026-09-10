@@ -24,7 +24,7 @@ def superadmin_reads_by_name(seed: Seeder) -> DomainScenario:
         actor=superadmin,
         given=seed.situation(),
         when=after(domain, lambda d: call(DomainAdapter.get, d.name)),
-        then=at(lambda node: node.basic_info.name, domain.describe),
+        then=at(lambda node: node.basic_info.name, domain.name),
     )
 
 

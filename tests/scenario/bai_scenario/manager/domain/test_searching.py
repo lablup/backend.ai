@@ -47,9 +47,9 @@ def a_name_filter_narrows(seed: Seeder) -> DomainScenario:
         given=seed.situation(),
         when=call(
             DomainAdapter.admin_search,
-            AdminSearchDomainsInput(filter=DomainFilter(name=StringFilter(equals=wanted.describe))),
+            AdminSearchDomainsInput(filter=DomainFilter(name=StringFilter(equals=wanted.name))),
         ),
-        then=every(lambda p: p.items, at(lambda node: node.basic_info.name, wanted.describe)),
+        then=every(lambda p: p.items, at(lambda node: node.basic_info.name, wanted.name)),
     )
 
 

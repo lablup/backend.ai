@@ -28,7 +28,7 @@ def seed_role[S](
     def build(name: str, scope: S) -> RoleCreator:
         return RoleCreator(name=name, scope=scope_of(scope))
 
-    return SpecFrom(name_hint, build)
+    return SpecFrom("a role", name_hint, build)
 
 
 def seed_permission(
@@ -36,7 +36,7 @@ def seed_permission(
 ) -> FieldOf[RoleData, PermissionData]:
     """One operation the role may perform on one entity type."""
     return FieldOf(
-        hint=f"{permission!s} on {entity_type}",
+        kind=f"{permission.name or int(permission)} on {entity_type}",
         owner_id=lambda role: RoleID(role.id),
         spec=RolePermissionCreator(entity_type=entity_type, permission=permission),
     )

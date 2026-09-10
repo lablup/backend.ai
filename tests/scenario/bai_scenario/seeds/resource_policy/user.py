@@ -28,4 +28,4 @@ def seed_user_policy(
             max_customized_image_count=max_customized_image_count,
         )
 
-    return Spec(name_hint, build)
+    return Spec("a user policy", name_hint, build)

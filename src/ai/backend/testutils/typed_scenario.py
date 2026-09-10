@@ -722,6 +722,21 @@ def mismatches_of(matcher: TypedMatcher[Any], answered: Any, fakes: Sequence[obj
     return matcher.mismatches(answered)
 
 
+def _deferred_operation[A, R](when: Deferred[A, R]) -> str:
+    """The method a deferred call names, recovered by building it over a recorder.
+
+    The call cannot be built until the row exists, but which method it names does not
+    depend on the row: replaying the builder over a stand-in answers it.
+    """
+    try:
+        built = when.build(_Recorder())
+    except Exception:
+        return "a call reading a row it laid"
+    if isinstance(built, ActorBound):
+        return built.label or "a call needing the actor"
+    return built.label
+
+
 def _operation_of(when: object) -> str:
     """The name of the method a row calls, for the report.
 
@@ -731,7 +746,7 @@ def _operation_of(when: object) -> str:
     if isinstance(when, Invocation):
         return when.label
     if isinstance(when, Deferred):
-        return "a call reading a row it laid"
+        return _deferred_operation(when)
     if isinstance(when, ActorBound):
         return when.label or "a call needing the actor"
     return ""

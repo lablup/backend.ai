@@ -8,6 +8,7 @@ written once.
 
 from __future__ import annotations
 
+import inspect
 from collections.abc import Sequence
 from typing import Any
 
@@ -108,6 +109,19 @@ def scenario_steps(scenario: TypedScenario[Any, Any]) -> list[str]:
     if isinstance(scenario.actor, Given):
         wanted.append(scenario.actor)
     return steps_of(wanted)
+
+
+def offered_by(adapter: object) -> frozenset[str]:
+    """Every call the adapter offers, read off the class rather than listed.
+
+    The report subtracts what the scenarios exercised from this, so a method no row
+    reaches is named by the run instead of going unnoticed.
+    """
+    return frozenset(
+        name
+        for name, member in inspect.getmembers(type(adapter), inspect.isfunction)
+        if not name.startswith("_") and inspect.iscoroutinefunction(member)
+    )
 
 
 def typed_matcher_problems(matcher: TypedMatcher[Any], answered: Any) -> list[str]:

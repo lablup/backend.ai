@@ -98,20 +98,19 @@ def render(rows: Iterable[dict[str, Any]]) -> str:
             rows_here = sorted(by_domain[domain][behaviour], key=lambda r: r["summary"])
             out.append(f"### {behaviour}")
             out.append("")
-            out.append("| | scenario | actor | holds | set-up | calls | expects |")
-            out.append("|---|---|---|---|---|---|---|")
             for row in rows_here:
-                rows_there = row.get("setup") or "-"
-                holding = ", ".join(row["holding"]) or "-"
-                actor = row["actor"] or "superadmin"
-                situation = " ".join(row["situation"])
-                expects = row["expects"] + (f" ({situation})" if situation else "")
-                out.append(
-                    f"| {MARK.get(row['outcome'], row['outcome'])} "
-                    f"| {row['summary']} | {actor} | {holding} | {rows_there} "
-                    f"| {row['operation']} | {expects} |"
-                )
-            out.append("")
+                mark = MARK.get(row["outcome"], row["outcome"])
+                out.append(f"#### {row['summary']} — {mark}")
+                out.append("")
+                out.append(row.get("description", ""))
+                out.append("")
+                for i, step in enumerate(row.get("steps", ()), start=1):
+                    out.append(f"{i}. {step}")
+                situation = " ".join(row.get("situation", ()))
+                out.append(f"{len(row.get('steps', ())) + 1}. calls {row['operation']}")
+                answers = row["expects"] + (f", with {situation} overridden" if situation else "")
+                out.append(f"{len(row.get('steps', ())) + 2}. {answers}")
+                out.append("")
     return "\n".join(out)
 
 

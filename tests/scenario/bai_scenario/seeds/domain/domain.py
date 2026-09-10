@@ -33,4 +33,4 @@ def seed_domain(
             },
         )
 
-    return Spec(name_hint, build)
+    return Spec("a domain", name_hint, build)

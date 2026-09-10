@@ -35,4 +35,4 @@ def seed_project_policy(
             max_network_count=max_network_count,
         )
 
-    return Spec(name, build)
+    return Spec("a project policy", name, build)

@@ -74,4 +74,4 @@ def seed_user(
             keypair_resource_policy=keypair_policy.name,
         )
 
-    return ProvisionFrom(name_hint, build)
+    return ProvisionFrom("a user", name_hint, build)

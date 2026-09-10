@@ -43,4 +43,4 @@ def seed_keypair_policy(
             total_resource_slots=ResourceSlot(),
         )
 
-    return Spec(name_hint, build)
+    return Spec("a keypair policy", name_hint, build)

@@ -57,6 +57,7 @@ type WriteSpec[D] = (
 class Spec[D]:
     """A write spec that needs nothing but its own name."""
 
+    kind: str
     hint: str
     build: Callable[[str], WriteSpec[D]]
 
@@ -65,6 +66,7 @@ class Spec[D]:
 class SpecFrom[A, D]:
     """A write spec that reads one row laid before it."""
 
+    kind: str
     hint: str
     build: Callable[[str, A], WriteSpec[D]]
 
@@ -73,6 +75,7 @@ class SpecFrom[A, D]:
 class SpecFromTwo[A, B, D]:
     """A write spec that reads two rows laid before it."""
 
+    kind: str
     hint: str
     build: Callable[[str, A, B], WriteSpec[D]]
 
@@ -81,6 +84,7 @@ class SpecFromTwo[A, B, D]:
 class SpecFromThree[A, B, C, D]:
     """A write spec that reads three rows laid before it."""
 
+    kind: str
     hint: str
     build: Callable[[str, A, B, C], WriteSpec[D]]
 
@@ -93,6 +97,7 @@ class ProvisionFrom[A, B, C, D]:
     personal project are one operation, and a seed takes that operation whole.
     """
 
+    kind: str
     hint: str
     build: Callable[[str, A, B, C], FullUserCreator]
 
@@ -105,7 +110,7 @@ class FieldOf[A, D: FieldData]:
     its own: the owner comes with it.
     """
 
-    hint: str
+    kind: str
     owner_id: Callable[[A], Any]
     spec: FieldCreator[Any, Any, D]
 
@@ -118,7 +123,10 @@ class Given[D]:
     repeating a value the row also carries.
     """
 
+    name: str
+    """The name the seeder made for this row, for a call that needs it."""
     describe: str
+    """What laying this row does, for the report."""
     sources: tuple[Given[Any], ...]
     write: Callable[[SeedOps, Sequence[Any]], Awaitable[D]]
 
@@ -187,12 +195,15 @@ class Seeder:
     def creating(self, spec: Any, /, *sources: Any) -> Given[Any]:
         """Lay the row this spec describes, reading the rows it names."""
         name = self.name(spec.hint)
+        described = f"{spec.kind} {name}"
         build: Callable[..., WriteSpec[Any]] = spec.build
 
         async def write(ops: SeedOps, values: Sequence[Any]) -> Any:
             return await _write(ops, build(name, *values))
 
-        return self._remember(Given(describe=name, sources=tuple(sources), write=write))
+        return self._remember(
+            Given(name=name, describe=described, sources=tuple(sources), write=write)
+        )
 
     def provisioning[A, B, C, D](
         self,
@@ -204,12 +215,13 @@ class Seeder:
     ) -> Given[UserData]:
         """Provision what the manager provisions as one operation."""
         name = self.name(spec.hint)
+        described = f"{spec.kind} {name}"
 
         async def write(ops: SeedOps, values: Sequence[Any]) -> UserData:
             result = await ops.create_user(spec.build(name, *values))
             return result.user
 
-        return self._remember(Given(describe=name, sources=(a, b, c), write=write))
+        return self._remember(Given(name=name, describe=described, sources=(a, b, c), write=write))
 
     def adding[A, D: FieldData](self, spec: FieldOf[A, D], owner: Given[A], /) -> Given[D]:
         """Lay one field row under the owner the scenario already laid."""
@@ -218,7 +230,12 @@ class Seeder:
             return await ops.create_field(spec.owner_id(values[0]), spec.spec)
 
         return self._remember(
-            Given(describe=f"{spec.hint} on {owner.describe}", sources=(owner,), write=write)
+            Given(
+                name=owner.name,
+                describe=f"{spec.kind} on {owner.describe}",
+                sources=(owner,),
+                write=write,
+            )
         )
 
     def granting[R, U](
@@ -236,6 +253,7 @@ class Seeder:
 
         return self._remember(
             Given(
+                name=to.name,
                 describe=f"{to.describe} holds {role.describe}",
                 sources=(role, to),
                 write=write,
