@@ -1197,3 +1197,49 @@ class TestKeys:
         assert members_prefix("s1") == "network/session/s1/members/"
         assert member_key("s1", "a2") == "network/session/s1/members/a2"
         assert endpoints_prefix("s1") == "network/session/s1/endpoints/"
+
+
+class TestOneTickReadsTheTablesOnce:
+    """Each pass used to read its own copy: five prefix reads a tick where both comments said two,
+    and -- the half that is not about cost -- a fail-closed ordering whose three steps judged three
+    different points in time. At the 15s period that was 20 reads per session per minute idle, and
+    a watch event drives the same pass, so a burst of endpoint publishes multiplied it."""
+
+    async def test_a_full_reconcile_reads_each_table_once(self) -> None:
+        etcd = FakeEtcd()
+        etcd.seed_session_meta()
+        coord = _coordinator(etcd, RecordingBackend())
+        await coord.start(_META, _SELF)
+
+        reads: list[str] = []
+        original = etcd.get_prefix
+
+        async def counting(prefix: str, **kwargs: Any) -> dict[str, str]:
+            reads.append(prefix)
+            return await original(prefix, **kwargs)
+
+        etcd.get_prefix = counting  # type: ignore[method-assign]
+        await coord._reconcile_all("s1")
+
+        assert len(reads) == 2, f"one tick read {len(reads)} prefixes: {reads}"
+        assert sorted(reads) == sorted({endpoints_prefix("s1"), members_prefix("s1")})
+
+    async def test_a_standalone_pass_still_reads_for_itself(self) -> None:
+        """The snapshot is an optimisation for a caller driving several passes, not a requirement.
+        `session_network` and the scenarios call these one at a time."""
+        etcd = FakeEtcd()
+        etcd.seed_session_meta()
+        coord = _coordinator(etcd, RecordingBackend())
+        await coord.start(_META, _SELF)
+
+        reads: list[str] = []
+        original = etcd.get_prefix
+
+        async def counting(prefix: str, **kwargs: Any) -> dict[str, str]:
+            reads.append(prefix)
+            return await original(prefix, **kwargs)
+
+        etcd.get_prefix = counting  # type: ignore[method-assign]
+        await coord.reconcile_peers("s1")
+
+        assert reads == [members_prefix("s1")]
