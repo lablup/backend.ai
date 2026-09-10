@@ -10,6 +10,7 @@ from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPoli
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
 from ai.backend.common.resilience.resilience import Resilience
 from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.container_registry.types import (
     ContainerRegistryData,
     ContainerRegistrySearchResult,
@@ -83,7 +84,7 @@ class ContainerRegistryRepository:
                         project=data.project,
                         url=data.url,
                     )
-                ).validate_on_modify()
+                ).validate(ActionOperationType.UPDATE)
             return data
 
     async def delete_registry(self, purger: ContainerRegistryPurger) -> ContainerRegistryData:

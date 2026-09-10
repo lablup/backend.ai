@@ -11,6 +11,7 @@ from graphql import Undefined
 from ai.backend.common.container_registry import AllowedGroupsModel
 from ai.backend.common.data.entity.container_registry import ContainerRegistryID
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.api.adapters.container_registry.adapter import ContainerRegistryAdapter
 from ai.backend.manager.models.container_registry import (
     ContainerRegistryValidator,
@@ -117,7 +118,7 @@ class CreateContainerRegistryNodeV2(graphene.Mutation):  # type: ignore[misc]
             )
         )
 
-        validator.validate_on_create()
+        validator.validate(ActionOperationType.CREATE)
 
         result = await ctx.processors.container_registry.create_container_registry.run(
             props.to_action()
