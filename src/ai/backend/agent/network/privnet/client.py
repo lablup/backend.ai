@@ -28,6 +28,7 @@ from ai.backend.agent.errors.network import (
 from ai.backend.agent.network.caps import probe_caps
 from ai.backend.agent.network.port_forward import PortForward
 from ai.backend.agent.network.privnet.protocol import (
+    ADVISORY_PREFIX,
     PrivNetOp,
     PrivNetRequest,
     PrivNetResponse,
@@ -169,7 +170,28 @@ class PrivNetClient:
                     " on the agent's version"
                 )
             }
-        return dict(resp.problems or {})
+        return {
+            what: why
+            for what, why in (resp.problems or {}).items()
+            if not what.startswith(ADVISORY_PREFIX)
+        }
+
+    async def advisory_problems(self) -> dict[str, str]:
+        """What the privnet wants reported without the node being taken out of service.
+
+        Answered from the same call as `recovery_problems`, split by `ADVISORY_PREFIX`. Empty on
+        any failure, deliberately: a probe that could not ask has already said so through the
+        blocking half, and reporting the same outage twice buries the one that matters.
+        """
+        try:
+            resp = await self.call(PrivNetRequest(PrivNetOp.RECOVERY_STATUS, "status"))
+        except (PrivNetClientError, ProtocolError, OSError):
+            return {}
+        return {
+            what.removeprefix(ADVISORY_PREFIX): why
+            for what, why in (resp.problems or {}).items()
+            if what.startswith(ADVISORY_PREFIX)
+        }
 
     async def encryption_problems(self) -> dict[str, str]:
         """What the privnet found when it tried to install the overlay's ESP state.

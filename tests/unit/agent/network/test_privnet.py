@@ -31,6 +31,7 @@ from ai.backend.agent.errors.network import (
     PrivnetConfigurationInvalid,
     UnsafePrivnetSocket,
 )
+from ai.backend.agent.network.caps import compute_caps
 from ai.backend.agent.network.local_subnet import LocalSubnetAllocator
 from ai.backend.agent.network.locator import ContainerLocator, LiveContainer
 from ai.backend.agent.network.native_attacher import HostLocalIpam
@@ -51,8 +52,14 @@ from ai.backend.agent.network.privnet.policy import (
     validate_network_config,
     validate_overlay_ip,
 )
-from ai.backend.agent.network.privnet.protocol import PrivNetOp, PrivNetRequest, PrivNetResponse
+from ai.backend.agent.network.privnet.protocol import (
+    ADVISORY_PREFIX,
+    PrivNetOp,
+    PrivNetRequest,
+    PrivNetResponse,
+)
 from ai.backend.agent.network.privnet.server import PrivNetServer
+from ai.backend.agent.network.readiness import Readiness
 from ai.backend.agent.network.vni_registry import Binding, VniRegistry, config_digest
 from ai.backend.common.exception import BackendAIError, ErrorDomain
 from ai.backend.common.network.types import (
@@ -2593,6 +2600,16 @@ class TestATeardownOverAnUnreadableJournal:
             )
 
 
+def _outstanding(problems: dict[str, str] | None) -> dict[str, str]:
+    """A recovery report with the harness's own gossip entry taken out.
+
+    `_Harness` gives the daemon a VTEP address that does not exist on the test host, so the
+    endpoint exchange can never bind here and every server it builds reports that -- correctly.
+    It is a fact about the harness, not about the case under test.
+    """
+    return {k: v for k, v in (problems or {}).items() if k != "privnet:gossip"}
+
+
 class TestTheNodeSaysWhatItCouldNotRecover:
     """A privnet that cannot take charge of something already running on it looks healthy from
     every other angle, and the manager goes on scheduling onto it."""
@@ -2607,7 +2624,7 @@ class TestTheNodeSaysWhatItCouldNotRecover:
         async with _Harness(_StubRuntime(pid=4242, live={"c1": "s1"}), state_dir=tmp_path) as h:
             await h.setup("s1")
             resp = await h.client().call(PrivNetRequest(PrivNetOp.RECOVERY_STATUS, "status"))
-            assert resp.problems == {}
+            assert _outstanding(resp.problems) == {}
 
     async def test_the_mark_survives_the_next_retry(self, tmp_path: Path) -> None:
         # It used to be dropped for not being journalled -- which is the whole point of it.
@@ -2630,7 +2647,7 @@ class TestTheNodeSaysWhatItCouldNotRecover:
             runtime._live.clear()
             await h.server._retry_recovery()
             resp = await h.client().call(PrivNetRequest(PrivNetOp.RECOVERY_STATUS, "status"))
-            assert resp.problems == {}
+            assert _outstanding(resp.problems) == {}
 
     async def test_an_orphan_stops_the_prune(self, tmp_path: Path) -> None:
         # The prune's premise is that the journal is the whole list of what this agent owns, and
@@ -2727,7 +2744,7 @@ class TestTheNodeReportsWhatItCouldNotClose:
     async def test_a_node_with_nothing_left_open_reports_nothing(self, tmp_path: Path) -> None:
         async with _Harness(_StubRuntime(), state_dir=tmp_path) as h:
             resp = await h.client().call(PrivNetRequest(PrivNetOp.RECOVERY_STATUS, "status"))
-            assert resp.problems == {}
+            assert _outstanding(resp.problems) == {}
 
 
 class TestAReclaimReChecksTheRuntime:
@@ -3095,7 +3112,7 @@ class TestASessionTakenBackOwesNothingAsADeadOne:
 
             assert restarted.server._unrecovered_sessions == {}
             assert restarted.server._unreclaimed_sessions == {}
-            assert restarted.server.recovery_problems() == {}
+            assert _outstanding(restarted.server.recovery_problems()) == {}
 
     async def test_the_timer_can_then_stop(self, tmp_path: Path) -> None:
         async with _Harness(_StubRuntime(pid=4242, live={"c1": "s1"}), state_dir=tmp_path) as h:
@@ -3167,7 +3184,7 @@ class TestAStaleRecordOfSomebodyElsesSession:
     async def test_the_node_stops_reporting_itself_unrecovered(self, tmp_path: Path) -> None:
         await self._shared_then_theirs(tmp_path)
         async with self._restarted_a(tmp_path) as restarted:
-            assert restarted.server.recovery_problems() == {}
+            assert _outstanding(restarted.server.recovery_problems()) == {}
             assert restarted.server._recovery_pending() is False
 
 
@@ -3555,3 +3572,49 @@ class TestPrivnetSocketStartup:
         await h.server._prepare_socket_path(socket_path)
 
         assert not socket_path.exists()
+
+
+class TestANodeThatCannotAnnounceStopsTakingWork:
+    async def test_the_bind_failure_is_reported_as_outstanding(self, tmp_path: Path) -> None:
+        """`_Harness` gives the daemon a VTEP that does not exist on this host, so the exchange
+        cannot bind -- which is exactly the state under test."""
+        async with _Harness(_StubRuntime(), state_dir=tmp_path) as h:
+            problems = h.server.recovery_problems()
+            assert "privnet:gossip" in problems
+            assert "could not bind" in problems["privnet:gossip"]
+
+    async def test_it_is_blocking_and_not_advisory(self, tmp_path: Path) -> None:
+        """Blocking, so the node stops advertising the backend. Advisory would leave it taking
+        overlay sessions it cannot announce into."""
+        async with _Harness(_StubRuntime(), state_dir=tmp_path) as h:
+            problems = h.server.recovery_problems()
+            assert not any(k.startswith(ADVISORY_PREFIX) for k in problems if "gossip" in k)
+
+    async def test_a_node_with_no_vtep_reports_no_exchange_problem(self, tmp_path: Path) -> None:
+        """It is nobody's peer and has nothing to announce, so there is nothing to fail."""
+        async with _Harness(_StubRuntime(), state_dir=tmp_path, vtep_ip=None) as h:
+            assert "privnet:gossip" not in h.server.recovery_problems()
+
+
+class TestWhatBlocksAndWhatOnlyReports:
+    """`can_serve_overlay` is what `compute_caps` turns into the advertised backend list, and the
+    manager pairs members off that. The split decides whether a node keeps taking work."""
+
+    def test_a_blocking_problem_withdraws_the_backend(self) -> None:
+        caps = compute_caps(
+            tunnel_offload=True,
+            readiness=Readiness(blocking=("the endpoint exchange could not bind",)),
+        )
+        assert caps.backends == []
+
+    def test_an_advisory_problem_does_not(self) -> None:
+        """A peer that has gone quiet is a fact about that peer. Withdrawing this node over it
+        would turn one node's firewall into an outage here."""
+        caps = compute_caps(
+            tunnel_offload=True,
+            readiness=Readiness(advisory=("no endpoint announcement in 30s from 10.0.0.2",)),
+        )
+        assert caps.backends == ["vxlan"]
+
+    def test_a_healthy_node_advertises_the_backend(self) -> None:
+        assert compute_caps(tunnel_offload=True, readiness=Readiness()).backends == ["vxlan"]

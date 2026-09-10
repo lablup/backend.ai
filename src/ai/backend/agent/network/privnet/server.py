@@ -77,6 +77,7 @@ from ai.backend.agent.network.privnet.gossip_runner import (
 )
 from ai.backend.agent.network.privnet.journal import AttachRecord, PrivNetJournal
 from ai.backend.agent.network.privnet.protocol import (
+    ADVISORY_PREFIX,
     PROTOCOL_VERSION,
     ForwardEntry,
     PrivNetOp,
@@ -364,6 +365,10 @@ class PrivNetServer:
     #: VTEP: it cannot be anybody's peer, so it has nothing to announce and no address to announce
     #: from.
     _gossip: EndpointGossip | None
+    _gossip_port: int
+    #: Why this node cannot take part in the endpoint exchange, if it cannot. Blocking: a node
+    #: that cannot announce its addresses must stop advertising the backend, not serve half.
+    _gossip_unavailable: str | None
 
     def __init__(
         self,
@@ -422,6 +427,8 @@ class PrivNetServer:
         # None without a VTEP: a node that cannot anchor a tunnel is nobody's peer, so it
         # has nothing to announce and no address to announce from.
         self._gossip = EndpointGossip(self, vtep=vtep_ip, port=gossip_port) if vtep_ip else None
+        self._gossip_port = gossip_port
+        self._gossip_unavailable = None
 
     @contextlib.asynccontextmanager
     async def _session_locked(self, session_id: str) -> AsyncIterator[None]:
@@ -495,10 +502,17 @@ class PrivNetServer:
             try:
                 await self._gossip.start()
             except OSError as e:
-                # A node that cannot bind the announce port still serves: its peers keep hearing
-                # from it never, which recovery and the readiness surface both report. Refusing to
-                # start would take the whole node's data plane down over a port conflict.
+                # The daemon keeps serving: a node with live kernels must not lose its data plane
+                # over a port conflict. What it must NOT do is go on taking new overlay sessions.
+                # Recorded as a blocking problem, so the node stops advertising `vxlan` and the
+                # manager refuses to place there by name -- rather than the node quietly falling
+                # back to the manager's endpoint table while its peers keep gossiping, which is
+                # asymmetric reachability that looks healthy from every angle.
                 log.error("could not start the endpoint exchange on {}: {}", self._vtep_ip, e)
+                self._gossip_unavailable = (
+                    f"the endpoint exchange could not bind {self._vtep_ip}:{self._gossip_port}"
+                    f" ({e}); this node cannot tell its peers which addresses it holds"
+                )
                 self._gossip = None
         server = await asyncio.start_unix_server(self._handle_conn, path=self._socket_path)
         bound_socket = sock_path.lstat()
@@ -800,10 +814,21 @@ class PrivNetServer:
         Read by the agent's readiness probe. Without it a node whose privnet cannot manage a live
         session -- one it has no journal record of, one whose VNI belongs to something else --
         looks healthy from every other angle, and the manager goes on scheduling onto it.
+
+        Entries under `ADVISORY_PREFIX` are reported without taking the node out of service; see
+        that constant for which of these belong on which side.
         """
         problems: dict[str, str] = {}
         if self._recovery_failed is not None:
             problems["privnet:recovery"] = self._recovery_failed
+        if self._gossip_unavailable is not None:
+            problems["privnet:gossip"] = self._gossip_unavailable
+        elif self._gossip is not None:
+            # Advisory: a peer that has gone quiet, or one never heard from, is a fact about that
+            # peer and not about this node's ability to serve. Blocking on it would take a healthy
+            # node out of service over somebody else's firewall.
+            for what, why in self._gossip.problems().items():
+                problems[f"{ADVISORY_PREFIX}{what}"] = why
         for session_id, reason in self._unrecovered_sessions.items():
             problems[f"privnet:session:{session_id}"] = reason
         for session_id, reason in self._unreclaimed_sessions.items():

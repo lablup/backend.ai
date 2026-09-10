@@ -36,6 +36,16 @@ from typing import Any
 #: `PrivNetClient.bind_session`).
 PROTOCOL_VERSION: int = 4
 
+#: Marks a `problems` entry that is reported without taking the node out of service.
+#:
+#: The recovery status answers with one map, and its entries are not all the same kind. Something
+#: this node cannot take charge of is blocking -- it must stop advertising the backend rather than
+#: accept work it cannot do. A fact about somebody else, like a peer that has gone quiet, is not:
+#: blocking on it would take a healthy node out of service over another node's firewall. The
+#: split is decided here rather than sniffed by each reader, and an old caller that does not know
+#: the prefix simply treats everything as blocking, which is the safe direction.
+ADVISORY_PREFIX: str = "advisory:"
+
 
 class PrivNetOp(enum.StrEnum):
     SETUP_SESSION = "setup_session"
