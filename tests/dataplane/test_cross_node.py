@@ -28,7 +28,7 @@ from ai.backend.testutils.dataplane.session import SessionDriver, SessionSpec
 class TestCrossNodeOverlay:
     @pytest.fixture
     def cross_node_spec(
-        self, session_spec: SessionSpec, agent_ids: tuple[str, ...], spread_cpu: str
+        self, session_spec: SessionSpec, pair_agent_ids: tuple[str, ...], spread_cpu: str
     ) -> SessionSpec:
         return replace(
             session_spec,
@@ -38,7 +38,7 @@ class TestCrossNodeOverlay:
             cpu=spread_cpu,
             cluster_size=2,
             cluster_mode=ClusterModeEnum.MULTI_NODE,
-            agent_list=agent_ids,
+            agent_list=pair_agent_ids,
         )
 
     async def test_g14_kernels_on_two_nodes_reach_each_other_over_the_overlay(
