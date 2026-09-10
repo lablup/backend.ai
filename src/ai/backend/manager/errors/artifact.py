@@ -2,6 +2,8 @@ from typing import override
 
 from aiohttp import web
 
+from ai.backend.common.data.entity.artifact import ArtifactEntityType
+from ai.backend.common.data.entity.artifact_revision import ArtifactRevisionFieldType
 from ai.backend.common.exception import (
     BackendAIError,
     ErrorCode,
@@ -9,57 +11,50 @@ from ai.backend.common.exception import (
     ErrorDomain,
     ErrorOperation,
 )
+from ai.backend.manager.actions.types import ActionOperationType
+from ai.backend.manager.errors.base.entity import EntityError, EntityErrorCode
+from ai.backend.manager.errors.base.field import FieldError, FieldErrorCode
 
 
-class ArtifactNotFoundError(BackendAIError, web.HTTPNotFound):
+class ArtifactNotFoundError(EntityError, web.HTTPNotFound):
     error_type = "https://api.backend.ai/probs/artifact-not-found"
     error_title = "Artifact Not Found"
 
     @override
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.ARTIFACT,
-            operation=ErrorOperation.READ,
-            error_detail=ErrorDetail.NOT_FOUND,
-        )
+    def entity_error_code(self) -> EntityErrorCode:
+        return EntityErrorCode(ArtifactEntityType(), ActionOperationType.GET, ErrorDetail.NOT_FOUND)
 
 
-class ArtifactNotVerified(BackendAIError, web.HTTPBadRequest):
+class ArtifactNotVerified(FieldError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/artifact-not-verified"
     error_title = "Artifact Not Verified"
 
     @override
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.ARTIFACT,
-            operation=ErrorOperation.ACCESS,
-            error_detail=ErrorDetail.BAD_REQUEST,
+    def field_error_code(self) -> FieldErrorCode:
+        return FieldErrorCode(
+            ArtifactRevisionFieldType(), ActionOperationType.UPDATE, ErrorDetail.BAD_REQUEST
         )
 
 
-class ArtifactUpdateError(BackendAIError, web.HTTPInternalServerError):
+class ArtifactUpdateError(FieldError, web.HTTPInternalServerError):
     error_type = "https://api.backend.ai/probs/artifact-update-failed"
     error_title = "Artifact Update Failed"
 
     @override
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.ARTIFACT,
-            operation=ErrorOperation.UPDATE,
-            error_detail=ErrorDetail.INTERNAL_ERROR,
+    def field_error_code(self) -> FieldErrorCode:
+        return FieldErrorCode(
+            ArtifactRevisionFieldType(), ActionOperationType.UPDATE, ErrorDetail.INTERNAL_ERROR
         )
 
 
-class ArtifactDeletionBadRequestError(BackendAIError, web.HTTPBadRequest):
+class ArtifactDeletionBadRequestError(FieldError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/artifact-deletion-failed"
     error_title = "Artifact Deletion Bad Request"
 
     @override
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.ARTIFACT,
-            operation=ErrorOperation.HARD_DELETE,
-            error_detail=ErrorDetail.BAD_REQUEST,
+    def field_error_code(self) -> FieldErrorCode:
+        return FieldErrorCode(
+            ArtifactRevisionFieldType(), ActionOperationType.PURGE, ErrorDetail.BAD_REQUEST
         )
 
 
@@ -72,19 +67,6 @@ class ArtifactDeletionError(BackendAIError, web.HTTPInternalServerError):
         return ErrorCode(
             domain=ErrorDomain.ARTIFACT,
             operation=ErrorOperation.HARD_DELETE,
-            error_detail=ErrorDetail.INTERNAL_ERROR,
-        )
-
-
-class ArtifactAssociationCreationError(BackendAIError, web.HTTPInternalServerError):
-    error_type = "https://api.backend.ai/probs/artifact-association-creation-failed"
-    error_title = "Artifact Association Creation Failed"
-
-    @override
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.ARTIFACT_ASSOCIATION,
-            operation=ErrorOperation.CREATE,
             error_detail=ErrorDetail.INTERNAL_ERROR,
         )
 
@@ -115,55 +97,36 @@ class ArtifactAssociationNotFoundError(BackendAIError, web.HTTPNotFound):
         )
 
 
-class ArtifactNotApproved(BackendAIError, web.HTTPForbidden):
+class ArtifactNotApproved(FieldError, web.HTTPForbidden):
     error_type = "https://api.backend.ai/probs/artifact-not-approved"
     error_title = "Artifact Not Approved"
 
     @override
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.ARTIFACT,
-            operation=ErrorOperation.ACCESS,
-            error_detail=ErrorDetail.FORBIDDEN,
+    def field_error_code(self) -> FieldErrorCode:
+        return FieldErrorCode(
+            ArtifactRevisionFieldType(), ActionOperationType.GET, ErrorDetail.FORBIDDEN
         )
 
 
-class ArtifactReadonly(BackendAIError, web.HTTPForbidden):
+class ArtifactReadonly(EntityError, web.HTTPForbidden):
     error_type = "https://api.backend.ai/probs/artifact-readonly"
     error_title = "You cannot upload files to readonly artifact storage"
 
     @override
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.ARTIFACT,
-            operation=ErrorOperation.UPDATE,
-            error_detail=ErrorDetail.FORBIDDEN,
+    def entity_error_code(self) -> EntityErrorCode:
+        return EntityErrorCode(
+            ArtifactEntityType(), ActionOperationType.UPDATE, ErrorDetail.FORBIDDEN
         )
 
 
-class InvalidArtifactModifierTypeError(BackendAIError, web.HTTPBadRequest):
-    error_type = "https://api.backend.ai/probs/invalid-modifier-type"
-    error_title = "Invalid Artifact Modifier Type"
-
-    @override
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.ARTIFACT,
-            operation=ErrorOperation.UPDATE,
-            error_detail=ErrorDetail.BAD_REQUEST,
-        )
-
-
-class ArtifactRevisionNotFoundError(BackendAIError, web.HTTPNotFound):
+class ArtifactRevisionNotFoundError(FieldError, web.HTTPNotFound):
     error_type = "https://api.backend.ai/probs/artifact-revision-not-found"
     error_title = "Artifact Revision Not Found"
 
     @override
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.ARTIFACT,
-            operation=ErrorOperation.READ,
-            error_detail=ErrorDetail.NOT_FOUND,
+    def field_error_code(self) -> FieldErrorCode:
+        return FieldErrorCode(
+            ArtifactRevisionFieldType(), ActionOperationType.GET, ErrorDetail.NOT_FOUND
         )
 
 
@@ -180,16 +143,14 @@ class ArtifactScanLimitExceededError(BackendAIError, web.HTTPBadRequest):
         )
 
 
-class ArtifactImportBadRequestError(BackendAIError, web.HTTPNotFound):
+class ArtifactImportBadRequestError(EntityError, web.HTTPNotFound):
     error_type = "https://api.backend.ai/probs/artifact-bad-import-request"
     error_title = "Artifact Bad Import Request"
 
     @override
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.ARTIFACT,
-            operation=ErrorOperation.CREATE,
-            error_detail=ErrorDetail.BAD_REQUEST,
+    def entity_error_code(self) -> EntityErrorCode:
+        return EntityErrorCode(
+            ArtifactEntityType(), ActionOperationType.CREATE, ErrorDetail.BAD_REQUEST
         )
 
 
