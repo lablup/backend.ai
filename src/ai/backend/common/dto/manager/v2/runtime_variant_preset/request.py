@@ -128,9 +128,9 @@ class UpdateRuntimeVariantPresetInput(BaseRequestModel):
 
     @model_validator(mode="after")
     def validate_default_value(self) -> Self:
-        if not isinstance(self.value_type, PresetValueType) or not isinstance(
-            self.default_value, str
-        ):
+        if isinstance(self.value_type, Unset) or self.value_type is None:
+            return self
+        if isinstance(self.default_value, Unset) or self.default_value is None:
             return self
         validator = VALUE_TYPE_VALIDATORS.get(self.value_type)
         if validator is None:
