@@ -491,3 +491,47 @@ class TestWhenAnOrphanedRuleMayBeTaken:
         """Pinned so neither end drifts: too short and a starting kernel loses its ports, too long
         and the black hole outlives the port pool's own reuse cooldown."""
         assert 5.0 <= ORPHAN_GRACE_SEC <= 300.0
+
+
+class TestAnUnownedRuleIsReported:
+    """It is not reclaimed -- `is_orphaned` refuses it, because an unowned rule may belong to a
+    co-located agent whose containers this runtime cannot see. But nothing this code writes is
+    untagged, so finding one at startup means an older build left it behind, and it will hold its
+    host port for the life of the node. Measured: 34 on one node, discovered months later as ports
+    that would not bind, with nothing on the node saying why."""
+
+    @staticmethod
+    def _fwd(port: int, owner: str | None) -> PortForward:
+        return PortForward(
+            container_id="c",
+            host_port=port,
+            container_ip="172.30.0.2",
+            container_port=2200,
+            owner_agent_id=owner,
+        )
+
+    def _reported(self, forwards: list[PortForward]) -> list[int]:
+        # `AbstractAgent` cannot be instantiated, and the method reads no attribute of it -- the
+        # same shape the defer test next door uses. Asserted on the return rather than on the log
+        # line, so the case does not depend on which handler another test left on the logger.
+        return AbstractAgent._report_unowned_port_forwards(cast(Any, self), forwards)
+
+    def test_every_unowned_rule_is_named(self) -> None:
+        assert self._reported([
+            self._fwd(33100, None),
+            self._fwd(33200, "i-dk-1"),
+            self._fwd(33101, None),
+        ]) == [33100, 33101]
+
+    def test_a_fully_owned_set_says_nothing(self) -> None:
+        """The ordinary case, and it must stay quiet -- a warning on every startup is one nobody
+        reads when it finally matters."""
+        assert self._reported([self._fwd(33100, "i-dk-1"), self._fwd(33101, "i-dk-1")]) == []
+
+    def test_the_reclaim_still_refuses_to_take_it(self) -> None:
+        """The report does not change the decision; both must hold at once."""
+        assert not is_orphaned(self._fwd(33100, None), set(), now=1e9, owner_agent_id="i-dk-1")
+
+    def test_startup_reports_before_it_decides(self) -> None:
+        source = inspect.getsource(AbstractAgent._reclaim_stale_port_forwards)
+        assert "_report_unowned_port_forwards(" in source

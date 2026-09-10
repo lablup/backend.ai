@@ -79,7 +79,7 @@ from ai.backend.agent.metrics.metric import (
     SyncContainerLifecycleObserver,
 )
 from ai.backend.agent.network.caps import publish_backend
-from ai.backend.agent.network.port_forward import PortPublisher, is_orphaned
+from ai.backend.agent.network.port_forward import PortForward, PortPublisher, is_orphaned
 from ai.backend.agent.port_pool import PortPool, ephemeral_overlap
 from ai.backend.agent.tasks import (
     CleanupReportedKernelsTask,
@@ -1889,6 +1889,7 @@ class AbstractAgent[
             return
         if not forwards:
             return
+        self._report_unowned_port_forwards(forwards)
         live = {
             str(container.id)
             for _kernel_id, container in await self.enumerate_containers(
@@ -2480,6 +2481,33 @@ class AbstractAgent[
         log.info("starting with resource allocations")
         for computer_name, computer_ctx in self.computers.items():
             log.info("{}: {!r}", computer_name, dict(computer_ctx.alloc_map.allocations))
+
+    def _report_unowned_port_forwards(self, forwards: Sequence[PortForward]) -> list[int]:
+        """Say so when a rule records no owner. It is a defect signal, not a rule to collect.
+
+        Nothing this code writes is untagged -- the owner arrived with the tag, and `port_forward`
+        has never shipped without it -- so a rule with no owner is a leftover of an older build,
+        and it holds its host port for the life of the node. `is_orphaned` will not touch it: the
+        liveness question is answered by THIS agent's runtime, and an unowned rule may belong to a
+        co-located agent whose containers this runtime cannot see, so reclaiming it could cut a
+        live kernel off from its published ports.
+
+        Which leaves saying it. Silence turned 34 of them on one node into ports that failed to
+        bind months later, with nothing on the node explaining why. Returns the ports it named.
+        """
+        unowned = sorted(f.host_port for f in forwards if f.owner_agent_id is None)
+        if not unowned:
+            return unowned
+        log.warning(
+            "{} host port forward(s) record no owner ({}): nothing this agent writes is untagged,"
+            " so these are left over from an older build and will hold those ports for the life of"
+            " this node. They are not reclaimed -- an unowned rule may be a co-located agent's,"
+            " whose containers this runtime cannot see. Remove them once no container of theirs is"
+            " running: iptables-save -t nat | grep 'bai:' | sed 's/^-A /-D /'",
+            len(unowned),
+            f"{unowned[0]}..{unowned[-1]}" if len(unowned) > 1 else unowned[0],
+        )
+        return unowned
 
     def _defer_ports_the_host_still_holds(self) -> None:
         """Put the cooldown back on ports the OS is still using, at startup.
