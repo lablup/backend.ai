@@ -1,205 +1,170 @@
-"""Editing a domain, and who may."""
+"""도메인 수정 — 무엇이 바뀌고 무엇이 그대로 남는가."""
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from datetime import UTC, datetime
-from uuid import UUID
+from typing import override
 
 import pytest
-from bai_scenario.components.domain import DomainScenario, SomeoneOf
-from bai_scenario.runner.runner import ScenarioRunner
-from bai_scenario.seeds.domain.domain import SeedDomain
-from bai_scenario.seeds.seeder import Seeder, after
+from bai_scenario.components.domain import (
+    ADomainAndACaller,
+    ADomainAndSomeone,
+    TheCallIsRefused,
+    TheDomainNode,
+)
+from bai_scenario.runner.acting import ActingAs
+from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.steps import run_scenario
 
-from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.v2.domain.request import UpdateDomainInput
-from ai.backend.common.dto.manager.v2.domain.response import (
-    DomainBasicInfo,
-    DomainLifecycleInfo,
-    DomainNode,
-    DomainPayload,
-    DomainRegistryInfo,
-)
+from ai.backend.common.dto.manager.v2.domain.response import DomainNode
 from ai.backend.manager.api.adapters.domain.adapter import DomainAdapter
 from ai.backend.manager.errors.base.entity import EntityNotFoundError
 from ai.backend.manager.errors.permission import NotEnoughPermission
-from ai.backend.testutils.typed_scenario import (
-    Checked,
-    Exactly,
-    Ignored,
-    TypedScenario,
-    call,
-    needs_actor,
-)
+from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.testutils.scenario_steps import Given, Scenario, Then, When
+
+EDITED = "고쳐 쓴 설명"
+
+type DomainStep = Scenario[SeedingSession, ADomainAndACaller, DomainAdapter, DomainNode]
 
 
-def superadmin_edits_a_description(seed: Seeder) -> DomainScenario:
-    home = seed.creating(SeedDomain(name_hint="home"))
-    was_here = "이미 있던 도메인"
-    editable = seed.creating(SeedDomain(name_hint="editable", description=was_here))
-    superadmin = seed.within(SomeoneOf(home, role=UserRole.SUPERADMIN))
-    # ``description`` is optional on the node, so what it is held to has to be too.
-    edited: str | None = "edited"
-    return TypedScenario.ok(
-        "editing-a-description-leaves-the-name-alone",
-        description=(
-            "슈퍼관리자가 도메인의 설명만 바꾸면, 설명은 새 값이 되고 이름은 그대로 남는다"
-        ),
-        actor=superadmin,
-        given=seed.situation(),
-        when=after(
-            editable,
-            lambda d: needs_actor(
-                lambda actor: call(
-                    DomainAdapter.admin_update,
-                    d.name,
-                    UpdateDomainInput(description="edited"),
-                    actor,
-                ),
-                "admin_update",
-            ),
-        ),
-        then=Exactly(
-            DomainPayload(
-                domain=DomainNode(
-                    id=DomainID(UUID(int=0)),
-                    basic_info=DomainBasicInfo(
-                        name=editable.name, description=edited, integration_name=None
-                    ),
-                    registry=DomainRegistryInfo(allowed_docker_registries=[]),
-                    lifecycle=DomainLifecycleInfo(
-                        is_active=True,
-                        is_default=False,
-                        created_at=datetime.now(UTC),
-                        modified_at=datetime.now(UTC),
-                    ),
-                )
-            ),
-            where=(
-                Ignored(lambda p: p.domain.id, "데이터베이스가 만든다"),
-                Checked(
-                    lambda p: p.domain.lifecycle.created_at,
-                    seed.since_started(),
-                    "이 실행이 쓴 시각",
-                ),
-                Checked(
-                    lambda p: p.domain.lifecycle.modified_at,
-                    seed.since_started(),
-                    "이 실행이 쓴 시각",
-                ),
-            ),
-        ),
-    )
+@dataclass(frozen=True)
+class Editing(When[ADomainAndACaller, DomainAdapter, DomainNode]):
+    """심은 도메인을 고친다. 답이 실은 노드를 벗겨서 준다."""
+
+    asked: UpdateDomainInput
+    named: str | None = None
+    changing: str = "설명"
+
+    @override
+    def describe(self, laid: ADomainAndACaller) -> str:
+        target = self.named or laid.domain.name
+        return f"{laid.caller.username}이 {target}의 {self.changing}을 고침"
+
+    @override
+    async def call(self, adapter: DomainAdapter, laid: ADomainAndACaller) -> DomainNode:
+        with ActingAs(laid.caller) as who:
+            payload = await adapter.admin_update(self.named or laid.domain.name, self.asked, who)
+        return payload.domain
 
 
-def retiring_is_an_edit_of_the_active_flag(seed: Seeder) -> DomainScenario:
-    home = seed.creating(SeedDomain(name_hint="home"))
-    was_here = "이미 있던 도메인"
-    target = seed.creating(SeedDomain(name_hint="to-retire", description=was_here))
-    superadmin = seed.within(SomeoneOf(home, role=UserRole.SUPERADMIN))
-    return TypedScenario.ok(
-        "clearing-the-active-flag-is-how-a-domain-retires",
-        description="활성 플래그를 내리는 수정으로 도메인을 물릴 수 있고, 답이 그 상태를 실어 온다",
-        actor=superadmin,
-        given=seed.situation(),
-        when=after(
-            target,
-            lambda d: needs_actor(
-                lambda actor: call(
-                    DomainAdapter.admin_update, d.name, UpdateDomainInput(is_active=False), actor
-                ),
-                "admin_update",
-            ),
-        ),
-        then=Exactly(
-            DomainPayload(
-                domain=DomainNode(
-                    id=DomainID(UUID(int=0)),
-                    basic_info=DomainBasicInfo(
-                        name=target.name, description=was_here, integration_name=None
-                    ),
-                    registry=DomainRegistryInfo(allowed_docker_registries=[]),
-                    lifecycle=DomainLifecycleInfo(
-                        is_active=False,
-                        is_default=False,
-                        created_at=datetime.now(UTC),
-                        modified_at=datetime.now(UTC),
-                    ),
-                )
-            ),
-            where=(
-                Ignored(lambda p: p.domain.id, "데이터베이스가 만든다"),
-                Checked(
-                    lambda p: p.domain.lifecycle.created_at,
-                    seed.since_started(),
-                    "이 실행이 쓴 시각",
-                ),
-                Checked(
-                    lambda p: p.domain.lifecycle.modified_at,
-                    seed.since_started(),
-                    "이 실행이 쓴 시각",
-                ),
-            ),
-        ),
-    )
+@dataclass(frozen=True)
+class TheDescriptionChangesAndTheNameStays(
+    Scenario[SeedingSession, ADomainAndACaller, DomainAdapter, DomainNode]
+):
+    started: datetime
+
+    @override
+    def summary(self) -> str:
+        return "editing-a-description-leaves-the-name-alone"
+
+    @override
+    def describe(self) -> str:
+        return "슈퍼관리자가 도메인의 설명만 바꾸면, 설명은 새 값이 되고 이름은 그대로 남는다"
+
+    @override
+    def given(self) -> Given[SeedingSession, ADomainAndACaller]:
+        return ADomainAndSomeone(role=UserRole.SUPERADMIN, name_hint="editable")
+
+    @override
+    def when(self) -> When[ADomainAndACaller, DomainAdapter, DomainNode]:
+        return Editing(UpdateDomainInput(description=EDITED))
+
+    @override
+    def then(self) -> Then[ADomainAndACaller, DomainNode]:
+        return TheDomainNode(started=self.started, described=EDITED)
 
 
-def unknown_name_is_not_found(seed: Seeder) -> DomainScenario:
-    home = seed.creating(SeedDomain(name_hint="home"))
-    superadmin = seed.within(SomeoneOf(home, role=UserRole.SUPERADMIN))
-    return TypedScenario.error(
-        "editing-a-name-nothing-answers-to-is-not-found",
-        description="아무 도메인도 갖지 않은 이름을 수정하려 하면 대상이 없다는 것으로 거부된다",
-        actor=superadmin,
-        given=seed.situation(),
-        when=needs_actor(
-            lambda actor: call(
-                DomainAdapter.admin_update,
-                "no-such-domain",
-                UpdateDomainInput(description="x"),
-                actor,
-            ),
-            "admin_update",
-        ),
-        then=EntityNotFoundError,
-    )
+@dataclass(frozen=True)
+class ClearingTheActiveFlagRetires(
+    Scenario[SeedingSession, ADomainAndACaller, DomainAdapter, DomainNode]
+):
+    started: datetime
+
+    @override
+    def summary(self) -> str:
+        return "clearing-the-active-flag-is-how-a-domain-retires"
+
+    @override
+    def describe(self) -> str:
+        return "활성 플래그를 내리는 수정으로 도메인을 물릴 수 있고, 답이 그 상태를 실어 온다"
+
+    @override
+    def given(self) -> Given[SeedingSession, ADomainAndACaller]:
+        return ADomainAndSomeone(role=UserRole.SUPERADMIN, name_hint="to-retire")
+
+    @override
+    def when(self) -> When[ADomainAndACaller, DomainAdapter, DomainNode]:
+        return Editing(UpdateDomainInput(is_active=False), changing="활성 플래그")
+
+    @override
+    def then(self) -> Then[ADomainAndACaller, DomainNode]:
+        return TheDomainNode(started=self.started, active=False)
 
 
-def ungranted_user_is_refused(seed: Seeder) -> DomainScenario:
-    home = seed.creating(SeedDomain(name_hint="home"))
-    target = seed.creating(SeedDomain(name_hint="untouchable"))
-    someone = seed.within(SomeoneOf(home))
-    return TypedScenario.error(
-        "a-user-granted-nothing-may-not-edit-a-domain",
-        description="아무 권한도 받지 않은 사용자가 도메인을 수정하려 하면 권한 부족으로 거부된다",
-        actor=someone,
-        given=seed.situation(),
-        when=after(
-            target,
-            lambda d: needs_actor(
-                lambda actor: call(
-                    DomainAdapter.admin_update,
-                    d.name,
-                    UpdateDomainInput(description="x"),
-                    actor,
-                ),
-                "admin_update",
-            ),
-        ),
-        then=NotEnoughPermission,
-    )
+@dataclass(frozen=True)
+class AUserGrantedNothingMayNotEdit(
+    Scenario[SeedingSession, ADomainAndACaller, DomainAdapter, DomainNode]
+):
+    @override
+    def summary(self) -> str:
+        return "a-user-granted-nothing-may-not-edit-a-domain"
+
+    @override
+    def describe(self) -> str:
+        return "아무 권한도 받지 않은 사용자가 도메인을 수정하려 하면 권한 부족으로 거부된다"
+
+    @override
+    def given(self) -> Given[SeedingSession, ADomainAndACaller]:
+        return ADomainAndSomeone()
+
+    @override
+    def when(self) -> When[ADomainAndACaller, DomainAdapter, DomainNode]:
+        return Editing(UpdateDomainInput(description=EDITED))
+
+    @override
+    def then(self) -> Then[ADomainAndACaller, DomainNode]:
+        return TheCallIsRefused(NotEnoughPermission)
 
 
-BUILDERS = (
-    superadmin_edits_a_description,
-    retiring_is_an_edit_of_the_active_flag,
-    unknown_name_is_not_found,
-    ungranted_user_is_refused,
-)
-SCENARIOS: list[DomainScenario] = [build(Seeder()) for build in BUILDERS]
+@dataclass(frozen=True)
+class ANameNothingAnswersToIsNotFound(
+    Scenario[SeedingSession, ADomainAndACaller, DomainAdapter, DomainNode]
+):
+    @override
+    def summary(self) -> str:
+        return "editing-a-name-nothing-answers-to-is-not-found"
+
+    @override
+    def describe(self) -> str:
+        return "아무 도메인도 갖지 않은 이름을 수정하려 하면 대상이 없다는 것으로 거부된다"
+
+    @override
+    def given(self) -> Given[SeedingSession, ADomainAndACaller]:
+        return ADomainAndSomeone(role=UserRole.SUPERADMIN)
+
+    @override
+    def when(self) -> When[ADomainAndACaller, DomainAdapter, DomainNode]:
+        return Editing(UpdateDomainInput(description=EDITED), named="no-such-domain")
+
+    @override
+    def then(self) -> Then[ADomainAndACaller, DomainNode]:
+        return TheCallIsRefused(EntityNotFoundError)
 
 
-@pytest.mark.parametrize("scenario", SCENARIOS, ids=lambda s: s.summary)
-async def test_editing(scenario: DomainScenario, run: ScenarioRunner) -> None:
-    await run(scenario)
+SCENARIOS: list[DomainStep] = [
+    TheDescriptionChangesAndTheNameStays(started=datetime.now(UTC)),
+    ClearingTheActiveFlagRetires(started=datetime.now(UTC)),
+    AUserGrantedNothingMayNotEdit(),
+    ANameNothingAnswersToIsNotFound(),
+]
+
+
+@pytest.mark.parametrize("scenario", SCENARIOS, ids=lambda s: s.summary())
+async def test_editing(
+    scenario: DomainStep, adapter: DomainAdapter, engine: ExtendedAsyncSAEngine
+) -> None:
+    await run_scenario(scenario, adapter, engine)

@@ -18,7 +18,7 @@ from ai.backend.testutils.typed_scenario import (
 )
 from bai_scenario.components.domain import GrantedUser, SomeoneOf
 from bai_scenario.seeds.rbac.role import SeedPermission, SeedRole
-from bai_scenario.seeds.seeder import Given, Seeder, SeedNest
+from bai_scenario.seeds.seeder import Laid, Seeder, SeedNest
 
 type SessionScenario = TypedScenario[SessionAdapter, ManagerUnifiedConfig]
 
@@ -31,8 +31,8 @@ class SomeoneMakingSessions(SeedNest[GrantedUser]):
     주는 일이 곧 그 사람을 프로젝트 명부에 올리는 일이 된다.
     """
 
-    domain: Given[DomainData]
-    project: Given[ProjectData]
+    domain: Laid[DomainData]
+    project: Laid[ProjectData]
 
     @override
     def kind(self) -> str:

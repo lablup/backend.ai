@@ -195,7 +195,7 @@ class SeedLink[S, T](ABC):
 
 
 @dataclass(frozen=True, eq=False)
-class Given[D]:
+class Laid[D]:
     """One row a scenario lays down, and a handle on what the write answered.
 
     Compared by identity, so a call that reads this row holds the handle rather than
@@ -210,7 +210,7 @@ class Given[D]:
     """How other rows refer to this one."""
     states: str
     """What laying this row establishes, as a sentence, for the report."""
-    sources: tuple[Given[Any], ...]
+    sources: tuple[Laid[Any], ...]
     write: Callable[[SeedOps, Sequence[Any]], Awaitable[D]]
 
 
@@ -244,8 +244,8 @@ class Seeder:
     """
 
     _counts: dict[str, int] = field(default_factory=dict)
-    _laid: list[Given[Any]] = field(default_factory=list)
-    _singletons: dict[type[Any], Given[Any]] = field(default_factory=dict)
+    _laid: list[Laid[Any]] = field(default_factory=list)
+    _singletons: dict[type[Any], Laid[Any]] = field(default_factory=dict)
     _nesting: list[str] = field(default_factory=list)
     _started: datetime = field(default_factory=lambda: datetime.now(UTC))
 
@@ -277,11 +277,11 @@ class Seeder:
         """
         return situation(rows=tuple(self._laid), config=config, answers=answers)
 
-    def declared(self) -> tuple[Given[Any], ...]:
+    def declared(self) -> tuple[Laid[Any], ...]:
         """Every row asked for so far, in the order it was asked."""
         return tuple(self._laid)
 
-    def once[D](self, seed: SeedRow[D], /) -> Given[D]:
+    def once[D](self, seed: SeedRow[D], /) -> Laid[D]:
         """The one row of its kind this scenario has.
 
         A row whose name the manager fixes is a singleton: laying it twice collides on
@@ -291,9 +291,9 @@ class Seeder:
         key = type(seed)
         if key not in self._singletons:
             self._singletons[key] = self.creating(seed)
-        return cast("Given[D]", self._singletons[key])
+        return cast("Laid[D]", self._singletons[key])
 
-    def _remember[D](self, row: Given[D]) -> Given[D]:
+    def _remember[D](self, row: Laid[D]) -> Laid[D]:
         self._laid.append(row)
         return row
 
@@ -302,7 +302,7 @@ class Seeder:
         self._counts[hint] = self._counts.get(hint, 0) + 1
         return f"{hint}-{self._counts[hint]}"
 
-    def creating[D](self, seed: SeedRow[D], /) -> Given[D]:
+    def creating[D](self, seed: SeedRow[D], /) -> Laid[D]:
         """Lay a row that needs nothing but its own name."""
         name = seed.name(self.name)
 
@@ -311,7 +311,7 @@ class Seeder:
 
         return self._remember(self._given(seed, name, (), write, _there_is(seed, name)))
 
-    def creating_from[A, D](self, seed: SeedRowFrom[A, D], a: Given[A], /) -> Given[D]:
+    def creating_from[A, D](self, seed: SeedRowFrom[A, D], a: Laid[A], /) -> Laid[D]:
         """Lay a row that reads one row laid before it."""
         name = seed.name(self.name)
 
@@ -321,8 +321,8 @@ class Seeder:
         return self._remember(self._given(seed, name, (a,), write, _there_is(seed, name)))
 
     def creating_from_two[A, B, D](
-        self, seed: SeedRowFromTwo[A, B, D], a: Given[A], b: Given[B], /
-    ) -> Given[D]:
+        self, seed: SeedRowFromTwo[A, B, D], a: Laid[A], b: Laid[B], /
+    ) -> Laid[D]:
         """Lay a row that reads two rows laid before it."""
         name = seed.name(self.name)
 
@@ -332,8 +332,8 @@ class Seeder:
         return self._remember(self._given(seed, name, (a, b), write, _there_is(seed, name)))
 
     def creating_from_three[A, B, C, D](
-        self, seed: SeedRowFromThree[A, B, C, D], a: Given[A], b: Given[B], c: Given[C], /
-    ) -> Given[D]:
+        self, seed: SeedRowFromThree[A, B, C, D], a: Laid[A], b: Laid[B], c: Laid[C], /
+    ) -> Laid[D]:
         """Lay a row that reads three rows laid before it."""
         name = seed.name(self.name)
 
@@ -345,11 +345,11 @@ class Seeder:
     def provisioning[A, B, C](
         self,
         seed: SeedUser[A, B, C],
-        a: Given[A],
-        b: Given[B],
-        c: Given[C],
+        a: Laid[A],
+        b: Laid[B],
+        c: Laid[C],
         /,
-    ) -> Given[UserData]:
+    ) -> Laid[UserData]:
         """Provision what the manager provisions as one operation."""
         name = seed.name(self.name)
 
@@ -359,14 +359,14 @@ class Seeder:
 
         return self._remember(self._given(seed, name, (a, b, c), write, _there_is(seed, name)))
 
-    def adding[A, D: FieldData](self, seed: SeedField[A, D], owner: Given[A], /) -> Given[D]:
+    def adding[A, D: FieldData](self, seed: SeedField[A, D], owner: Laid[A], /) -> Laid[D]:
         """Lay one field row under the owner the scenario already laid."""
 
         async def write(ops: SeedOps, values: Sequence[Any]) -> Any:
             return await ops.create_field(seed.owner_id(values[0]), seed.seed())
 
         return self._remember(
-            Given(
+            Laid(
                 name=owner.name,
                 nest=tuple(self._nesting),
                 describe=f"{owner.describe}({seed.kind()})",
@@ -376,9 +376,7 @@ class Seeder:
             )
         )
 
-    def linking[S, T](
-        self, seed: SeedLink[S, T], scope: Given[S], target: Given[T], /
-    ) -> Given[None]:
+    def linking[S, T](self, seed: SeedLink[S, T], scope: Laid[S], target: Laid[T], /) -> Laid[None]:
         """Link the two rows this scenario laid, the way an operator would."""
 
         async def write(ops: SeedOps, values: Sequence[Any]) -> None:
@@ -387,7 +385,7 @@ class Seeder:
             )
 
         return self._remember(
-            Given(
+            Laid(
                 name=target.name,
                 nest=tuple(self._nesting),
                 describe=target.describe,
@@ -399,19 +397,19 @@ class Seeder:
 
     def granting[R, U](
         self,
-        role: Given[R],
-        to: Given[U],
+        role: Laid[R],
+        to: Laid[U],
         *,
         role_id: Callable[[R], RoleID],
         user_id: Callable[[U], UserID],
-    ) -> Given[None]:
+    ) -> Laid[None]:
         """Give the user the role, the way an operator would."""
 
         async def write(ops: SeedOps, values: Sequence[Any]) -> None:
             await ops.grant_roles(user_id(values[1]), [role_id(values[0])])
 
         return self._remember(
-            Given(
+            Laid(
                 name=to.name,
                 nest=tuple(self._nesting),
                 describe=to.describe,
@@ -425,11 +423,11 @@ class Seeder:
         self,
         seed: Seed,
         name: str,
-        sources: Sequence[Given[Any]],
+        sources: Sequence[Laid[Any]],
         write: Callable[[SeedOps, Sequence[Any]], Awaitable[D]],
         sentence: str,
-    ) -> Given[D]:
-        return Given(
+    ) -> Laid[D]:
+        return Laid(
             name=name,
             nest=tuple(self._nesting),
             describe=f"{seed.kind()} {name}",
@@ -439,14 +437,14 @@ class Seeder:
         )
 
 
-async def lay(ops: SeedOps, wanted: Sequence[Given[Any]], made: dict[Given[Any], Any]) -> None:
+async def lay(ops: SeedOps, wanted: Sequence[Laid[Any]], made: dict[Laid[Any], Any]) -> None:
     """Write every row the wanted rows rest on, each once, in this session.
 
     What has been written is carried in ``made`` rather than answered, so a caller that
     lays in several goes writes each row once across all of them.
     """
 
-    async def settle(row: Given[Any]) -> Any:
+    async def settle(row: Laid[Any]) -> Any:
         if row in made:
             return made[row]
         values = [await settle(source) for source in row.sources]
@@ -457,11 +455,11 @@ async def lay(ops: SeedOps, wanted: Sequence[Given[Any]], made: dict[Given[Any],
         await settle(row)
 
 
-def laid_in_order(wanted: Sequence[Given[Any]]) -> list[Given[Any]]:
+def laid_in_order(wanted: Sequence[Laid[Any]]) -> list[Laid[Any]]:
     """Every row the wanted rows rest on, in the order they are written."""
-    seen: list[Given[Any]] = []
+    seen: list[Laid[Any]] = []
 
-    def walk(row: Given[Any]) -> None:
+    def walk(row: Laid[Any]) -> None:
         if row in seen:
             return
         for source in row.sources:
@@ -474,7 +472,7 @@ def laid_in_order(wanted: Sequence[Given[Any]]) -> list[Given[Any]]:
 
 
 def after[D, A, R](
-    row: Given[D],
+    row: Laid[D],
     build: Callable[[D], Invocation[A, R] | ActorBound[A, R, Any]],
     /,
 ) -> Deferred[A, R]:
@@ -487,8 +485,8 @@ def after[D, A, R](
 
 
 def after_two[D1, D2, A, R](
-    first: Given[D1],
-    second: Given[D2],
+    first: Laid[D1],
+    second: Laid[D2],
     build: Callable[[D1, D2], Invocation[A, R] | ActorBound[A, R, Any]],
     /,
 ) -> Deferred[A, R]:
@@ -497,9 +495,9 @@ def after_two[D1, D2, A, R](
 
 
 def after_three[D1, D2, D3, A, R](
-    first: Given[D1],
-    second: Given[D2],
-    third: Given[D3],
+    first: Laid[D1],
+    second: Laid[D2],
+    third: Laid[D3],
     build: Callable[[D1, D2, D3], Invocation[A, R] | ActorBound[A, R, Any]],
     /,
 ) -> Deferred[A, R]:

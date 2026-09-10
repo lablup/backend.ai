@@ -17,7 +17,7 @@ from ai.backend.testutils.typed_scenario import (
 from bai_scenario.components.domain import GrantedUser, SomeoneOf
 from bai_scenario.seeds.domain.domain import SeedDomain
 from bai_scenario.seeds.rbac.role import SeedPermission, SeedRole
-from bai_scenario.seeds.seeder import Given, Seeder, SeedNest, SeedRow
+from bai_scenario.seeds.seeder import Laid, Seeder, SeedNest, SeedRow
 
 type VFolderScenario = TypedScenario[VFolderAdapter, ManagerUnifiedConfig]
 
@@ -37,7 +37,7 @@ class SomeoneMakingFolders(SeedNest[GrantedUser]):
     범위는 사용자 자신이다. 개인 폴더는 만든 사람의 스코프에 생기므로 역할도 거기 앉는다.
     """
 
-    domain: Given[DomainData]
+    domain: Laid[DomainData]
 
     @override
     def kind(self) -> str:

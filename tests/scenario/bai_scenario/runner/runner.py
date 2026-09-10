@@ -21,7 +21,7 @@ from ai.backend.testutils.typed_scenario import (
 )
 from bai_scenario.runner.acting import ActingAs
 from bai_scenario.seeds.ops import SeedOpsProvider
-from bai_scenario.seeds.seeder import Given, laid_in_order, lay
+from bai_scenario.seeds.seeder import Laid, laid_in_order, lay
 
 
 class NoActor(Exception):
@@ -41,18 +41,18 @@ class ScenarioRunner:
         self._engine = engine
         self._fakes = fakes
 
-    async def _lay(self, scenario: TypedScenario[Any, Any]) -> dict[Given[Any], Any]:
-        wanted = [row for row in scenario.given.rows if isinstance(row, Given)]
-        if isinstance(scenario.actor, Given):
+    async def _lay(self, scenario: TypedScenario[Any, Any]) -> dict[Laid[Any], Any]:
+        wanted = [row for row in scenario.given.rows if isinstance(row, Laid)]
+        if isinstance(scenario.actor, Laid):
             wanted.append(scenario.actor)
-        made: dict[Given[Any], Any] = {}
+        made: dict[Laid[Any], Any] = {}
         async with SeedOpsProvider(self._engine).write_ops() as ops:
             await lay(ops, wanted, made)
         return made
 
     async def __call__(self, scenario: TypedScenario[Any, Any]) -> None:
         made = await self._lay(scenario)
-        actor = made.get(scenario.actor) if isinstance(scenario.actor, Given) else None
+        actor = made.get(scenario.actor) if isinstance(scenario.actor, Laid) else None
         try:
             if actor is None:
                 answered = await scenario.invoke(self._adapter, made, None)
@@ -90,8 +90,8 @@ class ScenarioRunner:
 
 def scenario_given(scenario: TypedScenario[Any, Any]) -> tuple[Line, ...]:
     """What is already true when the call is made, in the order it was laid."""
-    wanted = [row for row in scenario.given.rows if isinstance(row, Given)]
-    if isinstance(scenario.actor, Given):
+    wanted = [row for row in scenario.given.rows if isinstance(row, Laid)]
+    if isinstance(scenario.actor, Laid):
         wanted.append(scenario.actor)
     return tuple(Line(says=row.states, nest=row.nest) for row in laid_in_order(wanted))
 

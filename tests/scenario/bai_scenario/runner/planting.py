@@ -16,7 +16,7 @@ from ai.backend.common.data.entity.types import FieldData
 from ai.backend.testutils.scenario_steps import Told
 from bai_scenario.seeds.ops import SeedOps
 from bai_scenario.seeds.seeder import (
-    Given,
+    Laid,
     Seeder,
     SeedField,
     SeedLink,
@@ -38,7 +38,7 @@ class SeedingSession:
 
     _seed: Seeder
     _ops: SeedOps
-    _made: dict[Given[Any], Any]
+    _made: dict[Laid[Any], Any]
 
     def __init__(self, seed: Seeder, ops: SeedOps) -> None:
         self._seed = seed
@@ -47,7 +47,7 @@ class SeedingSession:
 
     def told(self) -> tuple[Told, ...]:
         """심은 행들을, 그것을 심은 묶음 아래로 쌓아서."""
-        roots: list[str | Given[Any]] = []
+        roots: list[str | Laid[Any]] = []
         under: dict[tuple[str, ...], list[Any]] = {(): roots}
         for row in self._seed.declared():
             chain: tuple[str, ...] = ()
@@ -70,51 +70,51 @@ class SeedingSession:
 
         return build(roots)
 
-    def made[D](self, row: Given[D]) -> D:
+    def made[D](self, row: Laid[D]) -> D:
         """What the write answered for this row."""
         if row not in self._made:
             raise LookupError("this row was not laid by this session")
         return cast("D", self._made[row])
 
-    async def _settle[D](self, row: Given[D]) -> Given[D]:
+    async def _settle[D](self, row: Laid[D]) -> Laid[D]:
         await lay(self._ops, self._seed.declared(), self._made)
         return row
 
-    async def creating[D](self, one: SeedRow[D], /) -> Given[D]:
+    async def creating[D](self, one: SeedRow[D], /) -> Laid[D]:
         return await self._settle(self._seed.creating(one))
 
-    async def creating_from[A, D](self, one: SeedRowFrom[A, D], a: Given[A], /) -> Given[D]:
+    async def creating_from[A, D](self, one: SeedRowFrom[A, D], a: Laid[A], /) -> Laid[D]:
         return await self._settle(self._seed.creating_from(one, a))
 
     async def creating_from_two[A, B, D](
-        self, one: SeedRowFromTwo[A, B, D], a: Given[A], b: Given[B], /
-    ) -> Given[D]:
+        self, one: SeedRowFromTwo[A, B, D], a: Laid[A], b: Laid[B], /
+    ) -> Laid[D]:
         return await self._settle(self._seed.creating_from_two(one, a, b))
 
     async def creating_from_three[A, B, C, D](
-        self, one: SeedRowFromThree[A, B, C, D], a: Given[A], b: Given[B], c: Given[C], /
-    ) -> Given[D]:
+        self, one: SeedRowFromThree[A, B, C, D], a: Laid[A], b: Laid[B], c: Laid[C], /
+    ) -> Laid[D]:
         return await self._settle(self._seed.creating_from_three(one, a, b, c))
 
-    async def once[D](self, one: SeedRow[D], /) -> Given[D]:
+    async def once[D](self, one: SeedRow[D], /) -> Laid[D]:
         return await self._settle(self._seed.once(one))
 
-    async def adding[A, D: FieldData](self, one: SeedField[A, D], owner: Given[A], /) -> Given[D]:
+    async def adding[A, D: FieldData](self, one: SeedField[A, D], owner: Laid[A], /) -> Laid[D]:
         return await self._settle(self._seed.adding(one, owner))
 
     async def linking[S, T](
-        self, one: SeedLink[S, T], scope: Given[S], target: Given[T], /
-    ) -> Given[None]:
+        self, one: SeedLink[S, T], scope: Laid[S], target: Laid[T], /
+    ) -> Laid[None]:
         return await self._settle(self._seed.linking(one, scope, target))
 
     async def granting[R, U](
         self,
-        role: Given[R],
-        to: Given[U],
+        role: Laid[R],
+        to: Laid[U],
         *,
         role_id: Any,
         user_id: Any,
-    ) -> Given[None]:
+    ) -> Laid[None]:
         return await self._settle(self._seed.granting(role, to, role_id=role_id, user_id=user_id))
 
     async def within[D](self, nest: SeedNest[D]) -> D:
