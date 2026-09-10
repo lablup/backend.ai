@@ -13,8 +13,8 @@ from ai.backend.manager.repositories.permission_controller.repository import (
     PermissionControllerRepository,
 )
 from ai.backend.manager.services.permission_contoller.actions.get_entity_types import (
-    GetEntityTypesAction,
-    GetEntityTypesActionResult,
+    GlobalGetEntityTypesAction,
+    GlobalGetEntityTypesActionResult,
 )
 from ai.backend.manager.services.permission_contoller.actions.get_permission_matrix import (
     GetPermissionMatrixAction,
@@ -25,8 +25,8 @@ from ai.backend.manager.services.permission_contoller.actions.get_role_detail im
     GetRoleDetailActionResult,
 )
 from ai.backend.manager.services.permission_contoller.actions.get_scope_types import (
-    GetScopeTypesAction,
-    GetScopeTypesActionResult,
+    GlobalGetScopeTypesAction,
+    GlobalGetScopeTypesActionResult,
 )
 from ai.backend.manager.services.permission_contoller.actions.permission import (
     CreatePermissionAction,
@@ -153,13 +153,17 @@ class PermissionControllerService:
         result = await self._repository.search_scopes(action.scope_type, action.querier)
         return SearchScopesActionResult(result=result)
 
-    async def get_scope_types(self, _action: GetScopeTypesAction) -> GetScopeTypesActionResult:
+    async def get_scope_types(
+        self, _action: GlobalGetScopeTypesAction
+    ) -> GlobalGetScopeTypesActionResult:
         """The scopes a role is created in."""
-        return GetScopeTypesActionResult(entity_types=list(role_scope_types()))
+        return GlobalGetScopeTypesActionResult(entity_types=list(role_scope_types()))
 
-    async def get_entity_types(self, _action: GetEntityTypesAction) -> GetEntityTypesActionResult:
+    async def get_entity_types(
+        self, _action: GlobalGetEntityTypesAction
+    ) -> GlobalGetEntityTypesActionResult:
         """The entities a role may permit, as the ops wiring declares them."""
-        return GetEntityTypesActionResult(entity_types=sorted(self._grantable_operations()))
+        return GlobalGetEntityTypesActionResult(entity_types=sorted(self._grantable_operations()))
 
     def _grantable_operations(self) -> Mapping[EntityType, Sequence[GrantableOperation]]:
         """Every operation a role may permit, grouped by the entity answering for it.

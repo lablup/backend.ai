@@ -58,10 +58,10 @@ from ai.backend.manager.services.permission_contoller.actions import (
     UpdateRoleAction,
 )
 from ai.backend.manager.services.permission_contoller.actions.get_entity_types import (
-    GetEntityTypesAction,
+    GlobalGetEntityTypesAction,
 )
 from ai.backend.manager.services.permission_contoller.actions.get_scope_types import (
-    GetScopeTypesAction,
+    GlobalGetScopeTypesAction,
 )
 from ai.backend.manager.services.permission_contoller.actions.purge_role import PurgeRoleAction
 from ai.backend.manager.services.permission_contoller.actions.search_scopes import (
@@ -291,8 +291,8 @@ class RBACHandler:
         if not ctx.is_superadmin:
             raise NotEnoughPermission("Only superadmin can access scope types.")
 
-        action_result = await self._permission_controller.get_scope_types.wait_for_complete(
-            GetScopeTypesAction()
+        action_result = await self._permission_controller.global_get_scope_types.run(
+            GlobalGetScopeTypesAction()
         )
         resp = GetScopeTypesResponse(items=action_result.entity_types)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=resp)
@@ -331,8 +331,8 @@ class RBACHandler:
         if not ctx.is_superadmin:
             raise NotEnoughPermission("Only superadmin can access entity types.")
 
-        action_result = await self._permission_controller.get_entity_types.wait_for_complete(
-            GetEntityTypesAction()
+        action_result = await self._permission_controller.global_get_entity_types.run(
+            GlobalGetEntityTypesAction()
         )
         resp = GetEntityTypesResponse(items=action_result.entity_types)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=resp)

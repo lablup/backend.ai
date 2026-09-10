@@ -5,6 +5,7 @@ from ai.backend.manager.actions.registry.field import LookupFieldGroup
 from ai.backend.manager.actions.registry.group import ProcessorGroup
 from ai.backend.manager.actions.registry.types import FieldGroupMeta
 from ai.backend.manager.actions.v2.field.bulk_processor import PartialBulkFieldActionProcessor
+from ai.backend.manager.actions.v2.global_scope.processor import GlobalActionProcessor
 from ai.backend.manager.actions.v2.ops.result import (
     CreatedEntityOpsResult,
     CreatedFieldOpsResult,
@@ -33,16 +34,16 @@ from .actions import (
     UpdateRoleAction,
 )
 from .actions.get_entity_types import (
-    GetEntityTypesAction,
-    GetEntityTypesActionResult,
+    GlobalGetEntityTypesAction,
+    GlobalGetEntityTypesActionResult,
 )
 from .actions.get_permission_matrix import (
     GetPermissionMatrixAction,
     GetPermissionMatrixActionResult,
 )
 from .actions.get_scope_types import (
-    GetScopeTypesAction,
-    GetScopeTypesActionResult,
+    GlobalGetScopeTypesAction,
+    GlobalGetScopeTypesActionResult,
 )
 from .actions.lookup_permission_owner import (
     LookupBulkRolePermissionOwnerAction,
@@ -95,8 +96,12 @@ class PermissionControllerProcessors:
         ReplaceRolePermissionsAction, ReplaceRolePermissionsActionResult
     ]
     search_scopes: ActionProcessor[SearchScopesAction, SearchScopesActionResult]
-    get_scope_types: ActionProcessor[GetScopeTypesAction, GetScopeTypesActionResult]
-    get_entity_types: ActionProcessor[GetEntityTypesAction, GetEntityTypesActionResult]
+    global_get_scope_types: GlobalActionProcessor[
+        GlobalGetScopeTypesAction, GlobalGetScopeTypesActionResult
+    ]
+    global_get_entity_types: GlobalActionProcessor[
+        GlobalGetEntityTypesAction, GlobalGetEntityTypesActionResult
+    ]
     get_permission_matrix: ActionProcessor[
         GetPermissionMatrixAction, GetPermissionMatrixActionResult
     ]
@@ -137,8 +142,12 @@ class PermissionControllerProcessors:
             service.replace_role_permissions, action_monitors
         )
         self.search_scopes = ActionProcessor(service.search_scopes, action_monitors)
-        self.get_scope_types = ActionProcessor(service.get_scope_types, action_monitors)
-        self.get_entity_types = ActionProcessor(service.get_entity_types, action_monitors)
+        self.global_get_scope_types = role_group.global_scope(
+            GlobalGetScopeTypesAction, service.get_scope_types
+        )
+        self.global_get_entity_types = role_group.global_scope(
+            GlobalGetEntityTypesAction, service.get_entity_types
+        )
         self.get_permission_matrix = ActionProcessor(service.get_permission_matrix, action_monitors)
         self.search_permissions = ActionProcessor(service.search_permissions, action_monitors)
         self.create_permission = ActionProcessor(service.create_permission, action_monitors)

@@ -27,7 +27,7 @@ from ai.backend.manager.dto.context import UserContext
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.services.permission_contoller.actions.get_scope_types import (
-    GetScopeTypesActionResult,
+    GlobalGetScopeTypesActionResult,
 )
 from ai.backend.manager.services.permission_contoller.actions.search_scopes import (
     SearchScopesActionResult,
@@ -74,8 +74,8 @@ class TestGetScopeTypesHandler:
     def mock_permission_controller(self) -> MagicMock:
         """Create mock permission controller processors."""
         pc = MagicMock()
-        pc.get_scope_types = MagicMock()
-        pc.get_scope_types.wait_for_complete = AsyncMock()
+        pc.global_get_scope_types = MagicMock()
+        pc.global_get_scope_types.run = AsyncMock()
         return pc
 
     async def test_get_scope_types_returns_scope_types(
@@ -85,8 +85,8 @@ class TestGetScopeTypesHandler:
         """Test get_scope_types returns all scope types for superadmin."""
         handler = make_test_handler(mock_permission_controller)
         ctx = make_test_superadmin_ctx()
-        action_result = GetScopeTypesActionResult(entity_types=self.SCOPE_TYPES)
-        mock_permission_controller.get_scope_types.wait_for_complete.return_value = action_result
+        action_result = GlobalGetScopeTypesActionResult(entity_types=self.SCOPE_TYPES)
+        mock_permission_controller.global_get_scope_types.run.return_value = action_result
 
         response = await handler.get_scope_types(ctx=ctx)
 

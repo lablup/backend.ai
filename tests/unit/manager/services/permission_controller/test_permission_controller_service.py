@@ -36,7 +36,7 @@ from ai.backend.manager.data.permission.status import RoleStatus
 from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.services.permission_contoller.actions.get_entity_types import (
-    GetEntityTypesAction,
+    GlobalGetEntityTypesAction,
 )
 from ai.backend.manager.services.permission_contoller.actions.get_permission_matrix import (
     GetPermissionMatrixAction,
@@ -45,7 +45,7 @@ from ai.backend.manager.services.permission_contoller.actions.get_role_detail im
     GetRoleDetailAction,
 )
 from ai.backend.manager.services.permission_contoller.actions.get_scope_types import (
-    GetScopeTypesAction,
+    GlobalGetScopeTypesAction,
 )
 from ai.backend.manager.services.permission_contoller.actions.permission import (
     CreatePermissionAction,
@@ -475,7 +475,7 @@ class TestPermissionCatalog:
         self,
         service: PermissionControllerService,
     ) -> None:
-        result = await service.get_entity_types(GetEntityTypesAction())
+        result = await service.get_entity_types(GlobalGetEntityTypesAction())
 
         assert RoleEntityType() in result.entity_types
         assert result.entity_types == sorted(set(result.entity_types))
@@ -484,7 +484,7 @@ class TestPermissionCatalog:
         self,
         service: PermissionControllerService,
     ) -> None:
-        result = await service.get_scope_types(GetScopeTypesAction())
+        result = await service.get_scope_types(GlobalGetScopeTypesAction())
 
         assert result.entity_types == [DomainEntityType(), ProjectEntityType(), UserEntityType()]
 
@@ -503,7 +503,7 @@ class TestPermissionCatalog:
         service: PermissionControllerService,
     ) -> None:
         matrix = (await service.get_permission_matrix(GetPermissionMatrixAction())).matrix
-        entity_types = (await service.get_entity_types(GetEntityTypesAction())).entity_types
+        entity_types = (await service.get_entity_types(GlobalGetEntityTypesAction())).entity_types
 
         for entity_map in matrix.values():
             assert sorted(entity_map) == entity_types
