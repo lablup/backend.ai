@@ -45,7 +45,7 @@ import pwd
 import socket
 import stat
 import struct
-from collections.abc import AsyncIterator, Mapping, Sequence
+from collections.abc import AsyncIterator, Iterable, Mapping, Sequence
 from dataclasses import replace
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
@@ -68,6 +68,12 @@ from ai.backend.agent.network.native_attacher import (
 from ai.backend.agent.network.port_forward import PortForwarder, forwards_for
 from ai.backend.agent.network.privnet import netns as netns_mod
 from ai.backend.agent.network.privnet import policy
+from ai.backend.agent.network.privnet.gossip import Endpoint as GossipEndpoint
+from ai.backend.agent.network.privnet.gossip import endpoints_of
+from ai.backend.agent.network.privnet.gossip_runner import (
+    DEFAULT_GOSSIP_PORT,
+    EndpointGossip,
+)
 from ai.backend.agent.network.privnet.journal import AttachRecord, PrivNetJournal
 from ai.backend.agent.network.privnet.protocol import (
     PROTOCOL_VERSION,
@@ -199,6 +205,11 @@ class _SessionEntry:
     #: not let a later ADOPT return early, or the retry that would fix it never runs.
     built: bool
 
+    #: The other nodes of this session, as the manager published them. The journal is the durable
+    #: copy; this is the same set in memory, because the endpoint announcements run on a timer and
+    #: reading the journal once per session per interval would put disk I/O on that path.
+    peer_vteps: set[str]
+
     def __init__(
         self,
         meta: SessionNetMeta,
@@ -211,6 +222,7 @@ class _SessionEntry:
         self.built = False
         self.attached = {}
         self.local_ips = {}
+        self.peer_vteps = set()
 
 
 def _descendants(pid: int) -> list[int]:
@@ -334,6 +346,10 @@ class PrivNetServer:
     #:
     #: Always taken BEFORE any per-session lock, on both paths, so the order is one way only.
     _mutation_lock: asyncio.Lock
+    #: The endpoint exchange with the other nodes of each session. None where this node has no
+    #: VTEP: it cannot be anybody's peer, so it has nothing to announce and no address to announce
+    #: from.
+    _gossip: EndpointGossip | None
 
     def __init__(
         self,
@@ -353,6 +369,7 @@ class PrivNetServer:
         vni_registry: VniRegistry | None = None,
         netns_owner_uid: int | None = None,
         netns_pinner: netns_mod.NetnsPinner | None = None,
+        gossip_port: int = DEFAULT_GOSSIP_PORT,
     ) -> None:
         self._socket_path = socket_path
         self._allowed_uid = allowed_uid
@@ -388,6 +405,9 @@ class PrivNetServer:
         # Set only where the PID record is agent-written (the rootless backends); see _attach.
         self._netns_owner_uid = netns_owner_uid
         self._netns = netns_pinner or netns_mod.NetnsPinner()
+        # None without a VTEP: a node that cannot anchor a tunnel is nobody's peer, so it
+        # has nothing to announce and no address to announce from.
+        self._gossip = EndpointGossip(self, vtep=vtep_ip, port=gossip_port) if vtep_ip else None
 
     @contextlib.asynccontextmanager
     async def _session_locked(self, session_id: str) -> AsyncIterator[None]:
@@ -455,6 +475,17 @@ class PrivNetServer:
             for backend in self._backends.values():
                 self._start_fail_close_retry(backend)
             self._start_recovery_retry()
+        if self._gossip is not None:
+            # After recovery, so the first announcement carries what this node actually still has
+            # rather than an empty table that would withdraw every peer's view of it.
+            try:
+                await self._gossip.start()
+            except OSError as e:
+                # A node that cannot bind the announce port still serves: its peers keep hearing
+                # from it never, which recovery and the readiness surface both report. Refusing to
+                # start would take the whole node's data plane down over a port conflict.
+                log.error("could not start the endpoint exchange on {}: {}", self._vtep_ip, e)
+                self._gossip = None
         server = await asyncio.start_unix_server(self._handle_conn, path=self._socket_path)
         bound_socket = sock_path.lstat()
         self._restrict_socket(sock_path)
@@ -467,6 +498,8 @@ class PrivNetServer:
             async with server:
                 await server.serve_forever()
         finally:
+            if self._gossip is not None:
+                await self._gossip.stop()
             await self._runtime.close()
             self._unlink_bound_socket(sock_path, bound_socket)
 
@@ -1945,6 +1978,7 @@ class PrivNetServer:
         """
         await self._journal.forget_session(session_id)
         self._sessions.pop(session_id, None)
+        self._forget_gossip(session_id)
 
     async def _teardown(self, session_id: str) -> None:
         """Remove the session's data plane -- but only if this node is the last one on it.
@@ -2016,6 +2050,7 @@ class PrivNetServer:
         if entry is not None:
             await entry.backend.teardown_session_network(session_id)
             self._sessions.pop(session_id, None)
+            self._forget_gossip(session_id)
             return
         if raw_config is None:
             return
@@ -2165,6 +2200,10 @@ class PrivNetServer:
             entry.attached[container_id] = plan
             if (local_ip := assigned.get(NetworkRole.LOCAL)) is not None:
                 entry.local_ips[container_id] = local_ip
+            # Straight away rather than at the next interval: a kernel is at rendezvous the
+            # moment it starts, and waiting a whole period to be announced is a peer that cannot
+            # reach it for that long. The timer stays the correction; this is the latency.
+            self._announce_now(session_id)
             return {str(role): ip for role, ip in assigned.items()}
         finally:
             pinned.close()
@@ -2269,6 +2308,8 @@ class PrivNetServer:
         entry.attached.pop(container_id, None)
         entry.local_ips.pop(container_id, None)
         await self._journal.forget_attachment(container_id)
+        # The withdrawal, and it is the same message: whole state without this container in it.
+        self._announce_now(session_id)
 
     async def _del_attachment(self, plan: Any, container_id: str) -> None:
         """Hand back the host side of an attachment: the veth and, for host-local IPAM, the
@@ -2297,6 +2338,7 @@ class PrivNetServer:
             # durable record names. ENSURE_SECURITY and teardown are idempotent over that excess.
             recorded.add(vtep_ip)
             await self._journal.record_peers(session_id, sorted(recorded))
+            self._remember_peers(session_id, recorded)
             await entry.backend.add_peer(session_id, peer)
         else:
             await entry.backend.del_peer(session_id, peer)
@@ -2304,6 +2346,7 @@ class PrivNetServer:
             # already-gone pair, which is safe and cleaned idempotently during recovery.
             recorded.discard(vtep_ip)
             await self._journal.record_peers(session_id, sorted(recorded))
+            self._remember_peers(session_id, recorded)
 
     async def _ensure_security(self, session_id: str, req: PrivNetRequest) -> None:
         """Re-assert the session's security state against the membership the agent published.
@@ -2318,7 +2361,132 @@ class PrivNetServer:
         recorded = set((await self._journal.peers()).get(session_id, ()))
         recorded.update(peer.vtep_ip for peer in peers if peer.vtep_ip is not None)
         await self._journal.record_peers(session_id, sorted(recorded))
+        self._remember_peers(session_id, recorded)
         await entry.backend.ensure_session_security(session_id, peers)
+
+    # --- GossipHost: what the endpoint exchange asks of this daemon ---------------------------
+    #
+    # The exchange owns a socket and a timer and nothing else; everything it needs to know about
+    # sessions it asks for here. Kept together so the seam is one block rather than six methods
+    # scattered among the request handlers.
+
+    def _forget_gossip(self, session_id: str) -> None:
+        """Drop what peers said about a session this node no longer carries.
+
+        Without it a torn-down session's entries sit in the exchange for the life of the daemon,
+        and a session id reused later starts by diffing against a stranger's table.
+        """
+        if self._gossip is not None:
+            self._gossip.forget(session_id)
+
+    def _announce_now(self, session_id: str) -> None:
+        """Tell this session's peers what this node holds, without waiting for the timer.
+
+        Send only -- no lock is taken and nothing is programmed here, so it is safe from inside a
+        request that already holds the session's lock. Applying what comes BACK is the receiver's
+        path, which runs on its own task.
+        """
+        if self._gossip is not None:
+            self._gossip.announce(session_id)
+
+    def _remember_peers(self, session_id: str, vteps: Iterable[str]) -> None:
+        """Mirror a journal write into the entry.
+
+        Only the mirror. Acting on the change -- unprogramming a peer the membership no longer
+        names -- happens on the announce timer instead, because every caller here is already
+        holding this session's lock and the unprogramming path takes it again.
+        """
+        entry = self._sessions.get(session_id)
+        if entry is None:
+            return
+        entry.peer_vteps = {vtep for vtep in vteps if vtep}
+
+    def gossip_key(self) -> str | None:
+        """The key announcements are signed under.
+
+        The cluster's overlay key, taken from any session that has one: ESP policies select on the
+        outer packet, which carries no session id, so there is one key for the cluster rather than
+        one per session. None while no session on this node carries an encrypted overlay, and then
+        nothing is announced -- an unsigned announcement is one any host that can reach the port
+        could have written.
+        """
+        for entry in self._sessions.values():
+            if entry.meta.encryption_key:
+                return entry.meta.encryption_key
+        return None
+
+    def gossip_sessions(self) -> Sequence[str]:
+        """Sessions whose data plane this node carries, and only the ones with a tunnel: a
+        single-node bridge session has no peers to tell and no overlay to program."""
+        return [
+            session_id
+            for session_id, entry in self._sessions.items()
+            if entry.meta.backend is NetworkBackendKind.VXLAN
+        ]
+
+    def gossip_peers(self, session_id: str) -> Sequence[str]:
+        """That session's other members, as the manager published them and this node recorded.
+
+        The same list the ESP pairs are built from. Membership stays the manager's to decide --
+        this exchange carries endpoints, never who is in the session.
+        """
+        entry = self._sessions.get(session_id)
+        if entry is None:
+            return []
+        return sorted(entry.peer_vteps)
+
+    def gossip_local_endpoints(self, session_id: str) -> Sequence[GossipEndpoint]:
+        """The overlay addresses this node holds, read from what its own attaches recorded.
+
+        This daemon assigned or validated every one of them itself, which is what entitles it to
+        announce them: no other process on the node can say, of its own knowledge, which addresses
+        this host holds.
+        """
+        entry = self._sessions.get(session_id)
+        if entry is None:
+            return []
+        return endpoints_of(entry.attached, overlay_role=NetworkRole.OVERLAY)
+
+    def gossip_generation(self, session_id: str) -> str | None:
+        entry = self._sessions.get(session_id)
+        return entry.meta.generation if entry is not None else None
+
+    async def gossip_program(
+        self,
+        session_id: str,
+        *,
+        add: Sequence[tuple[GossipEndpoint, str]],
+        remove: Sequence[tuple[GossipEndpoint, str]],
+    ) -> None:
+        """Apply a peer's endpoints through the same backend calls the RPC path uses.
+
+        Removals first, for the reason the agent's own reconcile orders them that way: an endpoint
+        that moved must have its old entry withdrawn before the new one is installed, or the FDB
+        carries two claims on one MAC.
+        """
+        entry = self._sessions.get(session_id)
+        if entry is None:
+            return
+        async with self._session_locked(session_id):
+            for endpoint, vtep in remove:
+                with contextlib.suppress(Exception):
+                    await entry.backend.del_endpoint(
+                        session_id, ip=endpoint.ip, mac=endpoint.mac, vtep_ip=vtep
+                    )
+            for endpoint, vtep in add:
+                try:
+                    await entry.backend.add_endpoint(
+                        session_id, ip=endpoint.ip, mac=endpoint.mac, vtep_ip=vtep
+                    )
+                except Exception:
+                    # One endpoint that will not program must not take the rest of the peer's
+                    # table with it; the next announcement carries it again.
+                    log.exception(
+                        "could not program endpoint {} of session {} via {}",
+                        endpoint.ip,
+                        session_id,
+                        vtep,
+                    )
 
     async def _endpoint(self, session_id: str, req: PrivNetRequest) -> None:
         """Program (ADD_ENDPOINT) or remove (DEL_ENDPOINT) a remote container endpoint's
