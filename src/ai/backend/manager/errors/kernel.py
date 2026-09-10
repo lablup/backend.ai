@@ -9,6 +9,8 @@ from typing import Any, override
 
 from aiohttp import web
 
+from ai.backend.common.data.entity.kernel import KernelFieldType
+from ai.backend.common.data.entity.session import SessionEntityType
 from ai.backend.common.exception import (
     BackendAIError,
     ErrorCode,
@@ -17,84 +19,65 @@ from ai.backend.common.exception import (
     ErrorOperation,
 )
 from ai.backend.common.json import dump_json
+from ai.backend.manager.actions.types import ActionOperationType
+from ai.backend.manager.errors.base.entity import EntityError, EntityErrorCode
+from ai.backend.manager.errors.base.field import FieldError, FieldErrorCode
 from ai.backend.manager.exceptions import AgentError
 
 from .common import ObjectNotFound
 
 
-class KernelNotReady(BackendAIError, web.HTTPBadRequest):
+class KernelNotReady(FieldError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/kernel-not-ready"
     error_title = "Kernel not ready."
 
     @override
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.KERNEL,
-            operation=ErrorOperation.READ,
-            error_detail=ErrorDetail.NOT_READY,
-        )
+    def field_error_code(self) -> FieldErrorCode:
+        return FieldErrorCode(KernelFieldType(), ActionOperationType.GET, ErrorDetail.NOT_READY)
 
 
-class InvalidSessionId(BackendAIError, web.HTTPBadRequest):
+class InvalidSessionId(EntityError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/invalid-session-id"
     error_title = "Invalid session ID format."
 
     @override
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.SESSION,
-            operation=ErrorOperation.READ,
-            error_detail=ErrorDetail.INVALID_PARAMETERS,
+    def entity_error_code(self) -> EntityErrorCode:
+        return EntityErrorCode(
+            SessionEntityType(), ActionOperationType.GET, ErrorDetail.INVALID_PARAMETERS
         )
 
 
-class SessionNotFound(ObjectNotFound):
+class SessionNotFound(EntityError, ObjectNotFound):
     object_name = "session"
 
     @override
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.SESSION,
-            operation=ErrorOperation.READ,
-            error_detail=ErrorDetail.NOT_FOUND,
-        )
+    def entity_error_code(self) -> EntityErrorCode:
+        return EntityErrorCode(SessionEntityType(), ActionOperationType.GET, ErrorDetail.NOT_FOUND)
 
 
-class MainKernelNotFound(ObjectNotFound):
+class MainKernelNotFound(FieldError, ObjectNotFound):
     object_name = "main kernel"
 
     @override
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.KERNEL,
-            operation=ErrorOperation.READ,
-            error_detail=ErrorDetail.NOT_FOUND,
-        )
+    def field_error_code(self) -> FieldErrorCode:
+        return FieldErrorCode(KernelFieldType(), ActionOperationType.GET, ErrorDetail.NOT_FOUND)
 
 
-class KernelNotFound(ObjectNotFound):
+class KernelNotFound(FieldError, ObjectNotFound):
     object_name = "kernel"
 
     @override
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.KERNEL,
-            operation=ErrorOperation.READ,
-            error_detail=ErrorDetail.NOT_FOUND,
-        )
+    def field_error_code(self) -> FieldErrorCode:
+        return FieldErrorCode(KernelFieldType(), ActionOperationType.GET, ErrorDetail.NOT_FOUND)
 
 
-class TooManySessionsMatched(BackendAIError, web.HTTPNotFound):
+class TooManySessionsMatched(EntityError, web.HTTPNotFound):
     error_type = "https://api.backend.ai/probs/too-many-sessions-matched"
     error_title = "Too many sessions matched."
 
     @override
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.SESSION,
-            operation=ErrorOperation.READ,
-            error_detail=ErrorDetail.CONFLICT,
-        )
+    def entity_error_code(self) -> EntityErrorCode:
+        return EntityErrorCode(SessionEntityType(), ActionOperationType.GET, ErrorDetail.CONFLICT)
 
     def __init__(
         self,
@@ -116,29 +99,23 @@ class TooManySessionsMatched(BackendAIError, web.HTTPNotFound):
         super().__init__(extra_msg, extra_data, **kwargs)
 
 
-class TooManyKernelsFound(BackendAIError, web.HTTPNotFound):
+class TooManyKernelsFound(FieldError, web.HTTPNotFound):
     error_type = "https://api.backend.ai/probs/too-many-kernels"
     error_title = "There are two or more matching kernels."
 
     @override
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.KERNEL,
-            operation=ErrorOperation.READ,
-            error_detail=ErrorDetail.CONFLICT,
-        )
+    def field_error_code(self) -> FieldErrorCode:
+        return FieldErrorCode(KernelFieldType(), ActionOperationType.GET, ErrorDetail.CONFLICT)
 
 
-class SessionAlreadyExists(BackendAIError, web.HTTPBadRequest):
+class SessionAlreadyExists(EntityError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/session-already-exists"
     error_title = "The session already exists but you requested not to reuse existing one."
 
     @override
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.SESSION,
-            operation=ErrorOperation.CREATE,
-            error_detail=ErrorDetail.ALREADY_EXISTS,
+    def entity_error_code(self) -> EntityErrorCode:
+        return EntityErrorCode(
+            SessionEntityType(), ActionOperationType.CREATE, ErrorDetail.ALREADY_EXISTS
         )
 
 
@@ -241,45 +218,6 @@ class BackendAgentError(BackendAIError):
         return (type(self), (self.agent_error_type, self.agent_details))
 
 
-class KernelCreationFailed(BackendAgentError, web.HTTPInternalServerError):
-    error_type = "https://api.backend.ai/probs/kernel-creation-failed"
-    error_title = "Kernel creation has failed."
-
-    @override
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.KERNEL,
-            operation=ErrorOperation.CREATE,
-            error_detail=ErrorDetail.INTERNAL_ERROR,
-        )
-
-
-class KernelDestructionFailed(BackendAgentError, web.HTTPInternalServerError):
-    error_type = "https://api.backend.ai/probs/kernel-destruction-failed"
-    error_title = "Kernel destruction has failed."
-
-    @override
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.KERNEL,
-            operation=ErrorOperation.SOFT_DELETE,
-            error_detail=ErrorDetail.INTERNAL_ERROR,
-        )
-
-
-class KernelRestartFailed(BackendAgentError, web.HTTPInternalServerError):
-    error_type = "https://api.backend.ai/probs/kernel-restart-failed"
-    error_title = "Kernel restart has failed."
-
-    @override
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.KERNEL,
-            operation=ErrorOperation.START,
-            error_detail=ErrorDetail.INTERNAL_ERROR,
-        )
-
-
 class KernelExecutionFailed(BackendAgentError, web.HTTPInternalServerError):
     error_type = "https://api.backend.ai/probs/kernel-execution-failed"
     error_title = "Executing user code in the kernel has failed."
@@ -306,55 +244,36 @@ class InvalidStreamMode(BackendAIError, web.HTTPBadRequest):
         )
 
 
-class InvalidSessionData(BackendAIError, web.HTTPInternalServerError):
+class InvalidSessionData(EntityError, web.HTTPInternalServerError):
     error_type = "https://api.backend.ai/probs/invalid-session-data"
     error_title = "Session data has an invalid type or format."
 
     @override
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.SESSION,
-            operation=ErrorOperation.READ,
-            error_detail=ErrorDetail.INVALID_DATA_FORMAT,
+    def entity_error_code(self) -> EntityErrorCode:
+        return EntityErrorCode(
+            SessionEntityType(), ActionOperationType.GET, ErrorDetail.INVALID_DATA_FORMAT
         )
 
 
-class InvalidKernelData(BackendAIError, web.HTTPInternalServerError):
-    error_type = "https://api.backend.ai/probs/invalid-kernel-data"
-    error_title = "Kernel data has an invalid type or format."
-
-    @override
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.KERNEL,
-            operation=ErrorOperation.READ,
-            error_detail=ErrorDetail.INVALID_DATA_FORMAT,
-        )
-
-
-class InvalidKernelConfig(BackendAIError, web.HTTPBadRequest):
+class InvalidKernelConfig(FieldError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/invalid-kernel-config"
     error_title = "Invalid kernel configuration."
 
     @override
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.KERNEL,
-            operation=ErrorOperation.CREATE,
-            error_detail=ErrorDetail.INVALID_PARAMETERS,
+    def field_error_code(self) -> FieldErrorCode:
+        return FieldErrorCode(
+            KernelFieldType(), ActionOperationType.CREATE, ErrorDetail.INVALID_PARAMETERS
         )
 
 
-class IncompleteSessionSpec(BackendAIError, web.HTTPBadRequest):
+class IncompleteSessionSpec(EntityError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/incomplete-session-spec"
     error_title = "Session spec has unresolved required fields."
 
     @override
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.SESSION,
-            operation=ErrorOperation.CREATE,
-            error_detail=ErrorDetail.INVALID_PARAMETERS,
+    def entity_error_code(self) -> EntityErrorCode:
+        return EntityErrorCode(
+            SessionEntityType(), ActionOperationType.CREATE, ErrorDetail.INVALID_PARAMETERS
         )
 
 
@@ -367,17 +286,4 @@ class IdlePolicyNotFound(ObjectNotFound):
             domain=ErrorDomain.SESSION,
             operation=ErrorOperation.READ,
             error_detail=ErrorDetail.NOT_FOUND,
-        )
-
-
-class InvalidKernelStatus(BackendAIError, web.HTTPConflict):
-    error_type = "https://api.backend.ai/probs/invalid-kernel-status"
-    error_title = "Invalid kernel status for this operation."
-
-    @override
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.KERNEL,
-            operation=ErrorOperation.UPDATE,
-            error_detail=ErrorDetail.CONFLICT,
         )

@@ -84,6 +84,13 @@ one place per domain.
 | `AgentNotAllocated` | a kernel with no agent assigned yet, reported under an `access` no `ActionOperationType` maps to |
 | `InvalidUserUpdateMode`, `InvalidPresetQuery` | a request's own mode value, or a query naming neither id nor name |
 | `NoCurrentTaskContext`, `DatabaseConnectionUnavailable`, `ConfigurationLoadFailed`, `DataTransformationFailed`, `DBOperationFailed` | the asyncio context, the connection, the configuration load or the database call itself |
+| `BackendAgentError`, `KernelExecutionFailed`, `InvalidStreamMode` | they report `access` or `execute`, which no `ActionOperationType` maps to |
+| `AgentConnectionUnavailable` | reaching an agent, under that same `access` |
+| `InvalidSessionId`, `InvalidKernelConfig`, `IncompleteSessionSpec` | they refuse a request before it reaches a row; `IncompleteSessionSpec` is one of three `BackendAISchema.build_validation_error` overrides, a hook declared to return `BackendAIError` |
+| the three `IdleCheckerAssignment*` errors | the assignment row's id is a `NewType`, with no `EntityType` |
+| `IdlePolicyNotFound` | no idle-policy row type, and it is raised for absent config values rather than a row |
+| `QuotaExceeded` | a resource-policy limit reached, not a condition of one row |
+| `ConflictingSessionRescheduleNotSupported` | an unimplemented cleanup policy, not a condition of an agent row |
 
 ## The legacy neighbor is a different kind
 
