@@ -63,16 +63,16 @@ class NotificationProcessingFailure(BackendAIError, web.HTTPInternalServerError)
         )
 
 
-class NotificationTemplateRenderingFailure(EntityError, web.HTTPBadRequest):
+class NotificationTemplateRenderingFailure(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/notification-template-rendering-failure"
     error_title = "Failed to render notification template."
 
     @override
-    def entity_error_code(self) -> EntityErrorCode:
-        return EntityErrorCode(
-            NotificationRuleEntityType(),
-            ActionOperationType.GET,
-            ErrorDetail.INVALID_PARAMETERS,
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.NOTIFICATION,
+            operation=ErrorOperation.GENERIC,
+            error_detail=ErrorDetail.INVALID_PARAMETERS,
         )
 
 
