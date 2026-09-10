@@ -1,7 +1,7 @@
 ---
 name: error-code-and-status-axes
 type: design-rationale
-description: The error-code triple and its no-underscore constraint, error code and HTTP status as independent axes, mixin-less base errors, GraphQL carrying only the code, absence of a central code registry, the separation from common/exception.py and the legacy manager/exceptions.py, the permission and share errors that stay on BackendAIError for want of a declared row type
+description: The error-code triple and its no-underscore constraint, error code and HTTP status as independent axes, mixin-less base errors, GraphQL carrying only the code, absence of a central code registry, the separation from common/exception.py and the legacy manager/exceptions.py, the errors that stay on BackendAIError for want of a declared row type
 scope: src/ai/backend/manager/errors
 keywords: [BackendAIError, ErrorCode, ErrorDomain, ErrorOperation, ErrorDetail, ObjectNotFound, EntityError, FieldError, problem+json, exceptions.py]
 sources:
@@ -9,8 +9,8 @@ sources:
   - src/ai/backend/manager/api/rest/middleware/exception.py
   - src/ai/backend/manager/api/gql/extensions/exception_handler.py
 generated:
-  by: claude-code/fable-5
-  at: 2026-08-10
+  by: claude-code/opus-5
+  at: 2026-09-10
 status: stable
 ---
 
@@ -44,7 +44,7 @@ one place per domain.
 - `ObjectNotFound` builds its title from `object_name`, and about 20 domain not-found errors inherit it setting only `object_name`.
 - When the meaning fits, extend an existing concrete error rather than deriving fresh from `BackendAIError`.
 
-## Some permission and share errors stay on `BackendAIError`
+## Some errors stay on `BackendAIError`
 
 These name no declared row type, so they keep an `ErrorDomain`. Declaring the
 type is what reopens the decision.
@@ -55,6 +55,11 @@ type is what reopens the decision.
 | `InvalidFieldPermission` | validates a requested field scope for both permission entries and entity shares, so it names no one row kind |
 | `VirtualEntityNotFound` | `data/entity/virtual_entity.py` declares an id alone, no `EntityType` |
 | `NotEnoughPermission` | an authorization denial about the caller, not about a row |
+| `DefinitionFileNotFound`, `DeploymentDefinitionFileReadError`, `ModelDefinitionNotFound` | a file inside a vfolder, which no row type declares |
+| `AutoScalingPolicyNotFound` | `deployment_auto_scaling_policies` has no `FieldType` |
+| `NoUpdatesToApply` | a modifier that changed nothing; the row is whichever one the caller was updating |
+| `AppServiceStartFailed` | an app started inside a session is no row, and `ActionOperationType` has no `start` |
+| `AppProxyConnectionError`, `AppProxyResponseError` | AppProxy is a system domain by the `AGENTS.md` table |
 
 ## The legacy neighbor is a different kind
 

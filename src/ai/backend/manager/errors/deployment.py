@@ -2,6 +2,13 @@ from typing import override
 
 from aiohttp import web
 
+from ai.backend.common.data.entity.deployment import DeploymentEntityType
+from ai.backend.common.data.entity.deployment_policy import DeploymentPolicyFieldType
+from ai.backend.common.data.entity.deployment_revision import DeploymentRevisionFieldType
+from ai.backend.common.data.entity.keypair import KeyPairFieldType
+from ai.backend.common.data.entity.replica import ReplicaFieldType
+from ai.backend.common.data.entity.session import SessionEntityType
+from ai.backend.common.data.entity.user import UserEntityType
 from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.exception import (
     BackendAIError,
@@ -10,6 +17,9 @@ from ai.backend.common.exception import (
     ErrorDomain,
     ErrorOperation,
 )
+from ai.backend.manager.actions.types import ActionOperationType
+from ai.backend.manager.errors.base.entity import EntityError, EntityErrorCode
+from ai.backend.manager.errors.base.field import FieldError, FieldErrorCode
 from ai.backend.manager.errors.common import ObjectNotFound
 
 
@@ -47,68 +57,56 @@ class DeploymentDefinitionFileReadError(BackendAIError, web.HTTPBadRequest):
         )
 
 
-class EndpointNotFound(ObjectNotFound):
+class EndpointNotFound(EntityError, ObjectNotFound):
     object_name = "endpoint"
 
     @override
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.MODEL_SERVICE,
-            operation=ErrorOperation.READ,
-            error_detail=ErrorDetail.NOT_FOUND,
+    def entity_error_code(self) -> EntityErrorCode:
+        return EntityErrorCode(
+            DeploymentEntityType(), ActionOperationType.GET, ErrorDetail.NOT_FOUND
         )
 
 
-class DeploymentRevisionNotFound(ObjectNotFound):
+class DeploymentRevisionNotFound(FieldError, ObjectNotFound):
     object_name = "deployment-revision"
 
     @override
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.MODEL_SERVICE,
-            operation=ErrorOperation.READ,
-            error_detail=ErrorDetail.NOT_FOUND,
+    def field_error_code(self) -> FieldErrorCode:
+        return FieldErrorCode(
+            DeploymentRevisionFieldType(), ActionOperationType.GET, ErrorDetail.NOT_FOUND
         )
 
 
-class UserNotFoundInDeployment(ObjectNotFound):
+class UserNotFoundInDeployment(EntityError, ObjectNotFound):
     object_name = "user in deployment"
 
     @override
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.MODEL_SERVICE,
-            operation=ErrorOperation.READ,
-            error_detail=ErrorDetail.NOT_FOUND,
-        )
+    def entity_error_code(self) -> EntityErrorCode:
+        return EntityErrorCode(UserEntityType(), ActionOperationType.GET, ErrorDetail.NOT_FOUND)
 
 
-class NoActiveKeypairForDeployment(ObjectNotFound):
+class NoActiveKeypairForDeployment(FieldError, ObjectNotFound):
     object_name = "active keypair for deployment user"
 
     @override
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.MODEL_DEPLOYMENT,
-            operation=ErrorOperation.READ,
-            error_detail=ErrorDetail.NOT_FOUND,
-        )
+    def field_error_code(self) -> FieldErrorCode:
+        return FieldErrorCode(KeyPairFieldType(), ActionOperationType.GET, ErrorDetail.NOT_FOUND)
 
 
-class DeploymentHasNoTargetRevision(BackendAIError, web.HTTPBadRequest):
+class DeploymentHasNoTargetRevision(FieldError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/deployment-has-no-target-revision"
     error_title = "Deployment has no target revision."
 
     @override
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.MODEL_SERVICE,
-            operation=ErrorOperation.READ,
-            error_detail=ErrorDetail.INVALID_PARAMETERS,
+    def field_error_code(self) -> FieldErrorCode:
+        return FieldErrorCode(
+            DeploymentRevisionFieldType(),
+            ActionOperationType.GET,
+            ErrorDetail.INVALID_PARAMETERS,
         )
 
 
-class RevisionMissingModelVFolder(BackendAIError, web.HTTPBadRequest):
+class RevisionMissingModelVFolder(FieldError, web.HTTPBadRequest):
     """A revision's model vfolder reference is null.
 
     Raised when the draft / session pipeline reads a
@@ -124,15 +122,15 @@ class RevisionMissingModelVFolder(BackendAIError, web.HTTPBadRequest):
     error_title = "Deployment revision has no model vfolder."
 
     @override
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.MODEL_SERVICE,
-            operation=ErrorOperation.READ,
-            error_detail=ErrorDetail.INVALID_PARAMETERS,
+    def field_error_code(self) -> FieldErrorCode:
+        return FieldErrorCode(
+            DeploymentRevisionFieldType(),
+            ActionOperationType.GET,
+            ErrorDetail.INVALID_PARAMETERS,
         )
 
 
-class RevisionNotDeployable(BackendAIError, web.HTTPConflict):
+class RevisionNotDeployable(FieldError, web.HTTPConflict):
     """A revision references resources that no longer exist.
 
     Raised when a ``DeploymentRevisionRow`` is converted to a
@@ -147,41 +145,37 @@ class RevisionNotDeployable(BackendAIError, web.HTTPConflict):
     error_title = "Deployment revision references deleted resources."
 
     @override
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.MODEL_SERVICE,
-            operation=ErrorOperation.READ,
-            error_detail=ErrorDetail.INVALID_PARAMETERS,
+    def field_error_code(self) -> FieldErrorCode:
+        return FieldErrorCode(
+            DeploymentRevisionFieldType(),
+            ActionOperationType.GET,
+            ErrorDetail.INVALID_PARAMETERS,
         )
 
 
-class InvalidDeploymentStrategy(BackendAIError, web.HTTPBadRequest):
+class InvalidDeploymentStrategy(FieldError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/invalid-deployment-strategy"
     error_title = "Unknown or invalid deployment strategy."
 
     @override
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.MODEL_SERVICE,
-            operation=ErrorOperation.READ,
-            error_detail=ErrorDetail.INVALID_PARAMETERS,
+    def field_error_code(self) -> FieldErrorCode:
+        return FieldErrorCode(
+            DeploymentPolicyFieldType(),
+            ActionOperationType.GET,
+            ErrorDetail.INVALID_PARAMETERS,
         )
 
 
-class RouteSessionNotFound(BackendAIError):
+class RouteSessionNotFound(EntityError):
     error_type = "https://api.backend.ai/probs/route-session-not-found"
     error_title = "No session associated with route."
 
     @override
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.MODEL_SERVICE,
-            operation=ErrorOperation.READ,
-            error_detail=ErrorDetail.NOT_FOUND,
-        )
+    def entity_error_code(self) -> EntityErrorCode:
+        return EntityErrorCode(SessionEntityType(), ActionOperationType.GET, ErrorDetail.NOT_FOUND)
 
 
-class RouteSessionTerminated(BackendAIError):
+class RouteSessionTerminated(EntityError):
     error_type = "https://api.backend.ai/probs/route-session-terminated"
     error_title = "Route session is in terminal state."
 
@@ -190,35 +184,31 @@ class RouteSessionTerminated(BackendAIError):
         self.session_status = session_status
 
     @override
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.MODEL_SERVICE,
-            operation=ErrorOperation.READ,
-            error_detail=ErrorDetail.INVALID_PARAMETERS,
+    def entity_error_code(self) -> EntityErrorCode:
+        return EntityErrorCode(
+            SessionEntityType(), ActionOperationType.GET, ErrorDetail.INVALID_PARAMETERS
         )
 
 
-class RouteUnhealthy(BackendAIError):
+class RouteUnhealthy(FieldError):
     error_type = "https://api.backend.ai/probs/route-unhealthy"
     error_title = "Route health check failed."
 
     @override
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.MODEL_SERVICE,
-            operation=ErrorOperation.READ,
-            error_detail=ErrorDetail.INVALID_PARAMETERS,
+    def field_error_code(self) -> FieldErrorCode:
+        return FieldErrorCode(
+            ReplicaFieldType(), ActionOperationType.GET, ErrorDetail.INVALID_PARAMETERS
         )
 
 
-class IncompleteRevisionData(BackendAIError, web.HTTPInternalServerError):
+class IncompleteRevisionData(FieldError, web.HTTPInternalServerError):
     error_type = "https://api.backend.ai/probs/incomplete-revision-data"
     error_title = "Revision data is missing required fields."
 
     @override
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.MODEL_SERVICE,
-            operation=ErrorOperation.READ,
-            error_detail=ErrorDetail.INVALID_PARAMETERS,
+    def field_error_code(self) -> FieldErrorCode:
+        return FieldErrorCode(
+            DeploymentRevisionFieldType(),
+            ActionOperationType.GET,
+            ErrorDetail.INVALID_PARAMETERS,
         )
