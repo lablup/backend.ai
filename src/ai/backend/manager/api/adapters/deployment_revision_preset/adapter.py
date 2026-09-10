@@ -301,16 +301,10 @@ class DeploymentRevisionPresetAdapter(BaseAdapter):
         if isinstance(input.model_definition, UpdatePresetModelDefinitionInput):
             current = await self.get(input.id)
 
-        slot_creators: list[PresetResourceSlotCreator] | None = (
-            OptionalState.from_unset(input.resource_slots)
-            .map(
-                lambda slots: [
-                    PresetResourceSlotCreator(entry=entry)
-                    for entry in self._convert_resource_slots_input(slots)
-                ]
-            )
-            .optional_value()
-        )
+        slot_creators: list[PresetResourceSlotCreator] | None = None
+        if isinstance(input.resource_slots, list):
+            resource_slots = self._convert_resource_slots_input(input.resource_slots)
+            slot_creators = [PresetResourceSlotCreator(entry=entry) for entry in resource_slots]
         model_def_state: TriState[PresetModelDefinition] = self._convert_model_definition_state(
             input.model_definition,
             current.model_definition if current is not None else None,
