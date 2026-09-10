@@ -1,5 +1,6 @@
 """RBAC GQL types package."""
 
+from .entity_node import EntityNodeGQL
 from .permission import (
     BulkAddRolePermissionFailureInfoGQL,
     BulkAddRolePermissionsInputGQL,
@@ -136,6 +137,7 @@ __all__ = [
     # Scope-entity combination
     "ScopeEntityCombinationGQL",
     # Entity-operation combination
+    "EntityNodeGQL",
     "EntityOperationCombinationGQL",
     "OperationInfoGQL",
     # Scope-entity-operation combination (permission matrix)

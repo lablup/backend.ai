@@ -2057,6 +2057,11 @@ type AuditLogV2 implements Node
   clientIp: String
 
   """
+  Added in 26.9.0. The entity the logged operation acted on. Null when the log names no entity, or when the recorded id does not name one that still exists.
+  """
+  entity: EntityNode
+
+  """
   The user who triggered this audit log entry, resolved from triggered_by UUID.
   """
   user: UserV2
@@ -7734,6 +7739,9 @@ type EntityLabel implements Node
 
   """When the label's value was last replaced."""
   updatedAt: DateTime!
+
+  """The labeled entity."""
+  entity: EntityNode
 }
 
 """Added in 26.9.0. Paginated connection for label records."""
@@ -7803,6 +7811,37 @@ enum EntityLabelOrderField
   VALUE @join__enumValue(graph: STRAWBERRY)
   CREATED_AT @join__enumValue(graph: STRAWBERRY)
 }
+
+union EntityNode
+  @join__type(graph: STRAWBERRY)
+  @join__unionMember(graph: STRAWBERRY, member: "UserV2")
+  @join__unionMember(graph: STRAWBERRY, member: "ProjectV2")
+  @join__unionMember(graph: STRAWBERRY, member: "DomainV2")
+  @join__unionMember(graph: STRAWBERRY, member: "VirtualFolderNode")
+  @join__unionMember(graph: STRAWBERRY, member: "ImageV2")
+  @join__unionMember(graph: STRAWBERRY, member: "ComputeSessionNode")
+  @join__unionMember(graph: STRAWBERRY, member: "SessionV2")
+  @join__unionMember(graph: STRAWBERRY, member: "Artifact")
+  @join__unionMember(graph: STRAWBERRY, member: "ArtifactRegistry")
+  @join__unionMember(graph: STRAWBERRY, member: "NotificationChannel")
+  @join__unionMember(graph: STRAWBERRY, member: "NotificationRule")
+  @join__unionMember(graph: STRAWBERRY, member: "ModelDeployment")
+  @join__unionMember(graph: STRAWBERRY, member: "ResourceGroup")
+  @join__unionMember(graph: STRAWBERRY, member: "ContainerRegistryV2")
+  @join__unionMember(graph: STRAWBERRY, member: "ArtifactRevision")
+  @join__unionMember(graph: STRAWBERRY, member: "Role")
+  @join__unionMember(graph: STRAWBERRY, member: "AgentV2")
+  @join__unionMember(graph: STRAWBERRY, member: "AppConfigAllowList")
+  @join__unionMember(graph: STRAWBERRY, member: "AppConfigDefinition")
+  @join__unionMember(graph: STRAWBERRY, member: "AppConfigFragment")
+  @join__unionMember(graph: STRAWBERRY, member: "IdleChecker")
+  @join__unionMember(graph: STRAWBERRY, member: "ObjectStorage")
+  @join__unionMember(graph: STRAWBERRY, member: "RuntimeVariant")
+  @join__unionMember(graph: STRAWBERRY, member: "RuntimeVariantPreset")
+  @join__unionMember(graph: STRAWBERRY, member: "StorageNamespace")
+  @join__unionMember(graph: STRAWBERRY, member: "VFolder")
+  @join__unionMember(graph: STRAWBERRY, member: "VFSStorage")
+ = UserV2 | ProjectV2 | DomainV2 | VirtualFolderNode | ImageV2 | ComputeSessionNode | SessionV2 | Artifact | ArtifactRegistry | NotificationChannel | NotificationRule | ModelDeployment | ResourceGroup | ContainerRegistryV2 | ArtifactRevision | Role | AgentV2 | AppConfigAllowList | AppConfigDefinition | AppConfigFragment | IdleChecker | ObjectStorage | RuntimeVariant | RuntimeVariantPreset | StorageNamespace | VFolder | VFSStorage
 
 """Added in 26.4.2. Valid entity-operation combination for RBAC actions."""
 type EntityOperationCombination
@@ -18833,6 +18872,9 @@ type Role implements Node
 
   """Added in 26.9.0. ID of the scope the role belongs to."""
   scopeId: UUID!
+
+  """Added in 26.9.0. The scope the role belongs to."""
+  scope: EntityNode
 
   """Added in 26.3.0. Permissions associated with this role."""
   permissions(filter: PermissionFilter = null, orderBy: [PermissionOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): PermissionConnection

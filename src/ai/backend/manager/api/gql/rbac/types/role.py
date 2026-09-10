@@ -14,6 +14,7 @@ from strawberry import UNSET, Info
 from strawberry.relay import Connection, Edge, NodeID
 
 from ai.backend.common.data.entity.role import RoleID
+from ai.backend.common.data.entity.types import EntityType, RuntimeEntityID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.dto.manager.v2.rbac.request import (
     AdminSearchPermissionsGQLInput,
@@ -115,6 +116,7 @@ from ai.backend.manager.api.gql.rbac.types.scope import (
 from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy, StrawberryGQLContext
 
 if TYPE_CHECKING:
+    from ai.backend.manager.api.gql.rbac.types.entity_node import EntityNodeGQL
     from ai.backend.manager.api.gql.rbac.types.permission import (
         PermissionConnection,
         PermissionFilter,
@@ -179,6 +181,26 @@ class RoleGQL(PydanticNodeMixin[Any]):
             description="ID of the scope the role belongs to.",
         )
     )
+
+    @gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="The scope the role belongs to.",
+        )
+    )  # type: ignore[misc]
+    async def scope(
+        self,
+        info: Info[StrawberryGQLContext],
+    ) -> (
+        Annotated[
+            EntityNodeGQL,
+            strawberry.lazy("ai.backend.manager.api.gql.rbac.types.entity_node"),
+        ]
+        | None
+    ):
+        return await info.context.data_loaders.entity_node_loader.load(
+            RuntimeEntityID(EntityType(self.scope_type), self.scope_id)
+        )
 
     @classmethod
     @override

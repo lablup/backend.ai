@@ -34,6 +34,7 @@ from .types import (
     CreatePermissionInput,
     CreateRoleInput,
     EntityActionInfoGQL,
+    EntityNodeGQL,
     EntityOperationCombinationGQL,
     OperationInfoGQL,
     OperationTypeGQL,
@@ -70,6 +71,7 @@ __all__ = (
     "EntityOperationCombinationGQL",
     "OperationInfoGQL",
     "EntityActionInfoGQL",
+    "EntityNodeGQL",
     "ScopeEntityOperationCombinationGQL",
     # Filters
     "RoleFilter",

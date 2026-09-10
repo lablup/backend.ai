@@ -3,11 +3,14 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any
+from typing import TYPE_CHECKING, Annotated, Any
 from uuid import UUID
 
+import strawberry
+from strawberry import Info
 from strawberry.relay import Connection, Edge, NodeID
 
+from ai.backend.common.data.entity.types import EntityType, RuntimeEntityID
 from ai.backend.common.dto.manager.v2.entity_label.response import EntityLabelNode
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.decorators import (
@@ -17,6 +20,10 @@ from ai.backend.manager.api.gql.decorators import (
     gql_node_type,
 )
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
+from ai.backend.manager.api.gql.types import StrawberryGQLContext
+
+if TYPE_CHECKING:
+    from ai.backend.manager.api.gql.rbac.types.entity_node import EntityNodeGQL
 
 __all__ = (
     "EntityLabelConnection",
@@ -40,6 +47,22 @@ class EntityLabelGQL(PydanticNodeMixin[EntityLabelNode]):
     value: str = gql_field(description="Label value.")
     created_at: datetime = gql_field(description="When the label was first put on the entity.")
     updated_at: datetime = gql_field(description="When the label's value was last replaced.")
+
+    @gql_field(description="The labeled entity.")  # type: ignore[misc]
+    async def entity(
+        self,
+        *,
+        info: Info[StrawberryGQLContext],
+    ) -> (
+        Annotated[
+            EntityNodeGQL,
+            strawberry.lazy("ai.backend.manager.api.gql.rbac.types.entity_node"),
+        ]
+        | None
+    ):
+        return await info.context.data_loaders.entity_node_loader.load(
+            RuntimeEntityID(EntityType(self.entity_type), self.entity_id)
+        )
 
 
 EntityLabelEdge = Edge[EntityLabelGQL]
