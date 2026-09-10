@@ -1942,7 +1942,6 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
             ),
         )
         pickle_loader = pickle_loader_writer_creator.create_loader()
-        pickle_writer = pickle_loader_writer_creator.create_writer()
         container_loader_writer_creator = ContainerBasedLoaderWriterCreator(
             ContainerBasedKernelRegistryCreatorArgs(
                 scratch_root=local_config.container.scratch_root,
@@ -1951,13 +1950,17 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
         )
         container_loader = container_loader_writer_creator.create_loader()
         container_writer = container_loader_writer_creator.create_writer()
+        # Container-based only: the pickle is no longer a second record of what is running here.
+        # It is read once by the adapter below, to carry a snapshot an older version left behind
+        # into the per-kernel scratch records.
         self._kernel_recovery = DockerKernelRegistryRecovery(
             loader=container_loader,
-            writers=[pickle_writer, container_writer],
+            writers=[container_writer],
         )
         self._kernel_recovery_adapter = KernelRecoveryDataAdapter(
             pickle_loader,
             [KernelRecoveryDataAdapterTarget(container_loader, container_writer)],
+            self._live_kernel_ids,
         )
 
     @override
@@ -2274,6 +2277,10 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
         if self.docker is not None:
             await self.docker.close()
         await self._session_network.close()
+
+    async def _live_kernel_ids(self) -> frozenset[KernelId]:
+        """The kernels this runtime actually has a container for, as the adapter's ground truth."""
+        return frozenset(kernel_id for kernel_id, _ in await self.enumerate_containers())
 
     @override
     async def _load_kernel_registry_from_recovery(self) -> MutableMapping[KernelId, AbstractKernel]:
