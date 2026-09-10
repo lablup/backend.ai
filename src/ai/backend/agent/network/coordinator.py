@@ -51,7 +51,8 @@ _WATCH_RETRY_BACKOFF_MAX = 30.0
 # How often each session re-converges from etcd regardless of the watch. The watch cannot see a
 # change published in the window between a reconcile's read and its own subscribe, and if nothing
 # else in the subtree ever changes, no event will ever correct it — so convergence cannot rest on
-# the watch alone. Two etcd reads per session per tick; device ops only on an actual difference.
+# the watch alone. Two etcd reads per session per tick -- the endpoint and member tables, read once
+# and shared by all three passes; device ops only on an actual difference.
 _RECONCILE_INTERVAL = 15.0
 
 # How many times a join re-reads a member record that changed under its compare-and-swap before it
@@ -238,8 +239,8 @@ class SessionNetworkCoordinator:
         late worker publishes its member and endpoint keys, and nothing changes afterwards. It would
         wait forever at rendezvous over a gap of milliseconds.
 
-        A periodic diff makes that gap self-healing instead of fatal. It is cheap: two etcd reads,
-        and a device op only when something actually differs.
+        A periodic diff makes that gap self-healing instead of fatal. It is cheap: two etcd reads
+        for the whole tick, shared by every pass, and a device op only when something differs.
         """
         while True:
             await asyncio.sleep(_RECONCILE_INTERVAL)
@@ -321,14 +322,29 @@ class SessionNetworkCoordinator:
         Endpoint removals close every known unicast path first. Peer removal may then close the
         broadcast path and withdraw XFRM. A second endpoint pass installs additions after their
         peer's XFRM exists.
+
+        The three passes read the tables ONCE, between them. Each used to read its own, which cost
+        five prefix reads per tick where the comments claimed two -- and, the part that is not
+        about cost, made the ordering above reason about three different points in time. The
+        second endpoint pass is here to apply what the first deferred until its peer's XFRM
+        existed, not to see newer data; a change that lands mid-pass is the next tick's business,
+        which is what the periodic reconcile and the watch are both for.
         """
         async with self._reconcile_locks.setdefault(session_id, asyncio.Lock()):
-            blocked_vteps = await self.reconcile_endpoints(session_id)
-            await self.reconcile_peers(session_id, blocked_vteps=blocked_vteps)
-            await self.reconcile_endpoints(session_id)
+            endpoints = await self._read_endpoints(session_id)
+            members = await self._read_members(session_id)
+            blocked_vteps = await self.reconcile_endpoints(
+                session_id, endpoints=endpoints, members=members
+            )
+            await self.reconcile_peers(session_id, blocked_vteps=blocked_vteps, members=members)
+            await self.reconcile_endpoints(session_id, endpoints=endpoints, members=members)
 
     async def reconcile_peers(
-        self, session_id: str, *, blocked_vteps: set[str] | None = None
+        self,
+        session_id: str,
+        *,
+        blocked_vteps: set[str] | None = None,
+        members: Mapping[str, Member] | None = None,
     ) -> None:
         """Diff the published members against what has been applied and drive the
         backend's add_peer/del_peer accordingly. Idempotent; safe to call repeatedly.
@@ -338,7 +354,8 @@ class SessionNetworkCoordinator:
         reconcile that follows -- still get applied. One unroutable member used to abort the whole
         pass, leaving this node with no FDB/ARP for anybody.
         """
-        members = await self._read_members(session_id)
+        if members is None:
+            members = await self._read_members(session_id)
         applied = self._applied.setdefault(session_id, {})
         current = {aid: m for aid, m in members.items() if aid != self._agent_id}
         blocked_vteps = blocked_vteps or set()
@@ -400,13 +417,24 @@ class SessionNetworkCoordinator:
             return False
         return True
 
-    async def reconcile_endpoints(self, session_id: str) -> set[str]:
+    async def reconcile_endpoints(
+        self,
+        session_id: str,
+        *,
+        endpoints: Mapping[str, EndpointAddr] | None = None,
+        members: Mapping[str, Member] | None = None,
+    ) -> set[str]:
         """Program FDB + ARP for every remote endpoint in the ``endpoints/`` table
         (proactive; no BUM flood), and remove entries for departed endpoints. Skips this
         node's own endpoints, and skips remotes whose VTEP is not yet published (a later
-        watch tick retries). Idempotent; safe to call repeatedly."""
-        endpoints = await self._read_endpoints(session_id)
-        members = await self._read_members(session_id)
+        watch tick retries). Idempotent; safe to call repeatedly.
+
+        ``endpoints``/``members`` let a caller driving several passes read the tables once and
+        have them all judge the same state; omitted, this reads its own."""
+        if endpoints is None:
+            endpoints = await self._read_endpoints(session_id)
+        if members is None:
+            members = await self._read_members(session_id)
         applied = self._applied_endpoints.setdefault(session_id, {})
         blocked_vteps: set[str] = set()
         # Name map first, from the FULL table (own + remote): a resolver must answer every peer in
