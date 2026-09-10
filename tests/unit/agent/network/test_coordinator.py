@@ -15,6 +15,7 @@ from ai.backend.common.network.keys import (
     member_key,
     members_prefix,
     session_meta_key,
+    session_prefix,
 )
 from ai.backend.common.network.types import (
     SESSION_META_GENERATION,
@@ -181,9 +182,11 @@ class _ScriptedWatchEtcd(FakeEtcd):
         super().__init__()
         self._behaviors = behaviors
         self.watch_calls = 0
+        self.watched: list[str] = []
 
     @override
     async def watch_prefix(self, prefix: str, **kwargs: Any) -> AsyncIterator[None]:
+        self.watched.append(prefix)
         i = self.watch_calls
         self.watch_calls += 1
         behavior = self._behaviors[i] if i < len(self._behaviors) else "end"
@@ -209,6 +212,14 @@ class RecordingBackend:
         #: membership changed -- an `iptables -F` is not a membership diff.
         self.security_checks: list[str] = []
         self.security_peers: list[list[str]] = []
+        #: What `cluster_names` answers. None is a backend with no view of the session's
+        #: endpoints -- the default, and what an in-process (no privnet) plugin is.
+        self.cluster_name_view: dict[str, str] | None = None
+        self.name_queries: list[str] = []
+
+    async def cluster_names(self, session_id: str) -> Mapping[str, str] | None:
+        self.name_queries.append(session_id)
+        return self.cluster_name_view
 
     async def ensure_session_security(self, session_id: str, peers: Sequence[Member]) -> None:
         self.security_checks.append(session_id)
@@ -1197,6 +1208,93 @@ class TestKeys:
         assert members_prefix("s1") == "network/session/s1/members/"
         assert member_key("s1", "a2") == "network/session/s1/members/a2"
         assert endpoints_prefix("s1") == "network/session/s1/endpoints/"
+
+
+class TestABackendThatCarriesItsOwnEndpoints:
+    """The privnets of a session's nodes announce endpoints to each other, so on such a backend
+    the manager's `endpoints/` table is neither this node's source for them nor its source for the
+    session's names -- and every write into it was waking a watch on every node of the session,
+    each wake re-reading both tables for an event about a table nothing would then read."""
+
+    async def _started(self, view: dict[str, str] | None) -> tuple[FakeEtcd, RecordingBackend, Any]:
+        etcd = FakeEtcd()
+        etcd.seed_session_meta()
+        backend = RecordingBackend()
+        backend.cluster_name_view = view
+        coord = _coordinator(etcd, backend)
+        await coord.start(_META, _SELF)
+        return etcd, backend, coord
+
+    async def test_the_endpoint_table_is_not_read(self) -> None:
+        etcd, _backend, coord = await self._started({"sub1": "10.128.5.9"})
+        reads: list[str] = []
+        original = etcd.get_prefix
+
+        async def counting(prefix: str, **kwargs: Any) -> dict[str, str]:
+            reads.append(prefix)
+            return await original(prefix, **kwargs)
+
+        etcd.get_prefix = counting  # type: ignore[method-assign]
+        await coord._reconcile_all("s1")
+
+        assert reads == [members_prefix("s1")]
+
+    async def test_the_names_come_from_the_backend(self) -> None:
+        _etcd, _backend, coord = await self._started({"sub1": "10.128.5.9"})
+        await coord._reconcile_all("s1")
+
+        assert coord.resolve_cluster_name("s1", "sub1") == "10.128.5.9"
+
+    async def test_it_does_not_program_endpoints_itself(self) -> None:
+        """The backend announcing them is the backend programming them. A second, table-driven
+        pass here would be a duplicate at best and, against a table this node no longer reads for
+        anything else, a stale one."""
+        etcd, backend, coord = await self._started({"sub1": "10.128.5.9"})
+        etcd.seed_member(Member(agent_id="a2", host_ip="10.0.0.2", vtep_ip="10.0.0.2"))
+        etcd.seed_endpoint("c2", "10.128.5.9", "02:42:0a:80:05:09", "a2", cluster_hostname="sub1")
+
+        await coord._reconcile_all("s1")
+
+        assert backend.endpoints_added == []
+        assert backend.added == ["a2"], "membership is still the manager's, and still applied"
+
+    async def test_a_backend_with_no_view_still_reads_both(self) -> None:
+        """The in-process (no privnet) path has no exchange between nodes, so nothing else would
+        ever tell it about a peer's endpoint."""
+        etcd, _backend, coord = await self._started(None)
+        reads: list[str] = []
+        original = etcd.get_prefix
+
+        async def counting(prefix: str, **kwargs: Any) -> dict[str, str]:
+            reads.append(prefix)
+            return await original(prefix, **kwargs)
+
+        etcd.get_prefix = counting  # type: ignore[method-assign]
+        await coord._reconcile_all("s1")
+
+        assert sorted(reads) == sorted({endpoints_prefix("s1"), members_prefix("s1")})
+
+    async def test_the_watch_narrows_to_membership(self) -> None:
+        etcd = _ScriptedWatchEtcd(["end"])
+        etcd.seed_session_meta()
+        backend = RecordingBackend()
+        backend.cluster_name_view = {}
+        coord = _coordinator(etcd, backend)
+        await coord.start(_META, _SELF)
+        await asyncio.sleep(0)
+        await coord.stop("s1")
+
+        assert etcd.watched == [members_prefix("s1")]
+
+    async def test_a_backend_with_no_view_watches_the_whole_session(self) -> None:
+        etcd = _ScriptedWatchEtcd(["end"])
+        etcd.seed_session_meta()
+        coord = _coordinator(etcd, RecordingBackend())
+        await coord.start(_META, _SELF)
+        await asyncio.sleep(0)
+        await coord.stop("s1")
+
+        assert etcd.watched == [session_prefix("s1")]
 
 
 class TestOneTickReadsTheTablesOnce:

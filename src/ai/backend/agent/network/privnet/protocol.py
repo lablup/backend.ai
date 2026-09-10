@@ -73,6 +73,11 @@ class PrivNetOp(enum.StrEnum):
     # assigned (to write /etc/hosts for a single-node cluster), it does not declare one — the
     # inverse of the trust concern the rest of this protocol guards against.
     LOCAL_SUBNET = "local_subnet"
+    # A session's `{cluster_hostname: ip}`, as this privnet knows it: its own attaches plus what
+    # the other nodes' privnets announced. Read-only, and the same inverse direction as
+    # LOCAL_SUBNET -- the agent asks what the daemon already learned. It is what lets the agent's
+    # resolver answer the session's names without reading another node's records anywhere.
+    CLUSTER_NAMES = "cluster_names"
     # Read-only: what this privnet knows it has NOT been able to recover. The agent's readiness
     # probe asks, because a node whose privnet cannot manage a session that is running on it looks
     # healthy from every other angle -- and that session's VNI can be handed out underneath it.
@@ -329,6 +334,9 @@ class PrivNetResponse:
     # RECOVERY_STATUS: {what could not be recovered: why}. Empty means this privnet is on top of
     # everything it owns.
     problems: dict[str, str] | None = None
+    # CLUSTER_NAMES: {cluster_hostname: ip} for one session. An empty map is an answer (a session
+    # whose kernels are all unnamed); None is "this daemon does not answer that".
+    cluster_names: dict[str, str] | None = None
     #: The protocol the answering daemon speaks. Absent from a daemon that predates it.
     version: int | None = None
     error: str | None = None
@@ -345,6 +353,8 @@ class PrivNetResponse:
             payload["subnet"] = self.subnet
         if self.problems is not None:
             payload["problems"] = self.problems
+        if self.cluster_names is not None:
+            payload["cluster_names"] = self.cluster_names
         if self.version is not None:
             payload["version"] = self.version
         if self.error is not None:
@@ -376,6 +386,12 @@ class PrivNetResponse:
             and all(isinstance(k, str) and isinstance(v, str) for k, v in problems.items())
         ):
             raise ProtocolError("problems must be an object of strings")
+        cluster_names = data.get("cluster_names")
+        if cluster_names is not None and not (
+            isinstance(cluster_names, dict)
+            and all(isinstance(k, str) and isinstance(v, str) for k, v in cluster_names.items())
+        ):
+            raise ProtocolError("cluster_names must be an object of strings")
         version = data.get("version")
         if version is not None and not isinstance(version, int):
             raise ProtocolError("version must be an integer or null")
@@ -387,6 +403,7 @@ class PrivNetResponse:
             forwards=_decode_forwards(data.get("forwards")),
             subnet=subnet,
             problems=problems,
+            cluster_names=cluster_names,
             version=version,
             error=error,
         )

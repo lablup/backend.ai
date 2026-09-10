@@ -281,6 +281,19 @@ class PeerEndpoints:
         removed = {e for e in removed if e.container_id not in still_held}
         return added, removed
 
+    def forget_endpoints(self, session_id: str, vtep: str, container_ids: Iterable[str]) -> None:
+        """Drop specific endpoints of one peer from what is held, without touching the rest.
+
+        For an endpoint the caller could not program. Held, it looks applied: the sender's next
+        announcement carries the same whole state, diffs to nothing, and the endpoint is never
+        programmed again -- a peer's kernel unreachable for the life of the session over one
+        failed `ip` call. Dropped, the very next announcement re-adds it.
+        """
+        wanted = set(container_ids)
+        for key in [k for k in self._held if k[0] == session_id and k[1] == vtep]:
+            for container_id in wanted:
+                self._held[key].pop(container_id, None)
+
     def forget_peer(self, session_id: str, vtep: str) -> set[Endpoint]:
         """Drop a peer the session no longer names, returning what it had been holding.
 
