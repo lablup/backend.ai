@@ -3,6 +3,7 @@ from typing import override
 import strawberry
 from graphql import GraphQLError
 from graphql.pyutils.undefined import Undefined as GraphQLUndefined
+from strawberry.extensions import MaxAliasesLimiter, QueryDepthLimiter
 from strawberry.federation import Schema
 from strawberry.schema.config import StrawberryConfig
 from strawberry.types import ExecutionContext
@@ -912,6 +913,11 @@ class Subscription:
     background_task_events = background_task_events
 
 
+# Per-request cost ceilings applied to every schema below.
+MAX_QUERY_DEPTH = 20
+MAX_ALIAS_COUNT = 20
+
+
 class CustomizedSchema(Schema):
     @override
     def process_errors(
@@ -951,6 +957,8 @@ schema = CustomizedSchema(
         GQLLoggingExtension,
         GQLMetricExtension,
         GQLValidationExtension,
+        QueryDepthLimiter(max_depth=MAX_QUERY_DEPTH),
+        MaxAliasesLimiter(max_alias_count=MAX_ALIAS_COUNT),
         GQLExceptionHandlerExtension,
     ],
 )
