@@ -196,6 +196,10 @@ class _SessionEntry:
     # host port may be DNAT'd to; never taken from the agent.
     local_ips: dict[str, str]
 
+    #: container_id -> the kernel's in-cluster hostname, as the agent named it at attach.
+    #: Announced with the address so a peer can resolve the name from the node that holds it.
+    hostnames: dict[str, str]
+
     #: The configuration digest this session's VNI is bound to node-wide, so the binding is
     #: released under the same name it was made under.
     digest: str
@@ -222,6 +226,7 @@ class _SessionEntry:
         self.built = False
         self.attached = {}
         self.local_ips = {}
+        self.hostnames = {}
         self.peer_vteps = set()
 
 
@@ -1261,6 +1266,8 @@ class PrivNetServer:
                 continue
             plan = await self._derive_plan(backend, meta, record.overlay_ip)
             entry.attached[container_id] = plan
+            if record.cluster_hostname is not None:
+                entry.hostnames[container_id] = record.cluster_hostname
             if (local_ip := await self._local_ip_of(plan, container_id)) is not None:
                 entry.local_ips[container_id] = local_ip
         self._sessions[session_id] = entry
@@ -1604,7 +1611,11 @@ class PrivNetServer:
                     return PrivNetResponse(ok=True)
                 case PrivNetOp.ATTACH_CONTAINER:
                     assigned = await self._attach(
-                        session_id, req.container_id, req.ip, req.local_ip
+                        session_id,
+                        req.container_id,
+                        req.ip,
+                        req.local_ip,
+                        req.cluster_hostname,
                     )
                     return PrivNetResponse(ok=True, assigned=assigned)
                 case PrivNetOp.DETACH_CONTAINER:
@@ -2141,10 +2152,14 @@ class PrivNetServer:
         container_id: str | None,
         overlay_ip: str | None,
         local_ip: str | None = None,
+        cluster_hostname: str | None = None,
     ) -> dict[str, str]:
         if container_id is None:
             raise policy.PolicyViolation("attach requires container_id")
         container_id = policy.validate_container_id(container_id)
+        # Bounded to a DNS label because that is all it is ever used as: announced to peers and
+        # answered by the session resolver. It reaches no command line.
+        cluster_hostname = policy.validate_cluster_hostname(cluster_hostname)
         entry = self._sessions.get(session_id)
         if entry is None:
             raise PrivNetError("attach before setup")
@@ -2193,12 +2208,17 @@ class PrivNetServer:
             # Journalled before the attach, so a privnet that dies mid-attach still knows on its next
             # boot that this container may hold a veth and an address to give back.
             await self._journal.record_attachment(
-                container_id, session_id, kernel_config.get("cluster_network_ip")
+                container_id,
+                session_id,
+                kernel_config.get("cluster_network_ip"),
+                cluster_hostname,
             )
             assigned = await self._attacher.attach(
                 plan, container_id=container_id, netns=f"/proc/{pid}/ns/net"
             )
             entry.attached[container_id] = plan
+            if cluster_hostname is not None:
+                entry.hostnames[container_id] = cluster_hostname
             if (local_ip := assigned.get(NetworkRole.LOCAL)) is not None:
                 entry.local_ips[container_id] = local_ip
             # Straight away rather than at the next interval: a kernel is at rendezvous the
@@ -2308,6 +2328,7 @@ class PrivNetServer:
             await self._del_attachment(plan, container_id)
         entry.attached.pop(container_id, None)
         entry.local_ips.pop(container_id, None)
+        entry.hostnames.pop(container_id, None)
         await self._journal.forget_attachment(container_id)
         # The withdrawal, and it is the same message: whole state without this container in it.
         self._announce_now(session_id)
@@ -2453,7 +2474,9 @@ class PrivNetServer:
         entry = self._sessions.get(session_id)
         if entry is None:
             return []
-        return endpoints_of(entry.attached, overlay_role=NetworkRole.OVERLAY)
+        return endpoints_of(
+            entry.attached, overlay_role=NetworkRole.OVERLAY, hostnames=entry.hostnames
+        )
 
     def gossip_generation(self, session_id: str) -> str | None:
         entry = self._sessions.get(session_id)

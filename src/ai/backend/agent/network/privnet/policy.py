@@ -30,6 +30,9 @@ _CONTAINER_ID_RE = re.compile(r"\A[A-Za-z0-9][A-Za-z0-9._-]{0,127}\Z")
 #: journalled, never interpolated into a command.
 _GENERATION_RE = re.compile(r"\A[A-Za-z0-9][A-Za-z0-9._-]{0,127}\Z")
 _MAC_RE = re.compile(r"\A[0-9a-fA-F]{2}(:[0-9a-fA-F]{2}){5}\Z")
+#: A single DNS label (RFC 1123): what the manager names kernels with (``main1``, ``sub1``, …) and
+#: what the session resolver has to be able to answer.
+_CLUSTER_HOSTNAME_RE = re.compile(r"\A[A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?\Z")
 
 # The privnet only ever operates on RFC1918 space; a manager-provided subnet outside
 # it is rejected outright (defence in depth — the bridge backend derives its own
@@ -150,6 +153,21 @@ def validate_ipv4(value: str | None, *, what: str) -> str:
         ipaddress.IPv4Address(value)
     except ValueError as e:
         raise PolicyViolation(f"invalid {what}") from e
+    return value
+
+
+def validate_cluster_hostname(value: str | None) -> str | None:
+    """Bound the agent-supplied in-cluster hostname, or None when it sent none.
+
+    A DNS label, because that is what it is used as: it is announced to peers and answered by the
+    session's resolver. None rather than a violation for an absent one -- a kernel without a name
+    is simply not resolvable by name, which is what a single-node session and an older agent both
+    produce.
+    """
+    if value is None:
+        return None
+    if not _CLUSTER_HOSTNAME_RE.match(value):
+        raise PolicyViolation("invalid cluster_hostname")
     return value
 
 
