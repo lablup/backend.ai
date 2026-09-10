@@ -55,8 +55,7 @@ type is what reopens the decision.
 | `InvalidFieldPermission` | validates a requested field scope for both permission entries and entity shares, so it names no one row kind |
 | `VirtualEntityNotFound` | `data/entity/virtual_entity.py` declares an id alone, no `EntityType` |
 | `NotEnoughPermission` | an authorization denial about the caller, not about a row |
-| `DefinitionFileNotFound`, `DeploymentDefinitionFileReadError`, `ModelDefinitionNotFound` | a file inside a vfolder, which no row type declares |
-| `AutoScalingPolicyNotFound` | `deployment_auto_scaling_policies` has no `FieldType` |
+| `DeploymentDefinitionFileReadError` | a file inside a vfolder, which no row type declares |
 | `NoUpdatesToApply` | a modifier that changed nothing; the row is whichever one the caller was updating |
 | `AppServiceStartFailed` | an app started inside a session is no row, and `ActionOperationType` has no `start` |
 | `AppProxyConnectionError`, `AppProxyResponseError` | AppProxy is a system domain by the `AGENTS.md` table |

@@ -6,7 +6,6 @@ from ai.backend.common.data.entity.deployment import DeploymentEntityType
 from ai.backend.common.data.entity.deployment_policy import DeploymentPolicyFieldType
 from ai.backend.common.data.entity.deployment_revision import DeploymentRevisionFieldType
 from ai.backend.common.data.entity.keypair import KeyPairFieldType
-from ai.backend.common.data.entity.replica import ReplicaFieldType
 from ai.backend.common.data.entity.session import SessionEntityType
 from ai.backend.common.data.entity.user import UserEntityType
 from ai.backend.common.data.entity.vfolder import VFolderUUID
@@ -21,18 +20,6 @@ from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.errors.base.entity import EntityError, EntityErrorCode
 from ai.backend.manager.errors.base.field import FieldError, FieldErrorCode
 from ai.backend.manager.errors.common import ObjectNotFound
-
-
-class DefinitionFileNotFound(ObjectNotFound):
-    object_name = "definition-file"
-
-    @override
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.MODEL_SERVICE,
-            operation=ErrorOperation.READ,
-            error_detail=ErrorDetail.NOT_FOUND,
-        )
 
 
 class DeploymentDefinitionFileReadError(BackendAIError, web.HTTPBadRequest):
@@ -130,29 +117,6 @@ class RevisionMissingModelVFolder(FieldError, web.HTTPBadRequest):
         )
 
 
-class RevisionNotDeployable(FieldError, web.HTTPConflict):
-    """A revision references resources that no longer exist.
-
-    Raised when a ``DeploymentRevisionRow`` is converted to a
-    ``ModelRevisionSpec`` but one of its SET NULL-backed references —
-    ``image`` or ``model`` — has collapsed to NULL because the
-    underlying row was deleted. The revision is preserved for history
-    yet cannot be redeployed; the scheduler is expected to catch this
-    exception and transition the deployment to ``BLOCKED``.
-    """
-
-    error_type = "https://api.backend.ai/probs/revision-not-deployable"
-    error_title = "Deployment revision references deleted resources."
-
-    @override
-    def field_error_code(self) -> FieldErrorCode:
-        return FieldErrorCode(
-            DeploymentRevisionFieldType(),
-            ActionOperationType.GET,
-            ErrorDetail.INVALID_PARAMETERS,
-        )
-
-
 class InvalidDeploymentStrategy(FieldError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/invalid-deployment-strategy"
     error_title = "Unknown or invalid deployment strategy."
@@ -187,17 +151,6 @@ class RouteSessionTerminated(EntityError):
     def entity_error_code(self) -> EntityErrorCode:
         return EntityErrorCode(
             SessionEntityType(), ActionOperationType.GET, ErrorDetail.INVALID_PARAMETERS
-        )
-
-
-class RouteUnhealthy(FieldError):
-    error_type = "https://api.backend.ai/probs/route-unhealthy"
-    error_title = "Route health check failed."
-
-    @override
-    def field_error_code(self) -> FieldErrorCode:
-        return FieldErrorCode(
-            ReplicaFieldType(), ActionOperationType.GET, ErrorDetail.INVALID_PARAMETERS
         )
 
 

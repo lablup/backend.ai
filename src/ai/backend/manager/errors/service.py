@@ -13,7 +13,6 @@ from ai.backend.common.data.entity.deployment import DeploymentEntityType
 from ai.backend.common.data.entity.deployment_policy import DeploymentPolicyFieldType
 from ai.backend.common.data.entity.deployment_token import DeploymentTokenFieldType
 from ai.backend.common.data.entity.replica import ReplicaFieldType
-from ai.backend.common.data.entity.vfolder import VFolderEntityType
 from ai.backend.common.exception import (
     BackendAIError,
     ErrorCode,
@@ -53,30 +52,6 @@ class EndpointNotFound(EntityError, ObjectNotFound):
         )
 
 
-class ModelDefinitionNotFound(ObjectNotFound):
-    object_name = "model_definition"
-
-    @override
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.MODEL_SERVICE,
-            operation=ErrorOperation.READ,
-            error_detail=ErrorDetail.NOT_FOUND,
-        )
-
-
-class ScalingImpossible(EntityError, web.HTTPBadRequest):
-    error_title = (
-        "Scaling operation cannot be performed due to insufficient resources or constraints."
-    )
-
-    @override
-    def entity_error_code(self) -> EntityErrorCode:
-        return EntityErrorCode(
-            DeploymentEntityType(), ActionOperationType.UPDATE, ErrorDetail.CONFLICT
-        )
-
-
 class AutoScalingRuleNotFound(FieldError, ObjectNotFound):
     object_name = "auto_scaling_rule"
 
@@ -84,18 +59,6 @@ class AutoScalingRuleNotFound(FieldError, ObjectNotFound):
     def field_error_code(self) -> FieldErrorCode:
         return FieldErrorCode(
             AutoScalingRuleFieldType(), ActionOperationType.GET, ErrorDetail.NOT_FOUND
-        )
-
-
-class AutoScalingPolicyNotFound(ObjectNotFound):
-    object_name = "auto_scaling_policy"
-
-    @override
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.ENDPOINT,
-            operation=ErrorOperation.READ,
-            error_detail=ErrorDetail.NOT_FOUND,
         )
 
 
@@ -143,16 +106,6 @@ class RouteNotFound(FieldError, ObjectNotFound):
     @override
     def field_error_code(self) -> FieldErrorCode:
         return FieldErrorCode(ReplicaFieldType(), ActionOperationType.GET, ErrorDetail.NOT_FOUND)
-
-
-class ModelServiceDependencyNotCleared(EntityError, web.HTTPBadRequest):
-    error_title = "Cannot delete model VFolders bound to alive model services."
-
-    @override
-    def entity_error_code(self) -> EntityErrorCode:
-        return EntityErrorCode(
-            VFolderEntityType(), ActionOperationType.DELETE, ErrorDetail.BAD_REQUEST
-        )
 
 
 class AppServiceStartFailed(BackendAIError, web.HTTPInternalServerError):
