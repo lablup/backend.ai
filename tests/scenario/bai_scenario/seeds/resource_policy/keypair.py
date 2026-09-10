@@ -22,7 +22,12 @@ def seed_keypair_policy(
     max_pending_session_count: int | None = None,
     vfolder_hosts: Sequence[str] = (),
 ) -> Spec[KeyPairResourcePolicyData]:
-    """What a keypair is allowed. The session limits a scenario varies live here."""
+    """What a keypair is allowed. The session limits a scenario varies live here.
+
+    The row also carries an ``is_default`` flag, which decides the policy a keypair
+    gets when nothing names one, but no write spec sets it. A scenario that needs a
+    default keypair policy cannot lay one yet.
+    """
 
     def build(name: str) -> KeyPairResourcePolicyCreator:
         return KeyPairResourcePolicyCreator(

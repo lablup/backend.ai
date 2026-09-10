@@ -418,8 +418,8 @@ class Deferred[A, R]:
     and the caller is one of these too.
     """
 
-    row: object
-    build: Callable[[Any], Invocation[A, R] | ActorBound[A, R, Any]]
+    rows: tuple[object, ...]
+    build: Callable[..., Invocation[A, R] | ActorBound[A, R, Any]]
 
 
 # ---------------------------------------------------------------------------
@@ -677,12 +677,12 @@ def _invoker[A, R](
         deferred = when
 
         def run_deferred(adapter: A, sown: Sown, actor: Any) -> Awaitable[R]:
-            if deferred.row not in sown:
+            missing = [row for row in deferred.rows if row not in sown]
+            if missing:
                 raise LookupError(
-                    f"the call reads the row {deferred.row!r}, "
-                    "which this scenario's set-up does not lay down"
+                    f"the call reads {missing!r}, which this scenario's set-up does not lay down"
                 )
-            built = deferred.build(sown[deferred.row])
+            built = deferred.build(*(sown[row] for row in deferred.rows))
             if isinstance(built, ActorBound):
                 return built.build(actor).call(adapter)
             return built.call(adapter)
@@ -729,7 +729,7 @@ def _deferred_operation[A, R](when: Deferred[A, R]) -> str:
     depend on the row: replaying the builder over a stand-in answers it.
     """
     try:
-        built = when.build(_Recorder())
+        built = when.build(*(_Recorder() for _ in when.rows))
     except Exception:
         return "a call reading a row it laid"
     if isinstance(built, ActorBound):

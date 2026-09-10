@@ -17,7 +17,7 @@ from __future__ import annotations
 
 from collections.abc import Awaitable, Callable, Sequence
 from dataclasses import dataclass, field
-from typing import Any, overload
+from typing import Any, cast, overload
 
 from ai.backend.common.data.entity.role import RoleID
 from ai.backend.common.data.entity.types import FieldData
@@ -153,6 +153,7 @@ class Seeder:
 
     _counts: dict[str, int] = field(default_factory=dict)
     _laid: list[Given[Any]] = field(default_factory=list)
+    _singletons: dict[str, Given[Any]] = field(default_factory=dict)
 
     def situation[C](
         self,
@@ -165,6 +166,16 @@ class Seeder:
         The scenario does not list its rows again: what it made is what it lays.
         """
         return situation(rows=tuple(self._laid), config=config, answers=answers)
+
+    def once[D](self, key: str, lay: Callable[[], Given[D]]) -> Given[D]:
+        """The one row of its kind this scenario has.
+
+        A row whose name the manager fixes is a singleton: laying it twice collides on
+        the primary key. Whoever needs it asks for it and gets the same one.
+        """
+        if key not in self._singletons:
+            self._singletons[key] = lay()
+        return cast("Given[D]", self._singletons[key])
 
     def _remember[D](self, row: Given[D]) -> Given[D]:
         self._laid.append(row)
@@ -292,13 +303,38 @@ def steps_of(wanted: Sequence[Given[Any]]) -> list[str]:
     return [row.describe for row in seen]
 
 
+@overload
 def after[D, A, R](
     row: Given[D],
     build: Callable[[D], Invocation[A, R] | ActorBound[A, R, Any]],
-) -> Deferred[A, R]:
-    """Read the row this scenario laid, then say what to call with it.
+    /,
+) -> Deferred[A, R]: ...
 
-    ``build`` receives the created data, typed, so an id the database generated is
-    reachable without a placeholder or a literal repeated from the seed.
+
+@overload
+def after[D1, D2, A, R](
+    first: Given[D1],
+    second: Given[D2],
+    build: Callable[[D1, D2], Invocation[A, R] | ActorBound[A, R, Any]],
+    /,
+) -> Deferred[A, R]: ...
+
+
+@overload
+def after[D1, D2, D3, A, R](
+    first: Given[D1],
+    second: Given[D2],
+    third: Given[D3],
+    build: Callable[[D1, D2, D3], Invocation[A, R] | ActorBound[A, R, Any]],
+    /,
+) -> Deferred[A, R]: ...
+
+
+def after(*parts: Any) -> Deferred[Any, Any]:
+    """Read the rows this scenario laid, then say what to call with them.
+
+    ``build`` comes last and receives the created data, typed, so an id the database
+    generated is reachable without a placeholder or a literal repeated from the seed.
     """
-    return Deferred(row, build)
+    *rows, build = parts
+    return Deferred(tuple(rows), build)

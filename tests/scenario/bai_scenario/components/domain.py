@@ -17,6 +17,7 @@ from ai.backend.manager.api.adapters.domain.adapter import DomainAdapter
 from ai.backend.manager.config.unified import ManagerUnifiedConfig
 from ai.backend.manager.data.domain.types import DomainData
 from ai.backend.manager.data.permission.types import Permission
+from ai.backend.manager.data.resource.types import ProjectResourcePolicyData
 from ai.backend.manager.data.user.types import UserData
 from ai.backend.testutils.typed_scenario import (
     Situation,
@@ -36,6 +37,12 @@ type DomainScenario = TypedScenario[DomainAdapter, ManagerUnifiedConfig]
 MANAGER_CONFIG = config_of(ManagerUnifiedConfig)
 
 
+def seed_personal_project_policy(seed: Seeder) -> Given[ProjectResourcePolicyData]:
+    """The policy a personal project is written under. Its name is fixed by the
+    manager, so a scenario has exactly one however many users it lays."""
+    return seed.once("project-policy", lambda: seed.creating(seed_project_policy()))
+
+
 def seed_someone_of(
     seed: Seeder,
     domain: Given[DomainData],
@@ -49,7 +56,7 @@ def seed_someone_of(
     live in. Neither is optional scenery: a request that resolves the caller, or makes
     a folder they own, fails before any permission is looked at without them.
     """
-    seed.creating(seed_project_policy())
+    seed_personal_project_policy(seed)
     policy = seed.creating(seed_user_policy())
     key_policy = seed.creating(seed_keypair_policy(vfolder_hosts=vfolder_hosts))
     return seed.provisioning(seed_user(role=role), domain, policy, key_policy)
