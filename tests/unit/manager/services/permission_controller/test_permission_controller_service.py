@@ -47,10 +47,6 @@ from ai.backend.manager.services.permission_contoller.actions.get_role_detail im
 from ai.backend.manager.services.permission_contoller.actions.get_scope_types import (
     GlobalGetScopeTypesAction,
 )
-from ai.backend.manager.services.permission_contoller.actions.permission import (
-    CreatePermissionAction,
-    DeletePermissionAction,
-)
 from ai.backend.manager.services.permission_contoller.actions.search_permissions import (
     SearchPermissionsAction,
 )
@@ -304,87 +300,6 @@ class TestSearchUsersAssignedToRole:
 
         assert result.result.total_count == 0
         assert len(result.result.items) == 0
-
-
-class TestCreatePermission:
-    @pytest.fixture
-    def mock_repository(self) -> MagicMock:
-        repository = MagicMock()
-        repository.create_permission = AsyncMock()
-        return repository
-
-    @pytest.fixture
-    def service(
-        self,
-        mock_repository: PermissionControllerRepository,
-        processor_registry: ProcessorRegistry[Any],
-    ) -> PermissionControllerService:
-        return PermissionControllerService(
-            repository=mock_repository,
-            action_registry=processor_registry,
-        )
-
-    async def test_create_permission_delegates_to_repository(
-        self,
-        service: PermissionControllerService,
-        mock_repository: MagicMock,
-    ) -> None:
-        perm_data = PermissionData(
-            id=PermissionID(uuid.uuid4()),
-            role_id=RoleID(uuid.uuid4()),
-            entity_type=EntityType(UserEntityType()),
-            permission=Permission.READ,
-            created_at=datetime.now(UTC),
-        )
-        mock_repository.create_permission.return_value = perm_data
-
-        creator = MagicMock()
-        role_id = RoleID(uuid.uuid4())
-        action = CreatePermissionAction(role_id=role_id, creator=creator)
-        result = await service.create_permission(action)
-
-        mock_repository.create_permission.assert_called_once_with(role_id, creator)
-        assert result.data.id == perm_data.id
-
-
-class TestDeletePermission:
-    @pytest.fixture
-    def mock_repository(self) -> MagicMock:
-        repository = MagicMock()
-        repository.delete_permission = AsyncMock()
-        return repository
-
-    @pytest.fixture
-    def service(
-        self,
-        mock_repository: PermissionControllerRepository,
-        processor_registry: ProcessorRegistry[Any],
-    ) -> PermissionControllerService:
-        return PermissionControllerService(
-            repository=mock_repository,
-            action_registry=processor_registry,
-        )
-
-    async def test_delete_permission_delegates_to_repository(
-        self,
-        service: PermissionControllerService,
-        mock_repository: MagicMock,
-    ) -> None:
-        perm_data = PermissionData(
-            id=PermissionID(uuid.uuid4()),
-            role_id=RoleID(uuid.uuid4()),
-            entity_type=EntityType(UserEntityType()),
-            permission=Permission.READ,
-            created_at=datetime.now(UTC),
-        )
-        mock_repository.delete_permission.return_value = perm_data
-
-        purger = MagicMock()
-        action = DeletePermissionAction(purger=purger)
-        result = await service.delete_permission(action)
-
-        mock_repository.delete_permission.assert_called_once_with(purger)
-        assert result.data.id == perm_data.id
 
 
 class TestSearchPermissions:

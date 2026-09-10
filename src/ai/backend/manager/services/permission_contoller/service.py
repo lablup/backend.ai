@@ -28,12 +28,6 @@ from ai.backend.manager.services.permission_contoller.actions.get_scope_types im
     GlobalGetScopeTypesAction,
     GlobalGetScopeTypesActionResult,
 )
-from ai.backend.manager.services.permission_contoller.actions.permission import (
-    CreatePermissionAction,
-    CreatePermissionActionResult,
-    DeletePermissionAction,
-    DeletePermissionActionResult,
-)
 from ai.backend.manager.services.permission_contoller.actions.replace_role_permissions import (
     ReplaceRolePermissionsAction,
     ReplaceRolePermissionsActionResult,
@@ -58,10 +52,6 @@ from ai.backend.manager.services.permission_contoller.actions.search_users_assig
     SearchUsersAssignedToRoleAction,
     SearchUsersAssignedToRoleActionResult,
 )
-from ai.backend.manager.services.permission_contoller.actions.update_permission import (
-    UpdatePermissionAction,
-    UpdatePermissionActionResult,
-)
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -77,33 +67,6 @@ class PermissionControllerService:
     ) -> None:
         self._repository = repository
         self._action_registry = action_registry
-
-    async def create_permission(
-        self, action: CreatePermissionAction
-    ) -> CreatePermissionActionResult:
-        """
-        Creates a new permission in the repository.
-        """
-        result = await self._repository.create_permission(action.role_id, action.creator)
-        return CreatePermissionActionResult(data=result)
-
-    async def delete_permission(
-        self, action: DeletePermissionAction
-    ) -> DeletePermissionActionResult:
-        """
-        Deletes a permission from the repository.
-        """
-        result = await self._repository.delete_permission(action.purger)
-        return DeletePermissionActionResult(data=result)
-
-    async def update_permission(
-        self, action: UpdatePermissionAction
-    ) -> UpdatePermissionActionResult:
-        """
-        Updates an existing permission in the repository.
-        """
-        result = await self._repository.update_permission(action.updater)
-        return UpdatePermissionActionResult(data=result)
 
     async def get_role_detail(self, action: GetRoleDetailAction) -> GetRoleDetailActionResult:
         """Get role with all permission details and assigned users."""

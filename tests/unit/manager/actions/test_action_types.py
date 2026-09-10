@@ -10,10 +10,6 @@ from ai.backend.manager.actions.types import ActionOperationType
 
 # Import representative concrete action classes across different entity types
 # and operation types to verify enum usage at runtime.
-from ai.backend.manager.services.permission_contoller.actions.permission import (
-    CreatePermissionAction,
-    DeletePermissionAction,
-)
 from ai.backend.manager.services.permission_contoller.actions.replace_role_permissions import (
     ReplaceRolePermissionsAction,
 )
@@ -25,9 +21,7 @@ from ai.backend.manager.services.permission_contoller.actions.search_permissions
 # ``ai.backend.common.data.entity.types.EntityType``, a distinct NewType, so mixing
 # them in would conflate two type systems rather than test either one.
 _REPRESENTATIVE_ACTION_CLASSES: list[type[BaseAction]] = [
-    CreatePermissionAction,
     ReplaceRolePermissionsAction,
-    DeletePermissionAction,
     SearchPermissionsAction,
 ]
 
@@ -111,11 +105,7 @@ class TestActionOperationType:
 
 
 class TestAllActionClassesUseEnums:
-    """Verify that representative concrete action classes return proper enum types.
-
-    These tests cover the operations concrete legacy actions declare today (GET,
-    SEARCH, CREATE, UPDATE, DELETE) via representative concrete action classes.
-    """
+    """Verify that representative concrete action classes return proper enum types."""
 
     def test_entity_type_returns_enum(self) -> None:
         for cls in _REPRESENTATIVE_ACTION_CLASSES:
@@ -133,22 +123,7 @@ class TestAllActionClassesUseEnums:
                 f"({result!r}), expected ActionOperationType"
             )
 
-    def test_covers_all_operation_types(self) -> None:
-        """Ensure the representative classes cover every declarable operation.
-
-        ``UPSERT`` is excluded: the upsert actions declare ``CREATE`` today, so
-        nothing can stand for it. ``GET``, ``LOOKUP``, ``PURGE`` and ``RESTORE`` are
-        excluded because no legacy action declares them, and every class here is a
-        legacy one.
-        """
-        expected = set(ActionOperationType) - {
-            ActionOperationType.UPSERT,
-            ActionOperationType.GET,
-            ActionOperationType.LOOKUP,
-            ActionOperationType.PURGE,
-            ActionOperationType.RESTORE,
-        }
+    def test_covers_the_operations_legacy_actions_declare(self) -> None:
+        """The legacy family is down to a search and an update; the v2 bases carry the rest."""
         covered = {cls.operation_type() for cls in _REPRESENTATIVE_ACTION_CLASSES}
-        assert covered == expected, (
-            f"Not all ActionOperationType values are covered. Missing: {expected - covered}"
-        )
+        assert covered == {ActionOperationType.SEARCH, ActionOperationType.UPDATE}

@@ -25,7 +25,7 @@ from .search_users_assigned_to_role import (
     SearchUsersAssignedToRoleAction,
     SearchUsersAssignedToRoleActionResult,
 )
-from .update_permission import UpdatePermissionAction, UpdatePermissionActionResult
+from .update_permission import UpdatePermissionAction
 from .update_role import UpdateRoleAction
 
 __all__ = [
@@ -49,6 +49,5 @@ __all__ = [
     "SearchUsersAssignedToRoleAction",
     "SearchUsersAssignedToRoleActionResult",
     "UpdatePermissionAction",
-    "UpdatePermissionActionResult",
     "UpdateRoleAction",
 ]

@@ -6,6 +6,7 @@ from ai.backend.manager.actions.registry.group import ProcessorGroup
 from ai.backend.manager.actions.registry.types import FieldGroupMeta
 from ai.backend.manager.actions.v2.bulk.partial_processor import PartialBulkActionProcessor
 from ai.backend.manager.actions.v2.field.bulk_processor import PartialBulkFieldActionProcessor
+from ai.backend.manager.actions.v2.field.processor import SingleFieldActionProcessor
 from ai.backend.manager.actions.v2.global_scope.processor import (
     GlobalActionProcessor,
     PublicActionProcessor,
@@ -38,6 +39,7 @@ from .actions import (
     UpdateRoleAction,
 )
 from .actions.bulk_get_roles import BulkGetRolesAction
+from .actions.delete_permission import DeletePermissionAction
 from .actions.get_entity_types import (
     GlobalGetEntityTypesAction,
     GlobalGetEntityTypesActionResult,
@@ -54,12 +56,6 @@ from .actions.lookup_permission_owner import (
     LookupBulkRolePermissionOwnerAction,
     LookupRolePermissionOwnerAction,
 )
-from .actions.permission import (
-    CreatePermissionAction,
-    CreatePermissionActionResult,
-    DeletePermissionAction,
-    DeletePermissionActionResult,
-)
 from .actions.purge_role import PurgeRoleAction
 from .actions.search_permissions import (
     SearchPermissionsAction,
@@ -69,10 +65,7 @@ from .actions.search_scopes import (
     GlobalSearchScopesAction,
     GlobalSearchScopesActionResult,
 )
-from .actions.update_permission import (
-    UpdatePermissionAction,
-    UpdatePermissionActionResult,
-)
+from .actions.update_permission import UpdatePermissionAction
 from .service import PermissionControllerService
 
 
@@ -116,9 +109,12 @@ class PermissionControllerProcessors:
         PublicGetPermissionMatrixAction, PublicGetPermissionMatrixActionResult
     ]
     search_permissions: ActionProcessor[SearchPermissionsAction, SearchPermissionsActionResult]
-    create_permission: ActionProcessor[CreatePermissionAction, CreatePermissionActionResult]
-    update_permission: ActionProcessor[UpdatePermissionAction, UpdatePermissionActionResult]
-    delete_permission: ActionProcessor[DeletePermissionAction, DeletePermissionActionResult]
+    update_permission: SingleFieldActionProcessor[
+        UpdatePermissionAction, EntityOpsResult[PermissionData]
+    ]
+    delete_permission: SingleFieldActionProcessor[
+        DeletePermissionAction, EntityOpsResult[PermissionData]
+    ]
 
     def __init__(
         self,
@@ -169,6 +165,5 @@ class PermissionControllerProcessors:
             PublicGetPermissionMatrixAction, service.get_permission_matrix
         )
         self.search_permissions = ActionProcessor(service.search_permissions, action_monitors)
-        self.create_permission = ActionProcessor(service.create_permission, action_monitors)
-        self.update_permission = ActionProcessor(service.update_permission, action_monitors)
-        self.delete_permission = ActionProcessor(service.delete_permission, action_monitors)
+        self.update_permission = permissions.update_ops(UpdatePermissionAction)
+        self.delete_permission = permissions.purge_ops(DeletePermissionAction)

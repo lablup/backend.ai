@@ -175,7 +175,6 @@ from ai.backend.manager.models.rbac_models.permission.conditions import (
 from ai.backend.manager.models.rbac_models.permission.creators import RolePermissionCreator
 from ai.backend.manager.models.rbac_models.permission.orders import ScopedPermissionOrders
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
-from ai.backend.manager.models.rbac_models.permission.purgers import RolePermissionPurger
 from ai.backend.manager.models.rbac_models.permission.updaters import RolePermissionUpdater
 from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.rbac_models.role.conditions import RoleConditions
@@ -197,16 +196,15 @@ from ai.backend.manager.services.permission_contoller.actions.bulk_remove_role_p
     BulkRemoveRolePermissionsAction,
 )
 from ai.backend.manager.services.permission_contoller.actions.create_role import CreateRoleAction
+from ai.backend.manager.services.permission_contoller.actions.delete_permission import (
+    DeletePermissionAction,
+)
 from ai.backend.manager.services.permission_contoller.actions.delete_role import DeleteRoleAction
 from ai.backend.manager.services.permission_contoller.actions.get_permission_matrix import (
     PublicGetPermissionMatrixAction,
 )
 from ai.backend.manager.services.permission_contoller.actions.get_role_detail import (
     GetRoleDetailAction,
-)
-from ai.backend.manager.services.permission_contoller.actions.permission import (
-    CreatePermissionAction,
-    DeletePermissionAction,
 )
 from ai.backend.manager.services.permission_contoller.actions.purge_role import PurgeRoleAction
 from ai.backend.manager.services.permission_contoller.actions.replace_role_permissions import (
@@ -786,8 +784,8 @@ class RBACAdapter(BaseAdapter):
 
     async def delete_permission(self, permission_id: UUID) -> DeletePermissionPayloadDTO:
         """Hard-delete a scoped permission."""
-        await self._permission_controller.delete_permission.wait_for_complete(
-            DeletePermissionAction(purger=RolePermissionPurger(PermissionID(permission_id)))
+        await self._permission_controller.delete_permission.run(
+            DeletePermissionAction(permission_id=PermissionID(permission_id))
         )
         return DeletePermissionPayloadDTO(id=permission_id)
 
@@ -799,8 +797,8 @@ class RBACAdapter(BaseAdapter):
             entity_type=input.entity_type,
             permission=single_bit(input.permission_bit()),
         )
-        action_result = await self._permission_controller.create_permission.wait_for_complete(
-            CreatePermissionAction(role_id=RoleID(input.role_id), creator=creator)
+        action_result = await self._permission_controller.add_role_permission.run(
+            AddRolePermissionAction(role_id=RoleID(input.role_id), creator=creator)
         )
         return self._permission_data_to_node(action_result.data)
 
@@ -819,8 +817,8 @@ class RBACAdapter(BaseAdapter):
                 else OptionalState.nop()
             ),
         )
-        action_result = await self._permission_controller.update_permission.wait_for_complete(
-            UpdatePermissionAction(updater=updater)
+        action_result = await self._permission_controller.update_permission.run(
+            UpdatePermissionAction(permission_id=PermissionID(input.id), updater=updater)
         )
         return self._permission_data_to_node(action_result.data)
 
