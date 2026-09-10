@@ -501,6 +501,23 @@ class PrivNetBackendProxy(AbstractNetworkAgentPluginV2["AbstractKernel"]):
         )
 
     @override
+    async def cluster_names(self, session_id: str) -> Mapping[str, str] | None:
+        """The session's ``{cluster_hostname: ip}``, as the privnet's endpoint exchange knows it.
+
+        None on any failure, which is the same word the daemon uses for "I have no view": the
+        caller then falls back to the manager's endpoint table, which is exactly right for an
+        unreachable privnet, one too old to know the verb, and one whose exchange is not running.
+        """
+        try:
+            resp = await self._client.call(
+                PrivNetRequest(op=PrivNetOp.CLUSTER_NAMES, session_id=session_id)
+            )
+        except (PrivNetClientError, OSError, ProtocolError) as e:
+            log.warning("privnet CLUSTER_NAMES query for {} failed, degrading: {}", session_id, e)
+            return None
+        return resp.cluster_names
+
+    @override
     async def setup_dns_redirect(self, session_id: str, loopback_port: int) -> None:
         # The agent bound the resolver on 127.0.0.1:<loopback_port> and hands only that port down;
         # the privnet derives the gateway from the session it owns and installs the :53 DNAT — a

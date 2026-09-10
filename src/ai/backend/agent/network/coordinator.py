@@ -131,17 +131,23 @@ class SessionNetworkCoordinator:
     _agent_id: str
     _applied: dict[str, dict[str, Member]]
     _applied_endpoints: dict[str, dict[str, tuple[EndpointAddr, str]]]
+    # session_id -> whether the backend supplies the session's endpoint view, and so is also the
+    # thing programming it. Settled by each reconcile (the first of which runs before the watch
+    # subscribes) and read by the watch to decide how much of the session subtree to listen to.
+    _backend_owns_endpoints: dict[str, bool]
     _watch_tasks: dict[str, asyncio.Task[None]]
     # The periodic re-converge task per session (see _reconcile_periodically).
     _sweep_tasks: dict[str, asyncio.Task[None]]
     _reconcile_locks: dict[str, asyncio.Lock]
     # session_id -> {cluster_hostname: ip} for the whole session (every node's endpoints, not the
-    # remote-only FDB view). Maintained by the same watch/reconcile that programs the data plane, so
-    # the per-session cluster name resolver reads a live map. See cluster-name-resolution.md.
+    # remote-only FDB view). Maintained by the same watch/reconcile that converges the data plane,
+    # so the per-session cluster name resolver reads a live map -- from the backend where it has
+    # its own view of the session's endpoints, and from the manager's table where it has not. See
+    # cluster-name-resolution.md.
     _names: dict[str, dict[str, str]]
     # session_id -> {cluster_hostname: ip} supplied by the agent, not etcd. Single-node sessions
     # have no central endpoints/ table (the agent lays peers out locally with cluster_host_ips), so
-    # their names are registered here instead. Consulted as a fallback after the etcd-backed _names.
+    # their names are registered here instead. Consulted as a fallback after the dynamic _names.
     _static_names: dict[str, dict[str, str]]
     # session_id -> the incarnation this node joined, so the withdrawal at teardown can tell its
     # own membership from one a later join published under the same session id (see `stop`).
@@ -158,6 +164,7 @@ class SessionNetworkCoordinator:
         self._agent_id = agent_id
         self._applied = {}
         self._applied_endpoints = {}
+        self._backend_owns_endpoints = {}
         self._watch_tasks = {}
         self._sweep_tasks = {}
         self._reconcile_locks = {}
@@ -331,8 +338,18 @@ class SessionNetworkCoordinator:
         which is what the periodic reconcile and the watch are both for.
         """
         async with self._reconcile_locks.setdefault(session_id, asyncio.Lock()):
-            endpoints = await self._read_endpoints(session_id)
             members = await self._read_members(session_id)
+            names = await self._backend.cluster_names(session_id)
+            self._backend_owns_endpoints[session_id] = names is not None
+            if names is not None:
+                # The backend's nodes exchange endpoints among themselves, so it is also the thing
+                # programming them: there is no endpoint table for this pass to read and nothing
+                # for it to install. What is left is membership -- which stays the manager's --
+                # and the names, which the exchange carried alongside the addresses.
+                self._names[session_id] = dict(names)
+                await self.reconcile_peers(session_id, members=members)
+                return
+            endpoints = await self._read_endpoints(session_id)
             blocked_vteps = await self.reconcile_endpoints(
                 session_id, endpoints=endpoints, members=members
             )
@@ -720,7 +737,17 @@ class SessionNetworkCoordinator:
                 # Closed explicitly: a reconcile raising out of the loop body would otherwise leave
                 # the generator suspended at its yield, holding the etcd watch stream open until the
                 # asyncgen finalizer got to it — one leaked stream per retry.
-                async with aclosing(self._etcd.watch_prefix(session_prefix(session_id))) as events:
+                # Membership alone where the backend carries endpoints between its own nodes:
+                # every endpoint write under this session would otherwise wake this watch on every
+                # node, and each wake re-reads the tables -- the amplification that made a session
+                # of N nodes and K kernels cost O(N^2 K) reads to start, for events about a table
+                # nothing here would then read.
+                prefix = (
+                    members_prefix(session_id)
+                    if self._backend_owns_endpoints.get(session_id)
+                    else session_prefix(session_id)
+                )
+                async with aclosing(self._etcd.watch_prefix(prefix)) as events:
                     async for _ in events:
                         await self._reconcile_all(session_id)
                         backoff = _WATCH_RETRY_BACKOFF  # events are flowing: the watch is healthy
