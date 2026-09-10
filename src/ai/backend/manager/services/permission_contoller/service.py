@@ -37,14 +37,6 @@ from ai.backend.manager.services.permission_contoller.actions.replace_role_permi
     ReplaceRolePermissionsAction,
     ReplaceRolePermissionsActionResult,
 )
-from ai.backend.manager.services.permission_contoller.actions.search_element_associations import (
-    SearchElementAssociationsAction,
-    SearchElementAssociationsActionResult,
-)
-from ai.backend.manager.services.permission_contoller.actions.search_entities import (
-    SearchEntitiesAction,
-    SearchEntitiesActionResult,
-)
 from ai.backend.manager.services.permission_contoller.actions.search_permissions import (
     SearchPermissionsAction,
     SearchPermissionsActionResult,
@@ -179,18 +171,6 @@ class PermissionControllerService:
     async def get_entity_types(self, _action: GetEntityTypesAction) -> GetEntityTypesActionResult:
         """Get all available entity types."""
         return GetEntityTypesActionResult(element_types=list(RBACElementType))
-
-    async def search_entities(self, action: SearchEntitiesAction) -> SearchEntitiesActionResult:
-        """Search entities within a scope."""
-        result = await self._repository.search_entities(action.querier)
-        return SearchEntitiesActionResult(result=result)
-
-    async def search_element_associations(
-        self, action: SearchElementAssociationsAction
-    ) -> SearchElementAssociationsActionResult:
-        """Search element associations (full association rows) within a scope."""
-        result = await self._repository.search_element_associations(action.querier)
-        return SearchElementAssociationsActionResult(result=result)
 
     def get_entity_valid_operations(
         self,

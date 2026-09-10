@@ -6,77 +6,65 @@ from typing import TYPE_CHECKING
 
 from strawberry.dataloader import DataLoader
 
-from ai.backend.common.data.entity.agent import AgentEntityType, AgentUUID
+from ai.backend.common.data.entity.agent import AgentUUID
 from ai.backend.common.data.entity.app_config_allow_list import (
-    AppConfigAllowListEntityType,
     AppConfigAllowListID,
 )
 from ai.backend.common.data.entity.app_config_definition import (
-    AppConfigDefinitionEntityType,
     AppConfigDefinitionID,
 )
 from ai.backend.common.data.entity.app_config_fragment import (
-    AppConfigFragmentEntityType,
     AppConfigFragmentID,
 )
 from ai.backend.common.data.entity.artifact_registry import (
-    ArtifactRegistryEntityType,
     ArtifactRegistryID,
 )
 from ai.backend.common.data.entity.artifact_revision import ArtifactRevisionID
 from ai.backend.common.data.entity.audit_log import AuditLogID
 from ai.backend.common.data.entity.container_registry import (
-    ContainerRegistryEntityType,
     ContainerRegistryID,
 )
-from ai.backend.common.data.entity.deployment import DeploymentEntityType, DeploymentID
+from ai.backend.common.data.entity.deployment import DeploymentID
 from ai.backend.common.data.entity.deployment_history import DeploymentHistoryID
 from ai.backend.common.data.entity.deployment_preset import DeploymentPresetID
 from ai.backend.common.data.entity.deployment_revision import DeploymentRevisionID
 from ai.backend.common.data.entity.deployment_token import DeploymentTokenID
-from ai.backend.common.data.entity.domain import DomainEntityType, DomainID
-from ai.backend.common.data.entity.idle_checker import IdleCheckerEntityType, IdleCheckerID
-from ai.backend.common.data.entity.image import ImageEntityType, ImageID
+from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.idle_checker import IdleCheckerID
+from ai.backend.common.data.entity.image import ImageID
 from ai.backend.common.data.entity.image_alias import ImageAliasID
 from ai.backend.common.data.entity.kernel import KernelID
 from ai.backend.common.data.entity.kernel_scheduling_history import KernelSchedulingHistoryID
 from ai.backend.common.data.entity.notification import (
-    NotificationChannelEntityType,
     NotificationChannelID,
-    NotificationRuleEntityType,
     NotificationRuleID,
 )
-from ai.backend.common.data.entity.object_storage import ObjectStorageEntityType, ObjectStorageID
+from ai.backend.common.data.entity.object_storage import ObjectStorageID
 from ai.backend.common.data.entity.permission import PermissionID
-from ai.backend.common.data.entity.project import ProjectEntityType, ProjectID
+from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.prometheus_query_preset import PrometheusQueryPresetID
 from ai.backend.common.data.entity.prometheus_query_preset_category import (
     PrometheusQueryPresetCategoryID,
 )
 from ai.backend.common.data.entity.replica import ReplicaID
-from ai.backend.common.data.entity.resource_group import ResourceGroupEntityType, ResourceGroupID
-from ai.backend.common.data.entity.role import RoleEntityType, RoleID
+from ai.backend.common.data.entity.resource_group import ResourceGroupID
+from ai.backend.common.data.entity.role import RoleID
 from ai.backend.common.data.entity.route_history import RouteHistoryID
-from ai.backend.common.data.entity.runtime_variant import RuntimeVariantEntityType, RuntimeVariantID
+from ai.backend.common.data.entity.runtime_variant import RuntimeVariantID
 from ai.backend.common.data.entity.runtime_variant_preset import (
-    RuntimeVariantPresetEntityType,
     RuntimeVariantPresetID,
 )
-from ai.backend.common.data.entity.session import SessionEntityType, SessionID
+from ai.backend.common.data.entity.session import SessionID
 from ai.backend.common.data.entity.session_scheduling_history import SessionSchedulingHistoryID
 from ai.backend.common.data.entity.storage_namespace import (
-    StorageNamespaceEntityType,
     StorageNamespaceID,
 )
-from ai.backend.common.data.entity.types import EntityIdentifier
-from ai.backend.common.data.entity.user import UserEntityType, UserID
-from ai.backend.common.data.entity.vfolder import VFolderEntityType, VFolderUUID
-from ai.backend.common.data.entity.vfs_storage import VFSStorageEntityType, VFSStorageID
+from ai.backend.common.data.entity.user import UserID
+from ai.backend.common.data.entity.vfolder import VFolderUUID
+from ai.backend.common.data.entity.vfs_storage import VFSStorageID
 from ai.backend.common.types import AgentId
-from ai.backend.manager.data.permission.id import ObjectId
 
 if TYPE_CHECKING:
-    from ai.backend.common.dto.manager.v2.rbac.response import EntityNode  # pants: no-infer-dep
     from ai.backend.manager.api.adapters.registry import Adapters  # pants: no-infer-dep
     from ai.backend.manager.api.gql.agent.types import AgentV2GQL  # pants: no-infer-dep
     from ai.backend.manager.api.gql.app_config_allow_list.types import (  # pants: no-infer-dep
@@ -146,10 +134,6 @@ if TYPE_CHECKING:
     )
     from ai.backend.manager.api.gql.prometheus_query_preset.types.node import (  # pants: no-infer-dep
         QueryDefinitionGQL,
-    )
-    from ai.backend.manager.api.gql.rbac.types.entity import EntityRefGQL  # pants: no-infer-dep
-    from ai.backend.manager.api.gql.rbac.types.entity_node import (  # pants: no-infer-dep
-        EntityNode as EntityNodeGQL,
     )
     from ai.backend.manager.api.gql.rbac.types.permission import (  # pants: no-infer-dep
         PermissionGQL,
@@ -1104,33 +1088,6 @@ class DataLoaders:
         return DataLoader(load_fn=load_fn)
 
     @cached_property
-    def entity_loader(
-        self,
-    ) -> DataLoader[ObjectId, EntityNode | None]:
-        adapter = self._adapters.rbac
-
-        async def load_fn(object_ids: list[ObjectId]) -> list[EntityNode | None]:
-            return await adapter.batch_load_entities_by_type_and_ids(object_ids)
-
-        return DataLoader(load_fn=load_fn)
-
-    @cached_property
-    def element_association_loader(
-        self,
-    ) -> DataLoader[uuid.UUID, EntityRefGQL | None]:
-        adapter = self._adapters.rbac
-
-        async def load_fn(ids: list[uuid.UUID]) -> list[EntityRefGQL | None]:
-            from ai.backend.manager.api.gql.rbac.types.entity import (  # pants: no-infer-dep
-                EntityRefGQL as ERG,
-            )
-
-            dtos = await adapter.batch_load_element_associations_by_ids(ids)
-            return [ERG.from_pydantic(dto) if dto is not None else None for dto in dtos]
-
-        return DataLoader(load_fn=load_fn)
-
-    @cached_property
     def assignments_by_role_loader(
         self,
     ) -> DataLoader[RoleID, list[RoleAssignmentGQL]]:
@@ -1223,74 +1180,3 @@ class DataLoaders:
             ]
 
         return DataLoader(load_fn=load_fn)
-
-    @cached_property
-    def entity_node_loader(self) -> DataLoader[EntityIdentifier, EntityNodeGQL | None]:
-        """Resolves an entity from its id alone.
-
-        An :class:`EntityIdentifier` carries the kind it is an id of, so every read
-        holding one resolves it here rather than choosing a loader itself. A kind with
-        no loader answers ``None``.
-        """
-
-        async def load_fn(
-            ids: list[EntityIdentifier],
-        ) -> list[EntityNodeGQL | Exception | None]:
-            return [await self._entity_node(entity_id) for entity_id in ids]
-
-        return DataLoader(load_fn=load_fn)
-
-    async def _entity_node(self, entity_id: EntityIdentifier) -> EntityNodeGQL | None:
-        match entity_id.entity_type():
-            case AgentEntityType():
-                return await self.agent_by_uuid_loader.load(AgentUUID(entity_id))
-            case AppConfigAllowListEntityType():
-                return await self.app_config_allow_list_loader.load(AppConfigAllowListID(entity_id))
-            case AppConfigDefinitionEntityType():
-                return await self.app_config_definition_loader.load(
-                    AppConfigDefinitionID(entity_id)
-                )
-            case AppConfigFragmentEntityType():
-                return await self.app_config_fragment_loader.load(AppConfigFragmentID(entity_id))
-            case ArtifactRegistryEntityType():
-                return await self.artifact_registry_loader.load(ArtifactRegistryID(entity_id))
-            case ContainerRegistryEntityType():
-                return await self.container_registry_loader.load(ContainerRegistryID(entity_id))
-            case DeploymentEntityType():
-                return await self.deployment_loader.load(DeploymentID(entity_id))
-            case DomainEntityType():
-                return await self.domain_by_id_loader.load(DomainID(entity_id))
-            case IdleCheckerEntityType():
-                return await self.idle_checker_loader.load(IdleCheckerID(entity_id))
-            case ImageEntityType():
-                return await self.image_loader.load(ImageID(entity_id))
-            case NotificationChannelEntityType():
-                return await self.notification_channel_loader.load(NotificationChannelID(entity_id))
-            case NotificationRuleEntityType():
-                return await self.notification_rule_loader.load(NotificationRuleID(entity_id))
-            case ObjectStorageEntityType():
-                return await self.object_storage_loader.load(ObjectStorageID(entity_id))
-            case ProjectEntityType():
-                return await self.project_loader.load(ProjectID(entity_id))
-            case ResourceGroupEntityType():
-                return await self.resource_group_by_id_loader.load(ResourceGroupID(entity_id))
-            case RoleEntityType():
-                return await self.role_loader.load(RoleID(entity_id))
-            case RuntimeVariantEntityType():
-                return await self.runtime_variant_loader.load(RuntimeVariantID(entity_id))
-            case RuntimeVariantPresetEntityType():
-                return await self.runtime_variant_preset_loader.load(
-                    RuntimeVariantPresetID(entity_id)
-                )
-            case SessionEntityType():
-                return await self.session_loader.load(SessionID(entity_id))
-            case StorageNamespaceEntityType():
-                return await self.storage_namespace_loader.load(StorageNamespaceID(entity_id))
-            case UserEntityType():
-                return await self.user_loader.load(UserID(entity_id))
-            case VFolderEntityType():
-                return await self.vfolder_loader.load(VFolderUUID(entity_id))
-            case VFSStorageEntityType():
-                return await self.vfs_storage_loader.load(VFSStorageID(entity_id))
-            case _:
-                return None

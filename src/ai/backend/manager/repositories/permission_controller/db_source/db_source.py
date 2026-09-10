@@ -10,11 +10,6 @@ from ai.backend.common.data.entity.project import ProjectEntityType
 from ai.backend.common.data.entity.role import RoleID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.logging.utils import BraceStyleAdapter
-from ai.backend.manager.data.permission.entity import (
-    ElementAssociationListResult,
-    EntityData,
-    EntityListResult,
-)
 from ai.backend.manager.data.permission.id import ScopeId
 from ai.backend.manager.data.permission.permission import (
     PermissionData,
@@ -53,9 +48,6 @@ from ai.backend.manager.errors.permission import (
 )
 from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.project.row import ProjectRow
-from ai.backend.manager.models.rbac_models.association_scopes_entities import (
-    AssociationScopesEntitiesRow,
-)
 from ai.backend.manager.models.rbac_models.permission.creators import RolePermissionCreator
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.rbac_models.permission.purgers import RolePermissionPurger
@@ -274,7 +266,7 @@ class PermissionDBSource:
         querier: BatchQuerier,
         scope: ScopedRoleOperationScope,
     ) -> RoleListResult:
-        """Search roles registered in a given scope via association_scopes_entities."""
+        """Search the roles that sit in a given scope."""
         async with self._db.begin_readonly_session() as db_sess:
             query = sa.select(RoleRow)
 
@@ -453,61 +445,6 @@ class PermissionDBSource:
             ]
 
             return ScopeListResult(
-                items=items,
-                total_count=result.total_count,
-                has_next_page=result.has_next_page,
-                has_previous_page=result.has_previous_page,
-            )
-
-    async def search_entities_in_scope(
-        self,
-        querier: BatchQuerier,
-    ) -> EntityListResult:
-        """Search entities within a scope."""
-        async with self._db.begin_readonly_session() as db_sess:
-            query = sa.select(
-                AssociationScopesEntitiesRow.entity_id,
-                AssociationScopesEntitiesRow.entity_type,
-            )
-
-            result = await execute_batch_querier(
-                db_sess,
-                query,
-                querier,
-            )
-
-            items = [
-                EntityData(
-                    entity_type=row.entity_type,
-                    entity_id=row.entity_id,
-                )
-                for row in result.rows
-            ]
-
-            return EntityListResult(
-                items=items,
-                total_count=result.total_count,
-                has_next_page=result.has_next_page,
-                has_previous_page=result.has_previous_page,
-            )
-
-    async def search_element_associations_in_scope(
-        self,
-        querier: BatchQuerier,
-    ) -> ElementAssociationListResult:
-        """Search element associations (full association rows) within a scope."""
-        async with self._db.begin_readonly_session() as db_sess:
-            query = sa.select(AssociationScopesEntitiesRow)
-
-            result = await execute_batch_querier(
-                db_sess,
-                query,
-                querier,
-            )
-
-            items = [row.AssociationScopesEntitiesRow.to_data() for row in result.rows]
-
-            return ElementAssociationListResult(
                 items=items,
                 total_count=result.total_count,
                 has_next_page=result.has_next_page,

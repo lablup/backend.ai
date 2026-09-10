@@ -1,9 +1,7 @@
 """Membership queries over the virtual-entity chain.
 
 The virtual-entity chain (``entity_memberships`` joined to ``virtual_entities`` at both
-ends) is the read model for user-scope membership. ``association_scopes_entities``
-remains as the legacy dual-written association and must not be used for new membership
-reads.
+ends) is the read model for user-scope membership.
 """
 
 from __future__ import annotations
@@ -24,6 +22,7 @@ __all__ = (
     "user_scope_membership_exists",
     "user_scope_membership_query",
 )
+
 
 # The column element is parameterized loosely: an id newtype makes
 # `ColumnElement[DomainID]`, which is not a `ColumnElement[UUID]` under invariance,

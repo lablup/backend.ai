@@ -19,7 +19,6 @@ from ai.backend.common.dto.manager.rbac.request import (
     RevokeRoleRequest,
     RoleFilter,
     RoleOrder,
-    SearchEntitiesRequest,
     SearchRolesRequest,
     SearchScopesRequest,
     SearchUsersAssignedToRoleRequest,
@@ -33,7 +32,6 @@ from ai.backend.common.dto.manager.rbac.response import (
     GetRoleResponse,
     GetScopeTypesResponse,
     RevokeRoleResponse,
-    SearchEntitiesResponse,
     SearchRolesResponse,
     SearchScopesResponse,
     SearchUsersAssignedToRoleResponse,
@@ -45,7 +43,6 @@ from ai.backend.common.dto.manager.rbac.types import (
     RoleSource,
     RoleStatus,
 )
-from ai.backend.testutils.fixtures import DomainFixtureData
 
 RoleFactory = Callable[..., Coroutine[Any, Any, CreateRoleResponse]]
 
@@ -591,60 +588,9 @@ class TestEntityManagement:
         assert isinstance(result, GetEntityTypesResponse)
         assert len(result.items) > 0
 
-    async def test_search_entities_in_domain(
-        self,
-        admin_registry: BackendAIClientRegistry,
-        domain_fixture: DomainFixtureData,
-    ) -> None:
-        """Search entities within a domain scope."""
-        # Search for users in the test domain
-        result = await admin_registry.rbac.search_entities(
-            scope_type="domain",
-            scope_id=domain_fixture.domain_name,
-            entity_type="user",
-            request=SearchEntitiesRequest(),
-        )
-
-        assert isinstance(result, SearchEntitiesResponse)
-        # Test domain may be empty, just verify search works
-        assert result.pagination.total >= len(result.items)
-        assert isinstance(result.items, list)
-
-    async def test_search_entities_with_pagination(
-        self,
-        admin_registry: BackendAIClientRegistry,
-        domain_fixture: DomainFixtureData,
-    ) -> None:
-        """Search entities with pagination returns correct page."""
-        result = await admin_registry.rbac.search_entities(
-            scope_type="domain",
-            scope_id=domain_fixture.domain_name,
-            entity_type="user",
-            request=SearchEntitiesRequest(limit=1, offset=0),
-        )
-
-        assert isinstance(result, SearchEntitiesResponse)
-        assert result.pagination.limit == 1
-        assert len(result.items) <= 1
-
     async def test_regular_user_cannot_get_entity_types(
         self,
         user_registry: BackendAIClientRegistry,
     ) -> None:
         with pytest.raises(PermissionDeniedError):
             await user_registry.rbac.get_entity_types()
-
-    async def test_regular_user_cannot_search_entities(
-        self,
-        user_registry: BackendAIClientRegistry,
-        domain_fixture: DomainFixtureData,
-    ) -> None:
-        """Regular user cannot search entities."""
-        # Entity search should be admin-only
-        with pytest.raises(PermissionDeniedError):
-            await user_registry.rbac.search_entities(
-                scope_type="domain",
-                scope_id=domain_fixture.domain_name,
-                entity_type="user",
-                request=SearchEntitiesRequest(),
-            )

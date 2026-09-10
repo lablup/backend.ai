@@ -55,14 +55,6 @@ from .actions.permission import (
     DeletePermissionActionResult,
 )
 from .actions.purge_role import PurgeRoleAction
-from .actions.search_element_associations import (
-    SearchElementAssociationsAction,
-    SearchElementAssociationsActionResult,
-)
-from .actions.search_entities import (
-    SearchEntitiesAction,
-    SearchEntitiesActionResult,
-)
 from .actions.search_permissions import (
     SearchPermissionsAction,
     SearchPermissionsActionResult,
@@ -108,10 +100,6 @@ class PermissionControllerProcessors:
     get_permission_matrix: ActionProcessor[
         GetPermissionMatrixAction, GetPermissionMatrixActionResult
     ]
-    search_entities: ActionProcessor[SearchEntitiesAction, SearchEntitiesActionResult]
-    search_element_associations: ActionProcessor[
-        SearchElementAssociationsAction, SearchElementAssociationsActionResult
-    ]
     search_permissions: ActionProcessor[SearchPermissionsAction, SearchPermissionsActionResult]
     create_permission: ActionProcessor[CreatePermissionAction, CreatePermissionActionResult]
     update_permission: ActionProcessor[UpdatePermissionAction, UpdatePermissionActionResult]
@@ -152,10 +140,6 @@ class PermissionControllerProcessors:
         self.get_scope_types = ActionProcessor(service.get_scope_types, action_monitors)
         self.get_entity_types = ActionProcessor(service.get_entity_types, action_monitors)
         self.get_permission_matrix = ActionProcessor(service.get_permission_matrix, action_monitors)
-        self.search_entities = ActionProcessor(service.search_entities, action_monitors)
-        self.search_element_associations = ActionProcessor(
-            service.search_element_associations, action_monitors
-        )
         self.search_permissions = ActionProcessor(service.search_permissions, action_monitors)
         self.create_permission = ActionProcessor(service.create_permission, action_monitors)
         self.update_permission = ActionProcessor(service.update_permission, action_monitors)

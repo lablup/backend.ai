@@ -20,11 +20,9 @@ from .types import (
 )
 
 __all__ = (
-    "AdminSearchAssociationsPayload",
     "AdminSearchPermissionsPayload",
     "SearchRoleAssignmentsPayload",
     "AdminSearchRolesPayload",
-    "AssociationScopesEntitiesNode",
     "BulkAddRolePermissionFailureInfo",
     "BulkAddRolePermissionsPayload",
     "BulkAssignRoleFailureInfo",
@@ -37,7 +35,6 @@ __all__ = (
     "DeletePermissionPayload",
     "DeleteRolePayload",
     "EntityActionInfo",
-    "EntityNode",
     "EntityOperationCombinationInfo",
     "OperationInfo",
     "PermissionNode",
@@ -226,25 +223,6 @@ class PermissionNode(BaseResponseModel):
     created_at: datetime = Field(description="Creation timestamp")
 
 
-class EntityNode(BaseResponseModel):
-    """Node representing an entity reference in the RBAC system."""
-
-    entity_type: str = Field(description="Entity type value (e.g. 'user', 'project')")
-    entity_id: str = Field(description="Entity identifier")
-
-
-class AssociationScopesEntitiesNode(BaseResponseModel):
-    """Node representing an association between a scope and an entity."""
-
-    id: UUID = Field(description="Association ID")
-    scope_type: str = Field(description="Scope element type value")
-    scope_id: str = Field(description="Scope element ID")
-    entity_type: str = Field(description="Entity element type value")
-    entity_id: str = Field(description="Entity identifier")
-    relation_type: str = Field(description="Relation type value")
-    registered_at: datetime = Field(description="Registration timestamp")
-
-
 class AdminSearchRolesPayload(BaseResponseModel):
     """Paginated result for role search."""
 
@@ -268,15 +246,6 @@ class SearchRoleAssignmentsPayload(BaseResponseModel):
 
     items: list[RoleAssignmentNode] = Field(description="List of role assignment nodes.")
     total_count: int = Field(description="Total number of assignments matching the filter.")
-    has_next_page: bool = Field(description="Whether there is a next page.")
-    has_previous_page: bool = Field(description="Whether there is a previous page.")
-
-
-class AdminSearchAssociationsPayload(BaseResponseModel):
-    """Paginated result for scope-entity association search."""
-
-    items: list[AssociationScopesEntitiesNode] = Field(description="List of association nodes.")
-    total_count: int = Field(description="Total number of associations matching the filter.")
     has_next_page: bool = Field(description="Whether there is a next page.")
     has_previous_page: bool = Field(description="Whether there is a previous page.")
 

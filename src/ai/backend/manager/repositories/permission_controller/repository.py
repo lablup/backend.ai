@@ -11,7 +11,6 @@ from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
 from ai.backend.common.resilience.resilience import Resilience
-from ai.backend.manager.data.permission.entity import ElementAssociationListResult, EntityListResult
 from ai.backend.manager.data.permission.permission import (
     PermissionData,
     PermissionListResult,
@@ -223,36 +222,6 @@ class PermissionControllerRepository:
                 raise NotImplementedError(
                     "This function will be deprecated and new repository functions will be implemented for each scope"
                 )
-
-    @permission_controller_repository_resilience.apply()
-    async def search_entities(
-        self,
-        querier: BatchQuerier,
-    ) -> EntityListResult:
-        """Search entities within a scope.
-
-        Args:
-            querier: BatchQuerier with scope conditions and pagination settings.
-
-        Returns:
-            EntityListResult with matching entities.
-        """
-        return await self._db_source.search_entities_in_scope(querier)
-
-    @permission_controller_repository_resilience.apply()
-    async def search_element_associations(
-        self,
-        querier: BatchQuerier,
-    ) -> ElementAssociationListResult:
-        """Search element associations (full association rows) within a scope.
-
-        Args:
-            querier: BatchQuerier with scope conditions and pagination settings.
-
-        Returns:
-            ElementAssociationListResult with full association row data.
-        """
-        return await self._db_source.search_element_associations_in_scope(querier)
 
     @permission_controller_repository_resilience.apply()
     async def owned_permissions(

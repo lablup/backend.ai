@@ -21,7 +21,6 @@ from .types import (
 )
 
 __all__ = (
-    "AdminSearchEntitiesGQLInput",
     "AdminSearchPermissionsGQLInput",
     "SearchRoleAssignmentsInput",
     "SearchRolesInput",
@@ -34,8 +33,6 @@ __all__ = (
     "CreateRoleInput",
     "DeletePermissionInput",
     "DeleteRoleInput",
-    "EntityFilter",
-    "EntityOrderBy",
     "PermissionFilter",
     "PermissionNestedFilter",
     "PermissionOrderBy",
@@ -315,21 +312,6 @@ class RoleAssignmentFilter(BaseRequestModel):
 RoleAssignmentFilter.model_rebuild()
 
 
-class EntityFilter(BaseRequestModel):
-    """Filter for entity associations."""
-
-    entity_type: StringFilter | None = None
-    entity_id: StringFilter | None = None
-    scope_type: StringFilter | None = None
-    scope_id: StringFilter | None = None
-    AND: list[EntityFilter] | None = None
-    OR: list[EntityFilter] | None = None
-    NOT: list[EntityFilter] | None = None
-
-
-EntityFilter.model_rebuild()
-
-
 class PermissionFilter(BaseRequestModel):
     """Filter for scoped permissions."""
 
@@ -353,13 +335,6 @@ class RoleOrderBy(BaseRequestModel):
 
 class RoleAssignmentOrderBy(BaseRequestModel):
     """Order by specification for role assignments."""
-
-    field: str
-    direction: OrderDirection = OrderDirection.DESC
-
-
-class EntityOrderBy(BaseRequestModel):
-    """Order by specification for entity associations."""
 
     field: str
     direction: OrderDirection = OrderDirection.DESC
@@ -403,19 +378,6 @@ class SearchRoleAssignmentsInput(BaseRequestModel):
 
     filter: RoleAssignmentFilter | None = None
     order: list[RoleAssignmentOrderBy] | None = None
-    first: int | None = None
-    after: str | None = None
-    last: int | None = None
-    before: str | None = None
-    limit: int | None = None
-    offset: int | None = None
-
-
-class AdminSearchEntitiesGQLInput(BaseRequestModel):
-    """GQL pagination search input for entity associations."""
-
-    filter: EntityFilter | None = None
-    order: list[EntityOrderBy] | None = None
     first: int | None = None
     after: str | None = None
     last: int | None = None

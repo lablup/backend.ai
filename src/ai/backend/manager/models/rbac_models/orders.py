@@ -5,9 +5,6 @@ from __future__ import annotations
 from ai.backend.manager.models.clauses import QueryOrder
 from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.project.row import ProjectRow
-from ai.backend.manager.models.rbac_models.association_scopes_entities import (
-    AssociationScopesEntitiesRow,
-)
 from ai.backend.manager.models.rbac_models.permission.object_permission import (
     ObjectPermissionRow,
 )
@@ -84,28 +81,6 @@ class UserScopeOrders:
         if ascending:
             return UserRow.created_at.asc()
         return UserRow.created_at.desc()
-
-
-class EntityScopeOrders:
-    """Query orders for entity scope search."""
-
-    @staticmethod
-    def id(ascending: bool = True) -> QueryOrder:
-        if ascending:
-            return AssociationScopesEntitiesRow.id.asc()
-        return AssociationScopesEntitiesRow.id.desc()
-
-    @staticmethod
-    def entity_type(ascending: bool = True) -> QueryOrder:
-        if ascending:
-            return AssociationScopesEntitiesRow.entity_type.asc()
-        return AssociationScopesEntitiesRow.entity_type.desc()
-
-    @staticmethod
-    def registered_at(ascending: bool = True) -> QueryOrder:
-        if ascending:
-            return AssociationScopesEntitiesRow.registered_at.asc()
-        return AssociationScopesEntitiesRow.registered_at.desc()
 
 
 class ObjectPermissionOrders:
