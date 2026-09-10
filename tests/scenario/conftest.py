@@ -38,6 +38,7 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.permission_controller.repository import (
     PermissionControllerRepository,
 )
+from ai.backend.testutils.scenario_steps import Configured
 from ai.backend.testutils.typed_scenario import (
     TypedScenario,
 )
@@ -125,7 +126,11 @@ def config(
     """
     callspec = getattr(request.node, "callspec", None)
     asked = callspec.params.get("scenario") if callspec is not None else None
-    overrides = asked.given.dotted_config() if isinstance(asked, TypedScenario) else {}
+    overrides: dict[str, Any] = {}
+    if isinstance(asked, TypedScenario):
+        overrides = asked.given.dotted_config()
+    elif isinstance(asked, Configured):
+        overrides = dict(asked.config())
     return ScenarioConfigProvider(
         make_config(base_config_dict(template.addr, test_db, None), overrides)
     )

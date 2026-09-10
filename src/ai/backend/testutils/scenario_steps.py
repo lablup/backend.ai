@@ -11,8 +11,9 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from collections.abc import Mapping
 from dataclasses import dataclass, field
-from typing import override
+from typing import Any, override
 
 
 @dataclass(frozen=True)
@@ -185,6 +186,18 @@ class Then[G, R](ABC):
         """본 것을 그대로 쌓는다."""
         seen = [one.told() for one in self.look(laid, answered)]
         return Told(self.says(), within=tuple(seen))
+
+
+class Configured(ABC):
+    """설정을 바꿔 두고 도는 시나리오가 함께 구현한다.
+
+    바꿀 자리는 설정 파일의 경로다. 표가 행을 잇는 값이 아니라 설정 그 자체이므로 경로로
+    적는다.
+    """
+
+    @abstractmethod
+    def config(self) -> Mapping[str, Any]:
+        raise NotImplementedError
 
 
 class Scenario[S, G, A, R](ABC):

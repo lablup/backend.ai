@@ -84,6 +84,64 @@ class ADomainAndSomeone(Given[Any, ADomainAndACaller]):
 
 
 @dataclass(frozen=True)
+class ATargetAndSomeone(Given[Any, ADomainAndACaller]):
+    """건드릴 도메인 하나와, 다른 도메인에 사는 사람 한 명.
+
+    건드리는 대상이 부르는 사람의 집이면 안 되는 자리에 쓴다. 완전히 지우는 요청이 그렇다.
+    """
+
+    role: UserRole = UserRole.USER
+    name_hint: str = "target"
+
+    @override
+    def describe(self) -> str:
+        return f"건드릴 도메인 하나와, 다른 도메인에 사는 {self.role.value} 한 명"
+
+    @override
+    async def lay(self, seeding: Any) -> ADomainAndACaller:
+        home = await seeding.creating(SeedDomain(name_hint="home", description=WAS_HERE))
+        target = await seeding.creating(SeedDomain(name_hint=self.name_hint, description=WAS_HERE))
+        caller = await seeding.within(SomeoneOf(home, role=self.role))
+        return ADomainAndACaller(seeding.made(target), seeding.made(caller))
+
+
+@dataclass(frozen=True)
+class ManyDomainsAndACaller:
+    """훑을 도메인 여럿과, 훑을 사람. `named`는 그중 골라낼 하나다."""
+
+    laid: tuple[DomainData, ...]
+    named: DomainData
+    caller: UserData
+
+
+@dataclass(frozen=True)
+class ManyDomainsAndSomeone(Given[Any, ManyDomainsAndACaller]):
+    """도메인 여럿과 그중 한 도메인에 속한 사용자 한 명."""
+
+    role: UserRole = UserRole.USER
+    besides: int = 2
+
+    @override
+    def describe(self) -> str:
+        return f"도메인 {self.besides + 2}개와, 그중 하나에 속한 {self.role.value} 한 명"
+
+    @override
+    async def lay(self, seeding: Any) -> ManyDomainsAndACaller:
+        home = await seeding.creating(SeedDomain(name_hint="home", description=WAS_HERE))
+        wanted = await seeding.creating(SeedDomain(name_hint="wanted", description=WAS_HERE))
+        others = [
+            await seeding.creating(SeedDomain(name_hint="other", description=WAS_HERE))
+            for _ in range(self.besides)
+        ]
+        caller = await seeding.within(SomeoneOf(home, role=self.role))
+        return ManyDomainsAndACaller(
+            laid=tuple(seeding.made(one) for one in [home, wanted, *others]),
+            named=seeding.made(wanted),
+            caller=seeding.made(caller),
+        )
+
+
+@dataclass(frozen=True)
 class WrittenByThisRun(Condition[datetime | None]):
     """이 실행이 쓴 시각. 값 자체는 실행마다 달라 레포트에 넣지 않는다."""
 
@@ -128,6 +186,37 @@ class TheDomainNode(Then[ADomainAndACaller, DomainNode]):
             Same("integration_name", node.basic_info.integration_name, None),
             Same("allowed_docker_registries", node.registry.allowed_docker_registries, []),
             Same("is_active", node.lifecycle.is_active, self.active),
+            Same("is_default", node.lifecycle.is_default, False),
+            Skipped("id", "데이터베이스가 만든다"),
+            Held("created_at", node.lifecycle.created_at, written),
+            Held("modified_at", node.lifecycle.modified_at, written),
+        ]
+
+
+@dataclass(frozen=True)
+class TheNewDomainNode(Then[Any, DomainNode]):
+    """방금 만든 도메인이 통째로 온다. 이름과 설명은 시나리오가 정한 것이다."""
+
+    started: datetime
+    named: str
+    described: str | None
+
+    @override
+    def says(self) -> str:
+        return "만든 도메인 전체가 온다"
+
+    @override
+    def look(self, laid: Any, answered: Answered[DomainNode]) -> list[Verdict]:
+        node = answered.response
+        if node is None:
+            return [Refused(EntityNotFoundError, answered.raised)]
+        written = WrittenByThisRun(self.started)
+        return [
+            Same("name", node.basic_info.name, self.named),
+            Same("description", node.basic_info.description, self.described),
+            Same("integration_name", node.basic_info.integration_name, None),
+            Same("allowed_docker_registries", node.registry.allowed_docker_registries, []),
+            Same("is_active", node.lifecycle.is_active, True),
             Same("is_default", node.lifecycle.is_default, False),
             Skipped("id", "데이터베이스가 만든다"),
             Held("created_at", node.lifecycle.created_at, written),
