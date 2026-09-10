@@ -6,7 +6,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from decimal import Decimal
-from typing import Any
+from typing import Annotated, Any
 from uuid import UUID
 
 from pydantic import Field, field_validator
@@ -528,8 +528,8 @@ class UpdateDeploymentInput(BaseRequestModel):
     name: str | None | Unset = Field(
         default=UNSET, description="Updated deployment name. Omit to leave unchanged."
     )
-    replica_count: int | None | Unset = Field(
-        default=UNSET, ge=0, description="Updated replica count. Omit to leave unchanged."
+    replica_count: Annotated[int, Field(ge=0)] | None | Unset = Field(
+        default=UNSET, description="Updated replica count. Omit to leave unchanged."
     )
     tags: list[str] | None | Unset = Field(
         default=UNSET, description="Updated tags. Omit to leave unchanged; null clears."
