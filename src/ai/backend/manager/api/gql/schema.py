@@ -119,6 +119,7 @@ from .deployment import (
     # Route
     route,
     routes,
+    scoped_deployments,
     sync_replicas,
     update_auto_scaling_rule,
     update_deployment_policy,
@@ -649,6 +650,7 @@ class Query:
     project_sessions_v2 = project_sessions_v2
     session_v2 = session_v2
     project_deployments = project_deployments
+    scoped_deployments = scoped_deployments
     my_deployments = my_deployments
     resource_slot_type = resource_slot_type
     resource_slot_types = resource_slot_types
