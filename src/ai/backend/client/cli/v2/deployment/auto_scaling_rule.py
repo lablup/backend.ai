@@ -208,6 +208,36 @@ def get(rule_id: uuid.UUID) -> None:
     type=click.UUID,
     help="Updated Prometheus query preset UUID (omit = no change).",
 )
+@click.option(
+    "--set-null-min-threshold",
+    is_flag=True,
+    default=False,
+    help="Clear min_threshold. Mutually exclusive with --min-threshold.",
+)
+@click.option(
+    "--set-null-max-threshold",
+    is_flag=True,
+    default=False,
+    help="Clear max_threshold. Mutually exclusive with --max-threshold.",
+)
+@click.option(
+    "--set-null-min-replicas",
+    is_flag=True,
+    default=False,
+    help="Clear min_replicas. Mutually exclusive with --min-replicas.",
+)
+@click.option(
+    "--set-null-max-replicas",
+    is_flag=True,
+    default=False,
+    help="Clear max_replicas. Mutually exclusive with --max-replicas.",
+)
+@click.option(
+    "--set-null-prometheus-query-preset-id",
+    is_flag=True,
+    default=False,
+    help="Clear prometheus_query_preset_id. Mutually exclusive with --prometheus-query-preset-id.",
+)
 def update(
     rule_id: uuid.UUID,
     metric_source: str | None,
@@ -219,6 +249,11 @@ def update(
     min_replicas: int | None,
     max_replicas: int | None,
     prometheus_query_preset_id: uuid.UUID | None,
+    set_null_min_threshold: bool,
+    set_null_max_threshold: bool,
+    set_null_min_replicas: bool,
+    set_null_max_replicas: bool,
+    set_null_prometheus_query_preset_id: bool,
 ) -> None:
     """Update an auto-scaling rule."""
     from ai.backend.common.dto.manager.v2.auto_scaling_rule.request import (
@@ -226,6 +261,23 @@ def update(
     )
     from ai.backend.common.dto.manager.v2.auto_scaling_rule.types import AutoScalingMetricSource
     from ai.backend.common.tristate.unset import UNSET
+
+    if min_threshold is not None and set_null_min_threshold:
+        raise click.UsageError(
+            "--min-threshold and --set-null-min-threshold are mutually exclusive."
+        )
+    if max_threshold is not None and set_null_max_threshold:
+        raise click.UsageError(
+            "--max-threshold and --set-null-max-threshold are mutually exclusive."
+        )
+    if min_replicas is not None and set_null_min_replicas:
+        raise click.UsageError("--min-replicas and --set-null-min-replicas are mutually exclusive.")
+    if max_replicas is not None and set_null_max_replicas:
+        raise click.UsageError("--max-replicas and --set-null-max-replicas are mutually exclusive.")
+    if prometheus_query_preset_id is not None and set_null_prometheus_query_preset_id:
+        raise click.UsageError(
+            "--prometheus-query-preset-id and --set-null-prometheus-query-preset-id are mutually exclusive."
+        )
 
     body = UpdateAutoScalingRuleInput(
         id=rule_id,
@@ -235,12 +287,32 @@ def update(
         metric_name=metric_name if metric_name is not None else UNSET,
         step_size=step_size if step_size is not None else UNSET,
         time_window=time_window if time_window is not None else UNSET,
-        min_threshold=Decimal(min_threshold) if min_threshold is not None else UNSET,
-        max_threshold=Decimal(max_threshold) if max_threshold is not None else UNSET,
-        min_replicas=min_replicas if min_replicas is not None else UNSET,
-        max_replicas=max_replicas if max_replicas is not None else UNSET,
+        min_threshold=(
+            None
+            if set_null_min_threshold
+            else Decimal(min_threshold)
+            if min_threshold is not None
+            else UNSET
+        ),
+        max_threshold=(
+            None
+            if set_null_max_threshold
+            else Decimal(max_threshold)
+            if max_threshold is not None
+            else UNSET
+        ),
+        min_replicas=(
+            None if set_null_min_replicas else min_replicas if min_replicas is not None else UNSET
+        ),
+        max_replicas=(
+            None if set_null_max_replicas else max_replicas if max_replicas is not None else UNSET
+        ),
         prometheus_query_preset_id=(
-            prometheus_query_preset_id if prometheus_query_preset_id is not None else UNSET
+            None
+            if set_null_prometheus_query_preset_id
+            else prometheus_query_preset_id
+            if prometheus_query_preset_id is not None
+            else UNSET
         ),
     )
 
