@@ -82,7 +82,6 @@ from ai.backend.manager.models.user.purgers import (
     UserGroupAssociationPurger,
     UserKeyPairPurger,
     UserPurger,
-    UserScopeAssociationPurger,
     UserSessionGroupPurger,
     UserVFolderPermissionPurger,
 )
@@ -407,7 +406,6 @@ class UserDBSource:
             # delegated (the groups moved with them) or deleted by now.
             # TODO: scope this purge. A user operation must not use in_global.
             await w.batch_purge_entities_in_global(UserSessionGroupPurger(user_id=user_id))
-            await w.batch_purge_field_entities(user_id, UserScopeAssociationPurger())
             # Finally the user itself as a scope: the row and the RBAC graph it left.
             await w.purge_entity(UserPurger(user_id=user_id))
 
