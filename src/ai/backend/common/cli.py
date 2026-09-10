@@ -55,22 +55,14 @@ class LazyGroup(LazyClickMixin, click.Group):
     pass
 
 
-class EnumChoice(click.Choice):
-    enum: type[Enum]
+class EnumChoice[T_enum: Enum](click.Choice[T_enum]):
+    enum: type[T_enum]
 
-    def __init__(self, enum: type[Enum]) -> None:
-        enum_members = [e.name for e in enum]
-        super().__init__(enum_members)
+    def __init__(self, enum: type[T_enum]) -> None:
+        super().__init__(list(enum))
         self.enum = enum
 
-    def convert(self, value: Any, param: click.Parameter | None, ctx: click.Context | None) -> Enum:
-        if isinstance(value, self.enum):
-            # for default value, it is already the enum type.
-            return next(e for e in self.enum if e == value)
-        value = super().convert(value, param, ctx)
-        return self.enum[value]
-
-    def get_metavar(self, param: click.Parameter) -> str:
+    def get_metavar(self, param: click.Parameter, ctx: click.Context) -> str:
         name = self.enum.__name__
         name = re.sub(r"([A-Z\d]+)([A-Z][a-z])", r"\1_\2", name)
         name = re.sub(r"([a-z\d])([A-Z])", r"\1_\2", name)
@@ -97,7 +89,7 @@ class MinMaxRangeParamType(click.ParamType):
         except (ArithmeticError, ValueError):
             self.fail(f"{value!r} contains an invalid number", param, ctx)
 
-    def get_metavar(self, param: click.Parameter) -> str:
+    def get_metavar(self, param: click.Parameter, ctx: click.Context) -> str:
         return "MIN:MAX"
 
 

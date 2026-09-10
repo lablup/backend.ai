@@ -5,13 +5,13 @@ from typing import Any
 import click
 
 
-class CommaSeparatedChoice(click.Choice):
+class CommaSeparatedChoice(click.Choice[str | list[str]]):
     def convert(
         self,
         value: str,
         param: click.Parameter | None,
         ctx: click.Context | None,
-    ) -> list[str] | None:
+    ) -> list[str]:
         pieces = value.split(",")
         return [super(click.Choice, self).convert(piece, param, ctx) for piece in pieces]
 
