@@ -11,11 +11,11 @@ from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
 from ai.backend.client.v2.exceptions import ConflictError, NotFoundError
 from ai.backend.client.v2.registry import BackendAIClientRegistry
+from ai.backend.common.data.entity.entity_membership import EntityMembershipID
 from ai.backend.common.data.entity.project import ProjectEntityType
 from ai.backend.common.data.entity.role import RoleEntityType
 from ai.backend.common.data.entity.user import UserEntityType
 from ai.backend.common.data.entity.virtual_entity import VirtualEntityID
-from ai.backend.common.data.permission.id import EntityMembershipID
 from ai.backend.common.dto.manager.user import (
     CreateUserRequest,
     CreateUserResponse,

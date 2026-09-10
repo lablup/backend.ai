@@ -8,6 +8,7 @@ from typing import override
 
 from aiohttp import web
 
+from ai.backend.common.data.entity.entity_membership import EntityMembershipEntityType
 from ai.backend.common.data.entity.keypair import KeyPairFieldType
 from ai.backend.common.data.entity.login_client_type import LoginClientTypeEntityType
 from ai.backend.common.data.entity.login_session import LoginSessionFieldType
@@ -146,16 +147,14 @@ class AccessKeyNotFound(FieldError, ObjectNotFound):
         return FieldErrorCode(KeyPairFieldType(), ActionOperationType.GET, ErrorDetail.NOT_FOUND)
 
 
-class GroupMembershipNotFoundError(BackendAIError, web.HTTPNotFound):
+class GroupMembershipNotFoundError(EntityError, web.HTTPNotFound):
     error_type = "https://api.backend.ai/probs/group-membership-not-found"
     error_title = "User is not a member of the specified group."
 
     @override
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.GROUP,
-            operation=ErrorOperation.READ,
-            error_detail=ErrorDetail.NOT_FOUND,
+    def entity_error_code(self) -> EntityErrorCode:
+        return EntityErrorCode(
+            EntityMembershipEntityType(), ActionOperationType.GET, ErrorDetail.NOT_FOUND
         )
 
 
