@@ -83,8 +83,9 @@ class ContainerRegistryRepository:
                         type=data.type,
                         project=data.project,
                         url=data.url,
+                        operation=ActionOperationType.UPDATE,
                     )
-                ).validate(ActionOperationType.UPDATE)
+                ).validate()
             return data
 
     async def delete_registry(self, purger: ContainerRegistryPurger) -> ContainerRegistryData:

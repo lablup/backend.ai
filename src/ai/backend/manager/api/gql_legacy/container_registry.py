@@ -369,10 +369,11 @@ class CreateContainerRegistryNode(graphene.Mutation):  # type: ignore[misc]
                 url=url,
                 type=type,
                 project=cast(str | None, project if project is not Undefined else None),
+                operation=ActionOperationType.CREATE,
             )
         )
 
-        validator.validate(ActionOperationType.CREATE)
+        validator.validate()
 
         def value_or_none(val: Any) -> Any | None:
             return None if val is Undefined else val

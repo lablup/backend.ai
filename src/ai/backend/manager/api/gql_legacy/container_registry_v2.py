@@ -115,10 +115,11 @@ class CreateContainerRegistryNodeV2(graphene.Mutation):  # type: ignore[misc]
                 url=props.url,
                 type=props.type,
                 project=props.project,
+                operation=ActionOperationType.CREATE,
             )
         )
 
-        validator.validate(ActionOperationType.CREATE)
+        validator.validate()
 
         result = await ctx.processors.container_registry.create_container_registry.run(
             props.to_action()

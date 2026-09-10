@@ -50,6 +50,7 @@ class ContainerRegistryValidatorArgs:
     url: str
     type: ContainerRegistryType
     project: str | None
+    operation: ActionOperationType
 
 
 # TODO: Refactor this using inheritance
@@ -61,11 +62,13 @@ class ContainerRegistryValidator:
     _url: str
     _type: ContainerRegistryType
     _project: str | None
+    _operation: ActionOperationType
 
     def __init__(self, args: ContainerRegistryValidatorArgs) -> None:
         self._url = args.url
         self._type = args.type
         self._project = args.project
+        self._operation = args.operation
 
     def _is_valid_url(self, url: str) -> bool:
         try:
@@ -77,14 +80,14 @@ class ContainerRegistryValidator:
         except Exception:
             return False
 
-    def validate(self, operation: ActionOperationType) -> None:
+    def validate(self) -> None:
         """
         Validate container registry configuration.
         """
         # Validate URL format
         if not self._is_valid_url(self._url):
             raise InvalidContainerRegistryURL(
-                f"Invalid URL format: {self._url}", operation=operation
+                f"Invalid URL format: {self._url}", operation=self._operation
             )
 
         # Validate project name for Harbor
@@ -92,16 +95,16 @@ class ContainerRegistryValidator:
             case ContainerRegistryType.HARBOR | ContainerRegistryType.HARBOR2:
                 if self._project is None:
                     raise InvalidContainerRegistryProject(
-                        "Project name is required for Harbor.", operation=operation
+                        "Project name is required for Harbor.", operation=self._operation
                     )
                 if not (1 <= len(self._project) <= 255):
                     raise InvalidContainerRegistryProject(
-                        "Invalid project name length.", operation=operation
+                        "Invalid project name length.", operation=self._operation
                     )
                 pattern = re.compile(r"^[a-z0-9]+(?:[._-][a-z0-9]+)*$")
                 if not pattern.match(self._project):
                     raise InvalidContainerRegistryProject(
-                        "Invalid project name format.", operation=operation
+                        "Invalid project name format.", operation=self._operation
                     )
             case _:
                 pass

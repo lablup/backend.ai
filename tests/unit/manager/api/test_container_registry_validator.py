@@ -56,10 +56,11 @@ class TestContainerRegistryValidator:
             url=valid_url,
             type=ContainerRegistryType.DOCKER,
             project=None,
+            operation=ActionOperationType.CREATE,
         )
         validator = ContainerRegistryValidator(args)
         # Should not raise any exception
-        validator.validate(ActionOperationType.CREATE)
+        validator.validate()
 
     @pytest.mark.parametrize(
         "invalid_url",
@@ -78,10 +79,11 @@ class TestContainerRegistryValidator:
             url=invalid_url,
             type=ContainerRegistryType.DOCKER,
             project=None,
+            operation=ActionOperationType.CREATE,
         )
         validator = ContainerRegistryValidator(args)
         with pytest.raises(InvalidContainerRegistryURL, match=f"Invalid URL format: {invalid_url}"):
-            validator.validate(ActionOperationType.CREATE)
+            validator.validate()
 
     @pytest.mark.parametrize(
         "registry_type, registry_url",
@@ -98,13 +100,14 @@ class TestContainerRegistryValidator:
             url=registry_url,
             type=registry_type,
             project=None,
+            operation=ActionOperationType.CREATE,
         )
         validator = ContainerRegistryValidator(args)
         with pytest.raises(
             InvalidContainerRegistryProject,
             match=r"Project name is required for Harbor\.",
         ):
-            validator.validate(ActionOperationType.CREATE)
+            validator.validate()
 
     @pytest.mark.parametrize(
         "project_name",
@@ -120,10 +123,11 @@ class TestContainerRegistryValidator:
             url="https://harbor.example.com",
             type=ContainerRegistryType.HARBOR,
             project=project_name,
+            operation=ActionOperationType.CREATE,
         )
         validator = ContainerRegistryValidator(args)
         with pytest.raises(InvalidContainerRegistryProject, match=r"Invalid project name length\."):
-            validator.validate(ActionOperationType.CREATE)
+            validator.validate()
 
     @pytest.mark.parametrize(
         "invalid_project_name",
@@ -160,10 +164,11 @@ class TestContainerRegistryValidator:
             url="https://harbor.example.com",
             type=ContainerRegistryType.HARBOR,
             project=invalid_project_name,
+            operation=ActionOperationType.CREATE,
         )
         validator = ContainerRegistryValidator(args)
         with pytest.raises(InvalidContainerRegistryProject, match=r"Invalid project name format\."):
-            validator.validate(ActionOperationType.CREATE)
+            validator.validate()
 
     @pytest.mark.parametrize(
         "valid_project_name",
@@ -200,10 +205,11 @@ class TestContainerRegistryValidator:
             url="https://harbor.example.com",
             type=ContainerRegistryType.HARBOR,
             project=valid_project_name,
+            operation=ActionOperationType.CREATE,
         )
         validator = ContainerRegistryValidator(args)
         # Should not raise any exception
-        validator.validate(ActionOperationType.CREATE)
+        validator.validate()
 
     @pytest.mark.parametrize(
         "case",
@@ -224,10 +230,11 @@ class TestContainerRegistryValidator:
             url="https://harbor.example.com",
             type=ContainerRegistryType.HARBOR,
             project=None,
+            operation=case.operation,
         )
         validator = ContainerRegistryValidator(args)
         with pytest.raises(InvalidContainerRegistryProject) as exc_info:
-            validator.validate(case.operation)
+            validator.validate()
         assert str(exc_info.value.error_code()) == case.expected_code
 
     @pytest.mark.parametrize(
@@ -249,8 +256,9 @@ class TestContainerRegistryValidator:
             url="",
             type=ContainerRegistryType.DOCKER,
             project=None,
+            operation=case.operation,
         )
         validator = ContainerRegistryValidator(args)
         with pytest.raises(InvalidContainerRegistryURL) as exc_info:
-            validator.validate(case.operation)
+            validator.validate()
         assert str(exc_info.value.error_code()) == case.expected_code
