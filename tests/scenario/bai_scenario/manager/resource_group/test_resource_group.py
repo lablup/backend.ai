@@ -14,7 +14,11 @@ from ai.backend.common.dto.manager.v2.resource_group.request import CreateResour
 from ai.backend.manager.api.adapters.resource_group.adapter import ResourceGroupAdapter
 from ai.backend.manager.config.unified import ManagerUnifiedConfig
 from ai.backend.manager.errors.auth import InsufficientPrivilege
-from ai.backend.testutils.typed_scenario import TypedScenario, at, call
+from ai.backend.testutils.typed_scenario import (
+    At,
+    TypedScenario,
+    call,
+)
 
 type ResourceGroupScenario = TypedScenario[ResourceGroupAdapter, ManagerUnifiedConfig]
 
@@ -36,7 +40,7 @@ def superadmin_makes_a_resource_group(seed: Seeder) -> ResourceGroupScenario:
                 CreateResourceGroupInput(name="compute", domain_name=d.name),
             ),
         ),
-        then=at(lambda p: p.resource_group.name, "compute"),
+        then=At(lambda p: p.resource_group.name, "compute"),
     )
 
 
@@ -50,7 +54,7 @@ def a_seeded_group_is_read_back(seed: Seeder) -> ResourceGroupScenario:
         actor=superadmin,
         given=seed.situation(),
         when=after(group, lambda g: call(ResourceGroupAdapter.get, g.name)),
-        then=at(lambda node: node.name, group.name),
+        then=At(lambda node: node.name, group.name),
     )
 
 

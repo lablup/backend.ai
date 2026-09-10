@@ -29,10 +29,17 @@ from ai.backend.common.dto.manager.v2.session.request import (
     AdminSearchSessionsInput,
     EnqueueSessionInput,
 )
+from ai.backend.common.dto.manager.v2.session.response import AdminSearchSessionsPayload
 from ai.backend.common.dto.manager.v2.session.types import CreateSessionTypeEnum
 from ai.backend.manager.api.adapters.session.adapter import SessionAdapter
 from ai.backend.manager.errors.permission import NotEnoughPermission
-from ai.backend.testutils.typed_scenario import TypedScenario, at, call, needs_actor
+from ai.backend.testutils.typed_scenario import (
+    At,
+    Exactly,
+    TypedScenario,
+    call,
+    needs_actor,
+)
 
 
 def nothing_laid_means_nothing_found(seed: Seeder) -> SessionScenario:
@@ -44,7 +51,11 @@ def nothing_laid_means_nothing_found(seed: Seeder) -> SessionScenario:
         actor=superadmin,
         given=seed.situation(),
         when=call(SessionAdapter.admin_search, AdminSearchSessionsInput()),
-        then=at(lambda p: p.total_count, 0),
+        then=Exactly(
+            AdminSearchSessionsPayload(
+                items=[], total_count=0, has_next_page=False, has_previous_page=False
+            )
+        ),
     )
 
 
@@ -105,7 +116,7 @@ def granted_user_enqueues_a_session(seed: Seeder) -> SessionScenario:
                 "enqueue",
             ),
         ),
-        then=at(lambda p: p.session.project_id, project.name and UUID(int=0)),
+        then=At(lambda p: p.session.project_id, project.name and UUID(int=0)),
     )
 
 

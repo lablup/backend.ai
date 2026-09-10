@@ -17,9 +17,15 @@ from ai.backend.common.dto.manager.v2.vfolder.request import (
     CreateVFolderInput,
     SearchVFoldersInput,
 )
+from ai.backend.common.dto.manager.v2.vfolder.response import SearchVFoldersPayload
 from ai.backend.manager.api.adapters.vfolder.adapter import VFolderAdapter
 from ai.backend.manager.errors.permission import NotEnoughPermission
-from ai.backend.testutils.typed_scenario import TypedScenario, at, call
+from ai.backend.testutils.typed_scenario import (
+    At,
+    Exactly,
+    TypedScenario,
+    call,
+)
 
 
 def ungranted_user_is_refused(seed: Seeder) -> VFolderScenario:
@@ -44,7 +50,11 @@ def granted_user_lists_none(seed: Seeder) -> VFolderScenario:
         actor=maker,
         given=seed.situation(),
         when=call(VFolderAdapter.my_search, SearchVFoldersInput()),
-        then=at(lambda p: p.total_count, 0),
+        then=Exactly(
+            SearchVFoldersPayload(
+                items=[], total_count=0, has_next_page=False, has_previous_page=False
+            )
+        ),
     )
 
 
@@ -60,7 +70,7 @@ def granted_user_makes_a_folder(seed: Seeder) -> VFolderScenario:
         actor=maker,
         given=seed.situation(),
         when=call(VFolderAdapter.create, CreateVFolderInput(name="work")),
-        then=at(lambda p: p.vfolder.access_control.ownership_type, "user"),
+        then=At(lambda p: p.vfolder.access_control.ownership_type, "user"),
     )
 
 

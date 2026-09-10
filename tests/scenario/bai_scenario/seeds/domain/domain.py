@@ -21,6 +21,7 @@ class SeedDomain(SeedRow[DomainData]):
     """
 
     name_hint: str = "domain"
+    description: str = "심어둔 도메인"
     is_active: bool = True
     vfolder_hosts: Sequence[str] = field(default_factory=tuple)
 
@@ -43,7 +44,7 @@ class SeedDomain(SeedRow[DomainData]):
     def seed(self, name: str) -> DomainCreator:
         return DomainCreator(
             name=name,
-            description=f"{name} was already here",
+            description=self.description,
             is_active=self.is_active,
             allowed_vfolder_hosts={
                 host: [p.value for p in VFolderHostPermission] for host in self.vfolder_hosts

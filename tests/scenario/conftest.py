@@ -38,7 +38,9 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.permission_controller.repository import (
     PermissionControllerRepository,
 )
-from ai.backend.testutils.typed_scenario import TypedScenario
+from ai.backend.testutils.typed_scenario import (
+    TypedScenario,
+)
 
 pytest_plugins = [
     "ai.backend.testutils.bootstrap",

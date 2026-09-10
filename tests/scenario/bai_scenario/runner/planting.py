@@ -13,6 +13,7 @@ from __future__ import annotations
 from typing import Any, cast
 
 from ai.backend.common.data.entity.types import FieldData
+from ai.backend.testutils.scenario_steps import Told
 from bai_scenario.seeds.ops import SeedOps
 from bai_scenario.seeds.seeder import (
     Given,
@@ -43,6 +44,31 @@ class SeedingSession:
         self._seed = seed
         self._ops = ops
         self._made = {}
+
+    def told(self) -> tuple[Told, ...]:
+        """심은 행들을, 그것을 심은 묶음 아래로 쌓아서."""
+        roots: list[str | Given[Any]] = []
+        under: dict[tuple[str, ...], list[Any]] = {(): roots}
+        for row in self._seed.declared():
+            chain: tuple[str, ...] = ()
+            for one in row.nest:
+                parent = under[chain]
+                chain = chain + (one,)
+                if chain not in under:
+                    under[chain] = []
+                    parent.append(chain)
+            under[chain].append(row.states)
+
+        def build(entries: list[Any]) -> tuple[Told, ...]:
+            out: list[Told] = []
+            for entry in entries:
+                if isinstance(entry, tuple):
+                    out.append(Told(entry[-1], within=build(under[entry])))
+                else:
+                    out.append(Told(entry))
+            return tuple(out)
+
+        return build(roots)
 
     def made[D](self, row: Given[D]) -> D:
         """What the write answered for this row."""

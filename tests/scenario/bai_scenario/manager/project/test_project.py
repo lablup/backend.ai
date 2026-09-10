@@ -20,7 +20,11 @@ from ai.backend.common.dto.manager.v2.group.request import (
 from ai.backend.manager.api.adapters.project.adapter import ProjectAdapter
 from ai.backend.manager.config.unified import ManagerUnifiedConfig
 from ai.backend.manager.errors.permission import NotEnoughPermission
-from ai.backend.testutils.typed_scenario import TypedScenario, at, call
+from ai.backend.testutils.typed_scenario import (
+    At,
+    TypedScenario,
+    call,
+)
 
 type ProjectScenario = TypedScenario[ProjectAdapter, ManagerUnifiedConfig]
 
@@ -45,7 +49,7 @@ def superadmin_makes_a_project(seed: Seeder) -> ProjectScenario:
                 CreateProjectInput(name="research", domain_name=d.name, resource_policy=pol.name),
             ),
         ),
-        then=at(lambda p: p.project.basic_info.name, "research"),
+        then=At(lambda p: p.project.basic_info.name, "research"),
     )
 
 
@@ -100,7 +104,7 @@ def a_member_joins_a_project(seed: Seeder) -> ProjectScenario:
                 AssignUsersToProjectInput(user_ids=[u.id], role_id=r.id),
             ),
         ),
-        then=at(lambda p: len(p.items), 1),
+        then=At(lambda p: len(p.items), 1),
     )
 
 

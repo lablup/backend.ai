@@ -14,10 +14,19 @@ from ai.backend.common.dto.manager.v2.domain.request import (
     PurgeDomainInput,
     RestoreDomainInput,
 )
+from ai.backend.common.dto.manager.v2.domain.response import (
+    DeleteDomainPayload,
+    PurgeDomainPayload,
+    RestoreDomainPayload,
+)
 from ai.backend.manager.api.adapters.domain.adapter import DomainAdapter
 from ai.backend.manager.errors.base.entity import EntityNotFoundError
 from ai.backend.manager.errors.permission import NotEnoughPermission
-from ai.backend.testutils.typed_scenario import TypedScenario, at, call
+from ai.backend.testutils.typed_scenario import (
+    Exactly,
+    TypedScenario,
+    call,
+)
 
 
 def superadmin_retires_a_domain(seed: Seeder) -> DomainScenario:
@@ -32,7 +41,7 @@ def superadmin_retires_a_domain(seed: Seeder) -> DomainScenario:
         when=after(
             target, lambda d: call(DomainAdapter.admin_delete, DeleteDomainInput(name=d.name))
         ),
-        then=at(lambda p: p.deleted, True),
+        then=Exactly(DeleteDomainPayload(deleted=True)),
     )
 
 
@@ -48,7 +57,7 @@ def superadmin_restores_a_domain(seed: Seeder) -> DomainScenario:
         when=after(
             target, lambda d: call(DomainAdapter.admin_restore, RestoreDomainInput(name=d.name))
         ),
-        then=at(lambda p: p.restored, True),
+        then=Exactly(RestoreDomainPayload(restored=True)),
     )
 
 
@@ -64,7 +73,7 @@ def superadmin_purges_a_domain(seed: Seeder) -> DomainScenario:
         when=after(
             target, lambda d: call(DomainAdapter.admin_purge, PurgeDomainInput(name=d.name))
         ),
-        then=at(lambda p: p.purged, True),
+        then=Exactly(PurgeDomainPayload(purged=True)),
     )
 
 

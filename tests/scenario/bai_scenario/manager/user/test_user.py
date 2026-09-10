@@ -10,7 +10,9 @@ from bai_scenario.seeds.seeder import Seeder
 
 from ai.backend.manager.api.adapters.user.adapter import UserAdapter
 from ai.backend.manager.config.unified import ManagerUnifiedConfig
-from ai.backend.testutils.typed_scenario import TypedScenario
+from ai.backend.testutils.typed_scenario import (
+    TypedScenario,
+)
 
 type UserScenario = TypedScenario[UserAdapter, ManagerUnifiedConfig]
 

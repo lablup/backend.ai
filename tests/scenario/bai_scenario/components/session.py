@@ -13,7 +13,9 @@ from ai.backend.manager.config.unified import ManagerUnifiedConfig
 from ai.backend.manager.data.domain.types import DomainData
 from ai.backend.manager.data.permission.types import Permission
 from ai.backend.manager.data.project.types import ProjectData
-from ai.backend.testutils.typed_scenario import TypedScenario
+from ai.backend.testutils.typed_scenario import (
+    TypedScenario,
+)
 from bai_scenario.components.domain import GrantedUser, SomeoneOf
 from bai_scenario.seeds.rbac.role import SeedPermission, SeedRole
 from bai_scenario.seeds.seeder import Given, Seeder, SeedNest

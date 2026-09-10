@@ -14,9 +14,15 @@ from ai.backend.common.dto.manager.v2.domain.request import (
     AdminSearchDomainsInput,
     DomainFilter,
 )
+from ai.backend.common.dto.manager.v2.domain.response import AdminSearchDomainsPayload
 from ai.backend.manager.api.adapters.domain.adapter import DomainAdapter
 from ai.backend.manager.errors.auth import InsufficientPrivilege
-from ai.backend.testutils.typed_scenario import TypedScenario, at, call, every
+from ai.backend.testutils.typed_scenario import (
+    Checked,
+    Exactly,
+    TypedScenario,
+    call,
+)
 
 
 def the_count_is_what_was_laid(seed: Seeder) -> DomainScenario:
@@ -28,7 +34,21 @@ def the_count_is_what_was_laid(seed: Seeder) -> DomainScenario:
         description=("이 시나리오가 심은 도메인이 넷일 때, 필터 없는 조회는 그 넷을 모두 센다"),
         actor=superadmin,
         given=seed.situation(),
-        then=at(lambda p: p.total_count, 1 + len(others)),
+        then=Exactly(
+            AdminSearchDomainsPayload(
+                items=[],
+                total_count=1 + len(others),
+                has_next_page=False,
+                has_previous_page=False,
+            ),
+            where=(
+                Checked(
+                    lambda p: p.items,
+                    lambda items: len(items) == 1 + len(others),
+                    "심은 도메인 넷이 그대로",
+                ),
+            ),
+        ),
         when=call(DomainAdapter.admin_search, AdminSearchDomainsInput()),
     )
 
@@ -49,7 +69,18 @@ def a_name_filter_narrows(seed: Seeder) -> DomainScenario:
             DomainAdapter.admin_search,
             AdminSearchDomainsInput(filter=DomainFilter(name=StringFilter(equals=wanted.name))),
         ),
-        then=every(lambda p: p.items, at(lambda node: node.basic_info.name, wanted.name)),
+        then=Exactly(
+            AdminSearchDomainsPayload(
+                items=[], total_count=1, has_next_page=False, has_previous_page=False
+            ),
+            where=(
+                Checked(
+                    lambda p: p.items,
+                    lambda items: [one.basic_info.name for one in items] == [wanted.name],
+                    "걸러낸 그 도메인 하나만",
+                ),
+            ),
+        ),
     )
 
 

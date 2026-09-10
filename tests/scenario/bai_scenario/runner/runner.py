@@ -13,8 +13,12 @@ from collections.abc import Sequence
 from typing import Any
 
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.scenario_report import GivenStep
-from ai.backend.testutils.typed_scenario import TypedMatcher, TypedScenario, mismatches_of
+from ai.backend.testutils.scenario_report import Line
+from ai.backend.testutils.typed_scenario import (
+    TypedMatcher,
+    TypedScenario,
+    mismatches_of,
+)
 from bai_scenario.runner.acting import ActingAs
 from bai_scenario.seeds.ops import SeedOpsProvider
 from bai_scenario.seeds.seeder import Given, laid_in_order, lay
@@ -84,15 +88,12 @@ class ScenarioRunner:
             raise AssertionError(f"[{scenario.summary}] " + "; ".join(problems))
 
 
-def scenario_given(scenario: TypedScenario[Any, Any]) -> tuple[GivenStep, ...]:
+def scenario_given(scenario: TypedScenario[Any, Any]) -> tuple[Line, ...]:
     """What is already true when the call is made, in the order it was laid."""
     wanted = [row for row in scenario.given.rows if isinstance(row, Given)]
     if isinstance(scenario.actor, Given):
         wanted.append(scenario.actor)
-    return tuple(
-        GivenStep(states=row.states, nest=row.nest, actor=row is scenario.actor)
-        for row in laid_in_order(wanted)
-    )
+    return tuple(Line(says=row.states, nest=row.nest) for row in laid_in_order(wanted))
 
 
 def offered_by(adapter: object) -> frozenset[str]:

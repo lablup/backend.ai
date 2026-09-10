@@ -17,6 +17,7 @@ from collections.abc import Awaitable, Callable, Mapping, Sequence
 from dataclasses import MISSING, dataclass, field
 from datetime import UTC, datetime, timedelta
 from typing import Any, Concatenate, Final, cast, override
+from uuid import UUID
 
 from ai.backend.testutils.scenario_report import ScenarioRecord
 
@@ -27,6 +28,9 @@ __all__ = (
     "Op",
     "Some",
     "TypedMatcher",
+    "All",
+    "OnFake",
+    "Holds",
     "TypedScenario",
     "Situation",
     "Sown",
@@ -40,19 +44,14 @@ __all__ = (
     "Exactly",
     "Ignored",
     "Taken",
-    "at",
     "mismatches_of",
-    "checked",
     "config_of",
-    "exactly",
-    "ignored",
     "since",
     "fake_of",
-    "every",
     "op",
     "call",
     "path_of",
-    "some",
+    "shown_for",
 )
 
 
@@ -71,8 +70,9 @@ class Invocation[A, R]:
 
     call: Callable[[A], Awaitable[R]]
     label: str
-    shows: tuple[str, ...] = ()
-    """The arguments the call was written with, one each, for the report."""
+    args: tuple[Any, ...] = ()
+    kwargs: Mapping[str, Any] = field(default_factory=dict)
+    """What the call was given, kept raw: what it reads as depends on the rows laid."""
 
 
 type Op[A, **P, R] = Callable[P, Invocation[A, R]]
@@ -100,42 +100,81 @@ def op[A, **P, R](method: Callable[Concatenate[A, P], Awaitable[R]]) -> Op[A, P,
         def run(adapter: A) -> Awaitable[R]:
             return method(adapter, *args, **kwargs)
 
-        return Invocation(run, getattr(method, "__name__", "call"), _shown(args, kwargs))
+        return Invocation(run, getattr(method, "__name__", "call"), args, kwargs)
 
     return bind
 
 
-def _shown(args: tuple[Any, ...], kwargs: Mapping[str, Any]) -> tuple[str, ...]:
+type Naming = Callable[[object], str | None]
+"""Answers with the row a value came from, or ``None`` when no row made it."""
+
+
+def _shown(args: tuple[Any, ...], kwargs: Mapping[str, Any], naming: Naming) -> tuple[str, ...]:
     """What was passed, with everything the caller left alone left out.
 
     A request model carries a field for every option the call has, and a report that
     prints them all says nothing. What the caller wrote is what the row is about.
     """
-    parts = [_shown_one(one) for one in args]
-    parts.extend(f"{name}={_shown_one(value)}" for name, value in kwargs.items())
+    parts = [_shown_one(one, naming) for one in args]
+    parts.extend(f"{name}={_shown_one(value, naming)}" for name, value in kwargs.items())
     return tuple(parts)
 
 
-def _shown_one(value: object) -> str:
-    """One argument, down to the fields it was actually given."""
+def _shown_one(value: object, naming: Naming) -> str:
+    """One argument, down to the fields it was actually given.
+
+    A value a laid row made is named by that row, so the report says which row the call
+    reached for and reads the same for two runs of the same behaviour.
+    """
+    made_by = naming(value)
+    if made_by is not None:
+        return made_by
+    if isinstance(value, UUID):
+        return f"{type(value).__name__}(어느 행도 만들지 않은 id)"
     written = getattr(value, "model_fields_set", None)
     declared = getattr(type(value), "model_fields", None)
     if written is not None and isinstance(declared, Mapping):
         inner = ", ".join(
-            f"{name}={_shown_one(getattr(value, name))}" for name in declared if name in written
+            f"{name}={_shown_one(getattr(value, name), naming)}"
+            for name in declared
+            if name in written
         )
         return f"{type(value).__name__}({inner})"
     fields = getattr(type(value), "__dataclass_fields__", None)
     if isinstance(fields, Mapping):
         inner = ", ".join(
-            f"{name}={_shown_one(getattr(value, name))}"
+            f"{name}={_shown_one(getattr(value, name), naming)}"
             for name, spec in fields.items()
             if not _left_alone(getattr(value, name), spec)
         )
         return f"{type(value).__name__}({inner})"
     if isinstance(value, (list, tuple)):
-        return "[" + ", ".join(_shown_one(one) for one in value) + "]"
+        return "[" + ", ".join(_shown_one(one, naming) for one in value) + "]"
     return repr(value)
+
+
+def shown_for(invocation: Invocation[Any, Any], sown: Sown) -> tuple[str, ...]:
+    """What the report says this call was given, once the rows are known."""
+    return _shown(invocation.args, invocation.kwargs, _naming_of(sown))
+
+
+def _naming_of(sown: Sown) -> Naming:
+    """Which laid row made a value, by the id that row answered with."""
+    named: dict[UUID, str] = {}
+    for row, data in sown.items():
+        label = getattr(row, "describe", None)
+        if not isinstance(label, str):
+            continue
+        for candidate in (data, getattr(data, "id", None)):
+            if isinstance(candidate, UUID):
+                named.setdefault(UUID(int=candidate.int), label)
+
+    def naming(value: object) -> str | None:
+        if isinstance(value, UUID):
+            return named.get(UUID(int=value.int))
+        return None
+
+    return naming
 
 
 def _left_alone(value: object, spec: Any) -> bool:
@@ -217,16 +256,6 @@ class At[T, V](TypedMatcher[T]):
         return f"{path_of(self.select)} = {self.expected!r}"
 
 
-def at[T, V](select: Callable[[T], V], expected: V) -> At[T, V]:
-    """The field and the value it must hold, in one call.
-
-    Both are checked from the position this sits in: the payload type comes from the
-    ``when`` beside it, and the value must be what the field holds. Splitting this into
-    two calls loses the payload type, so it stays one.
-    """
-    return At(select, expected)
-
-
 @dataclass(frozen=True)
 class Holds[T, V](TypedMatcher[T]):
     """One field, checked by a predicate over the field's own type."""
@@ -244,10 +273,6 @@ class Holds[T, V](TypedMatcher[T]):
     @override
     def describe(self) -> str:
         return f"{path_of(self.select)} 조건 충족"
-
-
-def holds[T, V](select: Callable[[T], V], predicate: Callable[[V], bool]) -> Holds[T, V]:
-    return Holds(select, predicate)
 
 
 @dataclass(frozen=True)
@@ -270,10 +295,6 @@ class Every[T, V](TypedMatcher[T]):
         return f"{path_of(self.select)} 전부: {self.item.describe()}"
 
 
-def every[T, V](select: Callable[[T], Sequence[V]], item: TypedMatcher[V]) -> Every[T, V]:
-    return Every(select, item)
-
-
 @dataclass(frozen=True)
 class Some[T, V](TypedMatcher[T]):
     """At least one element of a sequence field satisfies ``item``."""
@@ -293,10 +314,6 @@ class Some[T, V](TypedMatcher[T]):
         return f"{path_of(self.select)} 중 하나: {self.item.describe()}"
 
 
-def some[T, V](select: Callable[[T], Sequence[V]], item: TypedMatcher[V]) -> Some[T, V]:
-    return Some(select, item)
-
-
 @dataclass(frozen=True)
 class All[T](TypedMatcher[T]):
     parts: tuple[TypedMatcher[T], ...]
@@ -308,15 +325,6 @@ class All[T](TypedMatcher[T]):
     @override
     def describe(self) -> str:
         return "; ".join(part.describe() for part in self.parts)
-
-
-def all_of_typed[T](*parts: TypedMatcher[T]) -> All[T]:
-    return All(parts)
-
-
-# ---------------------------------------------------------------------------
-# Naming a config value and an external fake: by accessor and by class
-# ---------------------------------------------------------------------------
 
 
 @dataclass(frozen=True)
@@ -452,15 +460,6 @@ class OnFake[T, F](TypedMatcher[T]):
         return f"{self.fake.__name__}에서: {self.matcher.describe()}"
 
 
-def on_fake[T, F](fake: type[F], matcher: TypedMatcher[F]) -> OnFake[T, F]:
-    return OnFake(fake, matcher)
-
-
-# ---------------------------------------------------------------------------
-# Rows laid down before the call
-# ---------------------------------------------------------------------------
-
-
 @dataclass(frozen=True)
 class ActorBound[A, R, I]:
     """A call that cannot be written until the actor is known, because the method takes
@@ -522,13 +521,6 @@ class Checked[T, V]:
         return f"{self.path()}: {value!r} does not hold{wanted}"
 
 
-def checked[T, V](
-    select: Callable[[T], V], condition: Callable[[V], bool], describe: str = ""
-) -> Checked[T, V]:
-    """Take this field out of the comparison and hold it to a condition instead."""
-    return Checked(select, condition, describe)
-
-
 @dataclass(frozen=True)
 class Ignored[T, V]:
     """One field left out of the comparison entirely, with the reason written down.
@@ -545,13 +537,14 @@ class Ignored[T, V]:
         return path_of(self.select)
 
 
-def ignored[T, V](select: Callable[[T], V], why: str) -> Ignored[T, V]:
-    """Leave this field out. The reason is required, so leaving one out stays a
-    deliberate act rather than a quiet hole."""
-    return Ignored(select, why)
-
-
 type Taken[T] = Checked[T, Any] | Ignored[T, Any]
+
+
+def _taken_says(rule: Taken[Any]) -> str:
+    """What was said about a field the expected value could not state."""
+    if isinstance(rule, Ignored):
+        return f"{rule.path()} 무시({rule.why})"
+    return f"{rule.path()} 조건({rule.describe})" if rule.describe else f"{rule.path()} 조건"
 
 
 SKEW: Final = timedelta(seconds=30)
@@ -642,22 +635,8 @@ class Exactly[T](TypedMatcher[T]):
 
     @override
     def describe(self) -> str:
-        taken = ", ".join(rule.path() for rule in self.where)
-        return "답 전체 일치" + (f", 다만 {taken} 제외" if taken else "")
-
-
-def exactly[T](expected: T, where: Sequence[Taken[T]] = ()) -> Exactly[T]:
-    """Compare the whole answer.
-
-    A field the test cannot state goes in ``where``: held to a condition when a wrong
-    value is possible, left out when its type is already the whole guarantee.
-    """
-    return Exactly(expected, tuple(where))
-
-
-# ---------------------------------------------------------------------------
-# The scenario: result type bound where it is written, erased where it is stored
-# ---------------------------------------------------------------------------
+        taken = ", ".join(_taken_says(rule) for rule in self.where)
+        return "답 전체 일치" + (f", 다만 {taken}" if taken else "")
 
 
 @dataclass
@@ -797,7 +776,7 @@ def _invoker[A, R](
             else:
                 invocation = built
             called.name = invocation.label
-            called.shows = invocation.shows
+            called.shows = shown_for(invocation, sown)
             return invocation.call(adapter)
 
         return run_deferred
@@ -808,7 +787,7 @@ def _invoker[A, R](
         def run_bound(adapter: A, _sown: Sown, actor: Any) -> Awaitable[R]:
             invocation = bound.build(actor)
             called.name = invocation.label
-            called.shows = invocation.shows
+            called.shows = shown_for(invocation, _sown)
             return invocation.call(adapter)
 
         return run_bound
@@ -817,7 +796,7 @@ def _invoker[A, R](
 
     def run(adapter: A, _sown: Sown, _actor: Any) -> Awaitable[R]:
         called.name = invocation.label
-        called.shows = invocation.shows
+        called.shows = shown_for(invocation, _sown)
         return invocation.call(adapter)
 
     return run

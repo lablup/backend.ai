@@ -10,10 +10,15 @@ from bai_scenario.seeds.seeder import Seeder
 
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.v2.model_card.request import SearchModelCardsInput
+from ai.backend.common.dto.manager.v2.model_card.response import SearchModelCardsPayload
 from ai.backend.manager.api.adapters.model_card.adapter import ModelCardAdapter
 from ai.backend.manager.config.unified import ManagerUnifiedConfig
 from ai.backend.manager.errors.auth import InsufficientPrivilege
-from ai.backend.testutils.typed_scenario import TypedScenario, at, call
+from ai.backend.testutils.typed_scenario import (
+    Exactly,
+    TypedScenario,
+    call,
+)
 
 type ModelCardScenario = TypedScenario[ModelCardAdapter, ManagerUnifiedConfig]
 
@@ -29,7 +34,11 @@ def nothing_laid_means_nothing_found(seed: Seeder) -> ModelCardScenario:
         actor=superadmin,
         given=seed.situation(),
         when=call(ModelCardAdapter.admin_search, SearchModelCardsInput()),
-        then=at(lambda p: p.total_count, 0),
+        then=Exactly(
+            SearchModelCardsPayload(
+                items=[], total_count=0, has_next_page=False, has_previous_page=False
+            )
+        ),
     )
 
 

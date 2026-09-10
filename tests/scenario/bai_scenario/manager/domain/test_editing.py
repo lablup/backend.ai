@@ -2,23 +2,42 @@
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
+from uuid import UUID
+
 import pytest
 from bai_scenario.components.domain import DomainScenario, SomeoneOf
 from bai_scenario.runner.runner import ScenarioRunner
 from bai_scenario.seeds.domain.domain import SeedDomain
 from bai_scenario.seeds.seeder import Seeder, after
 
+from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.v2.domain.request import UpdateDomainInput
+from ai.backend.common.dto.manager.v2.domain.response import (
+    DomainBasicInfo,
+    DomainLifecycleInfo,
+    DomainNode,
+    DomainPayload,
+    DomainRegistryInfo,
+)
 from ai.backend.manager.api.adapters.domain.adapter import DomainAdapter
 from ai.backend.manager.errors.base.entity import EntityNotFoundError
 from ai.backend.manager.errors.permission import NotEnoughPermission
-from ai.backend.testutils.typed_scenario import TypedScenario, at, call, needs_actor
+from ai.backend.testutils.typed_scenario import (
+    Checked,
+    Exactly,
+    Ignored,
+    TypedScenario,
+    call,
+    needs_actor,
+)
 
 
 def superadmin_edits_a_description(seed: Seeder) -> DomainScenario:
     home = seed.creating(SeedDomain(name_hint="home"))
-    editable = seed.creating(SeedDomain(name_hint="editable"))
+    was_here = "이미 있던 도메인"
+    editable = seed.creating(SeedDomain(name_hint="editable", description=was_here))
     superadmin = seed.within(SomeoneOf(home, role=UserRole.SUPERADMIN))
     # ``description`` is optional on the node, so what it is held to has to be too.
     edited: str | None = "edited"
@@ -41,13 +60,43 @@ def superadmin_edits_a_description(seed: Seeder) -> DomainScenario:
                 "admin_update",
             ),
         ),
-        then=at(lambda p: p.domain.basic_info.description, edited),
+        then=Exactly(
+            DomainPayload(
+                domain=DomainNode(
+                    id=DomainID(UUID(int=0)),
+                    basic_info=DomainBasicInfo(
+                        name=editable.name, description=edited, integration_name=None
+                    ),
+                    registry=DomainRegistryInfo(allowed_docker_registries=[]),
+                    lifecycle=DomainLifecycleInfo(
+                        is_active=True,
+                        is_default=False,
+                        created_at=datetime.now(UTC),
+                        modified_at=datetime.now(UTC),
+                    ),
+                )
+            ),
+            where=(
+                Ignored(lambda p: p.domain.id, "데이터베이스가 만든다"),
+                Checked(
+                    lambda p: p.domain.lifecycle.created_at,
+                    seed.since_started(),
+                    "이 실행이 쓴 시각",
+                ),
+                Checked(
+                    lambda p: p.domain.lifecycle.modified_at,
+                    seed.since_started(),
+                    "이 실행이 쓴 시각",
+                ),
+            ),
+        ),
     )
 
 
 def retiring_is_an_edit_of_the_active_flag(seed: Seeder) -> DomainScenario:
     home = seed.creating(SeedDomain(name_hint="home"))
-    target = seed.creating(SeedDomain(name_hint="to-retire"))
+    was_here = "이미 있던 도메인"
+    target = seed.creating(SeedDomain(name_hint="to-retire", description=was_here))
     superadmin = seed.within(SomeoneOf(home, role=UserRole.SUPERADMIN))
     return TypedScenario.ok(
         "clearing-the-active-flag-is-how-a-domain-retires",
@@ -63,7 +112,36 @@ def retiring_is_an_edit_of_the_active_flag(seed: Seeder) -> DomainScenario:
                 "admin_update",
             ),
         ),
-        then=at(lambda p: p.domain.lifecycle.is_active, False),
+        then=Exactly(
+            DomainPayload(
+                domain=DomainNode(
+                    id=DomainID(UUID(int=0)),
+                    basic_info=DomainBasicInfo(
+                        name=target.name, description=was_here, integration_name=None
+                    ),
+                    registry=DomainRegistryInfo(allowed_docker_registries=[]),
+                    lifecycle=DomainLifecycleInfo(
+                        is_active=False,
+                        is_default=False,
+                        created_at=datetime.now(UTC),
+                        modified_at=datetime.now(UTC),
+                    ),
+                )
+            ),
+            where=(
+                Ignored(lambda p: p.domain.id, "데이터베이스가 만든다"),
+                Checked(
+                    lambda p: p.domain.lifecycle.created_at,
+                    seed.since_started(),
+                    "이 실행이 쓴 시각",
+                ),
+                Checked(
+                    lambda p: p.domain.lifecycle.modified_at,
+                    seed.since_started(),
+                    "이 실행이 쓴 시각",
+                ),
+            ),
+        ),
     )
 
 

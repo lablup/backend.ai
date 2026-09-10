@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import json
 from abc import ABC, abstractmethod
-from collections.abc import Iterable
+from collections.abc import Iterable, Sequence
 from dataclasses import asdict, dataclass, field
 from typing import Any, override
 
@@ -18,13 +18,12 @@ MARKS = {"passed": "pass", "failed": "FAIL", "skipped": "skip"}
 
 
 @dataclass(frozen=True)
-class GivenStep:
-    """One thing that was already true when the call was made."""
+class Line:
+    """레포트 한 줄. 자기가 어느 묶음 안에 있는지 안다."""
 
-    states: str
+    says: str
     nest: tuple[str, ...] = ()
-    """묶음들. 바깥부터 안쪽 순서다. 묶음 없이 심은 것은 비어 있다."""
-    actor: bool = False
+    """바깥부터 안쪽 순서. 묶음 없이 놓인 줄은 비어 있다."""
 
 
 @dataclass(frozen=True)
@@ -48,7 +47,9 @@ class ScenarioRecord:
     module: str = ""
     outcome: str = ""
     adapter: str = ""
-    given: tuple[GivenStep, ...] = ()
+    given: tuple[Line, ...] = ()
+    seen: tuple[Line, ...] = ()
+    """`then`이 자리마다 무엇을 보았는지."""
     offers: tuple[str, ...] = ()
 
     @property
@@ -70,9 +71,9 @@ class ScenarioRecord:
     def mark(self) -> str:
         return MARKS.get(self.outcome, self.outcome)
 
-    def situation(self) -> tuple[GivenStep, ...]:
+    def situation(self) -> tuple[Line, ...]:
         """What was already true when the call was made: the rows, then the config."""
-        return self.given + tuple(GivenStep(states=one) for one in self.config)
+        return self.given + tuple(Line(says=one) for one in self.config)
 
     def as_line(self) -> str:
         return json.dumps(asdict(self), ensure_ascii=False)
@@ -84,11 +85,11 @@ class ScenarioRecord:
         for name in ("config", "offers", "shows"):
             if name in fields:
                 fields[name] = tuple(fields[name])
-        if "given" in fields:
-            fields["given"] = tuple(
-                GivenStep(states=one["states"], nest=tuple(one["nest"]), actor=one["actor"])
-                for one in fields["given"]
-            )
+        for name in ("given", "seen"):
+            if name in fields:
+                fields[name] = tuple(
+                    Line(says=one["says"], nest=tuple(one["nest"])) for one in fields[name]
+                )
         return cls(**fields)
 
 
@@ -255,28 +256,32 @@ class MarkdownFormat(ReportFormat):
         out.extend(self._situation(row))
         out.extend(["", "When", "", f"- {row.when}"])
         out.extend(f"  - {one}" for one in row.shows)
-        out.extend(["", "Then", "", f"- {row.then}", ""])
+        out.extend(["", "Then", "", f"- {row.then}"])
+        out.extend(self._nested(row.seen, depth=1))
+        out.append("")
+        return out
+
+    def _nested(self, lines: Sequence[Line], depth: int = 0) -> list[str]:
+        """줄들을 자기 묶음 아래로 들여쓴다."""
+        out: list[str] = []
+        open_nests: tuple[str, ...] = ()
+        for line in lines:
+            shared = 0
+            while (
+                shared < len(open_nests)
+                and shared < len(line.nest)
+                and open_nests[shared] == line.nest[shared]
+            ):
+                shared += 1
+            for at in range(shared, len(line.nest)):
+                out.append(f"{'  ' * (depth + at)}- {line.nest[at]}")
+            out.append(f"{'  ' * (depth + len(line.nest))}- {line.says}")
+            open_nests = line.nest
         return out
 
     def _situation(self, row: ScenarioRecord) -> list[str]:
         """The rows, indented under the setup that laid them."""
-        out: list[str] = []
-        open_nests: tuple[str, ...] = ()
-        for step in row.situation():
-            shared = 0
-            while (
-                shared < len(open_nests)
-                and shared < len(step.nest)
-                and open_nests[shared] == step.nest[shared]
-            ):
-                shared += 1
-            for depth in range(shared, len(step.nest)):
-                out.append(f"{'  ' * depth}- {step.nest[depth]}")
-            out.append(
-                f"{'  ' * len(step.nest)}- {step.states}{'  ← 행위자' if step.actor else ''}"
-            )
-            open_nests = step.nest
-        return out
+        return self._nested(row.situation())
 
 
 class JsonFormat(ReportFormat):
