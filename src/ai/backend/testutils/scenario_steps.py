@@ -155,6 +155,11 @@ class When[G, A, R](ABC):
     """어댑터를 부른다. `given`이 답한 값과 어댑터 말고는 받지 않는다."""
 
     @abstractmethod
+    def operation(self) -> str:
+        """어느 어댑터 호출을 하는지. 레포트가 이것으로 미실행 호출을 센다."""
+        raise NotImplementedError
+
+    @abstractmethod
     def describe(self, laid: G) -> str:
         """무엇을 부르는지. 심은 것을 알고 나서 말하므로 그 값을 쓸 수 있다."""
         raise NotImplementedError

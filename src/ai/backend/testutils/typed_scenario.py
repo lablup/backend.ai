@@ -159,19 +159,29 @@ def shown_for(invocation: Invocation[Any, Any], sown: Sown) -> tuple[str, ...]:
 
 
 def _naming_of(sown: Sown) -> Naming:
-    """Which laid row made a value, by the id that row answered with."""
-    named: dict[UUID, str] = {}
+    """Which laid row a value came from, by the id or the name that row holds.
+
+    The report says the row's kind before its name, so a call reads as what it reached
+    for rather than as a bare string a reader has to place.
+    """
+    by_id: dict[UUID, str] = {}
+    by_name: dict[str, str] = {}
     for row, data in sown.items():
-        label = getattr(row, "describe", None)
-        if not isinstance(label, str):
+        kind = getattr(row, "kind", None)
+        name = getattr(row, "name", None)
+        if not isinstance(kind, str) or not isinstance(name, str):
             continue
+        says = f"{kind}: {name}"
+        by_name.setdefault(name, says)
         for candidate in (data, getattr(data, "id", None)):
             if isinstance(candidate, UUID):
-                named.setdefault(UUID(int=candidate.int), label)
+                by_id.setdefault(UUID(int=candidate.int), says)
 
     def naming(value: object) -> str | None:
         if isinstance(value, UUID):
-            return named.get(UUID(int=value.int))
+            return by_id.get(UUID(int=value.int))
+        if isinstance(value, str):
+            return by_name.get(value)
         return None
 
     return naming

@@ -434,6 +434,78 @@ jobs:
       if: always()  # We want the log even on failures.
 
 
+  test-scenario:
+    needs: detect-changes
+    if: |
+      always()
+      && !contains(github.event.pull_request.labels.*.name, 'skip:ci')
+      && !contains(toJSON(github.event.head_commit.message), 'skip:ci')
+      && (
+        needs.detect-changes.result != 'success'
+        || needs.detect-changes.outputs.code == 'true'
+        || startsWith(github.ref, 'refs/tags/')
+        || needs.detect-changes.outputs.release == 'true'
+      )
+    runs-on: ubuntu-latest
+    steps:
+    - name: Verify detect-changes
+      if: needs.detect-changes.result != 'success'
+      run: |
+        echo "detect-changes did not succeed: ${{ needs.detect-changes.result }}"
+        exit 1
+    - name: Check out the revision with minimal required history
+      uses: actions/checkout@v6
+      with:
+        fetch-depth: 2
+        lfs: false
+    - name: Extract Python version from pants.toml
+      run: |
+        PYTHON_VERSION=$(grep -m 1 -oP '(?<=CPython==)([^"]+)' pants.toml)
+        echo "PANTS_CONFIG_FILES=pants.ci.toml" >> $GITHUB_ENV
+        echo "PROJECT_PYTHON_VERSION=$PYTHON_VERSION" >> $GITHUB_ENV
+    - name: Set up Python as Runtime
+      uses: actions/setup-python@v6
+      with:
+        python-version: ${{ env.PROJECT_PYTHON_VERSION }}
+    - name: Set up remote cache backend (if applicable)
+      run: |
+        echo "PANTS_REMOTE_STORE_ADDRESS=${REMOTE_CACHE_BACKEND_ENDPOINT}" >> $GITHUB_ENV
+        echo "PANTS_REMOTE_CACHE_READ=true" >> $GITHUB_ENV
+        echo "PANTS_REMOTE_CACHE_WRITE=true" >> $GITHUB_ENV
+        echo "PANTS_REMOTE_INSTANCE_NAME=main" >> $GITHUB_ENV
+      env:
+        REMOTE_CACHE_BACKEND_ENDPOINT: ${{ secrets.PANTS_REMOTE_CACHE_ENDPOINT }}
+      if: ${{ env.REMOTE_CACHE_BACKEND_ENDPOINT != '' }}
+    - name: Bootstrap Pants
+      uses: pantsbuild/actions/init-pants@v11
+      with:
+        gha-cache-key: v1
+        named-caches-hash: ${{ hashFiles('python*.lock', 'tools/*.lock') }}
+        cache-lmdb-store: 'true'
+    - name: Run every scenario and keep what each one did
+      timeout-minutes: 60
+      run: |
+        mkdir -p dist
+        BACKEND_SCENARIO_LOG=$PWD/dist/scenarios.jsonl pants test \
+          --test-extra-env-vars="+['BACKEND_SCENARIO_LOG']" \
+          tests/scenario:: -- -v
+    - name: Check each entity's report against the run
+      run: |
+        python scripts/scenario-report.py dist/scenarios.jsonl \
+          --verify src/ai/backend/manager/api/adapters
+    - name: Upload the report the run produced
+      uses: actions/upload-artifact@v5
+      with:
+        name: scenario-report
+        path: dist/scenarios.jsonl
+      if: always()
+    - name: Upload pants log
+      uses: actions/upload-artifact@v5
+      with:
+        name: pants.test-scenario.log
+        path: .pants.d/workdir/pants.log
+      if: always()
+
   test-component:
     needs: detect-changes
     if: |

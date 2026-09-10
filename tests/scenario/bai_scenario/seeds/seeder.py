@@ -204,6 +204,8 @@ class Laid[D]:
 
     name: str
     """The name the seeder made for this row, for a call that needs it."""
+    kind: str
+    """레포트가 이 행을 부르는 이름."""
     nest: tuple[str, ...]
     """이 행을 심은 묶음들. 바깥부터 안쪽 순서다."""
     describe: str
@@ -368,6 +370,7 @@ class Seeder:
         return self._remember(
             Laid(
                 name=owner.name,
+                kind=owner.kind,
                 nest=tuple(self._nesting),
                 describe=f"{owner.describe}({seed.kind()})",
                 states=f"{owner.describe}: {seed.kind()}",
@@ -387,6 +390,7 @@ class Seeder:
         return self._remember(
             Laid(
                 name=target.name,
+                kind=target.kind,
                 nest=tuple(self._nesting),
                 describe=target.describe,
                 states=f"{scope.describe} {seed.kind()} {target.describe}",
@@ -411,6 +415,7 @@ class Seeder:
         return self._remember(
             Laid(
                 name=to.name,
+                kind=to.kind,
                 nest=tuple(self._nesting),
                 describe=to.describe,
                 states=f"{to.describe}: {role.describe} 보유",
@@ -429,6 +434,7 @@ class Seeder:
     ) -> Laid[D]:
         return Laid(
             name=name,
+            kind=seed.kind(),
             nest=tuple(self._nesting),
             describe=f"{seed.kind()} {name}",
             states=_states(sentence, seed.detail()),

@@ -15,7 +15,7 @@ Given
   - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
   - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
   - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-  - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다  ← 행위자
+  - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
 
 When
 
@@ -24,7 +24,7 @@ When
 
 Then
 
-- total_count = 0
+- 답 전체 일치
 
 #### a-user-who-is-not-the-superadmin-may-not-search-every-model-card — pass
 
@@ -37,7 +37,7 @@ Given
   - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
   - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
   - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-  - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다  ← 행위자
+  - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
 
 When
 

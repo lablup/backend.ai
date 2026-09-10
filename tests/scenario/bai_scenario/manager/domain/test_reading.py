@@ -35,6 +35,10 @@ class ReadingByName(When[ADomainAndACaller, DomainAdapter, DomainNode]):
     named: str | None = None
 
     @override
+    def operation(self) -> str:
+        return "get"
+
+    @override
     def describe(self, laid: ADomainAndACaller) -> str:
         return f"{laid.caller.username}이 {self.named or laid.domain.name}으로 조회"
 

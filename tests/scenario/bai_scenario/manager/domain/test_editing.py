@@ -40,6 +40,10 @@ class Editing(When[ADomainAndACaller, DomainAdapter, DomainNode]):
     changing: str = "설명"
 
     @override
+    def operation(self) -> str:
+        return "admin_update"
+
+    @override
     def describe(self, laid: ADomainAndACaller) -> str:
         target = self.named or laid.domain.name
         return f"{laid.caller.username}이 {target}의 {self.changing}을 고침"

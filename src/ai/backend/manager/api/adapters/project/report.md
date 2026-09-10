@@ -15,12 +15,12 @@ Given
 - 도메인에 속한 사용자 한 명 준비
   - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
   - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-  - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다  ← 행위자
+  - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
 
 When
 
 - 일반 사용자 user-1의 admin_create 호출
-  - CreateProjectInput(name='refused', domain_name='home-1', resource_policy='default')
+  - CreateProjectInput(name='refused', domain_name=도메인: home-1, resource_policy=프로젝트 정책: default)
 
 Then
 
@@ -43,13 +43,13 @@ Given
 - 도메인에 속한 사용자 한 명 준비
   - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
   - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
-  - 슈퍼관리자 user-2: 자기 키와 개인 프로젝트를 갖는다  ← 행위자
+  - 슈퍼관리자 user-2: 자기 키와 개인 프로젝트를 갖는다
 
 When
 
 - 슈퍼관리자 user-2의 assign_users 호출
-  - ProjectID('01a08a05-0541-7620-8073-70a13e290785')
-  - AssignUsersToProjectInput(user_ids=[UserID('01a08a05-057e-74c8-8b88-67d44c170058')], role_id=RoleID('01a08a05-062b-73ae-a7d1-daca3732e2a1'))
+  - 프로젝트: research-1
+  - AssignUsersToProjectInput(user_ids=[일반 사용자: user-1], role_id=역할: project-member-1)
 
 Then
 
@@ -66,12 +66,12 @@ Given
 - 도메인에 속한 사용자 한 명 준비
   - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
   - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-  - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다  ← 행위자
+  - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
 
 When
 
 - 슈퍼관리자 user-1의 admin_create 호출
-  - CreateProjectInput(name='research', domain_name='home-1', resource_policy='default')
+  - CreateProjectInput(name='research', domain_name=도메인: home-1, resource_policy=프로젝트 정책: default)
 
 Then
 

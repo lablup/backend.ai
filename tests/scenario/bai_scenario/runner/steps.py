@@ -106,7 +106,7 @@ def _record(
         description=scenario.describe(),
         actor="",
         caller="",
-        operation=type(scenario.when()).__name__,
+        operation=scenario.when().operation(),
         when=run.when.says,
         then=run.then.says,
         module=type(scenario).__module__,

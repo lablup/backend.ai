@@ -16,7 +16,7 @@ Given
     - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
     - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
     - 키페어 정책 keypair-policy-1: 동시 세션 5개까지, 폴더는 local:volume1에 놓을 수 있다
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다  ← 행위자
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
   - 역할 folder-owner-1: 이 역할이 앉은 스코프 안에서만 통한다
   - 역할 folder-owner-1: vfolder 전체에 CREATE 허용
   - 역할 folder-owner-1: vfolder 전체에 READ 허용
@@ -42,7 +42,7 @@ Given
   - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
   - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
   - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-  - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다  ← 행위자
+  - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
 
 When
 
@@ -65,7 +65,7 @@ Given
     - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
     - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
     - 키페어 정책 keypair-policy-1: 동시 세션 5개까지, 폴더는 local:volume1에 놓을 수 있다
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다  ← 행위자
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
   - 역할 folder-owner-1: 이 역할이 앉은 스코프 안에서만 통한다
   - 역할 folder-owner-1: vfolder 전체에 CREATE 허용
   - 역할 folder-owner-1: vfolder 전체에 READ 허용
@@ -78,5 +78,5 @@ When
 
 Then
 
-- total_count = 0
+- 답 전체 일치
 
