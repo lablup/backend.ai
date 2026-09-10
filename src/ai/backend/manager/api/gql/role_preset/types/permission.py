@@ -38,6 +38,7 @@ from ai.backend.common.dto.manager.v2.role_permission_preset.response import (
 from ai.backend.manager.api.gql.base import (
     DateTimeFilter,
     OrderDirection,
+    StringFilter,
     UUIDFilter,
 )
 from ai.backend.manager.api.gql.decorators import (
@@ -57,8 +58,6 @@ from ai.backend.manager.api.gql.pydantic_compat import (
 from ai.backend.manager.api.gql.rbac.types import (
     OperationTypeFilterGQL,
     OperationTypeGQL,
-    RBACElementTypeFilterGQL,
-    RBACElementTypeGQL,
 )
 
 # --- Node / Connection types ---
@@ -74,9 +73,7 @@ from ai.backend.manager.api.gql.rbac.types import (
 class RolePermissionPresetGQL(PydanticNodeMixin[RolePermissionPresetNode]):
     id: NodeID[str] = gql_field(description="Permission entry UUID.")
     role_preset_id: UUID = gql_field(description="UUID of the parent role preset.")
-    entity_type: RBACElementTypeGQL = gql_field(
-        description="Entity type the permission applies to."
-    )
+    entity_type: str = gql_field(description="Entity type the permission applies to.")
     operation: OperationTypeGQL = gql_field(description="Operation granted by the permission.")
     created_at: datetime = gql_field(description="Creation timestamp.")
 
@@ -118,7 +115,7 @@ class RolePermissionPresetFilterGQL(PydanticInputMixin[RolePermissionPresetFilte
     role_preset_id: UUIDFilter | None = gql_field(
         description="Filter by parent role preset ID.", default=None
     )
-    entity_type: RBACElementTypeFilterGQL | None = gql_field(
+    entity_type: StringFilter | None = gql_field(
         description="Filter by entity type the permission applies to.", default=None
     )
     operation: OperationTypeFilterGQL | None = gql_field(
@@ -197,9 +194,7 @@ class BulkRolePermissionPresetFailureInfoGQL(
 class BulkAddRolePermissionPresetFailureInfoGQL(
     PydanticOutputMixin[BulkAddRolePermissionPresetFailureInfoDTO]
 ):
-    entity_type: RBACElementTypeGQL = gql_field(
-        description="Entity type of the permission entry that failed."
-    )
+    entity_type: str = gql_field(description="Entity type of the permission entry that failed.")
     operation: OperationTypeGQL = gql_field(
         description="Operation of the permission entry that failed."
     )

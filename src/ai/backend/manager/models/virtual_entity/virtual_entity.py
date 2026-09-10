@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+from uuid import UUID
+
 import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, mapped_column
 
-from ai.backend.common.data.entity.types import EntityID, EntityType
+from ai.backend.common.data.entity.types import EntityType
 from ai.backend.common.data.entity.virtual_entity import VirtualEntityID
 from ai.backend.common.data.permission.virtual_entity import VirtualEntityData
 from ai.backend.manager.models.base import (
@@ -31,7 +33,7 @@ class VirtualEntityRow(CreatedAtMixin, Base):
     entity_type: Mapped[EntityType] = mapped_column(
         "entity_type", sa.String(length=32), nullable=False
     )
-    entity_id: Mapped[EntityID] = mapped_column("entity_id", GUID(), nullable=False)
+    entity_id: Mapped[UUID] = mapped_column("entity_id", GUID(), nullable=False)
 
     def to_data(self) -> VirtualEntityData:
         return VirtualEntityData(

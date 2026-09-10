@@ -62,6 +62,7 @@ from ai.backend.manager.services.idle_checker.actions.admin_search import (
 from ai.backend.manager.services.idle_checker.actions.create import CreateIdleCheckerAction
 from ai.backend.manager.services.idle_checker.actions.purge import BulkPurgeIdleCheckersAction
 from ai.backend.manager.services.idle_checker.actions.update import UpdateIdleCheckerAction
+from ai.backend.manager.services.idle_checker.processors import IdleCheckerProcessors
 from ai.backend.manager.types import OptionalState, TriState
 
 
@@ -79,6 +80,11 @@ def _get_idle_checker_pagination_spec() -> PaginationSpec:
 class IdleCheckerAdapter(BaseAdapter):
     """Adapter for global idle checker operations (admin-only)."""
 
+    _idle_checker: IdleCheckerProcessors
+
+    def __init__(self, idle_checker: IdleCheckerProcessors) -> None:
+        self._idle_checker = idle_checker
+
     async def admin_create(
         self,
         input: CreateIdleCheckerInput,
@@ -90,7 +96,7 @@ class IdleCheckerAdapter(BaseAdapter):
             initial_grace_period_seconds=input.initial_grace_period_seconds,
             spec=self._build_spec(input.checker_spec),
         )
-        action_result = await self._processors.idle_checker.create.run(
+        action_result = await self._idle_checker.create.run(
             CreateIdleCheckerAction(creator=creator)
         )
         return CreateIdleCheckerPayload(
@@ -109,7 +115,7 @@ class IdleCheckerAdapter(BaseAdapter):
             pagination=NoPagination(),
             conditions=[IdleCheckerConditions.by_ids(ids)],
         )
-        action_result = await self._processors.idle_checker.admin_search.run(
+        action_result = await self._idle_checker.admin_search.run(
             AdminSearchIdleCheckersAction(searcher=searcher)
         )
         node_map = {node.id: node for node in map(self._data_to_node, action_result.items)}
@@ -130,7 +136,7 @@ class IdleCheckerAdapter(BaseAdapter):
             limit=input.limit,
             offset=input.offset,
         )
-        action_result = await self._processors.idle_checker.admin_search.run(
+        action_result = await self._idle_checker.admin_search.run(
             AdminSearchIdleCheckersAction(searcher=searcher)
         )
         return SearchIdleCheckerPayload(
@@ -160,7 +166,7 @@ class IdleCheckerAdapter(BaseAdapter):
             ),
             spec=self._build_spec_update(input.checker_spec),
         )
-        action_result = await self._processors.idle_checker.update.run(
+        action_result = await self._idle_checker.update.run(
             UpdateIdleCheckerAction(updater=updater)
         )
         return UpdateIdleCheckerPayload(
@@ -176,7 +182,7 @@ class IdleCheckerAdapter(BaseAdapter):
         The action answers per entity, so the single failure it can report is raised
         here: the API names one checker and either removes it or fails.
         """
-        action_result = await self._processors.idle_checker.bulk_purge.run(
+        action_result = await self._idle_checker.bulk_purge.run(
             BulkPurgeIdleCheckersAction(ids=[input.id])
         )
         error = action_result.errors().get(input.id)

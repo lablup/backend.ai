@@ -3,7 +3,6 @@ from __future__ import annotations
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import Any, override
-from uuid import UUID
 
 from sqlalchemy.orm import InstrumentedAttribute
 
@@ -60,7 +59,7 @@ class KeyPairResourcePolicyUpdater(
         return KeyPairResourcePolicyRow.uuid
 
     @override
-    def target_id_value(self) -> UUID:
+    def target_id_value(self) -> KeyPairResourcePolicyUUID:
         return self.policy_id
 
     @property
@@ -115,7 +114,7 @@ class UserResourcePolicyUpdater(DataUpdater[UserResourcePolicyRow, UserResourceP
         return UserResourcePolicyRow.uuid
 
     @override
-    def target_id_value(self) -> UUID:
+    def target_id_value(self) -> UserResourcePolicyUUID:
         return self.policy_id
 
     @property
@@ -160,7 +159,7 @@ class ProjectResourcePolicyUpdater(
         return ProjectResourcePolicyRow.uuid
 
     @override
-    def target_id_value(self) -> UUID:
+    def target_id_value(self) -> ProjectResourcePolicyUUID:
         return self.policy_id
 
     @property

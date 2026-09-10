@@ -1,4 +1,4 @@
-"""Base types and utilities for repository layer.
+"""Read-side types and utilities for the repository layer.
 
 Re-exports all public APIs for backward compatibility.
 """
@@ -20,26 +20,7 @@ from ai.backend.manager.models.specs.searcher import (
 from ai.backend.manager.models.specs.types import (
     IntegrityErrorCheck,
 )
-from ai.backend.manager.repositories.base.types import LegacyBulkResultWithFailures
 
-from .creator import (
-    BulkCreator,
-    BulkCreatorError,
-    BulkCreatorResult,
-    BulkCreatorResultWithFailures,
-    Creator,
-    CreatorResult,
-    CreatorSpec,
-    DataCreator,
-    DependentCreatorSpec,
-    NextValuePolicy,
-    execute_bulk_creator,
-    execute_bulk_creator_partial,
-    execute_bulk_dependent_creator,
-    execute_creator,
-    execute_dependent_creator,
-    execute_next_value_creator,
-)
 from .export import (
     ExportDataStream,
     ExportFieldDef,
@@ -55,20 +36,6 @@ from .integrity import (
     match_integrity_error,
     parse_integrity_error,
 )
-from .purger import (
-    BatchPurger,
-    BatchPurgerResult,
-    BatchPurgerSpec,
-    BulkPurgerError,
-    BulkPurgerResultWithFailures,
-    DataBatchPurger,
-    DataPurger,
-    Purger,
-    PurgerResult,
-    execute_batch_purger,
-    execute_bulk_purger_partial,
-    execute_purger,
-)
 from .querier import (
     BatchQuerier,
     BatchQuerierResult,
@@ -81,37 +48,9 @@ from .querier import (
 from .types import (
     CursorConditionFactory,
 )
-from .updater import (
-    BatchUpdater,
-    BatchUpdaterResult,
-    BatchUpdaterSpec,
-    BulkUpdaterError,
-    BulkUpdaterResult,
-    DataBatchUpdater,
-    DataUpdater,
-    Updater,
-    UpdaterResult,
-    UpdaterSpec,
-    execute_batch_updater,
-    execute_bulk_updater_partial,
-    execute_updater,
-)
-from .upserter import (
-    BulkUpserter,
-    BulkUpserterError,
-    BulkUpserterResult,
-    BulkUpserterResultWithFailures,
-    DataUpserter,
-    Upserter,
-    UpserterResult,
-    UpserterSpec,
-    execute_bulk_upserter,
-    execute_upserter,
-)
 
 __all__ = [
     # Types
-    "LegacyBulkResultWithFailures",
     "CursorConditionFactory",
     "IntegrityErrorCheck",
     # Integrity
@@ -148,67 +87,4 @@ __all__ = [
     # Searcher
     "Searcher",
     "SearcherResult",
-    # Creator
-    "CreatorSpec",
-    "DataCreator",
-    "Creator",
-    "CreatorResult",
-    "execute_creator",
-    # DependentCreator
-    "DependentCreatorSpec",
-    "execute_dependent_creator",
-    "execute_bulk_dependent_creator",
-    # NextValue
-    "NextValuePolicy",
-    "execute_next_value_creator",
-    # BulkCreator
-    "BulkCreator",
-    "BulkCreatorError",
-    "BulkCreatorResult",
-    "BulkCreatorResultWithFailures",
-    "execute_bulk_creator",
-    "execute_bulk_creator_partial",
-    # Updater
-    "UpdaterSpec",
-    "DataBatchUpdater",
-    "DataUpdater",
-    "Updater",
-    "UpdaterResult",
-    "execute_updater",
-    # BatchUpdater
-    "BatchUpdaterSpec",
-    "BatchUpdater",
-    "BatchUpdaterResult",
-    "execute_batch_updater",
-    # BulkUpdater
-    "BulkUpdaterError",
-    "BulkUpdaterResult",
-    "execute_bulk_updater_partial",
-    # Upserter
-    "UpserterSpec",
-    "DataUpserter",
-    "Upserter",
-    "UpserterResult",
-    "execute_upserter",
-    # BulkUpserter
-    "BulkUpserter",
-    "BulkUpserterError",
-    "BulkUpserterResult",
-    "BulkUpserterResultWithFailures",
-    "execute_bulk_upserter",
-    # Purger
-    "DataBatchPurger",
-    "DataPurger",
-    "Purger",
-    "PurgerResult",
-    "execute_purger",
-    # BulkPurger
-    "BulkPurgerError",
-    "BulkPurgerResultWithFailures",
-    "execute_bulk_purger_partial",
-    # BatchPurger
-    "BatchPurgerSpec",
-    "BatchPurger",
-    "BatchPurgerResult",
-    "execute_batch_purger",
 ]

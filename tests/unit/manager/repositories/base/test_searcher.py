@@ -24,7 +24,7 @@ from ai.backend.manager.models.rbac_models.role_preset.row import RolePresetRow
 from ai.backend.manager.models.scopes import ExistenceCheck, OperationScope
 from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.models.specs.searcher import Searcher
-from ai.backend.manager.repositories.ops import DBOpsProvider
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.testutils.db import with_tables
 
 if TYPE_CHECKING:
@@ -122,12 +122,12 @@ class TestSearcher:
         yield data
 
     @pytest.fixture
-    def ops(self, database: ExtendedAsyncSAEngine) -> DBOpsProvider:
-        return DBOpsProvider(database)
+    def ops(self, database: ExtendedAsyncSAEngine) -> V2DBOpsProvider:
+        return V2DBOpsProvider(database)
 
     async def test_returns_data_instead_of_rows(
         self,
-        ops: DBOpsProvider,
+        ops: V2DBOpsProvider,
         sample_items: list[dict[str, int | str]],
     ) -> None:
         """The searcher converts every fetched row, so no ORM row is returned."""
@@ -147,7 +147,7 @@ class TestSearcher:
 
     async def test_applies_conditions(
         self,
-        ops: DBOpsProvider,
+        ops: V2DBOpsProvider,
         sample_items: list[dict[str, int | str]],
     ) -> None:
         """Conditions carried by the searcher filter the result."""
@@ -164,7 +164,7 @@ class TestSearcher:
 
     async def test_applies_orders(
         self,
-        ops: DBOpsProvider,
+        ops: V2DBOpsProvider,
         sample_items: list[dict[str, int | str]],
     ) -> None:
         """Orders carried by the searcher sort the result."""
@@ -186,7 +186,7 @@ class TestSearcher:
 
     async def test_reports_pagination_info(
         self,
-        ops: DBOpsProvider,
+        ops: V2DBOpsProvider,
         sample_items: list[dict[str, int | str]],
     ) -> None:
         """Page flags and total_count describe the whole match set, not the page."""
@@ -202,7 +202,7 @@ class TestSearcher:
 
     async def test_scopes_restrict_the_result(
         self,
-        ops: DBOpsProvider,
+        ops: V2DBOpsProvider,
         sample_items: list[dict[str, int | str]],
     ) -> None:
         """Scopes are applied exactly as they are for a batch query."""
@@ -217,7 +217,7 @@ class TestSearcher:
 
     async def test_rejects_empty_scopes(
         self,
-        ops: DBOpsProvider,
+        ops: V2DBOpsProvider,
         sample_items: list[dict[str, int | str]],
     ) -> None:
         """An empty scope list would degrade into an unscoped scan, so it is refused."""
@@ -230,7 +230,7 @@ class TestSearcher:
 
     async def test_global_search_applies_no_scope_filter(
         self,
-        ops: DBOpsProvider,
+        ops: V2DBOpsProvider,
         sample_items: list[dict[str, int | str]],
     ) -> None:
         """The global path returns rows from every category."""
@@ -314,7 +314,7 @@ class TestPassThroughDomainWiring:
         sample_presets: list[RolePresetID],
     ) -> None:
         """The whole db_source.search body is one ops call plus the result wrapper."""
-        ops = DBOpsProvider(database)
+        ops = V2DBOpsProvider(database)
         searcher = RolePresetSearcher(
             pagination=OffsetPagination(offset=0, limit=10),
             conditions=[lambda: RolePresetRow.deleted.is_(False)],

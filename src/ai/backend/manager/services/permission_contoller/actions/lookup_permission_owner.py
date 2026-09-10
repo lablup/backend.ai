@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from typing import Any, override
 
 from ai.backend.common.data.entity.permission import PermissionID
-from ai.backend.common.data.entity.role import ROLE_ENTITY_TYPE, RoleID
+from ai.backend.common.data.entity.role import RoleEntityType, RoleID
 from ai.backend.common.data.entity.types import EntityType
 from ai.backend.manager.actions.v2.field.bulk_lookup import LookupBulkFieldOwnerOpsAction
 from ai.backend.manager.actions.v2.field.lookup import LookupFieldOwnerOpsAction
@@ -37,7 +37,7 @@ class LookupRolePermissionOwnerAction(LookupFieldOwnerOpsAction[PermissionID, Ro
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return ROLE_ENTITY_TYPE
+        return RoleEntityType()
 
     @override
     @classmethod
@@ -66,7 +66,7 @@ class LookupBulkRolePermissionOwnerAction(LookupBulkFieldOwnerOpsAction[Permissi
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return ROLE_ENTITY_TYPE
+        return RoleEntityType()
 
     @override
     @classmethod

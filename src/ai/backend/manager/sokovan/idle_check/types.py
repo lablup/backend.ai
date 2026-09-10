@@ -9,6 +9,7 @@ from typing import override
 from uuid import UUID
 
 from ai.backend.common.types import SessionId
+from ai.backend.manager.data.idle_checker.types import IdleJudgmentData
 from ai.backend.manager.data.reconciler.types import (
     BaseReconcilerCategory,
     HandlerOutcome,
@@ -18,7 +19,6 @@ from ai.backend.manager.data.session.options import HandlerPolicyResolver
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.repositories.idle_checker.types import (
     IdleCheckBatchData,
-    IdleJudgmentData,
 )
 from ai.backend.manager.sokovan.reconciler.base import (
     BaseReconcilerInfo,

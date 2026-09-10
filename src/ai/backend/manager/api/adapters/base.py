@@ -14,7 +14,7 @@ from ai.backend.manager.api.adapter_options.pagination.pagination import (
     PaginationSpec,
     build_pagination,
 )
-from ai.backend.manager.errors.repository import EntityNotFoundError
+from ai.backend.manager.errors.base.not_found import NotFoundError
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.condition_utils import combine_conditions_or, negate_conditions
 from ai.backend.manager.models.entity_label.conditions import (
@@ -30,7 +30,6 @@ if TYPE_CHECKING:
         EntityLabelFilter,
         EntityLabelNestedFilter,
     )
-    from ai.backend.manager.services.processors import Processors
 
 
 class BaseAdapter(BaseFilterAdapter):
@@ -45,9 +44,6 @@ class BaseAdapter(BaseFilterAdapter):
     Adapters do NOT contain business logic — they translate between
     the DTO layer and the Processor/Action layer.
     """
-
-    def __init__(self, processors: Processors) -> None:
-        self._processors = processors
 
     def _convert_entity_label_filter(self, f: EntityLabelFilter) -> list[QueryCondition]:
         """Conditions matching a single label row.
@@ -147,7 +143,7 @@ class BaseAdapter(BaseFilterAdapter):
         """
         try:
             result: BulkFieldOpsResult[TData] = await processor.run(action)
-        except EntityNotFoundError:
+        except NotFoundError:
             return [None for _ in field_ids]
         return [
             to_node(result.successes[field_id])
@@ -163,7 +159,7 @@ class BaseAdapter(BaseFilterAdapter):
         awaiting it, so a caller is never told a row is missing when it is one they may
         not read.
         """
-        if error is None or isinstance(error, EntityNotFoundError):
+        if error is None or isinstance(error, NotFoundError):
             return None
         return error
 

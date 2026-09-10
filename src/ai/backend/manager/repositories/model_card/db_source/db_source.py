@@ -196,6 +196,7 @@ class ModelCardDBSource:
             # would only get rolled back on a mount-check failure.
             vfolder_id = VFolderUUID(deleted.vfolder_id)
             await self._reject_if_vfolder_mounted(w, vfolder_id)
+            # TODO: scope this purge. A user operation must not use in_global.
             siblings = await w.batch_purge_entities_in_global(
                 ModelCardVFolderBatchPurger(vfolder_id=vfolder_id)
             )

@@ -1,10 +1,21 @@
 from typing import NewType, override
 
-from ai.backend.common.data.entity.types import FieldIdentifier, FieldType
+from ai.backend.common.data.entity.types import DanglingFieldType, FieldIdentifier, FieldType
 
 __all__ = ("EntityLabelID", "EntityLabelKey")
 
-ENTITY_LABEL_FIELD_TYPE = FieldType("label")
+
+class EntityLabelFieldType(DanglingFieldType):
+    @override
+    @classmethod
+    def name(cls) -> str:
+        return "label"
+
+    @override
+    @classmethod
+    def description(cls) -> str:
+        return "One key and value label put on an entity of any kind."
+
 
 EntityLabelKey = NewType("EntityLabelKey", str)
 """The key half of a ``key=value`` label. Names no entity: which rows carry it is what
@@ -17,4 +28,4 @@ class EntityLabelID(FieldIdentifier):
     @override
     @classmethod
     def field_type(cls) -> FieldType:
-        return ENTITY_LABEL_FIELD_TYPE
+        return EntityLabelFieldType()

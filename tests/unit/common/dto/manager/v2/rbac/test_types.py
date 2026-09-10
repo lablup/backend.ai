@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import json
 
+from ai.backend.common.data.entity.types import EntityType
 from ai.backend.common.data.permission.types import (
-    EntityType,
     OperationType,
     RoleSource,
     RoleStatus,
@@ -106,10 +106,10 @@ class TestReExportedEnums:
         assert ExportedRoleStatus.DELETED.value == "deleted"
 
     def test_entity_type_user_value(self) -> None:
-        assert ExportedEntityType.USER.value == "user"
+        assert ExportedEntityType("user") == "user"
 
     def test_entity_type_role_value(self) -> None:
-        assert ExportedEntityType.ROLE.value == "role"
+        assert ExportedEntityType("role") == "role"
 
     def test_operation_type_create_value(self) -> None:
         assert ExportedOperationType.CREATE.value == "create"
@@ -123,42 +123,42 @@ class TestPermissionSummaryCreation:
 
     def test_basic_creation(self) -> None:
         perm = PermissionSummary(
-            entity_type=EntityType.ROLE,
+            entity_type=EntityType("role"),
             operation=OperationType.READ,
         )
-        assert perm.entity_type == EntityType.ROLE
+        assert perm.entity_type == EntityType("role")
         assert perm.operation == OperationType.READ
 
     def test_creation_with_user_entity_type(self) -> None:
         perm = PermissionSummary(
-            entity_type=EntityType.USER,
+            entity_type=EntityType("user"),
             operation=OperationType.CREATE,
         )
-        assert perm.entity_type == EntityType.USER
+        assert perm.entity_type == EntityType("user")
         assert perm.operation == OperationType.CREATE
 
     def test_creation_with_update_operation(self) -> None:
         perm = PermissionSummary(
-            entity_type=EntityType.SESSION,
+            entity_type=EntityType("session"),
             operation=OperationType.UPDATE,
         )
-        assert perm.entity_type == EntityType.SESSION
+        assert perm.entity_type == EntityType("session")
         assert perm.operation == OperationType.UPDATE
 
     def test_creation_with_soft_delete_operation(self) -> None:
         perm = PermissionSummary(
-            entity_type=EntityType.VFOLDER,
+            entity_type=EntityType("vfolder"),
             operation=OperationType.SOFT_DELETE,
         )
-        assert perm.entity_type == EntityType.VFOLDER
+        assert perm.entity_type == EntityType("vfolder")
         assert perm.operation == OperationType.SOFT_DELETE
 
     def test_creation_with_hard_delete_operation(self) -> None:
         perm = PermissionSummary(
-            entity_type=EntityType.IMAGE,
+            entity_type=EntityType("image"),
             operation=OperationType.HARD_DELETE,
         )
-        assert perm.entity_type == EntityType.IMAGE
+        assert perm.entity_type == EntityType("image")
         assert perm.operation == OperationType.HARD_DELETE
 
     def test_creation_from_string_values(self) -> None:
@@ -166,7 +166,7 @@ class TestPermissionSummaryCreation:
             "entity_type": "role",
             "operation": "read",
         })
-        assert perm.entity_type == EntityType.ROLE
+        assert perm.entity_type == EntityType("role")
         assert perm.operation == OperationType.READ
 
     def test_creation_from_string_values_create(self) -> None:
@@ -174,7 +174,7 @@ class TestPermissionSummaryCreation:
             "entity_type": "user",
             "operation": "create",
         })
-        assert perm.entity_type == EntityType.USER
+        assert perm.entity_type == EntityType("user")
         assert perm.operation == OperationType.CREATE
 
 
@@ -183,16 +183,16 @@ class TestPermissionSummarySerialization:
 
     def test_model_dump(self) -> None:
         perm = PermissionSummary(
-            entity_type=EntityType.ROLE,
+            entity_type=EntityType("role"),
             operation=OperationType.READ,
         )
         data = perm.model_dump()
-        assert data["entity_type"] == EntityType.ROLE
+        assert data["entity_type"] == EntityType("role")
         assert data["operation"] == OperationType.READ
 
     def test_model_dump_json(self) -> None:
         perm = PermissionSummary(
-            entity_type=EntityType.ROLE,
+            entity_type=EntityType("role"),
             operation=OperationType.READ,
         )
         json_str = perm.model_dump_json()
@@ -202,7 +202,7 @@ class TestPermissionSummarySerialization:
 
     def test_model_dump_json_with_enum_values(self) -> None:
         perm = PermissionSummary(
-            entity_type=EntityType.USER,
+            entity_type=EntityType("user"),
             operation=OperationType.CREATE,
         )
         json_str = perm.model_dump_json()
@@ -212,7 +212,7 @@ class TestPermissionSummarySerialization:
 
     def test_serialization_round_trip(self) -> None:
         perm = PermissionSummary(
-            entity_type=EntityType.ROLE,
+            entity_type=EntityType("role"),
             operation=OperationType.READ,
         )
         json_str = perm.model_dump_json()
@@ -222,7 +222,7 @@ class TestPermissionSummarySerialization:
 
     def test_serialization_round_trip_with_grant_operation(self) -> None:
         perm = PermissionSummary(
-            entity_type=EntityType.SESSION,
+            entity_type=EntityType("session"),
             operation=OperationType.GRANT_ALL,
         )
         json_str = perm.model_dump_json()
@@ -238,22 +238,22 @@ class TestPermissionSummarySerialization:
 
     def test_model_dump_preserves_enum_instances(self) -> None:
         perm = PermissionSummary(
-            entity_type=EntityType.DOMAIN,
+            entity_type=EntityType("domain"),
             operation=OperationType.UPDATE,
         )
         data = perm.model_dump()
         # model_dump returns enum instances by default
-        assert data["entity_type"] == EntityType.DOMAIN
+        assert data["entity_type"] == EntityType("domain")
         assert data["operation"] == OperationType.UPDATE
 
     def test_list_of_permission_summaries_serialization(self) -> None:
         permissions = [
             PermissionSummary(
-                entity_type=EntityType.ROLE,
+                entity_type=EntityType("role"),
                 operation=OperationType.READ,
             ),
             PermissionSummary(
-                entity_type=EntityType.USER,
+                entity_type=EntityType("user"),
                 operation=OperationType.CREATE,
             ),
         ]
@@ -261,7 +261,7 @@ class TestPermissionSummarySerialization:
         restored = [PermissionSummary.model_validate_json(s) for s in serialized]
 
         assert len(restored) == 2
-        assert restored[0].entity_type == EntityType.ROLE
+        assert restored[0].entity_type == EntityType("role")
         assert restored[0].operation == OperationType.READ
-        assert restored[1].entity_type == EntityType.USER
+        assert restored[1].entity_type == EntityType("user")
         assert restored[1].operation == OperationType.CREATE

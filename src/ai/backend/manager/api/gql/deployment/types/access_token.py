@@ -10,6 +10,7 @@ from uuid import UUID
 from strawberry import ID, Info
 from strawberry.relay import Connection, Edge, NodeID
 
+from ai.backend.common.data.entity.deployment_token import DeploymentTokenID
 from ai.backend.common.dto.manager.v2.deployment.request import (
     AccessTokenFilter as AccessTokenFilterDTO,
 )
@@ -93,7 +94,7 @@ class AccessToken(PydanticNodeMixin[AccessTokenNodeDTO]):
         required: bool = False,
     ) -> Iterable[Self | None]:
         results = await info.context.data_loaders.access_token_loader.load_many([
-            UUID(nid) for nid in node_ids
+            DeploymentTokenID(UUID(nid)) for nid in node_ids
         ])
         return cast(list[Self | None], results)
 

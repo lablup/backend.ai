@@ -25,6 +25,7 @@ from ai.backend.common.dto.manager.v2.user.types import (
     UserProjectFilter,
     UserRole,
     UserRoleFilter,
+    UserScope,
     UserStatus,
     UserStatusFilter,
 )
@@ -42,6 +43,7 @@ __all__ = (
     "PurgeUserInput",
     "PurgeUserV2Input",
     "RestoreUserInput",
+    "ScopedSearchUsersInput",
     "PurgeUserV2Options",
     "SearchUsersRequest",
     "UpdateMyAllowedClientIPInput",
@@ -376,6 +378,21 @@ class UserOrder(BaseRequestModel):
 class SearchUsersRequest(BaseRequestModel):
     """Request body for searching users with filters, orders, and pagination."""
 
+    filter: UserFilter | None = Field(default=None, description="Filter conditions.")
+    order: list[UserOrder] | None = Field(default=None, description="Order specifications.")
+    limit: int = Field(
+        default=DEFAULT_PAGE_LIMIT,
+        ge=1,
+        le=MAX_PAGE_LIMIT,
+        description="Maximum items to return.",
+    )
+    offset: int = Field(default=0, ge=0, description="Number of items to skip.")
+
+
+class ScopedSearchUsersInput(BaseRequestModel):
+    """Input for searching the users the named scopes reach."""
+
+    scope: UserScope = Field(description="Scope (OR across all items).")
     filter: UserFilter | None = Field(default=None, description="Filter conditions.")
     order: list[UserOrder] | None = Field(default=None, description="Order specifications.")
     limit: int = Field(

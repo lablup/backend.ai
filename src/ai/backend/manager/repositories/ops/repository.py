@@ -16,8 +16,11 @@ from ai.backend.common.data.entity.types import (
     FieldIdentifier,
     RuntimeEntityID,
 )
+from ai.backend.common.exception import BackendAIError
+from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.actions.v2.ops.result import BulkFieldOpsResult
-from ai.backend.manager.errors.repository import EntityNotFoundError
+from ai.backend.manager.errors.base.entity import EntityNotFoundError
+from ai.backend.manager.errors.base.field import FieldNotFoundError
 from ai.backend.manager.models.scopes import OperationScope
 from ai.backend.manager.models.specs.creator import (
     DanglingFieldCreator,
@@ -78,8 +81,11 @@ class OpsRepository[TData]:
         async with self._ops.read_ops() as r:
             data = await r.query_data(querier)
             if data is None:
+                entity_id = querier.entity_id_value()
                 raise EntityNotFoundError(
-                    f"{querier.row_class().__name__} {querier.entity_id_value()} not found"
+                    entity_type=entity_id.entity_type(),
+                    operation=ActionOperationType.GET,
+                    extra_msg=f"{querier.row_class().__name__} {entity_id} not found",
                 )
             return data
 
@@ -101,8 +107,10 @@ class OpsRepository[TData]:
         async with self._ops.read_ops() as r:
             data = await r.query_field_data(querier)
             if data is None:
-                raise EntityNotFoundError(
-                    f"{querier.row_class().__name__} {querier.target_id_value()} not found"
+                field_id = querier.target_id_value()
+                raise FieldNotFoundError(
+                    f"{querier.row_class().__name__} {field_id} not found",
+                    field_type=field_id.field_type(),
                 )
             return data
 
@@ -117,7 +125,11 @@ class OpsRepository[TData]:
         async with self._ops.read_ops() as r:
             entity_id = await r.lookup_entity_id(lookup)
             if entity_id is None:
-                raise EntityNotFoundError(f"No {lookup.row_class().__name__} matches the given key")
+                raise EntityNotFoundError(
+                    f"No {lookup.row_class().__name__} matches the given key",
+                    entity_type=lookup.entity_type(),
+                    operation=ActionOperationType.LOOKUP,
+                )
             return entity_id
 
     async def bulk_lookup[TKey, TEntityID: EntityIdentifier](
@@ -161,7 +173,11 @@ class OpsRepository[TData]:
         owners = await self.field_owners(lookup, [field_id])
         owner = owners.get(field_id)
         if owner is None:
-            raise EntityNotFoundError("No field row matches the given id")
+            raise FieldNotFoundError(
+                "No field row matches the given id",
+                field_type=field_id.field_type(),
+                operation=ActionOperationType.LOOKUP,
+            )
         return owner
 
     async def runtime_field_owners(
@@ -178,7 +194,11 @@ class OpsRepository[TData]:
         owners = await self.runtime_field_owners(lookup, [field_id])
         owner = owners.get(field_id)
         if owner is None:
-            raise EntityNotFoundError("No field row matches the given id")
+            raise FieldNotFoundError(
+                "No field row matches the given id",
+                field_type=field_id.field_type(),
+                operation=ActionOperationType.LOOKUP,
+            )
         return owner
 
     async def field_owner_by_key[TOwnerID: EntityIdentifier](
@@ -192,7 +212,11 @@ class OpsRepository[TData]:
         async with self._ops.read_ops() as r:
             owner = await r.lookup_field_owner_by_key(lookup)
         if owner is None:
-            raise EntityNotFoundError("No field row matches the given key")
+            raise FieldNotFoundError(
+                "No field row matches the given key",
+                field_type=lookup.field_type(),
+                operation=ActionOperationType.LOOKUP,
+            )
         return owner
 
     async def field_by_key[TFieldID: FieldIdentifier, TOwnerID: EntityIdentifier](
@@ -206,7 +230,11 @@ class OpsRepository[TData]:
         async with self._ops.read_ops() as r:
             resolved = await r.lookup_field_by_key(lookup)
         if resolved is None:
-            raise EntityNotFoundError("No field row matches the given key")
+            raise FieldNotFoundError(
+                "No field row matches the given key",
+                field_type=lookup.field_type(),
+                operation=ActionOperationType.LOOKUP,
+            )
         return resolved
 
     async def search_in_scopes(
@@ -385,8 +413,11 @@ class OpsRepository[TData]:
         async with self._ops.write_ops() as w:
             data = await w.purge_entity(purger)
             if data is None:
+                entity_id = purger.entity_id()
                 raise EntityNotFoundError(
-                    f"{purger.row_class().__name__} {purger.entity_id()} not found"
+                    entity_type=entity_id.entity_type(),
+                    operation=ActionOperationType.PURGE,
+                    extra_msg=f"{purger.row_class().__name__} {entity_id} not found",
                 )
             return data
 
@@ -398,8 +429,11 @@ class OpsRepository[TData]:
         async with self._ops.write_ops() as w:
             data = await w.purge_field_entity(purger)
             if data is None:
-                raise EntityNotFoundError(
-                    f"{purger.row_class().__name__} {purger.target_id_value()} not found"
+                field_id = purger.target_id_value()
+                raise FieldNotFoundError(
+                    f"{purger.row_class().__name__} {field_id} not found",
+                    field_type=field_id.field_type(),
+                    operation=ActionOperationType.PURGE,
                 )
             return data
 
@@ -456,10 +490,22 @@ class OpsRepository[TData]:
         async with self._ops.write_ops() as w:
             data = await w.update_data(updater)
             if data is None:
-                raise EntityNotFoundError(
-                    f"{updater.row_class.__name__} {updater.target_id_value()} not found"
-                )
+                raise self._missing_target(updater)
             return data
+
+    def _missing_target(self, updater: GuardedDataUpdater[Any, Any]) -> BackendAIError:
+        """The not-found error for the row an updater names, typed by the id it carries."""
+        target = updater.target_id_value()
+        msg = f"{updater.row_class.__name__} {target} not found"
+        if isinstance(target, FieldIdentifier):
+            return FieldNotFoundError(
+                msg,
+                field_type=target.field_type(),
+                operation=ActionOperationType.UPDATE,
+            )
+        return EntityNotFoundError(
+            msg, entity_type=target.entity_type(), operation=ActionOperationType.UPDATE
+        )
 
     async def partial_bulk_update(
         self, updaters: Mapping[EntityIdentifier, GuardedDataUpdater[Any, TData]]

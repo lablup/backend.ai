@@ -14,7 +14,7 @@ from dateutil.tz import tzutc
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
 from ai.backend.common.data.entity.resource_group import ResourceGroupID, ResourceGroupName
-from ai.backend.common.data.entity.session import SESSION_ENTITY_TYPE, SessionID
+from ai.backend.common.data.entity.session import SessionEntityType, SessionID
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.plugin.monitor import ErrorPluginContext
 from ai.backend.common.types import SessionTypes
@@ -32,7 +32,6 @@ from ai.backend.manager.dependencies.infrastructure.redis import ValkeyClients
 from ai.backend.manager.models.kernel import kernels
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.ops import DBOpsProvider
 from ai.backend.manager.repositories.session.repository import SessionRepository
 from ai.backend.manager.repositories.stream.repository import StreamRepository
 from ai.backend.manager.services.session.actions.lookup import LookupSessionAction
@@ -83,7 +82,7 @@ def stream_processors(
         valkey_live=valkey_clients.live,
         etcd=async_etcd,
     )
-    return StreamProcessors(processor_registry.group(GroupMeta(SESSION_ENTITY_TYPE)), service)
+    return StreamProcessors(processor_registry.group(GroupMeta(SessionEntityType())), service)
 
 
 @pytest.fixture()
@@ -104,7 +103,7 @@ async def session_processors(
             event_hub=AsyncMock(),
             error_monitor=AsyncMock(),
             idle_checker_host=AsyncMock(),
-            session_repository=SessionRepository(database_engine, DBOpsProvider(database_engine)),
+            session_repository=SessionRepository(database_engine),
             scheduler_repository=AsyncMock(),
             scheduling_controller=AsyncMock(),
             appproxy_client_pool=AsyncMock(),
@@ -112,7 +111,7 @@ async def session_processors(
         )
     )
     processors = MagicMock()
-    group = processor_registry.group(GroupMeta(SESSION_ENTITY_TYPE))
+    group = processor_registry.group(GroupMeta(SessionEntityType()))
     processors.resolve_session_name = group.single_entity(
         ResolveSessionNameAction, service.resolve_session_name
     )

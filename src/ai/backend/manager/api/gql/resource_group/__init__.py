@@ -18,6 +18,7 @@ from .resolver import (
     replace_resource_group_default_deployment_options,
     replace_resource_group_default_session_options,
     resource_groups,
+    scoped_resource_groups,
     update_resource_group_fair_share_spec,
 )
 from .types import (
@@ -46,6 +47,7 @@ __all__ = (
     # Query Resolvers - Admin
     "admin_resource_group_v2",
     "admin_resource_groups",
+    "scoped_resource_groups",
     "admin_allowed_resource_groups_for_domain_v2",
     "admin_allowed_resource_groups_for_project_v2",
     "admin_allowed_domains_for_resource_group_v2",

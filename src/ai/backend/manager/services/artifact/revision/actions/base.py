@@ -3,7 +3,7 @@ from typing import override
 
 from ai.backend.common.data.entity.artifact import ArtifactID
 from ai.backend.common.data.entity.artifact_revision import ArtifactRevisionID
-from ai.backend.common.data.entity.types import GLOBAL_ENTITY_TYPE, EntityType
+from ai.backend.common.data.entity.types import EntityType, GlobalEntityType
 from ai.backend.manager.actions.v2.field.base import BaseSingleFieldAction
 from ai.backend.manager.actions.v2.global_scope.base import BaseGlobalAction
 from ai.backend.manager.services.artifact.revision.actions.lookup_owner import (
@@ -18,7 +18,7 @@ class ArtifactRevisionAction(BaseGlobalAction):
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return GLOBAL_ENTITY_TYPE
+        return GlobalEntityType()
 
 
 @dataclass

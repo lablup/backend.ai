@@ -18,15 +18,15 @@ import yarl
 from ai.backend.client.v2.auth import HMACAuth
 from ai.backend.client.v2.config import ClientConfig
 from ai.backend.client.v2.v2_registry import V2ClientRegistry
-from ai.backend.common.data.entity.domain import DOMAIN_ENTITY_TYPE
-from ai.backend.common.data.entity.project import PROJECT_ENTITY_TYPE
+from ai.backend.common.data.entity.domain import DomainEntityType
+from ai.backend.common.data.entity.project import ProjectEntityType
 from ai.backend.common.data.entity.resource_group import (
-    RESOURCE_GROUP_ENTITY_TYPE,
+    ResourceGroupEntityType,
     ResourceGroupName,
 )
-from ai.backend.common.data.entity.resource_preset import RESOURCE_PRESET_ENTITY_TYPE
-from ai.backend.common.data.entity.session import SESSION_ENTITY_TYPE
-from ai.backend.common.data.entity.user import USER_ENTITY_TYPE
+from ai.backend.common.data.entity.resource_preset import ResourcePresetEntityType
+from ai.backend.common.data.entity.session import SessionEntityType
+from ai.backend.common.data.entity.user import UserEntityType
 from ai.backend.common.dto.manager.v2.resource_allocation.request import (
     EffectiveResourceAllocationInput,
 )
@@ -52,6 +52,7 @@ from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.config.unified import ManagerUnifiedConfig
 from ai.backend.manager.dependencies.infrastructure.redis import ValkeyClients
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.resource_allocation.repository import (
     ResourceAllocationRepository,
 )
@@ -115,7 +116,9 @@ def _build_registries(
     processors.session = MagicMock()
     processors.session.resource_allocation = ra_processors
     adapter = ResourceAllocationAdapter(
-        processors=processors,
+        processors.session,
+        MagicMock(),
+        MagicMock(),
         config_provider=config_provider,
     )
     handler = V2ResourceAllocationHandler(adapter=adapter)
@@ -157,6 +160,7 @@ class TestHideAgentsVisibility:
             db=database_engine,
             valkey_stat=valkey_clients.stat,
             config_provider=config_provider_hide_agents,
+            v2_ops_provider=V2DBOpsProvider(database_engine),
         )
         service = ResourceAllocationService(
             resource_allocation_repository=ra_repo,
@@ -164,12 +168,12 @@ class TestHideAgentsVisibility:
         )
         groups = processor_registry.concern(ConcernMeta(Concern.RESOURCE_GROUP))
         return ResourceAllocationProcessors(
-            groups.group(GroupMeta(USER_ENTITY_TYPE)),
-            groups.group(GroupMeta(PROJECT_ENTITY_TYPE)),
-            groups.group(GroupMeta(DOMAIN_ENTITY_TYPE)),
-            groups.group(GroupMeta(RESOURCE_GROUP_ENTITY_TYPE)),
-            groups.group(GroupMeta(SESSION_ENTITY_TYPE)),
-            groups.group(GroupMeta(RESOURCE_PRESET_ENTITY_TYPE)),
+            groups.group(GroupMeta(UserEntityType())),
+            groups.group(GroupMeta(ProjectEntityType())),
+            groups.group(GroupMeta(DomainEntityType())),
+            groups.group(GroupMeta(ResourceGroupEntityType())),
+            groups.group(GroupMeta(SessionEntityType())),
+            groups.group(GroupMeta(ResourcePresetEntityType())),
             service,
         )
 
@@ -293,6 +297,7 @@ class TestGroupResourceVisibility:
             db=database_engine,
             valkey_stat=valkey_clients.stat,
             config_provider=config_provider_no_grv,
+            v2_ops_provider=V2DBOpsProvider(database_engine),
         )
         service = ResourceAllocationService(
             resource_allocation_repository=ra_repo,
@@ -300,12 +305,12 @@ class TestGroupResourceVisibility:
         )
         groups = processor_registry.concern(ConcernMeta(Concern.RESOURCE_GROUP))
         return ResourceAllocationProcessors(
-            groups.group(GroupMeta(USER_ENTITY_TYPE)),
-            groups.group(GroupMeta(PROJECT_ENTITY_TYPE)),
-            groups.group(GroupMeta(DOMAIN_ENTITY_TYPE)),
-            groups.group(GroupMeta(RESOURCE_GROUP_ENTITY_TYPE)),
-            groups.group(GroupMeta(SESSION_ENTITY_TYPE)),
-            groups.group(GroupMeta(RESOURCE_PRESET_ENTITY_TYPE)),
+            groups.group(GroupMeta(UserEntityType())),
+            groups.group(GroupMeta(ProjectEntityType())),
+            groups.group(GroupMeta(DomainEntityType())),
+            groups.group(GroupMeta(ResourceGroupEntityType())),
+            groups.group(GroupMeta(SessionEntityType())),
+            groups.group(GroupMeta(ResourcePresetEntityType())),
             service,
         )
 

@@ -17,8 +17,10 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 import sqlalchemy as sa
 from dateutil.tz import tzutc
+from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
+from ai.backend.common.data.entity.agent import AgentUUID
 from ai.backend.common.data.entity.domain import DomainID, DomainName
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.data.user.types import UserRole
@@ -39,7 +41,6 @@ from ai.backend.common.types import (
 from ai.backend.manager.data.agent.types import AgentStatus
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.kernel.types import KernelStatus
-from ai.backend.manager.data.permission.types import EntityType, ScopeType
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
@@ -56,9 +57,6 @@ from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.project import ProjectRow
 from ai.backend.manager.models.rbac_models import RoleRow, UserRoleRow
-from ai.backend.manager.models.rbac_models.association_scopes_entities import (
-    AssociationScopesEntitiesRow,
-)
 from ai.backend.manager.models.replica_group import ReplicaGroupRow
 from ai.backend.manager.models.resource_group import (
     ResourceGroupOpts,
@@ -93,6 +91,7 @@ from ai.backend.manager.models.virtual_entity.entity_membership_field import (
 )
 from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
 from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.resource_preset.repository import (
     ResourcePresetRepository,
 )
@@ -103,6 +102,11 @@ from ai.backend.manager.secret.types import SecretValue
 from ai.backend.testutils.db import with_tables
 from ai.backend.testutils.fixtures import DomainFixtureData
 from ai.backend.testutils.virtual_entity import VirtualEntitySeeder
+
+
+async def _agent_uuid(db_sess: SASession, agent_id: str) -> AgentUUID:
+    """The agent's entity id, which the slot row records beside its name."""
+    return (await db_sess.scalars(sa.select(AgentRow.uuid).where(AgentRow.id == agent_id))).one()
 
 
 def _qty(slots: list[SlotQuantity], name: str) -> Decimal:
@@ -160,7 +164,6 @@ class TestCheckPresetsOccupiedSlots:
                 sgroups_for_domains,  # association table
                 sgroups_for_keypairs,  # association table
                 sgroups_for_groups,  # association table
-                AssociationScopesEntitiesRow,  # RBAC project membership
                 VirtualEntityRow,
                 ScopeBindingRow,
                 EntityLabelRow,
@@ -330,15 +333,6 @@ class TestCheckPresetsOccupiedSlots:
             db_sess.add(group)
             await db_sess.flush()
 
-            # RBAC project membership (queried by check_presets)
-            db_sess.add(
-                AssociationScopesEntitiesRow(
-                    scope_type=ScopeType.PROJECT,
-                    scope_id=str(group_id),
-                    entity_type=EntityType.USER,
-                    entity_id=str(test_user_uuid),
-                )
-            )
             await VirtualEntitySeeder().enroll_user_in_project(db_sess, group_id, test_user_uuid)
             await db_sess.flush()
 
@@ -475,6 +469,7 @@ class TestCheckPresetsOccupiedSlots:
                 db_sess.add(
                     AgentResourceRow(
                         agent_id=agent_id,
+                        agent_uuid=await _agent_uuid(db_sess, agent_id),
                         slot_name=slot_name,
                         capacity=Decimal(str(capacity)),
                         used=Decimal(str(_occupied.get(slot_name, 0))),
@@ -617,6 +612,7 @@ class TestCheckPresetsOccupiedSlots:
             db=db_with_cleanup,
             valkey_stat=valkey_stat_client,
             config_provider=mock_config_provider,
+            v2_ops_provider=V2DBOpsProvider(db_with_cleanup),
         )
         yield repo
 
@@ -1045,6 +1041,7 @@ class TestCheckPresetsOccupiedSlots:
                 db_sess.add(
                     AgentResourceRow(
                         agent_id=agent_id,
+                        agent_uuid=await _agent_uuid(db_sess, agent_id),
                         slot_name=slot_name,
                         capacity=Decimal(str(capacity)),
                         used=Decimal("0"),
@@ -1247,7 +1244,6 @@ class TestCheckPresetsZeroValues:
                 sgroups_for_domains,  # association table
                 sgroups_for_keypairs,  # association table
                 sgroups_for_groups,  # association table
-                AssociationScopesEntitiesRow,  # RBAC project membership
                 VirtualEntityRow,
                 ScopeBindingRow,
                 EntityMembershipRow,
@@ -1449,15 +1445,6 @@ class TestCheckPresetsZeroValues:
             db_sess.add(group)
             await db_sess.flush()
 
-            # RBAC project membership (queried by check_presets)
-            db_sess.add(
-                AssociationScopesEntitiesRow(
-                    scope_type=ScopeType.PROJECT,
-                    scope_id=str(group_id),
-                    entity_type=EntityType.USER,
-                    entity_id=str(test_user_uuid),
-                )
-            )
             await VirtualEntitySeeder().enroll_user_in_project(db_sess, group_id, test_user_uuid)
             await db_sess.flush()
 
@@ -1543,6 +1530,7 @@ class TestCheckPresetsZeroValues:
             db=db_with_cleanup,
             valkey_stat=valkey_stat_client,
             config_provider=mock_config_provider,
+            v2_ops_provider=V2DBOpsProvider(db_with_cleanup),
         )
         yield repo
 
@@ -1587,6 +1575,7 @@ class TestCheckPresetsZeroValues:
                 db_sess.add(
                     AgentResourceRow(
                         agent_id=agent_id,
+                        agent_uuid=await _agent_uuid(db_sess, agent_id),
                         slot_name=slot_name,
                         capacity=Decimal(str(capacity)),
                         used=Decimal("0"),

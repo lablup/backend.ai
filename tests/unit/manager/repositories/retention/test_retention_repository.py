@@ -35,7 +35,7 @@ import sqlalchemy as sa
 from ai.backend.common.data.entity.deployment import DeploymentID
 from ai.backend.common.data.entity.deployment_token import DeploymentTokenID
 from ai.backend.common.data.entity.domain import DomainID
-from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.project import ProjectEntityType, ProjectID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.data.entity.session_group import SessionGroupID
 from ai.backend.common.data.entity.user import UserID
@@ -496,10 +496,27 @@ class TestTerminalStateFilter:
         await _insert(
             db,
             [
-                RoleRow(name="deleted-old", status=RoleStatus.DELETED, deleted_at=_OLD),
-                RoleRow(name="deleted-new", status=RoleStatus.DELETED, deleted_at=_NEW),
+                RoleRow(
+                    scope_type=ProjectEntityType(),
+                    scope_id=uuid.uuid4(),
+                    name="deleted-old",
+                    status=RoleStatus.DELETED,
+                    deleted_at=_OLD,
+                ),
+                RoleRow(
+                    scope_type=ProjectEntityType(),
+                    scope_id=uuid.uuid4(),
+                    name="deleted-new",
+                    status=RoleStatus.DELETED,
+                    deleted_at=_NEW,
+                ),
                 # Active role: never deleted, deleted_at is NULL -> preserved.
-                RoleRow(name="active", status=RoleStatus.ACTIVE),
+                RoleRow(
+                    scope_type=ProjectEntityType(),
+                    scope_id=uuid.uuid4(),
+                    name="active",
+                    status=RoleStatus.ACTIVE,
+                ),
             ],
         )
         spec = RetentionDrain(

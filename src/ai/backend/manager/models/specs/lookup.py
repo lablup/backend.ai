@@ -13,6 +13,7 @@ from ai.backend.common.data.entity.types import (
     EntityIdentifier,
     EntityType,
     FieldIdentifier,
+    FieldType,
     RuntimeEntityID,
 )
 from ai.backend.manager.models.base import Base
@@ -60,6 +61,11 @@ class DataLookup[TRow: Base, TEntityID: EntityIdentifier](ABC):
     @abstractmethod
     def row_class(self) -> type[TRow]:
         """Return the ORM class the key resolves within."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def entity_type(self) -> EntityType:
+        """Return the type of the entity the key resolves."""
         raise NotImplementedError
 
     @abstractmethod
@@ -182,6 +188,11 @@ class FieldOwnerKeyLookup[TOwnerID: EntityIdentifier](ABC):
     """
 
     @abstractmethod
+    def field_type(self) -> FieldType:
+        """Return the type of field row the key names."""
+        raise NotImplementedError
+
+    @abstractmethod
     def build_query(self) -> sa.sql.Select[Any]:
         """Build the query selecting the owning entity's id for the key this carries."""
         raise NotImplementedError
@@ -203,6 +214,11 @@ class FieldKeyLookup[TFieldID: FieldIdentifier, TOwnerID: EntityIdentifier](ABC)
     A query rather than conditions, for the same reason :class:`FieldOwnerKeyLookup` is
     one: an owner reached through a join is expressible.
     """
+
+    @abstractmethod
+    def field_type(self) -> FieldType:
+        """Return the type of field row the key names."""
+        raise NotImplementedError
 
     @abstractmethod
     def build_query(self) -> sa.sql.Select[Any]:

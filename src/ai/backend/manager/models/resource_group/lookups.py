@@ -9,7 +9,12 @@ from uuid import UUID
 
 import sqlalchemy as sa
 
-from ai.backend.common.data.entity.resource_group import ResourceGroupID, ResourceGroupName
+from ai.backend.common.data.entity.resource_group import (
+    ResourceGroupEntityType,
+    ResourceGroupID,
+    ResourceGroupName,
+)
+from ai.backend.common.data.entity.types import EntityType
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.resource_group.row import ResourceGroupRow
 from ai.backend.manager.models.specs.lookup import BulkDataLookup, DataLookup
@@ -24,6 +29,10 @@ class ResourceGroupNameLookup(DataLookup[ResourceGroupRow, ResourceGroupID]):
     @override
     def row_class(self) -> type[ResourceGroupRow]:
         return ResourceGroupRow
+
+    @override
+    def entity_type(self) -> EntityType:
+        return ResourceGroupEntityType()
 
     @override
     def conditions(self) -> Sequence[QueryCondition]:

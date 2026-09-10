@@ -95,7 +95,15 @@ The client must be free to choose cursor or offset. For per-mode behavior, see `
 **scoped search convention:**
 - Query name `scopedFoosV2` (a single root field per entity).
 - The scope is a **required argument** received as a per-entity input (`FooScopeGQL`, `api/gql/{entity}/types/scope.py`) — no bare ID.
-  The shape is per-entity (single ID / list of entity-tag refs / per-category list).
+- That input carries one list per scope kind, each item a `UUIDScope`, and every item is OR'd:
+  `ResourceGroupScope{domain: [UUIDScope], project: [UUIDScope], user: [UUIDScope]}`. An open
+  entity type the closed RBAC element enum cannot name takes its own pair instead
+  (`EntityShareTargetScope`).
+- Which kinds a scope carries is fixed: an entity takes the scopes that may own it
+  (`created_in`, plus the scopes it is enrolled in), a field row takes its owner's type alone.
+- Every kind in a scope is also reachable the other way, as a connection field on that
+  scope's node — `ResourceGroupScope.domain` and `DomainV2.resourceGroups` are the two
+  directions of one relation. Add both or neither.
 - Put non-empty validation in the DTO's Pydantic `model_validator` — uniformly rejected at the GQL/REST boundary.
 - The resolver passes the scope to the adapter together with the search input DTO. Authorization (RBAC) is the responsibility of the adapter/service — not the resolver.
 - Legacy `{scope}FoosV2` (e.g. `projectSessionsV2`) predates this convention — do not create new ones.

@@ -9,7 +9,8 @@ from pydantic import Field
 from ai.backend.common.api_handlers import BaseResponseModel
 from ai.backend.common.data.entity.role_permission_preset import RolePermissionPresetID
 from ai.backend.common.data.entity.role_preset import RolePresetID
-from ai.backend.common.dto.manager.v2.rbac.types import OperationTypeDTO, RBACElementTypeDTO
+from ai.backend.common.data.entity.types import EntityType
+from ai.backend.common.dto.manager.v2.rbac.types import OperationTypeDTO
 
 __all__ = (
     "BulkAddRolePermissionPresetFailureInfo",
@@ -26,7 +27,7 @@ class RolePermissionPresetNode(BaseResponseModel):
 
     id: RolePermissionPresetID = Field(description="Permission entry UUID.")
     role_preset_id: RolePresetID = Field(description="UUID of the parent role preset.")
-    entity_type: RBACElementTypeDTO = Field(
+    entity_type: EntityType = Field(
         description="Entity type the permission applies to.",
     )
     operation: OperationTypeDTO = Field(description="Operation granted by the permission.")
@@ -60,7 +61,7 @@ class BulkAddRolePermissionPresetFailureInfo(BaseResponseModel):
     ``(entity_type, operation)`` pair that could not be inserted (e.g., a duplicate).
     """
 
-    entity_type: RBACElementTypeDTO = Field(
+    entity_type: EntityType = Field(
         description="Entity type of the permission entry that failed.",
     )
     operation: OperationTypeDTO = Field(

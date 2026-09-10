@@ -18,10 +18,12 @@ from ai.backend.common.dto.manager.v2.model_card.request import (
     DeleteModelCardOptions,
     ModelCardFilter,
     ModelCardOrder,
+    ScopedSearchModelCardsInput,
     SearchModelCardsInput,
 )
 from ai.backend.common.dto.manager.v2.model_card.response import SearchModelCardsPayload
 from ai.backend.common.dto.manager.v2.model_card.types import ModelCardOrderField
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.decorators import BackendAIGQLMeta, gql_mutation, gql_root_field
 from ai.backend.manager.api.gql.deployment.types.revision_preset import (
     DeploymentRevisionPresetConnection,
@@ -43,6 +45,7 @@ from ai.backend.manager.api.gql.model_card.types import (
     ModelCardFilterGQL,
     ModelCardGQL,
     ModelCardOrderByGQL,
+    ModelCardScopeGQL,
     ModelCardV2Connection,
     ModelCardV2Edge,
     ProjectModelCardScopeGQL,
@@ -75,6 +78,43 @@ async def admin_model_cards_v2(
     search_input = _build_search_input(filter, order_by, first, after, last, before, limit, offset)
     result = await info.context.adapters.model_card.admin_search(search_input)
     return _build_connection(result)
+
+
+@gql_root_field(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description=(
+            "Page through the model cards the named scopes reach, combined with OR. "
+            "Every scope is authorized before the read runs."
+        ),
+    )
+)  # type: ignore[misc]
+async def scoped_model_cards_v2(
+    info: Info[StrawberryGQLContext],
+    scope: ModelCardScopeGQL,
+    filter: ModelCardFilterGQL | None = None,
+    order_by: list[ModelCardOrderByGQL] | None = None,
+    before: str | None = None,
+    after: str | None = None,
+    first: int | None = None,
+    last: int | None = None,
+    limit: int | None = None,
+    offset: int | None = None,
+) -> ModelCardV2Connection | None:
+    payload = await info.context.adapters.model_card.scoped_search(
+        ScopedSearchModelCardsInput(
+            scope=scope.to_pydantic(),
+            filter=filter.to_pydantic() if filter else None,
+            order=[o.to_pydantic() for o in order_by] if order_by else None,
+            first=first,
+            after=after,
+            last=last,
+            before=before,
+            limit=limit,
+            offset=offset,
+        )
+    )
+    return _build_connection(payload)
 
 
 @gql_root_field(

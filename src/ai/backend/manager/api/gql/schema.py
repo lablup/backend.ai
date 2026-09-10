@@ -134,6 +134,7 @@ from .domain_v2 import (
     admin_update_domain_v2,
     domain_v2,
     rg_domains_v2,
+    scoped_domains_v2,
 )
 from .entity.resolver import entity_types
 from .entity_label.resolver import (
@@ -267,6 +268,7 @@ from .model_card import (
     model_card_v2,
     project_model_cards_v2,
     scan_project_model_cards_v2,
+    scoped_model_cards_v2,
 )
 from .node_field import node
 from .notification import (
@@ -317,6 +319,7 @@ from .project_v2 import (
     domain_projects_v2,
     project_domain_v2,
     project_v2,
+    scoped_projects_v2,
     unassign_users_from_project_v2,
 )
 from .prometheus_query_preset import (
@@ -342,7 +345,6 @@ from .rbac import (
     admin_create_role,
     admin_delete_permission,
     admin_delete_role,
-    admin_entities,
     admin_permissions,
     admin_purge_role,
     admin_replace_role_permissions,
@@ -392,6 +394,7 @@ from .resource_group import (
     replace_resource_group_default_deployment_options,
     replace_resource_group_default_session_options,
     resource_groups,
+    scoped_resource_groups,
     update_resource_group_fair_share_spec,
 )
 from .resource_group.federation import ResourceGroup as _ResourceGroupStub
@@ -526,6 +529,7 @@ from .user import (
     my_client_ip,
     my_user_v2,
     project_users_v2,
+    scoped_users_v2,
     update_my_allowed_client_ip,
     update_user_v2,
 )
@@ -601,6 +605,7 @@ class Query:
     image_alias = image_alias
     # Admin APIs
     admin_resource_groups = admin_resource_groups
+    scoped_resource_groups = scoped_resource_groups
     admin_resource_group_v2 = admin_resource_group_v2
     scheduling_handlers = scheduling_handlers
     compute_schedule = compute_schedule
@@ -663,7 +668,6 @@ class Query:
     admin_roles = admin_roles
     admin_permissions = admin_permissions
     admin_role_assignments = admin_role_assignments
-    admin_entities = admin_entities
     # Keypair self-service queries
     my_keypairs = my_keypairs
     # Keypair admin queries
@@ -730,14 +734,17 @@ class Query:
     my_client_ip = my_client_ip
     my_user_v2 = my_user_v2
     project_users_v2 = project_users_v2
+    scoped_users_v2 = scoped_users_v2
     # Domain V2 APIs
     domain_v2 = domain_v2
     admin_domains_v2 = admin_domains_v2
     rg_domains_v2 = rg_domains_v2
+    scoped_domains_v2 = scoped_domains_v2
     # Project V2 APIs
     project_v2 = project_v2
     admin_projects_v2 = admin_projects_v2
     domain_projects_v2 = domain_projects_v2
+    scoped_projects_v2 = scoped_projects_v2
     project_domain_v2 = project_domain_v2
     # Resource Policy V2 APIs
     admin_keypair_resource_policy_v2 = admin_keypair_resource_policy_v2
@@ -778,6 +785,7 @@ class Query:
     # Model Card APIs
     admin_model_cards_v2 = admin_model_cards_v2
     project_model_cards_v2 = project_model_cards_v2
+    scoped_model_cards_v2 = scoped_model_cards_v2
     model_card_v2 = model_card_v2
     model_card_available_presets = model_card_available_presets
     # Resource Allocation V2 APIs

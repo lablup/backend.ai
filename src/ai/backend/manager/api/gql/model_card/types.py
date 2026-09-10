@@ -9,6 +9,9 @@ import strawberry
 from strawberry import Info
 from strawberry.relay import Connection, Edge, NodeID
 
+from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.user import UserID
+from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.dto.manager.v2.common import OrderDirection
 from ai.backend.common.dto.manager.v2.deployment_revision_preset.request import (
     DeploymentRevisionPresetFilter,
@@ -73,10 +76,15 @@ from ai.backend.common.dto.manager.v2.model_card.types import (
     ModelCardAvailablePresetsScope as AvailablePresetsScopeDTO,
 )
 from ai.backend.common.dto.manager.v2.model_card.types import (
+    ModelCardScope,
+)
+from ai.backend.common.dto.manager.v2.model_card.types import (
     ProjectModelCardScope as ProjectModelCardScopeDTO,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import StringFilter as StringFilterGQL
 from ai.backend.manager.api.gql.base import UUIDFilter as UUIDFilterGQL
+from ai.backend.manager.api.gql.base import UUIDScopeGQL
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     PydanticInputMixin,
@@ -237,7 +245,7 @@ class ModelCardGQL(PydanticNodeMixin[NodeDTO]):
         ]
         | None
     ):
-        return await info.context.data_loaders.vfolder_loader.load(self.vfolder_id)
+        return await info.context.data_loaders.vfolder_loader.load(VFolderUUID(self.vfolder_id))
 
     @gql_added_field(
         BackendAIGQLMeta(
@@ -273,7 +281,7 @@ class ModelCardGQL(PydanticNodeMixin[NodeDTO]):
         ]
         | None
     ):
-        return await info.context.data_loaders.project_loader.load(self.project_id)
+        return await info.context.data_loaders.project_loader.load(ProjectID(self.project_id))
 
     @gql_added_field(
         BackendAIGQLMeta(
@@ -291,7 +299,7 @@ class ModelCardGQL(PydanticNodeMixin[NodeDTO]):
         ]
         | None
     ):
-        return await info.context.data_loaders.user_loader.load(self.creator_id)
+        return await info.context.data_loaders.user_loader.load(UserID(self.creator_id))
 
     @gql_field(  # type: ignore[misc]
         description="Deployment revision presets that satisfy this model card's minimum resource requirements. Equivalent to the root `model_card_available_presets` query but scoped to this card."
@@ -606,4 +614,22 @@ class BulkDeleteModelCardsV2PayloadGQL:
     )
     failed: list[BulkDeleteModelCardV2ErrorGQL] = gql_field(
         description="List of errors for model cards that failed to delete.",
+    )
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description=(
+            "Scope for the scoped model card query. Each list is OR'd internally, and "
+            "every scope named is authorized before the read runs."
+        ),
+    ),
+    name="ModelCardScope",
+)
+class ModelCardScopeGQL(PydanticInputMixin[ModelCardScope]):
+    """The scopes a model card read is answered for."""
+
+    project: list[UUIDScopeGQL] | None = gql_field(
+        default=None, description="Projects whose model cards are being read."
     )
