@@ -613,6 +613,7 @@ class TypedScenario[A, C]:
         return {
             "summary": self.summary,
             "description": self.description,
+            "actor": getattr(self.actor, "describe", ""),
             "operation": self.operation,
             "expects": expects,
             "situation": sorted(self.given.dotted_config()),

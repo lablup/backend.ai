@@ -79,10 +79,10 @@ def render(rows: Iterable[dict[str, Any]]) -> str:
     )
 
     out: list[str] = ["# Scenario coverage", ""]
-    out.append(f"{total} scenarios over {len(by_domain)} domains, {failed} failing.")
+    out.append(f"{total} scenarios over {len(by_domain)} components, {failed} failing.")
     out.append("")
 
-    out.append("| domain | scenarios | behaviours | failing |")
+    out.append("| component | scenarios | behaviours | failing |")
     out.append("|---|---:|---|---:|")
     for domain in sorted(by_domain):
         behaviours = by_domain[domain]
@@ -108,8 +108,10 @@ def render(rows: Iterable[dict[str, Any]]) -> str:
                 out.append("")
                 out.append(row.get("description", ""))
                 out.append("")
+                actor = row.get("actor", "")
                 for i, step in enumerate(row.get("steps", ()), start=1):
-                    out.append(f"{i}. {step}")
+                    mark = "  ← the actor" if step and step == actor else ""
+                    out.append(f"{i}. {step}{mark}")
                 situation = " ".join(row.get("situation", ()))
                 out.append(f"{len(row.get('steps', ())) + 1}. calls {row['operation']}")
                 answers = row["expects"] + (f", with {situation} overridden" if situation else "")
@@ -143,6 +145,7 @@ def as_data(rows: Iterable[dict[str, Any]]) -> dict[str, Any]:
                         {
                             "summary": row["summary"],
                             "description": row.get("description", ""),
+                            "actor": row.get("actor", ""),
                             "outcome": row["outcome"],
                             "steps": list(row.get("steps", ())),
                             "calls": row["operation"],
@@ -166,7 +169,7 @@ def as_data(rows: Iterable[dict[str, Any]]) -> dict[str, Any]:
 
 def as_summary(data: dict[str, Any]) -> str:
     """The counts alone, for a line in a build log."""
-    out = [f"{data['scenarios']} scenarios over {len(data['domains'])} domains, "
+    out = [f"{data['scenarios']} scenarios over {len(data['domains'])} components, "
            f"{data['failing']} failing."]
     for domain in data["domains"]:
         gap = f", {len(domain['unexercised'])} calls unexercised" if domain["unexercised"] else ""

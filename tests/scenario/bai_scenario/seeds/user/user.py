@@ -73,4 +73,10 @@ def seed_user(
             keypair_resource_policy=keypair_policy.name,
         )
 
-    return ProvisionFrom("a user", name_hint, build)
+    kinds = {
+        UserRole.SUPERADMIN: "a superadmin",
+        UserRole.ADMIN: "a domain admin",
+        UserRole.MONITOR: "a monitor",
+        UserRole.USER: "a user",
+    }
+    return ProvisionFrom(kinds[role], name_hint, build)
