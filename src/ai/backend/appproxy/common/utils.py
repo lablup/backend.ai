@@ -332,17 +332,19 @@ class BackendAIAccessLogger(AccessLogger):
             fmt_info = self._format_line(request, response, time)
 
             values = list()
-            extra = dict()
+            extra: dict[str, str | dict[str, str]] = {}
             for key, value in fmt_info:
                 values.append(value)
 
-                if key.__class__ is str:
+                if isinstance(key, str):
                     extra[key] = value
-                else:
-                    k1, k2 = key  # type: ignore[misc]
-                    dct = extra.get(k1, {})  # type: ignore[var-annotated,has-type]
-                    dct[k2] = value  # type: ignore[index,has-type]
-                    extra[k1] = dct  # type: ignore[has-type,assignment]
+                    continue
+                k1, k2 = key
+                nested = extra.get(k1)
+                if not isinstance(nested, dict):
+                    nested = {}
+                    extra[k1] = nested
+                nested[k2] = value
 
             self.logger.info((prepend_to_log + self._log_format) % tuple(values), extra=extra)
         except Exception:
