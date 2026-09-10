@@ -35,10 +35,11 @@ from ai.backend.logging import BraceStyleAdapter, LocalLogger, LogLevel
 from .client.manager import ManagerHTTPClientPool
 from .config.loaders import load_local_config, make_etcd
 from .config.unified import StorageProxyUnifiedConfig
-from .context import DEFAULT_BACKENDS, EVENT_DISPATCHER_CONSUMER_GROUP, RootContext
+from .context import EVENT_DISPATCHER_CONSUMER_GROUP, RootContext
 from .context_types import ArtifactVerifierContext
 from .types import VFolderID
 from .volumes.abc import CAP_FAST_SIZE, AbstractVolume
+from .volumes.backends import DEFAULT_BACKENDS
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
