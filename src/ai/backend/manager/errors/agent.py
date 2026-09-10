@@ -19,6 +19,7 @@ from ai.backend.common.exception import (
 from ai.backend.common.types import AgentId
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.errors.base.entity import EntityError, EntityErrorCode
+from ai.backend.manager.errors.common import ObjectNotFound
 
 
 class AgentConnectionUnavailable(BackendAIError, web.HTTPServiceUnavailable):
@@ -100,4 +101,31 @@ class ConflictingSessionRescheduleNotSupported(BackendAIError, web.HTTPNotImplem
             domain=ErrorDomain.AGENT,
             operation=ErrorOperation.UPDATE,
             error_detail=ErrorDetail.NOT_IMPLEMENTED,
+        )
+
+
+class AgentNotFound(EntityError, ObjectNotFound):
+    object_name = "agent"
+
+    @override
+    def entity_error_code(self) -> EntityErrorCode:
+        return EntityErrorCode(AgentEntityType(), ActionOperationType.GET, ErrorDetail.NOT_FOUND)
+
+
+class AgentNotAllocated(BackendAIError, web.HTTPInternalServerError):
+    """Raised when a kernel that should be placed carries no agent yet.
+
+    Stays on :class:`BackendAIError`: it reports ``access``, which
+    ``ActionOperationType`` has no value for.
+    """
+
+    error_type = "https://api.backend.ai/probs/agent-not-allocated"
+    error_title = "Agent is not allocated for the kernel."
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.AGENT,
+            operation=ErrorOperation.ACCESS,
+            error_detail=ErrorDetail.INTERNAL_ERROR,
         )
