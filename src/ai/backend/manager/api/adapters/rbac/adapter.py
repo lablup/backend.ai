@@ -752,8 +752,8 @@ class RBACAdapter(BaseAdapter):
 
     async def get(self, role_id: UUID) -> RoleNode:
         """Get a role by ID."""
-        action_result = await self._permission_controller.get_role_detail.wait_for_complete(
-            GetRoleDetailAction(role_id=role_id)
+        action_result = await self._permission_controller.get_role_detail.run(
+            GetRoleDetailAction(role_id=RoleID(role_id))
         )
         return self._role_detail_to_node(action_result.role)
 

@@ -150,8 +150,8 @@ class RBACHandler:
         if not ctx.is_superadmin:
             raise NotEnoughPermission("Only superadmin can get role details.")
 
-        action_result = await self._permission_controller.get_role_detail.wait_for_complete(
-            GetRoleDetailAction(role_id=path.parsed.role_id)
+        action_result = await self._permission_controller.get_role_detail.run(
+            GetRoleDetailAction(role_id=RoleID(path.parsed.role_id))
         )
         resp = GetRoleResponse(role=self._role_adapter.convert_to_dto(action_result.role))
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=resp)

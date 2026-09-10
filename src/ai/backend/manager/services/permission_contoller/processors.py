@@ -78,7 +78,7 @@ class PermissionControllerProcessors:
     update_role: SingleEntityActionProcessor[UpdateRoleAction, EntityOpsResult[RoleData]]
     delete_role: SingleEntityActionProcessor[DeleteRoleAction, EntityOpsResult[RoleData]]
     purge_role: SingleEntityActionProcessor[PurgeRoleAction, EntityOpsResult[RoleData]]
-    get_role_detail: ActionProcessor[GetRoleDetailAction, GetRoleDetailActionResult]
+    get_role_detail: SingleEntityActionProcessor[GetRoleDetailAction, GetRoleDetailActionResult]
     search_roles: ActionProcessor[SearchRolesAction, SearchRolesActionResult]
     search_roles_in_scope: ScopeActionProcessor[
         SearchRolesInScopeAction, SearchRolesInScopeActionResult
@@ -120,7 +120,9 @@ class PermissionControllerProcessors:
         self.update_role = role_group.single_update_ops(UpdateRoleAction)
         self.delete_role = role_group.single_delete_ops(DeleteRoleAction)
         self.purge_role = role_group.entity_purge_ops(PurgeRoleAction)
-        self.get_role_detail = ActionProcessor(service.get_role_detail, action_monitors)
+        self.get_role_detail = role_group.single_entity(
+            GetRoleDetailAction, service.get_role_detail
+        )
         self.search_roles = ActionProcessor(service.search_roles, action_monitors)
         self.search_roles_in_scope = role_group.scope(
             SearchRolesInScopeAction, service.search_roles_in_scope

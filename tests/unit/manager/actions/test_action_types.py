@@ -7,8 +7,8 @@ from ai.backend.common.data.permission.types import Permission
 from ai.backend.common.exception import ErrorOperation
 from ai.backend.manager.actions.action.base import BaseAction
 from ai.backend.manager.actions.types import ActionOperationType
-from ai.backend.manager.services.permission_contoller.actions.get_role_detail import (
-    GetRoleDetailAction,
+from ai.backend.manager.services.permission_contoller.actions.get_permission_matrix import (
+    GetPermissionMatrixAction,
 )
 from ai.backend.manager.services.permission_contoller.actions.replace_role_permissions import (
     ReplaceRolePermissionsAction,
@@ -27,7 +27,7 @@ from ai.backend.manager.services.rbac.actions.role.revoke import RevokeRoleActio
 # them in would conflate two type systems rather than test either one.
 _REPRESENTATIVE_ACTION_CLASSES: list[type[BaseAction]] = [
     AssignRoleAction,
-    GetRoleDetailAction,
+    GetPermissionMatrixAction,
     ReplaceRolePermissionsAction,
     RevokeRoleAction,
     SearchRolesAction,
