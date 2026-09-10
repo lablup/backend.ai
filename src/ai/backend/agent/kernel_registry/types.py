@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import TYPE_CHECKING, Self
+from typing import TYPE_CHECKING, Final, Self
 
 from pydantic import Field
 
-from ai.backend.agent.kernel import KernelOwnershipData
+from ai.backend.agent.kernel import AbstractKernel, KernelOwnershipData
+from ai.backend.agent.kernel_registry.exception import UnsupportedKernelType
 from ai.backend.agent.proxy import DomainSocketPathPair
 from ai.backend.agent.resources import KernelResourceSpec
 from ai.backend.common.docker import ImageRef
@@ -13,6 +14,9 @@ from ai.backend.common.types import AgentId, BackendAISchema, KernelId, ServiceP
 
 if TYPE_CHECKING:
     from ai.backend.agent.docker.kernel import DockerKernel
+
+#: The kernel class every record written before `KernelRecoveryData.kernel_type` came from.
+DOCKER_KERNEL_TYPE: Final = "docker"
 
 
 class KernelRecoveryData(BackendAISchema):
@@ -22,6 +26,12 @@ class KernelRecoveryData(BackendAISchema):
     rather than directly manipulating AbstractKernel instances.
     """
 
+    #: Which kernel class this record was written from, and which one to rebuild it as.
+    #:
+    #: A record from before this field carries none, and reads as ``docker`` -- the only backend
+    #: that ever wrote one. Without it a restore hands every backend a `DockerKernel`, which for
+    #: anything but Docker is a kernel object whose runtime methods belong to another runtime.
+    kernel_type: str = Field(default=DOCKER_KERNEL_TYPE, description="Kernel class of this record")
     id: KernelId = Field(description="ID of the kernel")
     agent_id: AgentId = Field(description="ID of the agent that owns the kernel")
     image_ref: ImageRef = Field(description="Docker image reference used for the kernel")
@@ -55,8 +65,41 @@ class KernelRecoveryData(BackendAISchema):
     environ: Mapping[str, str] = Field(description="Environment variables for the kernel")
 
     @classmethod
+    def from_kernel(cls, kernel: AbstractKernel) -> Self:
+        """Write a kernel down, whatever runtime it belongs to.
+
+        A backend added later adds its case here and to `to_kernel`. Both raise on a type they do
+        not know rather than returning nothing: a registry that quietly skips a backend's kernels
+        loses them at the next restart, and reports the same "saved" it does when it saved them.
+        """
+        from ai.backend.agent.docker.kernel import DockerKernel
+
+        match kernel:
+            case DockerKernel():
+                return cls.from_docker_kernel(kernel)
+            case _:
+                raise UnsupportedKernelType(
+                    f"{type(kernel).__name__} has no recovery record; add its case to"
+                    " KernelRecoveryData.from_kernel/to_kernel before the backend can be restarted"
+                    " with sessions running"
+                )
+
+    def to_kernel(self) -> AbstractKernel:
+        """Rebuild the kernel this record was written from, as its own class."""
+        match self.kernel_type:
+            case _ if self.kernel_type == DOCKER_KERNEL_TYPE:
+                return self.to_docker_kernel()
+            case _:
+                raise UnsupportedKernelType(
+                    f"this node holds a recovery record of kernel type {self.kernel_type!r}, which"
+                    " this agent cannot rebuild; it was written by a build that knows a backend"
+                    " this one does not"
+                )
+
+    @classmethod
     def from_docker_kernel(cls, kernel: DockerKernel) -> Self:
         return cls(
+            kernel_type=DOCKER_KERNEL_TYPE,
             id=kernel.kernel_id,
             agent_id=kernel.agent_id,
             image_ref=kernel.image,

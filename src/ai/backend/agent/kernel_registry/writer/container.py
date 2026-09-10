@@ -31,17 +31,11 @@ class ContainerBasedKernelRegistryWriter(AbstractKernelRegistryWriter):
     def _parse_recovery_data_from_kernel(
         self,
         kernel: AbstractKernel,
-    ) -> KernelRecoveryData | None:
-        from ai.backend.agent.docker.kernel import DockerKernel
-
-        match kernel:
-            case DockerKernel():
-                try:
-                    return KernelRecoveryData.from_docker_kernel(kernel)
-                except KeyError as e:
-                    raise KernelRecoveryDataParseError from e
-            case _:
-                return None
+    ) -> KernelRecoveryData:
+        try:
+            return KernelRecoveryData.from_kernel(kernel)
+        except KeyError as e:
+            raise KernelRecoveryDataParseError from e
 
     @override
     async def save_kernel_registry(
@@ -56,8 +50,6 @@ class ContainerBasedKernelRegistryWriter(AbstractKernelRegistryWriter):
                 log.exception(
                     "Failed to parse recovery data from kernel {}: {}", kernel.kernel_id, str(e)
                 )
-                continue
-            if original_recovery_data is None:
                 continue
             recovery_data = KernelRecoveryScratchData.from_kernel_recovery_data(
                 original_recovery_data
