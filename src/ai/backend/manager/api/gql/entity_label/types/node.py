@@ -15,6 +15,7 @@ from ai.backend.common.dto.manager.v2.entity_label.response import EntityLabelNo
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
+    gql_added_field,
     gql_connection_type,
     gql_field,
     gql_node_type,
@@ -48,7 +49,12 @@ class EntityLabelGQL(PydanticNodeMixin[EntityLabelNode]):
     created_at: datetime = gql_field(description="When the label was first put on the entity.")
     updated_at: datetime = gql_field(description="When the label's value was last replaced.")
 
-    @gql_field(description="The labeled entity.")  # type: ignore[misc]
+    @gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="The labeled entity.",
+        )
+    )  # type: ignore[misc]
     async def entity(
         self,
         *,

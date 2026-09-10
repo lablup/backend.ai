@@ -5367,7 +5367,7 @@ type EntityLabel implements Node {
   """When the label's value was last replaced."""
   updatedAt: DateTime!
 
-  """The labeled entity."""
+  """Added in 26.9.0. The labeled entity."""
   entity: EntityNode
 }
 
