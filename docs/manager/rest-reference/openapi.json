@@ -8794,7 +8794,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
+            "description": "Omit to leave unchanged.",
             "title": "Runtime Variant Id"
           },
           "name": {
@@ -8808,7 +8808,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
+            "description": "Omit to leave unchanged.",
             "title": "Name"
           },
           "description": {
@@ -8817,26 +8817,22 @@
                 "type": "string"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
             "title": "Description"
           },
           "rank": {
             "anyOf": [
               {
-                "minimum": 0,
+                "ge": 0,
                 "type": "integer"
               },
               {
                 "type": "null"
               }
             ],
-            "default": null,
+            "description": "Omit to leave unchanged.",
             "title": "Rank"
           },
           "image_id": {
@@ -8846,13 +8842,9 @@
                 "type": "string"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
             "title": "Image Id"
           },
           "model_definition": {
@@ -8861,13 +8853,9 @@
                 "$ref": "#/components/schemas/UpdatePresetModelDefinitionInput"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
             "title": "Model Definition"
           },
           "resource_slots": {
@@ -8882,7 +8870,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
+            "description": "Omit to leave unchanged.",
             "title": "Resource Slots"
           },
           "resource_opts": {
@@ -8897,7 +8885,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
+            "description": "Omit to leave unchanged.",
             "title": "Resource Opts"
           },
           "cluster_mode": {
@@ -8910,20 +8898,20 @@
                 "type": "null"
               }
             ],
-            "default": null,
+            "description": "Omit to leave unchanged.",
             "title": "Cluster Mode"
           },
           "cluster_size": {
             "anyOf": [
               {
-                "minimum": 1,
+                "ge": 1,
                 "type": "integer"
               },
               {
                 "type": "null"
               }
             ],
-            "default": null,
+            "description": "Omit to leave unchanged.",
             "title": "Cluster Size"
           },
           "startup_command": {
@@ -8932,13 +8920,9 @@
                 "type": "string"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
             "title": "Startup Command"
           },
           "bootstrap_script": {
@@ -8947,13 +8931,9 @@
                 "type": "string"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
             "title": "Bootstrap Script"
           },
           "environ": {
@@ -8968,7 +8948,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
+            "description": "Omit to leave unchanged.",
             "title": "Environ"
           },
           "preset_values": {
@@ -8983,7 +8963,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
+            "description": "Omit to leave unchanged.",
             "title": "Preset Values"
           },
           "open_to_public": {
@@ -8992,53 +8972,33 @@
                 "type": "boolean"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
             "title": "Open To Public"
           },
           "replica_count": {
             "anyOf": [
               {
-                "anyOf": [
-                  {
-                    "type": "integer"
-                  },
-                  {
-                    "$ref": "#/components/schemas/Sentinel"
-                  }
-                ],
-                "ge": 0
+                "ge": 0,
+                "type": "integer"
               },
               {
                 "type": "null"
               }
             ],
-            "default": 1,
             "title": "Replica Count"
           },
           "revision_history_limit": {
             "anyOf": [
               {
-                "anyOf": [
-                  {
-                    "type": "integer"
-                  },
-                  {
-                    "$ref": "#/components/schemas/Sentinel"
-                  }
-                ],
-                "ge": 0
+                "ge": 0,
+                "type": "integer"
               },
               {
                 "type": "null"
               }
             ],
-            "default": 1,
             "title": "Revision History Limit"
           },
           "deployment_strategy": {
@@ -9047,13 +9007,9 @@
                 "$ref": "#/components/schemas/DeploymentStrategyInput"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
             "title": "Deployment Strategy"
           }
         },
