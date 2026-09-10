@@ -11,12 +11,11 @@ from dataclasses import dataclass
 
 import pytest
 
+from ai.backend.common.data.entity.image import ImageEntityType
+from ai.backend.common.data.entity.session import SessionEntityType
+from ai.backend.common.data.entity.types import EntityType
 from ai.backend.common.data.entity.vfolder import VFolderEntityType
-from ai.backend.manager.data.permission.types import (
-    EntityType,
-    OperationType,
-    Permission,
-)
+from ai.backend.manager.data.permission.types import OperationType, Permission
 from ai.backend.manager.models.agent import AgentRow
 
 # ORM cluster registration: configure_mappers() (triggered when this isolated
@@ -115,10 +114,10 @@ class TestSearchPermissions:
             await db_sess.flush()
 
             for entity_type, operation in [
-                (EntityType.VFOLDER, OperationType.READ),
-                (EntityType.VFOLDER, OperationType.UPDATE),
-                (EntityType.SESSION, OperationType.CREATE),
-                (EntityType.IMAGE, OperationType.READ),
+                (VFolderEntityType(), OperationType.READ),
+                (VFolderEntityType(), OperationType.UPDATE),
+                (SessionEntityType(), OperationType.CREATE),
+                (ImageEntityType(), OperationType.READ),
             ]:
                 perm = PermissionRow(
                     role_id=role_id,
@@ -148,7 +147,7 @@ class TestSearchPermissions:
 
         assert result.total_count == 2
         for item in result.items:
-            assert item.entity_type == EntityType.VFOLDER.value
+            assert item.entity_type == VFolderEntityType()
 
     async def test_search_permissions_ordered_by_entity_type(
         self,

@@ -45,7 +45,6 @@ from ai.backend.common.dto.manager.auth.types import AuthTokenType
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
-from ai.backend.manager.data.permission.types import ScopeType
 from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.models.domain import DomainRow, domains
 from ai.backend.manager.models.hasher.types import PasswordInfo
@@ -150,7 +149,7 @@ async def signup_default_project(
         await conn.execute(
             sa.insert(VirtualEntityRow.__table__).values(
                 id=virtual_entity_id,
-                entity_type=ScopeType.PROJECT,
+                entity_type=ProjectEntityType(),
                 entity_id=data.project_id,
             )
         )
@@ -180,7 +179,7 @@ async def signup_default_project(
             await conn.execute(users.delete().where(users.c.email == email))
         await conn.execute(
             VirtualEntityRow.__table__.delete().where(
-                VirtualEntityRow.__table__.c.entity_type == ScopeType.PROJECT,
+                VirtualEntityRow.__table__.c.entity_type == ProjectEntityType(),
                 VirtualEntityRow.__table__.c.entity_id == data.project_id,
             )
         )
@@ -322,7 +321,7 @@ async def cross_domain_fixture(
         await conn.execute(
             sa.insert(VirtualEntityRow.__table__).values(
                 id=virtual_entity_id,
-                entity_type=ScopeType.PROJECT,
+                entity_type=ProjectEntityType(),
                 entity_id=group_id,
             )
         )
@@ -458,7 +457,7 @@ async def cross_domain_fixture(
         )
         await conn.execute(
             VirtualEntityRow.__table__.delete().where(
-                VirtualEntityRow.__table__.c.entity_type == ScopeType.PROJECT,
+                VirtualEntityRow.__table__.c.entity_type == ProjectEntityType(),
                 VirtualEntityRow.__table__.c.entity_id == group_id,
             )
         )

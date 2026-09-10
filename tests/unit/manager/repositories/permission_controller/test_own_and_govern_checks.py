@@ -27,12 +27,7 @@ from ai.backend.common.data.entity.virtual_entity import VirtualEntityID
 from ai.backend.common.data.permission.types import Permission
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.data.permission.status import RoleStatus
-from ai.backend.manager.data.permission.types import (
-    EntityType as PermEntityType,
-)
-from ai.backend.manager.data.permission.types import (
-    OperationType,
-)
+from ai.backend.manager.data.permission.types import OperationType
 from ai.backend.manager.data.permission.virtual_entity import (
     GovernCheckKey,
     OwnCheckKey,
@@ -283,7 +278,7 @@ class TestCheckPermissionViaVirtualEntity:
             db_sess.add_all(
                 _single_bit_rows(
                     role_id=ids.role_id,
-                    entity_type=PermEntityType.VFOLDER,
+                    entity_type=VFolderEntityType(),
                     permission=spec.granted,
                 )
             )
@@ -657,7 +652,7 @@ class TestUserRosterEnrollment:
         db: ExtendedAsyncSAEngine,
         ids: VSChainFixture,
         project_id: ProjectID,
-        entity_type: PermEntityType = PermEntityType.VFOLDER,
+        entity_type: EntityType | None = None,
         operation: OperationType = OperationType.READ,
         permission: Permission = Permission.READ,
     ) -> None:
@@ -730,7 +725,7 @@ class TestUserRosterEnrollment:
             db_sess.add_all(
                 _single_bit_rows(
                     role_id=ids.role_id,
-                    entity_type=entity_type,
+                    entity_type=entity_type or VFolderEntityType(),
                     permission=permission,
                 )
             )
@@ -875,7 +870,7 @@ class TestUserRosterEnrollment:
             db_with_rbac_tables,
             ids,
             ids.owner_scope_id,
-            entity_type=PermEntityType.SESSION,
+            entity_type=SessionEntityType(),
         )
 
         await self._enroll_user_in_project(
@@ -945,7 +940,7 @@ class TestUserRosterEnrollment:
             db_with_rbac_tables,
             ids,
             ids.owner_scope_id,
-            entity_type=PermEntityType.SESSION,
+            entity_type=SessionEntityType(),
         )
         await self._enroll_user_in_project(
             db_with_rbac_tables, roster_provider, project_scope, user_scope, ids.user_id
@@ -1029,7 +1024,7 @@ class TestUserRosterEnrollment:
             db_with_rbac_tables,
             ids,
             ids.owner_scope_id,
-            entity_type=PermEntityType.PROJECT,
+            entity_type=ProjectEntityType(),
         )
         await self._enroll_user_in_project(
             db_with_rbac_tables, roster_provider, project_scope, user_scope, ids.user_id
@@ -1061,7 +1056,7 @@ class TestUserRosterEnrollment:
             db_with_rbac_tables,
             ids,
             ids.owner_scope_id,
-            entity_type=PermEntityType.USER,
+            entity_type=UserEntityType(),
             operation=OperationType.UPDATE,
             permission=Permission.READ | Permission.UPDATE,
         )

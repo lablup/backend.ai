@@ -63,7 +63,7 @@ class RolePresetWriteOps(PermissionWriteOps):
         preset = await self._sess.get(RolePresetRow, preset_id)
         if preset is None:
             return
-        scope_type = EntityType(EntityType(preset.scope_type.to_element().value))
+        scope_type = preset.scope_type
         granted = await self._preset_grants(preset_id)
         roles = await self._derived_roles(preset_id, scope_type)
         for start in range(0, len(roles), _SYNC_CHUNK_SIZE):
@@ -115,7 +115,7 @@ class RolePresetWriteOps(PermissionWriteOps):
             permission = Permission.from_operation(row.operation)
             if permission == Permission.NONE:
                 continue
-            entity_type = EntityType(row.entity_type.to_element().value)
+            entity_type = row.entity_type
             granted[entity_type] = granted.get(entity_type, Permission.NONE) | permission
         return granted
 

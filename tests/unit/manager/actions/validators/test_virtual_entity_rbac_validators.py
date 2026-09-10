@@ -22,21 +22,12 @@ import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
 from ai.backend.common.contexts.user import with_user
-from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.domain import DomainEntityType, DomainID
 from ai.backend.common.data.entity.project import ProjectEntityType
 from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
 from ai.backend.common.data.entity.vfolder import VFolderEntityType
 from ai.backend.common.data.entity.virtual_entity import VirtualEntityID
-from ai.backend.common.data.permission.types import (
-    EntityType as PermEntityType,
-)
-from ai.backend.common.data.permission.types import (
-    OperationType,
-    Permission,
-)
-from ai.backend.common.data.permission.types import (
-    ScopeType as PermScopeType,
-)
+from ai.backend.common.data.permission.types import OperationType, Permission
 from ai.backend.common.data.user.types import UserData, UserRole
 from ai.backend.common.exception import UnreachableError
 from ai.backend.common.types import ResourceSlot
@@ -321,9 +312,9 @@ async def _grant_permission(
     db: ExtendedAsyncSAEngine,
     *,
     role_id: uuid.UUID,
-    scope_type: PermScopeType,
+    scope_type: EntityType,
     scope_id: uuid.UUID,
-    entity_type: PermEntityType,
+    entity_type: EntityType,
     operation: OperationType,
     permission: Permission | None = None,
 ) -> None:
@@ -412,8 +403,8 @@ async def _seed_granted_user(
     owner_scope_id: uuid.UUID,
     entity_type: str,
     entity_ids: Sequence[uuid.UUID],
-    perm_scope_type: PermScopeType,
-    perm_entity_type: PermEntityType,
+    perm_scope_type: EntityType,
+    perm_entity_type: EntityType,
     operation: OperationType,
     permission: Permission | None = None,
     scope_cap: Permission | None = None,
@@ -554,8 +545,8 @@ async def user_with_project_create_at_domain(
         owner_scope_id=_DOMAIN_ID,
         entity_type="domain",
         entity_ids=[_DOMAIN_ID],
-        perm_scope_type=PermScopeType.DOMAIN,
-        perm_entity_type=PermEntityType.PROJECT,
+        perm_scope_type=DomainEntityType(),
+        perm_entity_type=ProjectEntityType(),
         operation=OperationType.CREATE,
     )
 
@@ -571,8 +562,8 @@ async def user_with_read_capped_domain_scope(
         owner_scope_id=_DOMAIN_ID,
         entity_type="domain",
         entity_ids=[_DOMAIN_ID],
-        perm_scope_type=PermScopeType.DOMAIN,
-        perm_entity_type=PermEntityType.PROJECT,
+        perm_scope_type=DomainEntityType(),
+        perm_entity_type=ProjectEntityType(),
         operation=OperationType.CREATE,
         scope_cap=Permission.READ,
     )
@@ -589,8 +580,8 @@ async def user_with_vfolder_update_at_project(
         owner_scope_id=_PROJECT_ID,
         entity_type="vfolder",
         entity_ids=[_VFOLDER_ID],
-        perm_scope_type=PermScopeType.PROJECT,
-        perm_entity_type=PermEntityType.VFOLDER,
+        perm_scope_type=ProjectEntityType(),
+        perm_entity_type=VFolderEntityType(),
         operation=OperationType.UPDATE,
     )
 
@@ -606,8 +597,8 @@ async def user_with_read_capped_vfolder(
         owner_scope_id=_PROJECT_ID,
         entity_type="vfolder",
         entity_ids=[_VFOLDER_ID],
-        perm_scope_type=PermScopeType.PROJECT,
-        perm_entity_type=PermEntityType.VFOLDER,
+        perm_scope_type=ProjectEntityType(),
+        perm_entity_type=VFolderEntityType(),
         operation=OperationType.UPDATE,
         entity_cap=Permission.READ,
     )
@@ -624,8 +615,8 @@ def _vfolder_user_with(
         owner_scope_id=_PROJECT_ID,
         entity_type="vfolder",
         entity_ids=[_VFOLDER_ID],
-        perm_scope_type=PermScopeType.PROJECT,
-        perm_entity_type=PermEntityType.VFOLDER,
+        perm_scope_type=ProjectEntityType(),
+        perm_entity_type=VFolderEntityType(),
         operation=OperationType.CREATE,
         permission=permission,
     )
@@ -663,8 +654,8 @@ async def user_with_all_bulk_vfolders_granted(
         owner_scope_id=_PROJECT_ID,
         entity_type="vfolder",
         entity_ids=[_BULK_VF_GRANTED, _BULK_VF_DENIED],
-        perm_scope_type=PermScopeType.PROJECT,
-        perm_entity_type=PermEntityType.VFOLDER,
+        perm_scope_type=ProjectEntityType(),
+        perm_entity_type=VFolderEntityType(),
         operation=OperationType.UPDATE,
     )
 
@@ -680,8 +671,8 @@ async def user_with_partial_bulk_membership(
         owner_scope_id=_PROJECT_ID,
         entity_type="vfolder",
         entity_ids=[_BULK_VF_GRANTED],
-        perm_scope_type=PermScopeType.PROJECT,
-        perm_entity_type=PermEntityType.VFOLDER,
+        perm_scope_type=ProjectEntityType(),
+        perm_entity_type=VFolderEntityType(),
         operation=OperationType.UPDATE,
     )
 
@@ -697,8 +688,8 @@ async def user_with_read_capped_bulk_vfolder(
         owner_scope_id=_PROJECT_ID,
         entity_type="vfolder",
         entity_ids=[_BULK_VF_GRANTED],
-        perm_scope_type=PermScopeType.PROJECT,
-        perm_entity_type=PermEntityType.VFOLDER,
+        perm_scope_type=ProjectEntityType(),
+        perm_entity_type=VFolderEntityType(),
         operation=OperationType.UPDATE,
         entity_cap=Permission.READ,
     )

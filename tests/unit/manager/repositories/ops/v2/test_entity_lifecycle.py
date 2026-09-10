@@ -41,18 +41,10 @@ from ai.backend.common.data.entity.types import (
     FieldIdentifier,
     FieldType,
 )
+from ai.backend.common.data.entity.vfolder import VFolderEntityType
 from ai.backend.manager.data.permission.scope_template import ScopeTemplateValue
 from ai.backend.manager.data.permission.status import RoleStatus
-from ai.backend.manager.data.permission.types import (
-    EntityType as LegacyEntityType,
-)
-from ai.backend.manager.data.permission.types import (
-    OperationType,
-    RoleSource,
-)
-from ai.backend.manager.data.permission.types import (
-    ScopeType as LegacyScopeType,
-)
+from ai.backend.manager.data.permission.types import OperationType, RoleSource
 from ai.backend.manager.errors.base.entity import EntityNotFoundError
 from ai.backend.manager.errors.permission import VirtualEntityNotFound
 from ai.backend.manager.errors.repository import RepositoryIntegrityError
@@ -384,7 +376,7 @@ async def _add_presets(database: ExtendedAsyncSAEngine) -> None:
     async with database.begin_session() as sess:
         preset_row = RolePresetRow(
             name=_PRESET_NAME,
-            scope_type=LegacyScopeType.PROJECT,
+            scope_type=ProjectEntityType(),
             auto_assign=True,
             deleted=False,
         )
@@ -393,7 +385,7 @@ async def _add_presets(database: ExtendedAsyncSAEngine) -> None:
         sess.add(
             RolePermissionPresetRow(
                 role_preset_id=preset_row.id,
-                entity_type=LegacyEntityType.VFOLDER,
+                entity_type=VFolderEntityType(),
                 operation=OperationType.READ,
             )
         )
@@ -401,7 +393,7 @@ async def _add_presets(database: ExtendedAsyncSAEngine) -> None:
             RolePresetRow(
                 name="preset-templated",
                 role_name_template="{{ scope.name }}-member",
-                scope_type=LegacyScopeType.PROJECT,
+                scope_type=ProjectEntityType(),
                 auto_assign=False,
                 deleted=False,
             )

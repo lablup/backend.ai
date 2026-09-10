@@ -2,20 +2,15 @@ from __future__ import annotations
 
 import enum
 
+from ai.backend.common.data.entity.types import EntityType as OriginalEntityType
 from ai.backend.manager.data.permission.status import (
     RoleStatus as OriginalRoleStatus,
-)
-from ai.backend.manager.data.permission.types import (
-    EntityType as OriginalEntityType,
 )
 from ai.backend.manager.data.permission.types import (
     OperationType as OriginalOperationType,
 )
 from ai.backend.manager.data.permission.types import (
     RoleSource as OriginalRoleSource,
-)
-from ai.backend.manager.data.permission.types import (
-    ScopeType as OriginalScopeType,
 )
 
 
@@ -99,8 +94,8 @@ class ScopeType(enum.StrEnum):
 
     GLOBAL = "global"
 
-    def to_original(self) -> OriginalScopeType:
-        return OriginalScopeType(self.value)
+    def to_original(self) -> OriginalEntityType:
+        return OriginalEntityType.from_name(self.value)
 
 
 class EntityType(enum.StrEnum):
@@ -122,7 +117,7 @@ class EntityType(enum.StrEnum):
     MODEL_CARD = "model_card"
 
     def to_original(self) -> OriginalEntityType:
-        return OriginalEntityType(self.value)
+        return OriginalEntityType.from_name(self.value)
 
     @classmethod
     def _scope_types(cls) -> set[EntityType]:

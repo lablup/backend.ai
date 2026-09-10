@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 from ai.backend.client.v2.exceptions import NotFoundError, PermissionDeniedError
 from ai.backend.client.v2.registry import BackendAIClientRegistry
 from ai.backend.client.v2.v2_registry import V2ClientRegistry
+from ai.backend.common.data.entity.user import UserEntityType
 from ai.backend.common.dto.manager.query import ArrayFilter, IntFilter, StringFilter
 from ai.backend.common.dto.manager.user import (
     CreateUserRequest,
@@ -39,11 +40,7 @@ from ai.backend.common.dto.manager.v2.user.request import (
 )
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.permission.status import RoleStatus
-from ai.backend.manager.data.permission.types import (
-    EntityType,
-    Permission,
-    ScopeType,
-)
+from ai.backend.manager.data.permission.types import Permission
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
@@ -415,7 +412,7 @@ async def user_with_rbac_rows(
         )
         await conn.execute(
             sa.insert(VirtualEntityRow.__table__).values(
-                entity_type=ScopeType.USER.value, entity_id=user_id
+                entity_type=UserEntityType(), entity_id=user_id
             )
         )
         await conn.execute(
@@ -423,7 +420,7 @@ async def user_with_rbac_rows(
                 id=role_id,
                 name=f"user-{scope_id[:8]}",
                 status=RoleStatus.ACTIVE,
-                scope_type=ScopeType.USER.value,
+                scope_type=UserEntityType(),
                 scope_id=user_id,
             )
         )
@@ -432,7 +429,7 @@ async def user_with_rbac_rows(
         await conn.execute(
             sa.insert(PermissionRow.__table__).values(
                 role_id=role_id,
-                entity_type=EntityType.USER,
+                entity_type=UserEntityType(),
                 permission=Permission.READ,
             )
         )
@@ -447,7 +444,7 @@ async def user_with_rbac_rows(
         await conn.execute(RoleRow.__table__.delete().where(RoleRow.__table__.c.id == role_id))
         await conn.execute(
             VirtualEntityRow.__table__.delete().where(
-                VirtualEntityRow.__table__.c.entity_type == ScopeType.USER.value,
+                VirtualEntityRow.__table__.c.entity_type == UserEntityType(),
                 VirtualEntityRow.__table__.c.entity_id == user_id,
             )
         )

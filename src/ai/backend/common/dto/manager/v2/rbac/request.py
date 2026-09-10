@@ -9,6 +9,7 @@ from uuid import UUID
 from pydantic import Field, field_validator, model_validator
 
 from ai.backend.common.api_handlers import SENTINEL, BaseRequestModel, Sentinel
+from ai.backend.common.data.entity.types import EntityType
 from ai.backend.common.dto.manager.query import DateTimeFilter, StringFilter, UUIDFilter
 
 from .types import (
@@ -140,7 +141,7 @@ class CreatePermissionInput(BaseRequestModel):
     """Input for creating a scoped permission."""
 
     role_id: UUID = Field(description="Role ID to assign this permission to")
-    entity_type: str = Field(description="Entity element type (e.g. 'session', 'vfolder')")
+    entity_type: EntityType = Field(description="Entity type (e.g. 'session', 'vfolder')")
     operation: str = Field(description="Operation type (e.g. 'read', 'create')")
 
 
@@ -148,7 +149,7 @@ class UpdatePermissionInput(BaseRequestModel):
     """Input for updating a scoped permission."""
 
     id: UUID = Field(description="Permission ID to update")
-    entity_type: str | None = Field(default=None, description="Updated entity element type")
+    entity_type: EntityType | None = Field(default=None, description="Updated entity type")
     operation: str | None = Field(default=None, description="Updated operation type")
 
 

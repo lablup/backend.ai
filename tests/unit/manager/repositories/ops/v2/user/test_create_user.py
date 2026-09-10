@@ -13,12 +13,13 @@ from ai.backend.common.data.entity.domain import DomainEntityType, DomainID, Dom
 from ai.backend.common.data.entity.project import ProjectEntityType, ProjectID
 from ai.backend.common.data.entity.role import RoleEntityType, RoleID
 from ai.backend.common.data.entity.user import UserEntityType, UserID
+from ai.backend.common.data.entity.vfolder import VFolderEntityType
 from ai.backend.common.data.entity.virtual_entity import VirtualEntityID
 from ai.backend.common.data.permission.types import RoleStatus
 from ai.backend.common.types import AccessKey, ResourceSlot, VFolderHostPermissionMap
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.keypair.types import KeyPairSecrets
-from ai.backend.manager.data.permission.types import EntityType, OperationType, ScopeType
+from ai.backend.manager.data.permission.types import OperationType
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.entity_label.row import EntityLabelRow
 from ai.backend.manager.models.hasher.types import PasswordInfo
@@ -375,7 +376,7 @@ async def user_role_preset(db: ExtendedAsyncSAEngine) -> uuid.UUID:
             RolePresetRow(
                 id=preset_id,
                 name="preset-user",
-                scope_type=ScopeType.USER,
+                scope_type=UserEntityType(),
                 auto_assign=True,
                 deleted=False,
             )
@@ -384,7 +385,7 @@ async def user_role_preset(db: ExtendedAsyncSAEngine) -> uuid.UUID:
         session.add(
             RolePermissionPresetRow(
                 role_preset_id=preset_id,
-                entity_type=EntityType.VFOLDER,
+                entity_type=VFolderEntityType(),
                 operation=OperationType.READ,
             )
         )
@@ -438,7 +439,7 @@ class TestUserGraphProvisioning:
                 ).all()
             )
         assert role.name == f"preset-user-{str(user_id)[:8]}"
-        assert {str(EntityType.VFOLDER)} == {str(entity_type) for entity_type in entity_types}
+        assert {str(VFolderEntityType())} == {str(entity_type) for entity_type in entity_types}
 
 
 async def _create_project(db: ExtendedAsyncSAEngine, domain_name: DomainName) -> ProjectID:

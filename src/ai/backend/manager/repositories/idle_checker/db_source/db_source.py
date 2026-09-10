@@ -10,15 +10,17 @@ from typing import cast
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
+from ai.backend.common.data.entity.domain import DomainEntityType
 from ai.backend.common.data.entity.idle_checker import IdleCheckerID
+from ai.backend.common.data.entity.project import ProjectEntityType
+from ai.backend.common.data.entity.resource_group import ResourceGroupEntityType
 from ai.backend.common.data.entity.session import SessionID
-from ai.backend.common.data.entity.user import UserID
+from ai.backend.common.data.entity.user import UserEntityType, UserID
 from ai.backend.common.data.idle_checker.types import (
     CheckerType,
     IdleCheckerSpec,
     IdleCheckPhase,
 )
-from ai.backend.common.data.permission.types import ScopeType
 from ai.backend.common.types import SessionId, SessionTypes
 from ai.backend.manager.data.idle_checker.types import IdleCheckSession, IdleJudgmentData
 from ai.backend.manager.data.session.types import SessionStatus
@@ -217,19 +219,19 @@ class IdleCheckerDBSource:
     ) -> SessionIdleCheckAssignmentData:
         scope_matches = sa.or_(
             sa.and_(
-                IdleCheckerBindingRow.scope_type == ScopeType.RESOURCE_GROUP.value,
+                IdleCheckerBindingRow.scope_type == ResourceGroupEntityType(),
                 IdleCheckerBindingRow.scope_id == SessionRow.resource_group_id,
             ),
             sa.and_(
-                IdleCheckerBindingRow.scope_type == ScopeType.PROJECT.value,
+                IdleCheckerBindingRow.scope_type == ProjectEntityType(),
                 IdleCheckerBindingRow.scope_id == SessionRow.group_id,
             ),
             sa.and_(
-                IdleCheckerBindingRow.scope_type == ScopeType.DOMAIN.value,
+                IdleCheckerBindingRow.scope_type == DomainEntityType(),
                 IdleCheckerBindingRow.scope_id == SessionRow.domain_id,
             ),
             sa.and_(
-                IdleCheckerBindingRow.scope_type == ScopeType.USER.value,
+                IdleCheckerBindingRow.scope_type == UserEntityType(),
                 IdleCheckerBindingRow.scope_id == SessionRow.user_uuid,
             ),
         )

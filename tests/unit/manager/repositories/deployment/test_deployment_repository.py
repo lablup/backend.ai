@@ -23,16 +23,15 @@ from ai.backend.common.data.entity.deployment_revision import DeploymentRevision
 from ai.backend.common.data.entity.deployment_token import DeploymentTokenID
 from ai.backend.common.data.entity.domain import DomainID, DomainName
 from ai.backend.common.data.entity.image import ImageID
-from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.project import ProjectEntityType, ProjectID
 from ai.backend.common.data.entity.replica import ReplicaID
 from ai.backend.common.data.entity.replica_group import ReplicaGroupID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.data.entity.runtime_variant import RuntimeVariantID
 from ai.backend.common.data.entity.session_group import SessionGroupID
-from ai.backend.common.data.entity.user import UserID
+from ai.backend.common.data.entity.user import UserEntityType, UserID
 from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
-from ai.backend.common.data.permission.types import ScopeType
 from ai.backend.common.schema.deployment import BlueGreenSpec, IntOrPercent, RollingUpdateSpec
 from ai.backend.common.types import (
     AccessKey,
@@ -395,7 +394,7 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
             db_sess.add(user)
             await db_sess.flush()
             # A session group joins its owner, which must be in the graph first.
-            db_sess.add(VirtualEntityRow(entity_type=ScopeType.USER.value, entity_id=user_uuid))
+            db_sess.add(VirtualEntityRow(entity_type=UserEntityType(), entity_id=user_uuid))
             await db_sess.commit()
 
         return user_uuid
@@ -440,7 +439,7 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
             db_sess.add(group)
             await db_sess.flush()
             # A session group joins its project, which must be in the graph first.
-            db_sess.add(VirtualEntityRow(entity_type=ScopeType.PROJECT.value, entity_id=group_id))
+            db_sess.add(VirtualEntityRow(entity_type=ProjectEntityType(), entity_id=group_id))
             await db_sess.commit()
 
         return group_id
@@ -1576,7 +1575,7 @@ class TestDeploymentRevisionOperations:
             db_sess.add(user)
             await db_sess.flush()
             # A session group joins its owner, which must be in the graph first.
-            db_sess.add(VirtualEntityRow(entity_type=ScopeType.USER.value, entity_id=user_uuid))
+            db_sess.add(VirtualEntityRow(entity_type=UserEntityType(), entity_id=user_uuid))
             await db_sess.commit()
 
         return user_uuid
@@ -1601,7 +1600,7 @@ class TestDeploymentRevisionOperations:
             db_sess.add(group)
             await db_sess.flush()
             # A session group joins its project, which must be in the graph first.
-            db_sess.add(VirtualEntityRow(entity_type=ScopeType.PROJECT.value, entity_id=group_id))
+            db_sess.add(VirtualEntityRow(entity_type=ProjectEntityType(), entity_id=group_id))
             await db_sess.commit()
 
         return group_id
@@ -2301,7 +2300,7 @@ class TestDeploymentPolicyOperations:
             db_sess.add(user)
             await db_sess.flush()
             # A session group joins its owner, which must be in the graph first.
-            db_sess.add(VirtualEntityRow(entity_type=ScopeType.USER.value, entity_id=user_uuid))
+            db_sess.add(VirtualEntityRow(entity_type=UserEntityType(), entity_id=user_uuid))
             await db_sess.commit()
 
         return user_uuid
@@ -2326,7 +2325,7 @@ class TestDeploymentPolicyOperations:
             db_sess.add(group)
             await db_sess.flush()
             # A session group joins its project, which must be in the graph first.
-            db_sess.add(VirtualEntityRow(entity_type=ScopeType.PROJECT.value, entity_id=group_id))
+            db_sess.add(VirtualEntityRow(entity_type=ProjectEntityType(), entity_id=group_id))
             await db_sess.commit()
 
         return group_id
@@ -3022,7 +3021,7 @@ class TestRouteOperations:
             db_sess.add(user)
             await db_sess.flush()
             # A session group joins its owner, which must be in the graph first.
-            db_sess.add(VirtualEntityRow(entity_type=ScopeType.USER.value, entity_id=user_uuid))
+            db_sess.add(VirtualEntityRow(entity_type=UserEntityType(), entity_id=user_uuid))
             await db_sess.commit()
 
         return user_uuid
@@ -3047,7 +3046,7 @@ class TestRouteOperations:
             db_sess.add(group)
             await db_sess.flush()
             # A session group joins its project, which must be in the graph first.
-            db_sess.add(VirtualEntityRow(entity_type=ScopeType.PROJECT.value, entity_id=group_id))
+            db_sess.add(VirtualEntityRow(entity_type=ProjectEntityType(), entity_id=group_id))
             await db_sess.commit()
 
         return group_id
@@ -3420,7 +3419,7 @@ class TestDeploymentRepositoryDuplicateName:
             db_sess.add(group)
             await db_sess.flush()
             # A session group joins its project, which must be in the graph first.
-            db_sess.add(VirtualEntityRow(entity_type=ScopeType.PROJECT.value, entity_id=group.id))
+            db_sess.add(VirtualEntityRow(entity_type=ProjectEntityType(), entity_id=group.id))
             await db_sess.commit()
             return group
 
@@ -3445,7 +3444,7 @@ class TestDeploymentRepositoryDuplicateName:
             db_sess.add(group)
             await db_sess.flush()
             # A session group joins its project, which must be in the graph first.
-            db_sess.add(VirtualEntityRow(entity_type=ScopeType.PROJECT.value, entity_id=group.id))
+            db_sess.add(VirtualEntityRow(entity_type=ProjectEntityType(), entity_id=group.id))
             await db_sess.commit()
             return group
 
@@ -3493,7 +3492,7 @@ class TestDeploymentRepositoryDuplicateName:
             db_sess.add(user)
             await db_sess.flush()
             # A session group joins its owner, which must be in the graph first.
-            db_sess.add(VirtualEntityRow(entity_type=ScopeType.USER.value, entity_id=user_uuid))
+            db_sess.add(VirtualEntityRow(entity_type=UserEntityType(), entity_id=user_uuid))
             await db_sess.commit()
             return user
 

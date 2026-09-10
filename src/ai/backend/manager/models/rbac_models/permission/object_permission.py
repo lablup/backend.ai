@@ -7,12 +7,10 @@ import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, mapped_column
 
 from ai.backend.common.data.entity.role import RoleID
+from ai.backend.common.data.entity.types import EntityType
 from ai.backend.manager.data.permission.id import ObjectId
 from ai.backend.manager.data.permission.object_permission import ObjectPermissionData
-from ai.backend.manager.data.permission.types import (
-    EntityType,
-    OperationType,
-)
+from ai.backend.manager.data.permission.types import OperationType
 from ai.backend.manager.models.base import (
     GUID,
     Base,
@@ -40,7 +38,7 @@ class ObjectPermissionRow(Base):
     )
     role_id: Mapped[RoleID] = mapped_column("role_id", GUID(RoleID), nullable=False)
     entity_type: Mapped[EntityType] = mapped_column(
-        "entity_type", StrEnumType(EntityType, length=32), nullable=False
+        "entity_type", sa.String(length=32), nullable=False
     )
     entity_id: Mapped[str] = mapped_column(
         "entity_id", sa.String(64), nullable=False

@@ -4,25 +4,25 @@ from __future__ import annotations
 
 import uuid
 from collections import defaultdict
-from collections.abc import Callable, Collection, Sequence
+from collections.abc import Callable, Collection, Mapping, Sequence
 from datetime import UTC, datetime
 from functools import lru_cache
 from uuid import UUID
 
 from ai.backend.common.api_handlers import SENTINEL
 from ai.backend.common.contexts.user import current_user
-from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.domain import DomainEntityType, DomainID
 from ai.backend.common.data.entity.permission import PermissionID
-from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.project import ProjectEntityType, ProjectID
 from ai.backend.common.data.entity.role import RoleID
 from ai.backend.common.data.entity.types import (
     EntityIdentifier,
     EntityType,
     RuntimeEntityID,
 )
-from ai.backend.common.data.entity.user import UserID
+from ai.backend.common.data.entity.user import UserEntityType, UserID
 from ai.backend.common.data.permission.types import OperationType as InternalOperationType
-from ai.backend.common.data.permission.types import Permission, RBACElementType
+from ai.backend.common.data.permission.types import Permission
 from ai.backend.common.dto.manager.rbac import (
     OrderDirection,
     RoleDTO,
@@ -47,12 +47,14 @@ from ai.backend.common.dto.manager.v2.rbac import (
     CreateRolePayload,
     DeleteRolePayload,
     EntityActionInfo,
+    EntityOperationCombinationInfo,
     OperationInfo,
     PermissionNode,
     PurgeRolePayload,
     ReplaceRolePermissionsPayload,
     RoleAssignmentNode,
     RoleNode,
+    ScopeEntityCombinationInfo,
     ScopeEntityOperationCombinationInfo,
     UpdateRoleInput,
     UpdateRolePayload,
@@ -133,7 +135,6 @@ from ai.backend.common.dto.manager.v2.rbac.types import (
     OrderDirection as OrderDirectionV2,
 )
 from ai.backend.common.exception import UnreachableError
-from ai.backend.manager.actions.action import build_operation_description
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.data.common.types import SearchResult
@@ -153,6 +154,7 @@ from ai.backend.manager.data.permission.role import (
     UserRoleRevocationInput,
 )
 from ai.backend.manager.data.permission.status import RoleStatus as InternalRoleStatus
+from ai.backend.manager.data.permission.types import GrantableOperation
 from ai.backend.manager.data.permission.types import RoleSource as InternalRoleSource
 from ai.backend.manager.errors.base.not_found import NotFoundError
 from ai.backend.manager.errors.permission import (
@@ -298,34 +300,33 @@ class RBACAdapter(BaseAdapter):
         self._rbac = rbac
         self._permission_controller = permission_controller
 
-    def _validate_scope_id(self, scope_type: RBACElementType, scope_id: str) -> None:
+    def _validate_scope_id(self, scope_type: EntityType, scope_id: str) -> None:
         """Raise InvalidScope if scope_id is not a valid UUID for scope types that require one."""
         match scope_type:
-            case RBACElementType.USER | RBACElementType.PROJECT | RBACElementType.DOMAIN:
+            case UserEntityType() | ProjectEntityType() | DomainEntityType():
                 self._scope_uuid(scope_type, scope_id)
             case _:
                 pass
 
-    def _scope_uuid(self, scope_type: RBACElementType, scope_id: str) -> UUID:
+    def _scope_uuid(self, scope_type: EntityType, scope_id: str) -> UUID:
         try:
             return UUID(scope_id)
         except ValueError:
             raise InvalidScope(
-                f"scope_id must be a valid UUID for scope_type '{scope_type.value}', "
-                f"got '{scope_id}'"
+                f"scope_id must be a valid UUID for scope_type '{scope_type}', got '{scope_id}'"
             ) from None
 
-    def _scope_identifier(self, scope_type: RBACElementType, scope_id: str) -> EntityIdentifier:
+    def _scope_identifier(self, scope_type: EntityType, scope_id: str) -> EntityIdentifier:
         value = self._scope_uuid(scope_type, scope_id)
         match scope_type:
-            case RBACElementType.DOMAIN:
+            case DomainEntityType():
                 return DomainID(value)
-            case RBACElementType.PROJECT:
+            case ProjectEntityType():
                 return ProjectID(value)
-            case RBACElementType.USER:
+            case UserEntityType():
                 return UserID(value)
             case _:
-                return RuntimeEntityID(EntityType(scope_type.value), value)
+                return RuntimeEntityID(scope_type, value)
 
     # ------------------------------------------------------------------ batch load (DataLoader)
 
@@ -489,42 +490,80 @@ class RBACAdapter(BaseAdapter):
         }
         return [result_map.get(pair) for pair in pairs]
 
-    # ------------------------------------------------------------------ permission matrix
+    # ------------------------------------------------------------------ permission catalog
 
-    async def get_permission_matrix(self) -> list[ScopeEntityOperationCombinationInfo]:
-        """Return the complete RBAC scope-entity-operation permission matrix."""
+    async def _permission_matrix(
+        self,
+    ) -> Mapping[EntityType, Mapping[EntityType, Sequence[GrantableOperation]]]:
         action_result = await self._permission_controller.get_permission_matrix.wait_for_complete(
             GetPermissionMatrixAction()
         )
-        matrix = action_result.matrix
+        return action_result.matrix
+
+    async def get_permission_matrix(self) -> list[ScopeEntityOperationCombinationInfo]:
+        """Return the complete RBAC scope-entity-operation permission matrix."""
+        matrix = await self._permission_matrix()
         return [
             ScopeEntityOperationCombinationInfo(
-                scope_type=EntityType(scope.value),
-                entities=sorted(
-                    [
-                        EntityActionInfo(
-                            entity_type=EntityType(entity.value),
-                            actions=sorted(
-                                [
-                                    OperationInfo(
-                                        operation=action_name.value,
-                                        description=build_operation_description(
-                                            action_name, perm.element_type
-                                        ),
-                                        required_permission=OperationTypeDTO(perm.operation.value),
-                                    )
-                                    for action_name, perm in actions.items()
-                                ],
-                                key=lambda o: o.operation,
-                            ),
-                        )
-                        for entity, actions in entity_map.items()
-                    ],
-                    key=lambda e: e.entity_type,
-                ),
+                scope_type=scope,
+                entities=self._entity_actions(entity_map),
             )
-            for scope, entity_map in sorted(matrix.items(), key=lambda e: e[0].value)
+            for scope, entity_map in sorted(matrix.items())
         ]
+
+    async def get_entity_operation_combinations(self) -> list[EntityOperationCombinationInfo]:
+        """Return every entity a role may permit and the operations it may permit on it."""
+        matrix = await self._permission_matrix()
+        return [
+            EntityOperationCombinationInfo(
+                entity_type=entity.entity_type,
+                operations=entity.actions,
+            )
+            for entity in self._entity_actions(self._any_entity_map(matrix))
+        ]
+
+    async def get_scope_entity_combinations(self) -> list[ScopeEntityCombinationInfo]:
+        """Return, per scope a role sits in, the entities a permission there may name."""
+        matrix = await self._permission_matrix()
+        return [
+            ScopeEntityCombinationInfo(
+                scope_type=scope,
+                valid_entity_types=sorted(entity_map),
+            )
+            for scope, entity_map in sorted(matrix.items())
+        ]
+
+    @staticmethod
+    def _any_entity_map(
+        matrix: Mapping[EntityType, Mapping[EntityType, Sequence[GrantableOperation]]],
+    ) -> Mapping[EntityType, Sequence[GrantableOperation]]:
+        """The entities of any one scope. A permission row names no scope, so every
+        scope carries the same ones."""
+        for entity_map in matrix.values():
+            return entity_map
+        return {}
+
+    @staticmethod
+    def _entity_actions(
+        entity_map: Mapping[EntityType, Sequence[GrantableOperation]],
+    ) -> list[EntityActionInfo]:
+        return sorted(
+            [
+                EntityActionInfo(
+                    entity_type=entity,
+                    actions=[
+                        OperationInfo(
+                            operation=op.name,
+                            description=op.description,
+                            required_permission=OperationTypeDTO(op.operation.value),
+                        )
+                        for op in operations
+                    ],
+                )
+                for entity, operations in entity_map.items()
+            ],
+            key=lambda e: e.entity_type,
+        )
 
     # ------------------------------------------------------------------ create
 
@@ -535,9 +574,7 @@ class RBACAdapter(BaseAdapter):
             CreateRoleAction(
                 creator=RoleCreator(
                     name=input.name,
-                    scope=self._scope_identifier(
-                        RBACElementType(scope_input.scope_type), scope_input.scope_id
-                    ),
+                    scope=self._scope_identifier(scope_input.scope_type, scope_input.scope_id),
                     description=input.description,
                     auto_assign=input.auto_assign,
                 )
@@ -764,7 +801,7 @@ class RBACAdapter(BaseAdapter):
     async def create_permission(self, input: CreatePermissionInputDTO) -> PermissionNode:
         """Create a permission on the role; it holds in the scope the role sits in."""
         creator = RolePermissionCreator(
-            entity_type=EntityType(RBACElementType(input.entity_type)),
+            entity_type=input.entity_type,
             permission=self._permission_bit(input.operation),
         )
         action_result = await self._permission_controller.create_permission.wait_for_complete(
@@ -777,7 +814,7 @@ class RBACAdapter(BaseAdapter):
         updater = RolePermissionUpdater(
             permission_id=PermissionID(input.id),
             entity_type=(
-                OptionalState.update(EntityType(RBACElementType(input.entity_type)))
+                OptionalState.update(input.entity_type)
                 if input.entity_type is not None
                 else OptionalState.nop()
             ),
@@ -946,7 +983,7 @@ class RBACAdapter(BaseAdapter):
         type named more than once holds every operation named on it."""
         held: dict[EntityType, Permission] = {}
         for entry in entries:
-            entity_type = EntityType(RBACElementType(entry.entity_type))
+            entity_type = entry.entity_type
             held[entity_type] = held.get(entity_type, Permission.NONE) | self._permission_bit(
                 entry.operation
             )
@@ -957,7 +994,7 @@ class RBACAdapter(BaseAdapter):
 
     def _role_permission_creator(self, entry: CreatePermissionInputDTO) -> RolePermissionCreator:
         return RolePermissionCreator(
-            entity_type=EntityType(RBACElementType(entry.entity_type)),
+            entity_type=entry.entity_type,
             permission=Permission.from_operation(InternalOperationType(entry.operation)),
         )
 

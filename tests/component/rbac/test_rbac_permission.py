@@ -5,16 +5,14 @@ from typing import Any
 
 import pytest
 
+from ai.backend.common.data.entity.image import ImageEntityType
 from ai.backend.common.data.entity.permission import PermissionID
 from ai.backend.common.data.entity.role import RoleID
+from ai.backend.common.data.entity.session import SessionEntityType
 from ai.backend.common.data.entity.types import EntityType
-from ai.backend.common.data.permission.types import (
-    OperationType,
-    Permission,
-    RBACElementType,
-)
+from ai.backend.common.data.entity.vfolder import VFolderEntityType
+from ai.backend.common.data.permission.types import OperationType, Permission
 from ai.backend.manager.data.permission.permission import PermissionData
-from ai.backend.manager.data.permission.types import EntityType as LegacyEntityType
 from ai.backend.manager.errors.common import ObjectNotFound
 from ai.backend.manager.errors.permission import PermissionAlreadyGranted
 from ai.backend.manager.models.rbac_models.permission.creators import RolePermissionCreator
@@ -40,7 +38,7 @@ class TestPermissionCreate:
     ) -> None:
         """S-CREATE-1: Create basic permission with valid params → PermissionData returned."""
         creator = RolePermissionCreator(
-            entity_type=EntityType(RBACElementType.SESSION),
+            entity_type=EntityType(SessionEntityType()),
             permission=Permission.READ,
         )
         result = await permission_controller_processors.create_permission.wait_for_complete(
@@ -49,7 +47,7 @@ class TestPermissionCreate:
 
         assert isinstance(result.data, PermissionData)
         assert result.data.role_id == target_role.role.id
-        assert result.data.entity_type == LegacyEntityType.SESSION.value
+        assert result.data.entity_type == SessionEntityType()
         assert result.data.permission == Permission.READ
 
         # Cleanup
@@ -64,10 +62,10 @@ class TestPermissionCreate:
         domain_fixture: DomainFixtureData,
     ) -> None:
         """S-CREATE-2: Create permissions with various scope/entity/operation combinations."""
-        combos: list[tuple[RBACElementType, OperationType]] = [
-            (RBACElementType.SESSION, OperationType.READ),
-            (RBACElementType.IMAGE, OperationType.UPDATE),
-            (RBACElementType.VFOLDER, OperationType.SOFT_DELETE),
+        combos: list[tuple[EntityType, OperationType]] = [
+            (SessionEntityType(), OperationType.READ),
+            (ImageEntityType(), OperationType.UPDATE),
+            (VFolderEntityType(), OperationType.SOFT_DELETE),
         ]
         created_ids: list[uuid.UUID] = []
 
@@ -81,7 +79,7 @@ class TestPermissionCreate:
                     ),
                 )
             )
-            assert result.data.entity_type == entity_type.value
+            assert result.data.entity_type == entity_type
             assert result.data.permission == Permission.from_operation(operation)
             assert result.data.role_id == target_role.role.id
             created_ids.append(result.data.id)
@@ -100,7 +98,7 @@ class TestPermissionCreate:
     ) -> None:
         """F-BIZ-4: Create duplicate permission → unique constraint error."""
         spec = RolePermissionCreator(
-            entity_type=EntityType(RBACElementType.VFOLDER),
+            entity_type=EntityType(VFolderEntityType()),
             permission=Permission.READ,
         )
 
@@ -134,7 +132,7 @@ class TestPermissionDelete:
             CreatePermissionAction(
                 role_id=RoleID(target_role.role.id),
                 creator=RolePermissionCreator(
-                    entity_type=EntityType(RBACElementType.SESSION),
+                    entity_type=EntityType(SessionEntityType()),
                     permission=Permission.HARD_DELETE,
                 ),
             )
@@ -159,7 +157,7 @@ class TestPermissionDelete:
             CreatePermissionAction(
                 role_id=RoleID(target_role.role.id),
                 creator=RolePermissionCreator(
-                    entity_type=EntityType(RBACElementType.IMAGE),
+                    entity_type=EntityType(ImageEntityType()),
                     permission=Permission.SOFT_DELETE,
                 ),
             )

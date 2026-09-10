@@ -20,10 +20,7 @@ from ai.backend.common.data.filter_specs import (
     StringMatchSpec,
     UUIDEqualMatchSpec,
 )
-from ai.backend.common.data.permission.types import (
-    EntityType,
-    OperationType,
-)
+from ai.backend.common.data.permission.types import OperationType
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.models.agent import AgentRow
@@ -459,7 +456,7 @@ class TestSearchRolesTotalCountNotInflated:
             for op_type in [OperationType.READ, OperationType.UPDATE, OperationType.CREATE]:
                 obj_perm = ObjectPermissionRow(
                     role_id=role_with_perms.id,
-                    entity_type=EntityType.PROJECT,
+                    entity_type=ProjectEntityType(),
                     entity_id=str(uuid.uuid4()),
                     operation=op_type,
                 )

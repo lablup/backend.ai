@@ -21,7 +21,7 @@ from ai.backend.common.data.entity.idle_checker import (
     IdleCheckerEntityType,
     IdleCheckerID,
 )
-from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.project import ProjectEntityType, ProjectID
 from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
 from ai.backend.common.data.entity.user import UserEntityType, UserID
 from ai.backend.common.data.idle_checker.types import (
@@ -29,14 +29,7 @@ from ai.backend.common.data.idle_checker.types import (
     IdleCheckerSpec,
     SessionLifetimeSpec,
 )
-from ai.backend.common.data.permission.types import (
-    EntityType as LegacyEntityType,
-)
-from ai.backend.common.data.permission.types import (
-    OperationType,
-    Permission,
-    ScopeType,
-)
+from ai.backend.common.data.permission.types import OperationType, Permission
 from ai.backend.common.types import ResourceSlot, SessionTypes
 from ai.backend.manager.actions.monitors import ActionMonitors
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
@@ -436,7 +429,7 @@ async def project_assignment_read_permission(
     async for _ in _grant(
         database_engine,
         regular_user_fixture.user_uuid,
-        ScopeType.PROJECT,
+        ProjectEntityType(),
         assignment_seed.project_id,
         IdleCheckerEntityType(),
         (OperationType.READ,),
@@ -458,15 +451,15 @@ async def project_assignment_manage_permission(
     async for _ in _grant(
         database_engine,
         regular_user_fixture.user_uuid,
-        ScopeType.PROJECT,
+        ProjectEntityType(),
         assignment_seed.project_id,
-        LegacyEntityType.PROJECT,
+        ProjectEntityType(),
         (OperationType.SOFT_DELETE, OperationType.HARD_DELETE),
     ):
         async for _ in _grant(
             database_engine,
             regular_user_fixture.user_uuid,
-            ScopeType.PROJECT,
+            ProjectEntityType(),
             assignment_seed.project_id,
             IdleCheckerEntityType(),
             (OperationType.READ,),
@@ -496,9 +489,9 @@ async def user_self_scope_permission(
     async for _ in _grant(
         database_engine,
         regular_user_fixture.user_uuid,
-        ScopeType.USER,
+        UserEntityType(),
         regular_user_fixture.user_uuid,
-        LegacyEntityType.USER,
+        UserEntityType(),
         (
             OperationType.READ,
             OperationType.UPDATE,
@@ -509,7 +502,7 @@ async def user_self_scope_permission(
         async for _ in _grant(
             database_engine,
             regular_user_fixture.user_uuid,
-            ScopeType.USER,
+            UserEntityType(),
             regular_user_fixture.user_uuid,
             IdleCheckerEntityType(),
             (OperationType.READ,),
@@ -532,11 +525,11 @@ async def user_in_seeded_project(
     yield
     async with database_engine.begin() as conn:
         project_node = sa.select(VirtualEntityRow.__table__.c.id).where(
-            VirtualEntityRow.__table__.c.entity_type == ScopeType.PROJECT,
+            VirtualEntityRow.__table__.c.entity_type == ProjectEntityType(),
             VirtualEntityRow.__table__.c.entity_id == assignment_seed.project_id,
         )
         user_node = sa.select(VirtualEntityRow.__table__.c.id).where(
-            VirtualEntityRow.__table__.c.entity_type == ScopeType.USER,
+            VirtualEntityRow.__table__.c.entity_type == UserEntityType(),
             VirtualEntityRow.__table__.c.entity_id == regular_user_fixture.user_uuid,
         )
         await conn.execute(

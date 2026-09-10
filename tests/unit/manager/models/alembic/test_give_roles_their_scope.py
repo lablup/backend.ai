@@ -14,10 +14,10 @@ import pytest
 import sqlalchemy as sa
 from sqlalchemy import Table
 
+from ai.backend.common.data.entity.project import ProjectEntityType
 from ai.backend.common.data.entity.types import EntityType
 from ai.backend.manager.data.permission.status import RoleStatus
 from ai.backend.manager.data.permission.types import Permission, RoleSource
-from ai.backend.manager.data.permission.types import ScopeType as LegacyScopeType
 from ai.backend.manager.models.alembic.versions.a7d2c9e41b58_give_roles_their_scope import (
     backfill,
 )
@@ -96,7 +96,7 @@ async def _add_scope(db: ExtendedAsyncSAEngine) -> uuid.UUID:
 
 async def _add_preset(db: ExtendedAsyncSAEngine) -> uuid.UUID:
     async with db.begin_session() as session:
-        preset = RolePresetRow(name="member", scope_type=LegacyScopeType.PROJECT)
+        preset = RolePresetRow(name="member", scope_type=ProjectEntityType())
         session.add(preset)
         await session.flush()
         return preset.id

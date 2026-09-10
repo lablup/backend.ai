@@ -10,12 +10,10 @@ import pytest
 import sqlalchemy as sa
 
 from ai.backend.common.data.entity.role import RoleID
+from ai.backend.common.data.entity.session import SessionEntityType
 from ai.backend.common.data.entity.types import EntityType
-from ai.backend.common.data.permission.types import RBACElementType
-from ai.backend.manager.data.permission.types import (
-    OperationType,
-    Permission,
-)
+from ai.backend.common.data.entity.user import UserEntityType
+from ai.backend.manager.data.permission.types import OperationType, Permission
 from ai.backend.manager.errors.permission import RoleNotFound
 
 # ORM cluster registration: configure_mappers() (triggered when this isolated
@@ -61,7 +59,7 @@ _ORM_CLUSTER = (
 
 
 def _entry(
-    entity_type: RBACElementType,
+    entity_type: EntityType,
     permission: Permission,
 ) -> PermissionEntry:
     return PermissionEntry(
@@ -70,7 +68,7 @@ def _entry(
     )
 
 
-def _owner_entry(entity_type: RBACElementType) -> PermissionEntry:
+def _owner_entry(entity_type: EntityType) -> PermissionEntry:
     permission = Permission.NONE
     for op in ALL_OWNER_OPS:
         permission |= Permission.from_operation(op)
@@ -180,16 +178,16 @@ class TestBulkRolePermissions:
         await self._seed_permission(
             db_with_cleanup,
             role_id,
-            _entry(RBACElementType.USER, Permission.READ),
+            _entry(UserEntityType(), Permission.READ),
         )
-        new_entry = _owner_entry(RBACElementType.SESSION)
+        new_entry = _owner_entry(SessionEntityType())
         result = await perm_db_source.replace_role_permissions(
             role_id=RoleID(role_id), entries=[new_entry]
         )
         assert len(result) == len(ALL_OWNER_OPS)
         assert await self._count_permissions(db_with_cleanup, role_id) == len(ALL_OWNER_OPS)
         assert await self._list_operations(
-            db_with_cleanup, role_id, EntityType(RBACElementType.SESSION)
+            db_with_cleanup, role_id, EntityType(SessionEntityType())
         ) == set(ALL_OWNER_OPS)
 
     async def test_replace_with_empty_creator_clears_role(
@@ -201,7 +199,7 @@ class TestBulkRolePermissions:
         await self._seed_permission(
             db_with_cleanup,
             role_id,
-            _entry(RBACElementType.USER, Permission.READ),
+            _entry(UserEntityType(), Permission.READ),
         )
         await perm_db_source.replace_role_permissions(role_id=RoleID(role_id), entries=[])
         assert await self._count_permissions(db_with_cleanup, role_id) == 0

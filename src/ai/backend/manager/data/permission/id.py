@@ -1,16 +1,12 @@
 from dataclasses import dataclass
 from typing import Self
 
-from ai.backend.common.data.permission.types import (
-    EntityType,
-    FieldType,
-    ScopeType,
-)
+from ai.backend.common.data.entity.types import EntityType
+from ai.backend.common.data.permission.types import FieldType
 
 __all__ = [
     "EntityType",
     "FieldType",
-    "ScopeType",
     "FieldRef",
     "ScopeId",
     "ObjectId",
@@ -46,15 +42,15 @@ class FieldRef:
 
 @dataclass(frozen=True)
 class ScopeId:
-    """Deprecated: use ``EntityIdentifier``; this pair is keyed by the legacy scope type enum."""
+    """Deprecated: use ``EntityIdentifier``; this pair carries the scope id as a string."""
 
-    scope_type: ScopeType
+    scope_type: EntityType
     scope_id: str
 
     @classmethod
     def from_str(cls, val: str) -> Self:
         scope_type, _, scope_id = val.partition(":")
-        return cls(scope_type=ScopeType(scope_type), scope_id=scope_id)
+        return cls(scope_type=EntityType.from_name(scope_type), scope_id=scope_id)
 
     def to_str(self) -> str:
         return f"{self.scope_type}:{self.scope_id}"
@@ -62,7 +58,7 @@ class ScopeId:
 
 @dataclass(frozen=True)
 class ObjectId:
-    """Deprecated: use ``EntityIdentifier``; this pair is keyed by the legacy entity type enum."""
+    """Deprecated: use ``EntityIdentifier``; this pair carries the entity id as a string."""
 
     entity_type: EntityType
     entity_id: str
@@ -70,7 +66,7 @@ class ObjectId:
     @classmethod
     def from_str(cls, val: str) -> Self:
         entity_type, _, entity_id = val.partition(":")
-        return cls(entity_type=EntityType(entity_type), entity_id=entity_id)
+        return cls(entity_type=EntityType.from_name(entity_type), entity_id=entity_id)
 
     def to_str(self) -> str:
         return f"{self.entity_type}:{self.entity_id}"

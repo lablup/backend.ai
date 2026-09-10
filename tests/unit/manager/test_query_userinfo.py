@@ -15,7 +15,8 @@ from uuid import UUID
 import pytest
 
 from ai.backend.common.data.entity.domain import DomainID
-from ai.backend.common.data.permission.types import EntityType, ScopeType
+from ai.backend.common.data.entity.project import ProjectEntityType
+from ai.backend.common.data.entity.user import UserEntityType
 from ai.backend.common.types import AccessKey, ResourceSlot
 from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.auth import AccessKeyNotFound
@@ -218,12 +219,12 @@ class TestQueryUserinfo:
             sess.add_all([
                 VirtualEntityRow(
                     id=project_ve_id,
-                    entity_type=ScopeType.PROJECT.value,
+                    entity_type=ProjectEntityType(),
                     entity_id=group_id,
                 ),
                 VirtualEntityRow(
                     id=user_ve_id,
-                    entity_type=EntityType.USER.value,
+                    entity_type=UserEntityType(),
                     entity_id=user_uuid,
                 ),
             ])
@@ -613,12 +614,12 @@ class TestQueryUserinfoFromSession:
             sess.add_all([
                 VirtualEntityRow(
                     id=project_ve_id,
-                    entity_type=ScopeType.PROJECT.value,
+                    entity_type=ProjectEntityType(),
                     entity_id=group_id,
                 ),
                 VirtualEntityRow(
                     id=user_ve_id,
-                    entity_type=EntityType.USER.value,
+                    entity_type=UserEntityType(),
                     entity_id=user_uuid,
                 ),
             ])

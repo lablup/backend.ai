@@ -8,11 +8,7 @@ from __future__ import annotations
 
 from ai.backend.common.data.entity.role_permission_preset import RolePermissionPresetID
 from ai.backend.common.data.entity.role_preset import RolePresetID
-from ai.backend.common.data.entity.types import EntityType
-from ai.backend.common.data.permission.types import (
-    OperationType,
-    RBACElementType,
-)
+from ai.backend.common.data.permission.types import OperationType
 from ai.backend.common.dto.manager.v2.common import OrderDirection
 from ai.backend.common.dto.manager.v2.rbac.types import OperationTypeDTO
 from ai.backend.common.dto.manager.v2.role_permission_preset.request import (
@@ -137,12 +133,12 @@ class RolePresetAdapter(BaseAdapter):
         """Create a new role preset."""
         creator = RolePresetCreator(
             name=input.name,
-            scope_type=RBACElementType(input.scope_type).to_scope_type(),
+            scope_type=input.scope_type,
             auto_assign=input.auto_assign,
         )
         permission_creators = [
             RolePermissionPresetCreator(
-                entity_type=RBACElementType(entry.entity_type).to_entity_type(),
+                entity_type=entry.entity_type,
                 operation=OperationType(entry.operation.value),
             )
             for entry in input.permissions
@@ -319,7 +315,7 @@ class RolePresetAdapter(BaseAdapter):
         """Bulk-add permission entries to an existing role preset."""
         creators = [
             RolePermissionPresetCreator(
-                entity_type=RBACElementType(entry.entity_type).to_entity_type(),
+                entity_type=entry.entity_type,
                 operation=OperationType(entry.operation.value),
             )
             for entry in input.permissions
@@ -499,7 +495,7 @@ class RolePresetAdapter(BaseAdapter):
         return RolePresetNode(
             id=data.id,
             name=data.name,
-            scope_type=EntityType(data.scope_type.value),
+            scope_type=data.scope_type,
             auto_assign=data.auto_assign,
             deleted=data.deleted,
             created_at=data.created_at,
@@ -511,7 +507,7 @@ class RolePresetAdapter(BaseAdapter):
         return RolePermissionPresetNode(
             id=data.id,
             role_preset_id=data.role_preset_id,
-            entity_type=EntityType(data.entity_type.value),
+            entity_type=data.entity_type,
             operation=OperationTypeDTO(data.operation.value),
             created_at=data.created_at,
         )

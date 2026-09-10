@@ -26,8 +26,6 @@ from ai.backend.common.data.entity.role import RoleID
 from ai.backend.common.data.entity.role_preset import RolePresetID
 from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
 from ai.backend.common.data.entity.user import UserID
-from ai.backend.common.data.permission.types import RBACElementType
-from ai.backend.common.exception import RBACTypeConversionError
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.permission.scope_template import ScopeTemplateValue
@@ -36,9 +34,6 @@ from ai.backend.manager.data.permission.types import (
     OperationType,
     Permission,
     RoleSource,
-)
-from ai.backend.manager.data.permission.types import (
-    ScopeType as LegacyScopeType,
 )
 from ai.backend.manager.errors.base.entity import EntityNotFoundError
 from ai.backend.manager.errors.role_preset import InvalidRoleNameTemplate
@@ -75,7 +70,7 @@ class _PresetRoleSpec:
     role_preset_id: RolePresetID
     name: str
     auto_assign: bool
-    entity_operations: Mapping[RBACElementType, Sequence[OperationType]]
+    entity_operations: Mapping[EntityType, Sequence[OperationType]]
 
 
 class V2EntityWriteOps(V2GraphWriteOpsBase):
@@ -326,14 +321,6 @@ class V2EntityWriteOps(V2GraphWriteOpsBase):
 
     # -- Preset-derived roles (role-managed paths only) ---------------------------
 
-    def _scope_element_type(self, scope_type: EntityType) -> RBACElementType:
-        try:
-            return RBACElementType(scope_type)
-        except ValueError as e:
-            raise RBACTypeConversionError(
-                f"Scope type {scope_type!r} has no corresponding RBAC element type"
-            ) from e
-
     async def _create_preset_roles(
         self, entity_values: Mapping[EntityIdentifier, ScopeTemplateValue]
     ) -> None:
@@ -363,7 +350,7 @@ class V2EntityWriteOps(V2GraphWriteOpsBase):
         permission_rows = [
             PermissionRow(
                 role_id=row.id,
-                entity_type=entity_type.to_entity_type(),
+                entity_type=entity_type,
                 permission=Permission.from_operation(operation),
             )
             for spec, row in zip(specs, role_rows, strict=True)
@@ -385,16 +372,14 @@ class V2EntityWriteOps(V2GraphWriteOpsBase):
         preset_rows = (
             await self._sess.scalars(
                 sa.select(RolePresetRow).where(
-                    RolePresetRow.scope_type.in_({
-                        self._scope_element_type(e.entity_type()).to_scope_type() for e in entities
-                    }),
+                    RolePresetRow.scope_type.in_({e.entity_type() for e in entities}),
                     RolePresetRow.deleted.is_(False),
                 )
             )
         ).all()
         if not preset_rows:
             return []
-        operations_by_preset: dict[RolePresetID, dict[RBACElementType, list[OperationType]]] = (
+        operations_by_preset: dict[RolePresetID, dict[EntityType, list[OperationType]]] = (
             defaultdict(lambda: defaultdict(list))
         )
         preset_permission_rows = (
@@ -408,9 +393,9 @@ class V2EntityWriteOps(V2GraphWriteOpsBase):
         ).all()
         for preset_permission in preset_permission_rows:
             operations_by_preset[preset_permission.role_preset_id][
-                preset_permission.entity_type.to_element()
+                preset_permission.entity_type
             ].append(preset_permission.operation)
-        presets_by_scope_type: dict[LegacyScopeType, list[RolePresetRow]] = defaultdict(list)
+        presets_by_scope_type: dict[EntityType, list[RolePresetRow]] = defaultdict(list)
         for preset in preset_rows:
             presets_by_scope_type[preset.scope_type].append(preset)
         return [
@@ -425,9 +410,7 @@ class V2EntityWriteOps(V2GraphWriteOpsBase):
                 },
             )
             for entity in entities
-            for preset in presets_by_scope_type[
-                self._scope_element_type(entity.entity_type()).to_scope_type()
-            ]
+            for preset in presets_by_scope_type[entity.entity_type()]
         ]
 
     def _preset_role_name(

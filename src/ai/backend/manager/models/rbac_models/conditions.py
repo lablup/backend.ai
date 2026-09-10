@@ -7,17 +7,14 @@ from collections.abc import Collection
 
 import sqlalchemy as sa
 
+from ai.backend.common.data.entity.types import EntityType
 from ai.backend.common.data.filter_specs import (
     StringInMatchSpec,
     StringMatchSpec,
     UUIDEqualMatchSpec,
     UUIDInMatchSpec,
 )
-from ai.backend.common.data.permission.types import RBACElementType
-from ai.backend.manager.data.permission.types import (
-    EntityType,
-    Permission,
-)
+from ai.backend.manager.data.permission.types import Permission
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.condition_utils import (
     make_string_in_factory,
@@ -539,9 +536,9 @@ class ObjectPermissionConditions:
         return inner
 
     @staticmethod
-    def by_entity_type(element_type: RBACElementType) -> QueryCondition:
+    def by_entity_type(entity_type: EntityType) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return ObjectPermissionRow.entity_type == element_type.to_entity_type()
+            return ObjectPermissionRow.entity_type == entity_type
 
         return inner
 

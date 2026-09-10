@@ -12,7 +12,7 @@ from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
 from ai.backend.common.contexts.user import current_user
 from ai.backend.common.data.entity.model_card import ModelCardID
 from ai.backend.common.data.entity.project import ProjectEntityType, ProjectID
-from ai.backend.common.data.entity.user import UserID
+from ai.backend.common.data.entity.user import UserEntityType, UserID
 from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.data.entity.vfolder_permission import VFolderPermissionID
 from ai.backend.common.exception import BackendAIError
@@ -32,7 +32,6 @@ from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.permission.id import ScopeId
 from ai.backend.manager.data.permission.types import (
     Permission,
-    ScopeType,
 )
 from ai.backend.manager.data.project.types import ProjectResourceInfo
 from ai.backend.manager.data.vfolder.dto import UserIdentity
@@ -1237,9 +1236,9 @@ class VfolderRepository:
     def _get_vfolder_scope(self, vfolder: VFolderData) -> ScopeId:
         """Determine scope from vfolder ownership."""
         if vfolder.ownership_type == VFolderOwnershipType.USER:
-            return ScopeId(ScopeType.USER, str(vfolder.user))
+            return ScopeId(UserEntityType(), str(vfolder.user))
         # GROUP ownership
-        return ScopeId(ScopeType.PROJECT, str(vfolder.group))
+        return ScopeId(ProjectEntityType(), str(vfolder.group))
 
     async def _validate_vfolder_ownership(
         self, session: SASession, vfolder_id: uuid.UUID, user_id: uuid.UUID

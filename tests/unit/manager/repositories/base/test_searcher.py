@@ -11,8 +11,9 @@ import pytest
 import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, mapped_column
 
+from ai.backend.common.data.entity.domain import DomainEntityType
+from ai.backend.common.data.entity.project import ProjectEntityType
 from ai.backend.common.data.entity.role_preset import RolePresetID
-from ai.backend.common.data.permission.types import ScopeType
 from ai.backend.manager.data.role_preset.types import (
     RolePresetData,
     RolePresetSearchResult,
@@ -285,21 +286,21 @@ class TestPassThroughDomainWiring:
                     {
                         "id": preset_ids[0],
                         "name": "domain-admin",
-                        "scope_type": ScopeType.DOMAIN,
+                        "scope_type": DomainEntityType(),
                         "auto_assign": False,
                         "deleted": False,
                     },
                     {
                         "id": preset_ids[1],
                         "name": "project-member",
-                        "scope_type": ScopeType.PROJECT,
+                        "scope_type": ProjectEntityType(),
                         "auto_assign": True,
                         "deleted": False,
                     },
                     {
                         "id": preset_ids[2],
                         "name": "retired",
-                        "scope_type": ScopeType.PROJECT,
+                        "scope_type": ProjectEntityType(),
                         "auto_assign": False,
                         "deleted": True,
                     },
@@ -335,7 +336,7 @@ class TestPassThroughDomainWiring:
             "project-member",
         ]
         assert search_result.items[0].id == sample_presets[0]
-        assert search_result.items[0].scope_type == ScopeType.DOMAIN.to_element()
+        assert search_result.items[0].scope_type == DomainEntityType()
         assert search_result.items[1].auto_assign is True
         assert search_result.total_count == 2
         assert search_result.has_next_page is False

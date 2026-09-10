@@ -1,13 +1,14 @@
 import logging
-from collections.abc import Sequence
+from collections import defaultdict
+from collections.abc import Mapping, Sequence
+from typing import Any
 
-from ai.backend.common.data.permission.types import OperationType, RBACElementType
+from ai.backend.common.data.entity.types import EntityType
+from ai.backend.common.data.permission.types import role_scope_types
 from ai.backend.logging.utils import BraceStyleAdapter
-from ai.backend.manager.actions.action.rbac import (
-    BaseRBACAction,
-    RBACActionName,
-    RBACRequiredPermission,
-)
+from ai.backend.manager.actions.action.rbac import build_operation_description
+from ai.backend.manager.actions.registry.registry import ProcessorRegistry
+from ai.backend.manager.data.permission.types import GrantableOperation
 from ai.backend.manager.repositories.permission_controller.repository import (
     PermissionControllerRepository,
 )
@@ -64,30 +65,18 @@ from ai.backend.manager.services.permission_contoller.actions.update_permission 
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
-# Grant operations are declared in the RBAC action registry as placeholders for a future
-# entity-delegation feature, but no executable action can request them yet
-# (``ActionOperationType`` has no GRANT member). Exclude them from the permission matrix so
-# it only exposes (scope, entity, operation) combinations that are actually enforced.
-_GRANT_OPERATIONS: frozenset[OperationType] = frozenset({
-    OperationType.GRANT_ALL,
-    OperationType.GRANT_READ,
-    OperationType.GRANT_UPDATE,
-    OperationType.GRANT_SOFT_DELETE,
-    OperationType.GRANT_HARD_DELETE,
-})
-
 
 class PermissionControllerService:
     _repository: PermissionControllerRepository
-    _rbac_action_registry: Sequence[type[BaseRBACAction]]
+    _action_registry: ProcessorRegistry[Any]
 
     def __init__(
         self,
         repository: PermissionControllerRepository,
-        rbac_action_registry: Sequence[type[BaseRBACAction]],
+        action_registry: ProcessorRegistry[Any],
     ) -> None:
         self._repository = repository
-        self._rbac_action_registry = rbac_action_registry
+        self._action_registry = action_registry
 
     async def create_permission(
         self, action: CreatePermissionAction
@@ -160,54 +149,48 @@ class PermissionControllerService:
         return ReplaceRolePermissionsActionResult(data=result)
 
     async def search_scopes(self, action: SearchScopesAction) -> SearchScopesActionResult:
-        """Search scopes based on element type."""
-        result = await self._repository.search_scopes(action.element_type, action.querier)
+        """Search scopes of the given type."""
+        result = await self._repository.search_scopes(action.scope_type, action.querier)
         return SearchScopesActionResult(result=result)
 
     async def get_scope_types(self, _action: GetScopeTypesAction) -> GetScopeTypesActionResult:
-        """Get all available scope types."""
-        return GetScopeTypesActionResult(element_types=list(RBACElementType))
+        """The scopes a role is created in."""
+        return GetScopeTypesActionResult(entity_types=list(role_scope_types()))
 
     async def get_entity_types(self, _action: GetEntityTypesAction) -> GetEntityTypesActionResult:
-        """Get all available entity types."""
-        return GetEntityTypesActionResult(element_types=list(RBACElementType))
+        """The entities a role may permit, as the ops wiring declares them."""
+        return GetEntityTypesActionResult(entity_types=sorted(self._grantable_operations()))
 
-    def get_entity_valid_operations(
-        self,
-    ) -> dict[RBACElementType, dict[RBACActionName, RBACRequiredPermission]]:
-        """
-        Get valid operations for all registered RBAC element types.
+    def _grantable_operations(self) -> Mapping[EntityType, Sequence[GrantableOperation]]:
+        """Every operation a role may permit, grouped by the entity answering for it.
 
-        Aggregates required permissions from all registered action classes,
-        grouping them by element type. Each entry maps action name to its
-        required permission.
+        One action class may be wired more than once — an owner lookup is built by every
+        field operation running it first — so the operations are keyed by name.
         """
-        result: dict[RBACElementType, dict[RBACActionName, RBACRequiredPermission]] = {}
-        for action_cls in self._rbac_action_registry:
-            perm = action_cls.required_permission()
-            actions = result.setdefault(perm.element_type, {})
-            actions[action_cls.action_name()] = perm
-        return result
+        by_entity: dict[EntityType, dict[str, GrantableOperation]] = defaultdict(dict)
+        for wiring in self._action_registry.role_grantable_wirings():
+            entity_type = wiring.entity_type
+            if entity_type is None:
+                continue
+            operation = wiring.action_cls.operation_type()
+            name = str(wiring.action_cls.action_name())
+            by_entity[entity_type][name] = GrantableOperation(
+                name=name,
+                description=build_operation_description(operation, entity_type),
+                operation=operation.to_permission_operation(),
+            )
+        return {
+            entity_type: sorted(operations.values(), key=lambda op: op.name)
+            for entity_type, operations in by_entity.items()
+        }
 
     async def get_permission_matrix(
         self, _action: GetPermissionMatrixAction
     ) -> GetPermissionMatrixActionResult:
-        """
-        Build the RBAC permission matrix: scope -> entity -> action_name -> permission.
+        """The scope-entity-operation matrix a role editor offers.
 
-        Reads ``permission_scope()`` from each registered RBAC action to produce
-        the (scope, entity, operation) mapping. Grant operations are skipped because
-        they are not yet enforceable at runtime (see ``_GRANT_OPERATIONS``).
+        A permission row names an entity type and no scope, so every scope carries the
+        same entities; the scope axis is there because a role sits in one.
         """
-        result: dict[
-            RBACElementType, dict[RBACElementType, dict[RBACActionName, RBACRequiredPermission]]
-        ] = {}
-        for action_cls in self._rbac_action_registry:
-            perm = action_cls.required_permission()
-            if perm.operation in _GRANT_OPERATIONS:
-                continue
-            scope = action_cls.permission_scope()
-            entity_map = result.setdefault(scope, {})
-            actions = entity_map.setdefault(perm.element_type, {})
-            actions[action_cls.action_name()] = perm
-        return GetPermissionMatrixActionResult(matrix=result)
+        operations = self._grantable_operations()
+        return GetPermissionMatrixActionResult(matrix=dict.fromkeys(role_scope_types(), operations))

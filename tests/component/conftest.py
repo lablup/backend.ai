@@ -47,10 +47,10 @@ from ai.backend.common.configs.etcd import EtcdConfig
 from ai.backend.common.configs.pyroscope import PyroscopeConfig
 from ai.backend.common.contexts.user import with_user
 from ai.backend.common.data.entity.auth import AuthEntityType
-from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.domain import DomainEntityType, DomainID
+from ai.backend.common.data.entity.project import ProjectEntityType
 from ai.backend.common.data.entity.resource_group import ResourceGroupID, ResourceGroupName
 from ai.backend.common.data.entity.user import UserEntityType, UserID
-from ai.backend.common.data.permission.types import ScopeType
 from ai.backend.common.data.user.types import UserData, UserRole
 from ai.backend.common.defs import (
     REDIS_BGTASK_DB,
@@ -610,7 +610,7 @@ async def domain_fixture(
         await conn.execute(
             sa.insert(VirtualEntityRow.__table__).values(
                 id=virtual_entity_id,
-                entity_type=ScopeType.DOMAIN,
+                entity_type=DomainEntityType(),
                 entity_id=row.id,
             )
         )
@@ -632,7 +632,7 @@ async def domain_fixture(
     async with db_engine.begin() as conn:
         await conn.execute(
             VirtualEntityRow.__table__.delete().where(
-                VirtualEntityRow.__table__.c.entity_type == ScopeType.DOMAIN,
+                VirtualEntityRow.__table__.c.entity_type == DomainEntityType(),
                 VirtualEntityRow.__table__.c.entity_id == row.id,
             )
         )
@@ -744,7 +744,7 @@ async def resource_policy_fixture(
         if personal:
             await conn.execute(
                 VirtualEntityRow.__table__.delete().where(
-                    VirtualEntityRow.__table__.c.entity_type == ScopeType.PROJECT,
+                    VirtualEntityRow.__table__.c.entity_type == ProjectEntityType(),
                     VirtualEntityRow.__table__.c.entity_id.in_(personal),
                 )
             )
@@ -848,7 +848,7 @@ async def group_fixture(
         await conn.execute(
             sa.insert(VirtualEntityRow.__table__).values(
                 id=virtual_entity_id,
-                entity_type=ScopeType.PROJECT,
+                entity_type=ProjectEntityType(),
                 entity_id=group_id,
             )
         )
@@ -870,7 +870,7 @@ async def group_fixture(
     async with db_engine.begin() as conn:
         await conn.execute(
             VirtualEntityRow.__table__.delete().where(
-                VirtualEntityRow.__table__.c.entity_type == ScopeType.PROJECT,
+                VirtualEntityRow.__table__.c.entity_type == ProjectEntityType(),
                 VirtualEntityRow.__table__.c.entity_id == group_id,
             )
         )
@@ -895,7 +895,7 @@ class VirtualEntitySeeder:
         await conn.execute(
             sa.insert(VirtualEntityRow.__table__).values(
                 id=virtual_entity_id,
-                entity_type=ScopeType.USER,
+                entity_type=UserEntityType(),
                 entity_id=str(user_uuid),
             )
         )
@@ -940,7 +940,7 @@ class VirtualEntitySeeder:
         await conn.execute(
             sa.insert(VirtualEntityRow.__table__).values(
                 id=virtual_entity_id,
-                entity_type=ScopeType.PROJECT,
+                entity_type=ProjectEntityType(),
                 entity_id=str(project_id),
             )
         )
@@ -971,7 +971,7 @@ class VirtualEntitySeeder:
         project_scope_id = (
             await conn.execute(
                 sa.select(VirtualEntityRow.__table__.c.id).where(
-                    VirtualEntityRow.__table__.c.entity_type == ScopeType.PROJECT,
+                    VirtualEntityRow.__table__.c.entity_type == ProjectEntityType(),
                     VirtualEntityRow.__table__.c.entity_id == group_id,
                 )
             )
@@ -979,7 +979,7 @@ class VirtualEntitySeeder:
         user_scope_id = (
             await conn.execute(
                 sa.select(VirtualEntityRow.__table__.c.id).where(
-                    VirtualEntityRow.__table__.c.entity_type == ScopeType.USER,
+                    VirtualEntityRow.__table__.c.entity_type == UserEntityType(),
                     VirtualEntityRow.__table__.c.entity_id == str(user_uuid),
                 )
             )
@@ -1085,7 +1085,7 @@ async def admin_user_fixture(
         # The entity-membership and scope-binding rows cascade from the virtual entity.
         await conn.execute(
             VirtualEntityRow.__table__.delete().where(
-                VirtualEntityRow.__table__.c.entity_type == ScopeType.USER,
+                VirtualEntityRow.__table__.c.entity_type == UserEntityType(),
                 VirtualEntityRow.__table__.c.entity_id == str(data.user_uuid),
             )
         )
@@ -1176,7 +1176,7 @@ async def regular_user_fixture(
         # The entity-membership and scope-binding rows cascade from the virtual entity.
         await conn.execute(
             VirtualEntityRow.__table__.delete().where(
-                VirtualEntityRow.__table__.c.entity_type == ScopeType.USER,
+                VirtualEntityRow.__table__.c.entity_type == UserEntityType(),
                 VirtualEntityRow.__table__.c.entity_id == str(data.user_uuid),
             )
         )

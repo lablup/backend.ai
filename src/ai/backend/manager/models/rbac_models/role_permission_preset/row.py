@@ -5,10 +5,8 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from ai.backend.common.data.entity.role_permission_preset import RolePermissionPresetID
 from ai.backend.common.data.entity.role_preset import RolePresetID
-from ai.backend.manager.data.permission.types import (
-    EntityType,
-    OperationType,
-)
+from ai.backend.common.data.entity.types import EntityType
+from ai.backend.manager.data.permission.types import OperationType
 from ai.backend.manager.data.role_preset.types import RolePermissionPresetData
 from ai.backend.manager.models.base import (
     GUID,
@@ -42,7 +40,7 @@ class RolePermissionPresetRow(CreatedAtMixin, Base):
         nullable=False,
     )
     entity_type: Mapped[EntityType] = mapped_column(
-        "entity_type", StrEnumType(EntityType, length=32), nullable=False
+        "entity_type", sa.String(length=32), nullable=False
     )
     operation: Mapped[OperationType] = mapped_column(
         "operation", StrEnumType(OperationType, length=32), nullable=False

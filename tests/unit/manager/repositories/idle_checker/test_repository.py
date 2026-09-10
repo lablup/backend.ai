@@ -9,18 +9,17 @@ import pytest
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
-from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.domain import DomainEntityType, DomainID
 from ai.backend.common.data.entity.idle_checker import IdleCheckerEntityType, IdleCheckerID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.data.entity.session import SessionEntityType
-from ai.backend.common.data.entity.user import UserID
+from ai.backend.common.data.entity.user import UserEntityType, UserID
 from ai.backend.common.data.idle_checker.types import (
     CheckerType,
     IdleCheckerSpec,
     IdleCheckPhase,
     SessionLifetimeSpec,
 )
-from ai.backend.common.data.permission.types import ScopeType
 from ai.backend.common.types import (
     ClusterMode,
     SessionId,
@@ -291,7 +290,7 @@ class TestFetchJudgmentBatch:
             await db_sess.flush()
             db_sess.add(
                 IdleCheckerBindingRow(
-                    scope_type=ScopeType.DOMAIN.value,
+                    scope_type=DomainEntityType(),
                     scope_id=scope.domain_id,
                     idle_checker_id=checker_id,
                     enabled=True,
@@ -1608,7 +1607,7 @@ class TestUserScopeAssignments:
             await db_sess.flush()
             db_sess.add(
                 IdleCheckerBindingRow(
-                    scope_type=ScopeType.USER.value,
+                    scope_type=UserEntityType(),
                     scope_id=bound_user_id,
                     idle_checker_id=user_only_checker_id,
                     enabled=True,
@@ -1616,7 +1615,7 @@ class TestUserScopeAssignments:
             )
             db_sess.add(
                 IdleCheckerBindingRow(
-                    scope_type=ScopeType.DOMAIN.value,
+                    scope_type=DomainEntityType(),
                     scope_id=scope.domain_id,
                     idle_checker_id=domain_checker_id,
                     enabled=True,
@@ -1625,7 +1624,7 @@ class TestUserScopeAssignments:
             # A disabled narrower binding must not subtract the domain-inherited checker.
             db_sess.add(
                 IdleCheckerBindingRow(
-                    scope_type=ScopeType.USER.value,
+                    scope_type=UserEntityType(),
                     scope_id=bound_user_id,
                     idle_checker_id=domain_checker_id,
                     enabled=False,
@@ -1633,7 +1632,7 @@ class TestUserScopeAssignments:
             )
             db_sess.add(
                 IdleCheckerBindingRow(
-                    scope_type=ScopeType.USER.value,
+                    scope_type=UserEntityType(),
                     scope_id=bound_user_id,
                     idle_checker_id=interactive_only_checker_id,
                     enabled=True,

@@ -14,12 +14,13 @@ import pytest
 import sqlalchemy as sa
 from sqlalchemy import Table
 
-from ai.backend.common.data.entity.domain import DomainID, DomainName
+from ai.backend.common.data.entity.domain import DomainEntityType, DomainID, DomainName
+from ai.backend.common.data.entity.project import ProjectEntityType
+from ai.backend.common.data.entity.role import RoleEntityType
+from ai.backend.common.data.entity.types import EntityType
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 from ai.backend.manager.data.permission.status import RoleStatus
-from ai.backend.manager.data.permission.types import EntityType as LegacyEntityType
 from ai.backend.manager.data.permission.types import RoleSource
-from ai.backend.manager.data.permission.types import ScopeType as LegacyScopeType
 from ai.backend.manager.models.alembic.versions.b8c828d3636e_link_roles_to_their_preset import (
     backfill,
 )
@@ -117,12 +118,15 @@ async def _add_preset(
     name: str,
     *,
     template: str | None = None,
-    scope_type: LegacyScopeType = LegacyScopeType.PROJECT,
+    scope_type: EntityType | None = None,
     deleted: bool = False,
 ) -> uuid.UUID:
     async with db.begin_session() as session:
         preset = RolePresetRow(
-            name=name, role_name_template=template, scope_type=scope_type, deleted=deleted
+            name=name,
+            role_name_template=template,
+            scope_type=scope_type or ProjectEntityType(),
+            deleted=deleted,
         )
         session.add(preset)
         await session.flush()
@@ -184,9 +188,9 @@ async def _add_role(
         else:
             await session.execute(
                 sa.insert(_association_scopes_entities).values(
-                    scope_type=LegacyScopeType.PROJECT.value,
+                    scope_type=ProjectEntityType(),
                     scope_id=str(project_id),
-                    entity_type=LegacyEntityType.ROLE.value,
+                    entity_type=RoleEntityType(),
                     entity_id=str(role_id),
                 )
             )
@@ -270,7 +274,7 @@ class TestRolePresetLinkBackfill:
         self, db: ExtendedAsyncSAEngine, domain: DomainFixture
     ) -> None:
         await _add_preset(db, "member", deleted=True)
-        await _add_preset(db, "viewer", scope_type=LegacyScopeType.DOMAIN)
+        await _add_preset(db, "viewer", scope_type=DomainEntityType())
         project_id = await _add_project(db, domain, "alpha")
         deleted = await _add_role(db, "member", project_id)
         other_type = await _add_role(db, "viewer", project_id)

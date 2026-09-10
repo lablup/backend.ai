@@ -11,12 +11,6 @@ from pydantic import Field
 
 from ai.backend.common.api_handlers import SENTINEL, BaseRequestModel, Sentinel
 from ai.backend.common.data.entity.types import EntityType
-from ai.backend.common.data.permission.types import (
-    EntityType as LegacyEntityType,
-)
-from ai.backend.common.data.permission.types import (
-    ScopeType as LegacyScopeType,
-)
 from ai.backend.common.dto.manager.defs import DEFAULT_PAGE_LIMIT, MAX_PAGE_LIMIT
 from ai.backend.common.dto.manager.query import StringFilter
 
@@ -157,9 +151,9 @@ class CreatePermissionRequest(BaseRequestModel):
     """Request to create a permission."""
 
     role_id: UUID = Field(description="Role ID for the permission")
-    scope_type: LegacyScopeType = Field(description="Scope type for the permission")
+    scope_type: EntityType = Field(description="Scope type for the permission")
     scope_id: str = Field(description="Scope ID for the permission")
-    entity_type: LegacyEntityType = Field(description="Entity type for the permission")
+    entity_type: EntityType = Field(description="Entity type for the permission")
     operation: OperationType = Field(description="Operation type for the permission")
 
 
@@ -167,7 +161,7 @@ class CreateObjectPermissionRequest(BaseRequestModel):
     """Request to create an object permission for a role."""
 
     role_id: UUID = Field(description="Role ID to add the object permission to")
-    entity_type: LegacyEntityType = Field(description="Entity type for the object permission")
+    entity_type: EntityType = Field(description="Entity type for the object permission")
     entity_id: str = Field(description="Entity ID (e.g., project_id, user_id)")
     operation: OperationType = Field(description="Operation type for the object permission")
     status: PermissionStatus = Field(
