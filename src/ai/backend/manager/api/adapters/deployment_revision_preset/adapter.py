@@ -532,13 +532,15 @@ class DeploymentRevisionPresetAdapter(BaseAdapter):
         value: UpdatePresetModelDefinitionInput | None | Unset,
         current: PresetModelDefinitionInfoDTO | None,
     ) -> TriState[PresetModelDefinition]:
-        def _merge(patch: UpdatePresetModelDefinitionInput) -> PresetModelDefinition:
-            base_draft = PresetModelDefinitionDraft()
-            if current is not None:
-                base_draft = PresetModelDefinitionDraft.model_validate(current.model_dump())
-            return base_draft.merge(patch.to_draft()).to_resolved()
-
-        return TriState.from_unset(value).map(_merge)
+        if isinstance(value, Unset):
+            return TriState.nop()
+        if value is None:
+            return TriState.nullify()
+        base_draft = PresetModelDefinitionDraft()
+        if current is not None:
+            base_draft = PresetModelDefinitionDraft.model_validate(current.model_dump())
+        merged = base_draft.merge(value.to_draft()).to_resolved()
+        return TriState.update(merged)
 
     def _convert_strategy_spec(
         self,
