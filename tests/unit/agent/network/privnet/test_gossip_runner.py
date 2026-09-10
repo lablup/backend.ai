@@ -164,6 +164,63 @@ class TestWhatARunnerAppliesOnReceipt:
         assert len(receiver.programmed) == 1
 
 
+class TestAnEndpointThatWouldNotProgram:
+    """The exchange has no acknowledgement: an announcement is whole state, so the only correction
+    is the next one. A failure recorded as applied therefore never gets one -- the sender keeps
+    announcing the same thing, it keeps diffing to nothing, and that kernel stays unreachable for
+    the life of the session."""
+
+    async def test_the_next_announcement_offers_it_again(self) -> None:
+        sender = FakeHost(sessions={"s1": [_endpoint(1)]}, peers={"s1": ["10.0.0.1"]})
+        receiver = FakeHost(sessions={"s1": []}, peers={})
+        gossip = EndpointGossip(receiver, vtep="10.0.0.1")
+        datagram = _one_datagram(sender, "s1", vtep="10.0.0.2")
+        await gossip.on_datagram(datagram, ("10.0.0.2", 7947))
+        assert receiver.added() == {_endpoint(1).container_id}
+
+        gossip.retry_later("s1", [(_endpoint(1), "10.0.0.2")])
+        receiver.programmed.clear()
+        await gossip.on_datagram(datagram, ("10.0.0.2", 7947))
+
+        assert receiver.added() == {_endpoint(1).container_id}
+
+    async def test_the_peers_other_endpoints_stay_applied(self) -> None:
+        """Re-offering the whole peer would re-run every `ip` call this node already made."""
+        sender = FakeHost(sessions={"s1": [_endpoint(1), _endpoint(2)]}, peers={"s1": ["10.0.0.1"]})
+        receiver = FakeHost(sessions={"s1": []}, peers={})
+        gossip = EndpointGossip(receiver, vtep="10.0.0.1")
+        datagram = _one_datagram(sender, "s1", vtep="10.0.0.2")
+        await gossip.on_datagram(datagram, ("10.0.0.2", 7947))
+
+        gossip.retry_later("s1", [(_endpoint(1), "10.0.0.2")])
+        receiver.programmed.clear()
+        await gossip.on_datagram(datagram, ("10.0.0.2", 7947))
+
+        assert receiver.added() == {_endpoint(1).container_id}
+
+
+class TestTheNamesAPeerAnnounced:
+    async def test_they_are_readable_for_the_resolver(self) -> None:
+        named = Endpoint(
+            container_id="b" * 64, ip="10.128.2.7", mac="02:42:0a:80:02:07", cluster_hostname="Sub7"
+        )
+        sender = FakeHost(sessions={"s1": [named]}, peers={"s1": ["10.0.0.1"]})
+        receiver = FakeHost(sessions={"s1": []}, peers={})
+        gossip = EndpointGossip(receiver, vtep="10.0.0.1")
+        await gossip.on_datagram(_one_datagram(sender, "s1", vtep="10.0.0.2"), ("10.0.0.2", 7947))
+
+        # Lower-cased: what reads this is answering DNS, which is case-insensitive.
+        assert gossip.cluster_names("s1") == {"sub7": "10.128.2.7"}
+
+    async def test_an_unnamed_endpoint_contributes_nothing(self) -> None:
+        sender = FakeHost(sessions={"s1": [_endpoint(1)]}, peers={"s1": ["10.0.0.1"]})
+        receiver = FakeHost(sessions={"s1": []}, peers={})
+        gossip = EndpointGossip(receiver, vtep="10.0.0.1")
+        await gossip.on_datagram(_one_datagram(sender, "s1", vtep="10.0.0.2"), ("10.0.0.2", 7947))
+
+        assert gossip.cluster_names("s1") == {}
+
+
 class TestMembershipIsTheAuthorityOnLeaving:
     async def test_a_departed_peer_is_unprogrammed(self) -> None:
         sender = FakeHost(sessions={"s1": [_endpoint(1)]}, peers={"s1": ["10.0.0.1"]})

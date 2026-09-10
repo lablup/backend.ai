@@ -8,7 +8,7 @@ interpret it. The Docker provisioner is the one that does today. See BEP-1078 (a
 """
 
 from abc import ABCMeta, abstractmethod
-from collections.abc import Collection, Iterable, Sequence
+from collections.abc import Collection, Iterable, Mapping, Sequence
 from typing import Any
 
 from ai.backend.agent.kernel import AbstractKernel
@@ -143,6 +143,19 @@ class AbstractNetworkAgentPluginV2[TKernel: AbstractKernel](AbstractPlugin, meta
     async def del_endpoint(self, session_id: str, *, ip: str, mac: str, vtep_ip: str) -> None:
         """Remove a departed endpoint's forwarding + ARP state. Idempotent; default no-op."""
         pass
+
+    async def cluster_names(self, session_id: str) -> Mapping[str, str] | None:
+        """``{cluster_hostname: ip}`` for the whole session, or None where this backend has no
+        view of one.
+
+        A backend that answers is one whose nodes exchange endpoints among themselves, and it is
+        then also the thing programming them -- so the coordinator neither reads the central
+        endpoint table nor programs from it, and takes the session's names from here instead.
+
+        None means the opposite: nothing on this node learns endpoints from its peers, so the
+        coordinator falls back to the manager's ``endpoints/`` table for both.
+        """
+        return None
 
     async def setup_dns_redirect(self, session_id: str, loopback_port: int) -> None:
         """Redirect the session gateway's ``:53`` to the agent's cluster resolver, which bound
