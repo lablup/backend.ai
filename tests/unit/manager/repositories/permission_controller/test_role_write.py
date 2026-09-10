@@ -19,9 +19,6 @@ from ai.backend.manager.errors.permission import VirtualEntityNotFound
 from ai.backend.manager.errors.role_preset import SystemRoleNotEditable
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.entity_label.row import EntityLabelRow
-from ai.backend.manager.models.rbac_models.association_scopes_entities import (
-    AssociationScopesEntitiesRow,
-)
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.rbac_models.role.creators import RoleCreator
@@ -48,7 +45,6 @@ if TYPE_CHECKING:
 
 TABLES: Sequence[TableOrORM] = [
     RoleRow,
-    AssociationScopesEntitiesRow,
     PermissionRow,
     VirtualEntityRow,
     EntityMembershipRow,

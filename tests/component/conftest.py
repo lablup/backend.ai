@@ -50,7 +50,7 @@ from ai.backend.common.data.entity.auth import AuthEntityType
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID, ResourceGroupName
 from ai.backend.common.data.entity.user import UserEntityType, UserID
-from ai.backend.common.data.permission.types import EntityType, ScopeType
+from ai.backend.common.data.permission.types import ScopeType
 from ai.backend.common.data.user.types import UserData, UserRole
 from ai.backend.common.defs import (
     REDIS_BGTASK_DB,
@@ -125,9 +125,6 @@ from ai.backend.manager.models.project import (
     ProjectRow,
     ProjectType,
     association_groups_users,
-)
-from ai.backend.manager.models.rbac_models.association_scopes_entities import (
-    AssociationScopesEntitiesRow,
 )
 from ai.backend.manager.models.resource_group import resource_groups, sgroups_for_domains
 from ai.backend.manager.models.resource_group.row import ResourceGroupOpts
@@ -751,12 +748,6 @@ async def resource_policy_fixture(
                     VirtualEntityRow.__table__.c.entity_id.in_(personal),
                 )
             )
-            await conn.execute(
-                AssociationScopesEntitiesRow.__table__.delete().where(
-                    AssociationScopesEntitiesRow.scope_type == ScopeType.PROJECT,
-                    AssociationScopesEntitiesRow.scope_id.in_([str(pid) for pid in personal]),
-                )
-            )
             await conn.execute(ProjectRow.__table__.delete().where(ProjectRow.id.in_(personal)))
         await conn.execute(
             keypair_resource_policies.delete().where(
@@ -1072,14 +1063,6 @@ async def admin_user_fixture(
                 user_id=str(data.user_uuid),
             )
         )
-        await conn.execute(
-            sa.insert(AssociationScopesEntitiesRow.__table__).values(
-                scope_type=ScopeType.PROJECT,
-                scope_id=str(group_fixture),
-                entity_type=EntityType.USER,
-                entity_id=str(data.user_uuid),
-            )
-        )
         await virtual_entity_seeder.enroll_user_in_project(conn, group_fixture, data.user_uuid)
     yield data
     async with db_engine.begin() as conn:
@@ -1094,11 +1077,6 @@ async def admin_user_fixture(
         await conn.execute(
             association_groups_users.delete().where(
                 association_groups_users.c.user_id == str(data.user_uuid)
-            )
-        )
-        await conn.execute(
-            AssociationScopesEntitiesRow.__table__.delete().where(
-                AssociationScopesEntitiesRow.__table__.c.entity_id == str(data.user_uuid)
             )
         )
         await conn.execute(
@@ -1179,14 +1157,6 @@ async def regular_user_fixture(
                 user_id=str(data.user_uuid),
             )
         )
-        await conn.execute(
-            sa.insert(AssociationScopesEntitiesRow.__table__).values(
-                scope_type=ScopeType.PROJECT,
-                scope_id=str(group_fixture),
-                entity_type=EntityType.USER,
-                entity_id=str(data.user_uuid),
-            )
-        )
         await virtual_entity_seeder.enroll_user_in_project(conn, group_fixture, data.user_uuid)
     yield data
     async with db_engine.begin() as conn:
@@ -1198,11 +1168,6 @@ async def regular_user_fixture(
         await conn.execute(
             association_groups_users.delete().where(
                 association_groups_users.c.user_id == str(data.user_uuid)
-            )
-        )
-        await conn.execute(
-            AssociationScopesEntitiesRow.__table__.delete().where(
-                AssociationScopesEntitiesRow.__table__.c.entity_id == str(data.user_uuid)
             )
         )
         await conn.execute(

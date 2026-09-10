@@ -13,6 +13,7 @@ from strawberry import Info
 from strawberry.relay import Connection, Edge, NodeID
 
 from ai.backend.common.data.entity.audit_log import AuditLogID
+from ai.backend.common.data.entity.types import EntityType, RuntimeEntityID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.dto.manager.v2.audit_log.response import AuditLogNode
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
@@ -28,6 +29,7 @@ from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 
 if TYPE_CHECKING:
+    from ai.backend.manager.api.gql.rbac.types.entity_node import EntityNodeGQL
     from ai.backend.manager.api.gql.user.types.node import UserV2GQL
 
 
@@ -92,6 +94,36 @@ class AuditLogV2GQL(PydanticNodeMixin[AuditLogNode]):
             ),
         )
     )
+
+    @gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description=(
+                "The entity the logged operation acted on. Null when the log names no entity, "
+                "or when the recorded id does not name one that still exists."
+            ),
+        )
+    )  # type: ignore[misc]
+    async def entity(
+        self,
+        info: Info[StrawberryGQLContext],
+    ) -> (
+        Annotated[
+            EntityNodeGQL,
+            strawberry.lazy("ai.backend.manager.api.gql.rbac.types.entity_node"),
+        ]
+        | None
+    ):
+        if self.entity_type is None or self.entity_id is None:
+            return None
+        try:
+            entity_uuid = UUID(self.entity_id)
+        except ValueError:
+            # Older rows recorded a name rather than a uuid; those name no node.
+            return None
+        return await info.context.data_loaders.entity_node_loader.load(
+            RuntimeEntityID(EntityType(self.entity_type), entity_uuid)
+        )
 
     @gql_field(
         description="The user who triggered this audit log entry, resolved from triggered_by UUID."

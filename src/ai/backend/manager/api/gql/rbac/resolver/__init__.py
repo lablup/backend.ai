@@ -1,6 +1,5 @@
 """RBAC GQL resolvers package."""
 
-from .entity import admin_entities
 from .permission import (
     admin_bulk_add_role_permissions,
     admin_bulk_remove_role_permissions,
@@ -36,7 +35,6 @@ __all__ = [
     "rbac_permission_matrix",
     "rbac_scope_entity_combinations",
     # Entity queries
-    "admin_entities",
     # Permission mutations
     "admin_create_permission",
     "admin_update_permission",

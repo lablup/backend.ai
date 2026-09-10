@@ -36,7 +36,6 @@ from ai.backend.common.data.entity.user import UserEntityType
 from ai.backend.common.data.permission.types import (
     EntityType,
     Permission,
-    RelationType,
     RoleStatus,
     ScopeType,
 )
@@ -62,9 +61,6 @@ from ai.backend.manager.models.agent.row import AgentRow
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.image.row import ImageRow
 from ai.backend.manager.models.kernel import kernels
-from ai.backend.manager.models.rbac_models.association_scopes_entities import (
-    AssociationScopesEntitiesRow,
-)
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
@@ -278,15 +274,6 @@ async def user_system_role(
             )
         )
         # Scope the role to the user
-        await conn.execute(
-            sa.insert(AssociationScopesEntitiesRow.__table__).values(
-                scope_type=ScopeType.USER,
-                scope_id=str(user_uuid),
-                entity_type=EntityType.ROLE,
-                entity_id=str(role_id),
-                relation_type=RelationType.AUTO,
-            )
-        )
         # Grant owner permissions for all owner-accessible entity types in user scope
         for entity_type in EntityType.owner_accessible_entity_types_in_user():
             for bit in Permission:
@@ -318,12 +305,6 @@ async def user_system_role(
             PermissionRow.__table__.delete().where(PermissionRow.__table__.c.role_id == role_id)
         )
         await conn.execute(
-            AssociationScopesEntitiesRow.__table__.delete().where(
-                (AssociationScopesEntitiesRow.__table__.c.entity_type == EntityType.ROLE)
-                & (AssociationScopesEntitiesRow.__table__.c.entity_id == str(role_id))
-            )
-        )
-        await conn.execute(
             UserRoleRow.__table__.delete().where(UserRoleRow.__table__.c.role_id == role_id)
         )
         await conn.execute(RoleRow.__table__.delete().where(RoleRow.__table__.c.id == role_id))
@@ -349,7 +330,7 @@ async def _seed_session(
     """Insert a session + kernel row with RBAC scope association.
 
     Replicates what the scheduler does at session creation:
-    SessionRow + kernel + AssociationScopesEntitiesRow (session → user scope, session → project scope).
+    SessionRow + kernel, with the session placed under the user and project scopes.
     """
     unique = secrets.token_hex(4)
     session_id = SessionID(uuid.uuid4())
@@ -412,25 +393,7 @@ async def _seed_session(
             )
         )
         # RBAC scope association: session → user scope (AUTO)
-        await conn.execute(
-            sa.insert(AssociationScopesEntitiesRow.__table__).values(
-                scope_type=ScopeType.USER,
-                scope_id=str(user_uuid),
-                entity_type=EntityType.SESSION,
-                entity_id=str(session_id),
-                relation_type=RelationType.AUTO,
-            )
-        )
         # RBAC scope association: session → project scope (AUTO)
-        await conn.execute(
-            sa.insert(AssociationScopesEntitiesRow.__table__).values(
-                scope_type=ScopeType.PROJECT,
-                scope_id=str(group_id),
-                entity_type=EntityType.SESSION,
-                entity_id=str(session_id),
-                relation_type=RelationType.AUTO,
-            )
-        )
 
     return SessionSeedData(
         session_id=session_id,
@@ -445,12 +408,6 @@ async def _seed_session(
 async def _cleanup_session(db_engine: SAEngine, session_id: SessionID) -> None:
     """Remove session, kernel, and RBAC association rows."""
     async with db_engine.begin() as conn:
-        await conn.execute(
-            AssociationScopesEntitiesRow.__table__.delete().where(
-                (AssociationScopesEntitiesRow.__table__.c.entity_type == EntityType.SESSION)
-                & (AssociationScopesEntitiesRow.__table__.c.entity_id == str(session_id))
-            )
-        )
         await conn.execute(kernels.delete().where(kernels.c.session_id == session_id))
         await conn.execute(
             SessionRow.__table__.delete().where(SessionRow.__table__.c.id == session_id)

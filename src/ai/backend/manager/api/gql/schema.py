@@ -345,7 +345,6 @@ from .rbac import (
     admin_create_role,
     admin_delete_permission,
     admin_delete_role,
-    admin_entities,
     admin_permissions,
     admin_purge_role,
     admin_replace_role_permissions,
@@ -669,7 +668,6 @@ class Query:
     admin_roles = admin_roles
     admin_permissions = admin_permissions
     admin_role_assignments = admin_role_assignments
-    admin_entities = admin_entities
     # Keypair self-service queries
     my_keypairs = my_keypairs
     # Keypair admin queries

@@ -23,12 +23,10 @@ from ai.backend.manager.data.permission.types import ScopeType as LegacyScopeTyp
 from ai.backend.manager.models.alembic.versions.b8c828d3636e_link_roles_to_their_preset import (
     backfill,
 )
+from ai.backend.manager.models.base import GUID
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.project import ProjectRow, ProjectType
-from ai.backend.manager.models.rbac_models.association_scopes_entities import (
-    AssociationScopesEntitiesRow,
-)
 from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.rbac_models.role_preset.row import RolePresetRow
 from ai.backend.manager.models.resource_policy import (
@@ -42,6 +40,19 @@ from ai.backend.manager.models.virtual_entity.entity_membership import EntityMem
 from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
 from ai.backend.testutils.db import HasTable, with_tables
 
+# The migration reads the association rows the roles were bound through; the table is
+# gone from the models since, so its pre-migration shape is declared here.
+_metadata = sa.MetaData()
+_association_scopes_entities = sa.Table(
+    "association_scopes_entities",
+    _metadata,
+    sa.Column("id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v7()")),
+    sa.Column("scope_type", sa.String(32), nullable=False),
+    sa.Column("scope_id", sa.String(64), nullable=False),
+    sa.Column("entity_type", sa.String(32), nullable=False),
+    sa.Column("entity_id", sa.String(64), nullable=False),
+)
+
 _TABLES: list[Table | type[HasTable]] = [
     DomainRow,
     UserResourcePolicyRow,
@@ -52,9 +63,9 @@ _TABLES: list[Table | type[HasTable]] = [
     ProjectRow,
     RolePresetRow,
     RoleRow,
-    AssociationScopesEntitiesRow,
     VirtualEntityRow,
     EntityMembershipRow,
+    _association_scopes_entities,
 ]
 
 
@@ -171,11 +182,11 @@ async def _add_role(
                 )
             )
         else:
-            session.add(
-                AssociationScopesEntitiesRow(
-                    scope_type=LegacyScopeType.PROJECT,
+            await session.execute(
+                sa.insert(_association_scopes_entities).values(
+                    scope_type=LegacyScopeType.PROJECT.value,
                     scope_id=str(project_id),
-                    entity_type=LegacyEntityType.ROLE,
+                    entity_type=LegacyEntityType.ROLE.value,
                     entity_id=str(role_id),
                 )
             )

@@ -10,7 +10,6 @@ from ai.backend.common.data.permission.types import (
     OperationType,
     Permission,
     RBACElementType,
-    RelationType,
     RoleSource,
     ScopeType,
 )
@@ -27,7 +26,6 @@ __all__ = (
     "Permission",
     "RBACElementType",
     "RBACElementRef",
-    "RelationType",
     "RoleSource",
     "ScopeData",
     "ScopeListResult",

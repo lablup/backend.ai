@@ -1,7 +1,7 @@
 import logging
 from collections.abc import Sequence
 
-from ai.backend.common.data.permission.types import OperationType, RBACElementType, ScopeType
+from ai.backend.common.data.permission.types import OperationType, RBACElementType
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.actions.action.rbac import (
     BaseRBACAction,
@@ -36,14 +36,6 @@ from ai.backend.manager.services.permission_contoller.actions.permission import 
 from ai.backend.manager.services.permission_contoller.actions.replace_role_permissions import (
     ReplaceRolePermissionsAction,
     ReplaceRolePermissionsActionResult,
-)
-from ai.backend.manager.services.permission_contoller.actions.search_element_associations import (
-    SearchElementAssociationsAction,
-    SearchElementAssociationsActionResult,
-)
-from ai.backend.manager.services.permission_contoller.actions.search_entities import (
-    SearchEntitiesAction,
-    SearchEntitiesActionResult,
 )
 from ai.backend.manager.services.permission_contoller.actions.search_permissions import (
     SearchPermissionsAction,
@@ -139,11 +131,7 @@ class PermissionControllerService:
     ) -> SearchRolesInScopeActionResult:
         """Search roles registered in a given scope."""
         result = await self._repository.search_roles_in_scope(action.querier, action.scope)
-        return SearchRolesInScopeActionResult(
-            result=result,
-            _scope_type=ScopeType(action.scope.scope.entity_type()),
-            _scope_id=str(action.scope.scope),
-        )
+        return SearchRolesInScopeActionResult(result=result)
 
     async def search_permissions(
         self, action: SearchPermissionsAction
@@ -183,18 +171,6 @@ class PermissionControllerService:
     async def get_entity_types(self, _action: GetEntityTypesAction) -> GetEntityTypesActionResult:
         """Get all available entity types."""
         return GetEntityTypesActionResult(element_types=list(RBACElementType))
-
-    async def search_entities(self, action: SearchEntitiesAction) -> SearchEntitiesActionResult:
-        """Search entities within a scope."""
-        result = await self._repository.search_entities(action.querier)
-        return SearchEntitiesActionResult(result=result)
-
-    async def search_element_associations(
-        self, action: SearchElementAssociationsAction
-    ) -> SearchElementAssociationsActionResult:
-        """Search element associations (full association rows) within a scope."""
-        result = await self._repository.search_element_associations(action.querier)
-        return SearchElementAssociationsActionResult(result=result)
 
     def get_entity_valid_operations(
         self,

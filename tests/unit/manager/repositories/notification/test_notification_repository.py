@@ -35,9 +35,6 @@ from ai.backend.manager.models.notification import (
 )
 from ai.backend.manager.models.project import ProjectRow
 from ai.backend.manager.models.rbac_models import RoleRow, UserRoleRow
-from ai.backend.manager.models.rbac_models.association_scopes_entities import (
-    AssociationScopesEntitiesRow,
-)
 from ai.backend.manager.models.replica_group import ReplicaGroupRow
 from ai.backend.manager.models.resource_group import ResourceGroupRow
 from ai.backend.manager.models.resource_policy import (
@@ -102,7 +99,6 @@ class TestNotificationRepository:
                 RoutingRow,
                 ResourcePresetRow,
                 # RBAC association
-                AssociationScopesEntitiesRow,
                 # Test-specific rows
                 NotificationChannelRow,
                 NotificationRuleRow,

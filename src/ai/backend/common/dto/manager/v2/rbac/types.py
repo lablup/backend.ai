@@ -17,7 +17,6 @@ from ai.backend.common.data.permission.types import (
 from ai.backend.common.dto.manager.v2.common import OrderDirection
 
 __all__ = (
-    "EntityOrderField",
     "EntityType",
     "EntityTypeScope",
     "OperationType",
@@ -97,13 +96,6 @@ class RoleAssignmentOrderField(StrEnum):
     USERNAME = "username"
     EMAIL = "email"
     GRANTED_AT = "granted_at"
-
-
-class EntityOrderField(StrEnum):
-    """Fields available for ordering entity associations."""
-
-    ENTITY_TYPE = "entity_type"
-    REGISTERED_AT = "registered_at"
 
 
 class PermissionOrderField(StrEnum):

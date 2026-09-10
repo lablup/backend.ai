@@ -5,7 +5,6 @@ from typing import Any
 
 import pytest
 
-from ai.backend.common.data.entity.domain import DomainEntityType
 from ai.backend.common.data.entity.permission import PermissionID
 from ai.backend.common.data.entity.role import RoleID
 from ai.backend.common.data.entity.types import EntityType
@@ -14,27 +13,12 @@ from ai.backend.common.data.permission.types import (
     Permission,
     RBACElementType,
 )
-from ai.backend.common.data.permission.types import (
-    ScopeType as LegacyScopeType,
-)
-from ai.backend.manager.data.permission.id import ObjectId, ScopeId
 from ai.backend.manager.data.permission.permission import PermissionData
-from ai.backend.manager.data.permission.role import (
-    BatchEntityPermissionCheckInput,
-    ScopePermissionCheckInput,
-    SingleEntityPermissionCheckInput,
-    UserRoleAssignmentInput,
-    UserRoleRevocationInput,
-)
 from ai.backend.manager.data.permission.types import EntityType as LegacyEntityType
 from ai.backend.manager.errors.common import ObjectNotFound
 from ai.backend.manager.errors.permission import PermissionAlreadyGranted
 from ai.backend.manager.models.rbac_models.permission.creators import RolePermissionCreator
 from ai.backend.manager.models.rbac_models.permission.purgers import RolePermissionPurger
-from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.permission_controller.repository import (
-    PermissionControllerRepository,
-)
 from ai.backend.manager.services.permission_contoller.actions.permission import (
     CreatePermissionAction,
     DeletePermissionAction,
@@ -42,18 +26,7 @@ from ai.backend.manager.services.permission_contoller.actions.permission import 
 from ai.backend.manager.services.permission_contoller.processors import (
     PermissionControllerProcessors,
 )
-from ai.backend.manager.services.rbac.actions.role.assign import AssignRoleAction
-from ai.backend.manager.services.rbac.actions.role.revoke import RevokeRoleAction
-from ai.backend.manager.services.rbac.processors import RbacProcessors
 from ai.backend.testutils.fixtures import DomainFixtureData
-
-from .conftest import RoleFactory
-
-
-@pytest.fixture()
-def permission_repo(database_engine: ExtendedAsyncSAEngine) -> PermissionControllerRepository:
-    """Direct repository fixture for check-permission operations."""
-    return PermissionControllerRepository(database_engine)
 
 
 class TestPermissionCreate:
@@ -212,114 +185,3 @@ class TestPermissionDelete:
             await permission_controller_processors.delete_permission.wait_for_complete(
                 DeletePermissionAction(purger=RolePermissionPurger(PermissionID(uuid.uuid4())))
             )
-
-
-class TestCheckPermissionOfEntity:
-    """Check permission of a specific entity (object-level check)."""
-
-    async def test_user_with_no_roles_returns_false(
-        self,
-        permission_repo: PermissionControllerRepository,
-    ) -> None:
-        """S-ENTITY-3: User with no roles → False."""
-        has_perm = await permission_repo.check_permission_of_entity(
-            SingleEntityPermissionCheckInput(
-                user_id=uuid.uuid4(),  # random user with no roles
-                target_object_id=ObjectId(
-                    entity_type=LegacyEntityType.SESSION, entity_id=str(uuid.uuid4())
-                ),
-                operation=OperationType.READ,
-            )
-        )
-        assert has_perm is False
-
-
-class TestCheckPermissionInScope:
-    """Check permission within a specific scope (scope-level check)."""
-
-    async def test_user_with_permission_in_scope_returns_true(
-        self,
-        permission_controller_processors: PermissionControllerProcessors,
-        rbac_processors: RbacProcessors,
-        permission_repo: PermissionControllerRepository,
-        role_factory: RoleFactory,
-        admin_user_fixture: Any,
-        domain_fixture: DomainFixtureData,
-    ) -> None:
-        """S-SCOPE-1: User has permission in target scope → True."""
-        role = await role_factory(scope_type=DomainEntityType(), scope_id=domain_fixture.domain_id)
-        role_id = role.role.id
-        user_id: uuid.UUID = admin_user_fixture.user_uuid
-
-        perm_result = await permission_controller_processors.create_permission.wait_for_complete(
-            CreatePermissionAction(
-                role_id=RoleID(role_id),
-                creator=RolePermissionCreator(
-                    entity_type=EntityType(RBACElementType.SESSION),
-                    permission=Permission.READ,
-                ),
-            )
-        )
-
-        await rbac_processors.assign_role.wait_for_complete(
-            AssignRoleAction(input=UserRoleAssignmentInput(user_id=user_id, role_id=role_id))
-        )
-
-        try:
-            has_perm = await permission_repo.check_permission_in_scope(
-                ScopePermissionCheckInput(
-                    user_id=user_id,
-                    target_entity_type=LegacyEntityType.SESSION,
-                    target_scope_id=ScopeId(
-                        scope_type=LegacyScopeType.DOMAIN,
-                        scope_id=str(domain_fixture.domain_id),
-                    ),
-                    permission=Permission.READ,
-                )
-            )
-            assert has_perm is True
-        finally:
-            await rbac_processors.revoke_role.wait_for_complete(
-                RevokeRoleAction(input=UserRoleRevocationInput(user_id=user_id, role_id=role_id))
-            )
-            await permission_controller_processors.delete_permission.wait_for_complete(
-                DeletePermissionAction(
-                    purger=RolePermissionPurger(PermissionID(perm_result.data.id))
-                )
-            )
-
-    async def test_user_without_permission_in_scope_returns_false(
-        self,
-        permission_repo: PermissionControllerRepository,
-        domain_fixture: DomainFixtureData,
-    ) -> None:
-        """S-SCOPE-2: User lacks permission in target scope → False."""
-        has_perm = await permission_repo.check_permission_in_scope(
-            ScopePermissionCheckInput(
-                user_id=uuid.uuid4(),  # random user with no roles
-                target_entity_type=LegacyEntityType.SESSION,
-                target_scope_id=ScopeId(
-                    scope_type=LegacyScopeType.DOMAIN, scope_id=domain_fixture.domain_name
-                ),
-                permission=Permission.READ,
-            )
-        )
-        assert has_perm is False
-
-
-class TestCheckPermissionBatch:
-    """Batch permission check across multiple entities."""
-
-    async def test_batch_check_with_empty_list_returns_empty_mapping(
-        self,
-        permission_repo: PermissionControllerRepository,
-    ) -> None:
-        """S-BATCH-4: Empty entity list → empty mapping."""
-        result = await permission_repo.check_permission_of_entities(
-            BatchEntityPermissionCheckInput(
-                user_id=uuid.uuid4(),
-                target_object_ids=[],
-                operation=OperationType.READ,
-            )
-        )
-        assert result == {}

@@ -21,7 +21,6 @@ from ai.backend.common.data.entity.types import (
     RuntimeEntityID,
 )
 from ai.backend.common.data.entity.user import UserID
-from ai.backend.common.data.filter_specs import StringMatchSpec
 from ai.backend.common.data.permission.types import OperationType as InternalOperationType
 from ai.backend.common.data.permission.types import Permission, RBACElementType
 from ai.backend.common.dto.manager.rbac import (
@@ -37,7 +36,6 @@ from ai.backend.common.dto.manager.rbac import (
 )
 from ai.backend.common.dto.manager.rbac.response import PaginationInfo
 from ai.backend.common.dto.manager.v2.rbac import (
-    AssociationScopesEntitiesNode,
     BulkAddRolePermissionFailureInfo,
     BulkAddRolePermissionsPayload,
     BulkAssignRoleResultPayload,
@@ -49,7 +47,6 @@ from ai.backend.common.dto.manager.v2.rbac import (
     CreateRolePayload,
     DeleteRolePayload,
     EntityActionInfo,
-    EntityNode,
     OperationInfo,
     PermissionNode,
     PurgeRolePayload,
@@ -64,7 +61,6 @@ from ai.backend.common.dto.manager.v2.rbac import (
     DeletePermissionPayload as DeletePermissionPayloadDTO,
 )
 from ai.backend.common.dto.manager.v2.rbac.request import (
-    AdminSearchEntitiesGQLInput,
     AdminSearchPermissionsGQLInput,
     SearchRoleAssignmentsInput,
     SearchRolesInput,
@@ -86,12 +82,6 @@ from ai.backend.common.dto.manager.v2.rbac.request import (
 )
 from ai.backend.common.dto.manager.v2.rbac.request import (
     CreatePermissionInput as CreatePermissionInputDTO,
-)
-from ai.backend.common.dto.manager.v2.rbac.request import (
-    EntityFilter as EntityFilterDTO,
-)
-from ai.backend.common.dto.manager.v2.rbac.request import (
-    EntityOrderBy as EntityOrderByDTO,
 )
 from ai.backend.common.dto.manager.v2.rbac.request import (
     MappedScopeNestedFilter as MappedScopeNestedFilterDTO,
@@ -147,12 +137,7 @@ from ai.backend.manager.actions.action import build_operation_description
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.data.common.types import SearchResult
-from ai.backend.manager.data.permission.association_scopes_entities import (
-    AssociationScopesEntitiesData,
-)
 from ai.backend.manager.data.permission.bit import single_bit
-from ai.backend.manager.data.permission.entity import EntityData
-from ai.backend.manager.data.permission.id import ObjectId
 from ai.backend.manager.data.permission.permission import PermissionData
 from ai.backend.manager.data.permission.role import (
     AssignedUserData,
@@ -178,16 +163,11 @@ from ai.backend.manager.errors.repository import RepositoryIntegrityError
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.condition_utils import combine_conditions_or, negate_conditions
 from ai.backend.manager.models.rbac.exceptions import InvalidScope
-from ai.backend.manager.models.rbac_models.association_scopes_entities import (
-    AssociationScopesEntitiesRow,
-)
 from ai.backend.manager.models.rbac_models.conditions import (
     AssignedUserConditions,
-    EntityScopeConditions,
 )
 from ai.backend.manager.models.rbac_models.orders import (
     AssignedUserOrders,
-    EntityScopeOrders,
 )
 from ai.backend.manager.models.rbac_models.permission.conditions import (
     ScopedPermissionConditions,
@@ -228,14 +208,6 @@ from ai.backend.manager.services.permission_contoller.actions.permission import 
 from ai.backend.manager.services.permission_contoller.actions.purge_role import PurgeRoleAction
 from ai.backend.manager.services.permission_contoller.actions.replace_role_permissions import (
     ReplaceRolePermissionsAction,
-)
-from ai.backend.manager.services.permission_contoller.actions.search_element_associations import (
-    SearchElementAssociationsAction,
-    SearchElementAssociationsActionResult,
-)
-from ai.backend.manager.services.permission_contoller.actions.search_entities import (
-    SearchEntitiesAction,
-    SearchEntitiesActionResult,
 )
 from ai.backend.manager.services.permission_contoller.actions.search_permissions import (
     SearchPermissionsAction,
@@ -304,17 +276,6 @@ def _assignment_pagination_spec() -> PaginationSpec:
         forward_condition_factory=AssignedUserConditions.by_cursor_forward,
         backward_condition_factory=AssignedUserConditions.by_cursor_backward,
         tiebreaker_order=UserRoleRow.id.asc(),
-    )
-
-
-@lru_cache(maxsize=1)
-def _entity_pagination_spec() -> PaginationSpec:
-    return PaginationSpec(
-        forward_order=EntityScopeOrders.registered_at(ascending=False),
-        backward_order=EntityScopeOrders.registered_at(ascending=True),
-        forward_condition_factory=EntityScopeConditions.by_cursor_forward,
-        backward_condition_factory=EntityScopeConditions.by_cursor_backward,
-        tiebreaker_order=AssociationScopesEntitiesRow.id.asc(),
     )
 
 
@@ -434,53 +395,6 @@ class RBACAdapter(BaseAdapter):
             data.id: self._assignment_data_to_node(data) for data in action_result.result.items
         }
         return [assignment_map.get(aid) for aid in assignment_ids]
-
-    async def batch_load_entities_by_type_and_ids(
-        self, object_ids: Sequence[ObjectId]
-    ) -> list[EntityNode | None]:
-        """Batch load entities by ObjectId (type + id) for DataLoader use.
-
-        Returns EntityNode DTOs in the same order as the input object_ids list.
-        """
-        if not object_ids:
-            return []
-        querier = BatchQuerier(
-            pagination=NoPagination(),
-            conditions=[EntityScopeConditions.by_object_ids(object_ids)],
-        )
-        action_result: SearchEntitiesActionResult = (
-            await self._permission_controller.search_entities.wait_for_complete(
-                SearchEntitiesAction(querier=querier)
-            )
-        )
-        entity_map: dict[ObjectId, EntityNode] = {
-            ObjectId(entity_type=e.entity_type, entity_id=e.entity_id): self._entity_data_to_node(e)
-            for e in action_result.result.items
-        }
-        return [entity_map.get(oid) for oid in object_ids]
-
-    async def batch_load_element_associations_by_ids(
-        self, association_ids: Sequence[UUID]
-    ) -> list[AssociationScopesEntitiesNode | None]:
-        """Batch load element associations by ID for DataLoader use.
-
-        Returns AssociationScopesEntitiesNode DTOs in the same order as the input ids list.
-        """
-        if not association_ids:
-            return []
-        querier = BatchQuerier(
-            pagination=NoPagination(),
-            conditions=[EntityScopeConditions.by_ids(association_ids)],
-        )
-        action_result: SearchElementAssociationsActionResult = (
-            await self._permission_controller.search_element_associations.wait_for_complete(
-                SearchElementAssociationsAction(querier=querier)
-            )
-        )
-        association_map: dict[UUID, AssociationScopesEntitiesNode] = {
-            data.id: self._association_data_to_node(data) for data in action_result.result.items
-        }
-        return [association_map.get(aid) for aid in association_ids]
 
     async def batch_load_permissions_by_role_ids(
         self, role_ids: Sequence[RoleID]
@@ -735,7 +649,7 @@ class RBACAdapter(BaseAdapter):
             offset=input.offset,
         )
         action_result: SearchRolesInScopeActionResult = (
-            await self._permission_controller.search_roles_in_scope.wait_for_complete(
+            await self._permission_controller.search_roles_in_scope.run(
                 SearchRolesInScopeAction(scope=scope, querier=querier)
             )
         )
@@ -800,55 +714,6 @@ class RBACAdapter(BaseAdapter):
             has_next_page=raw.has_next_page,
             has_previous_page=raw.has_previous_page,
         )
-
-    async def admin_search_entities_gql(
-        self,
-        input: AdminSearchEntitiesGQLInput,
-        base_conditions: Sequence[QueryCondition] | None = None,
-    ) -> SearchResult[AssociationScopesEntitiesNode]:
-        """Search entity associations with cursor/offset pagination."""
-        conditions = self._convert_entity_filter(input.filter) if input.filter else []
-        orders = self._convert_entity_orders(input.order) if input.order else []
-        querier = self._build_querier(
-            conditions=conditions,
-            orders=orders,
-            pagination_spec=_entity_pagination_spec(),
-            first=input.first,
-            after=input.after,
-            last=input.last,
-            before=input.before,
-            limit=input.limit,
-            offset=input.offset,
-            base_conditions=base_conditions,
-        )
-        action_result: SearchElementAssociationsActionResult = (
-            await self._permission_controller.search_element_associations.wait_for_complete(
-                SearchElementAssociationsAction(querier=querier)
-            )
-        )
-        raw = action_result.result
-        return SearchResult(
-            items=[self._association_data_to_node(item) for item in raw.items],
-            total_count=raw.total_count,
-            has_next_page=raw.has_next_page,
-            has_previous_page=raw.has_previous_page,
-        )
-
-    async def search_role_scopes(
-        self,
-        role_id: UUID,
-        input: AdminSearchEntitiesGQLInput,
-    ) -> SearchResult[AssociationScopesEntitiesNode]:
-        """Search scope associations for a specific role with pagination."""
-        base_conditions: list[QueryCondition] = [
-            EntityScopeConditions.by_entity_type(RBACElementType.ROLE),
-            EntityScopeConditions.by_entity_id_equals(
-                StringMatchSpec(value=str(role_id), case_insensitive=False, negated=False)
-            ),
-        ]
-        return await self.admin_search_entities_gql(input, base_conditions=base_conditions)
-
-    # ------------------------------------------------------------------ get
 
     async def get(self, role_id: UUID) -> RoleNode:
         """Get a role by ID."""
@@ -1612,80 +1477,6 @@ class RBACAdapter(BaseAdapter):
                 result.append(AssignedUserOrders.granted_at(ascending))
         return result
 
-    def _convert_entity_filter(self, f: EntityFilterDTO) -> list[QueryCondition]:
-        conditions: list[QueryCondition] = []
-        if f.entity_type is not None:
-            condition = self.convert_string_filter(
-                f.entity_type,
-                contains_factory=EntityScopeConditions.by_entity_type_match.contains,
-                equals_factory=EntityScopeConditions.by_entity_type_match.equals,
-                starts_with_factory=EntityScopeConditions.by_entity_type_match.starts_with,
-                ends_with_factory=EntityScopeConditions.by_entity_type_match.ends_with,
-                in_factory=EntityScopeConditions.by_entity_type_match.in_,
-            )
-            if condition is not None:
-                conditions.append(condition)
-        if f.entity_id is not None:
-            condition = self.convert_string_filter(
-                f.entity_id,
-                contains_factory=EntityScopeConditions.by_entity_id_contains,
-                equals_factory=EntityScopeConditions.by_entity_id_equals,
-                starts_with_factory=EntityScopeConditions.by_entity_id_starts_with,
-                ends_with_factory=EntityScopeConditions.by_entity_id_ends_with,
-                in_factory=EntityScopeConditions.by_entity_id_in,
-            )
-            if condition is not None:
-                conditions.append(condition)
-        if f.scope_type is not None:
-            condition = self.convert_string_filter(
-                f.scope_type,
-                contains_factory=EntityScopeConditions.by_scope_type_match.contains,
-                equals_factory=EntityScopeConditions.by_scope_type_match.equals,
-                starts_with_factory=EntityScopeConditions.by_scope_type_match.starts_with,
-                ends_with_factory=EntityScopeConditions.by_scope_type_match.ends_with,
-                in_factory=EntityScopeConditions.by_scope_type_match.in_,
-            )
-            if condition is not None:
-                conditions.append(condition)
-        if f.scope_id is not None:
-            condition = self.convert_string_filter(
-                f.scope_id,
-                contains_factory=EntityScopeConditions.by_scope_id_contains,
-                equals_factory=EntityScopeConditions.by_scope_id_equals,
-                starts_with_factory=EntityScopeConditions.by_scope_id_starts_with,
-                ends_with_factory=EntityScopeConditions.by_scope_id_ends_with,
-                in_factory=EntityScopeConditions.by_scope_id_in,
-            )
-            if condition is not None:
-                conditions.append(condition)
-        if f.AND:
-            for sub in f.AND:
-                conditions.extend(self._convert_entity_filter(sub))
-        if f.OR:
-            or_conditions: list[QueryCondition] = []
-            for sub in f.OR:
-                or_conditions.extend(self._convert_entity_filter(sub))
-            if or_conditions:
-                conditions.append(combine_conditions_or(or_conditions))
-        if f.NOT:
-            not_conditions: list[QueryCondition] = []
-            for sub in f.NOT:
-                not_conditions.extend(self._convert_entity_filter(sub))
-            if not_conditions:
-                conditions.append(negate_conditions(not_conditions))
-        return conditions
-
-    @staticmethod
-    def _convert_entity_orders(orders: list[EntityOrderByDTO]) -> list[QueryOrder]:
-        result: list[QueryOrder] = []
-        for o in orders:
-            ascending = o.direction == OrderDirectionV2.ASC
-            if o.field == "entity_type":
-                result.append(EntityScopeOrders.entity_type(ascending))
-            elif o.field == "registered_at":
-                result.append(EntityScopeOrders.registered_at(ascending))
-        return result
-
     def _build_updater(self, role_id: UUID, input: UpdateRoleInput) -> RoleUpdater:
         name: OptionalState[str] = OptionalState.nop()
         description: TriState[str] = TriState.nop()
@@ -1756,27 +1547,6 @@ class RBACAdapter(BaseAdapter):
             role_id=data.role_id,
             granted_by=data.granted_by,
             granted_at=data.granted_at,
-        )
-
-    @staticmethod
-    def _entity_data_to_node(data: EntityData) -> EntityNode:
-        return EntityNode(
-            entity_type=data.entity_type.value,
-            entity_id=data.entity_id,
-        )
-
-    @staticmethod
-    def _association_data_to_node(
-        data: AssociationScopesEntitiesData,
-    ) -> AssociationScopesEntitiesNode:
-        return AssociationScopesEntitiesNode(
-            id=data.id,
-            scope_type=data.scope_id.scope_type.value,
-            scope_id=data.scope_id.scope_id,
-            entity_type=data.object_id.entity_type.value,
-            entity_id=data.object_id.entity_id,
-            relation_type=data.relation_type.value,
-            registered_at=data.registered_at,
         )
 
     @staticmethod

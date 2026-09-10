@@ -8,12 +8,6 @@ import sqlalchemy as sa
 
 from ai.backend.common.data.entity.domain import DomainID, DomainName
 from ai.backend.common.types import BinarySize, QuotaScopeID, ResourceSlot
-from ai.backend.manager.data.permission.types import (
-    EntityType as PermissionEntityType,
-)
-from ai.backend.manager.data.permission.types import (
-    ScopeType as PermissionScopeType,
-)
 from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
@@ -29,9 +23,6 @@ from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.project import ProjectRow, ProjectType
 from ai.backend.manager.models.rbac_models import RoleRow, UserRoleRow
-from ai.backend.manager.models.rbac_models.association_scopes_entities import (
-    AssociationScopesEntitiesRow,
-)
 from ai.backend.manager.models.replica_group import ReplicaGroupRow
 from ai.backend.manager.models.resource_group import ResourceGroupRow
 from ai.backend.manager.models.resource_policy import (
@@ -104,7 +95,6 @@ class TestEnsureQuotaScopeAccessibleByUser:
                 KernelRow,
                 ReplicaGroupRow,
                 RoutingRow,
-                AssociationScopesEntitiesRow,
                 VirtualEntityRow,
                 ScopeBindingRow,
                 EntityLabelRow,
@@ -425,16 +415,8 @@ class TestEnsureQuotaScopeAccessibleByUser:
         regular_user: UUID,
         test_group: UUID,
     ) -> AsyncGenerator[None, None]:
-        """Insert ASE row binding regular_user to test_group."""
+        """Enroll regular_user in test_group."""
         async with db_with_cleanup.begin_session() as session:
-            session.add(
-                AssociationScopesEntitiesRow(
-                    scope_type=PermissionScopeType.PROJECT,
-                    scope_id=str(test_group),
-                    entity_type=PermissionEntityType.USER,
-                    entity_id=str(regular_user),
-                )
-            )
             await VirtualEntitySeeder().enroll_user_in_project(session, test_group, regular_user)
             await session.flush()
         yield
@@ -447,7 +429,7 @@ class TestEnsureQuotaScopeAccessibleByUser:
         test_domain: DomainFixtureData,
         test_project_resource_policy_name: str,
     ) -> AsyncGenerator[UUID, None]:
-        """Insert a separate group in the same domain plus an ASE row for regular_user."""
+        """A separate group in the same domain, with regular_user enrolled in it."""
         other_group_id = uuid4()
         async with db_with_cleanup.begin_session() as session:
             session.add(
@@ -461,14 +443,6 @@ class TestEnsureQuotaScopeAccessibleByUser:
                     total_resource_slots=ResourceSlot(),
                     allowed_vfolder_hosts={},
                     type=ProjectType.GENERAL,
-                )
-            )
-            session.add(
-                AssociationScopesEntitiesRow(
-                    scope_type=PermissionScopeType.PROJECT,
-                    scope_id=str(other_group_id),
-                    entity_type=PermissionEntityType.USER,
-                    entity_id=str(regular_user),
                 )
             )
             await VirtualEntitySeeder().enroll_user_in_project(

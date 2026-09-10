@@ -11,7 +11,6 @@ from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 from ai.backend.client.v2.exceptions import NotFoundError, PermissionDeniedError
 from ai.backend.client.v2.registry import BackendAIClientRegistry
 from ai.backend.client.v2.v2_registry import V2ClientRegistry
-from ai.backend.common.data.permission.types import RBACElementType, RelationType
 from ai.backend.common.dto.manager.query import ArrayFilter, IntFilter, StringFilter
 from ai.backend.common.dto.manager.user import (
     CreateUserRequest,
@@ -47,9 +46,6 @@ from ai.backend.manager.data.permission.types import (
 )
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.hasher.types import PasswordInfo
-from ai.backend.manager.models.rbac_models.association_scopes_entities import (
-    AssociationScopesEntitiesRow,
-)
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.user import users
@@ -432,25 +428,7 @@ async def user_with_rbac_rows(
             )
         )
         # Role registered in the user's own scope (the per-user SYSTEM role binding).
-        await conn.execute(
-            sa.insert(AssociationScopesEntitiesRow.__table__).values(
-                scope_type=ScopeType.USER,
-                scope_id=scope_id,
-                entity_type=EntityType.ROLE,
-                entity_id=str(role_id),
-                relation_type=RelationType.AUTO,
-            )
-        )
         # User registered as an entity in the domain scope.
-        await conn.execute(
-            sa.insert(AssociationScopesEntitiesRow.__table__).values(
-                scope_type=ScopeType.DOMAIN,
-                scope_id=domain_fixture.domain_name,
-                entity_type=EntityType.USER,
-                entity_id=scope_id,
-                relation_type=RelationType.AUTO,
-            )
-        )
         await conn.execute(
             sa.insert(PermissionRow.__table__).values(
                 role_id=role_id,
@@ -465,14 +443,6 @@ async def user_with_rbac_rows(
         # Permissions cascade-delete with the role; explicit delete is a safety net.
         await conn.execute(
             PermissionRow.__table__.delete().where(PermissionRow.__table__.c.role_id == role_id)
-        )
-        await conn.execute(
-            AssociationScopesEntitiesRow.__table__.delete().where(
-                sa.or_(
-                    AssociationScopesEntitiesRow.__table__.c.scope_id == scope_id,
-                    AssociationScopesEntitiesRow.__table__.c.entity_id == scope_id,
-                )
-            )
         )
         await conn.execute(RoleRow.__table__.delete().where(RoleRow.__table__.c.id == role_id))
         await conn.execute(
@@ -511,37 +481,20 @@ class TestUserPurge:
         user_with_rbac_rows: tuple[uuid.UUID, str],
         db_engine: SAEngine,
     ) -> None:
-        """Purge must remove the scope-entity associations and the roles the user's
-        scope holds, so no permission is left pointing at a scope that is gone.
+        """Purge must remove the roles the user's scope holds, so no permission is left
+        pointing at a scope that is gone.
         """
         user_id, scope_id = user_with_rbac_rows
 
         await admin_registry.user.purge(PurgeUserRequest(user_id=user_id))
 
         async with db_engine.connect() as conn:
-            ase_after = await conn.scalar(
-                sa.select(sa.func.count())
-                .select_from(AssociationScopesEntitiesRow)
-                .where(
-                    sa.or_(
-                        sa.and_(
-                            AssociationScopesEntitiesRow.scope_type == RBACElementType.USER,
-                            AssociationScopesEntitiesRow.scope_id == scope_id,
-                        ),
-                        sa.and_(
-                            AssociationScopesEntitiesRow.entity_type == RBACElementType.USER,
-                            AssociationScopesEntitiesRow.entity_id == scope_id,
-                        ),
-                    )
-                )
-            )
             permissions_after = await conn.scalar(
                 sa.select(sa.func.count())
                 .select_from(PermissionRow)
                 .join(RoleRow, RoleRow.id == PermissionRow.role_id)
                 .where(RoleRow.scope_id == user_id)
             )
-        assert ase_after == 0, "association_scopes_entities rows should be cleaned up after purge"
         assert permissions_after == 0, "the role permissions should be gone after purge"
 
 

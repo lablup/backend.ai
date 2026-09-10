@@ -20,7 +20,6 @@ from ai.backend.common.dto.manager.rbac.request import (
     PurgeRoleRequest,
     RevokeRoleRequest,
     RoleFilter,
-    SearchEntitiesRequest,
     SearchRolesRequest,
     SearchScopesRequest,
     SearchUsersAssignedToRoleRequest,
@@ -34,7 +33,6 @@ from ai.backend.common.dto.manager.rbac.response import (
     GetRoleResponse,
     GetScopeTypesResponse,
     RevokeRoleResponse,
-    SearchEntitiesResponse,
     SearchRolesResponse,
     SearchScopesResponse,
     SearchUsersAssignedToRoleResponse,
@@ -364,24 +362,3 @@ class TestEntityTypes:
         assert method == "GET"
         assert url.endswith("/admin/rbac/entity-types")
         assert body is None
-
-
-class TestSearchEntities:
-    async def test_search_entities(self) -> None:
-        resp = _json_response({
-            "items": [
-                {"entity_type": "user", "entity_id": str(uuid.uuid4())},
-            ],
-            "pagination": {"total": 1, "offset": 0, "limit": 100},
-        })
-        mock_session = _make_request_session(resp)
-        rc = _make_rbac_client(mock_session)
-
-        scope_id = str(uuid.uuid4())
-        result = await rc.search_entities("domain", scope_id, "user", SearchEntitiesRequest())
-
-        assert isinstance(result, SearchEntitiesResponse)
-        assert len(result.items) == 1
-        method, url, body = _last_request_call(mock_session)
-        assert method == "POST"
-        assert url.endswith(f"/admin/rbac/scopes/domain/{scope_id}/entities/user/search")
