@@ -190,6 +190,9 @@ from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.services.permission_contoller.actions.add_role_permission import (
     AddRolePermissionAction,
 )
+from ai.backend.manager.services.permission_contoller.actions.bulk_get_roles import (
+    BulkGetRolesAction,
+)
 from ai.backend.manager.services.permission_contoller.actions.bulk_remove_role_permissions import (
     BulkRemoveRolePermissionsAction,
 )
@@ -335,17 +338,11 @@ class RBACAdapter(BaseAdapter):
         """
         if not role_ids:
             return []
-        querier = BatchQuerier(
-            pagination=NoPagination(),
-            conditions=[RoleConditions.by_ids(role_ids)],
+        got = await self._permission_controller.bulk_get_roles.run(
+            BulkGetRolesAction(ids=list(role_ids))
         )
-        action_result: SearchRolesActionResult = (
-            await self._permission_controller.search_roles.wait_for_complete(
-                SearchRolesAction(querier=querier)
-            )
-        )
-        role_map: dict[UUID, RoleNode] = {
-            data.id: self._role_data_to_node(data) for data in action_result.result.items
+        role_map = {
+            entity_id: self._role_data_to_node(data) for entity_id, data in got.values().items()
         }
         return [role_map.get(role_id) for role_id in role_ids]
 

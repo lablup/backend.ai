@@ -4,6 +4,7 @@ from ai.backend.manager.actions.processor import ActionProcessor
 from ai.backend.manager.actions.registry.field import LookupFieldGroup
 from ai.backend.manager.actions.registry.group import ProcessorGroup
 from ai.backend.manager.actions.registry.types import FieldGroupMeta
+from ai.backend.manager.actions.v2.bulk.partial_processor import PartialBulkActionProcessor
 from ai.backend.manager.actions.v2.field.bulk_processor import PartialBulkFieldActionProcessor
 from ai.backend.manager.actions.v2.global_scope.processor import GlobalActionProcessor
 from ai.backend.manager.actions.v2.ops.result import (
@@ -33,6 +34,7 @@ from .actions import (
     SearchUsersAssignedToRoleActionResult,
     UpdateRoleAction,
 )
+from .actions.bulk_get_roles import BulkGetRolesAction
 from .actions.get_entity_types import (
     GlobalGetEntityTypesAction,
     GlobalGetEntityTypesActionResult,
@@ -79,6 +81,7 @@ class PermissionControllerProcessors:
     delete_role: SingleEntityActionProcessor[DeleteRoleAction, EntityOpsResult[RoleData]]
     purge_role: SingleEntityActionProcessor[PurgeRoleAction, EntityOpsResult[RoleData]]
     get_role_detail: SingleEntityActionProcessor[GetRoleDetailAction, GetRoleDetailActionResult]
+    bulk_get_roles: PartialBulkActionProcessor[BulkGetRolesAction, RoleData]
     search_roles: ActionProcessor[SearchRolesAction, SearchRolesActionResult]
     search_roles_in_scope: ScopeActionProcessor[
         SearchRolesInScopeAction, SearchRolesInScopeActionResult
@@ -123,6 +126,7 @@ class PermissionControllerProcessors:
         self.get_role_detail = role_group.single_entity(
             GetRoleDetailAction, service.get_role_detail
         )
+        self.bulk_get_roles = role_group.partial_bulk_get_ops(BulkGetRolesAction)
         self.search_roles = ActionProcessor(service.search_roles, action_monitors)
         self.search_roles_in_scope = role_group.scope(
             SearchRolesInScopeAction, service.search_roles_in_scope
