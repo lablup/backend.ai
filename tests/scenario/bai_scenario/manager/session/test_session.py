@@ -1,135 +1,114 @@
-"""What the session adapter answers for a read, and who may ask.
+"""세션 조회, 그리고 누가 물을 수 있는가.
 
-Only the read half. What a session write needs is written down in this directory's
-conftest, which names the ten dependencies a read never reaches.
+세션을 대기열에 넣는 행은 아직 없다. 컨트롤러도 배선되어 있고, 리소스 그룹은 도메인에
+걸려 있고, 이미지와 프로젝트도 있고, 훅도 아무에게도 가지 않는다. 막히는 자리는 그 그룹이
+어떤 리소스 슬롯도 제공하지 않는다는 것이고, 그러려면 에이전트가 있어야 한다. 에이전트는
+write spec이 아예 없다 — 하트비트로 스스로 등록하므로 다른 행처럼 심을 수 없다.
 """
 
 from __future__ import annotations
 
-from uuid import UUID
+from dataclasses import dataclass
+from typing import override
 
 import pytest
-from bai_scenario.components.domain import SomeoneOf
-from bai_scenario.components.session import SessionScenario, SomeoneMakingSessions
-from bai_scenario.runner.runner import ScenarioRunner
-from bai_scenario.seeds.domain.domain import SeedDomain
-from bai_scenario.seeds.image.image import SeedImage
-from bai_scenario.seeds.image.registry import SeedContainerRegistry
-from bai_scenario.seeds.project.project import SeedProject
-from bai_scenario.seeds.resource_group.resource_group import (
-    LinkToDomain,
-    SeedResourceGroup,
-)
-from bai_scenario.seeds.resource_policy.project import SeedProjectPolicy
-from bai_scenario.seeds.seeder import Seeder, after_three
+from bai_scenario.components.answers import NothingIsFound, TheCallIsRefused
+from bai_scenario.components.domain import ADomainAndACaller, ADomainAndSomeone
+from bai_scenario.runner.acting import ActingAs
+from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.steps import run_scenario
 
-from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.data.user.types import UserRole
-from ai.backend.common.dto.manager.v2.session.request import (
-    AdminSearchSessionsInput,
-    EnqueueSessionInput,
-)
+from ai.backend.common.dto.manager.v2.session.request import AdminSearchSessionsInput
 from ai.backend.common.dto.manager.v2.session.response import AdminSearchSessionsPayload
-from ai.backend.common.dto.manager.v2.session.types import CreateSessionTypeEnum
 from ai.backend.manager.api.adapters.session.adapter import SessionAdapter
 from ai.backend.manager.errors.permission import NotEnoughPermission
-from ai.backend.testutils.typed_scenario import (
-    At,
-    Exactly,
-    TypedScenario,
-    call,
-    needs_actor,
-)
+from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.testutils.scenario_steps import Given, Scenario, Then, When
+
+type Searched = AdminSearchSessionsPayload
+type SessionStep = Scenario[SeedingSession, ADomainAndACaller, SessionAdapter, Searched]
 
 
-def nothing_laid_means_nothing_found(seed: Seeder) -> SessionScenario:
-    home = seed.creating(SeedDomain(name_hint="home"))
-    superadmin = seed.within(SomeoneOf(home, role=UserRole.SUPERADMIN))
-    return TypedScenario.ok(
-        "a-scenario-that-laid-no-session-finds-none",
-        description="세션을 하나도 심지 않은 상태에서 슈퍼관리자가 조회하면, 답은 비어 있다",
-        actor=superadmin,
-        given=seed.situation(),
-        when=call(SessionAdapter.admin_search, AdminSearchSessionsInput()),
-        then=Exactly(
-            AdminSearchSessionsPayload(
-                items=[], total_count=0, has_next_page=False, has_previous_page=False
-            )
-        ),
-    )
+@dataclass(frozen=True)
+class SearchingEverySession(When[ADomainAndACaller, SessionAdapter, Searched]):
+    """필터 없이 전체를 훑는다."""
+
+    @override
+    def operation(self) -> str:
+        return "admin_search"
+
+    @override
+    def describe(self, laid: ADomainAndACaller) -> str:
+        return f"{laid.caller.username}이 필터 없이 전체 조회"
+
+    @override
+    async def call(self, adapter: SessionAdapter, laid: ADomainAndACaller) -> Searched:
+        with ActingAs(laid.caller):
+            return await adapter.admin_search(AdminSearchSessionsInput())
 
 
-def ungranted_user_is_refused(seed: Seeder) -> SessionScenario:
-    home = seed.creating(SeedDomain(name_hint="home"))
-    someone = seed.within(SomeoneOf(home))
-    return TypedScenario.error(
-        "a-user-granted-nothing-may-not-search-sessions",
-        description=(
+@dataclass(frozen=True)
+class NoSessionLaidMeansNoneFound(
+    Scenario[SeedingSession, ADomainAndACaller, SessionAdapter, Searched]
+):
+    @override
+    def summary(self) -> str:
+        return "a-scenario-that-laid-no-session-finds-none"
+
+    @override
+    def describe(self) -> str:
+        return "세션을 하나도 심지 않은 상태에서 슈퍼관리자가 조회하면, 답은 비어 있다"
+
+    @override
+    def given(self) -> Given[SeedingSession, ADomainAndACaller]:
+        return ADomainAndSomeone(role=UserRole.SUPERADMIN)
+
+    @override
+    def when(self) -> When[ADomainAndACaller, SessionAdapter, Searched]:
+        return SearchingEverySession()
+
+    @override
+    def then(self) -> Then[ADomainAndACaller, Searched]:
+        return NothingIsFound()
+
+
+@dataclass(frozen=True)
+class AUserGrantedNothingMayNotSearch(
+    Scenario[SeedingSession, ADomainAndACaller, SessionAdapter, Searched]
+):
+    @override
+    def summary(self) -> str:
+        return "a-user-granted-nothing-may-not-search-sessions"
+
+    @override
+    def describe(self) -> str:
+        return (
             "세션 조회는 역할이 아니라 스코프 권한이 지키므로, "
             "아무 권한도 받지 않은 사용자는 권한 부족으로 거부된다"
-        ),
-        actor=someone,
-        given=seed.situation(),
-        when=call(SessionAdapter.admin_search, AdminSearchSessionsInput()),
-        then=NotEnoughPermission,
-    )
+        )
+
+    @override
+    def given(self) -> Given[SeedingSession, ADomainAndACaller]:
+        return ADomainAndSomeone()
+
+    @override
+    def when(self) -> When[ADomainAndACaller, SessionAdapter, Searched]:
+        return SearchingEverySession()
+
+    @override
+    def then(self) -> Then[ADomainAndACaller, Searched]:
+        return TheCallIsRefused(NotEnoughPermission)
 
 
-def granted_user_enqueues_a_session(seed: Seeder) -> SessionScenario:
-    home = seed.creating(SeedDomain(name_hint="home"))
-    group = seed.creating(SeedResourceGroup(name_hint="compute"))
-    seed.linking(LinkToDomain(), home, group)
-    registry = seed.creating(SeedContainerRegistry())
-    image = seed.creating_from(SeedImage(name_hint="python"), registry)
-    policy = seed.once(SeedProjectPolicy())
-    project = seed.creating_from_two(SeedProject(name_hint="research"), home, policy)
-    maker = seed.within(SomeoneMakingSessions(home, project)).user
-    return TypedScenario.ok(
-        "a-user-granted-session-create-enqueues-one",
-        description=(
-            "이미지와 리소스 그룹이 있고 자기 스코프에서 세션 생성 권한을 받은 사용자가 "
-            "세션을 요청하면, 그 세션이 대기 상태로 등록된다"
-        ),
-        actor=maker,
-        given=seed.situation(),
-        when=after_three(
-            image,
-            group,
-            project,
-            lambda img, rg, proj: needs_actor(
-                lambda actor: call(
-                    SessionAdapter.enqueue,
-                    EnqueueSessionInput(
-                        session_name="first",
-                        session_type=CreateSessionTypeEnum.INTERACTIVE,
-                        image_id=img.id,
-                        resource_entries=[],
-                        resource_group_id=ResourceGroupID(rg.id),
-                        project_id=proj.id,
-                    ),
-                    actor.id,
-                    str(actor.role),
-                    "",
-                    actor.domain_name,
-                    proj.id,
-                ),
-                "enqueue",
-            ),
-        ),
-        then=At(lambda p: p.session.project_id, project.name and UUID(int=0)),
-    )
+SCENARIOS: list[SessionStep] = [
+    NoSessionLaidMeansNoneFound(),
+    AUserGrantedNothingMayNotSearch(),
+]
 
 
-# Enqueueing runs the whole way now: the controller is wired, the resource group is
-# allowed for the domain, the image and the project are there, and the pre-enqueue hook
-# dispatches to nobody. What it stops on is that the group serves no resource slot,
-# which wants an agent — and an agent has no write spec at all. One registers itself by
-# heartbeat, so a scenario cannot lay one the way it lays every other row.
-
-BUILDERS = (nothing_laid_means_nothing_found, ungranted_user_is_refused)
-SCENARIOS: list[SessionScenario] = [build(Seeder()) for build in BUILDERS]
-
-
-@pytest.mark.parametrize("scenario", SCENARIOS, ids=lambda s: s.summary)
-async def test_session(scenario: SessionScenario, run: ScenarioRunner) -> None:
-    await run(scenario)
+@pytest.mark.parametrize("scenario", SCENARIOS, ids=lambda s: s.summary())
+async def test_session(
+    scenario: SessionStep, adapter: SessionAdapter, engine: ExtendedAsyncSAEngine
+) -> None:
+    await run_scenario(scenario, adapter, engine)
