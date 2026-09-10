@@ -25,7 +25,7 @@ class ArtifactNotFoundError(EntityError, web.HTTPNotFound):
         return EntityErrorCode(ArtifactEntityType(), ActionOperationType.GET, ErrorDetail.NOT_FOUND)
 
 
-class ArtifactNotVerified(FieldError, web.HTTPBadRequest):
+class ArtifactRevisionNotVerified(FieldError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/artifact-not-verified"
     error_title = "Artifact Not Verified"
 
@@ -36,7 +36,7 @@ class ArtifactNotVerified(FieldError, web.HTTPBadRequest):
         )
 
 
-class ArtifactUpdateError(FieldError, web.HTTPInternalServerError):
+class ArtifactRevisionUpdateError(FieldError, web.HTTPInternalServerError):
     error_type = "https://api.backend.ai/probs/artifact-update-failed"
     error_title = "Artifact Update Failed"
 
@@ -47,7 +47,7 @@ class ArtifactUpdateError(FieldError, web.HTTPInternalServerError):
         )
 
 
-class ArtifactDeletionBadRequestError(FieldError, web.HTTPBadRequest):
+class ArtifactRevisionDeletionBadRequestError(FieldError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/artifact-deletion-failed"
     error_title = "Artifact Deletion Bad Request"
 
@@ -97,7 +97,7 @@ class ArtifactAssociationNotFoundError(BackendAIError, web.HTTPNotFound):
         )
 
 
-class ArtifactNotApproved(FieldError, web.HTTPForbidden):
+class ArtifactRevisionNotApproved(FieldError, web.HTTPForbidden):
     error_type = "https://api.backend.ai/probs/artifact-not-approved"
     error_title = "Artifact Not Approved"
 
