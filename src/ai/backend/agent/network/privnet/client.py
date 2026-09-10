@@ -353,6 +353,9 @@ def _network_config_from_meta(meta: SessionNetMeta) -> dict[str, Any]:
         # carries -- with the agent's own ESP policy written for the other port.
         "vxlan_port": meta.vxlan_port,
         "encryption_key": meta.encryption_key,
+        # Sent for every session, encrypted or not: it is what the privnet's endpoint gossip signs
+        # under, and a session whose overlay carries no ESP still has endpoints to announce.
+        "gossip_key": meta.gossip_key,
     }
 
 

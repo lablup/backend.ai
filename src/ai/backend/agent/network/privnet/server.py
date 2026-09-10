@@ -1219,6 +1219,7 @@ class PrivNetServer:
             vxlan_port=cfg.vxlan_port,
             encryption_key=cfg.encryption_key,
             encryption_key_id=cfg.encryption_key_id,
+            gossip_key=cfg.gossip_key,
             generation=cfg.generation,
         )
 
@@ -2404,12 +2405,19 @@ class PrivNetServer:
     def gossip_key(self) -> str | None:
         """The key announcements are signed under.
 
-        The cluster's overlay key, taken from any session that has one: ESP policies select on the
-        outer packet, which carries no session id, so there is one key for the cluster rather than
-        one per session. None while no session on this node carries an encrypted overlay, and then
-        nothing is announced -- an unsigned announcement is one any host that can reach the port
-        could have written.
+        Cluster-wide, taken from any session that carries one: the exchange runs on one UDP port
+        for the whole node, and a receiver must be able to verify a datagram before it knows which
+        session it names. The manager derives it from the cluster root and publishes it on every
+        VXLAN session, encrypted or not -- a plaintext overlay still has endpoints to announce, and
+        an unsigned announcement is one any host that can reach the port could have written.
+
+        Falls back to the session's ESP key for a session whose meta predates the field, so a
+        rolling upgrade keeps announcing rather than going silent. None when nothing on this node
+        has either, and then nothing is announced.
         """
+        for entry in self._sessions.values():
+            if entry.meta.gossip_key:
+                return entry.meta.gossip_key
         for entry in self._sessions.values():
             if entry.meta.encryption_key:
                 return entry.meta.encryption_key

@@ -1231,6 +1231,64 @@ class TestEncryptingOnlyWhereEveryNodeCan:
         assert info.options["encryption_key"] is None
 
 
+class TestTheGossipKey:
+    """Endpoint propagation runs between the nodes' privnets and is signed. The key therefore has
+    to be on every VXLAN session -- including the ones that carry no ESP, which is where a key
+    shared with encryption would leave the exchange silent and the peers with no FDB."""
+
+    def _with_policy(self, etcd: FakeEtcd, policy: object) -> CNINetworkPlugin:
+        plugin = CNINetworkPlugin({"overlay-encryption": policy}, {})
+        plugin._etcd = cast(AsyncEtcd, etcd)
+        plugin._subnet_allocator = SubnetAllocator(cast(AsyncEtcd, etcd))
+        plugin._vni_allocator = VNIAllocator(cast(AsyncEtcd, etcd))
+        plugin._endpoint_allocator = EndpointAllocator(cast(AsyncEtcd, etcd))
+        return plugin
+
+    async def test_an_encrypted_session_carries_one(self) -> None:
+        etcd = FakeEtcd()
+        _encryption_capable(etcd, "a1", "a2")
+        info = await _plugin_with(etcd).create_network(
+            identifier="s1",
+            options={"forced_backend": "vxlan", "member_agents": ["a1", "a2"]},
+        )
+        assert info.options["gossip_key"] is not None
+
+    async def test_a_plaintext_session_carries_one_too(self) -> None:
+        etcd = FakeEtcd()
+        _publish_caps(etcd, "a1", encryption_profiles=[])
+        info = await self._with_policy(etcd, "disabled").create_network(
+            identifier="s1",
+            options={"forced_backend": "vxlan", "member_agents": ["a1"]},
+        )
+        assert info.options["encryption_key"] is None
+        assert info.options["gossip_key"] is not None
+
+    async def test_it_is_not_the_encryption_key(self) -> None:
+        """Signing under the ESP key would hand traffic-key material to every session that only
+        needs to announce addresses."""
+        etcd = FakeEtcd()
+        _encryption_capable(etcd, "a1")
+        info = await _plugin_with(etcd).create_network(
+            identifier="s1",
+            options={"forced_backend": "vxlan", "member_agents": ["a1"]},
+        )
+        assert info.options["gossip_key"] != info.options["encryption_key"]
+
+    async def test_every_session_on_one_cluster_gets_the_same_one(self) -> None:
+        """A datagram is verified before the receiver knows which session it names, so the key
+        cannot be per session."""
+        etcd = FakeEtcd()
+        _encryption_capable(etcd, "a1")
+        plugin = _plugin_with(etcd)
+        first = await plugin.create_network(
+            identifier="s1", options={"forced_backend": "vxlan", "member_agents": ["a1"]}
+        )
+        second = await plugin.create_network(
+            identifier="s2", options={"forced_backend": "vxlan", "member_agents": ["a1"]}
+        )
+        assert first.options["gossip_key"] == second.options["gossip_key"]
+
+
 class _CountingCas(FakeEtcd):
     """Counts the guarded writes a claim attempt costs, so a scan that should have stopped is
     visible as a number rather than as a wait."""
