@@ -1,14 +1,24 @@
+from dataclasses import dataclass
+
 import pytest
 
 from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.manager.errors.container_registry import (
     InvalidContainerRegistryProject,
+    InvalidContainerRegistryProjectOnCreate,
+    InvalidContainerRegistryProjectOnModify,
     InvalidContainerRegistryURL,
 )
 from ai.backend.manager.models.container_registry import (
     ContainerRegistryValidator,
     ContainerRegistryValidatorArgs,
 )
+
+
+@dataclass(frozen=True)
+class _ProjectErrorCase:
+    invalid_project: type[InvalidContainerRegistryProject]
+    expected_code: str
 
 
 class TestContainerRegistryValidator:
@@ -44,7 +54,10 @@ class TestContainerRegistryValidator:
     async def test_valid_urls(self, valid_url: str) -> None:
         """Test that valid URLs pass validation."""
         args = ContainerRegistryValidatorArgs(
-            url=valid_url, type=ContainerRegistryType.DOCKER, project=None
+            url=valid_url,
+            type=ContainerRegistryType.DOCKER,
+            project=None,
+            invalid_project=InvalidContainerRegistryProjectOnCreate,
         )
         validator = ContainerRegistryValidator(args)
         # Should not raise any exception
@@ -64,7 +77,10 @@ class TestContainerRegistryValidator:
     async def test_invalid_urls(self, invalid_url: str) -> None:
         """Test that invalid URLs fail validation."""
         args = ContainerRegistryValidatorArgs(
-            url=invalid_url, type=ContainerRegistryType.DOCKER, project=None
+            url=invalid_url,
+            type=ContainerRegistryType.DOCKER,
+            project=None,
+            invalid_project=InvalidContainerRegistryProjectOnCreate,
         )
         validator = ContainerRegistryValidator(args)
         with pytest.raises(InvalidContainerRegistryURL, match=f"Invalid URL format: {invalid_url}"):
@@ -81,7 +97,12 @@ class TestContainerRegistryValidator:
         self, registry_type: ContainerRegistryType, registry_url: str
     ) -> None:
         """Test that Harbor registries require project names."""
-        args = ContainerRegistryValidatorArgs(url=registry_url, type=registry_type, project=None)
+        args = ContainerRegistryValidatorArgs(
+            url=registry_url,
+            type=registry_type,
+            project=None,
+            invalid_project=InvalidContainerRegistryProjectOnCreate,
+        )
         validator = ContainerRegistryValidator(args)
         with pytest.raises(
             InvalidContainerRegistryProject, match=r"Project name is required for Harbor\."
@@ -102,6 +123,7 @@ class TestContainerRegistryValidator:
             url="https://harbor.example.com",
             type=ContainerRegistryType.HARBOR,
             project=project_name,
+            invalid_project=InvalidContainerRegistryProjectOnCreate,
         )
         validator = ContainerRegistryValidator(args)
         with pytest.raises(InvalidContainerRegistryProject, match=r"Invalid project name length\."):
@@ -142,6 +164,7 @@ class TestContainerRegistryValidator:
             url="https://harbor.example.com",
             type=ContainerRegistryType.HARBOR,
             project=invalid_project_name,
+            invalid_project=InvalidContainerRegistryProjectOnCreate,
         )
         validator = ContainerRegistryValidator(args)
         with pytest.raises(InvalidContainerRegistryProject, match=r"Invalid project name format\."):
@@ -182,7 +205,36 @@ class TestContainerRegistryValidator:
             url="https://harbor.example.com",
             type=ContainerRegistryType.HARBOR,
             project=valid_project_name,
+            invalid_project=InvalidContainerRegistryProjectOnCreate,
         )
         validator = ContainerRegistryValidator(args)
         # Should not raise any exception
         validator.validate()
+
+    @pytest.mark.parametrize(
+        "case",
+        [
+            _ProjectErrorCase(
+                invalid_project=InvalidContainerRegistryProjectOnCreate,
+                expected_code="container-registry_create_bad-request",
+            ),
+            _ProjectErrorCase(
+                invalid_project=InvalidContainerRegistryProjectOnModify,
+                expected_code="container-registry_update_bad-request",
+            ),
+        ],
+        ids=lambda case: case.invalid_project.__name__,
+    )
+    async def test_harbor_project_error_reports_the_operation(
+        self, case: _ProjectErrorCase
+    ) -> None:
+        args = ContainerRegistryValidatorArgs(
+            url="https://harbor.example.com",
+            type=ContainerRegistryType.HARBOR,
+            project=None,
+            invalid_project=case.invalid_project,
+        )
+        validator = ContainerRegistryValidator(args)
+        with pytest.raises(case.invalid_project) as exc_info:
+            validator.validate()
+        assert str(exc_info.value.error_code()) == case.expected_code

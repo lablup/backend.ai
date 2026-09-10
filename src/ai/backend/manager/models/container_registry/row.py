@@ -44,11 +44,17 @@ __all__: Sequence[str] = (
 )
 
 
+# Spelled here because the dataclass below declares a field named ``type``, which
+# shadows the builtin inside its body.
+type _InvalidProjectError = type[InvalidContainerRegistryProject]
+
+
 @dataclass
 class ContainerRegistryValidatorArgs:
     url: str
     type: ContainerRegistryType
     project: str | None
+    invalid_project: _InvalidProjectError
 
 
 # TODO: Refactor this using inheritance
@@ -60,11 +66,13 @@ class ContainerRegistryValidator:
     _url: str
     _type: ContainerRegistryType
     _project: str | None
+    _invalid_project: _InvalidProjectError
 
     def __init__(self, args: ContainerRegistryValidatorArgs) -> None:
         self._url = args.url
         self._type = args.type
         self._project = args.project
+        self._invalid_project = args.invalid_project
 
     def _is_valid_url(self, url: str) -> bool:
         try:
@@ -88,12 +96,12 @@ class ContainerRegistryValidator:
         match self._type:
             case ContainerRegistryType.HARBOR | ContainerRegistryType.HARBOR2:
                 if self._project is None:
-                    raise InvalidContainerRegistryProject("Project name is required for Harbor.")
+                    raise self._invalid_project("Project name is required for Harbor.")
                 if not (1 <= len(self._project) <= 255):
-                    raise InvalidContainerRegistryProject("Invalid project name length.")
+                    raise self._invalid_project("Invalid project name length.")
                 pattern = re.compile(r"^[a-z0-9]+(?:[._-][a-z0-9]+)*$")
                 if not pattern.match(self._project):
-                    raise InvalidContainerRegistryProject("Invalid project name format.")
+                    raise self._invalid_project("Invalid project name format.")
             case _:
                 pass
 

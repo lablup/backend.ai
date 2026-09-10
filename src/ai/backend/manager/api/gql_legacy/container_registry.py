@@ -16,6 +16,9 @@ from ai.backend.common.data.entity.container_registry import ContainerRegistryID
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.container_registry.types import ContainerRegistryData
 from ai.backend.manager.defs import PASSWORD_PLACEHOLDER
+from ai.backend.manager.errors.container_registry import (
+    InvalidContainerRegistryProjectOnCreate,
+)
 from ai.backend.manager.models.container_registry import (
     ContainerRegistryRow,
     ContainerRegistryValidator,
@@ -368,6 +371,7 @@ class CreateContainerRegistryNode(graphene.Mutation):  # type: ignore[misc]
                 url=url,
                 type=type,
                 project=cast(str | None, project if project is not Undefined else None),
+                invalid_project=InvalidContainerRegistryProjectOnCreate,
             )
         )
 
