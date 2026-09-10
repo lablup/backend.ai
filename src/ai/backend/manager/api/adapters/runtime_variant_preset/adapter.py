@@ -3,7 +3,6 @@ from __future__ import annotations
 from collections.abc import Sequence
 from uuid import UUID
 
-from ai.backend.common.api_handlers import SENTINEL
 from ai.backend.common.data.entity.runtime_variant import RuntimeVariantID
 from ai.backend.common.data.entity.runtime_variant_preset import RuntimeVariantPresetID
 from ai.backend.common.dto.manager.v2.runtime_variant_preset.request import (
@@ -189,65 +188,19 @@ class RuntimeVariantPresetAdapter(BaseAdapter):
     ) -> UpdateRuntimeVariantPresetPayload:
         updater = RuntimeVariantPresetUpdater(
             preset_id=RuntimeVariantPresetID(input.id),
-            name=(
-                OptionalState.update(input.name) if input.name is not None else OptionalState.nop()
-            ),
-            description=(
-                TriState.nop()
-                if input.description is SENTINEL
-                else TriState.nullify()
-                if input.description is None
-                else TriState.update(input.description)
-            ),
-            rank=(
-                OptionalState.update(input.rank) if input.rank is not None else OptionalState.nop()
-            ),
-            preset_target=(
-                OptionalState.update(input.preset_target)
-                if input.preset_target is not None
-                else OptionalState.nop()
-            ),
-            value_type=(
-                OptionalState.update(input.value_type)
-                if input.value_type is not None
-                else OptionalState.nop()
-            ),
-            default_value=(
-                TriState.nop()
-                if input.default_value is SENTINEL
-                else TriState.nullify()
-                if input.default_value is None
-                else TriState.update(input.default_value)
-            ),
-            key=(OptionalState.update(input.key) if input.key is not None else OptionalState.nop()),
-            required=(
-                OptionalState.update(input.required)
-                if input.required is not None
-                else OptionalState.nop()
-            ),
+            name=OptionalState.from_unset(input.name),
+            description=TriState.from_unset(input.description),
+            rank=OptionalState.from_unset(input.rank),
+            preset_target=OptionalState.from_unset(input.preset_target),
+            value_type=OptionalState.from_unset(input.value_type),
+            default_value=TriState.from_unset(input.default_value),
+            key=OptionalState.from_unset(input.key),
+            required=OptionalState.from_unset(input.required),
             added_version=TriState.from_unset(input.added_version),
             deprecated_version=TriState.from_unset(input.deprecated_version),
-            category=(
-                TriState.nop()
-                if input.category is SENTINEL
-                else TriState.nullify()
-                if input.category is None
-                else TriState.update(input.category)
-            ),
-            display_name=(
-                TriState.nop()
-                if input.display_name is SENTINEL
-                else TriState.nullify()
-                if input.display_name is None
-                else TriState.update(input.display_name)
-            ),
-            ui_option=(
-                TriState.nop()
-                if input.ui_option is SENTINEL
-                else TriState.nullify()
-                if input.ui_option is None
-                else TriState.update(input.ui_option)
-            ),
+            category=TriState.from_unset(input.category),
+            display_name=TriState.from_unset(input.display_name),
+            ui_option=TriState.from_unset(input.ui_option),
         )
         result = await self._runtime_variant_preset.update.run(
             UpdateRuntimeVariantPresetAction(updater=updater)
