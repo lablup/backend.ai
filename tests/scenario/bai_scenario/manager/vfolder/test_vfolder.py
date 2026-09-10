@@ -3,14 +3,14 @@
 from __future__ import annotations
 
 import pytest
-from bai_scenario.components.domain import seed_someone_of
+from bai_scenario.components.domain import SomeoneOf
 from bai_scenario.components.vfolder import (
+    SomeoneMakingFolders,
     VFolderScenario,
     seed_domain_with_storage,
-    seed_someone_making_folders,
 )
 from bai_scenario.runner.runner import ScenarioRunner
-from bai_scenario.seeds.domain.domain import seed_domain
+from bai_scenario.seeds.domain.domain import SeedDomain
 from bai_scenario.seeds.seeder import Seeder
 
 from ai.backend.common.dto.manager.v2.vfolder.request import (
@@ -23,8 +23,8 @@ from ai.backend.testutils.typed_scenario import TypedScenario, at, call
 
 
 def ungranted_user_is_refused(seed: Seeder) -> VFolderScenario:
-    home = seed.creating(seed_domain(name_hint="home"))
-    someone = seed_someone_of(seed, home)
+    home = seed.creating(SeedDomain(name_hint="home"))
+    someone = seed.within(SomeoneOf(home))
     return TypedScenario.error(
         "a-user-granted-nothing-may-not-make-a-folder",
         description="아무 권한도 받지 않은 사용자가 폴더를 만들려 하면 권한 부족으로 거부된다",
@@ -37,7 +37,7 @@ def ungranted_user_is_refused(seed: Seeder) -> VFolderScenario:
 
 def granted_user_lists_none(seed: Seeder) -> VFolderScenario:
     home = seed.creating(seed_domain_with_storage())
-    maker, _ = seed_someone_making_folders(seed, home)
+    maker = seed.within(SomeoneMakingFolders(home)).user
     return TypedScenario.ok(
         "a-user-who-has-made-no-folder-lists-none",
         description="폴더를 하나도 만들지 않은 사용자가 자기 폴더를 조회하면, 답은 비어 있다",
@@ -50,7 +50,7 @@ def granted_user_lists_none(seed: Seeder) -> VFolderScenario:
 
 def granted_user_makes_a_folder(seed: Seeder) -> VFolderScenario:
     home = seed.creating(seed_domain_with_storage())
-    maker, _ = seed_someone_making_folders(seed, home)
+    maker = seed.within(SomeoneMakingFolders(home)).user
     return TypedScenario.ok(
         "a-user-granted-folder-create-makes-one-of-their-own",
         description=(

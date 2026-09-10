@@ -9,6 +9,8 @@ it, so a seed takes that whole path rather than the user row alone.
 from __future__ import annotations
 
 import secrets
+from dataclasses import dataclass
+from typing import override
 
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.types import AccessKey
@@ -19,29 +21,50 @@ from ai.backend.manager.data.resource.types import (
     KeyPairResourcePolicyData,
     UserResourcePolicyData,
 )
-from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.user.creators import UserCreator
 from ai.backend.manager.repositories.ops.v2.user.write import FullUserCreator
 from ai.backend.manager.secret.types import SecretValue
-from bai_scenario.seeds.seeder import ProvisionFrom
+from bai_scenario.seeds.seeder import Naming, SeedUser
 
 PASSWORD = "scenario-password"
 
 
-def seed_user(
-    *,
-    name_hint: str = "user",
-    role: UserRole = UserRole.USER,
-    is_active: bool = True,
-) -> ProvisionFrom[DomainData, UserResourcePolicyData, KeyPairResourcePolicyData, UserData]:
+@dataclass(frozen=True)
+class SeedUserOf(SeedUser[DomainData, UserResourcePolicyData, KeyPairResourcePolicyData]):
     """A user of the given domain, held to the given policies.
 
     All three are values earlier rows answered, so nothing here names a domain or a
     policy that some other row happens to have made.
     """
 
-    def build(
+    name_hint: str = "user"
+    role: UserRole = UserRole.USER
+    is_active: bool = True
+
+    @override
+    def kind(self) -> str:
+        match self.role:
+            case UserRole.SUPERADMIN:
+                return "슈퍼관리자"
+            case UserRole.ADMIN:
+                return "도메인 관리자"
+            case UserRole.MONITOR:
+                return "모니터"
+            case UserRole.USER:
+                return "일반 사용자"
+
+    @override
+    def detail(self) -> str:
+        return "자기 키와 개인 프로젝트를 갖는다"
+
+    @override
+    def name(self, naming: Naming) -> str:
+        return naming(self.name_hint)
+
+    @override
+    def seed(
+        self,
         name: str,
         domain: DomainData,
         policy: UserResourcePolicyData,
@@ -60,8 +83,8 @@ def seed_user(
                 ),
                 need_password_change=False,
                 domain_id=domain.id,
-                role=role,
-                is_active=is_active,
+                role=self.role,
+                is_active=self.is_active,
                 resource_policy=policy.name,
             ),
             keypair_secrets=KeyPairSecrets(
@@ -72,11 +95,3 @@ def seed_user(
             ),
             keypair_resource_policy=keypair_policy.name,
         )
-
-    kinds = {
-        UserRole.SUPERADMIN: "a superadmin",
-        UserRole.ADMIN: "a domain admin",
-        UserRole.MONITOR: "a monitor",
-        UserRole.USER: "a user",
-    }
-    return ProvisionFrom(kinds[role], name_hint, build)

@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 import pytest
-from bai_scenario.components.domain import DomainScenario, seed_someone_of
+from bai_scenario.components.domain import DomainScenario, SomeoneOf
 from bai_scenario.runner.runner import ScenarioRunner
-from bai_scenario.seeds.domain.domain import seed_domain
+from bai_scenario.seeds.domain.domain import SeedDomain
 from bai_scenario.seeds.seeder import Seeder
 
 from ai.backend.common.data.user.types import UserRole
@@ -20,9 +20,9 @@ from ai.backend.testutils.typed_scenario import TypedScenario, at, call, every
 
 
 def the_count_is_what_was_laid(seed: Seeder) -> DomainScenario:
-    home = seed.creating(seed_domain(name_hint="home"))
-    others = [seed.creating(seed_domain(name_hint="other")) for _ in range(3)]
-    superadmin = seed_someone_of(seed, home, role=UserRole.SUPERADMIN)
+    home = seed.creating(SeedDomain(name_hint="home"))
+    others = [seed.creating(SeedDomain(name_hint="other")) for _ in range(3)]
+    superadmin = seed.within(SomeoneOf(home, role=UserRole.SUPERADMIN))
     return TypedScenario.ok(
         "the-answer-counts-every-domain-the-scenario-laid",
         description=("이 시나리오가 심은 도메인이 넷일 때, 필터 없는 조회는 그 넷을 모두 센다"),
@@ -34,10 +34,10 @@ def the_count_is_what_was_laid(seed: Seeder) -> DomainScenario:
 
 
 def a_name_filter_narrows(seed: Seeder) -> DomainScenario:
-    home = seed.creating(seed_domain(name_hint="home"))
-    wanted = seed.creating(seed_domain(name_hint="wanted"))
-    seed.creating(seed_domain(name_hint="other"))
-    superadmin = seed_someone_of(seed, home, role=UserRole.SUPERADMIN)
+    home = seed.creating(SeedDomain(name_hint="home"))
+    wanted = seed.creating(SeedDomain(name_hint="wanted"))
+    seed.creating(SeedDomain(name_hint="other"))
+    superadmin = seed.within(SomeoneOf(home, role=UserRole.SUPERADMIN))
     return TypedScenario.ok(
         "a-name-filter-narrows-the-answer-to-the-domain-it-names",
         description=(
@@ -54,8 +54,8 @@ def a_name_filter_narrows(seed: Seeder) -> DomainScenario:
 
 
 def ungranted_user_is_refused(seed: Seeder) -> DomainScenario:
-    home = seed.creating(seed_domain(name_hint="home"))
-    someone = seed_someone_of(seed, home)
+    home = seed.creating(SeedDomain(name_hint="home"))
+    someone = seed.within(SomeoneOf(home))
     return TypedScenario.error(
         "a-user-who-is-not-the-superadmin-may-not-search-every-domain",
         description=("슈퍼관리자가 아닌 사용자가 전체 도메인 조회를 요청하면 역할로 막힌다"),

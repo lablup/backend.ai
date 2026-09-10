@@ -7,8 +7,9 @@ against, and the situations worth naming more than once.
 
 from __future__ import annotations
 
-from collections.abc import Callable, Sequence
-from datetime import datetime, timedelta
+from collections.abc import Sequence
+from dataclasses import dataclass
+from typing import override
 
 from ai.backend.common.data.entity.domain import DomainEntityType
 from ai.backend.common.data.entity.user import UserID
@@ -17,64 +18,80 @@ from ai.backend.manager.api.adapters.domain.adapter import DomainAdapter
 from ai.backend.manager.config.unified import ManagerUnifiedConfig
 from ai.backend.manager.data.domain.types import DomainData
 from ai.backend.manager.data.permission.types import Permission
-from ai.backend.manager.data.resource.types import ProjectResourcePolicyData
 from ai.backend.manager.data.user.types import UserData
 from ai.backend.testutils.typed_scenario import (
     Situation,
     TypedScenario,
     config_of,
-    recent,
 )
-from bai_scenario.seeds.rbac.role import seed_permission, seed_role
-from bai_scenario.seeds.resource_policy.keypair import seed_keypair_policy
-from bai_scenario.seeds.resource_policy.project import seed_project_policy
-from bai_scenario.seeds.resource_policy.user import seed_user_policy
-from bai_scenario.seeds.seeder import Given, Seeder
-from bai_scenario.seeds.user.user import seed_user
+from bai_scenario.seeds.rbac.role import SeedPermission, SeedRole
+from bai_scenario.seeds.resource_policy.keypair import SeedKeypairPolicy
+from bai_scenario.seeds.resource_policy.project import SeedProjectPolicy
+from bai_scenario.seeds.resource_policy.user import SeedUserPolicy
+from bai_scenario.seeds.seeder import Given, Seeder, SeedNest
+from bai_scenario.seeds.user.user import SeedUserOf
 
 type DomainScenario = TypedScenario[DomainAdapter, ManagerUnifiedConfig]
 
 MANAGER_CONFIG = config_of(ManagerUnifiedConfig)
 
 
-def seed_personal_project_policy(seed: Seeder) -> Given[ProjectResourcePolicyData]:
-    """The policy a personal project is written under. Its name is fixed by the
-    manager, so a scenario has exactly one however many users it lays."""
-    return seed.once("project-policy", lambda: seed.creating(seed_project_policy()))
+@dataclass(frozen=True)
+class GrantedUser:
+    """A user and the grant they hold, answered apart.
 
-
-def seed_someone_of(
-    seed: Seeder,
-    domain: Given[DomainData],
-    *,
-    role: UserRole = UserRole.USER,
-    vfolder_hosts: Sequence[str] = (),
-) -> Given[UserData]:
-    """A user of that domain, provisioned the way the manager provisions one.
-
-    That brings the key they authorize with and the personal project their own folders
-    live in. Neither is optional scenery: a request that resolves the caller, or makes
-    a folder they own, fails before any permission is looked at without them.
+    The row beside it that wants the same user without the grant simply does not ask
+    for one, so the two never travel as an inseparable pair.
     """
-    seed_personal_project_policy(seed)
-    policy = seed.creating(seed_user_policy())
-    key_policy = seed.creating(seed_keypair_policy(vfolder_hosts=vfolder_hosts))
-    return seed.provisioning(seed_user(role=role), domain, policy, key_policy)
+
+    user: Given[UserData]
+    grant: Given[None]
 
 
-def seed_someone_reading_domains(
-    seed: Seeder, domain: Given[DomainData]
-) -> tuple[Given[UserData], Given[None]]:
-    """A user, and the grant that lets them read domains in that domain's scope.
+@dataclass(frozen=True)
+class SomeoneOf(SeedNest[Given[UserData]]):
+    """그 도메인에 속한 사용자 한 명. 매니저가 사용자를 만드는 경로를 그대로 탄다.
 
-    The two are answered apart so a row lays the grant by naming it, and the row
-    beside it that wants the same user without it simply does not.
+    그 경로가 인증에 쓰는 키와, 자기 폴더가 사는 개인 프로젝트까지 함께 만든다. 둘 다
+    장식이 아니다. 호출자를 찾는 요청이나 자기 폴더를 만드는 요청은 그 둘이 없으면 권한을
+    보기도 전에 실패한다.
     """
-    someone = seed_someone_of(seed, domain)
-    role = seed.creating(seed_role(lambda d: d.id, name_hint="domain-reader"), domain)
-    seed.adding(seed_permission(entity_type=DomainEntityType(), permission=Permission.READ), role)
-    grant = seed.granting(role, someone, role_id=lambda r: r.id, user_id=lambda u: UserID(u.id))
-    return someone, grant
+
+    domain: Given[DomainData]
+    role: UserRole = UserRole.USER
+    vfolder_hosts: Sequence[str] = ()
+
+    @override
+    def kind(self) -> str:
+        return "도메인에 속한 사용자 한 명 준비"
+
+    @override
+    def lay(self, seed: Seeder) -> Given[UserData]:
+        seed.once(SeedProjectPolicy())
+        policy = seed.creating(SeedUserPolicy())
+        key_policy = seed.creating(SeedKeypairPolicy(vfolder_hosts=self.vfolder_hosts))
+        return seed.provisioning(SeedUserOf(role=self.role), self.domain, policy, key_policy)
+
+
+@dataclass(frozen=True)
+class SomeoneReadingDomains(SeedNest[GrantedUser]):
+    """그 도메인 범위에서 도메인을 읽을 수 있는 사용자."""
+
+    domain: Given[DomainData]
+
+    @override
+    def kind(self) -> str:
+        return "도메인 조회 권한을 받은 사용자 준비"
+
+    @override
+    def lay(self, seed: Seeder) -> GrantedUser:
+        someone = seed.within(SomeoneOf(self.domain))
+        role = seed.creating_from(SeedRole(lambda d: d.id, name_hint="domain-reader"), self.domain)
+        seed.adding(
+            SeedPermission(entity_type=DomainEntityType(), permission=Permission.READ), role
+        )
+        grant = seed.granting(role, someone, role_id=lambda r: r.id, user_id=lambda u: UserID(u.id))
+        return GrantedUser(someone, grant)
 
 
 def enforcement_off(seed: Seeder) -> Situation[ManagerUnifiedConfig]:
@@ -83,8 +100,3 @@ def enforcement_off(seed: Seeder) -> Situation[ManagerUnifiedConfig]:
     return seed.situation(
         config=[MANAGER_CONFIG.set(lambda c: c.manager.rbac.enforcement_enabled, False)]
     )
-
-
-def within_the_run() -> Callable[[datetime], bool]:
-    """A timestamp the run itself wrote."""
-    return recent(timedelta(minutes=5))

@@ -3,12 +3,13 @@
 from __future__ import annotations
 
 import pytest
-from bai_scenario.components.domain import seed_personal_project_policy, seed_someone_of
+from bai_scenario.components.domain import SomeoneOf
 from bai_scenario.runner.runner import ScenarioRunner
-from bai_scenario.seeds.domain.domain import seed_domain
-from bai_scenario.seeds.project.project import seed_project
-from bai_scenario.seeds.rbac.role import seed_role
-from bai_scenario.seeds.seeder import Seeder, after
+from bai_scenario.seeds.domain.domain import SeedDomain
+from bai_scenario.seeds.project.project import SeedProject
+from bai_scenario.seeds.rbac.role import SeedRole
+from bai_scenario.seeds.resource_policy.project import SeedProjectPolicy
+from bai_scenario.seeds.seeder import Seeder, after_three, after_two
 
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.user.types import UserRole
@@ -25,9 +26,9 @@ type ProjectScenario = TypedScenario[ProjectAdapter, ManagerUnifiedConfig]
 
 
 def superadmin_makes_a_project(seed: Seeder) -> ProjectScenario:
-    home = seed.creating(seed_domain(name_hint="home"))
-    policy = seed_personal_project_policy(seed)
-    superadmin = seed_someone_of(seed, home, role=UserRole.SUPERADMIN)
+    home = seed.creating(SeedDomain(name_hint="home"))
+    policy = seed.once(SeedProjectPolicy())
+    superadmin = seed.within(SomeoneOf(home, role=UserRole.SUPERADMIN))
     return TypedScenario.ok(
         "the-superadmin-makes-a-project-in-a-domain",
         description=(
@@ -36,7 +37,7 @@ def superadmin_makes_a_project(seed: Seeder) -> ProjectScenario:
         ),
         actor=superadmin,
         given=seed.situation(),
-        when=after(
+        when=after_two(
             home,
             policy,
             lambda d, pol: call(
@@ -49,9 +50,9 @@ def superadmin_makes_a_project(seed: Seeder) -> ProjectScenario:
 
 
 def plain_user_may_not_make_a_project(seed: Seeder) -> ProjectScenario:
-    home = seed.creating(seed_domain(name_hint="home"))
-    policy = seed_personal_project_policy(seed)
-    someone = seed_someone_of(seed, home)
+    home = seed.creating(SeedDomain(name_hint="home"))
+    policy = seed.once(SeedProjectPolicy())
+    someone = seed.within(SomeoneOf(home))
     return TypedScenario.error(
         "a-user-granted-nothing-may-not-make-a-project",
         description=(
@@ -60,7 +61,7 @@ def plain_user_may_not_make_a_project(seed: Seeder) -> ProjectScenario:
         ),
         actor=someone,
         given=seed.situation(),
-        when=after(
+        when=after_two(
             home,
             policy,
             lambda d, pol: call(
@@ -73,12 +74,14 @@ def plain_user_may_not_make_a_project(seed: Seeder) -> ProjectScenario:
 
 
 def a_member_joins_a_project(seed: Seeder) -> ProjectScenario:
-    home = seed.creating(seed_domain(name_hint="home"))
-    policy = seed_personal_project_policy(seed)
-    project = seed.creating(seed_project(name_hint="research"), home, policy)
-    member = seed_someone_of(seed, home)
-    role = seed.creating(seed_role(lambda p: ProjectID(p.id), name_hint="project-member"), project)
-    superadmin = seed_someone_of(seed, home, role=UserRole.SUPERADMIN)
+    home = seed.creating(SeedDomain(name_hint="home"))
+    policy = seed.once(SeedProjectPolicy())
+    project = seed.creating_from_two(SeedProject(name_hint="research"), home, policy)
+    member = seed.within(SomeoneOf(home))
+    role = seed.creating_from(
+        SeedRole(lambda p: ProjectID(p.id), name_hint="project-member"), project
+    )
+    superadmin = seed.within(SomeoneOf(home, role=UserRole.SUPERADMIN))
     return TypedScenario.ok(
         "assigning-a-user-to-a-project-puts-them-on-its-roster",
         description=(
@@ -87,7 +90,7 @@ def a_member_joins_a_project(seed: Seeder) -> ProjectScenario:
         ),
         actor=superadmin,
         given=seed.situation(),
-        when=after(
+        when=after_three(
             project,
             member,
             role,

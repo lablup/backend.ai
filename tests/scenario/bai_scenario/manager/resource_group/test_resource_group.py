@@ -3,10 +3,10 @@
 from __future__ import annotations
 
 import pytest
-from bai_scenario.components.domain import seed_someone_of
+from bai_scenario.components.domain import SomeoneOf
 from bai_scenario.runner.runner import ScenarioRunner
-from bai_scenario.seeds.domain.domain import seed_domain
-from bai_scenario.seeds.resource_group.resource_group import seed_resource_group
+from bai_scenario.seeds.domain.domain import SeedDomain
+from bai_scenario.seeds.resource_group.resource_group import SeedResourceGroup
 from bai_scenario.seeds.seeder import Seeder, after
 
 from ai.backend.common.data.user.types import UserRole
@@ -20,8 +20,8 @@ type ResourceGroupScenario = TypedScenario[ResourceGroupAdapter, ManagerUnifiedC
 
 
 def superadmin_makes_a_resource_group(seed: Seeder) -> ResourceGroupScenario:
-    home = seed.creating(seed_domain(name_hint="home"))
-    superadmin = seed_someone_of(seed, home, role=UserRole.SUPERADMIN)
+    home = seed.creating(SeedDomain(name_hint="home"))
+    superadmin = seed.within(SomeoneOf(home, role=UserRole.SUPERADMIN))
     return TypedScenario.ok(
         "the-superadmin-makes-a-resource-group-in-a-domain",
         description=(
@@ -41,9 +41,9 @@ def superadmin_makes_a_resource_group(seed: Seeder) -> ResourceGroupScenario:
 
 
 def a_seeded_group_is_read_back(seed: Seeder) -> ResourceGroupScenario:
-    home = seed.creating(seed_domain(name_hint="home"))
-    group = seed.creating(seed_resource_group(name_hint="compute"))
-    superadmin = seed_someone_of(seed, home, role=UserRole.SUPERADMIN)
+    home = seed.creating(SeedDomain(name_hint="home"))
+    group = seed.creating(SeedResourceGroup(name_hint="compute"))
+    superadmin = seed.within(SomeoneOf(home, role=UserRole.SUPERADMIN))
     return TypedScenario.ok(
         "a-resource-group-already-there-is-read-back-by-name",
         description=("리소스 그룹이 이미 있을 때 이름으로 조회하면, 그 그룹이 답으로 온다"),
@@ -55,8 +55,8 @@ def a_seeded_group_is_read_back(seed: Seeder) -> ResourceGroupScenario:
 
 
 def ungranted_user_is_refused(seed: Seeder) -> ResourceGroupScenario:
-    home = seed.creating(seed_domain(name_hint="home"))
-    someone = seed_someone_of(seed, home)
+    home = seed.creating(SeedDomain(name_hint="home"))
+    someone = seed.within(SomeoneOf(home))
     return TypedScenario.error(
         "a-user-who-is-not-the-superadmin-may-not-make-a-resource-group",
         description=(

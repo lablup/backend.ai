@@ -2,18 +2,20 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
+from typing import override
+
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.entity.vfolder import VFolderEntityType
 from ai.backend.manager.api.adapters.vfolder.adapter import VFolderAdapter
 from ai.backend.manager.config.unified import ManagerUnifiedConfig
 from ai.backend.manager.data.domain.types import DomainData
 from ai.backend.manager.data.permission.types import Permission
-from ai.backend.manager.data.user.types import UserData
 from ai.backend.testutils.typed_scenario import TypedScenario
-from bai_scenario.components.domain import seed_someone_of
-from bai_scenario.seeds.domain.domain import seed_domain
-from bai_scenario.seeds.rbac.role import seed_permission, seed_role
-from bai_scenario.seeds.seeder import Given, Seeder, Spec
+from bai_scenario.components.domain import GrantedUser, SomeoneOf
+from bai_scenario.seeds.domain.domain import SeedDomain
+from bai_scenario.seeds.rbac.role import SeedPermission, SeedRole
+from bai_scenario.seeds.seeder import Given, Seeder, SeedNest, SeedRow
 
 type VFolderScenario = TypedScenario[VFolderAdapter, ManagerUnifiedConfig]
 
@@ -21,24 +23,35 @@ STORAGE_HOST = "local:volume1"
 """The one host the faked storage manager answers for."""
 
 
-def seed_domain_with_storage() -> Spec[DomainData]:
+def seed_domain_with_storage() -> SeedRow[DomainData]:
     """A domain whose folders may land on the host the fake answers for."""
-    return seed_domain(name_hint="home", vfolder_hosts=[STORAGE_HOST])
+    return SeedDomain(name_hint="home", vfolder_hosts=[STORAGE_HOST])
 
 
-def seed_someone_making_folders(
-    seed: Seeder, domain: Given[DomainData]
-) -> tuple[Given[UserData], Given[None]]:
-    """A user, and the grant that lets them make and read folders of their own.
+@dataclass(frozen=True)
+class SomeoneMakingFolders(SeedNest[GrantedUser]):
+    """자기 폴더를 만들고 조회할 수 있는 사용자.
 
-    The scope is the user themselves: a personal folder is created in the maker's own
-    scope, so that is where the role has to sit.
+    범위는 사용자 자신이다. 개인 폴더는 만든 사람의 스코프에 생기므로 역할도 거기 앉는다.
     """
-    someone = seed_someone_of(seed, domain, vfolder_hosts=[STORAGE_HOST])
-    role = seed.creating(seed_role(lambda u: UserID(u.id), name_hint="folder-owner"), someone)
-    seed.adding(
-        seed_permission(entity_type=VFolderEntityType(), permission=Permission.CREATE), role
-    )
-    seed.adding(seed_permission(entity_type=VFolderEntityType(), permission=Permission.READ), role)
-    grant = seed.granting(role, someone, role_id=lambda r: r.id, user_id=lambda u: UserID(u.id))
-    return someone, grant
+
+    domain: Given[DomainData]
+
+    @override
+    def kind(self) -> str:
+        return "폴더를 만들 수 있는 사용자 준비"
+
+    @override
+    def lay(self, seed: Seeder) -> GrantedUser:
+        someone = seed.within(SomeoneOf(self.domain, vfolder_hosts=[STORAGE_HOST]))
+        role = seed.creating_from(
+            SeedRole(lambda u: UserID(u.id), name_hint="folder-owner"), someone
+        )
+        seed.adding(
+            SeedPermission(entity_type=VFolderEntityType(), permission=Permission.CREATE), role
+        )
+        seed.adding(
+            SeedPermission(entity_type=VFolderEntityType(), permission=Permission.READ), role
+        )
+        grant = seed.granting(role, someone, role_id=lambda r: r.id, user_id=lambda u: UserID(u.id))
+        return GrantedUser(someone, grant)

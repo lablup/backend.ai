@@ -8,6 +8,8 @@ here would make these rows break whenever that answer changed.
 from __future__ import annotations
 
 from collections.abc import Callable
+from dataclasses import dataclass
+from typing import override
 
 from ai.backend.common.data.entity.role import RoleID
 from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
@@ -16,26 +18,48 @@ from ai.backend.manager.data.permission.role import RoleData
 from ai.backend.manager.data.permission.types import Permission
 from ai.backend.manager.models.rbac_models.permission.creators import RolePermissionCreator
 from ai.backend.manager.models.rbac_models.role.creators import RoleCreator
-from bai_scenario.seeds.seeder import FieldOf, SpecFrom
+from bai_scenario.seeds.seeder import Naming, SeedField, SeedRowFrom
 
 
-def seed_role[S](
-    scope_of: Callable[[S], EntityIdentifier], *, name_hint: str = "role"
-) -> SpecFrom[S, RoleData]:
+@dataclass(frozen=True)
+class SeedRole[S](SeedRowFrom[S, RoleData]):
     """A custom role in the scope of the row it is given."""
 
-    def build(name: str, scope: S) -> RoleCreator:
-        return RoleCreator(name=name, scope=scope_of(scope))
+    scope_of: Callable[[S], EntityIdentifier]
+    name_hint: str = "role"
 
-    return SpecFrom("a role", name_hint, build)
+    @override
+    def kind(self) -> str:
+        return "역할"
+
+    @override
+    def detail(self) -> str:
+        return "이 역할이 앉은 스코프 안에서만 통한다"
+
+    @override
+    def name(self, naming: Naming) -> str:
+        return naming(self.name_hint)
+
+    @override
+    def seed(self, name: str, source: S) -> RoleCreator:
+        return RoleCreator(name=name, scope=self.scope_of(source))
 
 
-def seed_permission(
-    *, entity_type: EntityType, permission: Permission
-) -> FieldOf[RoleData, PermissionData]:
+@dataclass(frozen=True)
+class SeedPermission(SeedField[RoleData, PermissionData]):
     """One operation the role may perform on one entity type."""
-    return FieldOf(
-        kind=f"{permission.name or int(permission)} on {entity_type}",
-        owner_id=lambda role: RoleID(role.id),
-        spec=RolePermissionCreator(entity_type=entity_type, permission=permission),
-    )
+
+    entity_type: EntityType
+    permission: Permission
+
+    @override
+    def kind(self) -> str:
+        return f"{self.entity_type} 전체에 {self.permission.name or int(self.permission)} 허용"
+
+    @override
+    def owner_id(self, owner: RoleData) -> RoleID:
+        return RoleID(owner.id)
+
+    @override
+    def seed(self) -> RolePermissionCreator:
+        return RolePermissionCreator(entity_type=self.entity_type, permission=self.permission)

@@ -15,9 +15,11 @@ Which ops path writes a row follows from the spec's type, so no scenario names a
 
 from __future__ import annotations
 
+from abc import ABC, abstractmethod
 from collections.abc import Awaitable, Callable, Sequence
 from dataclasses import dataclass, field
-from typing import Any, cast, overload
+from datetime import UTC, datetime
+from typing import Any, cast
 
 from ai.backend.common.data.entity.role import RoleID
 from ai.backend.common.data.entity.types import FieldData
@@ -40,6 +42,7 @@ from ai.backend.testutils.typed_scenario import (
     Invocation,
     Override,
     Situation,
+    since,
     situation,
 )
 from bai_scenario.seeds.ops import SeedOps
@@ -53,70 +56,119 @@ type WriteSpec[D] = (
 )
 
 
-@dataclass(frozen=True)
-class Spec[D]:
-    """A write spec that needs nothing but its own name."""
-
-    kind: str
-    hint: str
-    build: Callable[[str], WriteSpec[D]]
+type Naming = Callable[[str], str]
+"""Turns a hint into a name no other row of the same scenario holds."""
 
 
-@dataclass(frozen=True)
-class SpecFrom[A, D]:
-    """A write spec that reads one row laid before it."""
+class Seed(ABC):
+    """What the report says about one row a scenario lays."""
 
-    kind: str
-    hint: str
-    build: Callable[[str, A], WriteSpec[D]]
+    @abstractmethod
+    def kind(self) -> str:
+        """레포트가 이 행을 부르는 이름."""
+        raise NotImplementedError
 
+    @abstractmethod
+    def detail(self) -> str:
+        """이 행이 무엇을 세워두는지."""
+        raise NotImplementedError
 
-@dataclass(frozen=True)
-class SpecFromTwo[A, B, D]:
-    """A write spec that reads two rows laid before it."""
+    @abstractmethod
+    def name(self, naming: Naming) -> str:
+        """The name the row goes in under.
 
-    kind: str
-    hint: str
-    build: Callable[[str, A, B], WriteSpec[D]]
-
-
-@dataclass(frozen=True)
-class SpecFromThree[A, B, C, D]:
-    """A write spec that reads three rows laid before it."""
-
-    kind: str
-    hint: str
-    build: Callable[[str, A, B, C], WriteSpec[D]]
+        Most rows ask ``naming`` for one. A row whose name the manager fixes answers
+        with that name instead, and the report then says the name the row really holds.
+        """
+        raise NotImplementedError
 
 
-@dataclass(frozen=True)
-class ProvisionFrom[A, B, C, D]:
-    """A row the manager provisions through a path of its own rather than one spec.
+class SeedRow[D](Seed, ABC):
+    """A row that needs nothing but its own name."""
 
-    A user is the case: the row, its graph, its preset roles, its keypair and its
-    personal project are one operation, and a seed takes that operation whole.
+    @abstractmethod
+    def seed(self, name: str) -> WriteSpec[D]:
+        raise NotImplementedError
+
+
+class SeedRowFrom[A, D](Seed, ABC):
+    """A row that reads one row laid before it."""
+
+    @abstractmethod
+    def seed(self, name: str, source: A) -> WriteSpec[D]:
+        raise NotImplementedError
+
+
+class SeedRowFromTwo[A, B, D](Seed, ABC):
+    """A row that reads two rows laid before it."""
+
+    @abstractmethod
+    def seed(self, name: str, first: A, second: B) -> WriteSpec[D]:
+        raise NotImplementedError
+
+
+class SeedRowFromThree[A, B, C, D](Seed, ABC):
+    """A row that reads three rows laid before it."""
+
+    @abstractmethod
+    def seed(self, name: str, first: A, second: B, third: C) -> WriteSpec[D]:
+        raise NotImplementedError
+
+
+class SeedUser[A, B, C](Seed, ABC):
+    """A user, provisioned through the path the manager provisions one through.
+
+    The row, its graph, its preset roles, its keypair and its personal project are one
+    operation, and a seed takes that operation whole.
     """
 
-    kind: str
-    hint: str
-    build: Callable[[str, A, B, C], FullUserCreator]
+    @abstractmethod
+    def seed(self, name: str, domain: A, policy: B, keypair_policy: C) -> FullUserCreator:
+        raise NotImplementedError
 
 
-@dataclass(frozen=True)
-class FieldOf[A, D: FieldData]:
+class SeedNest[D](ABC):
+    """seed 여러 개를 함께 심어 전제 하나를 준비한다.
+
+    단위가 행 하나가 아니라 "폴더를 만들 수 있는 사용자" 같은 전제다. 무엇을 준비하는지는
+    ``kind``가 말하고, 어떤 seed와 어떤 nest를 딛는지는 ``lay`` 안이 보여준다.
+
+    ``Seeder``를 받지만 그 다섯 입구가 전부 seed 객체를 요구하므로, nest가 행을 직접 쓰는
+    길은 없다.
+    """
+
+    @abstractmethod
+    def kind(self) -> str:
+        """이 묶음이 무엇을 준비하는지."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def lay(self, seed: Seeder) -> D:
+        raise NotImplementedError
+
+
+class SeedField[A, D: FieldData](ABC):
     """A field row written under an owner the scenario already laid.
 
     A field grants nothing of its own and dies with its owner, so it is never laid on
-    its own: the owner comes with it.
+    its own: the owner comes with it, and its name with the owner.
     """
 
-    kind: str
-    owner_id: Callable[[A], Any]
-    spec: FieldCreator[Any, Any, D]
+    @abstractmethod
+    def kind(self) -> str:
+        """이 필드를 가진 주인이 무엇을 할 수 있게 되는지."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def owner_id(self, owner: A) -> Any:
+        raise NotImplementedError
+
+    @abstractmethod
+    def seed(self) -> FieldCreator[Any, Any, D]:
+        raise NotImplementedError
 
 
-@dataclass(frozen=True)
-class Link[S, T]:
+class SeedLink[S, T](ABC):
     """A row that links two entities and belongs to neither.
 
     A resource group reaches a session only through one of these: the group is linked
@@ -124,10 +176,22 @@ class Link[S, T]:
     on one of those three paths.
     """
 
-    kind: str
-    creator: RelationCreator[Any, Any, Any]
-    scope_id: Callable[[S], Any]
-    target_id: Callable[[T], Any]
+    @abstractmethod
+    def kind(self) -> str:
+        """무엇을 잇는지. 스코프와 대상 사이에 놓고 읽는다."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def scope_id(self, scope: S) -> Any:
+        raise NotImplementedError
+
+    @abstractmethod
+    def target_id(self, target: T) -> Any:
+        raise NotImplementedError
+
+    @abstractmethod
+    def seed(self) -> RelationCreator[Any, Any, Any]:
+        raise NotImplementedError
 
 
 @dataclass(frozen=True, eq=False)
@@ -140,10 +204,22 @@ class Given[D]:
 
     name: str
     """The name the seeder made for this row, for a call that needs it."""
+    nest: tuple[str, ...]
+    """이 행을 심은 묶음들. 바깥부터 안쪽 순서다."""
     describe: str
-    """What laying this row does, for the report."""
+    """How other rows refer to this one."""
+    states: str
+    """What laying this row establishes, as a sentence, for the report."""
     sources: tuple[Given[Any], ...]
     write: Callable[[SeedOps, Sequence[Any]], Awaitable[D]]
+
+
+def _there_is(seed: Seed, name: str) -> str:
+    return f"{seed.kind()} {name}"
+
+
+def _states(sentence: str, detail: str) -> str:
+    return f"{sentence}: {detail}" if detail else sentence
 
 
 async def _write(ops: SeedOps, spec: WriteSpec[Any]) -> Any:
@@ -169,7 +245,25 @@ class Seeder:
 
     _counts: dict[str, int] = field(default_factory=dict)
     _laid: list[Given[Any]] = field(default_factory=list)
-    _singletons: dict[str, Given[Any]] = field(default_factory=dict)
+    _singletons: dict[type[Any], Given[Any]] = field(default_factory=dict)
+    _nesting: list[str] = field(default_factory=list)
+    _started: datetime = field(default_factory=lambda: datetime.now(UTC))
+
+    def since_started(self) -> Callable[[datetime], bool]:
+        """이 시나리오를 만들기 시작한 뒤에 찍힌 시각.
+
+        실행이 쓴 값인지를 묻는 조건이다. 얼마 안에 찍혔는지가 아니라 언제부터 뒤인지를
+        기준으로 삼으므로, 임의의 시간 폭을 고르지 않는다.
+        """
+        return since(self._started)
+
+    def within[D](self, nest: SeedNest[D]) -> D:
+        """Lay what this nest lays, remembering that it laid them."""
+        self._nesting.append(nest.kind())
+        try:
+            return nest.lay(self)
+        finally:
+            self._nesting.pop()
 
     def situation[C](
         self,
@@ -183,14 +277,20 @@ class Seeder:
         """
         return situation(rows=tuple(self._laid), config=config, answers=answers)
 
-    def once[D](self, key: str, lay: Callable[[], Given[D]]) -> Given[D]:
+    def declared(self) -> tuple[Given[Any], ...]:
+        """Every row asked for so far, in the order it was asked."""
+        return tuple(self._laid)
+
+    def once[D](self, seed: SeedRow[D], /) -> Given[D]:
         """The one row of its kind this scenario has.
 
         A row whose name the manager fixes is a singleton: laying it twice collides on
-        the primary key. Whoever needs it asks for it and gets the same one.
+        the primary key. Whoever needs it asks for it and gets the same one, and the
+        seed's own type is what says they are the same.
         """
+        key = type(seed)
         if key not in self._singletons:
-            self._singletons[key] = lay()
+            self._singletons[key] = self.creating(seed)
         return cast("Given[D]", self._singletons[key])
 
     def _remember[D](self, row: Given[D]) -> Given[D]:
@@ -202,80 +302,96 @@ class Seeder:
         self._counts[hint] = self._counts.get(hint, 0) + 1
         return f"{hint}-{self._counts[hint]}"
 
-    @overload
-    def creating[D](self, spec: Spec[D], /) -> Given[D]: ...
-
-    @overload
-    def creating[A, D](self, spec: SpecFrom[A, D], a: Given[A], /) -> Given[D]: ...
-
-    @overload
-    def creating[A, B, D](
-        self, spec: SpecFromTwo[A, B, D], a: Given[A], b: Given[B], /
-    ) -> Given[D]: ...
-
-    @overload
-    def creating[A, B, C, D](
-        self, spec: SpecFromThree[A, B, C, D], a: Given[A], b: Given[B], c: Given[C], /
-    ) -> Given[D]: ...
-
-    def creating(self, spec: Any, /, *sources: Any) -> Given[Any]:
-        """Lay the row this spec describes, reading the rows it names."""
-        name = self.name(spec.hint)
-        described = f"{spec.kind} {name}"
-        build: Callable[..., WriteSpec[Any]] = spec.build
+    def creating[D](self, seed: SeedRow[D], /) -> Given[D]:
+        """Lay a row that needs nothing but its own name."""
+        name = seed.name(self.name)
 
         async def write(ops: SeedOps, values: Sequence[Any]) -> Any:
-            return await _write(ops, build(name, *values))
+            return await _write(ops, seed.seed(name))
 
-        return self._remember(
-            Given(name=name, describe=described, sources=tuple(sources), write=write)
-        )
+        return self._remember(self._given(seed, name, (), write, _there_is(seed, name)))
 
-    def provisioning[A, B, C, D](
+    def creating_from[A, D](self, seed: SeedRowFrom[A, D], a: Given[A], /) -> Given[D]:
+        """Lay a row that reads one row laid before it."""
+        name = seed.name(self.name)
+
+        async def write(ops: SeedOps, values: Sequence[Any]) -> Any:
+            return await _write(ops, seed.seed(name, values[0]))
+
+        return self._remember(self._given(seed, name, (a,), write, _there_is(seed, name)))
+
+    def creating_from_two[A, B, D](
+        self, seed: SeedRowFromTwo[A, B, D], a: Given[A], b: Given[B], /
+    ) -> Given[D]:
+        """Lay a row that reads two rows laid before it."""
+        name = seed.name(self.name)
+
+        async def write(ops: SeedOps, values: Sequence[Any]) -> Any:
+            return await _write(ops, seed.seed(name, values[0], values[1]))
+
+        return self._remember(self._given(seed, name, (a, b), write, _there_is(seed, name)))
+
+    def creating_from_three[A, B, C, D](
+        self, seed: SeedRowFromThree[A, B, C, D], a: Given[A], b: Given[B], c: Given[C], /
+    ) -> Given[D]:
+        """Lay a row that reads three rows laid before it."""
+        name = seed.name(self.name)
+
+        async def write(ops: SeedOps, values: Sequence[Any]) -> Any:
+            return await _write(ops, seed.seed(name, values[0], values[1], values[2]))
+
+        return self._remember(self._given(seed, name, (a, b, c), write, _there_is(seed, name)))
+
+    def provisioning[A, B, C](
         self,
-        spec: ProvisionFrom[A, B, C, D],
+        seed: SeedUser[A, B, C],
         a: Given[A],
         b: Given[B],
         c: Given[C],
         /,
     ) -> Given[UserData]:
         """Provision what the manager provisions as one operation."""
-        name = self.name(spec.hint)
-        described = f"{spec.kind} {name}"
+        name = seed.name(self.name)
 
         async def write(ops: SeedOps, values: Sequence[Any]) -> UserData:
-            result = await ops.create_user(spec.build(name, *values))
+            result = await ops.create_user(seed.seed(name, *values))
             return result.user
 
-        return self._remember(Given(name=name, describe=described, sources=(a, b, c), write=write))
+        return self._remember(self._given(seed, name, (a, b, c), write, _there_is(seed, name)))
 
-    def adding[A, D: FieldData](self, spec: FieldOf[A, D], owner: Given[A], /) -> Given[D]:
+    def adding[A, D: FieldData](self, seed: SeedField[A, D], owner: Given[A], /) -> Given[D]:
         """Lay one field row under the owner the scenario already laid."""
 
         async def write(ops: SeedOps, values: Sequence[Any]) -> Any:
-            return await ops.create_field(spec.owner_id(values[0]), spec.spec)
+            return await ops.create_field(seed.owner_id(values[0]), seed.seed())
 
         return self._remember(
             Given(
                 name=owner.name,
-                describe=f"{spec.kind} on {owner.describe}",
+                nest=tuple(self._nesting),
+                describe=f"{owner.describe}({seed.kind()})",
+                states=f"{owner.describe}: {seed.kind()}",
                 sources=(owner,),
                 write=write,
             )
         )
 
-    def linking[S, T](self, link: Link[S, T], scope: Given[S], target: Given[T], /) -> Given[None]:
+    def linking[S, T](
+        self, seed: SeedLink[S, T], scope: Given[S], target: Given[T], /
+    ) -> Given[None]:
         """Link the two rows this scenario laid, the way an operator would."""
 
         async def write(ops: SeedOps, values: Sequence[Any]) -> None:
             await ops.create_relations(
-                link.creator, [(link.scope_id(values[0]), link.target_id(values[1]))]
+                seed.seed(), [(seed.scope_id(values[0]), seed.target_id(values[1]))]
             )
 
         return self._remember(
             Given(
                 name=target.name,
-                describe=f"{target.describe} {link.kind} {scope.describe}",
+                nest=tuple(self._nesting),
+                describe=target.describe,
+                states=f"{scope.describe} {seed.kind()} {target.describe}",
                 sources=(scope, target),
                 write=write,
             )
@@ -297,16 +413,38 @@ class Seeder:
         return self._remember(
             Given(
                 name=to.name,
-                describe=f"{to.describe} holds {role.describe}",
+                nest=tuple(self._nesting),
+                describe=to.describe,
+                states=f"{to.describe}: {role.describe} 보유",
                 sources=(role, to),
                 write=write,
             )
         )
 
+    def _given[D](
+        self,
+        seed: Seed,
+        name: str,
+        sources: Sequence[Given[Any]],
+        write: Callable[[SeedOps, Sequence[Any]], Awaitable[D]],
+        sentence: str,
+    ) -> Given[D]:
+        return Given(
+            name=name,
+            nest=tuple(self._nesting),
+            describe=f"{seed.kind()} {name}",
+            states=_states(sentence, seed.detail()),
+            sources=tuple(sources),
+            write=write,
+        )
 
-async def lay(ops: SeedOps, wanted: Sequence[Given[Any]]) -> dict[Given[Any], Any]:
-    """Write every row the wanted rows rest on, each once, in this session."""
-    made: dict[Given[Any], Any] = {}
+
+async def lay(ops: SeedOps, wanted: Sequence[Given[Any]], made: dict[Given[Any], Any]) -> None:
+    """Write every row the wanted rows rest on, each once, in this session.
+
+    What has been written is carried in ``made`` rather than answered, so a caller that
+    lays in several goes writes each row once across all of them.
+    """
 
     async def settle(row: Given[Any]) -> Any:
         if row in made:
@@ -317,11 +455,10 @@ async def lay(ops: SeedOps, wanted: Sequence[Given[Any]]) -> dict[Given[Any], An
 
     for row in wanted:
         await settle(row)
-    return made
 
 
-def steps_of(wanted: Sequence[Given[Any]]) -> list[str]:
-    """What laying these rows does, in the order it does it."""
+def laid_in_order(wanted: Sequence[Given[Any]]) -> list[Given[Any]]:
+    """Every row the wanted rows rest on, in the order they are written."""
     seen: list[Given[Any]] = []
 
     def walk(row: Given[Any]) -> None:
@@ -333,41 +470,38 @@ def steps_of(wanted: Sequence[Given[Any]]) -> list[str]:
 
     for row in wanted:
         walk(row)
-    return [row.describe for row in seen]
+    return seen
 
 
-@overload
 def after[D, A, R](
     row: Given[D],
     build: Callable[[D], Invocation[A, R] | ActorBound[A, R, Any]],
     /,
-) -> Deferred[A, R]: ...
+) -> Deferred[A, R]:
+    """Read the row this scenario laid, then say what to call with it.
+
+    ``build`` comes last and receives the created data, typed, so an id the database
+    generated is reachable without a placeholder or a literal repeated from the seed.
+    """
+    return Deferred((row,), build)
 
 
-@overload
-def after[D1, D2, A, R](
+def after_two[D1, D2, A, R](
     first: Given[D1],
     second: Given[D2],
     build: Callable[[D1, D2], Invocation[A, R] | ActorBound[A, R, Any]],
     /,
-) -> Deferred[A, R]: ...
+) -> Deferred[A, R]:
+    """Read two rows this scenario laid, then say what to call with them."""
+    return Deferred((first, second), build)
 
 
-@overload
-def after[D1, D2, D3, A, R](
+def after_three[D1, D2, D3, A, R](
     first: Given[D1],
     second: Given[D2],
     third: Given[D3],
     build: Callable[[D1, D2, D3], Invocation[A, R] | ActorBound[A, R, Any]],
     /,
-) -> Deferred[A, R]: ...
-
-
-def after(*parts: Any) -> Deferred[Any, Any]:
-    """Read the rows this scenario laid, then say what to call with them.
-
-    ``build`` comes last and receives the created data, typed, so an id the database
-    generated is reachable without a placeholder or a literal repeated from the seed.
-    """
-    *rows, build = parts
-    return Deferred(tuple(rows), build)
+) -> Deferred[A, R]:
+    """Read three rows this scenario laid, then say what to call with them."""
+    return Deferred((first, second, third), build)

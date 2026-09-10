@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
+from typing import override
+
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.session import SessionEntityType
 from ai.backend.common.data.entity.user import UserID
@@ -10,28 +13,40 @@ from ai.backend.manager.config.unified import ManagerUnifiedConfig
 from ai.backend.manager.data.domain.types import DomainData
 from ai.backend.manager.data.permission.types import Permission
 from ai.backend.manager.data.project.types import ProjectData
-from ai.backend.manager.data.user.types import UserData
 from ai.backend.testutils.typed_scenario import TypedScenario
-from bai_scenario.components.domain import seed_someone_of
-from bai_scenario.seeds.rbac.role import seed_permission, seed_role
-from bai_scenario.seeds.seeder import Given, Seeder
+from bai_scenario.components.domain import GrantedUser, SomeoneOf
+from bai_scenario.seeds.rbac.role import SeedPermission, SeedRole
+from bai_scenario.seeds.seeder import Given, Seeder, SeedNest
 
 type SessionScenario = TypedScenario[SessionAdapter, ManagerUnifiedConfig]
 
 
-def seed_someone_making_sessions(
-    seed: Seeder, domain: Given[DomainData], project: Given[ProjectData]
-) -> tuple[Given[UserData], Given[None]]:
-    """A user on that project's roster, allowed to make and read sessions there.
+@dataclass(frozen=True)
+class SomeoneMakingSessions(SeedNest[GrantedUser]):
+    """그 프로젝트에서 세션을 만들고 조회할 수 있는 사용자.
 
-    A session names the project it belongs to, so the role sits in the project's scope
-    and the grant that gives it also puts the user on the roster.
+    세션은 자기가 속한 프로젝트를 이름으로 대므로 역할이 프로젝트 스코프에 앉고, 그 역할을
+    주는 일이 곧 그 사람을 프로젝트 명부에 올리는 일이 된다.
     """
-    someone = seed_someone_of(seed, domain)
-    role = seed.creating(seed_role(lambda p: ProjectID(p.id), name_hint="session-owner"), project)
-    seed.adding(
-        seed_permission(entity_type=SessionEntityType(), permission=Permission.CREATE), role
-    )
-    seed.adding(seed_permission(entity_type=SessionEntityType(), permission=Permission.READ), role)
-    grant = seed.granting(role, someone, role_id=lambda r: r.id, user_id=lambda u: UserID(u.id))
-    return someone, grant
+
+    domain: Given[DomainData]
+    project: Given[ProjectData]
+
+    @override
+    def kind(self) -> str:
+        return "그 프로젝트에서 세션을 만들 수 있는 사용자 준비"
+
+    @override
+    def lay(self, seed: Seeder) -> GrantedUser:
+        someone = seed.within(SomeoneOf(self.domain))
+        role = seed.creating_from(
+            SeedRole(lambda p: ProjectID(p.id), name_hint="session-owner"), self.project
+        )
+        seed.adding(
+            SeedPermission(entity_type=SessionEntityType(), permission=Permission.CREATE), role
+        )
+        seed.adding(
+            SeedPermission(entity_type=SessionEntityType(), permission=Permission.READ), role
+        )
+        grant = seed.granting(role, someone, role_id=lambda r: r.id, user_id=lambda u: UserID(u.id))
+        return GrantedUser(someone, grant)

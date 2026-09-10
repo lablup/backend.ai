@@ -7,10 +7,10 @@ here: ``bai_scenario`` beside it does the manager-aware work.
 from __future__ import annotations
 
 import asyncio
-import json
 import os
 import secrets
 from collections.abc import AsyncIterator, Iterator, Sequence
+from dataclasses import replace
 from typing import Any
 
 import pytest
@@ -23,7 +23,10 @@ from bai_scenario.db import (
     engine_for,
 )
 from bai_scenario.monitors import ActionRecorder
-from bai_scenario.runner.runner import ScenarioRunner, offered_by, scenario_steps
+from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.runner import ScenarioRunner, offered_by, scenario_given
+from bai_scenario.seeds.ops import SeedOpsProvider
+from bai_scenario.seeds.seeder import Seeder
 from bai_scenario.validators import build_action_validators
 
 from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
@@ -31,6 +34,7 @@ from ai.backend.manager.actions.monitors import ActionMonitors
 from ai.backend.manager.actions.v2.validators import ActionValidators as V2ActionValidators
 from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.config.provider import ManagerConfigProvider
+from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.permission_controller.repository import (
     PermissionControllerRepository,
 )
@@ -61,16 +65,16 @@ def pytest_runtest_makereport(item: pytest.Item, call: pytest.CallInfo[None]) ->
         return report
     result = report.get_result()
     adapter = getattr(item, "funcargs", {}).get("adapter")
-    row = {
-        **scenario.describe(),
-        "module": getattr(getattr(item, "module", None), "__name__", ""),
-        "outcome": result.outcome,
-        "steps": scenario_steps(scenario),
-        "adapter": type(adapter).__name__ if adapter is not None else "",
-        "offers": sorted(offered_by(adapter)) if adapter is not None else [],
-    }
+    record = replace(
+        scenario.describe(),
+        module=getattr(getattr(item, "module", None), "__name__", ""),
+        outcome=result.outcome,
+        given=scenario_given(scenario),
+        adapter=type(adapter).__name__ if adapter is not None else "",
+        offers=tuple(sorted(offered_by(adapter))) if adapter is not None else (),
+    )
     with open(path, "a", encoding="utf8") as f:
-        f.write(json.dumps(row) + "\n")
+        f.write(record.as_line() + "\n")
     return report
 
 
@@ -112,13 +116,16 @@ def config(
     template: TemplateDatabase,
     test_db: str,
 ) -> ManagerConfigProvider:
-    """The config this row runs under: the base, plus what the row overrides."""
-    scenario = request.node.callspec.params["scenario"]
+    """The config this test runs under: the base, plus what a scenario overrides.
+
+    A test that seeds through fixtures rather than a scenario table overrides nothing,
+    so it gets the base.
+    """
+    callspec = getattr(request.node, "callspec", None)
+    asked = callspec.params.get("scenario") if callspec is not None else None
+    overrides = asked.given.dotted_config() if isinstance(asked, TypedScenario) else {}
     return ScenarioConfigProvider(
-        make_config(
-            base_config_dict(template.addr, test_db, None),
-            scenario.given.dotted_config(),
-        )
+        make_config(base_config_dict(template.addr, test_db, None), overrides)
     )
 
 
@@ -151,3 +158,19 @@ def _note_time(kind: str, seconds: float) -> None:
     if path:
         with open(path, "a", encoding="utf8") as f:
             f.write(f"{kind}\t{seconds:.4f}\n")
+
+
+@pytest.fixture
+def seed() -> Seeder:
+    """행을 선언하는 자리. 시나리오 표가 쓰는 것과 같은 `Seeder`다."""
+    return Seeder()
+
+
+@pytest.fixture
+async def seeding(seed: Seeder, engine: ExtendedAsyncSAEngine) -> AsyncIterator[SeedingSession]:
+    """픽스처가 자기 행을 그 자리에서 쓰는 자리.
+
+    쓰기 세션 하나를 테스트 내내 열어 두므로, 픽스처가 몇 개로 나뉘어도 한 트랜잭션이다.
+    """
+    async with SeedOpsProvider(engine).write_ops() as ops:
+        yield SeedingSession(seed, ops)

@@ -12,36 +12,16 @@ import inspect
 from collections.abc import Sequence
 from typing import Any
 
-from ai.backend.common.contexts.user import with_user
-from ai.backend.common.data.user.types import UserData, UserRole
-from ai.backend.manager.data.domain.types import UserInfo
-from ai.backend.manager.data.user.types import UserData as SeededUser
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.testutils.scenario_report import GivenStep
 from ai.backend.testutils.typed_scenario import TypedMatcher, TypedScenario, mismatches_of
+from bai_scenario.runner.acting import ActingAs
 from bai_scenario.seeds.ops import SeedOpsProvider
-from bai_scenario.seeds.seeder import Given, lay, steps_of
+from bai_scenario.seeds.seeder import Given, laid_in_order, lay
 
 
 class NoActor(Exception):
     """The scenario made a call that needs a caller and named no actor."""
-
-
-def _context_of(user: SeededUser) -> UserData:
-    """What ``with_user`` needs: the request-context view of the user the row laid."""
-    return UserData(
-        user_id=user.id,
-        is_authorized=True,
-        is_admin=user.role in (UserRole.ADMIN, UserRole.SUPERADMIN),
-        is_superadmin=user.role == UserRole.SUPERADMIN,
-        role=user.role,
-        domain_name=user.domain_name,
-        domain_id=user.domain_id,
-    )
-
-
-def _info_of(user: SeededUser) -> UserInfo:
-    """What an adapter method taking the caller beside the DTO wants."""
-    return UserInfo(id=user.id, role=user.role, domain_name=user.domain_name)
 
 
 class ScenarioRunner:
@@ -61,8 +41,10 @@ class ScenarioRunner:
         wanted = [row for row in scenario.given.rows if isinstance(row, Given)]
         if isinstance(scenario.actor, Given):
             wanted.append(scenario.actor)
+        made: dict[Given[Any], Any] = {}
         async with SeedOpsProvider(self._engine).write_ops() as ops:
-            return await lay(ops, wanted)
+            await lay(ops, wanted, made)
+        return made
 
     async def __call__(self, scenario: TypedScenario[Any, Any]) -> None:
         made = await self._lay(scenario)
@@ -71,8 +53,8 @@ class ScenarioRunner:
             if actor is None:
                 answered = await scenario.invoke(self._adapter, made, None)
             else:
-                with with_user(_context_of(actor)):
-                    answered = await scenario.invoke(self._adapter, made, _info_of(actor))
+                with ActingAs(actor) as who:
+                    answered = await scenario.invoke(self._adapter, made, who)
         except Exception as raised:
             self._check_raised(scenario, raised)
             return
@@ -102,12 +84,15 @@ class ScenarioRunner:
             raise AssertionError(f"[{scenario.summary}] " + "; ".join(problems))
 
 
-def scenario_steps(scenario: TypedScenario[Any, Any]) -> list[str]:
-    """What laying this scenario's rows does, in order, for the report."""
+def scenario_given(scenario: TypedScenario[Any, Any]) -> tuple[GivenStep, ...]:
+    """What is already true when the call is made, in the order it was laid."""
     wanted = [row for row in scenario.given.rows if isinstance(row, Given)]
     if isinstance(scenario.actor, Given):
         wanted.append(scenario.actor)
-    return steps_of(wanted)
+    return tuple(
+        GivenStep(states=row.states, nest=row.nest, actor=row is scenario.actor)
+        for row in laid_in_order(wanted)
+    )
 
 
 def offered_by(adapter: object) -> frozenset[str]:

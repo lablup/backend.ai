@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 import pytest
-from bai_scenario.components.domain import DomainScenario, seed_someone_of
+from bai_scenario.components.domain import DomainScenario, SomeoneOf
 from bai_scenario.runner.runner import ScenarioRunner
-from bai_scenario.seeds.domain.domain import seed_domain
+from bai_scenario.seeds.domain.domain import SeedDomain
 from bai_scenario.seeds.seeder import Seeder, after
 
 from ai.backend.common.data.user.types import UserRole
@@ -17,9 +17,9 @@ from ai.backend.testutils.typed_scenario import TypedScenario, at, call, needs_a
 
 
 def superadmin_edits_a_description(seed: Seeder) -> DomainScenario:
-    home = seed.creating(seed_domain(name_hint="home"))
-    editable = seed.creating(seed_domain(name_hint="editable"))
-    superadmin = seed_someone_of(seed, home, role=UserRole.SUPERADMIN)
+    home = seed.creating(SeedDomain(name_hint="home"))
+    editable = seed.creating(SeedDomain(name_hint="editable"))
+    superadmin = seed.within(SomeoneOf(home, role=UserRole.SUPERADMIN))
     # ``description`` is optional on the node, so what it is held to has to be too.
     edited: str | None = "edited"
     return TypedScenario.ok(
@@ -46,9 +46,9 @@ def superadmin_edits_a_description(seed: Seeder) -> DomainScenario:
 
 
 def retiring_is_an_edit_of_the_active_flag(seed: Seeder) -> DomainScenario:
-    home = seed.creating(seed_domain(name_hint="home"))
-    target = seed.creating(seed_domain(name_hint="to-retire"))
-    superadmin = seed_someone_of(seed, home, role=UserRole.SUPERADMIN)
+    home = seed.creating(SeedDomain(name_hint="home"))
+    target = seed.creating(SeedDomain(name_hint="to-retire"))
+    superadmin = seed.within(SomeoneOf(home, role=UserRole.SUPERADMIN))
     return TypedScenario.ok(
         "clearing-the-active-flag-is-how-a-domain-retires",
         description="활성 플래그를 내리는 수정으로 도메인을 물릴 수 있고, 답이 그 상태를 실어 온다",
@@ -68,8 +68,8 @@ def retiring_is_an_edit_of_the_active_flag(seed: Seeder) -> DomainScenario:
 
 
 def unknown_name_is_not_found(seed: Seeder) -> DomainScenario:
-    home = seed.creating(seed_domain(name_hint="home"))
-    superadmin = seed_someone_of(seed, home, role=UserRole.SUPERADMIN)
+    home = seed.creating(SeedDomain(name_hint="home"))
+    superadmin = seed.within(SomeoneOf(home, role=UserRole.SUPERADMIN))
     return TypedScenario.error(
         "editing-a-name-nothing-answers-to-is-not-found",
         description="아무 도메인도 갖지 않은 이름을 수정하려 하면 대상이 없다는 것으로 거부된다",
@@ -89,9 +89,9 @@ def unknown_name_is_not_found(seed: Seeder) -> DomainScenario:
 
 
 def ungranted_user_is_refused(seed: Seeder) -> DomainScenario:
-    home = seed.creating(seed_domain(name_hint="home"))
-    target = seed.creating(seed_domain(name_hint="untouchable"))
-    someone = seed_someone_of(seed, home)
+    home = seed.creating(SeedDomain(name_hint="home"))
+    target = seed.creating(SeedDomain(name_hint="untouchable"))
+    someone = seed.within(SomeoneOf(home))
     return TypedScenario.error(
         "a-user-granted-nothing-may-not-edit-a-domain",
         description="아무 권한도 받지 않은 사용자가 도메인을 수정하려 하면 권한 부족으로 거부된다",

@@ -2,25 +2,43 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
+from typing import override
+
 from ai.backend.common.data.entity.container_registry import ContainerRegistryID
 from ai.backend.manager.data.container_registry.types import ContainerRegistryData
 from ai.backend.manager.data.image.types import ImageData, ImageType
 from ai.backend.manager.models.image.creators import ImageCreator
-from bai_scenario.seeds.seeder import SpecFrom
+from bai_scenario.seeds.seeder import Naming, SeedRowFrom
 
 
-def seed_image(
-    *, name_hint: str = "image", architecture: str = "x86_64"
-) -> SpecFrom[ContainerRegistryData, ImageData]:
+@dataclass(frozen=True)
+class SeedImage(SeedRowFrom[ContainerRegistryData, ImageData]):
     """An image of the given registry. A session names one to run."""
 
-    def build(name: str, registry: ContainerRegistryData) -> ImageCreator:
+    name_hint: str = "image"
+    architecture: str = "x86_64"
+
+    @override
+    def kind(self) -> str:
+        return "이미지"
+
+    @override
+    def detail(self) -> str:
+        return f"{self.architecture} 이미지"
+
+    @override
+    def name(self, naming: Naming) -> str:
+        return naming(self.name_hint)
+
+    @override
+    def seed(self, name: str, source: ContainerRegistryData) -> ImageCreator:
         return ImageCreator(
             name=name,
             project=None,
-            architecture=architecture,
-            registry_id=ContainerRegistryID(registry.id),
-            registry=registry.registry_name,
+            architecture=self.architecture,
+            registry_id=ContainerRegistryID(source.id),
+            registry=source.registry_name,
             image=name,
             tag="latest",
             config_digest=f"sha256:{name:>064}".replace(" ", "0"),
@@ -28,5 +46,3 @@ def seed_image(
             labels={},
             type=ImageType.COMPUTE,
         )
-
-    return SpecFrom("an image", name_hint, build)

@@ -9,18 +9,19 @@ from __future__ import annotations
 from uuid import UUID
 
 import pytest
-from bai_scenario.components.domain import seed_personal_project_policy, seed_someone_of
-from bai_scenario.components.session import SessionScenario, seed_someone_making_sessions
+from bai_scenario.components.domain import SomeoneOf
+from bai_scenario.components.session import SessionScenario, SomeoneMakingSessions
 from bai_scenario.runner.runner import ScenarioRunner
-from bai_scenario.seeds.domain.domain import seed_domain
-from bai_scenario.seeds.image.image import seed_image
-from bai_scenario.seeds.image.registry import seed_container_registry
-from bai_scenario.seeds.project.project import seed_project
+from bai_scenario.seeds.domain.domain import SeedDomain
+from bai_scenario.seeds.image.image import SeedImage
+from bai_scenario.seeds.image.registry import SeedContainerRegistry
+from bai_scenario.seeds.project.project import SeedProject
 from bai_scenario.seeds.resource_group.resource_group import (
-    link_to_domain,
-    seed_resource_group,
+    LinkToDomain,
+    SeedResourceGroup,
 )
-from bai_scenario.seeds.seeder import Seeder, after
+from bai_scenario.seeds.resource_policy.project import SeedProjectPolicy
+from bai_scenario.seeds.seeder import Seeder, after_three
 
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.data.user.types import UserRole
@@ -35,8 +36,8 @@ from ai.backend.testutils.typed_scenario import TypedScenario, at, call, needs_a
 
 
 def nothing_laid_means_nothing_found(seed: Seeder) -> SessionScenario:
-    home = seed.creating(seed_domain(name_hint="home"))
-    superadmin = seed_someone_of(seed, home, role=UserRole.SUPERADMIN)
+    home = seed.creating(SeedDomain(name_hint="home"))
+    superadmin = seed.within(SomeoneOf(home, role=UserRole.SUPERADMIN))
     return TypedScenario.ok(
         "a-scenario-that-laid-no-session-finds-none",
         description="세션을 하나도 심지 않은 상태에서 슈퍼관리자가 조회하면, 답은 비어 있다",
@@ -48,8 +49,8 @@ def nothing_laid_means_nothing_found(seed: Seeder) -> SessionScenario:
 
 
 def ungranted_user_is_refused(seed: Seeder) -> SessionScenario:
-    home = seed.creating(seed_domain(name_hint="home"))
-    someone = seed_someone_of(seed, home)
+    home = seed.creating(SeedDomain(name_hint="home"))
+    someone = seed.within(SomeoneOf(home))
     return TypedScenario.error(
         "a-user-granted-nothing-may-not-search-sessions",
         description=(
@@ -64,14 +65,14 @@ def ungranted_user_is_refused(seed: Seeder) -> SessionScenario:
 
 
 def granted_user_enqueues_a_session(seed: Seeder) -> SessionScenario:
-    home = seed.creating(seed_domain(name_hint="home"))
-    group = seed.creating(seed_resource_group(name_hint="compute"))
-    seed.linking(link_to_domain(), home, group)
-    registry = seed.creating(seed_container_registry())
-    image = seed.creating(seed_image(name_hint="python"), registry)
-    policy = seed_personal_project_policy(seed)
-    project = seed.creating(seed_project(name_hint="research"), home, policy)
-    maker, _ = seed_someone_making_sessions(seed, home, project)
+    home = seed.creating(SeedDomain(name_hint="home"))
+    group = seed.creating(SeedResourceGroup(name_hint="compute"))
+    seed.linking(LinkToDomain(), home, group)
+    registry = seed.creating(SeedContainerRegistry())
+    image = seed.creating_from(SeedImage(name_hint="python"), registry)
+    policy = seed.once(SeedProjectPolicy())
+    project = seed.creating_from_two(SeedProject(name_hint="research"), home, policy)
+    maker = seed.within(SomeoneMakingSessions(home, project)).user
     return TypedScenario.ok(
         "a-user-granted-session-create-enqueues-one",
         description=(
@@ -80,7 +81,7 @@ def granted_user_enqueues_a_session(seed: Seeder) -> SessionScenario:
         ),
         actor=maker,
         given=seed.situation(),
-        when=after(
+        when=after_three(
             image,
             group,
             project,

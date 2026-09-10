@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 import pytest
-from bai_scenario.components.domain import seed_someone_of
+from bai_scenario.components.domain import SomeoneOf
 from bai_scenario.runner.runner import ScenarioRunner
-from bai_scenario.seeds.domain.domain import seed_domain
+from bai_scenario.seeds.domain.domain import SeedDomain
 from bai_scenario.seeds.seeder import Seeder
 
 from ai.backend.common.data.user.types import UserRole
@@ -19,8 +19,8 @@ type ModelCardScenario = TypedScenario[ModelCardAdapter, ManagerUnifiedConfig]
 
 
 def nothing_laid_means_nothing_found(seed: Seeder) -> ModelCardScenario:
-    home = seed.creating(seed_domain(name_hint="home"))
-    superadmin = seed_someone_of(seed, home, role=UserRole.SUPERADMIN)
+    home = seed.creating(SeedDomain(name_hint="home"))
+    superadmin = seed.within(SomeoneOf(home, role=UserRole.SUPERADMIN))
     return TypedScenario.ok(
         "a-scenario-that-laid-no-model-card-finds-none",
         description=(
@@ -34,8 +34,8 @@ def nothing_laid_means_nothing_found(seed: Seeder) -> ModelCardScenario:
 
 
 def ungranted_user_is_refused(seed: Seeder) -> ModelCardScenario:
-    home = seed.creating(seed_domain(name_hint="home"))
-    someone = seed_someone_of(seed, home)
+    home = seed.creating(SeedDomain(name_hint="home"))
+    someone = seed.within(SomeoneOf(home))
     return TypedScenario.error(
         "a-user-who-is-not-the-superadmin-may-not-search-every-model-card",
         description=("슈퍼관리자가 아닌 사용자가 전체 모델 카드 조회를 요청하면 역할로 막힌다"),
