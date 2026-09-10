@@ -45,7 +45,7 @@ class KeypairResourcePolicyNotFound(EntityError, web.HTTPBadRequest):
     @override
     def entity_error_code(self) -> EntityErrorCode:
         return EntityErrorCode(
-            KeyPairResourcePolicyEntityType(), ActionOperationType.CREATE, ErrorDetail.NOT_FOUND
+            KeyPairResourcePolicyEntityType(), ActionOperationType.GET, ErrorDetail.NOT_FOUND
         )
 
 
@@ -56,7 +56,7 @@ class NoDefaultKeypairResourcePolicy(EntityError, web.HTTPInternalServerError):
     @override
     def entity_error_code(self) -> EntityErrorCode:
         return EntityErrorCode(
-            KeyPairResourcePolicyEntityType(), ActionOperationType.CREATE, ErrorDetail.NOT_FOUND
+            KeyPairResourcePolicyEntityType(), ActionOperationType.GET, ErrorDetail.NOT_FOUND
         )
 
 
