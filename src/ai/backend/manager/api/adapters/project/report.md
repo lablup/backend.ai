@@ -12,21 +12,22 @@ Not exercised by any scenario: admin_delete, admin_purge, admin_restore, admin_s
 
 Given
 
-- 도메인 home-1
-- 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-- 도메인에 속한 사용자 한 명 준비
-  - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-  - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-  - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- 도메인 하나와 프로젝트 정책, 그리고 user 한 명
+  - 도메인 home-1
+  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+  - 도메인에 속한 사용자 한 명 준비
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
 
 When
 
-- ProjectAdapter.admin_create — 일반 사용자 user-1
-  - CreateProjectInput(name='refused', domain_name=도메인: home-1, resource_policy=프로젝트 정책: default)
+- ProjectAdapter.admin_create — user-1이 home-1 아래에 refused을 만듦
 
 Then
 
-- 거부: NotEnoughPermission
+- 거부된다
+  - 거부: NotEnoughPermission
 
 #### [assigning-a-user-to-a-project-puts-them-on-its-roster](/tests/scenario/bai_scenario/manager/project/test_project.py) — pass
 
@@ -34,28 +35,27 @@ Then
 
 Given
 
-- 도메인 home-1
-- 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-- 프로젝트 research-1
-- 도메인에 속한 사용자 한 명 준비
-  - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-  - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-  - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-- 역할 project-member-1: 이 역할이 앉은 스코프 안에서만 통한다
-- 도메인에 속한 사용자 한 명 준비
-  - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
-  - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
-  - 슈퍼관리자 user-2: 자기 키와 개인 프로젝트를 갖는다
+- 프로젝트 하나와 그 프로젝트 스코프의 역할, 올릴 사용자, 그리고 슈퍼관리자
+  - 도메인 home-1
+  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+  - 프로젝트 research-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+    - 슈퍼관리자 user-2: 자기 키와 개인 프로젝트를 갖는다
+  - 역할 project-member-1: 이 역할이 앉은 스코프 안에서만 통한다
 
 When
 
-- ProjectAdapter.assign_users — 슈퍼관리자 user-2
-  - 프로젝트: research-1
-  - AssignUsersToProjectInput(user_ids=[일반 사용자: user-1], role_id=역할: project-member-1)
+- ProjectAdapter.assign_users — user-2이 user-1을 research-1에 배정
 
 Then
 
-- <computed> = 1
+- 명부에 배정한 사람만 올라 있다
+  - items = [UserID('01a08a89-c92e-734f-8697-3a0001d880dd')]
 
 #### [the-superadmin-makes-a-project-in-a-domain](/tests/scenario/bai_scenario/manager/project/test_project.py) — pass
 
@@ -63,19 +63,30 @@ Then
 
 Given
 
-- 도메인 home-1
-- 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-- 도메인에 속한 사용자 한 명 준비
-  - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-  - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-  - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- 도메인 하나와 프로젝트 정책, 그리고 superadmin 한 명
+  - 도메인 home-1
+  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+  - 도메인에 속한 사용자 한 명 준비
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
 
 When
 
-- ProjectAdapter.admin_create — 슈퍼관리자 user-1
-  - CreateProjectInput(name='research', domain_name=도메인: home-1, resource_policy=프로젝트 정책: default)
+- ProjectAdapter.admin_create — user-1이 home-1 아래에 research을 만듦
 
 Then
 
-- project.basic_info.name = 'research'
+- 만든 프로젝트 전체가 온다
+  - basic_info.name = 'research'
+  - basic_info.description = None
+  - basic_info.integration_name = None
+  - organization.domain_name = 'home-1'
+  - organization.resource_policy = 'default'
+  - storage.allowed_vfolder_hosts = []
+  - lifecycle.is_active = True
+  - id: 무시함 — 데이터베이스가 만든다
+  - basic_info.type: 무시함 — 타입이 이미 값을 못박는다
+  - lifecycle.created_at: 이 실행이 쓴 시각
+  - lifecycle.modified_at: 이 실행이 쓴 시각
 

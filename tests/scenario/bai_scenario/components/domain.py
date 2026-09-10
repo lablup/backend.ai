@@ -16,8 +16,6 @@ from ai.backend.common.data.entity.domain import DomainEntityType
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.v2.domain.response import DomainNode
-from ai.backend.manager.api.adapters.domain.adapter import DomainAdapter
-from ai.backend.manager.config.unified import ManagerUnifiedConfig
 from ai.backend.manager.data.domain.types import DomainData
 from ai.backend.manager.data.permission.types import Permission
 from ai.backend.manager.data.user.types import UserData
@@ -33,11 +31,6 @@ from ai.backend.testutils.scenario_steps import (
     Then,
     Verdict,
 )
-from ai.backend.testutils.typed_scenario import (
-    Situation,
-    TypedScenario,
-    config_of,
-)
 from bai_scenario.seeds.domain.domain import SeedDomain
 from bai_scenario.seeds.rbac.role import SeedPermission, SeedRole
 from bai_scenario.seeds.resource_policy.keypair import SeedKeypairPolicy
@@ -45,10 +38,6 @@ from bai_scenario.seeds.resource_policy.project import SeedProjectPolicy
 from bai_scenario.seeds.resource_policy.user import SeedUserPolicy
 from bai_scenario.seeds.seeder import Laid, Seeder, SeedNest
 from bai_scenario.seeds.user.user import SeedUserOf
-
-type DomainScenario = TypedScenario[DomainAdapter, ManagerUnifiedConfig]
-
-MANAGER_CONFIG = config_of(ManagerUnifiedConfig)
 
 WAS_HERE = "이미 있던 도메인"
 """시드가 심는 도메인의 설명. 시나리오가 기대값으로 다시 쓰므로 한 자리에 둔다."""
@@ -295,11 +284,3 @@ class SomeoneReadingDomains(SeedNest[GrantedUser]):
         )
         grant = seed.granting(role, someone, role_id=lambda r: r.id, user_id=lambda u: UserID(u.id))
         return GrantedUser(someone, grant)
-
-
-def enforcement_off(seed: Seeder) -> Situation[ManagerUnifiedConfig]:
-    """What this scenario laid, in an install that does not enforce entity
-    permissions."""
-    return seed.situation(
-        config=[MANAGER_CONFIG.set(lambda c: c.manager.rbac.enforcement_enabled, False)]
-    )

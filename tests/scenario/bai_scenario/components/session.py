@@ -8,19 +8,12 @@ from typing import override
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.session import SessionEntityType
 from ai.backend.common.data.entity.user import UserID
-from ai.backend.manager.api.adapters.session.adapter import SessionAdapter
-from ai.backend.manager.config.unified import ManagerUnifiedConfig
 from ai.backend.manager.data.domain.types import DomainData
 from ai.backend.manager.data.permission.types import Permission
 from ai.backend.manager.data.project.types import ProjectData
-from ai.backend.testutils.typed_scenario import (
-    TypedScenario,
-)
 from bai_scenario.components.domain import GrantedUser, SomeoneOf
 from bai_scenario.seeds.rbac.role import SeedPermission, SeedRole
 from bai_scenario.seeds.seeder import Laid, Seeder, SeedNest
-
-type SessionScenario = TypedScenario[SessionAdapter, ManagerUnifiedConfig]
 
 
 @dataclass(frozen=True)

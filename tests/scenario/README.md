@@ -6,24 +6,37 @@
 ## 한 행이 어떻게 도는가
 
 ```python
-def ungranted_user_is_refused(seed: Seeder) -> DomainScenario:
-    domain = seed.creating(SeedDomain(name_hint="host"))
-    stranger = seed.within(SomeoneOf(domain))
-    return TypedScenario.error(
-        "a-user-granted-nothing-may-not-read-a-domain",
-        description="같은 도메인이 있고 사용자가 아무 권한도 받지 않았을 때, "
-                    "이름으로 조회하면 권한 부족으로 거부된다",
-        actor=stranger,
-        given=seed.situation(),
-        when=after(domain, lambda d: call(DomainAdapter.get, d.name)),
-        then=NotEnoughPermission,
-    )
+class ADomainAndSomeone(Given[SeedingSession, ADomainAndACaller]):
+    async def lay(self, seeding: SeedingSession) -> ADomainAndACaller:
+        domain = await seeding.creating(SeedDomain(name_hint="host", description=WAS_HERE))
+        caller = await seeding.within(SomeoneOf(domain, role=self.role))
+        return ADomainAndACaller(seeding.made(domain), seeding.made(caller))
+
+
+class ReadingByName(When[ADomainAndACaller, DomainAdapter, DomainNode]):
+    def operation(self) -> str:
+        return "get"
+
+    async def call(self, adapter: DomainAdapter, laid: ADomainAndACaller) -> DomainNode:
+        with ActingAs(laid.caller):
+            return await adapter.get(laid.domain.name)
+
+
+class TheDomainNode(Then[ADomainAndACaller, DomainNode]):
+    def look(self, laid, answered) -> list[Verdict]:
+        node = answered.response
+        return [
+            Same("name", node.basic_info.name, laid.domain.name),
+            Skipped("id", "데이터베이스가 만든다"),
+            Held("created_at", node.lifecycle.created_at, WrittenByThisRun(self.started)),
+        ]
 ```
 
 1. 테스트마다 템플릿 데이터베이스를 복제한다. 템플릿에는 스키마만 있고 행은 없다.
-2. 빌더가 심겠다고 한 행을 한 트랜잭션에 쓴다. 여러 행이 딛는 행은 한 번만 쓴다.
-3. 행위자 명의로 어댑터 메서드를 부른다.
-4. 답 또는 예외를 `then`에 맞춰 본다.
+2. `given`이 자기가 쓸 행을 한 트랜잭션에 쓰고, 쓴 값을 답한다. 그 쓰기는 `when`이 시작하기
+   전에 닫힌다. 어댑터가 자기 연결로 읽기 때문이다.
+3. `when`이 그 값과 어댑터만 받아 호출한다.
+4. `then`이 심은 것과 답 또는 예외를 함께 받아, 자리마다 무엇을 보았는지 답한다.
 
 ## 무엇이 어디에 있는가
 

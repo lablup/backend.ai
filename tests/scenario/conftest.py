@@ -10,7 +10,6 @@ import asyncio
 import os
 import secrets
 from collections.abc import AsyncIterator, Iterator, Sequence
-from dataclasses import replace
 from typing import Any
 
 import pytest
@@ -24,7 +23,6 @@ from bai_scenario.db import (
 )
 from bai_scenario.monitors import ActionRecorder
 from bai_scenario.runner.planting import SeedingSession
-from bai_scenario.runner.runner import ScenarioRunner, offered_by, scenario_given
 from bai_scenario.seeds.ops import SeedOpsProvider
 from bai_scenario.seeds.seeder import Seeder
 from bai_scenario.validators import build_action_validators
@@ -39,9 +37,6 @@ from ai.backend.manager.repositories.permission_controller.repository import (
     PermissionControllerRepository,
 )
 from ai.backend.testutils.scenario_steps import Configured
-from ai.backend.testutils.typed_scenario import (
-    TypedScenario,
-)
 
 pytest_plugins = [
     "ai.backend.testutils.bootstrap",
@@ -53,32 +48,6 @@ CLONE_TIMES_ENV = "BACKEND_CLONE_TIMES_FILE"
 # it survives Pants running every test file in its own process and every shard in its
 # own machine. ``scripts/scenario-report.py`` turns the lines into a report.
 SCENARIO_LOG_ENV = "BACKEND_SCENARIO_LOG"
-
-
-@pytest.hookimpl(hookwrapper=True)
-def pytest_runtest_makereport(item: pytest.Item, call: pytest.CallInfo[None]) -> Any:
-    """Record what each scenario said about itself, beside how it went."""
-    report = yield
-    path = os.environ.get(SCENARIO_LOG_ENV)
-    if path is None or call.when != "call":
-        return report
-    callspec = getattr(item, "callspec", None)
-    scenario = callspec.params.get("scenario") if callspec is not None else None
-    if not isinstance(scenario, TypedScenario):
-        return report
-    result = report.get_result()
-    adapter = getattr(item, "funcargs", {}).get("adapter")
-    record = replace(
-        scenario.describe(),
-        module=getattr(getattr(item, "module", None), "__name__", ""),
-        outcome=result.outcome,
-        given=scenario_given(scenario),
-        adapter=type(adapter).__name__ if adapter is not None else "",
-        offers=tuple(sorted(offered_by(adapter))) if adapter is not None else (),
-    )
-    with open(path, "a", encoding="utf8") as f:
-        f.write(record.as_line() + "\n")
-    return report
 
 
 @pytest.fixture(scope="session")
@@ -126,11 +95,7 @@ def config(
     """
     callspec = getattr(request.node, "callspec", None)
     asked = callspec.params.get("scenario") if callspec is not None else None
-    overrides: dict[str, Any] = {}
-    if isinstance(asked, TypedScenario):
-        overrides = asked.given.dotted_config()
-    elif isinstance(asked, Configured):
-        overrides = dict(asked.config())
+    overrides = dict(asked.config()) if isinstance(asked, Configured) else {}
     return ScenarioConfigProvider(
         make_config(base_config_dict(template.addr, test_db, None), overrides)
     )
@@ -146,12 +111,6 @@ def validators(
 @pytest.fixture
 def monitors(recorder: ActionRecorder) -> ActionMonitors:
     return recorder.monitors()
-
-
-@pytest.fixture
-def run(adapter: Any, engine: Any, fakes: Sequence[object]) -> ScenarioRunner:
-    """The runner for the adapter the component's own conftest built."""
-    return ScenarioRunner(adapter=adapter, engine=engine, fakes=fakes)
 
 
 @pytest.fixture

@@ -8,6 +8,7 @@
 
 from __future__ import annotations
 
+import inspect
 import os
 from dataclasses import dataclass
 from typing import Any
@@ -16,9 +17,21 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_report import Line, ScenarioRecord
 from ai.backend.testutils.scenario_steps import Answered, Scenario, Told
 from bai_scenario.runner.planting import SeedingSession
-from bai_scenario.runner.runner import offered_by
 from bai_scenario.seeds.ops import SeedOpsProvider
 from bai_scenario.seeds.seeder import Seeder
+
+
+def offered_by(adapter: object) -> frozenset[str]:
+    """어댑터가 내놓는 호출 전부. 클래스에서 직접 읽는다.
+
+    레포트가 여기서 실행이 부른 것을 빼므로, 아무도 부르지 않는 호출을 손으로 관리하는
+    목록과 견주지 않는다.
+    """
+    return frozenset(
+        name
+        for name, member in inspect.getmembers(type(adapter), inspect.isfunction)
+        if not name.startswith("_") and inspect.iscoroutinefunction(member)
+    )
 
 
 @dataclass(frozen=True)

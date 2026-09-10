@@ -12,22 +12,34 @@ Not exercised by any scenario: admin_replace_default_deployment_options, admin_r
 
 Given
 
-- 도메인 home-1
-- 리소스 그룹 compute-1: fifo 스케줄러를 쓴다
-- 도메인에 속한 사용자 한 명 준비
-  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-  - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-  - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-  - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- 이미 있는 리소스 그룹과, superadmin 한 명
+  - 도메인 home-1
+  - 리소스 그룹 compute-1: fifo 스케줄러를 쓴다
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
 
 When
 
-- ResourceGroupAdapter.get — 슈퍼관리자 user-1
-  - 리소스 그룹: compute-1
+- ResourceGroupAdapter.get — user-1이 compute-1으로 조회
 
 Then
 
-- name = 'compute-1'
+- 리소스 그룹 전체가 온다
+  - name = 'compute-1'
+  - status.is_active = True
+  - status.is_public = True
+  - status.is_default = False
+  - metadata.description = None
+  - network.wsproxy_addr = None
+  - network.use_host_network = False
+  - id: 무시함 — 데이터베이스가 만든다
+  - scheduler: 무시함 — 설치본이 정한 기본값이라 시나리오가 말할 수 없다
+  - default_deployment_options: 무시함 — 설치본이 정한 기본값이다
+  - default_session_options: 무시함 — 설치본이 정한 기본값이다
+  - metadata.created_at: 이 실행이 쓴 시각
 
 #### [a-user-who-is-not-the-superadmin-may-not-make-a-resource-group](/tests/scenario/bai_scenario/manager/resource_group/test_resource_group.py) — pass
 
@@ -35,21 +47,22 @@ Then
 
 Given
 
-- 도메인 home-1
-- 도메인에 속한 사용자 한 명 준비
-  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-  - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-  - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-  - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- 도메인 하나와, 그 도메인에 속한 user 한 명
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
 
 When
 
-- ResourceGroupAdapter.create — 일반 사용자 user-1
-  - CreateResourceGroupInput(name='refused', domain_name=도메인: home-1)
+- ResourceGroupAdapter.create — user-1이 home-1 아래에 refused을 만듦
 
 Then
 
-- 거부: InsufficientPrivilege
+- 거부된다
+  - 거부: InsufficientPrivilege
 
 #### [the-superadmin-makes-a-resource-group-in-a-domain](/tests/scenario/bai_scenario/manager/resource_group/test_resource_group.py) — pass
 
@@ -57,19 +70,31 @@ Then
 
 Given
 
-- 도메인 home-1
-- 도메인에 속한 사용자 한 명 준비
-  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-  - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-  - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-  - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- 도메인 하나와, 그 도메인에 속한 superadmin 한 명
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
 
 When
 
-- ResourceGroupAdapter.create — 슈퍼관리자 user-1
-  - CreateResourceGroupInput(name='compute', domain_name=도메인: home-1)
+- ResourceGroupAdapter.create — user-1이 home-1 아래에 compute을 만듦
 
 Then
 
-- resource_group.name = 'compute'
+- 리소스 그룹 전체가 온다
+  - name = 'compute'
+  - status.is_active = True
+  - status.is_public = True
+  - status.is_default = False
+  - metadata.description = None
+  - network.wsproxy_addr = None
+  - network.use_host_network = False
+  - id: 무시함 — 데이터베이스가 만든다
+  - scheduler: 무시함 — 설치본이 정한 기본값이라 시나리오가 말할 수 없다
+  - default_deployment_options: 무시함 — 설치본이 정한 기본값이다
+  - default_session_options: 무시함 — 설치본이 정한 기본값이다
+  - metadata.created_at: 이 실행이 쓴 시각
 

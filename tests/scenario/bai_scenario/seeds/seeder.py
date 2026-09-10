@@ -18,8 +18,8 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from collections.abc import Awaitable, Callable, Sequence
 from dataclasses import dataclass, field
-from datetime import UTC, datetime
-from typing import Any, cast
+from datetime import UTC, datetime, timedelta
+from typing import Any, Final, cast
 
 from ai.backend.common.data.entity.role import RoleID
 from ai.backend.common.data.entity.types import FieldData
@@ -35,16 +35,6 @@ from ai.backend.manager.models.specs.creator import (
 from ai.backend.manager.models.specs.relation import RelationCreator
 from ai.backend.manager.models.specs.updater import GuardedDataUpdater
 from ai.backend.manager.repositories.ops.v2.user.write import FullUserCreator
-from ai.backend.testutils.typed_scenario import (
-    ActorBound,
-    Answer,
-    Deferred,
-    Invocation,
-    Override,
-    Situation,
-    since,
-    situation,
-)
 from bai_scenario.seeds.ops import SeedOps
 
 type WriteSpec[D] = (
@@ -216,6 +206,21 @@ class Laid[D]:
     write: Callable[[SeedOps, Sequence[Any]], Awaitable[D]]
 
 
+SKEW: Final = timedelta(seconds=30)
+"""두 시계가 어긋나 있어도 봐주는 폭."""
+
+
+def _since(start: datetime) -> Callable[[datetime], bool]:
+    """``start`` 뒤에, 그리고 지금보다 뒤가 아닌 시각."""
+
+    def condition(moment: datetime) -> bool:
+        if moment.tzinfo is None:
+            return False
+        return start - SKEW <= moment <= datetime.now(UTC) + SKEW
+
+    return condition
+
+
 def _there_is(seed: Seed, name: str) -> str:
     return f"{seed.kind()} {name}"
 
@@ -257,7 +262,7 @@ class Seeder:
         실행이 쓴 값인지를 묻는 조건이다. 얼마 안에 찍혔는지가 아니라 언제부터 뒤인지를
         기준으로 삼으므로, 임의의 시간 폭을 고르지 않는다.
         """
-        return since(self._started)
+        return _since(self._started)
 
     def within[D](self, nest: SeedNest[D]) -> D:
         """Lay what this nest lays, remembering that it laid them."""
@@ -266,18 +271,6 @@ class Seeder:
             return nest.lay(self)
         finally:
             self._nesting.pop()
-
-    def situation[C](
-        self,
-        *,
-        config: Sequence[Override[C, Any]] = (),
-        answers: Sequence[Answer[Any]] = (),
-    ) -> Situation[C]:
-        """Every row this scenario asked for, in the order it asked.
-
-        The scenario does not list its rows again: what it made is what it lays.
-        """
-        return situation(rows=tuple(self._laid), config=config, answers=answers)
 
     def declared(self) -> tuple[Laid[Any], ...]:
         """Every row asked for so far, in the order it was asked."""
@@ -475,37 +468,3 @@ def laid_in_order(wanted: Sequence[Laid[Any]]) -> list[Laid[Any]]:
     for row in wanted:
         walk(row)
     return seen
-
-
-def after[D, A, R](
-    row: Laid[D],
-    build: Callable[[D], Invocation[A, R] | ActorBound[A, R, Any]],
-    /,
-) -> Deferred[A, R]:
-    """Read the row this scenario laid, then say what to call with it.
-
-    ``build`` comes last and receives the created data, typed, so an id the database
-    generated is reachable without a placeholder or a literal repeated from the seed.
-    """
-    return Deferred((row,), build)
-
-
-def after_two[D1, D2, A, R](
-    first: Laid[D1],
-    second: Laid[D2],
-    build: Callable[[D1, D2], Invocation[A, R] | ActorBound[A, R, Any]],
-    /,
-) -> Deferred[A, R]:
-    """Read two rows this scenario laid, then say what to call with them."""
-    return Deferred((first, second), build)
-
-
-def after_three[D1, D2, D3, A, R](
-    first: Laid[D1],
-    second: Laid[D2],
-    third: Laid[D3],
-    build: Callable[[D1, D2, D3], Invocation[A, R] | ActorBound[A, R, Any]],
-    /,
-) -> Deferred[A, R]:
-    """Read three rows this scenario laid, then say what to call with them."""
-    return Deferred((first, second, third), build)
