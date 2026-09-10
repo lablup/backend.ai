@@ -38,8 +38,13 @@ class TestAgentRestart:
     tear it down afterwards."""
 
     @pytest.fixture
-    def two_kernel_spec(self, session_spec: SessionSpec) -> SessionSpec:
-        return replace(session_spec, cluster_size=2)
+    def two_kernel_spec(self, session_spec: SessionSpec, primary_agent_id: str) -> SessionSpec:
+        # Pinned to the node `agent_control` restarts. Unpinned, the scheduler is free to place
+        # the session on any agent in the group, and a restart of a node that holds none of its
+        # kernels leaves the data plane trivially identical -- the assertion still passes and the
+        # scenario tested nothing. Measured on a three-node rig: A1 landed on the second node and
+        # A3 on the third.
+        return replace(session_spec, cluster_size=2, agent_list=(primary_agent_id,))
 
     async def test_a1_graceful_restart_leaves_the_data_plane_identical(
         self,
@@ -115,8 +120,10 @@ class TestScratchLifecycle:
         leak_guard: LeakGuard,
         session_driver: SessionDriver,
         session_spec: SessionSpec,
+        primary_agent_id: str,
     ) -> None:
-        async with session_driver.session(session_spec, "dp-a8"):
+        pinned = replace(session_spec, agent_list=(primary_agent_id,))
+        async with session_driver.session(pinned, "dp-a8"):
             pass
         report = await leak_guard.settle()
         leaked_scratch = [r for r in report.leaked if r.kind == "scratch-dir"]
@@ -140,8 +147,14 @@ class TestPublishedPorts:
         session_driver: SessionDriver,
         agent_control: AgentController,
         session_spec: SessionSpec,
+        primary_agent_id: str,
     ) -> None:
-        published_spec = replace(session_spec, preopen_ports=(12345,))
+        # Pinned for the same reason as `two_kernel_spec`: the guard below only proves that SOME
+        # node published rules, and the leak guard collects from every node, so a session placed
+        # away from the restarted one compares a snapshot the restart never touched.
+        published_spec = replace(
+            session_spec, preopen_ports=(12345,), agent_list=(primary_agent_id,)
+        )
         async with session_driver.session(published_spec, "dp-a9"):
             before = await _stable(leak_guard)
             rules_before = frozenset(r for r in before if r.kind == "iptables")
