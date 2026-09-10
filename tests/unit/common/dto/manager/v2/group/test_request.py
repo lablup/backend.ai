@@ -7,7 +7,6 @@ import uuid
 import pytest
 from pydantic import ValidationError
 
-from ai.backend.common.api_handlers import SENTINEL, Sentinel
 from ai.backend.common.dto.manager.v2.group.request import (
     CreateProjectInput,
     DeleteProjectInput,
@@ -19,6 +18,7 @@ from ai.backend.common.dto.manager.v2.group.request import (
 )
 from ai.backend.common.dto.manager.v2.group.types import OrderDirection, ProjectOrderField
 from ai.backend.common.exception import BackendAISchemaValidationFailed
+from ai.backend.common.tristate.unset import UNSET, Unset
 
 
 class TestCreateProjectInput:
@@ -74,17 +74,23 @@ class TestCreateProjectInput:
 
 
 class TestUpdateProjectInput:
-    """Tests for UpdateProjectInput model with SENTINEL fields."""
+    """Tests for UpdateProjectInput model with Unset fields."""
 
-    def test_empty_update_has_sentinel_defaults(self) -> None:
+    def test_empty_update_has_unset_defaults(self) -> None:
         req = UpdateProjectInput()
-        assert req.description is SENTINEL
-        assert isinstance(req.description, Sentinel)
-        assert req.integration_name is SENTINEL
-        assert isinstance(req.integration_name, Sentinel)
+        assert req.description is UNSET
+        assert isinstance(req.description, Unset)
+        assert req.integration_name is UNSET
+        assert isinstance(req.integration_name, Unset)
 
-    def test_non_sentinel_fields_default_to_none(self) -> None:
+    def test_optional_state_fields_default_to_unset(self) -> None:
         req = UpdateProjectInput()
+        assert req.name is UNSET
+        assert req.is_active is UNSET
+        assert req.resource_policy is UNSET
+
+    def test_explicit_none_optional_state_fields_stay_none(self) -> None:
+        req = UpdateProjectInput(name=None, is_active=None, resource_policy=None)
         assert req.name is None
         assert req.is_active is None
         assert req.resource_policy is None

@@ -1,5 +1,8 @@
 """The role permission entries the permission ops consume and answer.
 
+A role sits in one scope and its permissions hold there, so an entry names the entity
+type alone.
+
 READ and UPDATE always state a field scope: the bit in ``permission`` means the
 operation on every field, a path in ``fields`` carrying the bit means the path and
 its descendants, neither means nothing. The other operations carry no scope.
@@ -10,34 +13,22 @@ from __future__ import annotations
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 
-from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
+from ai.backend.common.data.entity.types import EntityType
 from ai.backend.common.data.permission.id import FieldPath
 from ai.backend.common.data.permission.types import Permission
 
 
 @dataclass(frozen=True)
-class PermissionKey:
-    """One (scope, entity_type) coordinate of a role's permissions."""
-
-    scope: EntityIdentifier
-    entity_type: EntityType
-
-
-@dataclass(frozen=True)
 class PermissionEntry:
-    """What one key of a role's permissions holds.
+    """What a role holds on one entity type.
 
     ``fields`` values are READ|UPDATE bits; a bit set both in ``permission`` and
     in a field value is rejected by the ops.
     """
 
-    scope: EntityIdentifier
     entity_type: EntityType
     permission: Permission
     fields: Mapping[FieldPath, Permission] = field(default_factory=dict)
-
-    def key(self) -> PermissionKey:
-        return PermissionKey(scope=self.scope, entity_type=self.entity_type)
 
     def allows(self, operation: Permission, path: FieldPath | None = None) -> bool:
         """Whether ``operation`` (one bit) holds on ``path``; ``None`` asks for the
@@ -54,17 +45,13 @@ class PermissionEntry:
 
 @dataclass(frozen=True)
 class PermissionRevocation:
-    """The bits taken back from one key.
+    """The bits taken back from one entity type.
 
-    ``permission`` bits leave the key entirely — a READ or UPDATE bit takes its
-    scoped paths with it. ``fields`` bits leave the named paths and their
-    descendants; a path covered by an all-fields bit has nothing to remove.
+    ``permission`` bits leave entirely — a READ or UPDATE bit takes its scoped paths
+    with it. ``fields`` bits leave the named paths and their descendants; a path
+    covered by an all-fields bit has nothing to remove.
     """
 
-    scope: EntityIdentifier
     entity_type: EntityType
     permission: Permission = Permission.NONE
     fields: Mapping[FieldPath, Permission] = field(default_factory=dict)
-
-    def key(self) -> PermissionKey:
-        return PermissionKey(scope=self.scope, entity_type=self.entity_type)

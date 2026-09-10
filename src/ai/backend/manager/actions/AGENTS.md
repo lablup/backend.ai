@@ -20,6 +20,18 @@ decides the shape. Do not create new subclasses of the legacy `BaseAction` bases
 | `single_field` / `bulk_field` | field rows |
 | `relation` | two entities, linked or unlinked |
 
+## Searching within scopes
+
+- A `scope`-shaped search takes `items: Sequence[<Entity>ScopeItem]` and nothing else
+  standing for a scope. One action per entity, never one per scope kind.
+- `ScopeItem` (`actions/v2/ops/base.py`) declares the pair every item answers with:
+  `scope_ref()` names the scope the read is authorized against, `operation_scope()` the
+  rows it is restricted to. Declaring them together is what keeps a read from being
+  authorized against one thing and served another.
+- The action lists both back: `scope_targets()` is every item's `scope_ref()`, and
+  `operation_scopes()` every item's `operation_scope()`. Ops ORs the conditions; the gate
+  authorizes each scope, so a caller naming one they cannot see is refused the whole read.
+
 ## Linking two entities
 
 - The shape splits on **whether one side is contained in the other**.
@@ -34,7 +46,7 @@ decides the shape. Do not create new subclasses of the legacy `BaseAction` bases
   named scope itself and every one of them has to permit the run.
 - Its audit row names no entity and no kind; the scopes go to `audit_log_scopes`, which
   is why `audit_logs.entity_type` is nullable. The catalog records the wiring with no
-  entity type at all, which `GLOBAL_ENTITY_TYPE` does not stand for — that names an
+  entity type at all, which `GlobalEntityType` does not stand for — that names an
   operation over every entity, and a relation targets none.
 - It is wired through `ConcernGroups.relation_group()`, not through an entity group:
   a group is answered for by an entity type and a relation is answered for by none.
@@ -203,7 +215,7 @@ decides the shape. Do not create new subclasses of the legacy `BaseAction` bases
   different permission from the write that follows — the lookup asks for read, the
   write for write.
 - `BaseGlobalAction` declares no `entity_id()`.
-- `GLOBAL_ENTITY_TYPE` is what a global operation records when it names no other
+- `GlobalEntityType` is what a global operation records when it names no other
   entity. Wiring only — service and domain code never reference it.
 
 ## Monitors

@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.common.data.entity.artifact import ARTIFACT_ENTITY_TYPE, ArtifactID
+from ai.backend.common.data.entity.artifact import ArtifactEntityType, ArtifactID
 from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
 from ai.backend.manager.actions.v2.global_scope.base import BaseGlobalAction
 from ai.backend.manager.actions.v2.single_entity.base import BaseSingleEntityAction
@@ -14,7 +14,7 @@ class ArtifactAction(BaseGlobalAction):
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return ARTIFACT_ENTITY_TYPE
+        return ArtifactEntityType()
 
 
 @dataclass

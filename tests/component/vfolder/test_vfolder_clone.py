@@ -24,8 +24,8 @@ from ai.backend.client.v2.config import ClientConfig
 from ai.backend.client.v2.registry import BackendAIClientRegistry
 from ai.backend.client.v2.v2_registry import V2ClientRegistry
 from ai.backend.common.bgtask.types import TaskID
-from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE
-from ai.backend.common.data.entity.vfolder import VFOLDER_ENTITY_TYPE
+from ai.backend.common.data.entity.project import ProjectEntityType
+from ai.backend.common.data.entity.vfolder import VFolderEntityType
 from ai.backend.common.dto.manager.v2.vfolder.request import CloneVFolderInput
 from ai.backend.common.dto.manager.vfolder import CloneVFolderReq
 from ai.backend.common.types import QuotaScopeID, QuotaScopeType
@@ -78,7 +78,7 @@ def vfolder_admin_processors(
 ) -> VFolderAdminProcessors:
     repo = VFolderAdminRepository(database_engine)
     service = VFolderAdminService(vfolder_admin_repository=repo)
-    return VFolderAdminProcessors(processor_registry.group(GroupMeta(VFOLDER_ENTITY_TYPE)), service)
+    return VFolderAdminProcessors(processor_registry.group(GroupMeta(VFolderEntityType())), service)
 
 
 @pytest.fixture()
@@ -108,7 +108,7 @@ def server_module_registries(
     processors = MagicMock(spec=Processors)
     processors.vfolder = vfolder_processors
     processors.vfolder_admin = vfolder_admin_processors
-    adapter = VFolderAdapter(processors)
+    adapter = VFolderAdapter(processors.vfolder, MagicMock(), processors.vfolder_admin, MagicMock())
     handler = V2VFolderHandler(adapter=adapter)
     v2_reg = RouteRegistry.create("v2", route_deps.cors_options)
     v2_reg.add_subregistry(register_v2_vfolder_routes(handler, route_deps))
@@ -179,7 +179,7 @@ async def _fetch_scope_graph(
                 sa.select(sa.func.count())
                 .select_from(scopes)
                 .where(
-                    scopes.c.entity_type == VFOLDER_ENTITY_TYPE,
+                    scopes.c.entity_type == VFolderEntityType(),
                     scopes.c.entity_id == vfolder_id,
                 )
             )
@@ -194,9 +194,9 @@ async def _fetch_scope_graph(
                     )
                 )
                 .where(
-                    members.c.entity_type == VFOLDER_ENTITY_TYPE,
+                    members.c.entity_type == VFolderEntityType(),
                     members.c.entity_id == vfolder_id,
-                    scopes.c.entity_type == PROJECT_SCOPE_TYPE,
+                    scopes.c.entity_type == ProjectEntityType(),
                     scopes.c.entity_id == owner_project_id,
                 )
             )

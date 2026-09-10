@@ -5,17 +5,26 @@ from __future__ import annotations
 import uuid
 from datetime import UTC, datetime
 
+import pytest
+
+from ai.backend.common.data.entity.types import EntityType
 from ai.backend.common.dto.manager.v2.rbac.response import (
     CreateRolePayload,
     DeleteRolePayload,
+    PermissionNode,
     PurgeRolePayload,
     RoleNode,
     UpdateRolePayload,
 )
 from ai.backend.common.dto.manager.v2.rbac.types import (
+    OperationTypeDTO,
+    PermissionBitDTO,
     RoleSourceDTO,
     RoleStatusDTO,
 )
+from ai.backend.common.exception import BackendAISchemaValidationFailed
+
+_SCOPE_ID = uuid.UUID("11111111-1111-1111-1111-111111111111")
 
 
 class TestRoleNodeCreation:
@@ -32,6 +41,8 @@ class TestRoleNodeCreation:
             status=RoleStatusDTO.ACTIVE,
             created_at=now,
             updated_at=now,
+            scope_type=EntityType("project"),
+            scope_id=_SCOPE_ID,
             deleted_at=None,
         )
         assert node.id == role_id
@@ -53,6 +64,8 @@ class TestRoleNodeCreation:
             status=RoleStatusDTO.ACTIVE,
             created_at=now,
             updated_at=now,
+            scope_type=EntityType("project"),
+            scope_id=_SCOPE_ID,
         )
         assert node.id == role_id
         assert node.description is None
@@ -68,6 +81,8 @@ class TestRoleNodeCreation:
             status=RoleStatusDTO.ACTIVE,
             created_at=now,
             updated_at=now,
+            scope_type=EntityType("project"),
+            scope_id=_SCOPE_ID,
         )
         assert node.description is None
 
@@ -82,6 +97,8 @@ class TestRoleNodeCreation:
             status=RoleStatusDTO.ACTIVE,
             created_at=now,
             updated_at=now,
+            scope_type=EntityType("project"),
+            scope_id=_SCOPE_ID,
         )
         assert node.description is None
 
@@ -95,6 +112,8 @@ class TestRoleNodeCreation:
             status=RoleStatusDTO.DELETED,
             created_at=now,
             updated_at=now,
+            scope_type=EntityType("project"),
+            scope_id=_SCOPE_ID,
             deleted_at=now,
         )
         assert node.deleted_at == now
@@ -110,6 +129,8 @@ class TestRoleNodeCreation:
             status=RoleStatusDTO.ACTIVE,
             created_at=now,
             updated_at=now,
+            scope_type=EntityType("project"),
+            scope_id=_SCOPE_ID,
         )
         assert node.source == RoleSourceDTO.SYSTEM
 
@@ -123,6 +144,8 @@ class TestRoleNodeCreation:
             status=RoleStatusDTO.INACTIVE,
             created_at=now,
             updated_at=now,
+            scope_type=EntityType("project"),
+            scope_id=_SCOPE_ID,
         )
         assert node.status == RoleStatusDTO.INACTIVE
 
@@ -140,6 +163,8 @@ class TestCreateRolePayload:
             status=RoleStatusDTO.ACTIVE,
             created_at=now,
             updated_at=now,
+            scope_type=EntityType("project"),
+            scope_id=_SCOPE_ID,
         )
         payload = CreateRolePayload(role=role_node)
         assert payload.role.name == "Admin"
@@ -156,6 +181,8 @@ class TestCreateRolePayload:
             status=RoleStatusDTO.ACTIVE,
             created_at=now,
             updated_at=now,
+            scope_type=EntityType("project"),
+            scope_id=_SCOPE_ID,
         )
         payload = CreateRolePayload(role=role_node)
         assert payload.role.name == "Admin"
@@ -171,6 +198,8 @@ class TestCreateRolePayload:
             status=RoleStatusDTO.ACTIVE,
             created_at=now,
             updated_at=now,
+            scope_type=EntityType("project"),
+            scope_id=_SCOPE_ID,
         )
         payload = CreateRolePayload(role=role_node)
         json_str = payload.model_dump_json()
@@ -193,6 +222,8 @@ class TestUpdateRolePayload:
             status=RoleStatusDTO.ACTIVE,
             created_at=now,
             updated_at=now,
+            scope_type=EntityType("project"),
+            scope_id=_SCOPE_ID,
         )
         payload = UpdateRolePayload(role=role_node)
         assert payload.role.name == "UpdatedAdmin"
@@ -209,6 +240,8 @@ class TestUpdateRolePayload:
             status=RoleStatusDTO.INACTIVE,
             created_at=now,
             updated_at=now,
+            scope_type=EntityType("project"),
+            scope_id=_SCOPE_ID,
         )
         payload = UpdateRolePayload(role=role_node)
         json_str = payload.model_dump_json()
@@ -290,6 +323,8 @@ class TestRoleNodeRoundTrip:
             status=RoleStatusDTO.ACTIVE,
             created_at=now,
             updated_at=now,
+            scope_type=EntityType("project"),
+            scope_id=_SCOPE_ID,
             deleted_at=None,
         )
         json_str = node.model_dump_json()
@@ -311,6 +346,8 @@ class TestRoleNodeRoundTrip:
             status=RoleStatusDTO.DELETED,
             created_at=now,
             updated_at=now,
+            scope_type=EntityType("project"),
+            scope_id=_SCOPE_ID,
             deleted_at=now,
         )
         json_str = node.model_dump_json()
@@ -329,8 +366,76 @@ class TestRoleNodeRoundTrip:
             status=RoleStatusDTO.ACTIVE,
             created_at=now,
             updated_at=now,
+            scope_type=EntityType("project"),
+            scope_id=_SCOPE_ID,
         )
         json_str = node.model_dump_json()
         restored = RoleNode.model_validate_json(json_str)
         assert restored.id == role_id
         assert restored.name == "BasicRole"
+
+
+class TestRoleNodeScope:
+    """The role names the one scope it belongs to."""
+
+    def test_the_scope_is_required(self) -> None:
+        now = datetime.now(tz=UTC).isoformat()
+        with pytest.raises(BackendAISchemaValidationFailed):
+            RoleNode.model_validate({
+                "id": str(uuid.uuid4()),
+                "name": "Scopeless",
+                "source": RoleSourceDTO.CUSTOM.value,
+                "status": RoleStatusDTO.ACTIVE.value,
+                "created_at": now,
+                "updated_at": now,
+            })
+
+    def test_the_scope_survives_a_round_trip(self) -> None:
+        now = datetime.now(tz=UTC)
+        node = RoleNode(
+            id=uuid.uuid4(),
+            name="Scoped",
+            source=RoleSourceDTO.CUSTOM,
+            status=RoleStatusDTO.ACTIVE,
+            created_at=now,
+            updated_at=now,
+            scope_type=EntityType("domain"),
+            scope_id=_SCOPE_ID,
+        )
+
+        restored = RoleNode.model_validate_json(node.model_dump_json())
+
+        assert restored.scope_type == "domain"
+        assert restored.scope_id == _SCOPE_ID
+
+
+class TestPermissionNodeBit:
+    """A permission row names the bit it holds, and keeps the deprecated action name."""
+
+    def _node(self, permission: PermissionBitDTO, operation: OperationTypeDTO) -> PermissionNode:
+        return PermissionNode(
+            id=uuid.uuid4(),
+            role_id=uuid.uuid4(),
+            entity_type=EntityType("vfolder"),
+            permission=permission,
+            operation=operation,
+            created_at=datetime.now(tz=UTC),
+        )
+
+    def test_both_names_of_the_same_bit_are_carried(self) -> None:
+        node = self._node(PermissionBitDTO.SOFT_DELETE, OperationTypeDTO.SOFT_DELETE)
+
+        assert node.permission == PermissionBitDTO.SOFT_DELETE
+        assert node.operation == OperationTypeDTO.SOFT_DELETE
+        assert node.permission.value == "soft_delete"
+        assert node.operation.value == "soft-delete"
+
+    def test_the_bit_is_required(self) -> None:
+        with pytest.raises(BackendAISchemaValidationFailed):
+            PermissionNode.model_validate({
+                "id": str(uuid.uuid4()),
+                "role_id": str(uuid.uuid4()),
+                "entity_type": "vfolder",
+                "operation": OperationTypeDTO.READ.value,
+                "created_at": datetime.now(tz=UTC).isoformat(),
+            })

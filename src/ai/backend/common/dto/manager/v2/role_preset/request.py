@@ -6,9 +6,9 @@ from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.data.entity.role_preset import RolePresetID
+from ai.backend.common.data.entity.types import EntityType
 from ai.backend.common.dto.manager.query import StringFilter
 from ai.backend.common.dto.manager.v2.common import OrderDirection
-from ai.backend.common.dto.manager.v2.rbac.types import RBACElementTypeDTO
 from ai.backend.common.dto.manager.v2.role_permission_preset.types import (
     RolePermissionPresetEntry,
 )
@@ -31,7 +31,7 @@ class CreateRolePresetInput(BaseRequestModel):
     """Input for creating a new role preset."""
 
     name: str = Field(min_length=1, max_length=64, description="Role preset name.")
-    scope_type: RBACElementTypeDTO = Field(
+    scope_type: EntityType = Field(
         description="Scope type this preset targets (e.g., domain, project)."
     )
     auto_assign: bool = Field(
@@ -103,7 +103,7 @@ class RolePresetFilter(BaseRequestModel):
     """Filter criteria for searching role presets."""
 
     name: StringFilter | None = Field(default=None, description="Filter by name.")
-    scope_type: RBACElementTypeDTO | None = Field(default=None, description="Filter by scope type.")
+    scope_type: StringFilter | None = Field(default=None, description="Filter by scope type.")
     auto_assign: bool | None = Field(default=None, description="Filter by auto-assign flag.")
     deleted: bool | None = Field(
         default=None,

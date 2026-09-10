@@ -853,6 +853,137 @@ class PresetModelDefinition(BaseConfigModel):
         return ModelDefinitionDraft.model_validate(self.model_dump(exclude_unset=True))
 
 
+class PresetModelServiceConfigDraft(BaseConfigModel):
+    """Partial patch for a stored ``PresetModelServiceConfig``."""
+
+    pre_start_actions: list[PreStartAction] | None = None
+    start_command: str | None = None
+    shell: str | None = None
+    port: int | None = Field(default=None, gt=1)
+    health_check: ModelHealthCheckDraft | None = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def _resolve_start_command(cls, data: Any) -> Any:
+        return resolve_model_service_start_command(data)
+
+    def to_resolved(self) -> PresetModelServiceConfig:
+        return PresetModelServiceConfig.model_validate(self.model_dump())
+
+
+class PresetModelConfigDraft(BaseConfigModel):
+    """Partial patch for a stored ``PresetModelConfig``."""
+
+    name: str | None = None
+    model_path: str | None = None
+    service: PresetModelServiceConfigDraft | None = None
+    metadata: ModelMetadata | None = None  # ModelMetadata is already all-Optional.
+
+    def to_resolved(self) -> PresetModelConfig:
+        service = self.service.to_resolved() if self.service is not None else None
+        payload = self.model_dump(exclude_none=True, exclude={"service"})
+        payload["service"] = service
+        return PresetModelConfig.model_validate(payload)
+
+
+def _merge_preset_service_config_draft(
+    base: PresetModelServiceConfigDraft,
+    override: PresetModelServiceConfigDraft,
+) -> PresetModelServiceConfigDraft:
+    s = override.model_fields_set
+    health_check: ModelHealthCheckDraft | None
+    if "health_check" in s and base.health_check is not None and override.health_check is not None:
+        health_check = _merge_health_check_draft(base.health_check, override.health_check)
+    else:
+        health_check = _pick_non_null_override(
+            base.health_check, override.health_check, "health_check" in s
+        )
+    return PresetModelServiceConfigDraft.model_construct(
+        _fields_set=base.model_fields_set | override.model_fields_set,
+        pre_start_actions=_pick_non_null_override(
+            base.pre_start_actions, override.pre_start_actions, "pre_start_actions" in s
+        ),
+        start_command=_pick_non_null_override(
+            base.start_command, override.start_command, "start_command" in s
+        ),
+        # shell requires explicit none to disable shell wrapping; otherwise the base is kept.
+        shell=_pick(base.shell, override.shell, "shell" in s),
+        port=_pick_non_null_override(base.port, override.port, "port" in s),
+        health_check=health_check,
+    )
+
+
+def _merge_preset_config_draft(
+    base: PresetModelConfigDraft,
+    override: PresetModelConfigDraft,
+) -> PresetModelConfigDraft:
+    s = override.model_fields_set
+    service: PresetModelServiceConfigDraft | None
+    if "service" in s and base.service is not None and override.service is not None:
+        service = _merge_preset_service_config_draft(base.service, override.service)
+    else:
+        service = _pick_non_null_override(base.service, override.service, "service" in s)
+    metadata: ModelMetadata | None
+    if "metadata" in s and base.metadata is not None and override.metadata is not None:
+        metadata = _merge_metadata(base.metadata, override.metadata)
+    else:
+        metadata = _pick_non_null_override(base.metadata, override.metadata, "metadata" in s)
+    return PresetModelConfigDraft.model_construct(
+        _fields_set=base.model_fields_set | override.model_fields_set,
+        name=_pick_non_null_override(base.name, override.name, "name" in s),
+        model_path=override.model_path if override.model_path is not None else base.model_path,
+        service=service,
+        metadata=metadata,
+    )
+
+
+class PresetModelDefinitionDraft(BaseConfigModel):
+    """Partial patch for a stored ``PresetModelDefinition``.
+
+    Used to merge a client-supplied partial update onto a preset's currently
+    stored ``model_definition`` so fields the client omits keep their
+    previous value instead of being reset or crashing on strict validation.
+    """
+
+    models: list[PresetModelConfigDraft] | None = None
+
+    @override
+    @classmethod
+    def build_validation_error(cls, info: SchemaValidationFailureInfo) -> BackendAIError:
+        return ModelDefinitionValidationError(
+            extra_msg=info.summary,
+            extra_data={"errors": info.errors},
+        )
+
+    def merge(self, override: PresetModelDefinitionDraft) -> PresetModelDefinitionDraft:
+        """Merge ``override`` over ``self`` and return a new draft.
+
+        ``models`` is merged element-wise by index. Within each element,
+        nested sub-models are merged recursively when both sides provide
+        them; otherwise the override's value (when explicitly set) wins.
+        """
+        if "models" not in override.model_fields_set or override.models is None:
+            return PresetModelDefinitionDraft.model_construct(models=self.models)
+        if self.models is None or not self.models:
+            return PresetModelDefinitionDraft.model_construct(models=override.models)
+        if not override.models:
+            return PresetModelDefinitionDraft.model_construct(models=self.models)
+        merged: list[PresetModelConfigDraft] = []
+        for i in range(max(len(self.models), len(override.models))):
+            if i >= len(self.models):
+                merged.append(override.models[i])
+            elif i >= len(override.models):
+                merged.append(self.models[i])
+            else:
+                merged.append(_merge_preset_config_draft(self.models[i], override.models[i]))
+        return PresetModelDefinitionDraft.model_construct(models=merged)
+
+    def to_resolved(self) -> PresetModelDefinition:
+        return PresetModelDefinition.model_validate({
+            "models": [m.to_resolved() for m in (self.models or [])],
+        })
+
+
 def find_config_file(daemon_name: str) -> Path:
     toml_path_from_env = os.environ.get("BACKEND_CONFIG_FILE", None)
     if not toml_path_from_env:

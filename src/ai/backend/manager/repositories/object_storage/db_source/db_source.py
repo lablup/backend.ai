@@ -13,8 +13,6 @@ from ai.backend.manager.models.object_storage import ObjectStorageRow
 from ai.backend.manager.models.storage_namespace import StorageNamespaceRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base import BatchQuerier, execute_batch_querier
-from ai.backend.manager.repositories.base.creator import Creator, execute_creator
-from ai.backend.manager.repositories.base.updater import Updater, execute_updater
 
 
 class ObjectStorageDBSource:
@@ -72,42 +70,6 @@ class ObjectStorageDBSource:
                     f"Object storage not found for namespace ID {storage_namespace_id}."
                 )
             return row.object_storage_row.to_dataclass()
-
-    async def create(self, creator: Creator[ObjectStorageRow]) -> ObjectStorageData:
-        """
-        Create a new object storage configuration in the database.
-        """
-        async with self._db.begin_session() as db_session:
-            creator_result = await execute_creator(db_session, creator)
-            return creator_result.row.to_dataclass()
-
-    async def update(self, updater: Updater[ObjectStorageRow]) -> ObjectStorageData:
-        """
-        Update an existing object storage configuration in the database.
-        """
-        async with self._db.begin_session() as db_session:
-            result = await execute_updater(db_session, updater)
-            if result is None:
-                raise ObjectStorageNotFoundError(
-                    f"Object storage with ID {updater.pk_value} not found."
-                )
-            return result.row.to_dataclass()
-
-    async def delete(self, storage_id: uuid.UUID) -> uuid.UUID:
-        """
-        Delete an existing object storage configuration from the database.
-        """
-        async with self._db.begin_session() as db_session:
-            delete_query = (
-                sa.delete(ObjectStorageRow)
-                .where(ObjectStorageRow.id == storage_id)
-                .returning(ObjectStorageRow.id)
-            )
-            result = await db_session.execute(delete_query)
-            deleted_id = result.scalar()
-            if deleted_id is None:
-                raise ObjectStorageNotFoundError(f"Object storage with ID {storage_id} not found.")
-            return deleted_id
 
     async def list_object_storages(self) -> list[ObjectStorageData]:
         """

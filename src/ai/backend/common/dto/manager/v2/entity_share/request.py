@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+from uuid import UUID
+
 from pydantic import Field, model_validator
 
 from ai.backend.common.api_handlers import BaseRequestModel
-from ai.backend.common.data.entity.types import EntityID, EntityType
+from ai.backend.common.data.entity.types import EntityType
 from ai.backend.common.dto.manager.query import StringFilter, UUIDFilter
 from ai.backend.common.dto.manager.v2.common import OrderDirection
 from ai.backend.common.dto.manager.v2.entity_share.types import (
@@ -34,8 +36,8 @@ class EntityShareRecipientInput(BaseRequestModel):
     alone, and an address reaches someone who may have no account yet.
     """
 
-    project_id: EntityID | None = Field(default=None, description="Project the offer goes to")
-    user_id: EntityID | None = Field(
+    project_id: UUID | None = Field(default=None, description="Project the offer goes to")
+    user_id: UUID | None = Field(
         default=None, description="Person the offer goes to; it lands in their own project"
     )
     email: str | None = Field(default=None, description="Address the offer goes to")
@@ -56,7 +58,7 @@ class CreateEntityShareInput(BaseRequestModel):
     """
 
     target_entity_type: EntityType = Field(description="Type of the entity being offered")
-    target_entity_id: EntityID = Field(description="Id of the entity being offered")
+    target_entity_id: UUID = Field(description="Id of the entity being offered")
     recipient: EntityShareRecipientInput = Field(description="Who the offer goes to")
     permissions: list[PermissionBitDTO] = Field(
         default_factory=list,
@@ -92,7 +94,7 @@ class EntityShareTargetScope(BaseRequestModel):
     """
 
     entity_type: EntityType = Field(description="Type of the entity being offered")
-    entity_id: EntityID = Field(description="Id of the entity being offered")
+    entity_id: UUID = Field(description="Id of the entity being offered")
 
 
 class EntityShareScope(BaseRequestModel):

@@ -2,7 +2,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.common.data.entity.types import EntityIdentifier, ScopeRef, ScopeType
+from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.manager.actions.v2.relation.base import BaseRelationAction
 
 __all__ = (
@@ -62,13 +62,7 @@ class BaseEntityRelationAction[TScope: EntityIdentifier, TTarget: EntityIdentifi
     pairs: Sequence[RelationPair[TScope, TTarget]]
 
     @override
-    def scope_targets(self) -> Sequence[ScopeRef]:
+    def scope_targets(self) -> Sequence[EntityIdentifier]:
         """Every entity the run names, each once and in the order first named."""
-        seen: dict[tuple[ScopeType, EntityIdentifier], ScopeRef] = {}
-        for pair in self.pairs:
-            for entity in (pair.scope, pair.target):
-                scope_type = ScopeType(entity.entity_type())
-                seen.setdefault(
-                    (scope_type, entity), ScopeRef(scope_type=scope_type, scope_id=entity)
-                )
-        return list(seen.values())
+        seen = dict.fromkeys(entity for pair in self.pairs for entity in (pair.scope, pair.target))
+        return list(seen)

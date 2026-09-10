@@ -71,8 +71,9 @@ mutation IssueMyKeypair {
 # GQL error extension codes produced by GQLExceptionHandlerExtension
 # ErrorCode.__str__() formats as "{domain}_{operation}_{error_detail}" (underscore-separated)
 _GQL_ERR_FORBIDDEN = "keypair_read_forbidden"
-# An access key naming no keypair ends at the lookup that resolves it into a row id.
-_GQL_ERR_NO_ROW = "database_access_not-found"
+# An access key naming no keypair ends at the lookup that resolves it into a row id,
+# which reports under the keypair field's own domain rather than the database's.
+_GQL_ERR_NO_ROW = "user-keypair_read_not-found"
 
 
 # ---------------------------------------------------------------------------
@@ -138,7 +139,8 @@ def server_module_registries(
     mock_gql_deps.processors = mock_processors
     mock_gql_deps.config_provider = config_provider
     mock_gql_deps.adapters.user = UserAdapter(
-        processors=mock_processors,
+        mock_processors.user,
+        mock_processors.domain,
         auth_config=None,  # type: ignore[arg-type]
         key_provider_pool=KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
     )

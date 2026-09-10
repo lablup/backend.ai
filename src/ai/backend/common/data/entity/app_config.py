@@ -1,24 +1,25 @@
-from typing import NewType
+from typing import NewType, override
 from uuid import UUID
 
 from ai.backend.common.data.entity.types import EntityType
 
 __all__ = (
-    "APP_CONFIG_ALLOW_LIST_ENTITY_TYPE",
-    "APP_CONFIG_ENTITY_TYPE",
-    "APP_CONFIG_FRAGMENT_ENTITY_TYPE",
+    "AppConfigEntityType",
     "AppConfigScopeID",
 )
 
 
-# Raw string mirroring the RBAC-managed EntityType.APP_CONFIG_ALLOW_LIST value.
-APP_CONFIG_ALLOW_LIST_ENTITY_TYPE = EntityType("app_config_allow_list")
+class AppConfigEntityType(EntityType):
+    @override
+    @classmethod
+    def name(cls) -> str:
+        return "app_config"
 
-# Raw string mirroring the RBAC-managed EntityType.APP_CONFIG_FRAGMENT value.
-APP_CONFIG_FRAGMENT_ENTITY_TYPE = EntityType("app_config_fragment")
+    @override
+    @classmethod
+    def description(cls) -> str:
+        return "The value of one app config key, merged from its fragments in every visible scope."
 
-# The merged config a caller reads; the fragments it is merged from are their own type.
-APP_CONFIG_ENTITY_TYPE = EntityType("app_config")
 
 # Who an app config fragment belongs to. Polymorphic across scope kinds (domain/user); the
 # concrete kind is discriminated by the accompanying ``AppConfigScopeType``, and ``public``

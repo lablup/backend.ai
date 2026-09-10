@@ -7,11 +7,12 @@ from datetime import UTC, datetime
 
 import pytest
 import sqlalchemy as sa
+from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
 from ai.backend.common.data.entity.domain import DomainID
-from ai.backend.common.data.entity.idle_checker import IdleCheckerID
+from ai.backend.common.data.entity.idle_checker import IdleCheckerEntityType, IdleCheckerID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
-from ai.backend.common.data.entity.session import SessionID
+from ai.backend.common.data.entity.session import SessionEntityType
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.idle_checker.types import (
     CheckerType,
@@ -26,6 +27,7 @@ from ai.backend.common.types import (
     SessionResult,
     SessionTypes,
 )
+from ai.backend.manager.data.idle_checker.types import IdleJudgmentData
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.errors.idle_checker import IdleCheckerNotFound
 from ai.backend.manager.errors.kernel import SessionNotFound
@@ -44,19 +46,33 @@ from ai.backend.manager.models.resource_policy import (
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.base import BulkUpserter
+from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
+from ai.backend.manager.models.virtual_entity.entity_membership_cap import EntityMembershipCapRow
+from ai.backend.manager.models.virtual_entity.entity_membership_field import (
+    EntityMembershipFieldRow,
+)
+from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
+from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
 from ai.backend.manager.repositories.idle_checker.repository import IdleCheckerRepository
 from ai.backend.manager.repositories.idle_checker.types import (
-    IdleJudgmentData,
     SessionIdleCheckPair,
 )
-from ai.backend.manager.repositories.idle_checker.upserters import (
-    SessionIdleCheckExcludeUpserterSpec,
-    SessionIdleCheckIncludeUpserterSpec,
-)
-from ai.backend.manager.repositories.ops import DBOpsProvider
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.ops.v2.relation.provider import RelationOpsProvider
 from ai.backend.testutils.db import with_tables
+
+
+async def _provision_nodes(db_sess: SASession) -> None:
+    """The relation write refuses a pair whose sides are not in the graph, and these
+    fixtures add the rows straight to the table."""
+    await db_sess.flush()
+    for entity_type, id_column in (
+        (SessionEntityType(), SessionRow.id),
+        (IdleCheckerEntityType(), IdleCheckerRow.id),
+    ):
+        for entity_id in (await db_sess.scalars(sa.select(id_column))).all():
+            db_sess.add(VirtualEntityRow(entity_type=entity_type, entity_id=entity_id))
+    await db_sess.flush()
 
 
 @dataclass(frozen=True)
@@ -211,13 +227,22 @@ class TestFetchJudgmentBatch:
                 IdleCheckerRow,
                 IdleCheckerBindingRow,
                 SessionIdleCheckRow,
+                VirtualEntityRow,
+                ScopeBindingRow,
+                EntityMembershipRow,
+                EntityMembershipCapRow,
+                EntityMembershipFieldRow,
             ],
         ):
             yield database_connection
 
     @pytest.fixture
     def repository(self, database: ExtendedAsyncSAEngine) -> IdleCheckerRepository:
-        return IdleCheckerRepository(DBOpsProvider(database), RelationOpsProvider(database))
+        return IdleCheckerRepository(
+            database,
+            RelationOpsProvider(database),
+            V2DBOpsProvider(database),
+        )
 
     @pytest.fixture
     async def judgment_rows(
@@ -262,6 +287,7 @@ class TestFetchJudgmentBatch:
             for session_id, status in session_specs:
                 db_sess.add(_expired_check_session_row(scope, session_id, status))
             db_sess.add(_expired_check_checker_row(checker_id))
+            await _provision_nodes(db_sess)
             await db_sess.flush()
             db_sess.add(
                 IdleCheckerBindingRow(
@@ -863,13 +889,22 @@ class TestFetchExpiredIdleChecks:
                 SessionRow,
                 IdleCheckerRow,
                 SessionIdleCheckRow,
+                VirtualEntityRow,
+                ScopeBindingRow,
+                EntityMembershipRow,
+                EntityMembershipCapRow,
+                EntityMembershipFieldRow,
             ],
         ):
             yield database_connection
 
     @pytest.fixture
     def repository(self, database: ExtendedAsyncSAEngine) -> IdleCheckerRepository:
-        return IdleCheckerRepository(DBOpsProvider(database), RelationOpsProvider(database))
+        return IdleCheckerRepository(
+            database,
+            RelationOpsProvider(database),
+            V2DBOpsProvider(database),
+        )
 
     @pytest.fixture
     async def expired_check_session(
@@ -888,6 +923,7 @@ class TestFetchExpiredIdleChecks:
             db_sess.add(_expired_check_session_row(scope, session_id, SessionStatus.RUNNING))
             db_sess.add(_expired_check_checker_row(first_checker_id))
             db_sess.add(_expired_check_checker_row(second_checker_id))
+            await _provision_nodes(db_sess)
             await db_sess.flush()
             db_sess.add(
                 SessionIdleCheckRow(
@@ -928,6 +964,7 @@ class TestFetchExpiredIdleChecks:
                 db_sess.add(scope_row)
             db_sess.add(_expired_check_session_row(scope, session_id, SessionStatus.RUNNING))
             db_sess.add(_expired_check_checker_row(checker_id))
+            await _provision_nodes(db_sess)
             await db_sess.flush()
             db_sess.add(
                 SessionIdleCheckRow(
@@ -953,6 +990,7 @@ class TestFetchExpiredIdleChecks:
                 db_sess.add(scope_row)
             db_sess.add(_expired_check_session_row(scope, session_id, SessionStatus.TERMINATED))
             db_sess.add(_expired_check_checker_row(checker_id))
+            await _provision_nodes(db_sess)
             await db_sess.flush()
             db_sess.add(
                 SessionIdleCheckRow(
@@ -1050,13 +1088,22 @@ class TestSessionIdleCheckExclusion:
                 SessionRow,
                 IdleCheckerRow,
                 SessionIdleCheckRow,
+                VirtualEntityRow,
+                ScopeBindingRow,
+                EntityMembershipRow,
+                EntityMembershipCapRow,
+                EntityMembershipFieldRow,
             ],
         ):
             yield database_connection
 
     @pytest.fixture
     def repository(self, database: ExtendedAsyncSAEngine) -> IdleCheckerRepository:
-        return IdleCheckerRepository(DBOpsProvider(database), RelationOpsProvider(database))
+        return IdleCheckerRepository(
+            database,
+            RelationOpsProvider(database),
+            V2DBOpsProvider(database),
+        )
 
     @pytest.fixture
     async def exclusion_rows(
@@ -1124,6 +1171,7 @@ class TestSessionIdleCheckExclusion:
                 )
             )
             db_sess.add(_expired_check_checker_row(rows.checker_id))
+            await _provision_nodes(db_sess)
             await db_sess.flush()
             for session_id, phase, expire_at in check_specs:
                 db_sess.add(
@@ -1149,24 +1197,22 @@ class TestSessionIdleCheckExclusion:
             )
         return rows
 
-    async def test_exclude_upserts_missing_pair_row(
+    async def test_exclude_writes_a_pair_the_checker_has_not_reached(
         self,
         database: ExtendedAsyncSAEngine,
         repository: IdleCheckerRepository,
         exclusion_rows: ExclusionRows,
     ) -> None:
-        await repository.batch_exclude_session_idle_checks(
-            BulkUpserter(
-                specs=[
-                    SessionIdleCheckExcludeUpserterSpec(
-                        session_id=SessionID(exclusion_rows.unassigned_session_id),
-                        checker_id=exclusion_rows.checker_id,
-                        user_id=exclusion_rows.user_id,
-                    ),
-                ]
-            )
+        pair = SessionIdleCheckPair(
+            session_id=exclusion_rows.unassigned_session_id,
+            checker_id=exclusion_rows.checker_id,
         )
 
+        result = await repository.batch_exclude_session_idle_checks([pair], exclusion_rows.user_id)
+
+        assert [(item.pair, item.applied, item.error) for item in result.results] == [
+            (pair, True, None)
+        ]
         async with database.begin_readonly_session() as db_sess:
             row = await db_sess.get(
                 SessionIdleCheckRow,
@@ -1186,20 +1232,17 @@ class TestSessionIdleCheckExclusion:
         exclusion_rows: ExclusionRows,
     ) -> None:
         await repository.batch_exclude_session_idle_checks(
-            BulkUpserter(
-                specs=[
-                    SessionIdleCheckExcludeUpserterSpec(
-                        session_id=SessionID(exclusion_rows.active_session_id),
-                        checker_id=exclusion_rows.checker_id,
-                        user_id=exclusion_rows.user_id,
-                    ),
-                    SessionIdleCheckExcludeUpserterSpec(
-                        session_id=SessionID(exclusion_rows.idle_expired_session_id),
-                        checker_id=exclusion_rows.checker_id,
-                        user_id=exclusion_rows.user_id,
-                    ),
-                ]
-            )
+            [
+                SessionIdleCheckPair(
+                    session_id=exclusion_rows.active_session_id,
+                    checker_id=exclusion_rows.checker_id,
+                ),
+                SessionIdleCheckPair(
+                    session_id=exclusion_rows.idle_expired_session_id,
+                    checker_id=exclusion_rows.checker_id,
+                ),
+            ],
+            exclusion_rows.user_id,
         )
 
         async with database.begin_readonly_session() as db_sess:
@@ -1235,35 +1278,25 @@ class TestSessionIdleCheckExclusion:
         unknown_session_id = SessionId(uuid.uuid4())
 
         result = await repository.batch_exclude_session_idle_checks(
-            BulkUpserter(
-                specs=[
-                    SessionIdleCheckExcludeUpserterSpec(
-                        session_id=SessionID(exclusion_rows.active_session_id),
-                        checker_id=exclusion_rows.checker_id,
-                        user_id=exclusion_rows.user_id,
-                    ),
-                    SessionIdleCheckExcludeUpserterSpec(
-                        session_id=SessionID(unknown_session_id),
-                        checker_id=exclusion_rows.checker_id,
-                        user_id=exclusion_rows.user_id,
-                    ),
-                ]
-            )
+            [
+                SessionIdleCheckPair(
+                    session_id=exclusion_rows.active_session_id,
+                    checker_id=exclusion_rows.checker_id,
+                ),
+                SessionIdleCheckPair(
+                    session_id=unknown_session_id, checker_id=exclusion_rows.checker_id
+                ),
+            ],
+            exclusion_rows.user_id,
         )
 
-        assert result.success == [
-            SessionIdleCheckPair(
-                session_id=exclusion_rows.active_session_id,
-                checker_id=exclusion_rows.checker_id,
-            )
-        ]
-        # The FK violation is mapped to SessionNotFound naming the session.
-        unknown_pair = SessionIdleCheckPair(
-            session_id=unknown_session_id,
-            checker_id=exclusion_rows.checker_id,
-        )
-        assert set(result.errors) == {unknown_pair}
-        assert isinstance(result.errors[unknown_pair], SessionNotFound)
+        applied, refused = result.results
+        assert applied.pair.session_id == exclusion_rows.active_session_id
+        assert (applied.applied, applied.error) == (True, None)
+        # The insert's FK violation is mapped for the failing pair alone.
+        assert refused.pair.session_id == unknown_session_id
+        assert refused.applied is False
+        assert isinstance(refused.error, SessionNotFound)
 
         async with database.begin_readonly_session() as db_sess:
             unknown_row = await db_sess.get(
@@ -1281,43 +1314,35 @@ class TestSessionIdleCheckExclusion:
         unknown_checker_id = IdleCheckerID(uuid.uuid4())
 
         result = await repository.batch_exclude_session_idle_checks(
-            BulkUpserter(
-                specs=[
-                    SessionIdleCheckExcludeUpserterSpec(
-                        session_id=SessionID(exclusion_rows.active_session_id),
-                        checker_id=unknown_checker_id,
-                        user_id=exclusion_rows.user_id,
-                    ),
-                ]
-            )
+            [
+                SessionIdleCheckPair(
+                    session_id=exclusion_rows.active_session_id, checker_id=unknown_checker_id
+                ),
+            ],
+            exclusion_rows.user_id,
         )
 
-        assert result.success == []
-        unknown_pair = SessionIdleCheckPair(
-            session_id=exclusion_rows.active_session_id,
-            checker_id=unknown_checker_id,
-        )
-        assert set(result.errors) == {unknown_pair}
-        assert isinstance(result.errors[unknown_pair], IdleCheckerNotFound)
+        (refused,) = result.results
+        assert refused.pair.checker_id == unknown_checker_id
+        assert refused.applied is False
+        assert isinstance(refused.error, IdleCheckerNotFound)
 
-    async def test_include_upserts_missing_pair_row(
+    async def test_include_writes_a_pair_the_checker_has_not_reached(
         self,
         database: ExtendedAsyncSAEngine,
         repository: IdleCheckerRepository,
         exclusion_rows: ExclusionRows,
     ) -> None:
-        await repository.batch_include_session_idle_checks(
-            BulkUpserter(
-                specs=[
-                    SessionIdleCheckIncludeUpserterSpec(
-                        session_id=SessionID(exclusion_rows.unassigned_session_id),
-                        checker_id=exclusion_rows.checker_id,
-                        user_id=exclusion_rows.user_id,
-                    ),
-                ]
-            )
+        pair = SessionIdleCheckPair(
+            session_id=exclusion_rows.unassigned_session_id,
+            checker_id=exclusion_rows.checker_id,
         )
 
+        result = await repository.batch_include_session_idle_checks([pair], exclusion_rows.user_id)
+
+        assert [(item.pair, item.applied, item.error) for item in result.results] == [
+            (pair, True, None)
+        ]
         async with database.begin_readonly_session() as db_sess:
             row = await db_sess.get(
                 SessionIdleCheckRow,
@@ -1337,20 +1362,17 @@ class TestSessionIdleCheckExclusion:
         exclusion_rows: ExclusionRows,
     ) -> None:
         await repository.batch_include_session_idle_checks(
-            BulkUpserter(
-                specs=[
-                    SessionIdleCheckIncludeUpserterSpec(
-                        session_id=SessionID(exclusion_rows.excluded_session_id),
-                        checker_id=exclusion_rows.checker_id,
-                        user_id=exclusion_rows.user_id,
-                    ),
-                    SessionIdleCheckIncludeUpserterSpec(
-                        session_id=SessionID(exclusion_rows.active_session_id),
-                        checker_id=exclusion_rows.checker_id,
-                        user_id=exclusion_rows.user_id,
-                    ),
-                ]
-            )
+            [
+                SessionIdleCheckPair(
+                    session_id=exclusion_rows.excluded_session_id,
+                    checker_id=exclusion_rows.checker_id,
+                ),
+                SessionIdleCheckPair(
+                    session_id=exclusion_rows.active_session_id,
+                    checker_id=exclusion_rows.checker_id,
+                ),
+            ],
+            exclusion_rows.user_id,
         )
 
         async with database.begin_readonly_session() as db_sess:
@@ -1386,34 +1408,23 @@ class TestSessionIdleCheckExclusion:
         unknown_session_id = SessionId(uuid.uuid4())
 
         result = await repository.batch_include_session_idle_checks(
-            BulkUpserter(
-                specs=[
-                    SessionIdleCheckIncludeUpserterSpec(
-                        session_id=SessionID(exclusion_rows.excluded_session_id),
-                        checker_id=exclusion_rows.checker_id,
-                        user_id=exclusion_rows.user_id,
-                    ),
-                    SessionIdleCheckIncludeUpserterSpec(
-                        session_id=SessionID(unknown_session_id),
-                        checker_id=exclusion_rows.checker_id,
-                        user_id=exclusion_rows.user_id,
-                    ),
-                ]
-            )
+            [
+                SessionIdleCheckPair(
+                    session_id=exclusion_rows.excluded_session_id,
+                    checker_id=exclusion_rows.checker_id,
+                ),
+                SessionIdleCheckPair(
+                    session_id=unknown_session_id, checker_id=exclusion_rows.checker_id
+                ),
+            ],
+            exclusion_rows.user_id,
         )
 
-        assert result.success == [
-            SessionIdleCheckPair(
-                session_id=exclusion_rows.excluded_session_id,
-                checker_id=exclusion_rows.checker_id,
-            )
-        ]
-        unknown_pair = SessionIdleCheckPair(
-            session_id=unknown_session_id,
-            checker_id=exclusion_rows.checker_id,
-        )
-        assert set(result.errors) == {unknown_pair}
-        assert isinstance(result.errors[unknown_pair], SessionNotFound)
+        applied, refused = result.results
+        assert applied.pair.session_id == exclusion_rows.excluded_session_id
+        assert (applied.applied, applied.error) == (True, None)
+        assert refused.applied is False
+        assert isinstance(refused.error, SessionNotFound)
 
     async def test_include_unknown_checker_reported_per_pair(
         self,
@@ -1424,34 +1435,24 @@ class TestSessionIdleCheckExclusion:
         unknown_checker_id = IdleCheckerID(uuid.uuid4())
 
         result = await repository.batch_include_session_idle_checks(
-            BulkUpserter(
-                specs=[
-                    SessionIdleCheckIncludeUpserterSpec(
-                        session_id=SessionID(exclusion_rows.excluded_session_id),
-                        checker_id=exclusion_rows.checker_id,
-                        user_id=exclusion_rows.user_id,
-                    ),
-                    SessionIdleCheckIncludeUpserterSpec(
-                        session_id=SessionID(exclusion_rows.active_session_id),
-                        checker_id=unknown_checker_id,
-                        user_id=exclusion_rows.user_id,
-                    ),
-                ]
-            )
+            [
+                SessionIdleCheckPair(
+                    session_id=exclusion_rows.excluded_session_id,
+                    checker_id=exclusion_rows.checker_id,
+                ),
+                SessionIdleCheckPair(
+                    session_id=exclusion_rows.active_session_id, checker_id=unknown_checker_id
+                ),
+            ],
+            exclusion_rows.user_id,
         )
 
-        assert result.success == [
-            SessionIdleCheckPair(
-                session_id=exclusion_rows.excluded_session_id,
-                checker_id=exclusion_rows.checker_id,
-            )
-        ]
-        unknown_pair = SessionIdleCheckPair(
-            session_id=exclusion_rows.active_session_id,
-            checker_id=unknown_checker_id,
-        )
-        assert set(result.errors) == {unknown_pair}
-        assert isinstance(result.errors[unknown_pair], IdleCheckerNotFound)
+        applied, refused = result.results
+        assert applied.pair.session_id == exclusion_rows.excluded_session_id
+        assert (applied.applied, applied.error) == (True, None)
+        assert refused.pair.checker_id == unknown_checker_id
+        assert refused.applied is False
+        assert isinstance(refused.error, IdleCheckerNotFound)
 
     async def test_include_restarts_grace_period_from_new_write(
         self,
@@ -1460,15 +1461,13 @@ class TestSessionIdleCheckExclusion:
     ) -> None:
         """The included pair reenters the grace fetch with this write as its start."""
         await repository.batch_include_session_idle_checks(
-            BulkUpserter(
-                specs=[
-                    SessionIdleCheckIncludeUpserterSpec(
-                        session_id=SessionID(exclusion_rows.excluded_session_id),
-                        checker_id=exclusion_rows.checker_id,
-                        user_id=exclusion_rows.user_id,
-                    ),
-                ]
-            )
+            [
+                SessionIdleCheckPair(
+                    session_id=exclusion_rows.excluded_session_id,
+                    checker_id=exclusion_rows.checker_id,
+                ),
+            ],
+            exclusion_rows.user_id,
         )
 
         batch = await repository.fetch_initial_grace_period_checks([SessionStatus.RUNNING])
@@ -1543,13 +1542,22 @@ class TestUserScopeAssignments:
                 IdleCheckerRow,
                 IdleCheckerBindingRow,
                 SessionIdleCheckRow,
+                VirtualEntityRow,
+                ScopeBindingRow,
+                EntityMembershipRow,
+                EntityMembershipCapRow,
+                EntityMembershipFieldRow,
             ],
         ):
             yield database_connection
 
     @pytest.fixture
     def repository(self, database: ExtendedAsyncSAEngine) -> IdleCheckerRepository:
-        return IdleCheckerRepository(DBOpsProvider(database), RelationOpsProvider(database))
+        return IdleCheckerRepository(
+            database,
+            RelationOpsProvider(database),
+            V2DBOpsProvider(database),
+        )
 
     @pytest.fixture
     async def user_scope_rows(
@@ -1596,6 +1604,7 @@ class TestUserScopeAssignments:
             db_sess.add(_expired_check_checker_row(user_only_checker_id))
             db_sess.add(_expired_check_checker_row(domain_checker_id))
             db_sess.add(_expired_check_checker_row(interactive_only_checker_id))
+            await _provision_nodes(db_sess)
             await db_sess.flush()
             db_sess.add(
                 IdleCheckerBindingRow(

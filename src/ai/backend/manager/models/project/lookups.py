@@ -7,7 +7,8 @@ from dataclasses import dataclass
 from typing import override
 
 from ai.backend.common.data.entity.domain import DomainName
-from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.project import ProjectEntityType, ProjectID
+from ai.backend.common.data.entity.types import EntityType
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.manager.data.project.types import ProjectType
 from ai.backend.manager.models.clauses import QueryCondition
@@ -28,6 +29,10 @@ class ProjectNameInDomainLookup(DataLookup[ProjectRow, ProjectID]):
     @override
     def row_class(self) -> type[ProjectRow]:
         return ProjectRow
+
+    @override
+    def entity_type(self) -> EntityType:
+        return ProjectEntityType()
 
     @override
     def conditions(self) -> Sequence[QueryCondition]:
@@ -54,6 +59,10 @@ class PersonalProjectOfUserLookup(DataLookup[ProjectRow, ProjectID]):
     @override
     def row_class(self) -> type[ProjectRow]:
         return ProjectRow
+
+    @override
+    def entity_type(self) -> EntityType:
+        return ProjectEntityType()
 
     @override
     def conditions(self) -> Sequence[QueryCondition]:

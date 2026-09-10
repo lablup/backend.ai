@@ -1,14 +1,6 @@
 """RBAC GQL types package."""
 
-from .entity import (
-    EntityConnection,
-    EntityEdge,
-    EntityFilter,
-    EntityOrderBy,
-    EntityOrderField,
-    EntityRefGQL,
-)
-from .entity_node import EntityNode
+from .entity_node import EntityNodeGQL
 from .permission import (
     BulkAddRolePermissionFailureInfoGQL,
     BulkAddRolePermissionsInputGQL,
@@ -72,12 +64,10 @@ from .role import (
     RoleUserNestedFilterGQL,
     UpdateRoleInput,
 )
-from .scope import RBACElementTypeFilterGQL, RBACElementTypeGQL, ScopeInputGQL
+from .scope import ScopeInputGQL
 
 __all__ = [
     # Permission enums
-    "RBACElementTypeGQL",
-    "RBACElementTypeFilterGQL",
     "OperationTypeGQL",
     "OperationTypeFilterGQL",
     "PermissionOrderField",
@@ -90,12 +80,10 @@ __all__ = [
     "RoleOrderField",
     "RoleAssignmentOrderField",
     # Entity enums
-    "EntityOrderField",
     # Types
     "PermissionGQL",
     "RoleGQL",
     "RoleAssignmentGQL",
-    "EntityRefGQL",
     # Filters
     "PermissionFilter",
     "RoleFilter",
@@ -103,12 +91,10 @@ __all__ = [
     "RoleAssignmentRoleNestedFilterGQL",
     "RoleUserNestedFilterGQL",
     "PermissionNestedFilterGQL",
-    "EntityFilter",
     # OrderBy
     "PermissionOrderBy",
     "RoleOrderBy",
     "RoleAssignmentOrderBy",
-    "EntityOrderBy",
     # Inputs
     "CreatePermissionInput",
     "UpdatePermissionInput",
@@ -146,14 +132,12 @@ __all__ = [
     "RoleAssignmentConnection",
     "RoleAssignmentEdge",
     # Entity types
-    "EntityNode",
-    "EntityEdge",
-    "EntityConnection",
     # Scope types
     "ScopeInputGQL",
     # Scope-entity combination
     "ScopeEntityCombinationGQL",
     # Entity-operation combination
+    "EntityNodeGQL",
     "EntityOperationCombinationGQL",
     "OperationInfoGQL",
     # Scope-entity-operation combination (permission matrix)

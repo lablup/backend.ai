@@ -35,9 +35,6 @@ from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.project import ProjectRow, ProjectType
 from ai.backend.manager.models.rbac_models import RoleRow, UserRoleRow
-from ai.backend.manager.models.rbac_models.association_scopes_entities import (
-    AssociationScopesEntitiesRow,
-)
 from ai.backend.manager.models.resource_group import ResourceGroupRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
@@ -120,7 +117,6 @@ class TestShareVfolderWithUsersMembership:
                 ProjectRow,
                 VFolderRow,
                 VFolderPermissionRow,
-                AssociationScopesEntitiesRow,
                 VirtualEntityRow,
                 EntityMembershipRow,
                 EntityMembershipCapRow,
@@ -337,14 +333,6 @@ class TestShareVfolderWithUsersMembership:
                     member_entity_id=user_ve_id,
                 )
             )
-            sess.add(
-                AssociationScopesEntitiesRow(
-                    scope_type=PermissionScopeType.PROJECT,
-                    scope_id=str(project),
-                    entity_type=PermissionEntityType.USER,
-                    entity_id=str(user_uuid),
-                )
-            )
             personal_project_id = uuid4()
             sess.add(
                 ProjectRow(
@@ -441,14 +429,6 @@ class TestShareVfolderWithUsersMembership:
                     member_entity_id=user_ve_id,
                 )
             )
-            sess.add(
-                AssociationScopesEntitiesRow(
-                    scope_type=PermissionScopeType.PROJECT,
-                    scope_id=str(project),
-                    entity_type=PermissionEntityType.USER,
-                    entity_id=str(user_uuid),
-                )
-            )
             await sess.flush()
         yield email
 
@@ -538,14 +518,6 @@ class TestShareVfolderWithUsersMembership:
                 EntityMembershipRow(
                     virtual_entity_id=other_project_scope_id,
                     member_entity_id=user_ve_id,
-                )
-            )
-            sess.add(
-                AssociationScopesEntitiesRow(
-                    scope_type=PermissionScopeType.PROJECT,
-                    scope_id=str(other_project),
-                    entity_type=PermissionEntityType.USER,
-                    entity_id=str(user_uuid),
                 )
             )
             await sess.flush()

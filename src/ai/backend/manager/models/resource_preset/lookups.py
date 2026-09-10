@@ -6,7 +6,11 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.common.data.entity.resource_preset import ResourcePresetID
+from ai.backend.common.data.entity.resource_preset import (
+    ResourcePresetEntityType,
+    ResourcePresetID,
+)
+from ai.backend.common.data.entity.types import EntityType
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.resource_preset.row import ResourcePresetRow
 from ai.backend.manager.models.specs.lookup import DataLookup
@@ -22,6 +26,10 @@ class ResourcePresetNameLookup(DataLookup[ResourcePresetRow, ResourcePresetID]):
     @override
     def row_class(self) -> type[ResourcePresetRow]:
         return ResourcePresetRow
+
+    @override
+    def entity_type(self) -> EntityType:
+        return ResourcePresetEntityType()
 
     @override
     def conditions(self) -> Sequence[QueryCondition]:

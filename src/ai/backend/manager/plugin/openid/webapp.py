@@ -6,6 +6,7 @@ import urllib.parse
 import uuid
 from collections.abc import Mapping, Sequence
 from datetime import UTC, datetime, timedelta
+from http import HTTPStatus
 from typing import (
     Any,
     Final,
@@ -28,6 +29,7 @@ from ai.backend.common.data.entity.domain import DomainName
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.api.rest.types import CORSOptions, WebMiddleware
+from ai.backend.manager.errors.auth import OpenIDAuthenticationFailed
 from ai.backend.manager.models.domain.lookups import DomainNameLookup
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.project.lookups import ProjectNameInDomainLookup
@@ -284,7 +286,12 @@ class OIDCWebAppPlugin(WebappPlugin):
             redirect_uri=str(redirect_uri.with_path("/func/openid/redirect")),
         )
 
-        return web.HTTPFound(uri)
+        return web.Response(
+            status=HTTPStatus.FOUND,
+            headers={"Location": uri},
+            # Legacy body that aiohttp's HTTP*Redirect filled in.
+            text=f"{HTTPStatus.FOUND.value}: {HTTPStatus.FOUND.phrase}",
+        )
 
     async def redirect(self, request: web.Request) -> web.Response:
         root_app = request.app["_root_app"]
@@ -324,7 +331,7 @@ class OIDCWebAppPlugin(WebappPlugin):
         except Exception as e:
             log.exception("Failed to handle token: %s", e)
             log.info("OPENID.WEBAPP: request not authenticated")
-            return web.HTTPUnauthorized(reason="Not authenticated by OpenID Provider")
+            raise OpenIDAuthenticationFailed from e
 
         log.info("OPENID.WEBAPP: authorized ({})", json.dumps(claims))
         config = config_provider.config
@@ -349,7 +356,12 @@ class OIDCWebAppPlugin(WebappPlugin):
             "force": force,
         }
         token = encode_jwt_token(token_data, self._config.secret)
-        return web.HTTPFound(redirect_uri.update_query({"sToken": token}))
+        return web.Response(
+            status=HTTPStatus.FOUND,
+            headers={"Location": str(redirect_uri.update_query({"sToken": token}))},
+            # Legacy body that aiohttp's HTTP*Redirect filled in.
+            text=f"{HTTPStatus.FOUND.value}: {HTTPStatus.FOUND.phrase}",
+        )
 
     @override
     async def create_app(

@@ -18,9 +18,10 @@ from sqlalchemy.orm import aliased
 
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.entity_share import EntityShareID
-from ai.backend.common.data.entity.project import PROJECT_ENTITY_TYPE, ProjectID
-from ai.backend.common.data.entity.types import EntityIdentifier, EntityType, RuntimeEntityID
-from ai.backend.common.data.entity.user import USER_ENTITY_TYPE, UserID
+from ai.backend.common.data.entity.project import ProjectEntityType, ProjectID
+from ai.backend.common.data.entity.types import EntityIdentifier, RuntimeEntityID
+from ai.backend.common.data.entity.user import UserEntityType, UserID
+from ai.backend.common.data.entity.vfolder import VFolderEntityType
 from ai.backend.common.data.permission.types import Permission
 from ai.backend.common.exception import BackendAIError
 from ai.backend.common.types import ResourceSlot
@@ -71,7 +72,7 @@ ensure_all_tables_registered()
 _DOMAIN = "invitation-test-domain"
 _DOMAIN_ID = DomainID(uuid4())
 _POLICY = "invitation-test-policy"
-_TARGET_TYPE = EntityType("vfolder")
+_TARGET_TYPE = VFolderEntityType()
 
 _INVITER_ID = UserID(uuid4())
 _INVITEE_ID = UserID(uuid4())
@@ -221,11 +222,11 @@ async def database(
             # invitation joins the target and the grant lands in the invitee's scope.
             session.add_all([
                 VirtualEntityRow(entity_type=_TARGET_TYPE, entity_id=_TARGET_ID),
-                VirtualEntityRow(entity_type=USER_ENTITY_TYPE, entity_id=_INVITEE_ID),
-                VirtualEntityRow(entity_type=USER_ENTITY_TYPE, entity_id=_OUTSIDER_ID),
-                VirtualEntityRow(entity_type=PROJECT_ENTITY_TYPE, entity_id=_INVITEE_PROJECT_ID),
-                VirtualEntityRow(entity_type=PROJECT_ENTITY_TYPE, entity_id=_OUTSIDER_PROJECT_ID),
-                VirtualEntityRow(entity_type=PROJECT_ENTITY_TYPE, entity_id=_TEAM_PROJECT_ID),
+                VirtualEntityRow(entity_type=UserEntityType(), entity_id=_INVITEE_ID),
+                VirtualEntityRow(entity_type=UserEntityType(), entity_id=_OUTSIDER_ID),
+                VirtualEntityRow(entity_type=ProjectEntityType(), entity_id=_INVITEE_PROJECT_ID),
+                VirtualEntityRow(entity_type=ProjectEntityType(), entity_id=_OUTSIDER_PROJECT_ID),
+                VirtualEntityRow(entity_type=ProjectEntityType(), entity_id=_TEAM_PROJECT_ID),
             ])
         yield database_connection
 
@@ -483,7 +484,7 @@ class TestAProjectAnswering:
         created = await repository.create(_creator_to(_TEAM_PROJECT_ID))
         data = await repository.accept(created.id, _TEAM_PROJECT_ID)
         assert data.status == EntityShareStatus.ACCEPTED
-        assert data.recipient == RuntimeEntityID(PROJECT_ENTITY_TYPE, _TEAM_PROJECT_ID)
+        assert data.recipient == RuntimeEntityID(ProjectEntityType(), _TEAM_PROJECT_ID)
         assert await _cap(database, _TEAM_PROJECT_ID) == (True, Permission.READ)
 
     async def test_a_project_gives_back_what_it_took(
@@ -539,7 +540,7 @@ class TestAddressedByEmail:
         created = await repository.create(_creator())
         assert created.recipient is None
         data = await repository.accept(created.id, _INVITEE_ID)
-        assert data.recipient == RuntimeEntityID(USER_ENTITY_TYPE, _INVITEE_ID)
+        assert data.recipient == RuntimeEntityID(UserEntityType(), _INVITEE_ID)
 
 
 class TestRevoke:

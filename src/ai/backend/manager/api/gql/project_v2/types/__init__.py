@@ -20,7 +20,7 @@ from .nested import (
     ProjectStorageInfoGQL,
 )
 from .node import ProjectV2Connection, ProjectV2Edge, ProjectV2GQL
-from .scopes import DomainProjectScope
+from .scopes import DomainProjectScope, ProjectScopeGQL
 
 __all__ = [
     # Enums
@@ -34,6 +34,7 @@ __all__ = [
     "ProjectV2OrderField",
     # Scopes
     "DomainProjectScope",
+    "ProjectScopeGQL",
     # Nested types - Basic
     "ProjectBasicInfoGQL",
     # Nested types - Organization

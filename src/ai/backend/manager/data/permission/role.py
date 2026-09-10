@@ -7,27 +7,16 @@ from typing import override
 
 from ai.backend.common.data.entity.role import RoleID
 from ai.backend.common.data.entity.role_preset import RolePresetID
-from ai.backend.common.data.entity.types import (
-    EntityData,
-    EntityIdentifier,
-    EntityType,
-    ScopeType,
-)
+from ai.backend.common.data.entity.types import EntityData, EntityIdentifier, EntityType
 from ai.backend.manager.data.common.types import SearchResult
 
-from .id import ObjectId, ScopeId
 from .object_permission import (
     ObjectPermissionData,
 )
 from .permission import PermissionData
 from .status import RoleStatus
 from .types import (
-    EntityType as LegacyEntityType,
-)
-from .types import (
-    OperationType,
     Permission,
-    RBACElementType,
     RoleSource,
 )
 
@@ -46,6 +35,9 @@ class RoleData(EntityData):
     created_at: datetime
     updated_at: datetime
     deleted_at: datetime | None
+    # The one scope the role belongs to.
+    scope_type: EntityType
+    scope_id: uuid.UUID
     auto_assign: bool = False
     description: str | None = None
     role_preset_id: RolePresetID | None = None
@@ -83,62 +75,11 @@ class RoleDetailData:
     created_at: datetime
     updated_at: datetime
     deleted_at: datetime | None
+    scope_type: EntityType
+    scope_id: uuid.UUID
     auto_assign: bool = False
     description: str | None = None
     role_preset_id: RolePresetID | None = None
-
-
-@dataclass(frozen=True)
-class ScopePermissionCheckInput:
-    user_id: uuid.UUID
-    target_entity_type: LegacyEntityType
-    target_scope_id: ScopeId
-    permission: Permission
-
-
-@dataclass(frozen=True)
-class SingleEntityPermissionCheckInput:
-    user_id: uuid.UUID
-    target_object_id: ObjectId
-    operation: OperationType
-
-
-@dataclass(frozen=True)
-class BatchEntityPermissionCheckInput:
-    user_id: uuid.UUID
-    target_object_ids: list[ObjectId]
-    operation: OperationType
-
-
-@dataclass(frozen=True)
-class PermissionResolutionKey:
-    """Identifies a single (user, element_type, entity) target for permission resolution.
-
-    A bulk permission resolver accepts a sequence of these keys and returns a
-    mapping keyed by the same object, so each result is unambiguously tied to
-    its input target.
-
-    ``element_type`` controls scope-chain entry; ``subject_entity_type`` controls
-    which ``permission.entity_type`` rows are matched. Callers that want the
-    default mapping pass ``element_type`` itself.
-    """
-
-    user_id: uuid.UUID
-    element_type: RBACElementType
-    entity_id: str
-    subject_entity_type: RBACElementType
-
-
-@dataclass(frozen=True)
-class ScopeChainPermissionCheckInput:
-    key: PermissionResolutionKey
-    permission: Permission
-
-
-@dataclass(frozen=True)
-class BulkPermissionCheckInput:
-    keys: list[PermissionResolutionKey]
-    permission: Permission
 
 
 @dataclass(frozen=True)
@@ -248,8 +189,6 @@ class BulkRolePermissionAddFailure:
     """Failure information for a single permission entry in bulk add (or replace)."""
 
     role_id: uuid.UUID
-    scope_type: ScopeType
-    scope_id: str
     entity_type: EntityType
     permission: Permission
     message: str

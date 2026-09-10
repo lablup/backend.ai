@@ -23,14 +23,9 @@ from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
 from ai.backend.common.contexts.user import with_user
 from ai.backend.common.data.entity.domain import DomainID
-from ai.backend.common.data.entity.types import (
-    EntityID,
-    EntityIdentifier,
-    EntityType,
-    ScopeID,
-    ScopeRef,
-    ScopeType,
-)
+from ai.backend.common.data.entity.project import ProjectEntityType
+from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
+from ai.backend.common.data.entity.vfolder import VFolderEntityType
 from ai.backend.common.data.entity.virtual_entity import VirtualEntityID
 from ai.backend.common.data.permission.types import (
     EntityType as PermEntityType,
@@ -76,9 +71,6 @@ from ai.backend.manager.models.entity_label.row import EntityLabelRow
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.rbac_models import UserRoleRow
-from ai.backend.manager.models.rbac_models.association_scopes_entities import (
-    AssociationScopesEntitiesRow,
-)
 from ai.backend.manager.models.rbac_models.permission.object_permission import ObjectPermissionRow
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.rbac_models.role import RoleRow
@@ -110,36 +102,36 @@ _ORM_CLUSTER = (
     ResourceGroupForDomainRow,
 )
 
-_DOMAIN_ID: ScopeID = uuid.uuid4()
-_OTHER_DOMAIN_ID: ScopeID = uuid.uuid4()
-_PROJECT_ID: ScopeID = uuid.uuid4()
-_VFOLDER_ID: EntityID = uuid.uuid4()
-_BULK_VF_GRANTED: EntityID = uuid.uuid4()
-_BULK_VF_DENIED: EntityID = uuid.uuid4()
+_DOMAIN_ID: uuid.UUID = uuid.uuid4()
+_OTHER_DOMAIN_ID: uuid.UUID = uuid.uuid4()
+_PROJECT_ID: uuid.UUID = uuid.uuid4()
+_VFOLDER_ID: uuid.UUID = uuid.uuid4()
+_BULK_VF_GRANTED: uuid.UUID = uuid.uuid4()
+_BULK_VF_DENIED: uuid.UUID = uuid.uuid4()
 
 
 class _StubEntityID(EntityIdentifier):
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return EntityType("vfolder")
+        return VFolderEntityType()
 
 
 class _ProjectCreateScopeAction(BaseScopeAction):
     """PROJECT:CREATE at domain scopes — subject type differs from the scope type."""
 
-    _scopes: Sequence[ScopeRef]
+    _scopes: Sequence[EntityIdentifier]
 
-    def __init__(self, scopes: Sequence[ScopeRef]) -> None:
+    def __init__(self, scopes: Sequence[EntityIdentifier]) -> None:
         self._scopes = scopes
 
     @classmethod
     @override
     def entity_type(cls) -> EntityType:
-        return EntityType("project")
+        return ProjectEntityType()
 
     @override
-    def scope_targets(self) -> Sequence[ScopeRef]:
+    def scope_targets(self) -> Sequence[EntityIdentifier]:
         return self._scopes
 
     @classmethod
@@ -157,7 +149,7 @@ class _ProjectCreateScopeAction(BaseScopeAction):
 class _VfolderUpdateAction(BaseSingleEntityAction):
     """VFOLDER:UPDATE on a single vfolder — exercises the single-entity path."""
 
-    vfolder_id: EntityID = field(default_factory=lambda: _VFOLDER_ID)
+    vfolder_id: uuid.UUID = field(default_factory=lambda: _VFOLDER_ID)
 
     @classmethod
     @override
@@ -178,7 +170,7 @@ class _VfolderUpdateAction(BaseSingleEntityAction):
 class _VfolderUpsertAction(BaseSingleEntityAction):
     """VFOLDER:UPSERT on a single vfolder — requires the ``CREATE | UPDATE`` mask."""
 
-    vfolder_id: EntityID = field(default_factory=lambda: _VFOLDER_ID)
+    vfolder_id: uuid.UUID = field(default_factory=lambda: _VFOLDER_ID)
 
     @classmethod
     @override
@@ -199,7 +191,7 @@ class _VfolderUpsertAction(BaseSingleEntityAction):
 class _BulkVfolderUpdateAction(BaseBulkAction):
     """VFOLDER:UPDATE on multiple vfolders — exercises the bulk validator path."""
 
-    ids: list[EntityID]
+    ids: list[uuid.UUID]
 
     @classmethod
     @override
@@ -232,11 +224,11 @@ class _VfolderID(EntityIdentifier):
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return EntityType("vfolder")
+        return VFolderEntityType()
 
 
-def _domain_scope(scope_id: ScopeID) -> ScopeRef:
-    return ScopeRef(scope_type=ScopeType(EntityType("domain")), scope_id=scope_id)
+def _domain_scope(scope_id: uuid.UUID) -> EntityIdentifier:
+    return DomainID(scope_id)
 
 
 def _make_user_data(user_id: uuid.UUID, *, is_superadmin: bool) -> UserData:
@@ -292,11 +284,14 @@ async def _seed_user_with_role(
             )
         )
         await db_sess.flush()
+        db_sess.add(VirtualEntityRow(entity_type=EntityType("domain"), entity_id=domain_id))
         db_sess.add(
             RoleRow(
                 id=role_id,
                 name=f"role-{suffix}",
                 description="virtual-entity validator test role",
+                scope_type=EntityType("domain"),
+                scope_id=domain_id,
             )
         )
         await db_sess.flush()
@@ -307,8 +302,6 @@ async def _seed_user_with_role(
 def _single_bit_rows(
     *,
     role_id: uuid.UUID,
-    scope_type: object,
-    scope_id: str,
     entity_type: object,
     permission: Permission,
 ) -> list[PermissionRow]:
@@ -316,8 +309,6 @@ def _single_bit_rows(
     return [
         PermissionRow(
             role_id=role_id,
-            scope_type=scope_type,
-            scope_id=scope_id,
             entity_type=entity_type,
             permission=bit,
         )
@@ -346,11 +337,14 @@ async def _grant_permission(
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
         domain_id = DomainID(uuid.uuid4())
         db_sess.add(DomainRow(id=domain_id, name=domain_name, total_resource_slots=ResourceSlot()))
+        await db_sess.execute(
+            sa.update(RoleRow)
+            .where(RoleRow.id == role_id)
+            .values(scope_type=EntityType(str(scope_type)), scope_id=scope_id)
+        )
         db_sess.add_all(
             _single_bit_rows(
                 role_id=role_id,
-                scope_type=scope_type,
-                scope_id=str(scope_id),
                 entity_type=entity_type,
                 permission=permission
                 if permission is not None
@@ -495,7 +489,6 @@ async def db_with_rbac_tables(
             KeyPairRow,
             PermissionRow,
             ObjectPermissionRow,
-            AssociationScopesEntitiesRow,
             VirtualEntityRow,
             ScopeBindingRow,
             EntityLabelRow,

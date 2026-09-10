@@ -68,6 +68,7 @@ from ai.backend.manager.services.agent.actions.search_agents import SearchAgents
 from ai.backend.manager.services.agent.actions.update_resource_group import (
     UpdateAgentResourceGroupAction,
 )
+from ai.backend.manager.services.agent.processors import AgentProcessors
 from ai.backend.manager.services.agent.types import ConflictingSessionCleanupPolicy
 
 _AGENT_PAGINATION_SPEC = PaginationSpec(
@@ -81,6 +82,11 @@ _AGENT_PAGINATION_SPEC = PaginationSpec(
 
 class AgentAdapter(BaseAdapter):
     """Adapter for agent domain operations."""
+
+    _agent: AgentProcessors
+
+    def __init__(self, agent: AgentProcessors) -> None:
+        self._agent = agent
 
     # ------------------------------------------------------------------ batch load (DataLoader)
 
@@ -96,11 +102,9 @@ class AgentAdapter(BaseAdapter):
         """
         if not agent_ids:
             return []
-        lookup = await self._processors.agent.bulk_lookup.run(
-            BulkLookupAgentsAction(agent_ids=agent_ids)
-        )
+        lookup = await self._agent.bulk_lookup.run(BulkLookupAgentsAction(agent_ids=agent_ids))
         uuids = [lookup.resolved[agent_id] for agent_id in agent_ids if agent_id in lookup.resolved]
-        got = await self._processors.agent.bulk_get.run(BulkGetAgentsAction(ids=uuids))
+        got = await self._agent.bulk_get.run(BulkGetAgentsAction(ids=uuids))
         agents = got.values()
         errors = got.errors()
         permitted = [agent.uuid for agent in agents.values()]
@@ -127,13 +131,46 @@ class AgentAdapter(BaseAdapter):
             )
         return nodes
 
+    async def batch_load_by_uuids(
+        self, agent_uuids: Sequence[AgentUUID]
+    ) -> list[AgentNode | Exception | None]:
+        """Batch load agents by entity id for DataLoader use.
+
+        Answers the way :meth:`batch_load_by_ids` does, taking the uuid each agent is
+        checked by instead of its name.
+        """
+        if not agent_uuids:
+            return []
+        got = await self._agent.bulk_get.run(BulkGetAgentsAction(ids=list(agent_uuids)))
+        agents = got.values()
+        errors = got.errors()
+        permitted = [agent.uuid for agent in agents.values()]
+        resources = await self._load_resources(permitted)
+        permissions = await self._load_permissions(permitted)
+        nodes: list[AgentNode | Exception | None] = []
+        for agent_uuid in agent_uuids:
+            agent = agents.get(agent_uuid)
+            if agent is None:
+                nodes.append(self.batch_load_failure(errors.get(agent_uuid)))
+                continue
+            nodes.append(
+                self._data_to_dto(
+                    AgentDetailData(
+                        agent=agent,
+                        resources=resources.get(agent.id, []),
+                        permissions=permissions.get(agent_uuid, []),
+                    )
+                )
+            )
+        return nodes
+
     async def _load_permissions(
         self, agent_uuids: Sequence[AgentUUID]
     ) -> Mapping[EntityIdentifier, list[AgentPermission]]:
         """What the caller holds on each named agent."""
         if not agent_uuids:
             return {}
-        result = await self._processors.agent.bulk_load_permissions.run(
+        result = await self._agent.bulk_load_permissions.run(
             BulkLoadAgentPermissionsAction(agent_uuids=agent_uuids)
         )
         return result.values()
@@ -144,7 +181,7 @@ class AgentAdapter(BaseAdapter):
         """The slot rows of the named agents, keyed by the agent's name column."""
         if not agent_uuids:
             return {}
-        result = await self._processors.agent.scoped_search_resources.run(
+        result = await self._agent.scoped_search_resources.run(
             ScopedSearchAgentResourcesAction(
                 agent_uuids=agent_uuids,
                 searcher=AgentResourceSearcher(pagination=NoPagination()),
@@ -166,16 +203,14 @@ class AgentAdapter(BaseAdapter):
         """
         if not agent_ids:
             return []
-        lookup = await self._processors.agent.bulk_lookup.run(
-            BulkLookupAgentsAction(agent_ids=agent_ids)
-        )
+        lookup = await self._agent.bulk_lookup.run(BulkLookupAgentsAction(agent_ids=agent_ids))
         uuids = [lookup.resolved[agent_id] for agent_id in agent_ids if agent_id in lookup.resolved]
-        got = await self._processors.agent.bulk_get.run(BulkGetAgentsAction(ids=uuids))
+        got = await self._agent.bulk_get.run(BulkGetAgentsAction(ids=uuids))
         permitted = [uuid for uuid in uuids if uuid in got.values()]
         counts: Mapping[EntityIdentifier, int] = {}
         count_errors: Mapping[EntityIdentifier, Exception] = {}
         if permitted:
-            counted = await self._processors.agent.bulk_load_container_counts.run(
+            counted = await self._agent.bulk_load_container_counts.run(
                 BulkLoadContainerCountsAction(agent_uuids=permitted)
             )
             counts = counted.values()
@@ -213,9 +248,7 @@ class AgentAdapter(BaseAdapter):
             limit=input.limit,
             offset=input.offset,
         )
-        action_result = await self._processors.agent.search_agents.run(
-            SearchAgentsAction(querier=querier)
-        )
+        action_result = await self._agent.search_agents.run(SearchAgentsAction(querier=querier))
         return AdminSearchAgentsPayload(
             items=[self._data_to_dto(item) for item in action_result.agents],
             total_count=action_result.total_count,
@@ -328,7 +361,7 @@ class AgentAdapter(BaseAdapter):
     ) -> UpdateAgentResourceGroupPayload:
         """Change an agent's resource group, cleaning up conflicting sessions per policy."""
         applied_policy = input.policy or ConflictingSessionCleanupPolicyEnum.TERMINATE
-        action_result = await self._processors.agent.update_resource_group.run(
+        action_result = await self._agent.update_resource_group.run(
             UpdateAgentResourceGroupAction(
                 agent_id=input.agent_id,
                 resource_group_id=input.resource_group_id,
@@ -350,8 +383,8 @@ class AgentAdapter(BaseAdapter):
 
     async def get_total_resources(self) -> TotalResourceData:
         """Retrieve aggregate resource capacity/usage across all agents."""
-        action_result: GetTotalResourcesActionResult = (
-            await self._processors.agent.get_total_resources.run(GetTotalResourcesAction())
+        action_result: GetTotalResourcesActionResult = await self._agent.get_total_resources.run(
+            GetTotalResourcesAction()
         )
         return action_result.total_resources
 

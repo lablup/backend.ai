@@ -3,7 +3,6 @@ RBAC DTOs v2 for Manager API.
 """
 
 from ai.backend.common.dto.manager.v2.rbac.request import (
-    AdminSearchEntitiesGQLInput,
     AdminSearchPermissionsGQLInput,
     AssignRoleInput,
     BulkAddRolePermissionsInput,
@@ -14,8 +13,6 @@ from ai.backend.common.dto.manager.v2.rbac.request import (
     CreateRoleInput,
     DeletePermissionInput,
     DeleteRoleInput,
-    EntityFilter,
-    EntityOrderBy,
     PermissionFilter,
     PermissionOrderBy,
     PurgeRoleInput,
@@ -32,7 +29,6 @@ from ai.backend.common.dto.manager.v2.rbac.request import (
     UpdateRoleInput,
 )
 from ai.backend.common.dto.manager.v2.rbac.response import (
-    AssociationScopesEntitiesNode,
     BulkAddRolePermissionFailureInfo,
     BulkAddRolePermissionsPayload,
     BulkAssignRoleFailureInfo,
@@ -45,7 +41,6 @@ from ai.backend.common.dto.manager.v2.rbac.response import (
     DeletePermissionPayload,
     DeleteRolePayload,
     EntityActionInfo,
-    EntityNode,
     EntityOperationCombinationInfo,
     OperationInfo,
     PermissionNode,
@@ -59,7 +54,6 @@ from ai.backend.common.dto.manager.v2.rbac.response import (
     UpdateRolePayload,
 )
 from ai.backend.common.dto.manager.v2.rbac.types import (
-    EntityOrderField,
     EntityType,
     EntityTypeScope,
     OperationType,
@@ -68,8 +62,6 @@ from ai.backend.common.dto.manager.v2.rbac.types import (
     OrderDirection,
     PermissionOrderField,
     PermissionSummary,
-    RBACElementTypeDTO,
-    RBACElementTypeFilter,
     RoleAssignmentOrderField,
     RoleOrderField,
     RoleSource,
@@ -84,7 +76,6 @@ from ai.backend.common.dto.manager.v2.rbac.types import (
 
 __all__ = (
     # Types
-    "EntityOrderField",
     "EntityType",
     "EntityTypeScope",
     "OperationType",
@@ -93,8 +84,6 @@ __all__ = (
     "OrderDirection",
     "PermissionOrderField",
     "PermissionSummary",
-    "RBACElementTypeDTO",
-    "RBACElementTypeFilter",
     "RoleAssignmentOrderField",
     "RoleOrderField",
     "RoleSource",
@@ -106,7 +95,6 @@ __all__ = (
     "ScopeInputDTO",
     "UUIDScope",
     # Input models (request)
-    "AdminSearchEntitiesGQLInput",
     "AdminSearchPermissionsGQLInput",
     "SearchRoleAssignmentsInput",
     "SearchRolesInput",
@@ -119,8 +107,6 @@ __all__ = (
     "CreateRoleInput",
     "DeletePermissionInput",
     "DeleteRoleInput",
-    "EntityFilter",
-    "EntityOrderBy",
     "PermissionFilter",
     "PermissionOrderBy",
     "PurgeRoleInput",
@@ -134,7 +120,6 @@ __all__ = (
     "UpdatePermissionInput",
     "UpdateRoleInput",
     # Node and Payload models (response)
-    "AssociationScopesEntitiesNode",
     "EntityActionInfo",
     "EntityOperationCombinationInfo",
     "OperationInfo",
@@ -149,7 +134,6 @@ __all__ = (
     "CreateRolePayload",
     "DeletePermissionPayload",
     "DeleteRolePayload",
-    "EntityNode",
     "EntityOperationCombinationInfo",
     "OperationInfo",
     "PermissionNode",

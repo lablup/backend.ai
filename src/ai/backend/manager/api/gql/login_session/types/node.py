@@ -11,6 +11,7 @@ import strawberry
 from strawberry import Info
 from strawberry.relay import Connection, Edge, NodeID
 
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.dto.manager.v2.login_session.response import LoginSessionNode
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
@@ -74,7 +75,7 @@ class LoginSessionV2GQL(PydanticNodeMixin[LoginSessionNode]):
         ]
         | None
     ):
-        return await info.context.data_loaders.user_loader.load(self.user_id)
+        return await info.context.data_loaders.user_loader.load(UserID(self.user_id))
 
 
 LoginSessionV2EdgeGQL = Edge[LoginSessionV2GQL]

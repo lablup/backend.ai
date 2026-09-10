@@ -16,15 +16,15 @@ from ai.backend.client.v2.v2_registry import V2ClientRegistry
 if TYPE_CHECKING:
     from tests.component.conftest import ServerInfo, UserFixtureData
 
-from ai.backend.common.data.entity.secret import SECRET_ENTITY_TYPE
+from ai.backend.common.data.entity.secret import SecretFieldType
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
-from ai.backend.manager.actions.registry.types import GroupMeta
+from ai.backend.manager.actions.registry.types import Concern, ConcernMeta, FieldGroupMeta
 from ai.backend.manager.api.adapters.secret.adapter import SecretAdapter
 from ai.backend.manager.api.rest.routing import RouteRegistry
 from ai.backend.manager.api.rest.types import RouteDeps
 from ai.backend.manager.api.rest.v2.secret.handler import V2SecretHandler
 from ai.backend.manager.api.rest.v2.secret.registry import register_v2_secret_routes
-from ai.backend.manager.data.secret.types import KeyProviderType
+from ai.backend.manager.data.secret.types import KeyProviderType, SecretFieldData
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.ops.v2.secret.provider import SecretOpsProvider
 from ai.backend.manager.repositories.secret.repository import SecretRepository
@@ -43,7 +43,9 @@ def secret_processors(
     pool = KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN)
     repository = SecretRepository(SecretOpsProvider(database_engine), pool)
     return SecretProcessors(
-        processor_registry.group(GroupMeta(SECRET_ENTITY_TYPE)),
+        processor_registry.concern(ConcernMeta(Concern.SYSTEM)).dangling_field_group(
+            FieldGroupMeta(SecretFieldType()), SecretFieldData
+        ),
         SecretService(repository),
     )
 
@@ -57,7 +59,7 @@ def server_module_registries(
     processors = MagicMock(spec=Processors)
     processors.secret = secret_processors
 
-    handler = V2SecretHandler(adapter=SecretAdapter(processors))
+    handler = V2SecretHandler(adapter=SecretAdapter(processors.secret))
     v2_reg = RouteRegistry.create("v2", route_deps.cors_options)
     v2_reg.add_subregistry(register_v2_secret_routes(handler, route_deps))
     return [v2_reg]

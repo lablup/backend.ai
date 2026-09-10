@@ -12,6 +12,8 @@ import strawberry
 from strawberry import ID, UNSET, Info
 from strawberry.relay import NodeID
 
+from ai.backend.common.data.entity.notification import NotificationChannelID, NotificationRuleID
+
 # NOTE: NotificationChannelSpecGQL uses @gql_pydantic_interface so Strawberry
 # dispatches from_pydantic() to the concrete implementor (WebhookSpecGQL /
 # EmailSpecGQL) based on the runtime DTO type.  No _pydantic_extra needed in
@@ -226,7 +228,7 @@ class NotificationChannel(PydanticNodeMixin[NotificationChannelNode]):
         required: bool = False,
     ) -> Iterable[NotificationChannel | None]:
         return await info.context.data_loaders.notification_channel_loader.load_many([
-            UUID(nid) for nid in node_ids
+            NotificationChannelID(UUID(nid)) for nid in node_ids
         ])
 
 
@@ -253,7 +255,9 @@ class NotificationRule(PydanticNodeMixin[NotificationRuleNode]):
         The rule names its channel by id, so a client that skips the channel skips the
         read. Non-null because ``notification_rules.channel_id`` is.
         """
-        channel = await info.context.data_loaders.notification_channel_loader.load(self.channel_id)
+        channel = await info.context.data_loaders.notification_channel_loader.load(
+            NotificationChannelID(self.channel_id)
+        )
         if channel is None:
             raise NotificationChannelNotFound(f"Notification channel {self.channel_id} not found")
         return channel
@@ -268,7 +272,7 @@ class NotificationRule(PydanticNodeMixin[NotificationRuleNode]):
         required: bool = False,
     ) -> Iterable[NotificationRule | None]:
         return await info.context.data_loaders.notification_rule_loader.load_many([
-            UUID(nid) for nid in node_ids
+            NotificationRuleID(UUID(nid)) for nid in node_ids
         ])
 
 

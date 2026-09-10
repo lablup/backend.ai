@@ -10,13 +10,18 @@ from uuid import UUID
 from pydantic import Field
 
 from ai.backend.common.api_handlers import SENTINEL, BaseRequestModel, Sentinel
-from ai.backend.common.data.permission.types import ScopeType
+from ai.backend.common.data.entity.types import EntityType
+from ai.backend.common.data.permission.types import (
+    EntityType as LegacyEntityType,
+)
+from ai.backend.common.data.permission.types import (
+    ScopeType as LegacyScopeType,
+)
 from ai.backend.common.dto.manager.defs import DEFAULT_PAGE_LIMIT, MAX_PAGE_LIMIT
 from ai.backend.common.dto.manager.query import StringFilter
 
 from .types import (
     AssignedUserOrderField,
-    EntityType,
     OperationType,
     OrderDirection,
     PermissionStatus,
@@ -38,7 +43,6 @@ __all__ = (
     "RoleOrder",
     "ScopeFilter",
     "ScopeOrder",
-    "SearchEntitiesRequest",
     "SearchRolesRequest",
     "SearchScopesRequest",
     "SearchUsersAssignedToRoleRequest",
@@ -51,8 +55,9 @@ class CreateRoleRequest(BaseRequestModel):
     """Request to create a role."""
 
     name: str = Field(description="Role name")
-    source: RoleSource = Field(default=RoleSource.CUSTOM, description="Role source")
-    status: RoleStatus = Field(default=RoleStatus.ACTIVE, description="Role status")
+    scope_type: EntityType = Field(description="Type of the scope the role belongs to")
+    scope_id: UUID = Field(description="ID of the scope the role belongs to")
+    status: RoleStatus | None = Field(default=None, description="Role status; active if omitted")
     description: str | None = Field(default=None, description="Role description")
 
 
@@ -152,9 +157,9 @@ class CreatePermissionRequest(BaseRequestModel):
     """Request to create a permission."""
 
     role_id: UUID = Field(description="Role ID for the permission")
-    scope_type: ScopeType = Field(description="Scope type for the permission")
+    scope_type: LegacyScopeType = Field(description="Scope type for the permission")
     scope_id: str = Field(description="Scope ID for the permission")
-    entity_type: EntityType = Field(description="Entity type for the permission")
+    entity_type: LegacyEntityType = Field(description="Entity type for the permission")
     operation: OperationType = Field(description="Operation type for the permission")
 
 
@@ -162,7 +167,7 @@ class CreateObjectPermissionRequest(BaseRequestModel):
     """Request to create an object permission for a role."""
 
     role_id: UUID = Field(description="Role ID to add the object permission to")
-    entity_type: EntityType = Field(description="Entity type for the object permission")
+    entity_type: LegacyEntityType = Field(description="Entity type for the object permission")
     entity_id: str = Field(description="Entity ID (e.g., project_id, user_id)")
     operation: OperationType = Field(description="Operation type for the object permission")
     status: PermissionStatus = Field(
@@ -188,15 +193,6 @@ class SearchScopesRequest(BaseRequestModel):
 
     filter: ScopeFilter | None = Field(default=None, description="Filter conditions")
     order: list[ScopeOrder] | None = Field(default=None, description="Order specifications")
-    limit: int = Field(
-        default=DEFAULT_PAGE_LIMIT, ge=1, le=MAX_PAGE_LIMIT, description="Maximum items to return"
-    )
-    offset: int = Field(default=0, ge=0, description="Number of items to skip")
-
-
-class SearchEntitiesRequest(BaseRequestModel):
-    """Request body for searching entities within a scope."""
-
     limit: int = Field(
         default=DEFAULT_PAGE_LIMIT, ge=1, le=MAX_PAGE_LIMIT, description="Maximum items to return"
     )

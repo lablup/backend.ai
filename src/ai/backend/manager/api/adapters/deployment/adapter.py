@@ -10,7 +10,6 @@ from typing import TYPE_CHECKING
 from uuid import UUID
 
 if TYPE_CHECKING:
-    from ai.backend.manager.services.processors import Processors
     from ai.backend.manager.sokovan.deployment.coordinator import DeploymentCoordinator
 
 from ai.backend.common.config import (
@@ -356,6 +355,7 @@ from ai.backend.manager.services.deployment.actions.search_deployments import (
 from ai.backend.manager.services.deployment.actions.search_replicas import SearchReplicasAction
 from ai.backend.manager.services.deployment.actions.sync_replicas import SyncReplicaAction
 from ai.backend.manager.services.deployment.actions.update_deployment import UpdateDeploymentAction
+from ai.backend.manager.services.deployment.processors import DeploymentProcessors
 from ai.backend.manager.types import OptionalState, TriState
 
 DEFAULT_PAGINATION_LIMIT = 10
@@ -570,12 +570,15 @@ def _statuses_to_lifecycles(
 class DeploymentAdapter(BaseAdapter):
     """Adapter for deployment domain operations."""
 
+    _deployment: DeploymentProcessors
+    _deployment_coordinator: DeploymentCoordinator
+
     def __init__(
         self,
-        processors: Processors,
+        deployment: DeploymentProcessors,
         deployment_coordinator: DeploymentCoordinator,
     ) -> None:
-        super().__init__(processors)
+        self._deployment = deployment
         # ``deployment_coordinator`` is the authoritative source for the
         # live set of registered handler names; we consult it when
         # validating ``DeploymentOptions.handler_options.by_handler`` keys so an
@@ -696,7 +699,7 @@ class DeploymentAdapter(BaseAdapter):
             model_revision=model_revision_creator,
             policy=policy,
         )
-        action_result = await self._processors.deployment.create_deployment.run(
+        action_result = await self._deployment.create_deployment.run(
             CreateDeploymentAction(
                 project_id=ProjectID(creator.metadata.project),
                 creator=creator,
@@ -713,7 +716,7 @@ class DeploymentAdapter(BaseAdapter):
     ) -> AdminSearchDeploymentsPayload:
         """Search deployments (admin, no scope)."""
         querier = self._build_deployment_querier(input)
-        action_result = await self._processors.deployment.global_search.run(
+        action_result = await self._deployment.global_search.run(
             GlobalSearchDeploymentsAction(querier=querier)
         )
         return AdminSearchDeploymentsPayload(
@@ -731,7 +734,7 @@ class DeploymentAdapter(BaseAdapter):
         user = current_user()
         if user is None:
             raise RuntimeError("No authenticated user in context")
-        action_result = await self._processors.deployment.scoped_search.run(
+        action_result = await self._deployment.scoped_search.run(
             ScopedSearchDeploymentsAction(
                 items=[UserDeploymentScopeItem(user_id=UserID(user.user_id))],
                 querier=self._build_deployment_querier(input),
@@ -750,7 +753,7 @@ class DeploymentAdapter(BaseAdapter):
         input: AdminSearchDeploymentsInput,
     ) -> AdminSearchDeploymentsPayload:
         """Search deployments within a specific project."""
-        action_result = await self._processors.deployment.scoped_search.run(
+        action_result = await self._deployment.scoped_search.run(
             ScopedSearchDeploymentsAction(
                 items=[ProjectDeploymentScopeItem(project_id=ProjectID(project_id))],
                 querier=self._build_deployment_querier(input),
@@ -765,7 +768,7 @@ class DeploymentAdapter(BaseAdapter):
 
     async def get(self, deployment_id: DeploymentID) -> DeploymentNode:
         """Retrieve a single deployment by ID."""
-        action_result = await self._processors.deployment.get_deployment_by_id.run(
+        action_result = await self._deployment.get_deployment_by_id.run(
             GetDeploymentByIdAction(deployment_id=deployment_id)
         )
         return self._deployment_data_to_dto(action_result.data)
@@ -790,7 +793,7 @@ class DeploymentAdapter(BaseAdapter):
             replica_count=OptionalState.from_unset(input.replica_count),
             open_to_public=OptionalState.from_unset(input.open_to_public),
         )
-        action_result = await self._processors.deployment.update_deployment.run(
+        action_result = await self._deployment.update_deployment.run(
             UpdateDeploymentAction(deployment_id=deployment_id, updater=updater)
         )
         return UpdateDeploymentPayload(deployment=self._deployment_data_to_dto(action_result.data))
@@ -816,7 +819,7 @@ class DeploymentAdapter(BaseAdapter):
                 h.name() for h in self._deployment_coordinator.registered_handlers()
             ),
         )
-        action_result = await self._processors.deployment.replace_deployment_options.run(
+        action_result = await self._deployment.replace_deployment_options.run(
             ReplaceDeploymentOptionsAction(
                 deployment_id=deployment_id,
                 options=options,
@@ -829,14 +832,14 @@ class DeploymentAdapter(BaseAdapter):
 
     async def sync_replicas(self, input: SyncReplicaInput) -> SyncReplicaPayload:
         """Force sync replica information for a deployment."""
-        await self._processors.deployment.sync_replicas.run(
+        await self._deployment.sync_replicas.run(
             SyncReplicaAction(deployment_id=DeploymentID(input.model_deployment_id))
         )
         return SyncReplicaPayload(success=True)
 
     async def activate_revision(self, input: ActivateRevisionInput) -> ActivateRevisionPayload:
         """Activate a specific revision as the current revision."""
-        action_result = await self._processors.deployment.activate_revision.run(
+        action_result = await self._deployment.activate_revision.run(
             ActivateRevisionAction(
                 deployment_id=DeploymentID(input.deployment_id),
                 revision_id=DeploymentRevisionID(input.revision_id),
@@ -853,7 +856,7 @@ class DeploymentAdapter(BaseAdapter):
         self,
     ) -> AdminRefreshDeploymentRevisionsPayload:
         """Create and activate a fresh revision for every active deployment."""
-        action_result = await self._processors.deployment.global_refresh_revisions.run(
+        action_result = await self._deployment.global_refresh_revisions.run(
             GlobalRefreshDeploymentRevisionsAction()
         )
         return AdminRefreshDeploymentRevisionsPayload(
@@ -870,7 +873,7 @@ class DeploymentAdapter(BaseAdapter):
 
     async def delete(self, input: DeleteDeploymentInput) -> DeleteDeploymentPayload:
         """Delete a deployment."""
-        await self._processors.deployment.destroy_deployment.run(
+        await self._deployment.destroy_deployment.run(
             DestroyDeploymentAction(deployment_id=DeploymentID(input.id))
         )
         return DeleteDeploymentPayload(id=input.id)
@@ -880,7 +883,7 @@ class DeploymentAdapter(BaseAdapter):
     # ------------------------------------------------------------------
 
     async def _auto_scaling_rule_deployment(self, rule_id: UUID) -> DeploymentID:
-        result = await self._processors.deployment.lookup_auto_scaling_rule_deployment.run(
+        result = await self._deployment.lookup_auto_scaling_rule_deployment.run(
             LookupAutoScalingRuleDeploymentAction(rule_id=rule_id)
         )
         return DeploymentID(result.entity_id())
@@ -894,7 +897,7 @@ class DeploymentAdapter(BaseAdapter):
             model_deployment_id=DeploymentID(input.model_deployment_id),
             expires_at=input.expires_at,
         )
-        action_result = await self._processors.deployment.create_access_token.run(
+        action_result = await self._deployment.create_access_token.run(
             CreateAccessTokenAction(
                 deployment_id=DeploymentID(input.model_deployment_id), creator=creator
             )
@@ -908,7 +911,7 @@ class DeploymentAdapter(BaseAdapter):
         token_id: UUID,
     ) -> GetAccessTokenPayload:
         """Get a single access token by ID."""
-        action_result = await self._processors.deployment.get_access_token.run(
+        action_result = await self._deployment.get_access_token.run(
             GetAccessTokenAction(access_token_id=DeploymentTokenID(token_id))
         )
         return GetAccessTokenPayload(
@@ -920,7 +923,7 @@ class DeploymentAdapter(BaseAdapter):
         input: DeleteAccessTokenInput,
     ) -> DeleteAccessTokenPayload:
         """Delete an access token."""
-        action_result = await self._processors.deployment.delete_access_token.run(
+        action_result = await self._deployment.delete_access_token.run(
             DeleteAccessTokenAction(access_token_id=DeploymentTokenID(input.id))
         )
         if not action_result.success:
@@ -932,7 +935,7 @@ class DeploymentAdapter(BaseAdapter):
         input: BulkDeleteAccessTokensInput,
     ) -> BulkDeleteAccessTokensPayload:
         """Bulk delete access tokens."""
-        action_result = await self._processors.deployment.bulk_delete_access_tokens.run(
+        action_result = await self._deployment.bulk_delete_access_tokens.run(
             BulkDeleteAccessTokensAction(access_token_ids=input.ids)
         )
         return BulkDeleteAccessTokensPayload(ids=action_result.deleted_ids)
@@ -944,7 +947,7 @@ class DeploymentAdapter(BaseAdapter):
     ) -> SearchAccessTokensPayload:
         """Search access tokens scoped to a specific deployment."""
         searcher = self._build_access_token_searcher(input)
-        action_result = await self._processors.deployment.search_access_tokens.run(
+        action_result = await self._deployment.search_access_tokens.run(
             SearchAccessTokensAction(
                 deployment_id=DeploymentID(scope.deployment_id), searcher=searcher
             )
@@ -977,7 +980,7 @@ class DeploymentAdapter(BaseAdapter):
             max_replicas=input.max_replicas,
             prometheus_query_preset_id=input.prometheus_query_preset_id,
         )
-        action_result = await self._processors.deployment.create_auto_scaling_rule.run(
+        action_result = await self._deployment.create_auto_scaling_rule.run(
             CreateAutoScalingRuleAction(
                 deployment_id=DeploymentID(input.model_deployment_id), creator=creator
             )
@@ -993,7 +996,7 @@ class DeploymentAdapter(BaseAdapter):
     ) -> SearchAutoScalingRulesPayload:
         """Search auto-scaling rules scoped to a specific deployment."""
         querier = self._build_auto_scaling_rule_querier(input, scope=scope)
-        action_result = await self._processors.deployment.search_auto_scaling_rules.run(
+        action_result = await self._deployment.search_auto_scaling_rules.run(
             SearchAutoScalingRulesAction(querier=querier)
         )
         return SearchAutoScalingRulesPayload(
@@ -1005,7 +1008,7 @@ class DeploymentAdapter(BaseAdapter):
 
     async def get_rule(self, rule_id: UUID) -> GetAutoScalingRulePayload:
         """Retrieve a single auto-scaling rule by ID."""
-        action_result = await self._processors.deployment.get_auto_scaling_rule.run(
+        action_result = await self._deployment.get_auto_scaling_rule.run(
             GetAutoScalingRuleAction(
                 deployment_id=await self._auto_scaling_rule_deployment(rule_id),
                 auto_scaling_rule_id=rule_id,
@@ -1031,7 +1034,7 @@ class DeploymentAdapter(BaseAdapter):
             max_replicas=TriState.from_unset(input.max_replicas),
             prometheus_query_preset_id=TriState.from_unset(input.prometheus_query_preset_id),
         )
-        action_result = await self._processors.deployment.update_auto_scaling_rule.run(
+        action_result = await self._deployment.update_auto_scaling_rule.run(
             UpdateAutoScalingRuleAction(
                 deployment_id=await self._auto_scaling_rule_deployment(input.id),
                 auto_scaling_rule_id=input.id,
@@ -1044,7 +1047,7 @@ class DeploymentAdapter(BaseAdapter):
 
     async def delete_rule(self, input: DeleteAutoScalingRuleInput) -> DeleteAutoScalingRulePayload:
         """Delete an auto-scaling rule."""
-        await self._processors.deployment.delete_auto_scaling_rule.run(
+        await self._deployment.delete_auto_scaling_rule.run(
             DeleteAutoScalingRuleAction(
                 deployment_id=await self._auto_scaling_rule_deployment(input.id),
                 auto_scaling_rule_id=input.id,
@@ -1056,7 +1059,7 @@ class DeploymentAdapter(BaseAdapter):
         self, input: BulkDeleteAutoScalingRulesInput
     ) -> BulkDeleteAutoScalingRulesPayload:
         """Bulk delete auto-scaling rules."""
-        action_result = await self._processors.deployment.bulk_delete_auto_scaling_rules.run(
+        action_result = await self._deployment.bulk_delete_auto_scaling_rules.run(
             BulkDeleteAutoScalingRulesAction(auto_scaling_rule_ids=input.ids)
         )
         return BulkDeleteAutoScalingRulesPayload(ids=action_result.deleted_ids)
@@ -1067,7 +1070,7 @@ class DeploymentAdapter(BaseAdapter):
 
     async def get_policy(self, deployment_id: DeploymentID) -> GetDeploymentPolicyPayload:
         """Retrieve a deployment policy by deployment ID."""
-        action_result = await self._processors.deployment.get_deployment_policy.run(
+        action_result = await self._deployment.get_deployment_policy.run(
             GetDeploymentPolicyAction(deployment_id=deployment_id)
         )
         return GetDeploymentPolicyPayload(policy=self._policy_data_to_dto(action_result.data))
@@ -1078,7 +1081,7 @@ class DeploymentAdapter(BaseAdapter):
     ) -> SearchDeploymentPoliciesPayload:
         """Search deployment policies with filters and pagination."""
         querier = self._build_policy_querier(input)
-        action_result = await self._processors.deployment.search_deployment_policies.run(
+        action_result = await self._deployment.search_deployment_policies.run(
             SearchDeploymentPoliciesAction(querier=querier)
         )
         return SearchDeploymentPoliciesPayload(
@@ -1110,7 +1113,7 @@ class DeploymentAdapter(BaseAdapter):
                     auto_promote=bg.auto_promote if bg is not None else False,
                     promote_delay_seconds=bg.promote_delay_seconds if bg is not None else 0,
                 )
-        action_result = await self._processors.deployment.upsert_deployment_policy.run(
+        action_result = await self._deployment.upsert_deployment_policy.run(
             UpsertDeploymentPolicyAction(
                 deployment_id=DeploymentID(input.deployment_id),
                 upserter=DeploymentPolicyUpserter(
@@ -1214,7 +1217,7 @@ class DeploymentAdapter(BaseAdapter):
             revision_preset_id=input.revision_preset_id,
             runtime_variant_preset_values=runtime_variant_preset_values,
         )
-        action_result = await self._processors.deployment.add_model_revision.run(
+        action_result = await self._deployment.add_model_revision.run(
             AddModelRevisionAction(
                 deployment_id=DeploymentID(input.deployment_id),
                 adder=adder,
@@ -1225,7 +1228,7 @@ class DeploymentAdapter(BaseAdapter):
 
     async def get_revision(self, revision_id: DeploymentRevisionID) -> RevisionNode:
         """Retrieve a single revision by ID."""
-        action_result = await self._processors.deployment.get_revision_by_id.run(
+        action_result = await self._deployment.get_revision_by_id.run(
             GetRevisionByIdAction(revision_id=revision_id)
         )
         return self._revision_data_to_dto(action_result.data)
@@ -1237,7 +1240,7 @@ class DeploymentAdapter(BaseAdapter):
     ) -> AdminSearchRevisionsPayload:
         """Search model revisions scoped to a specific deployment."""
         searcher = self._build_revision_searcher(input)
-        action_result = await self._processors.deployment.search_revisions.run(
+        action_result = await self._deployment.search_revisions.run(
             SearchRevisionsAction(
                 deployment_id=DeploymentID(scope.deployment_id), searcher=searcher
             )
@@ -1255,7 +1258,7 @@ class DeploymentAdapter(BaseAdapter):
     ) -> AdminSearchRevisionsPayload:
         """Search model revisions without scope (admin, all deployments)."""
         searcher = self._build_revision_searcher(input)
-        action_result = await self._processors.deployment.global_search_revisions.run(
+        action_result = await self._deployment.global_search_revisions.run(
             GlobalSearchRevisionsAction(searcher=searcher)
         )
         return AdminSearchRevisionsPayload(
@@ -1276,7 +1279,7 @@ class DeploymentAdapter(BaseAdapter):
     ) -> SearchAllocatedResourceSlotsPayload:
         """Search resource slots allocated to a deployment revision."""
         querier = self._build_revision_resource_slot_querier(input, revision_id=revision_id)
-        action_result = await self._processors.deployment.search_revision_resource_slots.run(
+        action_result = await self._deployment.search_revision_resource_slots.run(
             SearchRevisionResourceSlotsAction(
                 revision_id=revision_id,
                 querier=querier,
@@ -1303,7 +1306,7 @@ class DeploymentAdapter(BaseAdapter):
     ) -> SearchRoutesPayload:
         """Search routes scoped to a specific deployment."""
         querier = self._build_route_querier(input, scope=scope)
-        action_result = await self._processors.deployment.search_routes.run(
+        action_result = await self._deployment.search_routes.run(
             SearchRoutesAction(querier=querier)
         )
         return SearchRoutesPayload(
@@ -1324,7 +1327,7 @@ class DeploymentAdapter(BaseAdapter):
     ) -> SearchReplicasPayload:
         """Search replicas scoped to a specific deployment."""
         searcher = self._build_replica_searcher(input)
-        action_result = await self._processors.deployment.search_replicas.run(
+        action_result = await self._deployment.search_replicas.run(
             SearchReplicasAction(deployment_id=DeploymentID(scope.deployment_id), searcher=searcher)
         )
         return SearchReplicasPayload(
@@ -1340,7 +1343,7 @@ class DeploymentAdapter(BaseAdapter):
     ) -> SearchReplicasPayload:
         """Search replicas without scope (admin, all deployments)."""
         searcher = self._build_replica_searcher(input)
-        action_result = await self._processors.deployment.global_search_replicas.run(
+        action_result = await self._deployment.global_search_replicas.run(
             GlobalSearchReplicasAction(searcher=searcher)
         )
         return SearchReplicasPayload(
@@ -1352,7 +1355,7 @@ class DeploymentAdapter(BaseAdapter):
 
     async def get_replica(self, replica_id: UUID) -> ReplicaNode | None:
         """Retrieve a single replica by ID."""
-        action_result = await self._processors.deployment.get_replica_by_id.run(
+        action_result = await self._deployment.get_replica_by_id.run(
             GetReplicaByIdAction(replica_id=ReplicaID(replica_id))
         )
         return self._replica_data_to_dto(action_result.data)
@@ -1363,7 +1366,7 @@ class DeploymentAdapter(BaseAdapter):
         traffic_status: RouteTrafficStatus,
     ) -> RouteNode:
         """Update the traffic status of a route."""
-        action_result = await self._processors.deployment.update_route_traffic_status.run(
+        action_result = await self._deployment.update_route_traffic_status.run(
             UpdateRouteTrafficStatusAction(
                 route_id=ReplicaID(route_id),
                 traffic_status=ManagerRouteTrafficStatus(traffic_status.value),
@@ -1389,7 +1392,7 @@ class DeploymentAdapter(BaseAdapter):
             pagination=OffsetPagination(limit=len(deployment_ids)),
             conditions=[DeploymentConditions.by_ids(deployment_ids)],
         )
-        action_result = await self._processors.deployment.global_search.run(
+        action_result = await self._deployment.global_search.run(
             GlobalSearchDeploymentsAction(querier=querier)
         )
         deployment_map = {
@@ -1399,14 +1402,14 @@ class DeploymentAdapter(BaseAdapter):
 
     async def batch_load_revisions_by_ids(
         self,
-        revision_ids: Sequence[uuid.UUID],
+        revision_ids: Sequence[DeploymentRevisionID],
     ) -> list[RevisionNode | Exception | None]:
         """Batch load revisions by ID for DataLoader use, checked per owning deployment."""
         if not revision_ids:
             return []
         ids = [DeploymentRevisionID(revision_id) for revision_id in revision_ids]
         return await self.batch_load_fields(
-            self._processors.deployment.bulk_get_revisions,
+            self._deployment.bulk_get_revisions,
             BulkGetRevisionsAction(ids=ids),
             ids,
             self._revision_data_to_dto,
@@ -1414,14 +1417,14 @@ class DeploymentAdapter(BaseAdapter):
 
     async def batch_load_replicas_by_ids(
         self,
-        replica_ids: Sequence[uuid.UUID],
+        replica_ids: Sequence[ReplicaID],
     ) -> list[ReplicaNode | Exception | None]:
         """Batch load replicas by ID for DataLoader use, checked per owning deployment."""
         if not replica_ids:
             return []
         ids = [ReplicaID(replica_id) for replica_id in replica_ids]
         return await self.batch_load_fields(
-            self._processors.deployment.bulk_get_replicas,
+            self._deployment.bulk_get_replicas,
             BulkGetReplicasAction(ids=ids),
             ids,
             self._replica_data_to_dto,
@@ -1436,7 +1439,7 @@ class DeploymentAdapter(BaseAdapter):
             return []
         ids = [ReplicaID(route_id) for route_id in route_ids]
         return await self.batch_load_fields(
-            self._processors.deployment.bulk_get_routes,
+            self._deployment.bulk_get_routes,
             BulkGetRoutesAction(ids=ids),
             ids,
             self._route_info_to_dto,
@@ -1444,14 +1447,14 @@ class DeploymentAdapter(BaseAdapter):
 
     async def batch_load_access_tokens_by_ids(
         self,
-        token_ids: Sequence[uuid.UUID],
+        token_ids: Sequence[DeploymentTokenID],
     ) -> list[AccessTokenNode | Exception | None]:
         """Batch load access tokens by ID for DataLoader use, checked per owning deployment."""
         if not token_ids:
             return []
         ids = [DeploymentTokenID(token_id) for token_id in token_ids]
         return await self.batch_load_fields(
-            self._processors.deployment.bulk_get_access_tokens,
+            self._deployment.bulk_get_access_tokens,
             BulkGetAccessTokensAction(ids=ids),
             ids,
             self._access_token_data_to_dto,
@@ -1471,7 +1474,7 @@ class DeploymentAdapter(BaseAdapter):
             pagination=OffsetPagination(limit=len(rule_ids)),
             conditions=[AutoScalingRuleConditions.by_ids(rule_ids)],
         )
-        action_result = await self._processors.deployment.search_auto_scaling_rules.run(
+        action_result = await self._deployment.search_auto_scaling_rules.run(
             SearchAutoScalingRulesAction(querier=querier)
         )
         rule_map = {
@@ -1481,7 +1484,7 @@ class DeploymentAdapter(BaseAdapter):
 
     async def batch_load_policies_by_endpoint_ids(
         self,
-        endpoint_ids: Sequence[uuid.UUID],
+        endpoint_ids: Sequence[DeploymentID],
     ) -> list[DeploymentPolicyNode | None]:
         """Batch load deployment policies by deployment ID for DataLoader use.
 
@@ -1490,7 +1493,7 @@ class DeploymentAdapter(BaseAdapter):
         if not endpoint_ids:
             return []
         ids = [DeploymentID(endpoint_id) for endpoint_id in endpoint_ids]
-        result = await self._processors.deployment.bulk_get_deployment_policies.run(
+        result = await self._deployment.bulk_get_deployment_policies.run(
             BulkGetDeploymentPoliciesAction(deployment_ids=ids)
         )
         return [

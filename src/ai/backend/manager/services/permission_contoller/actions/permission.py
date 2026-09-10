@@ -1,13 +1,13 @@
 from dataclasses import dataclass
 from typing import override
 
+from ai.backend.common.data.entity.role import RoleID
 from ai.backend.common.data.permission.types import EntityType
 from ai.backend.manager.actions.action import BaseAction, BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.permission.permission import PermissionData
-from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
-from ai.backend.manager.repositories.base.creator import Creator
-from ai.backend.manager.repositories.base.purger import Purger
+from ai.backend.manager.models.rbac_models.permission.creators import RolePermissionCreator
+from ai.backend.manager.models.rbac_models.permission.purgers import RolePermissionPurger
 
 
 @dataclass
@@ -20,7 +20,8 @@ class PermissionAction(BaseAction):
 
 @dataclass
 class CreatePermissionAction(PermissionAction):
-    creator: Creator[PermissionRow]
+    role_id: RoleID
+    creator: RolePermissionCreator
 
     @override
     def entity_id(self) -> str | None:
@@ -48,11 +49,11 @@ class CreatePermissionActionResult(BaseActionResult):
 
 @dataclass
 class DeletePermissionAction(PermissionAction):
-    purger: Purger[PermissionRow]
+    purger: RolePermissionPurger
 
     @override
     def entity_id(self) -> str | None:
-        return str(self.purger.spec.pk_value())
+        return str(self.purger.target_id_value())
 
     @override
     @classmethod

@@ -20,19 +20,16 @@ from typing import TYPE_CHECKING, ClassVar
 import jinja2
 import jinja2.sandbox
 import sqlalchemy as sa
-from sqlalchemy.orm import aliased
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from ai.backend.common.data.entity.role import RoleID
 from ai.backend.common.data.entity.role_preset import RolePresetID
-from ai.backend.common.data.entity.types import (
-    EntityIdentifier,
-    EntityType,
-    ScopeType,
-)
+from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.exception import RBACTypeConversionError
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.permission.scope_template import ScopeTemplateValue
 from ai.backend.manager.data.permission.status import RoleStatus
 from ai.backend.manager.data.permission.types import (
@@ -43,7 +40,7 @@ from ai.backend.manager.data.permission.types import (
 from ai.backend.manager.data.permission.types import (
     ScopeType as LegacyScopeType,
 )
-from ai.backend.manager.errors.repository import EntityNotFoundError
+from ai.backend.manager.errors.base.entity import EntityNotFoundError
 from ai.backend.manager.errors.role_preset import InvalidRoleNameTemplate
 from ai.backend.manager.models.base import Base
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
@@ -62,8 +59,6 @@ from ai.backend.manager.models.specs.creator import (
 from ai.backend.manager.models.specs.purger import GuardedEntityPurger
 from ai.backend.manager.models.specs.types import BulkResultWithFailures
 from ai.backend.manager.models.specs.upserter import EntityUpserter
-from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
-from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
 from ai.backend.manager.repositories.ops.v2.graph_write import V2GraphWriteOpsBase
 
 if TYPE_CHECKING:
@@ -88,9 +83,6 @@ class V2EntityWriteOps(V2GraphWriteOpsBase):
 
     # Rendered role names are stored in ``roles.name`` (sa.String(64)).
     _MAX_ROLE_NAME_LENGTH: ClassVar[int] = 64
-
-    # Roles enroll in their scope's virtual entity as entities of this type.
-    _ROLE_ENTITY_TYPE: ClassVar[EntityType] = EntityType("role")
 
     _template_env: jinja2.sandbox.ImmutableSandboxedEnvironment
 
@@ -227,7 +219,9 @@ class V2EntityWriteOps(V2GraphWriteOpsBase):
                     data = await self.purge_entity(purger)
                     if data is None:
                         raise EntityNotFoundError(
-                            f"{purger.row_class().__name__} {purger.entity_id()} not found"
+                            entity_type=entity_id.entity_type(),
+                            operation=ActionOperationType.PURGE,
+                            extra_msg=f"{purger.row_class().__name__} {entity_id} not found",
                         )
                     successes[entity_id] = data
             except Exception as e:
@@ -279,31 +273,47 @@ class V2EntityWriteOps(V2GraphWriteOpsBase):
             await self._created_in(upserter.created_in(row), entity)
         return [upserter.to_data(row) for upserter, row in zip(upserters, rows, strict=True)]
 
+    async def grant_roles(
+        self,
+        user_id: UserID,
+        role_ids: Sequence[RoleID],
+        granted_by: UserID | None = None,
+    ) -> list[bool]:
+        """Map the user to each role, answering per role, in the order given, whether
+        the grant was written. A role the user already holds is left as it stands and
+        answers False."""
+        if not role_ids:
+            return []
+        granted = set(
+            (
+                await self._sess.scalars(
+                    pg_insert(UserRoleRow)
+                    .values([
+                        {"user_id": user_id, "role_id": role_id, "granted_by": granted_by}
+                        for role_id in role_ids
+                    ])
+                    .on_conflict_do_nothing()
+                    .returning(UserRoleRow.role_id)
+                )
+            ).all()
+        )
+        return [role_id in granted for role_id in role_ids]
+
     async def _grant_auto_assign_roles(
         self, entities: Collection[EntityIdentifier], user_id: UserID
     ) -> None:
-        """Map the user to every active auto_assign role enrolled in ``scopes``'
-        virtual entities; already-granted pairs are skipped via the (user_id, role_id)
-        unique key.
+        """Map the user to every active auto_assign role of ``entities``; already-granted
+        pairs are skipped via the (user_id, role_id) unique key.
 
         Not called by the generic entity paths: whether (and for which scopes — the
         joined ones, the user's own) a creation grants roles is the user domain's
         decision, wired explicitly during its migration."""
-        role_node = aliased(VirtualEntityRow, name="role_virtual_entity")
         role_ids = (
             await self._sess.scalars(
-                sa.select(RoleRow.id)
-                .join(role_node, role_node.entity_id == RoleRow.id)
-                .join(EntityMembershipRow, EntityMembershipRow.member_entity_id == role_node.id)
-                .join(
-                    VirtualEntityRow,
-                    EntityMembershipRow.virtual_entity_id == VirtualEntityRow.id,
-                )
-                .where(
-                    sa.tuple_(VirtualEntityRow.entity_type, VirtualEntityRow.entity_id).in_([
+                sa.select(RoleRow.id).where(
+                    sa.tuple_(RoleRow.scope_type, RoleRow.scope_id).in_([
                         (e.entity_type(), e) for e in entities
                     ]),
-                    role_node.entity_type == self._ROLE_ENTITY_TYPE,
                     RoleRow.auto_assign.is_(True),
                     RoleRow.status == RoleStatus.ACTIVE,
                 )
@@ -316,7 +326,7 @@ class V2EntityWriteOps(V2GraphWriteOpsBase):
 
     # -- Preset-derived roles (role-managed paths only) ---------------------------
 
-    def _scope_element_type(self, scope_type: ScopeType) -> RBACElementType:
+    def _scope_element_type(self, scope_type: EntityType) -> RBACElementType:
         try:
             return RBACElementType(scope_type)
         except ValueError as e:
@@ -328,8 +338,8 @@ class V2EntityWriteOps(V2GraphWriteOpsBase):
         self, entity_values: Mapping[EntityIdentifier, ScopeTemplateValue]
     ) -> None:
         """Create the roles the active presets matching the scopes' types call for —
-        presets are the only source of a scope's roles. Each role is created in its
-        scope, which owns and governs it as it does every other entity created there."""
+        presets are the only source of a scope's roles. Each role carries its scope,
+        which owns and governs it as it does every other entity created there."""
         specs = await self._preset_role_specs(entity_values)
         if not specs:
             return
@@ -340,6 +350,8 @@ class V2EntityWriteOps(V2GraphWriteOpsBase):
                 status=RoleStatus.ACTIVE,
                 auto_assign=spec.auto_assign,
                 role_preset_id=spec.role_preset_id,
+                scope_type=spec.entity.entity_type(),
+                scope_id=spec.entity,
             )
             for spec in specs
         ]
@@ -351,10 +363,6 @@ class V2EntityWriteOps(V2GraphWriteOpsBase):
         permission_rows = [
             PermissionRow(
                 role_id=row.id,
-                scope_type=self._scope_element_type(
-                    ScopeType(spec.entity.entity_type())
-                ).to_scope_type(),
-                scope_id=str(spec.entity),
                 entity_type=entity_type.to_entity_type(),
                 permission=Permission.from_operation(operation),
             )
@@ -378,8 +386,7 @@ class V2EntityWriteOps(V2GraphWriteOpsBase):
             await self._sess.scalars(
                 sa.select(RolePresetRow).where(
                     RolePresetRow.scope_type.in_({
-                        self._scope_element_type(ScopeType(e.entity_type())).to_scope_type()
-                        for e in entities
+                        self._scope_element_type(e.entity_type()).to_scope_type() for e in entities
                     }),
                     RolePresetRow.deleted.is_(False),
                 )
@@ -419,7 +426,7 @@ class V2EntityWriteOps(V2GraphWriteOpsBase):
             )
             for entity in entities
             for preset in presets_by_scope_type[
-                self._scope_element_type(ScopeType(entity.entity_type())).to_scope_type()
+                self._scope_element_type(entity.entity_type()).to_scope_type()
             ]
         ]
 

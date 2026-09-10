@@ -17,20 +17,22 @@ from ai.backend.client.v2.config import ClientConfig
 from ai.backend.client.v2.v2_registry import V2ClientRegistry
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.idle_checker import (
-    IDLE_CHECKER_ENTITY_TYPE,
     IdleCheckerAssignmentID,
+    IdleCheckerEntityType,
     IdleCheckerID,
 )
 from ai.backend.common.data.entity.project import ProjectID
-from ai.backend.common.data.entity.types import EntityIdentifier
-from ai.backend.common.data.entity.user import USER_ENTITY_TYPE, UserID
+from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
+from ai.backend.common.data.entity.user import UserEntityType, UserID
 from ai.backend.common.data.idle_checker.types import (
     CheckerType,
     IdleCheckerSpec,
     SessionLifetimeSpec,
 )
 from ai.backend.common.data.permission.types import (
-    EntityType,
+    EntityType as LegacyEntityType,
+)
+from ai.backend.common.data.permission.types import (
     OperationType,
     Permission,
     ScopeType,
@@ -87,7 +89,6 @@ from ai.backend.manager.models.virtual_entity.entity_membership import EntityMem
 from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
 from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
 from ai.backend.manager.repositories.idle_checker.repository import IdleCheckerRepository
-from ai.backend.manager.repositories.ops import DBOpsProvider
 from ai.backend.manager.repositories.ops.repository import OpsRepository
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.ops.v2.relation.provider import RelationOpsProvider
@@ -187,11 +188,15 @@ def idle_checker_assignment_processors(
 ) -> IdleCheckerAssignmentProcessors:
     """The binding reads; its writes are the rbac boundary's."""
     service = IdleCheckerAssignmentService(
-        IdleCheckerRepository(DBOpsProvider(database_engine), RelationOpsProvider(database_engine))
+        IdleCheckerRepository(
+            database_engine,
+            RelationOpsProvider(database_engine),
+            V2DBOpsProvider(database_engine),
+        )
     )
     groups = action_registry.concern(ConcernMeta(Concern.SESSION))
     return IdleCheckerAssignmentProcessors(
-        groups.group(GroupMeta(IDLE_CHECKER_ENTITY_TYPE)),
+        groups.group(GroupMeta(IdleCheckerEntityType())),
         service,
     )
 
@@ -205,7 +210,7 @@ def rbac_processors(
     rbac_groups = action_registry.concern(ConcernMeta(Concern.RBAC))
     return RbacProcessors(
         rbac_groups.relation_group(),
-        rbac_groups.group(GroupMeta(USER_ENTITY_TYPE)),
+        rbac_groups.group(GroupMeta(UserEntityType())),
         RbacRelationService(RbacRelationRepository(RelationOpsProvider(database_engine))),
         RbacRosterService(RbacRosterRepository(RosterOpsProvider(database_engine))),
         RbacRoleService(
@@ -226,7 +231,9 @@ def server_module_registries(
     processors = MagicMock(spec=Processors)
     processors.idle_checker_assignment = idle_checker_assignment_processors
     processors.rbac = rbac_processors
-    handler = V2IdleCheckerAssignmentHandler(adapter=IdleCheckerAssignmentAdapter(processors))
+    handler = V2IdleCheckerAssignmentHandler(
+        adapter=IdleCheckerAssignmentAdapter(processors.idle_checker_assignment, processors.rbac)
+    )
     v2_reg = RouteRegistry.create("v2", route_deps.cors_options)
     v2_reg.add_subregistry(register_v2_idle_checker_assignment_routes(handler, route_deps))
     return [v2_reg]
@@ -334,7 +341,9 @@ async def assignment_seed(
     )
     checker_id = checker.id
     repository = IdleCheckerRepository(
-        DBOpsProvider(database_engine), RelationOpsProvider(database_engine)
+        database_engine,
+        RelationOpsProvider(database_engine),
+        V2DBOpsProvider(database_engine),
     )
     relations = RbacRelationRepository(RelationOpsProvider(database_engine))
     assignments: list[IdleCheckerAssignmentData] = []
@@ -390,6 +399,8 @@ async def _grant(
                 id=role_id,
                 name=f"icb-role-{role_id.hex[:8]}",
                 description="idle checker assignment component test role",
+                scope_type=EntityType(scope_type),
+                scope_id=scope_id,
             )
         )
         await db_sess.flush()
@@ -398,8 +409,6 @@ async def _grant(
             db_sess.add(
                 PermissionRow(
                     role_id=role_id,
-                    scope_type=scope_type,
-                    scope_id=str(scope_id),
                     entity_type=entity_type,
                     permission=Permission.from_operation(operation),
                 )
@@ -429,7 +438,7 @@ async def project_assignment_read_permission(
         regular_user_fixture.user_uuid,
         ScopeType.PROJECT,
         assignment_seed.project_id,
-        IDLE_CHECKER_ENTITY_TYPE,
+        IdleCheckerEntityType(),
         (OperationType.READ,),
     ):
         yield
@@ -451,7 +460,7 @@ async def project_assignment_manage_permission(
         regular_user_fixture.user_uuid,
         ScopeType.PROJECT,
         assignment_seed.project_id,
-        EntityType.PROJECT,
+        LegacyEntityType.PROJECT,
         (OperationType.SOFT_DELETE, OperationType.HARD_DELETE),
     ):
         async for _ in _grant(
@@ -459,15 +468,15 @@ async def project_assignment_manage_permission(
             regular_user_fixture.user_uuid,
             ScopeType.PROJECT,
             assignment_seed.project_id,
-            IDLE_CHECKER_ENTITY_TYPE,
+            IdleCheckerEntityType(),
             (OperationType.READ,),
         ):
             async for _ in _grant(
                 database_engine,
                 regular_user_fixture.user_uuid,
-                IDLE_CHECKER_ENTITY_TYPE,
+                IdleCheckerEntityType(),
                 assignment_seed.checker_id,
-                IDLE_CHECKER_ENTITY_TYPE,
+                IdleCheckerEntityType(),
                 (OperationType.SOFT_DELETE, OperationType.HARD_DELETE),
             ):
                 yield
@@ -489,7 +498,7 @@ async def user_self_scope_permission(
         regular_user_fixture.user_uuid,
         ScopeType.USER,
         regular_user_fixture.user_uuid,
-        EntityType.USER,
+        LegacyEntityType.USER,
         (
             OperationType.READ,
             OperationType.UPDATE,
@@ -502,7 +511,7 @@ async def user_self_scope_permission(
             regular_user_fixture.user_uuid,
             ScopeType.USER,
             regular_user_fixture.user_uuid,
-            IDLE_CHECKER_ENTITY_TYPE,
+            IdleCheckerEntityType(),
             (OperationType.READ,),
         ):
             yield

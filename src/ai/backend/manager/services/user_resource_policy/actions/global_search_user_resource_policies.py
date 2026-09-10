@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from typing import override
 
 from ai.backend.common.data.entity.resource_policy import (
-    USER_RESOURCE_POLICY_ENTITY_TYPE,
+    UserResourcePolicyEntityType,
 )
 from ai.backend.common.data.entity.types import EntityType
 from ai.backend.manager.actions.v2.ops.base import SearchGlobalOpsAction
@@ -26,7 +26,7 @@ class GlobalSearchUserResourcePoliciesAction(
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return USER_RESOURCE_POLICY_ENTITY_TYPE
+        return UserResourcePolicyEntityType()
 
     @override
     @classmethod

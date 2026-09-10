@@ -3,12 +3,12 @@ from __future__ import annotations
 from typing import Any
 from uuid import UUID
 
-from ai.backend.common.api_handlers import SENTINEL, Sentinel
 from ai.backend.common.config import (
     ModelHealthCheck,
     ModelMetadata,
     PresetModelConfig,
     PresetModelDefinition,
+    PresetModelDefinitionDraft,
     PresetModelServiceConfig,
     PreStartAction,
 )
@@ -24,9 +24,9 @@ from ai.backend.common.dto.manager.v2.deployment_revision_preset.request import 
     CreateDeploymentRevisionPresetInput,
     DeploymentRevisionPresetFilter,
     DeploymentRevisionPresetOrder,
-    PresetModelDefinitionInput,
     SearchDeploymentRevisionPresetsInput,
     UpdateDeploymentRevisionPresetInput,
+    UpdatePresetModelDefinitionInput,
 )
 from ai.backend.common.dto.manager.v2.deployment_revision_preset.response import (
     CreateDeploymentRevisionPresetPayload,
@@ -57,6 +57,7 @@ from ai.backend.common.dto.manager.v2.resource_slot.response import (
     SearchAllocatedResourceSlotsPayload,
 )
 from ai.backend.common.model_service_start_command_compat import to_legacy_start_command
+from ai.backend.common.tristate.unset import Unset
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.data.deployment_revision_preset.types import (
@@ -109,6 +110,9 @@ from ai.backend.manager.services.deployment_revision_preset.actions.search_resou
 )
 from ai.backend.manager.services.deployment_revision_preset.actions.update import (
     UpdateDeploymentPresetAction,
+)
+from ai.backend.manager.services.deployment_revision_preset.processors import (
+    DeploymentPresetProcessors,
 )
 from ai.backend.manager.types import OptionalState, TriState
 
@@ -207,6 +211,11 @@ def _model_definition_to_dto(
 
 
 class DeploymentRevisionPresetAdapter(BaseAdapter):
+    _deployment_revision_preset: DeploymentPresetProcessors
+
+    def __init__(self, deployment_revision_preset: DeploymentPresetProcessors) -> None:
+        self._deployment_revision_preset = deployment_revision_preset
+
     async def search(
         self,
         input: SearchDeploymentRevisionPresetsInput,
@@ -225,7 +234,7 @@ class DeploymentRevisionPresetAdapter(BaseAdapter):
             limit=input.limit,
             offset=input.offset,
         )
-        result = await self._processors.deployment_revision_preset.global_search.run(
+        result = await self._deployment_revision_preset.global_search.run(
             GlobalSearchDeploymentPresetsAction(searcher=searcher)
         )
         return SearchDeploymentRevisionPresetsPayload(
@@ -236,7 +245,7 @@ class DeploymentRevisionPresetAdapter(BaseAdapter):
         )
 
     async def get(self, preset_id: UUID) -> DeploymentRevisionPresetNode:
-        result = await self._processors.deployment_revision_preset.get.run(
+        result = await self._deployment_revision_preset.get.run(
             GetDeploymentPresetAction(preset_id=DeploymentPresetID(preset_id))
         )
         return self._data_to_node(result.data)
@@ -255,7 +264,8 @@ class DeploymentRevisionPresetAdapter(BaseAdapter):
             if input.model_definition is not None
             else None
         )
-        strategy, strategy_spec = self._convert_required_strategy_input(input.deployment_strategy)
+        strategy = input.deployment_strategy.type
+        strategy_spec = self._convert_strategy_spec(input.deployment_strategy)
 
         creator = DeploymentPresetCreator(
             runtime_variant_id=input.runtime_variant_id,
@@ -276,7 +286,7 @@ class DeploymentRevisionPresetAdapter(BaseAdapter):
             deployment_strategy=strategy,
             deployment_strategy_spec=strategy_spec,
         )
-        result = await self._processors.deployment_revision_preset.create.run(
+        result = await self._deployment_revision_preset.create.run(
             CreateDeploymentPresetAction(creator=creator, slot_creators=slot_creators)
         )
         return CreateDeploymentRevisionPresetPayload(preset=self._data_to_node(result.data))
@@ -285,102 +295,57 @@ class DeploymentRevisionPresetAdapter(BaseAdapter):
         self,
         input: UpdateDeploymentRevisionPresetInput,
     ) -> UpdateDeploymentRevisionPresetPayload:
-        slot_creators: list[PresetResourceSlotCreator] | None = (
-            [
-                PresetResourceSlotCreator(entry=entry)
-                for entry in self._convert_resource_slots_input(input.resource_slots)
-            ]
-            if input.resource_slots is not None
-            else None
-        )
-        environ_state: OptionalState[dict[str, str]] = (
-            OptionalState.update(self._convert_environ_input(input.environ))
-            if input.environ is not None
-            else OptionalState.nop()
-        )
-        preset_values_state: OptionalState[list[RuntimeVariantPresetValueEntry]] = (
-            OptionalState.update(self._convert_preset_values_input(input.preset_values))
-            if input.preset_values is not None
-            else OptionalState.nop()
-        )
+        # A model_definition patch merges onto the currently stored preset, so fetch it
+        # upfront when it's being patched (unset/None need no current value).
+        current: DeploymentRevisionPresetNode | None = None
+        if isinstance(input.model_definition, UpdatePresetModelDefinitionInput):
+            current = await self.get(input.id)
+
+        slot_creators: list[PresetResourceSlotCreator] | None = None
+        if isinstance(input.resource_slots, list):
+            resource_slots = self._convert_resource_slots_input(input.resource_slots)
+            slot_creators = [PresetResourceSlotCreator(entry=entry) for entry in resource_slots]
         model_def_state: TriState[PresetModelDefinition] = self._convert_model_definition_state(
-            input.model_definition
+            input.model_definition,
+            current.model_definition if current is not None else None,
         )
 
         updater = DeploymentPresetUpdater(
             preset_id=DeploymentPresetID(input.id),
-            runtime_variant=(
-                OptionalState.update(input.runtime_variant_id)
-                if input.runtime_variant_id is not None
-                else OptionalState.nop()
-            ),
-            name=(
-                OptionalState.update(input.name) if input.name is not None else OptionalState.nop()
-            ),
-            description=(
-                TriState.nop()
-                if input.description is SENTINEL
-                else TriState.nullify()
-                if input.description is None
-                else TriState.update(input.description)
-            ),
-            rank=(
-                OptionalState.update(input.rank) if input.rank is not None else OptionalState.nop()
-            ),
-            image_id=(
-                TriState.nop()
-                if input.image_id is SENTINEL
-                else TriState.nullify()
-                if input.image_id is None
-                else TriState.update(input.image_id)
-            ),
+            runtime_variant=OptionalState.from_unset(input.runtime_variant_id),
+            name=OptionalState.from_unset(input.name),
+            description=TriState.from_unset(input.description),
+            rank=OptionalState.from_unset(input.rank),
+            image_id=TriState.from_unset(input.image_id),
             model_definition=model_def_state,
-            resource_opts=(
-                OptionalState.update(self._convert_resource_opts_input(input.resource_opts))
-                if input.resource_opts is not None
-                else OptionalState.nop()
+            resource_opts=OptionalState.from_unset(input.resource_opts).map(
+                self._convert_resource_opts_input
             ),
-            cluster_mode=(
-                OptionalState.update(input.cluster_mode)
-                if input.cluster_mode is not None
-                else OptionalState.nop()
+            cluster_mode=OptionalState.from_unset(input.cluster_mode),
+            cluster_size=OptionalState.from_unset(input.cluster_size),
+            startup_command=TriState.from_unset(input.startup_command),
+            bootstrap_script=TriState.from_unset(input.bootstrap_script),
+            environ=OptionalState.from_unset(input.environ).map(self._convert_environ_input),
+            runtime_variant_preset_values=OptionalState.from_unset(input.preset_values).map(
+                self._convert_preset_values_input
             ),
-            cluster_size=(
-                OptionalState.update(input.cluster_size)
-                if input.cluster_size is not None
-                else OptionalState.nop()
+            open_to_public=TriState.from_unset(input.open_to_public),
+            replica_count=TriState.from_unset(input.replica_count),
+            revision_history_limit=TriState.from_unset(input.revision_history_limit),
+            deployment_strategy=OptionalState.from_unset(input.deployment_strategy).map(
+                lambda si: si.type
             ),
-            startup_command=(
-                TriState.nop()
-                if input.startup_command is SENTINEL
-                else TriState.nullify()
-                if input.startup_command is None
-                else TriState.update(input.startup_command)
-            ),
-            bootstrap_script=(
-                TriState.nop()
-                if input.bootstrap_script is SENTINEL
-                else TriState.nullify()
-                if input.bootstrap_script is None
-                else TriState.update(input.bootstrap_script)
-            ),
-            environ=environ_state,
-            runtime_variant_preset_values=preset_values_state,
-            open_to_public=self._convert_tri_state(input.open_to_public),
-            replica_count=self._convert_tri_state(input.replica_count),
-            revision_history_limit=self._convert_tri_state(input.revision_history_limit),
-            deployment_strategy=self._convert_strategy_update_state(input.deployment_strategy),
-            deployment_strategy_spec=self._convert_strategy_spec_update_state(
-                input.deployment_strategy
+            deployment_strategy_spec=OptionalState.from_unset(input.deployment_strategy).map(
+                self._convert_strategy_spec
             ),
         )
-        result = await self._processors.deployment_revision_preset.update.run(
+        result = await self._deployment_revision_preset.update.run(
             UpdateDeploymentPresetAction(updater=updater, slot_creators=slot_creators)
         )
         return UpdateDeploymentRevisionPresetPayload(preset=self._data_to_node(result.data))
 
     async def delete(self, preset_id: UUID) -> DeleteDeploymentRevisionPresetPayload:
-        result = await self._processors.deployment_revision_preset.purge.run(
+        result = await self._deployment_revision_preset.purge.run(
             PurgeDeploymentPresetAction(preset_id=DeploymentPresetID(preset_id))
         )
         return DeleteDeploymentRevisionPresetPayload(id=result.data.id)
@@ -392,7 +357,7 @@ class DeploymentRevisionPresetAdapter(BaseAdapter):
     ) -> SearchAllocatedResourceSlotsPayload:
         """Search resource slots allocated to a deployment revision preset."""
         searcher = self._build_preset_resource_slot_searcher(input)
-        action_result = await self._processors.deployment_revision_preset.search_resource_slots.run(
+        action_result = await self._deployment_revision_preset.search_resource_slots.run(
             SearchPresetResourceSlotsAction(
                 preset_id=DeploymentPresetID(preset_id),
                 searcher=searcher,
@@ -558,86 +523,31 @@ class DeploymentRevisionPresetAdapter(BaseAdapter):
 
     @staticmethod
     def _convert_model_definition_state(
-        value: PresetModelDefinitionInput | Sentinel | None,
+        value: UpdatePresetModelDefinitionInput | None | Unset,
+        current: PresetModelDefinitionInfoDTO | None,
     ) -> TriState[PresetModelDefinition]:
-        if value is SENTINEL:
+        if isinstance(value, Unset):
             return TriState.nop()
         if value is None:
             return TriState.nullify()
-        return TriState.update(value.to_model_definition())
+        base_draft = PresetModelDefinitionDraft()
+        if current is not None:
+            base_draft = PresetModelDefinitionDraft.model_validate(current.model_dump())
+        merged = base_draft.merge(value.to_draft()).to_resolved()
+        return TriState.update(merged)
 
-    @staticmethod
-    def _convert_tri_state(value: Any) -> TriState[Any]:
-        """Convert a Sentinel | None | T input to TriState."""
-        if value is SENTINEL:
-            return TriState.nop()
-        if value is None:
-            return TriState.nullify()
-        return TriState.update(value)
-
-    @staticmethod
-    def _convert_strategy_input(
-        strategy_input: DeploymentStrategyInput | None,
-    ) -> tuple[DeploymentStrategy | None, dict[str, Any] | None]:
-        """Convert DeploymentStrategyInput to (strategy, strategy_spec dict)."""
-        if strategy_input is None:
-            return None, None
-        match strategy_input.type:
-            case DeploymentStrategy.ROLLING:
-                rolling = strategy_input.rolling_update
-                spec_dict: dict[str, Any] = (
-                    rolling.model_dump(mode="json") if rolling is not None else {}
-                )
-                return DeploymentStrategy.ROLLING, spec_dict
-            case DeploymentStrategy.BLUE_GREEN:
-                bg = strategy_input.blue_green
-                spec_dict = bg.model_dump(mode="json") if bg is not None else {}
-                return DeploymentStrategy.BLUE_GREEN, spec_dict
-
-    def _convert_required_strategy_input(
+    def _convert_strategy_spec(
         self,
         strategy_input: DeploymentStrategyInput,
-    ) -> tuple[DeploymentStrategy, dict[str, Any]]:
-        """Convert a non-null DeploymentStrategyInput to (strategy, strategy_spec dict)."""
+    ) -> dict[str, Any]:
+        """Convert a non-null DeploymentStrategyInput to its strategy_spec dict."""
         match strategy_input.type:
             case DeploymentStrategy.ROLLING:
                 rolling = strategy_input.rolling_update
-                spec_dict: dict[str, Any] = (
-                    rolling.model_dump(mode="json") if rolling is not None else {}
-                )
-                return DeploymentStrategy.ROLLING, spec_dict
+                return rolling.model_dump(mode="json") if rolling is not None else {}
             case DeploymentStrategy.BLUE_GREEN:
                 bg = strategy_input.blue_green
-                spec_dict = bg.model_dump(mode="json") if bg is not None else {}
-                return DeploymentStrategy.BLUE_GREEN, spec_dict
-
-    @classmethod
-    def _convert_strategy_update_state(
-        cls,
-        strategy_input: Any,
-    ) -> TriState[DeploymentStrategy]:
-        if strategy_input is SENTINEL:
-            return TriState.nop()
-        if strategy_input is None:
-            return TriState.nullify()
-        strategy, _ = cls._convert_strategy_input(strategy_input)
-        if strategy is None:
-            return TriState.nullify()
-        return TriState.update(strategy)
-
-    @classmethod
-    def _convert_strategy_spec_update_state(
-        cls,
-        strategy_input: Any,
-    ) -> TriState[dict[str, Any]]:
-        if strategy_input is SENTINEL:
-            return TriState.nop()
-        if strategy_input is None:
-            return TriState.nullify()
-        _, spec = cls._convert_strategy_input(strategy_input)
-        if spec is None:
-            return TriState.nullify()
-        return TriState.update(spec)
+                return bg.model_dump(mode="json") if bg is not None else {}
 
     @staticmethod
     def _data_to_node(
