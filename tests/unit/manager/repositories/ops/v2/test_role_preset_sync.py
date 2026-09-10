@@ -21,7 +21,7 @@ from ai.backend.common.data.permission.types import Permission
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.permission.status import RoleStatus
-from ai.backend.manager.data.permission.types import OperationType, RoleSource
+from ai.backend.manager.data.permission.types import RoleSource
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.keypair import KeyPairRow
@@ -219,7 +219,7 @@ async def scene(db: ExtendedAsyncSAEngine) -> Scene:
             RolePermissionPresetRow(
                 role_preset_id=preset_id,
                 entity_type=VFolderEntityType(),
-                operation=OperationType.READ,
+                permission=Permission.READ,
             )
         )
     derived = await _add_role(db, project_id, "member-x", preset_id=preset_id)
@@ -239,7 +239,7 @@ async def scene(db: ExtendedAsyncSAEngine) -> Scene:
 async def _set_preset_grants(
     db: ExtendedAsyncSAEngine,
     preset_id: uuid.UUID,
-    grants: set[tuple[EntityType, OperationType]],
+    grants: set[tuple[EntityType, Permission]],
 ) -> None:
     async with db.begin_session() as sess:
         await sess.execute(
@@ -247,10 +247,10 @@ async def _set_preset_grants(
                 RolePermissionPresetRow.role_preset_id == preset_id
             )
         )
-        for entity_type, operation in grants:
+        for entity_type, permission in grants:
             sess.add(
                 RolePermissionPresetRow(
-                    role_preset_id=preset_id, entity_type=entity_type, operation=operation
+                    role_preset_id=preset_id, entity_type=entity_type, permission=permission
                 )
             )
 
@@ -305,9 +305,9 @@ class TestSyncPresetRoles:
             db,
             scene.preset_id,
             {
-                (VFolderEntityType(), OperationType.READ),
-                (SessionEntityType(), OperationType.READ),
-                (SessionEntityType(), OperationType.UPDATE),
+                (VFolderEntityType(), Permission.READ),
+                (SessionEntityType(), Permission.READ),
+                (SessionEntityType(), Permission.UPDATE),
             },
         )
 
@@ -322,7 +322,7 @@ class TestSyncPresetRoles:
     async def test_a_grant_the_preset_dropped_is_revoked(
         self, db: ExtendedAsyncSAEngine, provider: RolePresetOpsProvider, scene: Scene
     ) -> None:
-        await _set_preset_grants(db, scene.preset_id, {(SessionEntityType(), OperationType.READ)})
+        await _set_preset_grants(db, scene.preset_id, {(SessionEntityType(), Permission.READ)})
 
         await _sync(provider, scene.preset_id)
 

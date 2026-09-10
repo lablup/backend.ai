@@ -112,11 +112,11 @@ class RolePresetWriteOps(PermissionWriteOps):
         )
         granted: dict[EntityType, Permission] = {}
         for row in rows:
-            permission = Permission.from_operation(row.operation)
-            if permission == Permission.NONE:
+            if row.permission == Permission.NONE:
                 continue
-            entity_type = row.entity_type
-            granted[entity_type] = granted.get(entity_type, Permission.NONE) | permission
+            granted[row.entity_type] = (
+                granted.get(row.entity_type, Permission.NONE) | row.permission
+            )
         return granted
 
     async def _derived_roles(

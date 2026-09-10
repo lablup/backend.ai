@@ -44,7 +44,6 @@ from ai.backend.manager.models.entity_label.row import EntityLabelRow
 from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.project import ProjectRow
 from ai.backend.manager.models.rbac_models import UserRoleRow
-from ai.backend.manager.models.rbac_models.permission.object_permission import ObjectPermissionRow
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.resource_group import ResourceGroupForDomainRow
@@ -150,7 +149,6 @@ class TestCheckPermissionViaVirtualEntity:
                 UserRow,
                 KeyPairRow,
                 PermissionRow,
-                ObjectPermissionRow,
                 VirtualEntityRow,
                 ScopeBindingRow,
                 EntityLabelRow,
@@ -612,7 +610,6 @@ class TestUserRosterEnrollment:
                 UserRow,
                 KeyPairRow,
                 PermissionRow,
-                ObjectPermissionRow,
                 VirtualEntityRow,
                 ScopeBindingRow,
                 EntityMembershipRow,

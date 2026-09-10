@@ -23,6 +23,8 @@ __all__ = (
     "OperationTypeDTO",
     "OperationTypeFilter",
     "OrderDirection",
+    "PermissionBitDTO",
+    "PermissionBitFilter",
     "PermissionOrderField",
     "PermissionSummary",
     "RoleAssignmentOrderField",
@@ -130,6 +132,15 @@ class OperationTypeFilter(BaseRequestModel):
     in_: list[OperationTypeDTO] | None = None
     not_equals: OperationTypeDTO | None = None
     not_in: list[OperationTypeDTO] | None = None
+
+
+class PermissionBitFilter(BaseRequestModel):
+    """Filter for a permission-bit column over ``PermissionBitDTO``."""
+
+    equals: PermissionBitDTO | None = None
+    in_: list[PermissionBitDTO] | None = None
+    not_equals: PermissionBitDTO | None = None
+    not_in: list[PermissionBitDTO] | None = None
 
 
 class ScopeInputDTO(BaseRequestModel):

@@ -62,7 +62,6 @@ from ai.backend.manager.models.entity_label.row import EntityLabelRow
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.rbac_models import UserRoleRow
-from ai.backend.manager.models.rbac_models.permission.object_permission import ObjectPermissionRow
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.resource_group import ResourceGroupForDomainRow
@@ -479,7 +478,6 @@ async def db_with_rbac_tables(
             UserRow,
             KeyPairRow,
             PermissionRow,
-            ObjectPermissionRow,
             VirtualEntityRow,
             ScopeBindingRow,
             EntityLabelRow,

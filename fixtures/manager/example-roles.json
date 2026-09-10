@@ -4954,168 +4954,168 @@
             "id": "bb0a5027-216d-5dae-831e-d479611eaed7",
             "role_preset_id": "9ebf4f57-9e67-5631-997a-d2d79cc3815f",
             "entity_type": "user",
-            "operation": "create",
+            "permission": 4,
             "created_at": "2025-09-12 09:51:58.265582+00"
         },
         {
             "id": "e1b152ed-941c-5610-8aa2-0bfd7b0d338d",
             "role_preset_id": "9ebf4f57-9e67-5631-997a-d2d79cc3815f",
             "entity_type": "user",
-            "operation": "hard-delete",
+            "permission": 16,
             "created_at": "2025-09-12 09:51:58.265582+00"
         },
         {
             "id": "049ee953-61ea-5605-ac9e-e6a4e4a40f8a",
             "role_preset_id": "9ebf4f57-9e67-5631-997a-d2d79cc3815f",
             "entity_type": "user",
-            "operation": "read",
+            "permission": 1,
             "created_at": "2025-09-12 09:51:58.265582+00"
         },
         {
             "id": "83ecd0ae-33ba-5516-8394-f8eaa5fbb09d",
             "role_preset_id": "9ebf4f57-9e67-5631-997a-d2d79cc3815f",
             "entity_type": "user",
-            "operation": "soft-delete",
+            "permission": 8,
             "created_at": "2025-09-12 09:51:58.265582+00"
         },
         {
             "id": "9849cf3c-b40f-55ab-8cad-1578cec97e02",
             "role_preset_id": "9ebf4f57-9e67-5631-997a-d2d79cc3815f",
             "entity_type": "user",
-            "operation": "update",
+            "permission": 2,
             "created_at": "2025-09-12 09:51:58.265582+00"
         },
         {
             "id": "6cc53d82-7299-50a5-b199-0371e1f7b68b",
             "role_preset_id": "22c4db03-24aa-5ff8-b5a9-64b2a2182413",
             "entity_type": "model_deployment",
-            "operation": "create",
+            "permission": 4,
             "created_at": "2025-09-12 09:51:58.265582+00"
         },
         {
             "id": "35317d5f-2a28-51ba-845b-77f48a127168",
             "role_preset_id": "22c4db03-24aa-5ff8-b5a9-64b2a2182413",
             "entity_type": "model_deployment",
-            "operation": "hard-delete",
+            "permission": 16,
             "created_at": "2025-09-12 09:51:58.265582+00"
         },
         {
             "id": "12e1b41d-828c-5e1f-a75c-b115b93cf49f",
             "role_preset_id": "22c4db03-24aa-5ff8-b5a9-64b2a2182413",
             "entity_type": "model_deployment",
-            "operation": "read",
+            "permission": 1,
             "created_at": "2025-09-12 09:51:58.265582+00"
         },
         {
             "id": "9436c6de-cafe-5842-a1ac-56321a6dd8a1",
             "role_preset_id": "22c4db03-24aa-5ff8-b5a9-64b2a2182413",
             "entity_type": "model_deployment",
-            "operation": "update",
+            "permission": 2,
             "created_at": "2025-09-12 09:51:58.265582+00"
         },
         {
             "id": "059c527e-e0e6-5d5a-9fd4-3b28f93c7b96",
             "role_preset_id": "06057849-3534-546f-b74c-b79d5d3ecf5e",
             "entity_type": "model_deployment",
-            "operation": "read",
+            "permission": 1,
             "created_at": "2025-09-12 09:51:58.265582+00"
         },
         {
             "id": "bbc6fc69-63c3-59c7-93f0-f83ce26e7d1d",
             "role_preset_id": "776c1366-dcf3-5abd-b8de-bc3ad3b759ad",
             "entity_type": "keypair",
-            "operation": "create",
+            "permission": 4,
             "created_at": "2025-09-12 09:51:58.265582+00"
         },
         {
             "id": "025ee359-2400-5577-bfeb-9a1189ac8209",
             "role_preset_id": "776c1366-dcf3-5abd-b8de-bc3ad3b759ad",
             "entity_type": "keypair",
-            "operation": "hard-delete",
+            "permission": 16,
             "created_at": "2025-09-12 09:51:58.265582+00"
         },
         {
             "id": "fbbac31d-709f-51a5-b3a5-49f05d909db8",
             "role_preset_id": "776c1366-dcf3-5abd-b8de-bc3ad3b759ad",
             "entity_type": "keypair",
-            "operation": "read",
+            "permission": 1,
             "created_at": "2025-09-12 09:51:58.265582+00"
         },
         {
             "id": "db16eb2f-39e0-5b90-85aa-f3c3eac84177",
             "role_preset_id": "776c1366-dcf3-5abd-b8de-bc3ad3b759ad",
             "entity_type": "keypair",
-            "operation": "soft-delete",
+            "permission": 8,
             "created_at": "2025-09-12 09:51:58.265582+00"
         },
         {
             "id": "42a1d35d-784d-5061-8ed0-9388dc7e3153",
             "role_preset_id": "776c1366-dcf3-5abd-b8de-bc3ad3b759ad",
             "entity_type": "keypair",
-            "operation": "update",
+            "permission": 2,
             "created_at": "2025-09-12 09:51:58.265582+00"
         },
         {
             "id": "28f11661-be65-5c35-a2a9-cb5494c61737",
             "role_preset_id": "776c1366-dcf3-5abd-b8de-bc3ad3b759ad",
             "entity_type": "session",
-            "operation": "create",
+            "permission": 4,
             "created_at": "2025-09-12 09:51:58.265582+00"
         },
         {
             "id": "13f55c40-9029-56cb-883f-c8b72366c3d9",
             "role_preset_id": "776c1366-dcf3-5abd-b8de-bc3ad3b759ad",
             "entity_type": "session",
-            "operation": "hard-delete",
+            "permission": 16,
             "created_at": "2025-09-12 09:51:58.265582+00"
         },
         {
             "id": "7872c11e-59c2-5e6b-a6d2-bc5c8377503c",
             "role_preset_id": "776c1366-dcf3-5abd-b8de-bc3ad3b759ad",
             "entity_type": "session",
-            "operation": "read",
+            "permission": 1,
             "created_at": "2025-09-12 09:51:58.265582+00"
         },
         {
             "id": "9715fa7e-f837-5de6-8656-88a218a85382",
             "role_preset_id": "776c1366-dcf3-5abd-b8de-bc3ad3b759ad",
             "entity_type": "session",
-            "operation": "update",
+            "permission": 2,
             "created_at": "2025-09-12 09:51:58.265582+00"
         },
         {
             "id": "4ce57936-2f5f-5a7e-ac4a-0ac2438333c6",
             "role_preset_id": "776c1366-dcf3-5abd-b8de-bc3ad3b759ad",
             "entity_type": "vfolder",
-            "operation": "create",
+            "permission": 4,
             "created_at": "2025-09-12 09:51:58.265582+00"
         },
         {
             "id": "1d3eadd8-42cc-5810-b408-784cf045e0e1",
             "role_preset_id": "776c1366-dcf3-5abd-b8de-bc3ad3b759ad",
             "entity_type": "vfolder",
-            "operation": "hard-delete",
+            "permission": 16,
             "created_at": "2025-09-12 09:51:58.265582+00"
         },
         {
             "id": "537dbceb-08c4-586a-896a-de1779b383b5",
             "role_preset_id": "776c1366-dcf3-5abd-b8de-bc3ad3b759ad",
             "entity_type": "vfolder",
-            "operation": "read",
+            "permission": 1,
             "created_at": "2025-09-12 09:51:58.265582+00"
         },
         {
             "id": "03dfd892-f8e6-5993-a3a4-73718a4b9728",
             "role_preset_id": "776c1366-dcf3-5abd-b8de-bc3ad3b759ad",
             "entity_type": "vfolder",
-            "operation": "soft-delete",
+            "permission": 8,
             "created_at": "2025-09-12 09:51:58.265582+00"
         },
         {
             "id": "0ad556c3-c091-5fc4-864b-3573546e55ad",
             "role_preset_id": "776c1366-dcf3-5abd-b8de-bc3ad3b759ad",
             "entity_type": "vfolder",
-            "operation": "update",
+            "permission": 2,
             "created_at": "2025-09-12 09:51:58.265582+00"
         }
     ],

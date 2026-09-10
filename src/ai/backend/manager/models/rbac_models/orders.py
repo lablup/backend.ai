@@ -5,9 +5,6 @@ from __future__ import annotations
 from ai.backend.manager.models.clauses import QueryOrder
 from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.project.row import ProjectRow
-from ai.backend.manager.models.rbac_models.permission.object_permission import (
-    ObjectPermissionRow,
-)
 from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
 from ai.backend.manager.models.user import UserRow
 
@@ -81,19 +78,3 @@ class UserScopeOrders:
         if ascending:
             return UserRow.created_at.asc()
         return UserRow.created_at.desc()
-
-
-class ObjectPermissionOrders:
-    """Query orders for object permissions."""
-
-    @staticmethod
-    def id(ascending: bool = True) -> QueryOrder:
-        if ascending:
-            return ObjectPermissionRow.id.asc()
-        return ObjectPermissionRow.id.desc()
-
-    @staticmethod
-    def entity_type(ascending: bool = True) -> QueryOrder:
-        if ascending:
-            return ObjectPermissionRow.entity_type.asc()
-        return ObjectPermissionRow.entity_type.desc()

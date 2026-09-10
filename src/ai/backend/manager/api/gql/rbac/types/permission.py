@@ -78,6 +78,9 @@ from ai.backend.common.dto.manager.v2.rbac.types import (
 from ai.backend.common.dto.manager.v2.rbac.types import (
     OperationTypeFilter as OperationTypeFilterDTO,
 )
+from ai.backend.common.dto.manager.v2.rbac.types import (
+    PermissionBitFilter as PermissionBitFilterDTO,
+)
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import DateTimeFilter, OrderDirection, StringFilter, UUIDFilter
 from ai.backend.manager.api.gql.decorators import (
@@ -132,6 +135,32 @@ class OperationTypeFilterGQL(PydanticInputMixin[OperationTypeFilterDTO]):
     )
     not_in: list[OperationTypeGQL] | None = gql_field(
         description="Excludes rows whose operation is in this list.", default=None
+    )
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description=(
+            "Filter for a permission-bit column. Supports equals / in / not_equals / not_in."
+        ),
+        added_version=NEXT_RELEASE_VERSION,
+    ),
+    name="PermissionBitFilter",
+)
+class PermissionBitFilterGQL(PydanticInputMixin[PermissionBitFilterDTO]):
+    equals: PermissionBitGQL | None = gql_field(
+        description="Matches rows with this exact bit.", default=None
+    )
+    in_: list[PermissionBitGQL] | None = gql_field(
+        description="Matches rows whose bit is in this list.",
+        name="in",
+        default=None,
+    )
+    not_equals: PermissionBitGQL | None = gql_field(
+        description="Excludes rows with this exact bit.", default=None
+    )
+    not_in: list[PermissionBitGQL] | None = gql_field(
+        description="Excludes rows whose bit is in this list.", default=None
     )
 
 

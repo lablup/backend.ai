@@ -4,7 +4,6 @@ from collections.abc import Collection, Mapping, Sequence
 
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
-from sqlalchemy.orm import selectinload
 
 from ai.backend.common.data.entity.domain import DomainEntityType
 from ai.backend.common.data.entity.project import ProjectEntityType
@@ -310,15 +309,9 @@ class PermissionDBSource:
             )
 
     async def get_role_with_permissions(self, role_id: uuid.UUID) -> RoleRow:
-        """Get role with eagerly loaded permissions only (no users)."""
+        """Get the role a detail read answers with."""
         async with self._db.begin_readonly_session_read_committed() as db_sess:
-            stmt = (
-                sa.select(RoleRow)
-                .where(RoleRow.id == role_id)
-                .options(
-                    selectinload(RoleRow.object_permission_rows),
-                )
-            )
+            stmt = sa.select(RoleRow).where(RoleRow.id == role_id)
             result = await db_sess.execute(stmt)
             role_row = result.scalar_one_or_none()
             if role_row is None:

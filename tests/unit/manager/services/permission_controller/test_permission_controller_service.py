@@ -19,7 +19,6 @@ from ai.backend.common.data.entity.role import RoleEntityType, RoleID
 from ai.backend.common.data.entity.types import EntityType
 from ai.backend.common.data.entity.user import UserEntityType
 from ai.backend.common.data.permission.types import (
-    OperationType,
     Permission,
     RoleSource,
     role_scope_types,
@@ -27,10 +26,6 @@ from ai.backend.common.data.permission.types import (
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
 from ai.backend.manager.actions.registry.types import GroupMeta
 from ai.backend.manager.data.common.types import SearchResult
-from ai.backend.manager.data.permission.id import ObjectId
-from ai.backend.manager.data.permission.object_permission import (
-    ObjectPermissionData,
-)
 from ai.backend.manager.data.permission.permission import PermissionData
 from ai.backend.manager.data.permission.role import (
     AssignedUserData,
@@ -104,7 +99,6 @@ def _make_role_detail_data(
     *,
     role_id: RoleID | None = None,
     name: str = "test-role",
-    object_permissions: list[ObjectPermissionData] | None = None,
 ) -> RoleDetailData:
     now = datetime.now(tz=UTC)
     return RoleDetailData(
@@ -112,7 +106,6 @@ def _make_role_detail_data(
         name=name,
         source=RoleSource.CUSTOM,
         status=RoleStatus.ACTIVE,
-        object_permissions=object_permissions or [],
         created_at=now,
         updated_at=now,
         deleted_at=None,
@@ -153,13 +146,7 @@ class TestGetRoleDetail:
         mock_repository: MagicMock,
     ) -> None:
         role_id = RoleID(uuid.uuid4())
-        obj_perm = ObjectPermissionData(
-            id=uuid.uuid4(),
-            role_id=role_id,
-            object_id=ObjectId(entity_type=UserEntityType(), entity_id="user-1"),
-            operation=OperationType.READ,
-        )
-        detail = _make_role_detail_data(role_id=role_id, object_permissions=[obj_perm])
+        detail = _make_role_detail_data(role_id=role_id, name="detail-role")
         mock_repository.get_role_with_permissions.return_value = detail
 
         action = GetRoleDetailAction(role_id=role_id)
@@ -167,21 +154,7 @@ class TestGetRoleDetail:
 
         mock_repository.get_role_with_permissions.assert_called_once_with(role_id)
         assert result.role.id == role_id
-        assert len(result.role.object_permissions) == 1
-
-    async def test_get_role_detail_empty_permissions(
-        self,
-        service: PermissionControllerService,
-        mock_repository: MagicMock,
-    ) -> None:
-        role_id = RoleID(uuid.uuid4())
-        detail = _make_role_detail_data(role_id=role_id, object_permissions=[])
-        mock_repository.get_role_with_permissions.return_value = detail
-
-        action = GetRoleDetailAction(role_id=role_id)
-        result = await service.get_role_detail(action)
-
-        assert result.role.object_permissions == []
+        assert result.role.name == "detail-role"
 
 
 class TestSearchRoles:

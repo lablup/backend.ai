@@ -6,12 +6,12 @@ from sqlalchemy.orm import Mapped, mapped_column
 from ai.backend.common.data.entity.role_permission_preset import RolePermissionPresetID
 from ai.backend.common.data.entity.role_preset import RolePresetID
 from ai.backend.common.data.entity.types import EntityType
-from ai.backend.manager.data.permission.types import OperationType
+from ai.backend.manager.data.permission.types import Permission
 from ai.backend.manager.data.role_preset.types import RolePermissionPresetData
 from ai.backend.manager.models.base import (
     GUID,
     Base,
-    StrEnumType,
+    IntFlagType,
 )
 from ai.backend.manager.models.mixins.timestamp import CreatedAtMixin
 
@@ -22,7 +22,7 @@ class RolePermissionPresetRow(CreatedAtMixin, Base):
         sa.UniqueConstraint(
             "role_preset_id",
             "entity_type",
-            "operation",
+            "permission",
             name="uq_role_permission_presets_preset_entity_op",
         ),
     )
@@ -42,8 +42,9 @@ class RolePermissionPresetRow(CreatedAtMixin, Base):
     entity_type: Mapped[EntityType] = mapped_column(
         "entity_type", sa.String(length=32), nullable=False
     )
-    operation: Mapped[OperationType] = mapped_column(
-        "operation", StrEnumType(OperationType, length=32), nullable=False
+    # One row per operation bit; the bit is the row's identity.
+    permission: Mapped[Permission] = mapped_column(
+        "permission", IntFlagType(Permission), nullable=False
     )
 
     def to_data(self) -> RolePermissionPresetData:
@@ -51,6 +52,6 @@ class RolePermissionPresetRow(CreatedAtMixin, Base):
             id=self.id,
             role_preset_id=self.role_preset_id,
             entity_type=self.entity_type,
-            operation=self.operation,
+            permission=self.permission,
             created_at=self.created_at,
         )

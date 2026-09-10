@@ -13,7 +13,6 @@ from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.data.entity.types import EntityType
 
 __all__ = (
-    "DeleteObjectPermissionPathParam",
     "DeletePermissionPathParam",
     "GetRolePathParam",
     "SearchScopesPathParam",
@@ -44,12 +43,6 @@ class DeletePermissionPathParam(BaseRequestModel):
     """Path parameter for deleting a permission."""
 
     permission_id: UUID = Field(description="The permission ID to delete")
-
-
-class DeleteObjectPermissionPathParam(BaseRequestModel):
-    """Path parameter for deleting an object permission."""
-
-    object_permission_id: UUID = Field(description="The object permission ID to delete")
 
 
 class SearchScopesPathParam(BaseRequestModel):

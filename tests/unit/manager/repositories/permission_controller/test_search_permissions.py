@@ -29,7 +29,6 @@ from ai.backend.manager.models.rbac_models import UserRoleRow
 from ai.backend.manager.models.rbac_models.permission.conditions import (
     ScopedPermissionConditions,
 )
-from ai.backend.manager.models.rbac_models.permission.object_permission import ObjectPermissionRow
 from ai.backend.manager.models.rbac_models.permission.orders import (
     ScopedPermissionOrders,
 )
@@ -81,7 +80,6 @@ class TestSearchPermissions:
                 UserRow,
                 KeyPairRow,
                 PermissionRow,
-                ObjectPermissionRow,
             ],
         ):
             yield database_connection

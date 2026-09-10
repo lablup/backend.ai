@@ -12,7 +12,7 @@ from ai.backend.common.data.entity.types import (
     EntityType,
     FieldData,
 )
-from ai.backend.common.data.permission.types import OperationType
+from ai.backend.common.data.permission.types import Permission
 from ai.backend.manager.data.common.bulk import (
     BulkCreateFailure,
     BulkPurgeFailure,
@@ -25,7 +25,7 @@ class RolePermissionPresetData(FieldData):
     id: RolePermissionPresetID
     role_preset_id: RolePresetID
     entity_type: EntityType
-    operation: OperationType
+    permission: Permission
     created_at: datetime
 
 

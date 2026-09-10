@@ -31,7 +31,6 @@ from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.permission.scope_template import ScopeTemplateValue
 from ai.backend.manager.data.permission.status import RoleStatus
 from ai.backend.manager.data.permission.types import (
-    OperationType,
     Permission,
     RoleSource,
 )
@@ -70,7 +69,7 @@ class _PresetRoleSpec:
     role_preset_id: RolePresetID
     name: str
     auto_assign: bool
-    entity_operations: Mapping[EntityType, Sequence[OperationType]]
+    entity_permissions: Mapping[EntityType, Sequence[Permission]]
 
 
 class V2EntityWriteOps(V2GraphWriteOpsBase):
@@ -351,12 +350,12 @@ class V2EntityWriteOps(V2GraphWriteOpsBase):
             PermissionRow(
                 role_id=row.id,
                 entity_type=entity_type,
-                permission=Permission.from_operation(operation),
+                permission=permission,
             )
             for spec, row in zip(specs, role_rows, strict=True)
-            for entity_type, operations in spec.entity_operations.items()
-            for operation in operations
-            if Permission.from_operation(operation) != Permission.NONE
+            for entity_type, permissions in spec.entity_permissions.items()
+            for permission in permissions
+            if permission != Permission.NONE
         ]
         if permission_rows:
             self._sess.add_all(permission_rows)
@@ -379,8 +378,8 @@ class V2EntityWriteOps(V2GraphWriteOpsBase):
         ).all()
         if not preset_rows:
             return []
-        operations_by_preset: dict[RolePresetID, dict[EntityType, list[OperationType]]] = (
-            defaultdict(lambda: defaultdict(list))
+        permissions_by_preset: dict[RolePresetID, dict[EntityType, list[Permission]]] = defaultdict(
+            lambda: defaultdict(list)
         )
         preset_permission_rows = (
             await self._sess.scalars(
@@ -392,9 +391,9 @@ class V2EntityWriteOps(V2GraphWriteOpsBase):
             )
         ).all()
         for preset_permission in preset_permission_rows:
-            operations_by_preset[preset_permission.role_preset_id][
+            permissions_by_preset[preset_permission.role_preset_id][
                 preset_permission.entity_type
-            ].append(preset_permission.operation)
+            ].append(preset_permission.permission)
         presets_by_scope_type: dict[EntityType, list[RolePresetRow]] = defaultdict(list)
         for preset in preset_rows:
             presets_by_scope_type[preset.scope_type].append(preset)
@@ -404,9 +403,9 @@ class V2EntityWriteOps(V2GraphWriteOpsBase):
                 role_preset_id=preset.id,
                 name=self._preset_role_name(preset, entity, entity_values[entity]),
                 auto_assign=preset.auto_assign,
-                entity_operations={
-                    entity_type: tuple(operations)
-                    for entity_type, operations in operations_by_preset[preset.id].items()
+                entity_permissions={
+                    entity_type: tuple(permissions)
+                    for entity_type, permissions in permissions_by_preset[preset.id].items()
                 },
             )
             for entity in entities

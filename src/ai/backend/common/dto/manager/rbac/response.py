@@ -20,16 +20,13 @@ from .types import OperationType, RoleSource, RoleStatus
 __all__ = (
     "AssignRoleResponse",
     "AssignedUserDTO",
-    "CreateObjectPermissionResponse",
     "CreatePermissionResponse",
     "CreateRoleResponse",
-    "DeleteObjectPermissionResponse",
     "DeletePermissionResponse",
     "DeleteRoleResponse",
     "GetEntityTypesResponse",
     "GetRoleResponse",
     "GetScopeTypesResponse",
-    "ObjectPermissionDTO",
     "PaginationInfo",
     "PermissionDTO",
     "RevokeRoleResponse",
@@ -126,16 +123,6 @@ class PermissionDTO(BackendAISchema):
     operation: OperationType = Field(description="Operation type")
 
 
-class ObjectPermissionDTO(BackendAISchema):
-    """DTO for object permission data."""
-
-    id: UUID = Field(description="Object permission ID")
-    role_id: UUID = Field(description="Role ID")
-    entity_type: str = Field(description="Entity type")
-    entity_id: str = Field(description="Entity ID")
-    operation: OperationType = Field(description="Operation type")
-
-
 class CreatePermissionResponse(BaseResponseModel):
     """Response for creating a permission."""
 
@@ -146,18 +133,6 @@ class DeletePermissionResponse(BaseResponseModel):
     """Response for deleting a permission."""
 
     deleted: bool = Field(description="Whether the permission was deleted")
-
-
-class CreateObjectPermissionResponse(BaseResponseModel):
-    """Response for creating an object permission."""
-
-    object_permission: ObjectPermissionDTO = Field(description="Created object permission")
-
-
-class DeleteObjectPermissionResponse(BaseResponseModel):
-    """Response for deleting an object permission."""
-
-    deleted: bool = Field(description="Whether the object permission was deleted")
 
 
 class GetScopeTypesResponse(BaseResponseModel):

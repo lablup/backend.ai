@@ -22,9 +22,6 @@ from ai.backend.manager.models.alembic.versions.a7d2c9e41b58_give_roles_their_sc
     backfill,
 )
 from ai.backend.manager.models.base import GUID
-from ai.backend.manager.models.rbac_models.permission.object_permission import (
-    ObjectPermissionRow,
-)
 from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.rbac_models.role_preset.row import RolePresetRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -61,12 +58,24 @@ _association_scopes_entities = sa.Table(
     sa.Column("entity_id", sa.String(64), nullable=False),
 )
 
+# The migration clears the object permissions of the roles it drops; that table is gone
+# from the models since, so its pre-migration shape is declared here too.
+_object_permissions = sa.Table(
+    "object_permissions",
+    _metadata,
+    sa.Column("id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v7()")),
+    sa.Column("role_id", GUID, nullable=False),
+    sa.Column("entity_type", sa.String(32), nullable=False),
+    sa.Column("entity_id", sa.String(64), nullable=False),
+    sa.Column("operation", sa.String(32), nullable=False),
+)
+
 _TABLES: list[Table | type[HasTable]] = [
     RolePresetRow,
     RoleRow,
     _permissions,
     _association_scopes_entities,
-    ObjectPermissionRow,
+    _object_permissions,
     VirtualEntityRow,
     EntityMembershipRow,
     ScopeBindingRow,
