@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import enum
 import errno
+import ipaddress
 import logging
 import pickle
 import re
@@ -79,6 +80,7 @@ from ai.backend.agent.metrics.metric import (
     SyncContainerLifecycleObserver,
 )
 from ai.backend.agent.network.caps import publish_backend
+from ai.backend.agent.network.local_subnet import pool_route_conflicts
 from ai.backend.agent.network.port_forward import PortForward, PortPublisher, is_orphaned
 from ai.backend.agent.port_pool import PortPool, ephemeral_overlap
 from ai.backend.agent.tasks import (
@@ -960,6 +962,7 @@ class AbstractAgent[
             local_config.container.port_range,
             cooldown_sec=local_config.container.port_reuse_cooldown_sec,
         )
+        self._warn_if_the_local_pool_is_already_routed(local_config)
         if (exposed := ephemeral_overlap(local_config.container.port_range)) is not None:
             # Said once, loudly, because the failure it causes is otherwise unattributable: a
             # session fails to start with EADDRINUSE on a port nothing of ours is using, the next
@@ -2481,6 +2484,39 @@ class AbstractAgent[
         log.info("starting with resource allocations")
         for computer_name, computer_ctx in self.computers.items():
             log.info("{}: {!r}", computer_name, dict(computer_ctx.alloc_map.allocations))
+
+    @staticmethod
+    def _warn_if_the_local_pool_is_already_routed(local_config: AgentUnifiedConfig) -> None:
+        """Say when something else on this host already routes into the LOCAL pool.
+
+        An index out of the pool names a subnet AND the gateway its bridge answers on, so a second
+        claimant on that range puts two gateways behind one address -- traffic from some containers
+        works and from others does not. `host_ipv4_addresses` already refuses a block whose address
+        is held HERE; this is the half it cannot see, a network declared elsewhere whose route only
+        appears once something uses it.
+
+        Measured on this rig: Docker Swarm's `ingress` is 172.30.0.0/24 against the pool's default
+        172.30.0.0/16, so the swarm endpoint at 172.30.0.3 sat inside the /26 a live session held.
+        Nothing broke only because no swarm service was published.
+
+        A warning, not a refusal: the pool is the operator's, an overlap is not yet a collision,
+        and a node whose routes cannot be read is not one to hold back.
+        """
+        try:
+            pool = ipaddress.IPv4Network(local_config.container.local_network_pool, strict=False)
+        except ValueError:
+            return  # the allocator refuses an unparseable pool; that is its error to raise
+        conflicts = pool_route_conflicts(pool)
+        if not conflicts:
+            return
+        log.warning(
+            "the LOCAL bridge pool {} overlaps {} route(s) this host already carries ({}): a"
+            " session's block there would put a second gateway on a range something else owns."
+            " Set container.local-network-pool to a range nothing else routes, on a drained node.",
+            pool,
+            len(conflicts),
+            ", ".join(f"{prefix} via {iface}" for prefix, iface in conflicts[:4]),
+        )
 
     def _report_unowned_port_forwards(self, forwards: Sequence[PortForward]) -> list[int]:
         """Say so when a rule records no owner. It is a defect signal, not a rule to collect.
