@@ -193,12 +193,30 @@ class ReportFormat(ABC):
     """One way of writing a report out."""
 
     @abstractmethod
+    def suffix(self) -> str:
+        """The file extension a split report uses."""
+        raise NotImplementedError
+
+    @abstractmethod
     def render(self, report: Report) -> str:
+        raise NotImplementedError
+
+    @abstractmethod
+    def render_one(self, component: ComponentReport) -> str:
+        """One component alone, for a file that lives beside that component."""
         raise NotImplementedError
 
 
 class MarkdownFormat(ReportFormat):
     """The document a person reads, and a release pull request carries."""
+
+    @override
+    def suffix(self) -> str:
+        return "md"
+
+    @override
+    def render_one(self, component: ComponentReport) -> str:
+        return "\n".join(self._component(component))
 
     @override
     def render(self, report: Report) -> str:
@@ -265,6 +283,14 @@ class JsonFormat(ReportFormat):
     """The same report for a tool to read."""
 
     @override
+    def suffix(self) -> str:
+        return "json"
+
+    @override
+    def render_one(self, component: ComponentReport) -> str:
+        return json.dumps(asdict(component), indent=2, ensure_ascii=False)
+
+    @override
     def render(self, report: Report) -> str:
         return json.dumps(
             {
@@ -279,6 +305,17 @@ class JsonFormat(ReportFormat):
 
 class SummaryFormat(ReportFormat):
     """The counts alone, for a line in a build log."""
+
+    @override
+    def suffix(self) -> str:
+        return "txt"
+
+    @override
+    def render_one(self, component: ComponentReport) -> str:
+        return (
+            f"{component.component}: {len(component.rows)} scenarios, "
+            f"{component.failing} failing, {len(component.unexercised)} calls unexercised"
+        )
 
     @override
     def render(self, report: Report) -> str:

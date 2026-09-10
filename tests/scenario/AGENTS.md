@@ -1,6 +1,8 @@
 # 시나리오 테스트 — 가드레일
 
 배경과 근거는 이 디렉터리의 `KNOWLEDGE.md`, 구성은 `README.md`에 있다.
+시나리오는 엔티티 패키지의 `KNOWLEDGE.md`에 먼저 적는다. 그 규칙은
+`src/ai/backend/manager/api/adapters/AGENTS.md`에 있다.
 
 ## 한 행이 말하는 것
 

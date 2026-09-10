@@ -36,6 +36,12 @@ def main() -> int:
         type=pathlib.Path,
         help="write here instead of standard output",
     )
+    parser.add_argument(
+        "--split",
+        type=pathlib.Path,
+        metavar="DIR",
+        help="write one file per component into this directory instead of one report",
+    )
     args = parser.parse_args()
     missing = [p for p in args.logs if not p.exists()]
     if missing:
@@ -64,7 +70,16 @@ def main() -> int:
     lines = [
         line for path in args.logs for line in path.read_text(encoding="utf8").splitlines()
     ]
-    text = chosen.render(Report.of(records_of(lines)))
+    report = Report.of(records_of(lines))
+    if args.split is not None:
+        args.split.mkdir(parents=True, exist_ok=True)
+        for component in report.components:
+            written = args.split / f"{component.component}.{chosen.suffix()}"
+            written.write_text(chosen.render_one(component) + "\n", encoding="utf8")
+            print(written)
+        return 0
+
+    text = chosen.render(report)
     if args.output is None:
         print(text)
     else:

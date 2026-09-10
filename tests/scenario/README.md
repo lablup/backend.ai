@@ -54,6 +54,13 @@ BACKEND_SCENARIO_LOG=dist/scenarios.jsonl pants test tests/scenario::
 python scripts/scenario-report.py dist/scenarios.jsonl -o dist/scenarios.md
 ```
 
+`--split <디렉터리>`를 주면 컴포넌트마다 파일 하나로 나온다. 엔티티 패키지의 `KNOWLEDGE.md`에
+되붙일 때 쓴다.
+
+```bash
+python scripts/scenario-report.py dist/scenarios.jsonl --split dist/by-component
+```
+
 세 가지 형식으로 나온다.
 
 | `--format` | 무엇 |
