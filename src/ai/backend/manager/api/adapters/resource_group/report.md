@@ -1,0 +1,73 @@
+## resource_group
+
+Not exercised by any scenario: admin_replace_default_deployment_options, admin_replace_default_session_options, batch_load_by_ids, batch_load_by_names, batch_load_fields, get_allowed_domains_for_resource_group, get_allowed_projects_for_resource_group, get_allowed_resource_groups_for_domain, get_allowed_resource_groups_for_project, get_fair_share_spec, get_resource_info, purge, scoped_search, search, update, update_allowed_domains_for_resource_group, update_allowed_projects_for_resource_group, update_allowed_resource_groups_for_domain, update_allowed_resource_groups_for_project, update_config, update_fair_share_spec.
+
+### resource_group
+
+#### a-resource-group-already-there-is-read-back-by-name — pass
+
+리소스 그룹이 이미 있을 때 이름으로 조회하면, 그 그룹이 답으로 온다
+
+Given
+
+- 도메인 home-1
+- 리소스 그룹 compute-1: fifo 스케줄러를 쓴다
+- 도메인에 속한 사용자 한 명 준비
+  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+  - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+  - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+  - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다  ← 행위자
+
+When
+
+- 슈퍼관리자 user-1의 get 호출
+  - 'compute-1'
+
+Then
+
+- name = 'compute-1'
+
+#### a-user-who-is-not-the-superadmin-may-not-make-a-resource-group — pass
+
+리소스 그룹 생성은 도메인 생성과 같이 전역 역할이 지키므로, 슈퍼관리자가 아닌 사용자는 권한을 얼마나 받았는지와 무관하게 막힌다
+
+Given
+
+- 도메인 home-1
+- 도메인에 속한 사용자 한 명 준비
+  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+  - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+  - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+  - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다  ← 행위자
+
+When
+
+- 일반 사용자 user-1의 create 호출
+  - CreateResourceGroupInput(name='refused', domain_name='home-1')
+
+Then
+
+- 거부: InsufficientPrivilege
+
+#### the-superadmin-makes-a-resource-group-in-a-domain — pass
+
+슈퍼관리자가 도메인 아래에 리소스 그룹을 만들면, 그 이름의 그룹이 답으로 온다
+
+Given
+
+- 도메인 home-1
+- 도메인에 속한 사용자 한 명 준비
+  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+  - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+  - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+  - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다  ← 행위자
+
+When
+
+- 슈퍼관리자 user-1의 create 호출
+  - CreateResourceGroupInput(name='compute', domain_name='home-1')
+
+Then
+
+- resource_group.name = 'compute'
+

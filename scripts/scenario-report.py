@@ -37,10 +37,16 @@ def main() -> int:
         help="write here instead of standard output",
     )
     parser.add_argument(
+        "--verify",
+        type=pathlib.Path,
+        metavar="DIR",
+        help="check DIR/<component>/report.md against this run; write nothing",
+    )
+    parser.add_argument(
         "--split",
         type=pathlib.Path,
         metavar="DIR",
-        help="write one file per component into this directory instead of one report",
+        help="write DIR/<component>/report.md for every component this run covered",
     )
     args = parser.parse_args()
     missing = [p for p in args.logs if not p.exists()]
@@ -71,10 +77,31 @@ def main() -> int:
         line for path in args.logs for line in path.read_text(encoding="utf8").splitlines()
     ]
     report = Report.of(records_of(lines))
-    if args.split is not None:
-        args.split.mkdir(parents=True, exist_ok=True)
+    if args.verify is not None:
+        drifted = 0
         for component in report.components:
-            written = args.split / f"{component.component}.{chosen.suffix()}"
+            written = args.verify / component.component / f"report.{chosen.suffix()}"
+            wanted = chosen.render_one(component) + "\n"
+            if not written.exists():
+                print(f"{written}: not written yet", file=sys.stderr)
+                drifted += 1
+            elif written.read_text(encoding="utf8") != wanted:
+                print(f"{written}: no longer matches the run", file=sys.stderr)
+                drifted += 1
+        if drifted:
+            print(
+                f"{drifted} report(s) behind the run. Read what changed, then bring "
+                "them level with --split.",
+                file=sys.stderr,
+            )
+            return 1
+        print(f"{len(report.components)} report(s) level with the run")
+        return 0
+
+    if args.split is not None:
+        for component in report.components:
+            written = args.split / component.component / f"report.{chosen.suffix()}"
+            written.parent.mkdir(parents=True, exist_ok=True)
             written.write_text(chosen.render_one(component) + "\n", encoding="utf8")
             print(written)
         return 0

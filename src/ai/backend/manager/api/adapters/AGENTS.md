@@ -19,13 +19,26 @@
 ## 시나리오와 테스트를 맞춘다
 
 - 시나리오를 적은 뒤 `tests/scenario/`에 그대로 옮긴다. 규칙은 그쪽 `AGENTS.md`에 있다.
-- 실행 결과에서 엔티티별로 뽑아 이 파일에 되붙인다.
+- 적어둔 시나리오와 실행 결과가 어긋나면 둘 중 하나가 틀린 것이다. 문장이 의도이고 표가
+  구현이므로, 문장을 먼저 의심한다.
+
+## 실행 결과는 `report.md`에 둔다
+
+- 엔티티 패키지의 `report.md`는 실행이 낸 것이다. 손으로 문장을 짓지 않는다. `KNOWLEDGE.md`와
+  섞지도 않는다. 한쪽은 의도이고 한쪽은 실행 결과다.
+- 시나리오를 옮긴 뒤 실행하고 뽑는다.
 
   ```bash
   BACKEND_SCENARIO_LOG=dist/scenarios.jsonl pants test tests/scenario::
-  python scripts/scenario-report.py dist/scenarios.jsonl --split dist/by-component
+  python scripts/scenario-report.py dist/scenarios.jsonl --split src/ai/backend/manager/api/adapters
   ```
 
-- 적어둔 시나리오와 실행 결과가 어긋나면 둘 중 하나가 틀린 것이다. 문장이 의도이고 표가
-  구현이므로, 문장을 먼저 의심한다.
-- 어느 시나리오도 부르지 않은 어댑터 호출은 실행 결과가 함께 적는다. 그 목록을 지우지 않는다.
+- `report.md`가 실행과 어긋나면 알린다. 조용히 덮어쓰지 않는다.
+
+  ```bash
+  python scripts/scenario-report.py dist/scenarios.jsonl --verify src/ai/backend/manager/api/adapters
+  ```
+
+- 어긋났다는 말을 보면 무엇이 달라졌는지 먼저 읽는다. 시나리오를 고친 결과면 뽑아서 맞추고,
+  고친 적이 없는데 달라졌으면 동작이 바뀐 것이다.
+- 어느 시나리오도 부르지 않은 어댑터 호출은 `report.md`가 함께 적는다. 그 목록을 지우지 않는다.
