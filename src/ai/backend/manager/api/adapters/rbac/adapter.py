@@ -828,7 +828,7 @@ class RBACAdapter(BaseAdapter):
 
     async def assign_role(self, input: AssignRoleInputDTO) -> RoleAssignmentNode:
         """Assign a role to a user."""
-        action_result = await self._rbac.assign_role.wait_for_complete(
+        action_result = await self._rbac.assign_role.run(
             AssignRoleAction(
                 input=UserRoleAssignmentInput(
                     user_id=input.user_id,
@@ -848,7 +848,7 @@ class RBACAdapter(BaseAdapter):
 
     async def revoke_role(self, input: RevokeRoleInputDTO) -> RoleAssignmentNode:
         """Revoke a role from a user."""
-        action_result = await self._rbac.revoke_role.wait_for_complete(
+        action_result = await self._rbac.revoke_role.run(
             RevokeRoleAction(
                 input=UserRoleRevocationInput(user_id=input.user_id, role_id=input.role_id)
             )

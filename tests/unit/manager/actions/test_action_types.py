@@ -16,16 +16,16 @@ from ai.backend.manager.services.permission_contoller.actions.search_permissions
 
 # Import representative concrete action classes across different entity types
 # and operation types to verify enum usage at runtime.
-from ai.backend.manager.services.rbac.actions.role.assign import AssignRoleAction
-from ai.backend.manager.services.rbac.actions.role.revoke import RevokeRoleAction
+from ai.backend.manager.services.rbac.actions.role.bulk_assign import BulkAssignRoleAction
+from ai.backend.manager.services.rbac.actions.role.bulk_revoke import BulkRevokeRoleAction
 
 # Legacy-family actions only. The v2 families answer with
 # ``ai.backend.common.data.entity.types.EntityType``, a distinct NewType, so mixing
 # them in would conflate two type systems rather than test either one.
 _REPRESENTATIVE_ACTION_CLASSES: list[type[BaseAction]] = [
-    AssignRoleAction,
+    BulkAssignRoleAction,
     ReplaceRolePermissionsAction,
-    RevokeRoleAction,
+    BulkRevokeRoleAction,
     SearchPermissionsAction,
 ]
 

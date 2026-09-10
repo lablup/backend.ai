@@ -220,9 +220,7 @@ class RBACHandler:
             role_id=body.parsed.role_id,
             granted_by=body.parsed.granted_by or ctx.user_uuid,
         )
-        action_result = await self._rbac.assign_role.wait_for_complete(
-            AssignRoleAction(input=input_data)
-        )
+        action_result = await self._rbac.assign_role.run(AssignRoleAction(input=input_data))
         resp = AssignRoleResponse(
             user_id=action_result.data.user_id,
             role_id=action_result.data.role_id,
@@ -243,9 +241,7 @@ class RBACHandler:
             user_id=body.parsed.user_id,
             role_id=body.parsed.role_id,
         )
-        action_result = await self._rbac.revoke_role.wait_for_complete(
-            RevokeRoleAction(input=input_data)
-        )
+        action_result = await self._rbac.revoke_role.run(RevokeRoleAction(input=input_data))
         resp = RevokeRoleResponse(
             user_id=action_result.data.user_id,
             role_id=action_result.data.role_id,
