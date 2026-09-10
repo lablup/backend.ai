@@ -90,6 +90,19 @@ class AuthenticatedUser:
 
 
 @dataclass(frozen=True)
+class DelegationTargetUser:
+    """The user a request asks to act for.
+
+    The role and domain travel with the id because the eligibility check compares
+    them against the requester's own.
+    """
+
+    user_id: UserID
+    role: UserRole
+    domain_name: str
+
+
+@dataclass(frozen=True)
 class KeyPairSigningMaterial:
     """The owner and decrypted secret key of a keypair, as a signature check needs them."""
 

@@ -28,7 +28,7 @@ class ActingKeypairKey(LookupKey):
 class OwnerAccessKeyKey(LookupKey):
     """The access key naming the keypair a request acts on."""
 
-    access_key: str
+    access_key: AccessKey
 
     @override
     def kind(self) -> str:
@@ -57,7 +57,7 @@ class PublicResolveAccessKeyScopeAction(BaseLookupAction):
     def lookup_key(self) -> LookupKey:
         if self.owner_access_key is None:
             return ActingKeypairKey()
-        return OwnerAccessKeyKey(access_key=self.owner_access_key)
+        return OwnerAccessKeyKey(access_key=AccessKey(self.owner_access_key))
 
 
 @dataclass(frozen=True)
