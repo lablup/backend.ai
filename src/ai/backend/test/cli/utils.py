@@ -5,7 +5,7 @@ from typing import Any, override
 import click
 
 
-class CommaSeparatedChoice(click.Choice):
+class CommaSeparatedChoice(click.Choice[Any]):
     @override
     def convert(
         self,
