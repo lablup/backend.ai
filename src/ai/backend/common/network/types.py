@@ -343,6 +343,14 @@ class SessionNetMeta:
     programs only those into XFRM. See overlay-encryption.md."""
     encryption_key_id: str | None = None
     """Non-secret fingerprint identifying the cluster root for audit and rotation checks."""
+    gossip_key: str | None = None
+    """Hex-encoded 256-bit key the nodes' privnets sign endpoint announcements under.
+
+    Separate from ``encryption_key`` and present on every VXLAN session, encrypted or not: a
+    session that opted out of ESP still needs its endpoints to reach its peers, and signing under
+    the ESP key would both tie the two lifetimes together and hand out traffic-key material to a
+    session that carries none. Derived from the same cluster root, so the two ends never disagree
+    without also disagreeing about the root. See gossip.py."""
     generation: str | None = None
     """Which incarnation of ``session_id`` this descriptor names -- see ``SESSION_META_GENERATION``.
 
