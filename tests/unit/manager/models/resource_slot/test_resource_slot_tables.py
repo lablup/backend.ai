@@ -15,6 +15,7 @@ import pytest
 import sqlalchemy as sa
 from sqlalchemy.orm import selectinload
 
+from ai.backend.common.data.entity.agent import AgentUUID
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.resource_slot import (
     AgentResourceRow,
@@ -109,6 +110,7 @@ class TestAgentResourceRow:
         self,
         database_with_resource_slot_tables: ExtendedAsyncSAEngine,
         agent_id: str,
+        agent_uuid: AgentUUID,
     ) -> None:
         # Seed slot type
         async with database_with_resource_slot_tables.begin_session() as db_sess:
@@ -119,6 +121,7 @@ class TestAgentResourceRow:
             db_sess.add(
                 AgentResourceRow(
                     agent_id=agent_id,
+                    agent_uuid=agent_uuid,
                     slot_name="cpu",
                     capacity=Decimal("4.000000"),
                     used=Decimal("1.500000"),
@@ -136,6 +139,7 @@ class TestAgentResourceRow:
         self,
         database_with_resource_slot_tables: ExtendedAsyncSAEngine,
         agent_id: str,
+        agent_uuid: AgentUUID,
     ) -> None:
         async with database_with_resource_slot_tables.begin_session() as db_sess:
             db_sess.add(ResourceSlotTypeRow(slot_name="cpu", slot_type="count"))
@@ -146,6 +150,7 @@ class TestAgentResourceRow:
             db_sess.add(
                 AgentResourceRow(
                     agent_id=agent_id,
+                    agent_uuid=agent_uuid,
                     slot_name="cpu",
                     capacity=Decimal("4"),
                 )
@@ -153,6 +158,7 @@ class TestAgentResourceRow:
             db_sess.add(
                 AgentResourceRow(
                     agent_id=agent_id,
+                    agent_uuid=agent_uuid,
                     slot_name="mem",
                     capacity=Decimal("4294967296"),
                 )
@@ -171,6 +177,7 @@ class TestAgentResourceRow:
         self,
         database_with_resource_slot_tables: ExtendedAsyncSAEngine,
         agent_id: str,
+        agent_uuid: AgentUUID,
     ) -> None:
         async with database_with_resource_slot_tables.begin_session() as db_sess:
             db_sess.add(ResourceSlotTypeRow(slot_name="cpu", slot_type="count"))
@@ -180,6 +187,7 @@ class TestAgentResourceRow:
             db_sess.add(
                 AgentResourceRow(
                     agent_id=agent_id,
+                    agent_uuid=agent_uuid,
                     slot_name="cpu",
                     capacity=Decimal("4"),
                 )
@@ -201,6 +209,7 @@ class TestAgentResourceRow:
         self,
         database_with_resource_slot_tables: ExtendedAsyncSAEngine,
         agent_id: str,
+        agent_uuid: AgentUUID,
     ) -> None:
         """Verify NUMERIC(24,6) handles large byte values (e.g., 1 TiB)."""
         async with database_with_resource_slot_tables.begin_session() as db_sess:
@@ -212,6 +221,7 @@ class TestAgentResourceRow:
             db_sess.add(
                 AgentResourceRow(
                     agent_id=agent_id,
+                    agent_uuid=agent_uuid,
                     slot_name="mem",
                     capacity=one_tib,
                 )
@@ -227,6 +237,7 @@ class TestAgentResourceRow:
         self,
         database_with_resource_slot_tables: ExtendedAsyncSAEngine,
         agent_id: str,
+        agent_uuid: AgentUUID,
     ) -> None:
         """Verify NUMERIC(24,6) handles fractional values (e.g., 0.5 CPU)."""
         async with database_with_resource_slot_tables.begin_session() as db_sess:
@@ -238,6 +249,7 @@ class TestAgentResourceRow:
             db_sess.add(
                 AgentResourceRow(
                     agent_id=agent_id,
+                    agent_uuid=agent_uuid,
                     slot_name="cpu",
                     capacity=half_cpu,
                 )
@@ -253,6 +265,7 @@ class TestAgentResourceRow:
         self,
         database_with_resource_slot_tables: ExtendedAsyncSAEngine,
         agent_id: str,
+        agent_uuid: AgentUUID,
     ) -> None:
         async with database_with_resource_slot_tables.begin_session() as db_sess:
             db_sess.add(ResourceSlotTypeRow(slot_name="cpu", slot_type="count"))
@@ -262,6 +275,7 @@ class TestAgentResourceRow:
             db_sess.add(
                 AgentResourceRow(
                     agent_id=agent_id,
+                    agent_uuid=agent_uuid,
                     slot_name="cpu",
                     capacity=Decimal("4"),
                 )
@@ -277,6 +291,7 @@ class TestAgentResourceRow:
         self,
         database_with_resource_slot_tables: ExtendedAsyncSAEngine,
         agent_id: str,
+        agent_uuid: AgentUUID,
     ) -> None:
         """FK to resource_slot_types should reject unknown slot names."""
         with pytest.raises(sa.exc.IntegrityError):
@@ -284,6 +299,7 @@ class TestAgentResourceRow:
                 db_sess.add(
                     AgentResourceRow(
                         agent_id=agent_id,
+                        agent_uuid=agent_uuid,
                         slot_name="nonexistent.slot",
                         capacity=Decimal("1"),
                     )
@@ -499,6 +515,7 @@ class TestActualOccupiedSlotsOrdering:
         self,
         database_with_resource_slot_tables: ExtendedAsyncSAEngine,
         agent_id: str,
+        agent_uuid: AgentUUID,
         slot_type_ranks: dict[str, int],
         expected_order: list[str],
     ) -> None:
@@ -524,6 +541,7 @@ class TestActualOccupiedSlotsOrdering:
                 db_sess.add(
                     AgentResourceRow(
                         agent_id=agent_id,
+                        agent_uuid=agent_uuid,
                         slot_name=slot_name,
                         capacity=Decimal("1"),
                         used=Decimal("0"),
@@ -554,6 +572,7 @@ class TestActualAvailableSlots:
         self,
         database_with_resource_slot_tables: ExtendedAsyncSAEngine,
         agent_id: str,
+        agent_uuid: AgentUUID,
     ) -> None:
         capacities = {
             "cpu": Decimal("8"),
@@ -578,6 +597,7 @@ class TestActualAvailableSlots:
                 db_sess.add(
                     AgentResourceRow(
                         agent_id=agent_id,
+                        agent_uuid=agent_uuid,
                         slot_name=slot_name,
                         capacity=capacity,
                         used=Decimal("1"),

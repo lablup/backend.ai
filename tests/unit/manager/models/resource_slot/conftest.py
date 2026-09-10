@@ -5,6 +5,7 @@ from collections.abc import AsyncGenerator
 
 import pytest
 
+from ai.backend.common.data.entity.agent import AgentUUID
 from ai.backend.common.data.entity.domain import DomainID, DomainName
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.types import BinarySize
@@ -192,16 +193,29 @@ async def project_id(
 
 
 @pytest.fixture
+def agent_uuid() -> AgentUUID:
+    """The agent's surrogate key, fixed here rather than left to the column's server default.
+
+    ``agent_resources.agent_uuid`` is a NOT NULL copy of it, so every row a test writes has to name
+    it -- and reading it back from the inserted agent would make each of those tests depend on an
+    extra round trip for a value the fixture can simply decide.
+    """
+    return AgentUUID(uuid.uuid4())
+
+
+@pytest.fixture
 async def agent_id(
     database_with_resource_slot_tables: ExtendedAsyncSAEngine,
     resource_group: str,
     resource_group_id: ResourceGroupID,
+    agent_uuid: AgentUUID,
 ) -> AsyncGenerator[str, None]:
     aid = "i-test-agent-001"
     async with database_with_resource_slot_tables.begin_session() as db_sess:
         db_sess.add(
             AgentRow(
                 id=aid,
+                uuid=agent_uuid,
                 scaling_group=resource_group,
                 resource_group_id=resource_group_id,
                 region="local",
