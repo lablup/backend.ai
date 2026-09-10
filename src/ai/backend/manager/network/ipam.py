@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
+import hmac
 import ipaddress
 import json
 import logging
@@ -1149,6 +1150,22 @@ async def _active_overlay_encryption_key_locked(etcd: AsyncEtcd) -> OverlayEncry
         secret=secret,
         activated_at=float(activated_at) if isinstance(activated_at, (int, float)) else None,
     )
+
+
+#: Domain separator for the gossip signing key. Any change to it rotates every node's key at
+#: once, which is a cluster-wide gossip outage until the last session is re-created -- so it is
+#: versioned rather than edited.
+_GOSSIP_KEY_INFO = b"backend.ai/privnet-gossip/v1"
+
+
+def gossip_key_from_root(root: str) -> str:
+    """The key a session's privnets sign endpoint announcements under.
+
+    Derived from the cluster root rather than being it, so a session that opted out of ESP can
+    still gossip without being handed traffic-key material, and so rotating the root rotates this
+    with it. See `SessionNetMeta.gossip_key`.
+    """
+    return hmac.new(bytes.fromhex(root), _GOSSIP_KEY_INFO, hashlib.sha256).hexdigest()
 
 
 async def active_overlay_encryption_key(etcd: AsyncEtcd) -> OverlayEncryptionKey:

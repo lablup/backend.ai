@@ -299,3 +299,23 @@ class TestTheEncryptionKey:
 
     def test_no_key_means_no_encryption(self) -> None:
         assert validate_network_config({"backend": "vxlan"}).encryption_key is None
+
+
+class TestTheGossipKey:
+    """It becomes the HMAC key the endpoint exchange verifies datagrams with."""
+
+    def test_a_256_bit_hex_key_is_accepted(self) -> None:
+        key = "7a" * 32
+        assert validate_network_config({"backend": "vxlan", "gossip_key": key}).gossip_key == key
+
+    @pytest.mark.parametrize("key", ["7a" * 31, "7a" * 33, "z" * 64, "7a" * 31 + ";x"])
+    def test_anything_that_is_not_exactly_64_hex_chars_is_refused(self, key: str) -> None:
+        with pytest.raises(PolicyViolation, match="gossip_key"):
+            validate_network_config({"backend": "vxlan", "gossip_key": key})
+
+    def test_it_is_independent_of_the_encryption_key(self) -> None:
+        """A plaintext overlay still announces its endpoints, so the two must not share a
+        lifetime: a session with no ESP key still carries a signing key."""
+        cfg = validate_network_config({"backend": "vxlan", "gossip_key": "7a" * 32})
+        assert cfg.encryption_key is None
+        assert cfg.gossip_key is not None

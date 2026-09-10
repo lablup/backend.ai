@@ -84,6 +84,7 @@ def session_net_meta_from_network_config(
     """Parse the manager-provided network_config into a SessionNetMeta."""
     vni_raw = network_config.get("vni")
     key_raw = network_config.get("encryption_key")
+    gossip_key_raw = network_config.get("gossip_key")
     # A meta written before the port became configurable carries no `vxlan_port`; falling back to
     # the shipped default keeps such a session (and a rolling upgrade) on the port it is already
     # using, instead of silently rebuilding its tunnel on a different one.
@@ -103,6 +104,7 @@ def session_net_meta_from_network_config(
                 if network_config.get("encryption_key_id")
                 else None
             ),
+            gossip_key=str(gossip_key_raw) if gossip_key_raw else None,
             generation=str(generation_raw) if generation_raw else None,
         )
     except (KeyError, TypeError, ValueError) as e:

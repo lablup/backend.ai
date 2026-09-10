@@ -75,6 +75,7 @@ from ai.backend.manager.network.ipam import (
     SubnetAllocator,
     VNIAllocator,
     _active_overlay_encryption_key_locked,
+    gossip_key_from_root,
 )
 from ai.backend.manager.network.pairing import (
     AdmittedAgent,
@@ -703,7 +704,9 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
             # silent black hole into a named error. See agent/network/path_mtu.py.
 
             async def publish_with_key(
-                encryption_key: str | None, encryption_key_id: str | None
+                encryption_key: str | None,
+                encryption_key_id: str | None,
+                gossip_key: str | None,
             ) -> tuple[dict[str, Any], str]:
                 meta: dict[str, Any] = {
                     "subnet": subnet,
@@ -713,6 +716,7 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
                     "vxlan_port": vxlan_port,
                     "encryption_key": encryption_key,
                     "encryption_key_id": encryption_key_id,
+                    "gossip_key": gossip_key,
                     _GENERATION: generation,
                     _OWNER: token,
                     _STATE: _CREATING,
@@ -720,7 +724,11 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
                 }
                 return meta, await self._publish(etcd, session_id, held, meta)
 
-            if encrypt:
+            # The root is read under the rotation lock for every VXLAN session, not only an
+            # encrypted one: a plaintext session still gossips its endpoints, and its signing key
+            # is derived from the same root. A session that reads the root while it is being
+            # replaced would gossip under a key its peers do not hold.
+            if backend is NetworkBackendKind.VXLAN:
                 async with EtcdLock(
                     OVERLAY_KEY_ROTATION_LOCK,
                     etcd,
@@ -728,9 +736,13 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
                     lifetime=OVERLAY_KEY_ROTATION_LOCK_LIFETIME_SEC,
                 ):
                     active_key = await _active_overlay_encryption_key_locked(etcd)
-                    meta, held = await publish_with_key(active_key.secret, active_key.key_id)
+                    meta, held = await publish_with_key(
+                        active_key.secret if encrypt else None,
+                        active_key.key_id if encrypt else None,
+                        gossip_key_from_root(active_key.secret),
+                    )
             else:
-                meta, held = await publish_with_key(None, None)
+                meta, held = await publish_with_key(None, None, None)
             # Assign each endpoint a disjoint overlay IP and record it under endpoints/ (the
             # coordinator programs FDB/ARP from there). Returned map is threaded per-kernel by
             # the launcher into KernelCreationConfig["cluster_network_ip"].

@@ -70,6 +70,10 @@ class ValidatedNetworkConfig:
     vxlan_port: int
     encryption_key: str | None
     encryption_key_id: str | None
+    #: The key this session's privnets sign endpoint announcements under. Distinct from
+    #: ``encryption_key`` and present whether or not the overlay is encrypted -- see
+    #: ``SessionNetMeta.gossip_key``.
+    gossip_key: str | None
     #: Which incarnation of the session id this declaration is for, or None from an agent older
     #: than the field. The session id alone does not say: it is reused, and a request that arrives
     #: after the session was torn down and built again names the same one. See
@@ -250,6 +254,17 @@ def validate_network_config(raw: dict[str, Any]) -> ValidatedNetworkConfig:
     key_id_raw = raw.get("encryption_key_id")
     encryption_key_id = validate_generation(key_id_raw) if key_id_raw is not None else None
 
+    # Same shape as the encryption key and validated the same way, though this one never reaches
+    # `ip xfrm`: it is an HMAC key the privnet signs and verifies announcements with. Refusing a
+    # malformed one here is what keeps the gossip path from being handed a key that would verify
+    # nothing and silently accept every datagram.
+    gossip_key_raw = raw.get("gossip_key")
+    gossip_key: str | None = None
+    if gossip_key_raw is not None:
+        gossip_key = str(gossip_key_raw)
+        if len(gossip_key) != 64 or not all(c in "0123456789abcdefABCDEF" for c in gossip_key):
+            raise PolicyViolation("invalid gossip_key")
+
     port_raw = raw.get("vxlan_port")
     vxlan_port = DEFAULT_VXLAN_PORT
     if port_raw is not None:
@@ -268,5 +283,6 @@ def validate_network_config(raw: dict[str, Any]) -> ValidatedNetworkConfig:
         vxlan_port=vxlan_port,
         encryption_key=encryption_key,
         encryption_key_id=encryption_key_id,
+        gossip_key=gossip_key,
         generation=generation,
     )
