@@ -13,8 +13,8 @@ from ai.backend.manager.services.permission_contoller.actions.get_permission_mat
 from ai.backend.manager.services.permission_contoller.actions.replace_role_permissions import (
     ReplaceRolePermissionsAction,
 )
-from ai.backend.manager.services.permission_contoller.actions.search_scopes import (
-    SearchScopesAction,
+from ai.backend.manager.services.permission_contoller.actions.search_permissions import (
+    SearchPermissionsAction,
 )
 
 # Import representative concrete action classes across different entity types
@@ -30,7 +30,7 @@ _REPRESENTATIVE_ACTION_CLASSES: list[type[BaseAction]] = [
     GetPermissionMatrixAction,
     ReplaceRolePermissionsAction,
     RevokeRoleAction,
-    SearchScopesAction,
+    SearchPermissionsAction,
 ]
 
 

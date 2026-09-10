@@ -63,8 +63,8 @@ from .actions.search_permissions import (
     SearchPermissionsActionResult,
 )
 from .actions.search_scopes import (
-    SearchScopesAction,
-    SearchScopesActionResult,
+    GlobalSearchScopesAction,
+    GlobalSearchScopesActionResult,
 )
 from .actions.update_permission import (
     UpdatePermissionAction,
@@ -100,7 +100,9 @@ class PermissionControllerProcessors:
     replace_role_permissions: ActionProcessor[
         ReplaceRolePermissionsAction, ReplaceRolePermissionsActionResult
     ]
-    search_scopes: ActionProcessor[SearchScopesAction, SearchScopesActionResult]
+    global_search_scopes: GlobalActionProcessor[
+        GlobalSearchScopesAction, GlobalSearchScopesActionResult
+    ]
     global_get_scope_types: GlobalActionProcessor[
         GlobalGetScopeTypesAction, GlobalGetScopeTypesActionResult
     ]
@@ -151,7 +153,9 @@ class PermissionControllerProcessors:
         self.replace_role_permissions = ActionProcessor(
             service.replace_role_permissions, action_monitors
         )
-        self.search_scopes = ActionProcessor(service.search_scopes, action_monitors)
+        self.global_search_scopes = role_group.global_scope(
+            GlobalSearchScopesAction, service.search_scopes
+        )
         self.global_get_scope_types = role_group.global_scope(
             GlobalGetScopeTypesAction, service.get_scope_types
         )

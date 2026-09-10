@@ -65,7 +65,7 @@ from ai.backend.manager.services.permission_contoller.actions.get_scope_types im
 )
 from ai.backend.manager.services.permission_contoller.actions.purge_role import PurgeRoleAction
 from ai.backend.manager.services.permission_contoller.actions.search_scopes import (
-    SearchScopesAction,
+    GlobalSearchScopesAction,
 )
 from ai.backend.manager.services.permission_contoller.processors import (
     PermissionControllerProcessors,
@@ -309,8 +309,8 @@ class RBACHandler:
 
         scope_type = path.parsed.scope_type
         querier = self._scope_adapter.build_querier(scope_type, body.parsed)
-        action = SearchScopesAction(scope_type=scope_type, querier=querier)
-        action_result = await self._permission_controller.search_scopes.wait_for_complete(action)
+        action = GlobalSearchScopesAction(scope_type=scope_type, querier=querier)
+        action_result = await self._permission_controller.global_search_scopes.run(action)
         resp = SearchScopesResponse(
             items=[self._scope_adapter.convert_to_dto(item) for item in action_result.result.items],
             pagination=PaginationInfo(

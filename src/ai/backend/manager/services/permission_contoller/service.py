@@ -51,8 +51,8 @@ from ai.backend.manager.services.permission_contoller.actions.search_roles_in_sc
     SearchRolesInScopeActionResult,
 )
 from ai.backend.manager.services.permission_contoller.actions.search_scopes import (
-    SearchScopesAction,
-    SearchScopesActionResult,
+    GlobalSearchScopesAction,
+    GlobalSearchScopesActionResult,
 )
 from ai.backend.manager.services.permission_contoller.actions.search_users_assigned_to_role import (
     SearchUsersAssignedToRoleAction,
@@ -148,10 +148,12 @@ class PermissionControllerService:
         )
         return ReplaceRolePermissionsActionResult(data=result)
 
-    async def search_scopes(self, action: SearchScopesAction) -> SearchScopesActionResult:
+    async def search_scopes(
+        self, action: GlobalSearchScopesAction
+    ) -> GlobalSearchScopesActionResult:
         """Search scopes of the given type."""
         result = await self._repository.search_scopes(action.scope_type, action.querier)
-        return SearchScopesActionResult(result=result)
+        return GlobalSearchScopesActionResult(result=result)
 
     async def get_scope_types(
         self, _action: GlobalGetScopeTypesAction
