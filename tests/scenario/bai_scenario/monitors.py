@@ -30,6 +30,7 @@ from ai.backend.manager.actions.v2.scope.result import ScopeActionProcessResult
 from ai.backend.manager.actions.v2.single_entity.monitor.base import SingleEntityActionMonitor
 from ai.backend.manager.actions.v2.single_entity.result import SingleEntityActionProcessResult
 from ai.backend.manager.actions.v2.single_entity.trigger import SingleEntityActionTriggerMeta
+from ai.backend.manager.actions.v2.trigger import ActionTriggerMeta
 
 RECORD_FILE_ENV = "BACKEND_ACTION_RECORD_FILE"
 
@@ -117,7 +118,7 @@ class _Scope(ScopeActionMonitor):
         self._r = recorder
 
     @override
-    async def prepare(self, action: BaseScopeAction, meta: BaseActionTriggerMeta) -> None:
+    async def prepare(self, action: BaseScopeAction, meta: ActionTriggerMeta) -> None:
         return None
 
     @override
@@ -130,7 +131,7 @@ class _Global(GlobalActionMonitor):
         self._r = recorder
 
     @override
-    async def prepare(self, action: BaseGlobalAction, meta: BaseActionTriggerMeta) -> None:
+    async def prepare(self, action: BaseGlobalAction, meta: ActionTriggerMeta) -> None:
         return None
 
     @override
@@ -143,7 +144,7 @@ class _Lookup(LookupActionMonitor):
         self._r = recorder
 
     @override
-    async def prepare(self, action: BaseLookupAction, meta: BaseActionTriggerMeta) -> None:
+    async def prepare(self, action: BaseLookupAction, meta: ActionTriggerMeta) -> None:
         return None
 
     @override
