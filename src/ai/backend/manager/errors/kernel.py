@@ -36,14 +36,16 @@ class KernelNotReady(FieldError, web.HTTPBadRequest):
         return FieldErrorCode(KernelFieldType(), ActionOperationType.GET, ErrorDetail.NOT_READY)
 
 
-class InvalidSessionId(EntityError, web.HTTPBadRequest):
+class InvalidSessionId(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/invalid-session-id"
     error_title = "Invalid session ID format."
 
     @override
-    def entity_error_code(self) -> EntityErrorCode:
-        return EntityErrorCode(
-            SessionEntityType(), ActionOperationType.GET, ErrorDetail.INVALID_PARAMETERS
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.SESSION,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.INVALID_PARAMETERS,
         )
 
 
@@ -255,25 +257,29 @@ class InvalidSessionData(EntityError, web.HTTPInternalServerError):
         )
 
 
-class InvalidKernelConfig(FieldError, web.HTTPBadRequest):
+class InvalidKernelConfig(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/invalid-kernel-config"
     error_title = "Invalid kernel configuration."
 
     @override
-    def field_error_code(self) -> FieldErrorCode:
-        return FieldErrorCode(
-            KernelFieldType(), ActionOperationType.CREATE, ErrorDetail.INVALID_PARAMETERS
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.KERNEL,
+            operation=ErrorOperation.CREATE,
+            error_detail=ErrorDetail.INVALID_PARAMETERS,
         )
 
 
-class IncompleteSessionSpec(EntityError, web.HTTPBadRequest):
+class IncompleteSessionSpec(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/incomplete-session-spec"
     error_title = "Session spec has unresolved required fields."
 
     @override
-    def entity_error_code(self) -> EntityErrorCode:
-        return EntityErrorCode(
-            SessionEntityType(), ActionOperationType.CREATE, ErrorDetail.INVALID_PARAMETERS
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.SESSION,
+            operation=ErrorOperation.CREATE,
+            error_detail=ErrorDetail.INVALID_PARAMETERS,
         )
 
 
