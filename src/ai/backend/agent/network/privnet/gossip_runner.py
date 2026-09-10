@@ -21,7 +21,7 @@ import contextlib
 import logging
 import socket
 import time
-from collections.abc import Sequence
+from collections.abc import Iterable, Sequence
 from typing import Any, Final, Protocol, override
 
 from ai.backend.agent.network.privnet.gossip import (
@@ -286,6 +286,31 @@ class EndpointGossip:
                     add=[],
                     remove=[(e, vtep) for e in sorted(gone, key=lambda e: e.container_id)],
                 )
+
+    def retry_later(self, session_id: str, failed: Iterable[tuple[Endpoint, str]]) -> None:
+        """Un-hold endpoints the host could not program, so the next announcement re-offers them.
+
+        The exchange has no acknowledgement and nothing to retry on its own -- an announcement is
+        whole state, so the correction is always the next one. That only works if a failure is not
+        recorded as applied, which is what this undoes.
+        """
+        by_vtep: dict[str, list[str]] = {}
+        for endpoint, vtep in failed:
+            by_vtep.setdefault(vtep, []).append(endpoint.container_id)
+        for vtep, container_ids in by_vtep.items():
+            self._held.forget_endpoints(session_id, vtep, container_ids)
+
+    def cluster_names(self, session_id: str) -> dict[str, str]:
+        """``{cluster_hostname: ip}`` for what this session's PEERS have announced.
+
+        Lower-cased, because the resolver answering from it is answering DNS. The local half is
+        the caller's -- this object only ever holds what other nodes said.
+        """
+        return {
+            endpoint.cluster_hostname.lower(): endpoint.ip
+            for endpoint, _vtep in self._held.held(session_id).values()
+            if endpoint.cluster_hostname
+        }
 
     def problems(self) -> dict[str, str]:
         """Peers a session still names that have gone quiet, for the readiness surface.

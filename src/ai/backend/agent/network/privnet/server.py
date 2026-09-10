@@ -130,6 +130,7 @@ _READ_ONLY_OPS = frozenset({
     PrivNetOp.ENCRYPTION_PROBE,
     PrivNetOp.LIST_PORTS,
     PrivNetOp.LOCAL_SUBNET,
+    PrivNetOp.CLUSTER_NAMES,
 })
 
 
@@ -1645,6 +1646,8 @@ class PrivNetServer:
                     return PrivNetResponse(ok=True)
                 case PrivNetOp.LOCAL_SUBNET:
                     return PrivNetResponse(ok=True, subnet=await self._local_subnet(session_id))
+                case PrivNetOp.CLUSTER_NAMES:
+                    return PrivNetResponse(ok=True, cluster_names=self._cluster_names(session_id))
                 case PrivNetOp.SETUP_DNS_REDIRECT:
                     await self._setup_dns_redirect(session_id, req.dns_port)
                     return PrivNetResponse(ok=True)
@@ -2293,6 +2296,29 @@ class PrivNetServer:
         """
         return await self._local_subnets.subnet_of(session_id)
 
+    def _cluster_names(self, session_id: str) -> dict[str, str] | None:
+        """This session's ``{cluster_hostname: ip}``, or None where this daemon has no view.
+
+        Both halves: the names this node attached, and the ones its peers announced. Answering at
+        all is what tells the agent it need not read the manager's endpoint table -- so a VXLAN
+        session whose exchange is not running answers None instead of a half-map, which would
+        otherwise present this node's own kernels as the whole session.
+        """
+        entry = self._sessions.get(session_id)
+        if entry is None:
+            return None
+        if entry.meta.backend is NetworkBackendKind.VXLAN and self._gossip is None:
+            return None
+        names: dict[str, str] = {}
+        if self._gossip is not None:
+            names.update(self._gossip.cluster_names(session_id))
+        for endpoint in endpoints_of(
+            entry.attached, overlay_role=NetworkRole.OVERLAY, hostnames=entry.hostnames
+        ):
+            if endpoint.cluster_hostname:
+                names[endpoint.cluster_hostname.lower()] = endpoint.ip
+        return names
+
     async def _setup_dns_redirect(self, session_id: str, dns_port: int | None) -> None:
         """Redirect this session's gateway ``:53`` to the agent's resolver on ``127.0.0.1:dns_port``.
 
@@ -2498,6 +2524,7 @@ class PrivNetServer:
         entry = self._sessions.get(session_id)
         if entry is None:
             return
+        failed: list[tuple[GossipEndpoint, str]] = []
         async with self._session_locked(session_id):
             for endpoint, vtep in remove:
                 with contextlib.suppress(Exception):
@@ -2511,13 +2538,18 @@ class PrivNetServer:
                     )
                 except Exception:
                     # One endpoint that will not program must not take the rest of the peer's
-                    # table with it; the next announcement carries it again.
+                    # table with it, and it must not be left recorded as applied: the sender's
+                    # next announcement is the same whole state, so it would diff to nothing and
+                    # this kernel would stay unreachable for the life of the session.
                     log.exception(
                         "could not program endpoint {} of session {} via {}",
                         endpoint.ip,
                         session_id,
                         vtep,
                     )
+                    failed.append((endpoint, vtep))
+        if failed and self._gossip is not None:
+            self._gossip.retry_later(session_id, failed)
 
     async def _endpoint(self, session_id: str, req: PrivNetRequest) -> None:
         """Program (ADD_ENDPOINT) or remove (DEL_ENDPOINT) a remote container endpoint's
