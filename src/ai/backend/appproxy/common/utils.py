@@ -333,6 +333,7 @@ class BackendAIAccessLogger(AccessLogger):
 
             values = list()
             extra: dict[str, str | dict[str, str]] = {}
+            headers: dict[str, dict[str, str]] = {}
             for key, value in fmt_info:
                 values.append(value)
 
@@ -340,11 +341,8 @@ class BackendAIAccessLogger(AccessLogger):
                     extra[key] = value
                 else:
                     k1, k2 = key
-                    dct = extra.get(k1, {})
-                    if not isinstance(dct, dict):
-                        dct = {}
-                    dct[k2] = value
-                    extra[k1] = dct
+                    headers.setdefault(k1, {})[k2] = value
+            extra.update(headers)
 
             self.logger.info((prepend_to_log + self._log_format) % tuple(values), extra=extra)
         except Exception:
