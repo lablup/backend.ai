@@ -10,7 +10,7 @@ from __future__ import annotations
 import asyncio
 from collections.abc import Sequence
 
-from ai.backend.agent.network.privnet.gossip import Endpoint
+from ai.backend.agent.network.privnet.gossip import Endpoint, Intent
 from ai.backend.agent.network.privnet.gossip_runner import EndpointGossip
 
 _KEY = "fda91fcdff70a287ce06dd57c2723324701c7ece94c53747ad8d4410483d639b"
@@ -32,6 +32,8 @@ class FakeHost:
         self._key = key
         self._generation = generation
         self.programmed: list[tuple[str, str, Endpoint, str]] = []
+        #: Container ids the host refuses to program, so a caller can drive the retry path.
+        self.refuse: set[str] = set()
 
     def gossip_key(self) -> str | None:
         return self._key
@@ -48,17 +50,14 @@ class FakeHost:
     def gossip_generation(self, session_id: str) -> str | None:
         return self._generation
 
-    async def gossip_program(
-        self,
-        session_id: str,
-        *,
-        add: Sequence[tuple[Endpoint, str]],
-        remove: Sequence[tuple[Endpoint, str]],
-    ) -> None:
-        for endpoint, vtep in add:
-            self.programmed.append(("add", session_id, endpoint, vtep))
-        for endpoint, vtep in remove:
-            self.programmed.append(("remove", session_id, endpoint, vtep))
+    async def gossip_program(self, session_id: str, intents: Sequence[Intent]) -> Sequence[Intent]:
+        failed: list[Intent] = []
+        for intent in intents:
+            if intent.endpoint.container_id in self.refuse:
+                failed.append(intent)
+                continue
+            self.programmed.append((intent.action, session_id, intent.endpoint, intent.vtep))
+        return failed
 
     def added(self) -> set[str]:
         return {e.container_id for op, _s, e, _v in self.programmed if op == "add"}
@@ -132,7 +131,7 @@ class TestWhatARunnerAppliesOnReceipt:
     async def test_an_announcement_for_an_unknown_session_is_ignored(self) -> None:
         """Not an error: a peer may still be announcing a session this node already tore down."""
         sender = FakeHost(sessions={"s9": [_endpoint(1)]}, peers={"s9": ["10.0.0.1"]})
-        receiver = FakeHost(sessions={"s1": []}, peers={})
+        receiver = FakeHost(sessions={"s1": []}, peers={"s1": ["10.0.0.1", "10.0.0.2"]})
         datagram = _one_datagram(sender, "s9", vtep="10.0.0.2")
 
         await EndpointGossip(receiver, vtep="10.0.0.1").on_datagram(datagram, ("10.0.0.2", 7947))
@@ -154,7 +153,7 @@ class TestWhatARunnerAppliesOnReceipt:
 
     async def test_a_repeat_announcement_programs_nothing_twice(self) -> None:
         sender = FakeHost(sessions={"s1": [_endpoint(1)]}, peers={"s1": ["10.0.0.1"]})
-        receiver = FakeHost(sessions={"s1": []}, peers={})
+        receiver = FakeHost(sessions={"s1": []}, peers={"s1": ["10.0.0.1", "10.0.0.2"]})
         gossip = EndpointGossip(receiver, vtep="10.0.0.1")
         datagram = _one_datagram(sender, "s1", vtep="10.0.0.2")
 
@@ -172,14 +171,14 @@ class TestAnEndpointThatWouldNotProgram:
 
     async def test_the_next_announcement_offers_it_again(self) -> None:
         sender = FakeHost(sessions={"s1": [_endpoint(1)]}, peers={"s1": ["10.0.0.1"]})
-        receiver = FakeHost(sessions={"s1": []}, peers={})
+        receiver = FakeHost(sessions={"s1": []}, peers={"s1": ["10.0.0.1", "10.0.0.2"]})
+        receiver.refuse = {_endpoint(1).container_id}
         gossip = EndpointGossip(receiver, vtep="10.0.0.1")
         datagram = _one_datagram(sender, "s1", vtep="10.0.0.2")
         await gossip.on_datagram(datagram, ("10.0.0.2", 7947))
-        assert receiver.added() == {_endpoint(1).container_id}
+        assert receiver.added() == set()
 
-        gossip.retry_later("s1", [(_endpoint(1), "10.0.0.2")])
-        receiver.programmed.clear()
+        receiver.refuse = set()
         await gossip.on_datagram(datagram, ("10.0.0.2", 7947))
 
         assert receiver.added() == {_endpoint(1).container_id}
@@ -187,16 +186,36 @@ class TestAnEndpointThatWouldNotProgram:
     async def test_the_peers_other_endpoints_stay_applied(self) -> None:
         """Re-offering the whole peer would re-run every `ip` call this node already made."""
         sender = FakeHost(sessions={"s1": [_endpoint(1), _endpoint(2)]}, peers={"s1": ["10.0.0.1"]})
-        receiver = FakeHost(sessions={"s1": []}, peers={})
+        receiver = FakeHost(sessions={"s1": []}, peers={"s1": ["10.0.0.1", "10.0.0.2"]})
+        receiver.refuse = {_endpoint(1).container_id}
         gossip = EndpointGossip(receiver, vtep="10.0.0.1")
         datagram = _one_datagram(sender, "s1", vtep="10.0.0.2")
         await gossip.on_datagram(datagram, ("10.0.0.2", 7947))
+        assert receiver.added() == {_endpoint(2).container_id}
 
-        gossip.retry_later("s1", [(_endpoint(1), "10.0.0.2")])
+        receiver.refuse = set()
         receiver.programmed.clear()
         await gossip.on_datagram(datagram, ("10.0.0.2", 7947))
 
         assert receiver.added() == {_endpoint(1).container_id}
+
+    async def test_a_withdrawal_that_would_not_take_is_offered_again(self) -> None:
+        """The half that used to be swallowed whole: a removal that failed left an FDB entry
+        pointing at a kernel that is gone, and nothing ever asked for it again."""
+        sender = FakeHost(sessions={"s1": [_endpoint(1)]}, peers={"s1": ["10.0.0.1"]})
+        receiver = FakeHost(sessions={"s1": []}, peers={"s1": ["10.0.0.1", "10.0.0.2"]})
+        gossip = EndpointGossip(receiver, vtep="10.0.0.1")
+        await gossip.on_datagram(_one_datagram(sender, "s1", vtep="10.0.0.2"), ("10.0.0.2", 7947))
+
+        sender._sessions["s1"] = []  # the peer's last kernel went away
+        receiver.refuse = {_endpoint(1).container_id}
+        await gossip.on_datagram(_one_datagram(sender, "s1", vtep="10.0.0.2"), ("10.0.0.2", 7947))
+        assert receiver.removed() == set()
+
+        receiver.refuse = set()
+        await gossip.sync_membership("s1")
+
+        assert receiver.removed() == {_endpoint(1).container_id}
 
 
 class TestTheNamesAPeerAnnounced:
@@ -205,7 +224,7 @@ class TestTheNamesAPeerAnnounced:
             container_id="b" * 64, ip="10.128.2.7", mac="02:42:0a:80:02:07", cluster_hostname="Sub7"
         )
         sender = FakeHost(sessions={"s1": [named]}, peers={"s1": ["10.0.0.1"]})
-        receiver = FakeHost(sessions={"s1": []}, peers={})
+        receiver = FakeHost(sessions={"s1": []}, peers={"s1": ["10.0.0.1", "10.0.0.2"]})
         gossip = EndpointGossip(receiver, vtep="10.0.0.1")
         await gossip.on_datagram(_one_datagram(sender, "s1", vtep="10.0.0.2"), ("10.0.0.2", 7947))
 
@@ -214,7 +233,7 @@ class TestTheNamesAPeerAnnounced:
 
     async def test_an_unnamed_endpoint_contributes_nothing(self) -> None:
         sender = FakeHost(sessions={"s1": [_endpoint(1)]}, peers={"s1": ["10.0.0.1"]})
-        receiver = FakeHost(sessions={"s1": []}, peers={})
+        receiver = FakeHost(sessions={"s1": []}, peers={"s1": ["10.0.0.1", "10.0.0.2"]})
         gossip = EndpointGossip(receiver, vtep="10.0.0.1")
         await gossip.on_datagram(_one_datagram(sender, "s1", vtep="10.0.0.2"), ("10.0.0.2", 7947))
 
@@ -232,7 +251,7 @@ class TestMembershipIsTheAuthorityOnLeaving:
         assert receiver.added() == {_endpoint(1).container_id}
 
         receiver._peers["s1"] = ["10.0.0.1"]  # the manager dropped the peer
-        await gossip.drop_departed_peers("s1")
+        await gossip.sync_membership("s1")
 
         assert receiver.removed() == {_endpoint(1).container_id}
 
@@ -245,7 +264,7 @@ class TestMembershipIsTheAuthorityOnLeaving:
         gossip.announce("s1")
         await gossip.on_datagram(_one_datagram(sender, "s1", vtep="10.0.0.2"), ("10.0.0.2", 7947))
 
-        await gossip.drop_departed_peers("s1")  # membership unchanged, peer merely quiet
+        await gossip.sync_membership("s1")  # membership unchanged, peer merely quiet
 
         assert receiver.removed() == set()
 

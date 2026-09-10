@@ -21,13 +21,14 @@ import contextlib
 import logging
 import socket
 import time
-from collections.abc import Iterable, Sequence
+from collections.abc import Sequence
 from typing import Any, Final, Protocol, override
 
 from ai.backend.agent.network.privnet.gossip import (
     Announcement,
     Endpoint,
-    PeerEndpoints,
+    GossipState,
+    Intent,
     announcements_for,
     decode,
     peers_to_notify,
@@ -47,9 +48,18 @@ DEFAULT_GOSSIP_PORT: Final = 7947
 #: arrives is whole state rather than a change the receiver had to already agree about.
 ANNOUNCE_INTERVAL_SEC: Final = 5.0
 
-#: How long a peer may be silent before it is reported. Never acted on -- see
-#: `PeerEndpoints.forget_peer` for why silence is not a withdrawal.
+#: How long a peer may be silent before it is reported. Never acted on -- only the manager's
+#: membership withdraws a peer, because a node that has merely paused would have its kernels cut.
 SILENCE_REPORT_SEC: Final = 30.0
+
+#: How long after the membership first names a peer before never having heard from it is a
+#: problem. A path that was never open -- a firewall, a route -- is invisible to the silence check
+#: above, which has no last-heard time to age.
+FIRST_CONTACT_SEC: Final = 30.0
+
+#: How long a snapshot may sit half-assembled before its slices are discarded. The sender
+#: re-announces whole state every interval, so a snapshot older than a few of them is superseded.
+PENDING_SNAPSHOT_TTL_SEC: Final = ANNOUNCE_INTERVAL_SEC * 3
 
 
 class GossipHost(Protocol):
@@ -86,14 +96,13 @@ class GossipHost(Protocol):
         """Which incarnation of the session id this node is serving, if the manager publishes one."""
         ...
 
-    async def gossip_program(
-        self,
-        session_id: str,
-        *,
-        add: Sequence[tuple[Endpoint, str]],
-        remove: Sequence[tuple[Endpoint, str]],
-    ) -> None:
-        """Program (or unprogram) a peer's endpoints, each with the VTEP that announced it."""
+    async def gossip_program(self, session_id: str, intents: Sequence[Intent]) -> Sequence[Intent]:
+        """Apply the intents in order, and return the ones that did not take.
+
+        Returned rather than raised: one endpoint that will not program must not take the rest of
+        the pass with it, and the caller records only what succeeded -- an intent left out of the
+        confirmation is re-offered by the next convergence.
+        """
         ...
 
 
@@ -104,7 +113,7 @@ class EndpointGossip:
     _vtep: str
     _port: int
     _interval: float
-    _held: PeerEndpoints
+    _state: GossipState
     _transport: asyncio.DatagramTransport | None
     _task: asyncio.Task[None] | None
     #: Sessions whose peers were last seen, so a member that leaves can be unprogrammed. The
@@ -123,7 +132,7 @@ class EndpointGossip:
         self._vtep = vtep
         self._port = port
         self._interval = interval
-        self._held = PeerEndpoints()
+        self._state = GossipState()
         self._transport = None
         self._task = None
         self._known_peers = {}
@@ -177,8 +186,9 @@ class EndpointGossip:
         unprogramming takes it again. A departed peer is therefore unprogrammed within an interval
         rather than instantly, which is the same latency every other part of this exchange has.
         """
+        self._state.tick(now=time.time(), pending_ttl=PENDING_SNAPSHOT_TTL_SEC)
         for session_id in list(self._host.gossip_sessions()):
-            await self.drop_departed_peers(session_id)
+            await self.sync_membership(session_id)
             self.announce(session_id)
 
     def announce(self, session_id: str) -> None:
@@ -227,14 +237,15 @@ class EndpointGossip:
             return
         if not self._is_current(announcement):
             return
-        added, removed = self._held.apply(announcement, now=time.time())
-        if not added and not removed:
-            return
-        await self._host.gossip_program(
-            announcement.session_id,
-            add=[(e, announcement.vtep) for e in sorted(added, key=lambda e: e.container_id)],
-            remove=[(e, announcement.vtep) for e in sorted(removed, key=lambda e: e.container_id)],
-        )
+        session_id = announcement.session_id
+        now = time.time()
+        # Refreshed here, not only on the timer: a peer the manager has just added would otherwise
+        # have its first announcements dropped for want of state, costing an interval for nothing.
+        # The membership still authorizes -- a sender it does not name gets no state and no
+        # transition, whatever key signed the datagram.
+        self._state.on_membership(session_id, self._host.gossip_peers(session_id), now=now)
+        self._state.on_datagram(announcement, now=now)
+        await self._converge(session_id)
 
     def _is_current(self, announcement: Announcement) -> bool:
         """Whether the announcement is about the incarnation this node is serving.
@@ -266,39 +277,33 @@ class EndpointGossip:
         against them goes with them. This only stops the exchange from diffing a later session
         that reuses the id against a stranger's table.
         """
-        self._held.forget_session(session_id)
+        self._state.forget_session(session_id)
         self._known_peers.pop(session_id, None)
 
-    async def drop_departed_peers(self, session_id: str) -> None:
-        """Unprogram peers the session's membership no longer names.
+    async def sync_membership(self, session_id: str) -> None:
+        """Bring the peer set in line with the manager's membership, and settle what that changes.
 
         A node leaving is the manager's statement, and this is where it takes effect. It cannot
-        come from silence: a peer that has merely paused would have its live kernels cut.
+        come from silence: a peer that has merely paused would have its live kernels cut. A
+        departed peer's endpoints leave the desired state, and the convergence below unprograms
+        exactly them.
         """
         current = set(peers_to_notify(self._host.gossip_peers(session_id), self._vtep))
-        departed = self._known_peers.get(session_id, set()) - current
         self._known_peers[session_id] = current
-        for vtep in sorted(departed):
-            gone = self._held.forget_peer(session_id, vtep)
-            if gone:
-                await self._host.gossip_program(
-                    session_id,
-                    add=[],
-                    remove=[(e, vtep) for e in sorted(gone, key=lambda e: e.container_id)],
-                )
+        self._state.on_membership(session_id, current, now=time.time())
+        await self._converge(session_id)
 
-    def retry_later(self, session_id: str, failed: Iterable[tuple[Endpoint, str]]) -> None:
-        """Un-hold endpoints the host could not program, so the next announcement re-offers them.
+    async def _converge(self, session_id: str) -> None:
+        """Ask the host for the difference, and record only what it confirms.
 
-        The exchange has no acknowledgement and nothing to retry on its own -- an announcement is
-        whole state, so the correction is always the next one. That only works if a failure is not
-        recorded as applied, which is what this undoes.
+        Anything the host could not program is simply left out of the confirmation, so it is still
+        a difference on the next pass. There is no retry list to keep and none to lose.
         """
-        by_vtep: dict[str, list[str]] = {}
-        for endpoint, vtep in failed:
-            by_vtep.setdefault(vtep, []).append(endpoint.container_id)
-        for vtep, container_ids in by_vtep.items():
-            self._held.forget_endpoints(session_id, vtep, container_ids)
+        intents = self._state.converge(session_id)
+        if not intents:
+            return
+        failed = set(await self._host.gossip_program(session_id, intents))
+        self._state.confirm(session_id, applied=[i for i in intents if i not in failed])
 
     def cluster_names(self, session_id: str) -> dict[str, str]:
         """``{cluster_hostname: ip}`` for what this session's PEERS have announced.
@@ -308,28 +313,40 @@ class EndpointGossip:
         """
         return {
             endpoint.cluster_hostname.lower(): endpoint.ip
-            for endpoint, _vtep in self._held.held(session_id).values()
+            for endpoint, _vtep in self._state.held(session_id).values()
             if endpoint.cluster_hostname
         }
 
     def problems(self) -> dict[str, str]:
-        """Peers a session still names that have gone quiet, for the readiness surface.
+        """Peers a session names that are not saying what they should, for the readiness surface.
 
-        Not a failure of this node, and nothing is withdrawn over it -- but a peer whose privnet
-        is wedged or unreachable has kernels that are about to be unreachable too, and nothing
-        else on this node would say so.
+        Two shapes, reported apart because they point at different faults. A peer heard once and
+        now quiet is a privnet that is wedged or a node that went away. A peer never heard from at
+        all is more often a path that was never open, and a silence check cannot see it: there is
+        no last-heard time to age.
         """
         now = time.time()
         out: dict[str, str] = {}
         for session_id in self._host.gossip_sessions():
-            silent = self._held.silent_peers(
-                session_id, now=now, older_than=SILENCE_REPORT_SEC
-            ) & self._known_peers.get(session_id, set())
-            if silent:
-                out[f"gossip:{session_id}"] = (
-                    f"no endpoint announcement in {SILENCE_REPORT_SEC:.0f}s from "
-                    + ", ".join(sorted(silent))
+            health = self._state.health(
+                session_id,
+                now=now,
+                silent_after=SILENCE_REPORT_SEC,
+                expect_within=FIRST_CONTACT_SEC,
+            )
+            reasons: list[str] = []
+            if health.never_heard:
+                reasons.append(
+                    f"no endpoint announcement ever from {', '.join(sorted(health.never_heard))}"
+                    f" ({FIRST_CONTACT_SEC:.0f}s after the session named them)"
                 )
+            if health.silent:
+                reasons.append(
+                    f"no endpoint announcement in {SILENCE_REPORT_SEC:.0f}s from "
+                    + ", ".join(sorted(health.silent))
+                )
+            if reasons:
+                out[f"gossip:{session_id}"] = "; ".join(reasons)
         return out
 
 
