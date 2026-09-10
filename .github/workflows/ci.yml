@@ -434,6 +434,141 @@ jobs:
       if: always()  # We want the log even on failures.
 
 
+  test-scenario:
+    needs: detect-changes
+    if: |
+      always()
+      && !contains(github.event.pull_request.labels.*.name, 'skip:ci')
+      && !contains(toJSON(github.event.head_commit.message), 'skip:ci')
+      && (
+        needs.detect-changes.result != 'success'
+        || needs.detect-changes.outputs.code == 'true'
+        || startsWith(github.ref, 'refs/tags/')
+        || needs.detect-changes.outputs.release == 'true'
+      )
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: ${{ fromJSON('["0/3","1/3","2/3"]') }}
+    steps:
+    - name: Verify detect-changes
+      if: needs.detect-changes.result != 'success'
+      run: |
+        echo "detect-changes did not succeed: ${{ needs.detect-changes.result }}"
+        exit 1
+    - name: Check out the revision with minimal required history
+      uses: actions/checkout@v6
+      with:
+        # See "Calculate base ref" in the unit job for why depth 2 is enough.
+        fetch-depth: 2
+        lfs: false
+    - name: Extract Python version from pants.toml
+      run: |
+        PYTHON_VERSION=$(grep -m 1 -oP '(?<=CPython==)([^"]+)' pants.toml)
+        echo "PANTS_CONFIG_FILES=pants.ci.toml" >> $GITHUB_ENV
+        echo "PROJECT_PYTHON_VERSION=$PYTHON_VERSION" >> $GITHUB_ENV
+    - name: Set up Python as Runtime
+      uses: actions/setup-python@v6
+      with:
+        python-version: ${{ env.PROJECT_PYTHON_VERSION }}
+    - name: Set up remote cache backend (if applicable)
+      run: |
+        echo "PANTS_REMOTE_STORE_ADDRESS=${REMOTE_CACHE_BACKEND_ENDPOINT}" >> $GITHUB_ENV
+        echo "PANTS_REMOTE_CACHE_READ=true" >> $GITHUB_ENV
+        echo "PANTS_REMOTE_CACHE_WRITE=true" >> $GITHUB_ENV
+        echo "PANTS_REMOTE_INSTANCE_NAME=main" >> $GITHUB_ENV
+      env:
+        REMOTE_CACHE_BACKEND_ENDPOINT: ${{ secrets.PANTS_REMOTE_CACHE_ENDPOINT }}
+      if: ${{ env.REMOTE_CACHE_BACKEND_ENDPOINT != '' }}
+    - name: Bootstrap Pants
+      uses: pantsbuild/actions/init-pants@v11
+      with:
+        gha-cache-key: v1
+        named-caches-hash: ${{ hashFiles('python*.lock', 'tools/*.lock') }}
+        cache-lmdb-store: 'true'
+    - name: Pick which components to run
+      id: pick
+      env:
+        IS_RELEASE_PR: ${{ needs.detect-changes.outputs.release }}
+      run: |
+        # A component runs whole or not at all: its report.md covers every scenario it
+        # holds, so a half-run component would look as though rows had disappeared.
+        # Selection is transitive, because a scenario reaches src through its seeds and
+        # a direct-dependents run would skip almost every row.
+        if [[ "$GITHUB_REF" == refs/tags/* || "$IS_RELEASE_PR" == "true" ]]; then
+          echo "targets=tests/scenario::" >> $GITHUB_OUTPUT
+          exit 0
+        fi
+        if [ "$GITHUB_EVENT_NAME" == "pull_request" ]; then
+          BASE_REF=$(git rev-parse HEAD^1)
+        else
+          BASE_REF="HEAD~1"
+        fi
+        touched=$(pants list --changed-since="$BASE_REF" --changed-dependents=transitive \
+          2>/dev/null | grep '^tests/scenario/' || true)
+        if [ -z "$touched" ]; then
+          echo "targets=" >> $GITHUB_OUTPUT
+          exit 0
+        fi
+        components=$(echo "$touched" \
+          | sed -n 's|^tests/scenario/bai_scenario/manager/\([^/]*\)/.*|\1|p' | sort -u)
+        picked="tests/scenario/bai_scenario/setup::"
+        for one in $components; do
+          picked="$picked tests/scenario/bai_scenario/manager/$one::"
+        done
+        echo "targets=$picked" >> $GITHUB_OUTPUT
+    - name: Run the scenarios and keep what each one did
+      if: steps.pick.outputs.targets != ''
+      timeout-minutes: 60
+      run: |
+        mkdir -p dist
+        BACKEND_SCENARIO_LOG=$PWD/dist/scenarios.jsonl pants test \
+          --test-extra-env-vars="+['BACKEND_SCENARIO_LOG']" \
+          --shard='${{ matrix.shard }}' \
+          ${{ steps.pick.outputs.targets }} -- -v
+    - name: Upload the report the run produced
+      uses: actions/upload-artifact@v5
+      with:
+        name: scenario-report.${{ strategy.job-index }}
+        path: dist/scenarios.jsonl
+      if: always()
+    - name: Upload pants log
+      uses: actions/upload-artifact@v5
+      with:
+        name: pants.test-scenario.${{ strategy.job-index }}.log
+        path: .pants.d/workdir/pants.log
+      if: always()
+
+  verify-scenario-report:
+    needs: test-scenario
+    if: always() && needs.test-scenario.result == 'success'
+    runs-on: ubuntu-latest
+    steps:
+    - name: Check out the revision with minimal required history
+      uses: actions/checkout@v6
+      with:
+        fetch-depth: 1
+        lfs: false
+    - name: Collect what every shard recorded
+      uses: actions/download-artifact@v5
+      with:
+        pattern: scenario-report.*
+        path: dist
+        merge-multiple: false
+    - name: Check each entity's report against the run
+      run: |
+        # A shard holds only part of a component, so the check needs every shard's
+        # record together. A component that did not run at all is not checked here;
+        # it is checked by the run that does hold it.
+        found=$(find dist -name scenarios.jsonl)
+        if [ -z "$found" ]; then
+          echo "no scenario ran; nothing to check"
+          exit 0
+        fi
+        python scripts/scenario-report.py $found \
+          --verify src/ai/backend/manager/api/adapters
+
   test-component:
     needs: detect-changes
     if: |
@@ -623,19 +758,24 @@ jobs:
         fi
 
   test-component-gate:
-    needs: [test-component]
+    needs: [test-component, test-scenario, verify-scenario-report]
     if: always()
     runs-on: ubuntu-latest
     steps:
     - run: |
-        r="${{ needs.test-component.result }}"
-        echo "test-component: $r"
-        if [ "$r" = "success" ] || [ "$r" = "skipped" ]; then
-          echo "OK"
-        else
-          echo "FAIL"
-          exit 1
-        fi
+        for name in component scenario report; do
+          case "$name" in
+            component) r="${{ needs.test-component.result }}" ;;
+            scenario) r="${{ needs.test-scenario.result }}" ;;
+            report) r="${{ needs.verify-scenario-report.result }}" ;;
+          esac
+          echo "test-$name: $r"
+          if [ "$r" != "success" ] && [ "$r" != "skipped" ]; then
+            echo "FAIL"
+            exit 1
+          fi
+        done
+        echo "OK"
 
   test-integration-gate:
     needs: [test-integration]
