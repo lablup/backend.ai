@@ -265,6 +265,7 @@ async def probe_readiness(
     scheduled here and fails on one node with it buried in a create-time traceback.
     """
     blocking: list[str] = []
+    privnet_advisories: list[str] = []
     encryption_blocking = await _encryption_problems(privnet_socket)
     for binary in _REQUIRED_BINARIES:
         if not await _binary_present(binary):
@@ -315,8 +316,12 @@ async def probe_readiness(
             # two processes upgrade separately, so this is a real state and not a hypothetical.
             for _what, why in sorted((await client.fencing_problems()).items()):
                 blocking.append(why)
+            # Reported, never blocking: a peer that has gone quiet is a fact about that peer, and
+            # taking this node out of service over it would turn one node's firewall into an
+            # outage here. See `ADVISORY_PREFIX`.
+            privnet_advisories = sorted((await client.advisory_problems()).values())
     devices, unreadable = await describe_vxlan_devices()
-    advisory = foreign_conflicts(devices, port=port, vni_range=vni_range)
+    advisory = [*privnet_advisories, *foreign_conflicts(devices, port=port, vni_range=vni_range)]
     if unreadable:
         advisory.append(
             f"this host's `ip -d link` cannot describe {', '.join(unreadable)} (it exits non-zero"
