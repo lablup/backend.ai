@@ -219,6 +219,55 @@ class TestConvergence:
         assert set(held.held("s1")) == {_endpoint(1).container_id}
 
 
+class TestNamesTravelWithAddresses:
+    """The session's cluster names (`main1`, `sub1`, ...) are what a kernel dials its peers by.
+    Carrying them here is what lets a node answer for a peer's kernel without reading anything
+    that peer wrote: the name and the address arrive together, from the node holding both."""
+
+    def test_a_name_survives_the_round_trip(self) -> None:
+        sent = Announcement("s1", _VTEP, (_endpoint(1),), sent_at=1000.0)
+        got = decode(sent.encode(_KEY), _KEY, now=1000.0)
+        assert got is not None and got.endpoints[0].cluster_hostname == "sub1"
+
+    def test_a_nameless_endpoint_is_still_announced(self) -> None:
+        """A kernel with no cluster name is unresolvable by name, not unreachable by address."""
+        nameless = Endpoint(container_id="a" * 64, ip="10.128.2.9", mac="02:42:0a:80:02:09")
+        got = decode(
+            Announcement("s1", _VTEP, (nameless,), sent_at=1000.0).encode(_KEY), _KEY, now=1000.0
+        )
+        assert got is not None and got.endpoints == (nameless,)
+
+    def test_a_name_of_the_wrong_type_drops_only_that_entry(self) -> None:
+        body = json.dumps({
+            "v": PROTOCOL_VERSION,
+            "s": "s1",
+            "t": _VTEP,
+            "e": [_endpoint(1).to_wire(), {**_endpoint(2).to_wire(), "h": ["sub2"]}],
+            "at": 1000.0,
+            "p": 0,
+            "n": 1,
+        })
+        got = decode(_sign(body.encode(), _KEY) + b"." + body.encode(), _KEY, now=1000.0)
+        assert got is not None and got.endpoints == (_endpoint(1),)
+
+    def test_a_rename_is_an_update_and_not_a_withdrawal(self) -> None:
+        """The name has to register as a change, or every peer keeps answering the old one. It
+        must not register as a removal: the container is still there, and withdrawing it would
+        delete the FDB entry that is about to be re-added under the same MAC."""
+        held = PeerEndpoints()
+        held.apply(Announcement("s1", _PEER, (_endpoint(1),), 1000.0), now=1000.0)
+        renamed = Endpoint(
+            container_id=_endpoint(1).container_id,
+            ip=_endpoint(1).ip,
+            mac=_endpoint(1).mac,
+            cluster_hostname="main1",
+        )
+        added, removed = held.apply(Announcement("s1", _PEER, (renamed,), 1001.0), now=1001.0)
+        assert added == {renamed}
+        assert removed == set()
+        assert held.held("s1")[renamed.container_id] == (renamed, _PEER)
+
+
 class TestWhoIsTold:
     def test_a_node_does_not_announce_to_itself(self) -> None:
         """It would program its own kernels' MACs against its own VTEP -- a tunnel to nowhere,

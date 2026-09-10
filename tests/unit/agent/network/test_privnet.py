@@ -1894,6 +1894,9 @@ class TestTheAgentFacingProxy:
             "mtu": 1412,
             "vxlan_port": 4789,
             "encryption_key": "ab" * 32,
+            # Sent even where it is absent: this meta predates the field, and the privnet must see
+            # that rather than fall back to whatever a neighbouring session declared.
+            "gossip_key": None,
         }
 
     async def test_a_failed_withdrawal_is_not_reported_as_done(self) -> None:
