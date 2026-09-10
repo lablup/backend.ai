@@ -5,12 +5,7 @@ from typing import Any
 import click
 
 
-<<<<<<< HEAD
-class CommaSeparatedChoice(click.Choice):
-=======
 class CommaSeparatedChoice(click.Choice[str | list[str]]):
-    @override
->>>>>>> db2bf179 (deps(BA-7811): bump the dependency pins reported as vulnerable (#14480))
     def convert(
         self,
         value: str,
