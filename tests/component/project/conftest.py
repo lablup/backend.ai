@@ -27,7 +27,6 @@ from ai.backend.common.data.entity.domain import DomainEntityType
 from ai.backend.common.data.entity.project import ProjectEntityType
 from ai.backend.common.data.entity.role import RoleEntityType
 from ai.backend.common.data.entity.user import UserEntityType, UserID
-from ai.backend.common.data.permission.types import RelationType
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
 from ai.backend.manager.actions.registry.types import (
@@ -61,9 +60,6 @@ from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.keypair import keypairs
 from ai.backend.manager.models.project.row import ProjectRow
-from ai.backend.manager.models.rbac_models.association_scopes_entities import (
-    AssociationScopesEntitiesRow,
-)
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
@@ -505,15 +501,6 @@ async def member_role_fixture(
             )
         )
         await conn.execute(
-            sa.insert(AssociationScopesEntitiesRow.__table__).values(
-                scope_type=ScopeType.PROJECT,
-                scope_id=str(target_project_fixture),
-                entity_type=EntityType.ROLE,
-                entity_id=str(role_id),
-                relation_type=RelationType.AUTO,
-            )
-        )
-        await conn.execute(
             sa.insert(PermissionRow.__table__).values(
                 role_id=role_id,
                 entity_type=EntityType.USER,
@@ -524,14 +511,6 @@ async def member_role_fixture(
     async with db_engine.begin() as conn:
         await conn.execute(
             PermissionRow.__table__.delete().where(PermissionRow.__table__.c.role_id == role_id)
-        )
-        await conn.execute(
-            AssociationScopesEntitiesRow.__table__.delete().where(
-                sa.and_(
-                    AssociationScopesEntitiesRow.__table__.c.entity_type == EntityType.ROLE,
-                    AssociationScopesEntitiesRow.__table__.c.entity_id == str(role_id),
-                )
-            )
         )
         await conn.execute(RoleRow.__table__.delete().where(RoleRow.__table__.c.id == role_id))
 
@@ -592,11 +571,10 @@ async def assigned_users(
     resource_policy_fixture: str,
     virtual_entity_seeder: VirtualEntitySeeder,
 ) -> AsyncIterator[list[uuid.UUID]]:
-    """Insert test users and assign them to the target project via ASE.
+    """Insert test users and enroll them in the target project.
 
-    Yields a list of user UUIDs whose project membership row is recorded in
-    `association_scopes_entities` (PROJECT scope, USER entity).
-    Teardown removes the membership row, keypairs, and users.
+    Yields a list of user UUIDs enrolled in the project's virtual entity.
+    Teardown removes the enrollment, keypairs, and users.
     """
     user_ids: list[uuid.UUID] = []
     emails: list[str] = []
@@ -646,15 +624,6 @@ async def assigned_users(
                     user=str(uid),
                 )
             )
-            await conn.execute(
-                sa.insert(AssociationScopesEntitiesRow).values(
-                    scope_type=ScopeType.PROJECT,
-                    scope_id=str(group_fixture),
-                    entity_type=EntityType.USER,
-                    entity_id=str(uid),
-                    relation_type=RelationType.AUTO,
-                )
-            )
             await virtual_entity_seeder.insert_user_scope(conn, UserID(uid))
             await virtual_entity_seeder.enroll_user_in_project(conn, group_fixture, UserID(uid))
             user_ids.append(uid)
@@ -665,14 +634,6 @@ async def assigned_users(
 
     async with db_engine.begin() as conn:
         for uid in reversed(user_ids):
-            await conn.execute(
-                sa.delete(AssociationScopesEntitiesRow).where(
-                    AssociationScopesEntitiesRow.scope_type == ScopeType.PROJECT,
-                    AssociationScopesEntitiesRow.scope_id == str(group_fixture),
-                    AssociationScopesEntitiesRow.entity_type == EntityType.USER,
-                    AssociationScopesEntitiesRow.entity_id == str(uid),
-                )
-            )
             await conn.execute(
                 VirtualEntityRow.__table__.delete().where(
                     VirtualEntityRow.__table__.c.entity_type == ScopeType.USER,

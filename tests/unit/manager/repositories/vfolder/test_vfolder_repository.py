@@ -69,9 +69,6 @@ from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.model_card.row import ModelCardRow
 from ai.backend.manager.models.project import ProjectRow
 from ai.backend.manager.models.rbac_models import UserRoleRow
-from ai.backend.manager.models.rbac_models.association_scopes_entities import (
-    AssociationScopesEntitiesRow,
-)
 from ai.backend.manager.models.rbac_models.entity_field import EntityFieldRow
 from ai.backend.manager.models.rbac_models.permission.object_permission import ObjectPermissionRow
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
@@ -182,7 +179,6 @@ class TestVfolderRepository:
                 RoutingRow,
                 ResourcePresetRow,
                 VFolderPermissionRow,
-                AssociationScopesEntitiesRow,
                 VirtualEntityRow,
                 EntityMembershipRow,
                 EntityMembershipCapRow,
@@ -974,7 +970,6 @@ class TestVfolderRepositoryPurge:
                 RoutingRow,
                 ModelCardRow,
                 EntityFieldRow,
-                AssociationScopesEntitiesRow,
                 ObjectPermissionRow,
                 PermissionRow,
             ],

@@ -53,9 +53,6 @@ from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.project import ProjectRow
 from ai.backend.manager.models.rbac_models import PermissionRow, RoleRow, UserRoleRow
-from ai.backend.manager.models.rbac_models.association_scopes_entities import (
-    AssociationScopesEntitiesRow,
-)
 from ai.backend.manager.models.rbac_models.role_permission_preset.row import (
     RolePermissionPresetRow,
 )
@@ -167,7 +164,6 @@ class TestContainerRegistryRepository:
                 ResourcePresetRow,
                 ContainerRegistryRow,
                 AssociationContainerRegistriesGroupsRow,
-                AssociationScopesEntitiesRow,
                 PermissionRow,
                 RolePresetRow,
                 RolePermissionPresetRow,
@@ -1413,7 +1409,6 @@ class TestSearchContainerRegistries:
                 ResourcePresetRow,
                 ContainerRegistryRow,
                 AssociationContainerRegistriesGroupsRow,
-                AssociationScopesEntitiesRow,
             ],
         ):
             yield database_connection

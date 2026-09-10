@@ -37,9 +37,6 @@ from ai.backend.manager.models.model_card.row import ModelCardRow
 from ai.backend.manager.models.model_card.updaters import ModelCardUpdater
 from ai.backend.manager.models.project import ProjectRow
 from ai.backend.manager.models.rbac_models import RoleRow, UserRoleRow
-from ai.backend.manager.models.rbac_models.association_scopes_entities import (
-    AssociationScopesEntitiesRow,
-)
 from ai.backend.manager.models.resource_group import ResourceGroupRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
@@ -117,7 +114,6 @@ class TestModelCardCreatorResourceRequirements:
                 ResourceSlotTypeRow,
                 ModelCardRow,
                 ModelCardResourceRequirementRow,
-                AssociationScopesEntitiesRow,
             ],
         ):
             async with database_connection.begin_session() as sess:

@@ -88,9 +88,6 @@ from ai.backend.manager.models.kernel import KernelRow, KernelStatus
 from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.project import ProjectRow
 from ai.backend.manager.models.rbac_models import RoleRow, UserRoleRow
-from ai.backend.manager.models.rbac_models.association_scopes_entities import (
-    AssociationScopesEntitiesRow,
-)
 from ai.backend.manager.models.rbac_models.entity_field import EntityFieldRow
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.replica_group import ReplicaGroupRow
@@ -1445,7 +1442,6 @@ class TestDeploymentRevisionOperations:
                 EndpointRow,
                 ReplicaGroupRow,
                 EntityFieldRow,  # DeploymentRevisionRow relationship dependency
-                AssociationScopesEntitiesRow,
                 RuntimeVariantRow,
                 DeploymentRevisionPresetRow,
                 DeploymentRevisionRow,
@@ -2907,7 +2903,6 @@ class TestRouteOperations:
                 EndpointRow,
                 ReplicaGroupRow,
                 RoutingRow,
-                AssociationScopesEntitiesRow,
             ],
         ):
             yield database_connection
@@ -3295,7 +3290,6 @@ class TestDeploymentRepositoryDuplicateName:
                 DeploymentRevisionPresetRow,
                 DeploymentRevisionRow,
                 DeploymentRevisionResourceSlotRow,
-                AssociationScopesEntitiesRow,
                 DeploymentPolicyRow,
             ],
         ):

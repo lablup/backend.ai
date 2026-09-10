@@ -484,17 +484,6 @@ class RBACElementType(enum.StrEnum):
             raise RBACTypeConversionError(f"{self!r} has no corresponding EntityType") from e
 
 
-class RelationType(enum.StrEnum):
-    """Classification of parent-child entity edges in BEP-1048.
-
-    AUTO: Composition edge with permission delegation from parent.
-    REF: Read-only reference edge with no permission delegation.
-    """
-
-    AUTO = "auto"
-    REF = "ref"
-
-
 # ---------------------------------------------------------------------------
 # Per-entity allowed-operation tables
 #
