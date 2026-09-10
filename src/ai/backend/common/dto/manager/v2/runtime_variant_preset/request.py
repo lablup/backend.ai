@@ -5,7 +5,7 @@ from uuid import UUID
 
 from pydantic import Field, model_validator
 
-from ai.backend.common.api_handlers import SENTINEL, BaseRequestModel, Sentinel
+from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.dto.manager.query import StringFilter, UUIDFilter
 from ai.backend.common.dto.manager.v2.common import OrderDirection, SemVersion
 from ai.backend.common.dto.manager.v2.runtime_variant_preset.types import (
@@ -77,33 +77,50 @@ class CreateRuntimeVariantPresetInput(BaseRequestModel):
 
 class UpdateRuntimeVariantPresetInput(BaseRequestModel):
     id: UUID = Field(description="Preset ID.")
-    name: str | None = Field(default=None, min_length=1, max_length=256)
-    description: str | Sentinel | None = Field(default=SENTINEL)
-    rank: int | None = Field(default=None, ge=0)
-    preset_target: PresetTarget | None = Field(default=None)
-    value_type: PresetValueType | None = Field(
-        default=None,
+    name: str | None | Unset = Field(
+        default=UNSET, min_length=1, max_length=256, description="Omit to leave unchanged."
+    )
+    description: str | None | Unset = Field(
+        default=UNSET, description="Description. Omit to leave unchanged; null clears."
+    )
+    rank: int | None | Unset = Field(default=UNSET, ge=0, description="Omit to leave unchanged.")
+    preset_target: PresetTarget | None | Unset = Field(
+        default=UNSET, description="Omit to leave unchanged."
+    )
+    value_type: PresetValueType | None | Unset = Field(
+        default=UNSET,
         description=(
             "New value type. 'flag' is only valid when the effective preset_target is 'args' "
-            "(the stored target applies when preset_target is omitted)."
+            "(the stored target applies when preset_target is omitted). Omit to leave unchanged."
         ),
     )
-    default_value: str | Sentinel | None = Field(default=SENTINEL)
-    key: str | None = Field(default=None, min_length=1, max_length=256)
-    required: bool | None = Field(
-        default=None, description="Toggle required flag; None = no change."
+    default_value: str | None | Unset = Field(
+        default=UNSET, description="Default value. Omit to leave unchanged; null clears."
+    )
+    key: str | None | Unset = Field(
+        default=UNSET, min_length=1, max_length=256, description="Omit to leave unchanged."
+    )
+    required: bool | None | Unset = Field(
+        default=UNSET, description="Toggle required flag. Omit to leave unchanged."
+    )
+    category: str | None | Unset = Field(
+        default=UNSET, description="UI category group. Omit to leave unchanged; null clears."
+    )
+    display_name: str | None | Unset = Field(
+        default=UNSET, description="UI display name. Omit to leave unchanged; null clears."
+    )
+    ui_option: UIOption | None | Unset = Field(
+        default=UNSET,
+        description="UI rendering option. Omit to leave unchanged; null clears.",
     )
     added_version: SemVersion | None | Unset = Field(default=UNSET)
     deprecated_version: SemVersion | None | Unset = Field(default=UNSET)
-    category: str | Sentinel | None = Field(default=SENTINEL)
-    display_name: str | Sentinel | None = Field(default=SENTINEL)
-    ui_option: UIOption | Sentinel | None = Field(default=SENTINEL)
 
     @model_validator(mode="after")
     def validate_flag_requires_args(self) -> Self:
         if (
             self.value_type == PresetValueType.FLAG
-            and self.preset_target is not None
+            and isinstance(self.preset_target, PresetTarget)
             and self.preset_target != PresetTarget.ARGS
         ):
             raise ValueError("value_type 'flag' is only valid with preset_target 'args'.")
@@ -111,7 +128,9 @@ class UpdateRuntimeVariantPresetInput(BaseRequestModel):
 
     @model_validator(mode="after")
     def validate_default_value(self) -> Self:
-        if self.value_type is None or self.default_value is SENTINEL or self.default_value is None:
+        if isinstance(self.value_type, Unset) or self.value_type is None:
+            return self
+        if isinstance(self.default_value, Unset) or self.default_value is None:
             return self
         validator = VALUE_TYPE_VALIDATORS.get(self.value_type)
         if validator is None:
