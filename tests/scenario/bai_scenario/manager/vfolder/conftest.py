@@ -21,7 +21,6 @@ from ai.backend.manager.actions.monitors import ActionMonitors
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
 from ai.backend.manager.actions.registry.types import GroupMeta, ProcessorDependencies
 from ai.backend.manager.actions.v2.validators import ActionValidators as V2ActionValidators
-from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.api.adapters.vfolder.adapter import VFolderAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.secret.types import KeyProviderType
@@ -53,17 +52,16 @@ def fakes(storage: FakeStorageProxyManagerFacingClient) -> Sequence[object]:
 async def adapter(
     engine: Any,
     config: ManagerConfigProvider,
-    validators: tuple[ActionValidators, V2ActionValidators],
+    validators: V2ActionValidators,
     monitors: ActionMonitors,
     storage: FakeStorageProxyManagerFacingClient,
 ) -> VFolderAdapter:
-    _, v2_validators = validators
     provider = V2DBOpsProvider(engine)
     share_provider = ShareOpsProvider(engine)
     registry: ProcessorRegistry[Any] = ProcessorRegistry(
         ProcessorDependencies(
             monitors=monitors,
-            validators=v2_validators,
+            validators=validators,
             repository=OpsRepository(provider),
         )
     )

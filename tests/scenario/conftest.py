@@ -25,12 +25,11 @@ from bai_scenario.monitors import ActionRecorder
 from bai_scenario.runner.planting import SeedingSession
 from bai_scenario.seeds.ops import SeedOpsProvider
 from bai_scenario.seeds.seeder import Seeder
-from bai_scenario.validators import build_action_validators
 
 from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
 from ai.backend.manager.actions.monitors import ActionMonitors
 from ai.backend.manager.actions.v2.validators import ActionValidators as V2ActionValidators
-from ai.backend.manager.actions.validators import ActionValidators
+from ai.backend.manager.actions.validators.build import build_action_validators
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.permission_controller.repository import (
@@ -102,9 +101,7 @@ def config(
 
 
 @pytest.fixture
-def validators(
-    engine: Any, config: ManagerConfigProvider
-) -> tuple[ActionValidators, V2ActionValidators]:
+def validators(engine: Any, config: ManagerConfigProvider) -> V2ActionValidators:
     return build_action_validators(PermissionControllerRepository(engine), config)
 
 

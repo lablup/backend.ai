@@ -37,9 +37,9 @@ Then
   - metadata.cloneable = False
   - metadata.last_used = None
   - access_control.ownership_type = 'user'
-  - ownership.user_id = UserID('01a08a89-ca48-730a-9666-6eeb79b4a661')
+  - ownership.user_id = UserID('01a08a9c-5a40-7a35-8ec5-8156263b3b51')
   - ownership.project_id: 무시함 — 개인 폴더는 그 사람의 개인 프로젝트에 붙는다. 그 id는 사용자를 만들 때 생긴다
-  - ownership.creator_id = UserID('01a08a89-ca48-730a-9666-6eeb79b4a661')
+  - ownership.creator_id = UserID('01a08a9c-5a40-7a35-8ec5-8156263b3b51')
   - ownership.creator_email = 'user-1@scenario.local'
   - unmanaged_path = None
   - id: 무시함 — 데이터베이스가 만든다

@@ -18,7 +18,6 @@ from ai.backend.manager.actions.monitors import ActionMonitors
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
 from ai.backend.manager.actions.registry.types import GroupMeta, ProcessorDependencies
 from ai.backend.manager.actions.v2.validators import ActionValidators as V2ActionValidators
-from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.api.adapters.user.adapter import UserAdapter
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.config.provider import ManagerConfigProvider
@@ -43,15 +42,14 @@ from ai.backend.manager.sokovan.scheduling_controller.scheduling_controller impo
 async def adapter(
     engine: Any,
     config: ManagerConfigProvider,
-    validators: tuple[ActionValidators, V2ActionValidators],
+    validators: V2ActionValidators,
     monitors: ActionMonitors,
 ) -> UserAdapter:
-    _, v2_validators = validators
     provider = V2DBOpsProvider(engine)
     registry: ProcessorRegistry[Any] = ProcessorRegistry(
         ProcessorDependencies(
             monitors=monitors,
-            validators=v2_validators,
+            validators=validators,
             repository=OpsRepository(provider),
         )
     )

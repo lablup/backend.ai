@@ -55,7 +55,7 @@ When
 Then
 
 - 명부에 배정한 사람만 올라 있다
-  - items = [UserID('01a08a89-c92e-734f-8697-3a0001d880dd')]
+  - items = [UserID('01a08a9c-5d1e-7d60-bc37-cf0aa8a3c5e6')]
 
 #### [the-superadmin-makes-a-project-in-a-domain](/tests/scenario/bai_scenario/manager/project/test_project.py) — pass
 

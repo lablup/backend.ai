@@ -23,7 +23,6 @@ from ai.backend.manager.actions.registry.types import (
     ProcessorDependencies,
 )
 from ai.backend.manager.actions.v2.validators import ActionValidators as V2ActionValidators
-from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.api.adapters.resource_group.adapter import ResourceGroupAdapter
 from ai.backend.manager.repositories.domain.repository import DomainRepository
 from ai.backend.manager.repositories.ops.repository import OpsRepository
@@ -53,15 +52,14 @@ from ai.backend.manager.sokovan.scheduler.coordinator import ScheduleCoordinator
 @pytest.fixture
 async def adapter(
     engine: Any,
-    validators: tuple[ActionValidators, V2ActionValidators],
+    validators: V2ActionValidators,
     monitors: ActionMonitors,
 ) -> ResourceGroupAdapter:
-    _, v2_validators = validators
     provider = V2DBOpsProvider(engine)
     registry: ProcessorRegistry[Any] = ProcessorRegistry(
         ProcessorDependencies(
             monitors=monitors,
-            validators=v2_validators,
+            validators=validators,
             repository=OpsRepository(provider),
         )
     )
