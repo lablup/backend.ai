@@ -188,8 +188,8 @@ class BlueGreenConfigInputGQL(PydanticInputMixin[BlueGreenConfigInputDTO]):
 class UpdateDeploymentPolicyInputGQL(PydanticInputMixin[UpsertDeploymentPolicyInputDTO]):
     deployment_id: ID
     strategy: DeploymentStrategyTypeGQL
-    rolling_update: RollingUpdateConfigInputGQL | None = UNSET
-    blue_green: BlueGreenConfigInputGQL | None = UNSET
+    rolling_update: RollingUpdateConfigInputGQL | None = None
+    blue_green: BlueGreenConfigInputGQL | None = None
 
 
 @gql_pydantic_type(
