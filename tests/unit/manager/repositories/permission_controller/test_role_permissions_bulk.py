@@ -13,7 +13,7 @@ from ai.backend.common.data.entity.role import RoleID
 from ai.backend.common.data.entity.session import SessionEntityType
 from ai.backend.common.data.entity.types import EntityType
 from ai.backend.common.data.entity.user import UserEntityType
-from ai.backend.manager.data.permission.types import OperationType, Permission
+from ai.backend.manager.data.permission.types import Permission
 from ai.backend.manager.errors.permission import RoleNotFound
 
 # ORM cluster registration: configure_mappers() (triggered when this isolated
@@ -43,11 +43,11 @@ BULK_PERMISSION_TABLES: Sequence[TableOrORM] = [
 USER_SCOPE_ID = "00000000-0000-4000-8000-00000000fa01"
 
 ALL_OWNER_OPS = (
-    OperationType.CREATE,
-    OperationType.READ,
-    OperationType.UPDATE,
-    OperationType.SOFT_DELETE,
-    OperationType.HARD_DELETE,
+    Permission.CREATE,
+    Permission.READ,
+    Permission.UPDATE,
+    Permission.SOFT_DELETE,
+    Permission.HARD_DELETE,
 )
 
 
@@ -71,7 +71,7 @@ def _entry(
 def _owner_entry(entity_type: EntityType) -> PermissionEntry:
     permission = Permission.NONE
     for op in ALL_OWNER_OPS:
-        permission |= Permission.from_operation(op)
+        permission |= op
     return _entry(entity_type, permission)
 
 
@@ -158,14 +158,14 @@ class TestBulkRolePermissions:
         db: ExtendedAsyncSAEngine,
         role_id: uuid.UUID,
         entity_type: EntityType,
-    ) -> set[OperationType]:
+    ) -> set[Permission]:
         stmt = sa.select(PermissionRow.permission).where(
             PermissionRow.role_id == role_id,
             PermissionRow.entity_type == entity_type,
         )
         async with db.begin_readonly_session() as session:
             rows = (await session.execute(stmt)).scalars().all()
-        return {permission.to_operation() for permission in rows}
+        return {permission for permission in rows}
 
     # ---------- replace_role_permissions ----------
 

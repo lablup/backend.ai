@@ -15,7 +15,7 @@ from ai.backend.common.data.entity.image import ImageEntityType
 from ai.backend.common.data.entity.session import SessionEntityType
 from ai.backend.common.data.entity.types import EntityType
 from ai.backend.common.data.entity.vfolder import VFolderEntityType
-from ai.backend.manager.data.permission.types import OperationType, Permission
+from ai.backend.manager.data.permission.types import Permission
 from ai.backend.manager.models.agent import AgentRow
 
 # ORM cluster registration: configure_mappers() (triggered when this isolated
@@ -112,15 +112,15 @@ class TestSearchPermissions:
             await db_sess.flush()
 
             for entity_type, operation in [
-                (VFolderEntityType(), OperationType.READ),
-                (VFolderEntityType(), OperationType.UPDATE),
-                (SessionEntityType(), OperationType.CREATE),
-                (ImageEntityType(), OperationType.READ),
+                (VFolderEntityType(), Permission.READ),
+                (VFolderEntityType(), Permission.UPDATE),
+                (SessionEntityType(), Permission.CREATE),
+                (ImageEntityType(), Permission.READ),
             ]:
                 perm = PermissionRow(
                     role_id=role_id,
                     entity_type=entity_type,
-                    permission=Permission.from_operation(operation),
+                    permission=operation,
                 )
                 db_sess.add(perm)
                 await db_sess.flush()

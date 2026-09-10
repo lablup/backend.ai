@@ -13,9 +13,10 @@ from pydantic import Field
 from ai.backend.common.api_handlers import BaseResponseModel
 from ai.backend.common.data.entity.types import EntityType
 from ai.backend.common.dto.manager.pagination import PaginationInfo
+from ai.backend.common.dto.manager.v2.rbac.types import PermissionBitDTO
 from ai.backend.common.types import BackendAISchema
 
-from .types import OperationType, RoleSource, RoleStatus
+from .types import RoleSource, RoleStatus
 
 __all__ = (
     "AssignRoleResponse",
@@ -120,7 +121,7 @@ class PermissionDTO(BackendAISchema):
 
     id: UUID = Field(description="Permission ID")
     entity_type: EntityType = Field(description="Entity type")
-    operation: OperationType = Field(description="Operation type")
+    permission: PermissionBitDTO = Field(description="The operation bit the row holds")
 
 
 class CreatePermissionResponse(BaseResponseModel):

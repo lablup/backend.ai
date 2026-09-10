@@ -29,7 +29,7 @@ from ai.backend.common.data.idle_checker.types import (
     IdleCheckerSpec,
     SessionLifetimeSpec,
 )
-from ai.backend.common.data.permission.types import OperationType, Permission
+from ai.backend.common.data.permission.types import Permission
 from ai.backend.common.types import ResourceSlot, SessionTypes
 from ai.backend.manager.actions.monitors import ActionMonitors
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
@@ -383,7 +383,7 @@ async def _grant(
     scope_type: str,
     scope_id: uuid.UUID,
     entity_type: str,
-    operations: tuple[OperationType, ...],
+    operations: tuple[Permission, ...],
 ) -> AsyncIterator[None]:
     role_id = uuid.uuid4()
     async with database_engine.begin_session() as db_sess:
@@ -403,7 +403,7 @@ async def _grant(
                 PermissionRow(
                     role_id=role_id,
                     entity_type=entity_type,
-                    permission=Permission.from_operation(operation),
+                    permission=operation,
                 )
             )
         await db_sess.flush()
@@ -432,7 +432,7 @@ async def project_assignment_read_permission(
         ProjectEntityType(),
         assignment_seed.project_id,
         IdleCheckerEntityType(),
-        (OperationType.READ,),
+        (Permission.READ,),
     ):
         yield
 
@@ -454,7 +454,7 @@ async def project_assignment_manage_permission(
         ProjectEntityType(),
         assignment_seed.project_id,
         ProjectEntityType(),
-        (OperationType.SOFT_DELETE, OperationType.HARD_DELETE),
+        (Permission.SOFT_DELETE, Permission.HARD_DELETE),
     ):
         async for _ in _grant(
             database_engine,
@@ -462,7 +462,7 @@ async def project_assignment_manage_permission(
             ProjectEntityType(),
             assignment_seed.project_id,
             IdleCheckerEntityType(),
-            (OperationType.READ,),
+            (Permission.READ,),
         ):
             async for _ in _grant(
                 database_engine,
@@ -470,7 +470,7 @@ async def project_assignment_manage_permission(
                 IdleCheckerEntityType(),
                 assignment_seed.checker_id,
                 IdleCheckerEntityType(),
-                (OperationType.SOFT_DELETE, OperationType.HARD_DELETE),
+                (Permission.SOFT_DELETE, Permission.HARD_DELETE),
             ):
                 yield
 
@@ -493,10 +493,10 @@ async def user_self_scope_permission(
         regular_user_fixture.user_uuid,
         UserEntityType(),
         (
-            OperationType.READ,
-            OperationType.UPDATE,
-            OperationType.SOFT_DELETE,
-            OperationType.HARD_DELETE,
+            Permission.READ,
+            Permission.UPDATE,
+            Permission.SOFT_DELETE,
+            Permission.HARD_DELETE,
         ),
     ):
         async for _ in _grant(
@@ -505,7 +505,7 @@ async def user_self_scope_permission(
             UserEntityType(),
             regular_user_fixture.user_uuid,
             IdleCheckerEntityType(),
-            (OperationType.READ,),
+            (Permission.READ,),
         ):
             yield
 

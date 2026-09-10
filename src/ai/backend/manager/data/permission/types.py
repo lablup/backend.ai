@@ -7,7 +7,6 @@ from ai.backend.common.data.entity.types import EntityType
 from ai.backend.common.data.permission.types import (
     GLOBAL_SCOPE_ID,
     FieldType,
-    OperationType,
     Permission,
     RoleSource,
     role_scope_types,
@@ -22,7 +21,6 @@ __all__ = (
     "EntityType",
     "GrantableOperation",
     "FieldType",
-    "OperationType",
     "Permission",
     "RBACElementRef",
     "RoleSource",
@@ -38,7 +36,7 @@ class GrantableOperation:
 
     name: str
     description: str
-    operation: OperationType
+    permission: Permission
 
 
 @dataclass(frozen=True)

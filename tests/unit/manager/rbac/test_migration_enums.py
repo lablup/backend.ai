@@ -1,7 +1,4 @@
 from ai.backend.manager.data.permission.types import (
-    OperationType as OriginalOperationType,
-)
-from ai.backend.manager.data.permission.types import (
     RoleSource as OriginalRoleSource,
 )
 from ai.backend.manager.models.rbac_models.migration.enums import (
@@ -19,58 +16,11 @@ class TestRoleSource:
 
 
 class TestOperationType:
-    def test_to_original(self) -> None:
-        for op_type in OperationType:
-            original = op_type.to_original()
-            assert original.value == op_type.value
+    def test_owner_holds_every_operation(self) -> None:
+        assert OperationType.owner_operations() == set(OperationType)
 
-    def test_grant_operations(self) -> None:
-        grant_operations = [op for op in OperationType if op.value.startswith("grant:")]
-        assert len(grant_operations) == 5
-        assert OperationType.GRANT_ALL in grant_operations
-        assert OperationType.GRANT_READ in grant_operations
-        assert OperationType.GRANT_UPDATE in grant_operations
-        assert OperationType.GRANT_SOFT_DELETE in grant_operations
-        assert OperationType.GRANT_HARD_DELETE in grant_operations
-
-    def test_owner_operations_match_original(self) -> None:
-        """Test that owner_operations() returns the same values as original."""
-        migration_ops = OperationType.owner_operations()
-        original_ops = OriginalOperationType.owner_operations()
-
-        # Convert migration ops to values for comparison
-        migration_values = {op.value for op in migration_ops}
-        original_values = {op.value for op in original_ops}
-
-        assert migration_values == original_values, (
-            f"owner_operations mismatch: migration={migration_values}, original={original_values}"
-        )
-
-    def test_admin_operations_match_original(self) -> None:
-        """Test that admin_operations() returns the same values as original."""
-        migration_ops = OperationType.admin_operations()
-        original_ops = OriginalOperationType.admin_operations()
-
-        # Convert migration ops to values for comparison
-        migration_values = {op.value for op in migration_ops}
-        original_values = {op.value for op in original_ops}
-
-        assert migration_values == original_values, (
-            f"admin_operations mismatch: migration={migration_values}, original={original_values}"
-        )
-
-    def test_member_operations_match_original(self) -> None:
-        """Test that member_operations() returns the same values as original."""
-        migration_ops = OperationType.member_operations()
-        original_ops = OriginalOperationType.member_operations()
-
-        # Convert migration ops to values for comparison
-        migration_values = {op.value for op in migration_ops}
-        original_values = {op.value for op in original_ops}
-
-        assert migration_values == original_values, (
-            f"member_operations mismatch: migration={migration_values}, original={original_values}"
-        )
+    def test_member_reads_only(self) -> None:
+        assert OperationType.member_operations() == {OperationType.READ}
 
 
 class TestScopeType:

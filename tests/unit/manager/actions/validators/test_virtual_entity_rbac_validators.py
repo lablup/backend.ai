@@ -27,7 +27,7 @@ from ai.backend.common.data.entity.project import ProjectEntityType
 from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
 from ai.backend.common.data.entity.vfolder import VFolderEntityType
 from ai.backend.common.data.entity.virtual_entity import VirtualEntityID
-from ai.backend.common.data.permission.types import OperationType, Permission
+from ai.backend.common.data.permission.types import Permission
 from ai.backend.common.data.user.types import UserData, UserRole
 from ai.backend.common.exception import UnreachableError
 from ai.backend.common.types import ResourceSlot
@@ -314,7 +314,7 @@ async def _grant_permission(
     scope_type: EntityType,
     scope_id: uuid.UUID,
     entity_type: EntityType,
-    operation: OperationType,
+    operation: Permission,
     permission: Permission | None = None,
 ) -> None:
     """Grant *operation* on *entity_type* at the scope.
@@ -336,9 +336,7 @@ async def _grant_permission(
             _single_bit_rows(
                 role_id=role_id,
                 entity_type=entity_type,
-                permission=permission
-                if permission is not None
-                else Permission.from_operation(operation),
+                permission=permission if permission is not None else operation,
             )
         )
         await db_sess.flush()
@@ -404,7 +402,7 @@ async def _seed_granted_user(
     entity_ids: Sequence[uuid.UUID],
     perm_scope_type: EntityType,
     perm_entity_type: EntityType,
-    operation: OperationType,
+    operation: Permission,
     permission: Permission | None = None,
     scope_cap: Permission | None = None,
     entity_cap: Permission | None = None,
@@ -545,7 +543,7 @@ async def user_with_project_create_at_domain(
         entity_ids=[_DOMAIN_ID],
         perm_scope_type=DomainEntityType(),
         perm_entity_type=ProjectEntityType(),
-        operation=OperationType.CREATE,
+        operation=Permission.CREATE,
     )
 
 
@@ -562,7 +560,7 @@ async def user_with_read_capped_domain_scope(
         entity_ids=[_DOMAIN_ID],
         perm_scope_type=DomainEntityType(),
         perm_entity_type=ProjectEntityType(),
-        operation=OperationType.CREATE,
+        operation=Permission.CREATE,
         scope_cap=Permission.READ,
     )
 
@@ -580,7 +578,7 @@ async def user_with_vfolder_update_at_project(
         entity_ids=[_VFOLDER_ID],
         perm_scope_type=ProjectEntityType(),
         perm_entity_type=VFolderEntityType(),
-        operation=OperationType.UPDATE,
+        operation=Permission.UPDATE,
     )
 
 
@@ -597,7 +595,7 @@ async def user_with_read_capped_vfolder(
         entity_ids=[_VFOLDER_ID],
         perm_scope_type=ProjectEntityType(),
         perm_entity_type=VFolderEntityType(),
-        operation=OperationType.UPDATE,
+        operation=Permission.UPDATE,
         entity_cap=Permission.READ,
     )
 
@@ -615,7 +613,7 @@ def _vfolder_user_with(
         entity_ids=[_VFOLDER_ID],
         perm_scope_type=ProjectEntityType(),
         perm_entity_type=VFolderEntityType(),
-        operation=OperationType.CREATE,
+        operation=Permission.CREATE,
         permission=permission,
     )
 
@@ -654,7 +652,7 @@ async def user_with_all_bulk_vfolders_granted(
         entity_ids=[_BULK_VF_GRANTED, _BULK_VF_DENIED],
         perm_scope_type=ProjectEntityType(),
         perm_entity_type=VFolderEntityType(),
-        operation=OperationType.UPDATE,
+        operation=Permission.UPDATE,
     )
 
 
@@ -671,7 +669,7 @@ async def user_with_partial_bulk_membership(
         entity_ids=[_BULK_VF_GRANTED],
         perm_scope_type=ProjectEntityType(),
         perm_entity_type=VFolderEntityType(),
-        operation=OperationType.UPDATE,
+        operation=Permission.UPDATE,
     )
 
 
@@ -688,7 +686,7 @@ async def user_with_read_capped_bulk_vfolder(
         entity_ids=[_BULK_VF_GRANTED],
         perm_scope_type=ProjectEntityType(),
         perm_entity_type=VFolderEntityType(),
-        operation=OperationType.UPDATE,
+        operation=Permission.UPDATE,
         entity_cap=Permission.READ,
     )
 

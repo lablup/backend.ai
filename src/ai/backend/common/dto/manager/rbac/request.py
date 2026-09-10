@@ -13,10 +13,10 @@ from ai.backend.common.api_handlers import SENTINEL, BaseRequestModel, Sentinel
 from ai.backend.common.data.entity.types import EntityType
 from ai.backend.common.dto.manager.defs import DEFAULT_PAGE_LIMIT, MAX_PAGE_LIMIT
 from ai.backend.common.dto.manager.query import StringFilter
+from ai.backend.common.dto.manager.v2.rbac.types import PermissionBitDTO
 
 from .types import (
     AssignedUserOrderField,
-    OperationType,
     OrderDirection,
     RoleOrderField,
     RoleSource,
@@ -149,10 +149,8 @@ class CreatePermissionRequest(BaseRequestModel):
     """Request to create a permission."""
 
     role_id: UUID = Field(description="Role ID for the permission")
-    scope_type: EntityType = Field(description="Scope type for the permission")
-    scope_id: str = Field(description="Scope ID for the permission")
     entity_type: EntityType = Field(description="Entity type for the permission")
-    operation: OperationType = Field(description="Operation type for the permission")
+    permission: PermissionBitDTO = Field(description="The operation bit the row holds")
 
 
 class ScopeFilter(BaseRequestModel):

@@ -30,9 +30,6 @@ from ai.backend.manager.clients.storage_proxy.session_manager import StorageSess
 from ai.backend.manager.data.agent.types import AgentStatus
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.permission.id import ScopeId
-from ai.backend.manager.data.permission.types import (
-    Permission,
-)
 from ai.backend.manager.data.project.types import ProjectResourceInfo
 from ai.backend.manager.data.vfolder.dto import UserIdentity
 from ai.backend.manager.data.vfolder.types import (
@@ -172,14 +169,6 @@ class _VFolderWithLinkedModelCards:
 
     vfolder_row: VFolderRow
     model_card_rows: list[ModelCardRow]
-
-
-def _mount_permission_cap(permission: VFolderMountPermission) -> Permission:
-    """The ceiling a mount permission puts on the grantee's own permissions."""
-    cap = Permission.NONE
-    for operation in permission.to_rbac_operation():
-        cap |= Permission.from_operation(operation)
-    return cap
 
 
 class VfolderRepository:
@@ -941,7 +930,7 @@ class VfolderRepository:
         await w.replace_share(
             await self._landing_project(w, user_id),
             vfolder_id,
-            _mount_permission_cap(permission),
+            permission.to_permission_cap(),
         )
         return created
 
@@ -971,7 +960,7 @@ class VfolderRepository:
         await w.replace_share(
             await self._landing_project(w, user_id),
             vfolder_id,
-            _mount_permission_cap(permission),
+            permission.to_permission_cap(),
         )
         return updated
 

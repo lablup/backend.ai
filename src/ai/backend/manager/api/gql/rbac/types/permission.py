@@ -73,12 +73,6 @@ from ai.backend.common.dto.manager.v2.rbac.response import (
     ReplaceRolePermissionsPayload as ReplaceRolePermissionsPayloadDTO,
 )
 from ai.backend.common.dto.manager.v2.rbac.types import (
-    OperationTypeDTO,
-)
-from ai.backend.common.dto.manager.v2.rbac.types import (
-    OperationTypeFilter as OperationTypeFilterDTO,
-)
-from ai.backend.common.dto.manager.v2.rbac.types import (
     PermissionBitFilter as PermissionBitFilterDTO,
 )
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
@@ -104,38 +98,6 @@ if TYPE_CHECKING:
     from ai.backend.manager.api.gql.rbac.types.role import RoleGQL
 
 # ==================== Enums ====================
-
-OperationTypeGQL: type[OperationTypeDTO] = gql_enum(
-    BackendAIGQLMeta(added_version="26.3.0", description="RBAC operation type"),
-    OperationTypeDTO,
-    name="OperationType",
-)
-
-
-@gql_pydantic_input(
-    BackendAIGQLMeta(
-        description=(
-            "Filter for permission operation columns. Supports equals / in / not_equals / not_in."
-        ),
-        added_version="26.4.4",
-    ),
-    name="OperationTypeFilter",
-)
-class OperationTypeFilterGQL(PydanticInputMixin[OperationTypeFilterDTO]):
-    equals: OperationTypeGQL | None = gql_field(
-        description="Matches rows with this exact operation.", default=None
-    )
-    in_: list[OperationTypeGQL] | None = gql_field(
-        description="Matches rows whose operation is in this list.",
-        name="in",
-        default=None,
-    )
-    not_equals: OperationTypeGQL | None = gql_field(
-        description="Excludes rows with this exact operation.", default=None
-    )
-    not_in: list[OperationTypeGQL] | None = gql_field(
-        description="Excludes rows whose operation is in this list.", default=None
-    )
 
 
 @gql_pydantic_input(
@@ -189,10 +151,6 @@ class PermissionGQL(PydanticNodeMixin[PermissionNodeDTO]):
             description="The permission bit the row holds.",
         )
     )
-    operation: OperationTypeGQL = gql_field(
-        description="Deprecated: use `permission`. The same bit named as an action.",
-        deprecation_reason=f"Deprecated since {NEXT_RELEASE_VERSION}. Use `permission`.",
-    )
 
     @classmethod
     @override
@@ -235,7 +193,7 @@ class PermissionGQL(PydanticNodeMixin[PermissionNodeDTO]):
 )
 class PermissionNestedFilterGQL(PydanticInputMixin[PermissionNestedFilterDTO]):
     entity_type: StringFilter | None = None
-    operation: OperationTypeFilterGQL | None = None
+    permission: PermissionBitFilterGQL | None = None
 
     AND: list[Self] | None = None
     OR: list[Self] | None = None
@@ -276,7 +234,7 @@ class PermissionOrderBy(PydanticInputMixin[PermissionOrderByDTO], GQLOrderBy):
 class CreatePermissionInput(PydanticInputMixin[CreatePermissionInputDTO]):
     role_id: UUID
     entity_type: str
-    operation: OperationTypeGQL
+    permission: PermissionBitGQL
 
 
 @gql_pydantic_input(
@@ -285,7 +243,7 @@ class CreatePermissionInput(PydanticInputMixin[CreatePermissionInputDTO]):
 class UpdatePermissionInput(PydanticInputMixin[UpdatePermissionInputDTO]):
     id: UUID
     entity_type: str | None = None
-    operation: OperationTypeGQL | None = None
+    permission: PermissionBitGQL | None = None
 
 
 @gql_pydantic_input(
@@ -360,7 +318,7 @@ class BulkAddRolePermissionFailureInfoGQL(
 ):
     role_id: UUID = gql_field(description="Role ID of the failed entry.")
     entity_type: str = gql_field(description="Entity element type of the failed entry.")
-    operation: str = gql_field(description="Operation type of the failed entry.")
+    permission: PermissionBitGQL = gql_field(description="Operation bit of the failed entry.")
     message: str = gql_field(description="Error message describing the failure.")
 
 
@@ -392,7 +350,7 @@ class ReplaceRolePermissionFailureInfoGQL(
 ):
     role_id: UUID = gql_field(description="Role ID of the failed entry.")
     entity_type: str = gql_field(description="Entity element type of the failed entry.")
-    operation: str = gql_field(description="Operation type of the failed entry.")
+    permission: PermissionBitGQL = gql_field(description="Operation bit of the failed entry.")
     message: str = gql_field(description="Error message describing the failure.")
 
 
@@ -478,7 +436,7 @@ class ScopeEntityCombinationGQL(PydanticOutputMixin[ScopeEntityCombinationInfo])
 class OperationInfoGQL(PydanticOutputMixin[OperationInfo]):
     operation: str
     description: str
-    required_permission: OperationTypeGQL
+    required_permission: PermissionBitGQL
 
 
 @gql_pydantic_type(

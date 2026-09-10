@@ -8,7 +8,6 @@ from enum import StrEnum
 
 from ai.backend.common.data.entity.types import EntityType
 from ai.backend.common.data.permission.types import (
-    OperationType,
     PermissionStatus,
     RoleSource,
     RoleStatus,
@@ -17,7 +16,6 @@ from ai.backend.common.data.permission.types import (
 __all__ = (
     "AssignedUserOrderField",
     "EntityType",
-    "OperationType",
     "OrderDirection",
     "PermissionStatus",
     "RoleOrderField",

@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from typing import Final
 
 from ai.backend.common.data.entity.types import EntityType
-from ai.backend.common.data.permission.types import OperationType, Permission
+from ai.backend.common.data.permission.types import Permission
 from ai.backend.common.exception import ErrorOperation
 
 # Placeholder substituted when an id (request_id, entity_id, ...) is absent while
@@ -109,31 +109,32 @@ class ActionOperationType(enum.StrEnum):
         """
         return frozenset({cls.GET, cls.SEARCH, cls.LOOKUP})
 
-    def to_permission_operation(self) -> OperationType:
-        """The legacy single :class:`OperationType` this operation maps to.
+    def to_permission_bit(self) -> Permission:
+        """The single bit this operation is listed under.
 
-        ``UPSERT`` narrows to ``CREATE``: this axis carries one value and cannot
-        express the ``CREATE | UPDATE`` mask, so it keeps the stronger of the two.
+        ``UPSERT`` narrows to ``CREATE``: a listing carries one bit and cannot express
+        the ``CREATE | UPDATE`` mask :meth:`to_permission` requires, so it keeps the
+        stronger of the two.
         """
         match self:
             case ActionOperationType.GET:
-                return OperationType.READ
+                return Permission.READ
             case ActionOperationType.SEARCH:
-                return OperationType.READ
+                return Permission.READ
             case ActionOperationType.LOOKUP:
-                return OperationType.READ
+                return Permission.READ
             case ActionOperationType.CREATE:
-                return OperationType.CREATE
+                return Permission.CREATE
             case ActionOperationType.UPDATE:
-                return OperationType.UPDATE
+                return Permission.UPDATE
             case ActionOperationType.UPSERT:
-                return OperationType.CREATE
+                return Permission.CREATE
             case ActionOperationType.DELETE:
-                return OperationType.SOFT_DELETE
+                return Permission.SOFT_DELETE
             case ActionOperationType.PURGE:
-                return OperationType.HARD_DELETE
+                return Permission.HARD_DELETE
             case ActionOperationType.RESTORE:
-                return OperationType.SOFT_DELETE
+                return Permission.SOFT_DELETE
 
     def to_error_operation(self) -> ErrorOperation:
         """The ``ErrorCode`` operation an error raised under this operation reports.

@@ -8,7 +8,6 @@ from __future__ import annotations
 
 from ai.backend.common.data.entity.role_permission_preset import RolePermissionPresetID
 from ai.backend.common.data.entity.role_preset import RolePresetID
-from ai.backend.common.data.permission.types import Permission
 from ai.backend.common.dto.manager.v2.common import OrderDirection
 from ai.backend.common.dto.manager.v2.rbac.types import PermissionBitDTO
 from ai.backend.common.dto.manager.v2.role_permission_preset.request import (
@@ -139,7 +138,7 @@ class RolePresetAdapter(BaseAdapter):
         permission_creators = [
             RolePermissionPresetCreator(
                 entity_type=entry.entity_type,
-                permission=Permission[entry.permission.name],
+                permission=entry.permission.to_permission(),
             )
             for entry in input.permissions
         ]
@@ -316,7 +315,7 @@ class RolePresetAdapter(BaseAdapter):
         creators = [
             RolePermissionPresetCreator(
                 entity_type=entry.entity_type,
-                permission=Permission[entry.permission.name],
+                permission=entry.permission.to_permission(),
             )
             for entry in input.permissions
         ]
@@ -429,25 +428,25 @@ class RolePresetAdapter(BaseAdapter):
             if f_bit.equals is not None:
                 conditions.append(
                     RolePermissionPresetConditions.by_permission_equals(
-                        Permission[f_bit.equals.name]
+                        f_bit.equals.to_permission()
                     )
                 )
             if f_bit.not_equals is not None:
                 conditions.append(
                     RolePermissionPresetConditions.by_permission_not_equals(
-                        Permission[f_bit.not_equals.name]
+                        f_bit.not_equals.to_permission()
                     )
                 )
             if f_bit.in_:
                 conditions.append(
                     RolePermissionPresetConditions.by_permission_in([
-                        Permission[v.name] for v in f_bit.in_
+                        v.to_permission() for v in f_bit.in_
                     ])
                 )
             if f_bit.not_in:
                 conditions.append(
                     RolePermissionPresetConditions.by_permission_not_in([
-                        Permission[v.name] for v in f_bit.not_in
+                        v.to_permission() for v in f_bit.not_in
                     ])
                 )
         if filter_.created_at is not None:
@@ -508,6 +507,6 @@ class RolePresetAdapter(BaseAdapter):
             id=data.id,
             role_preset_id=data.role_preset_id,
             entity_type=data.entity_type,
-            permission=PermissionBitDTO[data.permission.to_operation().name],
+            permission=PermissionBitDTO.of(data.permission),
             created_at=data.created_at,
         )

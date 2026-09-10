@@ -10,11 +10,13 @@ from pydantic import Field, field_validator, model_validator
 
 from ai.backend.common.api_handlers import SENTINEL, BaseRequestModel, Sentinel
 from ai.backend.common.data.entity.types import EntityType
+from ai.backend.common.data.permission.types import Permission
 from ai.backend.common.dto.manager.query import DateTimeFilter, StringFilter, UUIDFilter
 
 from .types import (
-    OperationTypeFilter,
     OrderDirection,
+    PermissionBitDTO,
+    PermissionBitFilter,
     RoleSourceFilter,
     RoleStatus,
     RoleStatusFilter,
@@ -142,7 +144,11 @@ class CreatePermissionInput(BaseRequestModel):
 
     role_id: UUID = Field(description="Role ID to assign this permission to")
     entity_type: EntityType = Field(description="Entity type (e.g. 'session', 'vfolder')")
-    operation: str = Field(description="Operation type (e.g. 'read', 'create')")
+    permission: PermissionBitDTO = Field(description="The operation bit the row holds")
+
+    def permission_bit(self) -> Permission:
+        """The bit this input names, as the permission row records it."""
+        return self.permission.to_permission()
 
 
 class UpdatePermissionInput(BaseRequestModel):
@@ -150,7 +156,11 @@ class UpdatePermissionInput(BaseRequestModel):
 
     id: UUID = Field(description="Permission ID to update")
     entity_type: EntityType | None = Field(default=None, description="Updated entity type")
-    operation: str | None = Field(default=None, description="Updated operation type")
+    permission: PermissionBitDTO | None = Field(default=None, description="Updated operation bit")
+
+    def permission_bit(self) -> Permission:
+        """The bit this input names; ``NONE`` when it names none."""
+        return Permission.NONE if self.permission is None else self.permission.to_permission()
 
 
 class DeletePermissionInput(BaseRequestModel):
@@ -288,7 +298,7 @@ class PermissionNestedFilter(BaseRequestModel):
     """Nested filter for permissions within a role assignment."""
 
     entity_type: StringFilter | None = None
-    operation: OperationTypeFilter | None = None
+    permission: PermissionBitFilter | None = None
     AND: list[PermissionNestedFilter] | None = None
     OR: list[PermissionNestedFilter] | None = None
     NOT: list[PermissionNestedFilter] | None = None

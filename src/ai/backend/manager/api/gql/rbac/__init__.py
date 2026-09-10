@@ -37,7 +37,6 @@ from .types import (
     EntityNodeGQL,
     EntityOperationCombinationGQL,
     OperationInfoGQL,
-    OperationTypeGQL,
     PermissionConnection,
     PermissionFilter,
     PermissionGQL,
@@ -60,7 +59,6 @@ from .types import (
 
 __all__ = (
     # Enums
-    "OperationTypeGQL",
     "RoleSourceGQL",
     "RoleStatusGQL",
     # Types

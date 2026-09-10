@@ -13,7 +13,7 @@ from ai.backend.common.dto.manager.v2.rbac.response import (
     EntityOperationCombinationInfo,
     OperationInfo,
 )
-from ai.backend.common.dto.manager.v2.rbac.types import OperationTypeDTO
+from ai.backend.common.dto.manager.v2.rbac.types import PermissionBitDTO
 from ai.backend.manager.actions.action.rbac import build_operation_description
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.api.gql.rbac.resolver import permission as permission_resolver
@@ -72,7 +72,7 @@ class TestRbacEntityOperationCombinationsResolver:
                     OperationInfo(
                         operation="create_session",
                         description="Create a new session",
-                        required_permission=OperationTypeDTO.CREATE,
+                        required_permission=PermissionBitDTO.CREATE,
                     )
                 ],
             )

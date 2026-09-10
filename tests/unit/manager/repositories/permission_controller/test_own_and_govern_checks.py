@@ -27,7 +27,6 @@ from ai.backend.common.data.entity.virtual_entity import VirtualEntityID
 from ai.backend.common.data.permission.types import Permission
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.data.permission.status import RoleStatus
-from ai.backend.manager.data.permission.types import OperationType
 from ai.backend.manager.data.permission.virtual_entity import (
     GovernCheckKey,
     OwnCheckKey,
@@ -650,7 +649,7 @@ class TestUserRosterEnrollment:
         ids: VSChainFixture,
         project_id: ProjectID,
         entity_type: EntityType | None = None,
-        operation: OperationType = OperationType.READ,
+        operation: Permission = Permission.READ,
         permission: Permission = Permission.READ,
     ) -> None:
         """Give the user a role holding ``permission`` over ``entity_type`` on the
@@ -1054,7 +1053,7 @@ class TestUserRosterEnrollment:
             ids,
             ids.owner_scope_id,
             entity_type=UserEntityType(),
-            operation=OperationType.UPDATE,
+            operation=Permission.UPDATE,
             permission=Permission.READ | Permission.UPDATE,
         )
 

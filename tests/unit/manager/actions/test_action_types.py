@@ -3,7 +3,7 @@
 import pytest
 
 from ai.backend.common.data.entity.types import EntityType
-from ai.backend.common.data.permission.types import OperationType, Permission
+from ai.backend.common.data.permission.types import Permission
 from ai.backend.common.exception import ErrorOperation
 from ai.backend.manager.actions.action.base import BaseAction
 from ai.backend.manager.actions.types import ActionOperationType
@@ -70,16 +70,16 @@ class TestActionOperationType:
     ) -> None:
         assert operation.to_error_operation() is expected
 
-    def test_to_permission_operation_mapping(self) -> None:
-        assert ActionOperationType.GET.to_permission_operation() == OperationType.READ
-        assert ActionOperationType.SEARCH.to_permission_operation() == OperationType.READ
-        assert ActionOperationType.LOOKUP.to_permission_operation() == OperationType.READ
-        assert ActionOperationType.CREATE.to_permission_operation() == OperationType.CREATE
-        assert ActionOperationType.UPDATE.to_permission_operation() == OperationType.UPDATE
-        assert ActionOperationType.UPSERT.to_permission_operation() == OperationType.CREATE
-        assert ActionOperationType.DELETE.to_permission_operation() == OperationType.SOFT_DELETE
-        assert ActionOperationType.PURGE.to_permission_operation() == OperationType.HARD_DELETE
-        assert ActionOperationType.RESTORE.to_permission_operation() == OperationType.SOFT_DELETE
+    def test_to_permission_bit_maps_every_operation(self) -> None:
+        assert ActionOperationType.GET.to_permission_bit() == Permission.READ
+        assert ActionOperationType.SEARCH.to_permission_bit() == Permission.READ
+        assert ActionOperationType.LOOKUP.to_permission_bit() == Permission.READ
+        assert ActionOperationType.CREATE.to_permission_bit() == Permission.CREATE
+        assert ActionOperationType.UPDATE.to_permission_bit() == Permission.UPDATE
+        assert ActionOperationType.UPSERT.to_permission_bit() == Permission.CREATE
+        assert ActionOperationType.DELETE.to_permission_bit() == Permission.SOFT_DELETE
+        assert ActionOperationType.PURGE.to_permission_bit() == Permission.HARD_DELETE
+        assert ActionOperationType.RESTORE.to_permission_bit() == Permission.SOFT_DELETE
 
     def test_to_permission_mapping(self) -> None:
         assert ActionOperationType.GET.to_permission() == Permission.READ

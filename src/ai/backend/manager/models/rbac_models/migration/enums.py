@@ -7,9 +7,6 @@ from ai.backend.manager.data.permission.status import (
     RoleStatus as OriginalRoleStatus,
 )
 from ai.backend.manager.data.permission.types import (
-    OperationType as OriginalOperationType,
-)
-from ai.backend.manager.data.permission.types import (
     RoleSource as OriginalRoleSource,
 )
 
@@ -46,9 +43,6 @@ class OperationType(enum.StrEnum):
     GRANT_UPDATE = "grant:update"
     GRANT_SOFT_DELETE = "grant:soft-delete"
     GRANT_HARD_DELETE = "grant:hard-delete"
-
-    def to_original(self) -> OriginalOperationType:
-        return OriginalOperationType(self.value)
 
     @classmethod
     def owner_operations(cls) -> set[OperationType]:

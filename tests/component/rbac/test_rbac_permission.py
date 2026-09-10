@@ -11,7 +11,7 @@ from ai.backend.common.data.entity.role import RoleID
 from ai.backend.common.data.entity.session import SessionEntityType
 from ai.backend.common.data.entity.types import EntityType
 from ai.backend.common.data.entity.vfolder import VFolderEntityType
-from ai.backend.common.data.permission.types import OperationType, Permission
+from ai.backend.common.data.permission.types import Permission
 from ai.backend.manager.data.permission.permission import PermissionData
 from ai.backend.manager.errors.common import ObjectNotFound
 from ai.backend.manager.errors.permission import PermissionAlreadyGranted
@@ -62,10 +62,10 @@ class TestPermissionCreate:
         domain_fixture: DomainFixtureData,
     ) -> None:
         """S-CREATE-2: Create permissions with various scope/entity/operation combinations."""
-        combos: list[tuple[EntityType, OperationType]] = [
-            (SessionEntityType(), OperationType.READ),
-            (ImageEntityType(), OperationType.UPDATE),
-            (VFolderEntityType(), OperationType.SOFT_DELETE),
+        combos: list[tuple[EntityType, Permission]] = [
+            (SessionEntityType(), Permission.READ),
+            (ImageEntityType(), Permission.UPDATE),
+            (VFolderEntityType(), Permission.SOFT_DELETE),
         ]
         created_ids: list[uuid.UUID] = []
 
@@ -75,12 +75,12 @@ class TestPermissionCreate:
                     role_id=RoleID(target_role.role.id),
                     creator=RolePermissionCreator(
                         entity_type=EntityType(entity_type),
-                        permission=Permission.from_operation(operation),
+                        permission=operation,
                     ),
                 )
             )
             assert result.data.entity_type == entity_type
-            assert result.data.permission == Permission.from_operation(operation)
+            assert result.data.permission == operation
             assert result.data.role_id == target_role.role.id
             created_ids.append(result.data.id)
 

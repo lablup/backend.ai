@@ -177,7 +177,7 @@ class PermissionControllerService:
             by_entity[entity_type][name] = GrantableOperation(
                 name=name,
                 description=build_operation_description(operation, entity_type),
-                operation=operation.to_permission_operation(),
+                permission=operation.to_permission_bit(),
             )
         return {
             entity_type: sorted(operations.values(), key=lambda op: op.name)

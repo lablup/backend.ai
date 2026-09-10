@@ -1,4 +1,4 @@
-"""Tests for the per-entity allowed-operation cached helper."""
+"""Tests for the per-entity member permission."""
 
 from __future__ import annotations
 
@@ -11,13 +11,7 @@ from ai.backend.common.data.entity.session import SessionEntityType
 from ai.backend.common.data.entity.types import EntityType
 from ai.backend.common.data.entity.user import UserEntityType
 from ai.backend.common.data.entity.vfolder import VFolderEntityType
-from ai.backend.common.data.permission.types import OperationType, member_operations
-
-_READ_ONLY_OPS: frozenset[OperationType] = frozenset({OperationType.READ})
-_READ_AND_CREATE_OPS: frozenset[OperationType] = frozenset({
-    OperationType.READ,
-    OperationType.CREATE,
-})
+from ai.backend.common.data.permission.types import Permission, member_permissions
 
 _MEMBER_CREATE_ENTITIES: list[EntityType] = [
     SessionEntityType(),
@@ -36,21 +30,21 @@ class TestDefaultFallback:
 
     @pytest.mark.parametrize("entity_type", _OTHER_ENTITIES)
     def test_member_fallback_is_read_only(self, entity_type: EntityType) -> None:
-        assert member_operations(entity_type) == _READ_ONLY_OPS
+        assert member_permissions(entity_type) == Permission.READ
 
 
 class TestMemberCreateOverrides:
-    """Members may CREATE sessions, vfolders and model deployments in their scope."""
+    """Members may CREATE sessions, vfolders and deployments in their scope."""
 
     @pytest.mark.parametrize("entity_type", _MEMBER_CREATE_ENTITIES)
     def test_member_can_create(self, entity_type: EntityType) -> None:
-        assert member_operations(entity_type) == _READ_AND_CREATE_OPS
+        assert member_permissions(entity_type) == Permission.READ | Permission.CREATE
 
 
 class TestPurity:
     """The helper is a pure function of its argument."""
 
     def test_member_is_pure(self) -> None:
-        first = member_operations(SessionEntityType())
-        member_operations(VFolderEntityType())
-        assert member_operations(SessionEntityType()) == first
+        first = member_permissions(SessionEntityType())
+        member_permissions(VFolderEntityType())
+        assert member_permissions(SessionEntityType()) == first
