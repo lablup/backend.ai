@@ -6,21 +6,19 @@ from typing import Self
 from ai.backend.common.data.entity.types import EntityType
 from ai.backend.common.data.permission.types import (
     GLOBAL_SCOPE_ID,
-    FieldType,
     Permission,
     RoleSource,
     role_scope_types,
 )
 from ai.backend.manager.data.common.types import SearchResult
 
-from .id import ObjectId, ScopeId
+from .id import ScopeId
 
 # Re-export types for easier access
 __all__ = (
     "GLOBAL_SCOPE_ID",
     "EntityType",
     "GrantableOperation",
-    "FieldType",
     "Permission",
     "RBACElementRef",
     "RoleSource",
@@ -56,9 +54,6 @@ class RBACElementRef:
 
     def to_scope_id(self) -> ScopeId:
         return ScopeId(scope_type=self.element_type, scope_id=self.element_id)
-
-    def to_object_id(self) -> ObjectId:
-        return ObjectId(entity_type=self.element_type, entity_id=self.element_id)
 
 
 @dataclass(frozen=True)

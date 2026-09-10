@@ -39,18 +39,6 @@ class RoleSource(enum.StrEnum):
     CUSTOM = "custom"  # Custom role defined
 
 
-class FieldType(enum.StrEnum):
-    """Field types for RBAC field-scoped entities.
-
-    Deprecated: No longer actively used. The field-scoped entity concept
-    (RBACFieldCreator/RBACFieldPurger) was removed by BEP-1048.
-    Kept only for the existing entity_fields table schema compatibility.
-    """
-
-    KERNEL = "kernel"
-    MODEL_REVISION = "model_revision"
-
-
 GLOBAL_SCOPE_ID = "global"  # Deprecated: no longer used in RBAC scope hierarchy
 
 
