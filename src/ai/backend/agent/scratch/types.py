@@ -2,7 +2,7 @@ from collections.abc import Mapping
 from typing import Self
 
 from ai.backend.agent.kernel import KernelOwnershipData
-from ai.backend.agent.kernel_registry.types import KernelRecoveryData
+from ai.backend.agent.kernel_registry.types import DOCKER_KERNEL_TYPE, KernelRecoveryData
 from ai.backend.agent.proxy import DomainSocketPathPair
 from ai.backend.agent.resources import KernelResourceSpec
 from ai.backend.common.docker import ImageRef
@@ -17,6 +17,9 @@ class KernelRecoveryScratchData(BackendAISchema):
     See KernelRecoveryData in kernel_registry/types.py for field descriptions.
     """
 
+    #: See `KernelRecoveryData.kernel_type`. Absent on a record written before the field, and
+    #: read as docker -- the only backend that ever wrote one.
+    kernel_type: str = DOCKER_KERNEL_TYPE
     id: KernelId
     agent_id: AgentId
     image_ref: ImageRef
@@ -38,6 +41,7 @@ class KernelRecoveryScratchData(BackendAISchema):
         data: KernelRecoveryData,
     ) -> Self:
         return cls(
+            kernel_type=data.kernel_type,
             id=data.id,
             agent_id=data.agent_id,
             image_ref=data.image_ref,
@@ -59,6 +63,7 @@ class KernelRecoveryScratchData(BackendAISchema):
         environ: Mapping[str, str],
     ) -> KernelRecoveryData:
         return KernelRecoveryData(
+            kernel_type=self.kernel_type,
             id=self.id,
             agent_id=self.agent_id,
             image_ref=self.image_ref,
