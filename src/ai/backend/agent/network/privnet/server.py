@@ -69,6 +69,7 @@ from ai.backend.agent.network.port_forward import PortForwarder, forwards_for
 from ai.backend.agent.network.privnet import netns as netns_mod
 from ai.backend.agent.network.privnet import policy
 from ai.backend.agent.network.privnet.gossip import Endpoint as GossipEndpoint
+from ai.backend.agent.network.privnet.gossip import Intent as GossipIntent
 from ai.backend.agent.network.privnet.gossip import endpoints_of
 from ai.backend.agent.network.privnet.gossip_runner import (
     DEFAULT_GOSSIP_PORT,
@@ -2519,47 +2520,44 @@ class PrivNetServer:
         return entry.meta.generation if entry is not None else None
 
     async def gossip_program(
-        self,
-        session_id: str,
-        *,
-        add: Sequence[tuple[GossipEndpoint, str]],
-        remove: Sequence[tuple[GossipEndpoint, str]],
-    ) -> None:
-        """Apply a peer's endpoints through the same backend calls the RPC path uses.
+        self, session_id: str, intents: Sequence[GossipIntent]
+    ) -> Sequence[GossipIntent]:
+        """Apply the exchange's intents through the same backend calls the RPC path uses.
 
-        Removals first, for the reason the agent's own reconcile orders them that way: an endpoint
-        that moved must have its old entry withdrawn before the new one is installed, or the FDB
-        carries two claims on one MAC.
+        The caller orders removals first, for the reason the agent's own reconcile does: an
+        endpoint that moved must have its old entry withdrawn before the new one is installed, or
+        the FDB carries two claims on one MAC. Order is preserved here.
         """
         entry = self._sessions.get(session_id)
         if entry is None:
-            return
-        failed: list[tuple[GossipEndpoint, str]] = []
+            return intents
+        failed: list[GossipIntent] = []
         async with self._session_locked(session_id):
-            for endpoint, vtep in remove:
-                with contextlib.suppress(Exception):
-                    await entry.backend.del_endpoint(
-                        session_id, ip=endpoint.ip, mac=endpoint.mac, vtep_ip=vtep
-                    )
-            for endpoint, vtep in add:
+            for intent in intents:
+                endpoint, vtep = intent.endpoint, intent.vtep
                 try:
-                    await entry.backend.add_endpoint(
-                        session_id, ip=endpoint.ip, mac=endpoint.mac, vtep_ip=vtep
-                    )
+                    if intent.action == "remove":
+                        await entry.backend.del_endpoint(
+                            session_id, ip=endpoint.ip, mac=endpoint.mac, vtep_ip=vtep
+                        )
+                    else:
+                        await entry.backend.add_endpoint(
+                            session_id, ip=endpoint.ip, mac=endpoint.mac, vtep_ip=vtep
+                        )
                 except Exception:
-                    # One endpoint that will not program must not take the rest of the peer's
-                    # table with it, and it must not be left recorded as applied: the sender's
-                    # next announcement is the same whole state, so it would diff to nothing and
-                    # this kernel would stay unreachable for the life of the session.
+                    # One endpoint that will not program must not take the rest of the pass with
+                    # it, and it must not be reported as applied. A removal counts as much as an
+                    # addition: a withdrawal that was swallowed leaves an FDB entry pointing at a
+                    # kernel that is gone, for the life of the session.
                     log.exception(
-                        "could not program endpoint {} of session {} via {}",
+                        "could not {} endpoint {} of session {} via {}",
+                        intent.action,
                         endpoint.ip,
                         session_id,
                         vtep,
                     )
-                    failed.append((endpoint, vtep))
-        if failed and self._gossip is not None:
-            self._gossip.retry_later(session_id, failed)
+                    failed.append(intent)
+        return failed
 
     async def _endpoint(self, session_id: str, req: PrivNetRequest) -> None:
         """Program (ADD_ENDPOINT) or remove (DEL_ENDPOINT) a remote container endpoint's
