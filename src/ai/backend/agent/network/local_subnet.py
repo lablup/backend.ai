@@ -70,7 +70,7 @@ import socket
 from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import override
+from typing import Final, override
 
 from ai.backend.agent.errors.network import (
     HostAddressesUnreadable,
@@ -161,6 +161,68 @@ DEFAULT_LAYOUT = LocalSubnetLayout.parse(DEFAULT_LOCAL_POOL, DEFAULT_BLOCK_PREFI
 # configure and always meant this one. A store predating the marker is therefore not ambiguous, and
 # is held to the same check as any other — it must not be re-read as a pool it was not written from.
 _LEGACY_LAYOUT = LocalSubnetLayout.parse("172.30.0.0/16", 24)
+
+
+#: The kernel's IPv4 routing table, in the form that needs no `ip` binary. Destination and mask
+#: are little-endian hex, which is why they are byte-swapped below.
+_ROUTES_PATH: Final = Path("/proc/net/route")
+#: Devices this agent creates out of the pool itself. A route to our own LOCAL bridge is the pool
+#: working, not something else claiming it.
+_OUR_DEVICE_PREFIXES: Final = ("bailo", "baibr", "baivx", "bai")
+
+
+def _routed_prefixes(routes_path: Path) -> list[tuple[ipaddress.IPv4Network, str]]:
+    """Every IPv4 prefix this host routes, with the device it routes out of."""
+    out: list[tuple[ipaddress.IPv4Network, str]] = []
+    try:
+        lines = routes_path.read_text().splitlines()[1:]
+    except OSError:
+        return out
+    for line in lines:
+        parts = line.split()
+        if len(parts) < 8:
+            continue
+        iface, dest_hex, mask_hex = parts[0], parts[1], parts[7]
+        try:
+            dest = int.from_bytes(bytes.fromhex(dest_hex), "little")
+            mask = int.from_bytes(bytes.fromhex(mask_hex), "little")
+        except ValueError:
+            continue
+        if mask == 0:
+            continue  # the default route says nothing about any one prefix
+        prefixlen = mask.bit_count()
+        try:
+            out.append((ipaddress.IPv4Network((dest, prefixlen)), iface))
+        except ValueError:
+            continue
+    return out
+
+
+def pool_route_conflicts(
+    pool: ipaddress.IPv4Network, *, routes_path: Path = _ROUTES_PATH
+) -> list[tuple[str, str]]:
+    """Prefixes this host already routes that overlap ``pool``, as ``(prefix, device)``.
+
+    The pool's contract is that it must not collide with what the host already routes -- an index
+    names a subnet AND the gateway its bridge answers on, so a second claimant on that range puts
+    two gateways behind one address. `host_ipv4_addresses` catches the half of that where the
+    other claimant holds an address HERE. It cannot catch the other half: a network whose subnet
+    is declared elsewhere and only materialises as a route when something starts using it.
+
+    Measured on this rig: Docker Swarm's `ingress` network is 172.30.0.0/24 while the pool's
+    default is 172.30.0.0/16, so the swarm endpoint at 172.30.0.3 sits inside the very /26 a live
+    session held. Nothing broke, because no swarm service was published and the route was
+    therefore absent -- which is exactly why an address-only check reports a clean host.
+
+    Our own LOCAL bridges are excluded: a route to `bailo<index>` is the pool working.
+    """
+    conflicts: list[tuple[str, str]] = []
+    for prefix, iface in _routed_prefixes(routes_path):
+        if iface.startswith(_OUR_DEVICE_PREFIXES):
+            continue
+        if prefix.overlaps(pool):
+            conflicts.append((str(prefix), iface))
+    return conflicts
 
 
 def host_ipv4_addresses() -> frozenset[str]:

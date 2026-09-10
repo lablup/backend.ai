@@ -1,4 +1,6 @@
 import asyncio
+import inspect
+import ipaddress
 from collections.abc import Iterable
 from pathlib import Path
 from typing import Any
@@ -6,6 +8,7 @@ from typing import Any
 import psutil
 import pytest
 
+from ai.backend.agent.agent import AbstractAgent
 from ai.backend.agent.errors.network import (
     HostAddressesUnreadable,
     LocalSubnetLayoutChanged,
@@ -19,6 +22,7 @@ from ai.backend.agent.network.local_subnet import (
     cluster_host_ips,
     get_local_subnet_allocator,
     host_ipv4_addresses,
+    pool_route_conflicts,
 )
 
 
@@ -670,3 +674,69 @@ class TestTheHostIsTheLastWord:
             assert alloc._host_addresses is host_ipv4_addresses
         finally:
             _allocators.pop((tmp_path / "prod-store", "i-test"), None)
+
+
+class TestAPoolSomethingElseAlreadyRoutes:
+    """The half `host_ipv4_addresses` cannot see. That check refuses a block whose address is held
+    on THIS host; a network declared elsewhere holds no address here until something uses it, and
+    its route appears only then. An index names a subnet and the gateway its bridge answers on, so
+    a second claimant on that range puts two gateways behind one address.
+
+    Measured on the rig: Docker Swarm's `ingress` is 172.30.0.0/24 against the pool's default
+    172.30.0.0/16, and the swarm endpoint at 172.30.0.3 sat inside the /26 a live session held.
+    Nothing broke, because no swarm service was published and the route was therefore absent --
+    which is exactly why an address-only check reported a clean host.
+    """
+
+    @staticmethod
+    def _routes(tmp_path: Path, rows: list[tuple[str, str, str]]) -> Path:
+        """A `/proc/net/route` of our own. Destination and mask are little-endian hex there."""
+        p = tmp_path / "route"
+        lines = ["Iface\tDestination\tGateway\tFlags\tRefCnt\tUse\tMetric\tMask\tMTU\tWindow\tIRTT"]
+        for iface, dest, mask in rows:
+            lines.append(f"{iface}\t{dest}\t00000000\t0001\t0\t0\t0\t{mask}\t0\t0\t0")
+        p.write_text("\n".join(lines) + "\n")
+        return p
+
+    _POOL = ipaddress.IPv4Network("172.30.0.0/16")
+    _SWARM_INGRESS = ("br-ingress", "00001EAC", "00FFFFFF")  # 172.30.0.0/24
+    _OUR_BRIDGE = ("bailo0", "00001EAC", "C0FFFFFF")  # 172.30.0.0/26
+    _DOCKER0 = ("docker0", "000011AC", "0000FFFF")  # 172.17.0.0/16
+    _DEFAULT = ("enp4s0", "00000000", "00000000")
+
+    def test_an_overlapping_route_is_reported_with_its_device(self, tmp_path: Path) -> None:
+        routes = self._routes(tmp_path, [self._SWARM_INGRESS, self._DOCKER0, self._DEFAULT])
+        assert pool_route_conflicts(self._POOL, routes_path=routes) == [
+            ("172.30.0.0/24", "br-ingress")
+        ]
+
+    def test_our_own_bridge_is_not_a_conflict(self, tmp_path: Path) -> None:
+        """A route to `bailo<index>` is the pool working, not somebody else claiming it."""
+        routes = self._routes(tmp_path, [self._OUR_BRIDGE, self._DEFAULT])
+        assert pool_route_conflicts(self._POOL, routes_path=routes) == []
+
+    def test_a_pool_nothing_routes_is_quiet(self, tmp_path: Path) -> None:
+        routes = self._routes(tmp_path, [self._SWARM_INGRESS, self._DOCKER0, self._DEFAULT])
+        clear = ipaddress.IPv4Network("172.31.0.0/16")
+        assert pool_route_conflicts(clear, routes_path=routes) == []
+
+    def test_the_default_route_is_not_an_overlap(self, tmp_path: Path) -> None:
+        """0.0.0.0/0 covers every pool and says nothing about any of them; reporting it would make
+        the warning fire on every node and so be read by nobody."""
+        routes = self._routes(tmp_path, [self._DEFAULT])
+        assert pool_route_conflicts(self._POOL, routes_path=routes) == []
+
+    def test_routes_that_cannot_be_read_are_not_a_refusal(self, tmp_path: Path) -> None:
+        assert pool_route_conflicts(self._POOL, routes_path=tmp_path / "nope") == []
+
+    def test_a_route_wider_than_the_pool_still_counts(self, tmp_path: Path) -> None:
+        """Overlap, not containment: a /12 carrying the whole private range owns this pool too."""
+        routes = self._routes(tmp_path, [("br0", "000010AC", "0000F0FF")])  # 172.16.0.0/12
+        assert pool_route_conflicts(self._POOL, routes_path=routes) == [("172.16.0.0/12", "br0")]
+
+    def test_startup_says_so(self) -> None:
+        """Wired into the agent, not merely available -- the value is that it is said once at
+        startup rather than found later as traffic that works from some containers and not others."""
+        assert "pool_route_conflicts(" in inspect.getsource(AbstractAgent.__init__) or (
+            "_warn_if_the_local_pool_is_already_routed" in inspect.getsource(AbstractAgent.__init__)
+        )
