@@ -45,11 +45,12 @@ from ai.backend.testutils.dataplane.nodes import Node, SudoNode, parse_node_spec
 from ai.backend.testutils.dataplane.session import SessionDriver, SessionSpec
 
 ENV_NODES = "BAI_DATAPLANE_NODES"
+ENV_AGENT_IDS = "BAI_DATAPLANE_AGENT_IDS"
 ENV_RELEASE_GATE = "BAI_REQUIRE_DATAPLANE"
 RELEASE_GATE_REQUIRED_ENV = (
     ENV_NODES,
     "BAI_DATAPLANE_ACCESS_KEY",
-    "BAI_DATAPLANE_AGENT_IDS",
+    ENV_AGENT_IDS,
     "BAI_DATAPLANE_AGENT_START_CMD",
     "BAI_DATAPLANE_ETCD_ADDR",
     "BAI_DATAPLANE_IMAGE_ID",
@@ -258,6 +259,26 @@ def agent_ids(dataplane_config: DataplaneConfig) -> tuple[str, ...]:
     if not dataplane_config.agent_ids:
         _unavailable("BAI_DATAPLANE_AGENT_IDS is unset; placement-pinned scenarios need it")
     return dataplane_config.agent_ids
+
+
+@pytest.fixture
+def pair_agent_ids(agent_ids: tuple[str, ...]) -> tuple[str, ...]:
+    """The agent ids of `node_pair`, for a scenario that then inspects only those two nodes.
+
+    `BAI_DATAPLANE_AGENT_IDS` is per node in the same order as `BAI_DATAPLANE_NODES`, so the pair
+    is the first two. Cross-node scenarios pinned to the WHOLE list instead, which is placement on
+    two nodes only while the rig has exactly two: add a third and the scheduler may put both
+    kernels on it, or on one node big enough for both, and the scenario reports the pair it looked
+    at as unspread and skips. Measured on a three-node rig: one run skipped the cross-node
+    reachability check, the next skipped the MTU one, and the IPAM check -- which asserts where the
+    others skip -- failed with one endpoint instead of two.
+
+    Asking for the spread by CPU shape cannot replace this: a node larger than the rest fits both
+    kernels whatever each one asks for.
+    """
+    if len(agent_ids) < 2:
+        _unavailable(f"needs two agent ids; {ENV_AGENT_IDS} names {len(agent_ids)}")
+    return agent_ids[:2]
 
 
 @pytest.fixture
