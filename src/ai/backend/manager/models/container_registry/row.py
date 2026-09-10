@@ -21,7 +21,8 @@ from ai.backend.common.exception import UnknownImageRegistry
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.container_registry.types import ContainerRegistryData
 from ai.backend.manager.errors.container_registry import (
-    InvalidContainerRegistryProject,
+    InvalidContainerRegistryProjectOnCreate,
+    InvalidContainerRegistryProjectOnModify,
     InvalidContainerRegistryURL,
 )
 from ai.backend.manager.models.base import (
@@ -44,17 +45,11 @@ __all__: Sequence[str] = (
 )
 
 
-# Spelled here because the dataclass below declares a field named ``type``, which
-# shadows the builtin inside its body.
-type _InvalidProjectError = type[InvalidContainerRegistryProject]
-
-
 @dataclass
 class ContainerRegistryValidatorArgs:
     url: str
     type: ContainerRegistryType
     project: str | None
-    invalid_project: _InvalidProjectError
 
 
 # TODO: Refactor this using inheritance
@@ -66,13 +61,11 @@ class ContainerRegistryValidator:
     _url: str
     _type: ContainerRegistryType
     _project: str | None
-    _invalid_project: _InvalidProjectError
 
     def __init__(self, args: ContainerRegistryValidatorArgs) -> None:
         self._url = args.url
         self._type = args.type
         self._project = args.project
-        self._invalid_project = args.invalid_project
 
     def _is_valid_url(self, url: str) -> bool:
         try:
@@ -84,26 +77,36 @@ class ContainerRegistryValidator:
         except Exception:
             return False
 
-    def validate(self) -> None:
-        """
-        Validate container registry configuration.
-        """
-        # Validate URL format
-        if not self._is_valid_url(self._url):
-            raise InvalidContainerRegistryURL(f"Invalid URL format: {self._url}")
-
-        # Validate project name for Harbor
+    def _project_rejection(self) -> str | None:
+        """Why the project name cannot be stored, or ``None`` when it can."""
         match self._type:
             case ContainerRegistryType.HARBOR | ContainerRegistryType.HARBOR2:
                 if self._project is None:
-                    raise self._invalid_project("Project name is required for Harbor.")
+                    return "Project name is required for Harbor."
                 if not (1 <= len(self._project) <= 255):
-                    raise self._invalid_project("Invalid project name length.")
+                    return "Invalid project name length."
                 pattern = re.compile(r"^[a-z0-9]+(?:[._-][a-z0-9]+)*$")
                 if not pattern.match(self._project):
-                    raise self._invalid_project("Invalid project name format.")
+                    return "Invalid project name format."
+                return None
             case _:
-                pass
+                return None
+
+    def validate_on_create(self) -> None:
+        if not self._is_valid_url(self._url):
+            raise InvalidContainerRegistryURL(f"Invalid URL format: {self._url}")
+
+        rejection = self._project_rejection()
+        if rejection is not None:
+            raise InvalidContainerRegistryProjectOnCreate(rejection)
+
+    def validate_on_modify(self) -> None:
+        if not self._is_valid_url(self._url):
+            raise InvalidContainerRegistryURL(f"Invalid URL format: {self._url}")
+
+        rejection = self._project_rejection()
+        if rejection is not None:
+            raise InvalidContainerRegistryProjectOnModify(rejection)
 
 
 def _get_association_join_condition() -> sa.ColumnElement[bool]:

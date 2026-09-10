@@ -12,9 +12,6 @@ from ai.backend.common.container_registry import AllowedGroupsModel
 from ai.backend.common.data.entity.container_registry import ContainerRegistryID
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.api.adapters.container_registry.adapter import ContainerRegistryAdapter
-from ai.backend.manager.errors.container_registry import (
-    InvalidContainerRegistryProjectOnCreate,
-)
 from ai.backend.manager.models.container_registry import (
     ContainerRegistryValidator,
     ContainerRegistryValidatorArgs,
@@ -117,11 +114,10 @@ class CreateContainerRegistryNodeV2(graphene.Mutation):  # type: ignore[misc]
                 url=props.url,
                 type=props.type,
                 project=props.project,
-                invalid_project=InvalidContainerRegistryProjectOnCreate,
             )
         )
 
-        validator.validate()
+        validator.validate_on_create()
 
         result = await ctx.processors.container_registry.create_container_registry.run(
             props.to_action()

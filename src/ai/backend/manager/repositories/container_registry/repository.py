@@ -15,9 +15,6 @@ from ai.backend.manager.data.container_registry.types import (
     ContainerRegistrySearchResult,
 )
 from ai.backend.manager.data.image.types import ImageStatus
-from ai.backend.manager.errors.container_registry import (
-    InvalidContainerRegistryProjectOnModify,
-)
 from ai.backend.manager.errors.image import ContainerRegistryNotFound
 from ai.backend.manager.models.container_registry import (
     ContainerRegistryRow,
@@ -85,9 +82,8 @@ class ContainerRegistryRepository:
                         type=data.type,
                         project=data.project,
                         url=data.url,
-                        invalid_project=InvalidContainerRegistryProjectOnModify,
                     )
-                ).validate()
+                ).validate_on_modify()
             return data
 
     async def delete_registry(self, purger: ContainerRegistryPurger) -> ContainerRegistryData:
