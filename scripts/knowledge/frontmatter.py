@@ -50,6 +50,7 @@ class KnowledgeDocument:
     generated: Signature
     keywords: tuple[str, ...] = ()
     sources: tuple[str, ...] = ()
+    updated: Signature | None = None
     verified: tuple[Signature, ...] = ()
     status: str = DEFAULT_STATUS
 
@@ -81,13 +82,17 @@ def build_document(
 
     keywords = _str_tuple(raw, "keywords", problems)
     sources = _str_tuple(raw, "sources", problems)
+    updated = _optional_signature(raw.get("updated"), "updated", problems)
     verified = _verified_tuple(raw.get("verified"), problems)
 
-    if generated and verified:
+    if generated and updated and updated.at < generated.at:
+        problems.append(f"updated ({updated.at}) is older than generated ({generated.at})")
+    changed = updated or generated
+    if changed and verified:
         latest = max(entry.at for entry in verified)
-        if latest < generated.at:
+        if latest < changed.at:
             problems.append(
-                f"verified ({latest}) is older than generated ({generated.at}) — "
+                f"verified ({latest}) is older than the last change ({changed.at}) — "
                 "a meaningful change must clear 'verified'"
             )
 
@@ -101,6 +106,7 @@ def build_document(
         generated=generated,
         keywords=keywords,
         sources=sources,
+        updated=updated,
         verified=verified,
         status=status,
     )
@@ -136,6 +142,14 @@ def _signature(value: object, key: str, problems: list[str]) -> Signature | None
         problems.append(f"{key}.at must be YYYY-MM-DD, got {at!r}")
         return None
     return Signature(by=str(value["by"]), at=at)
+
+
+def _optional_signature(
+    value: object, key: str, problems: list[str]
+) -> Signature | None:
+    if value is None:
+        return None
+    return _signature(value, key, problems)
 
 
 def _verified_tuple(value: object, problems: list[str]) -> tuple[Signature, ...]:

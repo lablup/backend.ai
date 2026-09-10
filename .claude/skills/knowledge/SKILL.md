@@ -36,7 +36,8 @@ Judge by the printed description; open only the files you actually need.
 | `scope` | yes | directory the knowledge applies to |
 | `keywords` | no | 5-10 terms; include code identifiers (class/function names) |
 | `sources` | no | file/directory paths the content is grounded in — never PR or issue numbers |
-| `generated` | yes | `{by, at}` — actor and date of the last meaningful change |
+| `generated` | yes | `{by, at}` — actor and date of the first version. Never changes |
+| `updated` | no | `{by, at}` — actor and date of the last meaningful change after generation |
 | `verified` | no | list of `{by, at}` — human review sign-off for the current content |
 | `status` | no | `draft` / `stable` (default) / `deprecated` |
 
@@ -45,9 +46,9 @@ Actor convention: `<producer>/<version>` for agents (e.g. `claude-code/fable-5`)
 
 ## Lifecycle rules
 
-- A meaningful change (content, judgment, table) updates `generated` and
-  **removes `verified`** — the sign-off applied to the old content. Typo and
-  formatting fixes touch neither.
+- A meaningful change (content, judgment, table) sets `updated` and
+  **removes `verified`** — the sign-off applied to the old content. `generated`
+  stays. Typo and formatting fixes touch none of them.
 - `verified` is added only for a human review of the current content.
 - Set `status: deprecated` before deleting a document, so inbound links get a
   window to migrate.

@@ -3,12 +3,10 @@ from typing import override
 
 import strawberry
 from graphql import GraphQLError
-from graphql.pyutils.undefined import Undefined as GraphQLUndefined
 from strawberry.federation import Schema
 from strawberry.schema.config import StrawberryConfig
 from strawberry.types import ExecutionContext
 
-from ai.backend.common.api_handlers import Sentinel as BackendSentinel
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.decorators import BackendAIGQLMeta, gql_root_field
 from ai.backend.manager.api.gql.extensions import (
@@ -1098,15 +1096,6 @@ class CustomizedSchema(Schema):
 
     @override
     def as_str(self) -> str:
-        # Strawberry picks up pydantic field defaults (including SENTINEL) as GraphQL
-        # schema field default_values.  SENTINEL is not a valid GraphQL scalar value, so
-        # replace any SENTINEL default with Undefined (= "no default" in the schema SDL).
-        for type_def in self._schema.type_map.values():
-            if not hasattr(type_def, "fields"):
-                continue
-            for field in type_def.fields.values():
-                if isinstance(getattr(field, "default_value", None), BackendSentinel):
-                    field.default_value = GraphQLUndefined
         sdl = super().as_str()
         sdl = sdl.replace("type PageInfo", "type PageInfo @shareable")
         # PageInfo is force-marked @shareable above, so the directive must be imported from the
