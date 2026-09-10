@@ -22880,30 +22880,30 @@ input UpdateRuntimeVariantPresetInput
   id: UUID!
 
   """New name."""
-  name: String = null
+  name: String
 
   """New description."""
-  description: String = null
+  description: String
 
   """New rank."""
-  rank: Int = null
+  rank: Int
 
   """New target."""
-  presetTarget: PresetTarget = null
+  presetTarget: PresetTarget
 
   """
   New value type. 'flag' is only valid when the effective preset_target is 'args' (the stored target applies when preset_target is omitted).
   """
-  valueType: PresetValueType = null
+  valueType: PresetValueType
 
   """New default value."""
-  defaultValue: String = null
+  defaultValue: String
 
   """New key."""
-  key: String = null
+  key: String
 
   """Added in 26.4.4. New required flag."""
-  required: Boolean = null
+  required: Boolean
 
   """Added in 26.9.0. New version this preset becomes available in."""
   addedVersion: String

@@ -26278,7 +26278,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
+            "description": "Omit to leave unchanged.",
             "title": "Name"
           },
           "description": {
@@ -26287,26 +26287,23 @@
                 "type": "string"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
+            "description": "Description. Omit to leave unchanged; null clears.",
             "title": "Description"
           },
           "rank": {
             "anyOf": [
               {
-                "minimum": 0,
+                "ge": 0,
                 "type": "integer"
               },
               {
                 "type": "null"
               }
             ],
-            "default": null,
+            "description": "Omit to leave unchanged.",
             "title": "Rank"
           },
           "preset_target": {
@@ -26318,7 +26315,8 @@
                 "type": "null"
               }
             ],
-            "default": null
+            "description": "Omit to leave unchanged.",
+            "title": "Preset Target"
           },
           "value_type": {
             "anyOf": [
@@ -26329,8 +26327,8 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "New value type. 'flag' is only valid when the effective preset_target is 'args' (the stored target applies when preset_target is omitted)."
+            "description": "New value type. 'flag' is only valid when the effective preset_target is 'args' (the stored target applies when preset_target is omitted). Omit to leave unchanged.",
+            "title": "Value Type"
           },
           "default_value": {
             "anyOf": [
@@ -26338,13 +26336,10 @@
                 "type": "string"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
+            "description": "Default value. Omit to leave unchanged; null clears.",
             "title": "Default Value"
           },
           "key": {
@@ -26358,7 +26353,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
+            "description": "Omit to leave unchanged.",
             "title": "Key"
           },
           "required": {
@@ -26370,9 +26365,44 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Toggle required flag; None = no change.",
+            "description": "Toggle required flag. Omit to leave unchanged.",
             "title": "Required"
+          },
+          "category": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "UI category group. Omit to leave unchanged; null clears.",
+            "title": "Category"
+          },
+          "display_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "UI display name. Omit to leave unchanged; null clears.",
+            "title": "Display Name"
+          },
+          "ui_option": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UIOption"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "UI rendering option. Omit to leave unchanged; null clears.",
+            "title": "Ui Option"
           },
           "added_version": {
             "anyOf": [
@@ -26397,51 +26427,6 @@
               }
             ],
             "title": "Deprecated Version"
-          },
-          "category": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": 1,
-            "title": "Category"
-          },
-          "display_name": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": 1,
-            "title": "Display Name"
-          },
-          "ui_option": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/UIOption"
-              },
-              {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": 1,
-            "title": "Ui Option"
           }
         },
         "required": [

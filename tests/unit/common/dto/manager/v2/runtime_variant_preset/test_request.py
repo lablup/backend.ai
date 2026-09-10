@@ -17,7 +17,7 @@ from ai.backend.common.dto.manager.v2.runtime_variant_preset.types import (
     PresetTarget,
     PresetValueType,
 )
-from ai.backend.common.tristate.unset import Unset
+from ai.backend.common.tristate.unset import UNSET, Unset
 
 
 class TestCreateRuntimeVariantPresetInputFlagValidation:
@@ -110,6 +110,15 @@ class TestUpdateRuntimeVariantPresetInputFlagValidation:
             value_type=PresetValueType.FLAG,
         )
         assert result.value_type == PresetValueType.FLAG
+        assert result.preset_target is UNSET
+
+    def test_flag_with_null_preset_target_is_valid(self, preset_id: UUID) -> None:
+        result = UpdateRuntimeVariantPresetInput(
+            id=preset_id,
+            value_type=PresetValueType.FLAG,
+            preset_target=None,
+        )
+        assert result.value_type == PresetValueType.FLAG
         assert result.preset_target is None
 
     def test_flag_with_args_is_valid(self, preset_id: UUID) -> None:
@@ -119,6 +128,62 @@ class TestUpdateRuntimeVariantPresetInputFlagValidation:
             preset_target=PresetTarget.ARGS,
         )
         assert result.value_type == PresetValueType.FLAG
+
+
+class TestUpdateRuntimeVariantPresetInputDefaults:
+    """Omitted fields are UNSET; an explicit null stays None."""
+
+    @pytest.mark.parametrize(
+        "field",
+        [
+            "name",
+            "description",
+            "rank",
+            "preset_target",
+            "value_type",
+            "default_value",
+            "key",
+            "required",
+            "category",
+            "display_name",
+            "ui_option",
+        ],
+    )
+    def test_omitted_field_is_unset(self, field: str) -> None:
+        result = UpdateRuntimeVariantPresetInput(id=uuid4())
+        assert getattr(result, field) is UNSET
+
+    @pytest.mark.parametrize(
+        "field",
+        [
+            "name",
+            "description",
+            "rank",
+            "preset_target",
+            "value_type",
+            "default_value",
+            "key",
+            "required",
+            "category",
+            "display_name",
+            "ui_option",
+        ],
+    )
+    def test_null_field_stays_none(self, field: str) -> None:
+        result = UpdateRuntimeVariantPresetInput(id=uuid4(), **{field: None})
+        assert getattr(result, field) is None
+
+    @pytest.mark.parametrize(
+        ("field", "value"),
+        [
+            pytest.param("name", "", id="name_empty"),
+            pytest.param("key", "", id="key_empty"),
+            pytest.param("rank", -1, id="rank_negative"),
+        ],
+    )
+    def test_constraints_still_apply(self, field: str, value: Any) -> None:
+        with pytest.raises(ValidationError):
+            UpdateRuntimeVariantPresetInput(id=uuid4(), **{field: value})
 
 
 class TestUpdateRuntimeVariantPresetInputDefaultValueValidation:
