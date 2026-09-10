@@ -78,7 +78,7 @@ class ContainerRegistryValidator:
         except Exception:
             return False
 
-    def _project_rejection(self) -> str | None:
+    def _validate(self) -> str | None:
         """Why the project name cannot be stored, or ``None`` when it can."""
         match self._type:
             case ContainerRegistryType.HARBOR | ContainerRegistryType.HARBOR2:
@@ -97,7 +97,7 @@ class ContainerRegistryValidator:
         if not self._is_valid_url(self._url):
             raise InvalidContainerRegistryURLOnCreate(f"Invalid URL format: {self._url}")
 
-        rejection = self._project_rejection()
+        rejection = self._validate()
         if rejection is not None:
             raise InvalidContainerRegistryProjectOnCreate(rejection)
 
@@ -105,7 +105,7 @@ class ContainerRegistryValidator:
         if not self._is_valid_url(self._url):
             raise InvalidContainerRegistryURLOnModify(f"Invalid URL format: {self._url}")
 
-        rejection = self._project_rejection()
+        rejection = self._validate()
         if rejection is not None:
             raise InvalidContainerRegistryProjectOnModify(rejection)
 
