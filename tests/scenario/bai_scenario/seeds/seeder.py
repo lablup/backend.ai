@@ -19,8 +19,6 @@ from collections.abc import Awaitable, Callable, Sequence
 from dataclasses import dataclass, field
 from typing import Any, overload
 
-from bai_scenario.seeds.ops import SeedOps
-
 from ai.backend.common.data.entity.role import RoleID
 from ai.backend.common.data.entity.types import FieldData
 from ai.backend.common.data.entity.user import UserID
@@ -43,6 +41,7 @@ from ai.backend.testutils.typed_scenario import (
     Situation,
     situation,
 )
+from bai_scenario.seeds.ops import SeedOps
 
 type WriteSpec[D] = (
     GlobalEntityCreator[Any, D]

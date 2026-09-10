@@ -10,6 +10,7 @@
 | Repository / Model (real DB, `with_tables`) | `tests/unit/{component}/repositories/` |
 | HTTP API layer (real aiohttp server + DB) | `tests/component/{component}/` |
 | E2E user scenarios (Client SDK v2) | `tests/integration/` |
+| One adapter call against a real DB, seeded per scenario | `tests/scenario/` |
 
 Each directory keeps its setup patterns in its own `AGENTS.md`.
 

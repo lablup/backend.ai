@@ -2,10 +2,9 @@
 
 from __future__ import annotations
 
-from bai_scenario.seeds.seeder import Spec
-
 from ai.backend.manager.data.resource.types import UserResourcePolicyData
 from ai.backend.manager.models.resource_policy.creators import UserResourcePolicyCreator
+from bai_scenario.seeds.seeder import Spec
 
 
 def seed_user_policy(

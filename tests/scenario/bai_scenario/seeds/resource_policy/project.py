@@ -2,10 +2,9 @@
 
 from __future__ import annotations
 
-from bai_scenario.seeds.seeder import Spec
-
 from ai.backend.manager.data.resource.types import ProjectResourcePolicyData
 from ai.backend.manager.models.resource_policy.creators import ProjectResourcePolicyCreator
+from bai_scenario.seeds.seeder import Spec
 
 PERSONAL_PROJECT_POLICY = "default"
 """The name ``ProjectCreator.personal`` asks for. Provisioning a user makes that user's

@@ -14,17 +14,17 @@ from collections.abc import AsyncIterator, Iterator, Sequence
 from typing import Any
 
 import pytest
-from bai_scenario.infra.config import ScenarioConfigProvider, base_config_dict, make_config
-from bai_scenario.infra.db import (
+from bai_scenario.config import ScenarioConfigProvider, base_config_dict, make_config
+from bai_scenario.db import (
     TemplateDatabase,
     clone_database,
     create_template,
     drop_database,
     engine_for,
 )
-from bai_scenario.infra.monitors import ActionRecorder
-from bai_scenario.infra.validators import build_action_validators
+from bai_scenario.monitors import ActionRecorder
 from bai_scenario.runner.runner import ScenarioRunner, offered_by, scenario_steps
+from bai_scenario.validators import build_action_validators
 
 from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
 from ai.backend.manager.actions.monitors import ActionMonitors

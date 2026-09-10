@@ -12,15 +12,14 @@ import inspect
 from collections.abc import Sequence
 from typing import Any
 
-from bai_scenario.seeds.ops import SeedOpsProvider
-from bai_scenario.seeds.seeder import Given, lay, steps_of
-
 from ai.backend.common.contexts.user import with_user
 from ai.backend.common.data.user.types import UserData, UserRole
 from ai.backend.manager.data.domain.types import UserInfo
 from ai.backend.manager.data.user.types import UserData as SeededUser
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.typed_scenario import TypedMatcher, TypedScenario, mismatches_of
+from bai_scenario.seeds.ops import SeedOpsProvider
+from bai_scenario.seeds.seeder import Given, lay, steps_of
 
 
 class NoActor(Exception):

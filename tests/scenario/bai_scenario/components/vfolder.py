@@ -2,11 +2,6 @@
 
 from __future__ import annotations
 
-from bai_scenario.components.domain import seed_someone_of
-from bai_scenario.seeds.domain.domain import seed_domain
-from bai_scenario.seeds.rbac.role import seed_permission, seed_role
-from bai_scenario.seeds.seeder import Given, Seeder, Spec
-
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.entity.vfolder import VFolderEntityType
 from ai.backend.manager.api.adapters.vfolder.adapter import VFolderAdapter
@@ -15,6 +10,10 @@ from ai.backend.manager.data.domain.types import DomainData
 from ai.backend.manager.data.permission.types import Permission
 from ai.backend.manager.data.user.types import UserData
 from ai.backend.testutils.typed_scenario import TypedScenario
+from bai_scenario.components.domain import seed_someone_of
+from bai_scenario.seeds.domain.domain import seed_domain
+from bai_scenario.seeds.rbac.role import seed_permission, seed_role
+from bai_scenario.seeds.seeder import Given, Seeder, Spec
 
 type VFolderScenario = TypedScenario[VFolderAdapter, ManagerUnifiedConfig]
 

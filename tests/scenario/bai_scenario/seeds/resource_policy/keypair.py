@@ -4,8 +4,6 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
-from bai_scenario.seeds.seeder import Spec
-
 from ai.backend.common.types import (
     DefaultForUnspecified,
     ResourceSlot,
@@ -14,6 +12,7 @@ from ai.backend.common.types import (
 )
 from ai.backend.manager.data.resource.types import KeyPairResourcePolicyData
 from ai.backend.manager.models.resource_policy.creators import KeyPairResourcePolicyCreator
+from bai_scenario.seeds.seeder import Spec
 
 
 def seed_keypair_policy(

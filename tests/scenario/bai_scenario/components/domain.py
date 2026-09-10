@@ -10,13 +10,6 @@ from __future__ import annotations
 from collections.abc import Callable, Sequence
 from datetime import datetime, timedelta
 
-from bai_scenario.seeds.rbac.role import seed_permission, seed_role
-from bai_scenario.seeds.resource_policy.keypair import seed_keypair_policy
-from bai_scenario.seeds.resource_policy.project import seed_project_policy
-from bai_scenario.seeds.resource_policy.user import seed_user_policy
-from bai_scenario.seeds.seeder import Given, Seeder
-from bai_scenario.seeds.user.user import seed_user
-
 from ai.backend.common.data.entity.domain import DomainEntityType
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.user.types import UserRole
@@ -31,6 +24,12 @@ from ai.backend.testutils.typed_scenario import (
     config_of,
     recent,
 )
+from bai_scenario.seeds.rbac.role import seed_permission, seed_role
+from bai_scenario.seeds.resource_policy.keypair import seed_keypair_policy
+from bai_scenario.seeds.resource_policy.project import seed_project_policy
+from bai_scenario.seeds.resource_policy.user import seed_user_policy
+from bai_scenario.seeds.seeder import Given, Seeder
+from bai_scenario.seeds.user.user import seed_user
 
 type DomainScenario = TypedScenario[DomainAdapter, ManagerUnifiedConfig]
 

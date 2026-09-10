@@ -4,11 +4,10 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
-from bai_scenario.seeds.seeder import Spec
-
 from ai.backend.common.types import VFolderHostPermission
 from ai.backend.manager.data.domain.types import DomainData
 from ai.backend.manager.models.domain.creators import DomainCreator
+from bai_scenario.seeds.seeder import Spec
 
 
 def seed_domain(
