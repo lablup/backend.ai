@@ -97,7 +97,7 @@ class PermissionControllerProcessors:
     bulk_remove_role_permissions: PartialBulkFieldActionProcessor[
         BulkRemoveRolePermissionsAction, PermissionData
     ]
-    replace_role_permissions: ActionProcessor[
+    replace_role_permissions: SingleEntityActionProcessor[
         ReplaceRolePermissionsAction, ReplaceRolePermissionsActionResult
     ]
     global_search_scopes: GlobalActionProcessor[
@@ -159,8 +159,8 @@ class PermissionControllerProcessors:
         self.bulk_remove_role_permissions = permissions.partial_bulk_purge_ops(
             BulkRemoveRolePermissionsAction
         )
-        self.replace_role_permissions = ActionProcessor(
-            service.replace_role_permissions, action_monitors
+        self.replace_role_permissions = role_group.single_entity(
+            ReplaceRolePermissionsAction, service.replace_role_permissions
         )
         self.global_search_scopes = role_group.global_scope(
             GlobalSearchScopesAction, service.search_scopes

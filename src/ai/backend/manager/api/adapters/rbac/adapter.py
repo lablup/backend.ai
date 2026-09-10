@@ -950,12 +950,10 @@ class RBACAdapter(BaseAdapter):
                 raise ReplaceRolePermissionRoleIdMismatch(
                     f"entry role_id {entry.role_id} does not match request role_id {input.role_id}",
                 )
-        action_result = (
-            await self._permission_controller.replace_role_permissions.wait_for_complete(
-                ReplaceRolePermissionsAction(
-                    role_id=RoleID(input.role_id),
-                    entries=self._permission_entries(input.permissions),
-                )
+        action_result = await self._permission_controller.replace_role_permissions.run(
+            ReplaceRolePermissionsAction(
+                role_id=RoleID(input.role_id),
+                entries=self._permission_entries(input.permissions),
             )
         )
         result: BulkRolePermissionReplaceResultData = action_result.data

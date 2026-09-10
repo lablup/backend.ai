@@ -10,9 +10,6 @@ from ai.backend.manager.actions.types import ActionOperationType
 
 # Import representative concrete action classes across different entity types
 # and operation types to verify enum usage at runtime.
-from ai.backend.manager.services.permission_contoller.actions.replace_role_permissions import (
-    ReplaceRolePermissionsAction,
-)
 from ai.backend.manager.services.permission_contoller.actions.search_users_assigned_to_role import (
     SearchUsersAssignedToRoleAction,
 )
@@ -21,7 +18,6 @@ from ai.backend.manager.services.permission_contoller.actions.search_users_assig
 # ``ai.backend.common.data.entity.types.EntityType``, a distinct NewType, so mixing
 # them in would conflate two type systems rather than test either one.
 _REPRESENTATIVE_ACTION_CLASSES: list[type[BaseAction]] = [
-    ReplaceRolePermissionsAction,
     SearchUsersAssignedToRoleAction,
 ]
 
@@ -124,6 +120,6 @@ class TestAllActionClassesUseEnums:
             )
 
     def test_covers_the_operations_legacy_actions_declare(self) -> None:
-        """The legacy family is down to a search and an update; the v2 bases carry the rest."""
+        """The legacy family is down to one search; the v2 bases carry every other shape."""
         covered = {cls.operation_type() for cls in _REPRESENTATIVE_ACTION_CLASSES}
-        assert covered == {ActionOperationType.SEARCH, ActionOperationType.UPDATE}
+        assert covered == {ActionOperationType.SEARCH}
