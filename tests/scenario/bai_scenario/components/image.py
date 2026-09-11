@@ -452,7 +452,7 @@ class TheImageNode(Then[Any, ImageNode]):
             Held(
                 "metadata.last_used_at",
                 metadata.last_used_at,
-                SameAs(node.last_used_at, "노드의 last_used_at"),
+                SameAs(node.last_used_at, "노드의 last_used_at 필드"),
             ),
             Same("metadata.tags", metadata.tags, []),
             Same("metadata.labels", metadata.labels, []),

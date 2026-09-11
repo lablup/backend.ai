@@ -8,11 +8,11 @@ Not exercised by any scenario: batch_load_fields.
 
 #### [a-user-who-is-not-the-superadmin-may-not-dealias](/tests/scenario/bai_scenario/manager/image/test_aliasing.py) — pass
 
-슈퍼관리자가 아닌 사용자가 별칭을 떼려 하면 역할로 막힌다
+슈퍼관리자가 아닌 사용자가 별칭을 해제하려 하면 역할 부족으로 거부된다
 
 Given
 
-- 별칭이 붙은 이미지 하나, user 한 명
+- 별칭이 등록된 이미지 1개, user 1명
   - 도메인 home-1
   - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
   - 이미지 image-1: x86_64 이미지
@@ -25,7 +25,7 @@ Given
 
 When
 
-- ImageAdapter.admin_dealias — user-1이 별칭 seeded-alias를 뗌
+- ImageAdapter.admin_dealias — user-1이 별칭 seeded-alias 해제
 
 Then
 
@@ -34,11 +34,11 @@ Then
 
 #### [aliasing-an-id-that-holds-no-image-is-refused](/tests/scenario/bai_scenario/manager/image/test_aliasing.py) — pass
 
-아무 이미지도 갖지 않은 id에 별칭을 붙이려 하면 이미지가 없다는 이유로 거부된다
+어느 이미지도 가리키지 않는 id에 별칭을 등록하려 하면 대상을 찾을 수 없어 거부된다
 
 Given
 
-- 레지스트리 하나와 그 안의 이미지 하나, superadmin 한 명
+- 레지스트리 1개와 그 안의 이미지 1개, superadmin 1명
   - 도메인 home-1
   - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
   - 이미지 image-1: x86_64 이미지
@@ -50,7 +50,7 @@ Given
 
 When
 
-- ImageAdapter.admin_alias — user-1이 아무것도 갖지 않은 id에 별칭을 붙임
+- ImageAdapter.admin_alias — user-1이 어느 이미지도 가리키지 않는 id에 별칭 등록
 
 Then
 
@@ -59,11 +59,11 @@ Then
 
 #### [aliasing-an-image-answers-with-the-alias-and-the-image-it-names](/tests/scenario/bai_scenario/manager/image/test_aliasing.py) — pass
 
-슈퍼관리자가 이미지에 별칭을 붙이면 그 별칭과 가리키는 이미지가 답으로 온다
+슈퍼관리자가 이미지에 별칭을 등록하면 그 별칭과 가리키는 이미지가 반환된다
 
 Given
 
-- 레지스트리 하나와 그 안의 이미지 하나, superadmin 한 명
+- 레지스트리 1개와 그 안의 이미지 1개, superadmin 1명
   - 도메인 home-1
   - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
   - 이미지 image-1: x86_64 이미지
@@ -75,22 +75,22 @@ Given
 
 When
 
-- ImageAdapter.admin_alias — user-1이 image-1에 별칭 made-alias를 붙임
+- ImageAdapter.admin_alias — user-1이 image-1에 별칭 made-alias 등록
 
 Then
 
-- 붙인 별칭과 그 이미지의 id가 온다
+- 등록한 별칭과 그 이미지의 id가 반환된다
   - alias = 'made-alias'
-  - image_id: 심은 이미지의 id와 같다
-  - alias_id: 무시함 — 데이터베이스가 만든다
+  - image_id: 미리 만들어 둔 이미지의 id와 같다
+  - alias_id: 무시함 — 데이터베이스가 생성한다
 
 #### [an-alias-another-image-already-holds-is-refused](/tests/scenario/bai_scenario/manager/image/test_aliasing.py) — pass
 
-이미 쓰이고 있는 별칭을 붙이려 하면 별칭이 겹친다는 이유로 거부된다
+이미 사용 중인 별칭을 등록하려 하면 유니크 제약 위반으로 거부된다
 
 Given
 
-- 별칭이 붙은 이미지 하나, superadmin 한 명
+- 별칭이 등록된 이미지 1개, superadmin 1명
   - 도메인 home-1
   - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
   - 이미지 image-1: x86_64 이미지
@@ -103,7 +103,7 @@ Given
 
 When
 
-- ImageAdapter.admin_alias — user-1이 이미 쓰이는 별칭 seeded-alias를 붙임
+- ImageAdapter.admin_alias — user-1이 이미 사용 중인 별칭 seeded-alias 등록
 
 Then
 
@@ -112,11 +112,11 @@ Then
 
 #### [dealiasing-a-name-no-image-holds-is-refused](/tests/scenario/bai_scenario/manager/image/test_aliasing.py) — pass
 
-아무 이미지도 갖지 않은 별칭을 떼려 하면 별칭이 없다는 이유로 거부된다
+어느 이미지도 가리키지 않는 별칭을 해제하려 하면 대상을 찾을 수 없어 거부된다
 
 Given
 
-- 별칭이 붙은 이미지 하나, superadmin 한 명
+- 별칭이 등록된 이미지 1개, superadmin 1명
   - 도메인 home-1
   - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
   - 이미지 image-1: x86_64 이미지
@@ -129,7 +129,7 @@ Given
 
 When
 
-- ImageAdapter.admin_dealias — user-1이 아무 이미지도 갖지 않은 별칭을 뗌
+- ImageAdapter.admin_dealias — user-1이 어느 이미지도 가리키지 않는 별칭 해제
 
 Then
 
@@ -138,11 +138,11 @@ Then
 
 #### [dealiasing-answers-with-the-alias-it-removed](/tests/scenario/bai_scenario/manager/image/test_aliasing.py) — pass
 
-슈퍼관리자가 붙은 별칭을 떼면 떼어낸 별칭과 그 이미지가 답으로 온다
+슈퍼관리자가 등록된 별칭을 해제하면 해제된 별칭과 그 이미지가 반환된다
 
 Given
 
-- 별칭이 붙은 이미지 하나, superadmin 한 명
+- 별칭이 등록된 이미지 1개, superadmin 1명
   - 도메인 home-1
   - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
   - 이미지 image-1: x86_64 이미지
@@ -155,22 +155,22 @@ Given
 
 When
 
-- ImageAdapter.admin_dealias — user-1이 별칭 seeded-alias를 뗌
+- ImageAdapter.admin_dealias — user-1이 별칭 seeded-alias 해제
 
 Then
 
-- 떼어낸 별칭과 그 이미지의 id가 온다
+- 해제한 별칭과 그 이미지의 id가 반환된다
   - alias = 'seeded-alias'
-  - image_id: 심은 이미지의 id와 같다
-  - alias_id: 무시함 — 데이터베이스가 만든다
+  - image_id: 미리 만들어 둔 이미지의 id와 같다
+  - alias_id: 무시함 — 데이터베이스가 생성한다
 
 #### [the-maker-of-a-custom-image-still-may-not-alias-it](/tests/scenario/bai_scenario/manager/image/test_aliasing.py) — pass
 
-자기가 만든 커스텀 이미지라도 별칭은 붙일 수 없다. 별칭을 붙이는 문은 그 이미지의 권한이 아니라 역할이 지키기 때문이다
+자기가 만든 커스텀 이미지라도 별칭은 등록할 수 없다. 별칭 등록은 그 이미지의 권한이 아니라 전역 역할로 보호되기 때문이다
 
 Given
 
-- 부르는 사람이 만든 커스텀 이미지 하나, 그 이미지에 권한 있음
+- 호출자가 만든 커스텀 이미지 1개, 그 이미지에 권한 있음
   - 도메인 home-1
   - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
   - 도메인에 속한 사용자 한 명 준비
@@ -178,7 +178,7 @@ Given
     - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
     - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
     - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - 이미지 image-1: x86_64 이미지, 커스터마이즈된 것이라 주인이 있다
+  - 이미지 image-1: x86_64 이미지, 커스터마이즈된 이미지라 소유자가 있다
   - 이미지를 다룰 권한을 받은 사용자 준비
     - 역할 image-keeper-1: 이 역할이 앉은 스코프 안에서만 통한다
     - 역할 image-keeper-1: image 전체에 READ 허용
@@ -188,7 +188,7 @@ Given
 
 When
 
-- ImageAdapter.admin_alias — user-1이 image-1에 별칭 made-alias를 붙임
+- ImageAdapter.admin_alias — user-1이 image-1에 별칭 made-alias 등록
 
 Then
 
@@ -199,11 +199,11 @@ Then
 
 #### [a-user-who-is-not-the-superadmin-may-not-edit-an-image](/tests/scenario/bai_scenario/manager/image/test_editing.py) — pass
 
-슈퍼관리자가 아닌 사용자가 이미지를 고치려 하면 역할로 막힌다
+슈퍼관리자가 아닌 사용자가 이미지를 수정하려 하면 역할 부족으로 거부된다
 
 Given
 
-- 레지스트리 하나와 그 안의 이미지 하나, user 한 명
+- 레지스트리 1개와 그 안의 이미지 1개, user 1명
   - 도메인 home-1
   - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
   - 이미지 image-1: x86_64 이미지
@@ -215,7 +215,7 @@ Given
 
 When
 
-- ImageAdapter.admin_update — user-1이 image-1의 태그를 moved로 고침
+- ImageAdapter.admin_update — user-1이 image-1의 태그를 moved로 수정
 
 Then
 
@@ -224,11 +224,11 @@ Then
 
 #### [an-edit-that-names-no-value-changes-nothing](/tests/scenario/bai_scenario/manager/image/test_editing.py) — pass
 
-슈퍼관리자가 값을 하나도 주지 않고 고치면 아무것도 바뀌지 않은 노드가 온다
+슈퍼관리자가 값을 하나도 지정하지 않고 수정하면 아무것도 바뀌지 않은 노드가 반환된다
 
 Given
 
-- 레지스트리 하나와 그 안의 이미지 하나, superadmin 한 명
+- 레지스트리 1개와 그 안의 이미지 1개, superadmin 1명
   - 도메인 home-1
   - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
   - 이미지 image-1: x86_64 이미지
@@ -240,28 +240,50 @@ Given
 
 When
 
-- ImageAdapter.admin_update — user-1이 아무 값도 주지 않고 고침
+- ImageAdapter.admin_update — user-1이 값을 하나도 지정하지 않고 수정
 
 Then
 
-- 심은 이미지 전체가 온다
+- 미리 만들어 둔 이미지 전체가 반환된다
+  - id: 미리 만들어 둔 이미지의 id와 같다
   - name = 'image-1'
+  - image = 'image-1'
   - registry = 'host-1'
-  - architecture = 'x86_64'
+  - registry_id: 미리 만들어 둔 레지스트리의 id와 같다
+  - project = None
   - tag = 'latest'
-  - status = <ImageStatus.ALIVE: 'ALIVE'>
-  - is_local = False
+  - architecture = 'x86_64'
   - size_bytes = 0
-  - id: 무시함 — 데이터베이스가 만든다
-  - last_used_at: 무시함 — 세션이 쓰는 값이라 이 실행이 말할 수 없다
+  - type = <ImageType.COMPUTE: 'compute'>
+  - status = <ImageStatus.ALIVE: 'ALIVE'>
+  - labels = []
+  - tags = []
+  - resource_limits = [ImageResourceLimitInfo(key='cpu', min='1', max=None), ImageResourceLimitInfo(key='mem', min='1073741824', max=None)]
+  - accelerators = None
+  - config_digest: 미리 만들어 둔 다이제스트 뒤에 공백이 채워진 값
+  - is_local = False
+  - created_at: 이 실행이 쓴 시각
+  - last_used_at: 무시함 — 세션이 기록하는 값이라 이 실행에서는 알 수 없다
+  - identity.canonical_name = 'image-1'
+  - identity.namespace = 'image-1'
+  - identity.architecture = 'x86_64'
+  - metadata.digest: 미리 만들어 둔 다이제스트 뒤에 공백이 채워진 값
+  - metadata.size_bytes = 0
+  - metadata.created_at: 이 실행이 쓴 시각
+  - metadata.last_used_at: 노드의 last_used_at 필드와 같다
+  - metadata.tags = []
+  - metadata.labels = []
+  - metadata.status = <ImageStatus.ALIVE: 'ALIVE'>
+  - requirements.supported_accelerators = ['*']
+  - requirements.resource_limits = [ImageResourceLimitGQLInfo(key='cpu', min='1', max='Infinity'), ImageResourceLimitGQLInfo(key='mem', min='1073741824', max='Infinity')]
 
 #### [changing-only-the-tag-leaves-every-other-field-alone](/tests/scenario/bai_scenario/manager/image/test_editing.py) — pass
 
-슈퍼관리자가 태그만 고치면 태그만 새 값이 되고 나머지 자리는 그대로다
+슈퍼관리자가 태그만 수정하면 태그만 새 값이 되고 나머지 필드는 그대로다
 
 Given
 
-- 레지스트리 하나와 그 안의 이미지 하나, superadmin 한 명
+- 레지스트리 1개와 그 안의 이미지 1개, superadmin 1명
   - 도메인 home-1
   - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
   - 이미지 image-1: x86_64 이미지
@@ -273,30 +295,53 @@ Given
 
 When
 
-- ImageAdapter.admin_update — user-1이 image-1의 태그를 moved로 고침
+- ImageAdapter.admin_update — user-1이 image-1의 태그를 moved로 수정
 
 Then
 
-- 태그만 새 값이고 나머지는 그대로다
+- 미리 만들어 둔 이미지 전체가 반환된다
+  - id: 미리 만들어 둔 이미지의 id와 같다
   - name = 'image-1'
+  - image = 'image-1'
   - registry = 'host-1'
-  - architecture = 'x86_64'
+  - registry_id: 미리 만들어 둔 레지스트리의 id와 같다
+  - project = None
   - tag = 'moved'
+  - architecture = 'x86_64'
+  - size_bytes = 0
+  - type = <ImageType.COMPUTE: 'compute'>
   - status = <ImageStatus.ALIVE: 'ALIVE'>
+  - labels = []
+  - tags = []
+  - resource_limits = [ImageResourceLimitInfo(key='cpu', min='1', max=None), ImageResourceLimitInfo(key='mem', min='1073741824', max=None)]
+  - accelerators = None
+  - config_digest: 미리 만들어 둔 다이제스트 뒤에 공백이 채워진 값
   - is_local = False
-  - id: 무시함 — 데이터베이스가 만든다
-  - last_used_at: 무시함 — 세션이 쓰는 값이라 이 실행이 말할 수 없다
+  - created_at: 이 실행이 쓴 시각
+  - last_used_at: 무시함 — 세션이 기록하는 값이라 이 실행에서는 알 수 없다
+  - identity.canonical_name = 'image-1'
+  - identity.namespace = 'image-1'
+  - identity.architecture = 'x86_64'
+  - metadata.digest: 미리 만들어 둔 다이제스트 뒤에 공백이 채워진 값
+  - metadata.size_bytes = 0
+  - metadata.created_at: 이 실행이 쓴 시각
+  - metadata.last_used_at: 노드의 last_used_at 필드와 같다
+  - metadata.tags = []
+  - metadata.labels = []
+  - metadata.status = <ImageStatus.ALIVE: 'ALIVE'>
+  - requirements.supported_accelerators = ['*']
+  - requirements.resource_limits = [ImageResourceLimitGQLInfo(key='cpu', min='1', max='Infinity'), ImageResourceLimitGQLInfo(key='mem', min='1073741824', max='Infinity')]
 
 #### [clearing-the-accelerator-list-empties-it](/tests/scenario/bai_scenario/manager/image/test_editing.py) — pass
 
-슈퍼관리자가 가속기 목록을 비우는 수정을 하면 그 자리가 빈 채로 온다. 생략과 비우기를 따로 말할 수 있는 항목은 이것뿐이다
+슈퍼관리자가 가속기 목록을 비우는 수정을 하면 그 필드가 빈 채로 반환된다. 생략과 비우기를 구분할 수 있는 필드는 이것뿐이다
 
 Given
 
-- 레지스트리 하나와 그 안의 이미지 하나, superadmin 한 명
+- 레지스트리 1개와 그 안의 이미지 1개, superadmin 1명
   - 도메인 home-1
   - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
-  - 이미지 image-1: x86_64 이미지
+  - 이미지 image-1: x86_64 이미지, 가속기는 cuda
   - 도메인에 속한 사용자 한 명 준비
     - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
     - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
@@ -309,20 +354,46 @@ When
 
 Then
 
-- 가속기 자리가 비어 있다
+- 미리 만들어 둔 이미지 전체가 반환된다
+  - id: 미리 만들어 둔 이미지의 id와 같다
   - name = 'image-1'
-  - accelerators = None
+  - image = 'image-1'
+  - registry = 'host-1'
+  - registry_id: 미리 만들어 둔 레지스트리의 id와 같다
+  - project = None
   - tag = 'latest'
-  - id: 무시함 — 데이터베이스가 만든다
-  - last_used_at: 무시함 — 세션이 쓰는 값이라 이 실행이 말할 수 없다
+  - architecture = 'x86_64'
+  - size_bytes = 0
+  - type = <ImageType.COMPUTE: 'compute'>
+  - status = <ImageStatus.ALIVE: 'ALIVE'>
+  - labels = []
+  - tags = []
+  - resource_limits = [ImageResourceLimitInfo(key='cpu', min='1', max=None), ImageResourceLimitInfo(key='mem', min='1073741824', max=None)]
+  - accelerators = None
+  - config_digest: 미리 만들어 둔 다이제스트 뒤에 공백이 채워진 값
+  - is_local = False
+  - created_at: 이 실행이 쓴 시각
+  - last_used_at: 무시함 — 세션이 기록하는 값이라 이 실행에서는 알 수 없다
+  - identity.canonical_name = 'image-1'
+  - identity.namespace = 'image-1'
+  - identity.architecture = 'x86_64'
+  - metadata.digest: 미리 만들어 둔 다이제스트 뒤에 공백이 채워진 값
+  - metadata.size_bytes = 0
+  - metadata.created_at: 이 실행이 쓴 시각
+  - metadata.last_used_at: 노드의 last_used_at 필드와 같다
+  - metadata.tags = []
+  - metadata.labels = []
+  - metadata.status = <ImageStatus.ALIVE: 'ALIVE'>
+  - requirements.supported_accelerators = ['*']
+  - requirements.resource_limits = [ImageResourceLimitGQLInfo(key='cpu', min='1', max='Infinity'), ImageResourceLimitGQLInfo(key='mem', min='1073741824', max='Infinity')]
 
 #### [editing-an-id-that-holds-no-image-is-refused](/tests/scenario/bai_scenario/manager/image/test_editing.py) — pass
 
-아무 이미지도 갖지 않은 id를 고치려 하면 이미지가 없다는 이유로 거부된다
+어느 이미지도 가리키지 않는 id를 수정하려 하면 대상을 찾을 수 없어 거부된다
 
 Given
 
-- 레지스트리 하나와 그 안의 이미지 하나, superadmin 한 명
+- 레지스트리 1개와 그 안의 이미지 1개, superadmin 1명
   - 도메인 home-1
   - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
   - 이미지 image-1: x86_64 이미지
@@ -334,22 +405,77 @@ Given
 
 When
 
-- ImageAdapter.admin_update — user-1이 아무것도 갖지 않은 id를 고침
+- ImageAdapter.admin_update — user-1이 어느 이미지도 가리키지 않는 id 수정
 
 Then
 
 - 거부된다
   - 거부: ImageNotFound
 
+#### [writing-an-accelerator-onto-an-image-that-had-none](/tests/scenario/bai_scenario/manager/image/test_editing.py) — pass
+
+슈퍼관리자가 가속기 이름을 지정하면 그 이름이 담긴 노드가 반환된다
+
+Given
+
+- 레지스트리 1개와 그 안의 이미지 1개, superadmin 1명
+  - 도메인 home-1
+  - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
+  - 이미지 image-1: x86_64 이미지
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+
+When
+
+- ImageAdapter.admin_update — user-1이 image-1의 가속기 목록을 cuda로 지정
+
+Then
+
+- 미리 만들어 둔 이미지 전체가 반환된다
+  - id: 미리 만들어 둔 이미지의 id와 같다
+  - name = 'image-1'
+  - image = 'image-1'
+  - registry = 'host-1'
+  - registry_id: 미리 만들어 둔 레지스트리의 id와 같다
+  - project = None
+  - tag = 'latest'
+  - architecture = 'x86_64'
+  - size_bytes = 0
+  - type = <ImageType.COMPUTE: 'compute'>
+  - status = <ImageStatus.ALIVE: 'ALIVE'>
+  - labels = []
+  - tags = []
+  - resource_limits = [ImageResourceLimitInfo(key='cpu', min='1', max=None), ImageResourceLimitInfo(key='mem', min='1073741824', max=None)]
+  - accelerators = 'cuda'
+  - config_digest: 미리 만들어 둔 다이제스트 뒤에 공백이 채워진 값
+  - is_local = False
+  - created_at: 이 실행이 쓴 시각
+  - last_used_at: 무시함 — 세션이 기록하는 값이라 이 실행에서는 알 수 없다
+  - identity.canonical_name = 'image-1'
+  - identity.namespace = 'image-1'
+  - identity.architecture = 'x86_64'
+  - metadata.digest: 미리 만들어 둔 다이제스트 뒤에 공백이 채워진 값
+  - metadata.size_bytes = 0
+  - metadata.created_at: 이 실행이 쓴 시각
+  - metadata.last_used_at: 노드의 last_used_at 필드와 같다
+  - metadata.tags = []
+  - metadata.labels = []
+  - metadata.status = <ImageStatus.ALIVE: 'ALIVE'>
+  - requirements.supported_accelerators = ['cuda']
+  - requirements.resource_limits = [ImageResourceLimitGQLInfo(key='cpu', min='1', max='Infinity'), ImageResourceLimitGQLInfo(key='mem', min='1073741824', max='Infinity')]
+
 ### forgetting
 
 #### [a-granted-user-may-not-forget-an-image-nobody-owns](/tests/scenario/bai_scenario/manager/image/test_forgetting.py) — pass
 
-커스터마이즈되지 않은 이미지는 주인이 없으므로, 그 이미지에 권한을 받은 사용자라도 게이트를 지난 뒤 소유권 검사에서 막힌다
+커스터마이즈되지 않은 이미지에는 소유자가 없으므로, 그 이미지에 권한을 받은 사용자라도 엔티티 권한을 통과한 뒤 소유권 검사에서 거부된다
 
 Given
 
-- 주인 없는 이미지 하나, 그 이미지에 권한 있음인 사용자 한 명
+- 소유자가 없는 이미지 1개, 그 이미지에 권한 있음인 사용자 1명
   - 도메인 home-1
   - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
   - 이미지 image-1: x86_64 이미지
@@ -367,7 +493,7 @@ Given
 
 When
 
-- ImageAdapter.admin_forget — user-1이 image-1을 잊음
+- ImageAdapter.admin_forget — user-1이 image-1 소프트 삭제
 
 Then
 
@@ -376,11 +502,11 @@ Then
 
 #### [a-user-granted-nothing-may-not-forget-an-image](/tests/scenario/bai_scenario/manager/image/test_forgetting.py) — pass
 
-아무 권한도 받지 않은 사용자가 이미지를 잊으려 하면 권한 부족으로 막힌다
+아무 권한도 받지 않은 사용자가 이미지를 소프트 삭제하려 하면 권한 부족으로 거부된다
 
 Given
 
-- 주인 없는 이미지 하나, 아무 권한도 없음인 사용자 한 명
+- 소유자가 없는 이미지 1개, 아무 권한도 없음인 사용자 1명
   - 도메인 home-1
   - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
   - 이미지 image-1: x86_64 이미지
@@ -392,7 +518,7 @@ Given
 
 When
 
-- ImageAdapter.admin_forget — user-1이 image-1을 잊음
+- ImageAdapter.admin_forget — user-1이 image-1 소프트 삭제
 
 Then
 
@@ -401,11 +527,11 @@ Then
 
 #### [a-user-granted-nothing-may-not-restore-an-image](/tests/scenario/bai_scenario/manager/image/test_forgetting.py) — pass
 
-아무 권한도 받지 않은 사용자가 잊힌 이미지를 되살리려 하면 권한 부족으로 막힌다
+아무 권한도 받지 않은 사용자가 이미지를 복원하려 하면 권한 부족으로 거부된다
 
 Given
 
-- 주인 없는 이미지 하나, 아무 권한도 없음인 사용자 한 명
+- 소유자가 없는 이미지 1개, 아무 권한도 없음인 사용자 1명
   - 도메인 home-1
   - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
   - 이미지 image-1: x86_64 이미지
@@ -417,7 +543,7 @@ Given
 
 When
 
-- ImageAdapter.admin_restore — user-1이 image-1을 되살림
+- ImageAdapter.admin_restore — user-1이 image-1 복원
 
 Then
 
@@ -426,11 +552,11 @@ Then
 
 #### [an-image-a-purge-is-working-through-cannot-be-reached](/tests/scenario/bai_scenario/manager/image/test_forgetting.py) — pass
 
-지우는 중인 이미지를 잊으려 하면 이미지가 없다는 이유로 거부된다. 그 상태의 이미지는 id로 집는 자리에서 보이지 않는다
+완전 삭제 중인 이미지를 소프트 삭제하려 하면 대상을 찾을 수 없어 거부된다. 그 상태의 이미지는 id로 조회하는 지점에서 보이지 않는다
 
 Given
 
-- 레지스트리 하나와 그 안의 이미지 하나, 상태는 PURGING, superadmin 한 명
+- 레지스트리 1개와 그 안의 이미지 1개, 상태는 PURGING, superadmin 1명
   - 도메인 home-1
   - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
   - 이미지 image-1: x86_64 이미지, 상태는 PURGING
@@ -442,7 +568,7 @@ Given
 
 When
 
-- ImageAdapter.admin_forget — user-1이 image-1을 잊음
+- ImageAdapter.admin_forget — user-1이 image-1 소프트 삭제
 
 Then
 
@@ -451,11 +577,11 @@ Then
 
 #### [forgetting-an-id-that-holds-no-image-is-refused](/tests/scenario/bai_scenario/manager/image/test_forgetting.py) — pass
 
-아무 이미지도 갖지 않은 id를 잊으려 하면 이미지가 없다는 이유로 거부된다
+어느 이미지도 가리키지 않는 id를 소프트 삭제하려 하면 대상을 찾을 수 없어 거부된다
 
 Given
 
-- 레지스트리 하나와 그 안의 이미지 하나, superadmin 한 명
+- 레지스트리 1개와 그 안의 이미지 1개, superadmin 1명
   - 도메인 home-1
   - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
   - 이미지 image-1: x86_64 이미지
@@ -467,7 +593,7 @@ Given
 
 When
 
-- ImageAdapter.admin_forget — user-1이 아무것도 갖지 않은 id를 잊음
+- ImageAdapter.admin_forget — user-1이 어느 이미지도 가리키지 않는 id 소프트 삭제
 
 Then
 
@@ -476,11 +602,11 @@ Then
 
 #### [forgetting-an-image-marks-it-deleted-and-keeps-the-row](/tests/scenario/bai_scenario/manager/image/test_forgetting.py) — pass
 
-슈퍼관리자가 이미지를 잊으면, 행은 남고 지워졌다는 상태를 실은 노드가 온다
+슈퍼관리자가 이미지를 소프트 삭제하면, 행은 남고 삭제됨 상태가 담긴 노드가 반환된다
 
 Given
 
-- 레지스트리 하나와 그 안의 이미지 하나, superadmin 한 명
+- 레지스트리 1개와 그 안의 이미지 1개, superadmin 1명
   - 도메인 home-1
   - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
   - 이미지 image-1: x86_64 이미지
@@ -492,28 +618,50 @@ Given
 
 When
 
-- ImageAdapter.admin_forget — user-1이 image-1을 잊음
+- ImageAdapter.admin_forget — user-1이 image-1 소프트 삭제
 
 Then
 
-- 심은 이미지 전체가 온다
+- 미리 만들어 둔 이미지 전체가 반환된다
+  - id: 미리 만들어 둔 이미지의 id와 같다
   - name = 'image-1'
+  - image = 'image-1'
   - registry = 'host-1'
-  - architecture = 'x86_64'
+  - registry_id: 미리 만들어 둔 레지스트리의 id와 같다
+  - project = None
   - tag = 'latest'
-  - status = <ImageStatus.DELETED: 'DELETED'>
-  - is_local = False
+  - architecture = 'x86_64'
   - size_bytes = 0
-  - id: 무시함 — 데이터베이스가 만든다
-  - last_used_at: 무시함 — 세션이 쓰는 값이라 이 실행이 말할 수 없다
+  - type = <ImageType.COMPUTE: 'compute'>
+  - status = <ImageStatus.DELETED: 'DELETED'>
+  - labels = []
+  - tags = []
+  - resource_limits = [ImageResourceLimitInfo(key='cpu', min='1', max=None), ImageResourceLimitInfo(key='mem', min='1073741824', max=None)]
+  - accelerators = None
+  - config_digest: 미리 만들어 둔 다이제스트 뒤에 공백이 채워진 값
+  - is_local = False
+  - created_at: 이 실행이 쓴 시각
+  - last_used_at: 무시함 — 세션이 기록하는 값이라 이 실행에서는 알 수 없다
+  - identity.canonical_name = 'image-1'
+  - identity.namespace = 'image-1'
+  - identity.architecture = 'x86_64'
+  - metadata.digest: 미리 만들어 둔 다이제스트 뒤에 공백이 채워진 값
+  - metadata.size_bytes = 0
+  - metadata.created_at: 이 실행이 쓴 시각
+  - metadata.last_used_at: 노드의 last_used_at 필드와 같다
+  - metadata.tags = []
+  - metadata.labels = []
+  - metadata.status = <ImageStatus.DELETED: 'DELETED'>
+  - requirements.supported_accelerators = ['*']
+  - requirements.resource_limits = [ImageResourceLimitGQLInfo(key='cpu', min='1', max='Infinity'), ImageResourceLimitGQLInfo(key='mem', min='1073741824', max='Infinity')]
 
 #### [restoring-a-forgotten-image-cannot-reach-it](/tests/scenario/bai_scenario/manager/image/test_forgetting.py) — pass
 
-잊힌 이미지를 되살리려 하면 이미지가 없다는 이유로 거부된다. 이미지를 id로 집는 자리가 살아 있는 것만 보기 때문이다
+삭제된 이미지를 복원하려 하면 대상을 찾을 수 없어 거부된다. id로 이미지를 조회하는 지점이 살아 있는 것만 대상으로 삼기 때문이다
 
 Given
 
-- 레지스트리 하나와 그 안의 이미지 하나, 상태는 DELETED, superadmin 한 명
+- 레지스트리 1개와 그 안의 이미지 1개, 상태는 DELETED, superadmin 1명
   - 도메인 home-1
   - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
   - 이미지 image-1: x86_64 이미지, 상태는 DELETED
@@ -525,7 +673,7 @@ Given
 
 When
 
-- ImageAdapter.admin_restore — user-1이 image-1을 되살림
+- ImageAdapter.admin_restore — user-1이 image-1 복원
 
 Then
 
@@ -534,11 +682,11 @@ Then
 
 #### [restoring-an-id-that-holds-no-image-is-refused](/tests/scenario/bai_scenario/manager/image/test_forgetting.py) — pass
 
-아무 이미지도 갖지 않은 id를 되살리려 하면 이미지가 없다는 이유로 거부된다
+어느 이미지도 가리키지 않는 id를 복원하려 하면 대상을 찾을 수 없어 거부된다
 
 Given
 
-- 레지스트리 하나와 그 안의 이미지 하나, superadmin 한 명
+- 레지스트리 1개와 그 안의 이미지 1개, superadmin 1명
   - 도메인 home-1
   - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
   - 이미지 image-1: x86_64 이미지
@@ -550,7 +698,7 @@ Given
 
 When
 
-- ImageAdapter.admin_restore — user-1이 아무것도 갖지 않은 id를 되살림
+- ImageAdapter.admin_restore — user-1이 어느 이미지도 가리키지 않는 id 복원
 
 Then
 
@@ -559,11 +707,11 @@ Then
 
 #### [restoring-an-image-that-was-never-forgotten-leaves-it-alive](/tests/scenario/bai_scenario/manager/image/test_forgetting.py) — pass
 
-살아 있는 이미지를 되살려도 살아 있는 그대로다
+살아 있는 이미지를 복원해도 살아 있는 상태 그대로다
 
 Given
 
-- 레지스트리 하나와 그 안의 이미지 하나, superadmin 한 명
+- 레지스트리 1개와 그 안의 이미지 1개, superadmin 1명
   - 도메인 home-1
   - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
   - 이미지 image-1: x86_64 이미지
@@ -575,28 +723,50 @@ Given
 
 When
 
-- ImageAdapter.admin_restore — user-1이 image-1을 되살림
+- ImageAdapter.admin_restore — user-1이 image-1 복원
 
 Then
 
-- 심은 이미지 전체가 온다
+- 미리 만들어 둔 이미지 전체가 반환된다
+  - id: 미리 만들어 둔 이미지의 id와 같다
   - name = 'image-1'
+  - image = 'image-1'
   - registry = 'host-1'
-  - architecture = 'x86_64'
+  - registry_id: 미리 만들어 둔 레지스트리의 id와 같다
+  - project = None
   - tag = 'latest'
-  - status = <ImageStatus.ALIVE: 'ALIVE'>
-  - is_local = False
+  - architecture = 'x86_64'
   - size_bytes = 0
-  - id: 무시함 — 데이터베이스가 만든다
-  - last_used_at: 무시함 — 세션이 쓰는 값이라 이 실행이 말할 수 없다
+  - type = <ImageType.COMPUTE: 'compute'>
+  - status = <ImageStatus.ALIVE: 'ALIVE'>
+  - labels = []
+  - tags = []
+  - resource_limits = [ImageResourceLimitInfo(key='cpu', min='1', max=None), ImageResourceLimitInfo(key='mem', min='1073741824', max=None)]
+  - accelerators = None
+  - config_digest: 미리 만들어 둔 다이제스트 뒤에 공백이 채워진 값
+  - is_local = False
+  - created_at: 이 실행이 쓴 시각
+  - last_used_at: 무시함 — 세션이 기록하는 값이라 이 실행에서는 알 수 없다
+  - identity.canonical_name = 'image-1'
+  - identity.namespace = 'image-1'
+  - identity.architecture = 'x86_64'
+  - metadata.digest: 미리 만들어 둔 다이제스트 뒤에 공백이 채워진 값
+  - metadata.size_bytes = 0
+  - metadata.created_at: 이 실행이 쓴 시각
+  - metadata.last_used_at: 노드의 last_used_at 필드와 같다
+  - metadata.tags = []
+  - metadata.labels = []
+  - metadata.status = <ImageStatus.ALIVE: 'ALIVE'>
+  - requirements.supported_accelerators = ['*']
+  - requirements.resource_limits = [ImageResourceLimitGQLInfo(key='cpu', min='1', max='Infinity'), ImageResourceLimitGQLInfo(key='mem', min='1073741824', max='Infinity')]
 
 #### [the-maker-of-a-custom-image-may-forget-it](/tests/scenario/bai_scenario/manager/image/test_forgetting.py) — pass
 
-자기가 만든 커스텀 이미지에 권한까지 받은 사용자가 그것을 잊으면, 게이트와 소유권 검사를 모두 지나 지워졌다는 상태가 온다
+자기가 만든 커스텀 이미지에 권한까지 받은 사용자가 그것을 소프트 삭제하면, 엔티티 권한과 소유권 검사를 모두 통과해 삭제됨 상태가 반환된다
 
 Given
 
-- 부르는 사람이 만든 커스텀 이미지 하나, 그 이미지에 권한 있음
+- 호출자가 만든 커스텀 이미지 1개, 그 이미지에 권한 있음
   - 도메인 home-1
   - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
   - 도메인에 속한 사용자 한 명 준비
@@ -604,7 +774,7 @@ Given
     - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
     - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
     - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - 이미지 image-1: x86_64 이미지, 커스터마이즈된 것이라 주인이 있다
+  - 이미지 image-1: x86_64 이미지, 커스터마이즈된 이미지라 소유자가 있다
   - 이미지를 다룰 권한을 받은 사용자 준비
     - 역할 image-keeper-1: 이 역할이 앉은 스코프 안에서만 통한다
     - 역할 image-keeper-1: image 전체에 READ 허용
@@ -614,28 +784,50 @@ Given
 
 When
 
-- ImageAdapter.admin_forget — user-1이 image-1을 잊음
+- ImageAdapter.admin_forget — user-1이 image-1 소프트 삭제
 
 Then
 
-- 심은 이미지 전체가 온다
+- 미리 만들어 둔 이미지 전체가 반환된다
+  - id: 미리 만들어 둔 이미지의 id와 같다
   - name = 'image-1'
+  - image = 'image-1'
   - registry = 'host-1'
-  - architecture = 'x86_64'
+  - registry_id: 미리 만들어 둔 레지스트리의 id와 같다
+  - project = None
   - tag = 'latest'
-  - status = <ImageStatus.DELETED: 'DELETED'>
-  - is_local = False
+  - architecture = 'x86_64'
   - size_bytes = 0
-  - id: 무시함 — 데이터베이스가 만든다
-  - last_used_at: 무시함 — 세션이 쓰는 값이라 이 실행이 말할 수 없다
+  - type = <ImageType.COMPUTE: 'compute'>
+  - status = <ImageStatus.DELETED: 'DELETED'>
+  - labels = []
+  - tags = []
+  - resource_limits = [ImageResourceLimitInfo(key='cpu', min='1', max=None), ImageResourceLimitInfo(key='mem', min='1073741824', max=None)]
+  - accelerators = None
+  - config_digest: 미리 만들어 둔 다이제스트 뒤에 공백이 채워진 값
+  - is_local = False
+  - created_at: 이 실행이 쓴 시각
+  - last_used_at: 무시함 — 세션이 기록하는 값이라 이 실행에서는 알 수 없다
+  - identity.canonical_name = 'image-1'
+  - identity.namespace = 'image-1'
+  - identity.architecture = 'x86_64'
+  - metadata.digest: 미리 만들어 둔 다이제스트 뒤에 공백이 채워진 값
+  - metadata.size_bytes = 0
+  - metadata.created_at: 이 실행이 쓴 시각
+  - metadata.last_used_at: 노드의 last_used_at 필드와 같다
+  - metadata.tags = []
+  - metadata.labels = []
+  - metadata.status = <ImageStatus.DELETED: 'DELETED'>
+  - requirements.supported_accelerators = ['*']
+  - requirements.resource_limits = [ImageResourceLimitGQLInfo(key='cpu', min='1', max='Infinity'), ImageResourceLimitGQLInfo(key='mem', min='1073741824', max='Infinity')]
 
 #### [turning-enforcement-off-still-does-not-let-anyone-forget-an-unowned-image](/tests/scenario/bai_scenario/manager/image/test_forgetting.py) — pass
 
-엔티티 권한 집행을 꺼서 게이트를 열어도 주인 없는 이미지는 잊을 수 없다. 소유권 검사는 그 스위치가 닿지 않는 자리에서 돌기 때문이다
+권한 검사를 비활성화해도 소유자가 없는 이미지는 소프트 삭제할 수 없다. 소유권 검사는 그 설정의 영향을 받지 않기 때문이다
 
 Given
 
-- 주인 없는 이미지 하나, 아무 권한도 없음인 사용자 한 명
+- 소유자가 없는 이미지 1개, 아무 권한도 없음인 사용자 1명
   - 도메인 home-1
   - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
   - 이미지 image-1: x86_64 이미지
@@ -647,7 +839,7 @@ Given
 
 When
 
-- ImageAdapter.admin_forget — user-1이 image-1을 잊음
+- ImageAdapter.admin_forget — user-1이 image-1 소프트 삭제
 
 Then
 
@@ -658,11 +850,11 @@ Then
 
 #### [a-plain-user-loading-many-alias-ids-is-refused-as-a-whole](/tests/scenario/bai_scenario/manager/image/test_reading.py) — pass
 
-슈퍼관리자가 아닌 사용자가 별칭 id 여럿을 한 번에 읽으려 하면 역할로 막힌다
+슈퍼관리자가 아닌 사용자가 별칭 id 여러 개를 한 번에 조회하려 하면 역할 부족으로 거부된다
 
 Given
 
-- 별칭이 붙은 이미지 하나, user 한 명
+- 별칭이 등록된 이미지 1개, user 1명
   - 도메인 home-1
   - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
   - 이미지 image-1: x86_64 이미지
@@ -675,7 +867,7 @@ Given
 
 When
 
-- ImageAdapter.batch_load_aliases_by_ids — user-1이 심은 별칭 하나와 없는 id 하나를 한 번에 읽음
+- ImageAdapter.batch_load_aliases_by_ids — user-1이 미리 만들어 둔 별칭 1개와 없는 id 1개를 한 번에 조회
 
 Then
 
@@ -684,11 +876,11 @@ Then
 
 #### [a-plain-user-loading-many-image-ids-is-refused-as-a-whole](/tests/scenario/bai_scenario/manager/image/test_reading.py) — pass
 
-슈퍼관리자가 아닌 사용자가 id 여럿을 한 번에 읽으려 하면, 원소별로 갈리지 않고 요청 전체가 역할로 막힌다
+슈퍼관리자가 아닌 사용자가 id 여러 개를 한 번에 조회하려 하면, 원소별로 갈리지 않고 요청 전체가 역할 부족으로 거부된다
 
 Given
 
-- 레지스트리 하나와 그 안의 이미지 2개, user 한 명
+- 레지스트리 1개와 그 안의 이미지 2개, user 1명
   - 도메인 home-1
   - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
   - 이미지 image-0-1: x86_64 이미지
@@ -701,7 +893,7 @@ Given
 
 When
 
-- ImageAdapter.batch_load_by_ids — user-1이 심은 것 둘과 없는 id 하나를 한 번에 읽음
+- ImageAdapter.batch_load_by_ids — user-1이 미리 만들어 둔 이미지 2개와 없는 id 1개를 한 번에 조회
 
 Then
 
@@ -710,11 +902,11 @@ Then
 
 #### [an-empty-image-id-list-answers-empty-without-calling-the-wiring](/tests/scenario/bai_scenario/manager/image/test_reading.py) — pass
 
-빈 id 목록으로 읽으면 배선을 부르지 않고 빈 답이 온다
+빈 id 목록으로 조회하면 하위 계층을 호출하지 않고 빈 응답이 반환된다
 
 Given
 
-- 레지스트리 하나와 그 안의 이미지 2개, superadmin 한 명
+- 레지스트리 1개와 그 안의 이미지 2개, superadmin 1명
   - 도메인 home-1
   - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
   - 이미지 image-0-1: x86_64 이미지
@@ -727,20 +919,20 @@ Given
 
 When
 
-- ImageAdapter.batch_load_by_ids — user-1이 빈 id 목록으로 읽음
+- ImageAdapter.batch_load_by_ids — user-1이 빈 id 목록으로 조회
 
 Then
 
-- 빈 답이 온다
+- 빈 응답이 반환된다
   - items = []
 
 #### [loading-many-alias-ids-keeps-the-order-and-leaves-a-hole](/tests/scenario/bai_scenario/manager/image/test_reading.py) — pass
 
-슈퍼관리자가 심은 별칭 하나와 아무것도 갖지 않은 id 하나를 한 번에 읽으면, 준 순서 그대로 오고 없는 id 자리만 비어서 온다
+슈퍼관리자가 미리 만들어 둔 별칭 1개와 어느 별칭도 가리키지 않는 id 1개를 한 번에 조회하면, 요청한 순서대로 반환되고 없는 id 위치만 비어 있다
 
 Given
 
-- 별칭이 붙은 이미지 하나, superadmin 한 명
+- 별칭이 등록된 이미지 1개, superadmin 1명
   - 도메인 home-1
   - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
   - 이미지 image-1: x86_64 이미지
@@ -753,21 +945,21 @@ Given
 
 When
 
-- ImageAdapter.batch_load_aliases_by_ids — user-1이 심은 별칭 하나와 없는 id 하나를 한 번에 읽음
+- ImageAdapter.batch_load_aliases_by_ids — user-1이 미리 만들어 둔 별칭 1개와 없는 id 1개를 한 번에 조회
 
 Then
 
-- 준 순서 그대로 오고 없는 id 자리는 비어 있다
+- 요청한 순서대로 반환되고 없는 id 위치는 비어 있다
   - length = 2
   - aliases = ['seeded-alias', None]
 
 #### [loading-many-image-ids-keeps-the-order-and-leaves-a-hole](/tests/scenario/bai_scenario/manager/image/test_reading.py) — pass
 
-슈퍼관리자가 심은 이미지 둘과 아무것도 갖지 않은 id 하나를 한 번에 읽으면, 준 순서 그대로 오고 없는 id 자리만 비어서 온다
+슈퍼관리자가 미리 만들어 둔 이미지 2개와 어느 이미지도 가리키지 않는 id 1개를 한 번에 조회하면, 요청한 순서대로 반환되고 없는 id 위치만 비어 있다
 
 Given
 
-- 레지스트리 하나와 그 안의 이미지 2개, superadmin 한 명
+- 레지스트리 1개와 그 안의 이미지 2개, superadmin 1명
   - 도메인 home-1
   - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
   - 이미지 image-0-1: x86_64 이미지
@@ -780,11 +972,11 @@ Given
 
 When
 
-- ImageAdapter.batch_load_by_ids — user-1이 심은 것 둘과 없는 id 하나를 한 번에 읽음
+- ImageAdapter.batch_load_by_ids — user-1이 미리 만들어 둔 이미지 2개와 없는 id 1개를 한 번에 조회
 
 Then
 
-- 준 순서 그대로 오고 없는 id 자리는 비어 있다
+- 요청한 순서대로 반환되고 없는 id 위치는 비어 있다
   - length = 3
   - names = ['image-0-1', None, 'image-1-1']
 
@@ -792,11 +984,11 @@ Then
 
 #### [a-granted-user-may-not-purge-an-image-nobody-owns](/tests/scenario/bai_scenario/manager/image/test_retiring.py) — pass
 
-주인 없는 이미지는 그 이미지에 권한을 받은 사용자라도 지울 수 없다. 게이트를 지난 뒤 소유권 검사가 막는다
+소유자가 없는 이미지는 그 이미지에 권한을 받은 사용자라도 완전 삭제할 수 없다. 엔티티 권한을 통과한 뒤 소유권 검사에서 거부된다
 
 Given
 
-- 주인 없는 이미지 하나, 그 이미지에 권한 있음인 사용자 한 명
+- 소유자가 없는 이미지 1개, 그 이미지에 권한 있음인 사용자 1명
   - 도메인 home-1
   - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
   - 이미지 image-1: x86_64 이미지
@@ -814,7 +1006,7 @@ Given
 
 When
 
-- ImageAdapter.admin_purge — user-1이 image-1을 지움
+- ImageAdapter.admin_purge — user-1이 image-1 완전 삭제
 
 Then
 
@@ -823,11 +1015,11 @@ Then
 
 #### [a-user-granted-nothing-may-not-purge-an-image](/tests/scenario/bai_scenario/manager/image/test_retiring.py) — pass
 
-아무 권한도 받지 않은 사용자가 이미지를 지우려 하면 권한 부족으로 막힌다
+아무 권한도 받지 않은 사용자가 이미지를 완전 삭제하려 하면 권한 부족으로 거부된다
 
 Given
 
-- 주인 없는 이미지 하나, 아무 권한도 없음인 사용자 한 명
+- 소유자가 없는 이미지 1개, 아무 권한도 없음인 사용자 1명
   - 도메인 home-1
   - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
   - 이미지 image-1: x86_64 이미지
@@ -839,7 +1031,7 @@ Given
 
 When
 
-- ImageAdapter.admin_purge — user-1이 image-1을 지움
+- ImageAdapter.admin_purge — user-1이 image-1 완전 삭제
 
 Then
 
@@ -848,11 +1040,11 @@ Then
 
 #### [purging-an-id-that-holds-no-image-is-refused](/tests/scenario/bai_scenario/manager/image/test_retiring.py) — pass
 
-아무 이미지도 갖지 않은 id를 지우려 하면 이미지가 없다는 이유로 거부된다
+어느 이미지도 가리키지 않는 id를 완전 삭제하려 하면 대상을 찾을 수 없어 거부된다
 
 Given
 
-- 레지스트리 하나와 그 안의 이미지 하나, superadmin 한 명
+- 레지스트리 1개와 그 안의 이미지 1개, superadmin 1명
   - 도메인 home-1
   - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
   - 이미지 image-1: x86_64 이미지
@@ -864,7 +1056,7 @@ Given
 
 When
 
-- ImageAdapter.admin_purge — user-1이 아무것도 갖지 않은 id를 지움
+- ImageAdapter.admin_purge — user-1이 어느 이미지도 가리키지 않는 id 완전 삭제
 
 Then
 
@@ -873,11 +1065,11 @@ Then
 
 #### [purging-an-image-answers-with-the-image-it-removed](/tests/scenario/bai_scenario/manager/image/test_retiring.py) — pass
 
-슈퍼관리자가 이미지를 지우면 지워진 이미지가 답으로 오고 되살릴 수 없다
+슈퍼관리자가 이미지를 완전 삭제하면 삭제된 이미지가 반환되고 복원할 수 없다
 
 Given
 
-- 레지스트리 하나와 그 안의 이미지 하나, superadmin 한 명
+- 레지스트리 1개와 그 안의 이미지 1개, superadmin 1명
   - 도메인 home-1
   - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
   - 이미지 image-1: x86_64 이미지
@@ -889,28 +1081,50 @@ Given
 
 When
 
-- ImageAdapter.admin_purge — user-1이 image-1을 지움
+- ImageAdapter.admin_purge — user-1이 image-1 완전 삭제
 
 Then
 
-- 심은 이미지 전체가 온다
+- 미리 만들어 둔 이미지 전체가 반환된다
+  - id: 미리 만들어 둔 이미지의 id와 같다
   - name = 'image-1'
+  - image = 'image-1'
   - registry = 'host-1'
-  - architecture = 'x86_64'
+  - registry_id: 미리 만들어 둔 레지스트리의 id와 같다
+  - project = None
   - tag = 'latest'
-  - status = <ImageStatus.ALIVE: 'ALIVE'>
-  - is_local = False
+  - architecture = 'x86_64'
   - size_bytes = 0
-  - id: 무시함 — 데이터베이스가 만든다
-  - last_used_at: 무시함 — 세션이 쓰는 값이라 이 실행이 말할 수 없다
+  - type = <ImageType.COMPUTE: 'compute'>
+  - status = <ImageStatus.ALIVE: 'ALIVE'>
+  - labels = []
+  - tags = []
+  - resource_limits = [ImageResourceLimitInfo(key='cpu', min='1', max=None), ImageResourceLimitInfo(key='mem', min='1073741824', max=None)]
+  - accelerators = None
+  - config_digest: 미리 만들어 둔 다이제스트 뒤에 공백이 채워진 값
+  - is_local = False
+  - created_at: 이 실행이 쓴 시각
+  - last_used_at: 무시함 — 세션이 기록하는 값이라 이 실행에서는 알 수 없다
+  - identity.canonical_name = 'image-1'
+  - identity.namespace = 'image-1'
+  - identity.architecture = 'x86_64'
+  - metadata.digest: 미리 만들어 둔 다이제스트 뒤에 공백이 채워진 값
+  - metadata.size_bytes = 0
+  - metadata.created_at: 이 실행이 쓴 시각
+  - metadata.last_used_at: 노드의 last_used_at 필드와 같다
+  - metadata.tags = []
+  - metadata.labels = []
+  - metadata.status = <ImageStatus.ALIVE: 'ALIVE'>
+  - requirements.supported_accelerators = ['*']
+  - requirements.resource_limits = [ImageResourceLimitGQLInfo(key='cpu', min='1', max='Infinity'), ImageResourceLimitGQLInfo(key='mem', min='1073741824', max='Infinity')]
 
 #### [purging-an-image-takes-its-aliases-with-it](/tests/scenario/bai_scenario/manager/image/test_retiring.py) — pass
 
-별칭이 붙은 이미지도 지워지고 지워진 이미지가 답으로 온다. 별칭이 함께 사라지는 것은 답에 실리지 않아 이 행이 보지 못한다
+별칭이 등록된 이미지도 삭제되고 삭제된 이미지가 반환된다. 별칭이 함께 사라지는 것은 응답에 담기지 않아 이 시나리오로는 확인할 수 없다
 
 Given
 
-- 별칭이 붙은 이미지 하나, superadmin 한 명
+- 별칭이 등록된 이미지 1개, superadmin 1명
   - 도메인 home-1
   - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
   - 이미지 image-1: x86_64 이미지
@@ -923,24 +1137,50 @@ Given
 
 When
 
-- ImageAdapter.admin_purge — user-1이 별칭 seeded-alias가 붙은 이미지를 지움
+- ImageAdapter.admin_purge — user-1이 별칭 seeded-alias가 등록된 이미지를 완전 삭제
 
 Then
 
-- 지운 이미지가 답으로 온다
+- 미리 만들어 둔 이미지 전체가 반환된다
+  - id: 미리 만들어 둔 이미지의 id와 같다
   - name = 'image-1'
+  - image = 'image-1'
   - registry = 'host-1'
+  - registry_id: 미리 만들어 둔 레지스트리의 id와 같다
+  - project = None
+  - tag = 'latest'
   - architecture = 'x86_64'
-  - id: 무시함 — 데이터베이스가 만든다
-  - last_used_at: 무시함 — 세션이 쓰는 값이라 이 실행이 말할 수 없다
+  - size_bytes = 0
+  - type = <ImageType.COMPUTE: 'compute'>
+  - status = <ImageStatus.ALIVE: 'ALIVE'>
+  - labels = []
+  - tags = []
+  - resource_limits = [ImageResourceLimitInfo(key='cpu', min='1', max=None), ImageResourceLimitInfo(key='mem', min='1073741824', max=None)]
+  - accelerators = None
+  - config_digest: 미리 만들어 둔 다이제스트 뒤에 공백이 채워진 값
+  - is_local = False
+  - created_at: 이 실행이 쓴 시각
+  - last_used_at: 무시함 — 세션이 기록하는 값이라 이 실행에서는 알 수 없다
+  - identity.canonical_name = 'image-1'
+  - identity.namespace = 'image-1'
+  - identity.architecture = 'x86_64'
+  - metadata.digest: 미리 만들어 둔 다이제스트 뒤에 공백이 채워진 값
+  - metadata.size_bytes = 0
+  - metadata.created_at: 이 실행이 쓴 시각
+  - metadata.last_used_at: 노드의 last_used_at 필드와 같다
+  - metadata.tags = []
+  - metadata.labels = []
+  - metadata.status = <ImageStatus.ALIVE: 'ALIVE'>
+  - requirements.supported_accelerators = ['*']
+  - requirements.resource_limits = [ImageResourceLimitGQLInfo(key='cpu', min='1', max='Infinity'), ImageResourceLimitGQLInfo(key='mem', min='1073741824', max='Infinity')]
 
 #### [the-maker-of-a-custom-image-may-purge-it](/tests/scenario/bai_scenario/manager/image/test_retiring.py) — pass
 
-자기가 만든 커스텀 이미지에 권한까지 받은 사용자가 그것을 지우면, 게이트와 소유권 검사를 모두 지나 지워진 이미지가 답으로 온다
+자기가 만든 커스텀 이미지에 권한까지 받은 사용자가 그것을 완전 삭제하면, 엔티티 권한과 소유권 검사를 모두 통과해 삭제된 이미지가 반환된다
 
 Given
 
-- 부르는 사람이 만든 커스텀 이미지 하나, 그 이미지에 권한 있음
+- 호출자가 만든 커스텀 이미지 1개, 그 이미지에 권한 있음
   - 도메인 home-1
   - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
   - 도메인에 속한 사용자 한 명 준비
@@ -948,7 +1188,7 @@ Given
     - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
     - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
     - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - 이미지 image-1: x86_64 이미지, 커스터마이즈된 것이라 주인이 있다
+  - 이미지 image-1: x86_64 이미지, 커스터마이즈된 이미지라 소유자가 있다
   - 이미지를 다룰 권한을 받은 사용자 준비
     - 역할 image-keeper-1: 이 역할이 앉은 스코프 안에서만 통한다
     - 역할 image-keeper-1: image 전체에 READ 허용
@@ -958,30 +1198,52 @@ Given
 
 When
 
-- ImageAdapter.admin_purge — user-1이 image-1을 지움
+- ImageAdapter.admin_purge — user-1이 image-1 완전 삭제
 
 Then
 
-- 심은 이미지 전체가 온다
+- 미리 만들어 둔 이미지 전체가 반환된다
+  - id: 미리 만들어 둔 이미지의 id와 같다
   - name = 'image-1'
+  - image = 'image-1'
   - registry = 'host-1'
-  - architecture = 'x86_64'
+  - registry_id: 미리 만들어 둔 레지스트리의 id와 같다
+  - project = None
   - tag = 'latest'
-  - status = <ImageStatus.ALIVE: 'ALIVE'>
-  - is_local = False
+  - architecture = 'x86_64'
   - size_bytes = 0
-  - id: 무시함 — 데이터베이스가 만든다
-  - last_used_at: 무시함 — 세션이 쓰는 값이라 이 실행이 말할 수 없다
+  - type = <ImageType.COMPUTE: 'compute'>
+  - status = <ImageStatus.ALIVE: 'ALIVE'>
+  - labels = []
+  - tags = []
+  - resource_limits = [ImageResourceLimitInfo(key='cpu', min='1', max=None), ImageResourceLimitInfo(key='mem', min='1073741824', max=None)]
+  - accelerators = None
+  - config_digest: 미리 만들어 둔 다이제스트 뒤에 공백이 채워진 값
+  - is_local = False
+  - created_at: 이 실행이 쓴 시각
+  - last_used_at: 무시함 — 세션이 기록하는 값이라 이 실행에서는 알 수 없다
+  - identity.canonical_name = 'image-1'
+  - identity.namespace = 'image-1'
+  - identity.architecture = 'x86_64'
+  - metadata.digest: 미리 만들어 둔 다이제스트 뒤에 공백이 채워진 값
+  - metadata.size_bytes = 0
+  - metadata.created_at: 이 실행이 쓴 시각
+  - metadata.last_used_at: 노드의 last_used_at 필드와 같다
+  - metadata.tags = []
+  - metadata.labels = []
+  - metadata.status = <ImageStatus.ALIVE: 'ALIVE'>
+  - requirements.supported_accelerators = ['*']
+  - requirements.resource_limits = [ImageResourceLimitGQLInfo(key='cpu', min='1', max='Infinity'), ImageResourceLimitGQLInfo(key='mem', min='1073741824', max='Infinity')]
 
 ### searching
 
 #### [a-condition-given-from-outside-narrows-before-the-callers-filter](/tests/scenario/bai_scenario/manager/image/test_searching.py) — pass
 
-이미지가 두 레지스트리에 나뉘어 있을 때 바깥에서 한쪽으로 좁혀 주면, 그 레지스트리의 이미지만 답으로 오고 다른 쪽은 세어지지 않는다
+이미지가 레지스트리 2개에 나뉘어 있을 때 상위 계층이 한쪽으로 좁혀 주면, 그 레지스트리의 이미지만 반환되고 다른 쪽은 집계되지 않는다
 
 Given
 
-- 레지스트리 둘, 한쪽에 이미지 2개와 다른 쪽에 2개, superadmin 한 명
+- 레지스트리 2개, 한쪽에 이미지 2개와 다른 쪽에 2개, superadmin 1명
   - 도메인 home-1
   - 컨테이너 레지스트리 wanted-1: 이미지를 가져오는 곳
   - 컨테이너 레지스트리 other-1: 이미지를 가져오는 곳
@@ -1001,7 +1263,7 @@ When
 
 Then
 
-- 심은 이미지가 모두 세어진다
+- 미리 만들어 둔 이미지가 모두 집계된다
   - items = ['here-0-1', 'here-1-1']
   - total_count = 2
   - has_next_page = False
@@ -1009,11 +1271,11 @@ Then
 
 #### [a-cursor-search-answers-the-first-page-and-says-there-is-more](/tests/scenario/bai_scenario/manager/image/test_searching.py) — pass
 
-슈퍼관리자가 커서로 앞에서부터 읽으면 정한 만큼 오고 다음 쪽이 있다고 답한다
+슈퍼관리자가 커서로 앞에서부터 조회하면 지정한 개수만 반환되고 다음 페이지가 있다고 알린다
 
 Given
 
-- 레지스트리 하나와 그 안의 이미지 3개, superadmin 한 명
+- 레지스트리 1개와 그 안의 이미지 3개, superadmin 1명
   - 도메인 home-1
   - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
   - 이미지 image-0-1: x86_64 이미지
@@ -1031,19 +1293,19 @@ When
 
 Then
 
-- 정한 만큼만 오고 다음 쪽이 있다고 답한다
-  - items = 2
+- 지정한 개수만 반환되고 다음 페이지가 있다고 알린다
+  - length = 2
   - total_count = 3
   - has_next_page = True
   - has_previous_page = False
 
 #### [a-cursor-that-cannot-be-read-is-refused](/tests/scenario/bai_scenario/manager/image/test_searching.py) — pass
 
-읽을 수 없는 커서 값을 주면 커서가 틀렸다는 이유로 거부된다
+해석할 수 없는 커서 값을 지정하면 커서가 잘못되어 거부된다
 
 Given
 
-- 레지스트리 하나와 그 안의 이미지 2개, superadmin 한 명
+- 레지스트리 1개와 그 안의 이미지 2개, superadmin 1명
   - 도메인 home-1
   - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
   - 이미지 image-0-1: x86_64 이미지
@@ -1056,7 +1318,7 @@ Given
 
 When
 
-- ImageAdapter.admin_search_images_gql — user-1이 깨진 커서로 검색함
+- ImageAdapter.admin_search_images_gql — user-1이 잘못된 커서로 검색함
 
 Then
 
@@ -1065,11 +1327,11 @@ Then
 
 #### [a-user-who-is-not-the-superadmin-may-not-search-aliases](/tests/scenario/bai_scenario/manager/image/test_searching.py) — pass
 
-슈퍼관리자가 아닌 사용자가 별칭을 검색하려 하면 역할로 막힌다
+슈퍼관리자가 아닌 사용자가 별칭을 검색하려 하면 역할 부족으로 거부된다
 
 Given
 
-- 레지스트리 하나와 그 안의 이미지 2개, user 한 명
+- 레지스트리 1개와 그 안의 이미지 2개, user 1명
   - 도메인 home-1
   - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
   - 이미지 image-0-1: x86_64 이미지
@@ -1091,11 +1353,11 @@ Then
 
 #### [a-user-who-is-not-the-superadmin-may-not-search-images](/tests/scenario/bai_scenario/manager/image/test_searching.py) — pass
 
-슈퍼관리자가 아닌 사용자가 이미지를 검색하려 하면 역할로 막힌다
+슈퍼관리자가 아닌 사용자가 이미지를 검색하려 하면 역할 부족으로 거부된다
 
 Given
 
-- 레지스트리 하나와 그 안의 이미지 2개, user 한 명
+- 레지스트리 1개와 그 안의 이미지 2개, user 1명
   - 도메인 home-1
   - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
   - 이미지 image-0-1: x86_64 이미지
@@ -1117,11 +1379,11 @@ Then
 
 #### [naming-two-pagination-modes-at-once-is-refused](/tests/scenario/bai_scenario/manager/image/test_searching.py) — pass
 
-크기와 커서를 함께 주면 입력이 틀렸다는 이유로 거부된다. 요청 타입이 아니라 어댑터가 페이지 방식을 고르면서 낸다
+크기와 커서를 함께 지정하면 입력이 잘못되어 거부된다. 요청 타입이 아니라 어댑터가 페이지 방식을 고르는 과정에서 발생한다
 
 Given
 
-- 레지스트리 하나와 그 안의 이미지 2개, superadmin 한 명
+- 레지스트리 1개와 그 안의 이미지 2개, superadmin 1명
   - 도메인 home-1
   - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
   - 이미지 image-0-1: x86_64 이미지
@@ -1134,7 +1396,7 @@ Given
 
 When
 
-- ImageAdapter.admin_search_images_gql — user-1이 크기와 커서를 함께 주고 검색함
+- ImageAdapter.admin_search_images_gql — user-1이 크기와 커서를 함께 지정하고 검색함
 
 Then
 
@@ -1143,11 +1405,11 @@ Then
 
 #### [omitting-the-page-size-answers-with-fifty-and-says-there-is-more](/tests/scenario/bai_scenario/manager/image/test_searching.py) — pass
 
-슈퍼관리자가 페이지 크기를 생략하고 검색하면, 쉰 건까지만 오고 다음 쪽이 있다고 답한다
+슈퍼관리자가 페이지 크기를 생략하고 검색하면, 50개까지만 반환되고 다음 페이지가 있다고 알린다
 
 Given
 
-- 레지스트리 하나와 그 안의 이미지 51개, superadmin 한 명
+- 레지스트리 1개와 그 안의 이미지 51개, superadmin 1명
   - 도메인 home-1
   - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
   - 이미지 image-0-1: x86_64 이미지
@@ -1213,19 +1475,19 @@ When
 
 Then
 
-- 정한 만큼만 오고 다음 쪽이 있다고 답한다
-  - items = 50
+- 지정한 개수만 반환되고 다음 페이지가 있다고 알린다
+  - length = 50
   - total_count = 51
   - has_next_page = True
   - has_previous_page = False
 
 #### [searching-aliases-answers-with-the-one-that-was-attached](/tests/scenario/bai_scenario/manager/image/test_searching.py) — pass
 
-별칭이 붙어 있을 때 슈퍼관리자가 별칭을 검색하면 그 별칭이 답으로 온다
+별칭이 등록되어 있을 때 슈퍼관리자가 별칭을 검색하면 그 별칭이 반환된다
 
 Given
 
-- 별칭이 붙은 이미지 하나, superadmin 한 명
+- 별칭이 등록된 이미지 1개, superadmin 1명
   - 도메인 home-1
   - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
   - 이미지 image-1: x86_64 이미지
@@ -1242,7 +1504,7 @@ When
 
 Then
 
-- 붙여 둔 별칭이 답으로 온다
+- 등록해 둔 별칭이 반환된다
   - items = ['seeded-alias']
   - total_count = 1
   - has_next_page = False
@@ -1250,11 +1512,11 @@ Then
 
 #### [searching-aliases-when-none-were-attached-answers-empty](/tests/scenario/bai_scenario/manager/image/test_searching.py) — pass
 
-별칭을 하나도 붙이지 않은 상태에서 슈퍼관리자가 별칭을 검색하면 답이 비어 있다
+별칭을 하나도 등록하지 않은 상태에서 슈퍼관리자가 별칭을 검색하면 응답이 비어 있다
 
 Given
 
-- 레지스트리 하나와 그 안의 이미지 2개, superadmin 한 명
+- 레지스트리 1개와 그 안의 이미지 2개, superadmin 1명
   - 도메인 home-1
   - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
   - 이미지 image-0-1: x86_64 이미지
@@ -1279,11 +1541,11 @@ Then
 
 #### [searching-without-a-filter-counts-every-image](/tests/scenario/bai_scenario/manager/image/test_searching.py) — pass
 
-슈퍼관리자가 조건 없이 검색하면 심어둔 이미지가 모두 답으로 온다
+슈퍼관리자가 조건 없이 검색하면 미리 만들어 둔 이미지가 모두 반환된다
 
 Given
 
-- 레지스트리 하나와 그 안의 이미지 2개, superadmin 한 명
+- 레지스트리 1개와 그 안의 이미지 2개, superadmin 1명
   - 도메인 home-1
   - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
   - 이미지 image-0-1: x86_64 이미지
@@ -1300,7 +1562,7 @@ When
 
 Then
 
-- 심은 이미지가 모두 세어진다
+- 미리 만들어 둔 이미지가 모두 집계된다
   - items = ['image-0-1', 'image-1-1']
   - total_count = 2
   - has_next_page = False
