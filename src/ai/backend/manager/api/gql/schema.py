@@ -550,6 +550,7 @@ from .vfolder_v2 import (
     project_vfolders,
     purge_vfolder_v2,
     restore_vfolder_v2,
+    scoped_vfolders_v2,
     vfolder_create_download_session_v2,
     vfolder_create_upload_session_v2,
     vfolder_delete_files_v2,
@@ -803,6 +804,7 @@ class Query:
     admin_vfolders_v2 = admin_vfolders_v2
     vfolder_v2 = vfolder_v2
     project_vfolders = project_vfolders
+    scoped_vfolders_v2 = scoped_vfolders_v2
     my_vfolders = my_vfolders
 
 

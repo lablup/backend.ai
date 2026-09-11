@@ -7,6 +7,7 @@ from collections.abc import Sequence
 from uuid import UUID
 
 from ai.backend.common.contexts.user import current_user
+from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.entity.vfolder import VFolderUUID
@@ -27,6 +28,7 @@ from ai.backend.common.dto.manager.v2.vfolder.request import (
     MkdirInput,
     MoveFileInput,
     PurgeVFolderInput,
+    ScopedSearchVFoldersInput,
     SearchVFoldersInput,
     VFolderFilter,
     VFolderOrder,
@@ -58,6 +60,7 @@ from ai.backend.common.dto.manager.v2.vfolder.types import (
     VFolderMetadataInfo,
     VFolderOwnershipInfo,
     VFolderQuotaInfo,
+    VFolderScope,
 )
 from ai.backend.common.dto.manager.v2.vfolder.types import (
     VFolderUsageInfo as VFolderUsageInfoDTO,
@@ -137,9 +140,11 @@ from ai.backend.manager.services.vfolder.actions.get_usage import (
 )
 from ai.backend.manager.services.vfolder.actions.get_v2 import GetVFolderV2Action
 from ai.backend.manager.services.vfolder.actions.scoped_search import (
+    DomainVFolderScopeItem,
     ProjectVFolderScopeItem,
     ScopedSearchVFoldersAction,
     UserVFolderScopeItem,
+    VFolderScopeItem,
 )
 from ai.backend.manager.services.vfolder.actions.upload_session_v2 import (
     CreateUploadSessionV2Action,
@@ -348,6 +353,52 @@ class VFolderAdapter(BaseAdapter):
             total_count=action_result.total_count,
             has_next_page=action_result.has_next_page,
             has_previous_page=action_result.has_previous_page,
+        )
+
+    def _scope_items(self, scope: VFolderScope) -> list[VFolderScopeItem]:
+        """The scope items the request named, in the order the input lists them."""
+        items: list[VFolderScopeItem] = [
+            DomainVFolderScopeItem(domain_id=DomainID(entry.value)) for entry in scope.domain or ()
+        ]
+        items.extend(
+            ProjectVFolderScopeItem(project_id=ProjectID(entry.value))
+            for entry in scope.project or ()
+        )
+        items.extend(
+            UserVFolderScopeItem(user_id=UserID(entry.value)) for entry in scope.user or ()
+        )
+        return items
+
+    async def scoped_search(
+        self,
+        input: ScopedSearchVFoldersInput,
+    ) -> SearchVFoldersPayload:
+        """Search the vfolders the named scopes reach, combined with OR."""
+        action_result = await self._vfolder.scoped_search.run(
+            ScopedSearchVFoldersAction(
+                items=self._scope_items(input.scope),
+                searcher=self._build_scoped_vfolder_searcher(input),
+            )
+        )
+        return SearchVFoldersPayload(
+            items=[self._vfolder_data_to_node(item) for item in action_result.items],
+            total_count=action_result.total_count,
+            has_next_page=action_result.has_next_page,
+            has_previous_page=action_result.has_previous_page,
+        )
+
+    def _build_scoped_vfolder_searcher(self, input: ScopedSearchVFoldersInput) -> VFolderSearcher:
+        return self._build_searcher(
+            VFolderSearcher,
+            conditions=self._convert_vfolder_filter(input.filter) if input.filter else [],
+            orders=self._convert_vfolder_orders(input.order) if input.order else [],
+            pagination_spec=_VFOLDER_PAGINATION_SPEC,
+            first=input.first,
+            after=input.after,
+            last=input.last,
+            before=input.before,
+            limit=input.limit,
+            offset=input.offset,
         )
 
     def _build_vfolder_searcher(self, input: SearchVFoldersInput) -> VFolderSearcher:

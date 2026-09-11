@@ -7,6 +7,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import override
 
+from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
 from ai.backend.common.data.entity.user import UserID
@@ -16,12 +17,14 @@ from ai.backend.manager.data.vfolder.types import VFolderData
 from ai.backend.manager.models.scopes import OperationScope
 from ai.backend.manager.models.vfolder.row import VFolderRow
 from ai.backend.manager.models.vfolder.scopes import (
+    DomainVFolderOperationScope,
     ProjectVFolderOperationScope,
     UserVFolderOperationScope,
 )
 from ai.backend.manager.models.vfolder.searchers import VFolderSearcher
 
 __all__ = (
+    "DomainVFolderScopeItem",
     "ProjectVFolderScopeItem",
     "ScopedSearchVFoldersAction",
     "UserVFolderScopeItem",
@@ -31,6 +34,21 @@ __all__ = (
 
 class VFolderScopeItem(ScopeItem, ABC):
     """One side a vfolder is reachable from."""
+
+
+@dataclass(frozen=True)
+class DomainVFolderScopeItem(VFolderScopeItem):
+    """The vfolders of one domain."""
+
+    domain_id: DomainID
+
+    @override
+    def scope_id(self) -> EntityIdentifier:
+        return self.domain_id
+
+    @override
+    def operation_scope(self) -> OperationScope:
+        return DomainVFolderOperationScope(domain_id=self.domain_id)
 
 
 @dataclass(frozen=True)
