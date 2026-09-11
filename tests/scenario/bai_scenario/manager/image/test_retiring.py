@@ -174,7 +174,10 @@ class PurgingTakesTheAliasesWithIt(
 
     @override
     def describe(self) -> str:
-        return "별칭이 붙은 이미지를 지우면 이미지와 별칭이 함께 사라진다"
+        return (
+            "별칭이 붙은 이미지도 지워지고 지워진 이미지가 답으로 온다. "
+            "별칭이 함께 사라지는 것은 답에 실리지 않아 이 행이 보지 못한다"
+        )
 
     @override
     def given(self) -> Given[SeedingSession, AnAliasAndACaller]:

@@ -200,6 +200,45 @@ class ManyImagesAndSomeone(Given[Any, ManyImagesAndACaller]):
 
 
 @dataclass(frozen=True)
+class ImagesInTwoRegistries(Given[Any, ManyImagesAndACaller]):
+    """두 레지스트리에 나뉘어 놓인 이미지들과, 부를 사람 하나.
+
+    한쪽으로 좁히는 것을 보는 자리에 쓴다. 레지스트리가 하나뿐이면 좁혀도 걸러지는 것이
+    없어서, 조건을 빼도 같은 답이 온다.
+    """
+
+    role: UserRole = UserRole.SUPERADMIN
+    wanted: int = 2
+    elsewhere: int = 2
+
+    @override
+    def describe(self) -> str:
+        return (
+            f"레지스트리 둘, 한쪽에 이미지 {self.wanted}개와 다른 쪽에 {self.elsewhere}개, "
+            f"{self.role.value} 한 명"
+        )
+
+    @override
+    async def lay(self, seeding: Any) -> ManyImagesAndACaller:
+        domain = await seeding.creating(SeedDomain(name_hint="home"))
+        wanted = await seeding.creating(SeedContainerRegistry(name_hint="wanted"))
+        other = await seeding.creating(SeedContainerRegistry(name_hint="other"))
+        here = [
+            await seeding.creating_from(SeedImage(name_hint=f"here-{index}"), wanted)
+            for index in range(self.wanted)
+        ]
+        for index in range(self.elsewhere):
+            await seeding.creating_from(SeedImage(name_hint=f"there-{index}"), other)
+        caller = await seeding.within(SomeoneOf(domain, role=self.role))
+        return ManyImagesAndACaller(
+            laid=tuple(seeding.made(one) for one in here),
+            named=seeding.made(here[0]),
+            registry=seeding.made(wanted),
+            caller=seeding.made(caller),
+        )
+
+
+@dataclass(frozen=True)
 class AnAliasAndSomeone(Given[Any, AnAliasAndACaller]):
     """별칭이 붙은 이미지 하나와, 부를 사람 하나."""
 

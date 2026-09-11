@@ -8,10 +8,13 @@ from typing import Any, override
 import pytest
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.image import (
+    AnAliasAndACaller,
+    AnAliasAndSomeone,
     ByABrokenCursor,
     ByCursor,
     ByOffset,
     ByTwoModesAtOnce,
+    ImagesInTwoRegistries,
     ManyImagesAndACaller,
     ManyImagesAndSomeone,
     Paging,
@@ -119,6 +122,53 @@ class SearchingAliases(When[ManyImagesAndACaller, ImageAdapter, AdminSearchImage
             return await adapter.admin_search_image_aliases(
                 AdminSearchImageAliasesInput(limit=DEFAULT_PAGE)
             )
+
+
+@dataclass(frozen=True)
+class SearchingTheAliasesOf(When[AnAliasAndACaller, ImageAdapter, AdminSearchImageAliasesPayload]):
+    """별칭이 붙은 전제 위에서 별칭을 검색한다."""
+
+    @override
+    def operation(self) -> str:
+        return "admin_search_image_aliases"
+
+    @override
+    def describe(self, laid: AnAliasAndACaller) -> str:
+        return f"{laid.caller.username}이 별칭을 검색함"
+
+    @override
+    async def call(
+        self, adapter: ImageAdapter, laid: AnAliasAndACaller
+    ) -> AdminSearchImageAliasesPayload:
+        with ActingAs(laid.caller):
+            return await adapter.admin_search_image_aliases(
+                AdminSearchImageAliasesInput(limit=DEFAULT_PAGE)
+            )
+
+
+@dataclass(frozen=True)
+class TheAttachedAliasIsFound(Then[AnAliasAndACaller, AdminSearchImageAliasesPayload]):
+    """붙여 둔 별칭 하나가 답으로 온다."""
+
+    @override
+    def says(self) -> str:
+        return "붙여 둔 별칭이 답으로 온다"
+
+    @override
+    def look(
+        self, laid: AnAliasAndACaller, answered: Answered[AdminSearchImageAliasesPayload]
+    ) -> list[Verdict]:
+        payload = answered.response
+        if payload is None:
+            return [
+                Refused(type(answered.raised) if answered.raised else Exception, answered.raised)
+            ]
+        return [
+            Same("items", [one.alias for one in payload.items], [laid.alias.alias]),
+            Same("total_count", payload.total_count, 1),
+            Same("has_next_page", payload.has_next_page, False),
+            Same("has_previous_page", payload.has_previous_page, False),
+        ]
 
 
 @dataclass(frozen=True)
@@ -315,13 +365,13 @@ class TheBaseConditionNarrowsFirst(
     @override
     def describe(self) -> str:
         return (
-            "바깥에서 한 레지스트리로 좁혀 준 조건이 먼저 걸리므로, "
-            "그 레지스트리의 이미지만 답으로 온다"
+            "이미지가 두 레지스트리에 나뉘어 있을 때 바깥에서 한쪽으로 좁혀 주면, "
+            "그 레지스트리의 이미지만 답으로 오고 다른 쪽은 세어지지 않는다"
         )
 
     @override
     def given(self) -> Given[SeedingSession, ManyImagesAndACaller]:
-        return ManyImagesAndSomeone()
+        return ImagesInTwoRegistries()
 
     @override
     def when(self) -> When[ManyImagesAndACaller, ImageAdapter, AdminSearchImagesPayload]:
@@ -411,6 +461,31 @@ class SearchingAliasesWithNoneAttached(
 
 
 @dataclass(frozen=True)
+class SearchingAliasesFindsTheAttachedOne(
+    Scenario[SeedingSession, AnAliasAndACaller, ImageAdapter, AdminSearchImageAliasesPayload]
+):
+    @override
+    def summary(self) -> str:
+        return "searching-aliases-answers-with-the-one-that-was-attached"
+
+    @override
+    def describe(self) -> str:
+        return "별칭이 붙어 있을 때 슈퍼관리자가 별칭을 검색하면 그 별칭이 답으로 온다"
+
+    @override
+    def given(self) -> Given[SeedingSession, AnAliasAndACaller]:
+        return AnAliasAndSomeone()
+
+    @override
+    def when(self) -> When[AnAliasAndACaller, ImageAdapter, AdminSearchImageAliasesPayload]:
+        return SearchingTheAliasesOf()
+
+    @override
+    def then(self) -> Then[AnAliasAndACaller, AdminSearchImageAliasesPayload]:
+        return TheAttachedAliasIsFound()
+
+
+@dataclass(frozen=True)
 class APlainUserMayNotSearchAliases(
     Scenario[SeedingSession, ManyImagesAndACaller, ImageAdapter, AdminSearchImageAliasesPayload]
 ):
@@ -444,6 +519,7 @@ SCENARIOS: list[Any] = [
     TwoPaginationModesAreRefused(),
     ABrokenCursorIsRefused(),
     SearchingAliasesWithNoneAttached(),
+    SearchingAliasesFindsTheAttachedOne(),
     APlainUserMayNotSearchAliases(),
 ]
 
