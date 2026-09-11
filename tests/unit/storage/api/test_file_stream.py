@@ -14,7 +14,7 @@ from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any, cast
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import MagicMock
 from uuid import uuid4
 
 import jwt
@@ -129,8 +129,7 @@ class TestDownloadArchiveHandler:
         # Mock root context
         root_ctx = MagicMock()
         root_ctx.local_config.storage_proxy.secret = secret
-        root_ctx.get_volume.return_value.__aenter__ = AsyncMock(return_value=volume)
-        root_ctx.get_volume.return_value.__aexit__ = AsyncMock(return_value=None)
+        root_ctx.volume_pool.get_volume_by_name = MagicMock(return_value=volume)
 
         # Mock storage context
         ctx = MagicMock()
@@ -196,7 +195,9 @@ class TestDownloadArchiveHandler:
         response = await unwrapped(download_handler, mock_query_param, mock_context)
 
         # Verify volume was accessed from token
-        mock_context.root_ctx.get_volume.assert_called_once_with(token_data.volume)
+        mock_context.root_ctx.volume_pool.get_volume_by_name.assert_called_once_with(
+            token_data.volume
+        )
 
         # Verify response is successful
         api_response = cast(APIStreamResponse, response)

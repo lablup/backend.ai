@@ -11,6 +11,7 @@ from ai.backend.common.events.dispatcher import EventDispatcher, EventProducer
 from ai.backend.storage.config.unified import StorageProxyUnifiedConfig
 from ai.backend.storage.volumes.abc import AbstractVolume
 from ai.backend.storage.volumes.pool import VolumePool
+from ai.backend.storage.watcher import WatcherClient
 
 
 @dataclass
@@ -22,6 +23,7 @@ class VolumePoolInput:
     event_dispatcher: EventDispatcher
     event_producer: EventProducer
     backends: Mapping[str, type[AbstractVolume]]
+    watcher: WatcherClient | None
 
 
 class VolumePoolProvider(NonMonitorableDependencyProvider[VolumePoolInput, VolumePool]):
@@ -41,6 +43,7 @@ class VolumePoolProvider(NonMonitorableDependencyProvider[VolumePoolInput, Volum
             event_dispatcher=setup_input.event_dispatcher,
             event_producer=setup_input.event_producer,
             backends=setup_input.backends,
+            watcher=setup_input.watcher,
         )
         try:
             yield volume_pool
