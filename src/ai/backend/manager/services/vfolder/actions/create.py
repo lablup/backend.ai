@@ -4,7 +4,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.common.data.entity.types import ScopeRef
+from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.vfolder.types import VFolderData
 from ai.backend.manager.models.vfolder.creators import VFolderBaseCreator
@@ -26,7 +26,7 @@ class CreateVFolderAction(VFolderScopeAction):
     creator: VFolderBaseCreator
 
     @override
-    def scope_targets(self) -> Sequence[ScopeRef]:
+    def scope_targets(self) -> Sequence[EntityIdentifier]:
         return self.creator.scope_targets()
 
     @override

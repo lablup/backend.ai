@@ -6,17 +6,18 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from pydantic import Field, field_validator
+from pydantic import Field, field_validator, model_validator
 
 from ai.backend.common.api_handlers import BaseRequestModel
+from ai.backend.common.data.entity.types import EntityType
+from ai.backend.common.data.permission.types import Permission
 from ai.backend.common.dto.manager.query import DateTimeFilter, StringFilter, UUIDFilter
 from ai.backend.common.tristate.unset import UNSET, Unset
 
 from .types import (
-    OperationTypeFilter,
     OrderDirection,
-    RBACElementTypeFilter,
-    RoleSource,
+    PermissionBitDTO,
+    PermissionBitFilter,
     RoleSourceFilter,
     RoleStatus,
     RoleStatusFilter,
@@ -24,7 +25,6 @@ from .types import (
 )
 
 __all__ = (
-    "AdminSearchEntitiesGQLInput",
     "AdminSearchPermissionsGQLInput",
     "SearchRoleAssignmentsInput",
     "SearchRolesInput",
@@ -37,8 +37,6 @@ __all__ = (
     "CreateRoleInput",
     "DeletePermissionInput",
     "DeleteRoleInput",
-    "EntityFilter",
-    "EntityOrderBy",
     "PermissionFilter",
     "PermissionNestedFilter",
     "PermissionOrderBy",
@@ -61,7 +59,6 @@ class CreateRoleInput(BaseRequestModel):
 
     name: str = Field(min_length=1, max_length=256, description="Role name")
     description: str | None = Field(default=None, description="Role description")
-    source: RoleSource = Field(default=RoleSource.CUSTOM, description="Role source")
     auto_assign: bool = Field(
         default=False,
         description=(
@@ -69,8 +66,10 @@ class CreateRoleInput(BaseRequestModel):
             "to a scope this role is registered in."
         ),
     )
+    scope: ScopeInputDTO | None = Field(default=None, description="The scope the role belongs to")
     scopes: list[ScopeInputDTO] | None = Field(
-        default=None, description="Scopes to register the role in"
+        default=None,
+        description="Deprecated: use `scope`. Accepts exactly one entry.",
     )
 
     @field_validator("name")
@@ -80,6 +79,26 @@ class CreateRoleInput(BaseRequestModel):
         if not stripped:
             raise ValueError("name must not be blank or whitespace-only")
         return stripped
+
+    @model_validator(mode="after")
+    def exactly_one_scope(self) -> CreateRoleInput:
+        if self.scope is not None:
+            if self.scopes:
+                raise ValueError("scope and scopes cannot both be given")
+            return self
+        if not self.scopes:
+            raise ValueError("scope is required")
+        if len(self.scopes) != 1:
+            raise ValueError("A role belongs to exactly one scope")
+        return self
+
+    def scope_input(self) -> ScopeInputDTO:
+        """The scope the role belongs to, from whichever field carried it."""
+        if self.scope is not None:
+            return self.scope
+        if not self.scopes:
+            raise ValueError("scope is required")
+        return self.scopes[0]
 
 
 class UpdateRoleInput(BaseRequestModel):
@@ -130,27 +149,23 @@ class CreatePermissionInput(BaseRequestModel):
     """Input for creating a scoped permission."""
 
     role_id: UUID = Field(description="Role ID to assign this permission to")
-    scope_type: str = Field(description="Scope element type (e.g. 'domain', 'project')")
-    scope_id: str = Field(description="Scope element ID")
-    entity_type: str = Field(description="Entity element type (e.g. 'session', 'vfolder')")
-    operation: str = Field(description="Operation type (e.g. 'read', 'create')")
+    entity_type: EntityType = Field(description="Entity type (e.g. 'session', 'vfolder')")
+    permission: PermissionBitDTO = Field(description="The operation bit the row holds")
+
+    def permission_bit(self) -> Permission:
+        """The bit this input names, as the permission row records it."""
+        return self.permission.to_permission()
 
 
 class UpdatePermissionInput(BaseRequestModel):
     """Input for updating a scoped permission."""
 
     id: UUID = Field(description="Permission ID to update")
-    scope_type: str | None | Unset = Field(
-        default=UNSET, description="Updated scope element type. Omit to leave unchanged."
+    entity_type: EntityType | None | Unset = Field(
+        default=UNSET, description="Updated entity type. Omit to leave unchanged."
     )
-    scope_id: str | None | Unset = Field(
-        default=UNSET, description="Updated scope element ID. Omit to leave unchanged."
-    )
-    entity_type: str | None | Unset = Field(
-        default=UNSET, description="Updated entity element type. Omit to leave unchanged."
-    )
-    operation: str | None | Unset = Field(
-        default=UNSET, description="Updated operation type. Omit to leave unchanged."
+    permission: PermissionBitDTO | None | Unset = Field(
+        default=UNSET, description="Updated operation bit. Omit to leave unchanged."
     )
 
 
@@ -245,8 +260,8 @@ UserNestedFilter.model_rebuild()
 class MappedScopeNestedFilter(BaseRequestModel):
     """Filter roles by the scope they are mapped (registered) to."""
 
-    scope_type: RBACElementTypeFilter | None = None
-    scope_id: StringFilter | None = None
+    scope_type: StringFilter | None = None
+    scope_id: UUIDFilter | None = None
     AND: list[MappedScopeNestedFilter] | None = None
     OR: list[MappedScopeNestedFilter] | None = None
     NOT: list[MappedScopeNestedFilter] | None = None
@@ -288,10 +303,8 @@ RoleNestedFilter.model_rebuild()
 class PermissionNestedFilter(BaseRequestModel):
     """Nested filter for permissions within a role assignment."""
 
-    scope_id: StringFilter | None = None
-    scope_type: RBACElementTypeFilter | None = None
-    entity_type: RBACElementTypeFilter | None = None
-    operation: OperationTypeFilter | None = None
+    entity_type: StringFilter | None = None
+    permission: PermissionBitFilter | None = None
     AND: list[PermissionNestedFilter] | None = None
     OR: list[PermissionNestedFilter] | None = None
     NOT: list[PermissionNestedFilter] | None = None
@@ -316,28 +329,11 @@ class RoleAssignmentFilter(BaseRequestModel):
 RoleAssignmentFilter.model_rebuild()
 
 
-class EntityFilter(BaseRequestModel):
-    """Filter for entity associations."""
-
-    entity_type: RBACElementTypeFilter | None = None
-    entity_id: StringFilter | None = None
-    scope_type: RBACElementTypeFilter | None = None
-    scope_id: StringFilter | None = None
-    AND: list[EntityFilter] | None = None
-    OR: list[EntityFilter] | None = None
-    NOT: list[EntityFilter] | None = None
-
-
-EntityFilter.model_rebuild()
-
-
 class PermissionFilter(BaseRequestModel):
     """Filter for scoped permissions."""
 
     role_id: UUIDFilter | None = None
-    scope_type: RBACElementTypeFilter | None = None
-    scope_id: StringFilter | None = None
-    entity_type: RBACElementTypeFilter | None = None
+    entity_type: StringFilter | None = None
     created_at: DateTimeFilter | None = None
     AND: list[PermissionFilter] | None = None
     OR: list[PermissionFilter] | None = None
@@ -356,13 +352,6 @@ class RoleOrderBy(BaseRequestModel):
 
 class RoleAssignmentOrderBy(BaseRequestModel):
     """Order by specification for role assignments."""
-
-    field: str
-    direction: OrderDirection = OrderDirection.DESC
-
-
-class EntityOrderBy(BaseRequestModel):
-    """Order by specification for entity associations."""
 
     field: str
     direction: OrderDirection = OrderDirection.DESC
@@ -406,19 +395,6 @@ class SearchRoleAssignmentsInput(BaseRequestModel):
 
     filter: RoleAssignmentFilter | None = None
     order: list[RoleAssignmentOrderBy] | None = None
-    first: int | None = None
-    after: str | None = None
-    last: int | None = None
-    before: str | None = None
-    limit: int | None = None
-    offset: int | None = None
-
-
-class AdminSearchEntitiesGQLInput(BaseRequestModel):
-    """GQL pagination search input for entity associations."""
-
-    filter: EntityFilter | None = None
-    order: list[EntityOrderBy] | None = None
     first: int | None = None
     after: str | None = None
     last: int | None = None

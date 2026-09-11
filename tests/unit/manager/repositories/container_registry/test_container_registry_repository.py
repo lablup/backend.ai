@@ -11,11 +11,11 @@ import sqlalchemy as sa
 
 from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.data.entity.container_registry import (
-    CONTAINER_REGISTRY_ENTITY_TYPE,
+    ContainerRegistryEntityType,
     ContainerRegistryID,
 )
 from ai.backend.common.data.entity.domain import DomainID
-from ai.backend.common.data.entity.project import PROJECT_ENTITY_TYPE, ProjectID
+from ai.backend.common.data.entity.project import ProjectEntityType, ProjectID
 from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.common.data.permission.types import Permission
 from ai.backend.common.types import ResourceSlot
@@ -53,9 +53,6 @@ from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.project import ProjectRow
 from ai.backend.manager.models.rbac_models import PermissionRow, RoleRow, UserRoleRow
-from ai.backend.manager.models.rbac_models.association_scopes_entities import (
-    AssociationScopesEntitiesRow,
-)
 from ai.backend.manager.models.rbac_models.role_permission_preset.row import (
     RolePermissionPresetRow,
 )
@@ -167,7 +164,6 @@ class TestContainerRegistryRepository:
                 ResourcePresetRow,
                 ContainerRegistryRow,
                 AssociationContainerRegistriesGroupsRow,
-                AssociationScopesEntitiesRow,
                 PermissionRow,
                 RolePresetRow,
                 RolePermissionPresetRow,
@@ -240,7 +236,7 @@ class TestContainerRegistryRepository:
                 )
                 session.add(group)
                 await session.flush()
-                session.add(VirtualEntityRow(entity_type=PROJECT_ENTITY_TYPE, entity_id=group.id))
+                session.add(VirtualEntityRow(entity_type=ProjectEntityType(), entity_id=group.id))
                 group_ids.append(group.id)
 
             await session.commit()
@@ -496,7 +492,7 @@ class TestContainerRegistryRepository:
                 )
                 session.add(group)
                 await session.flush()
-                session.add(VirtualEntityRow(entity_type=PROJECT_ENTITY_TYPE, entity_id=group.id))
+                session.add(VirtualEntityRow(entity_type=ProjectEntityType(), entity_id=group.id))
                 group_ids.append(str(group.id))
             await session.commit()
 
@@ -868,7 +864,7 @@ class TestContainerRegistryRepository:
             session.add(registry)
             await session.flush()
             session.add(
-                VirtualEntityRow(entity_type=CONTAINER_REGISTRY_ENTITY_TYPE, entity_id=registry.id)
+                VirtualEntityRow(entity_type=ContainerRegistryEntityType(), entity_id=registry.id)
             )
             await session.commit()
             await session.refresh(registry)
@@ -932,7 +928,7 @@ class TestContainerRegistryRepository:
             session.add(registry)
             await session.flush()
             session.add(
-                VirtualEntityRow(entity_type=CONTAINER_REGISTRY_ENTITY_TYPE, entity_id=registry.id)
+                VirtualEntityRow(entity_type=ContainerRegistryEntityType(), entity_id=registry.id)
             )
 
             # Create resource policies
@@ -963,7 +959,7 @@ class TestContainerRegistryRepository:
                 )
                 session.add(group)
                 await session.flush()
-                session.add(VirtualEntityRow(entity_type=PROJECT_ENTITY_TYPE, entity_id=group.id))
+                session.add(VirtualEntityRow(entity_type=ProjectEntityType(), entity_id=group.id))
                 group_ids.append(group.id)
 
                 # Associate with registry
@@ -1050,7 +1046,7 @@ class TestContainerRegistryRepository:
             session.add(registry)
             await session.flush()
             session.add(
-                VirtualEntityRow(entity_type=CONTAINER_REGISTRY_ENTITY_TYPE, entity_id=registry.id)
+                VirtualEntityRow(entity_type=ContainerRegistryEntityType(), entity_id=registry.id)
             )
 
             # Create resource policies
@@ -1081,7 +1077,7 @@ class TestContainerRegistryRepository:
                 )
                 session.add(group)
                 await session.flush()
-                session.add(VirtualEntityRow(entity_type=PROJECT_ENTITY_TYPE, entity_id=group.id))
+                session.add(VirtualEntityRow(entity_type=ProjectEntityType(), entity_id=group.id))
                 group_ids.append(group.id)
 
             # Associate first 2 groups with the registry
@@ -1413,7 +1409,6 @@ class TestSearchContainerRegistries:
                 ResourcePresetRow,
                 ContainerRegistryRow,
                 AssociationContainerRegistriesGroupsRow,
-                AssociationScopesEntitiesRow,
             ],
         ):
             yield database_connection

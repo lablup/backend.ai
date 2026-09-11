@@ -5,10 +5,11 @@ from __future__ import annotations
 from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Any, override
+from uuid import UUID
 
 import sqlalchemy as sa
 
-from ai.backend.common.data.entity.types import EntityID, EntityType
+from ai.backend.common.data.entity.types import EntityType
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.entity_label.row import EntityLabelRow
 from ai.backend.manager.models.scopes import ExistenceCheck, OperationScope
@@ -27,7 +28,7 @@ class EntityLabelOperationScope(OperationScope):
     """
 
     entity_type: EntityType
-    entity_id: EntityID
+    entity_id: UUID
 
     @override
     def to_condition(self) -> QueryCondition:

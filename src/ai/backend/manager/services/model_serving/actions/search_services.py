@@ -3,8 +3,8 @@ from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import override
 
-from ai.backend.common.data.entity.types import ScopeRef
-from ai.backend.common.data.entity.user import USER_SCOPE_TYPE
+from ai.backend.common.data.entity.types import EntityIdentifier
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.model_serving.types import ServiceSearchItem
 from ai.backend.manager.models.clauses import QueryCondition
@@ -19,8 +19,8 @@ class SearchServicesAction(ModelServiceScopeAction):
     session_owner_id: uuid.UUID
 
     @override
-    def scope_targets(self) -> Sequence[ScopeRef]:
-        return (ScopeRef(scope_type=USER_SCOPE_TYPE, scope_id=self.session_owner_id),)
+    def scope_targets(self) -> Sequence[EntityIdentifier]:
+        return (UserID(self.session_owner_id),)
 
     conditions: list[QueryCondition] = field(default_factory=list)
     offset: int = 0

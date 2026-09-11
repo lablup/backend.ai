@@ -6,9 +6,9 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.common.data.entity.deployment import DEPLOYMENT_SCOPE_TYPE, DeploymentID
-from ai.backend.common.data.entity.session import SESSION_SCOPE_TYPE, SessionID
-from ai.backend.common.data.entity.types import EntityIdentifier, EntityType, ScopeRef
+from ai.backend.common.data.entity.deployment import DeploymentID
+from ai.backend.common.data.entity.session import SessionID
+from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
 from ai.backend.manager.actions.v2.global_scope.base import BaseGlobalAction
 from ai.backend.manager.actions.v2.scope.base import BaseScopeAction
 from ai.backend.manager.actions.v2.scope.result import BaseScopeActionResult
@@ -26,8 +26,8 @@ class SessionSchedulingHistoryAction(BaseScopeAction):
     session_id: SessionID
 
     @override
-    def scope_targets(self) -> Sequence[ScopeRef]:
-        return (ScopeRef(scope_type=SESSION_SCOPE_TYPE, scope_id=self.session_id),)
+    def scope_targets(self) -> Sequence[EntityIdentifier]:
+        return (self.session_id,)
 
 
 @dataclass
@@ -37,8 +37,8 @@ class DeploymentSchedulingHistoryAction(BaseScopeAction):
     deployment_id: DeploymentID
 
     @override
-    def scope_targets(self) -> Sequence[ScopeRef]:
-        return (ScopeRef(scope_type=DEPLOYMENT_SCOPE_TYPE, scope_id=self.deployment_id),)
+    def scope_targets(self) -> Sequence[EntityIdentifier]:
+        return (self.deployment_id,)
 
 
 @dataclass

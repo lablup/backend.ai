@@ -9,7 +9,6 @@ import pytest
 from ai.backend.client.v2.exceptions import PermissionDeniedError
 from ai.backend.client.v2.registry import BackendAIClientRegistry
 from ai.backend.common.dto.manager.image.request import RescanImagesRequest
-from ai.backend.common.dto.manager.image.response import RescanImagesResponse
 from ai.backend.common.exception import BackendAISchemaValidationFailed
 from ai.backend.common.types import ImageID
 from ai.backend.manager.data.image.types import ResourceLimitInput
@@ -27,24 +26,6 @@ from .conftest import ImageFactoryHelper
 
 
 class TestImageRescan:
-    @pytest.mark.xfail(reason="Requires live container registry", strict=False)
-    @pytest.mark.timeout(10)
-    async def test_rescan_returns_response(
-        self,
-        admin_registry: BackendAIClientRegistry,
-        image_fixture: tuple[uuid.UUID, ImageFactoryHelper],
-    ) -> None:
-        """S-1: Rescan with valid canonical + architecture → RescanImagesResponse."""
-        image_id, _ = image_fixture
-        canonical = f"registry.test.local/testproject/test-image-{image_id.hex[:8]}:latest"
-        result = await admin_registry.image.rescan(
-            RescanImagesRequest(
-                canonical=canonical,
-                architecture="x86_64",
-            )
-        )
-        assert isinstance(result, RescanImagesResponse)
-
     def test_rescan_request_requires_canonical(self) -> None:
         """F-INPUT-1: RescanImagesRequest without canonical field → ValidationError (→ HTTP 422)."""
         with pytest.raises((BackendAISchemaValidationFailed, pydantic.ValidationError)):

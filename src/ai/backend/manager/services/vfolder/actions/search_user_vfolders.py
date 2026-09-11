@@ -5,8 +5,8 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.common.data.entity.types import ScopeRef
-from ai.backend.common.data.entity.user import USER_SCOPE_TYPE
+from ai.backend.common.data.entity.types import EntityIdentifier
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.vfolder.types import VFolderData
 from ai.backend.manager.models.vfolder.scopes import UserVFolderOperationScope
@@ -29,8 +29,8 @@ class SearchUserVFoldersAction(VFolderScopeAction):
     querier: BatchQuerier
 
     @override
-    def scope_targets(self) -> Sequence[ScopeRef]:
-        return (ScopeRef(scope_type=USER_SCOPE_TYPE, scope_id=self.scope.user_id),)
+    def scope_targets(self) -> Sequence[EntityIdentifier]:
+        return (UserID(self.scope.user_id),)
 
     @override
     @classmethod

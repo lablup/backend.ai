@@ -9,8 +9,10 @@ from uuid import UUID
 
 import sqlalchemy as sa
 
+from ai.backend.common.data.entity.auto_scaling_rule import AutoScalingRuleID
 from ai.backend.common.data.entity.deployment import DeploymentID
 from ai.backend.common.data.entity.deployment_token import DeploymentTokenID
+from ai.backend.common.data.entity.types import FieldType
 from ai.backend.manager.models.endpoint.row import EndpointAutoScalingRuleRow, EndpointTokenRow
 from ai.backend.manager.models.specs.lookup import FieldOwnerKeyLookup, FieldOwnerLookup
 
@@ -20,6 +22,10 @@ class AutoScalingRuleDeploymentLookup(FieldOwnerKeyLookup[DeploymentID]):
     """Reads the deployment an auto-scaling rule belongs to."""
 
     rule_id: UUID
+
+    @override
+    def field_type(self) -> FieldType:
+        return AutoScalingRuleID.field_type()
 
     @override
     def build_query(self) -> sa.sql.Select[Any]:

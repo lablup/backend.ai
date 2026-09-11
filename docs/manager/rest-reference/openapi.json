@@ -5424,8 +5424,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Updated deployment name",
+            "description": "Updated deployment name. Omit to leave unchanged.",
             "title": "Name"
           },
           "replica_count": {
@@ -5438,8 +5437,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Updated replica count",
+            "description": "Updated replica count. Omit to leave unchanged.",
             "title": "Replica Count"
           },
           "tags": {
@@ -5451,14 +5449,10 @@
                 "type": "array"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
-            "description": "Updated tags. Use SENTINEL to clear.",
+            "description": "Updated tags. Omit to leave unchanged; null clears.",
             "title": "Tags"
           },
           "open_to_public": {
@@ -5470,8 +5464,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Updated network visibility. None means no change.",
+            "description": "Updated network visibility. Omit to leave unchanged.",
             "title": "Open To Public"
           },
           "preferred_domain_name": {
@@ -5483,8 +5476,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Updated preferred domain name. None means no change.",
+            "description": "Updated preferred domain name. Omit to leave unchanged.",
             "title": "Preferred Domain Name"
           },
           "default_deployment_strategy": {
@@ -5496,8 +5488,8 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Updated deployment strategy. None means no change."
+            "description": "Updated deployment strategy. Omit to leave unchanged.",
+            "title": "Default Deployment Strategy"
           }
         },
         "title": "UpdateDeploymentInput",
@@ -7284,7 +7276,7 @@
         "type": "object"
       },
       "UpdateAutoScalingRuleInput": {
-        "description": "Input for updating an auto-scaling rule.\n\nFields default to SENTINEL (no change). Set a field to None to clear it.\nFields that cannot be cleared use None to signal no change.",
+        "description": "Input for updating an auto-scaling rule.\n\nEvery field defaults to UNSET (no change). Null clears only the nullable fields.",
         "properties": {
           "id": {
             "description": "ID of the auto-scaling rule to update",
@@ -7301,8 +7293,8 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Updated metric source. None means no change."
+            "description": "Updated metric source. Omit to leave unchanged.",
+            "title": "Metric Source"
           },
           "metric_name": {
             "anyOf": [
@@ -7313,8 +7305,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Updated metric name. None means no change.",
+            "description": "Updated metric name. Omit to leave unchanged.",
             "title": "Metric Name"
           },
           "min_threshold": {
@@ -7327,14 +7318,10 @@
                 "type": "string"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
-            "description": "Updated minimum threshold. SENTINEL = no change, None = clear.",
+            "description": "Updated minimum threshold. Omit to leave unchanged; null clears.",
             "title": "Min Threshold"
           },
           "max_threshold": {
@@ -7347,14 +7334,10 @@
                 "type": "string"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
-            "description": "Updated maximum threshold. SENTINEL = no change, None = clear.",
+            "description": "Updated maximum threshold. Omit to leave unchanged; null clears.",
             "title": "Max Threshold"
           },
           "step_size": {
@@ -7366,8 +7349,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Updated step size. None means no change.",
+            "description": "Updated step size. Omit to leave unchanged.",
             "title": "Step Size"
           },
           "time_window": {
@@ -7379,8 +7361,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Updated time window in seconds. None means no change.",
+            "description": "Updated time window in seconds. Omit to leave unchanged.",
             "title": "Time Window"
           },
           "min_replicas": {
@@ -7389,14 +7370,10 @@
                 "type": "integer"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
-            "description": "Updated minimum replicas. SENTINEL = no change, None = clear.",
+            "description": "Updated minimum replicas. Omit to leave unchanged; null clears.",
             "title": "Min Replicas"
           },
           "max_replicas": {
@@ -7405,14 +7382,10 @@
                 "type": "integer"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
-            "description": "Updated maximum replicas. SENTINEL = no change, None = clear.",
+            "description": "Updated maximum replicas. Omit to leave unchanged; null clears.",
             "title": "Max Replicas"
           },
           "prometheus_query_preset_id": {
@@ -7422,14 +7395,10 @@
                 "type": "string"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
-            "description": "Updated Prometheus query preset ID. SENTINEL = no change, None = clear.",
+            "description": "Updated Prometheus query preset ID. Omit to leave unchanged; null clears.",
             "title": "Prometheus Query Preset Id"
           }
         },
@@ -8389,6 +8358,393 @@
         "title": "CreateDeploymentRevisionPresetInput",
         "type": "object"
       },
+      "UpdatePresetModelConfigInput": {
+        "description": "Patch for a single preset model entry. Omit a field to keep its current stored value.",
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "model_path": {
+            "anyOf": [
+              {
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model Path"
+          },
+          "service": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UpdatePresetModelServiceConfigInput"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Service"
+          },
+          "metadata": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UpdatePresetModelMetadataInput"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Metadata"
+          }
+        },
+        "title": "UpdatePresetModelConfigInput",
+        "type": "object"
+      },
+      "UpdatePresetModelDefinitionInput": {
+        "description": "Patch for a preset's model definition. Omit `models` to keep the current model entry.",
+        "properties": {
+          "models": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/UpdatePresetModelConfigInput"
+                },
+                "maxItems": 1,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Models"
+          }
+        },
+        "title": "UpdatePresetModelDefinitionInput",
+        "type": "object"
+      },
+      "UpdatePresetModelHealthCheckInput": {
+        "description": "Patch for a preset model's health check. Omit a field to keep its current stored value.",
+        "properties": {
+          "enable": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Enable"
+          },
+          "interval": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Interval"
+          },
+          "path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Path"
+          },
+          "max_retries": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Retries"
+          },
+          "max_wait_time": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Wait Time"
+          },
+          "expected_status_code": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 100,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expected Status Code"
+          },
+          "initial_delay": {
+            "anyOf": [
+              {
+                "minimum": 0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Initial Delay"
+          }
+        },
+        "title": "UpdatePresetModelHealthCheckInput",
+        "type": "object"
+      },
+      "UpdatePresetModelMetadataInput": {
+        "description": "Patch for a preset model's metadata. Omit a field to keep its current stored value.",
+        "properties": {
+          "author": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Author"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Version"
+          },
+          "created": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "task": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Task"
+          },
+          "category": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Category"
+          },
+          "architecture": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Architecture"
+          },
+          "framework": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Framework"
+          },
+          "label": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label"
+          },
+          "license": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "License"
+          },
+          "min_resource": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Min Resource"
+          }
+        },
+        "title": "UpdatePresetModelMetadataInput",
+        "type": "object"
+      },
+      "UpdatePresetModelServiceConfigInput": {
+        "description": "Patch for a preset model's service config. Omit a field to keep its current stored value.",
+        "properties": {
+          "pre_start_actions": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/PreStartAction"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pre Start Actions"
+          },
+          "command": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Command"
+          },
+          "start_command": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Start Command"
+          },
+          "shell": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Shell"
+          },
+          "port": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Port"
+          },
+          "health_check": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UpdatePresetModelHealthCheckInput"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Health Check"
+          }
+        },
+        "title": "UpdatePresetModelServiceConfigInput",
+        "type": "object"
+      },
       "UpdateDeploymentRevisionPresetInput": {
         "properties": {
           "id": {
@@ -8407,7 +8763,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
+            "description": "Omit to leave unchanged.",
             "title": "Runtime Variant Id"
           },
           "name": {
@@ -8421,7 +8777,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
+            "description": "Omit to leave unchanged.",
             "title": "Name"
           },
           "description": {
@@ -8430,26 +8786,22 @@
                 "type": "string"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
             "title": "Description"
           },
           "rank": {
             "anyOf": [
               {
-                "minimum": 0,
+                "ge": 0,
                 "type": "integer"
               },
               {
                 "type": "null"
               }
             ],
-            "default": null,
+            "description": "Omit to leave unchanged.",
             "title": "Rank"
           },
           "image_id": {
@@ -8459,28 +8811,20 @@
                 "type": "string"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
             "title": "Image Id"
           },
           "model_definition": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/PresetModelDefinitionInput"
-              },
-              {
-                "$ref": "#/components/schemas/Sentinel"
+                "$ref": "#/components/schemas/UpdatePresetModelDefinitionInput"
               },
               {
                 "type": "null"
               }
             ],
-            "default": 1,
             "title": "Model Definition"
           },
           "resource_slots": {
@@ -8495,7 +8839,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
+            "description": "Omit to leave unchanged.",
             "title": "Resource Slots"
           },
           "resource_opts": {
@@ -8510,7 +8854,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
+            "description": "Omit to leave unchanged.",
             "title": "Resource Opts"
           },
           "cluster_mode": {
@@ -8523,20 +8867,20 @@
                 "type": "null"
               }
             ],
-            "default": null,
+            "description": "Omit to leave unchanged.",
             "title": "Cluster Mode"
           },
           "cluster_size": {
             "anyOf": [
               {
-                "minimum": 1,
+                "ge": 1,
                 "type": "integer"
               },
               {
                 "type": "null"
               }
             ],
-            "default": null,
+            "description": "Omit to leave unchanged.",
             "title": "Cluster Size"
           },
           "startup_command": {
@@ -8545,13 +8889,9 @@
                 "type": "string"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
             "title": "Startup Command"
           },
           "bootstrap_script": {
@@ -8560,13 +8900,9 @@
                 "type": "string"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
             "title": "Bootstrap Script"
           },
           "environ": {
@@ -8581,7 +8917,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
+            "description": "Omit to leave unchanged.",
             "title": "Environ"
           },
           "preset_values": {
@@ -8596,7 +8932,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
+            "description": "Omit to leave unchanged.",
             "title": "Preset Values"
           },
           "open_to_public": {
@@ -8605,53 +8941,33 @@
                 "type": "boolean"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
             "title": "Open To Public"
           },
           "replica_count": {
             "anyOf": [
               {
-                "anyOf": [
-                  {
-                    "type": "integer"
-                  },
-                  {
-                    "$ref": "#/components/schemas/Sentinel"
-                  }
-                ],
-                "ge": 0
+                "ge": 0,
+                "type": "integer"
               },
               {
                 "type": "null"
               }
             ],
-            "default": 1,
             "title": "Replica Count"
           },
           "revision_history_limit": {
             "anyOf": [
               {
-                "anyOf": [
-                  {
-                    "type": "integer"
-                  },
-                  {
-                    "$ref": "#/components/schemas/Sentinel"
-                  }
-                ],
-                "ge": 0
+                "ge": 0,
+                "type": "integer"
               },
               {
                 "type": "null"
               }
             ],
-            "default": 1,
             "title": "Revision History Limit"
           },
           "deployment_strategy": {
@@ -8660,13 +8976,9 @@
                 "$ref": "#/components/schemas/DeploymentStrategyInput"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
             "title": "Deployment Strategy"
           }
         },
@@ -8919,6 +9231,164 @@
           }
         },
         "title": "AdminSearchDomainsInput",
+        "type": "object"
+      },
+      "DomainScope": {
+        "description": "Scope for the scoped domain query.\n\nEach list is OR'd internally. Raises an error if every field is empty.",
+        "properties": {
+          "resource_group": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/UUIDScope"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Resource groups whose domains are being read",
+            "title": "Resource Group"
+          }
+        },
+        "title": "DomainScope",
+        "type": "object"
+      },
+      "UUIDScope": {
+        "description": "Single-UUID scope item wrapper.\n\nA thin wrapper around a UUID used as a scope item. The wrapper exists so\nthat scope-input lists stay structurally uniform with other scope item\ntypes and leave room for per-item metadata in the future.",
+        "properties": {
+          "value": {
+            "format": "uuid",
+            "title": "Value",
+            "type": "string"
+          }
+        },
+        "required": [
+          "value"
+        ],
+        "title": "UUIDScope",
+        "type": "object"
+      },
+      "ScopedSearchDomainsInput": {
+        "description": "Input for searching the domains the named scopes reach.",
+        "properties": {
+          "scope": {
+            "$ref": "#/components/schemas/DomainScope",
+            "description": "Scope (OR across all items)."
+          },
+          "filter": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DomainFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter conditions."
+          },
+          "order": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/DomainOrder"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Order specifications.",
+            "title": "Order"
+          },
+          "first": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Cursor pagination: number of items.",
+            "title": "First"
+          },
+          "after": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Cursor pagination: after cursor.",
+            "title": "After"
+          },
+          "last": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Cursor pagination: last N items.",
+            "title": "Last"
+          },
+          "before": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Cursor pagination: before cursor.",
+            "title": "Before"
+          },
+          "limit": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Offset pagination: maximum items.",
+            "title": "Limit"
+          },
+          "offset": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Offset pagination: number to skip.",
+            "title": "Offset"
+          }
+        },
+        "required": [
+          "scope"
+        ],
+        "title": "ScopedSearchDomainsInput",
         "type": "object"
       },
       "CreateDomainInput": {
@@ -12089,8 +12559,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Updated canonical name.",
+            "description": "Updated canonical name. Omit to leave unchanged.",
             "title": "Name"
           },
           "registry": {
@@ -12102,8 +12571,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Updated registry hostname.",
+            "description": "Updated registry hostname. Omit to leave unchanged.",
             "title": "Registry"
           },
           "image": {
@@ -12115,8 +12583,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Updated namespace/path within registry.",
+            "description": "Updated namespace/path within registry. Omit to leave unchanged.",
             "title": "Image"
           },
           "tag": {
@@ -12128,8 +12595,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Updated image tag.",
+            "description": "Updated image tag. Omit to leave unchanged.",
             "title": "Tag"
           },
           "architecture": {
@@ -12141,8 +12607,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Updated CPU architecture.",
+            "description": "Updated CPU architecture. Omit to leave unchanged.",
             "title": "Architecture"
           },
           "is_local": {
@@ -12154,8 +12619,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Updated local-only status.",
+            "description": "Updated local-only status. Omit to leave unchanged.",
             "title": "Is Local"
           },
           "size_bytes": {
@@ -12167,8 +12631,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Updated image size in bytes.",
+            "description": "Updated image size in bytes. Omit to leave unchanged.",
             "title": "Size Bytes"
           },
           "type": {
@@ -12180,8 +12643,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Updated image type (compute, system, service).",
+            "description": "Updated image type (compute, system, service). Omit to leave unchanged.",
             "title": "Type"
           },
           "config_digest": {
@@ -12193,8 +12655,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Updated config digest.",
+            "description": "Updated config digest. Omit to leave unchanged.",
             "title": "Config Digest"
           },
           "labels": {
@@ -12209,8 +12670,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Updated labels dict.",
+            "description": "Updated labels dict. Omit to leave unchanged.",
             "title": "Labels"
           },
           "supported_accelerators": {
@@ -12219,14 +12679,10 @@
                 "type": "string"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
-            "description": "Updated accelerator string. Set to null to clear.",
+            "description": "Updated accelerator string. Omit to leave unchanged; null clears.",
             "title": "Supported Accelerators"
           },
           "resource_limits": {
@@ -12239,8 +12695,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Updated resource limits dict.",
+            "description": "Updated resource limits dict. Omit to leave unchanged.",
             "title": "Resource Limits"
           }
         },
@@ -13119,7 +13574,7 @@
         "type": "object"
       },
       "UpdateLoginClientTypeInput": {
-        "description": "Input for updating a login client type.\n\nFields default to \"no change\". For ``description``, pass ``null`` to clear the\nexisting value; omit the field (SENTINEL) to leave it untouched.",
+        "description": "Input for updating a login client type.\n\nEvery field defaults to UNSET (no change). ``description`` accepts ``null`` to clear.",
         "properties": {
           "name": {
             "anyOf": [
@@ -13132,7 +13587,6 @@
                 "type": "null"
               }
             ],
-            "default": null,
             "description": "Updated name. Omit to leave unchanged.",
             "title": "Name"
           },
@@ -13142,14 +13596,10 @@
                 "type": "string"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
-            "description": "Updated description. Use null to clear, omit to leave unchanged.",
+            "description": "Updated description. Omit to leave unchanged; null clears.",
             "title": "Description"
           }
         },
@@ -14582,7 +15032,6 @@
                 "type": "null"
               }
             ],
-            "default": null,
             "description": "Updated channel name",
             "title": "Name"
           },
@@ -14592,14 +15041,10 @@
                 "type": "string"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
-            "description": "Updated channel description. Use SENTINEL to clear.",
+            "description": "Updated channel description. Omit to leave unchanged; null clears.",
             "title": "Description"
           },
           "spec": {
@@ -14611,8 +15056,8 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Updated channel specification"
+            "description": "Updated channel specification",
+            "title": "Spec"
           },
           "enabled": {
             "anyOf": [
@@ -14623,7 +15068,6 @@
                 "type": "null"
               }
             ],
-            "default": null,
             "description": "Updated enabled status",
             "title": "Enabled"
           }
@@ -14993,7 +15437,6 @@
                 "type": "null"
               }
             ],
-            "default": null,
             "description": "Updated rule name",
             "title": "Name"
           },
@@ -15003,14 +15446,10 @@
                 "type": "string"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
-            "description": "Updated rule description. Use SENTINEL to clear.",
+            "description": "Updated rule description. Omit to leave unchanged; null clears.",
             "title": "Description"
           },
           "message_template": {
@@ -15023,7 +15462,6 @@
                 "type": "null"
               }
             ],
-            "default": null,
             "description": "Updated message template (max 64KB)",
             "title": "Message Template"
           },
@@ -15036,7 +15474,6 @@
                 "type": "null"
               }
             ],
-            "default": null,
             "description": "Updated enabled status",
             "title": "Enabled"
           }
@@ -15400,8 +15837,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Updated name of the object storage",
+            "description": "Updated name of the object storage. Omit to leave unchanged.",
             "title": "Name"
           },
           "host": {
@@ -15413,8 +15849,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Updated host address",
+            "description": "Updated host address. Omit to leave unchanged.",
             "title": "Host"
           },
           "access_key": {
@@ -15426,8 +15861,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Updated access key",
+            "description": "Updated access key. Omit to leave unchanged.",
             "title": "Access Key"
           },
           "secret_key": {
@@ -15439,8 +15873,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Updated secret key",
+            "description": "Updated secret key. Omit to leave unchanged.",
             "title": "Secret Key"
           },
           "endpoint": {
@@ -15452,8 +15885,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Updated endpoint URL",
+            "description": "Updated endpoint URL. Omit to leave unchanged.",
             "title": "Endpoint"
           },
           "region": {
@@ -15462,14 +15894,10 @@
                 "type": "string"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
-            "description": "Updated region. Use SENTINEL (default) for no change, None to clear.",
+            "description": "Updated region. Omit to leave unchanged; null clears.",
             "title": "Region"
           }
         },
@@ -16135,6 +16563,181 @@
         "title": "AdminSearchProjectsInput",
         "type": "object"
       },
+      "ProjectScope": {
+        "description": "Scope for the scoped project query.\n\nEach list is OR'd internally and across lists. Raises an error if every field is\nempty.",
+        "properties": {
+          "domain": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/UUIDScope"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Domains whose projects are being read",
+            "title": "Domain"
+          },
+          "user": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/UUIDScope"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Users whose project memberships are being read",
+            "title": "User"
+          },
+          "resource_group": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/UUIDScope"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Resource groups whose projects are being read",
+            "title": "Resource Group"
+          }
+        },
+        "title": "ProjectScope",
+        "type": "object"
+      },
+      "ScopedSearchProjectsInput": {
+        "description": "Input for searching the projects the named scopes reach.",
+        "properties": {
+          "scope": {
+            "$ref": "#/components/schemas/ProjectScope",
+            "description": "Scope (OR across all items)."
+          },
+          "filter": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ProjectFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter conditions."
+          },
+          "order": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ProjectOrder"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Order specifications.",
+            "title": "Order"
+          },
+          "first": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Cursor pagination: number of items.",
+            "title": "First"
+          },
+          "after": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Cursor pagination: after cursor.",
+            "title": "After"
+          },
+          "last": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Cursor pagination: last N items.",
+            "title": "Last"
+          },
+          "before": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Cursor pagination: before cursor.",
+            "title": "Before"
+          },
+          "limit": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Offset pagination: maximum items.",
+            "title": "Limit"
+          },
+          "offset": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Offset pagination: number to skip.",
+            "title": "Offset"
+          }
+        },
+        "required": [
+          "scope"
+        ],
+        "title": "ScopedSearchProjectsInput",
+        "type": "object"
+      },
       "CreateProjectInput": {
         "description": "Input for creating a new project.",
         "properties": {
@@ -16221,8 +16824,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "New group name.",
+            "description": "New group name. Omit to leave unchanged.",
             "title": "Name"
           },
           "description": {
@@ -16231,14 +16833,10 @@
                 "type": "string"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
-            "description": "New group description. Set to null to clear.",
+            "description": "Updated group description. Omit to leave unchanged; null clears.",
             "title": "Description"
           },
           "is_active": {
@@ -16250,8 +16848,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Updated active status.",
+            "description": "Updated active status. Omit to leave unchanged.",
             "title": "Is Active"
           },
           "integration_name": {
@@ -16260,14 +16857,10 @@
                 "type": "string"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
-            "description": "New external integration identifier. Set to null to clear.",
+            "description": "Updated external integration identifier. Omit to leave unchanged; null clears.",
             "title": "Integration Name"
           },
           "resource_policy": {
@@ -16279,8 +16872,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Name of the updated resource policy to apply to this group.",
+            "description": "Name of the updated resource policy to apply to this group. Omit to leave unchanged.",
             "title": "Resource Policy"
           }
         },
@@ -16380,36 +16972,36 @@
         "title": "UnassignUsersFromProjectInput",
         "type": "object"
       },
-      "EntityID": {
-        "format": "uuid",
-        "type": "string"
-      },
       "EntityShareRecipientInput": {
         "description": "Who an offer goes to, named exactly one of three ways.\n\nA project takes it directly, a person takes it into the project that is theirs\nalone, and an address reaches someone who may have no account yet.",
         "properties": {
           "project_id": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/EntityID"
+                "format": "uuid",
+                "type": "string"
               },
               {
                 "type": "null"
               }
             ],
             "default": null,
-            "description": "Project the offer goes to"
+            "description": "Project the offer goes to",
+            "title": "Project Id"
           },
           "user_id": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/EntityID"
+                "format": "uuid",
+                "type": "string"
               },
               {
                 "type": "null"
               }
             ],
             "default": null,
-            "description": "Person the offer goes to; it lands in their own project"
+            "description": "Person the offer goes to; it lands in their own project",
+            "title": "User Id"
           },
           "email": {
             "anyOf": [
@@ -16449,8 +17041,10 @@
             "type": "string"
           },
           "target_entity_id": {
-            "$ref": "#/components/schemas/EntityID",
-            "description": "Id of the entity being offered"
+            "description": "Id of the entity being offered",
+            "format": "uuid",
+            "title": "Target Entity Id",
+            "type": "string"
           },
           "recipient": {
             "$ref": "#/components/schemas/EntityShareRecipientInput",
@@ -16793,8 +17387,10 @@
             "type": "string"
           },
           "entity_id": {
-            "$ref": "#/components/schemas/EntityID",
-            "description": "Id of the entity being offered"
+            "description": "Id of the entity being offered",
+            "format": "uuid",
+            "title": "Entity Id",
+            "type": "string"
           }
         },
         "required": [
@@ -16802,21 +17398,6 @@
           "entity_id"
         ],
         "title": "EntityShareTargetScope",
-        "type": "object"
-      },
-      "UUIDScope": {
-        "description": "Single-UUID scope item wrapper.\n\nA thin wrapper around a UUID used as a scope item. The wrapper exists so\nthat scope-input lists stay structurally uniform with other scope item\ntypes and leave room for per-item metadata in the future.",
-        "properties": {
-          "value": {
-            "format": "uuid",
-            "title": "Value",
-            "type": "string"
-          }
-        },
-        "required": [
-          "value"
-        ],
-        "title": "UUIDScope",
         "type": "object"
       },
       "ScopedSearchEntitySharesInput": {
@@ -16930,90 +17511,22 @@
         "title": "ScopedSearchEntitySharesInput",
         "type": "object"
       },
-      "OperationTypeDTO": {
-        "description": "RBAC operation type enum for DTO layer.",
-        "enum": [
-          "create",
-          "read",
-          "update",
-          "soft-delete",
-          "hard-delete",
-          "grant:all",
-          "grant:read",
-          "grant:update",
-          "grant:soft-delete",
-          "grant:hard-delete"
-        ],
-        "title": "OperationTypeDTO",
-        "type": "string"
-      },
-      "RBACElementTypeDTO": {
-        "description": "Unified RBAC element type enum for DTO layer (matches GQL schema values).",
-        "enum": [
-          "domain",
-          "project",
-          "user",
-          "session",
-          "vfolder",
-          "model_deployment",
-          "keypair",
-          "notification_channel",
-          "network",
-          "idle_checker_assignment",
-          "resource_group",
-          "container_registry",
-          "storage_host",
-          "agent",
-          "kernel",
-          "routing",
-          "image",
-          "artifact",
-          "artifact_registry",
-          "session_template",
-          "app_config",
-          "app_config_definition",
-          "app_config_allow_list",
-          "app_config_fragment",
-          "model_card",
-          "resource_preset",
-          "user_resource_policy",
-          "keypair_resource_policy",
-          "project_resource_policy",
-          "role",
-          "audit_log",
-          "kernel:history",
-          "event_log",
-          "project_admin_page",
-          "domain_admin_page",
-          "notification_rule",
-          "deployment:token",
-          "deployment:policy",
-          "deployment:revision",
-          "image:alias",
-          "role:assignment",
-          "vfolder:data",
-          "session:app_service",
-          "user:email",
-          "artifact_revision"
-        ],
-        "title": "RBACElementTypeDTO",
-        "type": "string"
-      },
       "RolePermissionPresetEntry": {
-        "description": "A single (entity_type, operation) pair carried by a role preset.",
+        "description": "A single (entity_type, permission) pair carried by a role preset.",
         "properties": {
           "entity_type": {
-            "$ref": "#/components/schemas/RBACElementTypeDTO",
-            "description": "Entity type the permission applies to."
+            "description": "Entity type the permission applies to.",
+            "title": "Entity Type",
+            "type": "string"
           },
-          "operation": {
-            "$ref": "#/components/schemas/OperationTypeDTO",
-            "description": "Operation granted by the permission."
+          "permission": {
+            "$ref": "#/components/schemas/PermissionBitDTO",
+            "description": "The operation bit the entry grants."
           }
         },
         "required": [
           "entity_type",
-          "operation"
+          "permission"
         ],
         "title": "RolePermissionPresetEntry",
         "type": "object"
@@ -17029,8 +17542,9 @@
             "type": "string"
           },
           "scope_type": {
-            "$ref": "#/components/schemas/RBACElementTypeDTO",
-            "description": "Scope type this preset targets (e.g., domain, project)."
+            "description": "Scope type this preset targets (e.g., domain, project).",
+            "title": "Scope Type",
+            "type": "string"
           },
           "auto_assign": {
             "default": false,
@@ -17072,7 +17586,7 @@
           "scope_type": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/RBACElementTypeDTO"
+                "$ref": "#/components/schemas/StringFilter"
               },
               {
                 "type": "null"
@@ -17413,13 +17927,13 @@
         "title": "UpdateRolePresetBody",
         "type": "object"
       },
-      "OperationTypeFilter": {
-        "description": "Filter for permission operation columns over ``OperationTypeDTO``.",
+      "PermissionBitFilter": {
+        "description": "Filter for a permission-bit column over ``PermissionBitDTO``.",
         "properties": {
           "equals": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/OperationTypeDTO"
+                "$ref": "#/components/schemas/PermissionBitDTO"
               },
               {
                 "type": "null"
@@ -17431,7 +17945,7 @@
             "anyOf": [
               {
                 "items": {
-                  "$ref": "#/components/schemas/OperationTypeDTO"
+                  "$ref": "#/components/schemas/PermissionBitDTO"
                 },
                 "type": "array"
               },
@@ -17445,7 +17959,7 @@
           "not_equals": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/OperationTypeDTO"
+                "$ref": "#/components/schemas/PermissionBitDTO"
               },
               {
                 "type": "null"
@@ -17457,7 +17971,7 @@
             "anyOf": [
               {
                 "items": {
-                  "$ref": "#/components/schemas/OperationTypeDTO"
+                  "$ref": "#/components/schemas/PermissionBitDTO"
                 },
                 "type": "array"
               },
@@ -17469,66 +17983,7 @@
             "title": "Not In"
           }
         },
-        "title": "OperationTypeFilter",
-        "type": "object"
-      },
-      "RBACElementTypeFilter": {
-        "description": "Filter for RBAC element type (scope_type / entity_type) columns.\n\nMirrors the Strawberry GQL EnumFilter pattern: equals / in / not_equals / not_in.\nUsed for both ``scope_type`` and ``entity_type`` fields, which share the\n``RBACElementTypeDTO`` value space at the API surface.",
-        "properties": {
-          "equals": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/RBACElementTypeDTO"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null
-          },
-          "in_": {
-            "anyOf": [
-              {
-                "items": {
-                  "$ref": "#/components/schemas/RBACElementTypeDTO"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "In"
-          },
-          "not_equals": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/RBACElementTypeDTO"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null
-          },
-          "not_in": {
-            "anyOf": [
-              {
-                "items": {
-                  "$ref": "#/components/schemas/RBACElementTypeDTO"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "Not In"
-          }
-        },
-        "title": "RBACElementTypeFilter",
+        "title": "PermissionBitFilter",
         "type": "object"
       },
       "RolePermissionPresetFilter": {
@@ -17549,7 +18004,7 @@
           "entity_type": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/RBACElementTypeFilter"
+                "$ref": "#/components/schemas/StringFilter"
               },
               {
                 "type": "null"
@@ -17558,17 +18013,17 @@
             "default": null,
             "description": "Filter by entity type the permission applies to."
           },
-          "operation": {
+          "permission": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/OperationTypeFilter"
+                "$ref": "#/components/schemas/PermissionBitFilter"
               },
               {
                 "type": "null"
               }
             ],
             "default": null,
-            "description": "Filter by granted operation."
+            "description": "Filter by the operation bit granted."
           },
           "created_at": {
             "anyOf": [
@@ -17657,7 +18112,7 @@
         "description": "Fields available for ordering role permission preset entries.",
         "enum": [
           "entity_type",
-          "operation",
+          "permission",
           "created_at"
         ],
         "title": "RolePermissionPresetOrderField",
@@ -18605,20 +19060,12 @@
         "title": "DeleteCategoryInput",
         "type": "object"
       },
-      "RoleSource": {
-        "description": "Definition source of the role.",
-        "enum": [
-          "system",
-          "custom"
-        ],
-        "title": "RoleSource",
-        "type": "string"
-      },
       "ScopeInputDTO": {
         "description": "Scope reference for associating an entity with a scope.",
         "properties": {
           "scope_type": {
-            "$ref": "#/components/schemas/RBACElementTypeDTO"
+            "title": "Scope Type",
+            "type": "string"
           },
           "scope_id": {
             "title": "Scope Id",
@@ -18655,16 +19102,23 @@
             "description": "Role description",
             "title": "Description"
           },
-          "source": {
-            "$ref": "#/components/schemas/RoleSource",
-            "default": "custom",
-            "description": "Role source"
-          },
           "auto_assign": {
             "default": false,
             "description": "When true, the role is automatically granted to a user when the user is added to a scope this role is registered in.",
             "title": "Auto Assign",
             "type": "boolean"
+          },
+          "scope": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ScopeInputDTO"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The scope the role belongs to"
           },
           "scopes": {
             "anyOf": [
@@ -18679,7 +19133,7 @@
               }
             ],
             "default": null,
-            "description": "Scopes to register the role in",
+            "description": "Deprecated: use `scope`. Accepts exactly one entry.",
             "title": "Scopes"
           }
         },
@@ -18695,7 +19149,7 @@
           "scope_type": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/RBACElementTypeFilter"
+                "$ref": "#/components/schemas/StringFilter"
               },
               {
                 "type": "null"
@@ -18706,7 +19160,7 @@
           "scope_id": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/StringFilter"
+                "$ref": "#/components/schemas/UUIDFilter"
               },
               {
                 "type": "null"
@@ -19230,33 +19684,20 @@
             "title": "Role Id",
             "type": "string"
           },
-          "scope_type": {
-            "description": "Scope element type (e.g. 'domain', 'project')",
-            "title": "Scope Type",
-            "type": "string"
-          },
-          "scope_id": {
-            "description": "Scope element ID",
-            "title": "Scope Id",
-            "type": "string"
-          },
           "entity_type": {
-            "description": "Entity element type (e.g. 'session', 'vfolder')",
+            "description": "Entity type (e.g. 'session', 'vfolder')",
             "title": "Entity Type",
             "type": "string"
           },
-          "operation": {
-            "description": "Operation type (e.g. 'read', 'create')",
-            "title": "Operation",
-            "type": "string"
+          "permission": {
+            "$ref": "#/components/schemas/PermissionBitDTO",
+            "description": "The operation bit the row holds"
           }
         },
         "required": [
           "role_id",
-          "scope_type",
-          "scope_id",
           "entity_type",
-          "operation"
+          "permission"
         ],
         "title": "CreatePermissionInput",
         "type": "object"
@@ -19275,32 +19716,10 @@
             ],
             "default": null
           },
-          "scope_type": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/RBACElementTypeFilter"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null
-          },
-          "scope_id": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/StringFilter"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null
-          },
           "entity_type": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/RBACElementTypeFilter"
+                "$ref": "#/components/schemas/StringFilter"
               },
               {
                 "type": "null"
@@ -19500,32 +19919,6 @@
             "title": "Id",
             "type": "string"
           },
-          "scope_type": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Updated scope element type",
-            "title": "Scope Type"
-          },
-          "scope_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Updated scope element ID",
-            "title": "Scope Id"
-          },
           "entity_type": {
             "anyOf": [
               {
@@ -19536,21 +19929,20 @@
               }
             ],
             "default": null,
-            "description": "Updated entity element type",
+            "description": "Updated entity type",
             "title": "Entity Type"
           },
-          "operation": {
+          "permission": {
             "anyOf": [
               {
-                "type": "string"
+                "$ref": "#/components/schemas/PermissionBitDTO"
               },
               {
                 "type": "null"
               }
             ],
             "default": null,
-            "description": "Updated operation type",
-            "title": "Operation"
+            "description": "Updated operation bit"
           }
         },
         "required": [
@@ -19700,7 +20092,7 @@
       "PermissionNestedFilter": {
         "description": "Nested filter for permissions within a role assignment.",
         "properties": {
-          "scope_id": {
+          "entity_type": {
             "anyOf": [
               {
                 "$ref": "#/components/schemas/StringFilter"
@@ -19711,32 +20103,10 @@
             ],
             "default": null
           },
-          "scope_type": {
+          "permission": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/RBACElementTypeFilter"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null
-          },
-          "entity_type": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/RBACElementTypeFilter"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null
-          },
-          "operation": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/OperationTypeFilter"
+                "$ref": "#/components/schemas/PermissionBitFilter"
               },
               {
                 "type": "null"
@@ -20172,225 +20542,6 @@
           "user_ids"
         ],
         "title": "BulkRevokeRoleInput",
-        "type": "object"
-      },
-      "EntityFilter": {
-        "description": "Filter for entity associations.",
-        "properties": {
-          "entity_type": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/RBACElementTypeFilter"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null
-          },
-          "entity_id": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/StringFilter"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null
-          },
-          "scope_type": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/RBACElementTypeFilter"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null
-          },
-          "scope_id": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/StringFilter"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null
-          },
-          "AND": {
-            "anyOf": [
-              {
-                "items": {
-                  "$ref": "#/components/schemas/EntityFilter"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "And"
-          },
-          "OR": {
-            "anyOf": [
-              {
-                "items": {
-                  "$ref": "#/components/schemas/EntityFilter"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "Or"
-          },
-          "NOT": {
-            "anyOf": [
-              {
-                "items": {
-                  "$ref": "#/components/schemas/EntityFilter"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "Not"
-          }
-        },
-        "title": "EntityFilter",
-        "type": "object"
-      },
-      "EntityOrderBy": {
-        "description": "Order by specification for entity associations.",
-        "properties": {
-          "field": {
-            "title": "Field",
-            "type": "string"
-          },
-          "direction": {
-            "$ref": "#/components/schemas/OrderDirection",
-            "default": "DESC"
-          }
-        },
-        "required": [
-          "field"
-        ],
-        "title": "EntityOrderBy",
-        "type": "object"
-      },
-      "AdminSearchEntitiesGQLInput": {
-        "description": "GQL pagination search input for entity associations.",
-        "properties": {
-          "filter": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/EntityFilter"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null
-          },
-          "order": {
-            "anyOf": [
-              {
-                "items": {
-                  "$ref": "#/components/schemas/EntityOrderBy"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "Order"
-          },
-          "first": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "First"
-          },
-          "after": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "After"
-          },
-          "last": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "Last"
-          },
-          "before": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "Before"
-          },
-          "limit": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "Limit"
-          },
-          "offset": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "Offset"
-          }
-        },
-        "title": "AdminSearchEntitiesGQLInput",
         "type": "object"
       },
       "CreateReservoirRegistryInput": {
@@ -20846,6 +20997,181 @@
         ],
         "title": "ResourceGroupOrderField",
         "type": "string"
+      },
+      "ResourceGroupScope": {
+        "description": "Scope for the scoped resource group query.\n\nEach list is OR'd internally and across lists. Raises an error if every field is\nempty.",
+        "properties": {
+          "domain": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/UUIDScope"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Domains whose resource groups are being read",
+            "title": "Domain"
+          },
+          "project": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/UUIDScope"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Projects whose resource groups are being read",
+            "title": "Project"
+          },
+          "user": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/UUIDScope"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Users whose resource groups are being read",
+            "title": "User"
+          }
+        },
+        "title": "ResourceGroupScope",
+        "type": "object"
+      },
+      "ScopedSearchResourceGroupsInput": {
+        "description": "Input for searching the resource groups the named scopes reach.",
+        "properties": {
+          "scope": {
+            "$ref": "#/components/schemas/ResourceGroupScope",
+            "description": "Scope (OR across all items)."
+          },
+          "filter": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ResourceGroupFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter conditions."
+          },
+          "order": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ResourceGroupOrder"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Order specifications.",
+            "title": "Order"
+          },
+          "first": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Cursor pagination: number of items.",
+            "title": "First"
+          },
+          "after": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Cursor pagination: after cursor.",
+            "title": "After"
+          },
+          "last": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Cursor pagination: last N items.",
+            "title": "Last"
+          },
+          "before": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Cursor pagination: before cursor.",
+            "title": "Before"
+          },
+          "limit": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Offset pagination: maximum items.",
+            "title": "Limit"
+          },
+          "offset": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Offset pagination: number to skip.",
+            "title": "Offset"
+          }
+        },
+        "required": [
+          "scope"
+        ],
+        "title": "ScopedSearchResourceGroupsInput",
+        "type": "object"
       },
       "AdminSearchResourceGroupsInput": {
         "description": "Input for admin search of resource groups with cursor and offset pagination.",
@@ -22572,8 +22898,8 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Updated default resource allocation. Leave null to keep existing value."
+            "description": "Updated default resource allocation. Omit to leave unchanged.",
+            "title": "Default For Unspecified"
           },
           "total_resource_slots": {
             "anyOf": [
@@ -22584,14 +22910,10 @@
                 "type": "array"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
-            "description": "Updated resource slot limits. Set to null to clear.",
+            "description": "Updated resource slot limits. Omit to leave unchanged.",
             "title": "Total Resource Slots"
           },
           "max_session_lifetime": {
@@ -22603,8 +22925,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Updated maximum session lifetime in seconds. Leave null to keep existing.",
+            "description": "Updated maximum session lifetime in seconds. Omit to leave unchanged.",
             "title": "Max Session Lifetime"
           },
           "max_concurrent_sessions": {
@@ -22616,8 +22937,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Updated maximum concurrent sessions. Leave null to keep existing.",
+            "description": "Updated maximum concurrent sessions. Omit to leave unchanged.",
             "title": "Max Concurrent Sessions"
           },
           "max_pending_session_count": {
@@ -22626,14 +22946,10 @@
                 "type": "integer"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
-            "description": "Updated max pending sessions. Set to null to clear.",
+            "description": "Updated max pending sessions. Omit to leave unchanged; null clears.",
             "title": "Max Pending Session Count"
           },
           "max_priority": {
@@ -22642,14 +22958,10 @@
                 "type": "integer"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
-            "description": "Updated max priority. Set to null to clear.",
+            "description": "Updated max priority. Omit to leave unchanged; null clears.",
             "title": "Max Priority"
           },
           "max_pending_session_resource_slots": {
@@ -22661,14 +22973,10 @@
                 "type": "array"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
-            "description": "Updated max pending session resource slots. Set to null to clear.",
+            "description": "Updated max pending session resource slots. Omit to leave unchanged; null clears.",
             "title": "Max Pending Session Resource Slots"
           },
           "max_concurrent_sftp_sessions": {
@@ -22680,8 +22988,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Updated max concurrent SFTP sessions. Leave null to keep existing.",
+            "description": "Updated max concurrent SFTP sessions. Omit to leave unchanged.",
             "title": "Max Concurrent Sftp Sessions"
           },
           "max_containers_per_session": {
@@ -22693,8 +23000,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Updated max containers per session. Leave null to keep existing.",
+            "description": "Updated max containers per session. Omit to leave unchanged.",
             "title": "Max Containers Per Session"
           },
           "idle_timeout": {
@@ -22706,8 +23012,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Updated idle timeout in seconds. Leave null to keep existing.",
+            "description": "Updated idle timeout in seconds. Omit to leave unchanged.",
             "title": "Idle Timeout"
           },
           "allowed_vfolder_hosts": {
@@ -22719,14 +23024,10 @@
                 "type": "array"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
-            "description": "Updated vfolder host permissions. Set to null to clear.",
+            "description": "Updated vfolder host permissions. Omit to leave unchanged.",
             "title": "Allowed Vfolder Hosts"
           }
         },
@@ -23081,35 +23382,23 @@
                 "type": "integer"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
-            "description": "Updated max vfolder count. Use SENTINEL to clear, null to keep existing.",
+            "description": "Updated max vfolder count. Omit to leave unchanged.",
             "title": "Max Vfolder Count"
           },
           "max_concurrent_logins": {
             "anyOf": [
               {
-                "anyOf": [
-                  {
-                    "type": "integer"
-                  },
-                  {
-                    "$ref": "#/components/schemas/Sentinel"
-                  }
-                ],
-                "ge": 1
+                "ge": 1,
+                "type": "integer"
               },
               {
                 "type": "null"
               }
             ],
-            "default": 1,
-            "description": "Updated maximum number of concurrent authenticated login sessions per user. Set to null to clear (unlimited). Must be >= 1 when set. Distinct from keypair_resource_policies.max_concurrent_sessions which caps compute sessions.",
+            "description": "Updated maximum number of concurrent authenticated login sessions per user. Omit to leave unchanged; null clears (unlimited). Must be >= 1 when set. Distinct from keypair_resource_policies.max_concurrent_sessions which caps compute sessions.",
             "title": "Max Concurrent Logins"
           },
           "max_quota_scope_size": {
@@ -23118,14 +23407,10 @@
                 "$ref": "#/components/schemas/BinarySizeInput"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
-            "description": "Updated max quota scope size. Use SENTINEL to clear, null to keep existing.",
+            "description": "Updated max quota scope size. Omit to leave unchanged.",
             "title": "Max Quota Scope Size"
           },
           "max_session_count_per_model_session": {
@@ -23137,8 +23422,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Updated max sessions per model session. Leave null to keep existing.",
+            "description": "Updated max sessions per model session. Omit to leave unchanged.",
             "title": "Max Session Count Per Model Session"
           },
           "max_customized_image_count": {
@@ -23150,8 +23434,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Updated max customized image count. Leave null to keep existing.",
+            "description": "Updated max customized image count. Omit to leave unchanged.",
             "title": "Max Customized Image Count"
           }
         },
@@ -23460,14 +23743,10 @@
                 "type": "integer"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
-            "description": "Updated max vfolder count. Use SENTINEL to clear, null to keep existing.",
+            "description": "Updated max vfolder count. Omit to leave unchanged.",
             "title": "Max Vfolder Count"
           },
           "max_quota_scope_size": {
@@ -23476,14 +23755,10 @@
                 "$ref": "#/components/schemas/BinarySizeInput"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
-            "description": "Updated max quota scope size. Use SENTINEL to clear, null to keep existing.",
+            "description": "Updated max quota scope size. Omit to leave unchanged.",
             "title": "Max Quota Scope Size"
           },
           "max_network_count": {
@@ -23495,8 +23770,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Updated max network count. Leave null to keep existing.",
+            "description": "Updated max network count. Omit to leave unchanged.",
             "title": "Max Network Count"
           }
         },
@@ -23800,8 +24074,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Updated name.",
+            "description": "Updated name. Omit to leave unchanged.",
             "title": "Name"
           },
           "resource_slots": {
@@ -23816,8 +24089,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Updated resource slot allocations.",
+            "description": "Updated resource slot allocations. Omit to leave unchanged.",
             "title": "Resource Slots"
           },
           "shared_memory": {
@@ -23826,14 +24098,10 @@
                 "$ref": "#/components/schemas/BinarySizeInput"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
-            "description": "Updated shared memory. Use null to clear.",
+            "description": "Updated shared memory. Omit to leave unchanged; null clears.",
             "title": "Shared Memory"
           },
           "resource_group_name": {
@@ -23842,14 +24110,10 @@
                 "type": "string"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
-            "description": "Updated resource group name. Use null to make global.",
+            "description": "Updated resource group name. Omit to leave unchanged; null makes the preset global.",
             "title": "Resource Group Name"
           }
         },
@@ -24387,6 +24651,99 @@
         ],
         "title": "AgentResourceOrderField",
         "type": "string"
+      },
+      "AgentResourceScope": {
+        "description": "Scope for the scoped agent resource query.\n\nEach list is OR'd internally. Raises an error if every field is empty.",
+        "properties": {
+          "agent": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/UUIDScope"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Agents whose slot rows are being read",
+            "title": "Agent"
+          }
+        },
+        "title": "AgentResourceScope",
+        "type": "object"
+      },
+      "ScopedSearchAgentResourcesInput": {
+        "description": "Input for searching the slot rows the named agents carry.",
+        "properties": {
+          "scope": {
+            "$ref": "#/components/schemas/AgentResourceScope",
+            "description": "Scope (OR across all items)."
+          },
+          "filter": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AgentResourceFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter conditions."
+          },
+          "order": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/AgentResourceOrder"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Order specifications.",
+            "title": "Order"
+          },
+          "limit": {
+            "anyOf": [
+              {
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Maximum items to return.",
+            "title": "Limit"
+          },
+          "offset": {
+            "anyOf": [
+              {
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Number of items to skip.",
+            "title": "Offset"
+          }
+        },
+        "required": [
+          "scope"
+        ],
+        "title": "ScopedSearchAgentResourcesInput",
+        "type": "object"
       },
       "AdminSearchAgentResourcesInput": {
         "description": "Input for searching agent resources with filters, orders, and pagination.\n\nSupports two pagination modes (mutually exclusive):\n- Cursor-based: first/after (forward) or last/before (backward)\n- Offset-based: limit/offset",
@@ -25232,8 +25589,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "New name.",
+            "description": "New name. Omit to leave unchanged.",
             "title": "Name"
           },
           "description": {
@@ -25242,14 +25598,10 @@
                 "type": "string"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
-            "description": "New description.",
+            "description": "Updated description. Omit to leave unchanged; null clears.",
             "title": "Description"
           }
         },
@@ -25301,6 +25653,20 @@
               }
             ],
             "default": null
+          },
+          "runtime_version": {
+            "anyOf": [
+              {
+                "pattern": "^[0-9]{1,9}([.][0-9]{1,9}){0,2}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Keep only presets valid at this runtime version (added_version <= version < deprecated_version).",
+            "title": "Runtime Version"
           },
           "AND": {
             "anyOf": [
@@ -25371,7 +25737,9 @@
         "enum": [
           "name",
           "rank",
-          "created_at"
+          "created_at",
+          "added_version",
+          "deprecated_version"
         ],
         "title": "RuntimeVariantPresetOrderField",
         "type": "string"
@@ -25753,6 +26121,34 @@
             "title": "Required",
             "type": "boolean"
           },
+          "added_version": {
+            "anyOf": [
+              {
+                "pattern": "^[0-9]{1,9}([.][0-9]{1,9}){0,2}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Runtime version this preset became available in; None means always.",
+            "title": "Added Version"
+          },
+          "deprecated_version": {
+            "anyOf": [
+              {
+                "pattern": "^[0-9]{1,9}([.][0-9]{1,9}){0,2}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Runtime version this preset was removed in, exclusive; None means not removed.",
+            "title": "Deprecated Version"
+          },
           "category": {
             "anyOf": [
               {
@@ -25823,7 +26219,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
+            "description": "Omit to leave unchanged.",
             "title": "Name"
           },
           "description": {
@@ -25832,26 +26228,23 @@
                 "type": "string"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
+            "description": "Description. Omit to leave unchanged; null clears.",
             "title": "Description"
           },
           "rank": {
             "anyOf": [
               {
-                "minimum": 0,
+                "ge": 0,
                 "type": "integer"
               },
               {
                 "type": "null"
               }
             ],
-            "default": null,
+            "description": "Omit to leave unchanged.",
             "title": "Rank"
           },
           "preset_target": {
@@ -25863,7 +26256,8 @@
                 "type": "null"
               }
             ],
-            "default": null
+            "description": "Omit to leave unchanged.",
+            "title": "Preset Target"
           },
           "value_type": {
             "anyOf": [
@@ -25874,8 +26268,8 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "New value type. 'flag' is only valid when the effective preset_target is 'args' (the stored target applies when preset_target is omitted)."
+            "description": "New value type. 'flag' is only valid when the effective preset_target is 'args' (the stored target applies when preset_target is omitted). Omit to leave unchanged.",
+            "title": "Value Type"
           },
           "default_value": {
             "anyOf": [
@@ -25883,13 +26277,10 @@
                 "type": "string"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
+            "description": "Default value. Omit to leave unchanged; null clears.",
             "title": "Default Value"
           },
           "key": {
@@ -25903,7 +26294,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
+            "description": "Omit to leave unchanged.",
             "title": "Key"
           },
           "required": {
@@ -25915,8 +26306,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Toggle required flag; None = no change.",
+            "description": "Toggle required flag. Omit to leave unchanged.",
             "title": "Required"
           },
           "category": {
@@ -25925,13 +26315,10 @@
                 "type": "string"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
+            "description": "UI category group. Omit to leave unchanged; null clears.",
             "title": "Category"
           },
           "display_name": {
@@ -25940,13 +26327,10 @@
                 "type": "string"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
+            "description": "UI display name. Omit to leave unchanged; null clears.",
             "title": "Display Name"
           },
           "ui_option": {
@@ -25955,14 +26339,35 @@
                 "$ref": "#/components/schemas/UIOption"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
+                "type": "null"
+              }
+            ],
+            "description": "UI rendering option. Omit to leave unchanged; null clears.",
+            "title": "Ui Option"
+          },
+          "added_version": {
+            "anyOf": [
+              {
+                "pattern": "^[0-9]{1,9}([.][0-9]{1,9}){0,2}$",
+                "type": "string"
               },
               {
                 "type": "null"
               }
             ],
-            "default": 1,
-            "title": "Ui Option"
+            "title": "Added Version"
+          },
+          "deprecated_version": {
+            "anyOf": [
+              {
+                "pattern": "^[0-9]{1,9}([.][0-9]{1,9}){0,2}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Deprecated Version"
           }
         },
         "required": [
@@ -26197,6 +26602,145 @@
           }
         },
         "title": "SearchModelCardsInput",
+        "type": "object"
+      },
+      "ModelCardScope": {
+        "description": "Scope for the scoped model card query.\n\nEach list is OR'd internally. Raises an error if every field is empty.",
+        "properties": {
+          "project": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/UUIDScope"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Projects whose model cards are being read",
+            "title": "Project"
+          }
+        },
+        "title": "ModelCardScope",
+        "type": "object"
+      },
+      "ScopedSearchModelCardsInput": {
+        "description": "Input for searching the model cards the named scopes reach.",
+        "properties": {
+          "scope": {
+            "$ref": "#/components/schemas/ModelCardScope",
+            "description": "Scope (OR across all items)."
+          },
+          "filter": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ModelCardFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "order": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ModelCardOrder"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Order"
+          },
+          "first": {
+            "anyOf": [
+              {
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "First"
+          },
+          "after": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "After"
+          },
+          "last": {
+            "anyOf": [
+              {
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Last"
+          },
+          "before": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Before"
+          },
+          "limit": {
+            "anyOf": [
+              {
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Limit"
+          },
+          "offset": {
+            "anyOf": [
+              {
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Offset"
+          }
+        },
+        "required": [
+          "scope"
+        ],
+        "title": "ScopedSearchModelCardsInput",
         "type": "object"
       },
       "ModelCardAccessLevel": {
@@ -31405,6 +31949,102 @@
         "title": "RestoreUserInput",
         "type": "object"
       },
+      "UserScope": {
+        "description": "Scope for the scoped user query.\n\nEach list is OR'd internally and across lists. Raises an error if every field is\nempty.",
+        "properties": {
+          "domain": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/UUIDScope"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Domains whose users are being read",
+            "title": "Domain"
+          },
+          "project": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/UUIDScope"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Projects whose users are being read",
+            "title": "Project"
+          }
+        },
+        "title": "UserScope",
+        "type": "object"
+      },
+      "ScopedSearchUsersInput": {
+        "description": "Input for searching the users the named scopes reach.",
+        "properties": {
+          "scope": {
+            "$ref": "#/components/schemas/UserScope",
+            "description": "Scope (OR across all items)."
+          },
+          "filter": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UserFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter conditions."
+          },
+          "order": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/UserOrder"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Order specifications.",
+            "title": "Order"
+          },
+          "limit": {
+            "default": 50,
+            "description": "Maximum items to return.",
+            "maximum": 1000,
+            "minimum": 1,
+            "title": "Limit",
+            "type": "integer"
+          },
+          "offset": {
+            "default": 0,
+            "description": "Number of items to skip.",
+            "minimum": 0,
+            "title": "Offset",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "scope"
+        ],
+        "title": "ScopedSearchUsersInput",
+        "type": "object"
+      },
       "VFolderFilter": {
         "description": "Filter criteria for searching virtual folders.",
         "properties": {
@@ -34590,15 +35230,28 @@
             "title": "Name",
             "type": "string"
           },
-          "source": {
-            "$ref": "#/components/schemas/RoleSource",
-            "default": "custom",
-            "description": "Role source"
+          "scope_type": {
+            "description": "Type of the scope the role belongs to",
+            "title": "Scope Type",
+            "type": "string"
+          },
+          "scope_id": {
+            "description": "ID of the scope the role belongs to",
+            "format": "uuid",
+            "title": "Scope Id",
+            "type": "string"
           },
           "status": {
-            "$ref": "#/components/schemas/RoleStatus",
-            "default": "active",
-            "description": "Role status"
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RoleStatus"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Role status; active if omitted"
           },
           "description": {
             "anyOf": [
@@ -34615,7 +35268,9 @@
           }
         },
         "required": [
-          "name"
+          "name",
+          "scope_type",
+          "scope_id"
         ],
         "title": "CreateRoleRequest",
         "type": "object"
@@ -34647,6 +35302,15 @@
           "updated_at"
         ],
         "title": "RoleOrderField",
+        "type": "string"
+      },
+      "RoleSource": {
+        "description": "Definition source of the role.",
+        "enum": [
+          "system",
+          "custom"
+        ],
+        "title": "RoleSource",
         "type": "string"
       },
       "SearchRolesRequest": {
@@ -35066,28 +35730,6 @@
           }
         },
         "title": "SearchScopesRequest",
-        "type": "object"
-      },
-      "SearchEntitiesRequest": {
-        "description": "Request body for searching entities within a scope.",
-        "properties": {
-          "limit": {
-            "default": 50,
-            "description": "Maximum items to return",
-            "maximum": 1000,
-            "minimum": 1,
-            "title": "Limit",
-            "type": "integer"
-          },
-          "offset": {
-            "default": 0,
-            "description": "Number of items to skip",
-            "minimum": 0,
-            "title": "Offset",
-            "type": "integer"
-          }
-        },
-        "title": "SearchEntitiesRequest",
         "type": "object"
       },
       "QuotaScopeFilter": {
@@ -45444,6 +46086,35 @@
         "description": "Search domains with filters, orders, and pagination (superadmin only).\n\n**Preconditions:**\n* Superadmin privilege required.\n"
       }
     },
+    "/v2/domains/scoped/search": {
+      "post": {
+        "operationId": "v2/domains.scoped_search",
+        "tags": [
+          "v2/domains"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ScopedSearchDomainsInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Search the domains the named scopes reach, combined with OR.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
     "/v2/domains": {
       "post": {
         "operationId": "v2/domains.admin_create",
@@ -48037,6 +48708,35 @@
         "description": "Search projects with filters, orders, and pagination (superadmin only).\n\n**Preconditions:**\n* Superadmin privilege required.\n"
       }
     },
+    "/v2/projects/scoped/search": {
+      "post": {
+        "operationId": "v2/projects.scoped_search",
+        "tags": [
+          "v2/projects"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ScopedSearchProjectsInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Search the projects the named scopes reach, combined with OR.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
     "/v2/projects": {
       "post": {
         "operationId": "v2/projects.admin_create",
@@ -49752,35 +50452,6 @@
         "description": "Return the complete RBAC permission matrix.\n\n**Preconditions:**\n* Superadmin privilege required.\n"
       }
     },
-    "/v2/rbac/entities/search": {
-      "post": {
-        "operationId": "v2/rbac.search_entities",
-        "tags": [
-          "v2/rbac"
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful response"
-          }
-        },
-        "security": [
-          {
-            "TokenAuth": []
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/AdminSearchEntitiesGQLInput"
-              }
-            }
-          }
-        },
-        "parameters": [],
-        "description": "Search entity associations with filters, orders, and pagination.\n\n**Preconditions:**\n* Superadmin privilege required.\n"
-      }
-    },
     "/v2/reservoir-registries": {
       "post": {
         "operationId": "v2/reservoir-registries.create",
@@ -50125,6 +50796,35 @@
         },
         "parameters": [],
         "description": "Check which resource presets are available for session creation.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2/resource-groups/scoped/search": {
+      "post": {
+        "operationId": "v2/resource-groups.scoped_search",
+        "tags": [
+          "v2/resource-groups"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ScopedSearchResourceGroupsInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Search the resource groups the named scopes reach, combined with OR.\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/v2/resource-groups/search": {
@@ -51481,6 +52181,35 @@
         "description": "Remove a resource slot type by slot name (superadmin only).\n\n**Preconditions:**\n* Superadmin privilege required.\n"
       }
     },
+    "/v2/resource-slots/agent-resources/scoped/search": {
+      "post": {
+        "operationId": "v2/resource-slots.scoped_search_agent_resources",
+        "tags": [
+          "v2/resource-slots"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ScopedSearchAgentResourcesInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Read the slot rows the named agents carry, combined with OR.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
     "/v2/resource-slots/agent-resources/search": {
       "post": {
         "operationId": "v2/resource-slots.search_agent_resources",
@@ -52074,6 +52803,35 @@
         },
         "parameters": [],
         "description": "\n**Preconditions:**\n* Superadmin privilege required.\n"
+      }
+    },
+    "/v2/model-cards/scoped/search": {
+      "post": {
+        "operationId": "v2/model-cards.scoped_search",
+        "tags": [
+          "v2/model-cards"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ScopedSearchModelCardsInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Search the model cards the named scopes reach, combined with OR.\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/v2/model-cards/projects/{project_id}/search": {
@@ -53721,6 +54479,35 @@
         },
         "parameters": [],
         "description": "Restore a soft-deleted user (superadmin only).\n\n**Preconditions:**\n* Superadmin privilege required.\n"
+      }
+    },
+    "/v2/users/scoped/search": {
+      "post": {
+        "operationId": "v2/users.scoped_search",
+        "tags": [
+          "v2/users"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ScopedSearchUsersInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Search the users the named scopes reach, combined with OR.\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/v2/users/domains/{domain_name}/search": {
@@ -56457,60 +57244,6 @@
         ],
         "parameters": [],
         "description": "Get available entity types for role configuration.\n\n**Preconditions:**\n* User privilege required.\n"
-      }
-    },
-    "/admin/rbac/scopes/{scope_type}/{scope_id}/entities/{entity_type}/search": {
-      "post": {
-        "operationId": "admin/rbac.search_entities",
-        "tags": [
-          "admin/rbac"
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful response"
-          }
-        },
-        "security": [
-          {
-            "TokenAuth": []
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/SearchEntitiesRequest"
-              }
-            }
-          }
-        },
-        "parameters": [
-          {
-            "name": "scope_type",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "scope_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "entity_type",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "description": "Search entities within a scope by entity type with filters and pagination.\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/admin/quota-scopes/{storage_host_name}/{quota_scope_id}": {

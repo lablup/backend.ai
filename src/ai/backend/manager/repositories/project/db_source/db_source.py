@@ -42,7 +42,6 @@ from ai.backend.manager.models.project.purgers import (
     ProjectEndpointPurger,
     ProjectKernelPurger,
     ProjectPurger,
-    ProjectScopeAssociationPurger,
     ProjectSessionPurger,
     SessionsByIdsPurger,
 )
@@ -310,6 +309,7 @@ class ProjectDBSource:
 
         async with self._v2_ops.write_ops() as w:
             # Deployments go first (their routings cascade), then the sessions they routed.
+            # TODO: scope this purge. A user operation must not use in_global.
             await w.batch_purge_entities_in_global(ProjectEndpointPurger(project_id=project_id))
             if routed_session_ids:
                 await w.batch_purge_entities_in_global(
@@ -319,7 +319,6 @@ class ProjectDBSource:
                 project_id, ProjectKernelPurger(project_id=project_id)
             )
             await w.batch_purge_entities_in_global(ProjectSessionPurger(project_id=project_id))
-            await w.batch_purge_field_entities(project_id, ProjectScopeAssociationPurger())
             if await w.purge_entity(ProjectPurger(project_id=project_id)) is None:
                 raise ProjectNotFound("project not found")
 

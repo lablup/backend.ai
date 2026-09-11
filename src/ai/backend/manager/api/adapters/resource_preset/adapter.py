@@ -6,7 +6,6 @@ from decimal import Decimal
 from typing import Any
 from uuid import UUID
 
-from ai.backend.common.api_handlers import SENTINEL
 from ai.backend.common.data.entity.resource_preset import ResourcePresetID
 from ai.backend.common.dto.manager.v2.common import (
     BinarySizeInput,
@@ -33,17 +32,15 @@ from ai.backend.common.types import BinarySize, ResourceSlot
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.data.resource_preset.types import ResourcePresetData
-from ai.backend.manager.errors.repository import EntityNotFoundError
+from ai.backend.manager.errors.base.not_found import NotFoundError
 from ai.backend.manager.errors.resource import ResourcePresetNotFound
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.condition_utils import combine_conditions_or, negate_conditions
 from ai.backend.manager.models.resource_preset.conditions import ResourcePresetConditions
+from ai.backend.manager.models.resource_preset.creators import ResourcePresetCreator
 from ai.backend.manager.models.resource_preset.orders import ResourcePresetOrders
 from ai.backend.manager.models.resource_preset.row import ResourcePresetRow
-from ai.backend.manager.repositories.base.creator import Creator
-from ai.backend.manager.repositories.base.updater import Updater
-from ai.backend.manager.repositories.resource_preset.creators import ResourcePresetCreatorSpec
-from ai.backend.manager.repositories.resource_preset.updaters import ResourcePresetUpdaterSpec
+from ai.backend.manager.models.resource_preset.updaters import ResourcePresetUpdater
 from ai.backend.manager.services.resource_preset.actions.create_preset import (
     CreateResourcePresetAction,
 )
@@ -59,6 +56,7 @@ from ai.backend.manager.services.resource_preset.actions.search_presets import (
 from ai.backend.manager.services.resource_preset.actions.update_preset import (
     UpdateResourcePresetAction,
 )
+from ai.backend.manager.services.resource_preset.processors import ResourcePresetProcessors
 from ai.backend.manager.types import OptionalState, TriState
 
 
@@ -89,6 +87,11 @@ def _resource_preset_pagination_spec() -> PaginationSpec:
 class ResourcePresetAdapter(BaseAdapter):
     """Adapter for resource preset operations."""
 
+    _resource_preset: ResourcePresetProcessors
+
+    def __init__(self, resource_preset: ResourcePresetProcessors) -> None:
+        self._resource_preset = resource_preset
+
     async def search(
         self,
         input: AdminSearchResourcePresetsInput,
@@ -108,7 +111,7 @@ class ResourcePresetAdapter(BaseAdapter):
             limit=input.limit,
             offset=input.offset,
         )
-        result = await self._processors.resource_preset.search_presets_v2.run(
+        result = await self._resource_preset.search_presets_v2.run(
             SearchResourcePresetsV2Action(querier=querier)
         )
         return AdminSearchResourcePresetsPayload(
@@ -121,10 +124,10 @@ class ResourcePresetAdapter(BaseAdapter):
     async def get(self, preset_id: UUID) -> ResourcePresetNode:
         """Get a single resource preset by ID."""
         try:
-            result = await self._processors.resource_preset.get_preset.run(
+            result = await self._resource_preset.get_preset.run(
                 GetResourcePresetAction(preset_id=ResourcePresetID(preset_id))
             )
-        except EntityNotFoundError as e:
+        except NotFoundError as e:
             # The generic repository names no domain; the route answered with the
             # preset's own error before and keeps doing so.
             raise ResourcePresetNotFound() from e
@@ -139,15 +142,13 @@ class ResourcePresetAdapter(BaseAdapter):
     ) -> CreateResourcePresetPayload:
         """Create a new resource preset."""
         shared_memory_str = str(shared_memory) if shared_memory is not None else None
-        creator = Creator(
-            spec=ResourcePresetCreatorSpec(
-                name=name,
-                resource_slots=resource_slots,
-                shared_memory=shared_memory_str,
-                resource_group_name=resource_group_name,
-            )
+        creator = ResourcePresetCreator(
+            name=name,
+            resource_slots=resource_slots,
+            shared_memory=shared_memory_str,
+            resource_group_name=resource_group_name,
         )
-        result = await self._processors.resource_preset.create_preset.run(
+        result = await self._resource_preset.create_preset.run(
             CreateResourcePresetAction(creator=creator)
         )
         return CreateResourcePresetPayload(
@@ -159,34 +160,19 @@ class ResourcePresetAdapter(BaseAdapter):
         input: UpdateResourcePresetInput,
     ) -> UpdateResourcePresetPayload:
         """Update an existing resource preset."""
-        resource_slots_state: OptionalState[ResourceSlot] = OptionalState.nop()
-        if input.resource_slots is not None:
-            resource_slots_state = OptionalState.update(
-                _resource_slot_entries_to_slot(input.resource_slots)
-            )
-
-        shared_memory_value = _resolve_shared_memory_for_update(input.shared_memory)
-
-        name_state: OptionalState[str] = OptionalState.nop()
-        if input.name is not None:
-            name_state = OptionalState.update(input.name)
-
-        resource_group_state: TriState[str] = TriState.nop()
-        if input.resource_group_name is not SENTINEL:
-            if input.resource_group_name is None:
-                resource_group_state = TriState.nullify()
-            else:
-                resource_group_state = TriState.update(input.resource_group_name)
-
-        updater_spec = ResourcePresetUpdaterSpec(
-            resource_slots=resource_slots_state,
-            name=name_state,
-            shared_memory=shared_memory_value,
-            resource_group_name=resource_group_state,
+        updater = ResourcePresetUpdater(
+            preset_id=ResourcePresetID(input.id),
+            resource_slots=OptionalState.from_unset(input.resource_slots).map(
+                _resource_slot_entries_to_slot
+            ),
+            name=OptionalState.from_unset(input.name),
+            shared_memory=TriState.from_unset(input.shared_memory).map(
+                lambda v: BinarySize(v.bytes)
+            ),
+            resource_group_name=TriState.from_unset(input.resource_group_name),
         )
-        updater = Updater(spec=updater_spec, pk_value=input.id)
-        result = await self._processors.resource_preset.update_preset.run(
-            UpdateResourcePresetAction(preset_id=ResourcePresetID(input.id), updater=updater)
+        result = await self._resource_preset.update_preset.run(
+            UpdateResourcePresetAction(updater=updater)
         )
         return UpdateResourcePresetPayload(
             resource_preset=self._data_to_node(result.resource_preset),
@@ -194,7 +180,7 @@ class ResourcePresetAdapter(BaseAdapter):
 
     async def delete(self, preset_id: UUID) -> DeleteResourcePresetPayload:
         """Delete a resource preset by ID."""
-        result = await self._processors.resource_preset.delete_preset.run(
+        result = await self._resource_preset.delete_preset.run(
             DeleteResourcePresetAction(preset_id=ResourcePresetID(preset_id))
         )
         return DeleteResourcePresetPayload(id=result.resource_preset.id)
@@ -268,16 +254,3 @@ class ResourcePresetAdapter(BaseAdapter):
             ),
             resource_group_name=data.resource_group_name,
         )
-
-
-def _resolve_shared_memory_for_update(
-    shared_memory: BinarySizeInput | object | None,
-) -> TriState[BinarySize]:
-    """Resolve shared_memory BinarySizeInput for update operations."""
-    if shared_memory is SENTINEL:
-        return TriState.nop()
-    if shared_memory is None:
-        return TriState.nullify()
-    if not isinstance(shared_memory, BinarySizeInput):
-        return TriState.nop()
-    return TriState.update(BinarySize(shared_memory.bytes))

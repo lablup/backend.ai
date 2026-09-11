@@ -120,9 +120,9 @@ class TestPassthroughErrorFromHttpStatus:
         err = PassthroughError.from_http_status(
             403,
             domain=ErrorDomain.CONTAINER_REGISTRY,
-            operation=ErrorOperation.LIST,
+            operation=ErrorOperation.SEARCH,
         )
-        assert str(err.error_code()) == "container-registry_list-query_forbidden"
+        assert str(err.error_code()) == "container-registry_search_forbidden"
 
     def test_maps_server_error_status(self) -> None:
         # The mapping covers server-error statuses too, not just 4xx.

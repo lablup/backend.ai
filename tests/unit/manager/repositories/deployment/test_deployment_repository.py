@@ -3,11 +3,10 @@
 from __future__ import annotations
 
 import uuid
-from collections.abc import AsyncGenerator, Sequence
-from dataclasses import dataclass
+from collections.abc import AsyncGenerator
 from datetime import datetime
 from decimal import Decimal
-from typing import Any, override
+from typing import Any
 from unittest.mock import MagicMock
 
 import pytest
@@ -19,20 +18,20 @@ from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
 from ai.backend.common.data.entity.container_registry import ContainerRegistryID
 from ai.backend.common.data.entity.deployment import DeploymentID
+from ai.backend.common.data.entity.deployment_policy import DeploymentPolicyID
 from ai.backend.common.data.entity.deployment_revision import DeploymentRevisionID
 from ai.backend.common.data.entity.deployment_token import DeploymentTokenID
 from ai.backend.common.data.entity.domain import DomainID, DomainName
 from ai.backend.common.data.entity.image import ImageID
-from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.project import ProjectEntityType, ProjectID
 from ai.backend.common.data.entity.replica import ReplicaID
 from ai.backend.common.data.entity.replica_group import ReplicaGroupID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.data.entity.runtime_variant import RuntimeVariantID
 from ai.backend.common.data.entity.session_group import SessionGroupID
-from ai.backend.common.data.entity.user import UserID
+from ai.backend.common.data.entity.user import UserEntityType, UserID
 from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
-from ai.backend.common.data.permission.types import ScopeType
 from ai.backend.common.schema.deployment import BlueGreenSpec, IntOrPercent, RollingUpdateSpec
 from ai.backend.common.types import (
     AccessKey,
@@ -67,6 +66,7 @@ from ai.backend.manager.errors.service import DeploymentPolicyNotFound
 from ai.backend.manager.models.agent import AgentRow, AgentStatus
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.deployment_policy import DeploymentPolicyRow
+from ai.backend.manager.models.deployment_policy.purgers import DeploymentPolicyPurger
 from ai.backend.manager.models.deployment_policy.upserters import DeploymentPolicyUpserter
 from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
 from ai.backend.manager.models.deployment_revision.creators import DeploymentRevisionCreator
@@ -87,9 +87,6 @@ from ai.backend.manager.models.kernel import KernelRow, KernelStatus
 from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.project import ProjectRow
 from ai.backend.manager.models.rbac_models import RoleRow, UserRoleRow
-from ai.backend.manager.models.rbac_models.association_scopes_entities import (
-    AssociationScopesEntitiesRow,
-)
 from ai.backend.manager.models.rbac_models.entity_field import EntityFieldRow
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.replica_group import ReplicaGroupRow
@@ -116,7 +113,6 @@ from ai.backend.manager.models.session import (
 )
 from ai.backend.manager.models.session_group.row import SessionGroupRow
 from ai.backend.manager.models.specs.pagination import OffsetPagination
-from ai.backend.manager.models.specs.types import ConflictCheck
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderRow
@@ -129,7 +125,6 @@ from ai.backend.manager.models.virtual_entity.entity_membership_field import (
 )
 from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
 from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
-from ai.backend.manager.repositories.base.purger import Purger, PurgerSpec
 from ai.backend.manager.repositories.base.querier import BatchQuerier
 from ai.backend.manager.repositories.deployment import DeploymentRepository
 from ai.backend.manager.repositories.ops.v2.reconciler.provider import ReconcileOpsProvider
@@ -137,25 +132,6 @@ from ai.backend.manager.secret.types import SecretValue
 from ai.backend.manager.types import OptionalState
 from ai.backend.testutils.db import with_tables
 from ai.backend.testutils.fixtures import DomainFixtureData
-
-
-@dataclass
-class DeploymentPolicyPurgerSpec(PurgerSpec[DeploymentPolicyRow]):
-    """Test-local PurgerSpec for deleting a deployment policy."""
-
-    policy_id: uuid.UUID
-
-    @override
-    def row_class(self) -> type[DeploymentPolicyRow]:
-        return DeploymentPolicyRow
-
-    @override
-    def pk_value(self) -> uuid.UUID:
-        return self.policy_id
-
-    @override
-    def conflict_checks(self) -> Sequence[ConflictCheck]:
-        return ()
 
 
 def create_test_password_info(password: str) -> PasswordInfo:
@@ -418,7 +394,7 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
             db_sess.add(user)
             await db_sess.flush()
             # A session group joins its owner, which must be in the graph first.
-            db_sess.add(VirtualEntityRow(entity_type=ScopeType.USER.value, entity_id=user_uuid))
+            db_sess.add(VirtualEntityRow(entity_type=UserEntityType(), entity_id=user_uuid))
             await db_sess.commit()
 
         return user_uuid
@@ -463,7 +439,7 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
             db_sess.add(group)
             await db_sess.flush()
             # A session group joins its project, which must be in the graph first.
-            db_sess.add(VirtualEntityRow(entity_type=ScopeType.PROJECT.value, entity_id=group_id))
+            db_sess.add(VirtualEntityRow(entity_type=ProjectEntityType(), entity_id=group_id))
             await db_sess.commit()
 
         return group_id
@@ -1465,7 +1441,6 @@ class TestDeploymentRevisionOperations:
                 EndpointRow,
                 ReplicaGroupRow,
                 EntityFieldRow,  # DeploymentRevisionRow relationship dependency
-                AssociationScopesEntitiesRow,
                 RuntimeVariantRow,
                 DeploymentRevisionPresetRow,
                 DeploymentRevisionRow,
@@ -1600,7 +1575,7 @@ class TestDeploymentRevisionOperations:
             db_sess.add(user)
             await db_sess.flush()
             # A session group joins its owner, which must be in the graph first.
-            db_sess.add(VirtualEntityRow(entity_type=ScopeType.USER.value, entity_id=user_uuid))
+            db_sess.add(VirtualEntityRow(entity_type=UserEntityType(), entity_id=user_uuid))
             await db_sess.commit()
 
         return user_uuid
@@ -1625,7 +1600,7 @@ class TestDeploymentRevisionOperations:
             db_sess.add(group)
             await db_sess.flush()
             # A session group joins its project, which must be in the graph first.
-            db_sess.add(VirtualEntityRow(entity_type=ScopeType.PROJECT.value, entity_id=group_id))
+            db_sess.add(VirtualEntityRow(entity_type=ProjectEntityType(), entity_id=group_id))
             await db_sess.commit()
 
         return group_id
@@ -2325,7 +2300,7 @@ class TestDeploymentPolicyOperations:
             db_sess.add(user)
             await db_sess.flush()
             # A session group joins its owner, which must be in the graph first.
-            db_sess.add(VirtualEntityRow(entity_type=ScopeType.USER.value, entity_id=user_uuid))
+            db_sess.add(VirtualEntityRow(entity_type=UserEntityType(), entity_id=user_uuid))
             await db_sess.commit()
 
         return user_uuid
@@ -2350,7 +2325,7 @@ class TestDeploymentPolicyOperations:
             db_sess.add(group)
             await db_sess.flush()
             # A session group joins its project, which must be in the graph first.
-            db_sess.add(VirtualEntityRow(entity_type=ScopeType.PROJECT.value, entity_id=group_id))
+            db_sess.add(VirtualEntityRow(entity_type=ProjectEntityType(), entity_id=group_id))
             await db_sess.commit()
 
         return group_id
@@ -2494,15 +2469,15 @@ class TestDeploymentPolicyOperations:
         test_endpoint_id: DeploymentID,
         test_deployment_policy_data: DeploymentPolicyData,
     ) -> None:
-        """Test deleting a deployment policy using Purger."""
-        purger = Purger(
-            spec=DeploymentPolicyPurgerSpec(policy_id=test_deployment_policy_data.id),
+        """Test deleting a deployment policy."""
+        purger = DeploymentPolicyPurger(
+            policy_id=DeploymentPolicyID(test_deployment_policy_data.id)
         )
 
         result = await deployment_repository.delete_deployment_policy(purger)
 
         assert result is not None
-        assert result.row.id == test_deployment_policy_data.id
+        assert result.id == test_deployment_policy_data.id
 
         # Verify the policy no longer exists
         with pytest.raises(DeploymentPolicyNotFound):
@@ -2513,10 +2488,7 @@ class TestDeploymentPolicyOperations:
         deployment_repository: DeploymentRepository,
     ) -> None:
         """Test that delete_deployment_policy returns None for nonexistent policy."""
-        nonexistent_id = uuid.uuid4()
-        purger = Purger(
-            spec=DeploymentPolicyPurgerSpec(policy_id=nonexistent_id),
-        )
+        purger = DeploymentPolicyPurger(policy_id=DeploymentPolicyID(uuid.uuid4()))
 
         result = await deployment_repository.delete_deployment_policy(purger)
 
@@ -2930,7 +2902,6 @@ class TestRouteOperations:
                 EndpointRow,
                 ReplicaGroupRow,
                 RoutingRow,
-                AssociationScopesEntitiesRow,
             ],
         ):
             yield database_connection
@@ -3050,7 +3021,7 @@ class TestRouteOperations:
             db_sess.add(user)
             await db_sess.flush()
             # A session group joins its owner, which must be in the graph first.
-            db_sess.add(VirtualEntityRow(entity_type=ScopeType.USER.value, entity_id=user_uuid))
+            db_sess.add(VirtualEntityRow(entity_type=UserEntityType(), entity_id=user_uuid))
             await db_sess.commit()
 
         return user_uuid
@@ -3075,7 +3046,7 @@ class TestRouteOperations:
             db_sess.add(group)
             await db_sess.flush()
             # A session group joins its project, which must be in the graph first.
-            db_sess.add(VirtualEntityRow(entity_type=ScopeType.PROJECT.value, entity_id=group_id))
+            db_sess.add(VirtualEntityRow(entity_type=ProjectEntityType(), entity_id=group_id))
             await db_sess.commit()
 
         return group_id
@@ -3318,7 +3289,6 @@ class TestDeploymentRepositoryDuplicateName:
                 DeploymentRevisionPresetRow,
                 DeploymentRevisionRow,
                 DeploymentRevisionResourceSlotRow,
-                AssociationScopesEntitiesRow,
                 DeploymentPolicyRow,
             ],
         ):
@@ -3449,7 +3419,7 @@ class TestDeploymentRepositoryDuplicateName:
             db_sess.add(group)
             await db_sess.flush()
             # A session group joins its project, which must be in the graph first.
-            db_sess.add(VirtualEntityRow(entity_type=ScopeType.PROJECT.value, entity_id=group.id))
+            db_sess.add(VirtualEntityRow(entity_type=ProjectEntityType(), entity_id=group.id))
             await db_sess.commit()
             return group
 
@@ -3474,7 +3444,7 @@ class TestDeploymentRepositoryDuplicateName:
             db_sess.add(group)
             await db_sess.flush()
             # A session group joins its project, which must be in the graph first.
-            db_sess.add(VirtualEntityRow(entity_type=ScopeType.PROJECT.value, entity_id=group.id))
+            db_sess.add(VirtualEntityRow(entity_type=ProjectEntityType(), entity_id=group.id))
             await db_sess.commit()
             return group
 
@@ -3522,7 +3492,7 @@ class TestDeploymentRepositoryDuplicateName:
             db_sess.add(user)
             await db_sess.flush()
             # A session group joins its owner, which must be in the graph first.
-            db_sess.add(VirtualEntityRow(entity_type=ScopeType.USER.value, entity_id=user_uuid))
+            db_sess.add(VirtualEntityRow(entity_type=UserEntityType(), entity_id=user_uuid))
             await db_sess.commit()
             return user
 

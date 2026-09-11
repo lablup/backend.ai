@@ -6,7 +6,7 @@ from typing import override
 
 from ai.backend.common.data.entity.permission import PermissionID
 from ai.backend.common.data.entity.role import RoleID
-from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
+from ai.backend.common.data.entity.types import EntityType
 from ai.backend.manager.data.permission.bit import single_bit
 from ai.backend.manager.data.permission.permission import PermissionData
 from ai.backend.manager.data.permission.types import Permission
@@ -26,7 +26,6 @@ class RolePermissionCreator(FieldCreator[RoleID, PermissionRow, PermissionData])
     settle the parent row and its paths together.
     """
 
-    scope: EntityIdentifier
     entity_type: EntityType
     permission: Permission
 
@@ -40,8 +39,7 @@ class RolePermissionCreator(FieldCreator[RoleID, PermissionRow, PermissionData])
             IntegrityErrorCheck(
                 violation_type=UniqueConstraintViolationError,
                 error=PermissionAlreadyGranted(
-                    f"Duplicate permission entry ({self.scope}, {self.entity_type},"
-                    f" {self.permission})."
+                    f"Duplicate permission entry ({self.entity_type}, {self.permission})."
                 ),
             ),
         )
@@ -50,8 +48,6 @@ class RolePermissionCreator(FieldCreator[RoleID, PermissionRow, PermissionData])
     def build_row(self, owner_id: RoleID) -> PermissionRow:
         return PermissionRow(
             role_id=owner_id,
-            scope_type=self.scope.entity_type(),
-            scope_id=str(self.scope),
             entity_type=self.entity_type,
             permission=single_bit(self.permission),
         )

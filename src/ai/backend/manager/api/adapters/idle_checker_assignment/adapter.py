@@ -10,7 +10,6 @@ from ai.backend.common.data.entity.idle_checker import (
     IdleCheckerID,
 )
 from ai.backend.common.data.entity.types import EntityIdentifier, EntityType, RuntimeEntityID
-from ai.backend.common.data.permission.types import ScopeType
 from ai.backend.common.dto.manager.v2.common import OrderDirection
 from ai.backend.common.dto.manager.v2.idle_checker_assignment.request import (
     CreateIdleCheckerAssignmentInput,
@@ -60,6 +59,9 @@ from ai.backend.manager.services.idle_checker_assignment.actions.lookup import (
 from ai.backend.manager.services.idle_checker_assignment.actions.scoped_search import (
     ScopedSearchIdleCheckerAssignmentsAction,
 )
+from ai.backend.manager.services.idle_checker_assignment.processors import (
+    IdleCheckerAssignmentProcessors,
+)
 from ai.backend.manager.services.rbac.actions.relation.base import RelationPair
 from ai.backend.manager.services.rbac.actions.relation.create import CreateRelationAction
 from ai.backend.manager.services.rbac.actions.relation.purge import PurgeRelationAction
@@ -67,6 +69,7 @@ from ai.backend.manager.services.rbac.actions.relation.switch import (
     DeleteRelationAction,
     RestoreRelationAction,
 )
+from ai.backend.manager.services.rbac.processors import RbacProcessors
 
 
 @lru_cache(maxsize=1)
@@ -83,11 +86,22 @@ def _get_idle_checker_assignment_pagination_spec() -> PaginationSpec:
 class IdleCheckerAssignmentAdapter(BaseAdapter):
     """Adapter for idle checker assignment domain operations."""
 
+    _idle_checker_assignment: IdleCheckerAssignmentProcessors
+    _rbac: RbacProcessors
+
+    def __init__(
+        self,
+        idle_checker_assignment: IdleCheckerAssignmentProcessors,
+        rbac: RbacProcessors,
+    ) -> None:
+        self._idle_checker_assignment = idle_checker_assignment
+        self._rbac = rbac
+
     async def admin_create(
         self, input: CreateIdleCheckerAssignmentInput
     ) -> CreateIdleCheckerAssignmentPayload:
         scope = self._scope_entity(input.scope.scope_type, input.scope.scope_id)
-        result = await self._processors.rbac.create_relation.run(
+        result = await self._rbac.create_relation.run(
             CreateRelationAction(
                 pairs=[RelationPair(scope=scope, target=input.idle_checker_id)],
                 creator=IdleCheckerAssignmentCreator(enabled=input.enabled),
@@ -110,11 +124,11 @@ class IdleCheckerAssignmentAdapter(BaseAdapter):
         current = await self._resolve(input.id)
         pairs = [RelationPair(scope=current.scope_entity(), target=current.idle_checker_id)]
         if input.enabled:
-            await self._processors.rbac.restore_relation.run(
+            await self._rbac.restore_relation.run(
                 RestoreRelationAction(pairs=pairs, updater=IdleCheckerAssignmentEnabler())
             )
         else:
-            await self._processors.rbac.delete_relation.run(
+            await self._rbac.delete_relation.run(
                 DeleteRelationAction(pairs=pairs, updater=IdleCheckerAssignmentDisabler())
             )
         return UpdateIdleCheckerAssignmentPayload(
@@ -127,7 +141,7 @@ class IdleCheckerAssignmentAdapter(BaseAdapter):
         self, input: PurgeIdleCheckerAssignmentInput
     ) -> PurgeIdleCheckerAssignmentPayload:
         current = await self._resolve(input.id)
-        result = await self._processors.rbac.purge_relation.run(
+        result = await self._rbac.purge_relation.run(
             PurgeRelationAction(
                 pairs=[RelationPair(scope=current.scope_entity(), target=current.idle_checker_id)],
                 purger=IdleCheckerAssignmentPurger(),
@@ -141,7 +155,7 @@ class IdleCheckerAssignmentAdapter(BaseAdapter):
         self, scope: EntityIdentifier, idle_checker_id: IdleCheckerID
     ) -> IdleCheckerAssignmentData:
         """Read the binding back: a relation write answers with the pair alone."""
-        result = await self._processors.idle_checker_assignment.lookup_by_pair.run(
+        result = await self._idle_checker_assignment.lookup_by_pair.run(
             LookupIdleCheckerAssignmentByPairAction(scope=scope, idle_checker_id=idle_checker_id)
         )
         return result.data
@@ -163,7 +177,7 @@ class IdleCheckerAssignmentAdapter(BaseAdapter):
             limit=input.limit,
             offset=input.offset,
         )
-        action_result = await self._processors.idle_checker_assignment.admin_search.run(
+        action_result = await self._idle_checker_assignment.admin_search.run(
             AdminSearchIdleCheckerAssignmentsAction(searcher=searcher)
         )
         return SearchIdleCheckerAssignmentPayload(
@@ -193,7 +207,7 @@ class IdleCheckerAssignmentAdapter(BaseAdapter):
             offset=input.offset,
         )
         scopes = [self._scope_entity(ref.scope_type, ref.scope_id) for ref in input.scope.items]
-        action_result = await self._processors.idle_checker_assignment.scoped_search.run(
+        action_result = await self._idle_checker_assignment.scoped_search.run(
             ScopedSearchIdleCheckerAssignmentsAction(scopes=scopes, searcher=searcher)
         )
         return SearchIdleCheckerAssignmentPayload(
@@ -209,13 +223,13 @@ class IdleCheckerAssignmentAdapter(BaseAdapter):
             if f.scope_type.equals is not None:
                 conditions.append(
                     IdleCheckerAssignmentConditions.by_scope_type_equals(
-                        ScopeType(f.scope_type.equals.value)
+                        EntityType.from_name(f.scope_type.equals.value)
                     )
                 )
             if f.scope_type.in_ is not None:
-                scope_types: list[ScopeType] = []
+                scope_types: list[EntityType] = []
                 for scope_type_dto in f.scope_type.in_:
-                    scope_types.append(ScopeType(scope_type_dto.value))
+                    scope_types.append(EntityType.from_name(scope_type_dto.value))
                 conditions.append(IdleCheckerAssignmentConditions.by_scope_type_in(scope_types))
         if f.scope_id is not None:
             condition = self.convert_uuid_filter(
@@ -286,7 +300,7 @@ class IdleCheckerAssignmentAdapter(BaseAdapter):
 
     async def _resolve(self, assignment_id: IdleCheckerAssignmentID) -> IdleCheckerAssignmentData:
         """The pair the id names. Costs READ on the binding's scope."""
-        result = await self._processors.idle_checker_assignment.lookup.run(
+        result = await self._idle_checker_assignment.lookup.run(
             LookupIdleCheckerAssignmentAction(assignment_id=assignment_id)
         )
         return result.data
@@ -300,7 +314,7 @@ class IdleCheckerAssignmentAdapter(BaseAdapter):
     def _data_to_node(data: IdleCheckerAssignmentData) -> IdleCheckerAssignmentNode:
         return IdleCheckerAssignmentNode(
             id=IdleCheckerAssignmentID(data.id),
-            scope_type=IdleCheckerScopeTypeDTO(data.scope_type.value),
+            scope_type=IdleCheckerScopeTypeDTO(str(data.scope_type)),
             scope_id=data.scope_id,
             idle_checker_id=data.idle_checker_id,
             enabled=data.enabled,

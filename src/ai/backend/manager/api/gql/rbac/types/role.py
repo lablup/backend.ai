@@ -13,8 +13,10 @@ import strawberry.relay
 from strawberry import UNSET, Info
 from strawberry.relay import Connection, Edge, NodeID
 
+from ai.backend.common.data.entity.role import RoleID
+from ai.backend.common.data.entity.types import EntityType, RuntimeEntityID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.dto.manager.v2.rbac.request import (
-    AdminSearchEntitiesGQLInput,
     AdminSearchPermissionsGQLInput,
     SearchRoleAssignmentsInput,
 )
@@ -94,6 +96,7 @@ from ai.backend.common.dto.manager.v2.rbac.types import (
 from ai.backend.common.dto.manager.v2.rbac.types import (
     RoleStatusFilter as RoleStatusFilterDTO,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import OrderDirection, StringFilter, UUIDFilter, encode_cursor
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
@@ -107,15 +110,13 @@ from ai.backend.manager.api.gql.decorators import (
     gql_pydantic_type,
 )
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin, PydanticOutputMixin
-from ai.backend.manager.api.gql.rbac.types.scope import RBACElementTypeFilterGQL, ScopeInputGQL
+from ai.backend.manager.api.gql.rbac.types.scope import (
+    ScopeInputGQL,
+)
 from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy, StrawberryGQLContext
 
 if TYPE_CHECKING:
-    from ai.backend.manager.api.gql.rbac.types.entity import (
-        EntityConnection,
-        EntityFilter,
-        EntityOrderBy,
-    )
+    from ai.backend.manager.api.gql.rbac.types.entity_node import EntityNodeGQL
     from ai.backend.manager.api.gql.rbac.types.permission import (
         PermissionConnection,
         PermissionFilter,
@@ -168,6 +169,38 @@ class RoleGQL(PydanticNodeMixin[Any]):
             ),
         )
     )
+    scope_type: str = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Type of the scope the role belongs to.",
+        )
+    )
+    scope_id: UUID = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="ID of the scope the role belongs to.",
+        )
+    )
+
+    @gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="The scope the role belongs to.",
+        )
+    )  # type: ignore[misc]
+    async def scope(
+        self,
+        info: Info[StrawberryGQLContext],
+    ) -> (
+        Annotated[
+            EntityNodeGQL,
+            strawberry.lazy("ai.backend.manager.api.gql.rbac.types.entity_node"),
+        ]
+        | None
+    ):
+        return await info.context.data_loaders.entity_node_loader.load(
+            RuntimeEntityID(EntityType(self.scope_type), self.scope_id)
+        )
 
     @classmethod
     @override
@@ -180,7 +213,7 @@ class RoleGQL(PydanticNodeMixin[Any]):
     ) -> Iterable[Self | None]:
         # DataLoader already returns RoleGQL | None via from_pydantic conversion
         results = await info.context.data_loaders.role_loader.load_many([
-            UUID(nid) for nid in node_ids
+            RoleID(UUID(nid)) for nid in node_ids
         ])
         return cast(list[Self | None], results)
 
@@ -230,7 +263,6 @@ class RoleGQL(PydanticNodeMixin[Any]):
             # Merge with user-provided filter
             combined_filter = PermissionFilter(
                 role_id=role_filter.role_id,
-                scope_type=filter.scope_type,
                 entity_type=filter.entity_type,
             )
         else:
@@ -330,80 +362,6 @@ class RoleGQL(PydanticNodeMixin[Any]):
             count=result.total_count,
         )
 
-    @gql_added_field(
-        BackendAIGQLMeta(
-            added_version="26.4.2",
-            description="Scopes this role is registered in.",
-        )
-    )  # type: ignore[misc]
-    async def scopes(
-        self,
-        info: Info[StrawberryGQLContext],
-        filter: Annotated[
-            EntityFilter,
-            strawberry.lazy("ai.backend.manager.api.gql.rbac.types.entity"),
-        ]
-        | None = None,
-        order_by: list[
-            Annotated[
-                EntityOrderBy,
-                strawberry.lazy("ai.backend.manager.api.gql.rbac.types.entity"),
-            ]
-        ]
-        | None = None,
-        before: str | None = None,
-        after: str | None = None,
-        first: int | None = None,
-        last: int | None = None,
-        limit: int | None = None,
-        offset: int | None = None,
-    ) -> (
-        Annotated[
-            EntityConnection,
-            strawberry.lazy("ai.backend.manager.api.gql.rbac.types.entity"),
-        ]
-        | None
-    ):
-        from ai.backend.manager.api.gql.rbac.types.entity import (
-            EntityConnection,
-            EntityEdge,
-            EntityRefGQL,
-        )
-
-        pydantic_filter = filter.to_pydantic() if filter is not None else None
-        pydantic_order = [o.to_pydantic() for o in order_by] if order_by is not None else None
-
-        result = await info.context.adapters.rbac.search_role_scopes(
-            role_id=UUID(self.id),
-            input=AdminSearchEntitiesGQLInput(
-                filter=pydantic_filter,
-                order=pydantic_order,
-                first=first,
-                after=after,
-                last=last,
-                before=before,
-                limit=limit,
-                offset=offset,
-            ),
-        )
-        edges = [
-            EntityEdge(
-                node=EntityRefGQL.from_pydantic(item),
-                cursor=encode_cursor(str(item.id)),
-            )
-            for item in result.items
-        ]
-        return EntityConnection(
-            edges=edges,
-            page_info=strawberry.relay.PageInfo(
-                has_next_page=result.has_next_page,
-                has_previous_page=result.has_previous_page,
-                start_cursor=edges[0].cursor if edges else None,
-                end_cursor=edges[-1].cursor if edges else None,
-            ),
-            count=result.total_count,
-        )
-
 
 @gql_node_type(
     BackendAIGQLMeta(
@@ -436,7 +394,7 @@ class RoleAssignmentGQL(PydanticNodeMixin[RoleAssignmentNode]):
     @gql_field(description="The assigned role.")  # type: ignore[misc]
     async def role(self, info: Info[StrawberryGQLContext]) -> RoleGQL | None:
         # DataLoader already returns RoleGQL | None via from_pydantic conversion
-        return await info.context.data_loaders.role_loader.load(self.role_id)
+        return await info.context.data_loaders.role_loader.load(RoleID(self.role_id))
 
     @gql_field(description="The assigned user.")  # type: ignore[misc]
     async def user(
@@ -449,7 +407,7 @@ class RoleAssignmentGQL(PydanticNodeMixin[RoleAssignmentNode]):
         | None
     ):
         # DataLoader already returns UserV2GQL | None via from_pydantic conversion
-        return await info.context.data_loaders.user_loader.load(self.user_id)
+        return await info.context.data_loaders.user_loader.load(UserID(self.user_id))
 
     @gql_added_field(
         BackendAIGQLMeta(
@@ -469,7 +427,7 @@ class RoleAssignmentGQL(PydanticNodeMixin[RoleAssignmentNode]):
     ):
         if self.granted_by is None:
             return None
-        return await info.context.data_loaders.user_loader.load(self.granted_by)
+        return await info.context.data_loaders.user_loader.load(UserID(self.granted_by))
 
 
 # ==================== Filter Types ====================
@@ -542,8 +500,8 @@ class RoleUserNestedFilterGQL(PydanticInputMixin[UserNestedFilterDTO]):
     name="RoleMappedScopeNestedFilter",
 )
 class RoleMappedScopeNestedFilterGQL(PydanticInputMixin[MappedScopeNestedFilterDTO]):
-    scope_type: RBACElementTypeFilterGQL | None = None
-    scope_id: StringFilter | None = None
+    scope_type: StringFilter | None = None
+    scope_id: UUIDFilter | None = None
 
     AND: list[Self] | None = None
     OR: list[Self] | None = None
@@ -644,7 +602,13 @@ class RoleAssignmentOrderBy(PydanticInputMixin[RoleAssignmentOrderByDTO], GQLOrd
 class CreateRoleInput(PydanticInputMixin[CreateRoleInputDTO]):
     name: str
     description: str | None = None
-    source: RoleSourceGQL = RoleSourceGQL.CUSTOM
+    source: RoleSourceGQL | None = gql_field(
+        description="Deprecated and ignored: a created role is always custom.",
+        default=None,
+        deprecation_reason=(
+            f"Deprecated since {NEXT_RELEASE_VERSION}. Ignored: a created role is always custom."
+        ),
+    )
     auto_assign: bool = gql_added_field(
         BackendAIGQLMeta(
             added_version="26.4.4",
@@ -655,7 +619,18 @@ class CreateRoleInput(PydanticInputMixin[CreateRoleInputDTO]):
         ),
         default=False,
     )
-    scopes: list[ScopeInputGQL] | None = None
+    scope: ScopeInputGQL | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="The scope the role belongs to.",
+        ),
+        default=None,
+    )
+    scopes: list[ScopeInputGQL] | None = gql_field(
+        description="Deprecated: use `scope`. Accepts exactly one entry.",
+        default=None,
+        deprecation_reason=f"Deprecated since {NEXT_RELEASE_VERSION}. Use `scope`.",
+    )
 
 
 @gql_pydantic_input(
@@ -778,7 +753,10 @@ class BulkAssignRolePayloadGQL(PydanticOutputMixin[BulkAssignRoleResultPayloadDT
         description="List of successfully created role assignments."
     )
     failed: list[BulkAssignRoleErrorGQL] = gql_field(
-        description="List of errors for users that failed to be assigned."
+        description="List of errors for users that failed to be assigned.",
+        deprecation_reason=(
+            "Always empty. A user already holding the role keeps it; every other refusal raises."
+        ),
     )
 
 

@@ -25,7 +25,7 @@ from sqlalchemy.engine.row import Row
 from sqlalchemy.orm import joinedload, selectinload
 
 from ai.backend.common.config import ModelDefinition, ModelMetadata
-from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE
+from ai.backend.common.data.entity.project import ProjectEntityType
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.exception import ModelDefinitionValidationError, VFolderNotFound
 from ai.backend.common.types import (
@@ -1217,7 +1217,7 @@ class VirtualFolder(graphene.ObjectType):  # type: ignore[misc]
     ) -> int:
         from ai.backend.manager.models.project import groups
 
-        membership_query = user_scope_membership_query(PROJECT_SCOPE_TYPE, user_id)
+        membership_query = user_scope_membership_query(ProjectEntityType(), user_id)
 
         async with graph_ctx.db.begin_readonly() as conn:
             membership_result = await conn.execute(membership_query)
@@ -1258,7 +1258,7 @@ class VirtualFolder(graphene.ObjectType):  # type: ignore[misc]
     ) -> list[VirtualFolder]:
         from ai.backend.manager.models.project import groups
 
-        membership_query = user_scope_membership_query(PROJECT_SCOPE_TYPE, user_id)
+        membership_query = user_scope_membership_query(ProjectEntityType(), user_id)
         async with graph_ctx.db.begin_readonly() as conn:
             membership_result = await conn.execute(membership_query)
         grps = membership_result.fetchall()

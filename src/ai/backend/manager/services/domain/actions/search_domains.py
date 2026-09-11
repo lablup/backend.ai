@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.common.data.entity.domain import DOMAIN_ENTITY_TYPE
+from ai.backend.common.data.entity.domain import DomainEntityType
 from ai.backend.common.data.entity.types import EntityType
 from ai.backend.manager.actions.v2.ops.base import SearchGlobalOpsAction
 from ai.backend.manager.data.domain.types import DomainData
@@ -18,7 +18,7 @@ class GlobalSearchDomainsAction(SearchGlobalOpsAction[DomainRow, DomainData]):
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return DOMAIN_ENTITY_TYPE
+        return DomainEntityType()
 
     @override
     @classmethod

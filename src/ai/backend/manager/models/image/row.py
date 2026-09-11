@@ -32,7 +32,7 @@ from sqlalchemy.orm import (
 from sqlalchemy.sql.expression import true
 
 from ai.backend.common.data.entity.image_alias import ImageAliasID
-from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE
+from ai.backend.common.data.entity.project import ProjectEntityType
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.exception import UnknownImageReference
@@ -1214,7 +1214,7 @@ class ImagePermissionContextBuilder(
         scope: UserScope,
     ) -> list[ProjectScope]:
         project_ids_stmt = sa.select(ProjectRow.id).where(
-            user_scope_membership_exists(PROJECT_SCOPE_TYPE, ProjectRow.id, scope.user_id)
+            user_scope_membership_exists(ProjectEntityType(), ProjectRow.id, scope.user_id)
         )
         project_ids = await self.db_session.scalars(project_ids_stmt)
 

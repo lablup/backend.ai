@@ -25,8 +25,8 @@ from ai.backend.manager.sokovan.scheduler.fair_share.aggregator import (
 )
 
 if TYPE_CHECKING:
-    from ai.backend.manager.repositories.resource_usage_history import (
-        KernelUsageRecordCreatorSpec,
+    from ai.backend.manager.models.resource_usage_history.creators import (
+        KernelUsageRecordCreator,
     )
 
 
@@ -262,7 +262,7 @@ class TestScenarioConsecutiveObservations:
         mock_allocated_slots: ResourceSlot,
     ) -> None:
         """Test full kernel lifecycle with consecutive observations."""
-        all_specs: list[KernelUsageRecordCreatorSpec] = []
+        all_specs: list[KernelUsageRecordCreator] = []
         mock_kernel_info.lifecycle.starts_at = make_datetime(7, 42, 30)
 
         # 1st observation: now = 07:47:00

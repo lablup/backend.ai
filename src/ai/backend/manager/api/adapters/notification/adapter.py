@@ -5,7 +5,6 @@ from __future__ import annotations
 from collections.abc import Sequence
 from uuid import UUID
 
-from ai.backend.common.api_handlers import Sentinel
 from ai.backend.common.data.entity.notification import (
     NotificationChannelID,
     NotificationRuleID,
@@ -111,6 +110,7 @@ from ai.backend.manager.services.notification.actions.bulk_get_channels import (
     BulkGetChannelsAction,
 )
 from ai.backend.manager.services.notification.actions.bulk_get_rules import BulkGetRulesAction
+from ai.backend.manager.services.notification.processors import NotificationProcessors
 from ai.backend.manager.types import OptionalState, TriState
 
 
@@ -164,13 +164,18 @@ def _rule_pagination_spec() -> PaginationSpec:
 class NotificationAdapter(BaseAdapter):
     """Adapter for notification domain operations (channel + rule)."""
 
+    _notification: NotificationProcessors
+
+    def __init__(self, notification: NotificationProcessors) -> None:
+        self._notification = notification
+
     async def batch_load_channels_by_ids(
-        self, ids: Sequence[UUID]
+        self, ids: Sequence[NotificationChannelID]
     ) -> list[NotificationChannelNode | Exception | None]:
         """Batch load notification channels by ID for DataLoader use, checked per channel."""
         if not ids:
             return []
-        result = await self._processors.notification.bulk_get_channels.run(
+        result = await self._notification.bulk_get_channels.run(
             BulkGetChannelsAction(ids=[NotificationChannelID(channel_id) for channel_id in ids])
         )
         return [
@@ -181,12 +186,12 @@ class NotificationAdapter(BaseAdapter):
         ]
 
     async def batch_load_rules_by_ids(
-        self, ids: Sequence[UUID]
+        self, ids: Sequence[NotificationRuleID]
     ) -> list[NotificationRuleNode | Exception | None]:
         """Batch load notification rules by ID for DataLoader use, checked per rule."""
         if not ids:
             return []
-        result = await self._processors.notification.bulk_get_rules.run(
+        result = await self._notification.bulk_get_rules.run(
             BulkGetRulesAction(ids=[NotificationRuleID(rule_id) for rule_id in ids])
         )
         return [
@@ -213,7 +218,7 @@ class NotificationAdapter(BaseAdapter):
             created_by=created_by,
         )
 
-        action_result = await self._processors.notification.create_channel.run(
+        action_result = await self._notification.create_channel.run(
             CreateChannelAction(creator=creator)
         )
 
@@ -223,7 +228,7 @@ class NotificationAdapter(BaseAdapter):
 
     async def get_channel(self, channel_id: UUID) -> GetNotificationChannelPayload:
         """Get a notification channel by ID."""
-        action_result = await self._processors.notification.get_channel.run(
+        action_result = await self._notification.get_channel.run(
             GetChannelAction(channel_id=NotificationChannelID(channel_id))
         )
 
@@ -237,7 +242,7 @@ class NotificationAdapter(BaseAdapter):
         """Update an existing notification channel."""
         updater = self._build_channel_updater(NotificationChannelID(channel_id), input)
 
-        action_result = await self._processors.notification.update_channel.run(
+        action_result = await self._notification.update_channel.run(
             UpdateChannelAction(updater=updater)
         )
 
@@ -249,7 +254,7 @@ class NotificationAdapter(BaseAdapter):
         self, input: DeleteNotificationChannelInput
     ) -> DeleteNotificationChannelPayload:
         """Delete a notification channel."""
-        await self._processors.notification.purge_channel.run(
+        await self._notification.purge_channel.run(
             PurgeChannelAction(channel_id=NotificationChannelID(input.id))
         )
 
@@ -273,15 +278,13 @@ class NotificationAdapter(BaseAdapter):
             created_by=created_by,
         )
 
-        action_result = await self._processors.notification.create_rule.run(
-            CreateRuleAction(creator=creator)
-        )
+        action_result = await self._notification.create_rule.run(CreateRuleAction(creator=creator))
 
         return CreateNotificationRulePayload(rule=self._rule_data_to_dto(action_result.data))
 
     async def get_rule(self, rule_id: UUID) -> GetNotificationRulePayload:
         """Get a notification rule by ID."""
-        action_result = await self._processors.notification.get_rule.run(
+        action_result = await self._notification.get_rule.run(
             GetRuleAction(rule_id=NotificationRuleID(rule_id))
         )
 
@@ -295,9 +298,7 @@ class NotificationAdapter(BaseAdapter):
         """Update an existing notification rule."""
         updater = self._build_rule_updater(NotificationRuleID(rule_id), input)
 
-        action_result = await self._processors.notification.update_rule.run(
-            UpdateRuleAction(updater=updater)
-        )
+        action_result = await self._notification.update_rule.run(UpdateRuleAction(updater=updater))
 
         return UpdateNotificationRulePayload(rule=self._rule_data_to_dto(action_result.data))
 
@@ -305,7 +306,7 @@ class NotificationAdapter(BaseAdapter):
         self, input: DeleteNotificationRuleInput
     ) -> DeleteNotificationRulePayload:
         """Delete a notification rule."""
-        await self._processors.notification.purge_rule.run(
+        await self._notification.purge_rule.run(
             PurgeRuleAction(rule_id=NotificationRuleID(input.id))
         )
 
@@ -315,7 +316,7 @@ class NotificationAdapter(BaseAdapter):
         self, input: ValidateNotificationChannelInput
     ) -> ValidateNotificationChannelPayload:
         """Validate a notification channel by sending a test message."""
-        await self._processors.notification.validate_channel.run(
+        await self._notification.validate_channel.run(
             ValidateChannelAction(
                 channel_id=NotificationChannelID(input.id), test_message=input.test_message
             )
@@ -326,7 +327,7 @@ class NotificationAdapter(BaseAdapter):
         self, input: ValidateNotificationRuleInput
     ) -> ValidateNotificationRulePayload:
         """Validate a notification rule by rendering its template with test data."""
-        action_result = await self._processors.notification.validate_rule.run(
+        action_result = await self._notification.validate_rule.run(
             ValidateRuleAction(
                 rule_id=NotificationRuleID(input.id),
                 notification_data=input.notification_data or {},
@@ -353,7 +354,7 @@ class NotificationAdapter(BaseAdapter):
             offset=input.offset,
         )
 
-        action_result = await self._processors.notification.search_channels.run(
+        action_result = await self._notification.search_channels.run(
             SearchChannelsAction(searcher=searcher)
         )
 
@@ -383,7 +384,7 @@ class NotificationAdapter(BaseAdapter):
             offset=input.offset,
         )
 
-        action_result = await self._processors.notification.search_rules.run(
+        action_result = await self._notification.search_rules.run(
             SearchRulesAction(searcher=searcher)
         )
 
@@ -471,24 +472,10 @@ class NotificationAdapter(BaseAdapter):
     ) -> NotificationChannelUpdater:
         return NotificationChannelUpdater(
             channel_id=channel_id,
-            name=(
-                OptionalState.update(input.name) if input.name is not None else OptionalState.nop()
-            ),
-            description=(
-                TriState[str].nop()
-                if isinstance(input.description, Sentinel)
-                else TriState[str].from_graphql(input.description)
-            ),
-            spec=(
-                OptionalState.update(_spec_input_to_domain(input.spec))
-                if input.spec is not None
-                else OptionalState.nop()
-            ),
-            enabled=(
-                OptionalState.update(input.enabled)
-                if input.enabled is not None
-                else OptionalState.nop()
-            ),
+            name=OptionalState.from_unset(input.name),
+            description=TriState.from_unset(input.description),
+            spec=OptionalState.from_unset(input.spec).map(_spec_input_to_domain),
+            enabled=OptionalState.from_unset(input.enabled),
         )
 
     @staticmethod
@@ -498,24 +485,10 @@ class NotificationAdapter(BaseAdapter):
     ) -> NotificationRuleUpdater:
         return NotificationRuleUpdater(
             rule_id=rule_id,
-            name=(
-                OptionalState.update(input.name) if input.name is not None else OptionalState.nop()
-            ),
-            description=(
-                TriState[str].nop()
-                if isinstance(input.description, Sentinel)
-                else TriState[str].from_graphql(input.description)
-            ),
-            message_template=(
-                OptionalState.update(input.message_template)
-                if input.message_template is not None
-                else OptionalState.nop()
-            ),
-            enabled=(
-                OptionalState.update(input.enabled)
-                if input.enabled is not None
-                else OptionalState.nop()
-            ),
+            name=OptionalState.from_unset(input.name),
+            description=TriState.from_unset(input.description),
+            message_template=OptionalState.from_unset(input.message_template),
+            enabled=OptionalState.from_unset(input.enabled),
         )
 
     @staticmethod

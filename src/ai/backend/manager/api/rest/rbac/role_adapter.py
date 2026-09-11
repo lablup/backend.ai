@@ -39,6 +39,8 @@ class RoleAdapter(BaseFilterAdapter):
         return RoleDTO(
             id=data.id,
             name=data.name,
+            scope_type=data.scope_type,
+            scope_id=data.scope_id,
             source=data.source,
             status=data.status,
             created_at=data.created_at,

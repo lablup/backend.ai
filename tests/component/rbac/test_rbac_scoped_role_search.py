@@ -5,24 +5,20 @@ from __future__ import annotations
 import uuid
 from collections.abc import AsyncIterator
 from typing import TYPE_CHECKING, Any
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import MagicMock
 
 import pytest
-import sqlalchemy as sa
 import yarl
-from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
 from ai.backend.client.v2.auth import HMACAuth
 from ai.backend.client.v2.config import ClientConfig
 from ai.backend.client.v2.v2_registry import V2ClientRegistry
-from ai.backend.common.data.entity.project import PROJECT_ENTITY_TYPE
-from ai.backend.common.data.entity.role import ROLE_ENTITY_TYPE
+from ai.backend.common.data.entity.domain import DomainEntityType
+from ai.backend.common.data.entity.role import RoleEntityType
 from ai.backend.common.dto.manager.v2.rbac.request import SearchRolesInput
 from ai.backend.common.dto.manager.v2.rbac.response import AdminSearchRolesPayload
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
 from ai.backend.manager.actions.registry.types import GroupMeta
-from ai.backend.manager.actions.validators import ActionValidators
-from ai.backend.manager.actions.validators.rbac import RBACValidators
 from ai.backend.manager.api.adapters.rbac.adapter import RBACAdapter
 from ai.backend.manager.api.rest.admin.handler import AdminHandler
 from ai.backend.manager.api.rest.admin.registry import register_admin_routes
@@ -33,8 +29,6 @@ from ai.backend.manager.api.rest.types import RouteDeps
 from ai.backend.manager.api.rest.v2.rbac.handler import V2RBACHandler
 from ai.backend.manager.api.rest.v2.rbac.registry import register_v2_rbac_routes
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
-from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
 from ai.backend.manager.repositories.permission_controller.repository import (
     PermissionControllerRepository,
 )
@@ -43,7 +37,7 @@ from ai.backend.manager.services.permission_contoller.processors import (
 )
 from ai.backend.manager.services.permission_contoller.service import PermissionControllerService
 from ai.backend.manager.services.rbac.processors import RbacProcessors
-from ai.backend.testutils.action_validators import mock_virtual_entity_rbac_validators
+from ai.backend.testutils.fixtures import DomainFixtureData
 
 if TYPE_CHECKING:
     from tests.component.conftest import ServerInfo, UserFixtureData
@@ -61,17 +55,12 @@ def permission_controller_processors(
     repo = PermissionControllerRepository(database_engine)
     service = PermissionControllerService(
         repo,
-        rbac_action_registry=[],
-    )
-    validators = ActionValidators(
-        virtual_entity_rbac=mock_virtual_entity_rbac_validators(),
-        rbac=RBACValidators(scope=AsyncMock()),
+        action_registry=processor_registry,
     )
     return PermissionControllerProcessors(
-        processor_registry.group(GroupMeta(ROLE_ENTITY_TYPE)),
+        processor_registry.group(GroupMeta(RoleEntityType())),
         service=service,
         action_monitors=[],
-        validators=validators,
     )
 
 
@@ -101,7 +90,7 @@ def server_module_registries(
     processors = MagicMock()
     processors.permission_controller = permission_controller_processors
     processors.rbac = rbac_processors
-    adapter = RBACAdapter(processors)
+    adapter = RBACAdapter(processors.rbac, processors.permission_controller)
     handler = V2RBACHandler(adapter=adapter)
     v2_reg = RouteRegistry.create("v2", route_deps.cors_options)
     v2_reg.add_subregistry(register_v2_rbac_routes(handler, route_deps))
@@ -131,44 +120,10 @@ async def admin_v2_registry(
 @pytest.fixture()
 async def role_registered_in_project(
     role_factory: RoleFactory,
-    group_fixture: uuid.UUID,
-    db_engine: SAEngine,
-) -> AsyncIterator[uuid.UUID]:
-    """Create a role the project owns in the graph. Yields the role ID."""
+) -> uuid.UUID:
+    """A role of the test project: ``role_factory`` creates every role there."""
     created = await role_factory(name=f"proj-role-{uuid.uuid4().hex[:8]}")
-    role_id = created.role.id
-    nodes = VirtualEntityRow.__table__
-    edges = EntityMembershipRow.__table__
-
-    async with db_engine.begin() as conn:
-        scope_node = await conn.scalar(
-            sa.select(nodes.c.id).where(
-                nodes.c.entity_type == PROJECT_ENTITY_TYPE,
-                nodes.c.entity_id == group_fixture,
-            )
-        )
-        if scope_node is None:
-            scope_node = await conn.scalar(
-                sa.insert(nodes)
-                .values(entity_type=PROJECT_ENTITY_TYPE, entity_id=group_fixture)
-                .returning(nodes.c.id)
-            )
-        # Creating the role provisioned its node and self-membership.
-        role_node = await conn.scalar(
-            sa.select(nodes.c.id).where(
-                nodes.c.entity_type == ROLE_ENTITY_TYPE,
-                nodes.c.entity_id == role_id,
-            )
-        )
-        await conn.execute(
-            sa.insert(edges).values(virtual_entity_id=scope_node, member_entity_id=role_node)
-        )
-
-    yield role_id
-
-    async with db_engine.begin() as conn:
-        # The edges go with the node by FK cascade.
-        await conn.execute(sa.delete(nodes).where(nodes.c.id == role_node))
+    return created.role.id
 
 
 class TestScopedRoleSearch:
@@ -196,10 +151,15 @@ class TestScopedRoleSearch:
         admin_v2_registry: V2ClientRegistry,
         role_factory: RoleFactory,
         group_fixture: uuid.UUID,
+        domain_fixture: DomainFixtureData,
         role_registered_in_project: uuid.UUID,
     ) -> None:
-        """Roles NOT registered in project scope should NOT appear in project search."""
-        not_in_project = await role_factory(name=f"not-in-proj-{uuid.uuid4().hex[:8]}")
+        """Roles of another scope should NOT appear in project search."""
+        not_in_project = await role_factory(
+            name=f"not-in-proj-{uuid.uuid4().hex[:8]}",
+            scope_type=DomainEntityType(),
+            scope_id=domain_fixture.domain_id,
+        )
 
         result = await admin_v2_registry.rbac.project_search_roles(
             group_fixture,

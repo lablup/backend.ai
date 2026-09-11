@@ -11,7 +11,7 @@ class SessionRepositories:
 
     @classmethod
     def create(cls, args: RepositoryArgs) -> Self:
-        repository = SessionRepository(args.db, args.ops_provider)
+        repository = SessionRepository(args.db)
 
         return cls(
             repository=repository,

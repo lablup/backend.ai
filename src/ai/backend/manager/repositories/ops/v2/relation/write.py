@@ -17,11 +17,13 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.common.data.permission.types import Permission
+from ai.backend.manager.actions.v2.ops.result import BulkRelationResult, RelationWriteResult
 from ai.backend.manager.models.base import Base
 from ai.backend.manager.models.specs.relation import (
     RelationCreator,
     RelationLifecycleUpdater,
     RelationPurger,
+    RelationUpserter,
 )
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck, PreconditionCheck
 from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
@@ -103,6 +105,69 @@ class V2RelationWriteOps(V2WriteOps):
     ) -> list[bool]:
         """Switch each pair back on, answering as :meth:`delete_relations` does."""
         return [await self._switch_relation(updater, scope, target) for scope, target in pairs]
+
+    async def partial_upsert_relations[
+        TScope: EntityIdentifier,
+        TTarget: EntityIdentifier,
+        TRow: Base,
+    ](
+        self,
+        upserter: RelationUpserter[TScope, TTarget, TRow],
+        pairs: Sequence[tuple[TScope, TTarget]],
+    ) -> BulkRelationResult:
+        """Write each pair's row in its own savepoint, inserting the pair that does not
+        stand yet, so one refusing pair leaves the rest written and answers with why.
+
+        The graph reads are registered for every pair, idempotently: a pair written
+        again is already governed and already shared.
+        """
+        results: list[RelationWriteResult] = []
+        for scope, target in pairs:
+            try:
+                async with self._sess.begin_nested():
+                    await self._upsert_row_returning(
+                        upserter.row_class(),
+                        upserter.index_elements(),
+                        upserter.build_insert_values(scope, target),
+                        upserter.build_update_values(),
+                        upserter.integrity_error_checks(),
+                    )
+                    await self._govern([scope], target, cap=Permission.READ)
+                    await self._widen_share(target, scope, {Permission.READ: None})
+                results.append(RelationWriteResult(scope=scope, target=target, written=True))
+            except Exception as e:
+                results.append(
+                    RelationWriteResult(scope=scope, target=target, written=False, error=e)
+                )
+        return BulkRelationResult(results=results)
+
+    async def partial_switch_relations[
+        TScope: EntityIdentifier,
+        TTarget: EntityIdentifier,
+        TRow: Base,
+    ](
+        self,
+        updater: RelationLifecycleUpdater[TScope, TTarget, TRow],
+        pairs: Sequence[tuple[TScope, TTarget]],
+    ) -> BulkRelationResult:
+        """Switch each pair in its own savepoint, so one refusing pair leaves the rest
+        written and answers with why.
+
+        The plural switches above take the batch down together; this is for a caller
+        that reports per pair. A pair standing in no relation is answered ``written``
+        false with no error: there was nothing to switch.
+        """
+        results: list[RelationWriteResult] = []
+        for scope, target in pairs:
+            try:
+                async with self._sess.begin_nested():
+                    written = await self._switch_relation(updater, scope, target)
+                results.append(RelationWriteResult(scope=scope, target=target, written=written))
+            except Exception as e:
+                results.append(
+                    RelationWriteResult(scope=scope, target=target, written=False, error=e)
+                )
+        return BulkRelationResult(results=results)
 
     async def purge_relations[TScope: EntityIdentifier, TTarget: EntityIdentifier, TRow: Base](
         self,

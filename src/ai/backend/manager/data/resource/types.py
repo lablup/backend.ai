@@ -21,7 +21,7 @@ from ai.backend.common.types import (
 
 @dataclass
 class UserResourcePolicyData(EntityData):
-    """One user resource policy. Keyed by ``name``; ``uuid`` is its ``EntityID``."""
+    """One user resource policy. Keyed by ``name``; ``uuid`` is its ``EntityIdentifier``."""
 
     uuid: UserResourcePolicyUUID
     name: str
@@ -39,7 +39,7 @@ class UserResourcePolicyData(EntityData):
 
 @dataclass
 class ProjectResourcePolicyData(EntityData):
-    """One project resource policy. Keyed by ``name``; ``uuid`` is its ``EntityID``."""
+    """One project resource policy. Keyed by ``name``; ``uuid`` is its ``EntityIdentifier``."""
 
     uuid: ProjectResourcePolicyUUID
     name: str
@@ -55,7 +55,7 @@ class ProjectResourcePolicyData(EntityData):
 
 @dataclass
 class KeyPairResourcePolicyData(EntityData):
-    """One keypair resource policy. Keyed by ``name``; ``uuid`` is its ``EntityID``."""
+    """One keypair resource policy. Keyed by ``name``; ``uuid`` is its ``EntityIdentifier``."""
 
     uuid: KeyPairResourcePolicyUUID
     name: str

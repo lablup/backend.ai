@@ -13,6 +13,9 @@ class ResourcePresetRepositories:
     def create(cls, args: RepositoryArgs) -> Self:
         return cls(
             repository=ResourcePresetRepository(
-                args.db, args.valkey_stat_client, args.config_provider
+                args.db,
+                args.valkey_stat_client,
+                args.config_provider,
+                args.v2_ops_provider,
             ),
         )
