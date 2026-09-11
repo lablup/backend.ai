@@ -1,9 +1,11 @@
 """Stand-in for the Prometheus a query preset is run against.
 
-Implements ``PrometheusClient`` without HTTP: every query is answered with the one
-sample below, and what each query asked — the rendered PromQL, the window, the label
-matchers, the range — is kept so a scenario can read it back. The renderer is the real
-one, so a template the client could not render is refused here as it is there.
+Implements ``PrometheusClient`` without HTTP. Every query is answered with one series
+holding one sample, and the sample's value is the PromQL the query asked, so a scenario
+reads what reached Prometheus off the answer. The result type is what Prometheus
+answers: a matrix for a range query, a vector for an instant one. An empty query is
+refused as Prometheus refuses it. The renderer is the real one, so a template the
+client could not render is refused here as it is there.
 """
 
 from __future__ import annotations
@@ -19,12 +21,13 @@ from ai.backend.common.dto.clients.prometheus.response import (
     PrometheusQueryData,
     PrometheusResponse,
 )
+from ai.backend.common.exception import FailedToGetMetric
 from ai.backend.manager.clients.prometheus.client import PrometheusClient
 from ai.backend.manager.clients.prometheus.preset import MetricPreset, PromQLTemplateRenderer
 
 ANSWERED_AT = 1000.0
-ANSWERED_VALUE = "1"
-ANSWERED_RESULT_TYPE = "vector"
+INSTANT = "vector"
+RANGE = "matrix"
 
 
 @dataclass(frozen=True)
@@ -37,15 +40,13 @@ class PrometheusCall:
     time_range: QueryTimeRange | None
 
 
-def one_sample() -> PrometheusResponse:
-    """What the stand-in answers for every query: one series with one sample."""
+def one_sample_of(query: str, result_type: str) -> PrometheusResponse:
+    """What the stand-in answers: one series whose one sample carries the query."""
     return PrometheusResponse(
         status="success",
         data=PrometheusQueryData(
-            result_type=ANSWERED_RESULT_TYPE,
-            result=[
-                MetricResponse(metric=MetricResponseInfo(), values=[(ANSWERED_AT, ANSWERED_VALUE)])
-            ],
+            result_type=result_type,
+            result=[MetricResponse(metric=MetricResponseInfo(), values=[(ANSWERED_AT, query)])],
         ),
     )
 
@@ -66,8 +67,8 @@ class FakePrometheusClient(PrometheusClient):
         time_range: QueryTimeRange | None,
         time: str | None = None,
     ) -> PrometheusResponse:
-        self._note("execute_preset", preset, time_range)
-        return one_sample()
+        query = self._asked("execute_preset", preset, time_range)
+        return one_sample_of(query, RANGE if time_range is not None else INSTANT)
 
     @override
     async def preview_query_template(
@@ -76,21 +77,28 @@ class FakePrometheusClient(PrometheusClient):
         default_window: str,
     ) -> PrometheusResponse:
         preset = MetricPreset(template=query_template, window=default_window)
-        self._note("preview_query_template", preset, None)
-        return one_sample()
+        query = self._asked("preview_query_template", preset, None)
+        return one_sample_of(query, INSTANT)
 
     def asked(self) -> tuple[PrometheusCall, ...]:
         """What was queried, in the order it was asked."""
         return tuple(self.calls)
 
-    def _note(self, method: str, preset: MetricPreset, time_range: QueryTimeRange | None) -> None:
+    def _asked(self, method: str, preset: MetricPreset, time_range: QueryTimeRange | None) -> str:
+        query = self._template_renderer.render(preset)
+        if not query.strip():
+            raise FailedToGetMetric(
+                'invalid parameter "query": 1:1: parse error: no expression found in input '
+                f"(status=400, path={'query_range' if time_range is not None else 'query'})"
+            )
         self.calls.append(
             PrometheusCall(
                 method=method,
-                query=self._template_renderer.render(preset),
+                query=query,
                 window=preset.window,
                 labels={name: matcher.value for name, matcher in preset.labels.items()},
                 group_by=frozenset(preset.group_by),
                 time_range=time_range,
             )
         )
+        return query

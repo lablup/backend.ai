@@ -431,23 +431,22 @@ class AnUnknownIdIsNotFoundForASuperadmin(
         return TheCallIsRefused(EntityNotFoundError)
 
 
-@pytest.mark.parametrize(
-    "scenario",
-    [
-        TheSuperadminRetunesTheTemplate(started=datetime.now(UTC)),
-        ClearingTheDescription(started=datetime.now(UTC)),
-        MovingToAnotherCategory(started=datetime.now(UTC)),
-        ChangingOnlyTheFilterLabels(started=datetime.now(UTC)),
-        GivingNothingChangesNothing(started=datetime.now(UTC)),
-        AnUnrenderableTemplateIsRefused(),
-        AStoredBadTemplateDoesNotBlockOtherChanges(started=datetime.now(UTC)),
-        AnUnknownCategoryIsRefused(),
-        AUserGrantedNothingMayNotEdit(),
-        EnforcementOffLetsAnyoneEdit(started=datetime.now(UTC)),
-        AnUnknownIdIsNotFoundForASuperadmin(),
-    ],
-    ids=lambda s: s.summary(),
-)
+SCENARIOS: list[EditingStep] = [
+    TheSuperadminRetunesTheTemplate(started=datetime.now(UTC)),
+    ClearingTheDescription(started=datetime.now(UTC)),
+    MovingToAnotherCategory(started=datetime.now(UTC)),
+    ChangingOnlyTheFilterLabels(started=datetime.now(UTC)),
+    GivingNothingChangesNothing(started=datetime.now(UTC)),
+    AnUnrenderableTemplateIsRefused(),
+    AStoredBadTemplateDoesNotBlockOtherChanges(started=datetime.now(UTC)),
+    AnUnknownCategoryIsRefused(),
+    AUserGrantedNothingMayNotEdit(),
+    EnforcementOffLetsAnyoneEdit(started=datetime.now(UTC)),
+    AnUnknownIdIsNotFoundForASuperadmin(),
+]
+
+
+@pytest.mark.parametrize("scenario", SCENARIOS, ids=lambda s: s.summary())
 async def test_editing(
     scenario: EditingStep, adapter: PrometheusQueryPresetAdapter, engine: ExtendedAsyncSAEngine
 ) -> None:

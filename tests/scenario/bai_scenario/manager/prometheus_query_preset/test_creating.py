@@ -391,31 +391,28 @@ class EnforcementOffChangesNothing(
         return TheCallIsRefused(InsufficientPrivilege)
 
 
-@pytest.mark.parametrize(
-    "scenario",
-    [
-        TheRequiredValuesMakeAWholeNode(started=datetime.now(UTC)),
-        FiledUnderACategory(started=datetime.now(UTC)),
-        WithAWindow(started=datetime.now(UTC)),
-        AnUnrenderableTemplateIsRefused(),
-        AnUnknownCategoryIsRefused(),
-        APlainUserMayNotCreate(),
-        AMonitorMayNotCreate(),
-        EnforcementOffChangesNothing(),
-    ],
-    ids=lambda s: s.summary(),
-)
+SCENARIOS: list[CreatingStep] = [
+    TheRequiredValuesMakeAWholeNode(started=datetime.now(UTC)),
+    FiledUnderACategory(started=datetime.now(UTC)),
+    WithAWindow(started=datetime.now(UTC)),
+    AnUnrenderableTemplateIsRefused(),
+    AnUnknownCategoryIsRefused(),
+    APlainUserMayNotCreate(),
+    AMonitorMayNotCreate(),
+    EnforcementOffChangesNothing(),
+]
+
+REPEATING_SCENARIOS: list[RepeatingStep] = [TheSameNameIsAllowedTwice(started=datetime.now(UTC))]
+
+
+@pytest.mark.parametrize("scenario", SCENARIOS, ids=lambda s: s.summary())
 async def test_creating(
     scenario: CreatingStep, adapter: PrometheusQueryPresetAdapter, engine: ExtendedAsyncSAEngine
 ) -> None:
     await run_scenario(scenario, adapter, engine)
 
 
-@pytest.mark.parametrize(
-    "scenario",
-    [TheSameNameIsAllowedTwice(started=datetime.now(UTC))],
-    ids=lambda s: s.summary(),
-)
+@pytest.mark.parametrize("scenario", REPEATING_SCENARIOS, ids=lambda s: s.summary())
 async def test_creating_beside_another(
     scenario: RepeatingStep, adapter: PrometheusQueryPresetAdapter, engine: ExtendedAsyncSAEngine
 ) -> None:
