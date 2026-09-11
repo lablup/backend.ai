@@ -2,8 +2,8 @@
 
 A preset lives in a global catalog: nothing scopes it, so a table lays the preset and a
 caller side by side and never a role between them. The category a preset is filed
-under comes from the category table's seed, because a preset row names one; the
-category's own calls have a table of their own.
+under is laid here too, because a preset row names one; the category's own calls have
+a table of their own.
 """
 
 from __future__ import annotations
@@ -14,16 +14,17 @@ from datetime import datetime
 from typing import Any, override
 from uuid import UUID
 
-from bai_scenario.components.domain import WrittenByThisRun
-from bai_scenario.components.prometheus_query_preset_category import PAGE, lay_someone
+from bai_scenario.components.domain import WAS_HERE, SomeoneOf, WrittenByThisRun
 from bai_scenario.fakes.prometheus import ANSWERED_AT, INSTANT
+from bai_scenario.seeds.domain.domain import SeedDomain
+from bai_scenario.seeds.prometheus_query_preset.category import SeedCategory
 from bai_scenario.seeds.prometheus_query_preset.preset import (
     METRIC,
     TEMPLATE,
     SeedPreset,
     SeedPresetIn,
 )
-from bai_scenario.seeds.prometheus_query_preset_category.category import SeedCategory
+from bai_scenario.seeds.seeder import Laid
 
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.v2.prometheus_query_preset.response import (
@@ -58,6 +59,9 @@ from ai.backend.testutils.scenario_steps import (
 type PresetNodeAnswer = QueryDefinitionNode | None
 """The get payload may carry no node, so every step answering a node is typed by this."""
 
+PAGE = 10
+"""How many a search answers when the request names no page size."""
+
 
 @dataclass(frozen=True)
 class ACatalogAndACaller:
@@ -91,6 +95,13 @@ class ManyPresetsAndACaller:
     named: PrometheusQueryPresetData
     caller: UserData
     category: PrometheusQueryPresetCategoryData | None = None
+
+
+async def lay_someone(seeding: Any, role: UserRole) -> Laid[UserData]:
+    """부를 사람 한 명. 사용자는 도메인에 속해야 하므로 도메인 하나가 함께 깔린다."""
+    domain = await seeding.creating(SeedDomain(name_hint="home", description=WAS_HERE))
+    laid: Laid[UserData] = await seeding.within(SomeoneOf(domain, role=role))
+    return laid
 
 
 @dataclass(frozen=True)
