@@ -1568,6 +1568,25 @@ class AbstractAgent[
         # existing containers still hold ports from the old range.
         self.port_pool.release_many(host_ports)
 
+    def _is_reconcilable(self, kernel_id: KernelId) -> bool:
+        """Whether a periodic reconciler may judge this kernel by a container listing.
+
+        A kernel whose create has not returned may not: the start event marks it RUNNING as soon
+        as its container starts, which is while `create_kernel` is still running.
+        """
+        return kernel_id not in self._active_creates and kernel_id not in self.restarting_kernels
+
+    async def _confirm_kernels_have_no_container(self, candidates: set[KernelId]) -> set[KernelId]:
+        """Re-check candidates against a container listing taken after the registry was read.
+
+        The first listing predates the registry read, so a kernel that started in between looks
+        dangling on a snapshot older than its own container. A second one cannot make that
+        mistake, and it also keeps a listing that dropped a container it could not inspect --
+        `enumerate_containers` swallows a per-container failure -- from reading as absence.
+        """
+        alive_kernel_ids = {kid for kid, _ in await self.enumerate_containers()}
+        return {kid for kid in candidates - alive_kernel_ids if self._is_reconcilable(kid)}
+
     async def _clean_kernel_registry_loop(self) -> None:
         # TODO: After reducing `kernel_registry` dependencies and roles, this kind of tasks should be deprecated
         cleanup_tasks: set[asyncio.Task[None]] = set()
@@ -1578,9 +1597,16 @@ class AbstractAgent[
                 registered_kernel_ids = {
                     kid
                     for kid, kernel in self.kernel_registry.items()
-                    if kernel.state == KernelLifecycleStatus.RUNNING
+                    if kernel.state == KernelLifecycleStatus.RUNNING and self._is_reconcilable(kid)
                 }
                 dangling_kernel_ids = registered_kernel_ids - alive_kernel_ids
+                if dangling_kernel_ids:
+                    # Confirmed against a fresh listing before anything is closed: this cleanup
+                    # unregisters the kernel, and the lifecycle sync then destroys the container
+                    # of a kernel it no longer knows.
+                    dangling_kernel_ids = await self._confirm_kernels_have_no_container(
+                        dangling_kernel_ids
+                    )
                 if dangling_kernel_ids:
                     log.info(
                         "cleaning up dangling kernel objects (kernel ids): {}",
@@ -1616,19 +1642,20 @@ class AbstractAgent[
         """
         # TODO: Reduce `kernel_registry` dependencies and roles
         log.info("cleaning kernel object (kernel:{})", kernel_id)
+        kernel_obj = self.kernel_registry.get(kernel_id)
+        if kernel_obj is None:
+            log.warning(
+                "kernel object already removed (kernel:{})",
+                kernel_id,
+            )
+            return
         try:
-            kernel_obj = self.kernel_registry[kernel_id]
             if kernel_obj.runner is not None:
                 await kernel_obj.runner.close()
             await kernel_obj.close()
             host_ports = kernel_obj.get("host_ports")
             if host_ports is not None:
                 self._restore_ports(host_ports)
-        except KeyError:
-            log.warning(
-                "kernel object already removed (kernel:{})",
-                kernel_id,
-            )
         except Exception as e:
             log.exception(
                 "failed to clean kernel object (kernel:{0}): {1}",
@@ -1639,12 +1666,12 @@ class AbstractAgent[
         else:
             log.info("cleaned kernel object (kernel:{})", kernel_id)
         finally:
-            try:
-                del self.kernel_registry[kernel_id]
-            except KeyError:
-                # The kernel object may have been already removed
-                # and it is already logged.
-                pass
+            # Only if it is still the object this call closed: a restart can put a new kernel
+            # object under the same id while the awaits above run, and dropping that one
+            # unregisters a live kernel.
+            async with self.registry_lock:
+                if self.kernel_registry.get(kernel_id) is kernel_obj:
+                    del self.kernel_registry[kernel_id]
 
     async def process_lifecycle_events(self) -> None:
         async def lifecycle_task_exception_handler(
@@ -1888,8 +1915,10 @@ class AbstractAgent[
                     # Check if: kernel_registry has the container but it's gone.
                     for kernel_id in known_kernels.keys() - alive_kernels.keys():
                         kernel_obj = self.kernel_registry[kernel_id]
+                        # `_is_reconcilable`: the listing above was taken before this lock, so a
+                        # kernel that started in between is absent from it while already RUNNING.
                         if (
-                            kernel_id in self.restarting_kernels
+                            not self._is_reconcilable(kernel_id)
                             or kernel_obj.state != KernelLifecycleStatus.RUNNING
                         ):
                             continue
