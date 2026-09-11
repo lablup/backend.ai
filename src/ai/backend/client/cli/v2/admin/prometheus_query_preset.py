@@ -109,6 +109,7 @@ def update(
     from ai.backend.common.dto.manager.v2.prometheus_query_preset.request import (
         ModifyQueryDefinitionInput,
     )
+    from ai.backend.common.tristate.unset import UNSET
 
     async def _run() -> None:
         registry = await create_v2_registry(load_v2_config())
@@ -116,13 +117,13 @@ def update(
             result = await registry.prometheus_query_preset.update(
                 preset_id,
                 ModifyQueryDefinitionInput(
-                    name=name,
-                    metric_name=metric_name,
-                    query_template=query_template,
-                    time_window=time_window,
-                    description=description,
-                    rank=rank,
-                    category_id=category_id,
+                    name=name if name is not None else UNSET,
+                    metric_name=metric_name if metric_name is not None else UNSET,
+                    query_template=query_template if query_template is not None else UNSET,
+                    time_window=time_window if time_window is not None else UNSET,
+                    description=description if description is not None else UNSET,
+                    rank=rank if rank is not None else UNSET,
+                    category_id=category_id if category_id is not None else UNSET,
                 ),
             )
             print_result(result)

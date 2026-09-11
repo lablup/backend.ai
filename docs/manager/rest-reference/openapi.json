@@ -18554,8 +18554,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Allowed filter label keys",
+            "description": "Allowed filter label keys. Omit to leave unchanged.",
             "title": "Filter Labels"
           },
           "group_labels": {
@@ -18570,8 +18569,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Allowed group-by label keys",
+            "description": "Allowed group-by label keys. Omit to leave unchanged.",
             "title": "Group Labels"
           }
         },
@@ -18579,7 +18577,7 @@
         "type": "object"
       },
       "ModifyQueryDefinitionInput": {
-        "description": "Input for modifying a prometheus query definition.\n\nNullable DB columns (``time_window``, ``description``, ``category_id``) use the\n``Sentinel`` pattern so callers can distinguish \"leave unchanged\" from \"clear to null\".\nNon-nullable fields use ``None`` to mean \"do not update\".",
+        "description": "Input for modifying a prometheus query definition.\n\nEvery field defaults to ``Unset``; only fields the caller sends are updated.",
         "properties": {
           "name": {
             "anyOf": [
@@ -18590,8 +18588,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Updated human-readable name",
+            "description": "Updated human-readable name. Omit to leave unchanged.",
             "title": "Name"
           },
           "description": {
@@ -18600,28 +18597,23 @@
                 "type": "string"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
-            "description": "Updated description. Pass SENTINEL (default) to leave unchanged; pass None to clear.",
+            "description": "Updated description. Omit to leave unchanged; null clears.",
             "title": "Description"
           },
           "rank": {
             "anyOf": [
               {
-                "minimum": 0,
+                "ge": 0,
                 "type": "integer"
               },
               {
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Updated sort rank",
+            "description": "Updated sort rank. Omit to leave unchanged.",
             "title": "Rank"
           },
           "category_id": {
@@ -18631,14 +18623,10 @@
                 "type": "string"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
-            "description": "Updated category ID. Pass SENTINEL (default) to leave unchanged; pass None to clear.",
+            "description": "Updated category ID. Omit to leave unchanged; null clears.",
             "title": "Category Id"
           },
           "metric_name": {
@@ -18650,8 +18638,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Updated Prometheus metric name",
+            "description": "Updated Prometheus metric name. Omit to leave unchanged.",
             "title": "Metric Name"
           },
           "query_template": {
@@ -18663,8 +18650,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Updated PromQL template with placeholders (${{labels}}, ${{window}}, ${{group_by}})",
+            "description": "Updated PromQL template with placeholders (${{labels}}, ${{window}}, ${{group_by}}). Omit to leave unchanged.",
             "title": "Query Template"
           },
           "time_window": {
@@ -18673,14 +18659,10 @@
                 "type": "string"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
-            "description": "Updated default time window. Pass SENTINEL (default) to leave unchanged; pass None to clear.",
+            "description": "Updated default time window. Omit to leave unchanged; null clears.",
             "title": "Time Window"
           },
           "options": {
@@ -18692,8 +18674,8 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Updated query definition options"
+            "description": "Updated query definition options. Omit to leave unchanged.",
+            "title": "Options"
           }
         },
         "title": "ModifyQueryDefinitionInput",

@@ -5,7 +5,6 @@ from __future__ import annotations
 from collections.abc import Sequence
 from uuid import UUID
 
-from ai.backend.common.api_handlers import Sentinel
 from ai.backend.common.data.entity.prometheus_query_preset import PrometheusQueryPresetID
 from ai.backend.common.data.entity.prometheus_query_preset_category import (
     PrometheusQueryPresetCategoryID,
@@ -16,6 +15,7 @@ from ai.backend.common.dto.manager.v2.prometheus_query_preset.request import (
     CreateQueryDefinitionInput,
     DeleteQueryDefinitionInput,
     ModifyQueryDefinitionInput,
+    ModifyQueryDefinitionOptionsInput,
     PreviewQueryDefinitionInput,
     QueryDefinitionFilter,
     QueryDefinitionOrder,
@@ -322,49 +322,18 @@ class PrometheusQueryPresetAdapter(BaseAdapter):
     def _build_updater(
         preset_id: PrometheusQueryPresetID, input: ModifyQueryDefinitionInput
     ) -> PrometheusQueryPresetUpdater:
+        options = OptionalState[ModifyQueryDefinitionOptionsInput].from_unset(input.options)
         return PrometheusQueryPresetUpdater(
             preset_id=preset_id,
-            name=(
-                OptionalState.update(input.name) if input.name is not None else OptionalState.nop()
-            ),
-            description=TriState.nop()
-            if isinstance(input.description, Sentinel)
-            else TriState.nullify()
-            if input.description is None
-            else TriState.update(input.description),
-            rank=(
-                OptionalState.update(input.rank) if input.rank is not None else OptionalState.nop()
-            ),
-            category_id=TriState.nop()
-            if isinstance(input.category_id, Sentinel)
-            else TriState.nullify()
-            if input.category_id is None
-            else TriState.update(PrometheusQueryPresetCategoryID(input.category_id)),
-            metric_name=(
-                OptionalState.update(input.metric_name)
-                if input.metric_name is not None
-                else OptionalState.nop()
-            ),
-            query_template=(
-                OptionalState.update(input.query_template)
-                if input.query_template is not None
-                else OptionalState.nop()
-            ),
-            time_window=TriState.nop()
-            if isinstance(input.time_window, Sentinel)
-            else TriState.nullify()
-            if input.time_window is None
-            else TriState.update(input.time_window),
-            filter_labels=(
-                OptionalState.update(input.options.filter_labels)
-                if input.options is not None and input.options.filter_labels is not None
-                else OptionalState.nop()
-            ),
-            group_labels=(
-                OptionalState.update(input.options.group_labels)
-                if input.options is not None and input.options.group_labels is not None
-                else OptionalState.nop()
-            ),
+            name=OptionalState.from_unset(input.name),
+            description=TriState.from_unset(input.description),
+            rank=OptionalState.from_unset(input.rank),
+            category_id=TriState.from_unset(input.category_id).map(PrometheusQueryPresetCategoryID),
+            metric_name=OptionalState.from_unset(input.metric_name),
+            query_template=OptionalState.from_unset(input.query_template),
+            time_window=TriState.from_unset(input.time_window),
+            filter_labels=options.and_optional(lambda o: o.filter_labels),
+            group_labels=options.and_optional(lambda o: o.group_labels),
         )
 
     @staticmethod
