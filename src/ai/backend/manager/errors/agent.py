@@ -59,7 +59,7 @@ class AgentAlreadyExited(EntityError, web.HTTPConflict):
         return EntityErrorCode(AgentEntityType(), ActionOperationType.UPDATE, ErrorDetail.CONFLICT)
 
 
-class AgentHasConflictingSessions(BackendAIError, web.HTTPConflict):
+class AgentHasConflictingSessions(EntityError, web.HTTPConflict):
     """
     Raised when an agent has sessions conflicting with its resource group and
     the caller did not request forced cleanup (the admin must drain first).
@@ -77,12 +77,8 @@ class AgentHasConflictingSessions(BackendAIError, web.HTTPConflict):
         )
 
     @override
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.AGENT,
-            operation=ErrorOperation.UPDATE,
-            error_detail=ErrorDetail.CONFLICT,
-        )
+    def entity_error_code(self) -> EntityErrorCode:
+        return EntityErrorCode(AgentEntityType(), ActionOperationType.UPDATE, ErrorDetail.CONFLICT)
 
 
 class ConflictingSessionRescheduleNotSupported(BackendAIError, web.HTTPNotImplemented):
