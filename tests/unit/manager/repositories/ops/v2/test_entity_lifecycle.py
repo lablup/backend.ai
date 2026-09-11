@@ -42,7 +42,6 @@ from ai.backend.common.data.entity.types import (
     FieldType,
 )
 from ai.backend.common.data.entity.vfolder import VFolderEntityType
-from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.permission.scope_template import ScopeTemplateValue
 from ai.backend.manager.data.permission.status import RoleStatus
 from ai.backend.manager.data.permission.types import Permission, RoleSource
@@ -50,7 +49,6 @@ from ai.backend.manager.errors.base.entity import EntityNotFoundError
 from ai.backend.manager.errors.permission import VirtualEntityNotFound
 from ai.backend.manager.errors.repository import RepositoryIntegrityError
 from ai.backend.manager.models.base import GUID, Base
-from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.entity_label.row import EntityLabelRow
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.rbac_models.role import RoleRow
@@ -58,7 +56,6 @@ from ai.backend.manager.models.rbac_models.role_permission_preset.row import (
     RolePermissionPresetRow,
 )
 from ai.backend.manager.models.rbac_models.role_preset.row import RolePresetRow
-from ai.backend.manager.models.scopes import ExistenceCheck, OperationScope
 from ai.backend.manager.models.specs.creator import (
     DanglingFieldCreator,
     EntityCreator,
@@ -330,30 +327,6 @@ class _Upserter(EntityUpserter[EntityLifecycleTestRow, _EntityData]):
     @override
     def to_data(self, row: EntityLifecycleTestRow) -> _EntityData:
         return _EntityData(id=row.id, name=row.name, note=row.note)
-
-
-@dataclass(frozen=True)
-class _ParentScope(OperationScope):
-    """The parent scope an upsert is told it writes in; it exists if its node does."""
-
-    parent: UUID
-
-    @override
-    def to_condition(self) -> QueryCondition:
-        return lambda: sa.true()
-
-    @property
-    @override
-    def existence_checks(self) -> Sequence[ExistenceCheck[Any]]:
-        return (
-            ExistenceCheck(
-                column=VirtualEntityRow.entity_id,
-                value=self.parent,
-                error=EntityNotFoundError(
-                    entity_type=_PARENT_SCOPE_TYPE, operation=ActionOperationType.UPSERT
-                ),
-            ),
-        )
 
 
 @pytest.fixture
@@ -1078,31 +1051,6 @@ class TestEntityUpsert:
             await repository.upsert_entity(_Upserter(name="a", parents=(uuid.uuid4(),)))
 
         assert await _row_count(database) == 0
-
-    async def test_atomic_upsert_refuses_a_scope_that_does_not_exist_before_writing(
-        self, database: ExtendedAsyncSAEngine, repository: OpsRepository[_EntityData]
-    ) -> None:
-        # The scope's own error, not the graph's, and no row: the check runs first.
-        nobody = uuid.uuid4()
-        with pytest.raises(EntityNotFoundError):
-            await repository.atomic_upsert_entities(
-                [_Upserter(name="a", parents=(nobody,))], [_ParentScope(parent=nobody)]
-            )
-
-        assert await _row_count(database) == 0
-
-    async def test_atomic_upsert_writes_when_the_scope_it_is_told_exists(
-        self,
-        database: ExtendedAsyncSAEngine,
-        repository: OpsRepository[_EntityData],
-        parent_id: UUID,
-    ) -> None:
-        items = await repository.atomic_upsert_entities(
-            [_Upserter(name="a", parents=(parent_id,))], [_ParentScope(parent=parent_id)]
-        )
-
-        assert [item.name for item in items] == ["a"]
-        assert await _parent_membership_entity_ids(database, parent_id) == {items[0].id}
 
     async def test_atomic_upsert_provisions_and_joins_each_entity(
         self,

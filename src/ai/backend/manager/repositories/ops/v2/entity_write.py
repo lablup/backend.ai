@@ -44,7 +44,6 @@ from ai.backend.manager.models.rbac_models.role_permission_preset.row import (
 )
 from ai.backend.manager.models.rbac_models.role_preset.row import RolePresetRow
 from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
-from ai.backend.manager.models.scopes import OperationScope
 from ai.backend.manager.models.specs.creator import (
     EntityCreator,
     GuardedEntityCreator,
@@ -242,19 +241,16 @@ class V2EntityWriteOps(V2GraphWriteOpsBase):
         return upserter.to_data(row)
 
     async def atomic_upsert_entities[TRow: Base, TData](
-        self,
-        upserters: Sequence[EntityUpserter[TRow, TData]],
-        scopes: Sequence[OperationScope] = (),
+        self, upserters: Sequence[EntityUpserter[TRow, TData]]
     ) -> list[TData]:
         """Insert-or-update every entity row atomically, provisioning each row's scope as
-        :meth:`upsert_entity` does for one; ``scopes`` are existence-checked first.
+        :meth:`upsert_entity` does for one.
 
         One statement per row: each carries its own update values, so they cannot be
         folded into a single insert the way :meth:`atomic_create_entities` folds its rows.
         """
         if not upserters:
             return []
-        await self._validate_scope_existence(scopes)
         rows = [
             await self._upsert_row_returning(
                 upserter.row_class(),

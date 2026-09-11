@@ -815,9 +815,7 @@ class EntityAtomicUpsertService[TData: EntityData]:
         self, action: EntityAtomicUpsertOpsAction[Any, TData]
     ) -> EntitiesOpsResult[TData]:
         return EntitiesOpsResult(
-            items=await self._repository.atomic_upsert_entities(
-                action.to_upserters(), action.operation_scopes()
-            )
+            items=await self._repository.atomic_upsert_entities(action.to_upserters())
         )
 
 
