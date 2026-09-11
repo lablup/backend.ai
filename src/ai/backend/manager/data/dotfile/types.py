@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import enum
+import re
 import uuid
 from dataclasses import dataclass
 from typing import Any
@@ -23,6 +24,13 @@ class DotfileScope(enum.StrEnum):
 
 
 DotfileEntityKey = str | uuid.UUID
+
+_CR_LINE_BREAK = re.compile(r"\r\n?")
+
+
+def normalize_newlines(text: str) -> str:
+    """Convert CRLF and lone CR line breaks to LF."""
+    return _CR_LINE_BREAK.sub("\n", text)
 
 
 @dataclass(frozen=True)
