@@ -11,6 +11,10 @@ from datetime import datetime
 from typing import Any, override
 from uuid import UUID
 
+from bai_scenario.components.domain import WrittenByThisRun
+from bai_scenario.components.prometheus_query_preset import PAGE, lay_someone
+from bai_scenario.seeds.prometheus_query_preset.category import SeedCategory
+
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.v2.prometheus_query_preset_category.response import (
     CategoryNode,
@@ -34,9 +38,6 @@ from ai.backend.testutils.scenario_steps import (
     Then,
     Verdict,
 )
-from bai_scenario.components.domain import WrittenByThisRun
-from bai_scenario.components.prometheus_query_preset import PAGE, lay_someone
-from bai_scenario.seeds.prometheus_query_preset.category import SeedCategory
 
 type CategoryNodeAnswer = CategoryNode | None
 """The get payload may carry no node, so every step answering a node is typed by this."""

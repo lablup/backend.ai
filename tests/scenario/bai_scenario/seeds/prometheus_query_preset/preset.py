@@ -10,6 +10,8 @@ from collections.abc import Sequence
 from dataclasses import dataclass, replace
 from typing import override
 
+from bai_scenario.seeds.seeder import Naming, SeedRow, SeedRowFrom
+
 from ai.backend.common.data.entity.prometheus_query_preset_category import (
     PrometheusQueryPresetCategoryID,
 )
@@ -20,7 +22,6 @@ from ai.backend.manager.data.prometheus_query_preset_category.types import (
 from ai.backend.manager.models.prometheus_query_preset.creators import (
     PrometheusQueryPresetCreator,
 )
-from bai_scenario.seeds.seeder import Naming, SeedRow, SeedRowFrom
 
 METRIC = "container_cpu_seconds_total"
 TEMPLATE = "avg by (${{group_by}}) (rate(container_cpu_seconds_total{${{labels}}}[${{window}}]))"

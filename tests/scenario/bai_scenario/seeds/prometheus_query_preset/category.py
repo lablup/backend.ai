@@ -5,13 +5,14 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import override
 
+from bai_scenario.seeds.seeder import Naming, SeedRow
+
 from ai.backend.manager.data.prometheus_query_preset_category.types import (
     PrometheusQueryPresetCategoryData,
 )
 from ai.backend.manager.models.prometheus_query_preset_category.creators import (
     PrometheusQueryPresetCategoryCreator,
 )
-from bai_scenario.seeds.seeder import Naming, SeedRow
 
 
 @dataclass(frozen=True)
