@@ -44,6 +44,7 @@ from ai.backend.common.dto.manager.v2.idle_checker.types import (
     IdleCheckerTypeDTO,
 )
 from ai.backend.common.dto.manager.v2.prometheus_query_preset.types import MetricLabelEntryInfo
+from ai.backend.common.tristate.unset import Unset
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.data.idle_checker.types import IdleCheckerData
@@ -143,6 +144,9 @@ class IdleCheckerAdapter(BaseAdapter):
         self,
         input: UpdateIdleCheckerInput,
     ) -> UpdateIdleCheckerPayload:
+        spec: OptionalState[IdleCheckerSpec] = OptionalState.nop()
+        if not isinstance(input.checker_spec, Unset) and input.checker_spec is not None:
+            spec = OptionalState.update(self._build_spec(input.checker_spec))
         updater = IdleCheckerUpdater(
             checker_id=input.id,
             name=OptionalState.from_unset(input.name),
@@ -151,7 +155,7 @@ class IdleCheckerAdapter(BaseAdapter):
             initial_grace_period_seconds=OptionalState.from_unset(
                 input.initial_grace_period_seconds
             ),
-            spec=OptionalState.from_unset(input.checker_spec).map(self._build_spec),
+            spec=spec,
         )
         action_result = await self._processors.idle_checker.update.run(
             UpdateIdleCheckerAction(updater=updater)
