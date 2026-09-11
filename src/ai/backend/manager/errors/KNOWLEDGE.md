@@ -67,6 +67,10 @@ one place per domain.
 | `NoUpdatesToApply` | a modifier that changed nothing; the row is whichever one the caller was updating |
 | `AppServiceStartFailed` | an app started inside a session is no row, and `ActionOperationType` has no `start` |
 | `AppProxyConnectionError`, `AppProxyResponseError` | AppProxy is a system domain by the `AGENTS.md` table |
+| `NotificationProcessingFailure`, `NotificationTemplateRenderingFailure` | a notification is rendered and delivered, and the message that comes out is no row; only the two notification tables have a type |
+| `InvalidSecretKeyMaterial`, `SecretEncryptionMisconfigured` | the configured encryption keys and key providers, which no stored secret is read to reach |
+| `ExportReportNotFound`, `InvalidExportFieldKeys` | a report is a `ReportDef` in a code-declared registry, not a row, and its field keys with it |
+| `RetentionCategoryNotSupportedError` | a `RetentionCategory` with no cleanup wired — a gap in this build, not in a row |
 
 ## The legacy neighbor is a different kind
 
