@@ -7,7 +7,6 @@ import uuid
 import pytest
 from pydantic import ValidationError
 
-from ai.backend.common.api_handlers import SENTINEL, Sentinel
 from ai.backend.common.data.entity.types import EntityType
 from ai.backend.common.data.permission.types import RoleStatus
 from ai.backend.common.dto.manager.v2.rbac.request import (
@@ -18,6 +17,7 @@ from ai.backend.common.dto.manager.v2.rbac.request import (
 )
 from ai.backend.common.dto.manager.v2.rbac.types import ScopeInputDTO
 from ai.backend.common.exception import BackendAISchemaValidationFailed
+from ai.backend.common.tristate.unset import UNSET, Unset
 
 _SCOPE = ScopeInputDTO(scope_type=EntityType("project"), scope_id=str(uuid.uuid4()))
 
@@ -122,20 +122,28 @@ class TestUpdateRoleInput:
     """Tests for UpdateRoleInput model creation and validation."""
 
     def test_all_none_fields_is_valid(self) -> None:
-        req = UpdateRoleInput(name=None, description=None, status=None)
+        req = UpdateRoleInput(name=None, description=None, status=None, auto_assign=None)
         assert req.name is None
         assert req.description is None
         assert req.status is None
+        assert req.auto_assign is None
 
-    def test_default_description_is_sentinel(self) -> None:
+    def test_all_fields_default_to_unset(self) -> None:
         req = UpdateRoleInput()
-        assert req.description is SENTINEL
-        assert isinstance(req.description, Sentinel)
+        assert req.name is UNSET
+        assert req.description is UNSET
+        assert req.status is UNSET
+        assert req.auto_assign is UNSET
 
-    def test_explicit_sentinel_description_signals_clear(self) -> None:
-        req = UpdateRoleInput(description=SENTINEL)
-        assert req.description is SENTINEL
-        assert isinstance(req.description, Sentinel)
+    def test_default_description_is_unset(self) -> None:
+        req = UpdateRoleInput()
+        assert req.description is UNSET
+        assert isinstance(req.description, Unset)
+
+    def test_explicit_unset_description_signals_no_change(self) -> None:
+        req = UpdateRoleInput(description=UNSET)
+        assert req.description is UNSET
+        assert isinstance(req.description, Unset)
 
     def test_none_description_means_no_change(self) -> None:
         req = UpdateRoleInput(description=None)
@@ -172,11 +180,11 @@ class TestUpdateRoleInput:
     def test_partial_update_name_only(self) -> None:
         req = UpdateRoleInput(name="UpdatedName")
         assert req.name == "UpdatedName"
-        assert req.status is None
+        assert req.status is UNSET
 
     def test_partial_update_status_only(self) -> None:
         req = UpdateRoleInput(status=RoleStatus.INACTIVE)
-        assert req.name is None
+        assert req.name is UNSET
         assert req.status == RoleStatus.INACTIVE
 
 
@@ -285,7 +293,7 @@ class TestPurgeRoleInputRoundTrip:
 
 
 class TestUpdateRoleInputRoundTrip:
-    """Tests for UpdateRoleInput serialization round-trip (non-SENTINEL values)."""
+    """Tests for UpdateRoleInput serialization round-trip (non-UNSET values)."""
 
     def test_round_trip_with_all_none(self) -> None:
         req = UpdateRoleInput(name=None, description=None, status=None)

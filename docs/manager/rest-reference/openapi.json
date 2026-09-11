@@ -19598,8 +19598,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Updated role name",
+            "description": "Updated role name. Omit to leave unchanged.",
             "title": "Name"
           },
           "description": {
@@ -19608,14 +19607,10 @@
                 "type": "string"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
-            "description": "Updated role description. Use SENTINEL to clear.",
+            "description": "Updated role description. Omit to leave unchanged; null clears.",
             "title": "Description"
           },
           "status": {
@@ -19627,8 +19622,8 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Updated role status"
+            "description": "Updated role status. Omit to leave unchanged.",
+            "title": "Status"
           },
           "auto_assign": {
             "anyOf": [
@@ -19639,8 +19634,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Updated value for the `auto_assign` flag. When true, the role is automatically granted to a user when the user is added to a scope this role is registered in.",
+            "description": "Updated value for the `auto_assign` flag. When true, the role is automatically granted to a user when the user is added to a scope this role is registered in. Omit to leave unchanged.",
             "title": "Auto Assign"
           }
         },
@@ -19932,8 +19926,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Updated entity type",
+            "description": "Updated entity type. Omit to leave unchanged.",
             "title": "Entity Type"
           },
           "permission": {
@@ -19945,8 +19938,8 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Updated operation bit"
+            "description": "Updated operation bit. Omit to leave unchanged.",
+            "title": "Permission"
           }
         },
         "required": [
@@ -35413,14 +35406,10 @@
                 "type": "string"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
-            "description": "Updated role description",
+            "description": "Updated role description. Omit to leave unchanged; null clears.",
             "title": "Description"
           }
         },

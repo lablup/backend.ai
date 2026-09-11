@@ -8,10 +8,11 @@ from uuid import UUID
 
 from pydantic import Field, field_validator, model_validator
 
-from ai.backend.common.api_handlers import SENTINEL, BaseRequestModel, Sentinel
+from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.data.entity.types import EntityType
 from ai.backend.common.data.permission.types import Permission
 from ai.backend.common.dto.manager.query import DateTimeFilter, StringFilter, UUIDFilter
+from ai.backend.common.tristate.unset import UNSET, Unset
 
 from .types import (
     OrderDirection,
@@ -103,23 +104,28 @@ class CreateRoleInput(BaseRequestModel):
 class UpdateRoleInput(BaseRequestModel):
     """Input for updating a role."""
 
-    name: str | None = Field(default=None, description="Updated role name")
-    description: str | Sentinel | None = Field(
-        default=SENTINEL, description="Updated role description. Use SENTINEL to clear."
+    name: str | None | Unset = Field(
+        default=UNSET, description="Updated role name. Omit to leave unchanged."
     )
-    status: RoleStatus | None = Field(default=None, description="Updated role status")
-    auto_assign: bool | None = Field(
-        default=None,
+    description: str | None | Unset = Field(
+        default=UNSET, description="Updated role description. Omit to leave unchanged; null clears."
+    )
+    status: RoleStatus | None | Unset = Field(
+        default=UNSET, description="Updated role status. Omit to leave unchanged."
+    )
+    auto_assign: bool | None | Unset = Field(
+        default=UNSET,
         description=(
             "Updated value for the `auto_assign` flag. When true, the role is automatically "
-            "granted to a user when the user is added to a scope this role is registered in."
+            "granted to a user when the user is added to a scope this role is registered in. "
+            "Omit to leave unchanged."
         ),
     )
 
     @field_validator("name")
     @classmethod
-    def name_must_not_be_blank(cls, v: str | None) -> str | None:
-        if v is None:
+    def name_must_not_be_blank(cls, v: str | None | Unset) -> str | None | Unset:
+        if not isinstance(v, str):
             return v
         stripped = v.strip()
         if not stripped:
@@ -155,12 +161,12 @@ class UpdatePermissionInput(BaseRequestModel):
     """Input for updating a scoped permission."""
 
     id: UUID = Field(description="Permission ID to update")
-    entity_type: EntityType | None = Field(default=None, description="Updated entity type")
-    permission: PermissionBitDTO | None = Field(default=None, description="Updated operation bit")
-
-    def permission_bit(self) -> Permission:
-        """The bit this input names; ``NONE`` when it names none."""
-        return Permission.NONE if self.permission is None else self.permission.to_permission()
+    entity_type: EntityType | None | Unset = Field(
+        default=UNSET, description="Updated entity type. Omit to leave unchanged."
+    )
+    permission: PermissionBitDTO | None | Unset = Field(
+        default=UNSET, description="Updated operation bit. Omit to leave unchanged."
+    )
 
 
 class DeletePermissionInput(BaseRequestModel):

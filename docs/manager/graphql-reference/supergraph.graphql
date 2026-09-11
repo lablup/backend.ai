@@ -22353,8 +22353,8 @@ input UpdatePermissionInput
   @join__type(graph: STRAWBERRY)
 {
   id: UUID!
-  entityType: String = null
-  permission: PermissionBit = null
+  entityType: String
+  permission: PermissionBit
 }
 
 """

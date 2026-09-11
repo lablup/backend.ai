@@ -23,8 +23,6 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from typing import Any, Final, cast
 
-from bai_scenario.seeds.ops import SeedOps
-
 from ai.backend.common.data.entity.role import RoleID
 from ai.backend.common.data.entity.types import FieldData
 from ai.backend.common.data.entity.user import UserID
@@ -42,6 +40,7 @@ from ai.backend.manager.models.specs.relation import RelationCreator
 from ai.backend.manager.models.specs.updater import GuardedDataUpdater
 from ai.backend.manager.models.specs.upserter import EntityUpserter, GlobalEntityUpserter
 from ai.backend.manager.repositories.ops.v2.user.write import FullUserCreator
+from bai_scenario.seeds.ops import SeedOps
 
 type WriteSpec[D] = (
     GlobalEntityCreator[Any, D]

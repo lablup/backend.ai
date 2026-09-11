@@ -9,7 +9,6 @@ from datetime import UTC, datetime
 from functools import lru_cache
 from uuid import UUID
 
-from ai.backend.common.api_handlers import SENTINEL
 from ai.backend.common.contexts.user import current_user
 from ai.backend.common.data.entity.domain import DomainEntityType, DomainID
 from ai.backend.common.data.entity.permission import PermissionID
@@ -811,14 +810,10 @@ class RBACAdapter(BaseAdapter):
         """Update an existing permission."""
         updater = RolePermissionUpdater(
             permission_id=PermissionID(input.id),
-            entity_type=(
-                OptionalState.update(input.entity_type)
-                if input.entity_type is not None
-                else OptionalState.nop()
-            ),
+            entity_type=OptionalState.from_unset(input.entity_type),
             permission=(
-                OptionalState.update(single_bit(input.permission_bit()))
-                if input.permission is not None
+                OptionalState.update(single_bit(input.permission.to_permission()))
+                if isinstance(input.permission, PermissionBitDTO)
                 else OptionalState.nop()
             ),
         )
@@ -1480,22 +1475,11 @@ class RBACAdapter(BaseAdapter):
         return result
 
     def _build_updater(self, role_id: UUID, input: UpdateRoleInput) -> RoleUpdater:
-        name: OptionalState[str] = OptionalState.nop()
-        description: TriState[str] = TriState.nop()
-        auto_assign: OptionalState[bool] = OptionalState.nop()
-
-        if input.name is not None:
-            name = OptionalState.update(input.name)
-        if input.description is not SENTINEL:
-            if input.description is None:
-                description = TriState.nullify()
-            else:
-                description = TriState.update(str(input.description))
-        if input.auto_assign is not None:
-            auto_assign = OptionalState.update(input.auto_assign)
-
         return RoleUpdater(
-            role_id=RoleID(role_id), name=name, description=description, auto_assign=auto_assign
+            role_id=RoleID(role_id),
+            name=OptionalState.from_unset(input.name),
+            description=TriState.from_unset(input.description),
+            auto_assign=OptionalState.from_unset(input.auto_assign),
         )
 
     @staticmethod

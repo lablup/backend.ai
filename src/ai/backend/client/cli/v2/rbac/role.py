@@ -296,6 +296,7 @@ def update(
     """Update an existing role. Only the provided fields are changed."""
     from ai.backend.common.dto.manager.v2.rbac.request import UpdateRoleInput
     from ai.backend.common.dto.manager.v2.rbac.types import RoleStatus
+    from ai.backend.common.tristate.unset import UNSET
 
     async def _run() -> None:
         registry = await create_v2_registry(load_v2_config())
@@ -303,9 +304,9 @@ def update(
             result = await registry.rbac.update_role(
                 role_id,
                 UpdateRoleInput(
-                    name=name,
-                    status=RoleStatus(status) if status is not None else None,
-                    auto_assign=auto_assign,
+                    name=name if name is not None else UNSET,
+                    status=RoleStatus(status) if status is not None else UNSET,
+                    auto_assign=auto_assign if auto_assign is not None else UNSET,
                 ),
             )
             print_result(result)
