@@ -15,10 +15,10 @@ from ai.backend.manager.actions.v2.ops.base import OperationScopeOpsAction, Scop
 from ai.backend.manager.data.entity_share.types import EntityShareData
 from ai.backend.manager.models.entity_share.row import EntityShareRow
 from ai.backend.manager.models.entity_share.scopes import (
+    EntityShareOwningScope,
     EntityShareRecipientProjectScope,
     EntityShareRecipientScope,
     EntityShareSharerScope,
-    EntityShareTargetScope,
 )
 from ai.backend.manager.models.entity_share.searchers import EntityShareSearcher
 from ai.backend.manager.models.scopes import OperationScope
@@ -28,7 +28,7 @@ __all__ = (
     "EntityShareRecipientScopeItem",
     "EntityShareSharerScopeItem",
     "EntityShareScopeItem",
-    "EntityShareTargetScopeItem",
+    "EntityShareOwningScopeItem",
     "SearchEntitySharesAction",
 )
 
@@ -83,8 +83,8 @@ class EntityShareRecipientProjectScopeItem(EntityShareScopeItem):
 
 
 @dataclass(frozen=True)
-class EntityShareTargetScopeItem(EntityShareScopeItem):
-    """The shares lending one entity."""
+class EntityShareOwningScopeItem(EntityShareScopeItem):
+    """The offers a scope reaches through the entity each one is attached to."""
 
     target: EntityIdentifier
 
@@ -94,7 +94,7 @@ class EntityShareTargetScopeItem(EntityShareScopeItem):
 
     @override
     def operation_scope(self) -> OperationScope:
-        return EntityShareTargetScope(target=self.target)
+        return EntityShareOwningScope(scope=self.target)
 
 
 @dataclass

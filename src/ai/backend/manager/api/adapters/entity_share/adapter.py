@@ -53,11 +53,11 @@ from ai.backend.manager.services.entity_share.actions.create import (
 )
 from ai.backend.manager.services.entity_share.actions.get import GetEntityShareAction
 from ai.backend.manager.services.entity_share.actions.search import (
+    EntityShareOwningScopeItem,
     EntityShareRecipientProjectScopeItem,
     EntityShareRecipientScopeItem,
     EntityShareScopeItem,
     EntityShareSharerScopeItem,
-    EntityShareTargetScopeItem,
     SearchEntitySharesAction,
 )
 from ai.backend.manager.services.entity_share.processors import EntityShareProcessors
@@ -243,7 +243,7 @@ class EntityShareAdapter(BaseAdapter):
             items.append(EntityShareSharerScopeItem(user_id=UserID(sharer.value)))
         for target in scope.target or ():
             items.append(
-                EntityShareTargetScopeItem(
+                EntityShareOwningScopeItem(
                     target=RuntimeEntityID(target.entity_type, target.entity_id)
                 )
             )
