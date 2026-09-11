@@ -8,7 +8,7 @@ Not exercised by any scenario: batch_load_fields, get_agent_resource, get_domain
 
 #### [a-slot-name-already-taken-is-refused](/tests/scenario/bai_scenario/manager/resource_slot/test_creating.py) — pass
 
-같은 이름의 슬롯 종류가 있을 때 그 이름으로 다시 만들면, 이름이 겹친다는 이유로 거부된다. 이 행은 다섯 테이블의 참조 대상이라 덮어쓰지 않는다
+같은 이름의 슬롯 종류가 있을 때 그 이름으로 다시 생성하면, 이름 중복으로 거부된다. 이 행은 다섯 테이블의 참조 대상이라 덮어쓰지 않는다
 
 Given
 
@@ -23,7 +23,7 @@ Given
 
 When
 
-- ResourceSlotAdapter.admin_create_slot_type — user-1이 이미 있는 slot-1으로 다시 만듦
+- ResourceSlotAdapter.admin_create_slot_type — user-1이 이미 있는 이름 slot-1(으)로 다시 생성
 
 Then
 
@@ -32,7 +32,7 @@ Then
 
 #### [a-slot-type-made-with-every-display-value-carries-them-back](/tests/scenario/bai_scenario/manager/resource_slot/test_creating.py) — pass
 
-슈퍼관리자가 표시 이름·설명·단위·아이콘·서식·순위까지 주고 만들면, 준 값이 그대로 실린 노드가 온다
+슈퍼관리자가 표시 이름·설명·단위·아이콘·서식·순위까지 지정해 생성하면, 지정한 값이 그대로 담긴 노드가 반환된다
 
 Given
 
@@ -46,11 +46,11 @@ Given
 
 When
 
-- ResourceSlotAdapter.admin_create_slot_type — user-1이 count 종류 cuda.shares를 표시 항목까지 주고 만듦
+- ResourceSlotAdapter.admin_create_slot_type — user-1이 count 종류 슬롯 cuda.shares(을)를 표시 항목까지 지정해 생성
 
 Then
 
-- 만든 슬롯 종류 전체가 온다
+- 생성한 슬롯 종류 전체가 반환된다
   - id = 'cuda.shares'
   - uuid: 무시함 — 데이터베이스가 만든다
   - slot_name = 'cuda.shares'
@@ -66,7 +66,7 @@ Then
 
 #### [a-slot-type-of-the-bytes-kind-is-made](/tests/scenario/bai_scenario/manager/resource_slot/test_creating.py) — pass
 
-슈퍼관리자가 bytes 종류로 만들면 그 종류가 실린 노드가 온다
+슈퍼관리자가 bytes 종류로 생성하면 그 종류가 담긴 노드가 반환된다
 
 Given
 
@@ -80,11 +80,11 @@ Given
 
 When
 
-- ResourceSlotAdapter.admin_create_slot_type — user-1이 bytes 종류 cuda.shares를 이름과 종류만 주고 만듦
+- ResourceSlotAdapter.admin_create_slot_type — user-1이 bytes 종류 슬롯 cuda.shares(을)를 이름과 종류만 지정해 생성
 
 Then
 
-- 만든 슬롯 종류 전체가 온다
+- 생성한 슬롯 종류 전체가 반환된다
   - id = 'cuda.shares'
   - uuid: 무시함 — 데이터베이스가 만든다
   - slot_name = 'cuda.shares'
@@ -100,7 +100,7 @@ Then
 
 #### [a-slot-type-of-the-count-kind-is-made](/tests/scenario/bai_scenario/manager/resource_slot/test_creating.py) — pass
 
-슈퍼관리자가 count 종류로 만들면 그 종류가 실린 노드가 온다
+슈퍼관리자가 count 종류로 생성하면 그 종류가 담긴 노드가 반환된다
 
 Given
 
@@ -114,11 +114,11 @@ Given
 
 When
 
-- ResourceSlotAdapter.admin_create_slot_type — user-1이 count 종류 cuda.shares를 이름과 종류만 주고 만듦
+- ResourceSlotAdapter.admin_create_slot_type — user-1이 count 종류 슬롯 cuda.shares(을)를 이름과 종류만 지정해 생성
 
 Then
 
-- 만든 슬롯 종류 전체가 온다
+- 생성한 슬롯 종류 전체가 반환된다
   - id = 'cuda.shares'
   - uuid: 무시함 — 데이터베이스가 만든다
   - slot_name = 'cuda.shares'
@@ -134,7 +134,7 @@ Then
 
 #### [a-slot-type-of-the-unified-kind-is-made](/tests/scenario/bai_scenario/manager/resource_slot/test_creating.py) — pass
 
-슈퍼관리자가 unified 종류로 만들면 그 종류가 실린 노드가 온다
+슈퍼관리자가 unified 종류로 생성하면 그 종류가 담긴 노드가 반환된다
 
 Given
 
@@ -148,11 +148,11 @@ Given
 
 When
 
-- ResourceSlotAdapter.admin_create_slot_type — user-1이 unified 종류 cuda.shares를 이름과 종류만 주고 만듦
+- ResourceSlotAdapter.admin_create_slot_type — user-1이 unified 종류 슬롯 cuda.shares(을)를 이름과 종류만 지정해 생성
 
 Then
 
-- 만든 슬롯 종류 전체가 온다
+- 생성한 슬롯 종류 전체가 반환된다
   - id = 'cuda.shares'
   - uuid: 무시함 — 데이터베이스가 만든다
   - slot_name = 'cuda.shares'
@@ -168,7 +168,7 @@ Then
 
 #### [a-slot-type-of-the-unique-kind-is-made](/tests/scenario/bai_scenario/manager/resource_slot/test_creating.py) — pass
 
-슈퍼관리자가 unique 종류로 만들면 그 종류가 실린 노드가 온다
+슈퍼관리자가 unique 종류로 생성하면 그 종류가 담긴 노드가 반환된다
 
 Given
 
@@ -182,11 +182,11 @@ Given
 
 When
 
-- ResourceSlotAdapter.admin_create_slot_type — user-1이 unique 종류 cuda.shares를 이름과 종류만 주고 만듦
+- ResourceSlotAdapter.admin_create_slot_type — user-1이 unique 종류 슬롯 cuda.shares(을)를 이름과 종류만 지정해 생성
 
 Then
 
-- 만든 슬롯 종류 전체가 온다
+- 생성한 슬롯 종류 전체가 반환된다
   - id = 'cuda.shares'
   - uuid: 무시함 — 데이터베이스가 만든다
   - slot_name = 'cuda.shares'
@@ -202,7 +202,7 @@ Then
 
 #### [a-user-who-is-not-the-superadmin-may-not-create-a-slot-type](/tests/scenario/bai_scenario/manager/resource_slot/test_creating.py) — pass
 
-슈퍼관리자가 아닌 사용자가 슬롯 종류를 만들면 역할로 거부된다
+슈퍼관리자가 아닌 사용자가 슬롯 종류를 생성하면 역할 부족으로 거부된다
 
 Given
 
@@ -216,7 +216,7 @@ Given
 
 When
 
-- ResourceSlotAdapter.admin_create_slot_type — user-1이 count 종류 cuda.shares를 이름과 종류만 주고 만듦
+- ResourceSlotAdapter.admin_create_slot_type — user-1이 count 종류 슬롯 cuda.shares(을)를 이름과 종류만 지정해 생성
 
 Then
 
@@ -225,7 +225,7 @@ Then
 
 #### [the-superadmin-makes-a-slot-type-with-a-name-and-a-kind-alone](/tests/scenario/bai_scenario/manager/resource_slot/test_creating.py) — pass
 
-슈퍼관리자가 슬롯 이름과 종류만 주고 만들면, 표시용 문자열은 모두 비고 필수 여부는 거짓, 사용 여부는 참, 순위는 0, 숫자 서식은 십진에 반올림 없음인 노드가 온다
+슈퍼관리자가 슬롯 이름과 종류만 지정해 생성하면, 표시용 문자열은 모두 비고 필수 여부는 거짓, 사용 여부는 참, 순위는 0, 숫자 서식은 십진에 반올림 없음인 노드가 반환된다
 
 Given
 
@@ -239,11 +239,11 @@ Given
 
 When
 
-- ResourceSlotAdapter.admin_create_slot_type — user-1이 count 종류 cuda.shares를 이름과 종류만 주고 만듦
+- ResourceSlotAdapter.admin_create_slot_type — user-1이 count 종류 슬롯 cuda.shares(을)를 이름과 종류만 지정해 생성
 
 Then
 
-- 만든 슬롯 종류 전체가 온다
+- 생성한 슬롯 종류 전체가 반환된다
   - id = 'cuda.shares'
   - uuid: 무시함 — 데이터베이스가 만든다
   - slot_name = 'cuda.shares'
@@ -259,7 +259,7 @@ Then
 
 #### [turning-enforcement-off-does-not-let-a-user-create-a-slot-type](/tests/scenario/bai_scenario/manager/resource_slot/test_creating.py) — pass
 
-엔티티 권한 집행을 꺼도 슈퍼관리자가 아니면 슬롯 종류를 만들지 못한다. 이 문은 권한 그래프가 아니라 역할이라 스위치와 무관하다
+권한 검사를 꺼도 슈퍼관리자가 아니면 슬롯 종류를 생성하지 못한다. 생성은 권한 그래프가 아니라 역할로 보호되므로 스위치와 무관하다
 
 Given
 
@@ -273,7 +273,7 @@ Given
 
 When
 
-- ResourceSlotAdapter.admin_create_slot_type — user-1이 count 종류 cuda.shares를 이름과 종류만 주고 만듦
+- ResourceSlotAdapter.admin_create_slot_type — user-1이 count 종류 슬롯 cuda.shares(을)를 이름과 종류만 지정해 생성
 
 Then
 
@@ -284,7 +284,7 @@ Then
 
 #### [a-slot-type-edit-giving-no-value-changes-nothing](/tests/scenario/bai_scenario/manager/resource_slot/test_editing.py) — pass
 
-슬롯 이름만 주고 나머지를 모두 생략해 고치면 아무것도 바뀌지 않은 노드가 온다
+슬롯 이름만 지정하고 나머지를 모두 생략해 수정하면 아무것도 바뀌지 않은 노드가 반환된다
 
 Given
 
@@ -299,19 +299,19 @@ Given
 
 When
 
-- ResourceSlotAdapter.admin_update_slot_type — user-1이 slot-1의 아무것도 고침
+- ResourceSlotAdapter.admin_update_slot_type — user-1이 slot-1의 아무것도 수정
 
 Then
 
-- 심은 슬롯 종류 전체가 온다
+- 미리 만들어 둔 슬롯 종류 전체가 반환된다
   - id = 'slot-1'
   - uuid: 무시함 — 데이터베이스가 만든다
   - slot_name = 'slot-1'
   - slot_type = 'count'
   - required = False
   - enabled = True
-  - display_name = '심어둔 슬롯'
-  - description = '심어둔 슬롯 종류'
+  - display_name = '미리 만들어 둔 슬롯'
+  - description = '미리 만들어 둔 슬롯 종류'
   - display_unit = ''
   - display_icon = ''
   - number_format = NumberFormatInfo(binary=False, round_length=0)
@@ -319,7 +319,7 @@ Then
 
 #### [a-user-who-is-not-the-superadmin-may-not-edit-a-slot-type](/tests/scenario/bai_scenario/manager/resource_slot/test_editing.py) — pass
 
-슈퍼관리자가 아닌 사용자가 슬롯 종류를 고치면 역할로 거부된다
+슈퍼관리자가 아닌 사용자가 슬롯 종류를 수정하면 역할 부족으로 거부된다
 
 Given
 
@@ -334,7 +334,7 @@ Given
 
 When
 
-- ResourceSlotAdapter.admin_update_slot_type — user-1이 slot-1의 표시 이름 고침
+- ResourceSlotAdapter.admin_update_slot_type — user-1이 slot-1의 표시 이름 수정
 
 Then
 
@@ -343,7 +343,7 @@ Then
 
 #### [a-user-without-the-role-editing-an-unknown-slot-name-hears-not-found](/tests/scenario/bai_scenario/manager/resource_slot/test_editing.py) — pass
 
-슈퍼관리자가 아닌 사용자가 없는 이름을 고치면 역할이 아니라 대상 없음으로 거부된다. 이름 해석이 권한을 보지 않고 먼저 돌기 때문이다
+슈퍼관리자가 아닌 사용자가 존재하지 않는 이름을 수정하면 역할 부족이 아니라 대상 없음으로 거부된다. 이름을 풀어내는 단계가 권한을 검사하지 않고 먼저 실행되기 때문이다
 
 Given
 
@@ -358,7 +358,7 @@ Given
 
 When
 
-- ResourceSlotAdapter.admin_update_slot_type — user-1이 no-such-slot의 표시 이름 고침
+- ResourceSlotAdapter.admin_update_slot_type — user-1이 no-such-slot의 표시 이름 수정
 
 Then
 
@@ -367,7 +367,7 @@ Then
 
 #### [disabling-a-slot-type-answers-it-disabled](/tests/scenario/bai_scenario/manager/resource_slot/test_editing.py) — pass
 
-사용 중인 슬롯 종류의 사용 여부를 내리면, 사용하지 않는다는 상태를 실은 노드가 온다
+사용 중인 슬롯 종류의 사용 여부를 끄면, 사용하지 않는 상태가 담긴 노드가 반환된다
 
 Given
 
@@ -382,19 +382,19 @@ Given
 
 When
 
-- ResourceSlotAdapter.admin_update_slot_type — user-1이 slot-1의 사용 여부 고침
+- ResourceSlotAdapter.admin_update_slot_type — user-1이 slot-1의 사용 여부 수정
 
 Then
 
-- 심은 슬롯 종류 전체가 온다
+- 미리 만들어 둔 슬롯 종류 전체가 반환된다
   - id = 'slot-1'
   - uuid: 무시함 — 데이터베이스가 만든다
   - slot_name = 'slot-1'
   - slot_type = 'count'
   - required = False
   - enabled = False
-  - display_name = '심어둔 슬롯'
-  - description = '심어둔 슬롯 종류'
+  - display_name = '미리 만들어 둔 슬롯'
+  - description = '미리 만들어 둔 슬롯 종류'
   - display_unit = ''
   - display_icon = ''
   - number_format = NumberFormatInfo(binary=False, round_length=0)
@@ -402,7 +402,7 @@ Then
 
 #### [editing-a-slot-type-display-name-leaves-the-rest-alone](/tests/scenario/bai_scenario/manager/resource_slot/test_editing.py) — pass
 
-슈퍼관리자가 이름으로 지목해 표시 이름만 고치면, 표시 이름은 새 값이 되고 나머지는 그대로 남는다
+슈퍼관리자가 이름으로 지정해 표시 이름만 수정하면, 표시 이름은 새 값이 되고 나머지는 그대로 유지된다
 
 Given
 
@@ -417,11 +417,11 @@ Given
 
 When
 
-- ResourceSlotAdapter.admin_update_slot_type — user-1이 slot-1의 표시 이름 고침
+- ResourceSlotAdapter.admin_update_slot_type — user-1이 slot-1의 표시 이름 수정
 
 Then
 
-- 심은 슬롯 종류 전체가 온다
+- 미리 만들어 둔 슬롯 종류 전체가 반환된다
   - id = 'slot-1'
   - uuid: 무시함 — 데이터베이스가 만든다
   - slot_name = 'slot-1'
@@ -429,7 +429,7 @@ Then
   - required = False
   - enabled = True
   - display_name = 'GPU shares'
-  - description = '심어둔 슬롯 종류'
+  - description = '미리 만들어 둔 슬롯 종류'
   - display_unit = ''
   - display_icon = ''
   - number_format = NumberFormatInfo(binary=False, round_length=0)
@@ -437,7 +437,7 @@ Then
 
 #### [the-superadmin-editing-a-slot-name-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/resource_slot/test_editing.py) — pass
 
-슈퍼관리자가 아무 슬롯 종류도 갖지 않은 이름을 고치면 대상이 없다는 것으로 거부된다
+슈퍼관리자가 존재하지 않는 이름을 수정하면 대상을 찾을 수 없다는 이유로 거부된다
 
 Given
 
@@ -452,7 +452,7 @@ Given
 
 When
 
-- ResourceSlotAdapter.admin_update_slot_type — user-1이 no-such-slot의 표시 이름 고침
+- ResourceSlotAdapter.admin_update_slot_type — user-1이 no-such-slot의 표시 이름 수정
 
 Then
 
@@ -461,7 +461,7 @@ Then
 
 #### [turning-enforcement-off-does-not-let-a-user-edit-a-slot-type](/tests/scenario/bai_scenario/manager/resource_slot/test_editing.py) — pass
 
-엔티티 권한 집행을 꺼도 슈퍼관리자가 아니면 슬롯 종류를 고치지 못한다. 고치기의 문은 지우기와 달리 역할이라 스위치와 무관하다
+권한 검사를 꺼도 슈퍼관리자가 아니면 슬롯 종류를 수정하지 못한다. 수정은 삭제와 달리 역할로 보호되므로 스위치와 무관하다
 
 Given
 
@@ -476,7 +476,7 @@ Given
 
 When
 
-- ResourceSlotAdapter.admin_update_slot_type — user-1이 slot-1의 표시 이름 고침
+- ResourceSlotAdapter.admin_update_slot_type — user-1이 slot-1의 표시 이름 수정
 
 Then
 
@@ -487,7 +487,7 @@ Then
 
 #### [a-user-granted-nothing-reads-a-slot-type-by-name](/tests/scenario/bai_scenario/manager/resource_slot/test_reading.py) — pass
 
-아무 권한도 받지 않은 사용자가 이름으로 조회하면 그 슬롯 종류 전체가 온다. 이름 해석도 그 뒤의 읽기도 인증만 본다
+아무 권한도 없는 사용자가 이름으로 조회하면 그 슬롯 종류 전체가 반환된다. 이름을 풀어내는 단계도 그 뒤의 조회도 인증만 확인한다
 
 Given
 
@@ -502,19 +502,19 @@ Given
 
 When
 
-- ResourceSlotAdapter.get_slot_type — user-1이 slot-1으로 조회
+- ResourceSlotAdapter.get_slot_type — user-1이 slot-1 이름으로 조회
 
 Then
 
-- 심은 슬롯 종류 전체가 온다
+- 미리 만들어 둔 슬롯 종류 전체가 반환된다
   - id = 'slot-1'
   - uuid: 무시함 — 데이터베이스가 만든다
   - slot_name = 'slot-1'
   - slot_type = 'count'
   - required = False
   - enabled = True
-  - display_name = '심어둔 슬롯'
-  - description = '심어둔 슬롯 종류'
+  - display_name = '미리 만들어 둔 슬롯'
+  - description = '미리 만들어 둔 슬롯 종류'
   - display_unit = ''
   - display_icon = ''
   - number_format = NumberFormatInfo(binary=False, round_length=0)
@@ -522,7 +522,7 @@ Then
 
 #### [reading-a-slot-name-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/resource_slot/test_reading.py) — pass
 
-아무 슬롯 종류도 갖지 않은 이름으로 조회하면 대상이 없다는 것으로 거부된다
+존재하지 않는 이름으로 조회하면 대상을 찾을 수 없다는 이유로 거부된다
 
 Given
 
@@ -537,7 +537,7 @@ Given
 
 When
 
-- ResourceSlotAdapter.get_slot_type — user-1이 no-such-slot으로 조회
+- ResourceSlotAdapter.get_slot_type — user-1이 no-such-slot 이름으로 조회
 
 Then
 
@@ -548,7 +548,7 @@ Then
 
 #### [a-user-granted-nothing-may-not-purge-a-slot-type](/tests/scenario/bai_scenario/manager/resource_slot/test_retiring.py) — pass
 
-아무 권한도 받지 않은 사용자가 슬롯 종류를 지우면 권한 부족으로 거부된다. 고치기가 역할로 거부되는 것과 다른 문이다
+아무 권한도 없는 사용자가 슬롯 종류를 삭제하면 권한 부족으로 거부된다. 수정이 역할 부족으로 거부되는 것과는 다른 검사다
 
 Given
 
@@ -563,7 +563,7 @@ Given
 
 When
 
-- ResourceSlotAdapter.admin_purge_slot_type — user-1이 slot-1를 지움
+- ResourceSlotAdapter.admin_purge_slot_type — user-1이 slot-1 삭제
 
 Then
 
@@ -572,7 +572,7 @@ Then
 
 #### [a-user-granted-nothing-purging-an-unknown-slot-name-hears-not-found](/tests/scenario/bai_scenario/manager/resource_slot/test_retiring.py) — pass
 
-아무 권한도 받지 않은 사용자가 없는 이름을 지우면 권한 부족이 아니라 대상 없음으로 거부된다. 이름 해석이 권한을 보지 않고 먼저 돌기 때문이다
+아무 권한도 없는 사용자가 존재하지 않는 이름을 삭제하면 권한 부족이 아니라 대상 없음으로 거부된다. 이름을 풀어내는 단계가 권한을 검사하지 않고 먼저 실행되기 때문이다
 
 Given
 
@@ -587,7 +587,7 @@ Given
 
 When
 
-- ResourceSlotAdapter.admin_purge_slot_type — user-1이 no-such-slot를 지움
+- ResourceSlotAdapter.admin_purge_slot_type — user-1이 no-such-slot 삭제
 
 Then
 
@@ -596,7 +596,7 @@ Then
 
 #### [purging-a-slot-name-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/resource_slot/test_retiring.py) — pass
 
-슈퍼관리자가 아무 슬롯 종류도 갖지 않은 이름을 지우면 대상이 없다는 것으로 거부된다
+슈퍼관리자가 존재하지 않는 이름을 삭제하면 대상을 찾을 수 없다는 이유로 거부된다
 
 Given
 
@@ -611,7 +611,7 @@ Given
 
 When
 
-- ResourceSlotAdapter.admin_purge_slot_type — user-1이 no-such-slot를 지움
+- ResourceSlotAdapter.admin_purge_slot_type — user-1이 no-such-slot 삭제
 
 Then
 
@@ -620,7 +620,7 @@ Then
 
 #### [the-superadmin-purges-a-slot-type-nothing-refers-to](/tests/scenario/bai_scenario/manager/resource_slot/test_retiring.py) — pass
 
-아무것도 참조하지 않는 슬롯 종류를 슈퍼관리자가 이름으로 지우면 지운 이름을 실은 답이 온다
+아무것도 참조하지 않는 슬롯 종류를 슈퍼관리자가 이름으로 삭제하면 삭제한 이름을 담은 응답이 반환된다
 
 Given
 
@@ -635,16 +635,16 @@ Given
 
 When
 
-- ResourceSlotAdapter.admin_purge_slot_type — user-1이 slot-1를 지움
+- ResourceSlotAdapter.admin_purge_slot_type — user-1이 slot-1 삭제
 
 Then
 
-- 지운 슬롯 종류의 이름이 온다
+- 삭제한 슬롯 종류의 이름이 반환된다
   - slot_name = 'slot-1'
 
 #### [turning-enforcement-off-lets-a-user-purge-a-slot-type](/tests/scenario/bai_scenario/manager/resource_slot/test_retiring.py) — pass
 
-엔티티 권한 집행을 끄면 아무 권한도 받지 않은 사용자도 슬롯 종류를 지운다. 지우기의 문은 고치기와 달리 권한 그래프라 스위치가 통한다
+권한 검사를 끄면 아무 권한도 없는 사용자도 슬롯 종류를 삭제할 수 있다. 삭제는 수정과 달리 권한 그래프로 보호되므로 스위치가 영향을 준다
 
 Given
 
@@ -659,18 +659,18 @@ Given
 
 When
 
-- ResourceSlotAdapter.admin_purge_slot_type — user-1이 slot-1를 지움
+- ResourceSlotAdapter.admin_purge_slot_type — user-1이 slot-1 삭제
 
 Then
 
-- 지운 슬롯 종류의 이름이 온다
+- 삭제한 슬롯 종류의 이름이 반환된다
   - slot_name = 'slot-1'
 
 ### searching
 
 #### [a-name-filter-narrows-the-answer-to-the-slot-type-it-names](/tests/scenario/bai_scenario/manager/resource_slot/test_searching.py) — pass
 
-슬롯 종류 여럿 중 하나의 이름으로 걸러 조회하면, 답에는 그 이름의 것만 남는다
+슬롯 종류 여럿 중 하나의 이름을 필터로 조회하면, 응답에는 그 이름의 슬롯 종류만 남는다
 
 Given
 
@@ -687,11 +687,11 @@ Given
 
 When
 
-- ResourceSlotAdapter.search_slot_types — user-1이 wanted-1으로 걸러 조회
+- ResourceSlotAdapter.search_slot_types — user-1이 wanted-1 이름 필터로 조회
 
 Then
 
-- 걸러낸 그 슬롯 종류 하나만 남는다
+- 필터에 맞는 슬롯 종류 하나만 반환된다
   - items = ['wanted-1']
   - total_count = 1
   - has_next_page = False
@@ -699,7 +699,7 @@ Then
 
 #### [a-user-granted-nothing-counts-every-slot-type-laid](/tests/scenario/bai_scenario/manager/resource_slot/test_searching.py) — pass
 
-슬롯 종류 둘이 있을 때 아무 권한도 받지 않은 사용자가 필터 없이 조회하면 둘을 모두 센다
+슬롯 종류 둘이 있을 때 아무 권한도 없는 사용자가 필터 없이 조회하면 둘 다 집계된다
 
 Given
 
@@ -719,7 +719,7 @@ When
 
 Then
 
-- 심은 슬롯 종류가 모두 세어진다
+- 미리 만들어 둔 슬롯 종류가 모두 집계된다
   - items = ['other-1', 'wanted-1']
   - total_count = 2
   - has_next_page = False
@@ -727,7 +727,7 @@ Then
 
 #### [omitting-the-page-size-answers-ten-slot-types-and-a-next-page](/tests/scenario/bai_scenario/manager/resource_slot/test_searching.py) — pass
 
-슬롯 종류 열하나가 있을 때 크기 없이 조회하면 열 건까지 오고 다음 쪽이 있다고 답한다
+슬롯 종류 11개가 있을 때 크기 없이 조회하면 10건까지 반환되고 다음 페이지가 있다고 응답한다
 
 Given
 
@@ -756,7 +756,7 @@ When
 
 Then
 
-- 기본 크기의 첫 쪽이 온다
+- 기본 크기의 첫 페이지가 반환된다
   - len(items) = 10
   - total_count = 11
   - has_next_page = True
