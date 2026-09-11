@@ -84,7 +84,7 @@ class InvalidNotificationChannelType(EntityError, web.HTTPBadRequest):
     def entity_error_code(self) -> EntityErrorCode:
         return EntityErrorCode(
             NotificationChannelEntityType(),
-            ActionOperationType.UPDATE,
+            ActionOperationType.CREATE,
             ErrorDetail.INVALID_PARAMETERS,
         )
 
