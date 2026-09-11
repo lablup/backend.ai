@@ -1,7 +1,7 @@
 """What an app config definition scenario table says besides the call.
 
-A definition belongs to no scope, so the only seat a role can take to reach one is the
-definition itself. The situations here lay that seat when a row asks for a grant.
+A definition belongs to no scope, so no role reaches one: every door is passed by the
+superadmin and refused to anyone else. The situations here only choose who calls.
 """
 
 from __future__ import annotations
@@ -11,19 +11,13 @@ from datetime import datetime
 from typing import Any, override
 from uuid import UUID
 
-from bai_scenario.components.app_config import (
-    SomeoneGrantedOn,
-    SomeoneGrantedOnTheirOwn,
-    names_of,
-)
-from bai_scenario.components.domain import WAS_HERE, WrittenByThisRun
+from bai_scenario.components.domain import WAS_HERE, SomeoneOf, WrittenByThisRun
 from bai_scenario.seeds.app_config.allow_list import SeedAllowListEntry
 from bai_scenario.seeds.app_config.definition import SeedDefinition
 from bai_scenario.seeds.app_config.fragment import SeedPublicFragment
 from bai_scenario.seeds.domain.domain import SeedDomain
 
 from ai.backend.common.data.app_config.types import AppConfigScopeType
-from ai.backend.common.data.entity.app_config_definition import AppConfigDefinitionEntityType
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.v2.app_config_definition.response import (
     AppConfigDefinitionNode,
@@ -31,7 +25,6 @@ from ai.backend.common.dto.manager.v2.app_config_definition.response import (
 )
 from ai.backend.manager.data.app_config.types import AppConfigDefinitionData
 from ai.backend.manager.data.domain.types import DomainData
-from ai.backend.manager.data.permission.types import Permission
 from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.testutils.scenario_steps import (
@@ -47,12 +40,10 @@ from ai.backend.testutils.scenario_steps import (
 )
 
 
-def _who(granted: tuple[Permission, ...], role: UserRole) -> str:
-    if role == UserRole.SUPERADMIN:
-        return "슈퍼관리자 한 명"
-    if not granted:
-        return "설정 정의 권한을 하나도 받지 않은 사용자 한 명"
-    return f"그 정의에 {names_of(granted)} 권한을 받은 사용자 한 명"
+def _who(role: UserRole) -> str:
+    return (
+        "슈퍼관리자 한 명" if role == UserRole.SUPERADMIN else "아무 권한도 받지 않은 사용자 한 명"
+    )
 
 
 @dataclass(frozen=True)
@@ -66,20 +57,18 @@ class ADefinitionAndACaller:
 
 @dataclass(frozen=True)
 class ADefinitionAndSomeone(Given[Any, ADefinitionAndACaller]):
-    """정의 하나와, 그 정의 자체에 정해진 권한만 받은 사용자 한 명.
+    """정의 하나와, 슈퍼관리자 또는 아무 권한도 받지 않은 사용자 한 명.
 
-    권한 없이 부르는 줄은 권한을 대지 않고, 전역 역할이 문인 줄은 슈퍼관리자를 댄다.
     ``with_fragment``는 그 이름에 공개 허용 항목과 공개 조각을 딸려 둔다.
     """
 
-    granted: tuple[Permission, ...] = ()
     role: UserRole = UserRole.USER
     with_fragment: bool = False
 
     @override
     def describe(self) -> str:
         what = "허용 항목과 조각이 딸린 정의 하나" if self.with_fragment else "정의 하나"
-        return f"{what}와, {_who(self.granted, self.role)}"
+        return f"{what}와, {_who(self.role)}"
 
     @override
     async def lay(self, seeding: Any) -> ADefinitionAndACaller:
@@ -90,16 +79,7 @@ class ADefinitionAndSomeone(Given[Any, ADefinitionAndACaller]):
                 SeedAllowListEntry(scope_type=AppConfigScopeType.PUBLIC), definition
             )
             await seeding.creating_from(SeedPublicFragment(config={"theme": "light"}), entry)
-        caller = await seeding.within(
-            SomeoneGrantedOn(
-                home,
-                definition,
-                lambda d: d.id,
-                AppConfigDefinitionEntityType(),
-                granted=self.granted,
-                role=self.role,
-            )
-        )
+        caller = await seeding.within(SomeoneOf(home, role=self.role))
         return ADefinitionAndACaller(
             domain=seeding.made(home),
             caller=seeding.made(caller),
@@ -118,21 +98,14 @@ class ManyDefinitionsAndACaller:
 
 @dataclass(frozen=True)
 class ManyDefinitionsAndSomeone(Given[Any, ManyDefinitionsAndACaller]):
-    """정의 여럿과, 사용자 한 명. 권한을 대면 자기 스코프에 앉은 역할로 받는다."""
+    """정의 여럿과, 슈퍼관리자 또는 아무 권한도 받지 않은 사용자 한 명."""
 
     count: int = 3
-    granted: tuple[Permission, ...] = ()
     role: UserRole = UserRole.USER
 
     @override
     def describe(self) -> str:
-        if self.role == UserRole.SUPERADMIN:
-            who = "슈퍼관리자 한 명"
-        elif self.granted:
-            who = f"자기 스코프에서 설정 정의에 {names_of(self.granted)} 권한을 받은 사용자 한 명"
-        else:
-            who = "설정 정의 권한을 하나도 받지 않은 사용자 한 명"
-        return f"정의 {self.count}개와, {who}"
+        return f"정의 {self.count}개와, {_who(self.role)}"
 
     @override
     async def lay(self, seeding: Any) -> ManyDefinitionsAndACaller:
@@ -141,11 +114,7 @@ class ManyDefinitionsAndSomeone(Given[Any, ManyDefinitionsAndACaller]):
         others = [
             await seeding.creating(SeedDefinition(name_hint="other")) for _ in range(self.count - 1)
         ]
-        caller = await seeding.within(
-            SomeoneGrantedOnTheirOwn(
-                home, AppConfigDefinitionEntityType(), granted=self.granted, role=self.role
-            )
-        )
+        caller = await seeding.within(SomeoneOf(home, role=self.role))
         return ManyDefinitionsAndACaller(
             caller=seeding.made(caller),
             laid=tuple(seeding.made(one) for one in [wanted, *others]),
@@ -164,36 +133,20 @@ class TwoDefinitionsAndACaller:
 
 @dataclass(frozen=True)
 class TwoDefinitionsAndSomeone(Given[Any, TwoDefinitionsAndACaller]):
-    """정의 둘과, 첫째에만 읽기 권한을 받았거나 아무 권한도 없거나 슈퍼관리자인 사용자."""
+    """정의 둘과, 슈퍼관리자 또는 아무 권한도 받지 않은 사용자 한 명."""
 
-    reads_first: bool = False
     role: UserRole = UserRole.USER
 
     @override
     def describe(self) -> str:
-        if self.role == UserRole.SUPERADMIN:
-            who = "슈퍼관리자 한 명"
-        elif self.reads_first:
-            who = "그중 첫째에만 읽기 권한을 받은 사용자 한 명"
-        else:
-            who = "설정 정의 권한을 하나도 받지 않은 사용자 한 명"
-        return f"정의 둘과, {who}"
+        return f"정의 둘과, {_who(self.role)}"
 
     @override
     async def lay(self, seeding: Any) -> TwoDefinitionsAndACaller:
         home = await seeding.creating(SeedDomain(name_hint="home", description=WAS_HERE))
         first = await seeding.creating(SeedDefinition(name_hint="first"))
         second = await seeding.creating(SeedDefinition(name_hint="second"))
-        caller = await seeding.within(
-            SomeoneGrantedOn(
-                home,
-                first,
-                lambda d: d.id,
-                AppConfigDefinitionEntityType(),
-                granted=(Permission.READ,) if self.reads_first else (),
-                role=self.role,
-            )
-        )
+        caller = await seeding.within(SomeoneOf(home, role=self.role))
         return TwoDefinitionsAndACaller(
             caller=seeding.made(caller),
             first=seeding.made(first),

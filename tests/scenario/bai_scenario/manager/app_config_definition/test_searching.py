@@ -1,8 +1,4 @@
-"""정의 훑기 — 전역 역할이 지킨다.
-
-정의마다 읽을 수 있어도 전체 훑기는 역할이 지킨다. 하나를 읽는 문과 전체를 훑는 문이
-다르다는 것을 마지막 줄이 못박는다.
-"""
+"""정의 훑기 — 전역 역할이 지킨다."""
 
 from __future__ import annotations
 
@@ -40,7 +36,6 @@ from ai.backend.common.dto.manager.v2.common import OrderDirection
 from ai.backend.manager.api.adapters.app_config_definition.adapter import (
     AppConfigDefinitionAdapter,
 )
-from ai.backend.manager.data.permission.types import Permission
 from ai.backend.manager.errors.auth import InsufficientPrivilege
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import Given, Scenario, Then, When
@@ -229,23 +224,20 @@ class NoPageSizeMeansTen(
 
 
 @dataclass(frozen=True)
-class AGrantDoesNotOpenTheGlobalDoor(
+class APlainUserMayNotSearch(
     Scenario[SeedingSession, ManyDefinitionsAndACaller, AppConfigDefinitionAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
-        return "a-user-granted-read-may-not-search-every-definition"
+        return "a-user-who-is-not-the-superadmin-may-not-search-definitions"
 
     @override
     def describe(self) -> str:
-        return (
-            "설정 정의 읽기 권한을 받았지만 슈퍼관리자가 아닌 사용자가 전체를 훑으면, 역할로 "
-            "거부된다. 하나를 읽는 문과 전체를 훑는 문이 다르다"
-        )
+        return "슈퍼관리자가 아닌 사용자가 전체를 훑으면, 역할로 거부된다"
 
     @override
     def given(self) -> Given[SeedingSession, ManyDefinitionsAndACaller]:
-        return ManyDefinitionsAndSomeone(count=3, granted=(Permission.READ,))
+        return ManyDefinitionsAndSomeone(count=3)
 
     @override
     def when(self) -> When[ManyDefinitionsAndACaller, AppConfigDefinitionAdapter, Searched]:
@@ -261,7 +253,7 @@ SCENARIOS: list[SearchingStep] = [
     FilteringByNameKeepsOne(),
     OrderingByNameSortsThem(),
     NoPageSizeMeansTen(),
-    AGrantDoesNotOpenTheGlobalDoor(),
+    APlainUserMayNotSearch(),
 ]
 
 

@@ -1,8 +1,7 @@
 """여러 id로 정의 읽기 — 원소마다 답한다.
 
-권한이 없으면 요청 전체가 막히지 않고 그 원소만 거부된다. 없는 id도 슈퍼관리자가 아닌
-사람에게는 거부 원소다. 권한 검사가 원소마다 먼저 도는데 없는 행에는 걸린 권한도 없기
-때문이고, 빈 자리로 오는 것은 그 검사를 지나가는 슈퍼관리자에게뿐이다.
+슈퍼관리자가 아니면 요청 전체가 막히는 것이 아니라 원소마다 거부된다. 없는 id도 마찬가지로
+거부 원소이고, 빈 자리로 오는 것은 검사를 지나가는 슈퍼관리자에게뿐이다.
 """
 
 from __future__ import annotations
@@ -80,12 +79,12 @@ class LoadingByIds(When[TwoDefinitionsAndACaller, AppConfigDefinitionAdapter, Lo
 
 
 @dataclass(frozen=True)
-class OneNodeAndTwoRefused(Then[TwoDefinitionsAndACaller, Loaded]):
-    """첫째는 노드, 둘째와 셋째는 그 자리만 거부."""
+class EveryIdIsRefused(Then[TwoDefinitionsAndACaller, Loaded]):
+    """세 자리 모두 그 자리만 거부."""
 
     @override
     def says(self) -> str:
-        return "권한 있는 것은 노드, 볼 수 없는 것과 없는 id는 그 자리만 거부된다"
+        return "있는 둘도 없는 id도 그 자리만 거부된다"
 
     @override
     def look(self, laid: TwoDefinitionsAndACaller, answered: Answered[Loaded]) -> list[Verdict]:
@@ -95,16 +94,12 @@ class OneNodeAndTwoRefused(Then[TwoDefinitionsAndACaller, Loaded]):
         seen: list[Verdict] = [Same("items", len(items), 3)]
         if len(items) != 3:
             return seen
-        second, third = items[1], items[2]
         return [
             *seen,
-            Held[object](
-                "items[0].id",
-                getattr(items[0], "id", items[0]),
-                SameAs[object](laid.first.id, "심은 첫째 정의"),
+            *(
+                Refused(NotEnoughPermission, one if isinstance(one, BaseException) else None)
+                for one in items
             ),
-            Refused(NotEnoughPermission, second if isinstance(second, BaseException) else None),
-            Refused(NotEnoughPermission, third if isinstance(third, BaseException) else None),
         ]
 
 
@@ -157,26 +152,23 @@ class NothingIsAnswered(Then[TwoDefinitionsAndACaller, Loaded]):
 
 
 @dataclass(frozen=True)
-class MixedIdsAreAnsweredEach(
+class APlainUserIsRefusedPerId(
     Scenario[SeedingSession, TwoDefinitionsAndACaller, AppConfigDefinitionAdapter, Loaded]
 ):
     @override
     def summary(self) -> str:
-        return (
-            "a-readable-an-unreadable-and-a-missing-id-are-each-answered-in-order-for-a-plain-user"
-        )
+        return "a-user-who-is-not-the-superadmin-is-refused-per-id"
 
     @override
     def describe(self) -> str:
         return (
-            "정의 둘 중 첫째에만 읽기 권한을 받은 사용자가 그 둘과 없는 id 하나를 한 번에 "
-            "읽으면, 목록 순서대로 첫째는 노드, 둘째와 없는 id는 그 자리만 권한 부족으로 "
-            "거부된다. 없는 행에는 걸린 권한도 없다"
+            "슈퍼관리자가 아닌 사용자가 정의 둘과 없는 id 하나를 한 번에 읽으면, 요청 전체가 "
+            "막히는 것이 아니라 세 자리 모두 그 자리만 권한 부족으로 거부된다"
         )
 
     @override
     def given(self) -> Given[SeedingSession, TwoDefinitionsAndACaller]:
-        return TwoDefinitionsAndSomeone(reads_first=True)
+        return TwoDefinitionsAndSomeone()
 
     @override
     def when(self) -> When[TwoDefinitionsAndACaller, AppConfigDefinitionAdapter, Loaded]:
@@ -184,7 +176,7 @@ class MixedIdsAreAnsweredEach(
 
     @override
     def then(self) -> Then[TwoDefinitionsAndACaller, Loaded]:
-        return OneNodeAndTwoRefused()
+        return EveryIdIsRefused()
 
 
 @dataclass(frozen=True)
@@ -241,8 +233,8 @@ class AnEmptyListAnswersEmpty(
 
 
 SCENARIOS: list[LoadingStep] = [
-    MixedIdsAreAnsweredEach(),
     TheSuperadminSeesBoth(),
+    APlainUserIsRefusedPerId(),
     AnEmptyListAnswersEmpty(),
 ]
 

@@ -8,24 +8,20 @@ Not exercised by any scenario: batch_load_fields.
 
 #### [a-definition-holding-an-entry-and-a-fragment-is-still-purged](/tests/scenario/bai_scenario/manager/app_config_definition/test_purging.py) — pass
 
-허용 항목과 조각이 딸린 정의를 지우기 권한을 받은 사용자가 지우면, 딸린 것이 막지 않고 지운 id를 실은 답이 온다
+허용 항목과 조각이 딸린 정의를 슈퍼관리자가 지우면, 딸린 것이 막지 않고 지운 id를 실은 답이 온다
 
 Given
 
-- 허용 항목과 조각이 딸린 정의 하나와, 그 정의에 HARD_DELETE 권한을 받은 사용자 한 명
+- 허용 항목과 조각이 딸린 정의 하나와, 슈퍼관리자 한 명
   - 도메인 home-1
   - 설정 정의 config-1: 이 이름의 설정이 등록돼 있다
   - 허용 항목 entry-1: 공개 스코프가 이 이름을 채울 수 있다, 순위는 그 종류의 기본값
   - 공개 조각 public-fragment-1: 값 {'theme': 'light'}
-  - 설정 정의 config-1에서 설정 정의에 HARD_DELETE 권한을 받은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 seated-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 seated-1: app_config_definition 전체에 HARD_DELETE 허용
-    - 일반 사용자 user-1: 역할 seated-1 보유
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
 
 When
 
@@ -36,49 +32,20 @@ Then
 - 지운 정의의 id를 답한다
   - id: 심은 정의와 같다
 
-#### [a-user-granted-hard-delete-on-the-definition-purges-it](/tests/scenario/bai_scenario/manager/app_config_definition/test_purging.py) — pass
+#### [a-user-who-is-not-the-superadmin-may-not-purge-a-definition](/tests/scenario/bai_scenario/manager/app_config_definition/test_purging.py) — pass
 
-아무것도 딸리지 않은 정의에 지우기 권한을 받은 사용자가 지우면, 지운 id를 실은 답이 온다
-
-Given
-
-- 정의 하나와, 그 정의에 HARD_DELETE 권한을 받은 사용자 한 명
-  - 도메인 home-1
-  - 설정 정의 config-1: 이 이름의 설정이 등록돼 있다
-  - 설정 정의 config-1에서 설정 정의에 HARD_DELETE 권한을 받은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 seated-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 seated-1: app_config_definition 전체에 HARD_DELETE 허용
-    - 일반 사용자 user-1: 역할 seated-1 보유
-
-When
-
-- AppConfigDefinitionAdapter.admin_purge — user-1이 config-1를 지움
-
-Then
-
-- 지운 정의의 id를 답한다
-  - id: 심은 정의와 같다
-
-#### [a-user-granted-nothing-may-not-purge-a-definition](/tests/scenario/bai_scenario/manager/app_config_definition/test_purging.py) — pass
-
-같은 정의가 있고 아무 권한도 받지 않은 사용자가 지우면, 권한 부족으로 거부된다
+같은 정의가 있고 슈퍼관리자가 아닌 사용자가 지우면, 권한 부족으로 거부된다
 
 Given
 
-- 정의 하나와, 설정 정의 권한을 하나도 받지 않은 사용자 한 명
+- 정의 하나와, 아무 권한도 받지 않은 사용자 한 명
   - 도메인 home-1
   - 설정 정의 config-1: 이 이름의 설정이 등록돼 있다
-  - 설정 정의 권한을 하나도 받지 않은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
 
 When
 
@@ -98,12 +65,11 @@ Given
 - 정의 하나와, 슈퍼관리자 한 명
   - 도메인 home-1
   - 설정 정의 config-1: 이 이름의 설정이 등록돼 있다
-  - 설정 정의 권한을 하나도 받지 않은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
 
 When
 
@@ -114,23 +80,46 @@ Then
 - 거부된다
   - 거부: EntityNotFoundError
 
-### reading
+#### [the-superadmin-purges-a-definition](/tests/scenario/bai_scenario/manager/app_config_definition/test_purging.py) — pass
 
-#### [a-user-granted-nothing-may-not-read-a-definition](/tests/scenario/bai_scenario/manager/app_config_definition/test_reading.py) — pass
-
-같은 정의가 있고 아무 권한도 받지 않은 사용자가 조회하면, 권한 부족으로 거부된다
+아무것도 딸리지 않은 정의를 슈퍼관리자가 지우면, 지운 id를 실은 답이 온다
 
 Given
 
-- 정의 하나와, 설정 정의 권한을 하나도 받지 않은 사용자 한 명
+- 정의 하나와, 슈퍼관리자 한 명
   - 도메인 home-1
   - 설정 정의 config-1: 이 이름의 설정이 등록돼 있다
-  - 설정 정의 권한을 하나도 받지 않은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+
+When
+
+- AppConfigDefinitionAdapter.admin_purge — user-1이 config-1를 지움
+
+Then
+
+- 지운 정의의 id를 답한다
+  - id: 심은 정의와 같다
+
+### reading
+
+#### [a-user-who-is-not-the-superadmin-may-not-read-a-definition](/tests/scenario/bai_scenario/manager/app_config_definition/test_reading.py) — pass
+
+같은 정의가 있고 슈퍼관리자가 아닌 사용자가 조회하면, 권한 부족으로 거부된다. 정의는 어느 스코프에도 속하지 않아 역할로 열 수 없다
+
+Given
+
+- 정의 하나와, 아무 권한도 받지 않은 사용자 한 명
+  - 도메인 home-1
+  - 설정 정의 config-1: 이 이름의 설정이 등록돼 있다
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
 
 When
 
@@ -141,24 +130,44 @@ Then
 - 거부된다
   - 거부: NotEnoughPermission
 
-#### [a-user-granted-read-on-the-definition-reads-it-by-id](/tests/scenario/bai_scenario/manager/app_config_definition/test_reading.py) — pass
+#### [an-id-nothing-answers-to-is-not-found-for-a-superadmin](/tests/scenario/bai_scenario/manager/app_config_definition/test_reading.py) — pass
 
-정의 하나가 있고 그 정의에 읽기 권한을 받은 사용자가 id로 조회하면, 그 정의 전체가 답으로 온다
+슈퍼관리자가 아무것도 갖지 않은 id로 조회하면, 대상이 없다는 것으로 거부된다. 권한 검사를 지나가는 사람만 이 답을 본다
 
 Given
 
-- 정의 하나와, 그 정의에 READ 권한을 받은 사용자 한 명
+- 정의 하나와, 슈퍼관리자 한 명
   - 도메인 home-1
   - 설정 정의 config-1: 이 이름의 설정이 등록돼 있다
-  - 설정 정의 config-1에서 설정 정의에 READ 권한을 받은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 seated-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 seated-1: app_config_definition 전체에 READ 허용
-    - 일반 사용자 user-1: 역할 seated-1 보유
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+
+When
+
+- AppConfigDefinitionAdapter.admin_get — user-1이 아무것도 갖지 않은 id로 조회
+
+Then
+
+- 거부된다
+  - 거부: EntityNotFoundError
+
+#### [the-superadmin-reads-a-definition-by-id](/tests/scenario/bai_scenario/manager/app_config_definition/test_reading.py) — pass
+
+정의 하나가 있고 슈퍼관리자가 id로 조회하면, 그 정의 전체가 답으로 온다
+
+Given
+
+- 정의 하나와, 슈퍼관리자 한 명
+  - 도메인 home-1
+  - 설정 정의 config-1: 이 이름의 설정이 등록돼 있다
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
 
 When
 
@@ -172,74 +181,20 @@ Then
   - created_at: 이 실행이 쓴 시각
   - updated_at: 이 실행이 쓴 시각
 
-#### [an-id-nothing-answers-to-is-not-found-for-a-superadmin](/tests/scenario/bai_scenario/manager/app_config_definition/test_reading.py) — pass
-
-슈퍼관리자가 아무것도 갖지 않은 id로 조회하면, 대상이 없다는 것으로 거부된다. 권한 검사를 지나가는 사람만 이 답을 본다
-
-Given
-
-- 정의 하나와, 슈퍼관리자 한 명
-  - 도메인 home-1
-  - 설정 정의 config-1: 이 이름의 설정이 등록돼 있다
-  - 설정 정의 권한을 하나도 받지 않은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-
-When
-
-- AppConfigDefinitionAdapter.admin_get — user-1이 아무것도 갖지 않은 id로 조회
-
-Then
-
-- 거부된다
-  - 거부: EntityNotFoundError
-
-#### [an-id-nothing-answers-to-is-refused-as-permission-for-a-plain-user](/tests/scenario/bai_scenario/manager/app_config_definition/test_reading.py) — pass
-
-다른 정의에 읽기 권한을 받은 사용자가 아무것도 갖지 않은 id로 조회하면, 대상이 없다는 것이 아니라 권한 부족으로 거부된다. 없는 행에는 걸린 권한도 없기 때문이다
-
-Given
-
-- 정의 하나와, 그 정의에 READ 권한을 받은 사용자 한 명
-  - 도메인 home-1
-  - 설정 정의 config-1: 이 이름의 설정이 등록돼 있다
-  - 설정 정의 config-1에서 설정 정의에 READ 권한을 받은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 seated-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 seated-1: app_config_definition 전체에 READ 허용
-    - 일반 사용자 user-1: 역할 seated-1 보유
-
-When
-
-- AppConfigDefinitionAdapter.admin_get — user-1이 아무것도 갖지 않은 id로 조회
-
-Then
-
-- 거부된다
-  - 거부: NotEnoughPermission
-
-#### [turning-enforcement-off-lets-a-user-granted-nothing-read](/tests/scenario/bai_scenario/manager/app_config_definition/test_reading.py) — pass
+#### [turning-enforcement-off-lets-a-plain-user-read](/tests/scenario/bai_scenario/manager/app_config_definition/test_reading.py) — pass
 
 엔티티 권한 집행을 끄면 아무 권한도 받지 않은 사용자도 정의를 읽는다. 이 문은 역할이 아니라 권한 그래프가 지키므로 스위치가 통한다
 
 Given
 
-- 정의 하나와, 설정 정의 권한을 하나도 받지 않은 사용자 한 명
+- 정의 하나와, 아무 권한도 받지 않은 사용자 한 명
   - 도메인 home-1
   - 설정 정의 config-1: 이 이름의 설정이 등록돼 있다
-  - 설정 정의 권한을 하나도 받지 않은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
 
 When
 
@@ -255,25 +210,21 @@ Then
 
 ### reading_many
 
-#### [a-readable-an-unreadable-and-a-missing-id-are-each-answered-in-order-for-a-plain-user](/tests/scenario/bai_scenario/manager/app_config_definition/test_reading_many.py) — pass
+#### [a-user-who-is-not-the-superadmin-is-refused-per-id](/tests/scenario/bai_scenario/manager/app_config_definition/test_reading_many.py) — pass
 
-정의 둘 중 첫째에만 읽기 권한을 받은 사용자가 그 둘과 없는 id 하나를 한 번에 읽으면, 목록 순서대로 첫째는 노드, 둘째와 없는 id는 그 자리만 권한 부족으로 거부된다. 없는 행에는 걸린 권한도 없다
+슈퍼관리자가 아닌 사용자가 정의 둘과 없는 id 하나를 한 번에 읽으면, 요청 전체가 막히는 것이 아니라 세 자리 모두 그 자리만 권한 부족으로 거부된다
 
 Given
 
-- 정의 둘과, 그중 첫째에만 읽기 권한을 받은 사용자 한 명
+- 정의 둘과, 아무 권한도 받지 않은 사용자 한 명
   - 도메인 home-1
   - 설정 정의 first-1: 이 이름의 설정이 등록돼 있다
   - 설정 정의 second-1: 이 이름의 설정이 등록돼 있다
-  - 설정 정의 first-1에서 설정 정의에 READ 권한을 받은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 seated-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 seated-1: app_config_definition 전체에 READ 허용
-    - 일반 사용자 user-1: 역할 seated-1 보유
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
 
 When
 
@@ -281,9 +232,9 @@ When
 
 Then
 
-- 권한 있는 것은 노드, 볼 수 없는 것과 없는 id는 그 자리만 거부된다
+- 있는 둘도 없는 id도 그 자리만 거부된다
   - items = 3
-  - items[0].id: 심은 첫째 정의와 같다
+  - 거부: NotEnoughPermission
   - 거부: NotEnoughPermission
   - 거부: NotEnoughPermission
 
@@ -293,16 +244,15 @@ Then
 
 Given
 
-- 정의 둘과, 설정 정의 권한을 하나도 받지 않은 사용자 한 명
+- 정의 둘과, 아무 권한도 받지 않은 사용자 한 명
   - 도메인 home-1
   - 설정 정의 first-1: 이 이름의 설정이 등록돼 있다
   - 설정 정의 second-1: 이 이름의 설정이 등록돼 있다
-  - 설정 정의 권한을 하나도 받지 않은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
 
 When
 
@@ -323,12 +273,11 @@ Given
   - 도메인 home-1
   - 설정 정의 first-1: 이 이름의 설정이 등록돼 있다
   - 설정 정의 second-1: 이 이름의 설정이 등록돼 있다
-  - 설정 정의 권한을 하나도 받지 않은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
 
 When
 
@@ -353,12 +302,11 @@ Given
 - 정의 하나와, 슈퍼관리자 한 명
   - 도메인 home-1
   - 설정 정의 config-1: 이 이름의 설정이 등록돼 있다
-  - 설정 정의 권한을 하나도 받지 않은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
 
 When
 
@@ -375,15 +323,14 @@ Then
 
 Given
 
-- 정의 하나와, 설정 정의 권한을 하나도 받지 않은 사용자 한 명
+- 정의 하나와, 아무 권한도 받지 않은 사용자 한 명
   - 도메인 home-1
   - 설정 정의 config-1: 이 이름의 설정이 등록돼 있다
-  - 설정 정의 권한을 하나도 받지 않은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
 
 When
 
@@ -403,12 +350,11 @@ Given
 - 정의 하나와, 슈퍼관리자 한 명
   - 도메인 home-1
   - 설정 정의 config-1: 이 이름의 설정이 등록돼 있다
-  - 설정 정의 권한을 하나도 받지 않은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
 
 When
 
@@ -428,15 +374,14 @@ Then
 
 Given
 
-- 정의 하나와, 설정 정의 권한을 하나도 받지 않은 사용자 한 명
+- 정의 하나와, 아무 권한도 받지 않은 사용자 한 명
   - 도메인 home-1
   - 설정 정의 config-1: 이 이름의 설정이 등록돼 있다
-  - 설정 정의 권한을 하나도 받지 않은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
 
 When
 
@@ -449,26 +394,22 @@ Then
 
 ### searching
 
-#### [a-user-granted-read-may-not-search-every-definition](/tests/scenario/bai_scenario/manager/app_config_definition/test_searching.py) — pass
+#### [a-user-who-is-not-the-superadmin-may-not-search-definitions](/tests/scenario/bai_scenario/manager/app_config_definition/test_searching.py) — pass
 
-설정 정의 읽기 권한을 받았지만 슈퍼관리자가 아닌 사용자가 전체를 훑으면, 역할로 거부된다. 하나를 읽는 문과 전체를 훑는 문이 다르다
+슈퍼관리자가 아닌 사용자가 전체를 훑으면, 역할로 거부된다
 
 Given
 
-- 정의 3개와, 자기 스코프에서 설정 정의에 READ 권한을 받은 사용자 한 명
+- 정의 3개와, 아무 권한도 받지 않은 사용자 한 명
   - 도메인 home-1
   - 설정 정의 wanted-1: 이 이름의 설정이 등록돼 있다
   - 설정 정의 other-1: 이 이름의 설정이 등록돼 있다
   - 설정 정의 other-2: 이 이름의 설정이 등록돼 있다
-  - 자기 스코프에서 설정 정의에 READ 권한을 받은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 own-scope-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 own-scope-1: app_config_definition 전체에 READ 허용
-    - 일반 사용자 user-1: 역할 own-scope-1 보유
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
 
 When
 
@@ -490,12 +431,11 @@ Given
   - 설정 정의 wanted-1: 이 이름의 설정이 등록돼 있다
   - 설정 정의 other-1: 이 이름의 설정이 등록돼 있다
   - 설정 정의 other-2: 이 이름의 설정이 등록돼 있다
-  - 설정 정의 권한을 하나도 받지 않은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
 
 When
 
@@ -528,12 +468,11 @@ Given
   - 설정 정의 other-8: 이 이름의 설정이 등록돼 있다
   - 설정 정의 other-9: 이 이름의 설정이 등록돼 있다
   - 설정 정의 other-10: 이 이름의 설정이 등록돼 있다
-  - 설정 정의 권한을 하나도 받지 않은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
 
 When
 
@@ -558,12 +497,11 @@ Given
   - 설정 정의 wanted-1: 이 이름의 설정이 등록돼 있다
   - 설정 정의 other-1: 이 이름의 설정이 등록돼 있다
   - 설정 정의 other-2: 이 이름의 설정이 등록돼 있다
-  - 설정 정의 권한을 하나도 받지 않은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
 
 When
 
@@ -586,12 +524,11 @@ Given
   - 설정 정의 wanted-1: 이 이름의 설정이 등록돼 있다
   - 설정 정의 other-1: 이 이름의 설정이 등록돼 있다
   - 설정 정의 other-2: 이 이름의 설정이 등록돼 있다
-  - 설정 정의 권한을 하나도 받지 않은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
 
 When
 

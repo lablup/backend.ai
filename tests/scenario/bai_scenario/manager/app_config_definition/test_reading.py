@@ -1,8 +1,7 @@
-"""정의 읽기 — 누가 어느 정의를 읽을 수 있는가.
+"""정의 읽기 — 슈퍼관리자만 읽는다.
 
-정의는 어느 스코프에도 속하지 않으므로 역할이 앉을 자리는 그 정의 자체뿐이다. 없는 id는
-슈퍼관리자와 그렇지 않은 사람에게 다른 것으로 거부된다. 권한 검사가 먼저 도는데 없는 행에는
-걸린 권한도 없기 때문이다.
+정의는 어느 스코프에도 속하지 않아 역할이 닿지 않는다. 슈퍼관리자는 지나가고 그 밖의
+사용자는 권한 부족으로 거부되며, 없는 id는 슈퍼관리자에게만 대상 없음으로 답한다.
 """
 
 from __future__ import annotations
@@ -33,7 +32,6 @@ from ai.backend.common.dto.manager.v2.app_config_definition.response import (
 from ai.backend.manager.api.adapters.app_config_definition.adapter import (
     AppConfigDefinitionAdapter,
 )
-from ai.backend.manager.data.permission.types import Permission
 from ai.backend.manager.errors.base.entity import EntityNotFoundError
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -69,7 +67,7 @@ class ReadingById(When[ADefinitionAndACaller, AppConfigDefinitionAdapter, AppCon
 
 
 @dataclass(frozen=True)
-class TheGrantedUserReadsIt(
+class TheSuperadminReadsIt(
     Scenario[
         SeedingSession, ADefinitionAndACaller, AppConfigDefinitionAdapter, AppConfigDefinitionNode
     ]
@@ -78,15 +76,15 @@ class TheGrantedUserReadsIt(
 
     @override
     def summary(self) -> str:
-        return "a-user-granted-read-on-the-definition-reads-it-by-id"
+        return "the-superadmin-reads-a-definition-by-id"
 
     @override
     def describe(self) -> str:
-        return "정의 하나가 있고 그 정의에 읽기 권한을 받은 사용자가 id로 조회하면, 그 정의 전체가 답으로 온다"
+        return "정의 하나가 있고 슈퍼관리자가 id로 조회하면, 그 정의 전체가 답으로 온다"
 
     @override
     def given(self) -> Given[SeedingSession, ADefinitionAndACaller]:
-        return ADefinitionAndSomeone(granted=(Permission.READ,))
+        return ADefinitionAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
     def when(
@@ -107,11 +105,14 @@ class AUserGrantedNothingMayNotRead(
 ):
     @override
     def summary(self) -> str:
-        return "a-user-granted-nothing-may-not-read-a-definition"
+        return "a-user-who-is-not-the-superadmin-may-not-read-a-definition"
 
     @override
     def describe(self) -> str:
-        return "같은 정의가 있고 아무 권한도 받지 않은 사용자가 조회하면, 권한 부족으로 거부된다"
+        return (
+            "같은 정의가 있고 슈퍼관리자가 아닌 사용자가 조회하면, 권한 부족으로 거부된다. "
+            "정의는 어느 스코프에도 속하지 않아 역할로 열 수 없다"
+        )
 
     @override
     def given(self) -> Given[SeedingSession, ADefinitionAndACaller]:
@@ -122,38 +123,6 @@ class AUserGrantedNothingMayNotRead(
         self,
     ) -> When[ADefinitionAndACaller, AppConfigDefinitionAdapter, AppConfigDefinitionNode]:
         return ReadingById()
-
-    @override
-    def then(self) -> Then[ADefinitionAndACaller, AppConfigDefinitionNode]:
-        return TheCallIsRefused(NotEnoughPermission)
-
-
-@dataclass(frozen=True)
-class AnUnknownIdIsRefusedAsPermission(
-    Scenario[
-        SeedingSession, ADefinitionAndACaller, AppConfigDefinitionAdapter, AppConfigDefinitionNode
-    ]
-):
-    @override
-    def summary(self) -> str:
-        return "an-id-nothing-answers-to-is-refused-as-permission-for-a-plain-user"
-
-    @override
-    def describe(self) -> str:
-        return (
-            "다른 정의에 읽기 권한을 받은 사용자가 아무것도 갖지 않은 id로 조회하면, 대상이 "
-            "없다는 것이 아니라 권한 부족으로 거부된다. 없는 행에는 걸린 권한도 없기 때문이다"
-        )
-
-    @override
-    def given(self) -> Given[SeedingSession, ADefinitionAndACaller]:
-        return ADefinitionAndSomeone(granted=(Permission.READ,))
-
-    @override
-    def when(
-        self,
-    ) -> When[ADefinitionAndACaller, AppConfigDefinitionAdapter, AppConfigDefinitionNode]:
-        return ReadingById(other=uuid4())
 
     @override
     def then(self) -> Then[ADefinitionAndACaller, AppConfigDefinitionNode]:
@@ -203,7 +172,7 @@ class EnforcementOffLetsAnyoneRead(
 
     @override
     def summary(self) -> str:
-        return "turning-enforcement-off-lets-a-user-granted-nothing-read"
+        return "turning-enforcement-off-lets-a-plain-user-read"
 
     @override
     def describe(self) -> str:
@@ -232,9 +201,8 @@ class EnforcementOffLetsAnyoneRead(
 
 
 SCENARIOS: list[ReadingStep] = [
-    TheGrantedUserReadsIt(started=datetime.now(UTC)),
+    TheSuperadminReadsIt(started=datetime.now(UTC)),
     AUserGrantedNothingMayNotRead(),
-    AnUnknownIdIsRefusedAsPermission(),
     AnUnknownIdIsNotFoundForASuperadmin(),
     EnforcementOffLetsAnyoneRead(started=datetime.now(UTC)),
 ]

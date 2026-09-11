@@ -1,4 +1,4 @@
-"""정의 지우기 — 누가 지울 수 있고, 딸린 것이 막지 않는다.
+"""정의 지우기 — 슈퍼관리자만 지우고, 딸린 것이 막지 않는다.
 
 허용 항목과 조각은 데이터베이스가 함께 지운다. 이 어댑터에는 soft delete가 없다.
 """
@@ -29,7 +29,6 @@ from ai.backend.common.dto.manager.v2.app_config_definition.response import (
 from ai.backend.manager.api.adapters.app_config_definition.adapter import (
     AppConfigDefinitionAdapter,
 )
-from ai.backend.manager.data.permission.types import Permission
 from ai.backend.manager.errors.base.entity import EntityNotFoundError
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -92,20 +91,20 @@ class ThePurgedOneIsNamed(Then[ADefinitionAndACaller, Purged]):
 
 
 @dataclass(frozen=True)
-class TheGrantedUserPurgesIt(
+class TheSuperadminPurgesIt(
     Scenario[SeedingSession, ADefinitionAndACaller, AppConfigDefinitionAdapter, Purged]
 ):
     @override
     def summary(self) -> str:
-        return "a-user-granted-hard-delete-on-the-definition-purges-it"
+        return "the-superadmin-purges-a-definition"
 
     @override
     def describe(self) -> str:
-        return "아무것도 딸리지 않은 정의에 지우기 권한을 받은 사용자가 지우면, 지운 id를 실은 답이 온다"
+        return "아무것도 딸리지 않은 정의를 슈퍼관리자가 지우면, 지운 id를 실은 답이 온다"
 
     @override
     def given(self) -> Given[SeedingSession, ADefinitionAndACaller]:
-        return ADefinitionAndSomeone(granted=(Permission.HARD_DELETE,))
+        return ADefinitionAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
     def when(self) -> When[ADefinitionAndACaller, AppConfigDefinitionAdapter, Purged]:
@@ -126,14 +125,11 @@ class EntriesAndFragmentsDoNotBlockIt(
 
     @override
     def describe(self) -> str:
-        return (
-            "허용 항목과 조각이 딸린 정의를 지우기 권한을 받은 사용자가 지우면, 딸린 것이 막지 "
-            "않고 지운 id를 실은 답이 온다"
-        )
+        return "허용 항목과 조각이 딸린 정의를 슈퍼관리자가 지우면, 딸린 것이 막지 않고 지운 id를 실은 답이 온다"
 
     @override
     def given(self) -> Given[SeedingSession, ADefinitionAndACaller]:
-        return ADefinitionAndSomeone(granted=(Permission.HARD_DELETE,), with_fragment=True)
+        return ADefinitionAndSomeone(role=UserRole.SUPERADMIN, with_fragment=True)
 
     @override
     def when(self) -> When[ADefinitionAndACaller, AppConfigDefinitionAdapter, Purged]:
@@ -150,11 +146,11 @@ class AUserGrantedNothingMayNotPurge(
 ):
     @override
     def summary(self) -> str:
-        return "a-user-granted-nothing-may-not-purge-a-definition"
+        return "a-user-who-is-not-the-superadmin-may-not-purge-a-definition"
 
     @override
     def describe(self) -> str:
-        return "같은 정의가 있고 아무 권한도 받지 않은 사용자가 지우면, 권한 부족으로 거부된다"
+        return "같은 정의가 있고 슈퍼관리자가 아닌 사용자가 지우면, 권한 부족으로 거부된다"
 
     @override
     def given(self) -> Given[SeedingSession, ADefinitionAndACaller]:
@@ -195,7 +191,7 @@ class AnUnknownIdIsNotFoundForASuperadmin(
 
 
 SCENARIOS: list[PurgingStep] = [
-    TheGrantedUserPurgesIt(),
+    TheSuperadminPurgesIt(),
     EntriesAndFragmentsDoNotBlockIt(),
     AUserGrantedNothingMayNotPurge(),
     AnUnknownIdIsNotFoundForASuperadmin(),
