@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 from decimal import Decimal
-from typing import Self
+from typing import Annotated, Self
 
-from pydantic import ConfigDict, Field, model_validator
+from pydantic import ConfigDict, Field, StringConstraints, model_validator
 
 from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.data.entity.idle_checker import IdleCheckerID
@@ -87,24 +87,20 @@ class CreateIdleCheckerInput(BaseRequestModel):
 
 class UpdateIdleCheckerInput(BaseRequestModel):
     id: IdleCheckerID = Field(description="Idle checker ID to update.")
-    name: str | None | Unset = Field(
+    name: Annotated[str, StringConstraints(min_length=1, max_length=128)] | None | Unset = Field(
         default=UNSET,
-        min_length=1,
-        max_length=128,
         description="Updated name. Omit to leave unchanged.",
     )
     description: str | None | Unset = Field(
         default=UNSET,
         description="Updated description. Omit to leave unchanged; null clears.",
     )
-    target_session_types: list[SessionTypes] | None | Unset = Field(
+    target_session_types: Annotated[list[SessionTypes], Field(min_length=1)] | None | Unset = Field(
         default=UNSET,
-        min_length=1,
         description="Updated target session types. Omit to leave unchanged.",
     )
-    initial_grace_period_seconds: int | None | Unset = Field(
+    initial_grace_period_seconds: Annotated[int, Field(ge=0)] | None | Unset = Field(
         default=UNSET,
-        ge=0,
         description="Updated initial grace period in seconds. Omit to leave unchanged.",
     )
     checker_spec: IdleCheckerSpecInputDTO | None | Unset = Field(

@@ -115,3 +115,16 @@ class TestUpdateIdleCheckerInput:
     def test_rejects_negative_grace_period(self) -> None:
         with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             UpdateIdleCheckerInput(id=IdleCheckerID(uuid4()), initial_grace_period_seconds=-1)
+
+    def test_explicit_unset_is_accepted(self) -> None:
+        inp = UpdateIdleCheckerInput(
+            id=IdleCheckerID(uuid4()),
+            name=UNSET,
+            target_session_types=UNSET,
+            initial_grace_period_seconds=UNSET,
+            checker_spec=UNSET,
+        )
+        assert inp.name is UNSET
+        assert inp.target_session_types is UNSET
+        assert inp.initial_grace_period_seconds is UNSET
+        assert inp.checker_spec is UNSET
