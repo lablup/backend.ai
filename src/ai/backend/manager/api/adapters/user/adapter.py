@@ -532,20 +532,32 @@ class UserAdapter(BaseAdapter):
         updater = UserUpdater(
             user_id=UserID(user_id),
             username=OptionalState.from_unset(input.username),
-            password=OptionalState.from_unset(input.password).map(
-                lambda raw: PasswordInfo(
-                    password=raw,
-                    algorithm=self._auth_config.password_hash_algorithm,
-                    rounds=self._auth_config.password_hash_rounds,
-                    salt_size=self._auth_config.password_hash_salt_size,
+            password=(
+                OptionalState.nop()
+                if isinstance(input.password, Unset) or input.password is None
+                else OptionalState.update(
+                    PasswordInfo(
+                        password=input.password,
+                        algorithm=self._auth_config.password_hash_algorithm,
+                        rounds=self._auth_config.password_hash_rounds,
+                        salt_size=self._auth_config.password_hash_salt_size,
+                    )
                 )
             ),
             need_password_change=OptionalState.from_unset(input.need_password_change),
             full_name=TriState.from_unset(input.full_name),
             description=TriState.from_unset(input.description),
-            status=OptionalState.from_unset(input.status).map(UserStatus),
+            status=(
+                OptionalState.nop()
+                if isinstance(input.status, Unset) or input.status is None
+                else OptionalState.update(UserStatus(input.status))
+            ),
             domain_name=OptionalState.from_unset(input.domain_name),
-            role=OptionalState.from_unset(input.role).map(UserRoleModel),
+            role=(
+                OptionalState.nop()
+                if isinstance(input.role, Unset) or input.role is None
+                else OptionalState.update(UserRoleModel(input.role))
+            ),
             allowed_client_ip=TriState.from_unset(input.allowed_client_ip),
             resource_policy=OptionalState.from_unset(input.resource_policy),
             sudo_session_enabled=OptionalState.from_unset(input.sudo_session_enabled),
@@ -553,8 +565,10 @@ class UserAdapter(BaseAdapter):
             container_main_gid=TriState.from_unset(input.container_main_gid),
             container_gids=TriState.from_unset(input.container_gids),
             integration_name=TriState.from_unset(input.integration_name),
-            group_ids=OptionalState.from_unset(input.group_ids).map(
-                lambda gids: [str(gid) for gid in gids]
+            group_ids=(
+                OptionalState.nop()
+                if isinstance(input.group_ids, Unset) or input.group_ids is None
+                else OptionalState.update([str(gid) for gid in input.group_ids])
             ),
         )
         result = await self._user.update_user.run(UpdateUserAction(updater=updater))

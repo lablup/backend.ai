@@ -274,28 +274,42 @@ async def admin_bulk_update_users_v2(
         updater = UserUpdater(
             user_id=UserID(user_item.user_id),
             username=OptionalState.from_unset(dto.username),
-            password=OptionalState.from_unset(dto.password).map(
-                lambda raw: PasswordInfo(
-                    password=raw,
-                    algorithm=auth_config.password_hash_algorithm,
-                    rounds=auth_config.password_hash_rounds,
-                    salt_size=auth_config.password_hash_salt_size,
+            password=(
+                OptionalState.nop()
+                if isinstance(dto.password, Unset) or dto.password is None
+                else OptionalState.update(
+                    PasswordInfo(
+                        password=dto.password,
+                        algorithm=auth_config.password_hash_algorithm,
+                        rounds=auth_config.password_hash_rounds,
+                        salt_size=auth_config.password_hash_salt_size,
+                    )
                 )
             ),
             need_password_change=OptionalState.from_unset(dto.need_password_change),
             full_name=TriState.from_unset(dto.full_name),
             description=TriState.from_unset(dto.description),
-            status=OptionalState.from_unset(dto.status).map(UserStatus),
+            status=(
+                OptionalState.nop()
+                if isinstance(dto.status, Unset) or dto.status is None
+                else OptionalState.update(UserStatus(dto.status))
+            ),
             domain_name=OptionalState.from_unset(dto.domain_name),
-            role=OptionalState.from_unset(dto.role).map(UserRole),
+            role=(
+                OptionalState.nop()
+                if isinstance(dto.role, Unset) or dto.role is None
+                else OptionalState.update(UserRole(dto.role))
+            ),
             allowed_client_ip=TriState.from_unset(dto.allowed_client_ip),
             resource_policy=OptionalState.from_unset(dto.resource_policy),
             sudo_session_enabled=OptionalState.from_unset(dto.sudo_session_enabled),
             container_uid=TriState.from_unset(dto.container_uid),
             container_main_gid=TriState.from_unset(dto.container_main_gid),
             container_gids=TriState.from_unset(dto.container_gids),
-            group_ids=OptionalState.from_unset(dto.group_ids).map(
-                lambda gids: [str(gid) for gid in gids]
+            group_ids=(
+                OptionalState.nop()
+                if isinstance(dto.group_ids, Unset) or dto.group_ids is None
+                else OptionalState.update([str(gid) for gid in dto.group_ids])
             ),
         )
 
