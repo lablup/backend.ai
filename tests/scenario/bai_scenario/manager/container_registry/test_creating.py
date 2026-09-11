@@ -173,8 +173,8 @@ class AllowingAProjectWhileCreating(
     @override
     def describe(self) -> str:
         return (
-            "슈퍼관리자가 허용 프로젝트를 함께 주고 레지스트리를 만들면, "
-            "레지스트리와 그 프로젝트의 연결이 함께 만들어진다"
+            "슈퍼관리자는 허용 프로젝트를 함께 주고 레지스트리를 만들 수 있다. "
+            "연결이 함께 쓰이는 것은 답에 실리지 않아 이 행이 보지 못한다"
         )
 
     @override

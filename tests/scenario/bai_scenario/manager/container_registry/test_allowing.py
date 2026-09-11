@@ -72,7 +72,11 @@ class Allowing(When[ARegistryToAllowAndACaller, ContainerRegistryAdapter, None])
 
 @dataclass(frozen=True)
 class TheCallReturnsNothing(Then[ARegistryToAllowAndACaller, None]):
-    """이 호출은 답을 싣지 않는다. 예외 없이 끝나는 것이 성공이다."""
+    """이 호출은 답을 싣지 않는다. 예외 없이 끝나는 것이 성공이다.
+
+    연결이 실제로 쓰였는지는 이 자리에서 볼 수 없다. 답이 없으므로 확인하려면 그다음 읽기가
+    필요한데, 시나리오 한 줄은 호출 하나를 두고 짝을 세우는 자리다.
+    """
 
     @override
     def says(self) -> str:
@@ -96,8 +100,8 @@ class LinkingWithBothScopesGranted(
     @override
     def describe(self) -> str:
         return (
-            "레지스트리와 프로젝트 두 스코프 모두에 권한을 받은 사용자가 "
-            "그 프로젝트를 허용 목록에 넣으면 연결이 만들어진다"
+            "레지스트리와 프로젝트 두 스코프 모두에 권한을 받은 사용자는 "
+            "그 프로젝트를 허용 목록에 넣을 수 있다"
         )
 
     @override
@@ -124,8 +128,8 @@ class LinkingTwiceIsNotAnError(
     @override
     def describe(self) -> str:
         return (
-            "이미 연결된 프로젝트를 다시 허용 목록에 넣어도, "
-            "그 쌍은 데이터베이스에서 건너뛰므로 오류가 아니다"
+            "이미 연결된 프로젝트를 다시 허용 목록에 넣어도 거부되지 않는다. "
+            "그 쌍은 데이터베이스에서 건너뛴다"
         )
 
     @override
@@ -151,7 +155,7 @@ class RemovingALinkedProject(
 
     @override
     def describe(self) -> str:
-        return "이미 연결된 프로젝트를 허용 목록에서 빼면 그 연결이 사라진다"
+        return "이미 연결된 프로젝트는 허용 목록에서 뺄 수 있다"
 
     @override
     def given(self) -> Given[SeedingSession, ARegistryToAllowAndACaller]:
