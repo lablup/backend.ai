@@ -16,7 +16,7 @@ from uuid import UUID, uuid4
 
 from bai_scenario.components.domain import WAS_HERE, SomeoneOf
 from bai_scenario.runner.planting import SeedingSession
-from bai_scenario.seeds.audit_log.audit_log import SeedAuditRecord, SeedScopedAuditRecord
+from bai_scenario.seeds.audit_log.audit_log import SeedAuditRecord
 from bai_scenario.seeds.domain.domain import SeedDomain
 from bai_scenario.seeds.project.project import SeedProject
 from bai_scenario.seeds.rbac.role import SeedPermission, SeedRole
@@ -57,7 +57,6 @@ OP_OK = "succeeded"
 OP_DENIED = "was-refused"
 OP_MINE = "acted-by-me"
 OP_THEIRS = "acted-by-another"
-OP_SCOPED = "linked"
 
 
 @dataclass(frozen=True)
@@ -518,50 +517,6 @@ class OneProjectManyRecords(Given[Any, ScopedEntities]):
             scope_of=lambda p: ProjectID(p.id),
         )
         return ScopedEntities(seeding.made(caller), (seeding.made(project).id,), ())
-
-
-@dataclass(frozen=True)
-class ARecordScopedToAProject(Given[Any, ScopedEntities]):
-    """A record about a user, tagged with a project scope, and a caller granted READ on
-    that project. The record's own entity is not the project, so only the scope tag makes
-    a search by the project find it."""
-
-    @override
-    def describe(self) -> str:
-        return (
-            "다른 엔티티에 대한 기록이 한 프로젝트를 스코프로 달고 있고, 그 프로젝트에 읽기 "
-            "권한을 받은 사용자 한 명"
-        )
-
-    @override
-    async def lay(self, seeding: SeedingSession) -> ScopedEntities:
-        domain = await seeding.creating(SeedDomain(name_hint="home", description=WAS_HERE))
-        policy = await seeding.once(SeedProjectPolicy())
-        project = await seeding.creating_from_two(SeedProject(name_hint="team"), domain, policy)
-        subject = await seeding.within(SomeoneOf(domain))
-        pid = seeding.made(project).id
-        await seeding.adding_with_nested(
-            SeedScopedAuditRecord(
-                owner_of=lambda u: UserID(u.id),
-                operation=OP_SCOPED,
-                created_at=LATE,
-                scopes=((ProjectEntityType(), pid),),
-            ),
-            subject,
-        )
-        caller = await seeding.within(SomeoneOf(domain))
-        await grant_reading(
-            seeding,
-            project,
-            caller,
-            entity_type=ProjectEntityType(),
-            scope_of=lambda p: ProjectID(p.id),
-        )
-        return ScopedEntities(
-            seeding.made(caller),
-            (pid,),
-            (ExpectedRecord(OP_SCOPED, "user", seeding.made(subject).id, LATE),),
-        )
 
 
 @dataclass(frozen=True)
