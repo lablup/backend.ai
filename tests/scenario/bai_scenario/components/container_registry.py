@@ -7,6 +7,8 @@ against, and the situations worth naming more than once.
 
 from __future__ import annotations
 
+import uuid
+from abc import ABC, abstractmethod
 from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any, override
@@ -19,7 +21,7 @@ from bai_scenario.seeds.rbac.role import SeedPermission, SeedRole
 from bai_scenario.seeds.resource_policy.project import SeedProjectPolicy
 from bai_scenario.seeds.seeder import Laid, Seeder, SeedNest
 
-from ai.backend.common.container_registry import ContainerRegistryType
+from ai.backend.common.container_registry import AllowedGroupsModel, ContainerRegistryType
 from ai.backend.common.data.entity.container_registry import (
     ContainerRegistryEntityType,
     ContainerRegistryID,
@@ -28,6 +30,7 @@ from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.user.types import UserRole
+from ai.backend.common.dto.manager.v2.container_registry.request import AllowedGroupsInput
 from ai.backend.common.dto.manager.v2.container_registry.response import ContainerRegistryNode
 from ai.backend.manager.data.container_registry.types import ContainerRegistryData
 from ai.backend.manager.data.permission.types import Permission
@@ -44,12 +47,15 @@ from ai.backend.testutils.scenario_steps import (
     Verdict,
 )
 
+NOTHING = uuid.UUID("00000000-0000-0000-0000-0000000000ff")
+"""아무 행도 갖지 않는 id. 대상이 없을 때 무엇이 오는지 보려고 지목한다."""
+
 SEEDED_TYPE = ContainerRegistryType.DOCKER
 """시드가 심는 레지스트리의 종류. 기대값으로 다시 쓰므로 한 자리에 둔다."""
 
 
 @dataclass(frozen=True)
-class ACallerAlone:
+class ACallerWithNoRegistry:
     """부를 사람 하나. 레지스트리를 아직 하나도 심지 않은 자리에 쓴다."""
 
     caller: UserData
@@ -73,7 +79,7 @@ class ManyRegistriesAndACaller:
 
 
 @dataclass(frozen=True)
-class ARegistryAProjectAndACaller:
+class ARegistryToAllowAndACaller:
     """레지스트리 하나, 프로젝트 하나, 그리고 부를 사람."""
 
     registry: ContainerRegistryData
@@ -82,7 +88,7 @@ class ARegistryAProjectAndACaller:
 
 
 @dataclass(frozen=True)
-class SomeoneAlone(Given[Any, ACallerAlone]):
+class NoRegistryYet(Given[Any, ACallerWithNoRegistry]):
     """레지스트리는 없고, 부를 사람만 하나."""
 
     role: UserRole = UserRole.USER
@@ -92,10 +98,10 @@ class SomeoneAlone(Given[Any, ACallerAlone]):
         return f"레지스트리 없음, 도메인 하나에 속한 {self.role.value} 한 명"
 
     @override
-    async def lay(self, seeding: Any) -> ACallerAlone:
+    async def lay(self, seeding: Any) -> ACallerWithNoRegistry:
         domain = await seeding.creating(SeedDomain(name_hint="home"))
         caller = await seeding.within(SomeoneOf(domain, role=self.role))
-        return ACallerAlone(seeding.made(caller))
+        return ACallerWithNoRegistry(seeding.made(caller))
 
 
 @dataclass(frozen=True)
@@ -151,7 +157,7 @@ class ManyRegistriesAndSomeone(Given[Any, ManyRegistriesAndACaller]):
 
 
 @dataclass(frozen=True)
-class ARegistryAProjectAndSomeone(Given[Any, ARegistryAProjectAndACaller]):
+class ARegistryAndAProjectToAllow(Given[Any, ARegistryToAllowAndACaller]):
     """레지스트리와 프로젝트, 그리고 두 스코프에 권한을 어디까지 받았는지 고른 사람.
 
     관계 동작은 지목한 스코프가 모두 허용해야 실행된다. 그래서 한쪽만 주는 자리가 필요하다.
@@ -174,7 +180,7 @@ class ARegistryAProjectAndSomeone(Given[Any, ARegistryAProjectAndACaller]):
         return f"레지스트리 하나, 프로젝트 하나, {holds}인 사용자 한 명{already}"
 
     @override
-    async def lay(self, seeding: Any) -> ARegistryAProjectAndACaller:
+    async def lay(self, seeding: Any) -> ARegistryToAllowAndACaller:
         domain = await seeding.creating(SeedDomain(name_hint="home"))
         policy = await seeding.once(SeedProjectPolicy())
         project = await seeding.creating_from_two(SeedProject(), domain, policy)
@@ -184,7 +190,7 @@ class ARegistryAProjectAndSomeone(Given[Any, ARegistryAProjectAndACaller]):
         caller = await seeding.within(SomeoneOf(domain, role=self.role))
         if self.on_registry:
             await seeding.within(
-                RoleOver(
+                SomeoneLinkingIn(
                     registry,
                     caller,
                     scope_of=lambda one: ContainerRegistryID(one.id),
@@ -194,7 +200,7 @@ class ARegistryAProjectAndSomeone(Given[Any, ARegistryAProjectAndACaller]):
             )
         if self.on_project:
             await seeding.within(
-                RoleOver(
+                SomeoneLinkingIn(
                     project,
                     caller,
                     scope_of=lambda one: ProjectID(one.id),
@@ -202,7 +208,7 @@ class ARegistryAProjectAndSomeone(Given[Any, ARegistryAProjectAndACaller]):
                     name_hint="project-linker",
                 )
             )
-        return ARegistryAProjectAndACaller(
+        return ARegistryToAllowAndACaller(
             registry=seeding.made(registry),
             project=seeding.made(project),
             caller=seeding.made(caller),
@@ -216,16 +222,16 @@ LINKING = (Permission.CREATE, Permission.SOFT_DELETE)
 
 
 @dataclass(frozen=True)
-class RoleOver[S](SeedNest[Laid[None]]):
+class SomeoneLinkingIn[ScopeData](SeedNest[Laid[None]]):
     """그 스코프 안에서 레지스트리 연결을 다룰 수 있는 역할을 사용자에게 준다.
 
     관계 동작은 자기 엔티티 종류를 선언하지 않는다. 지목한 스코프마다 대상 엔티티 종류로
     권한을 묻기 때문에, 프로젝트 스코프에서도 레지스트리 종류로 적는다.
     """
 
-    scope: Laid[S]
+    scope: Laid[ScopeData]
     someone: Laid[UserData]
-    scope_of: Callable[[S], EntityIdentifier]
+    scope_of: Callable[[ScopeData], EntityIdentifier]
     entity_type: EntityType
     name_hint: str
 
@@ -306,3 +312,143 @@ class TheRegistryNode(Then[ARegistryAndACaller, ContainerRegistryNode]):
             Same("extra", node.extra, laid.registry.extra),
             Skipped("id", "데이터베이스가 만든다"),
         ]
+
+
+class Target(ABC):
+    """요청이 지목하는 레지스트리."""
+
+    @abstractmethod
+    def says(self) -> str:
+        raise NotImplementedError
+
+    @abstractmethod
+    def id_of(self, laid: ARegistryAndACaller) -> uuid.UUID:
+        raise NotImplementedError
+
+
+@dataclass(frozen=True)
+class TheLaidRegistry(Target):
+    """전제가 심어 둔 그 레지스트리."""
+
+    @override
+    def says(self) -> str:
+        return "심은 레지스트리"
+
+    @override
+    def id_of(self, laid: ARegistryAndACaller) -> uuid.UUID:
+        return laid.registry.id
+
+
+@dataclass(frozen=True)
+class AnIdThatHoldsNothing(Target):
+    """아무 레지스트리도 갖지 않는 id."""
+
+    @override
+    def says(self) -> str:
+        return "아무것도 갖지 않은 id"
+
+    @override
+    def id_of(self, laid: ARegistryAndACaller) -> uuid.UUID:
+        return NOTHING
+
+
+class AllowedGroups(ABC):
+    """만들기 요청이 허용 목록 자리에 담는 것."""
+
+    @abstractmethod
+    def says(self) -> str:
+        raise NotImplementedError
+
+    @abstractmethod
+    def of(self, laid: Any) -> AllowedGroupsInput | None:
+        raise NotImplementedError
+
+
+@dataclass(frozen=True)
+class NoProjects(AllowedGroups):
+    """허용 목록을 아예 주지 않는다."""
+
+    @override
+    def says(self) -> str:
+        return "허용 목록 없이"
+
+    @override
+    def of(self, laid: Any) -> AllowedGroupsInput | None:
+        return None
+
+
+@dataclass(frozen=True)
+class TheLaidProject(AllowedGroups):
+    """전제가 심어 둔 그 프로젝트를 허용한다."""
+
+    @override
+    def says(self) -> str:
+        return "심은 프로젝트를 허용 목록에 넣고"
+
+    @override
+    def of(self, laid: Any) -> AllowedGroupsInput:
+        return AllowedGroupsInput(add=[str(laid.project.id)], remove=[])
+
+
+@dataclass(frozen=True)
+class AProjectThatIsGone(AllowedGroups):
+    """아무 프로젝트도 갖지 않는 id를 허용하려 한다."""
+
+    @override
+    def says(self) -> str:
+        return "없는 프로젝트를 허용 목록에 넣고"
+
+    @override
+    def of(self, laid: Any) -> AllowedGroupsInput:
+        return AllowedGroupsInput(add=[str(NOTHING)], remove=[])
+
+
+class GroupChange(ABC):
+    """허용 목록을 고치는 요청이 한 방향으로 담는 것."""
+
+    @abstractmethod
+    def says(self) -> str:
+        raise NotImplementedError
+
+    @abstractmethod
+    def of(self, laid: ARegistryToAllowAndACaller) -> AllowedGroupsModel:
+        raise NotImplementedError
+
+
+@dataclass(frozen=True)
+class Adding(GroupChange):
+    """그 프로젝트를 허용 목록에 넣는다."""
+
+    @override
+    def says(self) -> str:
+        return "허용 목록에 넣음"
+
+    @override
+    def of(self, laid: ARegistryToAllowAndACaller) -> AllowedGroupsModel:
+        return AllowedGroupsModel(add=[str(laid.project.id)], remove=[])
+
+
+@dataclass(frozen=True)
+class Removing(GroupChange):
+    """그 프로젝트를 허용 목록에서 뺀다."""
+
+    @override
+    def says(self) -> str:
+        return "허용 목록에서 뺌"
+
+    @override
+    def of(self, laid: ARegistryToAllowAndACaller) -> AllowedGroupsModel:
+        return AllowedGroupsModel(add=[], remove=[str(laid.project.id)])
+
+
+@dataclass(frozen=True)
+class AddingWhatIsGone(GroupChange):
+    """아무 프로젝트도 갖지 않는 id를 허용 목록에 넣으려 한다."""
+
+    @override
+    def says(self) -> str:
+        return "없는 프로젝트를 허용 목록에 넣음"
+
+    @override
+    def of(self, laid: ARegistryToAllowAndACaller) -> AllowedGroupsModel:
+        return AllowedGroupsModel(add=[str(NOTHING)], remove=[])

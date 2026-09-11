@@ -7,6 +7,8 @@ against, and the situations worth naming more than once.
 
 from __future__ import annotations
 
+import uuid
+from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Any, override
 
@@ -36,6 +38,9 @@ from ai.backend.testutils.scenario_steps import (
     Then,
     Verdict,
 )
+
+NOTHING = uuid.UUID("00000000-0000-0000-0000-0000000000ff")
+"""아무 행도 갖지 않는 id. 대상이 없을 때 무엇이 오는지 보려고 지목한다."""
 
 REACHING = (Permission.READ, Permission.SOFT_DELETE, Permission.HARD_DELETE)
 """이미지를 읽고 잊고 지우는 데 드는 권한.
@@ -272,3 +277,109 @@ class TheImageNode(Then[AnImageAndACaller, ImageNode]):
             Skipped("id", "데이터베이스가 만든다"),
             Skipped("last_used_at", "세션이 쓰는 값이라 이 실행이 말할 수 없다"),
         ]
+
+
+class Target(ABC):
+    """요청이 지목하는 이미지."""
+
+    @abstractmethod
+    def says(self) -> str:
+        raise NotImplementedError
+
+    @abstractmethod
+    def id_of(self, laid: AnImageAndACaller) -> uuid.UUID:
+        raise NotImplementedError
+
+
+@dataclass(frozen=True)
+class TheLaidImage(Target):
+    """전제가 심어 둔 그 이미지."""
+
+    @override
+    def says(self) -> str:
+        return "심은 이미지"
+
+    @override
+    def id_of(self, laid: AnImageAndACaller) -> uuid.UUID:
+        return laid.image.id
+
+
+@dataclass(frozen=True)
+class AnIdThatHoldsNothing(Target):
+    """아무 이미지도 갖지 않는 id."""
+
+    @override
+    def says(self) -> str:
+        return "아무것도 갖지 않은 id"
+
+    @override
+    def id_of(self, laid: AnImageAndACaller) -> uuid.UUID:
+        return NOTHING
+
+
+class Paging(ABC):
+    """검색 요청이 한 쪽을 고르는 방식."""
+
+    @abstractmethod
+    def says(self) -> str:
+        raise NotImplementedError
+
+    @abstractmethod
+    def asked(self) -> dict[str, Any]:
+        raise NotImplementedError
+
+
+@dataclass(frozen=True)
+class ByOffset(Paging):
+    """크기와 건너뛸 수로 고른다. 생략하면 어댑터가 기본 크기를 채운다."""
+
+    limit: int | None = None
+
+    @override
+    def says(self) -> str:
+        return "크기를 생략하고" if self.limit is None else "조건 없이"
+
+    @override
+    def asked(self) -> dict[str, Any]:
+        return {"limit": self.limit}
+
+
+@dataclass(frozen=True)
+class ByCursor(Paging):
+    """커서로 앞에서부터 고른다."""
+
+    first: int
+
+    @override
+    def says(self) -> str:
+        return "커서로 앞에서부터"
+
+    @override
+    def asked(self) -> dict[str, Any]:
+        return {"first": self.first}
+
+
+@dataclass(frozen=True)
+class ByABrokenCursor(Paging):
+    """읽을 수 없는 커서 값을 준다."""
+
+    @override
+    def says(self) -> str:
+        return "깨진 커서로"
+
+    @override
+    def asked(self) -> dict[str, Any]:
+        return {"first": 1, "after": "not-a-cursor"}
+
+
+@dataclass(frozen=True)
+class ByTwoModesAtOnce(Paging):
+    """크기와 커서를 함께 준다. 어댑터가 방식을 고를 수 없는 자리다."""
+
+    @override
+    def says(self) -> str:
+        return "크기와 커서를 함께 주고"
+
+    @override
+    def asked(self) -> dict[str, Any]:
+        return {"first": 1, "limit": 1}

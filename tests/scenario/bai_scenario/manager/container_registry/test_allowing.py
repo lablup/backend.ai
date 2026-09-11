@@ -3,20 +3,23 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, override
 
 import pytest
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.container_registry import (
-    ARegistryAProjectAndACaller,
-    ARegistryAProjectAndSomeone,
+    Adding,
+    AddingWhatIsGone,
+    ARegistryAndAProjectToAllow,
+    ARegistryToAllowAndACaller,
+    GroupChange,
+    Removing,
 )
 from bai_scenario.runner.acting import ActingAs
 from bai_scenario.runner.planting import SeedingSession
 from bai_scenario.runner.steps import run_scenario
 
-from ai.backend.common.container_registry import AllowedGroupsModel
 from ai.backend.common.data.entity.container_registry import ContainerRegistryID
 from ai.backend.manager.api.adapters.container_registry.adapter import ContainerRegistryAdapter
 from ai.backend.manager.errors.image import ContainerRegistryGroupsAssociationNotFound
@@ -36,51 +39,38 @@ from ai.backend.testutils.scenario_steps import (
 )
 
 ENFORCEMENT = "manager.rbac.enforcement_enabled"
-MISSING_PROJECT = "00000000-0000-0000-0000-0000000000ff"
 
 type AllowingStep = Scenario[
-    SeedingSession, ARegistryAProjectAndACaller, ContainerRegistryAdapter, None
+    SeedingSession, ARegistryToAllowAndACaller, ContainerRegistryAdapter, None
 ]
 
 
 @dataclass(frozen=True)
-class Allowing(When[ARegistryAProjectAndACaller, ContainerRegistryAdapter, None]):
+class Allowing(When[ARegistryToAllowAndACaller, ContainerRegistryAdapter, None]):
     """허용 목록을 고친다. 넣을 것과 뺄 것을 함께 준다."""
 
-    adding: bool = False
-    removing: bool = False
-    at_missing: bool = False
+    change: GroupChange = field(default_factory=Adding)
 
     @override
     def operation(self) -> str:
         return "apply_allowed_groups"
 
     @override
-    def describe(self, laid: ARegistryAProjectAndACaller) -> str:
-        who = laid.caller.username
-        if self.at_missing:
-            return f"{who}이 없는 프로젝트를 허용 목록에 넣음"
-        if self.removing:
-            return f"{who}이 {laid.project.name}을 허용 목록에서 뺌"
-        return f"{who}이 {laid.project.name}을 허용 목록에 넣음"
+    def describe(self, laid: ARegistryToAllowAndACaller) -> str:
+        return f"{laid.caller.username}이 {self.change.says()}"
 
     @override
     async def call(
-        self, adapter: ContainerRegistryAdapter, laid: ARegistryAProjectAndACaller
+        self, adapter: ContainerRegistryAdapter, laid: ARegistryToAllowAndACaller
     ) -> None:
-        named = MISSING_PROJECT if self.at_missing else str(laid.project.id)
         with ActingAs(laid.caller):
             return await adapter.apply_allowed_groups(
-                ContainerRegistryID(laid.registry.id),
-                AllowedGroupsModel(
-                    add=[named] if self.adding or self.at_missing else [],
-                    remove=[named] if self.removing else [],
-                ),
+                ContainerRegistryID(laid.registry.id), self.change.of(laid)
             )
 
 
 @dataclass(frozen=True)
-class TheCallReturnsNothing(Then[ARegistryAProjectAndACaller, None]):
+class TheCallReturnsNothing(Then[ARegistryToAllowAndACaller, None]):
     """이 호출은 답을 싣지 않는다. 예외 없이 끝나는 것이 성공이다."""
 
     @override
@@ -88,7 +78,7 @@ class TheCallReturnsNothing(Then[ARegistryAProjectAndACaller, None]):
         return "답이 없고 예외도 없다"
 
     @override
-    def look(self, laid: ARegistryAProjectAndACaller, answered: Answered[None]) -> list[Verdict]:
+    def look(self, laid: ARegistryToAllowAndACaller, answered: Answered[None]) -> list[Verdict]:
         if answered.raised is not None:
             return [Refused(type(answered.raised), answered.raised)]
         return [Same("response", answered.response, None)]
@@ -96,7 +86,7 @@ class TheCallReturnsNothing(Then[ARegistryAProjectAndACaller, None]):
 
 @dataclass(frozen=True)
 class AProjectIsLinked(
-    Scenario[SeedingSession, ARegistryAProjectAndACaller, ContainerRegistryAdapter, None]
+    Scenario[SeedingSession, ARegistryToAllowAndACaller, ContainerRegistryAdapter, None]
 ):
     @override
     def summary(self) -> str:
@@ -110,21 +100,21 @@ class AProjectIsLinked(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ARegistryAProjectAndACaller]:
-        return ARegistryAProjectAndSomeone()
+    def given(self) -> Given[SeedingSession, ARegistryToAllowAndACaller]:
+        return ARegistryAndAProjectToAllow()
 
     @override
-    def when(self) -> When[ARegistryAProjectAndACaller, ContainerRegistryAdapter, None]:
-        return Allowing(adding=True)
+    def when(self) -> When[ARegistryToAllowAndACaller, ContainerRegistryAdapter, None]:
+        return Allowing()
 
     @override
-    def then(self) -> Then[ARegistryAProjectAndACaller, None]:
+    def then(self) -> Then[ARegistryToAllowAndACaller, None]:
         return TheCallReturnsNothing()
 
 
 @dataclass(frozen=True)
 class LinkingTwiceIsNotAnError(
-    Scenario[SeedingSession, ARegistryAProjectAndACaller, ContainerRegistryAdapter, None]
+    Scenario[SeedingSession, ARegistryToAllowAndACaller, ContainerRegistryAdapter, None]
 ):
     @override
     def summary(self) -> str:
@@ -138,21 +128,21 @@ class LinkingTwiceIsNotAnError(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ARegistryAProjectAndACaller]:
-        return ARegistryAProjectAndSomeone(linked=True)
+    def given(self) -> Given[SeedingSession, ARegistryToAllowAndACaller]:
+        return ARegistryAndAProjectToAllow(linked=True)
 
     @override
-    def when(self) -> When[ARegistryAProjectAndACaller, ContainerRegistryAdapter, None]:
-        return Allowing(adding=True)
+    def when(self) -> When[ARegistryToAllowAndACaller, ContainerRegistryAdapter, None]:
+        return Allowing()
 
     @override
-    def then(self) -> Then[ARegistryAProjectAndACaller, None]:
+    def then(self) -> Then[ARegistryToAllowAndACaller, None]:
         return TheCallReturnsNothing()
 
 
 @dataclass(frozen=True)
 class ALinkedProjectIsRemoved(
-    Scenario[SeedingSession, ARegistryAProjectAndACaller, ContainerRegistryAdapter, None]
+    Scenario[SeedingSession, ARegistryToAllowAndACaller, ContainerRegistryAdapter, None]
 ):
     @override
     def summary(self) -> str:
@@ -163,21 +153,21 @@ class ALinkedProjectIsRemoved(
         return "이미 연결된 프로젝트를 허용 목록에서 빼면 그 연결이 사라진다"
 
     @override
-    def given(self) -> Given[SeedingSession, ARegistryAProjectAndACaller]:
-        return ARegistryAProjectAndSomeone(linked=True)
+    def given(self) -> Given[SeedingSession, ARegistryToAllowAndACaller]:
+        return ARegistryAndAProjectToAllow(linked=True)
 
     @override
-    def when(self) -> When[ARegistryAProjectAndACaller, ContainerRegistryAdapter, None]:
-        return Allowing(removing=True)
+    def when(self) -> When[ARegistryToAllowAndACaller, ContainerRegistryAdapter, None]:
+        return Allowing(change=Removing())
 
     @override
-    def then(self) -> Then[ARegistryAProjectAndACaller, None]:
+    def then(self) -> Then[ARegistryToAllowAndACaller, None]:
         return TheCallReturnsNothing()
 
 
 @dataclass(frozen=True)
 class AProjectThatIsNotThereIsRefused(
-    Scenario[SeedingSession, ARegistryAProjectAndACaller, ContainerRegistryAdapter, None]
+    Scenario[SeedingSession, ARegistryToAllowAndACaller, ContainerRegistryAdapter, None]
 ):
     @override
     def summary(self) -> str:
@@ -190,21 +180,21 @@ class AProjectThatIsNotThereIsRefused(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ARegistryAProjectAndACaller]:
-        return ARegistryAProjectAndSomeone()
+    def given(self) -> Given[SeedingSession, ARegistryToAllowAndACaller]:
+        return ARegistryAndAProjectToAllow()
 
     @override
-    def when(self) -> When[ARegistryAProjectAndACaller, ContainerRegistryAdapter, None]:
-        return Allowing(at_missing=True)
+    def when(self) -> When[ARegistryToAllowAndACaller, ContainerRegistryAdapter, None]:
+        return Allowing(change=AddingWhatIsGone())
 
     @override
-    def then(self) -> Then[ARegistryAProjectAndACaller, None]:
+    def then(self) -> Then[ARegistryToAllowAndACaller, None]:
         return TheCallIsRefused(ProjectNotFound)
 
 
 @dataclass(frozen=True)
 class RemovingWhatIsNotLinkedIsRefused(
-    Scenario[SeedingSession, ARegistryAProjectAndACaller, ContainerRegistryAdapter, None]
+    Scenario[SeedingSession, ARegistryToAllowAndACaller, ContainerRegistryAdapter, None]
 ):
     @override
     def summary(self) -> str:
@@ -215,21 +205,21 @@ class RemovingWhatIsNotLinkedIsRefused(
         return "지목한 프로젝트 중 실제로 연결된 것이 하나도 없으면, 뺄 것이 없다는 이유로 거부된다"
 
     @override
-    def given(self) -> Given[SeedingSession, ARegistryAProjectAndACaller]:
-        return ARegistryAProjectAndSomeone()
+    def given(self) -> Given[SeedingSession, ARegistryToAllowAndACaller]:
+        return ARegistryAndAProjectToAllow()
 
     @override
-    def when(self) -> When[ARegistryAProjectAndACaller, ContainerRegistryAdapter, None]:
-        return Allowing(removing=True)
+    def when(self) -> When[ARegistryToAllowAndACaller, ContainerRegistryAdapter, None]:
+        return Allowing(change=Removing())
 
     @override
-    def then(self) -> Then[ARegistryAProjectAndACaller, None]:
+    def then(self) -> Then[ARegistryToAllowAndACaller, None]:
         return TheCallIsRefused(ContainerRegistryGroupsAssociationNotFound)
 
 
 @dataclass(frozen=True)
 class OneScopeIsNotEnough(
-    Scenario[SeedingSession, ARegistryAProjectAndACaller, ContainerRegistryAdapter, None]
+    Scenario[SeedingSession, ARegistryToAllowAndACaller, ContainerRegistryAdapter, None]
 ):
     @override
     def summary(self) -> str:
@@ -243,21 +233,21 @@ class OneScopeIsNotEnough(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ARegistryAProjectAndACaller]:
-        return ARegistryAProjectAndSomeone(on_project=False)
+    def given(self) -> Given[SeedingSession, ARegistryToAllowAndACaller]:
+        return ARegistryAndAProjectToAllow(on_project=False)
 
     @override
-    def when(self) -> When[ARegistryAProjectAndACaller, ContainerRegistryAdapter, None]:
-        return Allowing(adding=True)
+    def when(self) -> When[ARegistryToAllowAndACaller, ContainerRegistryAdapter, None]:
+        return Allowing()
 
     @override
-    def then(self) -> Then[ARegistryAProjectAndACaller, None]:
+    def then(self) -> Then[ARegistryToAllowAndACaller, None]:
         return TheCallIsRefused(NotEnoughPermission)
 
 
 @dataclass(frozen=True)
 class EnforcementOffOpensThisGate(
-    Scenario[SeedingSession, ARegistryAProjectAndACaller, ContainerRegistryAdapter, None],
+    Scenario[SeedingSession, ARegistryToAllowAndACaller, ContainerRegistryAdapter, None],
     Configured,
 ):
     @override
@@ -276,15 +266,15 @@ class EnforcementOffOpensThisGate(
         return {ENFORCEMENT: False}
 
     @override
-    def given(self) -> Given[SeedingSession, ARegistryAProjectAndACaller]:
-        return ARegistryAProjectAndSomeone(on_registry=False, on_project=False)
+    def given(self) -> Given[SeedingSession, ARegistryToAllowAndACaller]:
+        return ARegistryAndAProjectToAllow(on_registry=False, on_project=False)
 
     @override
-    def when(self) -> When[ARegistryAProjectAndACaller, ContainerRegistryAdapter, None]:
-        return Allowing(adding=True)
+    def when(self) -> When[ARegistryToAllowAndACaller, ContainerRegistryAdapter, None]:
+        return Allowing()
 
     @override
-    def then(self) -> Then[ARegistryAProjectAndACaller, None]:
+    def then(self) -> Then[ARegistryToAllowAndACaller, None]:
         return TheCallReturnsNothing()
 
 

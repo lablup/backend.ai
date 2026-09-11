@@ -51,7 +51,7 @@ type SearchingStep = Scenario[
 class Searching(When[ManyRegistriesAndACaller, ContainerRegistryAdapter, Searched]):
     """레지스트리를 검색한다. 이름을 주면 그 이름으로 거른다."""
 
-    by_name: bool = False
+    narrowed_by_name: bool = False
     limit: int | None = None
 
     @override
@@ -61,7 +61,7 @@ class Searching(When[ManyRegistriesAndACaller, ContainerRegistryAdapter, Searche
     @override
     def describe(self, laid: ManyRegistriesAndACaller) -> str:
         who = laid.caller.username
-        if self.by_name:
+        if self.narrowed_by_name:
             return f"{who}이 {laid.named.registry_name} 이름으로 걸러 검색함"
         if self.limit is None:
             return f"{who}이 크기를 생략하고 검색함"
@@ -73,7 +73,7 @@ class Searching(When[ManyRegistriesAndACaller, ContainerRegistryAdapter, Searche
     ) -> Searched:
         named = (
             ContainerRegistryFilter(registry_name=StringFilter(equals=laid.named.registry_name))
-            if self.by_name
+            if self.narrowed_by_name
             else None
         )
         with ActingAs(laid.caller):
@@ -202,7 +202,7 @@ class ANameNarrowsTheSearch(
 
     @override
     def when(self) -> When[ManyRegistriesAndACaller, ContainerRegistryAdapter, Searched]:
-        return Searching(by_name=True)
+        return Searching(narrowed_by_name=True)
 
     @override
     def then(self) -> Then[ManyRegistriesAndACaller, Searched]:

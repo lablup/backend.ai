@@ -2,12 +2,20 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, override
 
 import pytest
 from bai_scenario.components.answers import TheCallIsRefused
-from bai_scenario.components.image import ManyImagesAndACaller, ManyImagesAndSomeone
+from bai_scenario.components.image import (
+    ByABrokenCursor,
+    ByCursor,
+    ByOffset,
+    ByTwoModesAtOnce,
+    ManyImagesAndACaller,
+    ManyImagesAndSomeone,
+    Paging,
+)
 from bai_scenario.runner.acting import ActingAs
 from bai_scenario.runner.planting import SeedingSession
 from bai_scenario.runner.steps import run_scenario
@@ -45,7 +53,7 @@ DEFAULT_PAGE = 50
 class Searching(When[ManyImagesAndACaller, ImageAdapter, AdminSearchImagesPayload]):
     """오프셋만 읽는 검색."""
 
-    limit: int | None = None
+    paging: Paging = field(default_factory=ByOffset)
 
     @override
     def operation(self) -> str:
@@ -53,26 +61,21 @@ class Searching(When[ManyImagesAndACaller, ImageAdapter, AdminSearchImagesPayloa
 
     @override
     def describe(self, laid: ManyImagesAndACaller) -> str:
-        who = laid.caller.username
-        if self.limit is None:
-            return f"{who}이 크기를 생략하고 검색함"
-        return f"{who}이 조건 없이 검색함"
+        return f"{laid.caller.username}이 {self.paging.says()} 검색함"
 
     @override
     async def call(
         self, adapter: ImageAdapter, laid: ManyImagesAndACaller
     ) -> AdminSearchImagesPayload:
         with ActingAs(laid.caller):
-            return await adapter.admin_search(AdminSearchImagesInput(limit=self.limit))
+            return await adapter.admin_search(AdminSearchImagesInput(**self.paging.asked()))
 
 
 @dataclass(frozen=True)
 class SearchingWithACursor(When[ManyImagesAndACaller, ImageAdapter, AdminSearchImagesPayload]):
     """커서를 읽는 검색. 바깥에서 준 조건도 이 경로에만 있다."""
 
-    first: int | None = None
-    after: str | None = None
-    limit: int | None = None
+    paging: Paging = field(default_factory=ByOffset)
     narrowed: bool = False
 
     @override
@@ -82,13 +85,8 @@ class SearchingWithACursor(When[ManyImagesAndACaller, ImageAdapter, AdminSearchI
     @override
     def describe(self, laid: ManyImagesAndACaller) -> str:
         who = laid.caller.username
-        if self.narrowed:
-            return f"{who}이 한 레지스트리로 좁혀 검색함"
-        if self.after is not None:
-            return f"{who}이 깨진 커서로 검색함"
-        if self.limit is not None and self.first is not None:
-            return f"{who}이 크기와 커서를 함께 주고 검색함"
-        return f"{who}이 커서로 앞에서부터 검색함"
+        narrowing = "한 레지스트리로 좁혀 " if self.narrowed else ""
+        return f"{who}이 {narrowing}{self.paging.says()} 검색함"
 
     @override
     async def call(
@@ -97,8 +95,7 @@ class SearchingWithACursor(When[ManyImagesAndACaller, ImageAdapter, AdminSearchI
         narrowing = [ImageConditions.by_registry_id(laid.registry.id)] if self.narrowed else None
         with ActingAs(laid.caller):
             return await adapter.admin_search_images_gql(
-                AdminSearchImagesInput(first=self.first, after=self.after, limit=self.limit),
-                base_conditions=narrowing,
+                AdminSearchImagesInput(**self.paging.asked()), base_conditions=narrowing
             )
 
 
@@ -223,7 +220,7 @@ class EveryImageIsCounted(
 
     @override
     def when(self) -> When[ManyImagesAndACaller, ImageAdapter, AdminSearchImagesPayload]:
-        return Searching(limit=DEFAULT_PAGE)
+        return Searching(paging=ByOffset(limit=DEFAULT_PAGE))
 
     @override
     def then(self) -> Then[ManyImagesAndACaller, AdminSearchImagesPayload]:
@@ -275,7 +272,7 @@ class APlainUserMayNotSearch(
 
     @override
     def when(self) -> When[ManyImagesAndACaller, ImageAdapter, AdminSearchImagesPayload]:
-        return Searching(limit=DEFAULT_PAGE)
+        return Searching(paging=ByOffset(limit=DEFAULT_PAGE))
 
     @override
     def then(self) -> Then[ManyImagesAndACaller, AdminSearchImagesPayload]:
@@ -300,7 +297,7 @@ class ACursorReadsFromTheFront(
 
     @override
     def when(self) -> When[ManyImagesAndACaller, ImageAdapter, AdminSearchImagesPayload]:
-        return SearchingWithACursor(first=2)
+        return SearchingWithACursor(paging=ByCursor(first=2))
 
     @override
     def then(self) -> Then[ManyImagesAndACaller, AdminSearchImagesPayload]:
@@ -328,7 +325,7 @@ class TheBaseConditionNarrowsFirst(
 
     @override
     def when(self) -> When[ManyImagesAndACaller, ImageAdapter, AdminSearchImagesPayload]:
-        return SearchingWithACursor(limit=DEFAULT_PAGE, narrowed=True)
+        return SearchingWithACursor(paging=ByOffset(limit=DEFAULT_PAGE), narrowed=True)
 
     @override
     def then(self) -> Then[ManyImagesAndACaller, AdminSearchImagesPayload]:
@@ -356,7 +353,7 @@ class TwoPaginationModesAreRefused(
 
     @override
     def when(self) -> When[ManyImagesAndACaller, ImageAdapter, AdminSearchImagesPayload]:
-        return SearchingWithACursor(first=1, limit=1)
+        return SearchingWithACursor(paging=ByTwoModesAtOnce())
 
     @override
     def then(self) -> Then[ManyImagesAndACaller, AdminSearchImagesPayload]:
@@ -381,7 +378,7 @@ class ABrokenCursorIsRefused(
 
     @override
     def when(self) -> When[ManyImagesAndACaller, ImageAdapter, AdminSearchImagesPayload]:
-        return SearchingWithACursor(first=1, after="not-a-cursor")
+        return SearchingWithACursor(paging=ByABrokenCursor())
 
     @override
     def then(self) -> Then[ManyImagesAndACaller, AdminSearchImagesPayload]:

@@ -2,15 +2,17 @@
 
 from __future__ import annotations
 
-import uuid
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import override
 
 import pytest
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.container_registry import (
+    AnIdThatHoldsNothing,
     ARegistryAndACaller,
     ARegistryAndSomeone,
+    Target,
+    TheLaidRegistry,
     TheRegistryNode,
 )
 from bai_scenario.runner.acting import ActingAs
@@ -35,7 +37,6 @@ from ai.backend.testutils.scenario_steps import Given, Scenario, Then, When
 
 ANOTHER_URL = "https://moved.scenario.local"
 NO_HOST = "http://"
-MISSING = uuid.UUID("00000000-0000-0000-0000-0000000000ff")
 
 type EditingStep = Scenario[
     SeedingSession, ARegistryAndACaller, ContainerRegistryAdapter, ContainerRegistryNode
@@ -49,7 +50,7 @@ class Editing(When[ARegistryAndACaller, ContainerRegistryAdapter, ContainerRegis
     url: str | None = None
     kind: ContainerRegistryType | None = None
     project: str | None = None
-    at_missing: bool = False
+    at: Target = field(default_factory=TheLaidRegistry)
 
     @override
     def operation(self) -> str:
@@ -58,8 +59,8 @@ class Editing(When[ARegistryAndACaller, ContainerRegistryAdapter, ContainerRegis
     @override
     def describe(self, laid: ARegistryAndACaller) -> str:
         who = laid.caller.username
-        if self.at_missing:
-            return f"{who}이 아무것도 갖지 않은 id를 고침"
+        if isinstance(self.at, AnIdThatHoldsNothing):
+            return f"{who}이 {self.at.says()}를 고침"
         if self.url is not None:
             return f"{who}이 주소를 {self.url}로 고침"
         if self.kind is not None:
@@ -70,7 +71,7 @@ class Editing(When[ARegistryAndACaller, ContainerRegistryAdapter, ContainerRegis
     async def call(
         self, adapter: ContainerRegistryAdapter, laid: ARegistryAndACaller
     ) -> ContainerRegistryNode:
-        target = MISSING if self.at_missing else laid.registry.id
+        target = self.at.id_of(laid)
         with ActingAs(laid.caller):
             payload = await adapter.admin_update(
                 UpdateContainerRegistryInput(
@@ -204,7 +205,7 @@ class AnIdThatHoldsNothingIsRefused(
 
     @override
     def when(self) -> When[ARegistryAndACaller, ContainerRegistryAdapter, ContainerRegistryNode]:
-        return Editing(url=ANOTHER_URL, at_missing=True)
+        return Editing(url=ANOTHER_URL, at=AnIdThatHoldsNothing())
 
     @override
     def then(self) -> Then[ARegistryAndACaller, ContainerRegistryNode]:

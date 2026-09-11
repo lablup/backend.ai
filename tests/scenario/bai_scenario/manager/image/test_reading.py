@@ -47,7 +47,7 @@ type LoadedAliases = list[ImageAliasNode | None]
 class LoadingImages(When[ManyImagesAndACaller, ImageAdapter, LoadedImages]):
     """이미지 id 목록으로 한 번에 읽는다."""
 
-    empty: bool = False
+    nothing_is_asked: bool = False
 
     @override
     def operation(self) -> str:
@@ -56,7 +56,7 @@ class LoadingImages(When[ManyImagesAndACaller, ImageAdapter, LoadedImages]):
     @override
     def describe(self, laid: ManyImagesAndACaller) -> str:
         who = laid.caller.username
-        if self.empty:
+        if self.nothing_is_asked:
             return f"{who}이 빈 id 목록으로 읽음"
         return f"{who}이 심은 것 둘과 없는 id 하나를 한 번에 읽음"
 
@@ -64,7 +64,7 @@ class LoadingImages(When[ManyImagesAndACaller, ImageAdapter, LoadedImages]):
     async def call(self, adapter: ImageAdapter, laid: ManyImagesAndACaller) -> LoadedImages:
         asked = (
             []
-            if self.empty
+            if self.nothing_is_asked
             else [ImageID(laid.laid[0].id), MISSING_IMAGE, ImageID(laid.laid[1].id)]
         )
         with ActingAs(laid.caller):
@@ -206,7 +206,7 @@ class AnEmptyListAsksNothing(
 
     @override
     def when(self) -> When[ManyImagesAndACaller, ImageAdapter, LoadedImages]:
-        return LoadingImages(empty=True)
+        return LoadingImages(nothing_is_asked=True)
 
     @override
     def then(self) -> Then[ManyImagesAndACaller, LoadedImages]:

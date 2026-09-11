@@ -2,18 +2,21 @@
 
 from __future__ import annotations
 
-import uuid
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, override
+from uuid import UUID
 
 import pytest
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.image import (
     AnAliasAndACaller,
     AnAliasAndSomeone,
+    AnIdThatHoldsNothing,
     AnImageAndACaller,
     AnImageAndSomeone,
     AnImageTheCallerMade,
+    Target,
+    TheLaidImage,
 )
 from bai_scenario.runner.acting import ActingAs
 from bai_scenario.runner.planting import SeedingSession
@@ -41,15 +44,15 @@ from ai.backend.testutils.scenario_steps import (
     When,
 )
 
-MISSING = uuid.UUID("00000000-0000-0000-0000-0000000000ff")
 A_NEW_ALIAS = "made-alias"
+A_NAME_NO_IMAGE_HOLDS = "no-such-alias"
 
 
 @dataclass(frozen=True)
 class Aliasing(When[AnImageAndACaller, ImageAdapter, AliasImagePayload]):
     """이미지에 별칭을 붙인다."""
 
-    at_missing: bool = False
+    at: Target = field(default_factory=TheLaidImage)
     alias: str = A_NEW_ALIAS
 
     @override
@@ -59,13 +62,13 @@ class Aliasing(When[AnImageAndACaller, ImageAdapter, AliasImagePayload]):
     @override
     def describe(self, laid: AnImageAndACaller) -> str:
         who = laid.caller.username
-        if self.at_missing:
-            return f"{who}이 아무것도 갖지 않은 id에 별칭을 붙임"
+        if isinstance(self.at, AnIdThatHoldsNothing):
+            return f"{who}이 {self.at.says()}에 별칭을 붙임"
         return f"{who}이 {laid.image.name}에 별칭 {self.alias}를 붙임"
 
     @override
     async def call(self, adapter: ImageAdapter, laid: AnImageAndACaller) -> AliasImagePayload:
-        target = MISSING if self.at_missing else laid.image.id
+        target = self.at.id_of(laid)
         with ActingAs(laid.caller):
             return await adapter.admin_alias(AliasImageInput(image_id=target, alias=self.alias))
 
@@ -92,9 +95,9 @@ class AliasingTheTaken(When[AnAliasAndACaller, ImageAdapter, AliasImagePayload])
 
 @dataclass(frozen=True)
 class Dealiasing(When[AnAliasAndACaller, ImageAdapter, AliasImagePayload]):
-    """붙은 별칭을 뗀다."""
+    """붙은 별칭을 뗀다. 이 호출은 id가 아니라 별칭 이름으로 지목한다."""
 
-    at_missing: bool = False
+    named: str | None = None
 
     @override
     def operation(self) -> str:
@@ -103,13 +106,13 @@ class Dealiasing(When[AnAliasAndACaller, ImageAdapter, AliasImagePayload]):
     @override
     def describe(self, laid: AnAliasAndACaller) -> str:
         who = laid.caller.username
-        if self.at_missing:
-            return f"{who}이 아무것도 갖지 않은 별칭을 뗌"
+        if self.named is not None:
+            return f"{who}이 아무 이미지도 갖지 않은 별칭을 뗌"
         return f"{who}이 별칭 {laid.alias.alias}를 뗌"
 
     @override
     async def call(self, adapter: ImageAdapter, laid: AnAliasAndACaller) -> AliasImagePayload:
-        named = "no-such-alias" if self.at_missing else laid.alias.alias
+        named = self.named or laid.alias.alias
         with ActingAs(laid.caller):
             return await adapter.admin_dealias(DealiasImageInput(alias=named))
 
@@ -131,7 +134,7 @@ class TheAliasAndItsImage(Then[AnImageAndACaller, AliasImagePayload]):
             return [
                 Refused(type(answered.raised) if answered.raised else Exception, answered.raised)
             ]
-        wanted: uuid.UUID = laid.image.id
+        wanted: UUID = laid.image.id
         return [
             Same("alias", payload.alias, self.alias),
             Held("image_id", payload.image_id, SameAs(wanted, "심은 이미지의 id")),
@@ -154,7 +157,7 @@ class TheRemovedAlias(Then[AnAliasAndACaller, AliasImagePayload]):
             return [
                 Refused(type(answered.raised) if answered.raised else Exception, answered.raised)
             ]
-        wanted: uuid.UUID = laid.image.id
+        wanted: UUID = laid.image.id
         return [
             Same("alias", payload.alias, laid.alias.alias),
             Held("image_id", payload.image_id, SameAs(wanted, "심은 이미지의 id")),
@@ -230,7 +233,7 @@ class AliasingWhatIsNotThere(
 
     @override
     def when(self) -> When[AnImageAndACaller, ImageAdapter, AliasImagePayload]:
-        return Aliasing(at_missing=True)
+        return Aliasing(at=AnIdThatHoldsNothing())
 
     @override
     def then(self) -> Then[AnImageAndACaller, AliasImagePayload]:
@@ -280,7 +283,7 @@ class DealiasingWhatIsNotThere(
 
     @override
     def when(self) -> When[AnAliasAndACaller, ImageAdapter, AliasImagePayload]:
-        return Dealiasing(at_missing=True)
+        return Dealiasing(named=A_NAME_NO_IMAGE_HOLDS)
 
     @override
     def then(self) -> Then[AnAliasAndACaller, AliasImagePayload]:

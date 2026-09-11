@@ -2,16 +2,18 @@
 
 from __future__ import annotations
 
-import uuid
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, override
 
 import pytest
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.image import (
+    AnIdThatHoldsNothing,
     AnImageAndACaller,
     AnImageAndSomeone,
+    Target,
     TheImageNode,
+    TheLaidImage,
 )
 from bai_scenario.runner.acting import ActingAs
 from bai_scenario.runner.planting import SeedingSession
@@ -36,7 +38,6 @@ from ai.backend.testutils.scenario_steps import (
     When,
 )
 
-MISSING = uuid.UUID("00000000-0000-0000-0000-0000000000ff")
 A_NEW_TAG = "moved"
 
 
@@ -46,7 +47,7 @@ class Editing(When[AnImageAndACaller, ImageAdapter, ImageNode]):
 
     tag: str | None = None
     clearing_accelerators: bool = False
-    at_missing: bool = False
+    at: Target = field(default_factory=TheLaidImage)
 
     @override
     def operation(self) -> str:
@@ -55,8 +56,8 @@ class Editing(When[AnImageAndACaller, ImageAdapter, ImageNode]):
     @override
     def describe(self, laid: AnImageAndACaller) -> str:
         who = laid.caller.username
-        if self.at_missing:
-            return f"{who}이 아무것도 갖지 않은 id를 고침"
+        if isinstance(self.at, AnIdThatHoldsNothing):
+            return f"{who}이 {self.at.says()}를 고침"
         if self.clearing_accelerators:
             return f"{who}이 {laid.image.name}의 가속기 목록을 비움"
         if self.tag is not None:
@@ -65,7 +66,7 @@ class Editing(When[AnImageAndACaller, ImageAdapter, ImageNode]):
 
     @override
     async def call(self, adapter: ImageAdapter, laid: AnImageAndACaller) -> ImageNode:
-        target = MISSING if self.at_missing else laid.image.id
+        target = self.at.id_of(laid)
         asked: dict[str, Any] = {"image_id": target}
         if self.tag is not None:
             asked["tag"] = self.tag
@@ -221,7 +222,7 @@ class EditingWhatIsNotThere(Scenario[SeedingSession, AnImageAndACaller, ImageAda
 
     @override
     def when(self) -> When[AnImageAndACaller, ImageAdapter, ImageNode]:
-        return Editing(tag=A_NEW_TAG, at_missing=True)
+        return Editing(tag=A_NEW_TAG, at=AnIdThatHoldsNothing())
 
     @override
     def then(self) -> Then[AnImageAndACaller, ImageNode]:

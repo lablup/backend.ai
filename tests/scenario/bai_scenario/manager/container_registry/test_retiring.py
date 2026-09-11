@@ -2,15 +2,18 @@
 
 from __future__ import annotations
 
-import uuid
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import override
+from uuid import UUID
 
 import pytest
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.container_registry import (
+    AnIdThatHoldsNothing,
     ARegistryAndACaller,
     ARegistryAndSomeone,
+    Target,
+    TheLaidRegistry,
 )
 from bai_scenario.runner.acting import ActingAs
 from bai_scenario.runner.planting import SeedingSession
@@ -39,8 +42,6 @@ from ai.backend.testutils.scenario_steps import (
     When,
 )
 
-MISSING = uuid.UUID("00000000-0000-0000-0000-0000000000ff")
-
 type Deleted = DeleteContainerRegistryPayload
 type RetiringStep = Scenario[SeedingSession, ARegistryAndACaller, ContainerRegistryAdapter, Deleted]
 
@@ -49,7 +50,7 @@ type RetiringStep = Scenario[SeedingSession, ARegistryAndACaller, ContainerRegis
 class Retiring(When[ARegistryAndACaller, ContainerRegistryAdapter, Deleted]):
     """레지스트리를 지운다."""
 
-    at_missing: bool = False
+    at: Target = field(default_factory=TheLaidRegistry)
 
     @override
     def operation(self) -> str:
@@ -57,14 +58,11 @@ class Retiring(When[ARegistryAndACaller, ContainerRegistryAdapter, Deleted]):
 
     @override
     def describe(self, laid: ARegistryAndACaller) -> str:
-        who = laid.caller.username
-        if self.at_missing:
-            return f"{who}이 아무것도 갖지 않은 id를 지움"
-        return f"{who}이 심은 레지스트리를 지움"
+        return f"{laid.caller.username}이 {self.at.says()}를 지움"
 
     @override
     async def call(self, adapter: ContainerRegistryAdapter, laid: ARegistryAndACaller) -> Deleted:
-        target = MISSING if self.at_missing else laid.registry.id
+        target = self.at.id_of(laid)
         with ActingAs(laid.caller):
             return await adapter.admin_delete(DeleteContainerRegistryInput(id=target))
 
@@ -84,7 +82,7 @@ class TheDeletedIdComesBack(Then[ARegistryAndACaller, Deleted]):
             return [
                 Refused(type(answered.raised) if answered.raised else Exception, answered.raised)
             ]
-        wanted: uuid.UUID = laid.registry.id
+        wanted: UUID = laid.registry.id
         return [Held("id", payload.id, SameAs(wanted, "심은 레지스트리의 id"))]
 
 
@@ -156,7 +154,7 @@ class AnIdThatHoldsNothingIsRefused(
 
     @override
     def when(self) -> When[ARegistryAndACaller, ContainerRegistryAdapter, Deleted]:
-        return Retiring(at_missing=True)
+        return Retiring(at=AnIdThatHoldsNothing())
 
     @override
     def then(self) -> Then[ARegistryAndACaller, Deleted]:

@@ -46,7 +46,7 @@ MISSING = ContainerRegistryID(uuid.UUID("00000000-0000-0000-0000-0000000000ff"))
 class Loading(When[ManyRegistriesAndACaller, ContainerRegistryAdapter, Loaded]):
     """id 목록으로 한 번에 읽는다."""
 
-    empty: bool = False
+    nothing_is_asked: bool = False
 
     @override
     def operation(self) -> str:
@@ -55,12 +55,12 @@ class Loading(When[ManyRegistriesAndACaller, ContainerRegistryAdapter, Loaded]):
     @override
     def describe(self, laid: ManyRegistriesAndACaller) -> str:
         who = laid.caller.username
-        if self.empty:
+        if self.nothing_is_asked:
             return f"{who}이 빈 id 목록으로 읽음"
         return f"{who}이 심은 것 둘과 없는 id 하나를 한 번에 읽음"
 
     def _asked(self, laid: ManyRegistriesAndACaller) -> list[ContainerRegistryID]:
-        if self.empty:
+        if self.nothing_is_asked:
             return []
         return [ContainerRegistryID(laid.laid[0].id), MISSING, ContainerRegistryID(laid.laid[1].id)]
 
@@ -161,7 +161,7 @@ class AnEmptyListAsksNothing(
 
     @override
     def when(self) -> When[ManyRegistriesAndACaller, ContainerRegistryAdapter, Loaded]:
-        return Loading(empty=True)
+        return Loading(nothing_is_asked=True)
 
     @override
     def then(self) -> Then[ManyRegistriesAndACaller, Loaded]:

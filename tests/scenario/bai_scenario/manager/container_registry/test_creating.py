@@ -3,16 +3,20 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, override
 
 import pytest
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.container_registry import (
-    ACallerAlone,
-    ARegistryAProjectAndACaller,
-    ARegistryAProjectAndSomeone,
-    SomeoneAlone,
+    ACallerWithNoRegistry,
+    AllowedGroups,
+    AProjectThatIsGone,
+    ARegistryAndAProjectToAllow,
+    ARegistryToAllowAndACaller,
+    NoProjects,
+    NoRegistryYet,
+    TheLaidProject,
     TheNewRegistryNode,
 )
 from bai_scenario.runner.acting import ActingAs
@@ -22,7 +26,6 @@ from bai_scenario.runner.steps import run_scenario
 from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.v2.container_registry.request import (
-    AllowedGroupsInput,
     CreateContainerRegistryInput,
 )
 from ai.backend.common.dto.manager.v2.container_registry.response import ContainerRegistryNode
@@ -47,8 +50,7 @@ class Creating(When[Any, ContainerRegistryAdapter, ContainerRegistryNode]):
     url: str = A_URL
     username: str | None = None
     password: str | None = None
-    allowing: bool = False
-    allowing_missing: bool = False
+    allowed: AllowedGroups = field(default_factory=NoProjects)
 
     @override
     def operation(self) -> str:
@@ -56,19 +58,7 @@ class Creating(When[Any, ContainerRegistryAdapter, ContainerRegistryNode]):
 
     @override
     def describe(self, laid: Any) -> str:
-        who = laid.caller.username
-        if self.allowing_missing:
-            return f"{who}이 없는 프로젝트를 허용 목록에 넣고 만듦"
-        if self.allowing:
-            return f"{who}이 프로젝트 하나를 허용 목록에 넣고 만듦"
-        return f"{who}이 {self.url}로 만듦"
-
-    def _allowed(self, laid: Any) -> AllowedGroupsInput | None:
-        if self.allowing_missing:
-            return AllowedGroupsInput(add=["00000000-0000-0000-0000-0000000000ff"], remove=[])
-        if self.allowing:
-            return AllowedGroupsInput(add=[str(laid.project.id)], remove=[])
-        return None
+        return f"{laid.caller.username}이 {self.allowed.says()} {self.url}로 만듦"
 
     @override
     async def call(self, adapter: ContainerRegistryAdapter, laid: Any) -> ContainerRegistryNode:
@@ -80,7 +70,7 @@ class Creating(When[Any, ContainerRegistryAdapter, ContainerRegistryNode]):
                     type=ContainerRegistryType.DOCKER,
                     username=self.username,
                     password=self.password,
-                    allowed_groups=self._allowed(laid),
+                    allowed_groups=self.allowed.of(laid),
                 )
             )
         return payload.registry
@@ -88,7 +78,7 @@ class Creating(When[Any, ContainerRegistryAdapter, ContainerRegistryNode]):
 
 @dataclass(frozen=True)
 class OnlyTheRequiredValues(
-    Scenario[SeedingSession, ACallerAlone, ContainerRegistryAdapter, ContainerRegistryNode]
+    Scenario[SeedingSession, ACallerWithNoRegistry, ContainerRegistryAdapter, ContainerRegistryNode]
 ):
     @override
     def summary(self) -> str:
@@ -102,8 +92,8 @@ class OnlyTheRequiredValues(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ACallerAlone]:
-        return SomeoneAlone(role=UserRole.SUPERADMIN)
+    def given(self) -> Given[SeedingSession, ACallerWithNoRegistry]:
+        return NoRegistryYet(role=UserRole.SUPERADMIN)
 
     @override
     def when(self) -> When[Any, ContainerRegistryAdapter, ContainerRegistryNode]:
@@ -116,7 +106,7 @@ class OnlyTheRequiredValues(
 
 @dataclass(frozen=True)
 class ThePasswordDoesNotComeBack(
-    Scenario[SeedingSession, ACallerAlone, ContainerRegistryAdapter, ContainerRegistryNode]
+    Scenario[SeedingSession, ACallerWithNoRegistry, ContainerRegistryAdapter, ContainerRegistryNode]
 ):
     @override
     def summary(self) -> str:
@@ -130,8 +120,8 @@ class ThePasswordDoesNotComeBack(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ACallerAlone]:
-        return SomeoneAlone(role=UserRole.SUPERADMIN)
+    def given(self) -> Given[SeedingSession, ACallerWithNoRegistry]:
+        return NoRegistryYet(role=UserRole.SUPERADMIN)
 
     @override
     def when(self) -> When[Any, ContainerRegistryAdapter, ContainerRegistryNode]:
@@ -144,7 +134,7 @@ class ThePasswordDoesNotComeBack(
 
 @dataclass(frozen=True)
 class AnAddressTheUpdateWouldRefuse(
-    Scenario[SeedingSession, ACallerAlone, ContainerRegistryAdapter, ContainerRegistryNode]
+    Scenario[SeedingSession, ACallerWithNoRegistry, ContainerRegistryAdapter, ContainerRegistryNode]
 ):
     @override
     def summary(self) -> str:
@@ -158,8 +148,8 @@ class AnAddressTheUpdateWouldRefuse(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ACallerAlone]:
-        return SomeoneAlone(role=UserRole.SUPERADMIN)
+    def given(self) -> Given[SeedingSession, ACallerWithNoRegistry]:
+        return NoRegistryYet(role=UserRole.SUPERADMIN)
 
     @override
     def when(self) -> When[Any, ContainerRegistryAdapter, ContainerRegistryNode]:
@@ -173,7 +163,7 @@ class AnAddressTheUpdateWouldRefuse(
 @dataclass(frozen=True)
 class AllowingAProjectWhileCreating(
     Scenario[
-        SeedingSession, ARegistryAProjectAndACaller, ContainerRegistryAdapter, ContainerRegistryNode
+        SeedingSession, ARegistryToAllowAndACaller, ContainerRegistryAdapter, ContainerRegistryNode
     ]
 ):
     @override
@@ -188,12 +178,12 @@ class AllowingAProjectWhileCreating(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ARegistryAProjectAndACaller]:
-        return ARegistryAProjectAndSomeone(role=UserRole.SUPERADMIN)
+    def given(self) -> Given[SeedingSession, ARegistryToAllowAndACaller]:
+        return ARegistryAndAProjectToAllow(role=UserRole.SUPERADMIN)
 
     @override
     def when(self) -> When[Any, ContainerRegistryAdapter, ContainerRegistryNode]:
-        return Creating(allowing=True)
+        return Creating(allowed=TheLaidProject())
 
     @override
     def then(self) -> Then[Any, ContainerRegistryNode]:
@@ -203,7 +193,7 @@ class AllowingAProjectWhileCreating(
 @dataclass(frozen=True)
 class AProjectThatIsNotThereIsRefused(
     Scenario[
-        SeedingSession, ARegistryAProjectAndACaller, ContainerRegistryAdapter, ContainerRegistryNode
+        SeedingSession, ARegistryToAllowAndACaller, ContainerRegistryAdapter, ContainerRegistryNode
     ]
 ):
     @override
@@ -218,12 +208,12 @@ class AProjectThatIsNotThereIsRefused(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ARegistryAProjectAndACaller]:
-        return ARegistryAProjectAndSomeone(role=UserRole.SUPERADMIN)
+    def given(self) -> Given[SeedingSession, ARegistryToAllowAndACaller]:
+        return ARegistryAndAProjectToAllow(role=UserRole.SUPERADMIN)
 
     @override
     def when(self) -> When[Any, ContainerRegistryAdapter, ContainerRegistryNode]:
-        return Creating(allowing_missing=True)
+        return Creating(allowed=AProjectThatIsGone())
 
     @override
     def then(self) -> Then[Any, ContainerRegistryNode]:
@@ -232,7 +222,7 @@ class AProjectThatIsNotThereIsRefused(
 
 @dataclass(frozen=True)
 class APlainUserMayNotCreate(
-    Scenario[SeedingSession, ACallerAlone, ContainerRegistryAdapter, ContainerRegistryNode]
+    Scenario[SeedingSession, ACallerWithNoRegistry, ContainerRegistryAdapter, ContainerRegistryNode]
 ):
     @override
     def summary(self) -> str:
@@ -246,8 +236,8 @@ class APlainUserMayNotCreate(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ACallerAlone]:
-        return SomeoneAlone()
+    def given(self) -> Given[SeedingSession, ACallerWithNoRegistry]:
+        return NoRegistryYet()
 
     @override
     def when(self) -> When[Any, ContainerRegistryAdapter, ContainerRegistryNode]:
@@ -260,7 +250,9 @@ class APlainUserMayNotCreate(
 
 @dataclass(frozen=True)
 class EnforcementOffChangesNothing(
-    Scenario[SeedingSession, ACallerAlone, ContainerRegistryAdapter, ContainerRegistryNode],
+    Scenario[
+        SeedingSession, ACallerWithNoRegistry, ContainerRegistryAdapter, ContainerRegistryNode
+    ],
     Configured,
 ):
     @override
@@ -279,8 +271,8 @@ class EnforcementOffChangesNothing(
         return {ENFORCEMENT: False}
 
     @override
-    def given(self) -> Given[SeedingSession, ACallerAlone]:
-        return SomeoneAlone()
+    def given(self) -> Given[SeedingSession, ACallerWithNoRegistry]:
+        return NoRegistryYet()
 
     @override
     def when(self) -> When[Any, ContainerRegistryAdapter, ContainerRegistryNode]:

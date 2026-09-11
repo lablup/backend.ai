@@ -2,8 +2,7 @@
 
 from __future__ import annotations
 
-import uuid
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, override
 
 import pytest
@@ -11,11 +10,14 @@ from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.image import (
     AnAliasAndACaller,
     AnAliasAndSomeone,
+    AnIdThatHoldsNothing,
     AnImageAndACaller,
     AnImageAndSomeone,
     AnImageNobodyOwns,
     AnImageTheCallerMade,
+    Target,
     TheImageNode,
+    TheLaidImage,
 )
 from bai_scenario.runner.acting import ActingAs
 from bai_scenario.runner.planting import SeedingSession
@@ -40,14 +42,12 @@ from ai.backend.testutils.scenario_steps import (
     When,
 )
 
-MISSING = uuid.UUID("00000000-0000-0000-0000-0000000000ff")
-
 
 @dataclass(frozen=True)
 class Retiring(When[AnImageAndACaller, ImageAdapter, ImageNode]):
     """이미지를 지운다. 행이 사라지고 되살릴 수 없다."""
 
-    at_missing: bool = False
+    at: Target = field(default_factory=TheLaidImage)
 
     @override
     def operation(self) -> str:
@@ -56,13 +56,13 @@ class Retiring(When[AnImageAndACaller, ImageAdapter, ImageNode]):
     @override
     def describe(self, laid: AnImageAndACaller) -> str:
         who = laid.caller.username
-        if self.at_missing:
-            return f"{who}이 아무것도 갖지 않은 id를 지움"
+        if isinstance(self.at, AnIdThatHoldsNothing):
+            return f"{who}이 {self.at.says()}를 지움"
         return f"{who}이 {laid.image.name}을 지움"
 
     @override
     async def call(self, adapter: ImageAdapter, laid: AnImageAndACaller) -> ImageNode:
-        target = MISSING if self.at_missing else laid.image.id
+        target = self.at.id_of(laid)
         with ActingAs(laid.caller):
             payload = await adapter.admin_purge(PurgeImageInput(image_id=target))
         return payload.item
@@ -199,7 +199,7 @@ class RetiringWhatIsNotThere(Scenario[SeedingSession, AnImageAndACaller, ImageAd
 
     @override
     def when(self) -> When[AnImageAndACaller, ImageAdapter, ImageNode]:
-        return Retiring(at_missing=True)
+        return Retiring(at=AnIdThatHoldsNothing())
 
     @override
     def then(self) -> Then[AnImageAndACaller, ImageNode]:

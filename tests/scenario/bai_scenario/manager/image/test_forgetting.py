@@ -2,19 +2,21 @@
 
 from __future__ import annotations
 
-import uuid
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, override
 
 import pytest
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.image import (
+    AnIdThatHoldsNothing,
     AnImageAndACaller,
     AnImageAndSomeone,
     AnImageNobodyOwns,
     AnImageTheCallerMade,
+    Target,
     TheImageNode,
+    TheLaidImage,
 )
 from bai_scenario.runner.acting import ActingAs
 from bai_scenario.runner.planting import SeedingSession
@@ -31,14 +33,13 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import Configured, Given, Scenario, Then, When
 
 ENFORCEMENT = "manager.rbac.enforcement_enabled"
-MISSING = uuid.UUID("00000000-0000-0000-0000-0000000000ff")
 
 
 @dataclass(frozen=True)
 class Forgetting(When[AnImageAndACaller, ImageAdapter, ImageNode]):
     """이미지를 잊는다. 행은 남고 상태만 바뀐다."""
 
-    at_missing: bool = False
+    at: Target = field(default_factory=TheLaidImage)
 
     @override
     def operation(self) -> str:
@@ -47,13 +48,13 @@ class Forgetting(When[AnImageAndACaller, ImageAdapter, ImageNode]):
     @override
     def describe(self, laid: AnImageAndACaller) -> str:
         who = laid.caller.username
-        if self.at_missing:
-            return f"{who}이 아무것도 갖지 않은 id를 잊음"
+        if isinstance(self.at, AnIdThatHoldsNothing):
+            return f"{who}이 {self.at.says()}를 잊음"
         return f"{who}이 {laid.image.name}을 잊음"
 
     @override
     async def call(self, adapter: ImageAdapter, laid: AnImageAndACaller) -> ImageNode:
-        target = MISSING if self.at_missing else laid.image.id
+        target = self.at.id_of(laid)
         with ActingAs(laid.caller):
             payload = await adapter.admin_forget(ForgetImageInput(image_id=target))
         return payload.item
@@ -63,7 +64,7 @@ class Forgetting(When[AnImageAndACaller, ImageAdapter, ImageNode]):
 class Restoring(When[AnImageAndACaller, ImageAdapter, ImageNode]):
     """잊은 이미지를 되살린다."""
 
-    at_missing: bool = False
+    at: Target = field(default_factory=TheLaidImage)
 
     @override
     def operation(self) -> str:
@@ -72,13 +73,13 @@ class Restoring(When[AnImageAndACaller, ImageAdapter, ImageNode]):
     @override
     def describe(self, laid: AnImageAndACaller) -> str:
         who = laid.caller.username
-        if self.at_missing:
-            return f"{who}이 아무것도 갖지 않은 id를 되살림"
+        if isinstance(self.at, AnIdThatHoldsNothing):
+            return f"{who}이 {self.at.says()}를 되살림"
         return f"{who}이 {laid.image.name}을 되살림"
 
     @override
     async def call(self, adapter: ImageAdapter, laid: AnImageAndACaller) -> ImageNode:
-        target = MISSING if self.at_missing else laid.image.id
+        target = self.at.id_of(laid)
         with ActingAs(laid.caller):
             payload = await adapter.admin_restore(RestoreImageInput(image_id=target))
         return payload.item
@@ -204,7 +205,7 @@ class ForgettingWhatIsNotThere(
 
     @override
     def when(self) -> When[AnImageAndACaller, ImageAdapter, ImageNode]:
-        return Forgetting(at_missing=True)
+        return Forgetting(at=AnIdThatHoldsNothing())
 
     @override
     def then(self) -> Then[AnImageAndACaller, ImageNode]:
@@ -227,7 +228,7 @@ class RestoringWhatIsNotThere(Scenario[SeedingSession, AnImageAndACaller, ImageA
 
     @override
     def when(self) -> When[AnImageAndACaller, ImageAdapter, ImageNode]:
-        return Restoring(at_missing=True)
+        return Restoring(at=AnIdThatHoldsNothing())
 
     @override
     def then(self) -> Then[AnImageAndACaller, ImageNode]:
