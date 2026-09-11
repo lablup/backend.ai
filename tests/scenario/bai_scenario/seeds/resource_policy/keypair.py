@@ -6,6 +6,8 @@ from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import override
 
+from bai_scenario.seeds.seeder import Naming, SeedRow
+
 from ai.backend.common.types import (
     DefaultForUnspecified,
     ResourceSlot,
@@ -14,7 +16,6 @@ from ai.backend.common.types import (
 )
 from ai.backend.manager.data.resource.types import KeyPairResourcePolicyData
 from ai.backend.manager.models.resource_policy.creators import KeyPairResourcePolicyCreator
-from bai_scenario.seeds.seeder import Naming, SeedRow
 
 
 @dataclass(frozen=True)
@@ -29,6 +30,7 @@ class SeedKeypairPolicy(SeedRow[KeyPairResourcePolicyData]):
     name_hint: str = "keypair-policy"
     max_concurrent_sessions: int = 5
     max_pending_session_count: int | None = None
+    max_priority: int | None = None
     vfolder_hosts: Sequence[str] = field(default_factory=tuple)
 
     @override
@@ -40,6 +42,8 @@ class SeedKeypairPolicy(SeedRow[KeyPairResourcePolicyData]):
         allows = [f"동시 세션 {self.max_concurrent_sessions}개까지"]
         if self.max_pending_session_count is not None:
             allows.append(f"그중 대기 {self.max_pending_session_count}개까지")
+        if self.max_priority is not None:
+            allows.append(f"우선순위는 {self.max_priority}까지")
         if self.vfolder_hosts:
             allows.append(f"폴더는 {', '.join(self.vfolder_hosts)}에 놓을 수 있다")
         return ", ".join(allows)
@@ -61,7 +65,7 @@ class SeedKeypairPolicy(SeedRow[KeyPairResourcePolicyData]):
             max_containers_per_session=1,
             max_pending_session_count=self.max_pending_session_count,
             max_pending_session_resource_slots=None,
-            max_priority=None,
+            max_priority=self.max_priority,
             max_concurrent_sftp_sessions=1,
             max_session_lifetime=0,
             total_resource_slots=ResourceSlot(),

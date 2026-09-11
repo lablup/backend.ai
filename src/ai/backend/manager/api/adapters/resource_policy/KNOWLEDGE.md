@@ -1,7 +1,7 @@
 ---
 name: resource-policy-adapter-scenarios
 type: reference
-description: what the resource policy adapter guarantees, as scenarios; one adapter over the keypair, user and project policies, the superadmin role on create and search, the name lookup that hides whether a name exists, the caller's own scope on reading one's own policy
+description: what the resource policy adapter guarantees, as scenarios; the tests in tests/scenario/bai_scenario/manager/resource_policy match these one for one
 scope: src/ai/backend/manager/api/adapters/resource_policy
 keywords: [resource policy, keypair resource policy, user resource policy, project resource policy, scenario, adapter, superadmin, lookup, scope]
 generated:
@@ -74,7 +74,7 @@ status: draft
 
 | 시나리오 | 상황 | 요청 | 결과 |
 |---|---|---|---|
-| 슈퍼관리자가 필터 없이 검색한다 | 정책 둘이 있음 | 전체 검색 | 둘 다 오고 전체 수는 둘 |
+| 슈퍼관리자가 필터 없이 검색한다 | 정책 여럿이 있음 | 전체 검색 | 심은 것이 모두, 그리고 그것만 온다 |
 | 이름으로 걸러 검색한다 | 이름이 다른 정책 여럿 | 이름 필터 검색 | 그 이름의 것만 온다 |
 | 키페어 정책을 그 정책을 쓰는 사용자로 걸러 검색한다 | 키페어 정책 둘, 그중 한쪽 정책의 키페어를 가진 사용자 하나 | 사용자로 걸러 검색 | 그 사용자의 키페어가 쓰는 정책만 온다 |
 | 모니터 역할 사용자가 검색한다 | 모니터 역할, 정책 하나 | 전체 검색 | 슈퍼관리자와 같은 답 |
@@ -130,7 +130,7 @@ status: draft
 | 읽기 권한을 받은 사용자가 자기 키페어 정책을 읽는다 | 키페어 정책 하나, 그 정책의 키페어를 가진 사용자, 그 사용자 자신의 스코프에 키페어 정책 읽기 권한 있음 | 내 키페어 정책 조회 | 그 정책 전체 |
 | 읽기 권한을 받은 사용자가 자기 사용자 정책을 읽는다 | 사용자 정책 하나, 그 정책을 받은 사용자, 그 사용자 자신의 스코프에 사용자 정책 읽기 권한 있음 | 내 사용자 정책 조회 | 그 정책 전체 |
 | 키페어가 여럿이면 기본 키페어의 정책이 답이 된다 | 기본 키페어 외에 다른 정책을 쓰는 활성 키페어를 하나 더 가진 사용자, 읽기 권한 있음 | 내 키페어 정책 조회 | 기본 키페어의 정책 |
-| 기본 키페어가 비활성이면 가장 먼저 만든 활성 키페어의 정책이 답이 된다 | 기본 키페어는 비활성이고 다른 정책을 쓰는 활성 키페어가 있는 사용자, 읽기 권한 있음 | 내 키페어 정책 조회 | 그 활성 키페어의 정책 |
+| 기본 키페어가 비활성이면 활성인 다른 키페어의 정책이 답이 된다 | 기본 키페어는 비활성이고 다른 정책을 쓰는 활성 키페어가 있는 사용자, 읽기 권한 있음 | 내 키페어 정책 조회 | 그 활성 키페어의 정책 |
 | 활성 키페어가 없으면 자기 키페어 정책을 찾지 못한다 | 활성 키페어가 없는 사용자, 읽기 권한 있음 | 내 키페어 정책 조회 | 대상 없음으로 거부 |
 | 읽기 권한을 받지 않은 사용자가 자기 키페어 정책을 읽는다 | 같은 사용자, 권한 없음 | 내 키페어 정책 조회 | 권한 부족으로 거부 |
 | 읽기 권한을 받지 않은 사용자가 자기 사용자 정책을 읽는다 | 같은 사용자, 권한 없음 | 내 사용자 정책 조회 | 권한 부족으로 거부 |

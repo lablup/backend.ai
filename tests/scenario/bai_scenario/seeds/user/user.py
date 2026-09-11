@@ -12,6 +12,8 @@ import secrets
 from dataclasses import dataclass
 from typing import override
 
+from bai_scenario.seeds.seeder import Naming, SeedUser
+
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.types import AccessKey
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
@@ -25,7 +27,6 @@ from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.user.creators import UserCreator
 from ai.backend.manager.repositories.ops.v2.user.write import FullUserCreator
 from ai.backend.manager.secret.types import SecretValue
-from bai_scenario.seeds.seeder import Naming, SeedUser
 
 PASSWORD = "scenario-password"
 
@@ -56,6 +57,8 @@ class SeedUserOf(SeedUser[DomainData, UserResourcePolicyData, KeyPairResourcePol
 
     @override
     def detail(self) -> str:
+        if not self.is_active:
+            return "자기 키와 개인 프로젝트를 갖지만 비활성이라 키도 비활성이다"
         return "자기 키와 개인 프로젝트를 갖는다"
 
     @override
