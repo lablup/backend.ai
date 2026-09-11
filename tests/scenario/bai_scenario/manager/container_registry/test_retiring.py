@@ -42,14 +42,9 @@ from ai.backend.testutils.scenario_steps import (
     When,
 )
 
-type Deleted = DeleteContainerRegistryPayload
-type RetiringStep = Scenario[SeedingSession, ARegistryAndACaller, ContainerRegistryAdapter, Deleted]
-
 
 @dataclass(frozen=True)
-class Retiring(When[ARegistryAndACaller, ContainerRegistryAdapter, Deleted]):
-    """레지스트리를 지운다."""
-
+class Retiring(When[ARegistryAndACaller, ContainerRegistryAdapter, DeleteContainerRegistryPayload]):
     at: Target = field(default_factory=TheLaidRegistry)
 
     @override
@@ -61,22 +56,24 @@ class Retiring(When[ARegistryAndACaller, ContainerRegistryAdapter, Deleted]):
         return f"{laid.caller.username}이 {self.at.says()}를 지움"
 
     @override
-    async def call(self, adapter: ContainerRegistryAdapter, laid: ARegistryAndACaller) -> Deleted:
+    async def call(
+        self, adapter: ContainerRegistryAdapter, laid: ARegistryAndACaller
+    ) -> DeleteContainerRegistryPayload:
         target = self.at.id_of(laid)
         with ActingAs(laid.caller):
             return await adapter.admin_delete(DeleteContainerRegistryInput(id=target))
 
 
 @dataclass(frozen=True)
-class TheDeletedIdComesBack(Then[ARegistryAndACaller, Deleted]):
-    """지운 id가 답으로 온다."""
-
+class TheDeletedIdComesBack(Then[ARegistryAndACaller, DeleteContainerRegistryPayload]):
     @override
     def says(self) -> str:
         return "지운 id가 답으로 온다"
 
     @override
-    def look(self, laid: ARegistryAndACaller, answered: Answered[Deleted]) -> list[Verdict]:
+    def look(
+        self, laid: ARegistryAndACaller, answered: Answered[DeleteContainerRegistryPayload]
+    ) -> list[Verdict]:
         payload = answered.response
         if payload is None:
             return [
@@ -88,7 +85,12 @@ class TheDeletedIdComesBack(Then[ARegistryAndACaller, Deleted]):
 
 @dataclass(frozen=True)
 class DeletingAnswersWithTheRemovedId(
-    Scenario[SeedingSession, ARegistryAndACaller, ContainerRegistryAdapter, Deleted]
+    Scenario[
+        SeedingSession,
+        ARegistryAndACaller,
+        ContainerRegistryAdapter,
+        DeleteContainerRegistryPayload,
+    ]
 ):
     @override
     def summary(self) -> str:
@@ -103,17 +105,24 @@ class DeletingAnswersWithTheRemovedId(
         return ARegistryAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
-    def when(self) -> When[ARegistryAndACaller, ContainerRegistryAdapter, Deleted]:
+    def when(
+        self,
+    ) -> When[ARegistryAndACaller, ContainerRegistryAdapter, DeleteContainerRegistryPayload]:
         return Retiring()
 
     @override
-    def then(self) -> Then[ARegistryAndACaller, Deleted]:
+    def then(self) -> Then[ARegistryAndACaller, DeleteContainerRegistryPayload]:
         return TheDeletedIdComesBack()
 
 
 @dataclass(frozen=True)
 class DeletingTakesTheAllowedProjectWithIt(
-    Scenario[SeedingSession, ARegistryAndACaller, ContainerRegistryAdapter, Deleted]
+    Scenario[
+        SeedingSession,
+        ARegistryAndACaller,
+        ContainerRegistryAdapter,
+        DeleteContainerRegistryPayload,
+    ]
 ):
     @override
     def summary(self) -> str:
@@ -128,17 +137,24 @@ class DeletingTakesTheAllowedProjectWithIt(
         return ARegistryAndSomeone(role=UserRole.SUPERADMIN, allowed=True)
 
     @override
-    def when(self) -> When[ARegistryAndACaller, ContainerRegistryAdapter, Deleted]:
+    def when(
+        self,
+    ) -> When[ARegistryAndACaller, ContainerRegistryAdapter, DeleteContainerRegistryPayload]:
         return Retiring()
 
     @override
-    def then(self) -> Then[ARegistryAndACaller, Deleted]:
+    def then(self) -> Then[ARegistryAndACaller, DeleteContainerRegistryPayload]:
         return TheDeletedIdComesBack()
 
 
 @dataclass(frozen=True)
 class AnIdThatHoldsNothingIsRefused(
-    Scenario[SeedingSession, ARegistryAndACaller, ContainerRegistryAdapter, Deleted]
+    Scenario[
+        SeedingSession,
+        ARegistryAndACaller,
+        ContainerRegistryAdapter,
+        DeleteContainerRegistryPayload,
+    ]
 ):
     @override
     def summary(self) -> str:
@@ -153,17 +169,24 @@ class AnIdThatHoldsNothingIsRefused(
         return ARegistryAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
-    def when(self) -> When[ARegistryAndACaller, ContainerRegistryAdapter, Deleted]:
+    def when(
+        self,
+    ) -> When[ARegistryAndACaller, ContainerRegistryAdapter, DeleteContainerRegistryPayload]:
         return Retiring(at=AnIdThatHoldsNothing())
 
     @override
-    def then(self) -> Then[ARegistryAndACaller, Deleted]:
+    def then(self) -> Then[ARegistryAndACaller, DeleteContainerRegistryPayload]:
         return TheCallIsRefused(ContainerRegistryNotFound)
 
 
 @dataclass(frozen=True)
 class APlainUserMayNotDelete(
-    Scenario[SeedingSession, ARegistryAndACaller, ContainerRegistryAdapter, Deleted]
+    Scenario[
+        SeedingSession,
+        ARegistryAndACaller,
+        ContainerRegistryAdapter,
+        DeleteContainerRegistryPayload,
+    ]
 ):
     @override
     def summary(self) -> str:
@@ -181,15 +204,24 @@ class APlainUserMayNotDelete(
         return ARegistryAndSomeone()
 
     @override
-    def when(self) -> When[ARegistryAndACaller, ContainerRegistryAdapter, Deleted]:
+    def when(
+        self,
+    ) -> When[ARegistryAndACaller, ContainerRegistryAdapter, DeleteContainerRegistryPayload]:
         return Retiring()
 
     @override
-    def then(self) -> Then[ARegistryAndACaller, Deleted]:
+    def then(self) -> Then[ARegistryAndACaller, DeleteContainerRegistryPayload]:
         return TheCallIsRefused(InsufficientPrivilege)
 
 
-SCENARIOS: list[RetiringStep] = [
+SCENARIOS: list[
+    Scenario[
+        SeedingSession,
+        ARegistryAndACaller,
+        ContainerRegistryAdapter,
+        DeleteContainerRegistryPayload,
+    ]
+] = [
     DeletingAnswersWithTheRemovedId(),
     DeletingTakesTheAllowedProjectWithIt(),
     AnIdThatHoldsNothingIsRefused(),
@@ -199,7 +231,12 @@ SCENARIOS: list[RetiringStep] = [
 
 @pytest.mark.parametrize("scenario", SCENARIOS, ids=lambda s: s.summary())
 async def test_retiring(
-    scenario: RetiringStep,
+    scenario: Scenario[
+        SeedingSession,
+        ARegistryAndACaller,
+        ContainerRegistryAdapter,
+        DeleteContainerRegistryPayload,
+    ],
     adapter: ContainerRegistryAdapter,
     engine: ExtendedAsyncSAEngine,
 ) -> None:

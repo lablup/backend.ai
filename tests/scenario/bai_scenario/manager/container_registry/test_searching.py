@@ -24,7 +24,10 @@ from ai.backend.common.dto.manager.v2.container_registry.request import (
 from ai.backend.common.dto.manager.v2.container_registry.response import (
     AdminSearchContainerRegistriesPayload,
 )
-from ai.backend.manager.api.adapters.container_registry.adapter import ContainerRegistryAdapter
+from ai.backend.manager.api.adapters.container_registry.adapter import (
+    DEFAULT_PAGINATION_LIMIT,
+    ContainerRegistryAdapter,
+)
 from ai.backend.manager.errors.auth import InsufficientPrivilege
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import (
@@ -38,19 +41,11 @@ from ai.backend.testutils.scenario_steps import (
     When,
 )
 
-DEFAULT_PAGE = 10
-"""요청이 크기를 생략했을 때 어댑터가 채우는 한 쪽의 크기."""
-
-type Searched = AdminSearchContainerRegistriesPayload
-type SearchingStep = Scenario[
-    SeedingSession, ManyRegistriesAndACaller, ContainerRegistryAdapter, Searched
-]
-
 
 @dataclass(frozen=True)
-class Searching(When[ManyRegistriesAndACaller, ContainerRegistryAdapter, Searched]):
-    """레지스트리를 검색한다. 이름을 주면 그 이름으로 거른다."""
-
+class Searching(
+    When[ManyRegistriesAndACaller, ContainerRegistryAdapter, AdminSearchContainerRegistriesPayload]
+):
     narrowed_by_name: bool = False
     limit: int | None = None
 
@@ -70,7 +65,7 @@ class Searching(When[ManyRegistriesAndACaller, ContainerRegistryAdapter, Searche
     @override
     async def call(
         self, adapter: ContainerRegistryAdapter, laid: ManyRegistriesAndACaller
-    ) -> Searched:
+    ) -> AdminSearchContainerRegistriesPayload:
         named = (
             ContainerRegistryFilter(registry_name=StringFilter(equals=laid.named.registry_name))
             if self.narrowed_by_name
@@ -83,15 +78,19 @@ class Searching(When[ManyRegistriesAndACaller, ContainerRegistryAdapter, Searche
 
 
 @dataclass(frozen=True)
-class EveryLaidRegistryIsCounted(Then[ManyRegistriesAndACaller, Searched]):
-    """심은 것이 모두 세어진다."""
-
+class EveryLaidRegistryIsCounted(
+    Then[ManyRegistriesAndACaller, AdminSearchContainerRegistriesPayload]
+):
     @override
     def says(self) -> str:
         return "심은 레지스트리가 모두 세어진다"
 
     @override
-    def look(self, laid: ManyRegistriesAndACaller, answered: Answered[Searched]) -> list[Verdict]:
+    def look(
+        self,
+        laid: ManyRegistriesAndACaller,
+        answered: Answered[AdminSearchContainerRegistriesPayload],
+    ) -> list[Verdict]:
         payload = answered.response
         if payload is None:
             return [
@@ -110,15 +109,17 @@ class EveryLaidRegistryIsCounted(Then[ManyRegistriesAndACaller, Searched]):
 
 
 @dataclass(frozen=True)
-class OnlyTheNamedOneIsLeft(Then[ManyRegistriesAndACaller, Searched]):
-    """걸러낸 그 하나만 남는다."""
-
+class OnlyTheNamedOneIsLeft(Then[ManyRegistriesAndACaller, AdminSearchContainerRegistriesPayload]):
     @override
     def says(self) -> str:
         return "걸러낸 그 레지스트리 하나만 남는다"
 
     @override
-    def look(self, laid: ManyRegistriesAndACaller, answered: Answered[Searched]) -> list[Verdict]:
+    def look(
+        self,
+        laid: ManyRegistriesAndACaller,
+        answered: Answered[AdminSearchContainerRegistriesPayload],
+    ) -> list[Verdict]:
         payload = answered.response
         if payload is None:
             return [
@@ -137,22 +138,24 @@ class OnlyTheNamedOneIsLeft(Then[ManyRegistriesAndACaller, Searched]):
 
 
 @dataclass(frozen=True)
-class OnePageComesBack(Then[ManyRegistriesAndACaller, Searched]):
-    """한 쪽만 오고, 다음 쪽이 있다고 답한다."""
-
+class OnePageComesBack(Then[ManyRegistriesAndACaller, AdminSearchContainerRegistriesPayload]):
     @override
     def says(self) -> str:
         return "한 쪽만 오고 다음 쪽이 있다고 답한다"
 
     @override
-    def look(self, laid: ManyRegistriesAndACaller, answered: Answered[Searched]) -> list[Verdict]:
+    def look(
+        self,
+        laid: ManyRegistriesAndACaller,
+        answered: Answered[AdminSearchContainerRegistriesPayload],
+    ) -> list[Verdict]:
         payload = answered.response
         if payload is None:
             return [
                 Refused(type(answered.raised) if answered.raised else Exception, answered.raised)
             ]
         return [
-            Same("items", len(payload.items), DEFAULT_PAGE),
+            Same("items", len(payload.items), DEFAULT_PAGINATION_LIMIT),
             Same("total_count", payload.total_count, len(laid.laid)),
             Same("has_next_page", payload.has_next_page, True),
             Same("has_previous_page", payload.has_previous_page, False),
@@ -161,7 +164,12 @@ class OnePageComesBack(Then[ManyRegistriesAndACaller, Searched]):
 
 @dataclass(frozen=True)
 class SearchingWithoutAFilterCountsEvery(
-    Scenario[SeedingSession, ManyRegistriesAndACaller, ContainerRegistryAdapter, Searched]
+    Scenario[
+        SeedingSession,
+        ManyRegistriesAndACaller,
+        ContainerRegistryAdapter,
+        AdminSearchContainerRegistriesPayload,
+    ]
 ):
     @override
     def summary(self) -> str:
@@ -176,17 +184,26 @@ class SearchingWithoutAFilterCountsEvery(
         return ManyRegistriesAndSomeone()
 
     @override
-    def when(self) -> When[ManyRegistriesAndACaller, ContainerRegistryAdapter, Searched]:
-        return Searching(limit=DEFAULT_PAGE)
+    def when(
+        self,
+    ) -> When[
+        ManyRegistriesAndACaller, ContainerRegistryAdapter, AdminSearchContainerRegistriesPayload
+    ]:
+        return Searching(limit=100)
 
     @override
-    def then(self) -> Then[ManyRegistriesAndACaller, Searched]:
+    def then(self) -> Then[ManyRegistriesAndACaller, AdminSearchContainerRegistriesPayload]:
         return EveryLaidRegistryIsCounted()
 
 
 @dataclass(frozen=True)
 class ANameNarrowsTheSearch(
-    Scenario[SeedingSession, ManyRegistriesAndACaller, ContainerRegistryAdapter, Searched]
+    Scenario[
+        SeedingSession,
+        ManyRegistriesAndACaller,
+        ContainerRegistryAdapter,
+        AdminSearchContainerRegistriesPayload,
+    ]
 ):
     @override
     def summary(self) -> str:
@@ -201,17 +218,26 @@ class ANameNarrowsTheSearch(
         return ManyRegistriesAndSomeone()
 
     @override
-    def when(self) -> When[ManyRegistriesAndACaller, ContainerRegistryAdapter, Searched]:
+    def when(
+        self,
+    ) -> When[
+        ManyRegistriesAndACaller, ContainerRegistryAdapter, AdminSearchContainerRegistriesPayload
+    ]:
         return Searching(narrowed_by_name=True)
 
     @override
-    def then(self) -> Then[ManyRegistriesAndACaller, Searched]:
+    def then(self) -> Then[ManyRegistriesAndACaller, AdminSearchContainerRegistriesPayload]:
         return OnlyTheNamedOneIsLeft()
 
 
 @dataclass(frozen=True)
 class ThePageSizeDefaultsToTen(
-    Scenario[SeedingSession, ManyRegistriesAndACaller, ContainerRegistryAdapter, Searched]
+    Scenario[
+        SeedingSession,
+        ManyRegistriesAndACaller,
+        ContainerRegistryAdapter,
+        AdminSearchContainerRegistriesPayload,
+    ]
 ):
     @override
     def summary(self) -> str:
@@ -225,20 +251,29 @@ class ThePageSizeDefaultsToTen(
 
     @override
     def given(self) -> Given[SeedingSession, ManyRegistriesAndACaller]:
-        return ManyRegistriesAndSomeone(besides=DEFAULT_PAGE)
+        return ManyRegistriesAndSomeone(besides=DEFAULT_PAGINATION_LIMIT)
 
     @override
-    def when(self) -> When[ManyRegistriesAndACaller, ContainerRegistryAdapter, Searched]:
+    def when(
+        self,
+    ) -> When[
+        ManyRegistriesAndACaller, ContainerRegistryAdapter, AdminSearchContainerRegistriesPayload
+    ]:
         return Searching()
 
     @override
-    def then(self) -> Then[ManyRegistriesAndACaller, Searched]:
+    def then(self) -> Then[ManyRegistriesAndACaller, AdminSearchContainerRegistriesPayload]:
         return OnePageComesBack()
 
 
 @dataclass(frozen=True)
 class APlainUserMayNotSearch(
-    Scenario[SeedingSession, ManyRegistriesAndACaller, ContainerRegistryAdapter, Searched]
+    Scenario[
+        SeedingSession,
+        ManyRegistriesAndACaller,
+        ContainerRegistryAdapter,
+        AdminSearchContainerRegistriesPayload,
+    ]
 ):
     @override
     def summary(self) -> str:
@@ -256,15 +291,26 @@ class APlainUserMayNotSearch(
         return ManyRegistriesAndSomeone(role=UserRole.USER)
 
     @override
-    def when(self) -> When[ManyRegistriesAndACaller, ContainerRegistryAdapter, Searched]:
-        return Searching(limit=DEFAULT_PAGE)
+    def when(
+        self,
+    ) -> When[
+        ManyRegistriesAndACaller, ContainerRegistryAdapter, AdminSearchContainerRegistriesPayload
+    ]:
+        return Searching(limit=100)
 
     @override
-    def then(self) -> Then[ManyRegistriesAndACaller, Searched]:
+    def then(self) -> Then[ManyRegistriesAndACaller, AdminSearchContainerRegistriesPayload]:
         return TheCallIsRefused(InsufficientPrivilege)
 
 
-SCENARIOS: list[SearchingStep] = [
+SCENARIOS: list[
+    Scenario[
+        SeedingSession,
+        ManyRegistriesAndACaller,
+        ContainerRegistryAdapter,
+        AdminSearchContainerRegistriesPayload,
+    ]
+] = [
     SearchingWithoutAFilterCountsEvery(),
     ANameNarrowsTheSearch(),
     ThePageSizeDefaultsToTen(),
@@ -274,7 +320,12 @@ SCENARIOS: list[SearchingStep] = [
 
 @pytest.mark.parametrize("scenario", SCENARIOS, ids=lambda s: s.summary())
 async def test_searching(
-    scenario: SearchingStep,
+    scenario: Scenario[
+        SeedingSession,
+        ManyRegistriesAndACaller,
+        ContainerRegistryAdapter,
+        AdminSearchContainerRegistriesPayload,
+    ],
     adapter: ContainerRegistryAdapter,
     engine: ExtendedAsyncSAEngine,
 ) -> None:
