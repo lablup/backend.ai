@@ -46,7 +46,6 @@ from ai.backend.manager.data.vfolder.types import (
 )
 from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.auth import AuthorizationFailed
-from ai.backend.manager.errors.common import ObjectNotFound
 from ai.backend.manager.errors.repository import (
     ForeignKeyViolationError,
     RepositoryIntegrityError,
@@ -61,7 +60,7 @@ from ai.backend.manager.errors.storage import (
     VFolderNotFound,
     VFolderOperationFailed,
 )
-from ai.backend.manager.errors.user import UserNotFound
+from ai.backend.manager.errors.user import KeyPairNotFound, UserNotFound
 from ai.backend.manager.models.agent import agents
 from ai.backend.manager.models.kernel import kernels
 from ai.backend.manager.models.keypair import KeyPairRow, keypairs
@@ -199,7 +198,7 @@ class VfolderRepository:
             # Check access permissions
             user_row = await session.scalar(sa.select(UserRow).where(UserRow.uuid == user_id))
             if not user_row:
-                raise ObjectNotFound(object_name="User")
+                raise UserNotFound()
 
             # Check if user has access to this vfolder
             allowed_vfolder_types = ["user", "group"]  # TODO: get from config
@@ -305,7 +304,7 @@ class VfolderRepository:
 
             allowed_hosts = await self._fetch_default_keypair_vfolder_hosts(db_session, user_uuid)
             if allowed_hosts is None:
-                raise ObjectNotFound(object_name="User keypair")
+                raise KeyPairNotFound("The user has no default keypair.")
             return allowed_hosts
 
     async def _fetch_default_keypair_vfolder_hosts(
@@ -1835,12 +1834,11 @@ class VfolderRepository:
             users_to_share = [u.uuid for u in user_info]
             emails_to_share = [u.email for u in user_info]
             if len(user_info) < 1:
-                raise ObjectNotFound(object_name="user")
+                raise UserNotFound()
             if len(user_info) < len(emails):
                 users_not_in_group = list(set(emails) - set(emails_to_share))
-                raise ObjectNotFound(
-                    f"Some users do not belong to folder's group: {','.join(users_not_in_group)}",
-                    object_name="user",
+                raise UserNotFound(
+                    f"Some users do not belong to folder's group: {','.join(users_not_in_group)}"
                 )
 
         async with self._v2_ops.write_ops() as w:
@@ -1892,7 +1890,7 @@ class VfolderRepository:
             result = await session.execute(db_query)
             users_to_unshare = [u.uuid for u in result.fetchall()]
             if len(users_to_unshare) < 1:
-                raise ObjectNotFound(object_name="user(s).")
+                raise UserNotFound()
 
         async with self._v2_ops.write_ops() as w:
             for user_id in users_to_unshare:
@@ -2157,7 +2155,7 @@ class VfolderRepository:
                 raise InvalidAPIParameters from e
             user_info = result.first()
             if user_info is None:
-                raise ObjectNotFound(object_name="user")
+                raise UserNotFound()
 
             resource_policy_name = user_info.resource_policy
             result = await conn.execute(

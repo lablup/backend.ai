@@ -22,6 +22,7 @@ __all__ = (
     "InvalidPermissionOperation",
     "NotEnoughPermission",
     "PermissionAlreadyGranted",
+    "PermissionNotFound",
     "ReplaceRolePermissionRoleIdMismatch",
     "RoleAlreadyAssigned",
     "RoleNotAssigned",
@@ -63,6 +64,15 @@ class RoleNotAssigned(BackendAIError, web.HTTPBadRequest):
             operation=ErrorOperation.HARD_DELETE,
             error_detail=ErrorDetail.NOT_FOUND,
         )
+
+
+class PermissionNotFound(FieldError, web.HTTPNotFound):
+    error_type = "https://api.backend.ai/probs/permission-not-found"
+    error_title = "The permission entry does not exist."
+
+    @override
+    def field_error_code(self) -> FieldErrorCode:
+        return FieldErrorCode(PermissionFieldType(), ActionOperationType.GET, ErrorDetail.NOT_FOUND)
 
 
 class PermissionAlreadyGranted(FieldError, web.HTTPConflict):

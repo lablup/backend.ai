@@ -45,7 +45,8 @@ from sqlalchemy.orm.attributes import InstrumentedAttribute
 
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.errors.api import InvalidAPIParameters
-from ai.backend.manager.errors.common import GenericForbidden, ObjectNotFound
+from ai.backend.manager.errors.common import GenericForbidden
+from ai.backend.manager.errors.image import ImageNotFound
 from ai.backend.manager.models.minilang.ordering import (
     OrderDirection,
     OrderingColumn,
@@ -222,11 +223,8 @@ class UUIDFloatMap(Scalar):  # type: ignore[misc]
         return validated
 
 
-def extract_object_uuid(info: graphene.ResolveInfo, global_id: str, object_name: str) -> UUID:
-    """
-    Converts a GraphQL global ID to its corresponding UUID.
-    If the global ID is not valid, raises an error using the provided object name.
-    """
+def extract_image_uuid(info: graphene.ResolveInfo, global_id: str) -> UUID:
+    """Convert a GraphQL global ID naming an image to its UUID."""
 
     _, raw_id = AsyncNode.resolve_global_id(info, global_id)
     if not raw_id:
@@ -235,7 +233,7 @@ def extract_object_uuid(info: graphene.ResolveInfo, global_id: str, object_name:
     try:
         return UUID(raw_id)
     except ValueError as e:
-        raise ObjectNotFound(object_name) from e
+        raise ImageNotFound() from e
 
 
 # DataLoader-related types and classes

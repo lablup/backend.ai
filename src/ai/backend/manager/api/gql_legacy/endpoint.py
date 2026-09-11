@@ -42,14 +42,13 @@ from ai.backend.manager.data.model_serving.types import (
     EndpointAutoScalingRuleData,
     EndpointData,
 )
-from ai.backend.manager.errors.common import (
-    GenericForbidden,
-    ObjectNotFound,
-)
+from ai.backend.manager.errors.common import GenericForbidden
 from ai.backend.manager.errors.service import (
+    AutoScalingRuleNotFound,
     EndpointNotFound,
     EndpointTokenNotFound,
 )
+from ai.backend.manager.errors.storage import VFolderNotFound
 from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
 from ai.backend.manager.models.endpoint import (
     EndpointAutoScalingRuleRow,
@@ -221,7 +220,7 @@ class EndpointAutoScalingRuleNode(graphene.ObjectType):  # type: ignore[misc]
         try:
             _rule_id = RuleId(UUID(raw_rule_id))
         except ValueError as e:
-            raise ObjectNotFound(object_name="Endpoint Autoscaling Rule") from e
+            raise AutoScalingRuleNotFound() from e
 
         async with graph_ctx.db.begin_readonly_session() as db_session:
             rule_row = await EndpointAutoScalingRuleRow.get(
@@ -291,11 +290,11 @@ class EndpointAutoScalingRuleNode(graphene.ObjectType):  # type: ignore[misc]
             try:
                 _endpoint_id = DeploymentID(UUID(raw_endpoint_id))
             except ValueError as e:
-                raise ObjectNotFound(object_name="Endpoint") from e
+                raise EndpointNotFound() from e
             try:
                 row = await EndpointRow.get(db_session, _endpoint_id)
             except NoResultFound as e:
-                raise ObjectNotFound(object_name="Endpoint") from e
+                raise EndpointNotFound() from e
 
             match graph_ctx.user["role"]:
                 case UserRole.SUPERADMIN:
@@ -466,7 +465,7 @@ class CreateEndpointAutoScalingRuleNode(graphene.Mutation):  # type: ignore[misc
         try:
             _endpoint_id = DeploymentID(UUID(raw_endpoint_id))
         except ValueError as e:
-            raise ObjectNotFound(object_name="Endpoint") from e
+            raise EndpointNotFound() from e
 
         action = props.to_action(
             endpoint_id=_endpoint_id,
@@ -513,7 +512,7 @@ class ModifyEndpointAutoScalingRuleNode(graphene.Mutation):  # type: ignore[misc
         try:
             _rule_id = RuleId(UUID(rule_id))
         except ValueError as e:
-            raise ObjectNotFound(object_name="Endpoint Autoscaling Rule") from e
+            raise AutoScalingRuleNotFound() from e
         graph_ctx: GraphQueryContext = info.context
 
         action = props.to_action(
@@ -557,7 +556,7 @@ class DeleteEndpointAutoScalingRuleNode(graphene.Mutation):  # type: ignore[misc
         try:
             _rule_id = RuleId(UUID(rule_id))
         except ValueError as e:
-            raise ObjectNotFound(object_name="Endpoint Autoscaling Rule") from e
+            raise AutoScalingRuleNotFound() from e
 
         graph_ctx: GraphQueryContext = info.context
 
@@ -929,7 +928,7 @@ class Endpoint(graphene.ObjectType):  # type: ignore[misc]
 
     async def resolve_model_vfolder(self, info: graphene.ResolveInfo) -> VirtualFolderNode:
         if not self.model:
-            raise ObjectNotFound(object_name="VFolder")
+            raise VFolderNotFound()
 
         ctx: GraphQueryContext = info.context
 
@@ -939,7 +938,7 @@ class Endpoint(graphene.ObjectType):  # type: ignore[misc]
 
     async def resolve_extra_mounts(self, info: graphene.ResolveInfo) -> Sequence[VirtualFolderNode]:
         if not self.endpoint_id:
-            raise ObjectNotFound(object_name="Endpoint")
+            raise EndpointNotFound()
 
         ctx: GraphQueryContext = info.context
 

@@ -72,7 +72,8 @@ from ai.backend.manager.data.resource.types import (
     ProjectResourcePolicyData,
     UserResourcePolicyData,
 )
-from ai.backend.manager.errors.common import ObjectNotFound
+from ai.backend.manager.errors.keypair import KeypairResourcePolicyNotFound
+from ai.backend.manager.errors.user import UserResourcePolicyNotFound
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.condition_utils import combine_conditions_or, negate_conditions
 from ai.backend.manager.models.keypair.conditions import KeypairConditions
@@ -338,7 +339,7 @@ class ResourcePolicyAdapter(BaseAdapter):
             )
         )
         if not result.items:
-            raise ObjectNotFound(object_name="keypair resource policy")
+            raise KeypairResourcePolicyNotFound("No keypair resource policy applies to the caller.")
         return self._keypair_policy_data_to_node(result.items[0])
 
     # ── User Resource Policy ──
@@ -441,7 +442,7 @@ class ResourcePolicyAdapter(BaseAdapter):
             )
         )
         if not result.items:
-            raise ObjectNotFound(object_name="user resource policy")
+            raise UserResourcePolicyNotFound("No user resource policy applies to the caller.")
         return self._user_policy_data_to_node(result.items[0])
 
     # ── Project Resource Policy ──

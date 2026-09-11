@@ -75,7 +75,7 @@ from ai.backend.manager.data.model_serving.types import (
     EndpointTokenData,
     ScalingState,
 )
-from ai.backend.manager.errors.common import ObjectNotFound
+from ai.backend.manager.errors.service import AutoScalingRuleNotFound
 from ai.backend.manager.models.base import (
     GUID,
     Base,
@@ -1091,7 +1091,7 @@ class EndpointAutoScalingRuleRow(Base):
         result = await session.execute(query)
         row = result.scalar()
         if not row:
-            raise ObjectNotFound(object_name="Endpoint Autoscaling Rule")
+            raise AutoScalingRuleNotFound()
         return row
 
     async def remove_rule(
