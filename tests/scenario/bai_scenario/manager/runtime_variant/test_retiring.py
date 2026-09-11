@@ -1,7 +1,7 @@
-"""런타임 변형 지우기 — 하나씩, 그리고 여럿을 한 번에.
+"""런타임 변형 삭제 — 하나씩, 그리고 여럿을 한 번에.
 
-여럿 지우기는 하나 지우기를 id마다 되풀이하는 것이라 한 트랜잭션이 아니다. 답이 끝까지 성공한
-뒤에만 오므로 답의 수는 요청한 id의 수와 같다.
+일괄 삭제는 단건 삭제를 id마다 반복하는 것이라 한 트랜잭션이 아니다. 응답은 끝까지 성공한
+뒤에만 오므로 응답의 수는 요청한 id의 수와 같다.
 """
 
 from __future__ import annotations
@@ -43,7 +43,7 @@ type RetiringStep = Scenario[SeedingSession, Any, RuntimeVariantAdapter, Any]
 
 @dataclass(frozen=True)
 class Deleting(When[AVariantAndACaller, RuntimeVariantAdapter, DeleteRuntimeVariantPayload]):
-    """심은 변형 하나를 지운다."""
+    """미리 만들어 둔 변형 하나를 삭제한다."""
 
     unknown: bool = False
 
@@ -53,8 +53,8 @@ class Deleting(When[AVariantAndACaller, RuntimeVariantAdapter, DeleteRuntimeVari
 
     @override
     def describe(self, laid: AVariantAndACaller) -> str:
-        target = "없는 id" if self.unknown else laid.variant.name
-        return f"{laid.caller.username}이 {target}를 지움"
+        target = "존재하지 않는 id" if self.unknown else laid.variant.name
+        return f"{laid.caller.username}이 {target} 삭제"
 
     @override
     async def call(
@@ -68,7 +68,7 @@ class Deleting(When[AVariantAndACaller, RuntimeVariantAdapter, DeleteRuntimeVari
 class DeletingMany(
     When[ManyVariantsAndACaller, RuntimeVariantAdapter, DeleteRuntimeVariantsPayload]
 ):
-    """심은 변형 전부를 한 번에 지운다."""
+    """미리 만들어 둔 변형 전부를 한 번에 삭제한다."""
 
     @override
     def operation(self) -> str:
@@ -76,7 +76,7 @@ class DeletingMany(
 
     @override
     def describe(self, laid: ManyVariantsAndACaller) -> str:
-        return f"{laid.caller.username}이 {len(laid.laid)}개를 한 번에 지움"
+        return f"{laid.caller.username}이 {len(laid.laid)}개를 한 번에 삭제"
 
     @override
     async def call(
@@ -92,7 +92,7 @@ class DeletingMany(
 class DeletingWithAnUnknownIdBehind(
     When[AVariantAndACaller, RuntimeVariantAdapter, DeleteRuntimeVariantsPayload]
 ):
-    """심은 변형의 id 뒤에 없는 id를 붙여 한 번에 지운다."""
+    """미리 만들어 둔 변형의 id 뒤에 없는 id를 붙여 한 번에 삭제한다."""
 
     @override
     def operation(self) -> str:
@@ -100,7 +100,7 @@ class DeletingWithAnUnknownIdBehind(
 
     @override
     def describe(self, laid: AVariantAndACaller) -> str:
-        return f"{laid.caller.username}이 {laid.variant.name}와 없는 id를 한 번에 지움"
+        return f"{laid.caller.username}이 {laid.variant.name}(와)과 없는 id를 한 번에 삭제"
 
     @override
     async def call(
@@ -122,7 +122,7 @@ class TheSuperadminDeletesAVariant(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 변형을 지우면 지운 변형의 id를 실은 답이 온다"
+        return "슈퍼관리자가 변형을 삭제하면 삭제한 변형의 id를 담은 응답이 반환된다"
 
     @override
     def given(self) -> Given[SeedingSession, AVariantAndACaller]:
@@ -147,7 +147,7 @@ class AnIdNothingAnswersToIsNotFound(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 아무 변형도 갖지 않은 id를 지우면 대상이 없다는 것으로 거부된다"
+        return "슈퍼관리자가 존재하지 않는 id를 삭제하면 대상을 찾을 수 없다는 이유로 거부된다"
 
     @override
     def given(self) -> Given[SeedingSession, AVariantAndACaller]:
@@ -172,7 +172,7 @@ class AUserGrantedNothingMayNotDelete(
 
     @override
     def describe(self) -> str:
-        return "아무 권한도 받지 않은 사용자가 변형을 지우면 권한 부족으로 거부된다"
+        return "아무 권한도 없는 사용자가 변형을 삭제하면 권한 부족으로 거부된다"
 
     @override
     def given(self) -> Given[SeedingSession, AVariantAndACaller]:
@@ -201,8 +201,8 @@ class EnforcementOffLetsAnyoneDelete(
     @override
     def describe(self) -> str:
         return (
-            "엔티티 권한 집행을 끄면 아무 권한도 받지 않은 사용자도 변형을 지운다. "
-            "이 문은 역할이 아니라 권한 그래프가 지키기 때문이다"
+            "권한 검사를 끄면 아무 권한도 없는 사용자도 변형을 삭제할 수 있다. "
+            "삭제는 역할이 아니라 권한 그래프로 보호되기 때문이다"
         )
 
     @override
@@ -234,7 +234,7 @@ class ManyAreDeletedAtOnce(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 변형 둘을 한 번에 지우면, 답은 요청한 id의 수를 그대로 싣는다"
+        return "슈퍼관리자가 변형 둘을 한 번에 삭제하면, 응답에는 요청한 id의 수가 그대로 담긴다"
 
     @override
     def given(self) -> Given[SeedingSession, ManyVariantsAndACaller]:
@@ -264,8 +264,8 @@ class AnUnknownIdInTheListIsNotFound(
     @override
     def describe(self) -> str:
         return (
-            "있는 id 뒤에 없는 id를 붙여 한 번에 지우면 대상이 없다는 것으로 거부된다. "
-            "한 트랜잭션이 아니라 앞의 것은 이미 지워져 있다"
+            "있는 id 뒤에 없는 id를 붙여 한 번에 삭제하면 대상을 찾을 수 없다는 이유로 거부된다. "
+            "한 트랜잭션이 아니므로 앞의 것은 이미 삭제되어 있다"
         )
 
     @override
@@ -295,7 +295,7 @@ class AUserGrantedNothingMayNotDeleteMany(
 
     @override
     def describe(self) -> str:
-        return "아무 권한도 받지 않은 사용자가 변형 둘을 한 번에 지우면 권한 부족으로 거부된다"
+        return "아무 권한도 없는 사용자가 변형 둘을 한 번에 삭제하면 권한 부족으로 거부된다"
 
     @override
     def given(self) -> Given[SeedingSession, ManyVariantsAndACaller]:

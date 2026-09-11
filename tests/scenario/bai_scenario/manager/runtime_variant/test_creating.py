@@ -1,7 +1,7 @@
-"""런타임 변형 만들기 — 누가 만들 수 있고, 만들어진 것이 무엇을 들고 있는가.
+"""런타임 변형 생성 — 누가 생성할 수 있고, 생성된 노드에 무엇이 담기는가.
 
-이름이 비어 있거나 길이를 넘는 요청은 여기 없다. 요청 타입이 이미 막으므로 어댑터가 보장하는
-것이 아니다.
+이름이 비어 있거나 길이 제한을 넘는 요청은 여기 없다. 요청 타입이 이미 막으므로 어댑터가
+보장하는 것이 아니다.
 """
 
 from __future__ import annotations
@@ -33,14 +33,14 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import Configured, Given, Scenario, Then, When
 
 MADE = "vllm"
-DESCRIBED = "새로 적은 설명"
+DESCRIBED = "새로 지정한 설명"
 
 type CreatingStep = Scenario[SeedingSession, Any, RuntimeVariantAdapter, RuntimeVariantNode]
 
 
 @dataclass(frozen=True)
 class Creating(When[ACaller, RuntimeVariantAdapter, RuntimeVariantNode]):
-    """변형 하나를 만든다. 답이 실은 노드를 벗겨서 준다."""
+    """변형 하나를 생성한다. 응답에 담긴 노드를 꺼내서 준다."""
 
     named: str = MADE
     described: str | None = None
@@ -51,7 +51,7 @@ class Creating(When[ACaller, RuntimeVariantAdapter, RuntimeVariantNode]):
 
     @override
     def describe(self, laid: ACaller) -> str:
-        return f"{laid.caller.username}이 {self.named} 변형을 만듦"
+        return f"{laid.caller.username}이 {self.named} 변형을 생성"
 
     @override
     async def call(self, adapter: RuntimeVariantAdapter, laid: ACaller) -> RuntimeVariantNode:
@@ -64,7 +64,7 @@ class Creating(When[ACaller, RuntimeVariantAdapter, RuntimeVariantNode]):
 
 @dataclass(frozen=True)
 class CreatingWithTheLaidName(When[AVariantAndACaller, RuntimeVariantAdapter, RuntimeVariantNode]):
-    """심어둔 변형과 같은 이름으로 만든다."""
+    """미리 만들어 둔 변형과 같은 이름으로 생성한다."""
 
     @override
     def operation(self) -> str:
@@ -72,7 +72,7 @@ class CreatingWithTheLaidName(When[AVariantAndACaller, RuntimeVariantAdapter, Ru
 
     @override
     def describe(self, laid: AVariantAndACaller) -> str:
-        return f"{laid.caller.username}이 이미 있는 {laid.variant.name}으로 다시 만듦"
+        return f"{laid.caller.username}이 이미 있는 이름 {laid.variant.name}(으)로 다시 생성"
 
     @override
     async def call(
@@ -96,8 +96,8 @@ class TheSuperadminMakesOneWithANameAlone(
     @override
     def describe(self) -> str:
         return (
-            "슈퍼관리자가 이름만 주고 변형을 만들면, 설명은 비고 폴더 설정 파일은 읽지 않으며 "
-            "모델 정의는 코드가 못박은 기본값인 노드가 온다"
+            "슈퍼관리자가 이름만 지정해 변형을 생성하면, 설명은 비고 폴더 설정 파일은 읽지 않으며 "
+            "모델 정의는 코드가 정해 둔 기본값인 노드가 반환된다"
         )
 
     @override
@@ -125,7 +125,7 @@ class ADescriptionComesBackAsGiven(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 이름과 설명을 함께 주고 만들면, 준 값이 그대로 실린 노드가 온다"
+        return "슈퍼관리자가 이름과 설명을 함께 지정해 생성하면, 지정한 값이 그대로 담긴 노드가 반환된다"
 
     @override
     def given(self) -> Given[SeedingSession, ACaller]:
@@ -150,7 +150,7 @@ class ANameAlreadyTakenIsRefused(
 
     @override
     def describe(self) -> str:
-        return "같은 이름의 변형이 이미 있을 때 그 이름으로 다시 만들면, 이름이 겹친다는 이유로 거부된다"
+        return "같은 이름의 변형이 이미 있을 때 그 이름으로 다시 생성하면, 이름 중복으로 거부된다"
 
     @override
     def given(self) -> Given[SeedingSession, AVariantAndACaller]:
@@ -175,7 +175,7 @@ class AUserWhoIsNotTheSuperadminMayNotCreate(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 아닌 사용자가 변형을 만들면 역할로 거부된다"
+        return "슈퍼관리자가 아닌 사용자가 변형을 생성하면 역할 부족으로 거부된다"
 
     @override
     def given(self) -> Given[SeedingSession, ACaller]:
@@ -201,8 +201,8 @@ class EnforcementOffStillNeedsTheSuperadmin(
     @override
     def describe(self) -> str:
         return (
-            "엔티티 권한 집행을 꺼도 슈퍼관리자가 아니면 변형을 만들지 못한다. "
-            "이 문은 권한 그래프가 아니라 역할이라 스위치와 무관하다"
+            "권한 검사를 꺼도 슈퍼관리자가 아니면 변형을 생성하지 못한다. "
+            "생성은 권한 그래프가 아니라 역할로 보호되므로 스위치와 무관하다"
         )
 
     @override

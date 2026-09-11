@@ -1,4 +1,4 @@
-"""런타임 변형 고치기 — 무엇이 바뀌고 무엇이 그대로 남으며, 누가 고칠 수 있는가."""
+"""런타임 변형 수정 — 무엇이 바뀌고 무엇이 그대로 남으며, 누가 수정할 수 있는가."""
 
 from __future__ import annotations
 
@@ -40,7 +40,7 @@ type EditingStep = Scenario[SeedingSession, Any, RuntimeVariantAdapter, RuntimeV
 
 @dataclass(frozen=True)
 class Editing(When[AVariantAndACaller, RuntimeVariantAdapter, RuntimeVariantNode]):
-    """심은 변형을 고친다. 답이 실은 노드를 벗겨서 준다."""
+    """미리 만들어 둔 변형을 수정한다. 응답에 담긴 노드를 꺼내서 준다."""
 
     named: str | None = None
     described: str | Sentinel | None = SENTINEL
@@ -52,13 +52,13 @@ class Editing(When[AVariantAndACaller, RuntimeVariantAdapter, RuntimeVariantNode
 
     @override
     def describe(self, laid: AVariantAndACaller) -> str:
-        target = "없는 id" if self.unknown else laid.variant.name
+        target = "존재하지 않는 id" if self.unknown else laid.variant.name
         changing = []
         if self.named is not None:
             changing.append("이름")
         if not isinstance(self.described, Sentinel):
             changing.append("설명")
-        return f"{laid.caller.username}이 {target}의 {' 및 '.join(changing) or '아무것도'} 고침"
+        return f"{laid.caller.username}이 {target}의 {' 및 '.join(changing) or '아무것도'} 수정"
 
     @override
     async def call(
@@ -79,7 +79,7 @@ class Editing(When[AVariantAndACaller, RuntimeVariantAdapter, RuntimeVariantNode
 class RenamingToAnothersName(
     When[ManyVariantsAndACaller, RuntimeVariantAdapter, RuntimeVariantNode]
 ):
-    """골라낸 하나의 이름을 옆에 있는 다른 변형의 이름으로 바꾼다."""
+    """골라낸 하나의 이름을 함께 만들어 둔 다른 변형의 이름으로 바꾼다."""
 
     @override
     def operation(self) -> str:
@@ -88,7 +88,7 @@ class RenamingToAnothersName(
     @override
     def describe(self, laid: ManyVariantsAndACaller) -> str:
         other = next(one for one in laid.laid if one.id != laid.named.id)
-        return f"{laid.caller.username}이 {laid.named.name}의 이름을 {other.name}으로 고침"
+        return f"{laid.caller.username}이 {laid.named.name}의 이름을 {other.name}(으)로 수정"
 
     @override
     async def call(
@@ -114,7 +114,7 @@ class TheNameChangesAndTheDescriptionStays(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 변형의 이름만 바꾸면, 이름은 새 값이 되고 설명은 그대로 남는다"
+        return "슈퍼관리자가 변형의 이름만 바꾸면, 이름은 새 값이 되고 설명은 그대로 유지된다"
 
     @override
     def given(self) -> Given[SeedingSession, AVariantAndACaller]:
@@ -141,7 +141,7 @@ class ClearingTheDescription(
 
     @override
     def describe(self) -> str:
-        return "설명이 있는 변형의 설명을 비우는 수정을 하면, 설명이 없어진다"
+        return "설명이 있는 변형에 설명을 비우는 수정을 하면, 설명이 없어진다"
 
     @override
     def given(self) -> Given[SeedingSession, AVariantAndACaller]:
@@ -168,7 +168,7 @@ class AnEmptyEditChangesNothing(
 
     @override
     def describe(self) -> str:
-        return "값을 하나도 주지 않고 고치면 아무것도 바뀌지 않은 노드가 온다"
+        return "값을 하나도 지정하지 않고 수정하면 아무것도 바뀌지 않은 노드가 반환된다"
 
     @override
     def given(self) -> Given[SeedingSession, AVariantAndACaller]:
@@ -194,8 +194,8 @@ class RenamingToATakenNameIsRefused(
     @override
     def describe(self) -> str:
         return (
-            "변형 둘 중 한쪽의 이름을 다른 쪽 이름으로 바꾸면, 이름이 겹친다는 이유로 거부된다. "
-            "만들 때와 달리 저장소의 제약 위반이 그대로 온다"
+            "변형 둘 중 한쪽의 이름을 다른 쪽 이름으로 바꾸면, 이름 중복으로 거부된다. "
+            "생성할 때와 달리 저장소의 제약 위반이 그대로 전파된다"
         )
 
     @override
@@ -221,7 +221,7 @@ class TheSuperadminEditingAnUnknownIdIsNotFound(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 아무 변형도 갖지 않은 id를 고치면 대상이 없다는 것으로 거부된다"
+        return "슈퍼관리자가 존재하지 않는 id를 수정하면 대상을 찾을 수 없다는 이유로 거부된다"
 
     @override
     def given(self) -> Given[SeedingSession, AVariantAndACaller]:
@@ -247,8 +247,8 @@ class AUserGrantedNothingMayNotEdit(
     @override
     def describe(self) -> str:
         return (
-            "아무 권한도 받지 않은 사용자가 변형을 고치면 권한 부족으로 거부된다. "
-            "변형은 어느 스코프에도 없어 그 권한을 받을 길이 없다"
+            "아무 권한도 없는 사용자가 변형을 수정하면 권한 부족으로 거부된다. "
+            "변형은 어느 스코프에도 속하지 않아 그 권한을 받을 방법이 없다"
         )
 
     @override
@@ -275,8 +275,8 @@ class AUserGrantedNothingEditingAnUnknownIdIsRefusedTheSameWay(
     @override
     def describe(self) -> str:
         return (
-            "아무 권한도 받지 않은 사용자가 없는 id를 고치면 대상 없음이 아니라 권한 부족으로 "
-            "거부된다. 권한 검사가 먼저 돌고 없는 행에는 걸린 권한도 없다"
+            "아무 권한도 없는 사용자가 존재하지 않는 id를 수정하면 대상 없음이 아니라 권한 부족으로 "
+            "거부된다. 권한 검사가 먼저 실행되고 없는 행에는 부여된 권한도 없기 때문이다"
         )
 
     @override
@@ -306,8 +306,8 @@ class EnforcementOffLetsAnyoneEdit(
     @override
     def describe(self) -> str:
         return (
-            "엔티티 권한 집행을 끄면 아무 권한도 받지 않은 사용자도 변형을 고친다. "
-            "이 문은 역할이 아니라 권한 그래프가 지키기 때문이다"
+            "권한 검사를 끄면 아무 권한도 없는 사용자도 변형을 수정할 수 있다. "
+            "수정은 역할이 아니라 권한 그래프로 보호되기 때문이다"
         )
 
     @override

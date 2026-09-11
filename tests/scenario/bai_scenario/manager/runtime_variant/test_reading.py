@@ -1,4 +1,4 @@
-"""런타임 변형 읽기 — id로, 이름으로, 여러 id로. 셋 다 인증만 본다."""
+"""런타임 변형 조회 — id로, 이름으로, 여러 id로. 셋 다 인증만 확인한다."""
 
 from __future__ import annotations
 
@@ -46,7 +46,7 @@ type ReadingStep = Scenario[SeedingSession, Any, RuntimeVariantAdapter, Any]
 
 @dataclass(frozen=True)
 class ReadingById(When[AVariantAndACaller, RuntimeVariantAdapter, RuntimeVariantNode]):
-    """id로 읽는다. 없는 id를 대면 아무 행도 갖지 않은 id를 쓴다."""
+    """id로 조회한다. ``unknown``이면 어느 행에도 없는 id를 쓴다."""
 
     unknown: bool = False
 
@@ -56,8 +56,8 @@ class ReadingById(When[AVariantAndACaller, RuntimeVariantAdapter, RuntimeVariant
 
     @override
     def describe(self, laid: AVariantAndACaller) -> str:
-        target = "없는 id" if self.unknown else laid.variant.name
-        return f"{laid.caller.username}이 {target}로 조회"
+        target = "존재하지 않는 id" if self.unknown else laid.variant.name
+        return f"{laid.caller.username}이 {target}(으)로 조회"
 
     @override
     async def call(
@@ -69,7 +69,7 @@ class ReadingById(When[AVariantAndACaller, RuntimeVariantAdapter, RuntimeVariant
 
 @dataclass(frozen=True)
 class ResolvingByName(When[AVariantAndACaller, RuntimeVariantAdapter, RuntimeVariantID]):
-    """이름을 id로 해석한다. 이름을 대지 않으면 심은 변형의 이름을 쓴다."""
+    """이름을 id로 변환한다. 이름을 지정하지 않으면 미리 만들어 둔 변형의 이름을 쓴다."""
 
     named: str | None = None
 
@@ -79,7 +79,7 @@ class ResolvingByName(When[AVariantAndACaller, RuntimeVariantAdapter, RuntimeVar
 
     @override
     def describe(self, laid: AVariantAndACaller) -> str:
-        return f"{laid.caller.username}이 {self.named or laid.variant.name}을 id로 해석"
+        return f"{laid.caller.username}이 이름 {self.named or laid.variant.name}(을)를 id로 변환"
 
     @override
     async def call(
@@ -91,7 +91,7 @@ class ResolvingByName(When[AVariantAndACaller, RuntimeVariantAdapter, RuntimeVar
 
 @dataclass(frozen=True)
 class ReadingManyByIds(When[ManyVariantsAndACaller, RuntimeVariantAdapter, Loaded]):
-    """심은 것들의 id 뒤에 없는 id 하나를 붙여 한 번에 읽는다."""
+    """미리 만들어 둔 변형들의 id 뒤에 없는 id 하나를 붙여 한 번에 조회한다."""
 
     @override
     def operation(self) -> str:
@@ -99,7 +99,7 @@ class ReadingManyByIds(When[ManyVariantsAndACaller, RuntimeVariantAdapter, Loade
 
     @override
     def describe(self, laid: ManyVariantsAndACaller) -> str:
-        return f"{laid.caller.username}이 심은 {len(laid.laid)}개와 없는 id 하나를 한 번에 조회"
+        return f"{laid.caller.username}이 미리 만들어 둔 {len(laid.laid)}개와 없는 id 하나를 한 번에 조회"
 
     @override
     async def call(self, adapter: RuntimeVariantAdapter, laid: ManyVariantsAndACaller) -> Loaded:
@@ -113,7 +113,7 @@ class ReadingManyByIds(When[ManyVariantsAndACaller, RuntimeVariantAdapter, Loade
 
 @dataclass(frozen=True)
 class ReadingNoIds(When[AVariantAndACaller, RuntimeVariantAdapter, Loaded]):
-    """빈 id 목록으로 읽는다."""
+    """빈 id 목록으로 조회한다."""
 
     @override
     def operation(self) -> str:
@@ -131,27 +131,27 @@ class ReadingNoIds(When[AVariantAndACaller, RuntimeVariantAdapter, Loaded]):
 
 @dataclass(frozen=True)
 class TheLaidVariantsId(Then[AVariantAndACaller, RuntimeVariantID]):
-    """심은 변형의 id가 온다."""
+    """미리 만들어 둔 변형의 id가 반환된다."""
 
     @override
     def says(self) -> str:
-        return "심은 변형의 id가 온다"
+        return "미리 만들어 둔 변형의 id가 반환된다"
 
     @override
     def look(self, laid: AVariantAndACaller, answered: Answered[RuntimeVariantID]) -> list[Verdict]:
         resolved = answered.response
         if resolved is None:
             return [Refused(EntityNotFoundError, answered.raised)]
-        return [Held[UUID]("id", resolved, SameAs[UUID](laid.variant.id, "심은 변형"))]
+        return [Held[UUID]("id", resolved, SameAs[UUID](laid.variant.id, "미리 만들어 둔 변형"))]
 
 
 @dataclass(frozen=True)
 class NothingComesBack(Then[Any, Loaded]):
-    """빈 답이 온다."""
+    """빈 응답이 반환된다."""
 
     @override
     def says(self) -> str:
-        return "빈 답이 온다"
+        return "빈 응답이 반환된다"
 
     @override
     def look(self, laid: Any, answered: Answered[Loaded]) -> list[Verdict]:
@@ -173,7 +173,7 @@ class AUserGrantedNothingReadsById(
 
     @override
     def describe(self) -> str:
-        return "아무 권한도 받지 않은 사용자가 id로 조회하면, 그 변형 전체가 온다. 이 읽기는 인증만 본다"
+        return "아무 권한도 없는 사용자가 id로 조회하면, 그 변형 전체가 반환된다. 이 조회는 인증만 확인한다"
 
     @override
     def given(self) -> Given[SeedingSession, AVariantAndACaller]:
@@ -198,7 +198,7 @@ class AnIdNothingAnswersToIsNotFound(
 
     @override
     def describe(self) -> str:
-        return "아무 변형도 갖지 않은 id로 조회하면 대상이 없다는 것으로 거부된다"
+        return "존재하지 않는 id로 조회하면 대상을 찾을 수 없다는 이유로 거부된다"
 
     @override
     def given(self) -> Given[SeedingSession, AVariantAndACaller]:
@@ -223,7 +223,7 @@ class ANameResolvesToItsId(
 
     @override
     def describe(self) -> str:
-        return "아무 권한도 받지 않은 사용자가 이름을 해석하면 그 변형의 id가 온다"
+        return "아무 권한도 없는 사용자가 이름을 id로 변환하면 그 변형의 id가 반환된다"
 
     @override
     def given(self) -> Given[SeedingSession, AVariantAndACaller]:
@@ -249,8 +249,8 @@ class ANameNothingAnswersToIsNotFound(
     @override
     def describe(self) -> str:
         return (
-            "아무 변형도 갖지 않은 이름을 해석하면 대상이 없다는 것으로 거부된다. "
-            "이 해석에는 뒤따르는 권한 검사가 없어 없다는 사실이 그대로 드러난다"
+            "존재하지 않는 이름을 id로 변환하면 대상을 찾을 수 없다는 이유로 거부된다. "
+            "이 변환에는 뒤따르는 권한 검사가 없어 존재하지 않는다는 사실이 그대로 드러난다"
         )
 
     @override
@@ -278,7 +278,7 @@ class MixedIdsComeBackInOrder(
 
     @override
     def describe(self) -> str:
-        return "있는 id 둘과 없는 id 하나를 한 번에 읽으면, 준 순서대로 오고 없는 id 자리는 비어서 온다"
+        return "있는 id 둘과 없는 id 하나를 한 번에 조회하면, 요청한 순서대로 반환되고 없는 id 자리는 비어 있다"
 
     @override
     def given(self) -> Given[SeedingSession, ManyVariantsAndACaller]:
@@ -303,7 +303,7 @@ class AnEmptyListAnswersEmpty(
 
     @override
     def describe(self) -> str:
-        return "빈 id 목록을 주면 빈 답이 온다. 배선을 부르지 않는다"
+        return "빈 id 목록을 주면 빈 응답이 반환된다. 하위 계층을 호출하지 않는다"
 
     @override
     def given(self) -> Given[SeedingSession, AVariantAndACaller]:

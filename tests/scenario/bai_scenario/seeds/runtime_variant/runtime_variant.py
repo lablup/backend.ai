@@ -16,7 +16,7 @@ class SeedRuntimeVariant(SeedRow[RuntimeVariantData]):
     """A runtime variant in the global catalog. It is created in no scope."""
 
     name_hint: str = "variant"
-    description: str | None = "심어둔 런타임 변형"
+    description: str | None = "미리 만들어 둔 런타임 변형"
 
     @override
     def kind(self) -> str:
