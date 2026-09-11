@@ -1,4 +1,4 @@
-"""로그인 클라이언트 종류 읽기 — id로 읽는다. 인증만 본다."""
+"""로그인 클라이언트 종류 조회 — id로 조회한다. 인증만 확인한다."""
 
 from __future__ import annotations
 
@@ -31,7 +31,7 @@ type ReadingStep = Scenario[
 
 @dataclass(frozen=True)
 class ReadingById(When[ATypeAndACaller, LoginClientTypeAdapter, LoginClientTypeNode]):
-    """id로 읽는다. 없는 id를 대면 아무 행도 갖지 않은 id를 쓴다."""
+    """id로 조회한다. ``unknown``이면 어느 행에도 없는 id를 쓴다."""
 
     unknown: bool = False
 
@@ -41,8 +41,8 @@ class ReadingById(When[ATypeAndACaller, LoginClientTypeAdapter, LoginClientTypeN
 
     @override
     def describe(self, laid: ATypeAndACaller) -> str:
-        target = "없는 id" if self.unknown else laid.client_type.name
-        return f"{laid.caller.username}이 {target}로 조회"
+        target = "존재하지 않는 id" if self.unknown else laid.client_type.name
+        return f"{laid.caller.username}이 {target}(으)로 조회"
 
     @override
     async def call(
@@ -64,7 +64,7 @@ class AUserGrantedNothingReadsById(
 
     @override
     def describe(self) -> str:
-        return "아무 권한도 받지 않은 사용자가 id로 조회하면 그 종류 전체가 온다. 이 읽기는 인증만 본다"
+        return "아무 권한도 없는 사용자가 id로 조회하면 그 종류 전체가 반환된다. 이 조회는 인증만 확인한다"
 
     @override
     def given(self) -> Given[SeedingSession, ATypeAndACaller]:
@@ -89,7 +89,7 @@ class AnIdNothingAnswersToIsNotFound(
 
     @override
     def describe(self) -> str:
-        return "아무 종류도 갖지 않은 id로 조회하면 대상이 없다는 것으로 거부된다"
+        return "존재하지 않는 id로 조회하면 대상을 찾을 수 없다는 이유로 거부된다"
 
     @override
     def given(self) -> Given[SeedingSession, ATypeAndACaller]:

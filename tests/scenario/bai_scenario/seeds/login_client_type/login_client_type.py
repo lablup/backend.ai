@@ -16,7 +16,7 @@ class SeedLoginClientType(SeedRow[LoginClientTypeData]):
     """A login client type in the global catalog."""
 
     name_hint: str = "client"
-    description: str | None = "심어둔 로그인 클라이언트 종류"
+    description: str | None = "미리 만들어 둔 로그인 클라이언트 종류"
 
     @override
     def kind(self) -> str:

@@ -1,4 +1,4 @@
-"""로그인 클라이언트 종류 훑기 — 이름 필터가 무엇을 좁히고, 기본 페이지 크기가 쉰이다."""
+"""로그인 클라이언트 종류 검색 — 이름 필터가 무엇을 좁히고, 기본 페이지 크기가 50이다."""
 
 from __future__ import annotations
 
@@ -37,7 +37,7 @@ type SearchingStep = Scenario[SeedingSession, ManyTypesAndACaller, LoginClientTy
 
 @dataclass(frozen=True)
 class SearchingEveryType(When[ManyTypesAndACaller, LoginClientTypeAdapter, Searched]):
-    """필터도 크기도 없이 전체를 훑는다."""
+    """필터도 크기도 없이 전체를 검색한다."""
 
     @override
     def operation(self) -> str:
@@ -55,7 +55,7 @@ class SearchingEveryType(When[ManyTypesAndACaller, LoginClientTypeAdapter, Searc
 
 @dataclass(frozen=True)
 class SearchingByName(When[ManyTypesAndACaller, LoginClientTypeAdapter, Searched]):
-    """심은 것 중 하나의 이름으로 걸러 훑는다."""
+    """미리 만들어 둔 종류 중 하나의 이름을 필터로 검색한다."""
 
     @override
     def operation(self) -> str:
@@ -63,7 +63,7 @@ class SearchingByName(When[ManyTypesAndACaller, LoginClientTypeAdapter, Searched
 
     @override
     def describe(self, laid: ManyTypesAndACaller) -> str:
-        return f"{laid.caller.username}이 {laid.named.name}으로 걸러 조회"
+        return f"{laid.caller.username}이 {laid.named.name} 이름 필터로 조회"
 
     @override
     async def call(self, adapter: LoginClientTypeAdapter, laid: ManyTypesAndACaller) -> Searched:
@@ -85,7 +85,7 @@ class AUserGrantedNothingCountsEveryType(
 
     @override
     def describe(self) -> str:
-        return "종류 둘이 있을 때 아무 권한도 받지 않은 사용자가 필터 없이 조회하면 둘을 모두 센다"
+        return "종류 둘이 있을 때 아무 권한도 없는 사용자가 필터 없이 조회하면 둘 다 집계된다"
 
     @override
     def given(self) -> Given[SeedingSession, ManyTypesAndACaller]:
@@ -110,7 +110,7 @@ class ANameFilterNarrows(
 
     @override
     def describe(self) -> str:
-        return "종류 여럿 중 하나의 이름으로 걸러 조회하면, 답에는 그 이름의 것만 남는다"
+        return "종류 여럿 중 하나의 이름을 필터로 조회하면, 응답에는 그 이름의 종류만 남는다"
 
     @override
     def given(self) -> Given[SeedingSession, ManyTypesAndACaller]:
@@ -136,8 +136,8 @@ class OmittingThePageSizeGivesFifty(
     @override
     def describe(self) -> str:
         return (
-            "종류 쉰하나가 있을 때 크기 없이 조회하면 쉰 건까지 오고 다음 쪽이 있다고 답한다. "
-            "기본 페이지 크기가 다른 카탈로그의 열이 아니라 쉰이다"
+            "종류 51개가 있을 때 크기 없이 조회하면 50건까지 반환되고 다음 페이지가 있다고 응답한다. "
+            "기본 페이지 크기가 다른 카탈로그의 10이 아니라 50이다"
         )
 
     @override
