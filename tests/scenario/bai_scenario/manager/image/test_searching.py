@@ -215,7 +215,7 @@ class OnePageComesBack(Then[ManyImagesAndACaller, AdminSearchImagesPayload]):
         if payload is None:
             return [Held("답", answered.response, Filled())]
         return [
-            Same("items", len(payload.items), self.size),
+            Same("length", len(payload.items), self.size),
             Same("total_count", payload.total_count, len(laid.laid)),
             Same("has_next_page", payload.has_next_page, True),
             Same("has_previous_page", payload.has_previous_page, False),
