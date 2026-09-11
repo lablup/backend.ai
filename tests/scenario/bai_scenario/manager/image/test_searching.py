@@ -203,7 +203,7 @@ class NoAliasIsFound(Then[ManyImagesAndACaller, AdminSearchImageAliasesPayload])
 
 
 @dataclass(frozen=True)
-class EveryImageIsCounted(
+class SearchingWithoutAFilterCountsEvery(
     Scenario[SeedingSession, ManyImagesAndACaller, ImageAdapter, AdminSearchImagesPayload]
 ):
     @override
@@ -386,7 +386,7 @@ class ABrokenCursorIsRefused(
 
 
 @dataclass(frozen=True)
-class AliasesAreSearched(
+class SearchingAliasesWithNoneAttached(
     Scenario[SeedingSession, ManyImagesAndACaller, ImageAdapter, AdminSearchImageAliasesPayload]
 ):
     @override
@@ -436,14 +436,14 @@ class APlainUserMayNotSearchAliases(
 
 
 SCENARIOS: list[Any] = [
-    EveryImageIsCounted(),
+    SearchingWithoutAFilterCountsEvery(),
     ThePageSizeDefaultsToFifty(),
     APlainUserMayNotSearch(),
     ACursorReadsFromTheFront(),
     TheBaseConditionNarrowsFirst(),
     TwoPaginationModesAreRefused(),
     ABrokenCursorIsRefused(),
-    AliasesAreSearched(),
+    SearchingAliasesWithNoneAttached(),
     APlainUserMayNotSearchAliases(),
 ]
 

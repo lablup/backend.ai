@@ -112,7 +112,9 @@ class TheRetiredImageComesBack(Then[AnAliasAndACaller, ImageNode]):
 
 
 @dataclass(frozen=True)
-class TheSuperadminRetires(Scenario[SeedingSession, AnImageAndACaller, ImageAdapter, ImageNode]):
+class PurgingAnswersWithTheRemovedImage(
+    Scenario[SeedingSession, AnImageAndACaller, ImageAdapter, ImageNode]
+):
     @override
     def summary(self) -> str:
         return "purging-an-image-answers-with-the-image-it-removed"
@@ -135,7 +137,9 @@ class TheSuperadminRetires(Scenario[SeedingSession, AnImageAndACaller, ImageAdap
 
 
 @dataclass(frozen=True)
-class TheOwnerRetiresTheirOwn(Scenario[SeedingSession, AnImageAndACaller, ImageAdapter, ImageNode]):
+class TheMakerOfACustomImageMayPurgeIt(
+    Scenario[SeedingSession, AnImageAndACaller, ImageAdapter, ImageNode]
+):
     @override
     def summary(self) -> str:
         return "the-maker-of-a-custom-image-may-purge-it"
@@ -161,7 +165,9 @@ class TheOwnerRetiresTheirOwn(Scenario[SeedingSession, AnImageAndACaller, ImageA
 
 
 @dataclass(frozen=True)
-class TheAliasGoesWithIt(Scenario[SeedingSession, AnAliasAndACaller, ImageAdapter, ImageNode]):
+class PurgingTakesTheAliasesWithIt(
+    Scenario[SeedingSession, AnAliasAndACaller, ImageAdapter, ImageNode]
+):
     @override
     def summary(self) -> str:
         return "purging-an-image-takes-its-aliases-with-it"
@@ -260,9 +266,9 @@ class AGrantIsNotOwnershipHereEither(
 
 
 SCENARIOS: list[Any] = [
-    TheSuperadminRetires(),
-    TheOwnerRetiresTheirOwn(),
-    TheAliasGoesWithIt(),
+    PurgingAnswersWithTheRemovedImage(),
+    TheMakerOfACustomImageMayPurgeIt(),
+    PurgingTakesTheAliasesWithIt(),
     RetiringWhatIsNotThere(),
     AnUngrantedUserMayNotRetire(),
     AGrantIsNotOwnershipHereEither(),
