@@ -1,7 +1,7 @@
-"""정책 만들기 — 누가 만들 수 있고, 무엇이 값을 막는가.
+"""정책 생성 — 누가 생성할 수 있고, 무엇이 값을 막는가.
 
-문은 전역 superadmin 역할 하나다. 이름 겹침과 범위 밖 상한은 만들기 spec이 아니라
-데이터베이스 제약이 막으므로, 그 거부는 저장소의 제약 위반 오류로 온다.
+생성은 전역 superadmin 역할만 검사한다. 이름 중복과 범위 밖 우선순위 상한은 생성 spec이
+아니라 데이터베이스 제약이 막으므로, 그 거부는 저장소의 제약 위반 오류로 온다.
 """
 
 from __future__ import annotations
@@ -51,7 +51,7 @@ type CreatingStep = Scenario[SeedingSession, APolicyAndACaller[Any], ResourcePol
 
 @dataclass(frozen=True)
 class Creating(When[APolicyAndACaller[Any], ResourcePolicyAdapter, Any]):
-    """정책을 만든다. 요청을 대지 않으면 심은 정책의 이름으로 모든 값을 주고 만든다."""
+    """정책을 생성한다. 요청을 지정하지 않으면 미리 만들어 둔 정책의 이름으로 모든 값을 지정해 생성한다."""
 
     family: Family[Any, Any]
     ask: Ask | None = None
@@ -63,7 +63,7 @@ class Creating(When[APolicyAndACaller[Any], ResourcePolicyAdapter, Any]):
     @override
     def describe(self, laid: APolicyAndACaller[Any]) -> str:
         how = self.ask.says if self.ask is not None else "이미 있는 이름으로"
-        return f"{laid.caller.username}이 {how} {self.family.kind}을 만듦"
+        return f"{laid.caller.username}이 {how} {self.family.kind}을 생성"
 
     @override
     async def call(self, adapter: ResourcePolicyAdapter, laid: APolicyAndACaller[Any]) -> Any:
@@ -86,8 +86,8 @@ class TheWholeNodeComesBack(
     @override
     def describe(self) -> str:
         return (
-            f"슈퍼관리자가 모든 값을 주고 {self.family.kind}을 만들면, "
-            "준 값이 그대로 실린 노드 전체가 답으로 온다"
+            f"슈퍼관리자가 모든 값을 지정해 {self.family.kind}을 생성하면, "
+            "지정한 값이 그대로 담긴 노드 전체가 반환된다"
         )
 
     @override
@@ -118,8 +118,8 @@ class LeavingOptionalsOutLeavesThemEmpty(
     @override
     def describe(self) -> str:
         return (
-            f"슈퍼관리자가 생략할 수 있는 항목을 모두 빼고 {self.family.kind}을 만들면, "
-            "뺀 자리가 비어 있는 노드 전체가 답으로 온다"
+            f"슈퍼관리자가 생략할 수 있는 항목을 모두 생략하고 {self.family.kind}을 생성하면, "
+            "생략한 필드가 비어 있는 노드 전체가 반환된다"
         )
 
     @override
@@ -148,7 +148,7 @@ class AnUnlimitedSlotIsMarkedUnlimited(
     @override
     def describe(self) -> str:
         return (
-            "슈퍼관리자가 한 자원의 전체 슬롯을 무한으로 주고 키페어 정책을 만들면, "
+            "슈퍼관리자가 한 자원의 전체 슬롯을 무제한으로 지정해 키페어 정책을 생성하면, "
             "그 자원은 무제한으로 표시되고 수량은 비어 있다"
         )
 
@@ -178,8 +178,8 @@ class ANameAnotherPolicyHoldsIsRefused(
     @override
     def describe(self) -> str:
         return (
-            f"이미 어떤 {self.family.kind}이 쓰고 있는 이름으로 만들려 하면, "
-            "이름이 겹친다는 이유로 거부된다"
+            f"이미 다른 {self.family.kind}이 사용 중인 이름으로 생성하려 하면, "
+            "이름 중복으로 거부된다"
         )
 
     @override
@@ -206,8 +206,8 @@ class APriorityCapOutOfRangeIsRefused(
     @override
     def describe(self) -> str:
         return (
-            "슈퍼관리자가 우선순위 상한을 세션이 가질 수 있는 범위 밖으로 주고 키페어 정책을 "
-            "만들려 하면, 제약을 어겼다는 이유로 거부된다"
+            "슈퍼관리자가 우선순위 상한을 세션 우선순위 범위 밖 값으로 지정해 키페어 정책을 "
+            "생성하려 하면, 제약 위반으로 거부된다"
         )
 
     @override
@@ -236,8 +236,8 @@ class APlainUserMayNotCreate(
     @override
     def describe(self) -> str:
         return (
-            f"슈퍼관리자가 아닌 사용자가 {self.family.kind}을 만들려 하면, "
-            "권한을 얼마나 받았는지와 무관하게 역할로 막힌다"
+            f"슈퍼관리자가 아닌 사용자가 {self.family.kind}을 생성하려 하면, "
+            "어떤 권한을 받았는지와 무관하게 역할 부족으로 거부된다"
         )
 
     @override
@@ -266,8 +266,8 @@ class AMonitorMayNotCreate(
     @override
     def describe(self) -> str:
         return (
-            f"모니터 역할 사용자가 {self.family.kind}을 만들려 하면 역할로 막힌다. "
-            "역할 문은 모니터에게 읽기만 열어 준다"
+            f"모니터 역할 사용자가 {self.family.kind}을 생성하려 하면 역할 부족으로 거부된다. "
+            "역할 검사는 모니터에게 읽기만 허용한다"
         )
 
     @override
@@ -296,8 +296,8 @@ class EnforcementOffChangesNothing(
     @override
     def describe(self) -> str:
         return (
-            f"엔티티 권한 집행을 꺼도 {self.family.kind} 만들기는 여전히 막힌다. "
-            "이 문은 권한 그래프가 아니라 역할이 지키기 때문이다"
+            f"권한 검사를 꺼도 {self.family.kind} 생성은 여전히 거부된다. "
+            "생성은 권한 그래프가 아니라 역할로 보호되기 때문이다"
         )
 
     @override

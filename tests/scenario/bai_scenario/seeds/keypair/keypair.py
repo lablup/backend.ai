@@ -30,7 +30,7 @@ class SeedKeypair(SeedField[UserData, KeyPairData]):
     @override
     def kind(self) -> str:
         state = "활성" if self.active else "비활성"
-        return f"{self.resource_policy}에 매인 {state} 키 하나 더"
+        return f"{self.resource_policy} 정책이 할당된 {state} 키페어 하나 더"
 
     @override
     def owner_id(self, owner: UserData) -> UserID:

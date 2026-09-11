@@ -1,7 +1,7 @@
-"""정책 고치기 — 무엇이 바뀌고, 비우라는 요청을 어떻게 읽는가.
+"""정책 수정 — 무엇이 바뀌고, 값을 비우라는 요청을 어떻게 처리하는가.
 
-권한 없는 사용자는 고치기 문에 닿기 전에 이름 해석에서 막히므로, 거부가 읽기와 같은 이유로
-온다.
+권한 없는 사용자는 수정 로직에 이르기 전에 이름 조회 단계에서 막히므로, 거부 이유가 조회와
+같다.
 """
 
 from __future__ import annotations
@@ -40,7 +40,7 @@ type EditingStep = Scenario[SeedingSession, APolicyAndACaller[Any], ResourcePoli
 
 @dataclass(frozen=True)
 class Editing(When[APolicyAndACaller[Any], ResourcePolicyAdapter, Any]):
-    """정책 하나를 고친다. 이름을 대지 않으면 심은 정책을 고친다."""
+    """정책 하나를 수정한다. 이름을 지정하지 않으면 미리 만들어 둔 정책을 수정한다."""
 
     family: Family[Any, Any]
     edit: Edit
@@ -52,7 +52,7 @@ class Editing(When[APolicyAndACaller[Any], ResourcePolicyAdapter, Any]):
 
     @override
     def describe(self, laid: APolicyAndACaller[Any]) -> str:
-        return f"{laid.caller.username}이 {self.named or laid.policy.name}을 {self.edit.says} 수정"
+        return f"{laid.caller.username}이 {self.named or laid.policy.name} 수정 ({self.edit.says})"
 
     @override
     async def call(self, adapter: ResourcePolicyAdapter, laid: APolicyAndACaller[Any]) -> Any:
@@ -76,8 +76,8 @@ class OneLimitChangesAndNothingElse(
     @override
     def describe(self) -> str:
         return (
-            f"{self.family.kind} 하나가 있고 슈퍼관리자가 한도 하나만 고치면, "
-            "그 한도는 새 값이 되고 나머지는 그대로다"
+            f"{self.family.kind} 하나가 있고 슈퍼관리자가 한도 하나만 수정하면, "
+            "그 한도만 새 값이 되고 나머지는 그대로 유지된다"
         )
 
     @override
@@ -107,8 +107,8 @@ class GivingNothingChangesNothing(
     @override
     def describe(self) -> str:
         return (
-            f"슈퍼관리자가 {self.family.kind}을 지목만 하고 아무 값도 주지 않으면, "
-            "아무것도 바뀌지 않은 노드가 답으로 온다"
+            f"슈퍼관리자가 {self.family.kind}을 지정만 하고 아무 값도 주지 않으면, "
+            "아무것도 바뀌지 않은 노드가 반환된다"
         )
 
     @override
@@ -139,8 +139,8 @@ class ANullableValueIsCleared(
     @override
     def describe(self) -> str:
         return (
-            f"비울 수 있는 항목에 값이 있는 {self.family.kind}을 슈퍼관리자가 그 항목을 비우도록 "
-            "고치면, 그 항목이 비어 있는 노드가 답으로 온다"
+            f"비울 수 있는 항목에 값이 설정된 {self.family.kind}을 슈퍼관리자가 그 항목을 비우도록 "
+            "수정하면, 그 항목이 비어 있는 노드가 반환된다"
         )
 
     @override
@@ -170,8 +170,8 @@ class ANonNullableValueStaysWhenCleared(
     @override
     def describe(self) -> str:
         return (
-            f"슈퍼관리자가 {self.family.kind}의 비울 수 없는 항목을 비우도록 고치면, 그 요청은 "
-            "없던 것으로 읽혀 아무것도 바뀌지 않은 노드가 답으로 온다"
+            f"슈퍼관리자가 {self.family.kind}의 비울 수 없는 항목을 비우도록 수정하면, 그 요청은 "
+            "무시되어 아무것도 바뀌지 않은 노드가 반환된다"
         )
 
     @override
@@ -198,8 +198,8 @@ class APriorityCapMovedOutOfRangeIsRefused(
     @override
     def describe(self) -> str:
         return (
-            "슈퍼관리자가 키페어 정책의 우선순위 상한을 세션이 가질 수 있는 범위 밖으로 고치려 "
-            "하면, 제약을 어겼다는 이유로 거부된다"
+            "슈퍼관리자가 키페어 정책의 우선순위 상한을 세션 우선순위 범위 밖으로 수정하려 "
+            "하면, 제약 위반으로 거부된다"
         )
 
     @override
@@ -228,8 +228,8 @@ class AUserGrantedNothingMayNotEdit(
     @override
     def describe(self) -> str:
         return (
-            f"같은 {self.family.kind}이 있고 아무 권한도 받지 않은 사용자가 고치려 하면, "
-            "고치기 문에 닿기 전에 이름을 해석할 수 없다는 이유로 거부된다"
+            f"같은 {self.family.kind}이 있고 아무 권한도 없는 사용자가 수정하려 하면, "
+            "수정 로직에 이르기 전에 정책을 찾을 수 없다는 이유로 거부된다"
         )
 
     @override
@@ -258,8 +258,8 @@ class ANameNothingAnswersToIsUnresolvable(
     @override
     def describe(self) -> str:
         return (
-            f"슈퍼관리자가 어느 {self.family.kind}도 갖지 않은 이름을 고치려 하면, "
-            "이름을 해석할 수 없다는 이유로 거부된다"
+            f"슈퍼관리자가 어느 {self.family.kind}에도 없는 이름을 수정하려 하면, "
+            "정책을 찾을 수 없다는 이유로 거부된다"
         )
 
     @override
