@@ -1,6 +1,6 @@
-"""여러 id로 읽기 — 훑기를 id 조건으로 부르므로 문이 훑기와 같다.
+"""여러 id로 조회 — 검색을 id 조건으로 호출하므로 권한 경로가 검색과 같다.
 
-인증만 보므로 거부 원소는 생기지 않는다. 없는 id만 빈 자리로 온다.
+인증만 확인하므로 거부 원소는 생기지 않는다. 없는 id만 빈 항목으로 반환된다.
 """
 
 from __future__ import annotations
@@ -38,7 +38,7 @@ type LoadingStep = Scenario[
 class LoadingTheLaidAndOneUnknown(
     When[ManyPresetsAndACaller, PrometheusQueryPresetAdapter, Loaded]
 ):
-    """심은 것들의 id 뒤에 아무것도 갖지 않은 id 하나를 붙여 한 번에 읽는다."""
+    """미리 만들어 둔 프리셋들의 id 뒤에 존재하지 않는 id 하나를 붙여 한 번에 조회한다."""
 
     @override
     def operation(self) -> str:
@@ -46,7 +46,7 @@ class LoadingTheLaidAndOneUnknown(
 
     @override
     def describe(self, laid: ManyPresetsAndACaller) -> str:
-        return f"{laid.caller.username}이 심은 정의 {len(laid.laid)}개의 id와 없는 id 하나를 한 번에 조회"
+        return f"{laid.caller.username}이 미리 만들어 둔 프리셋 {len(laid.laid)}개의 id와 없는 id 하나를 한 번에 조회"
 
     @override
     async def call(
@@ -59,7 +59,7 @@ class LoadingTheLaidAndOneUnknown(
 
 @dataclass(frozen=True)
 class LoadingNothing(When[ManyPresetsAndACaller, PrometheusQueryPresetAdapter, Loaded]):
-    """빈 id 목록으로 읽는다."""
+    """빈 id 목록으로 조회한다."""
 
     @override
     def operation(self) -> str:
@@ -88,8 +88,8 @@ class TheLaidAndTheUnknownComeBackInOrder(
     @override
     def describe(self) -> str:
         return (
-            "정의 둘과 없는 id 하나를 섞어 한 번에 읽으면, 있는 둘은 노드로 없는 하나는 "
-            "빈 자리로 오고 순서가 준 순서와 같다"
+            "프리셋 둘과 없는 id 하나를 섞어 한 번에 조회하면, 있는 둘은 노드로 없는 하나는 "
+            "빈 항목으로 반환되고 순서가 요청한 순서와 같다"
         )
 
     @override
@@ -115,7 +115,7 @@ class AnEmptyListAnswersNothing(
 
     @override
     def describe(self) -> str:
-        return "정의가 있어도 빈 id 목록으로 읽으면, 빈 답이 온다"
+        return "프리셋이 있어도 빈 id 목록으로 조회하면, 빈 응답이 반환된다"
 
     @override
     def given(self) -> Given[SeedingSession, ManyPresetsAndACaller]:
