@@ -174,7 +174,7 @@ Given
 
 When
 
-- PrometheusQueryPresetCategoryAdapter.batch_load_by_ids — user-1이 심은 2개의 id와 없는 id 하나를 한 번에 조회
+- PrometheusQueryPresetCategoryAdapter.batch_load_by_ids — user-1이 심은 분류 2개의 id와 없는 id 하나를 한 번에 조회
 
 Then
 
@@ -183,6 +183,104 @@ Then
   - [0]: 1번째로 준 id의 분류 전체와 같다
   - [1]: 2번째로 준 id의 분류 전체와 같다
   - [2] = None
+
+### purging
+
+#### [a-user-granted-nothing-may-not-remove-a-category](/tests/scenario/bai_scenario/manager/prometheus_query_preset_category/test_purging.py) — pass
+
+같은 분류가 있고 아무 권한도 받지 않은 사용자가 지우면, 권한 부족으로 거부된다
+
+Given
+
+- 이미 있는 분류 하나와, user 한 명
+  - 분류 category-1
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+
+When
+
+- PrometheusQueryPresetCategoryAdapter.delete — user-1이 category-1를 지움
+
+Then
+
+- 거부된다
+  - 거부: NotEnoughPermission
+
+#### [removing-an-id-nothing-answers-to-is-not-found-for-a-superadmin](/tests/scenario/bai_scenario/manager/prometheus_query_preset_category/test_purging.py) — pass
+
+슈퍼관리자가 아무것도 갖지 않은 id를 지우면, 대상이 없다는 것으로 거부된다
+
+Given
+
+- 이미 있는 분류 하나와, superadmin 한 명
+  - 분류 category-1
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+
+When
+
+- PrometheusQueryPresetCategoryAdapter.delete — user-1이 아무것도 갖지 않은 id를 지움
+
+Then
+
+- 거부된다
+  - 거부: EntityNotFoundError
+
+#### [the-superadmin-removes-a-category](/tests/scenario/bai_scenario/manager/prometheus_query_preset_category/test_purging.py) — pass
+
+분류 하나가 있고 슈퍼관리자가 지우면, 지운 id를 실은 답이 온다
+
+Given
+
+- 이미 있는 분류 하나와, superadmin 한 명
+  - 분류 category-1
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+
+When
+
+- PrometheusQueryPresetCategoryAdapter.delete — user-1이 category-1를 지움
+
+Then
+
+- 지운 분류를 답한다
+  - id: 심은 분류와 같다
+
+#### [turning-enforcement-off-lets-a-user-remove-a-category](/tests/scenario/bai_scenario/manager/prometheus_query_preset_category/test_purging.py) — pass
+
+엔티티 권한 집행을 끄면 아무 권한도 받지 않은 사용자도 분류를 지운다. 이 문은 역할이 아니라 권한 그래프가 지키기 때문이다
+
+Given
+
+- 이미 있는 분류 하나와, user 한 명
+  - 분류 category-1
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+
+When
+
+- PrometheusQueryPresetCategoryAdapter.delete — user-1이 category-1를 지움
+
+Then
+
+- 지운 분류를 답한다
+  - id: 심은 분류와 같다
 
 ### reading
 
@@ -197,7 +295,7 @@ Given
 
 When
 
-- PrometheusQueryPresetCategoryAdapter.get — 아무도 아닌 채로 category-1을 조회
+- PrometheusQueryPresetCategoryAdapter.get — 사용자 컨텍스트 없이 category-1을 조회
 
 Then
 
@@ -256,104 +354,6 @@ Then
 - 거부된다
   - 거부: EntityNotFoundError
 
-### retiring
-
-#### [a-user-granted-nothing-may-not-remove-a-category](/tests/scenario/bai_scenario/manager/prometheus_query_preset_category/test_retiring.py) — pass
-
-같은 분류가 있고 아무 권한도 받지 않은 사용자가 지우면, 권한 부족으로 거부된다
-
-Given
-
-- 이미 있는 분류 하나와, user 한 명
-  - 분류 category-1
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-
-When
-
-- PrometheusQueryPresetCategoryAdapter.delete — user-1이 category-1를 지움
-
-Then
-
-- 거부된다
-  - 거부: NotEnoughPermission
-
-#### [removing-an-id-nothing-answers-to-is-not-found-for-a-superadmin](/tests/scenario/bai_scenario/manager/prometheus_query_preset_category/test_retiring.py) — pass
-
-슈퍼관리자가 아무것도 갖지 않은 id를 지우면, 대상이 없다는 것으로 거부된다
-
-Given
-
-- 이미 있는 분류 하나와, superadmin 한 명
-  - 분류 category-1
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-
-When
-
-- PrometheusQueryPresetCategoryAdapter.delete — user-1이 아무것도 갖지 않은 id를 지움
-
-Then
-
-- 거부된다
-  - 거부: EntityNotFoundError
-
-#### [the-superadmin-removes-a-category](/tests/scenario/bai_scenario/manager/prometheus_query_preset_category/test_retiring.py) — pass
-
-분류 하나가 있고 슈퍼관리자가 지우면, 지운 id를 실은 답이 온다
-
-Given
-
-- 이미 있는 분류 하나와, superadmin 한 명
-  - 분류 category-1
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-
-When
-
-- PrometheusQueryPresetCategoryAdapter.delete — user-1이 category-1를 지움
-
-Then
-
-- 지운 분류를 답한다
-  - id: 심은 분류와 같다
-
-#### [turning-enforcement-off-lets-a-user-remove-a-category](/tests/scenario/bai_scenario/manager/prometheus_query_preset_category/test_retiring.py) — pass
-
-엔티티 권한 집행을 끄면 아무 권한도 받지 않은 사용자도 분류를 지운다. 이 문은 역할이 아니라 권한 그래프가 지키기 때문이다
-
-Given
-
-- 이미 있는 분류 하나와, user 한 명
-  - 분류 category-1
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-
-When
-
-- PrometheusQueryPresetCategoryAdapter.delete — user-1이 category-1를 지움
-
-Then
-
-- 지운 분류를 답한다
-  - id: 심은 분류와 같다
-
 ### searching
 
 #### [a-call-carrying-no-user-may-not-search-categories](/tests/scenario/bai_scenario/manager/prometheus_query_preset_category/test_searching.py) — pass
@@ -367,7 +367,7 @@ Given
 
 When
 
-- PrometheusQueryPresetCategoryAdapter.search — 아무도 아닌 채로 전체 조회
+- PrometheusQueryPresetCategoryAdapter.search — 사용자 컨텍스트 없이 전체 조회
 
 Then
 
