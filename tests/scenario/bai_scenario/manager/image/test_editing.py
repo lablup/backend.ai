@@ -27,14 +27,9 @@ from ai.backend.manager.errors.auth import InsufficientPrivilege
 from ai.backend.manager.errors.image import ImageNotFound
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import (
-    Answered,
     Given,
-    Refused,
-    Same,
     Scenario,
-    Skipped,
     Then,
-    Verdict,
     When,
 )
 
@@ -78,59 +73,6 @@ class Editing(When[AnImageAndACaller, ImageAdapter, ImageNode]):
 
 
 @dataclass(frozen=True)
-class TheTagIsTheOnlyChange(Then[AnImageAndACaller, ImageNode]):
-    """태그만 새 값이 되고 나머지는 그대로다."""
-
-    tag: str
-
-    @override
-    def says(self) -> str:
-        return "태그만 새 값이고 나머지는 그대로다"
-
-    @override
-    def look(self, laid: AnImageAndACaller, answered: Answered[ImageNode]) -> list[Verdict]:
-        node = answered.response
-        if node is None:
-            return [
-                Refused(type(answered.raised) if answered.raised else Exception, answered.raised)
-            ]
-        return [
-            Same("name", node.name, laid.image.name),
-            Same("registry", node.registry, laid.image.registry),
-            Same("architecture", node.architecture, laid.image.architecture),
-            Same("tag", node.tag, self.tag),
-            Same("status", node.status, laid.image.status),
-            Same("is_local", node.is_local, laid.image.is_local),
-            Skipped("id", "데이터베이스가 만든다"),
-            Skipped("last_used_at", "세션이 쓰는 값이라 이 실행이 말할 수 없다"),
-        ]
-
-
-@dataclass(frozen=True)
-class NoAcceleratorsAreLeft(Then[AnImageAndACaller, ImageNode]):
-    """가속기 자리가 빈 채로 온다."""
-
-    @override
-    def says(self) -> str:
-        return "가속기 자리가 비어 있다"
-
-    @override
-    def look(self, laid: AnImageAndACaller, answered: Answered[ImageNode]) -> list[Verdict]:
-        node = answered.response
-        if node is None:
-            return [
-                Refused(type(answered.raised) if answered.raised else Exception, answered.raised)
-            ]
-        return [
-            Same("name", node.name, laid.image.name),
-            Same("accelerators", node.accelerators, None),
-            Same("tag", node.tag, laid.image.tag),
-            Skipped("id", "데이터베이스가 만든다"),
-            Skipped("last_used_at", "세션이 쓰는 값이라 이 실행이 말할 수 없다"),
-        ]
-
-
-@dataclass(frozen=True)
 class ChangingOnlyTheTag(Scenario[SeedingSession, AnImageAndACaller, ImageAdapter, ImageNode]):
     @override
     def summary(self) -> str:
@@ -150,7 +92,7 @@ class ChangingOnlyTheTag(Scenario[SeedingSession, AnImageAndACaller, ImageAdapte
 
     @override
     def then(self) -> Then[AnImageAndACaller, ImageNode]:
-        return TheTagIsTheOnlyChange(tag=A_NEW_TAG)
+        return TheImageNode(tag=A_NEW_TAG)
 
 
 @dataclass(frozen=True)
@@ -203,7 +145,7 @@ class ClearingTheAcceleratorList(
 
     @override
     def then(self) -> Then[AnImageAndACaller, ImageNode]:
-        return NoAcceleratorsAreLeft()
+        return TheImageNode()
 
 
 @dataclass(frozen=True)
