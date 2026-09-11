@@ -469,10 +469,15 @@ class OpsRepository[TData]:
             return await w.atomic_upsert_global_entities(upserters)
 
     async def atomic_upsert_entities(
-        self, upserters: Sequence[EntityUpserter[Any, TData]]
+        self,
+        upserters: Sequence[EntityUpserter[Any, TData]],
+        scopes: Sequence[OperationScope] = (),
     ) -> list[TData]:
+        """Insert or update every row atomically. ``scopes`` are existence-checked first,
+        so an owner nothing answers to is refused with the scope's own error rather than
+        found missing from the graph after the row is in."""
         async with self._ops.write_ops() as w:
-            return await w.atomic_upsert_entities(upserters)
+            return await w.atomic_upsert_entities(upserters, scopes)
 
     async def upsert_field_entity[TFieldData: FieldData](
         self, owner_id: Any, upserter: FieldUpserter[Any, Any, TFieldData]

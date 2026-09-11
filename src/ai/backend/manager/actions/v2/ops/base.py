@@ -518,6 +518,13 @@ class EntityAtomicUpsertOpsAction[TRow: Base, TData](OpsBackendAction):
         """Return one upsert spec per row this action writes."""
         raise NotImplementedError
 
+    def operation_scopes(self) -> Sequence[OperationScope]:
+        """The scopes the rows are written in, existence-checked before the write.
+
+        Empty unless the owner has no foreign key to refuse a missing one for the row.
+        """
+        return ()
+
 
 class FieldUpsertOpsAction[TOwnerID: OwnerEntityID, TRow: Base, TData: FieldData](OpsBackendAction):
     """A create-or-update of a field row under its owner's settled identifier."""
