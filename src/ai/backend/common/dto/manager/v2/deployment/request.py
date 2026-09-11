@@ -6,10 +6,10 @@ from __future__ import annotations
 
 from datetime import datetime
 from decimal import Decimal
-from typing import Annotated, Any
+from typing import Any
 from uuid import UUID
 
-from pydantic import Field, field_validator
+from pydantic import Field, NonNegativeInt, field_validator
 
 from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.config import (
@@ -528,7 +528,7 @@ class UpdateDeploymentInput(BaseRequestModel):
     name: str | None | Unset = Field(
         default=UNSET, description="Updated deployment name. Omit to leave unchanged."
     )
-    replica_count: Annotated[int, Field(ge=0)] | None | Unset = Field(
+    replica_count: NonNegativeInt | None | Unset = Field(
         default=UNSET, description="Updated replica count. Omit to leave unchanged."
     )
     tags: list[str] | None | Unset = Field(
