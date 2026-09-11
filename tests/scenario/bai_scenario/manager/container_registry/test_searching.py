@@ -160,7 +160,7 @@ class OnePageComesBack(Then[ManyRegistriesAndACaller, Searched]):
 
 
 @dataclass(frozen=True)
-class EveryRegistryIsCounted(
+class SearchingWithoutAFilterCountsEvery(
     Scenario[SeedingSession, ManyRegistriesAndACaller, ContainerRegistryAdapter, Searched]
 ):
     @override
@@ -262,7 +262,7 @@ class APlainUserMayNotSearch(
 
 
 SCENARIOS: list[SearchingStep] = [
-    EveryRegistryIsCounted(),
+    SearchingWithoutAFilterCountsEvery(),
     ANameNarrowsTheSearch(),
     ThePageSizeDefaultsToTen(),
     APlainUserMayNotSearch(),

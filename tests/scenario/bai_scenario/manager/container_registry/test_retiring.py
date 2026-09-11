@@ -87,7 +87,7 @@ class TheDeletedIdComesBack(Then[ARegistryAndACaller, Deleted]):
 
 
 @dataclass(frozen=True)
-class TheRegistryIsGone(
+class DeletingAnswersWithTheRemovedId(
     Scenario[SeedingSession, ARegistryAndACaller, ContainerRegistryAdapter, Deleted]
 ):
     @override
@@ -112,7 +112,7 @@ class TheRegistryIsGone(
 
 
 @dataclass(frozen=True)
-class ALinkedRegistryGoesToo(
+class DeletingTakesTheLinkWithIt(
     Scenario[SeedingSession, ARegistryAndACaller, ContainerRegistryAdapter, Deleted]
 ):
     @override
@@ -187,8 +187,8 @@ class APlainUserMayNotDelete(
 
 
 SCENARIOS: list[RetiringStep] = [
-    TheRegistryIsGone(),
-    ALinkedRegistryGoesToo(),
+    DeletingAnswersWithTheRemovedId(),
+    DeletingTakesTheLinkWithIt(),
     AnIdThatHoldsNothingIsRefused(),
     APlainUserMayNotDelete(),
 ]

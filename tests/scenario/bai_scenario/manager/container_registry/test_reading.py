@@ -116,7 +116,7 @@ class NothingIsAsked(Then[ManyRegistriesAndACaller, Loaded]):
 
 
 @dataclass(frozen=True)
-class MissingIdsLeaveHoles(
+class LoadingKeepsTheOrderAndLeavesHoles(
     Scenario[SeedingSession, ManyRegistriesAndACaller, ContainerRegistryAdapter, Loaded]
 ):
     @override
@@ -197,7 +197,7 @@ class APlainUserIsRefusedWholesale(
 
 
 SCENARIOS: list[ReadingStep] = [
-    MissingIdsLeaveHoles(),
+    LoadingKeepsTheOrderAndLeavesHoles(),
     AnEmptyListAsksNothing(),
     APlainUserIsRefusedWholesale(),
 ]

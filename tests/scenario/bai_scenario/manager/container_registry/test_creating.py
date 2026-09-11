@@ -77,7 +77,7 @@ class Creating(When[Any, ContainerRegistryAdapter, ContainerRegistryNode]):
 
 
 @dataclass(frozen=True)
-class OnlyTheRequiredValues(
+class CreatingWithOnlyTheRequiredValues(
     Scenario[SeedingSession, ACallerWithNoRegistry, ContainerRegistryAdapter, ContainerRegistryNode]
 ):
     @override
@@ -105,7 +105,7 @@ class OnlyTheRequiredValues(
 
 
 @dataclass(frozen=True)
-class ThePasswordDoesNotComeBack(
+class CreatingWithAPasswordHidesIt(
     Scenario[SeedingSession, ACallerWithNoRegistry, ContainerRegistryAdapter, ContainerRegistryNode]
 ):
     @override
@@ -133,7 +133,7 @@ class ThePasswordDoesNotComeBack(
 
 
 @dataclass(frozen=True)
-class AnAddressTheUpdateWouldRefuse(
+class CreatingTakesAnAddressTheUpdateWouldRefuse(
     Scenario[SeedingSession, ACallerWithNoRegistry, ContainerRegistryAdapter, ContainerRegistryNode]
 ):
     @override
@@ -284,9 +284,9 @@ class EnforcementOffChangesNothing(
 
 
 SCENARIOS: list[CreatingStep] = [
-    OnlyTheRequiredValues(),
-    ThePasswordDoesNotComeBack(),
-    AnAddressTheUpdateWouldRefuse(),
+    CreatingWithOnlyTheRequiredValues(),
+    CreatingWithAPasswordHidesIt(),
+    CreatingTakesAnAddressTheUpdateWouldRefuse(),
     AllowingAProjectWhileCreating(),
     AProjectThatIsNotThereIsRefused(),
     APlainUserMayNotCreate(),
