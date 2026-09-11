@@ -14,14 +14,10 @@ import sqlalchemy as sa
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
 from ai.backend.client.v2.v2_registry import V2ClientRegistry
-from ai.backend.common.data.permission.types import RBACElementType
+from ai.backend.common.data.entity.project import ProjectEntityType
 from ai.backend.common.dto.manager.v2.group.request import PurgeProjectInput
 from ai.backend.manager.data.permission.status import RoleStatus
-from ai.backend.manager.data.permission.types import (
-    EntityType,
-    Permission,
-    ScopeType,
-)
+from ai.backend.manager.data.permission.types import Permission
 from ai.backend.manager.models.project.row import ProjectRow
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.rbac_models.role import RoleRow
@@ -63,7 +59,7 @@ async def project_with_rbac_rows(
         await conn.execute(
             sa.insert(VirtualEntityRow.__table__).values(
                 id=virtual_entity_id,
-                entity_type=ScopeType.PROJECT,
+                entity_type=ProjectEntityType(),
                 entity_id=project_id,
             )
         )
@@ -87,14 +83,14 @@ async def project_with_rbac_rows(
                     "id": admin_role_id,
                     "name": f"project-{scope_id[:8]}-admin",
                     "status": RoleStatus.ACTIVE,
-                    "scope_type": ScopeType.PROJECT.value,
+                    "scope_type": ProjectEntityType(),
                     "scope_id": project_id,
                 },
                 {
                     "id": member_role_id,
                     "name": f"project-{scope_id[:8]}-member",
                     "status": RoleStatus.ACTIVE,
-                    "scope_type": ScopeType.PROJECT.value,
+                    "scope_type": ProjectEntityType(),
                     "scope_id": project_id,
                 },
             ])
@@ -104,12 +100,12 @@ async def project_with_rbac_rows(
             sa.insert(PermissionRow.__table__).values([
                 {
                     "role_id": admin_role_id,
-                    "entity_type": EntityType.PROJECT,
+                    "entity_type": ProjectEntityType(),
                     "permission": Permission.UPDATE,
                 },
                 {
                     "role_id": member_role_id,
-                    "entity_type": EntityType.PROJECT,
+                    "entity_type": ProjectEntityType(),
                     "permission": Permission.READ,
                 },
             ])
@@ -131,7 +127,7 @@ async def project_with_rbac_rows(
         )
         await conn.execute(
             VirtualEntityRow.__table__.delete().where(
-                VirtualEntityRow.__table__.c.entity_type == ScopeType.PROJECT,
+                VirtualEntityRow.__table__.c.entity_type == ProjectEntityType(),
                 VirtualEntityRow.__table__.c.entity_id == project_id,
             )
         )
@@ -166,7 +162,7 @@ class TestProjectPurgeRBACCleanup:
                 .select_from(PermissionRow)
                 .join(RoleRow, RoleRow.id == PermissionRow.role_id)
                 .where(
-                    RoleRow.scope_type == RBACElementType.PROJECT,
+                    RoleRow.scope_type == ProjectEntityType(),
                     RoleRow.scope_id == project_id,
                 )
             )

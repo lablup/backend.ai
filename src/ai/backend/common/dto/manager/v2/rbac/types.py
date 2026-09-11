@@ -7,10 +7,10 @@ from __future__ import annotations
 from enum import StrEnum
 from uuid import UUID
 
-from ai.backend.common.api_handlers import BaseRequestModel, BaseResponseModel
+from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.data.entity.types import EntityType
 from ai.backend.common.data.permission.types import (
-    OperationType,
+    Permission,
     RoleSource,
     RoleStatus,
 )
@@ -19,12 +19,10 @@ from ai.backend.common.dto.manager.v2.common import OrderDirection
 __all__ = (
     "EntityType",
     "EntityTypeScope",
-    "OperationType",
-    "OperationTypeDTO",
-    "OperationTypeFilter",
     "OrderDirection",
+    "PermissionBitDTO",
+    "PermissionBitFilter",
     "PermissionOrderField",
-    "PermissionSummary",
     "RoleAssignmentOrderField",
     "RoleOrderField",
     "RoleSource",
@@ -53,21 +51,6 @@ class RoleStatusDTO(StrEnum):
     DELETED = "deleted"
 
 
-class OperationTypeDTO(StrEnum):
-    """RBAC operation type enum for DTO layer."""
-
-    CREATE = "create"
-    READ = "read"
-    UPDATE = "update"
-    SOFT_DELETE = "soft-delete"
-    HARD_DELETE = "hard-delete"
-    GRANT_ALL = "grant:all"
-    GRANT_READ = "grant:read"
-    GRANT_UPDATE = "grant:update"
-    GRANT_SOFT_DELETE = "grant:soft-delete"
-    GRANT_HARD_DELETE = "grant:hard-delete"
-
-
 class PermissionBitDTO(StrEnum):
     """One bit of the permission mask.
 
@@ -80,6 +63,18 @@ class PermissionBitDTO(StrEnum):
     CREATE = "create"
     SOFT_DELETE = "soft_delete"
     HARD_DELETE = "hard_delete"
+
+    @classmethod
+    def of(cls, permission: Permission) -> PermissionBitDTO:
+        """The name of a single permission bit."""
+        for bit in cls:
+            if permission is Permission[bit.name]:
+                return bit
+        raise ValueError(f"{permission!r} is not a single permission bit")
+
+    def to_permission(self) -> Permission:
+        """The bit this names, as a permission row records it."""
+        return Permission[self.name]
 
 
 class RoleOrderField(StrEnum):
@@ -123,13 +118,13 @@ class RoleStatusFilter(BaseRequestModel):
     not_in: list[str] | None = None
 
 
-class OperationTypeFilter(BaseRequestModel):
-    """Filter for permission operation columns over ``OperationTypeDTO``."""
+class PermissionBitFilter(BaseRequestModel):
+    """Filter for a permission-bit column over ``PermissionBitDTO``."""
 
-    equals: OperationTypeDTO | None = None
-    in_: list[OperationTypeDTO] | None = None
-    not_equals: OperationTypeDTO | None = None
-    not_in: list[OperationTypeDTO] | None = None
+    equals: PermissionBitDTO | None = None
+    in_: list[PermissionBitDTO] | None = None
+    not_equals: PermissionBitDTO | None = None
+    not_in: list[PermissionBitDTO] | None = None
 
 
 class ScopeInputDTO(BaseRequestModel):
@@ -155,10 +150,3 @@ class UUIDScope(BaseRequestModel):
     """
 
     value: UUID
-
-
-class PermissionSummary(BaseResponseModel):
-    """Compact permission view for embedding inside RoleNode."""
-
-    entity_type: EntityType
-    operation: OperationType

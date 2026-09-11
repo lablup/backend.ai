@@ -7,13 +7,13 @@ from uuid import UUID
 import sqlalchemy as sa
 
 from ai.backend.common.data.entity.idle_checker import IdleCheckerAssignmentID, IdleCheckerID
+from ai.backend.common.data.entity.types import EntityType
 from ai.backend.common.data.filter_specs import (
     StringMatchSpec,
     UUIDEqualMatchSpec,
     UUIDInMatchSpec,
 )
 from ai.backend.common.data.idle_checker.types import CheckerType, IdleCheckPhase
-from ai.backend.common.data.permission.types import ScopeType
 from ai.backend.common.types import SessionId
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.condition_utils import make_string_in_factory
@@ -191,14 +191,14 @@ class IdleCheckerAssignmentConditions:
         return inner
 
     @staticmethod
-    def by_scope_type_equals(scope_type: ScopeType) -> QueryCondition:
+    def by_scope_type_equals(scope_type: EntityType) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return IdleCheckerBindingRow.scope_type == scope_type
 
         return inner
 
     @staticmethod
-    def by_scope_type_in(scope_types: Collection[ScopeType]) -> QueryCondition:
+    def by_scope_type_in(scope_types: Collection[EntityType]) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return IdleCheckerBindingRow.scope_type.in_(scope_types)
 

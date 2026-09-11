@@ -14,8 +14,7 @@ from .permission import (
     EntityActionInfoGQL,
     EntityOperationCombinationGQL,
     OperationInfoGQL,
-    OperationTypeFilterGQL,
-    OperationTypeGQL,
+    PermissionBitFilterGQL,
     PermissionConnection,
     PermissionEdge,
     PermissionFilter,
@@ -64,12 +63,12 @@ from .role import (
     RoleUserNestedFilterGQL,
     UpdateRoleInput,
 )
-from .scope import ScopeInputGQL
+from .scope import PermissionBitGQL, ScopeInputGQL
 
 __all__ = [
     # Permission enums
-    "OperationTypeGQL",
-    "OperationTypeFilterGQL",
+    "PermissionBitGQL",
+    "PermissionBitFilterGQL",
     "PermissionOrderField",
     # Role enums
     "RoleSourceGQL",

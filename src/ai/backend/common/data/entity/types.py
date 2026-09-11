@@ -50,23 +50,27 @@ class EntityType(str):
         imports the ones it handles. What is left over is a type this build does not
         declare, and the bare base is what it is.
         """
-        for kind in cls._kinds():
+        for kind in cls.kinds():
             if kind.name() == name:
                 return kind()
         return EntityType(name)
 
     @classmethod
-    def _kinds(cls) -> Iterator[type[EntityType]]:
+    def kinds(cls) -> Iterator[type[EntityType]]:
+        """Every kind declared under this one, in whatever this build has imported."""
         for kind in cls.__subclasses__():
             yield kind
-            yield from kind._kinds()
+            yield from kind.kinds()
 
     @classmethod
     def __get_pydantic_core_schema__(cls, source: Any, handler: GetCoreSchemaHandler) -> CoreSchema:
         """Validated as the string it is; pydantic builds no schema for a `str`
-        subclass on its own. A kind accepts its own name alone."""
+        subclass on its own. A kind accepts its own name alone; the base answers with
+        the kind the name belongs to, so a value read here matches on kinds."""
         if cls is EntityType:
-            return core_schema.no_info_after_validator_function(cls, core_schema.str_schema())
+            return core_schema.no_info_after_validator_function(
+                cls.from_name, core_schema.str_schema()
+            )
         return core_schema.no_info_after_validator_function(
             lambda _: cls(), core_schema.literal_schema([cls.name()])
         )

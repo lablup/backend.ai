@@ -20,13 +20,13 @@ import pytest
 import sqlalchemy as sa
 
 from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.project import ProjectEntityType
 from ai.backend.common.dto.manager.v2.deployment_revision_preset.request import (
     SearchDeploymentRevisionPresetsInput,
 )
 from ai.backend.common.types import QuotaScopeID, QuotaScopeType, ResourceSlot, VFolderUsageMode
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.model_card.types import ResourceRequirementEntry
-from ai.backend.manager.data.permission.types import ScopeType
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.deployment_revision_preset.row import DeploymentRevisionPresetRow
@@ -231,7 +231,7 @@ class TestModelCardScanResourceRequirements:
                 allowed_vfolder_hosts={},
             )
             db_sess.add(group)
-            db_sess.add(VirtualEntityRow(entity_type=ScopeType.PROJECT.value, entity_id=group.id))
+            db_sess.add(VirtualEntityRow(entity_type=ProjectEntityType(), entity_id=group.id))
             await db_sess.flush()
         return group
 

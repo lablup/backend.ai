@@ -26,7 +26,6 @@ from ai.backend.common.dto.manager.user import (
     UserStatus,
 )
 from ai.backend.manager.data.permission.status import RoleStatus
-from ai.backend.manager.data.permission.types import ScopeType
 from ai.backend.manager.models.keypair import KeyPairRow, keypairs
 from ai.backend.manager.models.project import ProjectRow, ProjectType
 from ai.backend.manager.models.rbac_models.role import RoleRow
@@ -547,7 +546,7 @@ class TestUserCreateAutoAssignRoles:
             await conn.execute(
                 sa.insert(VirtualEntityRow.__table__).values(
                     id=virtual_entity_id,
-                    entity_type=ScopeType.PROJECT,
+                    entity_type=ProjectEntityType(),
                     entity_id=project_id,
                 )
             )
@@ -569,7 +568,7 @@ class TestUserCreateAutoAssignRoles:
         async with db_engine.begin() as conn:
             await conn.execute(
                 VirtualEntityRow.__table__.delete().where(
-                    VirtualEntityRow.__table__.c.entity_type == ScopeType.PROJECT,
+                    VirtualEntityRow.__table__.c.entity_type == ProjectEntityType(),
                     VirtualEntityRow.__table__.c.entity_id == project_id,
                 )
             )

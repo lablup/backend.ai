@@ -7,8 +7,10 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from ai.backend.common.data.entity.domain import DomainEntityType
+from ai.backend.common.data.entity.project import ProjectEntityType
 from ai.backend.common.data.entity.types import EntityType
-from ai.backend.common.data.permission.types import RBACElementType
+from ai.backend.common.data.entity.user import UserEntityType
 from ai.backend.common.dto.manager.v2.rbac import CreateRoleInput
 from ai.backend.common.dto.manager.v2.rbac.types import ScopeInputDTO
 from ai.backend.manager.api.adapters.rbac.adapter import RBACAdapter
@@ -25,24 +27,24 @@ class TestValidateScopeId:
 
     @pytest.mark.parametrize(
         "scope_type",
-        [RBACElementType.USER, RBACElementType.PROJECT, RBACElementType.DOMAIN],
+        [UserEntityType(), ProjectEntityType(), DomainEntityType()],
     )
     def test_rejects_email_as_scope_id(
         self,
         adapter: RBACAdapter,
-        scope_type: RBACElementType,
+        scope_type: EntityType,
     ) -> None:
         with pytest.raises(InvalidScope):
             adapter._validate_scope_id(scope_type, "alice@example.com")
 
     @pytest.mark.parametrize(
         "scope_type",
-        [RBACElementType.USER, RBACElementType.PROJECT, RBACElementType.DOMAIN],
+        [UserEntityType(), ProjectEntityType(), DomainEntityType()],
     )
     def test_accepts_valid_uuid_scope_id(
         self,
         adapter: RBACAdapter,
-        scope_type: RBACElementType,
+        scope_type: EntityType,
     ) -> None:
         adapter._validate_scope_id(scope_type, str(uuid.uuid4()))
 
@@ -51,7 +53,7 @@ class TestValidateScopeId:
         adapter: RBACAdapter,
     ) -> None:
         with pytest.raises(InvalidScope):
-            adapter._validate_scope_id(RBACElementType.DOMAIN, "default")
+            adapter._validate_scope_id(DomainEntityType(), "default")
 
 
 class TestCreateRoleScopeValidation:

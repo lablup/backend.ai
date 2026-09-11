@@ -41,18 +41,10 @@ from ai.backend.common.data.entity.types import (
     FieldIdentifier,
     FieldType,
 )
+from ai.backend.common.data.entity.vfolder import VFolderEntityType
 from ai.backend.manager.data.permission.scope_template import ScopeTemplateValue
 from ai.backend.manager.data.permission.status import RoleStatus
-from ai.backend.manager.data.permission.types import (
-    EntityType as LegacyEntityType,
-)
-from ai.backend.manager.data.permission.types import (
-    OperationType,
-    RoleSource,
-)
-from ai.backend.manager.data.permission.types import (
-    ScopeType as LegacyScopeType,
-)
+from ai.backend.manager.data.permission.types import Permission, RoleSource
 from ai.backend.manager.errors.base.entity import EntityNotFoundError
 from ai.backend.manager.errors.permission import VirtualEntityNotFound
 from ai.backend.manager.errors.repository import RepositoryIntegrityError
@@ -384,7 +376,7 @@ async def _add_presets(database: ExtendedAsyncSAEngine) -> None:
     async with database.begin_session() as sess:
         preset_row = RolePresetRow(
             name=_PRESET_NAME,
-            scope_type=LegacyScopeType.PROJECT,
+            scope_type=ProjectEntityType(),
             auto_assign=True,
             deleted=False,
         )
@@ -393,15 +385,15 @@ async def _add_presets(database: ExtendedAsyncSAEngine) -> None:
         sess.add(
             RolePermissionPresetRow(
                 role_preset_id=preset_row.id,
-                entity_type=LegacyEntityType.VFOLDER,
-                operation=OperationType.READ,
+                entity_type=VFolderEntityType(),
+                permission=Permission.READ,
             )
         )
         sess.add(
             RolePresetRow(
                 name="preset-templated",
                 role_name_template="{{ scope.name }}-member",
-                scope_type=LegacyScopeType.PROJECT,
+                scope_type=ProjectEntityType(),
                 auto_assign=False,
                 deleted=False,
             )
@@ -576,12 +568,12 @@ async def _scope_governs_role(
         return row is not None
 
 
-async def _role_permissions(database: ExtendedAsyncSAEngine, role_id: UUID) -> set[OperationType]:
+async def _role_permissions(database: ExtendedAsyncSAEngine, role_id: UUID) -> set[Permission]:
     async with database.begin_readonly_session() as sess:
         rows = await sess.scalars(
             sa.select(PermissionRow.permission).where(PermissionRow.role_id == role_id)
         )
-        return {permission.to_operation() for permission in rows.all()}
+        return set(rows.all())
 
 
 async def _row_count(database: ExtendedAsyncSAEngine) -> int:
@@ -710,7 +702,7 @@ class TestRoleManagedGlobalEntityCreate:
         assert role.source == RoleSource.SYSTEM
         assert role.status == RoleStatus.ACTIVE
         assert role.auto_assign is True
-        assert await _role_permissions(database, role.id) == {OperationType.READ}
+        assert await _role_permissions(database, role.id) == {Permission.READ}
 
     async def test_a_preset_role_is_governed_by_the_scope_that_provisioned_it(
         self,

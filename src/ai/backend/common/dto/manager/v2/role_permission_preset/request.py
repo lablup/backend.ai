@@ -8,7 +8,7 @@ from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.data.entity.role_permission_preset import RolePermissionPresetID
 from ai.backend.common.dto.manager.query import DateTimeFilter, StringFilter, UUIDFilter
 from ai.backend.common.dto.manager.v2.common import OrderDirection
-from ai.backend.common.dto.manager.v2.rbac.types import OperationTypeFilter
+from ai.backend.common.dto.manager.v2.rbac.types import PermissionBitFilter
 from ai.backend.common.dto.manager.v2.role_permission_preset.types import (
     RolePermissionPresetEntry,
     RolePermissionPresetOrderField,
@@ -53,8 +53,8 @@ class RolePermissionPresetFilter(BaseRequestModel):
     entity_type: StringFilter | None = Field(
         default=None, description="Filter by entity type the permission applies to."
     )
-    operation: OperationTypeFilter | None = Field(
-        default=None, description="Filter by granted operation."
+    permission: PermissionBitFilter | None = Field(
+        default=None, description="Filter by the operation bit granted."
     )
     created_at: DateTimeFilter | None = Field(
         default=None, description="Filter by creation timestamp."

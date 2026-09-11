@@ -13,7 +13,6 @@ from ai.backend.common.api_handlers import BaseResponseModel
 from ai.backend.common.data.entity.types import EntityType
 
 from .types import (
-    OperationTypeDTO,
     PermissionBitDTO,
     RoleSourceDTO,
     RoleStatusDTO,
@@ -152,7 +151,7 @@ class BulkAddRolePermissionFailureInfo(BaseResponseModel):
 
     role_id: UUID = Field(description="Role ID of the failed entry")
     entity_type: str = Field(description="Entity element type of the failed entry")
-    operation: str = Field(description="Operation type of the failed entry")
+    permission: PermissionBitDTO = Field(description="Operation bit of the failed entry")
     message: str = Field(description="Error message describing the failure")
 
 
@@ -168,7 +167,7 @@ class ReplaceRolePermissionFailureInfo(BaseResponseModel):
 
     role_id: UUID = Field(description="Role ID of the failed entry")
     entity_type: str = Field(description="Entity element type of the failed entry")
-    operation: str = Field(description="Operation type of the failed entry")
+    permission: PermissionBitDTO = Field(description="Operation bit of the failed entry")
     message: str = Field(description="Error message describing the failure")
 
 
@@ -216,10 +215,6 @@ class PermissionNode(BaseResponseModel):
     role_id: UUID = Field(description="Role this permission belongs to")
     entity_type: EntityType = Field(description="Entity element type")
     permission: PermissionBitDTO = Field(description="The permission bit the row holds")
-    operation: OperationTypeDTO = Field(
-        description="Deprecated: use `permission`. The same bit named as an action.",
-        deprecated=True,
-    )
     created_at: datetime = Field(description="Creation timestamp")
 
 
@@ -264,7 +259,7 @@ class OperationInfo(BaseResponseModel):
 
     operation: str = Field(description="Operation name")
     description: str = Field(description="Human-readable description")
-    required_permission: OperationTypeDTO = Field(description="Required RBAC permission")
+    required_permission: PermissionBitDTO = Field(description="The permission bit required")
 
 
 class EntityOperationCombinationInfo(BaseResponseModel):

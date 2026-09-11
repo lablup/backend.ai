@@ -2,7 +2,8 @@
 
 import pytest
 
-from ai.backend.common.data.permission.types import EntityType, OperationType, Permission
+from ai.backend.common.data.entity.types import EntityType
+from ai.backend.common.data.permission.types import Permission
 from ai.backend.common.exception import ErrorOperation
 from ai.backend.manager.actions.action.base import BaseAction
 from ai.backend.manager.actions.types import ActionOperationType
@@ -69,16 +70,16 @@ class TestActionOperationType:
     ) -> None:
         assert operation.to_error_operation() is expected
 
-    def test_to_permission_operation_mapping(self) -> None:
-        assert ActionOperationType.GET.to_permission_operation() == OperationType.READ
-        assert ActionOperationType.SEARCH.to_permission_operation() == OperationType.READ
-        assert ActionOperationType.LOOKUP.to_permission_operation() == OperationType.READ
-        assert ActionOperationType.CREATE.to_permission_operation() == OperationType.CREATE
-        assert ActionOperationType.UPDATE.to_permission_operation() == OperationType.UPDATE
-        assert ActionOperationType.UPSERT.to_permission_operation() == OperationType.CREATE
-        assert ActionOperationType.DELETE.to_permission_operation() == OperationType.SOFT_DELETE
-        assert ActionOperationType.PURGE.to_permission_operation() == OperationType.HARD_DELETE
-        assert ActionOperationType.RESTORE.to_permission_operation() == OperationType.SOFT_DELETE
+    def test_to_permission_bit_maps_every_operation(self) -> None:
+        assert ActionOperationType.GET.to_permission_bit() == Permission.READ
+        assert ActionOperationType.SEARCH.to_permission_bit() == Permission.READ
+        assert ActionOperationType.LOOKUP.to_permission_bit() == Permission.READ
+        assert ActionOperationType.CREATE.to_permission_bit() == Permission.CREATE
+        assert ActionOperationType.UPDATE.to_permission_bit() == Permission.UPDATE
+        assert ActionOperationType.UPSERT.to_permission_bit() == Permission.CREATE
+        assert ActionOperationType.DELETE.to_permission_bit() == Permission.SOFT_DELETE
+        assert ActionOperationType.PURGE.to_permission_bit() == Permission.HARD_DELETE
+        assert ActionOperationType.RESTORE.to_permission_bit() == Permission.SOFT_DELETE
 
     def test_to_permission_mapping(self) -> None:
         assert ActionOperationType.GET.to_permission() == Permission.READ
@@ -108,42 +109,6 @@ class TestActionOperationType:
 
     def test_is_str_subclass(self) -> None:
         for v in ActionOperationType:
-            assert isinstance(v, str)
-
-
-class TestEntityType:
-    def test_all_values_are_unique(self) -> None:
-        values = [v.value for v in EntityType]
-        assert len(values) == len(set(values))
-
-    def test_scope_types_returns_original_three(self) -> None:
-        scope_types = EntityType._scope_types()
-        assert scope_types == {EntityType.USER, EntityType.PROJECT, EntityType.DOMAIN}
-
-    def test_resource_types_returns_expected_set(self) -> None:
-        resource_types = EntityType._resource_types()
-        expected = {
-            EntityType.VFOLDER,
-            EntityType.IMAGE,
-            EntityType.SESSION,
-            EntityType.ARTIFACT,
-            EntityType.ARTIFACT_REGISTRY,
-            EntityType.APP_CONFIG_FRAGMENT,
-            EntityType.NOTIFICATION_CHANNEL,
-            EntityType.NOTIFICATION_RULE,
-            EntityType.MODEL_DEPLOYMENT,
-            EntityType.MODEL_CARD,
-        }
-        assert resource_types == expected
-        assert len(resource_types) == 10
-
-    def test_scope_and_resource_types_no_overlap(self) -> None:
-        scope_types = EntityType._scope_types()
-        resource_types = EntityType._resource_types()
-        assert scope_types.isdisjoint(resource_types)
-
-    def test_is_str_subclass(self) -> None:
-        for v in EntityType:
             assert isinstance(v, str)
 
 

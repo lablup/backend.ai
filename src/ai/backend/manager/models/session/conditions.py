@@ -20,8 +20,9 @@ if TYPE_CHECKING:
         UUIDInMatchSpec,
     )
 
-from ai.backend.common.data.entity.resource_group import ResourceGroupID
-from ai.backend.common.data.permission.types import ScopeType
+from ai.backend.common.data.entity.domain import DomainEntityType
+from ai.backend.common.data.entity.project import ProjectEntityType
+from ai.backend.common.data.entity.resource_group import ResourceGroupEntityType, ResourceGroupID
 from ai.backend.common.types import SessionId, SessionTypes
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.permission.id import ScopeId
@@ -65,9 +66,9 @@ class SessionConditions:
         candidates: Collection[tuple[ScopeId, Collection[SessionTypes]]],
     ) -> QueryCondition:
         scope_columns = {
-            ScopeType.RESOURCE_GROUP: SessionRow.resource_group_id,
-            ScopeType.PROJECT: SessionRow.group_id,
-            ScopeType.DOMAIN: SessionRow.domain_id,
+            ResourceGroupEntityType(): SessionRow.resource_group_id,
+            ProjectEntityType(): SessionRow.group_id,
+            DomainEntityType(): SessionRow.domain_id,
         }
         candidate_conditions = []
         for scope, target_session_types in candidates:

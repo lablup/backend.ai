@@ -8,7 +8,6 @@ from ai.backend.common.data.entity.app_config import AppConfigScopeID
 from ai.backend.common.data.entity.domain import DomainEntityType, DomainID
 from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.common.data.entity.user import UserEntityType, UserID
-from ai.backend.common.data.permission.types import RBACElementType, ScopeType
 from ai.backend.common.exception import UnreachableError
 
 __all__ = ("AppConfigScopeType",)
@@ -56,36 +55,6 @@ class AppConfigScopeType(enum.StrEnum):
                 return DomainID(scope_id)
             case AppConfigScopeType.USER:
                 return UserID(scope_id)
-
-    def to_rbac_scope_type(self) -> ScopeType:
-        """The RBAC scope a write at this fragment scope acts on.
-
-        ``public`` is a system-wide write (``GLOBAL``); ``domain`` / ``user`` act at that
-        domain / user scope. This is why writing a fragment is not admin-only — an
-        allow-listed user may write their own ``user``-scope fragment.
-        """
-        match self:
-            case AppConfigScopeType.PUBLIC:
-                return ScopeType.GLOBAL
-            case AppConfigScopeType.DOMAIN:
-                return ScopeType.DOMAIN
-            case AppConfigScopeType.USER:
-                return ScopeType.USER
-
-    def to_rbac_element_type(self) -> RBACElementType | None:
-        """The RBAC scope element a fragment at this scope belongs to.
-
-        ``public`` maps to the global scope, which has no RBAC scope element — a public
-        fragment is *global-scoped* (no scope association; superadmin-only writes), so it
-        returns ``None``.
-        """
-        match self:
-            case AppConfigScopeType.PUBLIC:
-                return None
-            case AppConfigScopeType.DOMAIN:
-                return RBACElementType.DOMAIN
-            case AppConfigScopeType.USER:
-                return RBACElementType.USER
 
     def to_rbac_scope_id(self, scope_id: AppConfigScopeID | None) -> str:
         """The RBAC scope id for a write at this fragment scope, in RBAC's string form.
