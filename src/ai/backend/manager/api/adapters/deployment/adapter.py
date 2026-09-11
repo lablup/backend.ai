@@ -151,6 +151,7 @@ from ai.backend.common.dto.manager.v2.resource_slot.types import (
 )
 from ai.backend.common.model_service_start_command_compat import to_legacy_start_command
 from ai.backend.common.schema.deployment import BlueGreenSpec, RollingUpdateSpec
+from ai.backend.common.tristate.unset import Unset
 from ai.backend.manager.api.adapter_options.deployment.options import (
     deployment_options_from_input,
     deployment_options_to_info,
@@ -789,7 +790,7 @@ class DeploymentAdapter(BaseAdapter):
         updater = DeploymentUpdater(
             deployment_id=deployment_id,
             name=OptionalState.from_unset(input.name),
-            tag=TriState.from_unset(input.tags).map(lambda tags: ",".join(tags)),
+            tag=self._convert_tag_state(input.tags),
             replica_count=OptionalState.from_unset(input.replica_count),
             open_to_public=OptionalState.from_unset(input.open_to_public),
         )
@@ -2174,6 +2175,14 @@ class DeploymentAdapter(BaseAdapter):
                 if sub_conditions:
                     conditions.append(negate_conditions(sub_conditions))
         return conditions
+
+    @staticmethod
+    def _convert_tag_state(tags: list[str] | None | Unset) -> TriState[str]:
+        if isinstance(tags, Unset):
+            return TriState.nop()
+        if tags is None:
+            return TriState.nullify()
+        return TriState.update(",".join(tags))
 
     # ------------------------------------------------------------------
     # Order converters
