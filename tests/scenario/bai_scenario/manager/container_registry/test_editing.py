@@ -82,7 +82,7 @@ class Editing(When[ARegistryAndACaller, ContainerRegistryAdapter, ContainerRegis
 
 
 @dataclass(frozen=True)
-class TheAddressIsTheOnlyChange(
+class ChangingOnlyTheAddress(
     Scenario[SeedingSession, ARegistryAndACaller, ContainerRegistryAdapter, ContainerRegistryNode]
 ):
     @override
@@ -238,7 +238,7 @@ class APlainUserMayNotEdit(
 
 
 SCENARIOS: list[EditingStep] = [
-    TheAddressIsTheOnlyChange(),
+    ChangingOnlyTheAddress(),
     AnEmptyEditChangesNothing(),
     AnAddressWithoutAHostIsRefused(),
     HarborWithoutAProjectIsRefused(),

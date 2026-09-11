@@ -86,7 +86,7 @@ class TheCallReturnsNothing(Then[ARegistryToAllowAndACaller, None]):
 
 
 @dataclass(frozen=True)
-class AProjectIsLinked(
+class LinkingWithBothScopesGranted(
     Scenario[SeedingSession, ARegistryToAllowAndACaller, ContainerRegistryAdapter, None]
 ):
     @override
@@ -142,7 +142,7 @@ class LinkingTwiceIsNotAnError(
 
 
 @dataclass(frozen=True)
-class ALinkedProjectIsRemoved(
+class RemovingALinkedProject(
     Scenario[SeedingSession, ARegistryToAllowAndACaller, ContainerRegistryAdapter, None]
 ):
     @override
@@ -280,9 +280,9 @@ class EnforcementOffOpensThisGate(
 
 
 SCENARIOS: list[AllowingStep] = [
-    AProjectIsLinked(),
+    LinkingWithBothScopesGranted(),
     LinkingTwiceIsNotAnError(),
-    ALinkedProjectIsRemoved(),
+    RemovingALinkedProject(),
     AProjectThatIsNotThereIsRefused(),
     RemovingWhatIsNotLinkedIsRefused(),
     OneScopeIsNotEnough(),
