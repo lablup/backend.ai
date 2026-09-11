@@ -138,7 +138,7 @@ from ai.backend.manager.models.session.orders import (
     resolve_order as resolve_session_order,
 )
 from ai.backend.manager.models.session.row import SessionRow
-from ai.backend.manager.models.session.scopes import ProjectSessionOperationScope
+from ai.backend.manager.models.session.searchers import SessionSearcher
 from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.repositories.base import BatchQuerier
@@ -172,10 +172,11 @@ from ai.backend.manager.services.session.actions.get_container_logs import (
 )
 from ai.backend.manager.services.session.actions.get_session import GetSessionAction
 from ai.backend.manager.services.session.actions.rename_session import RenameSessionAction
-from ai.backend.manager.services.session.actions.search import SearchSessionsAction
-from ai.backend.manager.services.session.actions.search_in_project import (
-    SearchSessionsInProjectAction,
+from ai.backend.manager.services.session.actions.scoped_search import (
+    ProjectSessionScopeItem,
+    ScopedSearchSessionsAction,
 )
+from ai.backend.manager.services.session.actions.search import SearchSessionsAction
 from ai.backend.manager.services.session.actions.search_kernel import SearchKernelsAction
 from ai.backend.manager.services.session.actions.shutdown_service import ShutdownServiceAction
 from ai.backend.manager.services.session.actions.start_service import StartServiceAction
@@ -698,15 +699,30 @@ class SessionAdapter(BaseAdapter):
 
     async def gql_search_by_project(
         self,
-        scope: ProjectSessionOperationScope,
+        project_id: ProjectID,
         input: AdminSearchSessionsInput,
     ) -> AdminSearchSessionsPayload:
         """Search sessions within a project, cursor-based pagination."""
-        conditions = self._convert_session_filter(input.filter) if input.filter else []
-        orders = self._convert_session_orders(input.order) if input.order else []
-        querier = self._build_querier(
-            conditions=conditions,
-            orders=orders,
+        action_result = await self._session.scoped_search.run(
+            ScopedSearchSessionsAction(
+                items=[ProjectSessionScopeItem(project_id=project_id)],
+                searcher=self._build_session_searcher(input),
+            )
+        )
+        return AdminSearchSessionsPayload(
+            items=await self._session_data_to_nodes([
+                item.to_session_data() for item in action_result.items
+            ]),
+            total_count=action_result.total_count,
+            has_next_page=action_result.has_next_page,
+            has_previous_page=action_result.has_previous_page,
+        )
+
+    def _build_session_searcher(self, input: AdminSearchSessionsInput) -> SessionSearcher:
+        return self._build_searcher(
+            SessionSearcher,
+            conditions=self._convert_session_filter(input.filter) if input.filter else [],
+            orders=self._convert_session_orders(input.order) if input.order else [],
             pagination_spec=_SESSION_PAGINATION_SPEC,
             first=input.first,
             after=input.after,
@@ -714,15 +730,6 @@ class SessionAdapter(BaseAdapter):
             before=input.before,
             limit=input.limit,
             offset=input.offset,
-        )
-        action_result = await self._session.search_sessions_in_project.run(
-            SearchSessionsInProjectAction(scope=scope, querier=querier)
-        )
-        return AdminSearchSessionsPayload(
-            items=await self._session_data_to_nodes(action_result.data),
-            total_count=action_result.total_count,
-            has_next_page=action_result.has_next_page,
-            has_previous_page=action_result.has_previous_page,
         )
 
     async def project_search(

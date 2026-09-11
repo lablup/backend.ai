@@ -6,6 +6,7 @@ import strawberry
 from strawberry import ID, Info
 
 from ai.backend.common.contexts.user import current_user
+from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.dto.manager.v2.session.request import (
     AdminSearchSessionsInput,
     TerminateSessionsInput,
@@ -117,10 +118,8 @@ async def project_sessions_v2(
     limit: int | None = None,
     offset: int | None = None,
 ) -> SessionV2ConnectionGQL | None:
-    from ai.backend.manager.models.session.scopes import ProjectSessionOperationScope
-
     payload = await info.context.adapters.session.gql_search_by_project(
-        scope=ProjectSessionOperationScope(project_id=scope.project_id),
+        project_id=ProjectID(scope.project_id),
         input=AdminSearchSessionsInput(
             filter=filter.to_pydantic() if filter else None,
             order=[o.to_pydantic() for o in order_by] if order_by else None,

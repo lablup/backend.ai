@@ -52,7 +52,6 @@ from ai.backend.manager.models.session import (
     SessionDependencyRow,
     SessionRow,
 )
-from ai.backend.manager.models.session.scopes import ProjectSessionOperationScope
 from ai.backend.manager.models.session.updaters import SessionUpdater
 from ai.backend.manager.models.session_template import SessionTemplateRow
 from ai.backend.manager.models.specs.pagination import NoPagination
@@ -618,40 +617,6 @@ class SessionDBSource:
                 db_sess,
                 query,
                 querier,
-            )
-
-            session_rows = [row.SessionRow for row in result.rows]
-            items = [row.to_dataclass() for row in session_rows]
-
-            return SessionListResult(
-                items=items,
-                total_count=result.total_count,
-                has_next_page=result.has_next_page,
-                has_previous_page=result.has_previous_page,
-            )
-
-    async def search_in_project(
-        self,
-        querier: BatchQuerier,
-        scope: ProjectSessionOperationScope,
-    ) -> SessionListResult:
-        """Search sessions scoped to a project.
-
-        Args:
-            querier: BatchQuerier for filtering, ordering, and pagination
-            scope: ProjectSessionOperationScope that filters by project and validates existence
-
-        Returns:
-            SessionListResult with items, total count, and pagination info
-        """
-        async with self._db.begin_readonly_session() as db_sess:
-            query = sa.select(SessionRow).options(selectinload(SessionRow.kernels))
-
-            result = await execute_batch_querier(
-                db_sess,
-                query,
-                querier,
-                scopes=[scope],
             )
 
             session_rows = [row.SessionRow for row in result.rows]
