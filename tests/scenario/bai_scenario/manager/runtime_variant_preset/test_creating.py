@@ -1,6 +1,6 @@
-"""preset 만들기 — 순위가 어떻게 매겨지고, 무엇이 겹치면 안 되며, 누가 만들 수 있는가.
+"""preset 생성 — 순위가 어떻게 매겨지고, 무엇이 중복되면 안 되며, 누가 생성할 수 있는가.
 
-flag를 args 아닌 대상에 두는 요청과 값 종류에 맞지 않는 기본값은 여기 없다. 만들 때는 요청
+flag를 args가 아닌 대상에 두는 요청과 값 종류에 맞지 않는 기본값은 여기 없다. 생성할 때는 요청
 타입이 막으므로 어댑터가 보장하는 것이 아니다.
 """
 
@@ -83,7 +83,7 @@ type CreatingStep = Scenario[
 
 @dataclass(frozen=True)
 class Creating(When[AVariantAndACaller, RuntimeVariantPresetAdapter, RuntimeVariantPresetNode]):
-    """심은 변형 아래 preset 하나를 만든다. 답이 실은 노드를 벗겨서 준다."""
+    """미리 만들어 둔 변형 아래 preset 하나를 생성한다. 응답에 담긴 노드를 꺼내서 준다."""
 
     named: str = MADE
     target: PresetTargetSpec = field(default_factory=lambda: ENV_STR)
@@ -95,7 +95,7 @@ class Creating(When[AVariantAndACaller, RuntimeVariantPresetAdapter, RuntimeVari
 
     @override
     def describe(self, laid: AVariantAndACaller) -> str:
-        return f"{laid.caller.username}이 {laid.variant.name}에 {self.named} preset을 만듦"
+        return f"{laid.caller.username}이 변형 {laid.variant.name}에 preset {self.named} 생성"
 
     @override
     async def call(
@@ -120,7 +120,7 @@ class Creating(When[AVariantAndACaller, RuntimeVariantPresetAdapter, RuntimeVari
 class CreatingBesideTheLaidOne(
     When[APresetAndACaller, RuntimeVariantPresetAdapter, RuntimeVariantPresetNode]
 ):
-    """이미 preset이 하나 있는 변형에 하나 더 만든다. 이름을 대지 않으면 심은 것과 같은 이름을 쓴다."""
+    """이미 preset이 하나 있는 변형에 하나 더 생성한다. 이름을 지정하지 않으면 미리 만들어 둔 것과 같은 이름을 쓴다."""
 
     named: str | None = MADE
 
@@ -130,7 +130,7 @@ class CreatingBesideTheLaidOne(
 
     @override
     def describe(self, laid: APresetAndACaller) -> str:
-        return f"{laid.caller.username}이 {laid.variant.name}에 {self.named or laid.preset.name} preset을 하나 더 만듦"
+        return f"{laid.caller.username}이 변형 {laid.variant.name}에 preset {self.named or laid.preset.name} 하나 더 생성"
 
     @override
     async def call(
@@ -153,7 +153,7 @@ class CreatingBesideTheLaidOne(
 class CreatingTheSameNameUnderTheOther(
     When[TwoVariantsAndAPreset, RuntimeVariantPresetAdapter, RuntimeVariantPresetNode]
 ):
-    """preset이 없는 쪽 변형에, 있는 쪽 preset과 같은 이름으로 만든다."""
+    """preset이 없는 쪽 변형에, 있는 쪽 preset과 같은 이름으로 생성한다."""
 
     @override
     def operation(self) -> str:
@@ -161,7 +161,7 @@ class CreatingTheSameNameUnderTheOther(
 
     @override
     def describe(self, laid: TwoVariantsAndAPreset) -> str:
-        return f"{laid.caller.username}이 {laid.other.name}에 {laid.preset.name} preset을 만듦"
+        return f"{laid.caller.username}이 변형 {laid.other.name}에 preset {laid.preset.name} 생성"
 
     @override
     async def call(
@@ -182,13 +182,13 @@ class CreatingTheSameNameUnderTheOther(
 
 @dataclass(frozen=True)
 class TheNextPresetNode(Then[APresetAndACaller, RuntimeVariantPresetNode]):
-    """같은 변형에 하나 더 만든 preset. 순위가 앞의 것보다 간격만큼 크다."""
+    """같은 변형에 하나 더 생성한 preset. 순위가 앞의 것보다 간격만큼 크다."""
 
     started: datetime
 
     @override
     def says(self) -> str:
-        return "순위가 앞의 것보다 간격만큼 큰 preset 전체가 온다"
+        return "순위가 앞의 것보다 간격만큼 큰 preset 전체가 반환된다"
 
     @override
     def look(
@@ -230,8 +230,8 @@ class TheFirstPresetIsRankedAHundred(
     @override
     def describe(self) -> str:
         return (
-            "preset이 없는 변형에 슈퍼관리자가 필수 항목만 주고 만들면, 순위는 백, 필수 여부는 거짓, "
-            "나머지 선택 항목은 빈 노드가 온다"
+            "preset이 없는 변형에 슈퍼관리자가 필수 항목만 지정해 생성하면, 순위는 100, 필수 여부는 거짓, "
+            "나머지 선택 항목은 비어 있는 노드가 반환된다"
         )
 
     @override
@@ -263,7 +263,7 @@ class TheSecondPresetIsRankedAHundredHigher(
 
     @override
     def describe(self) -> str:
-        return "preset이 하나 있는 변형에 슈퍼관리자가 하나 더 만들면 순위가 앞의 것보다 백 크다"
+        return "preset이 하나 있는 변형에 슈퍼관리자가 하나 더 생성하면 순위가 앞의 것보다 100 크다"
 
     @override
     def given(self) -> Given[SeedingSession, APresetAndACaller]:
@@ -294,7 +294,9 @@ class FourValuesComeBackAsOneSpec(
 
     @override
     def describe(self) -> str:
-        return "대상·값 종류·기본값·키를 따로 주고 만들면, 답에서는 넷이 한 명세로 묶여 온다"
+        return (
+            "대상·값 종류·기본값·키를 따로 지정해 생성하면, 응답에서는 넷이 한 명세로 묶여 반환된다"
+        )
 
     @override
     def given(self) -> Given[SeedingSession, AVariantAndACaller]:
@@ -326,7 +328,7 @@ class ADefaultValueOfEachType(
 
     @override
     def describe(self) -> str:
-        return f"값 종류를 {self.target.value_type.value}로 두고 그에 맞는 기본값을 주면 만들어진다"
+        return f"값 종류를 {self.target.value_type.value}(으)로 두고 그에 맞는 기본값을 지정하면 생성된다"
 
     @override
     def given(self) -> Given[SeedingSession, AVariantAndACaller]:
@@ -357,7 +359,7 @@ class AUiOptionCarriesItsType(
 
     @override
     def describe(self) -> str:
-        return "슬라이더 옵션을 붙여 만들면, UI 종류가 옵션에서 읽혀 노드에 함께 실린다"
+        return "슬라이더 옵션을 붙여 생성하면, UI 종류가 옵션에서 읽혀 노드에 함께 담긴다"
 
     @override
     def given(self) -> Given[SeedingSession, AVariantAndACaller]:
@@ -386,9 +388,7 @@ class ANameTakenInTheSameVariantIsRefused(
 
     @override
     def describe(self) -> str:
-        return (
-            "같은 변형에 같은 이름의 preset이 있을 때 다시 만들면, 이름이 겹친다는 이유로 거부된다"
-        )
+        return "같은 변형에 같은 이름의 preset이 있을 때 다시 생성하면, 이름 중복으로 거부된다"
 
     @override
     def given(self) -> Given[SeedingSession, APresetAndACaller]:
@@ -419,7 +419,7 @@ class TheSameNameIsFreeInAnotherVariant(
 
     @override
     def describe(self) -> str:
-        return "유니크 제약이 변형과 이름의 짝에 걸려 있으므로, 다른 변형에는 같은 이름의 preset을 만들 수 있다"
+        return "유니크 제약이 변형과 이름의 조합에 걸려 있으므로, 다른 변형에는 같은 이름의 preset을 생성할 수 있다"
 
     @override
     def given(self) -> Given[SeedingSession, TwoVariantsAndAPreset]:
@@ -448,7 +448,7 @@ class AUserWhoIsNotTheSuperadminMayNotCreate(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 아닌 사용자가 preset을 만들면 역할로 거부된다"
+        return "슈퍼관리자가 아닌 사용자가 preset을 생성하면 역할 부족으로 거부된다"
 
     @override
     def given(self) -> Given[SeedingSession, AVariantAndACaller]:
@@ -479,8 +479,8 @@ class EnforcementOffStillNeedsTheSuperadmin(
     @override
     def describe(self) -> str:
         return (
-            "엔티티 권한 집행을 꺼도 슈퍼관리자가 아니면 preset을 만들지 못한다. "
-            "이 문은 권한 그래프가 아니라 역할이라 스위치와 무관하다"
+            "권한 검사를 꺼도 슈퍼관리자가 아니면 preset을 생성하지 못한다. "
+            "생성은 권한 그래프가 아니라 역할로 보호되므로 스위치와 무관하다"
         )
 
     @override

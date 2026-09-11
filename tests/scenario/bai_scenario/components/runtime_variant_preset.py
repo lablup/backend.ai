@@ -45,19 +45,19 @@ from ai.backend.testutils.scenario_steps import (
     Verdict,
 )
 
-DESCRIBED = "심어둔 preset"
-"""시드가 심는 preset의 설명. 시나리오가 기대값으로 다시 쓰므로 한 자리에 둔다."""
+DESCRIBED = "미리 만들어 둔 preset"
+"""시드가 미리 만들어 두는 preset의 설명. 시나리오가 기대값으로 다시 쓰므로 한 곳에 둔다."""
 
 KEY = "PRESET_KEY"
-"""시드가 심는 preset의 키."""
+"""시드가 미리 만들어 두는 preset의 키."""
 
 RANK_GAP = 100
-"""만들기가 같은 변형 안 가장 큰 순위에 더하는 값. 첫 preset의 순위이기도 하다."""
+"""생성이 같은 변형 안 가장 큰 순위에 더하는 값. 첫 preset의 순위이기도 하다."""
 
 
 @dataclass(frozen=True)
 class APresetAndACaller:
-    """preset 하나와 그 변형, 그리고 부를 사람."""
+    """preset 하나와 그 변형, 그리고 호출할 사용자."""
 
     variant: RuntimeVariantData
     preset: RuntimeVariantPresetData
@@ -66,7 +66,7 @@ class APresetAndACaller:
 
 @dataclass(frozen=True)
 class TwoVariantsAndAPreset:
-    """변형 둘과 한쪽에만 있는 preset 하나, 그리고 부를 사람."""
+    """변형 둘과 한쪽에만 있는 preset 하나, 그리고 호출할 사용자."""
 
     variant: RuntimeVariantData
     other: RuntimeVariantData
@@ -76,7 +76,7 @@ class TwoVariantsAndAPreset:
 
 @dataclass(frozen=True)
 class ManyPresetsAndACaller:
-    """훑을 preset 여럿과, 훑을 사람. ``laid``는 답에 나와야 하는 것만이다."""
+    """검색 대상 preset 여럿과, 검색을 호출할 사용자. ``laid``는 응답에 나와야 하는 것만이다."""
 
     variant: RuntimeVariantData
     laid: tuple[RuntimeVariantPresetData, ...]
@@ -184,12 +184,12 @@ class PresetsInTwoVariants(Given[Any, ManyPresetsAndACaller]):
 
 
 VALID_AT = "2.5.0"
-"""버전 필터가 묻는 버전. 아래 다섯 중 둘만 이 버전에 유효하다."""
+"""버전 필터로 지정하는 버전. 아래 다섯 중 둘만 이 버전에 유효하다."""
 
 
 @dataclass(frozen=True)
 class PresetsAcrossVersions(Given[Any, ManyPresetsAndACaller]):
-    """추가 버전과 폐기 버전이 갈리는 preset 다섯. ``laid``는 묻는 버전에 유효한 둘이다."""
+    """추가 버전과 폐기 버전이 서로 다른 preset 다섯. ``laid``는 지정한 버전에 유효한 둘이다."""
 
     @override
     def describe(self) -> str:
@@ -244,7 +244,11 @@ def preset_verdicts(
     """Every place of one preset node, prefixed for a node inside a list."""
     return [
         Skipped(f"{at}id", "데이터베이스가 만든다"),
-        Held(f"{at}runtime_variant_id", node.runtime_variant_id, SameAs(variant_id, "심은 변형")),
+        Held(
+            f"{at}runtime_variant_id",
+            node.runtime_variant_id,
+            SameAs(variant_id, "미리 만들어 둔 변형"),
+        ),
         Same(f"{at}name", node.name, named),
         Same(f"{at}description", node.description, described),
         Same(f"{at}rank", node.rank, rank),
@@ -293,7 +297,7 @@ def laid_preset_verdicts(
 
 @dataclass(frozen=True)
 class TheNewPresetNode(Then[AVariantAndACaller, RuntimeVariantPresetNode]):
-    """방금 만든 preset이 통째로 온다. 요청이 정한 것만 여기로 받고, 변형은 심은 것에서 읽는다."""
+    """방금 생성한 preset이 통째로 반환된다. 기대값은 요청이 지정한 값에서 읽고, 변형은 미리 만들어 둔 것에서 읽는다."""
 
     started: datetime
     named: str
@@ -309,7 +313,7 @@ class TheNewPresetNode(Then[AVariantAndACaller, RuntimeVariantPresetNode]):
 
     @override
     def says(self) -> str:
-        return "만든 preset 전체가 온다"
+        return "생성한 preset 전체가 반환된다"
 
     @override
     def look(
@@ -338,14 +342,14 @@ class TheNewPresetNode(Then[AVariantAndACaller, RuntimeVariantPresetNode]):
 
 @dataclass(frozen=True)
 class TheSameNameUnderTheOtherVariant(Then[TwoVariantsAndAPreset, RuntimeVariantPresetNode]):
-    """다른 변형 아래 같은 이름으로 만든 preset이 통째로 온다."""
+    """다른 변형 아래 같은 이름으로 생성한 preset이 통째로 반환된다."""
 
     started: datetime
     target: PresetTargetSpec
 
     @override
     def says(self) -> str:
-        return "다른 변형 아래 만든 preset 전체가 온다"
+        return "다른 변형 아래 생성한 preset 전체가 반환된다"
 
     @override
     def look(
@@ -374,7 +378,7 @@ class TheSameNameUnderTheOtherVariant(Then[TwoVariantsAndAPreset, RuntimeVariant
 
 @dataclass(frozen=True)
 class ThePresetNode(Then[APresetAndACaller, RuntimeVariantPresetNode]):
-    """심은 preset이 통째로 온다. 바꾸는 요청은 바뀌어야 하는 자리만 인자로 준다."""
+    """미리 만들어 둔 preset이 통째로 반환된다. 수정 요청은 바뀌어야 하는 필드만 인자로 준다."""
 
     started: datetime
     named: str | Kept = KEPT
@@ -383,7 +387,7 @@ class ThePresetNode(Then[APresetAndACaller, RuntimeVariantPresetNode]):
 
     @override
     def says(self) -> str:
-        return "심은 preset 전체가 온다"
+        return "미리 만들어 둔 preset 전체가 반환된다"
 
     @override
     def look(
@@ -419,11 +423,11 @@ class ThePresetNode(Then[APresetAndACaller, RuntimeVariantPresetNode]):
 
 @dataclass(frozen=True)
 class TheLaidPresetsAreLeft(Then[ManyPresetsAndACaller, SearchRuntimeVariantPresetsPayload]):
-    """답에 나와야 하는 것들이 모두, 그리고 그것들만 남는다."""
+    """응답에 나와야 하는 preset이 모두, 그리고 그것만 반환된다."""
 
     @override
     def says(self) -> str:
-        return "답에 나와야 하는 preset만 남는다"
+        return "응답에 나와야 하는 preset만 반환된다"
 
     @override
     def look(
@@ -446,13 +450,13 @@ class TheLaidPresetsAreLeft(Then[ManyPresetsAndACaller, SearchRuntimeVariantPres
 
 @dataclass(frozen=True)
 class TheFirstPageOfPresets(Then[ManyPresetsAndACaller, SearchRuntimeVariantPresetsPayload]):
-    """크기를 대지 않은 첫 쪽. 기본 크기만큼 오고 다음 쪽이 있다고 답한다."""
+    """크기를 지정하지 않은 첫 페이지. 기본 크기만큼 반환되고 다음 페이지가 있다고 응답한다."""
 
     size: int
 
     @override
     def says(self) -> str:
-        return "기본 크기의 첫 쪽이 온다"
+        return "기본 크기의 첫 페이지가 반환된다"
 
     @override
     def look(
@@ -471,13 +475,13 @@ class TheFirstPageOfPresets(Then[ManyPresetsAndACaller, SearchRuntimeVariantPres
 
 @dataclass(frozen=True)
 class ThePresetsInTheOrderAsked(Then[ManyPresetsAndACaller, list[RuntimeVariantPresetNode | None]]):
-    """준 순서대로 한 자리씩 온다. 심은 것은 노드로, 없는 id는 빈 자리로."""
+    """요청한 순서대로 한 항목씩 반환된다. 미리 만들어 둔 것은 노드로, 없는 id는 빈 항목으로."""
 
     started: datetime
 
     @override
     def says(self) -> str:
-        return "준 순서대로, 없는 id 자리는 비어서 온다"
+        return "요청한 순서대로, 없는 id 자리는 비어서 반환된다"
 
     @override
     def look(
@@ -504,11 +508,11 @@ class ThePresetsInTheOrderAsked(Then[ManyPresetsAndACaller, list[RuntimeVariantP
 
 @dataclass(frozen=True)
 class TheDeletedPresetId(Then[APresetAndACaller, DeleteRuntimeVariantPresetPayload]):
-    """지운 preset의 id를 실은 답."""
+    """삭제한 preset의 id를 담은 응답."""
 
     @override
     def says(self) -> str:
-        return "지운 preset의 id가 온다"
+        return "삭제한 preset의 id가 반환된다"
 
     @override
     def look(
@@ -517,4 +521,4 @@ class TheDeletedPresetId(Then[APresetAndACaller, DeleteRuntimeVariantPresetPaylo
         payload = answered.response
         if payload is None:
             return [Refused(EntityNotFoundError, answered.raised)]
-        return [Held[UUID]("id", payload.id, SameAs[UUID](laid.preset.id, "심은 preset"))]
+        return [Held[UUID]("id", payload.id, SameAs[UUID](laid.preset.id, "미리 만들어 둔 preset"))]
