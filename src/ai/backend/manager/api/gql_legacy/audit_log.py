@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Self, cast
 import graphene
 from dateutil.parser import parse as dtparse
 
-from ai.backend.common.data.permission.types import EntityType
+from ai.backend.common.data.entity.types import EntityType
 from ai.backend.manager.actions.types import OperationStatus
 from ai.backend.manager.models.audit_log import (
     AuditLogRow,
@@ -43,7 +43,7 @@ class AuditLogSchema(graphene.ObjectType):  # type: ignore[misc]
     )
 
     async def resolve_entity_type_variants(self, info: graphene.ResolveInfo) -> list[str]:
-        return list(EntityType)
+        return sorted(kind.name() for kind in EntityType.kinds())
 
     async def resolve_status_variants(self, info: graphene.ResolveInfo) -> list[str]:
         return list(OperationStatus.__members__.values())

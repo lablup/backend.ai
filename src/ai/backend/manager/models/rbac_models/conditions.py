@@ -7,26 +7,20 @@ from collections.abc import Collection
 
 import sqlalchemy as sa
 
+from ai.backend.common.data.entity.types import EntityType
 from ai.backend.common.data.filter_specs import (
     StringInMatchSpec,
     StringMatchSpec,
     UUIDEqualMatchSpec,
     UUIDInMatchSpec,
 )
-from ai.backend.common.data.permission.types import RBACElementType
-from ai.backend.manager.data.permission.types import (
-    EntityType,
-    Permission,
-)
+from ai.backend.manager.data.permission.types import Permission
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.condition_utils import (
     make_string_in_factory,
 )
 from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.project.row import ProjectRow
-from ai.backend.manager.models.rbac_models.permission.object_permission import (
-    ObjectPermissionRow,
-)
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
@@ -524,57 +518,5 @@ class UserScopeConditions:
             if spec.negated:
                 condition = sa.not_(condition)
             return condition
-
-        return inner
-
-
-class ObjectPermissionConditions:
-    """Query conditions for object permissions."""
-
-    @staticmethod
-    def by_role_id(role_id: uuid.UUID) -> QueryCondition:
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return ObjectPermissionRow.role_id == role_id
-
-        return inner
-
-    @staticmethod
-    def by_entity_type(element_type: RBACElementType) -> QueryCondition:
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return ObjectPermissionRow.entity_type == element_type.to_entity_type()
-
-        return inner
-
-    @staticmethod
-    def by_entity_id(entity_id: str) -> QueryCondition:
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return ObjectPermissionRow.entity_id == entity_id
-
-        return inner
-
-    @staticmethod
-    def by_operation(operation: str) -> QueryCondition:
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return ObjectPermissionRow.operation == operation
-
-        return inner
-
-    @staticmethod
-    def by_cursor_forward(cursor_id: str) -> QueryCondition:
-        """Cursor condition for forward pagination (after cursor)."""
-        cursor_uuid = uuid.UUID(cursor_id)
-
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return ObjectPermissionRow.id > cursor_uuid
-
-        return inner
-
-    @staticmethod
-    def by_cursor_backward(cursor_id: str) -> QueryCondition:
-        """Cursor condition for backward pagination (before cursor)."""
-        cursor_uuid = uuid.UUID(cursor_id)
-
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return ObjectPermissionRow.id < cursor_uuid
 
         return inner

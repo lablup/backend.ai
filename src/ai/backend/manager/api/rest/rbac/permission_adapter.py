@@ -9,12 +9,11 @@ import uuid
 
 from ai.backend.common.data.entity.permission import PermissionID
 from ai.backend.common.data.entity.role import RoleID
-from ai.backend.common.data.entity.types import EntityType
-from ai.backend.common.data.permission.types import Permission
 from ai.backend.common.dto.manager.rbac import (
     CreatePermissionRequest,
     PermissionDTO,
 )
+from ai.backend.common.dto.manager.v2.rbac.types import PermissionBitDTO
 from ai.backend.manager.data.permission.permission import PermissionData
 from ai.backend.manager.models.rbac_models.permission.creators import RolePermissionCreator
 from ai.backend.manager.models.rbac_models.permission.purgers import RolePermissionPurger
@@ -35,15 +34,15 @@ class PermissionAdapter:
         return PermissionDTO(
             id=data.id,
             entity_type=data.entity_type,
-            operation=data.permission.to_operation(),
+            permission=PermissionBitDTO.of(data.permission),
         )
 
     @staticmethod
     def to_create_permission_action(request: CreatePermissionRequest) -> CreatePermissionAction:
         """Convert CreatePermissionRequest to CreatePermissionAction."""
         creator = RolePermissionCreator(
-            entity_type=EntityType(request.entity_type),
-            permission=Permission.from_operation(request.operation),
+            entity_type=request.entity_type,
+            permission=request.permission.to_permission(),
         )
         return CreatePermissionAction(role_id=RoleID(request.role_id), creator=creator)
 

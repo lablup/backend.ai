@@ -57,7 +57,7 @@ def permission_controller_processors(
     processor_registry: ProcessorRegistry[Any],
 ) -> PermissionControllerProcessors:
     repo = PermissionControllerRepository(database_engine)
-    service = PermissionControllerService(repo, rbac_action_registry=[])
+    service = PermissionControllerService(repo, action_registry=processor_registry)
     return PermissionControllerProcessors(
         processor_registry.group(GroupMeta(RoleEntityType())),
         service=service,

@@ -48,11 +48,7 @@ from ai.backend.manager.api.rest.v2.user.registry import register_v2_user_routes
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.permission.status import RoleStatus
-from ai.backend.manager.data.permission.types import (
-    EntityType,
-    Permission,
-    ScopeType,
-)
+from ai.backend.manager.data.permission.types import Permission
 from ai.backend.manager.data.secret.types import KeyProviderType
 from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.dependencies.infrastructure.redis import ValkeyClients
@@ -177,7 +173,7 @@ def permission_controller_processors(
     perm_repo = PermissionControllerRepository(database_engine)
     service = PermissionControllerService(
         perm_repo,
-        rbac_action_registry=[],
+        action_registry=processor_registry,
     )
     return PermissionControllerProcessors(
         processor_registry.group(GroupMeta(RoleEntityType())),
@@ -283,7 +279,7 @@ async def rbac_permission_fixture(
                 id=role_id,
                 name=f"test-project-admin-{secrets.token_hex(4)}",
                 status=RoleStatus.ACTIVE,
-                scope_type=ScopeType.PROJECT.value,
+                scope_type=ProjectEntityType(),
                 scope_id=group_fixture,
             )
         )
@@ -296,7 +292,7 @@ async def rbac_permission_fixture(
         await conn.execute(
             sa.insert(PermissionRow.__table__).values(
                 role_id=role_id,
-                entity_type=EntityType.PROJECT,
+                entity_type=ProjectEntityType(),
                 permission=Permission.UPDATE,
             )
         )
@@ -336,7 +332,7 @@ async def admin_target_project_permission(
                 id=role_id,
                 name=f"test-target-admin-{secrets.token_hex(4)}",
                 status=RoleStatus.ACTIVE,
-                scope_type=ScopeType.PROJECT.value,
+                scope_type=ProjectEntityType(),
                 scope_id=target_project_fixture,
             )
         )
@@ -349,7 +345,7 @@ async def admin_target_project_permission(
         await conn.execute(
             sa.insert(PermissionRow.__table__).values(
                 role_id=role_id,
-                entity_type=EntityType.PROJECT,
+                entity_type=ProjectEntityType(),
                 permission=Permission.UPDATE,
             )
         )
@@ -393,7 +389,7 @@ async def target_project_fixture(
         await conn.execute(
             sa.insert(VirtualEntityRow.__table__).values(
                 id=virtual_entity_id,
-                entity_type=ScopeType.PROJECT,
+                entity_type=ProjectEntityType(),
                 entity_id=project_id,
             )
         )
@@ -415,7 +411,7 @@ async def target_project_fixture(
     async with db_engine.begin() as conn:
         await conn.execute(
             VirtualEntityRow.__table__.delete().where(
-                VirtualEntityRow.__table__.c.entity_type == ScopeType.PROJECT,
+                VirtualEntityRow.__table__.c.entity_type == ProjectEntityType(),
                 VirtualEntityRow.__table__.c.entity_id == project_id,
             )
         )
@@ -447,7 +443,7 @@ async def other_project_fixture(
         await conn.execute(
             sa.insert(VirtualEntityRow.__table__).values(
                 id=virtual_entity_id,
-                entity_type=ScopeType.PROJECT,
+                entity_type=ProjectEntityType(),
                 entity_id=project_id,
             )
         )
@@ -469,7 +465,7 @@ async def other_project_fixture(
     async with db_engine.begin() as conn:
         await conn.execute(
             VirtualEntityRow.__table__.delete().where(
-                VirtualEntityRow.__table__.c.entity_type == ScopeType.PROJECT,
+                VirtualEntityRow.__table__.c.entity_type == ProjectEntityType(),
                 VirtualEntityRow.__table__.c.entity_id == project_id,
             )
         )
@@ -496,14 +492,14 @@ async def member_role_fixture(
                 id=role_id,
                 name=f"test-member-{secrets.token_hex(4)}",
                 status=RoleStatus.ACTIVE,
-                scope_type=ScopeType.PROJECT.value,
+                scope_type=ProjectEntityType(),
                 scope_id=target_project_fixture,
             )
         )
         await conn.execute(
             sa.insert(PermissionRow.__table__).values(
                 role_id=role_id,
-                entity_type=EntityType.USER,
+                entity_type=UserEntityType(),
                 permission=Permission.READ,
             )
         )
@@ -636,7 +632,7 @@ async def assigned_users(
         for uid in reversed(user_ids):
             await conn.execute(
                 VirtualEntityRow.__table__.delete().where(
-                    VirtualEntityRow.__table__.c.entity_type == ScopeType.USER,
+                    VirtualEntityRow.__table__.c.entity_type == UserEntityType(),
                     VirtualEntityRow.__table__.c.entity_id == str(uid),
                 )
             )

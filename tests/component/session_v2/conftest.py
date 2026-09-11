@@ -22,8 +22,17 @@ from ai.backend.client.v2.v2_registry import V2ClientRegistry
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
 from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.data.entity.agent import AgentUUID
+from ai.backend.common.data.entity.app_config_fragment import AppConfigFragmentEntityType
+from ai.backend.common.data.entity.artifact import ArtifactEntityType
+from ai.backend.common.data.entity.artifact_registry import ArtifactRegistryEntityType
+from ai.backend.common.data.entity.deployment import DeploymentEntityType
 from ai.backend.common.data.entity.domain import DomainEntityType, DomainID
-from ai.backend.common.data.entity.image import ImageID
+from ai.backend.common.data.entity.image import ImageEntityType, ImageID
+from ai.backend.common.data.entity.model_card import ModelCardEntityType
+from ai.backend.common.data.entity.notification import (
+    NotificationChannelEntityType,
+    NotificationRuleEntityType,
+)
 from ai.backend.common.data.entity.project import ProjectEntityType
 from ai.backend.common.data.entity.resource_group import (
     ResourceGroupEntityType,
@@ -32,13 +41,10 @@ from ai.backend.common.data.entity.resource_group import (
 )
 from ai.backend.common.data.entity.resource_preset import ResourcePresetEntityType
 from ai.backend.common.data.entity.session import SessionEntityType, SessionID
+from ai.backend.common.data.entity.types import EntityType
 from ai.backend.common.data.entity.user import UserEntityType
-from ai.backend.common.data.permission.types import (
-    EntityType,
-    Permission,
-    RoleStatus,
-    ScopeType,
-)
+from ai.backend.common.data.entity.vfolder import VFolderEntityType
+from ai.backend.common.data.permission.types import Permission, RoleStatus
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.plugin.monitor import ErrorPluginContext
 from ai.backend.common.types import SessionTypes
@@ -100,6 +106,20 @@ if TYPE_CHECKING:
     from ai.backend.common.plugin.hook import HookPluginContext
 
 AgentFactoryFunc = Callable[[dict[str, str]], Coroutine[Any, Any, str]]
+
+
+_OWNER_ACCESSIBLE_ENTITY_TYPES: tuple[EntityType, ...] = (
+    VFolderEntityType(),
+    ImageEntityType(),
+    SessionEntityType(),
+    ArtifactEntityType(),
+    ArtifactRegistryEntityType(),
+    AppConfigFragmentEntityType(),
+    NotificationChannelEntityType(),
+    NotificationRuleEntityType(),
+    DeploymentEntityType(),
+    ModelCardEntityType(),
+)
 
 
 @dataclass
@@ -263,7 +283,7 @@ async def user_system_role(
                 id=role_id,
                 name=f"user-{str(user_uuid)[:8]}",
                 status=RoleStatus.ACTIVE,
-                scope_type=ScopeType.USER.value,
+                scope_type=UserEntityType(),
                 scope_id=user_uuid,
             )
         )
@@ -275,7 +295,7 @@ async def user_system_role(
         )
         # Scope the role to the user
         # Grant owner permissions for all owner-accessible entity types in user scope
-        for entity_type in EntityType.owner_accessible_entity_types_in_user():
+        for entity_type in _OWNER_ACCESSIBLE_ENTITY_TYPES:
             for bit in Permission:
                 if not bit:
                     continue
@@ -293,7 +313,7 @@ async def user_system_role(
             await conn.execute(
                 sa.insert(PermissionRow.__table__).values(
                     role_id=role_id,
-                    entity_type=EntityType.USER,
+                    entity_type=UserEntityType(),
                     permission=bit,
                 )
             )

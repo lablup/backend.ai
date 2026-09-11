@@ -56,7 +56,7 @@ class EntityTypeScopeGQL(PydanticInputMixin[EntityTypeScope]):
 PermissionBitGQL: type[PermissionBitDTO] = gql_enum(
     BackendAIGQLMeta(
         added_version=NEXT_RELEASE_VERSION,
-        description="One bit of a permission mask; distinct from OperationType, which names an action.",
+        description="One bit of a permission mask.",
     ),
     PermissionBitDTO,
     name="PermissionBit",

@@ -20,6 +20,7 @@ from ai.backend.client.v2.auth import HMACAuth
 from ai.backend.client.v2.config import ClientConfig
 from ai.backend.client.v2.exceptions import InvalidRequestError, PermissionDeniedError
 from ai.backend.client.v2.v2_registry import V2ClientRegistry
+from ai.backend.common.data.entity.types import EntityType
 from ai.backend.common.dto.manager.query import StringFilter, UUIDFilter
 from ai.backend.common.dto.manager.v2.rbac.request import (
     AdminSearchPermissionsGQLInput,
@@ -34,6 +35,7 @@ from ai.backend.common.dto.manager.v2.rbac.response import (
     BulkRemoveRolePermissionsPayload,
     ReplaceRolePermissionsPayload,
 )
+from ai.backend.common.dto.manager.v2.rbac.types import PermissionBitDTO
 from ai.backend.manager.api.adapters.rbac.adapter import RBACAdapter
 from ai.backend.manager.api.rest.admin.handler import AdminHandler
 from ai.backend.manager.api.rest.admin.registry import register_admin_routes
@@ -125,11 +127,13 @@ async def user_v2_registry(
         await registry.close()
 
 
-def _entry(role_id: uuid.UUID, entity_type: str, operation: str) -> CreatePermissionInput:
+def _entry(
+    role_id: uuid.UUID, entity_type: str, permission: PermissionBitDTO
+) -> CreatePermissionInput:
     return CreatePermissionInput(
         role_id=role_id,
-        entity_type=entity_type,
-        operation=operation,
+        entity_type=EntityType.from_name(entity_type),
+        permission=permission,
     )
 
 
@@ -145,15 +149,15 @@ class TestBulkAddRolePermissionsV2:
         result = await admin_v2_registry.rbac.bulk_add_role_permissions(
             BulkAddRolePermissionsInput(
                 permissions=[
-                    _entry(target_role.role.id, "session", "read"),
-                    _entry(target_role.role.id, "image", "read"),
+                    _entry(target_role.role.id, "session", PermissionBitDTO.READ),
+                    _entry(target_role.role.id, "image", PermissionBitDTO.READ),
                 ],
             ),
         )
         assert isinstance(result, BulkAddRolePermissionsPayload)
         assert len(result.items) == 2
         assert result.failed == []
-        entity_ops = {(item.entity_type, item.operation.value) for item in result.items}
+        entity_ops = {(item.entity_type, item.permission.value) for item in result.items}
         assert entity_ops == {("session", "read"), ("image", "read")}
 
     async def test_duplicate_entry_appears_in_failed(
@@ -166,7 +170,7 @@ class TestBulkAddRolePermissionsV2:
         first = await admin_v2_registry.rbac.bulk_add_role_permissions(
             BulkAddRolePermissionsInput(
                 permissions=[
-                    _entry(target_role.role.id, "vfolder", "read"),
+                    _entry(target_role.role.id, "vfolder", PermissionBitDTO.READ),
                 ],
             ),
         )
@@ -176,8 +180,8 @@ class TestBulkAddRolePermissionsV2:
         result = await admin_v2_registry.rbac.bulk_add_role_permissions(
             BulkAddRolePermissionsInput(
                 permissions=[
-                    _entry(target_role.role.id, "vfolder", "read"),
-                    _entry(target_role.role.id, "agent", "read"),
+                    _entry(target_role.role.id, "vfolder", PermissionBitDTO.READ),
+                    _entry(target_role.role.id, "agent", PermissionBitDTO.READ),
                 ],
             ),
         )
@@ -185,7 +189,7 @@ class TestBulkAddRolePermissionsV2:
         assert result.items[0].entity_type == "agent"
         assert len(result.failed) == 1
         assert result.failed[0].entity_type == "vfolder"
-        assert result.failed[0].operation == "read"
+        assert result.failed[0].permission == PermissionBitDTO.READ
 
     async def test_empty_input_is_ok(
         self,
@@ -208,7 +212,7 @@ class TestBulkAddRolePermissionsV2:
             await user_v2_registry.rbac.bulk_add_role_permissions(
                 BulkAddRolePermissionsInput(
                     permissions=[
-                        _entry(target_role.role.id, "session", "read"),
+                        _entry(target_role.role.id, "session", PermissionBitDTO.READ),
                     ],
                 ),
             )
@@ -226,8 +230,8 @@ class TestBulkRemoveRolePermissionsV2:
         added = await admin_v2_registry.rbac.bulk_add_role_permissions(
             BulkAddRolePermissionsInput(
                 permissions=[
-                    _entry(target_role.role.id, "session", "read"),
-                    _entry(target_role.role.id, "image", "read"),
+                    _entry(target_role.role.id, "session", PermissionBitDTO.READ),
+                    _entry(target_role.role.id, "image", PermissionBitDTO.READ),
                 ],
             ),
         )
@@ -260,7 +264,7 @@ class TestBulkRemoveRolePermissionsV2:
         added = await admin_v2_registry.rbac.bulk_add_role_permissions(
             BulkAddRolePermissionsInput(
                 permissions=[
-                    _entry(target_role.role.id, "session", "read"),
+                    _entry(target_role.role.id, "session", PermissionBitDTO.READ),
                 ],
             ),
         )
@@ -305,8 +309,8 @@ class TestReplaceRolePermissionsV2:
         await admin_v2_registry.rbac.bulk_add_role_permissions(
             BulkAddRolePermissionsInput(
                 permissions=[
-                    _entry(target_role.role.id, "session", "read"),
-                    _entry(target_role.role.id, "image", "read"),
+                    _entry(target_role.role.id, "session", PermissionBitDTO.READ),
+                    _entry(target_role.role.id, "image", PermissionBitDTO.READ),
                 ],
             ),
         )
@@ -316,13 +320,13 @@ class TestReplaceRolePermissionsV2:
             ReplaceRolePermissionsInput(
                 role_id=target_role.role.id,
                 permissions=[
-                    _entry(target_role.role.id, "vfolder", "read"),
-                    _entry(target_role.role.id, "agent", "read"),
+                    _entry(target_role.role.id, "vfolder", PermissionBitDTO.READ),
+                    _entry(target_role.role.id, "agent", PermissionBitDTO.READ),
                 ],
             ),
         )
         assert isinstance(result, ReplaceRolePermissionsPayload)
-        assert {(it.entity_type, it.operation.value) for it in result.items} == {
+        assert {(it.entity_type, it.permission.value) for it in result.items} == {
             ("vfolder", "read"),
             ("agent", "read"),
         }
@@ -337,7 +341,7 @@ class TestReplaceRolePermissionsV2:
         await admin_v2_registry.rbac.bulk_add_role_permissions(
             BulkAddRolePermissionsInput(
                 permissions=[
-                    _entry(target_role.role.id, "session", "read"),
+                    _entry(target_role.role.id, "session", PermissionBitDTO.READ),
                 ],
             ),
         )
@@ -359,7 +363,7 @@ class TestReplaceRolePermissionsV2:
                 ReplaceRolePermissionsInput(
                     role_id=target_role.role.id,
                     permissions=[
-                        _entry(wrong_role_id, "session", "read"),
+                        _entry(wrong_role_id, "session", PermissionBitDTO.READ),
                     ],
                 ),
             )
@@ -390,7 +394,7 @@ class TestPermissionFilters:
         await admin_v2_registry.rbac.bulk_add_role_permissions(
             BulkAddRolePermissionsInput(
                 permissions=[
-                    _entry(target_role.role.id, "session", "read"),
+                    _entry(target_role.role.id, "session", PermissionBitDTO.READ),
                 ],
             ),
         )
@@ -414,8 +418,8 @@ class TestPermissionFilters:
         await admin_v2_registry.rbac.bulk_add_role_permissions(
             BulkAddRolePermissionsInput(
                 permissions=[
-                    _entry(target_role.role.id, "session", "read"),
-                    _entry(target_role.role.id, "image", "read"),
+                    _entry(target_role.role.id, "session", PermissionBitDTO.READ),
+                    _entry(target_role.role.id, "image", PermissionBitDTO.READ),
                 ],
             ),
         )
@@ -440,9 +444,9 @@ class TestPermissionFilters:
         await admin_v2_registry.rbac.bulk_add_role_permissions(
             BulkAddRolePermissionsInput(
                 permissions=[
-                    _entry(target_role.role.id, "session", "read"),
-                    _entry(target_role.role.id, "image", "read"),
-                    _entry(target_role.role.id, "vfolder", "read"),
+                    _entry(target_role.role.id, "session", PermissionBitDTO.READ),
+                    _entry(target_role.role.id, "image", PermissionBitDTO.READ),
+                    _entry(target_role.role.id, "vfolder", PermissionBitDTO.READ),
                 ],
             ),
         )

@@ -8,13 +8,8 @@ from __future__ import annotations
 
 from ai.backend.common.data.entity.role_permission_preset import RolePermissionPresetID
 from ai.backend.common.data.entity.role_preset import RolePresetID
-from ai.backend.common.data.entity.types import EntityType
-from ai.backend.common.data.permission.types import (
-    OperationType,
-    RBACElementType,
-)
 from ai.backend.common.dto.manager.v2.common import OrderDirection
-from ai.backend.common.dto.manager.v2.rbac.types import OperationTypeDTO
+from ai.backend.common.dto.manager.v2.rbac.types import PermissionBitDTO
 from ai.backend.common.dto.manager.v2.role_permission_preset.request import (
     BulkAddRolePermissionPresetsInput,
     BulkRemoveRolePermissionPresetsInput,
@@ -137,13 +132,13 @@ class RolePresetAdapter(BaseAdapter):
         """Create a new role preset."""
         creator = RolePresetCreator(
             name=input.name,
-            scope_type=RBACElementType(input.scope_type).to_scope_type(),
+            scope_type=input.scope_type,
             auto_assign=input.auto_assign,
         )
         permission_creators = [
             RolePermissionPresetCreator(
-                entity_type=RBACElementType(entry.entity_type).to_entity_type(),
-                operation=OperationType(entry.operation.value),
+                entity_type=entry.entity_type,
+                permission=entry.permission.to_permission(),
             )
             for entry in input.permissions
         ]
@@ -319,8 +314,8 @@ class RolePresetAdapter(BaseAdapter):
         """Bulk-add permission entries to an existing role preset."""
         creators = [
             RolePermissionPresetCreator(
-                entity_type=RBACElementType(entry.entity_type).to_entity_type(),
-                operation=OperationType(entry.operation.value),
+                entity_type=entry.entity_type,
+                permission=entry.permission.to_permission(),
             )
             for entry in input.permissions
         ]
@@ -428,30 +423,30 @@ class RolePresetAdapter(BaseAdapter):
             )
             if cond is not None:
                 conditions.append(cond)
-        if filter_.operation is not None:
-            f_op = filter_.operation
-            if f_op.equals is not None:
+        if filter_.permission is not None:
+            f_bit = filter_.permission
+            if f_bit.equals is not None:
                 conditions.append(
-                    RolePermissionPresetConditions.by_operation_equals(
-                        OperationType(f_op.equals.value)
+                    RolePermissionPresetConditions.by_permission_equals(
+                        f_bit.equals.to_permission()
                     )
                 )
-            if f_op.not_equals is not None:
+            if f_bit.not_equals is not None:
                 conditions.append(
-                    RolePermissionPresetConditions.by_operation_not_equals(
-                        OperationType(f_op.not_equals.value)
+                    RolePermissionPresetConditions.by_permission_not_equals(
+                        f_bit.not_equals.to_permission()
                     )
                 )
-            if f_op.in_:
+            if f_bit.in_:
                 conditions.append(
-                    RolePermissionPresetConditions.by_operation_in([
-                        OperationType(v.value) for v in f_op.in_
+                    RolePermissionPresetConditions.by_permission_in([
+                        v.to_permission() for v in f_bit.in_
                     ])
                 )
-            if f_op.not_in:
+            if f_bit.not_in:
                 conditions.append(
-                    RolePermissionPresetConditions.by_operation_not_in([
-                        OperationType(v.value) for v in f_op.not_in
+                    RolePermissionPresetConditions.by_permission_not_in([
+                        v.to_permission() for v in f_bit.not_in
                     ])
                 )
         if filter_.created_at is not None:
@@ -488,8 +483,8 @@ class RolePresetAdapter(BaseAdapter):
             match order.field:
                 case RolePermissionPresetOrderField.ENTITY_TYPE:
                     result.append(RolePermissionPresetOrders.entity_type(ascending))
-                case RolePermissionPresetOrderField.OPERATION:
-                    result.append(RolePermissionPresetOrders.operation(ascending))
+                case RolePermissionPresetOrderField.PERMISSION:
+                    result.append(RolePermissionPresetOrders.permission(ascending))
                 case RolePermissionPresetOrderField.CREATED_AT:
                     result.append(RolePermissionPresetOrders.created_at(ascending))
         return result
@@ -499,7 +494,7 @@ class RolePresetAdapter(BaseAdapter):
         return RolePresetNode(
             id=data.id,
             name=data.name,
-            scope_type=EntityType(data.scope_type.value),
+            scope_type=data.scope_type,
             auto_assign=data.auto_assign,
             deleted=data.deleted,
             created_at=data.created_at,
@@ -511,7 +506,7 @@ class RolePresetAdapter(BaseAdapter):
         return RolePermissionPresetNode(
             id=data.id,
             role_preset_id=data.role_preset_id,
-            entity_type=EntityType(data.entity_type.value),
-            operation=OperationTypeDTO(data.operation.value),
+            entity_type=data.entity_type,
+            permission=PermissionBitDTO.of(data.permission),
             created_at=data.created_at,
         )

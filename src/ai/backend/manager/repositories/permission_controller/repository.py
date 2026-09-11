@@ -3,9 +3,12 @@ from __future__ import annotations
 import uuid
 from collections.abc import Collection, Mapping, Sequence
 
+from ai.backend.common.data.entity.domain import DomainEntityType
+from ai.backend.common.data.entity.project import ProjectEntityType
 from ai.backend.common.data.entity.role import RoleID
-from ai.backend.common.data.entity.user import UserID
-from ai.backend.common.data.permission.types import Permission, RBACElementType
+from ai.backend.common.data.entity.types import EntityType
+from ai.backend.common.data.entity.user import UserEntityType, UserID
+from ai.backend.common.data.permission.types import Permission
 from ai.backend.common.exception import BackendAIError
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
@@ -199,24 +202,24 @@ class PermissionControllerRepository:
     @permission_controller_repository_resilience.apply()
     async def search_scopes(
         self,
-        element_type: RBACElementType,
+        scope_type: EntityType,
         querier: BatchQuerier,
     ) -> ScopeListResult:
-        """Search scopes based on element type.
+        """Search scopes of the given type.
 
         Args:
-            element_type: The RBAC element type of scope to search.
+            scope_type: The entity type of scope to search.
             querier: BatchQuerier with conditions, orders, and pagination.
 
         Returns:
             ScopeListResult with matching scopes.
         """
-        match element_type:
-            case RBACElementType.DOMAIN:
+        match scope_type:
+            case DomainEntityType():
                 return await self._db_source.search_domain_scopes(querier)
-            case RBACElementType.PROJECT:
+            case ProjectEntityType():
                 return await self._db_source.search_project_scopes(querier)
-            case RBACElementType.USER:
+            case UserEntityType():
                 return await self._db_source.search_user_scopes(querier)
             case _:
                 raise NotImplementedError(

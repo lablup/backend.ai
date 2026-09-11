@@ -10,9 +10,6 @@ from ai.backend.common.data.entity.role_preset import RolePresetID
 from ai.backend.common.data.entity.types import EntityData, EntityIdentifier, EntityType
 from ai.backend.manager.data.common.types import SearchResult
 
-from .object_permission import (
-    ObjectPermissionData,
-)
 from .permission import PermissionData
 from .status import RoleStatus
 from .types import (
@@ -62,15 +59,12 @@ class AssignedUserData:
 class RoleDetailData:
     """
     Detailed information about a role.
-    It includes permission groups and object permissions.
     """
 
     id: uuid.UUID
     name: str
     source: RoleSource
     status: RoleStatus
-
-    object_permissions: list[ObjectPermissionData]
 
     created_at: datetime
     updated_at: datetime

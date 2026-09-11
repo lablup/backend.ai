@@ -13,12 +13,6 @@ from http import HTTPStatus
 from ai.backend.common.api_handlers import APIResponse, BodyParam, PathParam
 from ai.backend.common.data.entity.role import RoleID
 from ai.backend.common.data.entity.types import RuntimeEntityID
-from ai.backend.common.data.permission.types import (
-    EntityType as LegacyEntityType,
-)
-from ai.backend.common.data.permission.types import (
-    ScopeType,
-)
 from ai.backend.common.dto.manager.rbac import (
     AssignRoleRequest,
     AssignRoleResponse,
@@ -50,7 +44,6 @@ from ai.backend.common.dto.manager.rbac.response import (
     GetScopeTypesResponse,
     SearchScopesResponse,
 )
-from ai.backend.common.exception import RBACTypeConversionError
 from ai.backend.manager.data.permission.role import UserRoleAssignmentInput, UserRoleRevocationInput
 from ai.backend.manager.dto.context import UserContext
 from ai.backend.manager.errors.permission import NotEnoughPermission
@@ -301,13 +294,7 @@ class RBACHandler:
         action_result = await self._permission_controller.get_scope_types.wait_for_complete(
             GetScopeTypesAction()
         )
-        scope_types: list[ScopeType] = []
-        for et in action_result.element_types:
-            try:
-                scope_types.append(et.to_scope_type())
-            except RBACTypeConversionError:
-                pass
-        resp = GetScopeTypesResponse(items=scope_types)
+        resp = GetScopeTypesResponse(items=action_result.entity_types)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=resp)
 
     async def search_scopes(
@@ -321,9 +308,8 @@ class RBACHandler:
             raise NotEnoughPermission("Only superadmin can search scopes.")
 
         scope_type = path.parsed.scope_type
-        element_type = scope_type.to_element()
         querier = self._scope_adapter.build_querier(scope_type, body.parsed)
-        action = SearchScopesAction(element_type=element_type, querier=querier)
+        action = SearchScopesAction(scope_type=scope_type, querier=querier)
         action_result = await self._permission_controller.search_scopes.wait_for_complete(action)
         resp = SearchScopesResponse(
             items=[self._scope_adapter.convert_to_dto(item) for item in action_result.result.items],
@@ -348,11 +334,5 @@ class RBACHandler:
         action_result = await self._permission_controller.get_entity_types.wait_for_complete(
             GetEntityTypesAction()
         )
-        entity_types: list[LegacyEntityType] = []
-        for et in action_result.element_types:
-            try:
-                entity_types.append(et.to_entity_type())
-            except RBACTypeConversionError:
-                pass
-        resp = GetEntityTypesResponse(items=entity_types)
+        resp = GetEntityTypesResponse(items=action_result.entity_types)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=resp)
