@@ -127,7 +127,8 @@ class DotfileBundle:
         result: dict[str, Any] = {}
         if self.dotfiles:
             result["dotfiles"] = [
-                {"path": e.path, "perm": e.perm, "data": e.data} for e in self.dotfiles
+                {"path": e.path, "perm": e.perm, "data": normalize_newlines(e.data)}
+                for e in self.dotfiles
             ]
         if self.ssh_keypair is not None:
             result["ssh_keypair"] = {
