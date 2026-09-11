@@ -125,7 +125,7 @@ class SeedUser[A, B, C](Seed, ABC):
         raise NotImplementedError
 
 
-class SeedFieldWithNested[Owner, FieldDataT: FieldData](ABC):
+class SeedFieldWithNestedRows[Owner, FieldDataT: FieldData](ABC):
     """A field row together with the rows it owns, written in one transaction.
 
     A monitor that records a scope action writes the record and its scope rows atomically;
@@ -411,7 +411,7 @@ class Seeder:
         )
 
     def adding_with_nested[Owner, FieldDataT: FieldData](
-        self, seed: SeedFieldWithNested[Owner, FieldDataT], owner: Laid[Owner], /
+        self, seed: SeedFieldWithNestedRows[Owner, FieldDataT], owner: Laid[Owner], /
     ) -> Laid[FieldDataT]:
         """Lay one field row and the rows it owns, in the one write a monitor uses."""
 
