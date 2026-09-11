@@ -18,6 +18,7 @@ from ai.backend.manager.errors.resource import (
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.project import ProjectRow
+from ai.backend.manager.models.project.conditions import ProjectConditions
 from ai.backend.manager.models.resource_group import ResourceGroupRow
 from ai.backend.manager.models.scopes import ExistenceCheck, OperationScope
 
@@ -89,7 +90,7 @@ class ProjectFairShareOperationScope(OperationScope):
         domain_name = self.domain_name
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return ProjectRow.domain_name == domain_name
+            return ProjectConditions.held_by_domain(domain_name)()
 
         return inner
 
@@ -140,7 +141,7 @@ class UserFairShareOperationScope(OperationScope):
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return sa.and_(
-                ProjectRow.domain_name == domain_name,
+                ProjectConditions.held_by_domain(domain_name)(),
                 ProjectRow.id == project_id,
             )
 

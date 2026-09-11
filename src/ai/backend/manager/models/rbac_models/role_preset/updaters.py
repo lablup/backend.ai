@@ -9,12 +9,11 @@ from __future__ import annotations
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import Any, override
-from uuid import UUID
 
 from sqlalchemy.orm import InstrumentedAttribute
 
 from ai.backend.common.data.entity.role_preset import RolePresetID
-from ai.backend.manager.data.permission.types import ScopeType
+from ai.backend.common.data.entity.types import EntityType
 from ai.backend.manager.data.role_preset.types import RolePresetData
 from ai.backend.manager.models.rbac_models.role_preset.row import RolePresetRow
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck
@@ -29,7 +28,7 @@ class RolePresetUpdater(DataUpdater[RolePresetRow, RolePresetData]):
     preset_id: RolePresetID
     name: OptionalState[str] = field(default_factory=OptionalState[str].nop)
     role_name_template: TriState[str] = field(default_factory=TriState[str].nop)
-    scope_type: OptionalState[ScopeType] = field(default_factory=OptionalState[ScopeType].nop)
+    scope_type: OptionalState[EntityType] = field(default_factory=OptionalState[EntityType].nop)
     auto_assign: OptionalState[bool] = field(default_factory=OptionalState[bool].nop)
 
     @property
@@ -42,7 +41,7 @@ class RolePresetUpdater(DataUpdater[RolePresetRow, RolePresetData]):
         return RolePresetRow.id
 
     @override
-    def target_id_value(self) -> UUID:
+    def target_id_value(self) -> RolePresetID:
         return self.preset_id
 
     @property
@@ -80,7 +79,7 @@ class RolePresetSoftDeleteUpdater(DataUpdater[RolePresetRow, RolePresetData]):
         return RolePresetRow.id
 
     @override
-    def target_id_value(self) -> UUID:
+    def target_id_value(self) -> RolePresetID:
         return self.preset_id
 
     @property
@@ -113,7 +112,7 @@ class RolePresetRestoreUpdater(DataUpdater[RolePresetRow, RolePresetData]):
         return RolePresetRow.id
 
     @override
-    def target_id_value(self) -> UUID:
+    def target_id_value(self) -> RolePresetID:
         return self.preset_id
 
     @property

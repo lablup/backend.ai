@@ -59,9 +59,9 @@ def make_rlim_middleware(
         handler: WebRequestHandler,
     ) -> web.StreamResponse:
         """Global middleware implementing a fixed-window rate limiter."""
-        state: RateLimitState
+        rlim_window: RateLimitState
         if request["is_authorized"]:
-            state = await valkey_client.consume_user_rate_limit(
+            rlim_window = await valkey_client.consume_user_rlim_window(
                 user_id=request["user"]["uuid"],
                 window_seconds=_RATELIMIT_WINDOW_SECONDS,
                 limit=request["user"]["rate_limit"],
@@ -70,7 +70,7 @@ def make_rlim_middleware(
             client_ip = current_client_ip()
             if client_ip is None:
                 raise UnreachableError("a request over a socket always has a peer address")
-            state = await valkey_client.consume_ip_rate_limit(
+            rlim_window = await valkey_client.consume_ip_rlim_window(
                 client_ip=client_ip,
                 window_seconds=_RATELIMIT_WINDOW_SECONDS,
                 limit=_ANONYMOUS_RATELIMIT,
@@ -78,13 +78,13 @@ def make_rlim_middleware(
         reserve_response_headers(
             request,
             RateLimitQuota(
-                limit=state.limit,
-                remaining=max(state.limit - state.count, 0),
-                reset_after_seconds=state.reset_after_seconds,
+                limit=rlim_window.limit,
+                remaining=max(rlim_window.limit - rlim_window.count, 0),
+                reset_after_seconds=rlim_window.reset_after_seconds,
                 window_seconds=_RATELIMIT_WINDOW_SECONDS,
             ),
         )
-        if state.count > state.limit:
+        if rlim_window.count > rlim_window.limit:
             raise RateLimitExceeded
         return await handler(request)
 

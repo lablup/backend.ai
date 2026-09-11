@@ -14,21 +14,20 @@ import pytest
 import sqlalchemy as sa
 from sqlalchemy import Table
 
-from ai.backend.common.data.entity.domain import DomainID, DomainName
+from ai.backend.common.data.entity.domain import DomainEntityType, DomainID, DomainName
+from ai.backend.common.data.entity.project import ProjectEntityType
+from ai.backend.common.data.entity.role import RoleEntityType
+from ai.backend.common.data.entity.types import EntityType
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 from ai.backend.manager.data.permission.status import RoleStatus
-from ai.backend.manager.data.permission.types import EntityType as LegacyEntityType
 from ai.backend.manager.data.permission.types import RoleSource
-from ai.backend.manager.data.permission.types import ScopeType as LegacyScopeType
 from ai.backend.manager.models.alembic.versions.b8c828d3636e_link_roles_to_their_preset import (
     backfill,
 )
+from ai.backend.manager.models.base import GUID
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.project import ProjectRow, ProjectType
-from ai.backend.manager.models.rbac_models.association_scopes_entities import (
-    AssociationScopesEntitiesRow,
-)
 from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.rbac_models.role_preset.row import RolePresetRow
 from ai.backend.manager.models.resource_policy import (
@@ -42,6 +41,19 @@ from ai.backend.manager.models.virtual_entity.entity_membership import EntityMem
 from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
 from ai.backend.testutils.db import HasTable, with_tables
 
+# The migration reads the association rows the roles were bound through; the table is
+# gone from the models since, so its pre-migration shape is declared here.
+_metadata = sa.MetaData()
+_association_scopes_entities = sa.Table(
+    "association_scopes_entities",
+    _metadata,
+    sa.Column("id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v7()")),
+    sa.Column("scope_type", sa.String(32), nullable=False),
+    sa.Column("scope_id", sa.String(64), nullable=False),
+    sa.Column("entity_type", sa.String(32), nullable=False),
+    sa.Column("entity_id", sa.String(64), nullable=False),
+)
+
 _TABLES: list[Table | type[HasTable]] = [
     DomainRow,
     UserResourcePolicyRow,
@@ -52,9 +64,9 @@ _TABLES: list[Table | type[HasTable]] = [
     ProjectRow,
     RolePresetRow,
     RoleRow,
-    AssociationScopesEntitiesRow,
     VirtualEntityRow,
     EntityMembershipRow,
+    _association_scopes_entities,
 ]
 
 
@@ -106,12 +118,15 @@ async def _add_preset(
     name: str,
     *,
     template: str | None = None,
-    scope_type: LegacyScopeType = LegacyScopeType.PROJECT,
+    scope_type: EntityType | None = None,
     deleted: bool = False,
 ) -> uuid.UUID:
     async with db.begin_session() as session:
         preset = RolePresetRow(
-            name=name, role_name_template=template, scope_type=scope_type, deleted=deleted
+            name=name,
+            role_name_template=template,
+            scope_type=scope_type or ProjectEntityType(),
+            deleted=deleted,
         )
         session.add(preset)
         await session.flush()
@@ -132,6 +147,7 @@ async def _add_project(db: ExtendedAsyncSAEngine, domain: DomainFixture, name: s
                 type=ProjectType.GENERAL,
             )
         )
+        session.add(VirtualEntityRow(entity_type="project", entity_id=project_id))
     return project_id
 
 
@@ -147,23 +163,34 @@ async def _add_role(
     virtual entity graph when ``via_graph``."""
     role_id = uuid.uuid4()
     async with db.begin_session() as session:
-        session.add(RoleRow(id=role_id, name=name, source=source, status=RoleStatus.ACTIVE))
+        session.add(
+            RoleRow(
+                id=role_id,
+                name=name,
+                source=source,
+                status=RoleStatus.ACTIVE,
+                scope_type="project",
+                scope_id=project_id,
+            )
+        )
         if via_graph:
-            scope_node = VirtualEntityRow(entity_type="project", entity_id=project_id)
+            scope_node_id = await session.scalar(
+                sa.select(VirtualEntityRow.id).where(VirtualEntityRow.entity_id == project_id)
+            )
             role_node = VirtualEntityRow(entity_type="role", entity_id=role_id)
-            session.add_all([scope_node, role_node])
+            session.add(role_node)
             await session.flush()
             session.add(
                 EntityMembershipRow(
-                    virtual_entity_id=scope_node.id, member_entity_id=role_node.id, capped=False
+                    virtual_entity_id=scope_node_id, member_entity_id=role_node.id, capped=False
                 )
             )
         else:
-            session.add(
-                AssociationScopesEntitiesRow(
-                    scope_type=LegacyScopeType.PROJECT,
+            await session.execute(
+                sa.insert(_association_scopes_entities).values(
+                    scope_type=ProjectEntityType(),
                     scope_id=str(project_id),
-                    entity_type=LegacyEntityType.ROLE,
+                    entity_type=RoleEntityType(),
                     entity_id=str(role_id),
                 )
             )
@@ -247,7 +274,7 @@ class TestRolePresetLinkBackfill:
         self, db: ExtendedAsyncSAEngine, domain: DomainFixture
     ) -> None:
         await _add_preset(db, "member", deleted=True)
-        await _add_preset(db, "viewer", scope_type=LegacyScopeType.DOMAIN)
+        await _add_preset(db, "viewer", scope_type=DomainEntityType())
         project_id = await _add_project(db, domain, "alpha")
         deleted = await _add_role(db, "member", project_id)
         other_type = await _add_role(db, "viewer", project_id)

@@ -9,8 +9,8 @@ import pytest
 from ai.backend.common.data.entity.idle_checker import IdleCheckerID
 from ai.backend.common.data.idle_checker.types import IdleCheckPhase
 from ai.backend.common.types import SessionId
+from ai.backend.manager.data.idle_checker.types import IdleJudgmentData
 from ai.backend.manager.repositories.idle_checker.repository import IdleCheckerRepository
-from ai.backend.manager.repositories.idle_checker.types import IdleJudgmentData
 from ai.backend.manager.sokovan.idle_check.applier import IdleCheckApplier
 from ai.backend.manager.sokovan.idle_check.types import IdleCheckResult
 

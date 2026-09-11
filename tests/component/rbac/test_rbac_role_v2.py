@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import AsyncIterator
 from typing import TYPE_CHECKING, Any
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import MagicMock
 
 import pytest
 import yarl
@@ -13,7 +13,7 @@ from ai.backend.client.v2.auth import HMACAuth
 from ai.backend.client.v2.config import ClientConfig
 from ai.backend.client.v2.exceptions import PermissionDeniedError
 from ai.backend.client.v2.v2_registry import V2ClientRegistry
-from ai.backend.common.data.entity.role import ROLE_ENTITY_TYPE
+from ai.backend.common.data.entity.role import RoleEntityType
 from ai.backend.common.dto.manager.v2.rbac.request import (
     AssignRoleInput,
     RevokeRoleInput,
@@ -25,8 +25,6 @@ from ai.backend.common.dto.manager.v2.rbac.response import (
 )
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
 from ai.backend.manager.actions.registry.types import GroupMeta
-from ai.backend.manager.actions.validators import ActionValidators
-from ai.backend.manager.actions.validators.rbac import RBACValidators
 from ai.backend.manager.api.adapters.rbac.adapter import RBACAdapter
 from ai.backend.manager.api.rest.admin.handler import AdminHandler
 from ai.backend.manager.api.rest.admin.registry import register_admin_routes
@@ -45,7 +43,6 @@ from ai.backend.manager.services.permission_contoller.processors import (
 )
 from ai.backend.manager.services.permission_contoller.service import PermissionControllerService
 from ai.backend.manager.services.rbac.processors import RbacProcessors
-from ai.backend.testutils.action_validators import mock_virtual_entity_rbac_validators
 
 if TYPE_CHECKING:
     from tests.component.conftest import ServerInfo, UserFixtureData
@@ -60,16 +57,11 @@ def permission_controller_processors(
     processor_registry: ProcessorRegistry[Any],
 ) -> PermissionControllerProcessors:
     repo = PermissionControllerRepository(database_engine)
-    service = PermissionControllerService(repo, rbac_action_registry=[])
-    validators = ActionValidators(
-        virtual_entity_rbac=mock_virtual_entity_rbac_validators(),
-        rbac=RBACValidators(scope=AsyncMock()),
-    )
+    service = PermissionControllerService(repo, action_registry=processor_registry)
     return PermissionControllerProcessors(
-        processor_registry.group(GroupMeta(ROLE_ENTITY_TYPE)),
+        processor_registry.group(GroupMeta(RoleEntityType())),
         service=service,
         action_monitors=[],
-        validators=validators,
     )
 
 
@@ -99,7 +91,7 @@ def server_module_registries(
     processors = MagicMock()
     processors.permission_controller = permission_controller_processors
     processors.rbac = rbac_processors
-    adapter = RBACAdapter(processors)
+    adapter = RBACAdapter(processors.rbac, processors.permission_controller)
     handler = V2RBACHandler(adapter=adapter)
     v2_reg = RouteRegistry.create("v2", route_deps.cors_options)
     v2_reg.add_subregistry(register_v2_rbac_routes(handler, route_deps))

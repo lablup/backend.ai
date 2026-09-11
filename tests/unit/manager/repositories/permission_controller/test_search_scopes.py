@@ -10,9 +10,10 @@ from collections.abc import AsyncGenerator
 
 import pytest
 
-from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.domain import DomainEntityType, DomainID
+from ai.backend.common.data.entity.project import ProjectEntityType
+from ai.backend.common.data.entity.user import UserEntityType
 from ai.backend.common.data.filter_specs import StringMatchSpec
-from ai.backend.common.data.permission.types import RBACElementType, ScopeType
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
@@ -177,14 +178,12 @@ class TestSearchDomainScopes:
             pagination=OffsetPagination(limit=10, offset=0),
         )
 
-        result = await permission_controller_repository.search_scopes(
-            RBACElementType.DOMAIN, querier
-        )
+        result = await permission_controller_repository.search_scopes(DomainEntityType(), querier)
 
         assert result.total_count == len(sample_domains)
         assert len(result.items) == len(sample_domains)
         for item in result.items:
-            assert item.id.scope_type == ScopeType.DOMAIN
+            assert item.id.scope_type == DomainEntityType()
             assert item.name in sample_domains
 
     async def test_search_domain_scopes_with_name_contains_filter(
@@ -200,9 +199,7 @@ class TestSearchDomainScopes:
             pagination=OffsetPagination(limit=10, offset=0),
         )
 
-        result = await permission_controller_repository.search_scopes(
-            RBACElementType.DOMAIN, querier
-        )
+        result = await permission_controller_repository.search_scopes(DomainEntityType(), querier)
 
         # sample_domains has "test-domain-alpha", "test-domain-beta", "prod-domain"
         # Only domains containing "test" should be returned
@@ -224,9 +221,7 @@ class TestSearchDomainScopes:
             pagination=OffsetPagination(limit=10, offset=0),
         )
 
-        result = await permission_controller_repository.search_scopes(
-            RBACElementType.DOMAIN, querier
-        )
+        result = await permission_controller_repository.search_scopes(DomainEntityType(), querier)
 
         assert result.total_count == 1
         assert result.items[0].name == target_name
@@ -244,9 +239,7 @@ class TestSearchDomainScopes:
             pagination=OffsetPagination(limit=10, offset=0),
         )
 
-        result = await permission_controller_repository.search_scopes(
-            RBACElementType.DOMAIN, querier
-        )
+        result = await permission_controller_repository.search_scopes(DomainEntityType(), querier)
 
         assert result.total_count == 2
         for item in result.items:
@@ -264,9 +257,7 @@ class TestSearchDomainScopes:
             pagination=OffsetPagination(limit=10, offset=0),
         )
 
-        result = await permission_controller_repository.search_scopes(
-            RBACElementType.DOMAIN, querier
-        )
+        result = await permission_controller_repository.search_scopes(DomainEntityType(), querier)
 
         names = [item.name for item in result.items]
         assert names == sorted(names)
@@ -283,9 +274,7 @@ class TestSearchDomainScopes:
             pagination=OffsetPagination(limit=10, offset=0),
         )
 
-        result = await permission_controller_repository.search_scopes(
-            RBACElementType.DOMAIN, querier
-        )
+        result = await permission_controller_repository.search_scopes(DomainEntityType(), querier)
 
         names = [item.name for item in result.items]
         assert names == sorted(names, reverse=True)
@@ -303,7 +292,7 @@ class TestSearchDomainScopes:
             pagination=OffsetPagination(limit=5, offset=0),
         )
         result_page1 = await permission_controller_repository.search_scopes(
-            RBACElementType.DOMAIN, querier_page1
+            DomainEntityType(), querier_page1
         )
 
         assert len(result_page1.items) == 5
@@ -318,7 +307,7 @@ class TestSearchDomainScopes:
             pagination=OffsetPagination(limit=5, offset=5),
         )
         result_page2 = await permission_controller_repository.search_scopes(
-            RBACElementType.DOMAIN, querier_page2
+            DomainEntityType(), querier_page2
         )
 
         assert len(result_page2.items) == 5
@@ -481,13 +470,11 @@ class TestSearchProjectScopes:
             pagination=OffsetPagination(limit=10, offset=0),
         )
 
-        result = await permission_controller_repository.search_scopes(
-            RBACElementType.PROJECT, querier
-        )
+        result = await permission_controller_repository.search_scopes(ProjectEntityType(), querier)
 
         assert result.total_count == len(sample_projects)
         for item in result.items:
-            assert item.id.scope_type == ScopeType.PROJECT
+            assert item.id.scope_type == ProjectEntityType()
 
     async def test_search_project_scopes_with_name_contains_filter(
         self,
@@ -502,9 +489,7 @@ class TestSearchProjectScopes:
             pagination=OffsetPagination(limit=10, offset=0),
         )
 
-        result = await permission_controller_repository.search_scopes(
-            RBACElementType.PROJECT, querier
-        )
+        result = await permission_controller_repository.search_scopes(ProjectEntityType(), querier)
 
         assert result.total_count == 1
         assert "alpha" in result.items[0].name.lower()
@@ -521,9 +506,7 @@ class TestSearchProjectScopes:
             pagination=OffsetPagination(limit=10, offset=0),
         )
 
-        result = await permission_controller_repository.search_scopes(
-            RBACElementType.PROJECT, querier
-        )
+        result = await permission_controller_repository.search_scopes(ProjectEntityType(), querier)
 
         names = [item.name for item in result.items]
         assert names == sorted(names)
@@ -540,9 +523,7 @@ class TestSearchProjectScopes:
             pagination=OffsetPagination(limit=5, offset=0),
         )
 
-        result = await permission_controller_repository.search_scopes(
-            RBACElementType.PROJECT, querier
-        )
+        result = await permission_controller_repository.search_scopes(ProjectEntityType(), querier)
 
         assert len(result.items) == 5
         assert result.total_count == 15
@@ -708,11 +689,11 @@ class TestSearchUserScopes:
             pagination=OffsetPagination(limit=10, offset=0),
         )
 
-        result = await permission_controller_repository.search_scopes(RBACElementType.USER, querier)
+        result = await permission_controller_repository.search_scopes(UserEntityType(), querier)
 
         assert result.total_count == len(sample_users)
         for item in result.items:
-            assert item.id.scope_type == ScopeType.USER
+            assert item.id.scope_type == UserEntityType()
 
     async def test_search_user_scopes_filters_username_or_email(
         self,
@@ -728,7 +709,7 @@ class TestSearchUserScopes:
             pagination=OffsetPagination(limit=10, offset=0),
         )
 
-        result = await permission_controller_repository.search_scopes(RBACElementType.USER, querier)
+        result = await permission_controller_repository.search_scopes(UserEntityType(), querier)
 
         # Users with "example" in email: alpha@example.com, beta@example.com
         assert result.total_count == 2
@@ -745,7 +726,7 @@ class TestSearchUserScopes:
             pagination=OffsetPagination(limit=10, offset=0),
         )
 
-        result = await permission_controller_repository.search_scopes(RBACElementType.USER, querier)
+        result = await permission_controller_repository.search_scopes(UserEntityType(), querier)
 
         names = [item.name for item in result.items]
         assert names == sorted(names)
@@ -762,7 +743,7 @@ class TestSearchUserScopes:
             pagination=OffsetPagination(limit=5, offset=0),
         )
 
-        result = await permission_controller_repository.search_scopes(RBACElementType.USER, querier)
+        result = await permission_controller_repository.search_scopes(UserEntityType(), querier)
 
         assert len(result.items) == 5
         assert result.total_count == 15
@@ -909,9 +890,7 @@ class TestSearchScopesEmptyResult:
             pagination=OffsetPagination(limit=10, offset=0),
         )
 
-        result = await permission_controller_repository.search_scopes(
-            RBACElementType.DOMAIN, querier
-        )
+        result = await permission_controller_repository.search_scopes(DomainEntityType(), querier)
 
         assert result.total_count == 0
         assert len(result.items) == 0

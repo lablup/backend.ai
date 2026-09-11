@@ -11,18 +11,16 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 
 import pytest
+import sqlalchemy as sa
 
 from ai.backend.common.data.entity.domain import DomainID
-from ai.backend.common.data.entity.project import PROJECT_ENTITY_TYPE
-from ai.backend.common.data.entity.role import ROLE_ENTITY_TYPE
+from ai.backend.common.data.entity.project import ProjectEntityType
+from ai.backend.common.data.entity.role import RoleEntityType
 from ai.backend.common.data.filter_specs import (
     StringMatchSpec,
     UUIDEqualMatchSpec,
 )
-from ai.backend.common.data.permission.types import (
-    EntityType,
-    OperationType,
-)
+from ai.backend.common.data.permission.types import Permission
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.models.agent import AgentRow
@@ -39,7 +37,6 @@ from ai.backend.manager.models.rbac_models import UserRoleRow
 from ai.backend.manager.models.rbac_models.conditions import (
     AssignedUserConditions,
 )
-from ai.backend.manager.models.rbac_models.permission.object_permission import ObjectPermissionRow
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.rbac_models.role.conditions import RoleConditions
@@ -52,7 +49,6 @@ from ai.backend.manager.models.resource_policy import (
 from ai.backend.manager.models.specs.pagination import CursorForwardPagination, OffsetPagination
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.models.virtual_entity.conditions import OwningScopeConditions
 from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
 from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
 from ai.backend.manager.repositories.base import BatchQuerier
@@ -94,7 +90,6 @@ class TestSearchRoles:
                 UserRow,
                 KeyPairRow,
                 PermissionRow,
-                ObjectPermissionRow,
                 VirtualEntityRow,
                 EntityMembershipRow,
             ],
@@ -118,6 +113,8 @@ class TestSearchRoles:
         base_time = datetime(2026, 1, 1, tzinfo=UTC)
 
         async with db_with_rbac_tables.begin_session() as db_sess:
+            home = uuid.uuid4()
+            db_sess.add(VirtualEntityRow(entity_type=ProjectEntityType(), entity_id=home))
             for i, (name, description) in enumerate([
                 ("admin-role", "Admin role"),
                 ("editor-role", "Editor role"),
@@ -128,6 +125,8 @@ class TestSearchRoles:
                     name=name,
                     description=description,
                     created_at=created_at,
+                    scope_type=ProjectEntityType(),
+                    scope_id=home,
                 )
                 db_sess.add(role)
                 await db_sess.flush()
@@ -332,16 +331,17 @@ class TestSearchRoles:
         db_with_rbac_tables: ExtendedAsyncSAEngine,
         created_roles: list[CreatedRole],
     ) -> tuple[str, list[CreatedRole]]:
-        """Put the first role under a project scope in the graph.
+        """Put the first role in a project scope: on the row, and under the scope in
+        the graph.
 
         Returns ``(project_scope_id, created_roles)``.
         """
         project_id = uuid.uuid4()
 
         async with db_with_rbac_tables.begin_session() as db_sess:
-            scope_node = VirtualEntityRow(entity_type=PROJECT_ENTITY_TYPE, entity_id=project_id)
+            scope_node = VirtualEntityRow(entity_type=ProjectEntityType(), entity_id=project_id)
             role_node = VirtualEntityRow(
-                entity_type=ROLE_ENTITY_TYPE, entity_id=created_roles[0].role_id
+                entity_type=RoleEntityType(), entity_id=created_roles[0].role_id
             )
             db_sess.add_all([scope_node, role_node])
             await db_sess.flush()
@@ -352,6 +352,11 @@ class TestSearchRoles:
             db_sess.add(
                 EntityMembershipRow(virtual_entity_id=scope_node.id, member_entity_id=role_node.id)
             )
+            await db_sess.execute(
+                sa.update(RoleRow)
+                .where(RoleRow.id == created_roles[0].role_id)
+                .values(scope_type=ProjectEntityType(), scope_id=project_id)
+            )
             await db_sess.flush()
 
         return str(project_id), created_roles
@@ -361,18 +366,16 @@ class TestSearchRoles:
         repository: PermissionControllerRepository,
         roles_mapped_to_scope: tuple[str, list[CreatedRole]],
     ) -> None:
-        """``RoleConditions.by_mapped_scope`` should restrict results to roles the
-        given scope owns in the graph."""
+        """``RoleConditions.by_mapped_scope`` should restrict results to the roles of
+        the given scope."""
         project_scope_id, created_roles = roles_mapped_to_scope
 
         querier = BatchQuerier(
             conditions=[
                 RoleConditions.by_mapped_scope([
-                    OwningScopeConditions.by_scope_type_equals(PROJECT_ENTITY_TYPE),
-                    OwningScopeConditions.by_scope_id_equals(
-                        StringMatchSpec(
-                            value=project_scope_id, case_insensitive=False, negated=False
-                        )
+                    RoleConditions.by_scope_type_equals(ProjectEntityType()),
+                    RoleConditions.by_scope_id_equals(
+                        UUIDEqualMatchSpec(value=uuid.UUID(project_scope_id), negated=False)
                     ),
                 ]),
             ],
@@ -387,7 +390,7 @@ class TestSearchRoles:
 
 
 class TestSearchRolesTotalCountNotInflated:
-    """Regression tests for BA-5749: total_count must not be inflated by ObjectPermissionRow JOIN."""
+    """Regression tests for BA-5749: total_count counts roles, not the rows they own."""
 
     @pytest.fixture
     async def db_with_rbac_tables(
@@ -405,7 +408,6 @@ class TestSearchRolesTotalCountNotInflated:
                 UserRow,
                 KeyPairRow,
                 PermissionRow,
-                ObjectPermissionRow,
             ],
         ):
             yield database_connection
@@ -418,20 +420,24 @@ class TestSearchRolesTotalCountNotInflated:
         return PermissionControllerRepository(db_with_rbac_tables)
 
     @pytest.fixture
-    async def roles_with_object_permissions(
+    async def roles_with_permissions(
         self,
         db_with_rbac_tables: ExtendedAsyncSAEngine,
     ) -> list[CreatedRole]:
-        """Create 2 roles: one with 3 ObjectPermissionRows, one with 0."""
+        """Create 2 roles: one holding 3 permission rows, one holding none."""
         created: list[CreatedRole] = []
         base_time = datetime(2026, 1, 1, tzinfo=UTC)
 
         async with db_with_rbac_tables.begin_session() as db_sess:
+            home = uuid.uuid4()
+            db_sess.add(VirtualEntityRow(entity_type=ProjectEntityType(), entity_id=home))
             # Role with multiple object permissions
             role_with_perms = RoleRow(
                 name="role-with-perms",
                 description="Role that has multiple object permissions",
                 created_at=base_time,
+                scope_type=ProjectEntityType(),
+                scope_id=home,
             )
             db_sess.add(role_with_perms)
             await db_sess.flush()
@@ -443,20 +449,21 @@ class TestSearchRolesTotalCountNotInflated:
                 )
             )
 
-            # Add 3 ObjectPermissionRow entries for this role
-            for op_type in [OperationType.READ, OperationType.UPDATE, OperationType.CREATE]:
-                obj_perm = ObjectPermissionRow(
-                    role_id=role_with_perms.id,
-                    entity_type=EntityType.PROJECT,
-                    entity_id=str(uuid.uuid4()),
-                    operation=op_type,
+            for permission in [Permission.READ, Permission.UPDATE, Permission.CREATE]:
+                db_sess.add(
+                    PermissionRow(
+                        role_id=role_with_perms.id,
+                        entity_type=ProjectEntityType(),
+                        permission=permission,
+                    )
                 )
-                db_sess.add(obj_perm)
 
             # Role with zero object permissions
             role_without_perms = RoleRow(
                 name="role-without-perms",
-                description="Role that has no object permissions",
+                scope_type=ProjectEntityType(),
+                scope_id=home,
+                description="Role that holds no permissions",
                 created_at=base_time + timedelta(minutes=1),
             )
             db_sess.add(role_without_perms)
@@ -474,7 +481,7 @@ class TestSearchRolesTotalCountNotInflated:
     async def test_total_count_not_inflated_with_offset_pagination(
         self,
         repository: PermissionControllerRepository,
-        roles_with_object_permissions: list[CreatedRole],
+        roles_with_permissions: list[CreatedRole],
     ) -> None:
         """BA-5749: offset pagination total_count must equal distinct role count, not JOIN-inflated count."""
         querier = BatchQuerier(
@@ -491,7 +498,7 @@ class TestSearchRolesTotalCountNotInflated:
     async def test_total_count_not_inflated_with_cursor_pagination(
         self,
         repository: PermissionControllerRepository,
-        roles_with_object_permissions: list[CreatedRole],
+        roles_with_permissions: list[CreatedRole],
     ) -> None:
         """BA-5749: cursor pagination total_count must equal distinct role count, not JOIN-inflated count."""
         querier = BatchQuerier(

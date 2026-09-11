@@ -8,7 +8,10 @@ from datetime import UTC, datetime
 from decimal import Decimal
 
 import pytest
+import sqlalchemy as sa
+from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
+from ai.backend.common.data.entity.agent import AgentUUID
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.types import ResourceSlot, SlotQuantity
@@ -41,6 +44,11 @@ from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.resource_group.db_source import ResourceGroupDBSource
 from ai.backend.testutils.db import with_tables
+
+
+async def _agent_uuid(db_sess: SASession, agent_id: str) -> AgentUUID:
+    """The agent's entity id, which the slot row records beside its name."""
+    return (await db_sess.scalars(sa.select(AgentRow.uuid).where(AgentRow.id == agent_id))).one()
 
 
 def _quantities_to_resource_slot(quantities: list[SlotQuantity]) -> ResourceSlot:
@@ -84,18 +92,21 @@ def _create_kernel(
     )
 
 
-def _create_agent_resource_rows(
+async def _create_agent_resource_rows(
+    db_sess: SASession,
     agent_id: str,
     slots: ResourceSlot,
     used: ResourceSlot | None = None,
 ) -> list[AgentResourceRow]:
     """Create AgentResourceRow entries for each slot in the ResourceSlot."""
+    agent_uuid = await _agent_uuid(db_sess, agent_id)
     rows = []
     for slot_name, capacity_val in slots.items():
         used_val = Decimal(str(used.get(slot_name, 0))) if used else Decimal(0)
         rows.append(
             AgentResourceRow(
                 agent_id=agent_id,
+                agent_uuid=agent_uuid,
                 slot_name=slot_name,
                 capacity=Decimal(str(capacity_val)),
                 used=used_val,
@@ -225,7 +236,7 @@ class TestResourceInfo:
                 )
                 db_sess.add(agent)
                 await db_sess.flush()
-                for ar in _create_agent_resource_rows(agent_id, slots):
+                for ar in await _create_agent_resource_rows(db_sess, agent_id, slots):
                     db_sess.add(ar)
 
         yield base_scaling_group, agent_slots
@@ -313,7 +324,7 @@ class TestResourceInfo:
                 (lost_id, lost_slots),
                 (terminated_id, terminated_slots),
             ]:
-                for ar in _create_agent_resource_rows(aid, slots):
+                for ar in await _create_agent_resource_rows(db_sess, aid, slots):
                     db_sess.add(ar)
 
         yield base_scaling_group, alive_slots
@@ -380,7 +391,7 @@ class TestResourceInfo:
                 (sched_id, schedulable_slots),
                 (non_sched_id, non_schedulable_slots),
             ]:
-                for ar in _create_agent_resource_rows(aid, slots):
+                for ar in await _create_agent_resource_rows(db_sess, aid, slots):
                     db_sess.add(ar)
 
         yield base_scaling_group, schedulable_slots
@@ -513,7 +524,9 @@ class TestResourceInfo:
             await db_sess.flush()
 
             # Add agent_resources with used = sum of kernel occupied slots
-            for ar in _create_agent_resource_rows(agent_id, agent_capacity, used=total_used):
+            for ar in await _create_agent_resource_rows(
+                db_sess, agent_id, agent_capacity, used=total_used
+            ):
                 db_sess.add(ar)
 
             # Create session and kernels
@@ -618,7 +631,9 @@ class TestResourceInfo:
             await db_sess.flush()
 
             # Add agent_resources with used = only RUNNING + TERMINATING
-            for ar in _create_agent_resource_rows(agent_id, agent_capacity, used=expected_used):
+            for ar in await _create_agent_resource_rows(
+                db_sess, agent_id, agent_capacity, used=expected_used
+            ):
                 db_sess.add(ar)
 
             # Create session

@@ -9,11 +9,12 @@ from uuid import UUID
 
 from pydantic import Field, field_validator, model_validator
 
-from ai.backend.common.api_handlers import SENTINEL, BaseRequestModel, Sentinel
+from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.data.entity.deployment_preset import DeploymentPresetID
 from ai.backend.common.dto.manager.query import DateTimeFilter, StringFilter
 from ai.backend.common.dto.manager.v2.deployment.request import DeploymentStrategyInput
 from ai.backend.common.dto.manager.v2.entity_label.request import EntityLabelNestedFilter
+from ai.backend.common.tristate.unset import UNSET, Unset
 from ai.backend.common.typed_validators import VFolderName
 
 from .types import (
@@ -142,19 +143,23 @@ class CreateVFolderInScopeInput(BaseRequestModel):
 class UpdateVFolderInput(BaseRequestModel):
     """Input for updating a virtual folder."""
 
-    name: str | Sentinel | None = Field(
-        default=SENTINEL,
-        description="Updated vfolder name. Use SENTINEL (default) for no change.",
+    name: str | None | Unset = Field(
+        default=UNSET,
+        description="Updated vfolder name. Omit to leave unchanged.",
     )
-    cloneable: bool | None = Field(default=None, description="Updated cloneable setting")
-    permission: VFolderPermissionField | None = Field(
-        default=None, description="Updated permission level"
+    cloneable: bool | None | Unset = Field(
+        default=UNSET,
+        description="Updated cloneable setting. Omit to leave unchanged.",
+    )
+    permission: VFolderPermissionField | None | Unset = Field(
+        default=UNSET,
+        description="Updated permission level. Omit to leave unchanged.",
     )
 
     @field_validator("name")
     @classmethod
-    def strip_and_validate_name(cls, v: str | Sentinel | None) -> str | Sentinel | None:
-        if v is None or isinstance(v, Sentinel):
+    def strip_and_validate_name(cls, v: str | None | Unset) -> str | None | Unset:
+        if not isinstance(v, str):
             return v
         stripped = v.strip()
         if not stripped:

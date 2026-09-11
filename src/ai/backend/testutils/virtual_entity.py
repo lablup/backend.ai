@@ -15,7 +15,10 @@ import uuid
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ai.backend.common.data.permission.types import Permission, ScopeType
+from ai.backend.common.data.entity.project import ProjectEntityType
+from ai.backend.common.data.entity.types import EntityType
+from ai.backend.common.data.entity.user import UserEntityType
+from ai.backend.common.data.permission.types import Permission
 from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
 from ai.backend.manager.models.virtual_entity.entity_membership_cap import (
     EntityMembershipCapRow,
@@ -44,14 +47,14 @@ class VirtualEntitySeeder:
         return row.id
 
     async def get_or_create_scope(
-        self, sess: AsyncSession, scope_type: ScopeType, scope_id: uuid.UUID
+        self, sess: AsyncSession, scope_type: EntityType, scope_id: uuid.UUID
     ) -> uuid.UUID:
         return await self.get_or_create_node(sess, scope_type, scope_id)
 
     async def seed_user_scope(self, sess: AsyncSession, user_id: uuid.UUID) -> None:
         """Give a directly-inserted user the chain rows ``create_user`` would
         have made: their own virtual entity plus the self membership/binding."""
-        scope_id = await self.get_or_create_scope(sess, ScopeType.USER, user_id)
+        scope_id = await self.get_or_create_scope(sess, UserEntityType(), user_id)
         sess.add(
             EntityMembershipRow(
                 virtual_entity_id=scope_id,
@@ -75,8 +78,8 @@ class VirtualEntitySeeder:
         membership: the user joins the project's virtual entity. The project is not bound
         into the user's own virtual entity — a member does not hand the project its
         personal entities."""
-        project_scope_id = await self.get_or_create_scope(sess, ScopeType.PROJECT, group_id)
-        user_scope_id = await self.get_or_create_scope(sess, ScopeType.USER, user_id)
+        project_scope_id = await self.get_or_create_scope(sess, ProjectEntityType(), group_id)
+        user_scope_id = await self.get_or_create_scope(sess, UserEntityType(), user_id)
         sess.add(
             EntityMembershipRow(
                 virtual_entity_id=project_scope_id,

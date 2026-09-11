@@ -2,16 +2,16 @@
 
 from __future__ import annotations
 
-from abc import ABC, abstractmethod
+from abc import ABC
 from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.common.data.entity.domain import DOMAIN_SCOPE_TYPE, DomainID
-from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE, ProjectID
-from ai.backend.common.data.entity.types import EntityType, ScopeRef
-from ai.backend.common.data.entity.user import USER_ENTITY_TYPE
-from ai.backend.manager.actions.v2.ops.base import OperationScopeOpsAction
+from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
+from ai.backend.common.data.entity.user import UserEntityType
+from ai.backend.manager.actions.v2.ops.base import OperationScopeOpsAction, ScopeItem
 from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.models.scopes import OperationScope
 from ai.backend.manager.models.user.row import UserRow
@@ -29,22 +29,8 @@ __all__ = (
 )
 
 
-class UserScopeItem(ABC):
-    """One side a user is reachable from.
-
-    The scope the read is answered for and the rows it is restricted to are declared
-    together, so a read cannot be authorized against one thing and served another.
-    """
-
-    @abstractmethod
-    def scope_ref(self) -> ScopeRef:
-        """The scope the read is answered for."""
-        raise NotImplementedError
-
-    @abstractmethod
-    def operation_scope(self) -> OperationScope:
-        """The rows the read is restricted to."""
-        raise NotImplementedError
+class UserScopeItem(ScopeItem, ABC):
+    """One side a user is reachable from."""
 
 
 @dataclass(frozen=True)
@@ -54,8 +40,8 @@ class DomainUserScopeItem(UserScopeItem):
     domain_id: DomainID
 
     @override
-    def scope_ref(self) -> ScopeRef:
-        return ScopeRef(scope_type=DOMAIN_SCOPE_TYPE, scope_id=self.domain_id)
+    def scope_id(self) -> EntityIdentifier:
+        return self.domain_id
 
     @override
     def operation_scope(self) -> OperationScope:
@@ -69,8 +55,8 @@ class ProjectUserScopeItem(UserScopeItem):
     project_id: ProjectID
 
     @override
-    def scope_ref(self) -> ScopeRef:
-        return ScopeRef(scope_type=PROJECT_SCOPE_TYPE, scope_id=self.project_id)
+    def scope_id(self) -> EntityIdentifier:
+        return self.project_id
 
     @override
     def operation_scope(self) -> OperationScope:
@@ -91,7 +77,7 @@ class ScopedSearchUsersAction(OperationScopeOpsAction[UserRow, UserData]):
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return USER_ENTITY_TYPE
+        return UserEntityType()
 
     @override
     @classmethod
@@ -99,8 +85,8 @@ class ScopedSearchUsersAction(OperationScopeOpsAction[UserRow, UserData]):
         return "scoped_search_users"
 
     @override
-    def scope_targets(self) -> Sequence[ScopeRef]:
-        return [item.scope_ref() for item in self.items]
+    def scope_targets(self) -> Sequence[EntityIdentifier]:
+        return [item.scope_id() for item in self.items]
 
     @override
     def operation_scopes(self) -> Sequence[OperationScope]:

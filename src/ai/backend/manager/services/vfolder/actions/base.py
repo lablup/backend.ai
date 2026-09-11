@@ -3,9 +3,9 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any, override
 
-from ai.backend.common.data.entity.types import EntityIdentifier, EntityType, ScopeRef
-from ai.backend.common.data.entity.user import USER_SCOPE_TYPE
-from ai.backend.common.data.entity.vfolder import VFOLDER_ENTITY_TYPE, VFolderUUID
+from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
+from ai.backend.common.data.entity.user import UserID
+from ai.backend.common.data.entity.vfolder import VFolderEntityType, VFolderUUID
 from ai.backend.common.types import (
     AccessKey,
     KernelId,
@@ -85,7 +85,7 @@ class VFolderGlobalAction(BaseGlobalAction):
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return VFOLDER_ENTITY_TYPE
+        return VFolderEntityType()
 
     @override
     @classmethod
@@ -100,7 +100,7 @@ class VFolderScopeAction(BaseScopeAction):
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return VFOLDER_ENTITY_TYPE
+        return VFolderEntityType()
 
     @override
     @classmethod
@@ -164,10 +164,10 @@ class GetVFolderActionResult:
 @dataclass
 class ListVFolderAction(VFolderScopeAction):
     user_uuid: uuid.UUID
-    scope: ScopeRef
+    scope: EntityIdentifier
 
     @override
-    def scope_targets(self) -> Sequence[ScopeRef]:
+    def scope_targets(self) -> Sequence[EntityIdentifier]:
         return (self.scope,)
 
     @override
@@ -359,8 +359,8 @@ class GetTaskLogsAction(VFolderScopeAction):
     request: Any
 
     @override
-    def scope_targets(self) -> Sequence[ScopeRef]:
-        return (ScopeRef(scope_type=USER_SCOPE_TYPE, scope_id=self.user_id),)
+    def scope_targets(self) -> Sequence[EntityIdentifier]:
+        return (UserID(self.user_id),)
 
     @override
     @classmethod
@@ -411,7 +411,7 @@ class LookupAccessibleVFolderAction(BaseLookupAction):
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return VFOLDER_ENTITY_TYPE
+        return VFolderEntityType()
 
     @override
     @classmethod

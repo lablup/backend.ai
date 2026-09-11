@@ -24,6 +24,11 @@ from ai.backend.manager.models.fair_share import (
     ProjectFairShareRow,
     UserFairShareRow,
 )
+from ai.backend.manager.models.fair_share.upserters import (
+    DomainFairShareUpserter,
+    ProjectFairShareUpserter,
+    UserFairShareUpserter,
+)
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
@@ -52,18 +57,13 @@ from ai.backend.manager.models.user import (
     UserStatus,
 )
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.base import BatchQuerier, Creator, Upserter
+from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.fair_share import (
     DomainFairShareConditions,
-    DomainFairShareCreatorSpec,
     DomainFairShareOrders,
-    DomainFairShareUpserterSpec,
     FairShareRepository,
-    ProjectFairShareCreatorSpec,
-    ProjectFairShareUpserterSpec,
-    UserFairShareCreatorSpec,
-    UserFairShareUpserterSpec,
 )
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.types import OptionalState, TriState
 from ai.backend.testutils.db import with_tables
 from ai.backend.testutils.fixtures import DomainFixtureData
@@ -268,35 +268,9 @@ class TestFairShareRepository:
         db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> FairShareRepository:
         """Create FairShareRepository instance with database"""
-        return FairShareRepository(db=db_with_cleanup)
+        return FairShareRepository(db_with_cleanup, V2DBOpsProvider(db_with_cleanup))
 
     # ==================== Domain Fair Share Tests ====================
-
-    async def test_create_domain_fair_share(
-        self,
-        fair_share_repository: FairShareRepository,
-        test_scaling_group: str,
-        test_domain: DomainFixtureData,
-    ) -> None:
-        """Test creating domain fair share"""
-        creator = Creator(
-            spec=DomainFairShareCreatorSpec(
-                resource_group=test_scaling_group,
-                resource_group_id=RESOURCE_GROUP_ID,
-                domain_name=test_domain.domain_name,
-                weight=Decimal("2.0"),
-            )
-        )
-
-        result = await fair_share_repository.create_domain_fair_share(creator)
-
-        assert result.resource_group == test_scaling_group
-        assert result.domain_name == test_domain.domain_name
-        assert result.data.spec.weight == Decimal("2.0")
-        assert result.data.calculation_snapshot.fair_share_factor == Decimal(
-            "1.0"
-        )  # Default initial value
-        assert result.data.calculation_snapshot.total_decayed_usage == []
 
     async def test_upsert_domain_fair_share_insert(
         self,
@@ -305,15 +279,13 @@ class TestFairShareRepository:
         test_domain: DomainFixtureData,
     ) -> None:
         """Test upsert domain fair share - insert case"""
-        upserter = Upserter(
-            spec=DomainFairShareUpserterSpec(
-                resource_group=test_scaling_group,
-                resource_group_id=RESOURCE_GROUP_ID,
-                domain_name=test_domain.domain_name,
-                weight=TriState.update(Decimal("1.5")),
-                # Must provide at least one update value for ON CONFLICT UPDATE
-                fair_share_factor=OptionalState.update(Decimal("1.0")),
-            )
+        upserter = DomainFairShareUpserter(
+            resource_group=test_scaling_group,
+            resource_group_id=RESOURCE_GROUP_ID,
+            domain_name=test_domain.domain_name,
+            weight=TriState.update(Decimal("1.5")),
+            # Must provide at least one update value for ON CONFLICT UPDATE
+            fair_share_factor=OptionalState.update(Decimal("1.0")),
         )
 
         result = await fair_share_repository.upsert_domain_fair_share(upserter)
@@ -332,27 +304,23 @@ class TestFairShareRepository:
     ) -> None:
         """Test upsert domain fair share - update case"""
         # First insert
-        upserter1 = Upserter(
-            spec=DomainFairShareUpserterSpec(
-                resource_group=test_scaling_group,
-                resource_group_id=RESOURCE_GROUP_ID,
-                domain_name=test_domain.domain_name,
-                weight=TriState.update(Decimal("1.0")),
-                # Must provide at least one update value for ON CONFLICT UPDATE
-                fair_share_factor=OptionalState.update(Decimal("1.0")),
-            )
+        upserter1 = DomainFairShareUpserter(
+            resource_group=test_scaling_group,
+            resource_group_id=RESOURCE_GROUP_ID,
+            domain_name=test_domain.domain_name,
+            weight=TriState.update(Decimal("1.0")),
+            # Must provide at least one update value for ON CONFLICT UPDATE
+            fair_share_factor=OptionalState.update(Decimal("1.0")),
         )
         await fair_share_repository.upsert_domain_fair_share(upserter1)
 
         # Second upsert - should update calculated fields
-        upserter2 = Upserter(
-            spec=DomainFairShareUpserterSpec(
-                resource_group=test_scaling_group,
-                resource_group_id=RESOURCE_GROUP_ID,
-                domain_name=test_domain.domain_name,
-                fair_share_factor=OptionalState.update(Decimal("0.75")),
-                normalized_usage=OptionalState.update(Decimal("0.5")),
-            )
+        upserter2 = DomainFairShareUpserter(
+            resource_group=test_scaling_group,
+            resource_group_id=RESOURCE_GROUP_ID,
+            domain_name=test_domain.domain_name,
+            fair_share_factor=OptionalState.update(Decimal("0.75")),
+            normalized_usage=OptionalState.update(Decimal("0.5")),
         )
         result = await fair_share_repository.upsert_domain_fair_share(upserter2)
 
@@ -377,16 +345,13 @@ class TestFairShareRepository:
         test_domain: DomainFixtureData,
     ) -> None:
         """Test getting domain fair share by scaling group and domain"""
-        # Create first
-        creator = Creator(
-            spec=DomainFairShareCreatorSpec(
-                resource_group=test_scaling_group,
-                resource_group_id=RESOURCE_GROUP_ID,
-                domain_name=test_domain.domain_name,
-                weight=Decimal("1.5"),
-            )
+        upserter = DomainFairShareUpserter(
+            resource_group=test_scaling_group,
+            resource_group_id=RESOURCE_GROUP_ID,
+            domain_name=test_domain.domain_name,
+            weight=TriState.update(Decimal("1.5")),
         )
-        await fair_share_repository.create_domain_fair_share(creator)
+        await fair_share_repository.upsert_domain_fair_share(upserter)
 
         # Get
         result = await fair_share_repository.get_domain_fair_share(
@@ -436,14 +401,13 @@ class TestFairShareRepository:
             await db_sess.commit()
 
         for name in domain_names:
-            creator = Creator(
-                spec=DomainFairShareCreatorSpec(
-                    resource_group=test_scaling_group,
-                    resource_group_id=RESOURCE_GROUP_ID,
-                    domain_name=name,
-                )
+            upserter = DomainFairShareUpserter(
+                resource_group=test_scaling_group,
+                resource_group_id=RESOURCE_GROUP_ID,
+                domain_name=name,
+                weight=TriState.update(Decimal("1.0")),
             )
-            await fair_share_repository.create_domain_fair_share(creator)
+            await fair_share_repository.upsert_domain_fair_share(upserter)
 
         # Search with BatchQuerier
         querier = BatchQuerier(
@@ -460,31 +424,6 @@ class TestFairShareRepository:
 
     # ==================== Project Fair Share Tests ====================
 
-    async def test_create_project_fair_share(
-        self,
-        fair_share_repository: FairShareRepository,
-        test_scaling_group: str,
-        test_domain: DomainFixtureData,
-        test_project_id: uuid.UUID,
-    ) -> None:
-        """Test creating project fair share"""
-        creator = Creator(
-            spec=ProjectFairShareCreatorSpec(
-                resource_group=test_scaling_group,
-                resource_group_id=RESOURCE_GROUP_ID,
-                project_id=test_project_id,
-                domain_name=test_domain.domain_name,
-                weight=Decimal("1.5"),
-            )
-        )
-
-        result = await fair_share_repository.create_project_fair_share(creator)
-
-        assert result.resource_group == test_scaling_group
-        assert result.project_id == test_project_id
-        assert result.domain_name == test_domain.domain_name
-        assert result.data.spec.weight == Decimal("1.5")
-
     async def test_upsert_project_fair_share(
         self,
         fair_share_repository: FairShareRepository,
@@ -493,15 +432,13 @@ class TestFairShareRepository:
         test_project_id: uuid.UUID,
     ) -> None:
         """Test upsert project fair share"""
-        upserter = Upserter(
-            spec=ProjectFairShareUpserterSpec(
-                resource_group=test_scaling_group,
-                resource_group_id=RESOURCE_GROUP_ID,
-                project_id=test_project_id,
-                domain_name=test_domain.domain_name,
-                weight=TriState.update(Decimal("2.0")),
-                fair_share_factor=OptionalState.update(Decimal("0.8")),
-            )
+        upserter = ProjectFairShareUpserter(
+            resource_group=test_scaling_group,
+            resource_group_id=RESOURCE_GROUP_ID,
+            project_id=test_project_id,
+            domain_name=test_domain.domain_name,
+            weight=TriState.update(Decimal("2.0")),
+            fair_share_factor=OptionalState.update(Decimal("0.8")),
         )
 
         result = await fair_share_repository.upsert_project_fair_share(upserter)
@@ -518,15 +455,14 @@ class TestFairShareRepository:
         test_project_id: uuid.UUID,
     ) -> None:
         """Test getting project fair share"""
-        creator = Creator(
-            spec=ProjectFairShareCreatorSpec(
-                resource_group=test_scaling_group,
-                resource_group_id=RESOURCE_GROUP_ID,
-                project_id=test_project_id,
-                domain_name=test_domain.domain_name,
-            )
+        upserter = ProjectFairShareUpserter(
+            resource_group=test_scaling_group,
+            resource_group_id=RESOURCE_GROUP_ID,
+            project_id=test_project_id,
+            domain_name=test_domain.domain_name,
+            weight=TriState.update(Decimal("1.0")),
         )
-        await fair_share_repository.create_project_fair_share(creator)
+        await fair_share_repository.upsert_project_fair_share(upserter)
 
         result = await fair_share_repository.get_project_fair_share(
             resource_group_id=RESOURCE_GROUP_ID,
@@ -537,33 +473,6 @@ class TestFairShareRepository:
 
     # ==================== User Fair Share Tests ====================
 
-    async def test_create_user_fair_share(
-        self,
-        fair_share_repository: FairShareRepository,
-        test_scaling_group: str,
-        test_domain: DomainFixtureData,
-        test_project_id: uuid.UUID,
-        test_user_uuid: uuid.UUID,
-    ) -> None:
-        """Test creating user fair share"""
-        creator = Creator(
-            spec=UserFairShareCreatorSpec(
-                resource_group=test_scaling_group,
-                resource_group_id=RESOURCE_GROUP_ID,
-                user_uuid=test_user_uuid,
-                project_id=test_project_id,
-                domain_name=test_domain.domain_name,
-                weight=Decimal("1.2"),
-            )
-        )
-
-        result = await fair_share_repository.create_user_fair_share(creator)
-
-        assert result.resource_group == test_scaling_group
-        assert result.user_uuid == test_user_uuid
-        assert result.project_id == test_project_id
-        assert result.data.spec.weight == Decimal("1.2")
-
     async def test_upsert_user_fair_share(
         self,
         fair_share_repository: FairShareRepository,
@@ -573,16 +482,14 @@ class TestFairShareRepository:
         test_user_uuid: uuid.UUID,
     ) -> None:
         """Test upsert user fair share"""
-        upserter = Upserter(
-            spec=UserFairShareUpserterSpec(
-                resource_group=test_scaling_group,
-                resource_group_id=RESOURCE_GROUP_ID,
-                user_uuid=test_user_uuid,
-                project_id=test_project_id,
-                domain_name=test_domain.domain_name,
-                weight=TriState.update(Decimal("1.5")),
-                fair_share_factor=OptionalState.update(Decimal("0.9")),
-            )
+        upserter = UserFairShareUpserter(
+            resource_group=test_scaling_group,
+            resource_group_id=RESOURCE_GROUP_ID,
+            user_uuid=test_user_uuid,
+            project_id=test_project_id,
+            domain_name=test_domain.domain_name,
+            weight=TriState.update(Decimal("1.5")),
+            fair_share_factor=OptionalState.update(Decimal("0.9")),
         )
 
         result = await fair_share_repository.upsert_user_fair_share(upserter)
@@ -600,16 +507,15 @@ class TestFairShareRepository:
         test_user_uuid: uuid.UUID,
     ) -> None:
         """Test getting user fair share"""
-        creator = Creator(
-            spec=UserFairShareCreatorSpec(
-                resource_group=test_scaling_group,
-                resource_group_id=RESOURCE_GROUP_ID,
-                user_uuid=test_user_uuid,
-                project_id=test_project_id,
-                domain_name=test_domain.domain_name,
-            )
+        upserter = UserFairShareUpserter(
+            resource_group=test_scaling_group,
+            resource_group_id=RESOURCE_GROUP_ID,
+            user_uuid=test_user_uuid,
+            project_id=test_project_id,
+            domain_name=test_domain.domain_name,
+            weight=TriState.update(Decimal("1.0")),
         )
-        await fair_share_repository.create_user_fair_share(creator)
+        await fair_share_repository.upsert_user_fair_share(upserter)
 
         result = await fair_share_repository.get_user_fair_share(
             resource_group_id=RESOURCE_GROUP_ID,
@@ -651,14 +557,12 @@ class TestFairShareRepository:
             db_sess.add(domain)
             await db_sess.commit()
 
-        upserter = Upserter(
-            spec=DomainFairShareUpserterSpec(
-                resource_group=non_existent_sg,
-                resource_group_id=non_existent_sg_id,
-                domain_name=domain_name,
-                weight=TriState.update(Decimal("2.5")),
-                fair_share_factor=OptionalState.update(Decimal("1.0")),
-            )
+        upserter = DomainFairShareUpserter(
+            resource_group=non_existent_sg,
+            resource_group_id=non_existent_sg_id,
+            domain_name=domain_name,
+            weight=TriState.update(Decimal("2.5")),
+            fair_share_factor=OptionalState.update(Decimal("1.0")),
         )
 
         result = await fair_share_repository.upsert_domain_fair_share(upserter)
@@ -704,15 +608,13 @@ class TestFairShareRepository:
             db_sess.add(group)
             await db_sess.commit()
 
-        upserter = Upserter(
-            spec=ProjectFairShareUpserterSpec(
-                resource_group=non_existent_sg,
-                resource_group_id=non_existent_sg_id,
-                project_id=project_id,
-                domain_name=test_domain.domain_name,
-                weight=TriState.update(Decimal("3.0")),
-                fair_share_factor=OptionalState.update(Decimal("1.0")),
-            )
+        upserter = ProjectFairShareUpserter(
+            resource_group=non_existent_sg,
+            resource_group_id=non_existent_sg_id,
+            project_id=project_id,
+            domain_name=test_domain.domain_name,
+            weight=TriState.update(Decimal("3.0")),
+            fair_share_factor=OptionalState.update(Decimal("1.0")),
         )
 
         result = await fair_share_repository.upsert_project_fair_share(upserter)
@@ -737,16 +639,14 @@ class TestFairShareRepository:
         non_existent_sg = f"non-existent-sg-{uuid.uuid4().hex[:8]}"
         non_existent_sg_id = ResourceGroupID(uuid.uuid4())
 
-        upserter = Upserter(
-            spec=UserFairShareUpserterSpec(
-                resource_group=non_existent_sg,
-                resource_group_id=non_existent_sg_id,
-                user_uuid=test_user_uuid,
-                project_id=test_project_id,
-                domain_name=test_domain.domain_name,
-                weight=TriState.update(Decimal("1.8")),
-                fair_share_factor=OptionalState.update(Decimal("1.0")),
-            )
+        upserter = UserFairShareUpserter(
+            resource_group=non_existent_sg,
+            resource_group_id=non_existent_sg_id,
+            user_uuid=test_user_uuid,
+            project_id=test_project_id,
+            domain_name=test_domain.domain_name,
+            weight=TriState.update(Decimal("1.8")),
+            fair_share_factor=OptionalState.update(Decimal("1.0")),
         )
 
         result = await fair_share_repository.upsert_user_fair_share(upserter)

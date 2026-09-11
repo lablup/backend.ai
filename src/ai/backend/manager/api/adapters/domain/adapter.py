@@ -6,7 +6,7 @@ from collections.abc import Sequence
 
 from ai.backend.common.api_handlers import Sentinel
 from ai.backend.common.data.entity.domain import DomainID, DomainName
-from ai.backend.common.data.entity.resource_group import ResourceGroupName
+from ai.backend.common.data.entity.resource_group import ResourceGroupID, ResourceGroupName
 from ai.backend.common.dto.manager.query import StringFilter
 from ai.backend.common.dto.manager.v2.domain.request import (
     AdminSearchDomainsInput,
@@ -16,6 +16,7 @@ from ai.backend.common.dto.manager.v2.domain.request import (
     DomainOrder,
     PurgeDomainInput,
     RestoreDomainInput,
+    ScopedSearchDomainsInput,
     UpdateDomainInput,
 )
 from ai.backend.common.dto.manager.v2.domain.response import (
@@ -59,7 +60,9 @@ from ai.backend.manager.services.domain.actions.scoped_search import (
 )
 from ai.backend.manager.services.domain.actions.search_domains import GlobalSearchDomainsAction
 from ai.backend.manager.services.domain.actions.update_domain_node import UpdateDomainNodeAction
+from ai.backend.manager.services.domain.processors import DomainProcessors
 from ai.backend.manager.services.resource_group.actions.lookup import LookupResourceGroupAction
+from ai.backend.manager.services.resource_group.processors import ResourceGroupProcessors
 from ai.backend.manager.types import OptionalState, TriState
 
 _DOMAIN_PAGINATION_SPEC = PaginationSpec(
@@ -74,6 +77,13 @@ _DOMAIN_PAGINATION_SPEC = PaginationSpec(
 class DomainAdapter(BaseAdapter):
     """Adapter for domain operations."""
 
+    _domain: DomainProcessors
+    _resource_group: ResourceGroupProcessors
+
+    def __init__(self, domain: DomainProcessors, resource_group: ResourceGroupProcessors) -> None:
+        self._domain = domain
+        self._resource_group = resource_group
+
     async def batch_load_by_names(
         self, names: Sequence[str]
     ) -> list[DomainNode | Exception | None]:
@@ -85,9 +95,9 @@ class DomainAdapter(BaseAdapter):
         if not names:
             return []
         keys = [DomainName(name) for name in names]
-        lookup = await self._processors.domain.bulk_lookup.run(BulkLookupDomainsAction(names=keys))
+        lookup = await self._domain.bulk_lookup.run(BulkLookupDomainsAction(names=keys))
         ids = [lookup.resolved[key] for key in keys if key in lookup.resolved]
-        got = await self._processors.domain.bulk_get.run(BulkGetDomainsAction(ids=ids))
+        got = await self._domain.bulk_get.run(BulkGetDomainsAction(ids=ids))
         domains = got.values()
         errors = got.errors()
         nodes: list[DomainNode | Exception | None] = []
@@ -109,7 +119,7 @@ class DomainAdapter(BaseAdapter):
         """Batch load domains by UUID for DataLoader use."""
         if not ids:
             return []
-        result = await self._processors.domain.bulk_get.run(BulkGetDomainsAction(ids=list(ids)))
+        result = await self._domain.bulk_get.run(BulkGetDomainsAction(ids=list(ids)))
         return [
             self._domain_data_to_node(item.value)
             if item.value is not None
@@ -119,12 +129,8 @@ class DomainAdapter(BaseAdapter):
 
     async def get(self, domain_name: str) -> DomainNode:
         """Retrieve a single domain by name."""
-        resolved = await self._processors.domain.lookup.run(
-            LookupDomainAction(name=DomainName(domain_name))
-        )
-        result = await self._processors.domain.get.run(
-            GetDomainAction(domain_id=resolved.entity_id())
-        )
+        resolved = await self._domain.lookup.run(LookupDomainAction(name=DomainName(domain_name)))
+        result = await self._domain.get.run(GetDomainAction(domain_id=resolved.entity_id()))
         return self._domain_data_to_node(result.data)
 
     async def admin_search(
@@ -147,10 +153,43 @@ class DomainAdapter(BaseAdapter):
             offset=input.offset,
         )
 
-        result = await self._processors.domain.global_search.run(
-            GlobalSearchDomainsAction(searcher=searcher)
+        result = await self._domain.global_search.run(GlobalSearchDomainsAction(searcher=searcher))
+
+        return AdminSearchDomainsPayload(
+            items=[self._domain_data_to_node(item) for item in result.items],
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
         )
 
+    async def scoped_search(
+        self,
+        input: ScopedSearchDomainsInput,
+    ) -> AdminSearchDomainsPayload:
+        """Search the domains the named scopes reach, combined with OR."""
+        conditions = self._convert_domain_filter(input.filter) if input.filter else []
+        orders = self._convert_orders(input.order) if input.order else []
+        searcher = self._build_searcher(
+            DomainSearcher,
+            conditions=conditions,
+            orders=orders,
+            pagination_spec=_DOMAIN_PAGINATION_SPEC,
+            first=input.first,
+            after=input.after,
+            last=input.last,
+            before=input.before,
+            limit=input.limit,
+            offset=input.offset,
+        )
+        result = await self._domain.scoped_search.run(
+            ScopedSearchDomainsAction(
+                items=[
+                    ResourceGroupDomainScopeItem(resource_group_id=ResourceGroupID(entry.value))
+                    for entry in input.scope.resource_group or ()
+                ],
+                searcher=searcher,
+            )
+        )
         return AdminSearchDomainsPayload(
             items=[self._domain_data_to_node(item) for item in result.items],
             total_count=result.total_count,
@@ -164,7 +203,7 @@ class DomainAdapter(BaseAdapter):
         input: AdminSearchDomainsInput,
     ) -> AdminSearchDomainsPayload:
         """Search the domains a resource group serves."""
-        resource_group = await self._processors.resource_group.lookup.run(
+        resource_group = await self._resource_group.lookup.run(
             LookupResourceGroupAction(name=ResourceGroupName(resource_group_name))
         )
         conditions = self._convert_domain_filter(input.filter) if input.filter else []
@@ -182,7 +221,7 @@ class DomainAdapter(BaseAdapter):
             offset=input.offset,
         )
 
-        result = await self._processors.domain.scoped_search.run(
+        result = await self._domain.scoped_search.run(
             ScopedSearchDomainsAction(
                 items=[ResourceGroupDomainScopeItem(resource_group_id=resource_group.entity_id())],
                 searcher=searcher,
@@ -202,7 +241,7 @@ class DomainAdapter(BaseAdapter):
         user_info: UserInfo,
     ) -> DomainPayload:
         """Create a new domain (superadmin only)."""
-        result = await self._processors.domain.create_domain_node.run(
+        result = await self._domain.create_domain_node.run(
             CreateDomainNodeAction(
                 user_info=user_info,
                 creator=DomainCreator(
@@ -223,9 +262,7 @@ class DomainAdapter(BaseAdapter):
         user_info: UserInfo,
     ) -> DomainPayload:
         """Update an existing domain (superadmin only)."""
-        target = await self._processors.domain.lookup.run(
-            LookupDomainAction(name=DomainName(domain_name))
-        )
+        target = await self._domain.lookup.run(LookupDomainAction(name=DomainName(domain_name)))
         updater = DomainUpdater(
             domain_id=target.entity_id(),
             description=(
@@ -255,7 +292,7 @@ class DomainAdapter(BaseAdapter):
                 else TriState.update(input.integration_name)
             ),
         )
-        result = await self._processors.domain.update_domain_node.run(
+        result = await self._domain.update_domain_node.run(
             UpdateDomainNodeAction(
                 updater=updater,
                 user_info=user_info,
@@ -265,10 +302,8 @@ class DomainAdapter(BaseAdapter):
 
     async def admin_delete(self, input: DeleteDomainInput) -> DeleteDomainPayload:
         """Soft-delete a domain (superadmin only)."""
-        target = await self._processors.domain.lookup.run(
-            LookupDomainAction(name=DomainName(input.name))
-        )
-        await self._processors.domain.delete_domain.run(
+        target = await self._domain.lookup.run(LookupDomainAction(name=DomainName(input.name)))
+        await self._domain.delete_domain.run(
             DeleteDomainAction(
                 updater=DomainSoftDeleteUpdater(domain_id=target.entity_id()),
             )
@@ -277,10 +312,8 @@ class DomainAdapter(BaseAdapter):
 
     async def admin_restore(self, input: RestoreDomainInput) -> RestoreDomainPayload:
         """Restore a soft-deleted domain (superadmin only)."""
-        target = await self._processors.domain.lookup.run(
-            LookupDomainAction(name=DomainName(input.name))
-        )
-        await self._processors.domain.restore_domain.run(
+        target = await self._domain.lookup.run(LookupDomainAction(name=DomainName(input.name)))
+        await self._domain.restore_domain.run(
             RestoreDomainAction(
                 updater=DomainRestoreUpdater(domain_id=target.entity_id()),
             )
@@ -289,10 +322,8 @@ class DomainAdapter(BaseAdapter):
 
     async def admin_purge(self, input: PurgeDomainInput) -> PurgeDomainPayload:
         """Permanently purge a domain (superadmin only)."""
-        target = await self._processors.domain.lookup.run(
-            LookupDomainAction(name=DomainName(input.name))
-        )
-        await self._processors.domain.purge_domain.run(
+        target = await self._domain.lookup.run(LookupDomainAction(name=DomainName(input.name)))
+        await self._domain.purge_domain.run(
             PurgeDomainAction(domain_id=target.entity_id(), name=input.name)
         )
         return PurgeDomainPayload(purged=True)

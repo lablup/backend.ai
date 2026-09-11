@@ -5,9 +5,10 @@ import tempfile
 import textwrap
 import unittest.mock
 import uuid
+from collections.abc import Mapping
 from decimal import Decimal
 from pathlib import Path
-from typing import Any
+from typing import Any, Protocol, cast
 from unittest import mock
 
 import pytest
@@ -17,11 +18,30 @@ from pytest_mock import MockerFixture
 from ai.backend.accelerator.mock.plugin import MockPlugin
 from ai.backend.agent import resources
 from ai.backend.agent.affinity_map import AffinityMap, AffinityPolicy
+from ai.backend.agent.alloc_map import (
+    DeviceSlotInfo,
+    DiscretePropertyAllocMap,
+    FractionAllocMap,
+)
 from ai.backend.agent.dummy.intrinsic import CPUPlugin, MemoryPlugin
 from ai.backend.agent.errors import FractionalResourceFragmented, InsufficientResource
-from ai.backend.agent.resources import ComputerContext, align_memory, scan_resource_usage_per_slot
+from ai.backend.agent.resources import (
+    AbstractComputePlugin,
+    ComputerContext,
+    align_memory,
+    collect_device_capacities,
+    scan_gpu_alloc_map,
+    scan_resource_usage_per_slot,
+)
 from ai.backend.agent.vendor import linux
-from ai.backend.common.types import DeviceId, DeviceName, KernelId, ResourceSlot, SlotName
+from ai.backend.common.types import (
+    DeviceId,
+    DeviceName,
+    KernelId,
+    ResourceSlot,
+    SlotName,
+    SlotTypes,
+)
 
 
 def test_parse_cpuset() -> None:
@@ -509,3 +529,175 @@ def test_align_memory() -> None:
         assert usable % align == 0
         assert usable + actual_reserved == orig
         assert 990 <= actual_reserved <= 1010
+
+
+class WriteResourceSpec(Protocol):
+    def __call__(self, kernel_id: KernelId, share_lines: Mapping[str, str]) -> None: ...
+
+
+@pytest.fixture
+def scratch_root(tmp_path: Path) -> Path:
+    return tmp_path
+
+
+@pytest.fixture
+def write_resource_spec(scratch_root: Path) -> WriteResourceSpec:
+    def _write(kernel_id: KernelId, share_lines: Mapping[str, str]) -> None:
+        config_dir = scratch_root / str(kernel_id) / "config"
+        config_dir.mkdir(parents=True, exist_ok=True)
+        header = textwrap.dedent("""\
+            SCRATCH_SIZE=0
+            MOUNTS=
+            SLOTS={"cpu":"1","mem":"1024"}
+        """)
+        body = "".join(f"{key}={value}\n" for key, value in share_lines.items())
+        (config_dir / "resource.txt").write_text(header + body)
+
+    return _write
+
+
+class TestNormalizeDeviceAlloc:
+    def test_returns_the_ratio_against_the_device_capacity(self) -> None:
+        capacities = {(SlotName("cuda.shares"), DeviceId("0")): Decimal("2")}
+        assert resources._normalize_device_alloc(
+            capacities, SlotName("cuda.shares"), DeviceId("0"), Decimal("0.5")
+        ) == Decimal("0.25")
+
+    def test_reports_the_raw_allocation_when_the_device_has_no_capacity(self) -> None:
+        assert resources._normalize_device_alloc(
+            {}, SlotName("cuda.shares"), DeviceId("0"), Decimal("0.5")
+        ) == Decimal("0.5")
+
+    def test_reports_the_raw_allocation_when_the_capacity_is_not_positive(self) -> None:
+        capacities = {(SlotName("cuda.shares"), DeviceId("0")): Decimal("0")}
+        assert resources._normalize_device_alloc(
+            capacities, SlotName("cuda.shares"), DeviceId("0"), Decimal("0.5")
+        ) == Decimal("0.5")
+
+
+class TestCollectDeviceCapacities:
+    def test_flattens_the_device_slots_of_every_computer(self) -> None:
+        cpu_alloc_map = DiscretePropertyAllocMap(
+            device_slots={
+                DeviceId("0"): DeviceSlotInfo(SlotTypes.COUNT, SlotName("cpu"), Decimal("1")),
+                DeviceId("1"): DeviceSlotInfo(SlotTypes.COUNT, SlotName("cpu"), Decimal("1")),
+            },
+        )
+        cuda_alloc_map = FractionAllocMap(
+            device_slots={
+                DeviceId("gpu0"): DeviceSlotInfo(
+                    SlotTypes.COUNT, SlotName("cuda.shares"), Decimal("2")
+                ),
+            },
+        )
+        computers = {
+            DeviceName("cpu"): ComputerContext(
+                cast(AbstractComputePlugin, mock.Mock()), [], cpu_alloc_map
+            ),
+            DeviceName("cuda"): ComputerContext(
+                cast(AbstractComputePlugin, mock.Mock()), [], cuda_alloc_map
+            ),
+        }
+
+        assert collect_device_capacities(computers) == {
+            (SlotName("cpu"), DeviceId("0")): Decimal("1"),
+            (SlotName("cpu"), DeviceId("1")): Decimal("1"),
+            (SlotName("cuda.shares"), DeviceId("gpu0")): Decimal("2"),
+        }
+
+    def test_returns_an_empty_map_without_computers(self) -> None:
+        assert collect_device_capacities({}) == {}
+
+
+class TestScanGPUAllocMap:
+    async def test_normalizes_the_allocation_into_a_capacity_ratio(
+        self, scratch_root: Path, write_resource_spec: WriteResourceSpec
+    ) -> None:
+        kernel_id = KernelId(uuid.uuid4())
+        write_resource_spec(kernel_id, {"CUDA.SHARES_SHARES": "0:0.5"})
+
+        result = await scan_gpu_alloc_map(
+            [kernel_id],
+            scratch_root,
+            {(SlotName("cuda.shares"), DeviceId("0")): Decimal("2")},
+        )
+
+        assert result == {DeviceId("0"): Decimal("0.2500")}
+
+    async def test_sums_the_allocations_of_every_kernel_on_the_same_device(
+        self, scratch_root: Path, write_resource_spec: WriteResourceSpec
+    ) -> None:
+        kernel_ids = [KernelId(uuid.uuid4()) for _ in range(3)]
+        write_resource_spec(kernel_ids[0], {"CUDA.SHARES_SHARES": "0:0.5"})
+        write_resource_spec(kernel_ids[1], {"CUDA.SHARES_SHARES": "0:0.25,1:1"})
+        write_resource_spec(kernel_ids[2], {"CUDA.SHARES_SHARES": "1:0.5"})
+
+        result = await scan_gpu_alloc_map(
+            kernel_ids,
+            scratch_root,
+            {
+                (SlotName("cuda.shares"), DeviceId("0")): Decimal("1"),
+                (SlotName("cuda.shares"), DeviceId("1")): Decimal("2"),
+            },
+        )
+
+        assert result == {
+            DeviceId("0"): Decimal("0.7500"),
+            DeviceId("1"): Decimal("0.7500"),
+        }
+
+    async def test_skips_a_kernel_whose_resource_spec_is_gone(
+        self, scratch_root: Path, write_resource_spec: WriteResourceSpec
+    ) -> None:
+        alive_kernel_id = KernelId(uuid.uuid4())
+        terminated_kernel_id = KernelId(uuid.uuid4())
+        write_resource_spec(alive_kernel_id, {"CUDA.SHARES_SHARES": "0:1"})
+
+        result = await scan_gpu_alloc_map(
+            [alive_kernel_id, terminated_kernel_id],
+            scratch_root,
+            {(SlotName("cuda.shares"), DeviceId("0")): Decimal("2")},
+        )
+
+        assert result == {DeviceId("0"): Decimal("0.5000")}
+
+    async def test_reports_the_raw_allocation_when_the_capacity_is_unknown(
+        self, scratch_root: Path, write_resource_spec: WriteResourceSpec
+    ) -> None:
+        kernel_id = KernelId(uuid.uuid4())
+        write_resource_spec(kernel_id, {"CUDA.SHARES_SHARES": "0:0.5"})
+
+        result = await scan_gpu_alloc_map([kernel_id], scratch_root, {})
+
+        assert result == {DeviceId("0"): Decimal("0.5000")}
+
+    async def test_ignores_the_devices_other_than_cuda(
+        self, scratch_root: Path, write_resource_spec: WriteResourceSpec
+    ) -> None:
+        kernel_id = KernelId(uuid.uuid4())
+        write_resource_spec(kernel_id, {"CPU_SHARES": "0:2", "MEM_SHARES": "root:1024"})
+
+        result = await scan_gpu_alloc_map(
+            [kernel_id],
+            scratch_root,
+            {(SlotName("cpu"), DeviceId("0")): Decimal("4")},
+        )
+
+        assert result == {}
+
+    async def test_quantizes_the_ratio_to_four_decimal_places(
+        self, scratch_root: Path, write_resource_spec: WriteResourceSpec
+    ) -> None:
+        kernel_id = KernelId(uuid.uuid4())
+        write_resource_spec(kernel_id, {"CUDA.SHARES_SHARES": "0:1"})
+
+        result = await scan_gpu_alloc_map(
+            [kernel_id],
+            scratch_root,
+            {(SlotName("cuda.shares"), DeviceId("0")): Decimal("3")},
+        )
+
+        assert result == {DeviceId("0"): Decimal("0.3333")}
+
+    async def test_returns_an_empty_map_without_kernels(self, scratch_root: Path) -> None:
+        assert await scan_gpu_alloc_map([], scratch_root, {}) == {}

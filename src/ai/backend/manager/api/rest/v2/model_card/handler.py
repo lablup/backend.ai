@@ -20,6 +20,7 @@ from ai.backend.common.dto.manager.v2.model_card.request import (
     CreateModelCardInput,
     DeleteModelCardOptions,
     DeployModelCardInput,
+    ScopedSearchModelCardsInput,
     SearchModelCardsInput,
     UpdateModelCardInput,
 )
@@ -40,6 +41,14 @@ class V2ModelCardHandler:
         body: BodyParam[SearchModelCardsInput],
     ) -> APIResponse:
         result = await self._adapter.admin_search(body.parsed)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def scoped_search(
+        self,
+        body: BodyParam[ScopedSearchModelCardsInput],
+    ) -> APIResponse:
+        """Search the model cards the named scopes reach, combined with OR."""
+        result = await self._adapter.scoped_search(body.parsed)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
     async def project_search(

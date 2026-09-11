@@ -5,7 +5,6 @@ from typing import TypeVar, override
 
 from ai.backend.common.data.entity.action import ActionID
 from ai.backend.common.data.entity.types import EntityType
-from ai.backend.common.data.permission.types import EntityType as LegacyEntityType
 from ai.backend.common.exception import ErrorCode
 from ai.backend.manager.actions.types import ActionOperationType, ActionSpec, OperationStatus
 from ai.backend.manager.data.common.types import SearchResult
@@ -21,7 +20,7 @@ class BaseAction(ABC):
 
     @classmethod
     @abstractmethod
-    def entity_type(cls) -> LegacyEntityType:
+    def entity_type(cls) -> EntityType:
         raise NotImplementedError
 
     @classmethod
@@ -32,7 +31,7 @@ class BaseAction(ABC):
     @classmethod
     def spec(cls) -> ActionSpec:
         return ActionSpec(
-            entity_type=EntityType(cls.entity_type()),
+            entity_type=cls.entity_type(),
             operation_type=cls.operation_type(),
         )
 

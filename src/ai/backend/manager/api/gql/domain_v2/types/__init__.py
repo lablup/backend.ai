@@ -13,8 +13,10 @@ from .nested import (
     DomainRegistryInfoGQL,
 )
 from .node import DomainV2Connection, DomainV2Edge, DomainV2GQL
+from .scopes import DomainScopeGQL
 
 __all__ = [
+    "DomainScopeGQL",
     # Filter and OrderBy
     "DomainProjectNestedFilter",
     "DomainUserNestedFilter",

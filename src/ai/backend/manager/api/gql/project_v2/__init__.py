@@ -14,6 +14,7 @@ from .resolver import (
     domain_projects_v2,
     project_domain_v2,
     project_v2,
+    scoped_projects_v2,
     unassign_users_from_project_v2,
 )
 from .types import (
@@ -33,6 +34,7 @@ __all__ = [
     # Queries
     "admin_projects_v2",
     "domain_projects_v2",
+    "scoped_projects_v2",
     "project_domain_v2",
     "project_v2",
     # Mutations

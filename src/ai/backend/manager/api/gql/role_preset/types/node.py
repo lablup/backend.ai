@@ -24,7 +24,6 @@ from ai.backend.manager.api.gql.decorators import (
     gql_node_type,
 )
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
-from ai.backend.manager.api.gql.rbac.types import RBACElementTypeGQL
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 
 from .permission import (
@@ -46,7 +45,7 @@ from .permission import (
 class RolePresetGQL(PydanticNodeMixin[RolePresetNode]):
     id: NodeID[str] = gql_field(description="Role preset UUID (primary key).")
     name: str = gql_field(description="Role preset name.")
-    scope_type: RBACElementTypeGQL = gql_field(
+    scope_type: str = gql_field(
         description="Scope type this preset targets (e.g., domain, project)."
     )
     auto_assign: bool = gql_field(

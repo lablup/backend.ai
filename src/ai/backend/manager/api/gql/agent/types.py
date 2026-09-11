@@ -11,7 +11,7 @@ from strawberry import Info
 from strawberry.relay import Connection, Edge, NodeID
 from strawberry.scalars import JSON
 
-from ai.backend.common.data.entity.agent import AGENT_ENTITY_TYPE
+from ai.backend.common.data.entity.agent import AgentEntityType
 from ai.backend.common.data.entity.types import RuntimeEntityID
 from ai.backend.common.dto.manager.v2.agent.request import (
     AgentFilter,
@@ -409,7 +409,7 @@ class AgentV2GQL(PydanticNodeMixin[AgentNode]):
     ) -> EntityLabelConnection | None:
         return await resolve_entity_labels(
             info,
-            RuntimeEntityID(AGENT_ENTITY_TYPE, self.uuid),
+            RuntimeEntityID(AgentEntityType(), self.uuid),
             filter=filter,
             order_by=order_by,
             before=before,

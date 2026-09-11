@@ -1,15 +1,37 @@
 from typing import override
 
-from ai.backend.common.data.entity.types import FieldIdentifier, FieldType
+from ai.backend.common.data.entity.role_preset import RolePresetEntityType
+from ai.backend.common.data.entity.types import (
+    EntityType,
+    FieldIdentifier,
+    FieldType,
+)
 
-__all__ = ("RolePermissionPresetID",)
+__all__ = (
+    "RolePermissionPresetFieldType",
+    "RolePermissionPresetID",
+)
 
 
-ROLE_PERMISSION_PRESET_FIELD_TYPE = FieldType("role_permission_preset")
+class RolePermissionPresetFieldType(FieldType):
+    @override
+    @classmethod
+    def name(cls) -> str:
+        return "role_permission_preset"
+
+    @override
+    @classmethod
+    def description(cls) -> str:
+        return "One permission a role preset grants."
+
+    @override
+    @classmethod
+    def owner_type(cls) -> type[EntityType]:
+        return RolePresetEntityType
 
 
 class RolePermissionPresetID(FieldIdentifier):
     @override
     @classmethod
     def field_type(cls) -> FieldType:
-        return ROLE_PERMISSION_PRESET_FIELD_TYPE
+        return RolePermissionPresetFieldType()

@@ -17,16 +17,17 @@ from uuid import UUID, uuid4
 import pytest
 import sqlalchemy as sa
 from dateutil.tz import tzutc
+from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
 from ai.backend.common.auth import PublicKey
 from ai.backend.common.clients.valkey_client.valkey_image.client import ValkeyImageClient
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.data.agent.types import AgentInfo
+from ai.backend.common.data.entity.agent import AgentUUID
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.data.entity.resource_slot import ResourceSlotName
-from ai.backend.common.exception import AgentNotFound
 from ai.backend.common.types import (
     AgentId,
     ClusterMode,
@@ -43,7 +44,11 @@ from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.agent.types import AgentHeartbeatUpsert, AgentStatus
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.session.types import SessionStatus
-from ai.backend.manager.errors.agent import AgentAlreadyExited, AgentHasConflictingSessions
+from ai.backend.manager.errors.agent import (
+    AgentAlreadyExited,
+    AgentHasConflictingSessions,
+    AgentNotFound,
+)
 from ai.backend.manager.errors.resource import ResourceGroupNotFound, UnresolvableResourceGroup
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.agent.updaters import AgentExitStatusUpdater
@@ -81,6 +86,11 @@ from ai.backend.manager.repositories.base.querier import BatchQuerier
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.types import OptionalState
 from ai.backend.testutils.db import with_tables
+
+
+async def _agent_uuid(db_sess: SASession, agent_id: str) -> AgentUUID:
+    """The agent's entity id, which the slot row records beside its name."""
+    return (await db_sess.scalars(sa.select(AgentRow.uuid).where(AgentRow.id == agent_id))).one()
 
 
 @dataclass
@@ -587,7 +597,7 @@ class TestAgentRepositoryDB:
     @pytest.fixture
     def agent_db_source(self, db_with_cleanup: ExtendedAsyncSAEngine) -> AgentDBSource:
         """AgentDBSource backed by the real test database."""
-        return AgentDBSource(db_with_cleanup)
+        return AgentDBSource(db_with_cleanup, V2DBOpsProvider(db_with_cleanup))
 
     @pytest.fixture
     async def default_scaling_group(
@@ -1271,6 +1281,7 @@ class TestAgentDBSourceKernelFiltering:
             db_sess.add(
                 AgentResourceRow(
                     agent_id=actual_agent_id,
+                    agent_uuid=await _agent_uuid(db_sess, actual_agent_id),
                     slot_name="cpu",
                     capacity=Decimal("16"),
                     used=expected_used,
@@ -1388,7 +1399,7 @@ class TestAgentDBSourceKernelFiltering:
         db_with_tables: ExtendedAsyncSAEngine,
     ) -> AsyncGenerator[AgentDBSource, None]:
         """Create AgentDBSource for testing"""
-        db_source = AgentDBSource(db=db_with_tables)
+        db_source = AgentDBSource(db_with_tables, V2DBOpsProvider(db_with_tables))
         yield db_source
 
     @pytest.mark.parametrize(

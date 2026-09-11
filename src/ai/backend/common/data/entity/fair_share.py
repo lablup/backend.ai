@@ -1,13 +1,47 @@
-"""Entity types of the fair share tables."""
+"""Field types of the fair share tables."""
 
-from ai.backend.common.data.entity.types import EntityType
+from typing import override
+
+from ai.backend.common.data.entity.types import DanglingFieldType
 
 __all__ = (
-    "DOMAIN_FAIR_SHARE_ENTITY_TYPE",
-    "PROJECT_FAIR_SHARE_ENTITY_TYPE",
-    "USER_FAIR_SHARE_ENTITY_TYPE",
+    "DomainFairShareFieldType",
+    "ProjectFairShareFieldType",
+    "UserFairShareFieldType",
 )
 
-DOMAIN_FAIR_SHARE_ENTITY_TYPE = EntityType("domain_fair_share")
-PROJECT_FAIR_SHARE_ENTITY_TYPE = EntityType("project_fair_share")
-USER_FAIR_SHARE_ENTITY_TYPE = EntityType("user_fair_share")
+
+class DomainFairShareFieldType(DanglingFieldType):
+    @override
+    @classmethod
+    def name(cls) -> str:
+        return "domain_fair_share"
+
+    @override
+    @classmethod
+    def description(cls) -> str:
+        return "A domain's scheduling priority in a resource group, from past usage and weight."
+
+
+class ProjectFairShareFieldType(DanglingFieldType):
+    @override
+    @classmethod
+    def name(cls) -> str:
+        return "project_fair_share"
+
+    @override
+    @classmethod
+    def description(cls) -> str:
+        return "A project's scheduling priority in a resource group, from past usage and weight."
+
+
+class UserFairShareFieldType(DanglingFieldType):
+    @override
+    @classmethod
+    def name(cls) -> str:
+        return "user_fair_share"
+
+    @override
+    @classmethod
+    def description(cls) -> str:
+        return "A user's scheduling priority in a resource group, from past usage and weight."

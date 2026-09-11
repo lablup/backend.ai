@@ -203,7 +203,7 @@ class CreateLoginClientTypePayloadGQL(PydanticOutputMixin[CreateLoginClientTypeP
     name="UpdateLoginClientTypeInput",
 )
 class UpdateLoginClientTypeInputGQL(PydanticInputMixin[UpdateLoginClientTypeInputDTO]):
-    name: str | None = gql_field(default=None, description="Updated name.")
+    name: str | None = gql_field(default=UNSET, description="Updated name.")
     description: str | None = gql_field(
         default=UNSET,
         description="Updated description. Pass null to clear, omit to leave unchanged.",
