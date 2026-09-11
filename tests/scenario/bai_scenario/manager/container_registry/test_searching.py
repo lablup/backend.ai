@@ -246,7 +246,10 @@ class APlainUserMayNotSearch(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 아닌 사용자가 레지스트리를 검색하려 하면 역할로 막힌다"
+        return (
+            "슈퍼관리자가 아닌 사용자가 레지스트리를 검색하려 하면 권한 부족으로 거부된다. "
+            "이 호출은 부른 사람이 슈퍼관리자인지만 보고, 어떤 권한을 받았는지는 보지 않는다"
+        )
 
     @override
     def given(self) -> Given[SeedingSession, ManyRegistriesAndACaller]:
