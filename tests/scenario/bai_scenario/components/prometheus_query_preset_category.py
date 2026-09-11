@@ -53,14 +53,14 @@ PAGE = 10
 
 @dataclass(frozen=True)
 class ACallerAlone:
-    """부를 사람 한 명."""
+    """호출자 한 명."""
 
     caller: UserData
 
 
 @dataclass(frozen=True)
 class ACategoryAndACaller:
-    """이미 있는 분류 하나와, 그것을 부를 사람."""
+    """이미 있는 카테고리 하나와, 그것을 호출할 사용자."""
 
     category: PrometheusQueryPresetCategoryData
     caller: UserData
@@ -68,14 +68,14 @@ class ACategoryAndACaller:
 
 @dataclass(frozen=True)
 class ACategoryAlone:
-    """분류 하나뿐, 부를 사람이 없다."""
+    """카테고리 하나뿐이고, 호출자가 없다."""
 
     category: PrometheusQueryPresetCategoryData
 
 
 @dataclass(frozen=True)
 class ManyCategoriesAndACaller:
-    """훑을 분류 여럿과, 훑을 사람. ``named``는 그중 골라낼 하나다."""
+    """검색 대상 카테고리 여럿과, 검색을 호출할 사용자. ``named``는 그중 이름 필터로 골라낼 하나다."""
 
     laid: tuple[PrometheusQueryPresetCategoryData, ...]
     named: PrometheusQueryPresetCategoryData
@@ -83,7 +83,7 @@ class ManyCategoriesAndACaller:
 
 
 async def lay_someone(seeding: Any, role: UserRole) -> Laid[UserData]:
-    """부를 사람 한 명. 사용자는 도메인에 속해야 하므로 도메인 하나가 함께 깔린다."""
+    """호출자 한 명. 사용자는 도메인에 속해야 하므로 도메인 하나를 함께 만든다."""
     domain = await seeding.creating(SeedDomain(name_hint="home", description=WAS_HERE))
     laid: Laid[UserData] = await seeding.within(SomeoneOf(domain, role=role))
     return laid
@@ -91,13 +91,13 @@ async def lay_someone(seeding: Any, role: UserRole) -> Laid[UserData]:
 
 @dataclass(frozen=True)
 class JustSomeone(Given[Any, ACallerAlone]):
-    """분류가 하나도 없고, 부를 사람 한 명."""
+    """카테고리가 하나도 없고, 호출자 한 명."""
 
     role: UserRole = UserRole.USER
 
     @override
     def describe(self) -> str:
-        return f"분류가 하나도 없고, {self.role.value} 한 명"
+        return f"카테고리가 하나도 없고, {self.role.value} 한 명"
 
     @override
     async def lay(self, seeding: Any) -> ACallerAlone:
@@ -107,13 +107,13 @@ class JustSomeone(Given[Any, ACallerAlone]):
 
 @dataclass(frozen=True)
 class ACategoryAndSomeone(Given[Any, ACategoryAndACaller]):
-    """이미 있는 분류 하나와, 부를 사람 한 명."""
+    """이미 있는 카테고리 하나와, 호출자 한 명."""
 
     role: UserRole = UserRole.USER
 
     @override
     def describe(self) -> str:
-        return f"이미 있는 분류 하나와, {self.role.value} 한 명"
+        return f"이미 있는 카테고리 하나와, {self.role.value} 한 명"
 
     @override
     async def lay(self, seeding: Any) -> ACategoryAndACaller:
@@ -124,11 +124,11 @@ class ACategoryAndSomeone(Given[Any, ACategoryAndACaller]):
 
 @dataclass(frozen=True)
 class ACategoryAndNobody(Given[Any, ACategoryAlone]):
-    """분류 하나뿐이고, 부를 사람은 없다."""
+    """카테고리 하나뿐이고, 호출자는 없다."""
 
     @override
     def describe(self) -> str:
-        return "이미 있는 분류 하나, 부를 사람 없음"
+        return "이미 있는 카테고리 하나, 호출자 없음"
 
     @override
     async def lay(self, seeding: Any) -> ACategoryAlone:
@@ -138,14 +138,14 @@ class ACategoryAndNobody(Given[Any, ACategoryAlone]):
 
 @dataclass(frozen=True)
 class ManyCategoriesAndSomeone(Given[Any, ManyCategoriesAndACaller]):
-    """분류 여럿과, 부를 사람 한 명."""
+    """카테고리 여럿과, 호출자 한 명."""
 
     role: UserRole = UserRole.USER
     besides: int = 1
 
     @override
     def describe(self) -> str:
-        return f"분류 {self.besides + 1}개와, {self.role.value} 한 명"
+        return f"카테고리 {self.besides + 1}개와, {self.role.value} 한 명"
 
     @override
     async def lay(self, seeding: Any) -> ManyCategoriesAndACaller:
@@ -163,7 +163,7 @@ class ManyCategoriesAndSomeone(Given[Any, ManyCategoriesAndACaller]):
 
 @dataclass(frozen=True)
 class TheNewCategoryNode(Then[Any, CategoryNodeAnswer]):
-    """방금 만든 분류가 통째로 온다. 이름과 설명은 시나리오가 정한 것이다."""
+    """방금 생성한 카테고리가 통째로 반환된다. 이름과 설명은 시나리오가 정한 값이다."""
 
     started: datetime
     named: str
@@ -171,7 +171,7 @@ class TheNewCategoryNode(Then[Any, CategoryNodeAnswer]):
 
     @override
     def says(self) -> str:
-        return "만든 분류 전체가 온다"
+        return "생성한 카테고리 전체가 반환된다"
 
     @override
     def look(self, laid: Any, answered: Answered[CategoryNodeAnswer]) -> list[Verdict]:
@@ -190,13 +190,13 @@ class TheNewCategoryNode(Then[Any, CategoryNodeAnswer]):
 
 @dataclass(frozen=True)
 class TheCategoryNode(Then[ACategoryAndACaller, CategoryNodeAnswer]):
-    """심은 분류가 통째로 온다. 값은 심은 것에서 읽는다."""
+    """미리 만들어 둔 카테고리가 통째로 반환된다. 기대값은 미리 만들어 둔 데이터에서 읽는다."""
 
     started: datetime
 
     @override
     def says(self) -> str:
-        return "심은 분류 전체가 온다"
+        return "미리 만들어 둔 카테고리 전체가 반환된다"
 
     @override
     def look(
@@ -207,7 +207,7 @@ class TheCategoryNode(Then[ACategoryAndACaller, CategoryNodeAnswer]):
             return [Refused(EntityNotFoundError, answered.raised)]
         written = WrittenByThisRun(self.started)
         return [
-            Held("id", node.id, SameAs[UUID](laid.category.id, "심은 분류")),
+            Held("id", node.id, SameAs[UUID](laid.category.id, "미리 만들어 둔 카테고리")),
             Same("name", node.name, laid.category.name),
             Same("description", node.description, laid.category.description),
             Held("created_at", node.created_at, written),
@@ -217,11 +217,11 @@ class TheCategoryNode(Then[ACategoryAndACaller, CategoryNodeAnswer]):
 
 @dataclass(frozen=True)
 class EveryLaidCategoryIsFound(Then[ManyCategoriesAndACaller, SearchCategoriesPayload]):
-    """심은 분류가 모두, 그리고 그것만 세어진다."""
+    """미리 만들어 둔 카테고리가 모두, 그리고 그것만 집계된다."""
 
     @override
     def says(self) -> str:
-        return "심은 분류가 모두, 그리고 그것만 세어진다"
+        return "미리 만들어 둔 카테고리가 모두, 그리고 그것만 집계된다"
 
     @override
     def look(
@@ -244,11 +244,11 @@ class EveryLaidCategoryIsFound(Then[ManyCategoriesAndACaller, SearchCategoriesPa
 
 @dataclass(frozen=True)
 class OnePageOfThemComesBack(Then[ManyCategoriesAndACaller, SearchCategoriesPayload]):
-    """크기를 대지 않은 훑기는 한 쪽 분량만 답하고, 다음 쪽이 있다고 말한다."""
+    """크기를 지정하지 않은 검색은 한 페이지 분량만 응답하고, 다음 페이지가 있다고 알린다."""
 
     @override
     def says(self) -> str:
-        return "한 쪽만 오고 다음 쪽이 있다고 답한다"
+        return "한 페이지만 반환되고 다음 페이지가 있다고 응답한다"
 
     @override
     def look(
@@ -278,11 +278,11 @@ def node_of(seeded: PrometheusQueryPresetCategoryData) -> CategoryNode:
 
 @dataclass(frozen=True)
 class TheBatchAnswersInOrder(Then[ManyCategoriesAndACaller, list[LoadedCategory]]):
-    """준 순서대로 답한다. 심은 것은 노드 전체로, 마지막의 없는 id는 빈 자리로."""
+    """요청한 순서대로 응답한다. 미리 만들어 둔 것은 노드 전체로, 마지막의 없는 id는 빈 항목으로."""
 
     @override
     def says(self) -> str:
-        return "준 순서대로, 없는 id 자리는 비어서 온다"
+        return "요청한 순서대로, 없는 id 자리는 비어서 반환된다"
 
     @override
     def look(
@@ -299,7 +299,9 @@ class TheBatchAnswersInOrder(Then[ManyCategoriesAndACaller, list[LoadedCategory]
                 Held(
                     f"[{at}]",
                     got,
-                    SameAs[LoadedCategory](node_of(wanted), f"{at + 1}번째로 준 id의 분류 전체"),
+                    SameAs[LoadedCategory](
+                        node_of(wanted), f"{at + 1}번째로 요청한 id의 카테고리 전체"
+                    ),
                 )
             )
         seen.append(Same(f"[{len(laid.laid)}]", answer[-1], None))
@@ -308,11 +310,11 @@ class TheBatchAnswersInOrder(Then[ManyCategoriesAndACaller, list[LoadedCategory]
 
 @dataclass(frozen=True)
 class NothingIsAnswered(Then[Any, list[LoadedCategory]]):
-    """빈 목록에는 빈 답이다."""
+    """빈 목록에는 빈 응답이다."""
 
     @override
     def says(self) -> str:
-        return "빈 답이 온다"
+        return "빈 응답이 반환된다"
 
     @override
     def look(self, laid: Any, answered: Answered[list[LoadedCategory]]) -> list[Verdict]:
@@ -324,11 +326,11 @@ class NothingIsAnswered(Then[Any, list[LoadedCategory]]):
 
 @dataclass(frozen=True)
 class TheRemovedOneIsNamed(Then[ACategoryAndACaller, DeleteCategoryPayload]):
-    """지운 분류가 무엇인지 답한다."""
+    """삭제한 카테고리가 무엇인지 응답한다."""
 
     @override
     def says(self) -> str:
-        return "지운 분류를 답한다"
+        return "삭제한 카테고리를 응답한다"
 
     @override
     def look(
@@ -337,4 +339,4 @@ class TheRemovedOneIsNamed(Then[ACategoryAndACaller, DeleteCategoryPayload]):
         payload = answered.response
         if payload is None:
             return [Refused(EntityNotFoundError, answered.raised)]
-        return [Held("id", payload.id, SameAs[UUID](laid.category.id, "심은 분류"))]
+        return [Held("id", payload.id, SameAs[UUID](laid.category.id, "미리 만들어 둔 카테고리"))]

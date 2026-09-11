@@ -1,7 +1,7 @@
-"""분류 지우기 — 누가 지울 수 있는가.
+"""카테고리 삭제 — 누가 삭제할 수 있는가.
 
-이 어댑터에는 soft delete가 없다. 정의가 아직 가리키고 있어도 분류는 지워지고 그 정의의
-분류 자리가 비는데, 그 줄은 `then`이 지운 뒤의 정의를 읽게 되면 더한다.
+이 어댑터에는 soft delete가 없다. 정의가 아직 참조하고 있어도 카테고리는 삭제되고 그 정의의
+카테고리 필드가 비는데, 그 시나리오는 `then`이 삭제 뒤의 정의를 읽게 되면 추가한다.
 """
 
 from __future__ import annotations
@@ -52,7 +52,7 @@ type PurgingStep = Scenario[SeedingSession, ACategoryAndACaller, Adapter, Remove
 
 @dataclass(frozen=True)
 class Removing(When[ACategoryAndACaller, Adapter, Removed]):
-    """분류 하나를 지운다. id를 대지 않으면 심은 분류를 지운다."""
+    """카테고리 하나를 삭제한다. id를 지정하지 않으면 미리 만들어 둔 카테고리를 삭제한다."""
 
     other: UUID | None = None
 
@@ -62,8 +62,8 @@ class Removing(When[ACategoryAndACaller, Adapter, Removed]):
 
     @override
     def describe(self, laid: ACategoryAndACaller) -> str:
-        called = "아무것도 갖지 않은 id" if self.other is not None else laid.category.name
-        return f"{laid.caller.username}이 {called}를 지움"
+        called = "존재하지 않는 id" if self.other is not None else laid.category.name
+        return f"{laid.caller.username}이 {called} 삭제"
 
     @override
     async def call(self, adapter: Adapter, laid: ACategoryAndACaller) -> Removed:
@@ -80,7 +80,7 @@ class TheSuperadminRemovesIt(Scenario[SeedingSession, ACategoryAndACaller, Adapt
 
     @override
     def describe(self) -> str:
-        return "분류 하나가 있고 슈퍼관리자가 지우면, 지운 id를 실은 답이 온다"
+        return "카테고리 하나가 있고 슈퍼관리자가 삭제하면, 삭제한 id를 담은 응답이 반환된다"
 
     @override
     def given(self) -> Given[SeedingSession, ACategoryAndACaller]:
@@ -105,7 +105,7 @@ class AUserGrantedNothingMayNotRemove(
 
     @override
     def describe(self) -> str:
-        return "같은 분류가 있고 아무 권한도 받지 않은 사용자가 지우면, 권한 부족으로 거부된다"
+        return "같은 카테고리가 있고 아무 권한도 없는 사용자가 삭제하면, 권한 부족으로 거부된다"
 
     @override
     def given(self) -> Given[SeedingSession, ACategoryAndACaller]:
@@ -131,8 +131,8 @@ class EnforcementOffLetsAnyoneRemove(
     @override
     def describe(self) -> str:
         return (
-            "엔티티 권한 집행을 끄면 아무 권한도 받지 않은 사용자도 분류를 지운다. "
-            "이 문은 역할이 아니라 권한 그래프가 지키기 때문이다"
+            "권한 검사를 끄면 아무 권한도 없는 사용자도 카테고리를 삭제할 수 있다. "
+            "삭제는 역할이 아니라 권한 그래프로 보호되기 때문이다"
         )
 
     @override
@@ -162,7 +162,7 @@ class AnUnknownIdIsNotFoundForASuperadmin(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 아무것도 갖지 않은 id를 지우면, 대상이 없다는 것으로 거부된다"
+        return "슈퍼관리자가 존재하지 않는 id를 삭제하면, 대상을 찾을 수 없다는 이유로 거부된다"
 
     @override
     def given(self) -> Given[SeedingSession, ACategoryAndACaller]:

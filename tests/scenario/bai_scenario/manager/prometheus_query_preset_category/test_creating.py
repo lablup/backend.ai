@@ -1,7 +1,7 @@
-"""분류 만들기 — 누가 만들 수 있고, 무엇이 이름을 막는가.
+"""카테고리 생성 — 누가 생성할 수 있고, 무엇이 이름을 막는가.
 
-이름이 겹치는 것은 저장소의 유일 제약이 거부하고 도메인 오류로 옮겨져 있지 않다. 정의의
-이름에는 제약이 없으므로 두 엔티티가 반대다.
+이름 중복은 저장소의 유일 제약이 거부하고 도메인 오류로 옮겨져 있지 않다. 정의의 이름에는
+제약이 없으므로 두 엔티티가 반대다.
 """
 
 from __future__ import annotations
@@ -44,7 +44,7 @@ from ai.backend.testutils.scenario_steps import (
 )
 
 MADE = "cpu"
-FRESH = "새로 만든 분류"
+FRESH = "새로 만든 카테고리"
 ENFORCEMENT = "manager.rbac.enforcement_enabled"
 
 type Adapter = PrometheusQueryPresetCategoryAdapter
@@ -54,7 +54,7 @@ type RepeatingStep = Scenario[SeedingSession, ACategoryAndACaller, Adapter, Cate
 
 @dataclass(frozen=True)
 class Creating(When[ACallerAlone, Adapter, CategoryNodeAnswer]):
-    """분류 하나를 만든다."""
+    """카테고리 하나를 생성한다."""
 
     named: str = MADE
     described: str | None = None
@@ -65,7 +65,7 @@ class Creating(When[ACallerAlone, Adapter, CategoryNodeAnswer]):
 
     @override
     def describe(self, laid: ACallerAlone) -> str:
-        return f"{laid.caller.username}이 {self.named}으로 만듦"
+        return f"{laid.caller.username}이 이름 {self.named}(으)로 생성"
 
     @override
     async def call(self, adapter: Adapter, laid: ACallerAlone) -> CategoryNodeAnswer:
@@ -78,7 +78,7 @@ class Creating(When[ACallerAlone, Adapter, CategoryNodeAnswer]):
 
 @dataclass(frozen=True)
 class CreatingUnderTheSameName(When[ACategoryAndACaller, Adapter, CategoryNodeAnswer]):
-    """심은 분류와 같은 이름으로 하나 더 만든다."""
+    """미리 만들어 둔 카테고리와 같은 이름으로 하나 더 생성한다."""
 
     @override
     def operation(self) -> str:
@@ -86,7 +86,7 @@ class CreatingUnderTheSameName(When[ACategoryAndACaller, Adapter, CategoryNodeAn
 
     @override
     def describe(self, laid: ACategoryAndACaller) -> str:
-        return f"{laid.caller.username}이 이미 있는 {laid.category.name}으로 다시 만듦"
+        return f"{laid.caller.username}이 이미 있는 이름 {laid.category.name}(으)로 다시 생성"
 
     @override
     async def call(self, adapter: Adapter, laid: ACategoryAndACaller) -> CategoryNodeAnswer:
@@ -107,7 +107,9 @@ class TheNameAloneMakesAWholeNode(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 이름만 주고 분류를 만들면, 설명이 비어 있는 노드 전체가 답으로 온다"
+        return (
+            "슈퍼관리자가 이름만 지정해 카테고리를 생성하면, 설명이 비어 있는 노드 전체가 반환된다"
+        )
 
     @override
     def given(self) -> Given[SeedingSession, ACallerAlone]:
@@ -134,7 +136,7 @@ class TheDescriptionComesBackAsGiven(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 이름과 설명을 함께 주고 만들면, 준 값이 그대로 실린 노드가 온다"
+        return "슈퍼관리자가 이름과 설명을 함께 지정해 생성하면, 지정한 값이 그대로 담긴 노드가 반환된다"
 
     @override
     def given(self) -> Given[SeedingSession, ACallerAlone]:
@@ -160,8 +162,8 @@ class ANameAnotherCategoryHoldsIsRefused(
     @override
     def describe(self) -> str:
         return (
-            "이미 어떤 분류가 쓰고 있는 이름으로 슈퍼관리자가 다시 만들면, 이름이 겹친다는 "
-            "이유로 거부된다. 저장소의 유일 제약이 막는 것이고 도메인 오류로 옮겨져 있지 않다"
+            "이미 다른 카테고리가 사용 중인 이름으로 슈퍼관리자가 다시 생성하면, 이름 중복으로 "
+            "거부된다. 저장소의 유일 제약이 막는 것이고 도메인 오류로 옮겨져 있지 않다"
         )
 
     @override
@@ -185,7 +187,7 @@ class APlainUserMayNotCreate(Scenario[SeedingSession, ACallerAlone, Adapter, Cat
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 아닌 사용자가 분류를 만들려 하면, 역할로 막힌다"
+        return "슈퍼관리자가 아닌 사용자가 카테고리를 생성하려 하면, 역할 부족으로 거부된다"
 
     @override
     def given(self) -> Given[SeedingSession, ACallerAlone]:
@@ -211,8 +213,8 @@ class EnforcementOffChangesNothing(
     @override
     def describe(self) -> str:
         return (
-            "엔티티 권한 집행을 꺼도 분류 만들기는 여전히 막힌다. "
-            "이 문은 권한 그래프가 아니라 역할이 지키기 때문이다"
+            "권한 검사를 꺼도 카테고리 생성은 여전히 거부된다. "
+            "생성은 권한 그래프가 아니라 역할로 보호되기 때문이다"
         )
 
     @override

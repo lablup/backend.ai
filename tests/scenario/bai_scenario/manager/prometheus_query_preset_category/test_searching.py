@@ -1,4 +1,4 @@
-"""분류 훑기 — 인증된 사용자 누구나, 이름으로 걸러서."""
+"""카테고리 검색 — 인증된 사용자 누구나, 이름 필터로."""
 
 from __future__ import annotations
 
@@ -51,7 +51,7 @@ type NobodyStep = Scenario[SeedingSession, ACategoryAlone, Adapter, Searched]
 
 @dataclass(frozen=True)
 class SearchingEverything(When[ManyCategoriesAndACaller, Adapter, Searched]):
-    """필터도 크기도 없이 전체를 훑는다."""
+    """필터도 크기도 없이 전체를 검색한다."""
 
     @override
     def operation(self) -> str:
@@ -69,7 +69,7 @@ class SearchingEverything(When[ManyCategoriesAndACaller, Adapter, Searched]):
 
 @dataclass(frozen=True)
 class SearchingByName(When[ManyCategoriesAndACaller, Adapter, Searched]):
-    """심은 것 중 골라낸 하나의 이름으로 걸러 훑는다."""
+    """미리 만들어 둔 카테고리 중 골라낸 하나의 이름을 필터로 검색한다."""
 
     @override
     def operation(self) -> str:
@@ -77,7 +77,7 @@ class SearchingByName(When[ManyCategoriesAndACaller, Adapter, Searched]):
 
     @override
     def describe(self, laid: ManyCategoriesAndACaller) -> str:
-        return f"{laid.caller.username}이 이름 {laid.named.name}으로 걸러 조회"
+        return f"{laid.caller.username}이 {laid.named.name} 이름 필터로 조회"
 
     @override
     async def call(self, adapter: Adapter, laid: ManyCategoriesAndACaller) -> Searched:
@@ -91,7 +91,7 @@ class SearchingByName(When[ManyCategoriesAndACaller, Adapter, Searched]):
 
 @dataclass(frozen=True)
 class SearchingAsNobody(When[ACategoryAlone, Adapter, Searched]):
-    """사용자 컨텍스트 없이 훑는다."""
+    """사용자 컨텍스트 없이 검색한다."""
 
     @override
     def operation(self) -> str:
@@ -108,11 +108,11 @@ class SearchingAsNobody(When[ACategoryAlone, Adapter, Searched]):
 
 @dataclass(frozen=True)
 class OnlyTheNamedOneIsFound(Then[ManyCategoriesAndACaller, Searched]):
-    """골라낸 하나만 세어진다."""
+    """골라낸 하나만 집계된다."""
 
     @override
     def says(self) -> str:
-        return "이름으로 고른 하나만 세어진다"
+        return "이름 필터에 맞는 하나만 집계된다"
 
     @override
     def look(self, laid: ManyCategoriesAndACaller, answered: Answered[Searched]) -> list[Verdict]:
@@ -135,7 +135,7 @@ class AnyoneCountsEveryOne(Scenario[SeedingSession, ManyCategoriesAndACaller, Ad
 
     @override
     def describe(self) -> str:
-        return "분류 둘이 있고 아무 권한도 받지 않은 사용자가 필터 없이 훑으면, 둘을 모두 센다"
+        return "카테고리 둘이 있고 아무 권한도 없는 사용자가 필터 없이 검색하면, 둘 다 집계된다"
 
     @override
     def given(self) -> Given[SeedingSession, ManyCategoriesAndACaller]:
@@ -160,7 +160,9 @@ class FilteringByNameKeepsThatOne(
 
     @override
     def describe(self) -> str:
-        return "이름이 다른 분류 셋이 있을 때 이름으로 걸러 훑으면, 그 이름의 것만 남는다"
+        return (
+            "이름이 다른 카테고리 셋이 있을 때 이름 필터로 검색하면, 그 이름의 카테고리만 반환된다"
+        )
 
     @override
     def given(self) -> Given[SeedingSession, ManyCategoriesAndACaller]:
@@ -185,7 +187,7 @@ class OmittingThePageSizeAnswersTen(
 
     @override
     def describe(self) -> str:
-        return "분류 열하나가 있을 때 크기 없이 훑으면, 열 건까지 오고 다음 쪽이 있다고 답한다"
+        return "카테고리 11개가 있을 때 크기 없이 검색하면, 10건까지 반환되고 다음 페이지가 있다고 응답한다"
 
     @override
     def given(self) -> Given[SeedingSession, ManyCategoriesAndACaller]:
@@ -208,7 +210,7 @@ class NobodyMayNotSearch(Scenario[SeedingSession, ACategoryAlone, Adapter, Searc
 
     @override
     def describe(self) -> str:
-        return "분류 하나가 있고 사용자 컨텍스트 없이 훑으면, 인증으로 거부된다"
+        return "카테고리 하나가 있고 사용자 컨텍스트 없이 검색하면, 인증 실패로 거부된다"
 
     @override
     def given(self) -> Given[SeedingSession, ACategoryAlone]:
