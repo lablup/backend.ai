@@ -10,6 +10,10 @@ from ai.backend.common.identifier.user import UserID
 from ai.backend.common.types import AccessKey
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
+<<<<<<< HEAD
+=======
+from ai.backend.manager.data.dotfile.types import DotfileEntries, normalize_newlines
+>>>>>>> 7cb399f0 (fix(BA-7813): normalize CRLF line endings in bootstrap scripts and dotfiles (#14554))
 from ai.backend.manager.data.user.types import (
     BulkPurgeError,
     BulkUserPurgeResultData,
@@ -574,3 +578,60 @@ class UserService:
             access_key=action.access_key,
             ssh_public_key=ssh_public_key,
         )
+<<<<<<< HEAD
+=======
+
+    async def create_dotfile(
+        self, action: CreateKeypairDotfileAction
+    ) -> CreateKeypairDotfileActionResult:
+        if not verify_dotfile_name(action.entry.path):
+            raise InvalidAPIParameters("dotfile path is reserved for internal operations.")
+        keypair_id, current = await self._read_dotfiles(action.access_key)
+        entries = current.added(action.entry)
+        await self._write_dotfiles(keypair_id, entries)
+        return CreateKeypairDotfileActionResult(entries=entries.entries)
+
+    async def update_dotfile(
+        self, action: UpdateKeypairDotfileAction
+    ) -> UpdateKeypairDotfileActionResult:
+        keypair_id, current = await self._read_dotfiles(action.access_key)
+        entries = current.replaced(action.entry)
+        await self._write_dotfiles(keypair_id, entries)
+        return UpdateKeypairDotfileActionResult(entries=entries.entries)
+
+    async def delete_dotfile(
+        self, action: DeleteKeypairDotfileAction
+    ) -> DeleteKeypairDotfileActionResult:
+        keypair_id, current = await self._read_dotfiles(action.access_key)
+        entries = current.removed(action.path)
+        await self._write_dotfiles(keypair_id, entries)
+        return DeleteKeypairDotfileActionResult(entries=entries.entries)
+
+    async def get_bootstrap_script(
+        self, action: GetBootstrapScriptAction
+    ) -> GetBootstrapScriptActionResult:
+        keypair = await self._user_repository.admin_get_keypair(action.access_key)
+        return GetBootstrapScriptActionResult(script=keypair.bootstrap_script)
+
+    async def update_bootstrap_script(
+        self, action: UpdateBootstrapScriptAction
+    ) -> UpdateBootstrapScriptActionResult:
+        script = normalize_newlines(action.script).strip()
+        if len(script) > MAXIMUM_DOTFILE_SIZE:
+            raise DotfileCreationFailed("Maximum bootstrap script length reached")
+        keypair = await self._user_repository.admin_get_keypair(action.access_key)
+        await self._user_repository.update_keypair_column(
+            KeypairBootstrapScriptUpdater(keypair_id=keypair.id, script=script)
+        )
+        return UpdateBootstrapScriptActionResult()
+
+    async def _read_dotfiles(self, access_key: AccessKey) -> tuple[KeyPairID, DotfileEntries]:
+        """The keypair's id alongside its entries, so the write keys on the row it read."""
+        keypair = await self._user_repository.admin_get_keypair(access_key)
+        return keypair.id, DotfileEntries.unpack(keypair.dotfiles)
+
+    async def _write_dotfiles(self, keypair_id: KeyPairID, entries: DotfileEntries) -> None:
+        await self._user_repository.update_keypair_column(
+            KeypairDotfilesUpdater(keypair_id=keypair_id, dotfiles=entries.pack())
+        )
+>>>>>>> 7cb399f0 (fix(BA-7813): normalize CRLF line endings in bootstrap scripts and dotfiles (#14554))
