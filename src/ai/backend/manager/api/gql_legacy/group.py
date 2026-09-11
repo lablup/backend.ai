@@ -635,7 +635,7 @@ class ModifyGroupInput(graphene.InputObjectType):  # type: ignore[misc]
                 if (self.total_resource_slots is Undefined or self.total_resource_slots is None)
                 else ResourceSlot.from_user_input(self.total_resource_slots, None),
             ),
-            allowed_vfolder_hosts=OptionalState.from_graphql(
+            allowed_vfolder_hosts=OptionalState[dict[str, str]].from_graphql(
                 self.allowed_vfolder_hosts,
             ),
             integration_name=TriState[str].from_graphql(
