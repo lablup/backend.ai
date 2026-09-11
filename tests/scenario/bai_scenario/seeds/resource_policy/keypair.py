@@ -6,6 +6,8 @@ from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import override
 
+from bai_scenario.seeds.seeder import Naming, SeedRow
+
 from ai.backend.common.types import (
     DefaultForUnspecified,
     ResourceSlot,
@@ -14,7 +16,6 @@ from ai.backend.common.types import (
 )
 from ai.backend.manager.data.resource.types import KeyPairResourcePolicyData
 from ai.backend.manager.models.resource_policy.creators import KeyPairResourcePolicyCreator
-from bai_scenario.seeds.seeder import Naming, SeedRow
 
 
 @dataclass(frozen=True)
@@ -30,6 +31,8 @@ class SeedKeypairPolicy(SeedRow[KeyPairResourcePolicyData]):
     max_concurrent_sessions: int = 5
     max_pending_session_count: int | None = None
     vfolder_hosts: Sequence[str] = field(default_factory=tuple)
+    host_permissions: Sequence[VFolderHostPermission] = tuple(VFolderHostPermission)
+    """What the keypair may do on those hosts. Everything, until a row narrows it."""
 
     @override
     def kind(self) -> str:
@@ -42,6 +45,9 @@ class SeedKeypairPolicy(SeedRow[KeyPairResourcePolicyData]):
             allows.append(f"그중 대기 {self.max_pending_session_count}개까지")
         if self.vfolder_hosts:
             allows.append(f"폴더는 {', '.join(self.vfolder_hosts)}에 놓을 수 있다")
+        if set(self.host_permissions) != set(VFolderHostPermission):
+            named = ", ".join(sorted(one.value for one in self.host_permissions))
+            allows.append(f"그 호스트에서 할 수 있는 것은 {named}뿐이다")
         return ", ".join(allows)
 
     @override
@@ -50,11 +56,12 @@ class SeedKeypairPolicy(SeedRow[KeyPairResourcePolicyData]):
 
     @override
     def seed(self, name: str) -> KeyPairResourcePolicyCreator:
+        allowed = VFolderHostPermissionMap()
+        for host in self.vfolder_hosts:
+            allowed[host] = set(self.host_permissions)
         return KeyPairResourcePolicyCreator(
             name=name,
-            allowed_vfolder_hosts=VFolderHostPermissionMap({
-                host: set(VFolderHostPermission) for host in self.vfolder_hosts
-            }),
+            allowed_vfolder_hosts=allowed,
             default_for_unspecified=DefaultForUnspecified.UNLIMITED,
             idle_timeout=3600,
             max_concurrent_sessions=self.max_concurrent_sessions,

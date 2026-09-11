@@ -24,6 +24,7 @@ from ai.backend.common.data.entity.domain import DomainEntityType
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.v2.domain.response import DomainNode
+from ai.backend.common.types import VFolderHostPermission
 from ai.backend.manager.data.domain.types import DomainData
 from ai.backend.manager.data.permission.types import Permission
 from ai.backend.manager.data.user.types import UserData
@@ -254,6 +255,7 @@ class SomeoneOf(SeedNest[Laid[UserData]]):
     role: UserRole = UserRole.USER
     vfolder_hosts: Sequence[str] = ()
     max_vfolder_count: int = 10
+    host_permissions: Sequence[VFolderHostPermission] = tuple(VFolderHostPermission)
 
     @override
     def kind(self) -> str:
@@ -263,7 +265,11 @@ class SomeoneOf(SeedNest[Laid[UserData]]):
     def lay(self, seed: Seeder) -> Laid[UserData]:
         seed.once(SeedProjectPolicy())
         policy = seed.creating(SeedUserPolicy(max_vfolder_count=self.max_vfolder_count))
-        key_policy = seed.creating(SeedKeypairPolicy(vfolder_hosts=self.vfolder_hosts))
+        key_policy = seed.creating(
+            SeedKeypairPolicy(
+                vfolder_hosts=self.vfolder_hosts, host_permissions=self.host_permissions
+            )
+        )
         return seed.provisioning(SeedUserOf(role=self.role), self.domain, policy, key_policy)
 
 

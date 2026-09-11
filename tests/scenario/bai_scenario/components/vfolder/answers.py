@@ -15,12 +15,11 @@ from uuid import UUID
 from bai_scenario.components.domain import WrittenByThisRun
 from bai_scenario.components.vfolder.stage import (
     STORAGE_HOST,
-    AFolderAndACaller,
-    AFolderMakerAndTheirDomain,
     AProjectAndACaller,
 )
 
 from ai.backend.common.dto.manager.v2.vfolder.response import (
+    SearchVFoldersPayload,
     VFolderNode,
 )
 from ai.backend.manager.data.project.types import ProjectData
@@ -104,31 +103,6 @@ def look_node(
 
 
 @dataclass(frozen=True)
-class TheFolderBelongsToTheMaker(Then[AFolderMakerAndTheirDomain, Any]):
-    """만든 폴더가 통째로 오고, 그 주인은 만든 사람이다."""
-
-    started: datetime
-    named: str
-
-    @override
-    def says(self) -> str:
-        return "만든 폴더 전체가 오고, 주인은 만든 사람이다"
-
-    @override
-    def look(self, laid: AFolderMakerAndTheirDomain, answered: Answered[Any]) -> list[Verdict]:
-        node = answered.response
-        if not isinstance(node, VFolderNode):
-            return [NoAnswer(answered.raised)]
-        return look_node(
-            node,
-            named=self.named,
-            owner=laid.caller.id,
-            creator=laid.caller,
-            started=self.started,
-        )
-
-
-@dataclass(frozen=True)
 class TheFolderBelongsToTheProject(Then[AProjectAndACaller, Any]):
     """만든 폴더가 통째로 오고, 그 주인은 프로젝트다. 개인 주인은 없다."""
 
@@ -155,24 +129,24 @@ class TheFolderBelongsToTheProject(Then[AProjectAndACaller, Any]):
 
 
 @dataclass(frozen=True)
-class TheFolderTakesTheFreedName(Then[AFolderAndACaller, Any]):
-    """앞서 있던 폴더가 쓰던 이름으로 새 폴더가 만들어진다."""
+class OnlyTheirsIsFound(Then[Any, Any]):
+    """훑은 답에 부르는 사람이 볼 것만 담긴다."""
 
-    started: datetime
+    counted: int
 
     @override
     def says(self) -> str:
-        return "앞서 있던 폴더의 이름으로 새 폴더가 만들어진다"
+        return f"볼 수 있는 폴더 {self.counted}개만 온다"
 
     @override
-    def look(self, laid: AFolderAndACaller, answered: Answered[Any]) -> list[Verdict]:
-        node = answered.response
-        if not isinstance(node, VFolderNode):
+    def look(self, laid: Any, answered: Answered[Any]) -> list[Verdict]:
+        page = answered.response
+        if not isinstance(page, SearchVFoldersPayload):
             return [NoAnswer(answered.raised)]
-        return look_node(
-            node,
-            named=laid.folder.name,
-            owner=laid.caller.id,
-            creator=laid.caller,
-            started=self.started,
-        )
+        wanted = sorted(one.name for one in laid.seen)
+        return [
+            Same("items", sorted(one.metadata.name for one in page.items), wanted),
+            Same("total_count", page.total_count, len(wanted)),
+            Same("has_next_page", page.has_next_page, False),
+            Same("has_previous_page", page.has_previous_page, False),
+        ]

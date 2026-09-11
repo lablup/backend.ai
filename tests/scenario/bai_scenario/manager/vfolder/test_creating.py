@@ -10,9 +10,9 @@ from typing import Any, override
 import pytest
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.vfolder.answers import (
-    TheFolderBelongsToTheMaker,
+    NoAnswer,
     TheFolderBelongsToTheProject,
-    TheFolderTakesTheFreedName,
+    look_node,
 )
 from bai_scenario.components.vfolder.callers import (
     SomeoneGrantedNothing,
@@ -35,16 +35,20 @@ from bai_scenario.runner.steps import run_scenario
 from ai.backend.common.dto.manager.v2.vfolder.request import (
     CreateVFolderInput,
 )
-from ai.backend.common.dto.manager.v2.vfolder.response import VFolderNode
+from ai.backend.common.dto.manager.v2.vfolder.response import (
+    VFolderNode,
+)
 from ai.backend.manager.api.adapters.vfolder.adapter import VFolderAdapter
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.errors.storage import VFolderAlreadyExists, VFolderInvalidParameter
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import (
+    Answered,
     Configured,
     Given,
     Scenario,
     Then,
+    Verdict,
     When,
 )
 
@@ -124,6 +128,55 @@ class MakingAFolderForTheProject(When[AProjectAndACaller, VFolderAdapter, VFolde
                 CreateVFolderInput(name=self.named, host=STORAGE_HOST, project_id=laid.project.id)
             )
         return payload.vfolder
+
+
+@dataclass(frozen=True)
+class TheFolderBelongsToTheMaker(Then[AFolderMakerAndTheirDomain, Any]):
+    """만든 폴더가 통째로 오고, 그 주인은 만든 사람이다."""
+
+    started: datetime
+    named: str
+
+    @override
+    def says(self) -> str:
+        return "만든 폴더 전체가 오고, 주인은 만든 사람이다"
+
+    @override
+    def look(self, laid: AFolderMakerAndTheirDomain, answered: Answered[Any]) -> list[Verdict]:
+        node = answered.response
+        if not isinstance(node, VFolderNode):
+            return [NoAnswer(answered.raised)]
+        return look_node(
+            node,
+            named=self.named,
+            owner=laid.caller.id,
+            creator=laid.caller,
+            started=self.started,
+        )
+
+
+@dataclass(frozen=True)
+class TheFolderTakesTheFreedName(Then[AFolderAndACaller, Any]):
+    """앞서 있던 폴더가 쓰던 이름으로 새 폴더가 만들어진다."""
+
+    started: datetime
+
+    @override
+    def says(self) -> str:
+        return "앞서 있던 폴더의 이름으로 새 폴더가 만들어진다"
+
+    @override
+    def look(self, laid: AFolderAndACaller, answered: Answered[Any]) -> list[Verdict]:
+        node = answered.response
+        if not isinstance(node, VFolderNode):
+            return [NoAnswer(answered.raised)]
+        return look_node(
+            node,
+            named=laid.folder.name,
+            owner=laid.caller.id,
+            creator=laid.caller,
+            started=self.started,
+        )
 
 
 @dataclass(frozen=True)

@@ -10,10 +10,12 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import override
 
-from bai_scenario.seeds.seeder import Naming, SeedRowFrom
+from bai_scenario.seeds.seeder import Naming, SeedRowFrom, SeedRowFromTwo
 
+from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.types import QuotaScopeID, QuotaScopeType, VFolderUsageMode
+from ai.backend.manager.data.project.types import ProjectData
 from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.data.vfolder.types import (
     VFolderData,
@@ -22,6 +24,7 @@ from ai.backend.manager.data.vfolder.types import (
 )
 from ai.backend.manager.models.vfolder.creators import (
     PersonalVFolderCreator,
+    ProjectVFolderCreator,
 )
 
 
@@ -64,4 +67,39 @@ class SeedFolderOf(SeedRowFrom[UserData, VFolderData]):
             permission=VFolderMountPermission.READ_WRITE,
             cloneable=False,
             status=self.status,
+        )
+
+
+@dataclass(frozen=True)
+class SeedProjectFolderOf(SeedRowFromTwo[UserData, ProjectData, VFolderData]):
+    """A folder the given project owns, made by the given user."""
+
+    host: str
+    name_hint: str = "project-folder"
+
+    @override
+    def kind(self) -> str:
+        return "프로젝트 폴더"
+
+    @override
+    def detail(self) -> str:
+        return "프로젝트가 소유하고, 개인 소유자는 없다"
+
+    @override
+    def name(self, naming: Naming) -> str:
+        return naming(self.name_hint)
+
+    @override
+    def seed(self, name: str, first: UserData, second: ProjectData) -> ProjectVFolderCreator:
+        return ProjectVFolderCreator(
+            name=name,
+            domain_name=first.domain_name,
+            quota_scope_id=str(QuotaScopeID(QuotaScopeType.PROJECT, ProjectID(second.id))),
+            host=self.host,
+            creator_id=first.id,
+            project=ProjectID(second.id),
+            usage_mode=VFolderUsageMode.GENERAL,
+            permission=VFolderMountPermission.READ_WRITE,
+            cloneable=False,
+            status=VFolderOperationStatus.READY,
         )

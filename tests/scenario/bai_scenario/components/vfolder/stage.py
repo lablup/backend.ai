@@ -10,6 +10,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.types import VFolderHostPermission
 from ai.backend.manager.data.domain.types import DomainData
 from ai.backend.manager.data.permission.types import Permission
 from ai.backend.manager.data.project.types import ProjectData
@@ -21,6 +23,12 @@ STORAGE_HOST = "local:volume1"
 # The permission sets a table asks for, named by what the caller is about to do.
 MAKING = (Permission.CREATE, Permission.READ)
 READING = (Permission.READ,)
+RETIRING = (Permission.READ, Permission.SOFT_DELETE)
+
+# The one host permission a delete asks the keypair policy for, taken away.
+WITHOUT_DELETE = tuple(
+    one for one in VFolderHostPermission if one is not VFolderHostPermission.DELETE
+)
 
 
 # ---------------------------------------------------------------------------
@@ -54,6 +62,17 @@ class FoldersAndACaller:
 
     seen: tuple[VFolderData, ...]
     unseen: tuple[VFolderData, ...]
+    caller: UserData
+
+
+@dataclass(frozen=True)
+class APersonalProjectAndItsOwner:
+    """사용자를 만들 때 딸려 만들어진 개인 프로젝트와, 그 주인.
+
+    그 프로젝트는 시나리오가 심지 않았으므로 행이 아니라 id만 손에 있다.
+    """
+
+    project_id: ProjectID
     caller: UserData
 
 

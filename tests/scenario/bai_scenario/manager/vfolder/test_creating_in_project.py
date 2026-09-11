@@ -14,9 +14,11 @@ from bai_scenario.components.vfolder.answers import (
 from bai_scenario.components.vfolder.callers import (
     SomeoneGrantedNothingOnAProject,
     SomeoneGrantedOnAProject,
+    SomeoneNamingTheirPersonalProject,
 )
 from bai_scenario.components.vfolder.stage import (
     STORAGE_HOST,
+    APersonalProjectAndItsOwner,
     AProjectAndACaller,
 )
 from bai_scenario.runner.acting import ActingAs
@@ -26,9 +28,12 @@ from bai_scenario.runner.steps import run_scenario
 from ai.backend.common.dto.manager.v2.vfolder.request import (
     CreateVFolderInScopeInput,
 )
-from ai.backend.common.dto.manager.v2.vfolder.response import VFolderNode
+from ai.backend.common.dto.manager.v2.vfolder.response import (
+    VFolderNode,
+)
 from ai.backend.manager.api.adapters.vfolder.adapter import VFolderAdapter
 from ai.backend.manager.errors.permission import NotEnoughPermission
+from ai.backend.manager.errors.storage import InsufficientStoragePermission
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import (
     Given,
@@ -63,6 +68,59 @@ class MakingAFolderUnderTheProject(When[AProjectAndACaller, VFolderAdapter, VFol
                 laid.project.id, CreateVFolderInScopeInput(name=self.named, host=STORAGE_HOST)
             )
         return payload.vfolder
+
+
+@dataclass(frozen=True)
+class MakingAFolderUnderTheirPersonalProject(
+    When[APersonalProjectAndItsOwner, VFolderAdapter, VFolderNode]
+):
+    """자기 개인 프로젝트를 대상으로 지목해 만든다."""
+
+    named: str
+
+    @override
+    def operation(self) -> str:
+        return "create_in_project"
+
+    @override
+    def describe(self, laid: APersonalProjectAndItsOwner) -> str:
+        return f"{laid.caller.username}이 자기 개인 프로젝트 아래 {self.named}이라는 폴더를 만듦"
+
+    @override
+    async def call(self, adapter: VFolderAdapter, laid: APersonalProjectAndItsOwner) -> VFolderNode:
+        with ActingAs(laid.caller):
+            payload = await adapter.create_in_project(
+                laid.project_id, CreateVFolderInScopeInput(name=self.named, host=STORAGE_HOST)
+            )
+        return payload.vfolder
+
+
+@dataclass(frozen=True)
+class APersonalProjectMayNotBeNamed(
+    Scenario[SeedingSession, APersonalProjectAndItsOwner, VFolderAdapter, VFolderNode]
+):
+    @override
+    def summary(self) -> str:
+        return "naming-a-personal-project-is-stopped-by-the-storage-host-first"
+
+    @override
+    def describe(self) -> str:
+        return (
+            "사용자를 만들 때 딸려 만들어진 개인 프로젝트를 대상으로 지목해 폴더를 만들려 하면, "
+            "그 프로젝트가 어떤 스토리지 호스트도 허용하지 않으므로 저장소 쪽이 먼저 막는다"
+        )
+
+    @override
+    def given(self) -> Given[SeedingSession, APersonalProjectAndItsOwner]:
+        return SomeoneNamingTheirPersonalProject()
+
+    @override
+    def when(self) -> When[APersonalProjectAndItsOwner, VFolderAdapter, VFolderNode]:
+        return MakingAFolderUnderTheirPersonalProject(named="mine")
+
+    @override
+    def then(self) -> Then[APersonalProjectAndItsOwner, VFolderNode]:
+        return TheCallIsRefused(InsufficientStoragePermission)
 
 
 @dataclass(frozen=True)
@@ -126,6 +184,7 @@ class NoProjectGrantMakesNoProjectFolder(
 SCENARIOS: list[CreatingStep] = [
     AProjectGrantMakesAProjectFolder(started=datetime.now(UTC)),
     NoProjectGrantMakesNoProjectFolder(),
+    APersonalProjectMayNotBeNamed(),
 ]
 
 
