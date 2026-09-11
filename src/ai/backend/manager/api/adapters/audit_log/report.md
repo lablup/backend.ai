@@ -53,8 +53,8 @@ When
 
 Then
 
-- 준 순서대로 오고, 없는 id 자리는 비어 있다
-  - operations = []
+- 준 순서대로 노드가 오고, 없는 id 자리는 비어 있다
+  - length = 0
 
 #### [reading-present-and-absent-ids-answers-each-in-order-with-a-gap](/tests/scenario/bai_scenario/manager/audit_log/test_batch_loading.py) — pass
 
@@ -78,8 +78,35 @@ When
 
 Then
 
-- 준 순서대로 오고, 없는 id 자리는 비어 있다
-  - operations = ['edited', None, 'created']
+- 준 순서대로 노드가 오고, 없는 id 자리는 비어 있다
+  - length = 3
+  - id: 무시함 — 데이터베이스가 만든다
+  - action_id: 무시함 — 실행마다 새로 생긴다
+  - operation = 'edited'
+  - entity_type = 'user'
+  - entity_id: 기록의 대상 엔티티와 같다
+  - status = <AuditLogStatus.SUCCESS: 'success'>
+  - description = 'edited was recorded'
+  - created_at = datetime.datetime(2026, 1, 2, 0, 0, tzinfo=datetime.timezone.utc)
+  - request_id = None
+  - acted_as = None
+  - duration = None
+  - client_ip = None
+  - triggered_by = None
+  - slot[1] = None
+  - id: 무시함 — 데이터베이스가 만든다
+  - action_id: 무시함 — 실행마다 새로 생긴다
+  - operation = 'created'
+  - entity_type = 'user'
+  - entity_id: 기록의 대상 엔티티와 같다
+  - status = <AuditLogStatus.SUCCESS: 'success'>
+  - description = 'created was recorded'
+  - created_at = datetime.datetime(2026, 1, 1, 0, 0, tzinfo=datetime.timezone.utc)
+  - request_id = None
+  - acted_as = None
+  - duration = None
+  - client_ip = None
+  - triggered_by = None
 
 #### [the-monitor-role-reading-by-id-sees-the-same-nodes-as-the-superadmin](/tests/scenario/bai_scenario/manager/audit_log/test_batch_loading.py) — pass
 
@@ -103,10 +130,83 @@ When
 
 Then
 
-- 준 순서대로 오고, 없는 id 자리는 비어 있다
-  - operations = ['edited', 'created']
+- 준 순서대로 노드가 오고, 없는 id 자리는 비어 있다
+  - length = 2
+  - id: 무시함 — 데이터베이스가 만든다
+  - action_id: 무시함 — 실행마다 새로 생긴다
+  - operation = 'edited'
+  - entity_type = 'user'
+  - entity_id: 기록의 대상 엔티티와 같다
+  - status = <AuditLogStatus.SUCCESS: 'success'>
+  - description = 'edited was recorded'
+  - created_at = datetime.datetime(2026, 1, 2, 0, 0, tzinfo=datetime.timezone.utc)
+  - request_id = None
+  - acted_as = None
+  - duration = None
+  - client_ip = None
+  - triggered_by = None
+  - id: 무시함 — 데이터베이스가 만든다
+  - action_id: 무시함 — 실행마다 새로 생긴다
+  - operation = 'created'
+  - entity_type = 'user'
+  - entity_id: 기록의 대상 엔티티와 같다
+  - status = <AuditLogStatus.SUCCESS: 'success'>
+  - description = 'created was recorded'
+  - created_at = datetime.datetime(2026, 1, 1, 0, 0, tzinfo=datetime.timezone.utc)
+  - request_id = None
+  - acted_as = None
+  - duration = None
+  - client_ip = None
+  - triggered_by = None
 
 ### scoped_searching
+
+#### [a-record-tagged-with-a-scope-is-found-by-searching-that-scope](/tests/scenario/bai_scenario/manager/audit_log/test_scoped_searching.py) — pass
+
+다른 엔티티에 대한 기록이 한 프로젝트를 스코프로 달고 있을 때 그 프로젝트를 지목해 검색하면, 대상 엔티티가 그 프로젝트가 아니어도 그 기록이 온다
+
+Given
+
+- 다른 엔티티에 대한 기록이 한 프로젝트를 스코프로 달고 있고, 그 프로젝트에 읽기 권한을 받은 사용자 한 명
+  - 도메인 home-1
+  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+  - 프로젝트 team-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+    - 일반 사용자 user-2: 자기 키와 개인 프로젝트를 갖는다
+  - 일반 사용자 user-1: 'linked' 기록, 스코프 1개 달림
+  - 역할 record-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
+  - 역할 record-reader-1: project 전체에 READ 허용
+  - 일반 사용자 user-2: 역할 record-reader-1 보유
+
+When
+
+- AuditLogAdapter.scoped_search — user-2이 엔티티를 지목해 검색
+
+Then
+
+- 지목한 기록이 순서대로, 그리고 그것만 온다
+  - item_count = 1
+  - total_count = 1
+  - has_next_page = False
+  - has_previous_page = False
+  - id: 무시함 — 데이터베이스가 만든다
+  - action_id: 무시함 — 실행마다 새로 생긴다
+  - operation = 'linked'
+  - entity_type = 'user'
+  - entity_id: 기록의 대상 엔티티와 같다
+  - status = <AuditLogStatus.SUCCESS: 'success'>
+  - description = 'linked was recorded'
+  - created_at = datetime.datetime(2026, 1, 2, 0, 0, tzinfo=datetime.timezone.utc)
+  - request_id = None
+  - acted_as = None
+  - duration = None
+  - client_ip = None
+  - triggered_by = None
 
 #### [a-scope-id-that-is-not-an-entity-id-is-refused](/tests/scenario/bai_scenario/manager/audit_log/test_scoped_searching.py) — pass
 
@@ -165,10 +265,23 @@ When
 Then
 
 - 지목한 기록이 순서대로, 그리고 그것만 온다
-  - items = ['succeeded']
+  - item_count = 1
   - total_count = 1
   - has_next_page = False
   - has_previous_page = False
+  - id: 무시함 — 데이터베이스가 만든다
+  - action_id: 무시함 — 실행마다 새로 생긴다
+  - operation = 'succeeded'
+  - entity_type = 'project'
+  - entity_id: 기록의 대상 엔티티와 같다
+  - status = <AuditLogStatus.SUCCESS: 'success'>
+  - description = 'succeeded was recorded'
+  - created_at = datetime.datetime(2026, 1, 2, 0, 0, tzinfo=datetime.timezone.utc)
+  - request_id = None
+  - acted_as = None
+  - duration = None
+  - client_ip = None
+  - triggered_by = None
 
 #### [a-user-granted-nothing-may-not-read-even-the-records-they-triggered](/tests/scenario/bai_scenario/manager/audit_log/test_scoped_searching.py) — pass
 
@@ -257,10 +370,23 @@ When
 Then
 
 - 지목한 기록이 순서대로, 그리고 그것만 온다
-  - items = ['acted-by-me']
+  - item_count = 1
   - total_count = 1
   - has_next_page = False
   - has_previous_page = False
+  - id: 무시함 — 데이터베이스가 만든다
+  - action_id: 무시함 — 실행마다 새로 생긴다
+  - operation = 'acted-by-me'
+  - entity_type = 'user'
+  - entity_id: 기록의 대상 엔티티와 같다
+  - status = <AuditLogStatus.SUCCESS: 'success'>
+  - description = 'acted-by-me was recorded'
+  - created_at = datetime.datetime(2026, 1, 2, 0, 0, tzinfo=datetime.timezone.utc)
+  - request_id = None
+  - acted_as = None
+  - duration = None
+  - client_ip = None
+  - triggered_by: 일으킨 사용자와 같다
 
 #### [a-user-granted-read-on-an-entity-reads-only-that-entitys-records](/tests/scenario/bai_scenario/manager/audit_log/test_scoped_searching.py) — pass
 
@@ -290,10 +416,23 @@ When
 Then
 
 - 지목한 기록이 순서대로, 그리고 그것만 온다
-  - items = ['edited']
+  - item_count = 1
   - total_count = 1
   - has_next_page = False
   - has_previous_page = False
+  - id: 무시함 — 데이터베이스가 만든다
+  - action_id: 무시함 — 실행마다 새로 생긴다
+  - operation = 'edited'
+  - entity_type = 'project'
+  - entity_id: 기록의 대상 엔티티와 같다
+  - status = <AuditLogStatus.SUCCESS: 'success'>
+  - description = 'edited was recorded'
+  - created_at = datetime.datetime(2026, 1, 2, 0, 0, tzinfo=datetime.timezone.utc)
+  - request_id = None
+  - acted_as = None
+  - duration = None
+  - client_ip = None
+  - triggered_by = None
 
 #### [naming-an-entity-nothing-answers-to-is-refused-as-permission](/tests/scenario/bai_scenario/manager/audit_log/test_scoped_searching.py) — pass
 
@@ -356,10 +495,36 @@ When
 Then
 
 - 지목한 기록이 순서대로, 그리고 그것만 온다
-  - items = ['edited', 'created']
+  - item_count = 2
   - total_count = 2
   - has_next_page = False
   - has_previous_page = False
+  - id: 무시함 — 데이터베이스가 만든다
+  - action_id: 무시함 — 실행마다 새로 생긴다
+  - operation = 'edited'
+  - entity_type = 'project'
+  - entity_id: 기록의 대상 엔티티와 같다
+  - status = <AuditLogStatus.SUCCESS: 'success'>
+  - description = 'edited was recorded'
+  - created_at = datetime.datetime(2026, 1, 2, 0, 0, tzinfo=datetime.timezone.utc)
+  - request_id = None
+  - acted_as = None
+  - duration = None
+  - client_ip = None
+  - triggered_by = None
+  - id: 무시함 — 데이터베이스가 만든다
+  - action_id: 무시함 — 실행마다 새로 생긴다
+  - operation = 'created'
+  - entity_type = 'project'
+  - entity_id: 기록의 대상 엔티티와 같다
+  - status = <AuditLogStatus.SUCCESS: 'success'>
+  - description = 'created was recorded'
+  - created_at = datetime.datetime(2026, 1, 1, 0, 0, tzinfo=datetime.timezone.utc)
+  - request_id = None
+  - acted_as = None
+  - duration = None
+  - client_ip = None
+  - triggered_by = None
 
 #### [omitting-the-page-size-caps-a-scoped-page-and-says-more-follow](/tests/scenario/bai_scenario/manager/audit_log/test_scoped_searching.py) — pass
 
@@ -514,10 +679,23 @@ When
 Then
 
 - 지목한 기록이 순서대로, 그리고 그것만 온다
-  - items = ['edited']
+  - item_count = 1
   - total_count = 1
   - has_next_page = False
   - has_previous_page = False
+  - id: 무시함 — 데이터베이스가 만든다
+  - action_id: 무시함 — 실행마다 새로 생긴다
+  - operation = 'edited'
+  - entity_type = 'project'
+  - entity_id: 기록의 대상 엔티티와 같다
+  - status = <AuditLogStatus.SUCCESS: 'success'>
+  - description = 'edited was recorded'
+  - created_at = datetime.datetime(2026, 1, 2, 0, 0, tzinfo=datetime.timezone.utc)
+  - request_id = None
+  - acted_as = None
+  - duration = None
+  - client_ip = None
+  - triggered_by = None
 
 ### searching
 
@@ -569,10 +747,23 @@ When
 Then
 
 - 지목한 기록이 순서대로, 그리고 그것만 온다
-  - items = ['succeeded']
+  - item_count = 1
   - total_count = 1
   - has_next_page = False
   - has_previous_page = False
+  - id: 무시함 — 데이터베이스가 만든다
+  - action_id: 무시함 — 실행마다 새로 생긴다
+  - operation = 'succeeded'
+  - entity_type = 'user'
+  - entity_id: 기록의 대상 엔티티와 같다
+  - status = <AuditLogStatus.SUCCESS: 'success'>
+  - description = 'succeeded was recorded'
+  - created_at = datetime.datetime(2026, 1, 2, 0, 0, tzinfo=datetime.timezone.utc)
+  - request_id = None
+  - acted_as = None
+  - duration = None
+  - client_ip = None
+  - triggered_by = None
 
 #### [a-user-who-is-not-the-superadmin-may-not-search-every-record](/tests/scenario/bai_scenario/manager/audit_log/test_searching.py) — pass
 
@@ -628,10 +819,23 @@ When
 Then
 
 - 지목한 기록이 순서대로, 그리고 그것만 온다
-  - items = ['acted-by-me']
+  - item_count = 1
   - total_count = 1
   - has_next_page = False
   - has_previous_page = False
+  - id: 무시함 — 데이터베이스가 만든다
+  - action_id: 무시함 — 실행마다 새로 생긴다
+  - operation = 'acted-by-me'
+  - entity_type = 'user'
+  - entity_id: 기록의 대상 엔티티와 같다
+  - status = <AuditLogStatus.SUCCESS: 'success'>
+  - description = 'acted-by-me was recorded'
+  - created_at = datetime.datetime(2026, 1, 2, 0, 0, tzinfo=datetime.timezone.utc)
+  - request_id = None
+  - acted_as = None
+  - duration = None
+  - client_ip = None
+  - triggered_by: 일으킨 사용자와 같다
 
 #### [naming-two-pagination-modes-at-once-is-refused](/tests/scenario/bai_scenario/manager/audit_log/test_searching.py) — pass
 
@@ -718,10 +922,36 @@ When
 Then
 
 - 지목한 기록이 순서대로, 그리고 그것만 온다
-  - items = ['edited', 'created']
+  - item_count = 2
   - total_count = 2
   - has_next_page = False
   - has_previous_page = False
+  - id: 무시함 — 데이터베이스가 만든다
+  - action_id: 무시함 — 실행마다 새로 생긴다
+  - operation = 'edited'
+  - entity_type = 'user'
+  - entity_id: 기록의 대상 엔티티와 같다
+  - status = <AuditLogStatus.SUCCESS: 'success'>
+  - description = 'edited was recorded'
+  - created_at = datetime.datetime(2026, 1, 2, 0, 0, tzinfo=datetime.timezone.utc)
+  - request_id = None
+  - acted_as = None
+  - duration = None
+  - client_ip = None
+  - triggered_by = None
+  - id: 무시함 — 데이터베이스가 만든다
+  - action_id: 무시함 — 실행마다 새로 생긴다
+  - operation = 'created'
+  - entity_type = 'user'
+  - entity_id: 기록의 대상 엔티티와 같다
+  - status = <AuditLogStatus.SUCCESS: 'success'>
+  - description = 'created was recorded'
+  - created_at = datetime.datetime(2026, 1, 1, 0, 0, tzinfo=datetime.timezone.utc)
+  - request_id = None
+  - acted_as = None
+  - duration = None
+  - client_ip = None
+  - triggered_by = None
 
 #### [the-superadmin-searching-without-a-filter-sees-every-record-newest-first](/tests/scenario/bai_scenario/manager/audit_log/test_searching.py) — pass
 
@@ -746,10 +976,36 @@ When
 Then
 
 - 지목한 기록이 순서대로, 그리고 그것만 온다
-  - items = ['edited', 'created']
+  - item_count = 2
   - total_count = 2
   - has_next_page = False
   - has_previous_page = False
+  - id: 무시함 — 데이터베이스가 만든다
+  - action_id: 무시함 — 실행마다 새로 생긴다
+  - operation = 'edited'
+  - entity_type = 'user'
+  - entity_id: 기록의 대상 엔티티와 같다
+  - status = <AuditLogStatus.SUCCESS: 'success'>
+  - description = 'edited was recorded'
+  - created_at = datetime.datetime(2026, 1, 2, 0, 0, tzinfo=datetime.timezone.utc)
+  - request_id = None
+  - acted_as = None
+  - duration = None
+  - client_ip = None
+  - triggered_by = None
+  - id: 무시함 — 데이터베이스가 만든다
+  - action_id: 무시함 — 실행마다 새로 생긴다
+  - operation = 'created'
+  - entity_type = 'user'
+  - entity_id: 기록의 대상 엔티티와 같다
+  - status = <AuditLogStatus.SUCCESS: 'success'>
+  - description = 'created was recorded'
+  - created_at = datetime.datetime(2026, 1, 1, 0, 0, tzinfo=datetime.timezone.utc)
+  - request_id = None
+  - acted_as = None
+  - duration = None
+  - client_ip = None
+  - triggered_by = None
 
 #### [turning-enforcement-off-does-not-let-a-plain-user-search-every-record](/tests/scenario/bai_scenario/manager/audit_log/test_searching.py) — pass
 
