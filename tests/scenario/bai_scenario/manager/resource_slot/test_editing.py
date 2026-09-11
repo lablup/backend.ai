@@ -1,6 +1,6 @@
-"""슬롯 종류 고치기 — 이름으로 지목해 무엇이 바뀌고, 누가 고칠 수 있는가.
+"""슬롯 종류 수정 — 이름으로 지정해 무엇이 바뀌고, 누가 수정할 수 있는가.
 
-이름과 종류는 고치지 못한다. 요청 타입이 그 둘을 받지 않으므로 여기 없다.
+이름과 종류는 수정할 수 없다. 요청 타입이 그 둘을 받지 않으므로 여기 없다.
 """
 
 from __future__ import annotations
@@ -40,7 +40,7 @@ type EditingStep = Scenario[
 
 @dataclass(frozen=True)
 class Editing(When[ASlotTypeAndACaller, ResourceSlotAdapter, ResourceSlotTypeNode]):
-    """심은 슬롯 종류를 이름으로 지목해 고친다. 답이 실은 노드를 벗겨서 준다."""
+    """미리 만들어 둔 슬롯 종류를 이름으로 지정해 수정한다. 응답에 담긴 노드를 꺼내서 준다."""
 
     display_name: str | None = None
     enabled: bool | None = None
@@ -58,7 +58,7 @@ class Editing(When[ASlotTypeAndACaller, ResourceSlotAdapter, ResourceSlotTypeNod
             changing.append("표시 이름")
         if self.enabled is not None:
             changing.append("사용 여부")
-        return f"{laid.caller.username}이 {target}의 {' 및 '.join(changing) or '아무것도'} 고침"
+        return f"{laid.caller.username}이 {target}의 {' 및 '.join(changing) or '아무것도'} 수정"
 
     @override
     async def call(
@@ -85,7 +85,7 @@ class TheDisplayNameChangesAndTheRestStays(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 이름으로 지목해 표시 이름만 고치면, 표시 이름은 새 값이 되고 나머지는 그대로 남는다"
+        return "슈퍼관리자가 이름으로 지정해 표시 이름만 수정하면, 표시 이름은 새 값이 되고 나머지는 그대로 유지된다"
 
     @override
     def given(self) -> Given[SeedingSession, ASlotTypeAndACaller]:
@@ -110,7 +110,7 @@ class DisablingIt(
 
     @override
     def describe(self) -> str:
-        return "사용 중인 슬롯 종류의 사용 여부를 내리면, 사용하지 않는다는 상태를 실은 노드가 온다"
+        return "사용 중인 슬롯 종류의 사용 여부를 끄면, 사용하지 않는 상태가 담긴 노드가 반환된다"
 
     @override
     def given(self) -> Given[SeedingSession, ASlotTypeAndACaller]:
@@ -135,7 +135,7 @@ class AnEmptyEditChangesNothing(
 
     @override
     def describe(self) -> str:
-        return "슬롯 이름만 주고 나머지를 모두 생략해 고치면 아무것도 바뀌지 않은 노드가 온다"
+        return "슬롯 이름만 지정하고 나머지를 모두 생략해 수정하면 아무것도 바뀌지 않은 노드가 반환된다"
 
     @override
     def given(self) -> Given[SeedingSession, ASlotTypeAndACaller]:
@@ -160,7 +160,7 @@ class TheSuperadminEditingAnUnknownNameIsNotFound(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 아무 슬롯 종류도 갖지 않은 이름을 고치면 대상이 없다는 것으로 거부된다"
+        return "슈퍼관리자가 존재하지 않는 이름을 수정하면 대상을 찾을 수 없다는 이유로 거부된다"
 
     @override
     def given(self) -> Given[SeedingSession, ASlotTypeAndACaller]:
@@ -185,7 +185,7 @@ class AUserWhoIsNotTheSuperadminMayNotEdit(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 아닌 사용자가 슬롯 종류를 고치면 역할로 거부된다"
+        return "슈퍼관리자가 아닌 사용자가 슬롯 종류를 수정하면 역할 부족으로 거부된다"
 
     @override
     def given(self) -> Given[SeedingSession, ASlotTypeAndACaller]:
@@ -211,8 +211,8 @@ class AUserWithoutTheRoleStillHearsNotFound(
     @override
     def describe(self) -> str:
         return (
-            "슈퍼관리자가 아닌 사용자가 없는 이름을 고치면 역할이 아니라 대상 없음으로 거부된다. "
-            "이름 해석이 권한을 보지 않고 먼저 돌기 때문이다"
+            "슈퍼관리자가 아닌 사용자가 존재하지 않는 이름을 수정하면 역할 부족이 아니라 대상 없음으로 거부된다. "
+            "이름을 풀어내는 단계가 권한을 검사하지 않고 먼저 실행되기 때문이다"
         )
 
     @override
@@ -240,8 +240,8 @@ class EnforcementOffStillNeedsTheSuperadmin(
     @override
     def describe(self) -> str:
         return (
-            "엔티티 권한 집행을 꺼도 슈퍼관리자가 아니면 슬롯 종류를 고치지 못한다. "
-            "고치기의 문은 지우기와 달리 역할이라 스위치와 무관하다"
+            "권한 검사를 꺼도 슈퍼관리자가 아니면 슬롯 종류를 수정하지 못한다. "
+            "수정은 삭제와 달리 역할로 보호되므로 스위치와 무관하다"
         )
 
     @override

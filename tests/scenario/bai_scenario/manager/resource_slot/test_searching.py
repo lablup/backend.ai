@@ -1,4 +1,4 @@
-"""슬롯 종류 훑기 — 이름 필터가 무엇을 좁히고, 크기를 대지 않으면 몇 건이 오는가."""
+"""슬롯 종류 검색 — 이름 필터가 무엇을 좁히고, 크기를 지정하지 않으면 몇 건이 반환되는가."""
 
 from __future__ import annotations
 
@@ -39,7 +39,7 @@ type SearchingStep = Scenario[
 
 @dataclass(frozen=True)
 class SearchingEverySlotType(When[ManySlotTypesAndACaller, ResourceSlotAdapter, Searched]):
-    """필터도 크기도 없이 전체를 훑는다."""
+    """필터도 크기도 없이 전체를 검색한다."""
 
     @override
     def operation(self) -> str:
@@ -57,7 +57,7 @@ class SearchingEverySlotType(When[ManySlotTypesAndACaller, ResourceSlotAdapter, 
 
 @dataclass(frozen=True)
 class SearchingByName(When[ManySlotTypesAndACaller, ResourceSlotAdapter, Searched]):
-    """심은 것 중 하나의 이름으로 걸러 훑는다."""
+    """미리 만들어 둔 슬롯 종류 중 하나의 이름을 필터로 검색한다."""
 
     @override
     def operation(self) -> str:
@@ -65,7 +65,7 @@ class SearchingByName(When[ManySlotTypesAndACaller, ResourceSlotAdapter, Searche
 
     @override
     def describe(self, laid: ManySlotTypesAndACaller) -> str:
-        return f"{laid.caller.username}이 {laid.named.slot_name}으로 걸러 조회"
+        return f"{laid.caller.username}이 {laid.named.slot_name} 이름 필터로 조회"
 
     @override
     async def call(self, adapter: ResourceSlotAdapter, laid: ManySlotTypesAndACaller) -> Searched:
@@ -89,7 +89,7 @@ class AUserGrantedNothingCountsEverySlotType(
 
     @override
     def describe(self) -> str:
-        return "슬롯 종류 둘이 있을 때 아무 권한도 받지 않은 사용자가 필터 없이 조회하면 둘을 모두 센다"
+        return "슬롯 종류 둘이 있을 때 아무 권한도 없는 사용자가 필터 없이 조회하면 둘 다 집계된다"
 
     @override
     def given(self) -> Given[SeedingSession, ManySlotTypesAndACaller]:
@@ -114,7 +114,9 @@ class ANameFilterNarrows(
 
     @override
     def describe(self) -> str:
-        return "슬롯 종류 여럿 중 하나의 이름으로 걸러 조회하면, 답에는 그 이름의 것만 남는다"
+        return (
+            "슬롯 종류 여럿 중 하나의 이름을 필터로 조회하면, 응답에는 그 이름의 슬롯 종류만 남는다"
+        )
 
     @override
     def given(self) -> Given[SeedingSession, ManySlotTypesAndACaller]:
@@ -139,9 +141,7 @@ class OmittingThePageSizeGivesTen(
 
     @override
     def describe(self) -> str:
-        return (
-            "슬롯 종류 열하나가 있을 때 크기 없이 조회하면 열 건까지 오고 다음 쪽이 있다고 답한다"
-        )
+        return "슬롯 종류 11개가 있을 때 크기 없이 조회하면 10건까지 반환되고 다음 페이지가 있다고 응답한다"
 
     @override
     def given(self) -> Given[SeedingSession, ManySlotTypesAndACaller]:

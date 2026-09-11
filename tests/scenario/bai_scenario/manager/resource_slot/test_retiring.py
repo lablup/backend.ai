@@ -1,7 +1,7 @@
-"""슬롯 종류 지우기 — 이름으로 지목해 누가 지울 수 있고, 집행을 끄면 무엇이 열리는가.
+"""슬롯 종류 삭제 — 이름으로 지정해 누가 삭제할 수 있고, 권한 검사를 끄면 무엇이 허용되는가.
 
-아직 참조하는 것이 있어 거부되는 다섯 줄은 여기 없다. 에이전트 자원, 커널 할당, 모델 카드,
-배포 preset, 배포 리비전을 심는 seed가 아직 없다.
+아직 참조하는 곳이 있어 거부되는 다섯 시나리오는 여기 없다. 에이전트 자원, 커널 할당, 모델 카드,
+배포 preset, 배포 리비전을 미리 만들어 두는 seed가 아직 없다.
 """
 
 from __future__ import annotations
@@ -39,7 +39,7 @@ type RetiringStep = Scenario[SeedingSession, ASlotTypeAndACaller, ResourceSlotAd
 
 @dataclass(frozen=True)
 class Purging(When[ASlotTypeAndACaller, ResourceSlotAdapter, Purged]):
-    """심은 슬롯 종류를 이름으로 지목해 지운다."""
+    """미리 만들어 둔 슬롯 종류를 이름으로 지정해 삭제한다."""
 
     unknown: bool = False
 
@@ -50,7 +50,7 @@ class Purging(When[ASlotTypeAndACaller, ResourceSlotAdapter, Purged]):
     @override
     def describe(self, laid: ASlotTypeAndACaller) -> str:
         target = UNKNOWN if self.unknown else laid.slot_type.slot_name
-        return f"{laid.caller.username}이 {target}를 지움"
+        return f"{laid.caller.username}이 {target} 삭제"
 
     @override
     async def call(self, adapter: ResourceSlotAdapter, laid: ASlotTypeAndACaller) -> Purged:
@@ -72,7 +72,7 @@ class TheSuperadminPurgesASlotType(
 
     @override
     def describe(self) -> str:
-        return "아무것도 참조하지 않는 슬롯 종류를 슈퍼관리자가 이름으로 지우면 지운 이름을 실은 답이 온다"
+        return "아무것도 참조하지 않는 슬롯 종류를 슈퍼관리자가 이름으로 삭제하면 삭제한 이름을 담은 응답이 반환된다"
 
     @override
     def given(self) -> Given[SeedingSession, ASlotTypeAndACaller]:
@@ -97,7 +97,7 @@ class ANameNothingAnswersToIsNotFound(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 아무 슬롯 종류도 갖지 않은 이름을 지우면 대상이 없다는 것으로 거부된다"
+        return "슈퍼관리자가 존재하지 않는 이름을 삭제하면 대상을 찾을 수 없다는 이유로 거부된다"
 
     @override
     def given(self) -> Given[SeedingSession, ASlotTypeAndACaller]:
@@ -123,8 +123,8 @@ class AUserGrantedNothingMayNotPurge(
     @override
     def describe(self) -> str:
         return (
-            "아무 권한도 받지 않은 사용자가 슬롯 종류를 지우면 권한 부족으로 거부된다. "
-            "고치기가 역할로 거부되는 것과 다른 문이다"
+            "아무 권한도 없는 사용자가 슬롯 종류를 삭제하면 권한 부족으로 거부된다. "
+            "수정이 역할 부족으로 거부되는 것과는 다른 검사다"
         )
 
     @override
@@ -151,8 +151,8 @@ class AUserGrantedNothingStillHearsNotFound(
     @override
     def describe(self) -> str:
         return (
-            "아무 권한도 받지 않은 사용자가 없는 이름을 지우면 권한 부족이 아니라 대상 없음으로 거부된다. "
-            "이름 해석이 권한을 보지 않고 먼저 돌기 때문이다"
+            "아무 권한도 없는 사용자가 존재하지 않는 이름을 삭제하면 권한 부족이 아니라 대상 없음으로 거부된다. "
+            "이름을 풀어내는 단계가 권한을 검사하지 않고 먼저 실행되기 때문이다"
         )
 
     @override
@@ -179,8 +179,8 @@ class EnforcementOffLetsAnyonePurge(
     @override
     def describe(self) -> str:
         return (
-            "엔티티 권한 집행을 끄면 아무 권한도 받지 않은 사용자도 슬롯 종류를 지운다. "
-            "지우기의 문은 고치기와 달리 권한 그래프라 스위치가 통한다"
+            "권한 검사를 끄면 아무 권한도 없는 사용자도 슬롯 종류를 삭제할 수 있다. "
+            "삭제는 수정과 달리 권한 그래프로 보호되므로 스위치가 영향을 준다"
         )
 
     @override

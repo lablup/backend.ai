@@ -1,4 +1,4 @@
-"""슬롯 종류 읽기 — 이름으로 해석하고 읽는다. 어느 쪽도 인증만 본다."""
+"""슬롯 종류 조회 — 이름을 풀어낸 뒤 조회한다. 어느 단계도 인증만 확인한다."""
 
 from __future__ import annotations
 
@@ -31,7 +31,7 @@ type ReadingStep = Scenario[
 
 @dataclass(frozen=True)
 class ReadingByName(When[ASlotTypeAndACaller, ResourceSlotAdapter, ResourceSlotTypeNode]):
-    """이름으로 읽는다. 이름을 대지 않으면 심은 슬롯 종류의 이름을 쓴다."""
+    """이름으로 조회한다. 이름을 지정하지 않으면 미리 만들어 둔 슬롯 종류의 이름을 쓴다."""
 
     named: str | None = None
 
@@ -41,7 +41,7 @@ class ReadingByName(When[ASlotTypeAndACaller, ResourceSlotAdapter, ResourceSlotT
 
     @override
     def describe(self, laid: ASlotTypeAndACaller) -> str:
-        return f"{laid.caller.username}이 {self.named or laid.slot_type.slot_name}으로 조회"
+        return f"{laid.caller.username}이 {self.named or laid.slot_type.slot_name} 이름으로 조회"
 
     @override
     async def call(
@@ -62,8 +62,8 @@ class AUserGrantedNothingReadsByName(
     @override
     def describe(self) -> str:
         return (
-            "아무 권한도 받지 않은 사용자가 이름으로 조회하면 그 슬롯 종류 전체가 온다. "
-            "이름 해석도 그 뒤의 읽기도 인증만 본다"
+            "아무 권한도 없는 사용자가 이름으로 조회하면 그 슬롯 종류 전체가 반환된다. "
+            "이름을 풀어내는 단계도 그 뒤의 조회도 인증만 확인한다"
         )
 
     @override
@@ -89,7 +89,7 @@ class ANameNothingAnswersToIsNotFound(
 
     @override
     def describe(self) -> str:
-        return "아무 슬롯 종류도 갖지 않은 이름으로 조회하면 대상이 없다는 것으로 거부된다"
+        return "존재하지 않는 이름으로 조회하면 대상을 찾을 수 없다는 이유로 거부된다"
 
     @override
     def given(self) -> Given[SeedingSession, ASlotTypeAndACaller]:
