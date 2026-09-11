@@ -11,15 +11,15 @@ import sqlalchemy as sa
 
 from ai.backend.common.data.entity.domain import DomainEntityType, DomainID
 from ai.backend.common.data.entity.project import ProjectEntityType
-from ai.backend.common.data.entity.user import UserEntityType
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.entity.vfolder import VFolderEntityType
-from ai.backend.manager.data.project.types import ProjectType
 from ai.backend.manager.errors.resource import DomainNotFound, ProjectNotFound
 from ai.backend.manager.errors.user import UserNotFound
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.project import ProjectRow
 from ai.backend.manager.models.scopes import ExistenceCheck, OperationScope
+from ai.backend.manager.models.user.queries import user_scope_reaches
 from ai.backend.manager.models.user.row import UserRow
 from ai.backend.manager.models.vfolder import VFolderPermissionRow, VFolderRow
 from ai.backend.manager.models.virtual_entity.queries import scope_membership_exists
@@ -111,7 +111,7 @@ class UserVFolderOperationScope(OperationScope):
     Used for my_vfolders query (current authenticated user).
     """
 
-    user_id: UUID
+    user_id: UserID
     """Required. The user whose vfolders to search."""
 
     @override
@@ -129,23 +129,10 @@ class UserVFolderOperationScope(OperationScope):
             permitted_vfolder_ids = sa.select(VFolderPermissionRow.vfolder).where(
                 VFolderPermissionRow.user == user_id
             )
-            personal_project_id = (
-                sa.select(ProjectRow.id)
-                .where(
-                    ProjectRow.creator_id == user_id,
-                    ProjectRow.type == ProjectType.PERSONAL,
-                )
-                .scalar_subquery()
-            )
             return sa.or_(
                 VFolderRow.user == user_id,
                 VFolderRow.id.in_(permitted_vfolder_ids),
-                scope_membership_exists(
-                    ProjectEntityType(), personal_project_id, VFolderEntityType(), VFolderRow.id
-                ),
-                scope_membership_exists(
-                    UserEntityType(), user_id, VFolderEntityType(), VFolderRow.id
-                ),
+                user_scope_reaches(user_id, VFolderEntityType(), VFolderRow.id),
             )
 
         return inner

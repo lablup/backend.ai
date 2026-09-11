@@ -12,7 +12,7 @@ import sqlalchemy as sa
 from ai.backend.common.data.entity.deployment import DeploymentEntityType, DeploymentID
 from ai.backend.common.data.entity.domain import DomainEntityType, DomainID
 from ai.backend.common.data.entity.project import ProjectEntityType
-from ai.backend.common.data.entity.user import UserEntityType
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.manager.errors.resource import DomainNotFound, ProjectNotFound
 from ai.backend.manager.errors.user import UserNotFound
 from ai.backend.manager.models.clauses import QueryCondition
@@ -20,6 +20,7 @@ from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.endpoint.row import EndpointRow, EndpointTokenRow
 from ai.backend.manager.models.project.row import ProjectRow
 from ai.backend.manager.models.scopes import ExistenceCheck, OperationScope
+from ai.backend.manager.models.user.queries import user_scope_reaches
 from ai.backend.manager.models.user.row import UserRow
 from ai.backend.manager.models.virtual_entity.queries import scope_membership_exists
 
@@ -98,7 +99,7 @@ class ProjectDeploymentOperationScope(OperationScope):
 class UserDeploymentOperationScope(OperationScope):
     """The deployments one user created."""
 
-    user_id: UUID
+    user_id: UserID
 
     @override
     def to_condition(self) -> QueryCondition:
@@ -108,9 +109,7 @@ class UserDeploymentOperationScope(OperationScope):
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return sa.or_(
                 EndpointRow.created_user == user_id,
-                scope_membership_exists(
-                    UserEntityType(), user_id, DeploymentEntityType(), EndpointRow.id
-                ),
+                user_scope_reaches(user_id, DeploymentEntityType(), EndpointRow.id),
             )
 
         return inner

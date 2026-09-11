@@ -7,10 +7,14 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import AsyncGenerator
+from typing import Any
 
 import pytest
+import sqlalchemy as sa
+from sqlalchemy import Row
 
 from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.types import BinarySize, ResourceSlot, VFolderUsageMode
 from ai.backend.manager.data.project.types import ProjectType
 from ai.backend.manager.data.vfolder.types import (
@@ -28,6 +32,7 @@ from ai.backend.manager.models.resource_policy import (
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,
 )
+from ai.backend.manager.models.scopes import OperationScope
 from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -35,12 +40,25 @@ from ai.backend.manager.models.vfolder import VFolderPermissionRow, VFolderRow
 from ai.backend.manager.models.vfolder.conditions import VFolderConditions
 from ai.backend.manager.models.vfolder.scopes import UserVFolderOperationScope
 from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
+from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
 from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
 from ai.backend.manager.repositories.base import BatchQuerier
+from ai.backend.manager.repositories.base.querier import (
+    BatchQuerierResult,
+    execute_batch_querier,
+)
 from ai.backend.manager.repositories.ops.v2.share.provider import ShareOpsProvider
 from ai.backend.manager.repositories.vfolder.repository import VfolderRepository
 from ai.backend.manager.secret.types import SecretValue
 from ai.backend.testutils.db import with_tables
+
+
+async def _search_vfolders(
+    db: ExtendedAsyncSAEngine, querier: BatchQuerier, scope: OperationScope
+) -> BatchQuerierResult[Row[Any]]:
+    """What the read does, without the repository method that used to wrap it."""
+    async with db.begin_readonly_session() as sess:
+        return await execute_batch_querier(sess, sa.select(VFolderRow), querier, scopes=[scope])
 
 
 class TestVfolderSearchFilter:
@@ -67,6 +85,7 @@ class TestVfolderSearchFilter:
                 VFolderPermissionRow,
                 VirtualEntityRow,
                 EntityMembershipRow,
+                ScopeBindingRow,
             ],
         ):
             yield database_connection
@@ -359,20 +378,20 @@ class TestVfolderSearchFilter:
 
     async def test_cloneable_true_returns_only_cloneable_vfolders(
         self,
-        vfolder_repository: VfolderRepository,
+        db_with_cleanup: ExtendedAsyncSAEngine,
         cloneable_data: dict[str, uuid.UUID],
     ) -> None:
         """cloneable={eq: true} returns only cloneable=true vfolders (owned + shared)."""
-        scope = UserVFolderOperationScope(user_id=cloneable_data["user_a_id"])
+        scope = UserVFolderOperationScope(user_id=UserID(cloneable_data["user_a_id"]))
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=[VFolderConditions.by_cloneable(True)],
             orders=[],
         )
 
-        result = await vfolder_repository.search_user_vfolders(querier, scope)
+        result = await _search_vfolders(db_with_cleanup, querier, scope)
 
-        returned_ids = {item.id for item in result.items}
+        returned_ids = {item.id for item in [row.VFolderRow for row in result.rows]}
         assert returned_ids == {
             cloneable_data["vf_clone_1"],
             cloneable_data["vf_clone_2"],
@@ -382,39 +401,39 @@ class TestVfolderSearchFilter:
 
     async def test_cloneable_false_returns_only_non_cloneable_vfolders(
         self,
-        vfolder_repository: VfolderRepository,
+        db_with_cleanup: ExtendedAsyncSAEngine,
         cloneable_data: dict[str, uuid.UUID],
     ) -> None:
         """cloneable={eq: false} returns only cloneable=false vfolders."""
-        scope = UserVFolderOperationScope(user_id=cloneable_data["user_a_id"])
+        scope = UserVFolderOperationScope(user_id=UserID(cloneable_data["user_a_id"]))
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=[VFolderConditions.by_cloneable(False)],
             orders=[],
         )
 
-        result = await vfolder_repository.search_user_vfolders(querier, scope)
+        result = await _search_vfolders(db_with_cleanup, querier, scope)
 
-        returned_ids = {item.id for item in result.items}
+        returned_ids = {item.id for item in [row.VFolderRow for row in result.rows]}
         assert returned_ids == {cloneable_data["vf_noclone_1"]}
         assert result.total_count == 1
 
     async def test_no_cloneable_filter_returns_all_vfolders(
         self,
-        vfolder_repository: VfolderRepository,
+        db_with_cleanup: ExtendedAsyncSAEngine,
         cloneable_data: dict[str, uuid.UUID],
     ) -> None:
         """No cloneable filter returns all visible vfolders (owned + shared)."""
-        scope = UserVFolderOperationScope(user_id=cloneable_data["user_a_id"])
+        scope = UserVFolderOperationScope(user_id=UserID(cloneable_data["user_a_id"]))
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=[],
             orders=[],
         )
 
-        result = await vfolder_repository.search_user_vfolders(querier, scope)
+        result = await _search_vfolders(db_with_cleanup, querier, scope)
 
-        returned_ids = {item.id for item in result.items}
+        returned_ids = {item.id for item in [row.VFolderRow for row in result.rows]}
         assert returned_ids == {
             cloneable_data["vf_clone_1"],
             cloneable_data["vf_clone_2"],
@@ -425,30 +444,30 @@ class TestVfolderSearchFilter:
 
     async def test_cloneable_filter_with_pagination(
         self,
-        vfolder_repository: VfolderRepository,
+        db_with_cleanup: ExtendedAsyncSAEngine,
         cloneable_data: dict[str, uuid.UUID],
     ) -> None:
         """cloneable filter works with pagination (correct total_count and has_next_page)."""
-        scope = UserVFolderOperationScope(user_id=cloneable_data["user_a_id"])
+        scope = UserVFolderOperationScope(user_id=UserID(cloneable_data["user_a_id"]))
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=2, offset=0),
             conditions=[VFolderConditions.by_cloneable(True)],
             orders=[],
         )
 
-        result = await vfolder_repository.search_user_vfolders(querier, scope)
+        result = await _search_vfolders(db_with_cleanup, querier, scope)
 
         assert result.total_count == 3
-        assert len(result.items) == 2
+        assert len([row.VFolderRow for row in result.rows]) == 2
         assert result.has_next_page is True
 
     async def test_cloneable_filter_combines_with_usage_mode(
         self,
-        vfolder_repository: VfolderRepository,
+        db_with_cleanup: ExtendedAsyncSAEngine,
         cloneable_data: dict[str, uuid.UUID],
     ) -> None:
         """cloneable filter combines correctly with other conditions (usage_mode)."""
-        scope = UserVFolderOperationScope(user_id=cloneable_data["user_a_id"])
+        scope = UserVFolderOperationScope(user_id=UserID(cloneable_data["user_a_id"]))
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=[
@@ -458,9 +477,9 @@ class TestVfolderSearchFilter:
             orders=[],
         )
 
-        result = await vfolder_repository.search_user_vfolders(querier, scope)
+        result = await _search_vfolders(db_with_cleanup, querier, scope)
 
-        returned_ids = {item.id for item in result.items}
+        returned_ids = {item.id for item in [row.VFolderRow for row in result.rows]}
         # Only GENERAL + cloneable: clone-1 and shared-clone (clone-2 is DATA)
         assert returned_ids == {
             cloneable_data["vf_clone_1"],

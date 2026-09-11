@@ -12,7 +12,7 @@ import sqlalchemy as sa
 from ai.backend.common.data.entity.domain import DomainEntityType, DomainID
 from ai.backend.common.data.entity.model_card import ModelCardEntityType, ModelCardID
 from ai.backend.common.data.entity.project import ProjectEntityType
-from ai.backend.common.data.entity.user import UserEntityType, UserID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.manager.errors.resource import DomainNotFound, ProjectNotFound
 from ai.backend.manager.errors.user import UserNotFound
@@ -22,6 +22,7 @@ from ai.backend.manager.models.model_card.row import ModelCardRow
 from ai.backend.manager.models.project.row import ProjectRow
 from ai.backend.manager.models.resource_slot.row import ModelCardResourceRequirementRow
 from ai.backend.manager.models.scopes import ExistenceCheck, OperationScope
+from ai.backend.manager.models.user.queries import user_scope_reaches
 from ai.backend.manager.models.user.row import UserRow
 from ai.backend.manager.models.virtual_entity.queries import scope_membership_exists
 
@@ -104,9 +105,7 @@ class UserModelCardOperationScope(OperationScope):
         user_id = self.user_id
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return scope_membership_exists(
-                UserEntityType(), user_id, ModelCardEntityType(), ModelCardRow.id
-            )
+            return user_scope_reaches(user_id, ModelCardEntityType(), ModelCardRow.id)
 
         return inner
 

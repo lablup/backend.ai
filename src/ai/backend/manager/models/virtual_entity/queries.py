@@ -20,6 +20,7 @@ from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingR
 from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
 
 __all__ = (
+    "UuidExpr",
     "scope_membership_exists",
     "user_scope_membership_exists",
     "user_scope_membership_query",
@@ -29,11 +30,11 @@ __all__ = (
 # The column element is parameterized loosely: an id newtype makes
 # `ColumnElement[DomainID]`, which is not a `ColumnElement[UUID]` under invariance,
 # and every such newtype is a UUID at the database.
-type _UuidExpr = uuid.UUID | sa.ColumnElement[Any] | InstrumentedAttribute[Any]
+type UuidExpr = uuid.UUID | sa.ColumnElement[Any] | InstrumentedAttribute[Any]
 
 
 def user_scope_membership_query(
-    scope_type: EntityType, user_id: _UuidExpr | None = None
+    scope_type: EntityType, user_id: UuidExpr | None = None
 ) -> sa.Select[tuple[uuid.UUID, uuid.UUID]]:
     """(``user_id``, ``scope_id``) pairs of the users enrolled in scopes of
     ``scope_type``, narrowed to one user when ``user_id`` is given. The scope side is
@@ -60,9 +61,9 @@ def user_scope_membership_query(
 
 def scope_membership_exists(
     scope_type: EntityType,
-    scope_id: _UuidExpr,
+    scope_id: UuidExpr,
     member_type: EntityType,
-    member_id: _UuidExpr,
+    member_id: UuidExpr,
 ) -> sa.ColumnElement[bool]:
     """EXISTS predicate: the scope reaches the named member.
 
@@ -99,8 +100,8 @@ def scope_membership_exists(
 
 def user_scope_membership_exists(
     scope_type: EntityType,
-    scope_id: _UuidExpr,
-    user_id: _UuidExpr,
+    scope_id: UuidExpr,
+    user_id: UuidExpr,
 ) -> sa.ColumnElement[bool]:
     """EXISTS predicate: the user is enrolled in the scope's virtual entity."""
     return scope_membership_exists(scope_type, scope_id, UserEntityType(), user_id)

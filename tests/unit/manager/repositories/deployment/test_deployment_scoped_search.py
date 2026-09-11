@@ -15,6 +15,7 @@ from ai.backend.common.data.entity.container_registry import ContainerRegistryID
 from ai.backend.common.data.entity.deployment import DeploymentID
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.image import ImageID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.deployment.types import DeploymentInfo
@@ -57,6 +58,7 @@ from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderRow
 from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
+from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
 from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
 from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.deployment import DeploymentRepository
@@ -129,6 +131,7 @@ class TestDeploymentScopedSearch:
                 ResourcePresetRow,
                 VirtualEntityRow,
                 EntityMembershipRow,
+                ScopeBindingRow,
             ],
         ):
             yield database_connection
@@ -322,7 +325,7 @@ class TestDeploymentScopedSearch:
         test_data: TestData,
     ) -> None:
         result = await repository.search_endpoints_in_scopes(
-            querier, [UserDeploymentOperationScope(user_id=test_data.owner_id)]
+            querier, [UserDeploymentOperationScope(user_id=UserID(test_data.owner_id))]
         )
 
         assert result.total_count == 3
@@ -337,7 +340,7 @@ class TestDeploymentScopedSearch:
         test_data: TestData,
     ) -> None:
         result = await repository.search_endpoints_in_scopes(
-            querier, [UserDeploymentOperationScope(user_id=test_data.other_user_id)]
+            querier, [UserDeploymentOperationScope(user_id=UserID(test_data.other_user_id))]
         )
 
         assert result.total_count == 0
@@ -362,5 +365,5 @@ class TestDeploymentScopedSearch:
     ) -> None:
         with pytest.raises(UserNotFound):
             await repository.search_endpoints_in_scopes(
-                querier, [UserDeploymentOperationScope(user_id=uuid.uuid4())]
+                querier, [UserDeploymentOperationScope(user_id=UserID(uuid.uuid4()))]
             )

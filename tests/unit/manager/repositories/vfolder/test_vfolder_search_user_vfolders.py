@@ -8,10 +8,14 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import AsyncGenerator
+from typing import Any
 
 import pytest
+import sqlalchemy as sa
+from sqlalchemy import Row
 
 from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.types import BinarySize, ResourceSlot, VFolderUsageMode
 from ai.backend.manager.data.project.types import ProjectType
 from ai.backend.manager.data.vfolder.types import (
@@ -30,18 +34,32 @@ from ai.backend.manager.models.resource_policy import (
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,
 )
+from ai.backend.manager.models.scopes import OperationScope
 from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderPermissionRow, VFolderRow
 from ai.backend.manager.models.vfolder.scopes import UserVFolderOperationScope
 from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
+from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
 from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
 from ai.backend.manager.repositories.base import BatchQuerier
+from ai.backend.manager.repositories.base.querier import (
+    BatchQuerierResult,
+    execute_batch_querier,
+)
 from ai.backend.manager.repositories.ops.v2.share.provider import ShareOpsProvider
 from ai.backend.manager.repositories.vfolder.repository import VfolderRepository
 from ai.backend.manager.secret.types import SecretValue
 from ai.backend.testutils.db import with_tables
+
+
+async def _search_vfolders(
+    db: ExtendedAsyncSAEngine, querier: BatchQuerier, scope: OperationScope
+) -> BatchQuerierResult[Row[Any]]:
+    """What the read does, without the repository method that used to wrap it."""
+    async with db.begin_readonly_session() as sess:
+        return await execute_batch_querier(sess, sa.select(VFolderRow), querier, scopes=[scope])
 
 
 class TestVfolderSearchUserVfolders:
@@ -68,6 +86,7 @@ class TestVfolderSearchUserVfolders:
                 VFolderPermissionRow,
                 VirtualEntityRow,
                 EntityMembershipRow,
+                ScopeBindingRow,
             ],
         ):
             yield database_connection
@@ -249,57 +268,57 @@ class TestVfolderSearchUserVfolders:
 
     async def test_returns_only_vfolders_for_target_user(
         self,
-        vfolder_repository: VfolderRepository,
+        db_with_cleanup: ExtendedAsyncSAEngine,
         test_data: dict[str, uuid.UUID],
     ) -> None:
         """search_user_vfolders returns only vfolders where VFolderRow.user matches the target user."""
-        scope = UserVFolderOperationScope(user_id=test_data["user_a_id"])
+        scope = UserVFolderOperationScope(user_id=UserID(test_data["user_a_id"]))
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=[],
             orders=[],
         )
 
-        result = await vfolder_repository.search_user_vfolders(querier, scope)
+        result = await _search_vfolders(db_with_cleanup, querier, scope)
 
         assert result.total_count == 2
-        assert len(result.items) == 2
-        returned_ids = {item.id for item in result.items}
+        assert len([row.VFolderRow for row in result.rows]) == 2
+        returned_ids = {item.id for item in [row.VFolderRow for row in result.rows]}
         assert returned_ids == {test_data["vfolder_1_id"], test_data["vfolder_2_id"]}
 
     async def test_does_not_return_vfolders_from_other_user(
         self,
-        vfolder_repository: VfolderRepository,
+        db_with_cleanup: ExtendedAsyncSAEngine,
         test_data: dict[str, uuid.UUID],
     ) -> None:
         """search_user_vfolders for user_b returns only vfolders with user_b as VFolderRow.user."""
-        scope = UserVFolderOperationScope(user_id=test_data["user_b_id"])
+        scope = UserVFolderOperationScope(user_id=UserID(test_data["user_b_id"]))
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=[],
             orders=[],
         )
 
-        result = await vfolder_repository.search_user_vfolders(querier, scope)
+        result = await _search_vfolders(db_with_cleanup, querier, scope)
 
         assert result.total_count == 1
-        assert len(result.items) == 1
-        assert result.items[0].id == test_data["vfolder_3_id"]
+        assert len([row.VFolderRow for row in result.rows]) == 1
+        assert [row.VFolderRow for row in result.rows][0].id == test_data["vfolder_3_id"]
 
     async def test_pagination_fields(
         self,
-        vfolder_repository: VfolderRepository,
+        db_with_cleanup: ExtendedAsyncSAEngine,
         test_data: dict[str, uuid.UUID],
     ) -> None:
         """search_user_vfolders returns correct pagination fields."""
-        scope = UserVFolderOperationScope(user_id=test_data["user_a_id"])
+        scope = UserVFolderOperationScope(user_id=UserID(test_data["user_a_id"]))
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=[],
             orders=[],
         )
 
-        result = await vfolder_repository.search_user_vfolders(querier, scope)
+        result = await _search_vfolders(db_with_cleanup, querier, scope)
 
         assert result.has_next_page is False
         assert result.has_previous_page is False
@@ -460,22 +479,22 @@ class TestVfolderSearchUserVfolders:
 
     async def test_returns_vfolders_regardless_of_ownership_type(
         self,
-        vfolder_repository: VfolderRepository,
+        db_with_cleanup: ExtendedAsyncSAEngine,
         mixed_ownership_data: dict[str, uuid.UUID],
     ) -> None:
         """search_user_vfolders returns both USER-owned and GROUP-owned vfolders
         as long as VFolderRow.user matches, regardless of ownership_type."""
-        scope = UserVFolderOperationScope(user_id=mixed_ownership_data["user_id"])
+        scope = UserVFolderOperationScope(user_id=UserID(mixed_ownership_data["user_id"]))
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=[],
             orders=[],
         )
 
-        result = await vfolder_repository.search_user_vfolders(querier, scope)
+        result = await _search_vfolders(db_with_cleanup, querier, scope)
 
         assert result.total_count == 2
-        returned_ids = {item.id for item in result.items}
+        returned_ids = {item.id for item in [row.VFolderRow for row in result.rows]}
         assert returned_ids == {
             mixed_ownership_data["user_vfolder_id"],
             mixed_ownership_data["group_vfolder_id"],
@@ -483,11 +502,11 @@ class TestVfolderSearchUserVfolders:
 
     async def test_nonexistent_user_raises_error(
         self,
-        vfolder_repository: VfolderRepository,
+        db_with_cleanup: ExtendedAsyncSAEngine,
         test_data: dict[str, uuid.UUID],
     ) -> None:
         """search_user_vfolders raises UserNotFound for a nonexistent user."""
-        scope = UserVFolderOperationScope(user_id=uuid.uuid4())
+        scope = UserVFolderOperationScope(user_id=UserID(uuid.uuid4()))
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=[],
@@ -495,7 +514,7 @@ class TestVfolderSearchUserVfolders:
         )
 
         with pytest.raises(UserNotFound):
-            await vfolder_repository.search_user_vfolders(querier, scope)
+            await _search_vfolders(db_with_cleanup, querier, scope)
 
     @pytest.fixture
     async def permission_data(
@@ -721,20 +740,20 @@ class TestVfolderSearchUserVfolders:
 
     async def test_returns_vfolders_with_permission(
         self,
-        vfolder_repository: VfolderRepository,
+        db_with_cleanup: ExtendedAsyncSAEngine,
         permission_data: dict[str, uuid.UUID],
     ) -> None:
         """search_user_vfolders returns vfolders the user owns AND vfolders shared via permission."""
-        scope = UserVFolderOperationScope(user_id=permission_data["user_a_id"])
+        scope = UserVFolderOperationScope(user_id=UserID(permission_data["user_a_id"]))
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=[],
             orders=[],
         )
 
-        result = await vfolder_repository.search_user_vfolders(querier, scope)
+        result = await _search_vfolders(db_with_cleanup, querier, scope)
 
-        returned_ids = {item.id for item in result.items}
+        returned_ids = {item.id for item in [row.VFolderRow for row in result.rows]}
         assert returned_ids == {
             permission_data["vfolder_owned_id"],
             permission_data["vfolder_shared_id"],
@@ -743,27 +762,26 @@ class TestVfolderSearchUserVfolders:
 
     async def test_does_not_return_vfolders_without_permission(
         self,
-        vfolder_repository: VfolderRepository,
+        db_with_cleanup: ExtendedAsyncSAEngine,
         permission_data: dict[str, uuid.UUID],
     ) -> None:
         """search_user_vfolders does not return vfolders the user neither owns nor has permission for."""
-        scope = UserVFolderOperationScope(user_id=permission_data["user_a_id"])
+        scope = UserVFolderOperationScope(user_id=UserID(permission_data["user_a_id"]))
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=[],
             orders=[],
         )
 
-        result = await vfolder_repository.search_user_vfolders(querier, scope)
+        result = await _search_vfolders(db_with_cleanup, querier, scope)
 
-        returned_ids = {item.id for item in result.items}
+        returned_ids = {item.id for item in [row.VFolderRow for row in result.rows]}
         assert permission_data["vfolder_no_access_id"] not in returned_ids
 
     async def test_no_duplicate_when_owner_has_permission(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         permission_data: dict[str, uuid.UUID],
-        vfolder_repository: VfolderRepository,
     ) -> None:
         """When a user owns a vfolder AND has a permission row for it, it appears only once."""
         # Add a permission row for user_a on their own vfolder
@@ -777,16 +795,16 @@ class TestVfolderSearchUserVfolders:
             )
             await db_sess.flush()
 
-        scope = UserVFolderOperationScope(user_id=permission_data["user_a_id"])
+        scope = UserVFolderOperationScope(user_id=UserID(permission_data["user_a_id"]))
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=[],
             orders=[],
         )
 
-        result = await vfolder_repository.search_user_vfolders(querier, scope)
+        result = await _search_vfolders(db_with_cleanup, querier, scope)
 
-        returned_ids = [item.id for item in result.items]
+        returned_ids = [item.id for item in [row.VFolderRow for row in result.rows]]
         assert len(returned_ids) == 2
         assert set(returned_ids) == {
             permission_data["vfolder_owned_id"],

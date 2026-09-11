@@ -15,6 +15,7 @@ from ai.backend.common.data.entity.user import UserEntityType, UserID
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.entity_share.row import EntityShareRow
 from ai.backend.manager.models.scopes import ExistenceCheck, OperationScope
+from ai.backend.manager.models.user.queries import user_scope_reaches
 from ai.backend.manager.models.user.row import UserRow
 from ai.backend.manager.models.virtual_entity.queries import scope_membership_exists
 
@@ -131,6 +132,8 @@ class EntityShareOwningScope(OperationScope):
         scope = self.scope
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if isinstance(scope, UserID):
+                return user_scope_reaches(scope, EntityShareEntityType(), EntityShareRow.id)
             return scope_membership_exists(
                 scope.entity_type(), scope, EntityShareEntityType(), EntityShareRow.id
             )
