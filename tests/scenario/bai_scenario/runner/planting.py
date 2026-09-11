@@ -104,9 +104,9 @@ class SeedingSession:
     async def adding[A, D: FieldData](self, one: SeedField[A, D], owner: Laid[A], /) -> Laid[D]:
         return await self._settle(self._seed.adding(one, owner))
 
-    async def adding_with_nested[Owner, FieldDataT: FieldData](
-        self, one: SeedFieldWithNestedRows[Owner, FieldDataT], owner: Laid[Owner], /
-    ) -> Laid[FieldDataT]:
+    async def adding_with_nested[A, D: FieldData](
+        self, one: SeedFieldWithNestedRows[A, D], owner: Laid[A], /
+    ) -> Laid[D]:
         return await self._settle(self._seed.adding_with_nested(one, owner))
 
     async def linking[S, T](
