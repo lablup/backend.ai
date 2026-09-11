@@ -356,6 +356,21 @@ class SomeoneReachingImages(SeedNest[Laid[None]]):
 
 
 @dataclass(frozen=True)
+class PaddedDigest(Condition[str | None]):
+    """미리 만들어 둔 다이제스트. 컬럼 폭이 고정이라 뒤에 공백이 채워져 반환된다."""
+
+    planted: str
+
+    @override
+    def says(self) -> str:
+        return "미리 만들어 둔 다이제스트 뒤에 공백이 채워진 값"
+
+    @override
+    def holds(self, got: str | None) -> bool:
+        return got is not None and got.rstrip(" ") == self.planted
+
+
+@dataclass(frozen=True)
 class Filled(Condition[Any]):
     """채워져 온다. 비어 있으면 그 안의 자리들을 볼 수 없다."""
 
@@ -404,10 +419,11 @@ class TheImageNode(Then[Any, ImageNode]):
             Same("name", node.name, image.name),
             Same("image", node.image, image.image),
             Same("registry", node.registry, image.registry),
+            # 두 id는 서로 다른 `EntityIdentifier` 종류이고 그 동등성은 종류까지 본다.
             Held(
                 "registry_id",
-                node.registry_id,
-                SameAs(image.registry_id, "심은 레지스트리의 id"),
+                node.registry_id.int,
+                SameAs(image.registry_id.int, "심은 레지스트리의 id"),
             ),
             Same("project", node.project, image.project),
             Same("tag", node.tag, self.tag or image.tag),
@@ -423,14 +439,14 @@ class TheImageNode(Then[Any, ImageNode]):
                 DEFAULT_LIMITS,
             ),
             Same("accelerators", node.accelerators, self.accelerators.named()),
-            Same("config_digest", node.config_digest, image.config_digest),
+            Held("config_digest", node.config_digest, PaddedDigest(image.config_digest)),
             Same("is_local", node.is_local, image.is_local),
             Held("created_at", node.created_at, written),
             Skipped("last_used_at", "세션이 쓰는 값이라 이 실행이 말할 수 없다"),
             Same("identity.canonical_name", identity.canonical_name, image.name),
             Same("identity.namespace", identity.namespace, image.image),
             Same("identity.architecture", identity.architecture, image.architecture),
-            Same("metadata.digest", metadata.digest, image.config_digest),
+            Held("metadata.digest", metadata.digest, PaddedDigest(image.config_digest)),
             Same("metadata.size_bytes", metadata.size_bytes, image.size_bytes),
             Held("metadata.created_at", metadata.created_at, written),
             Held(
