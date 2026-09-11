@@ -71,6 +71,26 @@ one place per domain.
 | `InvalidSecretKeyMaterial`, `SecretEncryptionMisconfigured` | the configured encryption keys and key providers, which no stored secret is read to reach |
 | `ExportReportNotFound`, `InvalidExportFieldKeys` | a report is a `ReportDef` in a code-declared registry, not a row, and its field keys with it |
 | `RetentionCategoryNotSupportedError` | a `RetentionCategory` with no cleanup wired — a gap in this build, not in a row |
+| `QuotaScopeNotFoundError`, `StorageProxyNotFound` | neither quota scopes nor storage proxies declare a row kind |
+| the four `Dotfile*` errors | dotfiles are a msgpack blob in a `keypairs` column, not rows |
+| `VFolderBadRequest`, `VFolderOperationFailed`, `VFolderCreationFailure` | they report the storage-proxy call rather than the row, under a `generic` operation |
+| `StorageProxyConnectionError`, `StorageProxyTimeoutError`, `UnexpectedStorageProxyResponseError` | the external call itself, under a `request` no `ActionOperationType` maps to |
+| `VFolderPermissionError`, `VFolderInvalidParameter`, `InsufficientStoragePermission` | an authorization denial about the caller, or a parameter refused before a row is reached |
+| `ModelCardParseError` | a model-definition file that does not parse, before any model card row exists |
+| `VFolderFilterStatusNotAvailable` | the status-set alias names no entry in a constant map; the row-status half is `VFolderFilterStatusFailed` |
+| `UnsupportedStorageTypeError`, `ObjectStorageOperationNotSupported` | a requested storage type, or a configured one offering no such operation |
+| `AppNotFound` | an app absent from a session's `service_ports`, which is a value, not a row |
+| `UnresolvableResourceGroup` | no group resolves at all, so it names none, and it reports `access` |
+| `AgentNotAllocated` | a kernel with no agent assigned yet, reported under an `access` no `ActionOperationType` maps to |
+| `InvalidUserUpdateMode`, `InvalidPresetQuery` | a request's own mode value, or a query naming neither id nor name |
+| `NoCurrentTaskContext`, `DatabaseConnectionUnavailable`, `ConfigurationLoadFailed`, `DataTransformationFailed`, `DBOperationFailed` | the asyncio context, the connection, the configuration load or the database call itself |
+| `BackendAgentError`, `KernelExecutionFailed`, `InvalidStreamMode` | they report `access` or `execute`, which no `ActionOperationType` maps to |
+| `AgentConnectionUnavailable` | reaching an agent, under that same `access` |
+| `InvalidSessionId`, `InvalidKernelConfig`, `IncompleteSessionSpec` | they refuse a request before it reaches a row; `IncompleteSessionSpec` is one of three `BackendAISchema.build_validation_error` overrides, a hook declared to return `BackendAIError` |
+| the three `IdleCheckerAssignment*` errors | the assignment row's id is a `NewType`, with no `EntityType` |
+| `IdlePolicyNotFound` | no idle-policy row type, and it is raised for absent config values rather than a row |
+| `QuotaExceeded` | a resource-policy limit reached, not a condition of one row |
+| `ConflictingSessionRescheduleNotSupported` | an unimplemented cleanup policy, not a condition of an agent row |
 
 ## The legacy neighbor is a different kind
 

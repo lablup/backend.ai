@@ -28,7 +28,6 @@ from ai.backend.common.data.entity.agent import AgentUUID
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.data.entity.resource_slot import ResourceSlotName
-from ai.backend.common.exception import AgentNotFound
 from ai.backend.common.types import (
     AgentId,
     ClusterMode,
@@ -45,7 +44,11 @@ from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.agent.types import AgentHeartbeatUpsert, AgentStatus
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.session.types import SessionStatus
-from ai.backend.manager.errors.agent import AgentAlreadyExited, AgentHasConflictingSessions
+from ai.backend.manager.errors.agent import (
+    AgentAlreadyExited,
+    AgentHasConflictingSessions,
+    AgentNotFound,
+)
 from ai.backend.manager.errors.resource import ResourceGroupNotFound, UnresolvableResourceGroup
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.agent.updaters import AgentExitStatusUpdater

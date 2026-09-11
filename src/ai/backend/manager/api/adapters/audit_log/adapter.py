@@ -167,6 +167,17 @@ class AuditLogAdapter(BaseAdapter):
             )
             if condition is not None:
                 conditions.append(condition)
+        if f.entity_id is not None:
+            condition = self.convert_string_filter(
+                f.entity_id,
+                contains_factory=AuditLogConditions.by_entity_id_contains,
+                equals_factory=AuditLogConditions.by_entity_id_equals,
+                starts_with_factory=AuditLogConditions.by_entity_id_starts_with,
+                ends_with_factory=AuditLogConditions.by_entity_id_ends_with,
+                in_factory=AuditLogConditions.by_entity_id_in,
+            )
+            if condition is not None:
+                conditions.append(condition)
         if f.operation is not None:
             condition = self.convert_string_filter(
                 f.operation,

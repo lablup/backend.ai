@@ -18,8 +18,7 @@ from ai.backend.common.plugin.event import EventDispatcherPluginContext
 from ai.backend.common.types import AgentId
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.agent.types import AgentHeartbeatUpsert
-from ai.backend.manager.errors.agent import AgentAlreadyExited
-from ai.backend.manager.errors.resource import InstanceNotFound
+from ai.backend.manager.errors.agent import AgentAlreadyExited, AgentNotFound
 from ai.backend.manager.models.agent import AgentStatus, agents
 from ai.backend.manager.models.agent.updaters import AgentExitStatusUpdater, AgentStatusUpdater
 from ai.backend.manager.models.resource_slot import AgentResourceRow
@@ -176,7 +175,7 @@ class AgentEventHandler:
             agent_query = sa.select(sa.literal(1)).select_from(agents).where(agents.c.id == source)
             agent_result = await conn.execute(agent_query)
             if agent_result.first() is None:
-                raise InstanceNotFound(source)
+                raise AgentNotFound(source)
             # Read used slots from normalized agent_resources table
             ar = AgentResourceRow.__table__
             query = sa.select(ar.c.slot_name, ar.c.used).where(ar.c.agent_id == source)

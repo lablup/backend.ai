@@ -10,6 +10,8 @@ Which ops path writes a row follows from the spec's type, so no scenario names a
     RoleManagedEntityCreator        -> create_role_managed_entity
     GuardedEntityCreator            -> create_entity   (EntityCreator is one of these)
     GlobalEntityCreator             -> create_global_entity
+    EntityUpserter                  -> upsert_entity
+    GlobalEntityUpserter            -> upsert_global_entity
     GuardedDataUpdater              -> update_data
 """
 
@@ -29,13 +31,16 @@ from ai.backend.common.data.entity.user import UserID
 from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.models.specs.creator import (
     FieldCreator,
+    FieldToCreate,
     GlobalEntityCreator,
     GuardedEntityCreator,
+    NestedFieldCreator,
     RoleManagedEntityCreator,
     RoleManagedGlobalEntityCreator,
 )
 from ai.backend.manager.models.specs.relation import RelationCreator
 from ai.backend.manager.models.specs.updater import GuardedDataUpdater
+from ai.backend.manager.models.specs.upserter import EntityUpserter, GlobalEntityUpserter
 from ai.backend.manager.repositories.ops.v2.user.write import FullUserCreator
 
 type WriteSpec[D] = (
@@ -43,6 +48,8 @@ type WriteSpec[D] = (
     | GuardedEntityCreator[Any, D]
     | RoleManagedGlobalEntityCreator[Any, D]
     | RoleManagedEntityCreator[Any, D]
+    | EntityUpserter[Any, D]
+    | GlobalEntityUpserter[Any, D]
     | GuardedDataUpdater[Any, D]
 )
 
@@ -118,13 +125,39 @@ class SeedUser[A, B, C](Seed, ABC):
         raise NotImplementedError
 
 
+class SeedFieldWithNested[Owner, FieldDataT: FieldData](ABC):
+    """A field row together with the rows it owns, written in one transaction.
+
+    A monitor that records a scope action writes the record and its scope rows atomically;
+    a seed that lays such a record takes that whole write rather than splitting it. Like
+    :class:`SeedField`, the row's name and report line come from the owner it is laid under.
+    """
+
+    @abstractmethod
+    def kind(self) -> str:
+        """이 필드를 가진 주인이 무엇을 할 수 있게 되는지."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def owner_id(self, owner: Owner) -> Any:
+        raise NotImplementedError
+
+    @abstractmethod
+    def field(self) -> FieldCreator[Any, Any, FieldDataT]:
+        raise NotImplementedError
+
+    @abstractmethod
+    def nested(self) -> Sequence[NestedFieldCreator[Any, Any, Any]]:
+        raise NotImplementedError
+
+
 class SeedNest[D](ABC):
     """seed 여러 개를 함께 심어 전제 하나를 준비한다.
 
     단위가 행 하나가 아니라 "폴더를 만들 수 있는 사용자" 같은 전제다. 무엇을 준비하는지는
     ``kind``가 말하고, 어떤 seed와 어떤 nest를 딛는지는 ``lay`` 안이 보여준다.
 
-    ``Seeder``를 받지만 그 다섯 입구가 전부 seed 객체를 요구하므로, nest가 행을 직접 쓰는
+    ``Seeder``를 받지만 그 입구가 전부 seed 객체를 요구하므로, nest가 행을 직접 쓰는
     길은 없다.
     """
 
@@ -240,6 +273,10 @@ async def _write(ops: SeedOps, spec: WriteSpec[Any]) -> Any:
         return await ops.create_entity(spec)
     if isinstance(spec, GlobalEntityCreator):
         return await ops.create_global_entity(spec)
+    if isinstance(spec, EntityUpserter):
+        return await ops.upsert_entity(spec)
+    if isinstance(spec, GlobalEntityUpserter):
+        return await ops.upsert_global_entity(spec)
     return await ops.update_data(spec)
 
 
@@ -360,6 +397,30 @@ class Seeder:
 
         async def write(ops: SeedOps, values: Sequence[Any]) -> Any:
             return await ops.create_field(seed.owner_id(values[0]), seed.seed())
+
+        return self._remember(
+            Laid(
+                name=owner.name,
+                kind=owner.kind,
+                nest=tuple(self._nesting),
+                describe=f"{owner.describe}({seed.kind()})",
+                states=f"{owner.describe}: {seed.kind()}",
+                sources=(owner,),
+                write=write,
+            )
+        )
+
+    def adding_with_nested[Owner, FieldDataT: FieldData](
+        self, seed: SeedFieldWithNested[Owner, FieldDataT], owner: Laid[Owner], /
+    ) -> Laid[FieldDataT]:
+        """Lay one field row and the rows it owns, in the one write a monitor uses."""
+
+        async def write(ops: SeedOps, values: Sequence[Any]) -> Any:
+            created = await ops.atomic_create_fields_with_nested(
+                [FieldToCreate(owner_id=seed.owner_id(values[0]), creator=seed.field())],
+                list(seed.nested()),
+            )
+            return created[0]
 
         return self._remember(
             Laid(

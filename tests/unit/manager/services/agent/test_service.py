@@ -22,9 +22,9 @@ from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.permission.permission_defs import AgentPermission
 from ai.backend.manager.errors.agent import (
     AgentHasConflictingSessions,
+    AgentNotFound,
     ConflictingSessionRescheduleNotSupported,
 )
-from ai.backend.manager.errors.resource import AgentNotFound
 from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.repositories.agent.repository import AgentRepository
 from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
