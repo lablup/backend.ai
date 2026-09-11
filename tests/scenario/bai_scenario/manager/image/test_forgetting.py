@@ -1,0 +1,392 @@
+"""이미지 잊기와 되살리기 — 게이트를 지난 뒤에도 소유권 검사가 남는다."""
+
+from __future__ import annotations
+
+import uuid
+from collections.abc import Mapping
+from dataclasses import dataclass
+from typing import Any, override
+
+import pytest
+from bai_scenario.components.answers import TheCallIsRefused
+from bai_scenario.components.image import (
+    AnImageAndACaller,
+    AnImageAndSomeone,
+    AnImageNobodyOwns,
+    AnImageTheCallerMade,
+    TheImageNode,
+)
+from bai_scenario.runner.acting import ActingAs
+from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.steps import run_scenario
+
+from ai.backend.common.data.user.types import UserRole
+from ai.backend.common.dto.manager.v2.image.request import ForgetImageInput, RestoreImageInput
+from ai.backend.common.dto.manager.v2.image.response import ImageNode
+from ai.backend.manager.api.adapters.image.adapter import ImageAdapter
+from ai.backend.manager.data.image.types import ImageStatus
+from ai.backend.manager.errors.image import (
+    ImageAccessForbiddenError,
+    ImageNotFound,
+    ImagePurgeInProgress,
+)
+from ai.backend.manager.errors.permission import NotEnoughPermission
+from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.testutils.scenario_steps import Configured, Given, Scenario, Then, When
+
+ENFORCEMENT = "manager.rbac.enforcement_enabled"
+MISSING = uuid.UUID("00000000-0000-0000-0000-0000000000ff")
+
+
+@dataclass(frozen=True)
+class Forgetting(When[AnImageAndACaller, ImageAdapter, ImageNode]):
+    """이미지를 잊는다. 행은 남고 상태만 바뀐다."""
+
+    at_missing: bool = False
+
+    @override
+    def operation(self) -> str:
+        return "admin_forget"
+
+    @override
+    def describe(self, laid: AnImageAndACaller) -> str:
+        who = laid.caller.username
+        if self.at_missing:
+            return f"{who}이 아무것도 갖지 않은 id를 잊음"
+        return f"{who}이 {laid.image.name}을 잊음"
+
+    @override
+    async def call(self, adapter: ImageAdapter, laid: AnImageAndACaller) -> ImageNode:
+        target = MISSING if self.at_missing else laid.image.id
+        with ActingAs(laid.caller):
+            payload = await adapter.admin_forget(ForgetImageInput(image_id=target))
+        return payload.item
+
+
+@dataclass(frozen=True)
+class Restoring(When[AnImageAndACaller, ImageAdapter, ImageNode]):
+    """잊은 이미지를 되살린다."""
+
+    at_missing: bool = False
+
+    @override
+    def operation(self) -> str:
+        return "admin_restore"
+
+    @override
+    def describe(self, laid: AnImageAndACaller) -> str:
+        who = laid.caller.username
+        if self.at_missing:
+            return f"{who}이 아무것도 갖지 않은 id를 되살림"
+        return f"{who}이 {laid.image.name}을 되살림"
+
+    @override
+    async def call(self, adapter: ImageAdapter, laid: AnImageAndACaller) -> ImageNode:
+        target = MISSING if self.at_missing else laid.image.id
+        with ActingAs(laid.caller):
+            payload = await adapter.admin_restore(RestoreImageInput(image_id=target))
+        return payload.item
+
+
+@dataclass(frozen=True)
+class TheSuperadminForgets(Scenario[SeedingSession, AnImageAndACaller, ImageAdapter, ImageNode]):
+    @override
+    def summary(self) -> str:
+        return "forgetting-an-image-marks-it-deleted-and-keeps-the-row"
+
+    @override
+    def describe(self) -> str:
+        return "슈퍼관리자가 이미지를 잊으면, 행은 남고 지워졌다는 상태를 실은 노드가 온다"
+
+    @override
+    def given(self) -> Given[SeedingSession, AnImageAndACaller]:
+        return AnImageAndSomeone(role=UserRole.SUPERADMIN)
+
+    @override
+    def when(self) -> When[AnImageAndACaller, ImageAdapter, ImageNode]:
+        return Forgetting()
+
+    @override
+    def then(self) -> Then[AnImageAndACaller, ImageNode]:
+        return TheImageNode(status=ImageStatus.DELETED)
+
+
+@dataclass(frozen=True)
+class TheOwnerForgetsTheirOwn(Scenario[SeedingSession, AnImageAndACaller, ImageAdapter, ImageNode]):
+    @override
+    def summary(self) -> str:
+        return "the-maker-of-a-custom-image-may-forget-it"
+
+    @override
+    def describe(self) -> str:
+        return (
+            "자기가 만든 커스텀 이미지에 권한까지 받은 사용자가 그것을 잊으면, "
+            "게이트와 소유권 검사를 모두 지나 지워졌다는 상태가 온다"
+        )
+
+    @override
+    def given(self) -> Given[SeedingSession, AnImageAndACaller]:
+        return AnImageTheCallerMade()
+
+    @override
+    def when(self) -> When[AnImageAndACaller, ImageAdapter, ImageNode]:
+        return Forgetting()
+
+    @override
+    def then(self) -> Then[AnImageAndACaller, ImageNode]:
+        return TheImageNode(status=ImageStatus.DELETED)
+
+
+@dataclass(frozen=True)
+class AForgottenImageComesBack(
+    Scenario[SeedingSession, AnImageAndACaller, ImageAdapter, ImageNode]
+):
+    @override
+    def summary(self) -> str:
+        return "restoring-a-forgotten-image-marks-it-alive-again"
+
+    @override
+    def describe(self) -> str:
+        return "잊힌 이미지를 되살리면 살아 있다는 상태를 실은 노드가 온다"
+
+    @override
+    def given(self) -> Given[SeedingSession, AnImageAndACaller]:
+        return AnImageAndSomeone(role=UserRole.SUPERADMIN, status=ImageStatus.DELETED)
+
+    @override
+    def when(self) -> When[AnImageAndACaller, ImageAdapter, ImageNode]:
+        return Restoring()
+
+    @override
+    def then(self) -> Then[AnImageAndACaller, ImageNode]:
+        return TheImageNode(status=ImageStatus.ALIVE)
+
+
+@dataclass(frozen=True)
+class RestoringWhatWasNeverForgotten(
+    Scenario[SeedingSession, AnImageAndACaller, ImageAdapter, ImageNode]
+):
+    @override
+    def summary(self) -> str:
+        return "restoring-an-image-that-was-never-forgotten-leaves-it-alive"
+
+    @override
+    def describe(self) -> str:
+        return "살아 있는 이미지를 되살려도 살아 있는 그대로다"
+
+    @override
+    def given(self) -> Given[SeedingSession, AnImageAndACaller]:
+        return AnImageAndSomeone(role=UserRole.SUPERADMIN)
+
+    @override
+    def when(self) -> When[AnImageAndACaller, ImageAdapter, ImageNode]:
+        return Restoring()
+
+    @override
+    def then(self) -> Then[AnImageAndACaller, ImageNode]:
+        return TheImageNode(status=ImageStatus.ALIVE)
+
+
+@dataclass(frozen=True)
+class ForgettingWhatIsNotThere(
+    Scenario[SeedingSession, AnImageAndACaller, ImageAdapter, ImageNode]
+):
+    @override
+    def summary(self) -> str:
+        return "forgetting-an-id-that-holds-no-image-is-refused"
+
+    @override
+    def describe(self) -> str:
+        return "아무 이미지도 갖지 않은 id를 잊으려 하면 이미지가 없다는 이유로 거부된다"
+
+    @override
+    def given(self) -> Given[SeedingSession, AnImageAndACaller]:
+        return AnImageAndSomeone(role=UserRole.SUPERADMIN)
+
+    @override
+    def when(self) -> When[AnImageAndACaller, ImageAdapter, ImageNode]:
+        return Forgetting(at_missing=True)
+
+    @override
+    def then(self) -> Then[AnImageAndACaller, ImageNode]:
+        return TheCallIsRefused(ImageNotFound)
+
+
+@dataclass(frozen=True)
+class RestoringWhatIsNotThere(Scenario[SeedingSession, AnImageAndACaller, ImageAdapter, ImageNode]):
+    @override
+    def summary(self) -> str:
+        return "restoring-an-id-that-holds-no-image-is-refused"
+
+    @override
+    def describe(self) -> str:
+        return "아무 이미지도 갖지 않은 id를 되살리려 하면 이미지가 없다는 이유로 거부된다"
+
+    @override
+    def given(self) -> Given[SeedingSession, AnImageAndACaller]:
+        return AnImageAndSomeone(role=UserRole.SUPERADMIN)
+
+    @override
+    def when(self) -> When[AnImageAndACaller, ImageAdapter, ImageNode]:
+        return Restoring(at_missing=True)
+
+    @override
+    def then(self) -> Then[AnImageAndACaller, ImageNode]:
+        return TheCallIsRefused(ImageNotFound)
+
+
+@dataclass(frozen=True)
+class AnUngrantedUserMayNotForget(
+    Scenario[SeedingSession, AnImageAndACaller, ImageAdapter, ImageNode]
+):
+    @override
+    def summary(self) -> str:
+        return "a-user-granted-nothing-may-not-forget-an-image"
+
+    @override
+    def describe(self) -> str:
+        return "아무 권한도 받지 않은 사용자가 이미지를 잊으려 하면 권한 부족으로 막힌다"
+
+    @override
+    def given(self) -> Given[SeedingSession, AnImageAndACaller]:
+        return AnImageNobodyOwns(granted=False)
+
+    @override
+    def when(self) -> When[AnImageAndACaller, ImageAdapter, ImageNode]:
+        return Forgetting()
+
+    @override
+    def then(self) -> Then[AnImageAndACaller, ImageNode]:
+        return TheCallIsRefused(NotEnoughPermission)
+
+
+@dataclass(frozen=True)
+class AnUngrantedUserMayNotRestore(
+    Scenario[SeedingSession, AnImageAndACaller, ImageAdapter, ImageNode]
+):
+    @override
+    def summary(self) -> str:
+        return "a-user-granted-nothing-may-not-restore-an-image"
+
+    @override
+    def describe(self) -> str:
+        return "아무 권한도 받지 않은 사용자가 잊힌 이미지를 되살리려 하면 권한 부족으로 막힌다"
+
+    @override
+    def given(self) -> Given[SeedingSession, AnImageAndACaller]:
+        return AnImageNobodyOwns(granted=False)
+
+    @override
+    def when(self) -> When[AnImageAndACaller, ImageAdapter, ImageNode]:
+        return Restoring()
+
+    @override
+    def then(self) -> Then[AnImageAndACaller, ImageNode]:
+        return TheCallIsRefused(NotEnoughPermission)
+
+
+@dataclass(frozen=True)
+class AGrantIsNotOwnership(Scenario[SeedingSession, AnImageAndACaller, ImageAdapter, ImageNode]):
+    @override
+    def summary(self) -> str:
+        return "a-granted-user-may-not-forget-an-image-nobody-owns"
+
+    @override
+    def describe(self) -> str:
+        return (
+            "커스터마이즈되지 않은 이미지는 주인이 없으므로, "
+            "그 이미지에 권한을 받은 사용자라도 게이트를 지난 뒤 소유권 검사에서 막힌다"
+        )
+
+    @override
+    def given(self) -> Given[SeedingSession, AnImageAndACaller]:
+        return AnImageNobodyOwns()
+
+    @override
+    def when(self) -> When[AnImageAndACaller, ImageAdapter, ImageNode]:
+        return Forgetting()
+
+    @override
+    def then(self) -> Then[AnImageAndACaller, ImageNode]:
+        return TheCallIsRefused(ImageAccessForbiddenError)
+
+
+@dataclass(frozen=True)
+class EnforcementOffDoesNotReachOwnership(
+    Scenario[SeedingSession, AnImageAndACaller, ImageAdapter, ImageNode], Configured
+):
+    @override
+    def summary(self) -> str:
+        return "turning-enforcement-off-still-does-not-let-anyone-forget-an-unowned-image"
+
+    @override
+    def describe(self) -> str:
+        return (
+            "엔티티 권한 집행을 꺼서 게이트를 열어도 주인 없는 이미지는 잊을 수 없다. "
+            "소유권 검사는 그 스위치가 닿지 않는 자리에서 돌기 때문이다"
+        )
+
+    @override
+    def config(self) -> Mapping[str, Any]:
+        return {ENFORCEMENT: False}
+
+    @override
+    def given(self) -> Given[SeedingSession, AnImageAndACaller]:
+        return AnImageNobodyOwns(granted=False)
+
+    @override
+    def when(self) -> When[AnImageAndACaller, ImageAdapter, ImageNode]:
+        return Forgetting()
+
+    @override
+    def then(self) -> Then[AnImageAndACaller, ImageNode]:
+        return TheCallIsRefused(ImageAccessForbiddenError)
+
+
+@dataclass(frozen=True)
+class AnImageBeingPurgedRefusesAStatusWrite(
+    Scenario[SeedingSession, AnImageAndACaller, ImageAdapter, ImageNode]
+):
+    @override
+    def summary(self) -> str:
+        return "forgetting-an-image-a-purge-is-working-through-is-refused"
+
+    @override
+    def describe(self) -> str:
+        return "지우는 중인 이미지를 잊으려 하면 지우는 중이라는 이유로 거부된다"
+
+    @override
+    def given(self) -> Given[SeedingSession, AnImageAndACaller]:
+        return AnImageAndSomeone(role=UserRole.SUPERADMIN, status=ImageStatus.PURGING)
+
+    @override
+    def when(self) -> When[AnImageAndACaller, ImageAdapter, ImageNode]:
+        return Forgetting()
+
+    @override
+    def then(self) -> Then[AnImageAndACaller, ImageNode]:
+        return TheCallIsRefused(ImagePurgeInProgress)
+
+
+SCENARIOS: list[Scenario[SeedingSession, AnImageAndACaller, ImageAdapter, ImageNode]] = [
+    TheSuperadminForgets(),
+    TheOwnerForgetsTheirOwn(),
+    AForgottenImageComesBack(),
+    RestoringWhatWasNeverForgotten(),
+    ForgettingWhatIsNotThere(),
+    RestoringWhatIsNotThere(),
+    AnUngrantedUserMayNotForget(),
+    AnUngrantedUserMayNotRestore(),
+    AGrantIsNotOwnership(),
+    EnforcementOffDoesNotReachOwnership(),
+    AnImageBeingPurgedRefusesAStatusWrite(),
+]
+
+
+@pytest.mark.parametrize("scenario", SCENARIOS, ids=lambda s: s.summary())
+async def test_forgetting(
+    scenario: Scenario[SeedingSession, AnImageAndACaller, ImageAdapter, ImageNode],
+    adapter: ImageAdapter,
+    engine: ExtendedAsyncSAEngine,
+) -> None:
+    await run_scenario(scenario, adapter, engine)
