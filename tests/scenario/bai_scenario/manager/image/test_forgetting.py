@@ -86,7 +86,9 @@ class Restoring(When[AnImageAndACaller, ImageAdapter, ImageNode]):
 
 
 @dataclass(frozen=True)
-class TheSuperadminForgets(Scenario[SeedingSession, AnImageAndACaller, ImageAdapter, ImageNode]):
+class ForgettingMarksItDeletedAndKeepsTheRow(
+    Scenario[SeedingSession, AnImageAndACaller, ImageAdapter, ImageNode]
+):
     @override
     def summary(self) -> str:
         return "forgetting-an-image-marks-it-deleted-and-keeps-the-row"
@@ -109,7 +111,9 @@ class TheSuperadminForgets(Scenario[SeedingSession, AnImageAndACaller, ImageAdap
 
 
 @dataclass(frozen=True)
-class TheOwnerForgetsTheirOwn(Scenario[SeedingSession, AnImageAndACaller, ImageAdapter, ImageNode]):
+class TheMakerOfACustomImageMayForgetIt(
+    Scenario[SeedingSession, AnImageAndACaller, ImageAdapter, ImageNode]
+):
     @override
     def summary(self) -> str:
         return "the-maker-of-a-custom-image-may-forget-it"
@@ -372,8 +376,8 @@ class AnImageBeingPurgedIsNotVisible(
 
 
 SCENARIOS: list[Scenario[SeedingSession, AnImageAndACaller, ImageAdapter, ImageNode]] = [
-    TheSuperadminForgets(),
-    TheOwnerForgetsTheirOwn(),
+    ForgettingMarksItDeletedAndKeepsTheRow(),
+    TheMakerOfACustomImageMayForgetIt(),
     AForgottenImageCannotBeReached(),
     RestoringWhatWasNeverForgotten(),
     ForgettingWhatIsNotThere(),
