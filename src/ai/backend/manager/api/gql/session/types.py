@@ -931,7 +931,7 @@ class IncludeSessionIdleChecksPayloadGQL:
         ),
         added_version=NEXT_RELEASE_VERSION,
     ),
-    name="SessionScope",
+    name="SessionSearchScope",
 )
 class SessionScopeGQL(PydanticInputMixin[SessionScope]):
     """The scopes a session read is answered for."""

@@ -21,7 +21,7 @@ from ai.backend.manager.api.gql.pydantic_compat import PydanticInputMixin
         ),
         added_version=NEXT_RELEASE_VERSION,
     ),
-    name="DeploymentScope",
+    name="DeploymentSearchScope",
 )
 class DeploymentScopeGQL(PydanticInputMixin[DeploymentScope]):
     """The scopes a deployment read is answered for."""

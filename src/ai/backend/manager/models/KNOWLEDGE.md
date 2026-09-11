@@ -111,7 +111,7 @@ what the condition may read.
 
 | Shape | How it is told | Condition |
 |---|---|---|
-| Entity | the row's id class is an `EntityIdentifier` and answers its own `EntityType` | a correlated EXISTS over the membership edges |
+| Entity | the row's id class is an `EntityIdentifier` and answers its own `EntityType` | a correlated EXISTS over the govern and own edges |
 | Field | `FieldType.owner_type()` answers an entity kind | equality on the owner column, or an edge EXISTS on that owner |
 | Dangling field | `FieldType.owner_type()` is `None` | equality on the `(entity_type, entity_id)` pair written on the row |
 
@@ -136,7 +136,13 @@ named scope is the owning entity, the condition is equality on the owner column;
 it is above that owner, it is an edge EXISTS on the same column. Which axes a kind
 accepts is declared per kind, not open to any scope.
 
-### An edge answers for both belonging and a share
+### What a scope reaches is two edges, not one
+
+`entity_memberships` says which virtual entity holds a row; `scope_bindings` says which
+scopes govern a virtual entity. A permission check walks both, so a scope predicate that
+walked only the first would find less than the caller is allowed to see -- a domain would
+miss every row its projects hold. Every node carries a self-govern edge, so a scope
+holding the row itself answers through the same span.
 
 A membership edge answers without telling belonging from a share. What may be done with
 something reached through a share is bounded by that edge's cap, so a scope has no
