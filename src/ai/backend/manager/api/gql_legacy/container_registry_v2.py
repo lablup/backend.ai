@@ -13,6 +13,9 @@ from ai.backend.common.data.entity.container_registry import ContainerRegistryID
 from ai.backend.common.dto.manager.v2.container_registry.request import (
     CreateContainerRegistryInput as CreateContainerRegistryInputDTO,
 )
+from ai.backend.common.dto.manager.v2.container_registry.request import (
+    UpdateContainerRegistryInput as UpdateContainerRegistryInputDTO,
+)
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.api.adapters.container_registry.adapter import ContainerRegistryAdapter
 from ai.backend.manager.models.container_registry.purgers import ContainerRegistryPurger
@@ -157,6 +160,7 @@ class ModifyContainerRegistryNodeV2(graphene.Mutation):  # type: ignore[misc]
 
         _, _id = AsyncNode.resolve_global_id(info, id)
         reg_id = uuid.UUID(_id) if _id else uuid.UUID(id)
+        UpdateContainerRegistryInputDTO.model_validate({"id": reg_id, **dict(props)})
 
         allowed_groups = props.to_allowed_groups()
         if allowed_groups is not None:

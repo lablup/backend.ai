@@ -4,13 +4,14 @@ Request DTOs for container registry DTO v2.
 
 from __future__ import annotations
 
+import re
 from typing import Any, Self
+from urllib.parse import urlparse
 from uuid import UUID
 
 from pydantic import Field, field_validator, model_validator
 
 from ai.backend.common.api_handlers import BaseRequestModel
-from ai.backend.common.container_registry import validate_registry_project, validate_registry_url
 from ai.backend.common.dto.manager.query import StringFilter
 
 from .types import (
@@ -29,6 +30,28 @@ __all__ = (
     "AdminSearchContainerRegistriesInput",
     "UpdateContainerRegistryInput",
 )
+
+
+_HARBOR_PROJECT_NAME_PATTERN = re.compile(r"^[a-z0-9]+(?:[._-][a-z0-9]+)*$")
+
+
+def _validate_url(url: str) -> None:
+    """Raise ValueError unless ``url`` parses to a scheme and a host; a bare host
+    is read as http."""
+    candidate = url if url.startswith(("http://", "https://")) else f"http://{url}"
+    try:
+        parsed = urlparse(candidate)
+    except ValueError:
+        raise ValueError(f"Invalid URL format: {url}") from None
+    if not (parsed.scheme and parsed.netloc):
+        raise ValueError(f"Invalid URL format: {url}")
+
+
+def _validate_harbor_project(project: str) -> None:
+    if not (1 <= len(project) <= 255):
+        raise ValueError("Invalid project name length.")
+    if not _HARBOR_PROJECT_NAME_PATTERN.match(project):
+        raise ValueError("Invalid project name format.")
 
 
 class AllowedGroupsInput(BaseRequestModel):
@@ -78,7 +101,7 @@ class CreateContainerRegistryInput(BaseRequestModel):
         stripped = v.strip()
         if not stripped:
             raise ValueError("url must not be blank")
-        validate_registry_url(stripped)
+        _validate_url(stripped)
         return stripped
 
     @field_validator("registry_name", mode="before")
@@ -91,7 +114,11 @@ class CreateContainerRegistryInput(BaseRequestModel):
 
     @model_validator(mode="after")
     def harbor_project_required(self) -> Self:
-        validate_registry_project(self.type, self.project)
+        if self.type not in (ContainerRegistryType.HARBOR, ContainerRegistryType.HARBOR2):
+            return self
+        if self.project is None:
+            raise ValueError("Project name is required for Harbor.")
+        _validate_harbor_project(self.project)
         return self
 
 
@@ -134,6 +161,7 @@ class UpdateContainerRegistryInput(BaseRequestModel):
         stripped = v.strip()
         if not stripped:
             raise ValueError("url must not be blank")
+        _validate_url(stripped)
         return stripped
 
     @field_validator("registry_name", mode="before")
@@ -145,6 +173,16 @@ class UpdateContainerRegistryInput(BaseRequestModel):
         if not stripped:
             raise ValueError("registry_name must not be blank")
         return stripped
+
+    @model_validator(mode="after")
+    def harbor_project_well_formed(self) -> Self:
+        """A patch is judged on its own: the project is checked only when the same
+        patch names a Harbor type, since the stored type is not known here."""
+        if self.type in (ContainerRegistryType.HARBOR, ContainerRegistryType.HARBOR2) and (
+            self.project is not None
+        ):
+            _validate_harbor_project(self.project)
+        return self
 
 
 class DeleteContainerRegistryInput(BaseRequestModel):

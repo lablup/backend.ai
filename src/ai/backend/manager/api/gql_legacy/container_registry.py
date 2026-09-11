@@ -9,12 +9,15 @@ import graphene
 import graphene_federation
 import graphql
 import sqlalchemy as sa
-from graphql import Undefined, UndefinedType
+from graphql import Undefined
 
 from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.data.entity.container_registry import ContainerRegistryID
 from ai.backend.common.dto.manager.v2.container_registry.request import (
     CreateContainerRegistryInput as CreateContainerRegistryInputDTO,
+)
+from ai.backend.common.dto.manager.v2.container_registry.request import (
+    UpdateContainerRegistryInput as UpdateContainerRegistryInputDTO,
 )
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.api.adapters.container_registry.adapter import ContainerRegistryAdapter
@@ -389,33 +392,26 @@ class ModifyContainerRegistryNode(graphene.Mutation):  # type: ignore[misc]
         root: Any,
         info: graphene.ResolveInfo,
         id: str,
-        url: str | UndefinedType = Undefined,
-        type: ContainerRegistryType | UndefinedType = Undefined,
-        registry_name: str | UndefinedType = Undefined,
-        is_global: bool | UndefinedType = Undefined,
-        project: str | UndefinedType = Undefined,
-        username: str | UndefinedType = Undefined,
-        password: str | UndefinedType = Undefined,
-        ssl_verify: bool | UndefinedType = Undefined,
-        extra: dict[str, Any] | UndefinedType = Undefined,
+        **props: Any,
     ) -> ModifyContainerRegistryNode:
         ctx: GraphQueryContext = info.context
 
         _, _id = AsyncNode.resolve_global_id(info, id)
         reg_id = uuid.UUID(_id) if _id else uuid.UUID(id)
+        UpdateContainerRegistryInputDTO.model_validate({"id": reg_id, **props})
 
         action = UpdateContainerRegistryAction(
             updater=ContainerRegistryUpdater(
                 registry_id=ContainerRegistryID(reg_id),
-                url=OptionalState.from_graphql(url),
-                type=OptionalState.from_graphql(type),
-                registry_name=OptionalState.from_graphql(registry_name),
-                is_global=TriState.from_graphql(is_global),
-                project=TriState.from_graphql(project),
-                username=TriState.from_graphql(username),
-                password=TriState.from_graphql(password),
-                ssl_verify=TriState.from_graphql(ssl_verify),
-                extra=TriState.from_graphql(extra),
+                url=OptionalState.from_graphql(props.get("url", Undefined)),
+                type=OptionalState.from_graphql(props.get("type", Undefined)),
+                registry_name=OptionalState.from_graphql(props.get("registry_name", Undefined)),
+                is_global=TriState.from_graphql(props.get("is_global", Undefined)),
+                project=TriState.from_graphql(props.get("project", Undefined)),
+                username=TriState.from_graphql(props.get("username", Undefined)),
+                password=TriState.from_graphql(props.get("password", Undefined)),
+                ssl_verify=TriState.from_graphql(props.get("ssl_verify", Undefined)),
+                extra=TriState.from_graphql(props.get("extra", Undefined)),
             )
         )
 

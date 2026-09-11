@@ -3,7 +3,6 @@ from __future__ import annotations
 import logging
 import uuid
 from collections.abc import Mapping, MutableMapping, Sequence
-from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Self, cast
 
 import sqlalchemy as sa
@@ -13,19 +12,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Mapped, foreign, load_only, mapped_column, relationship
 from sqlalchemy.sql.expression import SQLColumnExpression
 
-from ai.backend.common.container_registry import (
-    ContainerRegistryType,
-    validate_registry_project,
-    validate_registry_url,
-)
+from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.data.entity.container_registry import ContainerRegistryID
 from ai.backend.common.exception import UnknownImageRegistry
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.container_registry.types import ContainerRegistryData
-from ai.backend.manager.errors.container_registry import (
-    InvalidContainerRegistryProject,
-    InvalidContainerRegistryURL,
-)
 from ai.backend.manager.models.base import (
     GUID,
     Base,
@@ -39,47 +30,7 @@ if TYPE_CHECKING:
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
-__all__: Sequence[str] = (
-    "ContainerRegistryRow",
-    "ContainerRegistryValidator",
-    "ContainerRegistryValidatorArgs",
-)
-
-
-@dataclass
-class ContainerRegistryValidatorArgs:
-    url: str
-    type: ContainerRegistryType
-    project: str | None
-
-
-# TODO: Refactor this using inheritance
-class ContainerRegistryValidator:
-    """
-    Validator for container registry configuration.
-    """
-
-    _url: str
-    _type: ContainerRegistryType
-    _project: str | None
-
-    def __init__(self, args: ContainerRegistryValidatorArgs) -> None:
-        self._url = args.url
-        self._type = args.type
-        self._project = args.project
-
-    def validate(self) -> None:
-        """
-        Validate container registry configuration.
-        """
-        try:
-            validate_registry_url(self._url)
-        except ValueError as e:
-            raise InvalidContainerRegistryURL(str(e)) from e
-        try:
-            validate_registry_project(self._type, self._project)
-        except ValueError as e:
-            raise InvalidContainerRegistryProject(str(e)) from e
+__all__: Sequence[str] = ("ContainerRegistryRow",)
 
 
 def _get_association_join_condition() -> sa.ColumnElement[bool]:
