@@ -45,7 +45,7 @@ type CreatingStep = Scenario[SeedingSession, Any, ContainerRegistryAdapter, Cont
 
 @dataclass(frozen=True)
 class Creating(When[Any, ContainerRegistryAdapter, ContainerRegistryNode]):
-    """레지스트리를 만든다. 허용 프로젝트를 주면 연결까지 함께 쓴다."""
+    """레지스트리를 만든다. 허용 프로젝트를 주면 허용 목록까지 함께 쓴다."""
 
     url: str = A_URL
     username: str | None = None
@@ -168,13 +168,13 @@ class AllowingAProjectWhileCreating(
 ):
     @override
     def summary(self) -> str:
-        return "a-project-named-while-creating-is-linked-to-the-new-registry"
+        return "a-project-named-while-creating-is-allowed-on-the-new-registry"
 
     @override
     def describe(self) -> str:
         return (
             "슈퍼관리자는 허용 프로젝트를 함께 주고 레지스트리를 만들 수 있다. "
-            "연결이 함께 쓰이는 것은 답에 실리지 않아 이 행이 보지 못한다"
+            "허용 목록이 함께 쓰이는 것은 답에 실리지 않아 이 행이 보지 못한다"
         )
 
     @override

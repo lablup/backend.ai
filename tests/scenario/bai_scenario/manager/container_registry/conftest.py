@@ -2,7 +2,7 @@
 
 The only place in these scenarios that knows how the adapter is built. It takes two
 bundles: its own, and the rbac one behind the allowed-project list. The second is not
-decoration — the calls that link a project to a registry go through it.
+decoration — the calls that allow a project on a registry go through it.
 """
 
 from __future__ import annotations

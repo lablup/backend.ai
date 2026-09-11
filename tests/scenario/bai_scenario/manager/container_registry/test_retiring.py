@@ -1,4 +1,4 @@
-"""레지스트리 지우기 — 되돌릴 수 없고, 연결도 함께 사라진다."""
+"""레지스트리 지우기 — 되돌릴 수 없고, 허용 목록도 함께 사라진다."""
 
 from __future__ import annotations
 
@@ -112,20 +112,20 @@ class DeletingAnswersWithTheRemovedId(
 
 
 @dataclass(frozen=True)
-class DeletingTakesTheLinkWithIt(
+class DeletingTakesTheAllowedProjectWithIt(
     Scenario[SeedingSession, ARegistryAndACaller, ContainerRegistryAdapter, Deleted]
 ):
     @override
     def summary(self) -> str:
-        return "deleting-a-registry-a-project-is-linked-to-takes-the-link-with-it"
+        return "deleting-a-registry-takes-its-allowed-projects-with-it"
 
     @override
     def describe(self) -> str:
-        return "허용 프로젝트가 딸린 레지스트리를 지우면, 외래 키를 통해 그 연결까지 함께 사라진다"
+        return "허용 프로젝트가 딸린 레지스트리를 지우면, 외래 키를 통해 그 허용 목록까지 함께 사라진다"
 
     @override
     def given(self) -> Given[SeedingSession, ARegistryAndACaller]:
-        return ARegistryAndSomeone(role=UserRole.SUPERADMIN, linked=True)
+        return ARegistryAndSomeone(role=UserRole.SUPERADMIN, allowed=True)
 
     @override
     def when(self) -> When[ARegistryAndACaller, ContainerRegistryAdapter, Deleted]:
@@ -188,7 +188,7 @@ class APlainUserMayNotDelete(
 
 SCENARIOS: list[RetiringStep] = [
     DeletingAnswersWithTheRemovedId(),
-    DeletingTakesTheLinkWithIt(),
+    DeletingTakesTheAllowedProjectWithIt(),
     AnIdThatHoldsNothingIsRefused(),
     APlainUserMayNotDelete(),
 ]
