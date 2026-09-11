@@ -576,6 +576,10 @@ class ResourceGroupAdapter(BaseAdapter):
         Returns:
             Payload DTO containing the updated resource group.
         """
+        weight_entries = OptionalState.from_unset(input.resource_weights).optional_value()
+        resource_weights = (
+            _resource_weights_to_domain(weight_entries) if weight_entries is not None else None
+        )
         action_result = await self._resource_group.update_fair_share_spec.run(
             UpdateFairShareSpecAction(
                 resource_group_id=await self._resolve_resource_group_id(input.resource_group_name),
@@ -584,9 +588,7 @@ class ResourceGroupAdapter(BaseAdapter):
                 lookback_days=OptionalState.from_unset(input.lookback_days).optional_value(),
                 decay_unit_days=OptionalState.from_unset(input.decay_unit_days).optional_value(),
                 default_weight=OptionalState.from_unset(input.default_weight).optional_value(),
-                resource_weights=OptionalState.from_unset(input.resource_weights)
-                .map(_resource_weights_to_domain)
-                .optional_value(),
+                resource_weights=resource_weights,
             )
         )
         return UpdateResourceGroupFairShareSpecPayloadNode(
