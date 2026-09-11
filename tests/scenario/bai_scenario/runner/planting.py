@@ -27,7 +27,8 @@ from bai_scenario.seeds.seeder import (
     lay,
 )
 
-from ai.backend.common.data.entity.types import FieldData
+from ai.backend.common.data.entity.types import EntityIdentifier, FieldData
+from ai.backend.manager.models.specs.lookup import DataLookup
 from ai.backend.testutils.scenario_steps import Told
 
 
@@ -71,6 +72,20 @@ class SeedingSession:
             return tuple(out)
 
         return build(roots)
+
+    async def looking_up[TEntityID: EntityIdentifier](
+        self, lookup: DataLookup[Any, TEntityID]
+    ) -> TEntityID:
+        """Resolve a row the manager wrote on its own into its id.
+
+        Provisioning a user writes rows the scenario never named — the personal project
+        is one — and answers with the user alone. A request that has to name one of them
+        asks here, through the manager's own lookup spec rather than a query of its own.
+        """
+        found = await self._ops.lookup_entity_id(lookup)
+        if found is None:
+            raise LookupError(f"nothing in this session answers to {lookup}")
+        return found
 
     def made[D](self, row: Laid[D]) -> D:
         """What the write answered for this row."""
