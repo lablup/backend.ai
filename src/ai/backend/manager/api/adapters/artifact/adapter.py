@@ -5,7 +5,6 @@ from __future__ import annotations
 from collections.abc import Sequence
 from uuid import UUID
 
-from ai.backend.common.api_handlers import Sentinel
 from ai.backend.common.data.entity.artifact import ArtifactID
 from ai.backend.common.data.entity.artifact_registry import ArtifactRegistryID
 from ai.backend.common.data.entity.artifact_revision import ArtifactRevisionID
@@ -128,7 +127,7 @@ from ai.backend.manager.services.artifact.revision.actions.reject import (
 from ai.backend.manager.services.artifact.revision.actions.search import (
     SearchArtifactRevisionsAction,
 )
-from ai.backend.manager.types import TriState
+from ai.backend.manager.types import OptionalState, TriState
 
 DEFAULT_PAGINATION_LIMIT = 10
 
@@ -268,16 +267,8 @@ class ArtifactAdapter(BaseAdapter):
         """Update artifact metadata (readonly flag and description)."""
         updater = ArtifactUpdater(
             artifact_id=ArtifactID(artifact_id),
-            readonly=(
-                TriState.update(input.readonly)
-                if input.readonly is not None
-                else TriState[bool].nop()
-            ),
-            description=(
-                TriState[str].nop()
-                if isinstance(input.description, Sentinel)
-                else TriState[str].from_graphql(input.description)
-            ),
+            readonly=OptionalState.from_unset(input.readonly),
+            description=TriState.from_unset(input.description),
         )
         action_result = await self._artifact.update.run(
             UpdateArtifactAction(artifact_id=ArtifactID(artifact_id), updater=updater)

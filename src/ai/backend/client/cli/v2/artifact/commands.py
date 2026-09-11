@@ -54,21 +54,19 @@ def update(
     """Update artifact metadata."""
     from uuid import UUID
 
-    from ai.backend.common.api_handlers import SENTINEL, Sentinel
     from ai.backend.common.dto.manager.v2.artifact.request import UpdateArtifactInput
+    from ai.backend.common.tristate.unset import UNSET, Unset
 
-    # SENTINEL means "no change" in the DTO; None means "clear the field".
-    # When the CLI user does not pass --description, keep SENTINEL (no change).
-    desc_value: str | Sentinel | None = SENTINEL
-    if description is not None:
-        desc_value = description
+    # Options the user did not pass stay UNSET (no change); an empty --description clears it.
+    readonly_value: bool | Unset = UNSET if readonly is None else readonly
+    desc_value: str | Unset = UNSET if description is None else description
 
     async def _run() -> None:
         registry = await create_v2_registry(load_v2_config())
         try:
             result = await registry.artifact.update(
                 UUID(artifact_id),
-                UpdateArtifactInput(readonly=readonly, description=desc_value),
+                UpdateArtifactInput(readonly=readonly_value, description=desc_value),
             )
             print_result(result)
         finally:
