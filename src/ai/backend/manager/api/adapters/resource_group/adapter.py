@@ -222,17 +222,6 @@ def _resource_weights_to_domain(
     ]
 
 
-def _preemption_input_to_domain(preemption: PreemptionConfigInputDTO) -> DataPreemptionConfig:
-    return DataPreemptionConfig(
-        enabled=preemption.enabled,
-        preemptible_priority=preemption.preemptible_priority,
-        order=PreemptionOrder(preemption.order),
-        mode=PreemptionMode(preemption.mode),
-        preemption_min_runtime=timedelta(seconds=preemption.preemption_min_runtime),
-        victim_scope=preemption.victim_scope,
-    )
-
-
 @dataclass
 class ResourceGroupSearchPayload:
     """Result of a resource group search containing paginated ResourceGroupDetailNode items."""
@@ -658,7 +647,15 @@ class ResourceGroupAdapter(BaseAdapter):
     ) -> OptionalState[DataPreemptionConfig]:
         if isinstance(value, Unset) or value is None:
             return OptionalState.nop()
-        return OptionalState.update(_preemption_input_to_domain(value))
+        preemption_config = DataPreemptionConfig(
+            enabled=value.enabled,
+            preemptible_priority=value.preemptible_priority,
+            order=PreemptionOrder(value.order),
+            mode=PreemptionMode(value.mode),
+            preemption_min_runtime=timedelta(seconds=value.preemption_min_runtime),
+            victim_scope=value.victim_scope,
+        )
+        return OptionalState.update(preemption_config)
 
     async def update_config(
         self,
