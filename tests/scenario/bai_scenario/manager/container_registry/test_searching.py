@@ -24,10 +24,10 @@ from ai.backend.common.dto.manager.v2.container_registry.request import (
 from ai.backend.common.dto.manager.v2.container_registry.response import (
     AdminSearchContainerRegistriesPayload,
 )
-from ai.backend.manager.api.adapters.container_registry.adapter import (
+from ai.backend.manager.api.adapter_options.pagination.pagination import (
     DEFAULT_PAGINATION_LIMIT,
-    ContainerRegistryAdapter,
 )
+from ai.backend.manager.api.adapters.container_registry.adapter import ContainerRegistryAdapter
 from ai.backend.manager.errors.auth import InsufficientPrivilege
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import (
