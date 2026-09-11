@@ -10,6 +10,7 @@ Which ops path writes a row follows from the spec's type, so no scenario names a
     RoleManagedEntityCreator        -> create_role_managed_entity
     GuardedEntityCreator            -> create_entity   (EntityCreator is one of these)
     GlobalEntityCreator             -> create_global_entity
+    GlobalEntityUpserter            -> upsert_global_entity
     GuardedDataUpdater              -> update_data
 """
 
@@ -20,6 +21,8 @@ from collections.abc import Awaitable, Callable, Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from typing import Any, Final, cast
+
+from bai_scenario.seeds.ops import SeedOps
 
 from ai.backend.common.data.entity.role import RoleID
 from ai.backend.common.data.entity.types import FieldData
@@ -34,14 +37,15 @@ from ai.backend.manager.models.specs.creator import (
 )
 from ai.backend.manager.models.specs.relation import RelationCreator
 from ai.backend.manager.models.specs.updater import GuardedDataUpdater
+from ai.backend.manager.models.specs.upserter import GlobalEntityUpserter
 from ai.backend.manager.repositories.ops.v2.user.write import FullUserCreator
-from bai_scenario.seeds.ops import SeedOps
 
 type WriteSpec[D] = (
     GlobalEntityCreator[Any, D]
     | GuardedEntityCreator[Any, D]
     | RoleManagedGlobalEntityCreator[Any, D]
     | RoleManagedEntityCreator[Any, D]
+    | GlobalEntityUpserter[Any, D]
     | GuardedDataUpdater[Any, D]
 )
 
@@ -239,6 +243,8 @@ async def _write(ops: SeedOps, spec: WriteSpec[Any]) -> Any:
         return await ops.create_entity(spec)
     if isinstance(spec, GlobalEntityCreator):
         return await ops.create_global_entity(spec)
+    if isinstance(spec, GlobalEntityUpserter):
+        return await ops.upsert_global_entity(spec)
     return await ops.update_data(spec)
 
 
