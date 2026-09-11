@@ -283,7 +283,9 @@ def _create_session_for_start(
 @pytest.fixture
 def session_for_start_single_kernel() -> SessionDataForStart:
     """Single session with one kernel for starting."""
-    return _create_session_for_start()
+    session = _create_session_for_start()
+    session.kernels[0].bootstrap_script = "if true; then\r\n  echo ok\r\nfi"
+    return session
 
 
 @pytest.fixture

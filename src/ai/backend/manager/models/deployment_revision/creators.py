@@ -15,6 +15,7 @@ from ai.backend.common.data.entity.deployment_revision import DeploymentRevision
 from ai.backend.common.data.entity.image import ImageID
 from ai.backend.common.data.entity.runtime_variant import RuntimeVariantID
 from ai.backend.common.data.entity.vfolder import VFolderUUID
+from ai.backend.common.text import normalize_newlines
 from ai.backend.common.types import (
     MountInfoEntry,
     MountPermission,
@@ -104,7 +105,11 @@ class DeploymentRevisionCreator(
             cluster_mode=self.cluster_mode,
             cluster_size=self.cluster_size,
             startup_command=self.startup_command,
-            bootstrap_script=self.bootstrap_script,
+            bootstrap_script=(
+                normalize_newlines(self.bootstrap_script)
+                if self.bootstrap_script is not None
+                else None
+            ),
             environ=self.environ,
             callback_url=self.callback_url,
             runtime_variant_id=self.runtime_variant_id,

@@ -11,6 +11,7 @@ from ai.backend.common.config import PresetModelDefinition
 from ai.backend.common.data.entity.deployment_preset import DeploymentPresetID
 from ai.backend.common.data.entity.runtime_variant import RuntimeVariantID
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
+from ai.backend.common.text import normalize_newlines
 from ai.backend.manager.data.deployment_revision_preset.types import DeploymentRevisionPresetData
 from ai.backend.manager.models.base import ResourceOptsEntry
 from ai.backend.manager.models.deployment_revision_preset.row import DeploymentRevisionPresetRow
@@ -95,7 +96,7 @@ class DeploymentPresetUpdater(
         self.cluster_mode.update_dict(to_update, "cluster_mode")
         self.cluster_size.update_dict(to_update, "cluster_size")
         self.startup_command.update_dict(to_update, "startup_command")
-        self.bootstrap_script.update_dict(to_update, "bootstrap_script")
+        self.bootstrap_script.map(normalize_newlines).update_dict(to_update, "bootstrap_script")
         self.environ.update_dict(to_update, "environ")
         # DB column name stays ``preset_values`` (ORM attr unchanged).
         self.runtime_variant_preset_values.update_dict(to_update, "preset_values")

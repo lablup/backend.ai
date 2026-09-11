@@ -8,6 +8,7 @@ from ai.backend.common.data.entity.keypair import KeyPairID
 from ai.backend.common.dto.manager.config.types import MAXIMUM_DOTFILE_SIZE
 from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
 from ai.backend.common.exception import InvalidAPIParameters
+from ai.backend.common.text import normalize_newlines
 from ai.backend.common.types import AccessKey
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
@@ -412,12 +413,12 @@ class UserService:
         self, action: GetBootstrapScriptAction
     ) -> GetBootstrapScriptActionResult:
         keypair = await self._user_repository.admin_get_keypair(action.access_key)
-        return GetBootstrapScriptActionResult(script=keypair.bootstrap_script)
+        return GetBootstrapScriptActionResult(script=normalize_newlines(keypair.bootstrap_script))
 
     async def update_bootstrap_script(
         self, action: UpdateBootstrapScriptAction
     ) -> UpdateBootstrapScriptActionResult:
-        script = action.script.replace("\r\n", "\n").strip()
+        script = normalize_newlines(action.script).strip()
         if len(script) > MAXIMUM_DOTFILE_SIZE:
             raise DotfileCreationFailed("Maximum bootstrap script length reached")
         keypair = await self._user_repository.admin_get_keypair(action.access_key)

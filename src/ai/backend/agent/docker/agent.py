@@ -140,6 +140,7 @@ from ai.backend.common.json import (
     load_json,
 )
 from ai.backend.common.plugin.monitor import ErrorPluginContext, StatsPluginContext
+from ai.backend.common.text import normalize_newlines
 from ai.backend.common.types import (
     AgentId,
     AutoPullBehavior,
@@ -964,7 +965,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
             if bootstrap := self.kernel_config.get("bootstrap_script"):
 
                 def _write_user_bootstrap_script() -> None:
-                    (self.work_dir / "bootstrap.sh").write_text(bootstrap.replace("\r\n", "\n"))
+                    (self.work_dir / "bootstrap.sh").write_text(normalize_newlines(bootstrap))
                     if ouid is not None or ogid is not None:
                         self._chown_paths_if_root([self.work_dir / "bootstrap.sh"], ouid, ogid)
                     else:
@@ -1069,7 +1070,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                 file_path = self.work_dir / dotfile["path"]
             file_path.parent.mkdir(parents=True, exist_ok=True)
 
-            dotfile_content = dotfile["data"].replace("\r\n", "\n")
+            dotfile_content = normalize_newlines(dotfile["data"])
             if not dotfile_content.endswith("\n"):
                 dotfile_content += "\n"
             await loop.run_in_executor(None, file_path.write_text, dotfile_content)

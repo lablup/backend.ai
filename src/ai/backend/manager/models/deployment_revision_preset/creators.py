@@ -13,6 +13,7 @@ from ai.backend.common.data.entity.image import ImageID
 from ai.backend.common.data.entity.preset_resource_slot import PresetResourceSlotID
 from ai.backend.common.data.entity.runtime_variant import RuntimeVariantID
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
+from ai.backend.common.text import normalize_newlines
 from ai.backend.common.types import BinarySize
 from ai.backend.manager.data.deployment_revision_preset.types import (
     DeploymentRevisionPresetData,
@@ -107,7 +108,11 @@ class DeploymentPresetCreator(
             cluster_mode=self.cluster_mode,
             cluster_size=self.cluster_size,
             startup_command=self.startup_command,
-            bootstrap_script=self.bootstrap_script,
+            bootstrap_script=(
+                normalize_newlines(self.bootstrap_script)
+                if self.bootstrap_script is not None
+                else None
+            ),
             environ=self.environ,
             preset_values=self.runtime_variant_preset_values,
             open_to_public=self.open_to_public,

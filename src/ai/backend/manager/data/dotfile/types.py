@@ -2,11 +2,12 @@ from __future__ import annotations
 
 import enum
 import uuid
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 from typing import Any
 
 from ai.backend.common import msgpack
 from ai.backend.common.dto.manager.config.types import MAXIMUM_DOTFILE_SIZE
+from ai.backend.common.text import normalize_newlines
 from ai.backend.manager.errors.storage import (
     DotfileAlreadyExists,
     DotfileCreationFailed,
@@ -30,6 +31,9 @@ class DotfileEntry:
     path: str
     perm: str
     data: str
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "data", normalize_newlines(self.data))
 
 
 @dataclass(frozen=True)
@@ -69,14 +73,12 @@ class DotfileEntries:
             raise DotfileAlreadyExists
         if len(self.entries) >= MAXIMUM_DOTFILE_COUNT:
             raise DotfileCreationFailed("Dotfile creation limit reached")
-        entry = replace(entry, data=entry.data.replace("\r\n", "\n"))
         return DotfileEntries(entries=(*self.entries, entry))
 
     def replaced(self, entry: DotfileEntry) -> DotfileEntries:
         kept = tuple(e for e in self.entries if e.path != entry.path)
         if len(kept) == len(self.entries):
             raise DotfileNotFound
-        entry = replace(entry, data=entry.data.replace("\r\n", "\n"))
         return DotfileEntries(entries=(*kept, entry))
 
     def removed(self, path: str) -> DotfileEntries:

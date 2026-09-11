@@ -17,6 +17,7 @@ from cryptography.hazmat.primitives.asymmetric import rsa
 from ai.backend.common.clients.valkey_client.valkey_schedule.client import ValkeyScheduleClient
 from ai.backend.common.data.entity.network import NetworkID
 from ai.backend.common.docker import ImageRef
+from ai.backend.common.text import normalize_newlines
 from ai.backend.common.types import (
     AgentId,
     AutoPullBehavior,
@@ -372,7 +373,11 @@ class SessionLauncher:
                         ],
                         "package_directory": tuple(),
                         "idle_timeout": int(idle_timeout),
-                        "bootstrap_script": k.bootstrap_script,
+                        "bootstrap_script": (
+                            normalize_newlines(k.bootstrap_script)
+                            if k.bootstrap_script is not None
+                            else None
+                        ),
                         "startup_command": k.startup_command,
                         "internal_data": k.internal_data,
                         "auto_pull": kernel_image_config.get("auto_pull", AutoPullBehavior.DIGEST),

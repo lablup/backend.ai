@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import override
 
 from ai.backend.common.stage.types import ArgsSpecGenerator, Provisioner, ProvisionStage
+from ai.backend.common.text import normalize_newlines
 
 from .utils import ChownUtil, PathOwnerDeterminer
 
@@ -66,7 +67,7 @@ class BootstrapProvisioner(Provisioner[BootstrapSpec, BootstrapResult]):
             return None
 
         bootstrap_path = spec.work_dir / "bootstrap.sh"
-        bootstrap_path.write_text(spec.bootstrap_script.replace("\r\n", "\n"))
+        bootstrap_path.write_text(normalize_newlines(spec.bootstrap_script))
 
         # Set proper ownership
         owner_determiner = PathOwnerDeterminer.by_kernel_features(

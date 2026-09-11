@@ -16,11 +16,12 @@ from __future__ import annotations
 import enum
 from collections.abc import Mapping
 from datetime import datetime
-from typing import Any, Protocol
+from typing import Annotated, Any, Protocol
 
-from pydantic import ConfigDict, Field
+from pydantic import AfterValidator, ConfigDict, Field
 
 from ai.backend.common.data.entity.image import ImageID
+from ai.backend.common.text import normalize_newlines
 from ai.backend.common.types import (
     AgentId,
     BackendAISchema,
@@ -326,7 +327,7 @@ class KernelExecutionSpec(_OptionsBaseModel):
             "Command executed after kernel bootstrap. `None` defers to the image's declared CMD."
         ),
     )
-    bootstrap_script: str | None = Field(
+    bootstrap_script: Annotated[str, AfterValidator(normalize_newlines)] | None = Field(
         default=None,
         description=(
             "Shell script executed before `startup_command`. `None` skips the bootstrap step."

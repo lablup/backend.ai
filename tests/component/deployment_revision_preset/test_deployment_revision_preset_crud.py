@@ -102,6 +102,7 @@ class TestDeploymentRevisionPresetCRUD:
                 runtime_variant_id=runtime_variant_id,
                 name="test-preset",
                 description="Test preset",
+                bootstrap_script="if true; then\r\n  echo ok\r\nfi",
                 image_id=ImageID(uuid.uuid4()),
                 resource_slots=[
                     ResourceSlotEntryInput(resource_type="cpu", quantity="4"),
@@ -122,6 +123,7 @@ class TestDeploymentRevisionPresetCRUD:
         get_result = await admin_v2_registry.deployment_revision_preset.get(preset.id)
         assert get_result.id == preset.id
         assert get_result.name == "test-preset"
+        assert get_result.execution.bootstrap_script == "if true; then\n  echo ok\nfi"
 
         await admin_v2_registry.deployment_revision_preset.delete(preset.id)
 
@@ -224,10 +226,12 @@ class TestDeploymentRevisionPresetCRUD:
                 id=preset_id,
                 description="After",
                 rank=50,
+                bootstrap_script="echo first\r\necho last",
             ),
         )
         assert update_result.preset.description == "After"
         assert update_result.preset.rank == 50
+        assert update_result.preset.execution.bootstrap_script == "echo first\necho last"
 
         await admin_v2_registry.deployment_revision_preset.delete(preset_id)
 

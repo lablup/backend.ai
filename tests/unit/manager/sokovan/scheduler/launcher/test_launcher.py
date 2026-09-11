@@ -181,6 +181,8 @@ class TestSessionLauncherKernelCreation:
         call_args = mock_client.create_kernels.call_args
         kernel_ids = call_args[0][1]  # Second positional arg
         assert len(kernel_ids) == 1
+        kernel_configs = call_args[0][2]
+        assert kernel_configs[0]["bootstrap_script"] == "if true; then\n  echo ok\nfi"
 
     async def test_multi_kernel_cluster_session(
         self,
