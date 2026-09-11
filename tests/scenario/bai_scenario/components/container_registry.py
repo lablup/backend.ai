@@ -209,8 +209,10 @@ class ARegistryAProjectAndSomeone(Given[Any, ARegistryAProjectAndACaller]):
         )
 
 
-LINKING = Permission.CREATE | Permission.SOFT_DELETE
-"""연결을 붙이고 떼는 데 드는 권한. 붙이기는 생성이고 떼기는 삭제로 친다."""
+LINKING = (Permission.CREATE, Permission.SOFT_DELETE)
+"""연결을 붙이고 떼는 데 드는 권한. 붙이기는 생성이고 떼기는 삭제로 친다.
+
+한 행이 한 비트만 담으므로 둘을 따로 심는다."""
 
 
 @dataclass(frozen=True)
@@ -234,7 +236,8 @@ class RoleOver[S](SeedNest[Laid[None]]):
     @override
     def lay(self, seed: Seeder) -> Laid[None]:
         role = seed.creating_from(SeedRole(self.scope_of, name_hint=self.name_hint), self.scope)
-        seed.adding(SeedPermission(entity_type=self.entity_type, permission=LINKING), role)
+        for allowed in LINKING:
+            seed.adding(SeedPermission(entity_type=self.entity_type, permission=allowed), role)
         return seed.granting(
             role, self.someone, role_id=lambda r: r.id, user_id=lambda u: UserID(u.id)
         )
@@ -249,8 +252,8 @@ class TheNewRegistryNode(Then[Any, ContainerRegistryNode]):
     kind: ContainerRegistryType = ContainerRegistryType.DOCKER
     project: str | None = None
     username: str | None = None
-    ssl_verify: bool | None = None
-    is_global: bool | None = None
+    ssl_verify: bool | None = True
+    is_global: bool | None = True
     extra: dict[str, Any] | None = None
 
     @override

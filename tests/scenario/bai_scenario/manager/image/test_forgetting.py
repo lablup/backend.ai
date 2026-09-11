@@ -25,11 +25,7 @@ from ai.backend.common.dto.manager.v2.image.request import ForgetImageInput, Res
 from ai.backend.common.dto.manager.v2.image.response import ImageNode
 from ai.backend.manager.api.adapters.image.adapter import ImageAdapter
 from ai.backend.manager.data.image.types import ImageStatus
-from ai.backend.manager.errors.image import (
-    ImageAccessForbiddenError,
-    ImageNotFound,
-    ImagePurgeInProgress,
-)
+from ai.backend.manager.errors.image import ImageAccessForbiddenError, ImageNotFound
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import Configured, Given, Scenario, Then, When
@@ -138,16 +134,19 @@ class TheOwnerForgetsTheirOwn(Scenario[SeedingSession, AnImageAndACaller, ImageA
 
 
 @dataclass(frozen=True)
-class AForgottenImageComesBack(
+class AForgottenImageCannotBeReached(
     Scenario[SeedingSession, AnImageAndACaller, ImageAdapter, ImageNode]
 ):
     @override
     def summary(self) -> str:
-        return "restoring-a-forgotten-image-marks-it-alive-again"
+        return "restoring-a-forgotten-image-cannot-reach-it"
 
     @override
     def describe(self) -> str:
-        return "잊힌 이미지를 되살리면 살아 있다는 상태를 실은 노드가 온다"
+        return (
+            "잊힌 이미지를 되살리려 하면 이미지가 없다는 이유로 거부된다. "
+            "이미지를 id로 집는 자리가 살아 있는 것만 보기 때문이다"
+        )
 
     @override
     def given(self) -> Given[SeedingSession, AnImageAndACaller]:
@@ -159,7 +158,7 @@ class AForgottenImageComesBack(
 
     @override
     def then(self) -> Then[AnImageAndACaller, ImageNode]:
-        return TheImageNode(status=ImageStatus.ALIVE)
+        return TheCallIsRefused(ImageNotFound)
 
 
 @dataclass(frozen=True)
@@ -344,16 +343,19 @@ class EnforcementOffDoesNotReachOwnership(
 
 
 @dataclass(frozen=True)
-class AnImageBeingPurgedRefusesAStatusWrite(
+class AnImageBeingPurgedIsNotVisible(
     Scenario[SeedingSession, AnImageAndACaller, ImageAdapter, ImageNode]
 ):
     @override
     def summary(self) -> str:
-        return "forgetting-an-image-a-purge-is-working-through-is-refused"
+        return "an-image-a-purge-is-working-through-cannot-be-reached"
 
     @override
     def describe(self) -> str:
-        return "지우는 중인 이미지를 잊으려 하면 지우는 중이라는 이유로 거부된다"
+        return (
+            "지우는 중인 이미지를 잊으려 하면 이미지가 없다는 이유로 거부된다. "
+            "그 상태의 이미지는 id로 집는 자리에서 보이지 않는다"
+        )
 
     @override
     def given(self) -> Given[SeedingSession, AnImageAndACaller]:
@@ -365,13 +367,13 @@ class AnImageBeingPurgedRefusesAStatusWrite(
 
     @override
     def then(self) -> Then[AnImageAndACaller, ImageNode]:
-        return TheCallIsRefused(ImagePurgeInProgress)
+        return TheCallIsRefused(ImageNotFound)
 
 
 SCENARIOS: list[Scenario[SeedingSession, AnImageAndACaller, ImageAdapter, ImageNode]] = [
     TheSuperadminForgets(),
     TheOwnerForgetsTheirOwn(),
-    AForgottenImageComesBack(),
+    AForgottenImageCannotBeReached(),
     RestoringWhatWasNeverForgotten(),
     ForgettingWhatIsNotThere(),
     RestoringWhatIsNotThere(),
@@ -379,7 +381,7 @@ SCENARIOS: list[Scenario[SeedingSession, AnImageAndACaller, ImageAdapter, ImageN
     AnUngrantedUserMayNotRestore(),
     AGrantIsNotOwnership(),
     EnforcementOffDoesNotReachOwnership(),
-    AnImageBeingPurgedRefusesAStatusWrite(),
+    AnImageBeingPurgedIsNotVisible(),
 ]
 
 

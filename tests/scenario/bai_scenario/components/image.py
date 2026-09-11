@@ -37,8 +37,10 @@ from ai.backend.testutils.scenario_steps import (
     Verdict,
 )
 
-REACHING = Permission.READ | Permission.SOFT_DELETE | Permission.HARD_DELETE
-"""이미지를 읽고 잊고 지우는 데 드는 권한. 세 문이 모두 이 역할 하나로 열린다."""
+REACHING = (Permission.READ, Permission.SOFT_DELETE, Permission.HARD_DELETE)
+"""이미지를 읽고 잊고 지우는 데 드는 권한.
+
+한 행이 한 비트만 담으므로 셋을 따로 심는다. 역할은 하나다."""
 
 
 @dataclass(frozen=True)
@@ -237,7 +239,8 @@ class SomeoneReachingImages(SeedNest[Laid[None]]):
             SeedRole(lambda one: ContainerRegistryID(one.id), name_hint="image-keeper"),
             self.registry,
         )
-        seed.adding(SeedPermission(entity_type=ImageEntityType(), permission=REACHING), role)
+        for allowed in REACHING:
+            seed.adding(SeedPermission(entity_type=ImageEntityType(), permission=allowed), role)
         return seed.granting(
             role, self.someone, role_id=lambda r: r.id, user_id=lambda u: UserID(u.id)
         )

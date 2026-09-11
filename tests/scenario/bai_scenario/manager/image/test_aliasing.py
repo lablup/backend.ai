@@ -24,11 +24,8 @@ from ai.backend.common.dto.manager.v2.image.request import AliasImageInput, Deal
 from ai.backend.common.dto.manager.v2.image.response import AliasImagePayload
 from ai.backend.manager.api.adapters.image.adapter import ImageAdapter
 from ai.backend.manager.errors.auth import InsufficientPrivilege
-from ai.backend.manager.errors.image import (
-    AliasImageActionDBError,
-    ImageAliasNotFound,
-    ImageNotFound,
-)
+from ai.backend.manager.errors.image import ImageAliasNotFound, ImageNotFound
+from ai.backend.manager.errors.repository import UniqueConstraintViolationError
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import (
     Answered,
@@ -262,7 +259,7 @@ class AnAliasAnotherImageHolds(
 
     @override
     def then(self) -> Then[AnAliasAndACaller, AliasImagePayload]:
-        return TheCallIsRefused(AliasImageActionDBError)
+        return TheCallIsRefused(UniqueConstraintViolationError)
 
 
 @dataclass(frozen=True)
