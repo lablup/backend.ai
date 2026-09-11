@@ -1,4 +1,4 @@
-"""preset 훑기 — 변형과 버전 필터가 무엇을 좁히고, 크기를 대지 않으면 몇 건이 오는가."""
+"""preset 검색 — 변형과 버전 필터가 무엇을 좁히고, 크기를 지정하지 않으면 몇 건이 반환되는가."""
 
 from __future__ import annotations
 
@@ -43,7 +43,7 @@ type SearchingStep = Scenario[
 
 @dataclass(frozen=True)
 class SearchingEveryPreset(When[ManyPresetsAndACaller, RuntimeVariantPresetAdapter, Searched]):
-    """필터도 크기도 없이 전체를 훑는다."""
+    """필터도 크기도 없이 전체를 검색한다."""
 
     @override
     def operation(self) -> str:
@@ -63,7 +63,7 @@ class SearchingEveryPreset(When[ManyPresetsAndACaller, RuntimeVariantPresetAdapt
 
 @dataclass(frozen=True)
 class SearchingByVariant(When[ManyPresetsAndACaller, RuntimeVariantPresetAdapter, Searched]):
-    """심은 변형으로 걸러 훑는다."""
+    """미리 만들어 둔 변형을 필터로 검색한다."""
 
     @override
     def operation(self) -> str:
@@ -71,7 +71,7 @@ class SearchingByVariant(When[ManyPresetsAndACaller, RuntimeVariantPresetAdapter
 
     @override
     def describe(self, laid: ManyPresetsAndACaller) -> str:
-        return f"{laid.caller.username}이 {laid.variant.name}으로 걸러 조회"
+        return f"{laid.caller.username}이 변형 {laid.variant.name} 필터로 조회"
 
     @override
     async def call(
@@ -89,7 +89,7 @@ class SearchingByVariant(When[ManyPresetsAndACaller, RuntimeVariantPresetAdapter
 
 @dataclass(frozen=True)
 class SearchingValidAtAVersion(When[ManyPresetsAndACaller, RuntimeVariantPresetAdapter, Searched]):
-    """한 런타임 버전에 유효한 것만 걸러 훑는다."""
+    """한 런타임 버전에 유효한 preset만 필터로 검색한다."""
 
     @override
     def operation(self) -> str:
@@ -97,7 +97,7 @@ class SearchingValidAtAVersion(When[ManyPresetsAndACaller, RuntimeVariantPresetA
 
     @override
     def describe(self, laid: ManyPresetsAndACaller) -> str:
-        return f"{laid.caller.username}이 버전 {VALID_AT}에 유효한 것만 조회"
+        return f"{laid.caller.username}이 버전 {VALID_AT}에 유효한 preset만 조회"
 
     @override
     async def call(
@@ -121,9 +121,7 @@ class AUserGrantedNothingCountsEveryPreset(
 
     @override
     def describe(self) -> str:
-        return (
-            "preset 둘이 있을 때 아무 권한도 받지 않은 사용자가 필터 없이 조회하면 둘을 모두 센다"
-        )
+        return "preset 둘이 있을 때 아무 권한도 없는 사용자가 필터 없이 조회하면 둘 다 집계된다"
 
     @override
     def given(self) -> Given[SeedingSession, ManyPresetsAndACaller]:
@@ -148,7 +146,7 @@ class AVariantFilterNarrows(
 
     @override
     def describe(self) -> str:
-        return "두 변형에 preset이 나뉘어 있을 때 한 변형으로 걸러 조회하면, 그 변형의 것만 남는다"
+        return "두 변형에 preset이 나뉘어 있을 때 한 변형을 필터로 조회하면, 그 변형의 preset만 반환된다"
 
     @override
     def given(self) -> Given[SeedingSession, ManyPresetsAndACaller]:
@@ -174,8 +172,8 @@ class AVersionFilterKeepsWhatIsValidThen(
     @override
     def describe(self) -> str:
         return (
-            "추가 버전과 폐기 버전이 다른 preset들을 한 버전으로 걸러 조회하면, 추가 버전 이상이고 "
-            "폐기 버전 미만인 것만 남는다. 비어 있는 쪽은 열려 있다"
+            "추가 버전과 폐기 버전이 다른 preset들을 한 버전 필터로 조회하면, 추가 버전 이상이고 "
+            "폐기 버전 미만인 preset만 반환된다. 비어 있는 쪽은 제한이 없다"
         )
 
     @override
@@ -201,7 +199,7 @@ class OmittingThePageSizeGivesTen(
 
     @override
     def describe(self) -> str:
-        return "preset 열하나가 있을 때 크기 없이 조회하면 열 건까지 오고 다음 쪽이 있다고 답한다"
+        return "preset 11개가 있을 때 크기 없이 조회하면 10건까지 반환되고 다음 페이지가 있다고 응답한다"
 
     @override
     def given(self) -> Given[SeedingSession, ManyPresetsAndACaller]:

@@ -23,7 +23,7 @@ class SeedRuntimeVariantPreset(SeedRowFrom[RuntimeVariantData, RuntimeVariantPre
     """A preset of the variant laid before it. The insert ranks it last in that variant."""
 
     name_hint: str = "preset"
-    description: str | None = "심어둔 preset"
+    description: str | None = "미리 만들어 둔 preset"
     preset_target: PresetTarget = PresetTarget.ENV
     value_type: PresetValueType = PresetValueType.STR
     default_value: str | None = None
