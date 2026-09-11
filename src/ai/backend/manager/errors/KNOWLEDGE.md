@@ -79,6 +79,11 @@ one place per domain.
 | `ModelCardParseError` | a model-definition file that does not parse, before any model card row exists |
 | `VFolderFilterStatusNotAvailable` | the status-set alias names no entry in a constant map; the row-status half is `VFolderFilterStatusFailed` |
 | `UnsupportedStorageTypeError`, `ObjectStorageOperationNotSupported` | a requested storage type, or a configured one offering no such operation |
+| `AppNotFound` | an app absent from a session's `service_ports`, which is a value, not a row |
+| `UnresolvableResourceGroup` | no group resolves at all, so it names none, and it reports `access` |
+| `AgentNotAllocated` | a kernel with no agent assigned yet, reported under an `access` no `ActionOperationType` maps to |
+| `InvalidUserUpdateMode`, `InvalidPresetQuery` | a request's own mode value, or a query naming neither id nor name |
+| `NoCurrentTaskContext`, `DatabaseConnectionUnavailable`, `ConfigurationLoadFailed`, `DataTransformationFailed`, `DBOperationFailed` | the asyncio context, the connection, the configuration load or the database call itself |
 
 ## The legacy neighbor is a different kind
 
