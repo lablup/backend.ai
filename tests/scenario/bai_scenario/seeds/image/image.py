@@ -41,7 +41,7 @@ class SeedImage(SeedRowFrom[ContainerRegistryData, ImageData]):
         if self.status is not ImageStatus.ALIVE:
             marks.append(f"상태는 {self.status.value}")
         if self.customized:
-            marks.append("커스터마이즈된 것이라 주인이 있다")
+            marks.append("커스터마이즈된 이미지라 소유자가 있다")
         if self.accelerators is not None:
             marks.append(f"가속기는 {self.accelerators}")
         return ", ".join(marks)
