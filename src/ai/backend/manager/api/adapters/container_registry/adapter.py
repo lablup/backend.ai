@@ -11,6 +11,7 @@ from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.dto.manager.query import StringFilter
 from ai.backend.common.dto.manager.v2.container_registry.request import (
     AdminSearchContainerRegistriesInput,
+    AllowedGroupsInput,
     ContainerRegistryFilter,
     ContainerRegistryOrder,
     CreateContainerRegistryInput,
@@ -26,7 +27,10 @@ from ai.backend.common.dto.manager.v2.container_registry.response import (
 )
 from ai.backend.common.dto.manager.v2.container_registry.types import ContainerRegistryTypeFilter
 from ai.backend.manager.api.adapters.base import BaseAdapter
-from ai.backend.manager.data.container_registry.types import ContainerRegistryData
+from ai.backend.manager.data.container_registry.types import (
+    ContainerRegistryData,
+    RegistryProjectChange,
+)
 from ai.backend.manager.errors.image import ContainerRegistryGroupsAssociationNotFound
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.condition_utils import combine_conditions_or, negate_conditions
@@ -141,15 +145,11 @@ class ContainerRegistryAdapter(BaseAdapter):
         self,
         input: UpdateContainerRegistryInput,
     ) -> UpdateContainerRegistryPayload:
-        """Update an existing container registry (superadmin only)."""
-        if input.allowed_groups is not None:
-            await self.apply_allowed_groups(
-                ContainerRegistryID(input.id),
-                AllowedGroupsModel(
-                    add=input.allowed_groups.add,
-                    remove=input.allowed_groups.remove,
-                ),
-            )
+        """Update an existing container registry (superadmin only).
+
+        The allowed projects ride with the update rather than being written before it,
+        so an update this refuses leaves them as they were.
+        """
         updater = ContainerRegistryUpdater(
             registry_id=ContainerRegistryID(input.id),
             url=(OptionalState.update(input.url) if input.url is not None else OptionalState.nop()),
@@ -181,9 +181,19 @@ class ContainerRegistryAdapter(BaseAdapter):
             extra=(TriState.update(input.extra) if input.extra is not None else TriState.nop()),
         )
         result = await self._container_registry.update_container_registry.run(
-            UpdateContainerRegistryAction(updater=updater)
+            UpdateContainerRegistryAction(updater=updater, links=self._links(input.allowed_groups))
         )
         return UpdateContainerRegistryPayload(registry=self._data_to_dto(result.data))
+
+    @staticmethod
+    def _links(asked: AllowedGroupsInput | None) -> RegistryProjectChange | None:
+        """What the request said to allow and stop allowing, as project ids."""
+        if asked is None:
+            return None
+        return RegistryProjectChange(
+            add=[ProjectID(uuid.UUID(raw)) for raw in asked.add],
+            remove=[ProjectID(uuid.UUID(raw)) for raw in asked.remove],
+        )
 
     async def apply_allowed_groups(
         self,
