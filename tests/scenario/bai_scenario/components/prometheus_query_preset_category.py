@@ -2,7 +2,7 @@
 
 A category is a name presets are filed under, in a global catalog nothing scopes. The
 presets pointing at one are laid by the preset table; this one lays categories and a
-caller, and the caller helper the preset table reuses.
+caller.
 """
 
 from __future__ import annotations
