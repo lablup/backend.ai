@@ -9462,14 +9462,14 @@
             "anyOf": [
               {
                 "maxLength": 64,
+                "minLength": 1,
                 "type": "string"
               },
               {
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "New domain name.",
+            "description": "New domain name. Omit to leave unchanged.",
             "title": "Name"
           },
           "description": {
@@ -9478,14 +9478,10 @@
                 "type": "string"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
-            "description": "New domain description. Set to null to clear.",
+            "description": "Updated domain description. Omit to leave unchanged; null clears.",
             "title": "Description"
           },
           "is_active": {
@@ -9497,8 +9493,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Updated active status.",
+            "description": "Updated active status. Omit to leave unchanged.",
             "title": "Is Active"
           },
           "allowed_docker_registries": {
@@ -9510,14 +9505,10 @@
                 "type": "array"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
-            "description": "New list of allowed Docker registry URLs. Set to null to clear.",
+            "description": "Updated list of allowed Docker registry URLs. Omit to leave unchanged.",
             "title": "Allowed Docker Registries"
           },
           "integration_name": {
@@ -9526,14 +9517,10 @@
                 "type": "string"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
-            "description": "New external integration identifier. Set to null to clear.",
+            "description": "Updated external integration identifier. Omit to leave unchanged; null clears.",
             "title": "Integration Name"
           }
         },

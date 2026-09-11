@@ -7,9 +7,10 @@ from __future__ import annotations
 
 from pydantic import Field
 
-from ai.backend.common.api_handlers import SENTINEL, BaseRequestModel, Sentinel
+from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.dto.manager.defs import DEFAULT_PAGE_LIMIT, MAX_PAGE_LIMIT
 from ai.backend.common.dto.manager.query import DateTimeFilter, StringFilter, UUIDFilter
+from ai.backend.common.dto.manager.v2.common import String64
 from ai.backend.common.dto.manager.v2.domain.types import (
     DomainOrderField,
     DomainProjectFilter,
@@ -17,6 +18,7 @@ from ai.backend.common.dto.manager.v2.domain.types import (
     DomainUserFilter,
     OrderDirection,
 )
+from ai.backend.common.tristate.unset import UNSET, Unset
 
 __all__ = (
     "AdminSearchDomainsInput",
@@ -60,26 +62,25 @@ class CreateDomainInput(BaseRequestModel):
 class UpdateDomainInput(BaseRequestModel):
     """Input for updating domain information. All fields optional — only provided fields will be updated."""
 
-    name: str | None = Field(
-        default=None,
-        description="New domain name.",
-        max_length=64,
+    name: String64 | None | Unset = Field(
+        default=UNSET,
+        description="New domain name. Omit to leave unchanged.",
     )
-    description: str | Sentinel | None = Field(
-        default=SENTINEL,
-        description="New domain description. Set to null to clear.",
+    description: str | None | Unset = Field(
+        default=UNSET,
+        description="Updated domain description. Omit to leave unchanged; null clears.",
     )
-    is_active: bool | None = Field(
-        default=None,
-        description="Updated active status.",
+    is_active: bool | None | Unset = Field(
+        default=UNSET,
+        description="Updated active status. Omit to leave unchanged.",
     )
-    allowed_docker_registries: list[str] | Sentinel | None = Field(
-        default=SENTINEL,
-        description="New list of allowed Docker registry URLs. Set to null to clear.",
+    allowed_docker_registries: list[str] | None | Unset = Field(
+        default=UNSET,
+        description="Updated list of allowed Docker registry URLs. Omit to leave unchanged.",
     )
-    integration_name: str | Sentinel | None = Field(
-        default=SENTINEL,
-        description="New external integration identifier. Set to null to clear.",
+    integration_name: str | None | Unset = Field(
+        default=UNSET,
+        description="Updated external integration identifier. Omit to leave unchanged; null clears.",
     )
 
 

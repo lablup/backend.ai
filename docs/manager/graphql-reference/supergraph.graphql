@@ -22020,16 +22020,16 @@ input UpdateDomainInput
   @join__type(graph: STRAWBERRY)
 {
   """New domain name."""
-  name: String = null
+  name: String
 
   """New description."""
   description: String
 
   """Updated active status."""
-  isActive: Boolean = null
+  isActive: Boolean
 
   """New allowed Docker registry URLs."""
-  allowedDockerRegistries: [String!] = null
+  allowedDockerRegistries: [String!]
 
   """New external integration identifier."""
   integrationName: String

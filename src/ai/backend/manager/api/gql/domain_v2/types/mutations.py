@@ -66,11 +66,11 @@ class CreateDomainInputGQL(PydanticInputMixin[CreateDomainInputDTO]):
 class UpdateDomainInputGQL(PydanticInputMixin[UpdateDomainInputDTO]):
     """Input for updating domain information."""
 
-    name: str | None = gql_field(default=None, description="New domain name.")
+    name: str | None = gql_field(default=UNSET, description="New domain name.")
     description: str | None = gql_field(default=UNSET, description="New description.")
-    is_active: bool | None = gql_field(default=None, description="Updated active status.")
+    is_active: bool | None = gql_field(default=UNSET, description="Updated active status.")
     allowed_docker_registries: list[str] | None = gql_field(
-        default=None, description="New allowed Docker registry URLs."
+        default=UNSET, description="New allowed Docker registry URLs."
     )
     integration_name: str | None = gql_field(
         default=UNSET, description="New external integration identifier."

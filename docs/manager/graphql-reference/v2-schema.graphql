@@ -15875,16 +15875,16 @@ Added in 26.4.2. Input for updating domain information. All fields optional.
 """
 input UpdateDomainInput {
   """New domain name."""
-  name: String = null
+  name: String
 
   """New description."""
   description: String
 
   """Updated active status."""
-  isActive: Boolean = null
+  isActive: Boolean
 
   """New allowed Docker registry URLs."""
-  allowedDockerRegistries: [String!] = null
+  allowedDockerRegistries: [String!]
 
   """New external integration identifier."""
   integrationName: String
