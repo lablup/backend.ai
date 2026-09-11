@@ -42,7 +42,8 @@ one place per domain.
 
 ## Reuse by subclassing concrete errors
 
-- `ObjectNotFound` builds its title from `object_name`, and about 20 domain not-found errors inherit it setting only `object_name`.
+- `ObjectNotFound` builds its title from `object_name`; a domain not-found error that predates the row bases keeps it as a second base beside `EntityError` or `FieldError` for that title.
+- A raise site that names one row kind raises that kind's own not-found error. `ObjectNotFound` itself is raised only where the missing thing is no row (the table below lists them).
 - When the meaning fits, extend an existing concrete error rather than deriving fresh from `BackendAIError`.
 
 ## An error stays on `BackendAIError` for want of a row type, or of an action operation
@@ -97,6 +98,20 @@ one place per domain.
 | `ArtifactScanLimitExceededError` | bounds a scan request's `limit` before any row is named |
 | `ArtifactImportDelegationError` | reports two returned lists disagreeing in length |
 | `ArtifactDeletionError`, `RemoteReservoirArtifactImportError`, `ReservoirConnectionError`, `RemoteReservoirScanError` | report a storage-proxy or remote reservoir call failing |
+| `ObjectNotFound` | names its row kind only as the `object_name` string, so it has no type to answer with |
+| `ObjectNotFound` raised in `clients/container_registry/harbor.py` | a Harbor quota, the registry's own object |
+| `ObjectNotFound` raised in `services/resource_group/service.py` | the AppProxy client pool the manager was started without |
+| `ObjectNotFound` raised in `api/gql_legacy/base.py` | `extract_object_uuid` takes its row kind as a caller-supplied string |
+| `ObjectNotFound` raised in `services/auth/service.py` | "no such project or not a member" is one answer for two cases on purpose, so it names no row |
+| `URLNotFound`, `MethodNotAllowed`, `ServerFrozen`, `NotImplementedAPI`, `InvalidAPIParameters`, `InvalidGraphQLParameters`, `InvalidCursor` | the request — its path, method, parameters or cursor — refused before a row is reached |
+| `RateLimitExceeded` | how often the caller asks, not a row |
+| `GenericBadRequest`, `GenericForbidden` | every site refuses the caller ("only authorized requests", "not the account owner"), not a row |
+| `Forbidden` | every site is about a vfolder, but it reports `ErrorOperation.ACCESS`, which no `ActionOperationType` maps to, and the WebUI branches on `vfolder_access_forbidden` |
+| `RejectedByHook` | a plugin hook's answer; `plugin` is a system domain by the `AGENTS.md` table |
+| `InternalServerError`, `ServerMisconfiguredError`, `ServiceUnavailable` | the manager itself |
+| `RepositoryError`, `UpsertEmptyResultError`, `UnsupportedCompositePrimaryKeyError`, `EmptyOperationScopeError`, `AmbiguousEntityKeyError` | a schema or invariant fault the generic ops hit: a key that is not unique, a composite primary key, an empty scope. The row's kind is at hand in the lookup, but what failed is the key |
+| `RepositoryIntegrityError` and its five SQLSTATE kinds | what an `IntegrityErrorCheck` matches on by `violation_type`; the row-facing error is the check's `error` |
+| `InvalidBgtaskId` | `bgtask` has no `EntityType` or `FieldType`; it is a system domain by the `AGENTS.md` table |
 
 ## The legacy neighbor is a different kind
 

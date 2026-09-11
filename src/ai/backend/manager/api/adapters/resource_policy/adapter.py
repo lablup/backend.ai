@@ -9,6 +9,10 @@ from decimal import Decimal
 from typing import Any
 
 from ai.backend.common.contexts.user import current_user
+from ai.backend.common.data.entity.resource_policy import (
+    KeyPairResourcePolicyEntityType,
+    UserResourcePolicyEntityType,
+)
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.dto.manager.v2.common import (
     ResourceLimitEntryInfo,
@@ -72,7 +76,7 @@ from ai.backend.manager.data.resource.types import (
     ProjectResourcePolicyData,
     UserResourcePolicyData,
 )
-from ai.backend.manager.errors.common import ObjectNotFound
+from ai.backend.manager.errors.base.entity import EntityNotFoundError
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.condition_utils import combine_conditions_or, negate_conditions
 from ai.backend.manager.models.keypair.conditions import KeypairConditions
@@ -338,7 +342,10 @@ class ResourcePolicyAdapter(BaseAdapter):
             )
         )
         if not result.items:
-            raise ObjectNotFound(object_name="keypair resource policy")
+            raise EntityNotFoundError(
+                "No keypair resource policy applies to the caller.",
+                entity_type=KeyPairResourcePolicyEntityType(),
+            )
         return self._keypair_policy_data_to_node(result.items[0])
 
     # ── User Resource Policy ──
@@ -441,7 +448,10 @@ class ResourcePolicyAdapter(BaseAdapter):
             )
         )
         if not result.items:
-            raise ObjectNotFound(object_name="user resource policy")
+            raise EntityNotFoundError(
+                "No user resource policy applies to the caller.",
+                entity_type=UserResourcePolicyEntityType(),
+            )
         return self._user_policy_data_to_node(result.items[0])
 
     # ── Project Resource Policy ──
