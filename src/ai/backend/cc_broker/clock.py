@@ -15,7 +15,10 @@ def claims(token: bytes | str) -> dict[str, Any]:
         raise ClockUntrusted("attestation token is not a three-part JWT")
     payload = parts[1].encode("ascii")
     body = base64.urlsafe_b64decode(payload + b"=" * (-len(payload) % 4))
-    return json.loads(body)
+    parsed = json.loads(body)
+    if not isinstance(parsed, dict):
+        raise ClockUntrusted("attestation token payload is not a JSON object")
+    return parsed
 
 
 def issued_at(token_claims: Mapping[str, Any]) -> float:

@@ -150,7 +150,7 @@ stage_storage_clients() {
 
 stage_fuse_driver() {
 	local src out built
-	src="$(cd "${BAI_CC_ROOT}/../rust" && pwd)"
+	src="$(cd "${BAI_CC_ROOT}/../../../rust" && pwd)"
 	out="${BAI_CC_CACHE}/rust"
 	built="${out}/target/${BAI_CC_RUST_TARGET}/release/bai-storage-fuse"
 	mkdir -p "$out"

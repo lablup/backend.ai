@@ -149,7 +149,7 @@ class Kbs:
         )
         try:
             with urllib.request.urlopen(get, timeout=self.timeout) as response:
-                chain = response.read()
+                chain: bytes = response.read()
         except urllib.error.HTTPError as exc:
             if exc.code in (401, 403):
                 raise ReleaseDenied(f"certificate issuance for {name}: {exc}") from exc

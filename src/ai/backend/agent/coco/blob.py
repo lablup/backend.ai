@@ -22,6 +22,18 @@ class MeasuredBlob:
         return self.data.decode("ascii")
 
 
+def supplied_blob(annotation_value: str) -> MeasuredBlob:
+    try:
+        data = annotation_value.encode("ascii")
+    except UnicodeEncodeError:
+        raise MeasuredBlobCorrupted(
+            extra_msg="the manager supplied a measured blob that is not ascii"
+        ) from None
+    if not data:
+        raise MeasuredBlobUnavailable(extra_msg="the manager supplied an empty measured blob")
+    return MeasuredBlob("sha256:" + hashlib.sha256(data).hexdigest(), data)
+
+
 class MeasuredBlobStore:
     def __init__(self, root: Path) -> None:
         self._root = root

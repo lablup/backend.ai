@@ -66,7 +66,7 @@ from ai.backend.common.types import (
 )
 from ai.backend.logging import BraceStyleAdapter
 
-from .blob import MeasuredBlobStore
+from .blob import MeasuredBlobStore, supplied_blob
 from .errors import (
     AcceleratorHooksRefused,
     FolderEncryptionMissing,
@@ -74,10 +74,10 @@ from .errors import (
     HostConfigReadbackRefused,
     HostLogFolderRefused,
     HostPrivilegeWriteRefused,
-    LaunchOptionRefused,
     ImageDistroUnresolved,
     ImageProcessConfigMissing,
     ImagePushRefused,
+    LaunchOptionRefused,
     MountPlanMissing,
     NetworkSetupFailed,
     RawCircuitRefused,
@@ -465,11 +465,12 @@ class CocoKernelCreationContext(AbstractKernelCreationContext[CocoKernel]):
             raise NetworkSetupFailed(extra_msg="apply_network did not run before start_container")
         image = self.kernel_config["image"]
         digest = await self.runtime.resolve_image(image["canonical"], image.get("digest") or "")
-        blob = self.blob_store.select(digest)
+        confidential = self.internal_data.get("confidential") or {}
+        measured = confidential.get("measured_blob")
+        blob = supplied_blob(measured) if measured else self.blob_store.select(digest)
         cpu_alloc = kernel_obj.resource_spec.allocations.get(DeviceName("cpu"), {})
         cores = cpu_alloc.get(SlotName("cpu"), {})
         cpuset = ",".join(sorted(str(core) for core in cores))
-        confidential = self.internal_data.get("confidential") or {}
         if self.internal_data.get("sudo_session_enabled"):
             raise HostPrivilegeWriteRefused(
                 extra_msg=(
