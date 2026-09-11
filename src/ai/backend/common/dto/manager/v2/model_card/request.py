@@ -4,7 +4,7 @@ from uuid import UUID
 
 from pydantic import Field, field_validator
 
-from ai.backend.common.api_handlers import SENTINEL, BaseRequestModel, Sentinel
+from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.data.entity.deployment_preset import DeploymentPresetID
 from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.dto.manager.query import StringFilter, UUIDFilter
@@ -15,6 +15,7 @@ from ai.backend.common.dto.manager.v2.model_card.types import (
     ModelCardOrderField,
     ModelCardScope,
 )
+from ai.backend.common.tristate.unset import UNSET, Unset
 
 
 class ResourceSlotEntryInput(BaseRequestModel):
@@ -57,20 +58,52 @@ class CreateModelCardInput(BaseRequestModel):
 
 class UpdateModelCardInput(BaseRequestModel):
     id: UUID = Field(description="Model card ID.")
-    name: str | None = Field(default=None, min_length=1, max_length=512)
-    author: str | Sentinel | None = Field(default=SENTINEL)
-    title: str | Sentinel | None = Field(default=SENTINEL)
-    model_version: str | Sentinel | None = Field(default=SENTINEL)
-    description: str | Sentinel | None = Field(default=SENTINEL)
-    task: str | Sentinel | None = Field(default=SENTINEL)
-    category: str | Sentinel | None = Field(default=SENTINEL)
-    architecture: str | Sentinel | None = Field(default=SENTINEL)
-    framework: list[str] | None = Field(default=None)
-    label: list[str] | None = Field(default=None)
-    license: str | Sentinel | None = Field(default=SENTINEL)
-    min_resource: list[ResourceSlotEntryInput] | Sentinel | None = Field(default=SENTINEL)
-    readme: str | Sentinel | None = Field(default=SENTINEL)
-    access_level: ModelCardAccessLevel | Sentinel | None = Field(default=SENTINEL)
+    name: str | None | Unset = Field(
+        default=UNSET,
+        min_length=1,
+        max_length=512,
+        description="Model card name. Omit to leave unchanged.",
+    )
+    author: str | None | Unset = Field(
+        default=UNSET, description="Model card author. Omit to leave unchanged; null clears."
+    )
+    title: str | None | Unset = Field(
+        default=UNSET, description="Model card title. Omit to leave unchanged; null clears."
+    )
+    model_version: str | None | Unset = Field(
+        default=UNSET, description="Model version. Omit to leave unchanged; null clears."
+    )
+    description: str | None | Unset = Field(
+        default=UNSET, description="Model card description. Omit to leave unchanged; null clears."
+    )
+    task: str | None | Unset = Field(
+        default=UNSET, description="Task type. Omit to leave unchanged; null clears."
+    )
+    category: str | None | Unset = Field(
+        default=UNSET, description="Model category. Omit to leave unchanged; null clears."
+    )
+    architecture: str | None | Unset = Field(
+        default=UNSET, description="Model architecture. Omit to leave unchanged; null clears."
+    )
+    framework: list[str] | None | Unset = Field(
+        default=UNSET, description="Frameworks. Omit to leave unchanged."
+    )
+    label: list[str] | None | Unset = Field(
+        default=UNSET, description="Labels. Omit to leave unchanged."
+    )
+    license: str | None | Unset = Field(
+        default=UNSET, description="Model license. Omit to leave unchanged; null clears."
+    )
+    min_resource: list[ResourceSlotEntryInput] | None | Unset = Field(
+        default=UNSET,
+        description="Minimum resource requirements. Omit to leave unchanged; null clears.",
+    )
+    readme: str | None | Unset = Field(
+        default=UNSET, description="Model readme. Omit to leave unchanged; null clears."
+    )
+    access_level: ModelCardAccessLevel | None | Unset = Field(
+        default=UNSET, description="Access level. Omit to leave unchanged."
+    )
 
 
 class ModelCardFilter(BaseRequestModel):
