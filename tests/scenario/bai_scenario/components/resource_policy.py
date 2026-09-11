@@ -29,6 +29,7 @@ from bai_scenario.seeds.user.user import SeedUserOf
 from ai.backend.common.data.entity.resource_policy import (
     KeyPairResourcePolicyEntityType,
     ProjectResourcePolicyEntityType,
+    UserResourcePolicyEntityType,
 )
 from ai.backend.common.data.entity.types import EntityType
 from ai.backend.common.data.entity.user import UserID
@@ -43,21 +44,28 @@ from ai.backend.common.dto.manager.v2.common import (
 from ai.backend.common.dto.manager.v2.resource_policy.request import (
     AdminSearchKeypairResourcePoliciesInput,
     AdminSearchProjectResourcePoliciesInput,
+    AdminSearchUserResourcePoliciesInput,
     CreateKeypairResourcePolicyInput,
     CreateProjectResourcePolicyInput,
+    CreateUserResourcePolicyInput,
     DeleteKeypairResourcePolicyInput,
     DeleteProjectResourcePolicyInput,
+    DeleteUserResourcePolicyInput,
     KeypairResourcePolicyFilter,
     KeypairResourcePolicyKeypairNestedFilter,
     ProjectResourcePolicyFilter,
     UpdateKeypairResourcePolicyInput,
     UpdateProjectResourcePolicyInput,
+    UpdateUserResourcePolicyInput,
+    UserResourcePolicyFilter,
 )
 from ai.backend.common.dto.manager.v2.resource_policy.response import (
     KeypairResourcePolicyNode,
     ProjectResourcePolicyNode,
     SearchKeypairResourcePoliciesPayload,
     SearchProjectResourcePoliciesPayload,
+    SearchUserResourcePoliciesPayload,
+    UserResourcePolicyNode,
 )
 from ai.backend.common.types import (
     BinarySize,
@@ -85,7 +93,11 @@ from ai.backend.testutils.scenario_steps import (
     Verdict,
 )
 
-type Searched = SearchKeypairResourcePoliciesPayload | SearchProjectResourcePoliciesPayload
+type Searched = (
+    SearchKeypairResourcePoliciesPayload
+    | SearchUserResourcePoliciesPayload
+    | SearchProjectResourcePoliciesPayload
+)
 
 VFOLDER_HOST = "local:volume1"
 
@@ -539,6 +551,180 @@ class KeypairPolicies(OwnFamily[KeyPairResourcePolicyData, KeypairResourcePolicy
         return await adapter.get_my_keypair_resource_policy()
 
 
+class UserPolicies(OwnFamily[UserResourcePolicyData, UserResourcePolicyNode]):
+    @property
+    @override
+    def label(self) -> str:
+        return "user-policy"
+
+    @property
+    @override
+    def kind(self) -> str:
+        return "사용자 정책"
+
+    @property
+    @override
+    def entity_type(self) -> EntityType:
+        return UserResourcePolicyEntityType()
+
+    @property
+    @override
+    def calls(self) -> Calls:
+        return Calls(
+            create="admin_create_user_resource_policy",
+            read="admin_get_user_resource_policy",
+            search="admin_search_user_resource_policies",
+            update="admin_update_user_resource_policy",
+            delete="admin_delete_user_resource_policy",
+        )
+
+    @property
+    @override
+    def mine(self) -> str:
+        return "get_my_user_resource_policy"
+
+    @property
+    @override
+    def fields(self) -> tuple[str, ...]:
+        return (
+            "max_vfolder_count",
+            "max_concurrent_logins",
+            "max_quota_scope_size",
+            "max_session_count_per_model_session",
+            "max_customized_image_count",
+        )
+
+    @override
+    def seed(
+        self, name_hint: str = "user-policy", *, holding_optional: bool = False
+    ) -> SeedRow[UserResourcePolicyData]:
+        return SeedUserPolicy(
+            name_hint=name_hint, max_concurrent_logins=3 if holding_optional else None
+        )
+
+    @override
+    def own_of(self, holder: LaidHolder) -> Laid[UserResourcePolicyData]:
+        return holder.user_policy
+
+    @override
+    def view(self, node: UserResourcePolicyNode) -> dict[str, Any]:
+        return {
+            "name": node.name,
+            "max_vfolder_count": node.max_vfolder_count,
+            "max_concurrent_logins": node.max_concurrent_logins,
+            "max_quota_scope_size": (
+                node.max_quota_scope_size.expr,
+                node.max_quota_scope_size.display,
+            ),
+            "max_session_count_per_model_session": node.max_session_count_per_model_session,
+            "max_customized_image_count": node.max_customized_image_count,
+        }
+
+    @override
+    def seeded_view(self, seeded: UserResourcePolicyData) -> dict[str, Any]:
+        return {
+            "name": seeded.name,
+            "max_vfolder_count": seeded.max_vfolder_count,
+            "max_concurrent_logins": seeded.max_concurrent_logins,
+            "max_quota_scope_size": (
+                str(seeded.max_quota_scope_size),
+                f"{BinarySize(seeded.max_quota_scope_size):s}",
+            ),
+            "max_session_count_per_model_session": seeded.max_session_count_per_model_session,
+            "max_customized_image_count": seeded.max_customized_image_count,
+        }
+
+    def _ask(self, name: str, says: str, *, logins: int | None) -> Ask:
+        """요청과, 그 요청이 답에 남겨야 하는 것을 같은 값에서 짓는다."""
+        asked = CreateUserResourcePolicyInput(
+            name=name,
+            max_vfolder_count=20,
+            max_concurrent_logins=logins,
+            max_quota_scope_size=BinarySizeInput(expr="1g"),
+            max_session_count_per_model_session=4,
+            max_customized_image_count=2,
+        )
+        expects = {
+            "name": name,
+            "max_vfolder_count": 20,
+            "max_concurrent_logins": logins,
+            "max_quota_scope_size": ("1073741824", "1g"),
+            "max_session_count_per_model_session": 4,
+            "max_customized_image_count": 2,
+        }
+        return Ask(asked, says, expects)
+
+    @override
+    def everything(self, name: str) -> Ask:
+        return self._ask(name, "모든 값을 주고", logins=3)
+
+    @override
+    def only_required(self, name: str) -> Ask:
+        return self._ask(name, "동시 로그인 수를 빼고", logins=None)
+
+    @override
+    def one_limit(self) -> Edit:
+        return Edit(
+            UpdateUserResourcePolicyInput(max_vfolder_count=20),
+            "폴더 수를 20으로",
+            {"max_vfolder_count": 20},
+        )
+
+    @override
+    def nothing(self) -> Edit:
+        return Edit(UpdateUserResourcePolicyInput(), "아무것도 대지 않고")
+
+    @override
+    def clearing_a_nullable(self) -> Edit:
+        return Edit(
+            UpdateUserResourcePolicyInput(max_concurrent_logins=None),
+            "동시 로그인 수를 비우도록",
+            {"max_concurrent_logins": None},
+        )
+
+    @override
+    def clearing_a_non_nullable(self) -> Edit:
+        return Edit(UpdateUserResourcePolicyInput(max_vfolder_count=None), "폴더 수를 비우도록")
+
+    @override
+    async def create(self, adapter: ResourcePolicyAdapter, asked: Any) -> UserResourcePolicyNode:
+        payload = await adapter.admin_create_user_resource_policy(asked)
+        return payload.user_resource_policy
+
+    @override
+    async def read(self, adapter: ResourcePolicyAdapter, name: str) -> UserResourcePolicyNode:
+        return await adapter.admin_get_user_resource_policy(name)
+
+    @override
+    async def search(
+        self, adapter: ResourcePolicyAdapter, named: str | None = None
+    ) -> SearchUserResourcePoliciesPayload:
+        chosen = (
+            UserResourcePolicyFilter(name=StringFilter(equals=named)) if named is not None else None
+        )
+        return await adapter.admin_search_user_resource_policies(
+            AdminSearchUserResourcePoliciesInput(filter=chosen)
+        )
+
+    @override
+    async def update(
+        self, adapter: ResourcePolicyAdapter, name: str, asked: Any
+    ) -> UserResourcePolicyNode:
+        payload = await adapter.admin_update_user_resource_policy(name, asked)
+        return payload.user_resource_policy
+
+    @override
+    async def delete(self, adapter: ResourcePolicyAdapter, name: str) -> str:
+        payload = await adapter.admin_delete_user_resource_policy(
+            DeleteUserResourcePolicyInput(name=name)
+        )
+        return payload.name
+
+    @override
+    async def read_mine(self, adapter: ResourcePolicyAdapter) -> UserResourcePolicyNode:
+        return await adapter.get_my_user_resource_policy()
+
+
 class ProjectPolicies(Family[ProjectResourcePolicyData, ProjectResourcePolicyNode]):
     @property
     @override
@@ -677,10 +863,11 @@ class ProjectPolicies(Family[ProjectResourcePolicyData, ProjectResourcePolicyNod
 
 
 KEYPAIR = KeypairPolicies()
+USER = UserPolicies()
 PROJECT = ProjectPolicies()
 
-FAMILIES: tuple[Family[Any, Any], ...] = (PROJECT, KEYPAIR)
-OWN_FAMILIES: tuple[OwnFamily[Any, Any], ...] = (KEYPAIR,)
+FAMILIES: tuple[Family[Any, Any], ...] = (PROJECT, KEYPAIR, USER)
+OWN_FAMILIES: tuple[OwnFamily[Any, Any], ...] = (KEYPAIR, USER)
 
 
 @dataclass(frozen=True)
