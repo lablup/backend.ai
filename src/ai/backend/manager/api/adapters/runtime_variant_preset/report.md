@@ -8,7 +8,7 @@ Not exercised by any scenario: batch_load_fields.
 
 #### [a-bool-default-value-that-fits-its-type-is-accepted](/tests/scenario/bai_scenario/manager/runtime_variant_preset/test_creating.py) — pass
 
-값 종류를 bool로 두고 그에 맞는 기본값을 주면 만들어진다
+값 종류를 bool(으)로 두고 그에 맞는 기본값을 지정하면 생성된다
 
 Given
 
@@ -23,13 +23,13 @@ Given
 
 When
 
-- RuntimeVariantPresetAdapter.create — user-1이 variant-1에 max-tokens preset을 만듦
+- RuntimeVariantPresetAdapter.create — user-1이 변형 variant-1에 preset max-tokens 생성
 
 Then
 
-- 만든 preset 전체가 온다
+- 생성한 preset 전체가 반환된다
   - id: 무시함 — 데이터베이스가 만든다
-  - runtime_variant_id: 심은 변형와 같다
+  - runtime_variant_id: 미리 만들어 둔 변형와 같다
   - name = 'max-tokens'
   - description = None
   - rank = 100
@@ -46,7 +46,7 @@ Then
 
 #### [a-flag-default-value-that-fits-its-type-is-accepted](/tests/scenario/bai_scenario/manager/runtime_variant_preset/test_creating.py) — pass
 
-값 종류를 flag로 두고 그에 맞는 기본값을 주면 만들어진다
+값 종류를 flag(으)로 두고 그에 맞는 기본값을 지정하면 생성된다
 
 Given
 
@@ -61,13 +61,13 @@ Given
 
 When
 
-- RuntimeVariantPresetAdapter.create — user-1이 variant-1에 max-tokens preset을 만듦
+- RuntimeVariantPresetAdapter.create — user-1이 변형 variant-1에 preset max-tokens 생성
 
 Then
 
-- 만든 preset 전체가 온다
+- 생성한 preset 전체가 반환된다
   - id: 무시함 — 데이터베이스가 만든다
-  - runtime_variant_id: 심은 변형와 같다
+  - runtime_variant_id: 미리 만들어 둔 변형와 같다
   - name = 'max-tokens'
   - description = None
   - rank = 100
@@ -84,7 +84,7 @@ Then
 
 #### [a-float-default-value-that-fits-its-type-is-accepted](/tests/scenario/bai_scenario/manager/runtime_variant_preset/test_creating.py) — pass
 
-값 종류를 float로 두고 그에 맞는 기본값을 주면 만들어진다
+값 종류를 float(으)로 두고 그에 맞는 기본값을 지정하면 생성된다
 
 Given
 
@@ -99,13 +99,13 @@ Given
 
 When
 
-- RuntimeVariantPresetAdapter.create — user-1이 variant-1에 max-tokens preset을 만듦
+- RuntimeVariantPresetAdapter.create — user-1이 변형 variant-1에 preset max-tokens 생성
 
 Then
 
-- 만든 preset 전체가 온다
+- 생성한 preset 전체가 반환된다
   - id: 무시함 — 데이터베이스가 만든다
-  - runtime_variant_id: 심은 변형와 같다
+  - runtime_variant_id: 미리 만들어 둔 변형와 같다
   - name = 'max-tokens'
   - description = None
   - rank = 100
@@ -122,7 +122,7 @@ Then
 
 #### [a-int-default-value-that-fits-its-type-is-accepted](/tests/scenario/bai_scenario/manager/runtime_variant_preset/test_creating.py) — pass
 
-값 종류를 int로 두고 그에 맞는 기본값을 주면 만들어진다
+값 종류를 int(으)로 두고 그에 맞는 기본값을 지정하면 생성된다
 
 Given
 
@@ -137,13 +137,13 @@ Given
 
 When
 
-- RuntimeVariantPresetAdapter.create — user-1이 variant-1에 max-tokens preset을 만듦
+- RuntimeVariantPresetAdapter.create — user-1이 변형 variant-1에 preset max-tokens 생성
 
 Then
 
-- 만든 preset 전체가 온다
+- 생성한 preset 전체가 반환된다
   - id: 무시함 — 데이터베이스가 만든다
-  - runtime_variant_id: 심은 변형와 같다
+  - runtime_variant_id: 미리 만들어 둔 변형와 같다
   - name = 'max-tokens'
   - description = None
   - rank = 100
@@ -160,7 +160,7 @@ Then
 
 #### [a-preset-name-taken-in-the-same-variant-is-refused](/tests/scenario/bai_scenario/manager/runtime_variant_preset/test_creating.py) — pass
 
-같은 변형에 같은 이름의 preset이 있을 때 다시 만들면, 이름이 겹친다는 이유로 거부된다
+같은 변형에 같은 이름의 preset이 있을 때 다시 생성하면, 이름 중복으로 거부된다
 
 Given
 
@@ -176,7 +176,7 @@ Given
 
 When
 
-- RuntimeVariantPresetAdapter.create — user-1이 variant-1에 preset-1 preset을 하나 더 만듦
+- RuntimeVariantPresetAdapter.create — user-1이 변형 variant-1에 preset preset-1 하나 더 생성
 
 Then
 
@@ -185,7 +185,7 @@ Then
 
 #### [a-second-preset-in-the-same-variant-is-ranked-a-hundred-higher](/tests/scenario/bai_scenario/manager/runtime_variant_preset/test_creating.py) — pass
 
-preset이 하나 있는 변형에 슈퍼관리자가 하나 더 만들면 순위가 앞의 것보다 백 크다
+preset이 하나 있는 변형에 슈퍼관리자가 하나 더 생성하면 순위가 앞의 것보다 100 크다
 
 Given
 
@@ -201,13 +201,13 @@ Given
 
 When
 
-- RuntimeVariantPresetAdapter.create — user-1이 variant-1에 max-tokens preset을 하나 더 만듦
+- RuntimeVariantPresetAdapter.create — user-1이 변형 variant-1에 preset max-tokens 하나 더 생성
 
 Then
 
-- 순위가 앞의 것보다 간격만큼 큰 preset 전체가 온다
+- 순위가 앞의 것보다 간격만큼 큰 preset 전체가 반환된다
   - id: 무시함 — 데이터베이스가 만든다
-  - runtime_variant_id: 심은 변형와 같다
+  - runtime_variant_id: 미리 만들어 둔 변형와 같다
   - name = 'max-tokens'
   - description = None
   - rank = 200
@@ -224,7 +224,7 @@ Then
 
 #### [a-str-default-value-that-fits-its-type-is-accepted](/tests/scenario/bai_scenario/manager/runtime_variant_preset/test_creating.py) — pass
 
-값 종류를 str로 두고 그에 맞는 기본값을 주면 만들어진다
+값 종류를 str(으)로 두고 그에 맞는 기본값을 지정하면 생성된다
 
 Given
 
@@ -239,13 +239,13 @@ Given
 
 When
 
-- RuntimeVariantPresetAdapter.create — user-1이 variant-1에 max-tokens preset을 만듦
+- RuntimeVariantPresetAdapter.create — user-1이 변형 variant-1에 preset max-tokens 생성
 
 Then
 
-- 만든 preset 전체가 온다
+- 생성한 preset 전체가 반환된다
   - id: 무시함 — 데이터베이스가 만든다
-  - runtime_variant_id: 심은 변형와 같다
+  - runtime_variant_id: 미리 만들어 둔 변형와 같다
   - name = 'max-tokens'
   - description = None
   - rank = 100
@@ -262,7 +262,7 @@ Then
 
 #### [a-ui-option-given-on-create-carries-its-type-into-the-node](/tests/scenario/bai_scenario/manager/runtime_variant_preset/test_creating.py) — pass
 
-슬라이더 옵션을 붙여 만들면, UI 종류가 옵션에서 읽혀 노드에 함께 실린다
+슬라이더 옵션을 붙여 생성하면, UI 종류가 옵션에서 읽혀 노드에 함께 담긴다
 
 Given
 
@@ -277,13 +277,13 @@ Given
 
 When
 
-- RuntimeVariantPresetAdapter.create — user-1이 variant-1에 max-tokens preset을 만듦
+- RuntimeVariantPresetAdapter.create — user-1이 변형 variant-1에 preset max-tokens 생성
 
 Then
 
-- 만든 preset 전체가 온다
+- 생성한 preset 전체가 반환된다
   - id: 무시함 — 데이터베이스가 만든다
-  - runtime_variant_id: 심은 변형와 같다
+  - runtime_variant_id: 미리 만들어 둔 변형와 같다
   - name = 'max-tokens'
   - description = None
   - rank = 100
@@ -300,7 +300,7 @@ Then
 
 #### [a-user-who-is-not-the-superadmin-may-not-create-a-preset](/tests/scenario/bai_scenario/manager/runtime_variant_preset/test_creating.py) — pass
 
-슈퍼관리자가 아닌 사용자가 preset을 만들면 역할로 거부된다
+슈퍼관리자가 아닌 사용자가 preset을 생성하면 역할 부족으로 거부된다
 
 Given
 
@@ -315,7 +315,7 @@ Given
 
 When
 
-- RuntimeVariantPresetAdapter.create — user-1이 variant-1에 max-tokens preset을 만듦
+- RuntimeVariantPresetAdapter.create — user-1이 변형 variant-1에 preset max-tokens 생성
 
 Then
 
@@ -324,7 +324,7 @@ Then
 
 #### [target-value-type-default-and-key-come-back-as-one-spec](/tests/scenario/bai_scenario/manager/runtime_variant_preset/test_creating.py) — pass
 
-대상·값 종류·기본값·키를 따로 주고 만들면, 답에서는 넷이 한 명세로 묶여 온다
+대상·값 종류·기본값·키를 따로 지정해 생성하면, 응답에서는 넷이 한 명세로 묶여 반환된다
 
 Given
 
@@ -339,13 +339,13 @@ Given
 
 When
 
-- RuntimeVariantPresetAdapter.create — user-1이 variant-1에 max-tokens preset을 만듦
+- RuntimeVariantPresetAdapter.create — user-1이 변형 variant-1에 preset max-tokens 생성
 
 Then
 
-- 만든 preset 전체가 온다
+- 생성한 preset 전체가 반환된다
   - id: 무시함 — 데이터베이스가 만든다
-  - runtime_variant_id: 심은 변형와 같다
+  - runtime_variant_id: 미리 만들어 둔 변형와 같다
   - name = 'max-tokens'
   - description = None
   - rank = 100
@@ -362,7 +362,7 @@ Then
 
 #### [the-first-preset-of-a-variant-is-ranked-a-hundred](/tests/scenario/bai_scenario/manager/runtime_variant_preset/test_creating.py) — pass
 
-preset이 없는 변형에 슈퍼관리자가 필수 항목만 주고 만들면, 순위는 백, 필수 여부는 거짓, 나머지 선택 항목은 빈 노드가 온다
+preset이 없는 변형에 슈퍼관리자가 필수 항목만 지정해 생성하면, 순위는 100, 필수 여부는 거짓, 나머지 선택 항목은 비어 있는 노드가 반환된다
 
 Given
 
@@ -377,13 +377,13 @@ Given
 
 When
 
-- RuntimeVariantPresetAdapter.create — user-1이 variant-1에 max-tokens preset을 만듦
+- RuntimeVariantPresetAdapter.create — user-1이 변형 variant-1에 preset max-tokens 생성
 
 Then
 
-- 만든 preset 전체가 온다
+- 생성한 preset 전체가 반환된다
   - id: 무시함 — 데이터베이스가 만든다
-  - runtime_variant_id: 심은 변형와 같다
+  - runtime_variant_id: 미리 만들어 둔 변형와 같다
   - name = 'max-tokens'
   - description = None
   - rank = 100
@@ -400,7 +400,7 @@ Then
 
 #### [the-same-preset-name-is-free-in-another-variant](/tests/scenario/bai_scenario/manager/runtime_variant_preset/test_creating.py) — pass
 
-유니크 제약이 변형과 이름의 짝에 걸려 있으므로, 다른 변형에는 같은 이름의 preset을 만들 수 있다
+유니크 제약이 변형과 이름의 조합에 걸려 있으므로, 다른 변형에는 같은 이름의 preset을 생성할 수 있다
 
 Given
 
@@ -417,13 +417,13 @@ Given
 
 When
 
-- RuntimeVariantPresetAdapter.create — user-1이 free-1에 preset-1 preset을 만듦
+- RuntimeVariantPresetAdapter.create — user-1이 변형 free-1에 preset preset-1 생성
 
 Then
 
-- 다른 변형 아래 만든 preset 전체가 온다
+- 다른 변형 아래 생성한 preset 전체가 반환된다
   - id: 무시함 — 데이터베이스가 만든다
-  - runtime_variant_id: 심은 변형와 같다
+  - runtime_variant_id: 미리 만들어 둔 변형와 같다
   - name = 'preset-1'
   - description = None
   - rank = 100
@@ -440,7 +440,7 @@ Then
 
 #### [turning-enforcement-off-does-not-let-a-user-create-a-preset](/tests/scenario/bai_scenario/manager/runtime_variant_preset/test_creating.py) — pass
 
-엔티티 권한 집행을 꺼도 슈퍼관리자가 아니면 preset을 만들지 못한다. 이 문은 권한 그래프가 아니라 역할이라 스위치와 무관하다
+권한 검사를 꺼도 슈퍼관리자가 아니면 preset을 생성하지 못한다. 생성은 권한 그래프가 아니라 역할로 보호되므로 스위치와 무관하다
 
 Given
 
@@ -455,7 +455,7 @@ Given
 
 When
 
-- RuntimeVariantPresetAdapter.create — user-1이 variant-1에 max-tokens preset을 만듦
+- RuntimeVariantPresetAdapter.create — user-1이 변형 variant-1에 preset max-tokens 생성
 
 Then
 
@@ -466,7 +466,7 @@ Then
 
 #### [a-preset-edit-giving-no-value-changes-nothing](/tests/scenario/bai_scenario/manager/runtime_variant_preset/test_editing.py) — pass
 
-값을 하나도 주지 않고 고치면 아무것도 바뀌지 않은 노드가 온다
+값을 하나도 지정하지 않고 수정하면 아무것도 바뀌지 않은 노드가 반환된다
 
 Given
 
@@ -482,15 +482,15 @@ Given
 
 When
 
-- RuntimeVariantPresetAdapter.update — user-1이 preset-1의 아무것도 고침
+- RuntimeVariantPresetAdapter.update — user-1이 preset-1의 아무것도 수정
 
 Then
 
-- 심은 preset 전체가 온다
+- 미리 만들어 둔 preset 전체가 반환된다
   - id: 무시함 — 데이터베이스가 만든다
-  - runtime_variant_id: 심은 변형와 같다
+  - runtime_variant_id: 미리 만들어 둔 변형와 같다
   - name = 'preset-1'
-  - description = '심어둔 preset'
+  - description = '미리 만들어 둔 preset'
   - rank = 100
   - target_spec = PresetTargetSpec(preset_target=<PresetTarget.ENV: 'env'>, value_type=<PresetValueType.STR: 'str'>, default_value=None, key='PRESET_KEY')
   - required = False
@@ -505,7 +505,7 @@ Then
 
 #### [a-user-granted-nothing-may-not-edit-a-preset](/tests/scenario/bai_scenario/manager/runtime_variant_preset/test_editing.py) — pass
 
-아무 권한도 받지 않은 사용자가 preset을 고치면 권한 부족으로 거부된다. preset은 어느 스코프에도 없어 그 권한을 받을 길이 없다
+아무 권한도 없는 사용자가 preset을 수정하면 권한 부족으로 거부된다. preset은 어느 스코프에도 속하지 않아 그 권한을 받을 방법이 없다
 
 Given
 
@@ -521,7 +521,7 @@ Given
 
 When
 
-- RuntimeVariantPresetAdapter.update — user-1이 preset-1의 name 고침
+- RuntimeVariantPresetAdapter.update — user-1이 preset-1의 name 수정
 
 Then
 
@@ -530,7 +530,7 @@ Then
 
 #### [changing-only-the-default-to-one-that-does-not-fit-the-stored-type-is-refused](/tests/scenario/bai_scenario/manager/runtime_variant_preset/test_editing.py) — pass
 
-값 종류가 정수인 preset의 기본값만 숫자 아닌 문자열로 고치면 입력이 틀렸다는 이유로 거부된다. 서비스가 저장된 값 종류에 대고 새 기본값을 본다
+값 종류가 정수인 preset의 기본값만 숫자 아닌 문자열로 수정하면 잘못된 입력으로 거부된다. 서비스가 저장된 값 종류를 기준으로 새 기본값을 검사한다
 
 Given
 
@@ -546,7 +546,7 @@ Given
 
 When
 
-- RuntimeVariantPresetAdapter.update — user-1이 preset-1의 default_value 고침
+- RuntimeVariantPresetAdapter.update — user-1이 preset-1의 default_value 수정
 
 Then
 
@@ -555,7 +555,7 @@ Then
 
 #### [changing-only-the-value-type-to-flag-on-an-env-preset-is-refused](/tests/scenario/bai_scenario/manager/runtime_variant_preset/test_editing.py) — pass
 
-대상이 env인 preset의 값 종류만 flag로 고치면 입력이 틀렸다는 이유로 거부된다. 요청은 대상을 생략했으므로 요청 타입은 통과시키고, 서비스가 저장된 대상과 합쳐 보고 막는다
+대상이 env인 preset의 값 종류만 flag로 수정하면 잘못된 입력으로 거부된다. 요청은 대상을 생략했으므로 요청 타입은 통과시키고, 서비스가 저장된 대상과 합쳐 검사한 뒤 막는다
 
 Given
 
@@ -571,7 +571,7 @@ Given
 
 When
 
-- RuntimeVariantPresetAdapter.update — user-1이 preset-1의 value_type 고침
+- RuntimeVariantPresetAdapter.update — user-1이 preset-1의 value_type 수정
 
 Then
 
@@ -580,7 +580,7 @@ Then
 
 #### [clearing-a-preset-description-leaves-it-empty](/tests/scenario/bai_scenario/manager/runtime_variant_preset/test_editing.py) — pass
 
-설명이 있는 preset의 설명을 비우는 수정을 하면, 설명이 없어진다
+설명이 있는 preset에 설명을 비우는 수정을 하면, 설명이 없어진다
 
 Given
 
@@ -596,13 +596,13 @@ Given
 
 When
 
-- RuntimeVariantPresetAdapter.update — user-1이 preset-1의 description 고침
+- RuntimeVariantPresetAdapter.update — user-1이 preset-1의 description 수정
 
 Then
 
-- 심은 preset 전체가 온다
+- 미리 만들어 둔 preset 전체가 반환된다
   - id: 무시함 — 데이터베이스가 만든다
-  - runtime_variant_id: 심은 변형와 같다
+  - runtime_variant_id: 미리 만들어 둔 변형와 같다
   - name = 'preset-1'
   - description = None
   - rank = 100
@@ -619,7 +619,7 @@ Then
 
 #### [editing-a-preset-rank-sets-the-new-rank](/tests/scenario/bai_scenario/manager/runtime_variant_preset/test_editing.py) — pass
 
-슈퍼관리자가 preset의 순위를 바꾸면 순위가 새 값인 노드가 온다
+슈퍼관리자가 preset의 순위를 바꾸면 순위가 새 값인 노드가 반환된다
 
 Given
 
@@ -635,15 +635,15 @@ Given
 
 When
 
-- RuntimeVariantPresetAdapter.update — user-1이 preset-1의 rank 고침
+- RuntimeVariantPresetAdapter.update — user-1이 preset-1의 rank 수정
 
 Then
 
-- 심은 preset 전체가 온다
+- 미리 만들어 둔 preset 전체가 반환된다
   - id: 무시함 — 데이터베이스가 만든다
-  - runtime_variant_id: 심은 변형와 같다
+  - runtime_variant_id: 미리 만들어 둔 변형와 같다
   - name = 'preset-1'
-  - description = '심어둔 preset'
+  - description = '미리 만들어 둔 preset'
   - rank = 7
   - target_spec = PresetTargetSpec(preset_target=<PresetTarget.ENV: 'env'>, value_type=<PresetValueType.STR: 'str'>, default_value=None, key='PRESET_KEY')
   - required = False
@@ -658,7 +658,7 @@ Then
 
 #### [renaming-a-preset-leaves-the-rest-alone](/tests/scenario/bai_scenario/manager/runtime_variant_preset/test_editing.py) — pass
 
-슈퍼관리자가 preset의 이름만 바꾸면, 이름은 새 값이 되고 나머지는 그대로 남는다
+슈퍼관리자가 preset의 이름만 바꾸면, 이름은 새 값이 되고 나머지는 그대로 유지된다
 
 Given
 
@@ -674,15 +674,15 @@ Given
 
 When
 
-- RuntimeVariantPresetAdapter.update — user-1이 preset-1의 name 고침
+- RuntimeVariantPresetAdapter.update — user-1이 preset-1의 name 수정
 
 Then
 
-- 심은 preset 전체가 온다
+- 미리 만들어 둔 preset 전체가 반환된다
   - id: 무시함 — 데이터베이스가 만든다
-  - runtime_variant_id: 심은 변형와 같다
+  - runtime_variant_id: 미리 만들어 둔 변형와 같다
   - name = 'renamed'
-  - description = '심어둔 preset'
+  - description = '미리 만들어 둔 preset'
   - rank = 100
   - target_spec = PresetTargetSpec(preset_target=<PresetTarget.ENV: 'env'>, value_type=<PresetValueType.STR: 'str'>, default_value=None, key='PRESET_KEY')
   - required = False
@@ -697,7 +697,7 @@ Then
 
 #### [the-superadmin-editing-a-preset-id-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/runtime_variant_preset/test_editing.py) — pass
 
-슈퍼관리자가 아무 preset도 갖지 않은 id를 고치면 대상이 없다는 것으로 거부된다
+슈퍼관리자가 존재하지 않는 id를 수정하면 대상을 찾을 수 없다는 이유로 거부된다
 
 Given
 
@@ -713,7 +713,7 @@ Given
 
 When
 
-- RuntimeVariantPresetAdapter.update — user-1이 없는 id의 name 고침
+- RuntimeVariantPresetAdapter.update — user-1이 존재하지 않는 id의 name 수정
 
 Then
 
@@ -722,7 +722,7 @@ Then
 
 #### [turning-enforcement-off-lets-a-user-edit-a-preset](/tests/scenario/bai_scenario/manager/runtime_variant_preset/test_editing.py) — pass
 
-엔티티 권한 집행을 끄면 아무 권한도 받지 않은 사용자도 preset을 고친다. 이 문은 역할이 아니라 권한 그래프가 지키기 때문이다
+권한 검사를 끄면 아무 권한도 없는 사용자도 preset을 수정할 수 있다. 수정은 역할이 아니라 권한 그래프로 보호되기 때문이다
 
 Given
 
@@ -738,15 +738,15 @@ Given
 
 When
 
-- RuntimeVariantPresetAdapter.update — user-1이 preset-1의 name 고침
+- RuntimeVariantPresetAdapter.update — user-1이 preset-1의 name 수정
 
 Then
 
-- 심은 preset 전체가 온다
+- 미리 만들어 둔 preset 전체가 반환된다
   - id: 무시함 — 데이터베이스가 만든다
-  - runtime_variant_id: 심은 변형와 같다
+  - runtime_variant_id: 미리 만들어 둔 변형와 같다
   - name = 'renamed'
-  - description = '심어둔 preset'
+  - description = '미리 만들어 둔 preset'
   - rank = 100
   - target_spec = PresetTargetSpec(preset_target=<PresetTarget.ENV: 'env'>, value_type=<PresetValueType.STR: 'str'>, default_value=None, key='PRESET_KEY')
   - required = False
@@ -763,7 +763,7 @@ Then
 
 #### [a-user-granted-nothing-reads-a-preset-by-id](/tests/scenario/bai_scenario/manager/runtime_variant_preset/test_reading.py) — pass
 
-아무 권한도 받지 않은 사용자가 id로 조회하면, 그 preset 전체가 온다. 이 읽기는 인증만 본다
+아무 권한도 없는 사용자가 id로 조회하면, 그 preset 전체가 반환된다. 이 조회는 인증만 확인한다
 
 Given
 
@@ -779,15 +779,15 @@ Given
 
 When
 
-- RuntimeVariantPresetAdapter.get — user-1이 preset-1로 조회
+- RuntimeVariantPresetAdapter.get — user-1이 preset-1(으)로 조회
 
 Then
 
-- 심은 preset 전체가 온다
+- 미리 만들어 둔 preset 전체가 반환된다
   - id: 무시함 — 데이터베이스가 만든다
-  - runtime_variant_id: 심은 변형와 같다
+  - runtime_variant_id: 미리 만들어 둔 변형와 같다
   - name = 'preset-1'
-  - description = '심어둔 preset'
+  - description = '미리 만들어 둔 preset'
   - rank = 100
   - target_spec = PresetTargetSpec(preset_target=<PresetTarget.ENV: 'env'>, value_type=<PresetValueType.STR: 'str'>, default_value=None, key='PRESET_KEY')
   - required = False
@@ -802,7 +802,7 @@ Then
 
 #### [an-empty-preset-id-list-answers-empty-without-a-call](/tests/scenario/bai_scenario/manager/runtime_variant_preset/test_reading.py) — pass
 
-빈 id 목록을 주면 빈 답이 온다. 배선을 부르지 않는다
+빈 id 목록을 주면 빈 응답이 반환된다. 하위 계층을 호출하지 않는다
 
 Given
 
@@ -822,12 +822,12 @@ When
 
 Then
 
-- 빈 답이 온다
+- 빈 응답이 반환된다
   - items = []
 
 #### [presets-read-by-many-ids-come-back-in-the-order-asked](/tests/scenario/bai_scenario/manager/runtime_variant_preset/test_reading.py) — pass
 
-있는 id 둘과 없는 id 하나를 한 번에 읽으면, 준 순서대로 오고 없는 id 자리는 비어서 온다
+있는 id 둘과 없는 id 하나를 한 번에 조회하면, 요청한 순서대로 반환되고 없는 id 자리는 비어 있다
 
 Given
 
@@ -844,16 +844,16 @@ Given
 
 When
 
-- RuntimeVariantPresetAdapter.batch_load_by_ids — user-1이 심은 2개와 없는 id 하나를 한 번에 조회
+- RuntimeVariantPresetAdapter.batch_load_by_ids — user-1이 미리 만들어 둔 2개와 없는 id 하나를 한 번에 조회
 
 Then
 
-- 준 순서대로, 없는 id 자리는 비어서 온다
+- 요청한 순서대로, 없는 id 자리는 비어서 반환된다
   - len(items) = 3
   - items[0].id: 무시함 — 데이터베이스가 만든다
-  - items[0].runtime_variant_id: 심은 변형와 같다
+  - items[0].runtime_variant_id: 미리 만들어 둔 변형와 같다
   - items[0].name = 'preset-1'
-  - items[0].description = '심어둔 preset'
+  - items[0].description = '미리 만들어 둔 preset'
   - items[0].rank = 100
   - items[0].target_spec = PresetTargetSpec(preset_target=<PresetTarget.ENV: 'env'>, value_type=<PresetValueType.STR: 'str'>, default_value=None, key='PRESET_KEY')
   - items[0].required = False
@@ -866,9 +866,9 @@ Then
   - items[0].created_at: 이 실행이 쓴 시각
   - items[0].updated_at: 이 실행이 쓴 시각
   - items[1].id: 무시함 — 데이터베이스가 만든다
-  - items[1].runtime_variant_id: 심은 변형와 같다
+  - items[1].runtime_variant_id: 미리 만들어 둔 변형와 같다
   - items[1].name = 'preset-2'
-  - items[1].description = '심어둔 preset'
+  - items[1].description = '미리 만들어 둔 preset'
   - items[1].rank = 200
   - items[1].target_spec = PresetTargetSpec(preset_target=<PresetTarget.ENV: 'env'>, value_type=<PresetValueType.STR: 'str'>, default_value=None, key='PRESET_KEY')
   - items[1].required = False
@@ -884,7 +884,7 @@ Then
 
 #### [reading-a-preset-id-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/runtime_variant_preset/test_reading.py) — pass
 
-아무 preset도 갖지 않은 id로 조회하면 대상이 없다는 것으로 거부된다
+존재하지 않는 id로 조회하면 대상을 찾을 수 없다는 이유로 거부된다
 
 Given
 
@@ -900,7 +900,7 @@ Given
 
 When
 
-- RuntimeVariantPresetAdapter.get — user-1이 없는 id로 조회
+- RuntimeVariantPresetAdapter.get — user-1이 존재하지 않는 id(으)로 조회
 
 Then
 
@@ -911,7 +911,7 @@ Then
 
 #### [a-user-granted-nothing-may-not-delete-a-preset](/tests/scenario/bai_scenario/manager/runtime_variant_preset/test_retiring.py) — pass
 
-아무 권한도 받지 않은 사용자가 preset을 지우면 권한 부족으로 거부된다
+아무 권한도 없는 사용자가 preset을 삭제하면 권한 부족으로 거부된다
 
 Given
 
@@ -927,7 +927,7 @@ Given
 
 When
 
-- RuntimeVariantPresetAdapter.delete — user-1이 preset-1를 지움
+- RuntimeVariantPresetAdapter.delete — user-1이 preset-1 삭제
 
 Then
 
@@ -936,7 +936,7 @@ Then
 
 #### [deleting-a-preset-id-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/runtime_variant_preset/test_retiring.py) — pass
 
-슈퍼관리자가 아무 preset도 갖지 않은 id를 지우면 대상이 없다는 것으로 거부된다
+슈퍼관리자가 존재하지 않는 id를 삭제하면 대상을 찾을 수 없다는 이유로 거부된다
 
 Given
 
@@ -952,7 +952,7 @@ Given
 
 When
 
-- RuntimeVariantPresetAdapter.delete — user-1이 없는 id를 지움
+- RuntimeVariantPresetAdapter.delete — user-1이 존재하지 않는 id 삭제
 
 Then
 
@@ -961,7 +961,7 @@ Then
 
 #### [the-superadmin-deletes-a-preset](/tests/scenario/bai_scenario/manager/runtime_variant_preset/test_retiring.py) — pass
 
-슈퍼관리자가 preset을 지우면 지운 preset의 id를 실은 답이 온다
+슈퍼관리자가 preset을 삭제하면 삭제한 preset의 id를 담은 응답이 반환된다
 
 Given
 
@@ -977,16 +977,16 @@ Given
 
 When
 
-- RuntimeVariantPresetAdapter.delete — user-1이 preset-1를 지움
+- RuntimeVariantPresetAdapter.delete — user-1이 preset-1 삭제
 
 Then
 
-- 지운 preset의 id가 온다
-  - id: 심은 preset와 같다
+- 삭제한 preset의 id가 반환된다
+  - id: 미리 만들어 둔 preset와 같다
 
 #### [turning-enforcement-off-lets-a-user-delete-a-preset](/tests/scenario/bai_scenario/manager/runtime_variant_preset/test_retiring.py) — pass
 
-엔티티 권한 집행을 끄면 아무 권한도 받지 않은 사용자도 preset을 지운다. 이 문은 역할이 아니라 권한 그래프가 지키기 때문이다
+권한 검사를 끄면 아무 권한도 없는 사용자도 preset을 삭제할 수 있다. 삭제는 역할이 아니라 권한 그래프로 보호되기 때문이다
 
 Given
 
@@ -1002,18 +1002,18 @@ Given
 
 When
 
-- RuntimeVariantPresetAdapter.delete — user-1이 preset-1를 지움
+- RuntimeVariantPresetAdapter.delete — user-1이 preset-1 삭제
 
 Then
 
-- 지운 preset의 id가 온다
-  - id: 심은 preset와 같다
+- 삭제한 preset의 id가 반환된다
+  - id: 미리 만들어 둔 preset와 같다
 
 ### searching
 
 #### [a-user-granted-nothing-counts-every-preset-laid](/tests/scenario/bai_scenario/manager/runtime_variant_preset/test_searching.py) — pass
 
-preset 둘이 있을 때 아무 권한도 받지 않은 사용자가 필터 없이 조회하면 둘을 모두 센다
+preset 둘이 있을 때 아무 권한도 없는 사용자가 필터 없이 조회하면 둘 다 집계된다
 
 Given
 
@@ -1034,7 +1034,7 @@ When
 
 Then
 
-- 답에 나와야 하는 preset만 남는다
+- 응답에 나와야 하는 preset만 반환된다
   - items = ['preset-1', 'preset-2']
   - total_count = 2
   - has_next_page = False
@@ -1042,7 +1042,7 @@ Then
 
 #### [a-variant-filter-narrows-the-answer-to-that-variants-presets](/tests/scenario/bai_scenario/manager/runtime_variant_preset/test_searching.py) — pass
 
-두 변형에 preset이 나뉘어 있을 때 한 변형으로 걸러 조회하면, 그 변형의 것만 남는다
+두 변형에 preset이 나뉘어 있을 때 한 변형을 필터로 조회하면, 그 변형의 preset만 반환된다
 
 Given
 
@@ -1061,11 +1061,11 @@ Given
 
 When
 
-- RuntimeVariantPresetAdapter.search — user-1이 wanted-1으로 걸러 조회
+- RuntimeVariantPresetAdapter.search — user-1이 변형 wanted-1 필터로 조회
 
 Then
 
-- 답에 나와야 하는 preset만 남는다
+- 응답에 나와야 하는 preset만 반환된다
   - items = ['mine-1', 'mine-2']
   - total_count = 2
   - has_next_page = False
@@ -1073,7 +1073,7 @@ Then
 
 #### [a-version-filter-keeps-only-the-presets-valid-at-that-version](/tests/scenario/bai_scenario/manager/runtime_variant_preset/test_searching.py) — pass
 
-추가 버전과 폐기 버전이 다른 preset들을 한 버전으로 걸러 조회하면, 추가 버전 이상이고 폐기 버전 미만인 것만 남는다. 비어 있는 쪽은 열려 있다
+추가 버전과 폐기 버전이 다른 preset들을 한 버전 필터로 조회하면, 추가 버전 이상이고 폐기 버전 미만인 preset만 반환된다. 비어 있는 쪽은 제한이 없다
 
 Given
 
@@ -1093,11 +1093,11 @@ Given
 
 When
 
-- RuntimeVariantPresetAdapter.search — user-1이 버전 2.5.0에 유효한 것만 조회
+- RuntimeVariantPresetAdapter.search — user-1이 버전 2.5.0에 유효한 preset만 조회
 
 Then
 
-- 답에 나와야 하는 preset만 남는다
+- 응답에 나와야 하는 preset만 반환된다
   - items = ['open-1', 'unbounded-1']
   - total_count = 2
   - has_next_page = False
@@ -1105,7 +1105,7 @@ Then
 
 #### [omitting-the-page-size-answers-ten-presets-and-a-next-page](/tests/scenario/bai_scenario/manager/runtime_variant_preset/test_searching.py) — pass
 
-preset 열하나가 있을 때 크기 없이 조회하면 열 건까지 오고 다음 쪽이 있다고 답한다
+preset 11개가 있을 때 크기 없이 조회하면 10건까지 반환되고 다음 페이지가 있다고 응답한다
 
 Given
 
@@ -1135,7 +1135,7 @@ When
 
 Then
 
-- 기본 크기의 첫 쪽이 온다
+- 기본 크기의 첫 페이지가 반환된다
   - len(items) = 10
   - total_count = 11
   - has_next_page = True
