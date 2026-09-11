@@ -9,8 +9,22 @@ import sqlalchemy as sa
 
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.manager.data.model_card.types import VFolderScanData
+from ai.backend.manager.data.vfolder.types import VFolderData
 from ai.backend.manager.models.specs.searcher import Searcher
 from ai.backend.manager.models.vfolder.row import VFolderRow
+
+
+@dataclass
+class VFolderSearcher(Searcher[VFolderRow, VFolderData]):
+    """The vfolder rows a scoped read returns."""
+
+    @override
+    def build_select(self) -> sa.sql.Select[Any]:
+        return sa.select(VFolderRow)
+
+    @override
+    def to_data(self, row: VFolderRow) -> VFolderData:
+        return row.to_data()
 
 
 @dataclass

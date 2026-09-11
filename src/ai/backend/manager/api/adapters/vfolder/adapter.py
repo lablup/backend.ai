@@ -111,10 +111,7 @@ from ai.backend.manager.models.vfolder.orders import (
 from ai.backend.manager.models.vfolder.orders import (
     resolve_order as resolve_vfolder_order,
 )
-from ai.backend.manager.models.vfolder.scopes import (
-    ProjectVFolderOperationScope,
-    UserVFolderOperationScope,
-)
+from ai.backend.manager.models.vfolder.searchers import VFolderSearcher
 from ai.backend.manager.services.deployment.actions.create_deployment import CreateDeploymentAction
 from ai.backend.manager.services.deployment.processors import DeploymentProcessors
 from ai.backend.manager.services.vfolder.actions.admin_search_vfolders import (
@@ -139,11 +136,10 @@ from ai.backend.manager.services.vfolder.actions.get_usage import (
     GetVFolderUsageAction,
 )
 from ai.backend.manager.services.vfolder.actions.get_v2 import GetVFolderV2Action
-from ai.backend.manager.services.vfolder.actions.search_in_project import (
-    SearchVFoldersInProjectAction,
-)
-from ai.backend.manager.services.vfolder.actions.search_user_vfolders import (
-    SearchUserVFoldersAction,
+from ai.backend.manager.services.vfolder.actions.scoped_search import (
+    ProjectVFolderScopeItem,
+    ScopedSearchVFoldersAction,
+    UserVFolderScopeItem,
 )
 from ai.backend.manager.services.vfolder.actions.upload_session_v2 import (
     CreateUploadSessionV2Action,
@@ -319,25 +315,14 @@ class VFolderAdapter(BaseAdapter):
         me = current_user()
         if me is None:
             raise UnreachableError("User context is not available")
-        scope = UserVFolderOperationScope(user_id=me.user_id)
-        conditions = self._convert_vfolder_filter(input.filter) if input.filter else []
-        orders = self._convert_vfolder_orders(input.order) if input.order else []
-        querier = self._build_querier(
-            conditions=conditions,
-            orders=orders,
-            pagination_spec=_VFOLDER_PAGINATION_SPEC,
-            first=input.first,
-            after=input.after,
-            last=input.last,
-            before=input.before,
-            limit=input.limit,
-            offset=input.offset,
-        )
-        action_result = await self._vfolder.search_user_vfolders.run(
-            SearchUserVFoldersAction(scope=scope, querier=querier)
+        action_result = await self._vfolder.scoped_search.run(
+            ScopedSearchVFoldersAction(
+                items=[UserVFolderScopeItem(user_id=UserID(me.user_id))],
+                searcher=self._build_vfolder_searcher(input),
+            )
         )
         return SearchVFoldersPayload(
-            items=[self._vfolder_data_to_node(item) for item in action_result.data],
+            items=[self._vfolder_data_to_node(item) for item in action_result.items],
             total_count=action_result.total_count,
             has_next_page=action_result.has_next_page,
             has_previous_page=action_result.has_previous_page,
@@ -352,12 +337,24 @@ class VFolderAdapter(BaseAdapter):
 
         Used for the project admin page.
         """
-        scope = ProjectVFolderOperationScope(project_id=project_id)
-        conditions = self._convert_vfolder_filter(input.filter) if input.filter else []
-        orders = self._convert_vfolder_orders(input.order) if input.order else []
-        querier = self._build_querier(
-            conditions=conditions,
-            orders=orders,
+        action_result = await self._vfolder.scoped_search.run(
+            ScopedSearchVFoldersAction(
+                items=[ProjectVFolderScopeItem(project_id=ProjectID(project_id))],
+                searcher=self._build_vfolder_searcher(input),
+            )
+        )
+        return SearchVFoldersPayload(
+            items=[self._vfolder_data_to_node(item) for item in action_result.items],
+            total_count=action_result.total_count,
+            has_next_page=action_result.has_next_page,
+            has_previous_page=action_result.has_previous_page,
+        )
+
+    def _build_vfolder_searcher(self, input: SearchVFoldersInput) -> VFolderSearcher:
+        return self._build_searcher(
+            VFolderSearcher,
+            conditions=self._convert_vfolder_filter(input.filter) if input.filter else [],
+            orders=self._convert_vfolder_orders(input.order) if input.order else [],
             pagination_spec=_VFOLDER_PAGINATION_SPEC,
             first=input.first,
             after=input.after,
@@ -365,15 +362,6 @@ class VFolderAdapter(BaseAdapter):
             before=input.before,
             limit=input.limit,
             offset=input.offset,
-        )
-        action_result = await self._vfolder.search_vfolders_in_project.run(
-            SearchVFoldersInProjectAction(scope=scope, querier=querier)
-        )
-        return SearchVFoldersPayload(
-            items=[self._vfolder_data_to_node(item) for item in action_result.data],
-            total_count=action_result.total_count,
-            has_next_page=action_result.has_next_page,
-            has_previous_page=action_result.has_previous_page,
         )
 
     async def create(self, input: CreateVFolderInput) -> CreateVFolderPayload:
