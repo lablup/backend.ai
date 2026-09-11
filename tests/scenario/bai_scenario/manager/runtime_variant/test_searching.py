@@ -1,4 +1,4 @@
-"""런타임 변형 훑기 — 필터가 무엇을 좁히고, 크기를 대지 않으면 몇 건이 오는가."""
+"""런타임 변형 검색 — 필터가 무엇을 좁히고, 크기를 지정하지 않으면 몇 건이 반환되는가."""
 
 from __future__ import annotations
 
@@ -37,7 +37,7 @@ type SearchingStep = Scenario[
 
 @dataclass(frozen=True)
 class SearchingEveryVariant(When[ManyVariantsAndACaller, RuntimeVariantAdapter, Searched]):
-    """필터도 크기도 없이 전체를 훑는다."""
+    """필터도 크기도 없이 전체를 검색한다."""
 
     @override
     def operation(self) -> str:
@@ -55,7 +55,7 @@ class SearchingEveryVariant(When[ManyVariantsAndACaller, RuntimeVariantAdapter, 
 
 @dataclass(frozen=True)
 class SearchingByName(When[ManyVariantsAndACaller, RuntimeVariantAdapter, Searched]):
-    """심은 것 중 하나의 이름으로 걸러 훑는다."""
+    """미리 만들어 둔 변형 중 하나의 이름을 필터로 검색한다."""
 
     @override
     def operation(self) -> str:
@@ -63,7 +63,7 @@ class SearchingByName(When[ManyVariantsAndACaller, RuntimeVariantAdapter, Search
 
     @override
     def describe(self, laid: ManyVariantsAndACaller) -> str:
-        return f"{laid.caller.username}이 {laid.named.name}으로 걸러 조회"
+        return f"{laid.caller.username}이 {laid.named.name} 이름 필터로 조회"
 
     @override
     async def call(self, adapter: RuntimeVariantAdapter, laid: ManyVariantsAndACaller) -> Searched:
@@ -85,7 +85,7 @@ class AUserGrantedNothingCountsEveryVariant(
 
     @override
     def describe(self) -> str:
-        return "변형 둘이 있을 때 아무 권한도 받지 않은 사용자가 필터 없이 조회하면 둘을 모두 센다"
+        return "변형 둘이 있을 때 아무 권한도 없는 사용자가 필터 없이 조회하면 둘 다 집계된다"
 
     @override
     def given(self) -> Given[SeedingSession, ManyVariantsAndACaller]:
@@ -110,7 +110,7 @@ class ANameFilterNarrows(
 
     @override
     def describe(self) -> str:
-        return "변형 여럿 중 하나의 이름으로 걸러 조회하면, 답에는 그 이름의 변형만 남는다"
+        return "변형 여럿 중 하나의 이름을 필터로 조회하면, 응답에는 그 이름의 변형만 남는다"
 
     @override
     def given(self) -> Given[SeedingSession, ManyVariantsAndACaller]:
@@ -135,7 +135,9 @@ class OmittingThePageSizeGivesTen(
 
     @override
     def describe(self) -> str:
-        return "변형 열하나가 있을 때 크기 없이 조회하면 열 건까지 오고 다음 쪽이 있다고 답한다"
+        return (
+            "변형 11개가 있을 때 크기 없이 조회하면 10건까지 반환되고 다음 페이지가 있다고 응답한다"
+        )
 
     @override
     def given(self) -> Given[SeedingSession, ManyVariantsAndACaller]:
