@@ -43,13 +43,18 @@ def get(artifact_id: str) -> None:
 @click.option(
     "--readonly", default=None, type=bool, help="Whether the artifact should be readonly."
 )
+@click.option("--description", default=None, help="Updated description.")
 @click.option(
-    "--description", default=None, help="Updated description. Pass empty string to clear."
+    "--set-null-description",
+    is_flag=True,
+    default=False,
+    help="Clear the description. Mutually exclusive with --description.",
 )
 def update(
     artifact_id: str,
     readonly: bool | None,
     description: str | None,
+    set_null_description: bool,
 ) -> None:
     """Update artifact metadata."""
     from uuid import UUID
@@ -57,9 +62,16 @@ def update(
     from ai.backend.common.dto.manager.v2.artifact.request import UpdateArtifactInput
     from ai.backend.common.tristate.unset import UNSET, Unset
 
-    # Options the user did not pass stay UNSET (no change); an empty --description clears it.
+    if description is not None and set_null_description:
+        raise click.UsageError("--description and --set-null-description are mutually exclusive.")
+
+    # An option the user did not pass stays UNSET so the field is left unchanged.
     readonly_value: bool | Unset = UNSET if readonly is None else readonly
-    desc_value: str | Unset = UNSET if description is None else description
+    desc_value: str | None | Unset = UNSET
+    if set_null_description:
+        desc_value = None
+    elif description is not None:
+        desc_value = description
 
     async def _run() -> None:
         registry = await create_v2_registry(load_v2_config())
