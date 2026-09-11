@@ -194,27 +194,25 @@ async def download(request: web.Request) -> web.StreamResponse:
         archive: bool
         no_cache: bool
 
-    async with (
-        cast(
-            AbstractAsyncContextManager[Params],
-            check_params(
-                request,
-                t.Dict(
-                    {
-                        t.Key("token"): tx.JsonWebToken(
-                            secret=secret,
-                            inner_iv=download_token_data_iv,
-                        ),
-                        t.Key("dst_dir", default=None): t.Null | t.String,
-                        t.Key("archive", default=False): t.ToBool,
-                        t.Key("no_cache", default=False): t.ToBool,
-                    },
-                ),
-                read_from=CheckParamSource.QUERY,
+    async with cast(
+        AbstractAsyncContextManager[Params],
+        check_params(
+            request,
+            t.Dict(
+                {
+                    t.Key("token"): tx.JsonWebToken(
+                        secret=secret,
+                        inner_iv=download_token_data_iv,
+                    ),
+                    t.Key("dst_dir", default=None): t.Null | t.String,
+                    t.Key("archive", default=False): t.ToBool,
+                    t.Key("no_cache", default=False): t.ToBool,
+                },
             ),
-        ) as params,
-        ctx.get_volume(params["token"]["volume"]) as volume,
-    ):
+            read_from=CheckParamSource.QUERY,
+        ),
+    ) as params:
+        volume = ctx.volume_pool.get_volume_by_name(params["token"]["volume"])
         token_data = params["token"]
         if token_data["unmanaged_path"] is not None:
             vfpath = Path(token_data["unmanaged_path"]).resolve()
@@ -376,8 +374,8 @@ async def tus_check_session(request: web.Request) -> web.Response:
         ),
     ) as params:
         token_data = params["token"]
-        async with ctx.get_volume(token_data["volume"]) as volume:
-            headers = await prepare_tus_session_headers(request, token_data, volume)
+        volume = ctx.volume_pool.get_volume_by_name(token_data["volume"])
+        headers = await prepare_tus_session_headers(request, token_data, volume)
     return web.Response(headers=headers)
 
 
@@ -409,72 +407,72 @@ async def tus_upload_part(request: web.Request) -> web.Response:
         ),
     ) as params:
         token_data = params["token"]
-        async with ctx.get_volume(token_data["volume"]) as volume:
-            headers = await prepare_tus_session_headers(request, token_data, volume)
-            vfpath = volume.mangle_vfpath(token_data["vfid"])
-            upload_temp_path: Path = vfpath / ".upload" / token_data["session"]
+        volume = ctx.volume_pool.get_volume_by_name(token_data["volume"])
+        headers = await prepare_tus_session_headers(request, token_data, volume)
+        vfpath = volume.mangle_vfpath(token_data["vfid"])
+        upload_temp_path: Path = vfpath / ".upload" / token_data["session"]
 
-            # TUS protocol requires Upload-Offset validation before appending data
-            upload_offset_header = request.headers.get("Upload-Offset")
-            if upload_offset_header is None:
-                raise InvalidAPIParameters(
-                    "Missing required Upload-Offset header for TUS PATCH request"
-                )
-
-            try:
-                client_offset = int(upload_offset_header)
-            except ValueError as e:
-                raise InvalidAPIParameters(
-                    f"Invalid Upload-Offset header value: {upload_offset_header}"
-                ) from e
-
-            await aiofiles.os.makedirs(upload_temp_path.parent, exist_ok=True)
-
-            session_id = TusSessionId(token_data["session"])
-            holder_token = f"{ctx.node_id}:{uuid.uuid4().hex}"
-            actual_offset = await ctx.valkey_tus_client.try_load_offset(session_id, holder_token)
-            if client_offset != actual_offset:
-                # We hold the lease but the precondition fails — release it
-                # before bailing so the next PATCH does not have to wait for
-                # the TTL.
-                await ctx.valkey_tus_client.release_lease(session_id, holder_token)
-                raise UploadOffsetMismatchError(
-                    f"Upload offset mismatch: expected {actual_offset}, got {client_offset}"
-                )
-            watcher_task = asyncio.create_task(
-                ctx.valkey_tus_client.watch_lease(session_id),
-                name=f"tus-lease-watch-{session_id}",
-            )
-            try:
-                bytes_written = await _drain_into_upload_file(
-                    request.content, upload_temp_path, actual_offset, session_id
-                )
-            except BaseException:
-                await ctx.valkey_tus_client.release_lease(session_id, holder_token)
-                raise
-            finally:
-                watcher_task.cancel()
-                try:
-                    await watcher_task
-                except asyncio.CancelledError:
-                    pass
-            new_offset = await ctx.valkey_tus_client.advance_offset(
-                session_id, holder_token, bytes_written
+        # TUS protocol requires Upload-Offset validation before appending data
+        upload_offset_header = request.headers.get("Upload-Offset")
+        if upload_offset_header is None:
+            raise InvalidAPIParameters(
+                "Missing required Upload-Offset header for TUS PATCH request"
             )
 
-            headers["Upload-Offset"] = str(new_offset)
-            if new_offset >= int(token_data["size"]):
-                parent_dir = vfpath
-                if (dst_dir := params["dst_dir"]) is not None:
-                    parent_dir = vfpath / dst_dir
-                target_path: Path = parent_dir / token_data["relpath"]
-                if not target_path.parent.exists():
-                    target_path.parent.mkdir(parents=True, exist_ok=True)
-                upload_temp_path.rename(target_path)
-                try:
-                    await aiofiles.os.rmdir(upload_temp_path.parent)
-                except OSError:
-                    pass
+        try:
+            client_offset = int(upload_offset_header)
+        except ValueError as e:
+            raise InvalidAPIParameters(
+                f"Invalid Upload-Offset header value: {upload_offset_header}"
+            ) from e
+
+        await aiofiles.os.makedirs(upload_temp_path.parent, exist_ok=True)
+
+        session_id = TusSessionId(token_data["session"])
+        holder_token = f"{ctx.node_id}:{uuid.uuid4().hex}"
+        actual_offset = await ctx.valkey_tus_client.try_load_offset(session_id, holder_token)
+        if client_offset != actual_offset:
+            # We hold the lease but the precondition fails — release it
+            # before bailing so the next PATCH does not have to wait for
+            # the TTL.
+            await ctx.valkey_tus_client.release_lease(session_id, holder_token)
+            raise UploadOffsetMismatchError(
+                f"Upload offset mismatch: expected {actual_offset}, got {client_offset}"
+            )
+        watcher_task = asyncio.create_task(
+            ctx.valkey_tus_client.watch_lease(session_id),
+            name=f"tus-lease-watch-{session_id}",
+        )
+        try:
+            bytes_written = await _drain_into_upload_file(
+                request.content, upload_temp_path, actual_offset, session_id
+            )
+        except BaseException:
+            await ctx.valkey_tus_client.release_lease(session_id, holder_token)
+            raise
+        finally:
+            watcher_task.cancel()
+            try:
+                await watcher_task
+            except asyncio.CancelledError:
+                pass
+        new_offset = await ctx.valkey_tus_client.advance_offset(
+            session_id, holder_token, bytes_written
+        )
+
+        headers["Upload-Offset"] = str(new_offset)
+        if new_offset >= int(token_data["size"]):
+            parent_dir = vfpath
+            if (dst_dir := params["dst_dir"]) is not None:
+                parent_dir = vfpath / dst_dir
+            target_path: Path = parent_dir / token_data["relpath"]
+            if not target_path.parent.exists():
+                target_path.parent.mkdir(parents=True, exist_ok=True)
+            upload_temp_path.rename(target_path)
+            try:
+                await aiofiles.os.rmdir(upload_temp_path.parent)
+            except OSError:
+                pass
     return web.Response(status=HTTPStatus.NO_CONTENT, headers=headers)
 
 
@@ -555,25 +553,21 @@ class DownloadHandler:
         """Stream multiple files/directories as a ZIP archive."""
         token_data = self._jwt_validator.validate(query.parsed.token, ArchiveDownloadTokenData)
 
-        async with ctx.root_ctx.get_volume(token_data.volume) as volume:
-            vfolder_root = volume.sanitize_vfpath(token_data.virtual_folder_id)
-            sanitized: list[Path] = [
-                (vfolder_root / relpath).resolve() for relpath in token_data.files
-            ]
-            for file_path, relpath in zip(sanitized, token_data.files, strict=True):
-                if not file_path.is_relative_to(vfolder_root):
-                    raise InvalidAPIParameters(
-                        extra_msg=f"Path escapes vfolder boundary: {relpath}"
-                    )
-                if not file_path.exists():
-                    raise web.HTTPNotFound(reason=f"File not found: {relpath}")
+        volume = ctx.root_ctx.volume_pool.get_volume_by_name(token_data.volume)
+        vfolder_root = volume.sanitize_vfpath(token_data.virtual_folder_id)
+        sanitized: list[Path] = [(vfolder_root / relpath).resolve() for relpath in token_data.files]
+        for file_path, relpath in zip(sanitized, token_data.files, strict=True):
+            if not file_path.is_relative_to(vfolder_root):
+                raise InvalidAPIParameters(extra_msg=f"Path escapes vfolder boundary: {relpath}")
+            if not file_path.exists():
+                raise web.HTTPNotFound(reason=f"File not found: {relpath}")
 
-            reader = ZipArchiveStreamReader(vfolder_root)
-            reader.add_entries(sanitized)
+        reader = ZipArchiveStreamReader(vfolder_root)
+        reader.add_entries(sanitized)
 
-            filename = token_data.filename if token_data.filename is not None else reader.filename()
-            headers = build_attachment_headers(filename, reader.content_type())
-            return APIStreamResponse(body=reader, status=HTTPStatus.OK, headers=headers)
+        filename = token_data.filename if token_data.filename is not None else reader.filename()
+        headers = build_attachment_headers(filename, reader.content_type())
+        return APIStreamResponse(body=reader, status=HTTPStatus.OK, headers=headers)
 
 
 async def init_client_app(ctx: RootContext) -> web.Application:

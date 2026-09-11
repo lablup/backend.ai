@@ -1,8 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-from collections.abc import AsyncIterator
-from contextlib import asynccontextmanager
 from datetime import UTC, datetime
 from typing import Protocol
 from unittest.mock import AsyncMock, MagicMock
@@ -77,13 +75,9 @@ def mock_volume_pool_with_single_volume(sample_metric: FSPerfMetric) -> MagicMoc
     mock_volume = AsyncMock()
     mock_volume.get_performance_metric = AsyncMock(return_value=sample_metric)
 
-    @asynccontextmanager
-    async def get_volume_by_name(name: str) -> AsyncIterator[MockVolume]:
-        yield mock_volume
-
     pool = MagicMock()
     pool.list_volumes = MagicMock(return_value={"test-volume": MagicMock()})
-    pool.get_volume_by_name = get_volume_by_name
+    pool.get_volume_by_name = MagicMock(return_value=mock_volume)
 
     return pool
 
@@ -114,13 +108,9 @@ def mock_volume_pool_with_timeout() -> MagicMock:
 
     mock_volume.get_performance_metric = slow_get_metric
 
-    @asynccontextmanager
-    async def get_volume_by_name(name: str) -> AsyncIterator[MockVolume]:
-        yield mock_volume
-
     pool = MagicMock()
     pool.list_volumes = MagicMock(return_value={"slow-volume": MagicMock()})
-    pool.get_volume_by_name = get_volume_by_name
+    pool.get_volume_by_name = MagicMock(return_value=mock_volume)
 
     return pool
 
@@ -131,12 +121,8 @@ def mock_volume_pool_with_error() -> MagicMock:
     mock_volume = AsyncMock()
     mock_volume.get_performance_metric = AsyncMock(side_effect=RuntimeError("API error"))
 
-    @asynccontextmanager
-    async def get_volume_by_name(name: str) -> AsyncIterator[MockVolume]:
-        yield mock_volume
-
     pool = MagicMock()
     pool.list_volumes = MagicMock(return_value={"error-volume": MagicMock()})
-    pool.get_volume_by_name = get_volume_by_name
+    pool.get_volume_by_name = MagicMock(return_value=mock_volume)
 
     return pool
