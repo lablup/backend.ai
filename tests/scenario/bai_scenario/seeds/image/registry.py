@@ -5,10 +5,17 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import override
 
+from bai_scenario.seeds.seeder import Naming, SeedLink, SeedRow
+
 from ai.backend.common.container_registry import ContainerRegistryType
+from ai.backend.common.data.entity.container_registry import ContainerRegistryID
+from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.manager.data.container_registry.types import ContainerRegistryData
-from ai.backend.manager.models.container_registry.creators import ContainerRegistryCreator
-from bai_scenario.seeds.seeder import Naming, SeedRow
+from ai.backend.manager.data.project.types import ProjectData
+from ai.backend.manager.models.container_registry.creators import (
+    ContainerRegistryCreator,
+    ContainerRegistryProjectCreator,
+)
 
 
 @dataclass(frozen=True)
@@ -36,3 +43,22 @@ class SeedContainerRegistry(SeedRow[ContainerRegistryData]):
             type=ContainerRegistryType.DOCKER,
             registry_name=name,
         )
+
+
+@dataclass(frozen=True)
+class AllowProject(SeedLink[ProjectData, ContainerRegistryData]):
+    @override
+    def kind(self) -> str:
+        return "이 허용된"
+
+    @override
+    def scope_id(self, scope: ProjectData) -> ProjectID:
+        return ProjectID(scope.id)
+
+    @override
+    def target_id(self, target: ContainerRegistryData) -> ContainerRegistryID:
+        return ContainerRegistryID(target.id)
+
+    @override
+    def seed(self) -> ContainerRegistryProjectCreator:
+        return ContainerRegistryProjectCreator()
