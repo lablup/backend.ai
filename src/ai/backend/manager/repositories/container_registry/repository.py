@@ -63,7 +63,19 @@ class ContainerRegistryRepository:
         self,
         creator: ContainerRegistryCreator,
     ) -> ContainerRegistryData:
-        """Create a container registry with its own virtual entity."""
+        """Create a container registry with its own virtual entity.
+
+        The address and the project are checked here as they are on the update path.
+        Checking only there let a registry be created with an address its own update
+        would refuse.
+        """
+        ContainerRegistryValidator(
+            ContainerRegistryValidatorArgs(
+                type=creator.type,
+                project=creator.project,
+                url=creator.url,
+            )
+        ).validate()
         async with self._ops_provider.write_ops() as w:
             return await w.create_global_entity(creator)
 
