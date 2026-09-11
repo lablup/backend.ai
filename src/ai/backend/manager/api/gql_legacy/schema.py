@@ -123,11 +123,12 @@ from ai.backend.manager.data.permission.permission_defs import (
 from ai.backend.manager.data.project.types import ProjectType
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.data.user.types import UserStatus
+from ai.backend.manager.errors.agent import AgentNotFound
 from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.auth import InsufficientPrivilege
 from ai.backend.manager.errors.image import ImageNotFound
 from ai.backend.manager.errors.kernel import TooManyKernelsFound
-from ai.backend.manager.errors.resource import AgentNotFound, DomainNotFound
+from ai.backend.manager.errors.resource import DomainNotFound
 from ai.backend.manager.models.image.row import (
     ImageLoadFilter,
     PublicImageLoadFilter,

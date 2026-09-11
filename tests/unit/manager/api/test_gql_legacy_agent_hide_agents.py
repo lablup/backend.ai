@@ -12,7 +12,7 @@ import graphene
 import pytest
 
 from ai.backend.manager.api.gql_legacy.schema import Query
-from ai.backend.manager.errors.resource import AgentNotFound
+from ai.backend.manager.errors.agent import AgentNotFound
 from ai.backend.manager.models.user import UserRole
 
 
