@@ -47,38 +47,38 @@ from ai.backend.testutils.scenario_steps import (
 )
 
 NOTHING = uuid.UUID("00000000-0000-0000-0000-0000000000ff")
-"""아무 행도 갖지 않는 id. 대상이 없을 때 무엇이 오는지 보려고 지목한다."""
+"""어느 행도 가리키지 않는 id. 대상이 없을 때 무엇이 반환되는지 확인하려고 지정한다."""
 
 DEFAULT_LIMITS = [
     ImageResourceLimitInfo(key=str(slot), min=str(least), max=None)
     for slot, least in sorted(INTRINSIC_SLOTS_MIN.items())
 ]
-"""라벨로 아무 하한도 적지 않은 이미지에 채워지는 하한. 값은 src가 정한 것에서 읽는다."""
+"""라벨로 하한을 지정하지 않은 이미지에 채워지는 기본 하한. 값은 src가 정한 상수에서 읽는다."""
 
 DEFAULT_LIMITS_GQL = [
     ImageResourceLimitGQLInfo(key=str(slot), min=str(least), max="Infinity")
     for slot, least in sorted(INTRINSIC_SLOTS_MIN.items())
 ]
-"""같은 하한을 GQL 모양으로 적은 것. 상한이 없는 자리에 Infinity가 들어간다."""
+"""같은 하한의 GQL 표현. 상한이 없는 필드에는 Infinity가 들어간다."""
 
 
 class Accelerators(ABC):
-    """이미지의 가속기 자리에 놓인 것."""
+    """이미지에 지정된 가속기."""
 
     @abstractmethod
     def named(self) -> str | None:
-        """이미지 행에 적히는 값."""
+        """이미지 행에 저장되는 값."""
         raise NotImplementedError
 
     @abstractmethod
     def supported(self) -> list[str]:
-        """노드가 그 값을 풀어 답하는 목록."""
+        """노드가 그 값을 펼쳐 반환하는 목록."""
         raise NotImplementedError
 
 
 @dataclass(frozen=True)
 class NoAccelerator(Accelerators):
-    """아무것도 적히지 않은 자리. 무엇이든 된다는 뜻으로 풀린다."""
+    """가속기를 지정하지 않은 상태. 무엇이든 허용한다는 의미로 펼쳐진다."""
 
     @override
     def named(self) -> str | None:
@@ -91,7 +91,7 @@ class NoAccelerator(Accelerators):
 
 @dataclass(frozen=True)
 class OneAccelerator(Accelerators):
-    """가속기 하나가 적힌 자리."""
+    """가속기 하나를 지정한 상태."""
 
     name: str = "cuda"
 
@@ -105,14 +105,14 @@ class OneAccelerator(Accelerators):
 
 
 REACHING = (Permission.READ, Permission.SOFT_DELETE, Permission.HARD_DELETE)
-"""이미지를 읽고 잊고 지우는 데 드는 권한.
+"""이미지를 조회하고 소프트 삭제하고 완전 삭제하는 데 필요한 권한.
 
-한 행이 한 비트만 담으므로 셋을 따로 심는다. 역할은 하나다."""
+권한 행 하나가 비트 하나만 담으므로 3개를 따로 만든다. 역할은 하나다."""
 
 
 @dataclass(frozen=True)
 class AnImageAndACaller:
-    """이미지 하나와, 그것을 부를 사람."""
+    """이미지 1개와 호출자."""
 
     image: ImageData
     caller: UserData
@@ -120,7 +120,7 @@ class AnImageAndACaller:
 
 @dataclass(frozen=True)
 class ManyImagesAndACaller:
-    """이미지 여럿과 부를 사람. `named`는 그중 골라낼 하나다."""
+    """이미지 여러 개와 호출자. `named`는 그중 지정해서 쓸 하나다."""
 
     laid: tuple[ImageData, ...]
     named: ImageData
@@ -130,7 +130,7 @@ class ManyImagesAndACaller:
 
 @dataclass(frozen=True)
 class AnAliasAndACaller:
-    """별칭이 붙은 이미지 하나와, 그것을 부를 사람."""
+    """별칭이 등록된 이미지 1개와 호출자."""
 
     image: ImageData
     alias: ImageAliasData
@@ -139,7 +139,7 @@ class AnAliasAndACaller:
 
 @dataclass(frozen=True)
 class ARegistryWithImages(SeedNest[tuple[ContainerRegistryData, tuple[Laid[ImageData], ...]]]):
-    """레지스트리 하나와 그 안의 이미지들. 이미지는 레지스트리에 붙어야 존재한다."""
+    """레지스트리 1개와 그 안의 이미지들. 이미지는 레지스트리에 속해야 만들 수 있다."""
 
     count: int = 1
 
@@ -159,7 +159,7 @@ class ARegistryWithImages(SeedNest[tuple[ContainerRegistryData, tuple[Laid[Image
 
 @dataclass(frozen=True)
 class AnImageAndSomeone(Given[Any, AnImageAndACaller]):
-    """이미지 하나와, 부를 사람 하나."""
+    """이미지 1개와 호출자 1명."""
 
     role: UserRole = UserRole.USER
     status: ImageStatus = ImageStatus.ALIVE
@@ -168,7 +168,7 @@ class AnImageAndSomeone(Given[Any, AnImageAndACaller]):
     @override
     def describe(self) -> str:
         marked = "" if self.status is ImageStatus.ALIVE else f", 상태는 {self.status.value}"
-        return f"레지스트리 하나와 그 안의 이미지 하나{marked}, {self.role.value} 한 명"
+        return f"레지스트리 1개와 그 안의 이미지 1개{marked}, {self.role.value} 1명"
 
     @override
     async def lay(self, seeding: Any) -> AnImageAndACaller:
@@ -183,10 +183,10 @@ class AnImageAndSomeone(Given[Any, AnImageAndACaller]):
 
 @dataclass(frozen=True)
 class AnImageNobodyOwns(Given[Any, AnImageAndACaller]):
-    """출하된 이미지 하나와, 그 이미지를 다룰 권한까지 받은 사람.
+    """커스터마이즈되지 않은 이미지 1개와, 그 이미지에 권한까지 받은 사용자.
 
-    커스터마이즈되지 않은 이미지에는 주인이 없다. 게이트를 열어도 소유권 검사가 남는 것을
-    보는 자리이므로, 권한은 주되 주인은 아닌 상태를 세운다.
+    커스터마이즈되지 않은 이미지에는 소유자가 없다. 엔티티 권한을 통과해도 소유권 검사가
+    남는 것을 확인하는 전제이므로, 권한은 주되 소유자는 아닌 상태를 만든다.
     """
 
     granted: bool = True
@@ -194,7 +194,7 @@ class AnImageNobodyOwns(Given[Any, AnImageAndACaller]):
     @override
     def describe(self) -> str:
         holds = "그 이미지에 권한 있음" if self.granted else "아무 권한도 없음"
-        return f"주인 없는 이미지 하나, {holds}인 사용자 한 명"
+        return f"소유자가 없는 이미지 1개, {holds}인 사용자 1명"
 
     @override
     async def lay(self, seeding: Any) -> AnImageAndACaller:
@@ -209,10 +209,10 @@ class AnImageNobodyOwns(Given[Any, AnImageAndACaller]):
 
 @dataclass(frozen=True)
 class AnImageTheCallerMade(Given[Any, AnImageAndACaller]):
-    """부르는 사람이 만든 커스텀 이미지 하나와, 그 이미지를 다룰 권한.
+    """호출자가 만든 커스텀 이미지 1개와, 그 이미지에 대한 권한.
 
-    소유권 검사를 통과하는 유일한 모양이다. 커스터마이즈된 것이면서 만든 사람이 부르는
-    사람이어야 한다.
+    소유권 검사를 통과하는 유일한 조합이다. 커스터마이즈된 이미지이면서 만든 사람이
+    호출자여야 한다.
     """
 
     status: ImageStatus = ImageStatus.ALIVE
@@ -220,7 +220,7 @@ class AnImageTheCallerMade(Given[Any, AnImageAndACaller]):
     @override
     def describe(self) -> str:
         marked = "" if self.status is ImageStatus.ALIVE else f", 상태는 {self.status.value}"
-        return f"부르는 사람이 만든 커스텀 이미지 하나{marked}, 그 이미지에 권한 있음"
+        return f"호출자가 만든 커스텀 이미지 1개{marked}, 그 이미지에 권한 있음"
 
     @override
     async def lay(self, seeding: Any) -> AnImageAndACaller:
@@ -238,14 +238,14 @@ class AnImageTheCallerMade(Given[Any, AnImageAndACaller]):
 
 @dataclass(frozen=True)
 class ManyImagesAndSomeone(Given[Any, ManyImagesAndACaller]):
-    """한 레지스트리 안의 이미지 여럿과, 부를 사람 하나."""
+    """레지스트리 1개 안의 이미지 여러 개와 호출자 1명."""
 
     role: UserRole = UserRole.SUPERADMIN
     count: int = 2
 
     @override
     def describe(self) -> str:
-        return f"레지스트리 하나와 그 안의 이미지 {self.count}개, {self.role.value} 한 명"
+        return f"레지스트리 1개와 그 안의 이미지 {self.count}개, {self.role.value} 1명"
 
     @override
     async def lay(self, seeding: Any) -> ManyImagesAndACaller:
@@ -266,10 +266,10 @@ class ManyImagesAndSomeone(Given[Any, ManyImagesAndACaller]):
 
 @dataclass(frozen=True)
 class ImagesInTwoRegistries(Given[Any, ManyImagesAndACaller]):
-    """두 레지스트리에 나뉘어 놓인 이미지들과, 부를 사람 하나.
+    """레지스트리 2개에 나뉘어 있는 이미지들과 호출자 1명.
 
-    한쪽으로 좁히는 것을 보는 자리에 쓴다. 레지스트리가 하나뿐이면 좁혀도 걸러지는 것이
-    없어서, 조건을 빼도 같은 답이 온다.
+    한쪽으로 좁히는 동작을 확인할 때 쓴다. 레지스트리가 1개뿐이면 좁혀도 걸러지는 것이
+    없어서, 조건을 빼도 같은 응답이 반환된다.
     """
 
     role: UserRole = UserRole.SUPERADMIN
@@ -279,8 +279,8 @@ class ImagesInTwoRegistries(Given[Any, ManyImagesAndACaller]):
     @override
     def describe(self) -> str:
         return (
-            f"레지스트리 둘, 한쪽에 이미지 {self.wanted}개와 다른 쪽에 {self.elsewhere}개, "
-            f"{self.role.value} 한 명"
+            f"레지스트리 2개, 한쪽에 이미지 {self.wanted}개와 다른 쪽에 {self.elsewhere}개, "
+            f"{self.role.value} 1명"
         )
 
     @override
@@ -305,13 +305,13 @@ class ImagesInTwoRegistries(Given[Any, ManyImagesAndACaller]):
 
 @dataclass(frozen=True)
 class AnAliasAndSomeone(Given[Any, AnAliasAndACaller]):
-    """별칭이 붙은 이미지 하나와, 부를 사람 하나."""
+    """별칭이 등록된 이미지 1개와 호출자 1명."""
 
     role: UserRole = UserRole.SUPERADMIN
 
     @override
     def describe(self) -> str:
-        return f"별칭이 붙은 이미지 하나, {self.role.value} 한 명"
+        return f"별칭이 등록된 이미지 1개, {self.role.value} 1명"
 
     @override
     async def lay(self, seeding: Any) -> AnAliasAndACaller:
@@ -329,10 +329,10 @@ class AnAliasAndSomeone(Given[Any, AnAliasAndACaller]):
 
 @dataclass(frozen=True)
 class SomeoneReachingImages(SeedNest[Laid[None]]):
-    """그 레지스트리 안의 이미지를 읽고 잊고 지울 수 있는 사용자.
+    """그 레지스트리 안의 이미지를 조회·소프트 삭제·완전 삭제할 수 있는 사용자.
 
-    이미지는 자기를 담은 레지스트리 아래에 만들어진다. 그래서 역할이 앉는 스코프는 이미지가
-    아니라 레지스트리다.
+    이미지는 자신을 담은 레지스트리 아래에 만들어진다. 그래서 역할이 놓이는 스코프는
+    이미지가 아니라 레지스트리다.
     """
 
     registry: Laid[ContainerRegistryData]
@@ -372,11 +372,11 @@ class PaddedDigest(Condition[str | None]):
 
 @dataclass(frozen=True)
 class Filled(Condition[Any]):
-    """채워져 온다. 비어 있으면 그 안의 자리들을 볼 수 없다."""
+    """값이 채워져 반환된다. 비어 있으면 그 안의 필드를 확인할 수 없다."""
 
     @override
     def says(self) -> str:
-        return "채워져 온다"
+        return "값이 채워져 반환된다"
 
     @override
     def holds(self, got: Any) -> bool:
@@ -385,9 +385,9 @@ class Filled(Condition[Any]):
 
 @dataclass(frozen=True)
 class TheImageNode(Then[Any, ImageNode]):
-    """심은 이미지가 통째로 온다. 시나리오가 바꾼 자리만 여기로 받는다.
+    """미리 만들어 둔 이미지 전체가 반환된다. 시나리오가 바꾼 필드만 인자로 받는다.
 
-    이미지를 담은 전제면 무엇이든 받는다. 이미지 하나를 `image`로 들고 있으면 된다.
+    이미지를 담은 전제면 무엇이든 받는다. `image` 필드로 이미지 1개를 들고 있으면 된다.
     """
 
     status: ImageStatus | None = None
@@ -396,13 +396,13 @@ class TheImageNode(Then[Any, ImageNode]):
 
     @override
     def says(self) -> str:
-        return "심은 이미지 전체가 온다"
+        return "미리 만들어 둔 이미지 전체가 반환된다"
 
     @override
     def look(self, laid: Any, answered: Answered[ImageNode]) -> list[Verdict]:
         node = answered.response
         if node is None:
-            return [Held("답", node, Filled())]
+            return [Held("응답", node, Filled())]
         identity, metadata, requirements = node.identity, node.metadata, node.requirements
         if identity is None or metadata is None or requirements is None:
             return [
@@ -415,15 +415,15 @@ class TheImageNode(Then[Any, ImageNode]):
         status = self.status or image.status
         written = WrittenByThisRun(datetime.now(UTC))
         return [
-            Held("id", node.id, SameAs(planted, "심은 이미지의 id")),
+            Held("id", node.id, SameAs(planted, "미리 만들어 둔 이미지의 id")),
             Same("name", node.name, image.name),
             Same("image", node.image, image.image),
             Same("registry", node.registry, image.registry),
-            # 두 id는 서로 다른 `EntityIdentifier` 종류이고 그 동등성은 종류까지 본다.
+            # 두 id는 `EntityIdentifier`의 종류가 서로 다르고, 그 동등성은 종류까지 비교한다.
             Held(
                 "registry_id",
                 node.registry_id.int,
-                SameAs(image.registry_id.int, "심은 레지스트리의 id"),
+                SameAs(image.registry_id.int, "미리 만들어 둔 레지스트리의 id"),
             ),
             Same("project", node.project, image.project),
             Same("tag", node.tag, self.tag or image.tag),
@@ -442,7 +442,7 @@ class TheImageNode(Then[Any, ImageNode]):
             Held("config_digest", node.config_digest, PaddedDigest(image.config_digest)),
             Same("is_local", node.is_local, image.is_local),
             Held("created_at", node.created_at, written),
-            Skipped("last_used_at", "세션이 쓰는 값이라 이 실행이 말할 수 없다"),
+            Skipped("last_used_at", "세션이 기록하는 값이라 이 실행에서는 알 수 없다"),
             Same("identity.canonical_name", identity.canonical_name, image.name),
             Same("identity.namespace", identity.namespace, image.image),
             Same("identity.architecture", identity.architecture, image.architecture),
@@ -471,7 +471,7 @@ class TheImageNode(Then[Any, ImageNode]):
 
 
 class Target(ABC):
-    """요청이 지목하는 이미지."""
+    """요청이 지정하는 이미지."""
 
     @abstractmethod
     def says(self) -> str:
@@ -484,11 +484,11 @@ class Target(ABC):
 
 @dataclass(frozen=True)
 class TheLaidImage(Target):
-    """전제가 심어 둔 그 이미지."""
+    """전제에서 미리 만들어 둔 이미지."""
 
     @override
     def says(self) -> str:
-        return "심은 이미지"
+        return "미리 만들어 둔 이미지"
 
     @override
     def id_of(self, laid: AnImageAndACaller) -> uuid.UUID:
@@ -497,11 +497,11 @@ class TheLaidImage(Target):
 
 @dataclass(frozen=True)
 class AnIdThatHoldsNothing(Target):
-    """아무 이미지도 갖지 않는 id."""
+    """어느 이미지도 가리키지 않는 id."""
 
     @override
     def says(self) -> str:
-        return "아무것도 갖지 않은 id"
+        return "어느 이미지도 가리키지 않는 id"
 
     @override
     def id_of(self, laid: AnImageAndACaller) -> uuid.UUID:
@@ -509,7 +509,7 @@ class AnIdThatHoldsNothing(Target):
 
 
 class Paging(ABC):
-    """검색 요청이 한 쪽을 고르는 방식."""
+    """검색 요청이 페이지를 고르는 방식."""
 
     @abstractmethod
     def says(self) -> str:
@@ -522,7 +522,7 @@ class Paging(ABC):
 
 @dataclass(frozen=True)
 class ByOffset(Paging):
-    """크기와 건너뛸 수로 고른다. 생략하면 어댑터가 기본 크기를 채운다."""
+    """크기와 오프셋으로 고른다. 생략하면 어댑터가 기본 크기를 채운다."""
 
     limit: int | None = None
 
@@ -552,11 +552,11 @@ class ByCursor(Paging):
 
 @dataclass(frozen=True)
 class ByABrokenCursor(Paging):
-    """읽을 수 없는 커서 값을 준다."""
+    """해석할 수 없는 커서 값을 지정한다."""
 
     @override
     def says(self) -> str:
-        return "깨진 커서로"
+        return "잘못된 커서로"
 
     @override
     def asked(self) -> dict[str, Any]:
@@ -565,11 +565,11 @@ class ByABrokenCursor(Paging):
 
 @dataclass(frozen=True)
 class ByTwoModesAtOnce(Paging):
-    """크기와 커서를 함께 준다. 어댑터가 방식을 고를 수 없는 자리다."""
+    """크기와 커서를 함께 지정한다. 어댑터가 페이지 방식을 고를 수 없는 경우다."""
 
     @override
     def says(self) -> str:
-        return "크기와 커서를 함께 주고"
+        return "크기와 커서를 함께 지정하고"
 
     @override
     def asked(self) -> dict[str, Any]:

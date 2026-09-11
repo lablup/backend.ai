@@ -1,4 +1,4 @@
-"""이미지 잊기와 되살리기 — 게이트를 지난 뒤에도 소유권 검사가 남는다."""
+"""이미지 소프트 삭제와 복원 — 엔티티 권한을 통과한 뒤에도 소유권 검사가 남는다."""
 
 from __future__ import annotations
 
@@ -37,7 +37,7 @@ ENFORCEMENT = "manager.rbac.enforcement_enabled"
 
 @dataclass(frozen=True)
 class Forgetting(When[AnImageAndACaller, ImageAdapter, ImageNode]):
-    """이미지를 잊는다. 행은 남고 상태만 바뀐다."""
+    """이미지를 소프트 삭제한다. 행은 남고 상태만 바뀐다."""
 
     at: Target = field(default_factory=TheLaidImage)
 
@@ -49,8 +49,8 @@ class Forgetting(When[AnImageAndACaller, ImageAdapter, ImageNode]):
     def describe(self, laid: AnImageAndACaller) -> str:
         who = laid.caller.username
         if isinstance(self.at, AnIdThatHoldsNothing):
-            return f"{who}이 {self.at.says()}를 잊음"
-        return f"{who}이 {laid.image.name}을 잊음"
+            return f"{who}이 {self.at.says()} 소프트 삭제"
+        return f"{who}이 {laid.image.name} 소프트 삭제"
 
     @override
     async def call(self, adapter: ImageAdapter, laid: AnImageAndACaller) -> ImageNode:
@@ -62,7 +62,7 @@ class Forgetting(When[AnImageAndACaller, ImageAdapter, ImageNode]):
 
 @dataclass(frozen=True)
 class Restoring(When[AnImageAndACaller, ImageAdapter, ImageNode]):
-    """잊은 이미지를 되살린다."""
+    """소프트 삭제한 이미지를 복원한다."""
 
     at: Target = field(default_factory=TheLaidImage)
 
@@ -74,8 +74,8 @@ class Restoring(When[AnImageAndACaller, ImageAdapter, ImageNode]):
     def describe(self, laid: AnImageAndACaller) -> str:
         who = laid.caller.username
         if isinstance(self.at, AnIdThatHoldsNothing):
-            return f"{who}이 {self.at.says()}를 되살림"
-        return f"{who}이 {laid.image.name}을 되살림"
+            return f"{who}이 {self.at.says()} 복원"
+        return f"{who}이 {laid.image.name} 복원"
 
     @override
     async def call(self, adapter: ImageAdapter, laid: AnImageAndACaller) -> ImageNode:
@@ -95,7 +95,7 @@ class ForgettingMarksItDeletedAndKeepsTheRow(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 이미지를 잊으면, 행은 남고 지워졌다는 상태를 실은 노드가 온다"
+        return "슈퍼관리자가 이미지를 소프트 삭제하면, 행은 남고 삭제됨 상태가 담긴 노드가 반환된다"
 
     @override
     def given(self) -> Given[SeedingSession, AnImageAndACaller]:
@@ -121,8 +121,8 @@ class TheMakerOfACustomImageMayForgetIt(
     @override
     def describe(self) -> str:
         return (
-            "자기가 만든 커스텀 이미지에 권한까지 받은 사용자가 그것을 잊으면, "
-            "게이트와 소유권 검사를 모두 지나 지워졌다는 상태가 온다"
+            "자기가 만든 커스텀 이미지에 권한까지 받은 사용자가 그것을 소프트 삭제하면, "
+            "엔티티 권한과 소유권 검사를 모두 통과해 삭제됨 상태가 반환된다"
         )
 
     @override
@@ -149,8 +149,8 @@ class AForgottenImageCannotBeReached(
     @override
     def describe(self) -> str:
         return (
-            "잊힌 이미지를 되살리려 하면 이미지가 없다는 이유로 거부된다. "
-            "이미지를 id로 집는 자리가 살아 있는 것만 보기 때문이다"
+            "삭제된 이미지를 복원하려 하면 대상을 찾을 수 없어 거부된다. "
+            "id로 이미지를 조회하는 지점이 살아 있는 것만 대상으로 삼기 때문이다"
         )
 
     @override
@@ -176,7 +176,7 @@ class RestoringWhatWasNeverForgotten(
 
     @override
     def describe(self) -> str:
-        return "살아 있는 이미지를 되살려도 살아 있는 그대로다"
+        return "살아 있는 이미지를 복원해도 살아 있는 상태 그대로다"
 
     @override
     def given(self) -> Given[SeedingSession, AnImageAndACaller]:
@@ -201,7 +201,7 @@ class ForgettingWhatIsNotThere(
 
     @override
     def describe(self) -> str:
-        return "아무 이미지도 갖지 않은 id를 잊으려 하면 이미지가 없다는 이유로 거부된다"
+        return "어느 이미지도 가리키지 않는 id를 소프트 삭제하려 하면 대상을 찾을 수 없어 거부된다"
 
     @override
     def given(self) -> Given[SeedingSession, AnImageAndACaller]:
@@ -224,7 +224,7 @@ class RestoringWhatIsNotThere(Scenario[SeedingSession, AnImageAndACaller, ImageA
 
     @override
     def describe(self) -> str:
-        return "아무 이미지도 갖지 않은 id를 되살리려 하면 이미지가 없다는 이유로 거부된다"
+        return "어느 이미지도 가리키지 않는 id를 복원하려 하면 대상을 찾을 수 없어 거부된다"
 
     @override
     def given(self) -> Given[SeedingSession, AnImageAndACaller]:
@@ -249,7 +249,7 @@ class AnUngrantedUserMayNotForget(
 
     @override
     def describe(self) -> str:
-        return "아무 권한도 받지 않은 사용자가 이미지를 잊으려 하면 권한 부족으로 막힌다"
+        return "아무 권한도 받지 않은 사용자가 이미지를 소프트 삭제하려 하면 권한 부족으로 거부된다"
 
     @override
     def given(self) -> Given[SeedingSession, AnImageAndACaller]:
@@ -274,7 +274,7 @@ class AnUngrantedUserMayNotRestore(
 
     @override
     def describe(self) -> str:
-        return "아무 권한도 받지 않은 사용자가 이미지를 되살리려 하면 권한 부족으로 막힌다"
+        return "아무 권한도 받지 않은 사용자가 이미지를 복원하려 하면 권한 부족으로 거부된다"
 
     @override
     def given(self) -> Given[SeedingSession, AnImageAndACaller]:
@@ -298,8 +298,8 @@ class AGrantIsNotOwnership(Scenario[SeedingSession, AnImageAndACaller, ImageAdap
     @override
     def describe(self) -> str:
         return (
-            "커스터마이즈되지 않은 이미지는 주인이 없으므로, "
-            "그 이미지에 권한을 받은 사용자라도 게이트를 지난 뒤 소유권 검사에서 막힌다"
+            "커스터마이즈되지 않은 이미지에는 소유자가 없으므로, "
+            "그 이미지에 권한을 받은 사용자라도 엔티티 권한을 통과한 뒤 소유권 검사에서 거부된다"
         )
 
     @override
@@ -326,8 +326,8 @@ class EnforcementOffDoesNotReachOwnership(
     @override
     def describe(self) -> str:
         return (
-            "엔티티 권한 집행을 꺼서 게이트를 열어도 주인 없는 이미지는 잊을 수 없다. "
-            "소유권 검사는 그 스위치가 닿지 않는 자리에서 돌기 때문이다"
+            "권한 검사를 비활성화해도 소유자가 없는 이미지는 소프트 삭제할 수 없다. "
+            "소유권 검사는 그 설정의 영향을 받지 않기 때문이다"
         )
 
     @override
@@ -358,8 +358,8 @@ class AnImageBeingPurgedIsNotVisible(
     @override
     def describe(self) -> str:
         return (
-            "지우는 중인 이미지를 잊으려 하면 이미지가 없다는 이유로 거부된다. "
-            "그 상태의 이미지는 id로 집는 자리에서 보이지 않는다"
+            "완전 삭제 중인 이미지를 소프트 삭제하려 하면 대상을 찾을 수 없어 거부된다. "
+            "그 상태의 이미지는 id로 조회하는 지점에서 보이지 않는다"
         )
 
     @override
