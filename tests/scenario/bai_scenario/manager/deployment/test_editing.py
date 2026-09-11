@@ -12,6 +12,7 @@ from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.deployment import (
     ADeploymentAndACaller,
     ADeploymentInThatPlace,
+    AnothersDeploymentAndASuperadmin,
     TheDeploymentNode,
 )
 from bai_scenario.runner.acting import ActingAs
@@ -197,6 +198,36 @@ class ItIsOpenedToThePublic(
 
 
 @dataclass(frozen=True)
+class TheSuperadminEditsAnothers(
+    Scenario[SeedingSession, ADeploymentAndACaller, DeploymentAdapter, DeploymentNode]
+):
+    started: datetime
+
+    @override
+    def summary(self) -> str:
+        return "the-superadmin-renames-anothers-deployment-without-a-grant"
+
+    @override
+    def describe(self) -> str:
+        return (
+            "다른 사람이 만든 배포의 이름을 아무 권한도 받지 않은 슈퍼관리자가 바꾸면, "
+            "이름만 새 값이 된다. 역할이 권한 그래프를 지나간다"
+        )
+
+    @override
+    def given(self) -> Given[SeedingSession, ADeploymentAndACaller]:
+        return AnothersDeploymentAndASuperadmin()
+
+    @override
+    def when(self) -> When[ADeploymentAndACaller, DeploymentAdapter, DeploymentNode]:
+        return Editing(named=RENAMED)
+
+    @override
+    def then(self) -> Then[ADeploymentAndACaller, DeploymentNode]:
+        return TheDeploymentNode(started=self.started, named=RENAMED)
+
+
+@dataclass(frozen=True)
 class ReadingIsNotEnoughToEdit(
     Scenario[SeedingSession, ADeploymentAndACaller, DeploymentAdapter, DeploymentNode]
 ):
@@ -251,6 +282,7 @@ SCENARIOS: list[EditingStep] = [
     TheReplicaCountChanges(started=datetime.now(UTC)),
     TheTagsAreCleared(started=datetime.now(UTC)),
     ItIsOpenedToThePublic(started=datetime.now(UTC)),
+    TheSuperadminEditsAnothers(started=datetime.now(UTC)),
     ReadingIsNotEnoughToEdit(),
     EditingAnUnknownIdIsNotFoundForASuperadmin(),
 ]

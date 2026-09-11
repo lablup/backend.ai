@@ -12,7 +12,11 @@ from uuid import UUID, uuid4
 
 import pytest
 from bai_scenario.components.answers import TheCallIsRefused
-from bai_scenario.components.deployment import ADeploymentAndACaller, ADeploymentInThatPlace
+from bai_scenario.components.deployment import (
+    ADeploymentAndACaller,
+    ADeploymentInThatPlace,
+    AnothersDeploymentAndASuperadmin,
+)
 from bai_scenario.runner.acting import ActingAs
 from bai_scenario.runner.planting import SeedingSession
 from bai_scenario.runner.steps import run_scenario
@@ -113,6 +117,34 @@ class TheGrantedUserRetiresIt(
 
 
 @dataclass(frozen=True)
+class TheSuperadminRetiresAnothers(
+    Scenario[SeedingSession, ADeploymentAndACaller, DeploymentAdapter, DeleteDeploymentPayload]
+):
+    @override
+    def summary(self) -> str:
+        return "the-superadmin-retires-anothers-deployment-without-a-grant"
+
+    @override
+    def describe(self) -> str:
+        return (
+            "다른 사람이 만든 배포를 아무 권한도 받지 않은 슈퍼관리자가 지우면, "
+            "그 배포를 지우기 시작했다고 답한다. 역할이 권한 그래프를 지나간다"
+        )
+
+    @override
+    def given(self) -> Given[SeedingSession, ADeploymentAndACaller]:
+        return AnothersDeploymentAndASuperadmin()
+
+    @override
+    def when(self) -> When[ADeploymentAndACaller, DeploymentAdapter, DeleteDeploymentPayload]:
+        return Retiring()
+
+    @override
+    def then(self) -> Then[ADeploymentAndACaller, DeleteDeploymentPayload]:
+        return TheRetiredOneIsNamed()
+
+
+@dataclass(frozen=True)
 class UpdatingIsNotEnoughToRetire(
     Scenario[SeedingSession, ADeploymentAndACaller, DeploymentAdapter, DeleteDeploymentPayload]
 ):
@@ -167,6 +199,7 @@ class RetiringAnUnknownIdIsNotFoundForASuperadmin(
 
 SCENARIOS: list[RetiringStep] = [
     TheGrantedUserRetiresIt(),
+    TheSuperadminRetiresAnothers(),
     UpdatingIsNotEnoughToRetire(),
     RetiringAnUnknownIdIsNotFoundForASuperadmin(),
 ]

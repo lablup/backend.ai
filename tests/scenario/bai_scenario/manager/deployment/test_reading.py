@@ -16,6 +16,7 @@ from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.deployment import (
     ADeploymentAndACaller,
     ADeploymentInThatPlace,
+    AnothersDeploymentAndASuperadmin,
     TheDeploymentNode,
 )
 from bai_scenario.runner.acting import ActingAs
@@ -217,8 +218,39 @@ class ADeploymentWithNoRevisionHasNoCurrentOne(
         return TheCallIsRefused(DeploymentRevisionNotFound)
 
 
+@dataclass(frozen=True)
+class TheSuperadminReadsAnothers(
+    Scenario[SeedingSession, ADeploymentAndACaller, DeploymentAdapter, DeploymentNode]
+):
+    started: datetime
+
+    @override
+    def summary(self) -> str:
+        return "the-superadmin-reads-anothers-deployment-without-a-grant"
+
+    @override
+    def describe(self) -> str:
+        return (
+            "다른 사람이 만든 배포를 아무 권한도 받지 않은 슈퍼관리자가 id로 조회하면, "
+            "그 배포가 답으로 온다. 역할이 권한 그래프를 지나간다"
+        )
+
+    @override
+    def given(self) -> Given[SeedingSession, ADeploymentAndACaller]:
+        return AnothersDeploymentAndASuperadmin()
+
+    @override
+    def when(self) -> When[ADeploymentAndACaller, DeploymentAdapter, DeploymentNode]:
+        return ReadingById()
+
+    @override
+    def then(self) -> Then[ADeploymentAndACaller, DeploymentNode]:
+        return TheDeploymentNode(started=self.started)
+
+
 SCENARIOS: list[ReadingStep] = [
     TheGrantedUserReadsIt(started=datetime.now(UTC)),
+    TheSuperadminReadsAnothers(started=datetime.now(UTC)),
     AUserGrantedNothingMayNotRead(),
     AnUnknownIdIsRefusedAsPermission(),
     AnUnknownIdIsNotFoundForASuperadmin(),
