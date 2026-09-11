@@ -14,8 +14,8 @@ from typing import Any, override
 import pytest
 from bai_scenario.components.answers import NothingIsFound, TheCallIsRefused
 from bai_scenario.components.audit_log import (
-    ARecordScopedToAProject,
     ActorRecords,
+    ARecordScopedToAProject,
     OneProjectManyRecords,
     OneProjectMixedStatus,
     ProjectRecords,
