@@ -606,6 +606,32 @@ Then
 
 ### executing
 
+#### [a-filter-label-the-preset-allows-reaches-the-query-as-an-exact-match](/tests/scenario/bai_scenario/manager/prometheus_query_preset/test_executing.py) — pass
+
+필터 라벨을 제한해 둔 정의를 슈퍼관리자가 그 목록 안의 라벨로 실행하면, 대역이 받은 질의에 그 라벨이 정확히 일치하는 조건으로 들어 있다
+
+Given
+
+- 이미 있는 정의 하나와, superadmin 한 명
+  - 질의 정의 preset-1: 창이 1h로 적혀 있다, 필터 라벨을 kernel_id로 제한한다
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+
+When
+
+- PrometheusQueryPresetAdapter.execute_preset — user-1이 preset-1을 kernel_id=k1 실행
+
+Then
+
+- 대역이 받은 질의를 실은 결과가 온다
+  - status = 'success'
+  - result_type = 'vector'
+  - result = [([], [(1000.0, 'avg by () (rate(container_cpu_seconds_total{kernel_id="k1"}[1h]))')])]
+
 #### [a-filter-label-the-preset-does-not-allow-is-refused](/tests/scenario/bai_scenario/manager/prometheus_query_preset/test_executing.py) — pass
 
 필터 라벨을 제한해 둔 정의를 슈퍼관리자가 그 목록에 없는 라벨로 실행하면, 외부에 질의하기 전에 라벨로 거부된다
@@ -623,12 +649,38 @@ Given
 
 When
 
-- PrometheusQueryPresetAdapter.execute_preset — user-1이 preset-1을 session_id=abc 라벨로 실행
+- PrometheusQueryPresetAdapter.execute_preset — user-1이 preset-1을 session_id=s1 실행
 
 Then
 
 - 거부된다
   - 거부: PrometheusQueryPresetInvalidLabel
+
+#### [a-group-label-the-preset-allows-reaches-the-query](/tests/scenario/bai_scenario/manager/prometheus_query_preset/test_executing.py) — pass
+
+묶음 라벨을 제한해 둔 정의를 슈퍼관리자가 그 목록 안의 라벨로 실행하면, 대역이 받은 질의의 묶음에 그 라벨이 들어 있다
+
+Given
+
+- 이미 있는 정의 하나와, superadmin 한 명
+  - 질의 정의 preset-1: 창이 1h로 적혀 있다, 묶음 라벨을 agent_id로 제한한다
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+
+When
+
+- PrometheusQueryPresetAdapter.execute_preset — user-1이 preset-1을 묶음 agent_id 실행
+
+Then
+
+- 대역이 받은 질의를 실은 결과가 온다
+  - status = 'success'
+  - result_type = 'vector'
+  - result = [([], [(1000.0, 'avg by (agent_id) (rate(container_cpu_seconds_total{}[1h]))')])]
 
 #### [a-group-label-the-preset-does-not-allow-is-refused](/tests/scenario/bai_scenario/manager/prometheus_query_preset/test_executing.py) — pass
 
@@ -647,16 +699,118 @@ Given
 
 When
 
-- PrometheusQueryPresetAdapter.execute_preset — user-1이 preset-1을 묶음 session_id 라벨로 실행
+- PrometheusQueryPresetAdapter.execute_preset — user-1이 preset-1을 묶음 session_id 실행
 
 Then
 
 - 거부된다
   - 거부: PrometheusQueryPresetInvalidLabel
 
+#### [a-preset-and-a-request-naming-no-window-run-with-the-server-default](/tests/scenario/bai_scenario/manager/prometheus_query_preset/test_executing.py) — pass
+
+창이 없는 정의를 슈퍼관리자가 창 없이 실행하면, 대역이 받은 질의의 창이 서버 설정의 기본 창이다
+
+Given
+
+- 이미 있는 정의 하나와, superadmin 한 명
+  - 질의 정의 preset-1
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+
+When
+
+- PrometheusQueryPresetAdapter.execute_preset — user-1이 preset-1을 아무것도 주지 않고 실행
+
+Then
+
+- 대역이 받은 질의를 실은 결과가 온다
+  - status = 'success'
+  - result_type = 'vector'
+  - result = [([], [(1000.0, 'avg by () (rate(container_cpu_seconds_total{}[2m]))')])]
+
+#### [a-preset-restricting-no-label-runs-with-any-label](/tests/scenario/bai_scenario/manager/prometheus_query_preset/test_executing.py) — pass
+
+허용 라벨 목록이 빈 정의를 슈퍼관리자가 아무 라벨이나 주고 실행하면, 대역이 받은 질의에 그 라벨이 들어 있다
+
+Given
+
+- 이미 있는 정의 하나와, superadmin 한 명
+  - 질의 정의 preset-1: 창이 1h로 적혀 있다
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+
+When
+
+- PrometheusQueryPresetAdapter.execute_preset — user-1이 preset-1을 session_id=s1, 묶음 agent_id 실행
+
+Then
+
+- 대역이 받은 질의를 실은 결과가 온다
+  - status = 'success'
+  - result_type = 'vector'
+  - result = [([], [(1000.0, 'avg by (agent_id) (rate(container_cpu_seconds_total{session_id="s1"}[1h]))')])]
+
+#### [a-query-prometheus-refuses-is-refused-as-a-failed-metric-read](/tests/scenario/bai_scenario/manager/prometheus_query_preset/test_executing.py) — pass
+
+라벨 없이는 빈 질의로 렌더되는 정의를 슈퍼관리자가 라벨 없이 실행하면, Prometheus가 그 질의를 거부하고 그 거부가 지표를 얻지 못했다는 이유로 그대로 올라온다
+
+Given
+
+- 이미 있는 정의 하나와, superadmin 한 명
+  - 질의 정의 preset-1: 라벨 없이는 빈 질의로 렌더되는 템플릿을 갖고 있다
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+
+When
+
+- PrometheusQueryPresetAdapter.execute_preset — user-1이 preset-1을 아무것도 주지 않고 실행
+
+Then
+
+- 거부된다
+  - 거부: FailedToGetMetric
+
+#### [a-request-naming-no-window-runs-with-the-window-of-the-preset](/tests/scenario/bai_scenario/manager/prometheus_query_preset/test_executing.py) — pass
+
+창이 적힌 정의를 슈퍼관리자가 창 없이 실행하면, 대역이 받은 질의의 창이 정의의 창이다
+
+Given
+
+- 이미 있는 정의 하나와, superadmin 한 명
+  - 질의 정의 preset-1: 창이 1h로 적혀 있다
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+
+When
+
+- PrometheusQueryPresetAdapter.execute_preset — user-1이 preset-1을 아무것도 주지 않고 실행
+
+Then
+
+- 대역이 받은 질의를 실은 결과가 온다
+  - status = 'success'
+  - result_type = 'vector'
+  - result = [([], [(1000.0, 'avg by () (rate(container_cpu_seconds_total{}[1h]))')])]
+
 #### [a-user-who-may-read-a-preset-may-not-run-it](/tests/scenario/bai_scenario/manager/prometheus_query_preset/test_executing.py) — pass
 
-정의를 읽을 수는 있는 아무 권한도 받지 않은 사용자가 실행하면, 권한 부족으로 거부된다. 이 엔티티는 어느 스코프에도 없어 권한을 받을 길이 없다
+정의를 읽을 수는 있는 아무 권한도 받지 않은 사용자가 실행하면, 권한 부족으로 거부된다. 이 엔티티는 어느 스코프에도 없어 역할로는 권한을 받을 길이 없다
 
 Given
 
@@ -671,12 +825,64 @@ Given
 
 When
 
-- PrometheusQueryPresetAdapter.execute_preset — user-1이 preset-1을 라벨 없이 실행
+- PrometheusQueryPresetAdapter.execute_preset — user-1이 preset-1을 아무것도 주지 않고 실행
 
 Then
 
 - 거부된다
   - 거부: NotEnoughPermission
+
+#### [running-a-preset-over-a-range-is-a-range-query](/tests/scenario/bai_scenario/manager/prometheus_query_preset/test_executing.py) — pass
+
+슈퍼관리자가 시작·끝·간격을 주고 실행하면, 대역이 범위 질의로 답한다
+
+Given
+
+- 이미 있는 정의 하나와, superadmin 한 명
+  - 질의 정의 preset-1: 창이 1h로 적혀 있다
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+
+When
+
+- PrometheusQueryPresetAdapter.execute_preset — user-1이 preset-1을 구간 실행
+
+Then
+
+- 대역이 받은 질의를 실은 결과가 온다
+  - status = 'success'
+  - result_type = 'matrix'
+  - result = [([], [(1000.0, 'avg by () (rate(container_cpu_seconds_total{}[1h]))')])]
+
+#### [running-a-preset-without-a-range-is-an-instant-query-carrying-the-asked-window](/tests/scenario/bai_scenario/manager/prometheus_query_preset/test_executing.py) — pass
+
+창이 없는 정의를 슈퍼관리자가 창을 주고 구간 없이 실행하면, 순간 질의로 답하고 대역이 받은 질의에 요청의 창이 들어 있다
+
+Given
+
+- 이미 있는 정의 하나와, superadmin 한 명
+  - 질의 정의 preset-1
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+
+When
+
+- PrometheusQueryPresetAdapter.execute_preset — user-1이 preset-1을 창 30s 실행
+
+Then
+
+- 대역이 받은 질의를 실은 결과가 온다
+  - status = 'success'
+  - result_type = 'vector'
+  - result = [([], [(1000.0, 'avg by () (rate(container_cpu_seconds_total{}[30s]))')])]
 
 #### [running-an-id-nothing-answers-to-is-not-found-for-a-superadmin](/tests/scenario/bai_scenario/manager/prometheus_query_preset/test_executing.py) — pass
 
@@ -695,7 +901,7 @@ Given
 
 When
 
-- PrometheusQueryPresetAdapter.execute_preset — user-1이 아무것도 갖지 않은 id을 라벨 없이 실행
+- PrometheusQueryPresetAdapter.execute_preset — user-1이 아무것도 갖지 않은 id을 아무것도 주지 않고 실행
 
 Then
 
@@ -719,21 +925,21 @@ Given
 
 When
 
-- PrometheusQueryPresetAdapter.execute_preset — user-1이 아무것도 갖지 않은 id을 라벨 없이 실행
+- PrometheusQueryPresetAdapter.execute_preset — user-1이 아무것도 갖지 않은 id을 아무것도 주지 않고 실행
 
 Then
 
 - 거부된다
   - 거부: NotEnoughPermission
 
-#### [the-superadmin-runs-a-preset-and-gets-what-prometheus-answered](/tests/scenario/bai_scenario/manager/prometheus_query_preset/test_executing.py) — pass
+#### [the-window-a-request-names-wins-over-the-window-of-the-preset](/tests/scenario/bai_scenario/manager/prometheus_query_preset/test_executing.py) — pass
 
-정의 하나가 있고 대역이 결과 하나를 답하도록 세워 둔 채 슈퍼관리자가 실행하면, 대역이 준 상태와 결과 종류와 값이 그대로 실려 온다
+창이 적힌 정의를 슈퍼관리자가 다른 창을 주고 실행하면, 대역이 받은 질의의 창이 요청의 창이다
 
 Given
 
 - 이미 있는 정의 하나와, superadmin 한 명
-  - 질의 정의 preset-1
+  - 질의 정의 preset-1: 창이 1h로 적혀 있다
   - 도메인 home-1
   - 도메인에 속한 사용자 한 명 준비
     - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
@@ -743,14 +949,14 @@ Given
 
 When
 
-- PrometheusQueryPresetAdapter.execute_preset — user-1이 preset-1을 라벨 없이 실행
+- PrometheusQueryPresetAdapter.execute_preset — user-1이 preset-1을 창 30s 실행
 
 Then
 
-- 대역이 답한 결과가 그대로 온다
+- 대역이 받은 질의를 실은 결과가 온다
   - status = 'success'
   - result_type = 'vector'
-  - result = [([], [(1000.0, '1')])]
+  - result = [([], [(1000.0, 'avg by () (rate(container_cpu_seconds_total{}[30s]))')])]
 
 #### [turning-enforcement-off-lets-a-user-run-a-preset](/tests/scenario/bai_scenario/manager/prometheus_query_preset/test_executing.py) — pass
 
@@ -759,7 +965,7 @@ Then
 Given
 
 - 이미 있는 정의 하나와, user 한 명
-  - 질의 정의 preset-1
+  - 질의 정의 preset-1: 창이 1h로 적혀 있다
   - 도메인 home-1
   - 도메인에 속한 사용자 한 명 준비
     - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
@@ -769,14 +975,14 @@ Given
 
 When
 
-- PrometheusQueryPresetAdapter.execute_preset — user-1이 preset-1을 라벨 없이 실행
+- PrometheusQueryPresetAdapter.execute_preset — user-1이 preset-1을 아무것도 주지 않고 실행
 
 Then
 
-- 대역이 답한 결과가 그대로 온다
+- 대역이 받은 질의를 실은 결과가 온다
   - status = 'success'
   - result_type = 'vector'
-  - result = [([], [(1000.0, '1')])]
+  - result = [([], [(1000.0, 'avg by () (rate(container_cpu_seconds_total{}[1h]))')])]
 
 ### loading
 
@@ -834,6 +1040,29 @@ Then
 
 ### previewing
 
+#### [a-query-prometheus-refuses-is-refused-as-an-evaluation-failure](/tests/scenario/bai_scenario/manager/prometheus_query_preset/test_previewing.py) — pass
+
+슈퍼관리자가 빈 질의로 렌더되는 템플릿을 미리 보면, Prometheus가 그 질의를 거부하고 그 거부가 평가 실패로 바뀌어 올라온다. 실행의 같은 줄과 다른 것으로 거부된다
+
+Given
+
+- 정의가 하나도 없고, superadmin 한 명
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+
+When
+
+- PrometheusQueryPresetAdapter.admin_preview — user-1이 빈 질의로 렌더되는 템플릿을 미리 봄
+
+Then
+
+- 거부된다
+  - 거부: PrometheusQueryEvaluationFailed
+
 #### [a-template-the-renderer-refuses-cannot-be-previewed](/tests/scenario/bai_scenario/manager/prometheus_query_preset/test_previewing.py) — pass
 
 슈퍼관리자가 렌더러가 받지 않는 템플릿을 미리 보면, 외부에 묻기 전에 템플릿으로 거부된다
@@ -880,6 +1109,31 @@ Then
 - 거부된다
   - 거부: InsufficientPrivilege
 
+#### [previewing-a-template-is-an-instant-query-with-the-server-window-and-no-label](/tests/scenario/bai_scenario/manager/prometheus_query_preset/test_previewing.py) — pass
+
+슈퍼관리자가 템플릿만 주고 미리 보면, 순간 질의로 답하고 대역이 받은 질의의 창은 서버 설정의 기본 창이며 라벨은 비어 있다
+
+Given
+
+- 정의가 하나도 없고, superadmin 한 명
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+
+When
+
+- PrometheusQueryPresetAdapter.admin_preview — user-1이 템플릿을 미리 봄
+
+Then
+
+- 대역이 받은 질의를 실은 결과가 온다
+  - status = 'success'
+  - result_type = 'vector'
+  - result = [([], [(1000.0, 'avg by () (rate(container_cpu_seconds_total{}[2m]))')])]
+
 #### [the-monitor-role-previews-a-template](/tests/scenario/bai_scenario/manager/prometheus_query_preset/test_previewing.py) — pass
 
 모니터 역할이 템플릿을 미리 보면, 대역이 답한 결과가 온다. 전역 문은 읽기에 한해 그 역할을 지나게 한다
@@ -900,35 +1154,10 @@ When
 
 Then
 
-- 대역이 답한 결과가 그대로 온다
+- 대역이 받은 질의를 실은 결과가 온다
   - status = 'success'
   - result_type = 'vector'
-  - result = [([], [(1000.0, '1')])]
-
-#### [the-superadmin-previews-a-template-and-gets-what-prometheus-answered](/tests/scenario/bai_scenario/manager/prometheus_query_preset/test_previewing.py) — pass
-
-대역이 결과를 답하도록 세워 둔 채 슈퍼관리자가 템플릿만 주고 미리 보면, 대역이 답한 결과가 온다
-
-Given
-
-- 정의가 하나도 없고, superadmin 한 명
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-
-When
-
-- PrometheusQueryPresetAdapter.admin_preview — user-1이 템플릿을 미리 봄
-
-Then
-
-- 대역이 답한 결과가 그대로 온다
-  - status = 'success'
-  - result_type = 'vector'
-  - result = [([], [(1000.0, '1')])]
+  - result = [([], [(1000.0, 'avg by () (rate(container_cpu_seconds_total{}[2m]))')])]
 
 ### reading
 
