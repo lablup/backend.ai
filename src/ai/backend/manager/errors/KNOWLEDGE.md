@@ -11,7 +11,7 @@ sources:
   - src/ai/backend/manager/api/gql/extensions/exception_handler.py
 generated:
   by: claude-code/opus-5
-  at: 2026-09-10
+  at: 2026-09-11
 status: stable
 ---
 
