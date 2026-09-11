@@ -18,7 +18,6 @@ from ai.backend.manager.models.entity_share.scopes import (
     EntityShareOwningScope,
     EntityShareRecipientProjectScope,
     EntityShareRecipientScope,
-    EntityShareSharerScope,
 )
 from ai.backend.manager.models.entity_share.searchers import EntityShareSearcher
 from ai.backend.manager.models.scopes import OperationScope
@@ -26,7 +25,6 @@ from ai.backend.manager.models.scopes import OperationScope
 __all__ = (
     "EntityShareRecipientProjectScopeItem",
     "EntityShareRecipientScopeItem",
-    "EntityShareSharerScopeItem",
     "EntityShareScopeItem",
     "EntityShareOwningScopeItem",
     "SearchEntitySharesAction",
@@ -53,20 +51,6 @@ class EntityShareRecipientScopeItem(EntityShareScopeItem):
 
 
 @dataclass(frozen=True)
-class EntityShareSharerScopeItem(EntityShareScopeItem):
-    """The shares one person sent."""
-
-    user_id: UserID
-
-    @override
-    def scope_id(self) -> EntityIdentifier:
-        return self.user_id
-
-    @override
-    def operation_scope(self) -> OperationScope:
-        return EntityShareSharerScope(sharer_user_id=self.user_id)
-
-
 @dataclass(frozen=True)
 class EntityShareRecipientProjectScopeItem(EntityShareScopeItem):
     """The shares addressed to one project."""

@@ -23,7 +23,6 @@ __all__ = (
     "EntityShareOwningScope",
     "EntityShareRecipientProjectScope",
     "EntityShareRecipientScope",
-    "EntityShareSharerScope",
 )
 
 
