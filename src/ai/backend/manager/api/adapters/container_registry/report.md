@@ -111,6 +111,36 @@ Then
 - 답이 없고 예외도 없다
   - 거부: NotEnoughPermission
 
+#### [a-user-granted-on-the-registry-but-not-the-project-is-refused](/tests/scenario/bai_scenario/manager/container_registry/test_allowing_projects.py) — pass
+
+레지스트리에만 권한을 받고 프로젝트에는 받지 못한 사용자가 프로젝트를 허용하려 하면, 관계 동작은 지목한 스코프를 모두 보므로 권한 부족으로 막힌다
+
+Given
+
+- 레지스트리 하나, 프로젝트 하나, 레지스트리에 권한 있음인 사용자 한 명
+  - 도메인 home-1
+  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+  - 프로젝트 project-1
+  - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
+  - 도메인에 속한 사용자 한 명 준비
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+  - allow-on-registry 권한을 받은 사용자 준비
+    - 역할 allow-on-registry-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 allow-on-registry-1: container_registry 전체에 CREATE 허용
+    - 역할 allow-on-registry-1: container_registry 전체에 SOFT_DELETE 허용
+    - 일반 사용자 user-1: 역할 allow-on-registry-1 보유
+
+When
+
+- ContainerRegistryAdapter.apply_allowed_groups — user-1이 허용 목록에 넣음
+
+Then
+
+- 거부된다
+  - 거부: NotEnoughPermission
+
 #### [allowing-a-project-that-is-already-allowed-is-not-an-error](/tests/scenario/bai_scenario/manager/container_registry/test_allowing_projects.py) — pass
 
 이미 허용된 프로젝트를 다시 허용 목록에 넣어도 거부되지 않는다. 그 쌍은 데이터베이스에서 건너뛴다
@@ -183,36 +213,6 @@ Then
 - 답이 없고 예외도 없다
   - 거부: NotEnoughPermission
 
-#### [holding-only-one-of-the-two-scopes-is-not-enough-to-allow-a-project](/tests/scenario/bai_scenario/manager/container_registry/test_allowing_projects.py) — pass
-
-레지스트리에만 권한을 받고 프로젝트에는 받지 못한 사용자가 프로젝트를 허용하려 하면, 관계 동작은 지목한 스코프를 모두 보므로 권한 부족으로 막힌다
-
-Given
-
-- 레지스트리 하나, 프로젝트 하나, 레지스트리에 권한 있음인 사용자 한 명
-  - 도메인 home-1
-  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-  - 프로젝트 project-1
-  - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
-  - 도메인에 속한 사용자 한 명 준비
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - allow-on-registry 권한을 받은 사용자 준비
-    - 역할 allow-on-registry-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 allow-on-registry-1: container_registry 전체에 CREATE 허용
-    - 역할 allow-on-registry-1: container_registry 전체에 SOFT_DELETE 허용
-    - 일반 사용자 user-1: 역할 allow-on-registry-1 보유
-
-When
-
-- ContainerRegistryAdapter.apply_allowed_groups — user-1이 허용 목록에 넣음
-
-Then
-
-- 거부된다
-  - 거부: NotEnoughPermission
-
 #### [turning-enforcement-off-lets-an-ungranted-user-allow-a-project](/tests/scenario/bai_scenario/manager/container_registry/test_allowing_projects.py) — pass
 
 엔티티 권한 집행을 끄면 아무 권한도 받지 않은 사용자도 프로젝트를 허용할 수 있다. 이 문은 역할이 아니라 권한 그래프가 지키기 때문이다
@@ -246,25 +246,14 @@ Then
 
 Given
 
-- 레지스트리 하나, 프로젝트 하나, 레지스트리, 프로젝트에 권한 있음인 사용자 한 명
+- 레지스트리 없음, 프로젝트 하나, 도메인 하나에 속한 superadmin 한 명
   - 도메인 home-1
   - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
   - 프로젝트 project-1
-  - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
   - 도메인에 속한 사용자 한 명 준비
     - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
     - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
     - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - allow-on-registry 권한을 받은 사용자 준비
-    - 역할 allow-on-registry-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 allow-on-registry-1: container_registry 전체에 CREATE 허용
-    - 역할 allow-on-registry-1: container_registry 전체에 SOFT_DELETE 허용
-    - 슈퍼관리자 user-1: 역할 allow-on-registry-1 보유
-  - allow-on-project 권한을 받은 사용자 준비
-    - 역할 allow-on-project-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 allow-on-project-1: container_registry 전체에 CREATE 허용
-    - 역할 allow-on-project-1: container_registry 전체에 SOFT_DELETE 허용
-    - 슈퍼관리자 user-1: 역할 allow-on-project-1 보유
 
 When
 
@@ -289,25 +278,14 @@ Then
 
 Given
 
-- 레지스트리 하나, 프로젝트 하나, 레지스트리, 프로젝트에 권한 있음인 사용자 한 명
+- 레지스트리 없음, 프로젝트 하나, 도메인 하나에 속한 superadmin 한 명
   - 도메인 home-1
   - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
   - 프로젝트 project-1
-  - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
   - 도메인에 속한 사용자 한 명 준비
     - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
     - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
     - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - allow-on-registry 권한을 받은 사용자 준비
-    - 역할 allow-on-registry-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 allow-on-registry-1: container_registry 전체에 CREATE 허용
-    - 역할 allow-on-registry-1: container_registry 전체에 SOFT_DELETE 허용
-    - 슈퍼관리자 user-1: 역할 allow-on-registry-1 보유
-  - allow-on-project 권한을 받은 사용자 준비
-    - 역할 allow-on-project-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 allow-on-project-1: container_registry 전체에 CREATE 허용
-    - 역할 allow-on-project-1: container_registry 전체에 SOFT_DELETE 허용
-    - 슈퍼관리자 user-1: 역할 allow-on-project-1 보유
 
 When
 
@@ -320,14 +298,15 @@ Then
 
 #### [a-user-who-is-not-the-superadmin-may-not-create-a-registry](/tests/scenario/bai_scenario/manager/container_registry/test_creating.py) — pass
 
-슈퍼관리자가 아닌 사용자가 레지스트리를 만들려 하면, 권한을 얼마나 받았는지와 무관하게 역할로 막힌다
+슈퍼관리자가 아닌 사용자가 레지스트리를 만들려 하면 권한 부족으로 거부된다. 이 호출은 부른 사람이 슈퍼관리자인지만 보고, 어떤 권한을 받았는지는 보지 않는다
 
 Given
 
-- 레지스트리 없음, 도메인 하나에 속한 user 한 명
+- 레지스트리 없음, 프로젝트 하나, 도메인 하나에 속한 user 한 명
   - 도메인 home-1
+  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+  - 프로젝트 project-1
   - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
     - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
     - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
     - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
@@ -341,47 +320,17 @@ Then
 - 거부된다
   - 거부: InsufficientPrivilege
 
-#### [an-address-the-update-path-would-refuse-still-creates-a-registry](/tests/scenario/bai_scenario/manager/container_registry/test_creating.py) — pass
-
-호스트가 없는 주소로도 레지스트리가 만들어진다. 주소 검사는 고치는 경로에만 있고 만드는 경로에는 없기 때문이다
-
-Given
-
-- 레지스트리 없음, 도메인 하나에 속한 superadmin 한 명
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-
-When
-
-- ContainerRegistryAdapter.admin_create — user-1이 허용 목록 없이 http://로 만듦
-
-Then
-
-- 만든 레지스트리 전체가 온다
-  - url = 'http://'
-  - registry_name = 'made-registry'
-  - type = <ContainerRegistryType.DOCKER: 'docker'>
-  - project = None
-  - username = None
-  - ssl_verify = True
-  - is_global = True
-  - extra = None
-  - id: 무시함 — 데이터베이스가 만든다
-
 #### [creating-a-registry-with-only-the-required-values-leaves-the-rest-empty](/tests/scenario/bai_scenario/manager/container_registry/test_creating.py) — pass
 
 슈퍼관리자가 주소와 이름과 종류만 주고 레지스트리를 만들면, 나머지 자리가 모두 비어 있는 노드가 답으로 온다
 
 Given
 
-- 레지스트리 없음, 도메인 하나에 속한 superadmin 한 명
+- 레지스트리 없음, 프로젝트 하나, 도메인 하나에 속한 superadmin 한 명
   - 도메인 home-1
+  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+  - 프로젝트 project-1
   - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
     - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
     - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
     - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
@@ -405,14 +354,15 @@ Then
 
 #### [turning-enforcement-off-still-does-not-let-a-user-create-a-registry](/tests/scenario/bai_scenario/manager/container_registry/test_creating.py) — pass
 
-엔티티 권한 집행을 꺼도 레지스트리 생성은 여전히 막힌다. 이 문은 권한 그래프가 아니라 역할이 지키기 때문이다
+엔티티 권한 집행을 꺼도 슈퍼관리자가 아닌 사용자는 여전히 권한 부족으로 거부된다. 집행 스위치는 권한 그래프만 끄고, 부른 사람이 슈퍼관리자인지 보는 검사는 그대로 남기 때문이다
 
 Given
 
-- 레지스트리 없음, 도메인 하나에 속한 user 한 명
+- 레지스트리 없음, 프로젝트 하나, 도메인 하나에 속한 user 한 명
   - 도메인 home-1
+  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+  - 프로젝트 project-1
   - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
     - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
     - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
     - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
@@ -430,7 +380,7 @@ Then
 
 #### [a-user-who-is-not-the-superadmin-may-not-edit-a-registry](/tests/scenario/bai_scenario/manager/container_registry/test_editing.py) — pass
 
-슈퍼관리자가 아닌 사용자가 레지스트리를 고치려 하면 역할로 막힌다
+슈퍼관리자가 아닌 사용자가 레지스트리를 고치려 하면 권한 부족으로 거부된다. 이 호출은 부른 사람이 슈퍼관리자인지만 보고, 어떤 권한을 받았는지는 보지 않는다
 
 Given
 
@@ -592,7 +542,7 @@ Then
 
 #### [a-plain-user-loading-many-ids-is-refused-as-a-whole](/tests/scenario/bai_scenario/manager/container_registry/test_reading.py) — pass
 
-슈퍼관리자가 아닌 사용자가 id 여럿을 한 번에 읽으려 하면, 원소별로 갈리지 않고 요청 전체가 역할로 막힌다
+슈퍼관리자가 아닌 사용자가 id 여럿을 한 번에 읽으려 하면, 원소별로 갈리지 않고 요청 전체가 권한 부족으로 거부된다. 이 호출은 id를 보기 전에 부른 사람이 슈퍼관리자인지부터 본다
 
 Given
 
@@ -670,7 +620,7 @@ Then
 
 #### [a-user-who-is-not-the-superadmin-may-not-delete-a-registry](/tests/scenario/bai_scenario/manager/container_registry/test_retiring.py) — pass
 
-슈퍼관리자가 아닌 사용자가 레지스트리를 지우려 하면 역할로 막힌다
+슈퍼관리자가 아닌 사용자가 레지스트리를 지우려 하면 권한 부족으로 거부된다. 이 호출은 부른 사람이 슈퍼관리자인지만 보고, 어떤 권한을 받았는지는 보지 않는다
 
 Given
 
@@ -770,7 +720,7 @@ Then
 
 #### [a-user-who-is-not-the-superadmin-may-not-search-registries](/tests/scenario/bai_scenario/manager/container_registry/test_searching.py) — pass
 
-슈퍼관리자가 아닌 사용자가 레지스트리를 검색하려 하면 역할로 막힌다
+슈퍼관리자가 아닌 사용자가 레지스트리를 검색하려 하면 권한 부족으로 거부된다. 이 호출은 부른 사람이 슈퍼관리자인지만 보고, 어떤 권한을 받았는지는 보지 않는다
 
 Given
 
