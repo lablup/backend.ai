@@ -1594,12 +1594,12 @@ class AbstractAgent[
             try:
                 alive_containers = await self.enumerate_containers()
                 alive_kernel_ids = {kid for kid, _ in alive_containers}
-                registered_kernel_ids = {
-                    kid
+                registered_kernels = {
+                    kid: kernel
                     for kid, kernel in self.kernel_registry.items()
                     if kernel.state == KernelLifecycleStatus.RUNNING and self._is_reconcilable(kid)
                 }
-                dangling_kernel_ids = registered_kernel_ids - alive_kernel_ids
+                dangling_kernel_ids = set(registered_kernels) - alive_kernel_ids
                 if dangling_kernel_ids:
                     # Confirmed against a fresh listing before anything is closed: this cleanup
                     # unregisters the kernel, and the lifecycle sync then destroys the container
@@ -1612,9 +1612,14 @@ class AbstractAgent[
                         "cleaning up dangling kernel objects (kernel ids): {}",
                         ", ".join(map(str, dangling_kernel_ids)),
                     )
+                    # Carrying the objects, not just the ids: the task below runs later, and by
+                    # then a restart may have put a new object under the same id.
                     cleanup_task = asyncio.create_task(
                         asyncio.wait_for(
-                            self.clean_kernel_objects(dangling_kernel_ids), timeout=30.0
+                            self.clean_kernel_objects({
+                                kid: registered_kernels[kid] for kid in dangling_kernel_ids
+                            }),
+                            timeout=30.0,
                         )
                     )
                     cleanup_tasks.add(cleanup_task)
@@ -1624,11 +1629,17 @@ class AbstractAgent[
             finally:
                 await asyncio.sleep(60.0)
 
-    async def clean_kernel_objects(self, kernel_ids: Iterable[KernelId]) -> None:
+    async def clean_kernel_objects(self, kernels: Mapping[KernelId, AbstractKernel]) -> None:
         """
         Clean up the given kernel objects from the registry.
+
+        Keyed by the object each id was judged as, so a cleanup that starts after the id was
+        re-used closes nothing.
         """
-        tasks = [self._clean_kernel_object(kernel_id) for kernel_id in kernel_ids]
+        tasks = [
+            self._clean_kernel_object(kernel_id, expected)
+            for kernel_id, expected in kernels.items()
+        ]
         try:
             await asyncio.gather(*tasks, return_exceptions=True)
         except TimeoutError:
@@ -1636,19 +1647,33 @@ class AbstractAgent[
                 "clean_kernel_objects() timed out, some kernel objects may not be cleaned up"
             )
 
-    async def _clean_kernel_object(self, kernel_id: KernelId) -> None:
+    async def _clean_kernel_object(
+        self, kernel_id: KernelId, expected: AbstractKernel | None = None
+    ) -> None:
         """
         Clean up the given kernel objects from the registry.
+
+        `expected` is the object the caller judged; the id is re-checked against it under the
+        lock, because a restart can re-use the id between that judgement and this call.
         """
         # TODO: Reduce `kernel_registry` dependencies and roles
         log.info("cleaning kernel object (kernel:{})", kernel_id)
-        kernel_obj = self.kernel_registry.get(kernel_id)
-        if kernel_obj is None:
-            log.warning(
-                "kernel object already removed (kernel:{})",
-                kernel_id,
-            )
-            return
+        async with self.registry_lock:
+            kernel_obj = self.kernel_registry.get(kernel_id)
+            if kernel_obj is None:
+                log.warning(
+                    "kernel object already removed (kernel:{})",
+                    kernel_id,
+                )
+                return
+            if expected is not None and (
+                kernel_obj is not expected or not self._is_reconcilable(kernel_id)
+            ):
+                log.warning(
+                    "kernel object was taken over before its cleanup ran (kernel:{}); leaving it",
+                    kernel_id,
+                )
+                return
         try:
             if kernel_obj.runner is not None:
                 await kernel_obj.runner.close()
@@ -1817,6 +1842,49 @@ class AbstractAgent[
                             kernel_id,
                         )
 
+    async def _report_kernels_whose_container_is_gone(
+        self,
+        candidates: Mapping[KernelId, AbstractKernel],
+        kernel_session_map: Mapping[KernelId, SessionId],
+    ) -> None:
+        """Raise CLEAN for the candidates a second listing also has no container for.
+
+        The listing the candidates came from was taken before the registry lock, so a kernel
+        whose container started in between is missing from it while already RUNNING -- and the
+        CLEAN this raises removes the container with `force=True`, scratch and all.
+        """
+        if not candidates:
+            return
+        confirmed = await self._confirm_kernels_have_no_container(set(candidates))
+        if not confirmed:
+            return
+        events: list[ContainerLifecycleEvent] = []
+        async with self.registry_lock:
+            for kernel_id in confirmed:
+                kernel_obj = self.kernel_registry.get(kernel_id)
+                # The same object, still RUNNING, still not in flight: a create or restart that
+                # replaced it between the two listings owns it now.
+                if (
+                    kernel_obj is not candidates[kernel_id]
+                    or kernel_obj.state != KernelLifecycleStatus.RUNNING
+                    or not self._is_reconcilable(kernel_id)
+                ):
+                    continue
+                log.debug("kernel with no container (kid: {})", kernel_id)
+                events.append(
+                    ContainerLifecycleEvent(
+                        kernel_id,
+                        kernel_session_map[kernel_id],
+                        ContainerId(kernel_obj.container_id)
+                        if kernel_obj.container_id is not None
+                        else None,
+                        LifecycleEvent.CLEAN,
+                        KernelLifecycleEventReason.CONTAINER_NOT_FOUND,
+                    )
+                )
+        for ev in events:
+            await self.container_lifecycle_queue.put(ev)
+
     async def sync_container_lifecycles(self) -> None:
         """
         Periodically synchronize the alive/known container sets,
@@ -1832,6 +1900,7 @@ class AbstractAgent[
         kernel_session_map: dict[KernelId, SessionId] = {}
         own_kernels: dict[KernelId, ContainerId] = {}
         terminated_kernels: dict[KernelId, ContainerLifecycleEvent] = {}
+        gone_candidates: dict[KernelId, AbstractKernel] = {}
 
         def _get_session_id(container: Container) -> SessionId | None:
             _session_id = container.labels.get(LabelName.SESSION_ID)
@@ -1922,14 +1991,22 @@ class AbstractAgent[
                             or kernel_obj.state != KernelLifecycleStatus.RUNNING
                         ):
                             continue
-                        log.debug("kernel with no container (kid: {})", kernel_id)
-                        terminated_kernels[kernel_id] = ContainerLifecycleEvent(
-                            kernel_id,
-                            kernel_session_map[kernel_id],
-                            known_kernels[kernel_id],
-                            LifecycleEvent.CLEAN,
-                            KernelLifecycleEventReason.CONTAINER_NOT_FOUND,
-                        )
+                        if kernel_id in terminated_kernels:
+                            # Its container WAS listed, just not alive. Absence is not in question,
+                            # so this keeps the reason it has always had.
+                            log.debug("kernel with no container (kid: {})", kernel_id)
+                            terminated_kernels[kernel_id] = ContainerLifecycleEvent(
+                                kernel_id,
+                                kernel_session_map[kernel_id],
+                                known_kernels[kernel_id],
+                                LifecycleEvent.CLEAN,
+                                KernelLifecycleEventReason.CONTAINER_NOT_FOUND,
+                            )
+                            continue
+                        # Missing from the listing entirely: confirmed below, outside this lock.
+                        # The CLEAN this would raise removes the container with `force=True` and
+                        # its scratch with it, on a listing older than the lock.
+                        gone_candidates[kernel_id] = kernel_obj
                     # Check if: there are containers already deleted from my registry.
                     for kernel_id in alive_kernels.keys() - known_kernels.keys():
                         if kernel_id in self.restarting_kernels:
@@ -1952,6 +2029,10 @@ class AbstractAgent[
 
                     # Set container count
                     await self.set_container_count(len(own_kernels.keys()))
+            if gone_candidates:
+                await self._report_kernels_whose_container_is_gone(
+                    gone_candidates, kernel_session_map
+                )
         except asyncio.CancelledError as e:
             self._sync_container_lifecycle_observer.observe_container_lifecycle_failure(
                 agent_id=self.id, exception=e
