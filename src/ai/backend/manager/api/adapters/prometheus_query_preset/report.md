@@ -181,7 +181,7 @@ Then
 
 #### [creating-a-preset-with-the-required-values-answers-with-the-whole-node](/tests/scenario/bai_scenario/manager/prometheus_query_preset/test_creating.py) — pass
 
-슈퍼관리자가 이름과 지표 이름과 템플릿과 허용 라벨 목록만 주고 만들면, 순위는 0이고 분류·설명·창은 비어 있는 노드 전체가 답으로 온다
+슈퍼관리자가 이름, 지표 이름, 템플릿, 허용 라벨 목록만 주고 만들면, 순위는 0이고 분류·설명·창은 비어 있는 노드 전체가 답으로 온다
 
 Given
 
@@ -278,7 +278,7 @@ Given
 
 When
 
-- PrometheusQueryPresetAdapter.update — user-1이 preset-1의 이름 수정
+- PrometheusQueryPresetAdapter.update — user-1이 preset-1의 이름을 바꿈
 
 Then
 
@@ -313,7 +313,7 @@ Given
 
 When
 
-- PrometheusQueryPresetAdapter.update — user-1이 preset-1의 템플릿 수정
+- PrometheusQueryPresetAdapter.update — user-1이 preset-1의 템플릿을 바꿈
 
 Then
 
@@ -337,7 +337,7 @@ Given
 
 When
 
-- PrometheusQueryPresetAdapter.update — user-1이 preset-1의 이름 수정
+- PrometheusQueryPresetAdapter.update — user-1이 preset-1의 이름을 바꿈
 
 Then
 
@@ -361,7 +361,7 @@ Given
 
 When
 
-- PrometheusQueryPresetAdapter.update — user-1이 preset-1의 아무것도 수정
+- PrometheusQueryPresetAdapter.update — user-1이 preset-1을 아무것도 바꾸지 않고 고침
 
 Then
 
@@ -396,7 +396,7 @@ Given
 
 When
 
-- PrometheusQueryPresetAdapter.update — user-1이 preset-1의 필터 라벨 수정
+- PrometheusQueryPresetAdapter.update — user-1이 preset-1의 필터 라벨을 바꿈
 
 Then
 
@@ -431,7 +431,7 @@ Given
 
 When
 
-- PrometheusQueryPresetAdapter.update — user-1이 preset-1의 설명 비움 수정
+- PrometheusQueryPresetAdapter.update — user-1이 preset-1의 설명을 비움
 
 Then
 
@@ -466,7 +466,7 @@ Given
 
 When
 
-- PrometheusQueryPresetAdapter.update — user-1이 아무것도 갖지 않은 id의 이름 수정
+- PrometheusQueryPresetAdapter.update — user-1이 아무것도 갖지 않은 id의 이름을 바꿈
 
 Then
 
@@ -490,7 +490,7 @@ Given
 
 When
 
-- PrometheusQueryPresetAdapter.update — user-1이 preset-1의 없는 분류로 수정
+- PrometheusQueryPresetAdapter.update — user-1이 preset-1의 아무것도 갖지 않은 분류 id로 옮김
 
 Then
 
@@ -499,7 +499,7 @@ Then
 
 #### [moving-a-preset-to-another-category-points-the-node-at-that-one](/tests/scenario/bai_scenario/manager/prometheus_query_preset/test_editing.py) — pass
 
-분류 둘 중 한쪽에 속한 정의를 슈퍼관리자가 다른 분류로 고치면, 분류가 새 값이다
+분류 둘 중 한쪽에 속한 정의를 슈퍼관리자가 다른 분류로 옮기면, 답의 분류가 그것을 가리킨다
 
 Given
 
@@ -516,7 +516,7 @@ Given
 
 When
 
-- PrometheusQueryPresetAdapter.update — user-1이 preset-1의 다른 분류로 수정
+- PrometheusQueryPresetAdapter.update — user-1이 preset-1의 다른 분류로 옮김
 
 Then
 
@@ -551,7 +551,7 @@ Given
 
 When
 
-- PrometheusQueryPresetAdapter.update — user-1이 preset-1의 템플릿 수정
+- PrometheusQueryPresetAdapter.update — user-1이 preset-1의 템플릿을 바꿈
 
 Then
 
@@ -586,7 +586,7 @@ Given
 
 When
 
-- PrometheusQueryPresetAdapter.update — user-1이 preset-1의 이름 수정
+- PrometheusQueryPresetAdapter.update — user-1이 preset-1의 이름을 바꿈
 
 Then
 
@@ -623,7 +623,7 @@ Given
 
 When
 
-- PrometheusQueryPresetAdapter.execute_preset — user-1이 preset-1을 kernel_id=k1 실행
+- PrometheusQueryPresetAdapter.execute_preset — user-1이 preset-1을 kernel_id=k1 라벨로 실행
 
 Then
 
@@ -649,7 +649,7 @@ Given
 
 When
 
-- PrometheusQueryPresetAdapter.execute_preset — user-1이 preset-1을 session_id=s1 실행
+- PrometheusQueryPresetAdapter.execute_preset — user-1이 preset-1을 session_id=s1 라벨로 실행
 
 Then
 
@@ -673,7 +673,7 @@ Given
 
 When
 
-- PrometheusQueryPresetAdapter.execute_preset — user-1이 preset-1을 묶음 agent_id 실행
+- PrometheusQueryPresetAdapter.execute_preset — user-1이 preset-1을 agent_id로 묶어 실행
 
 Then
 
@@ -699,7 +699,7 @@ Given
 
 When
 
-- PrometheusQueryPresetAdapter.execute_preset — user-1이 preset-1을 묶음 session_id 실행
+- PrometheusQueryPresetAdapter.execute_preset — user-1이 preset-1을 session_id로 묶어 실행
 
 Then
 
@@ -749,7 +749,7 @@ Given
 
 When
 
-- PrometheusQueryPresetAdapter.execute_preset — user-1이 preset-1을 session_id=s1, 묶음 agent_id 실행
+- PrometheusQueryPresetAdapter.execute_preset — user-1이 preset-1을 session_id=s1 라벨로, agent_id로 묶어 실행
 
 Then
 
@@ -810,7 +810,7 @@ Then
 
 #### [a-user-who-may-read-a-preset-may-not-run-it](/tests/scenario/bai_scenario/manager/prometheus_query_preset/test_executing.py) — pass
 
-정의를 읽을 수는 있는 아무 권한도 받지 않은 사용자가 실행하면, 권한 부족으로 거부된다. 이 엔티티는 어느 스코프에도 없어 역할로는 권한을 받을 길이 없다
+아무 권한도 받지 않은 사용자는 정의를 읽을 수 있지만 실행하면 권한 부족으로 거부된다. 이 엔티티는 어느 스코프에도 없어 역할로는 권한을 받을 길이 없다
 
 Given
 
@@ -849,7 +849,7 @@ Given
 
 When
 
-- PrometheusQueryPresetAdapter.execute_preset — user-1이 preset-1을 구간 실행
+- PrometheusQueryPresetAdapter.execute_preset — user-1이 preset-1을 구간을 주고 실행
 
 Then
 
@@ -875,7 +875,7 @@ Given
 
 When
 
-- PrometheusQueryPresetAdapter.execute_preset — user-1이 preset-1을 창 30s 실행
+- PrometheusQueryPresetAdapter.execute_preset — user-1이 preset-1을 창 30s로 실행
 
 Then
 
@@ -949,7 +949,7 @@ Given
 
 When
 
-- PrometheusQueryPresetAdapter.execute_preset — user-1이 preset-1을 창 30s 실행
+- PrometheusQueryPresetAdapter.execute_preset — user-1이 preset-1을 창 30s로 실행
 
 Then
 
@@ -1028,7 +1028,7 @@ Given
 
 When
 
-- PrometheusQueryPresetAdapter.batch_load_by_ids — user-1이 심은 2개의 id와 없는 id 하나를 한 번에 조회
+- PrometheusQueryPresetAdapter.batch_load_by_ids — user-1이 심은 정의 2개의 id와 없는 id 하나를 한 번에 조회
 
 Then
 
@@ -1159,6 +1159,104 @@ Then
   - result_type = 'vector'
   - result = [([], [(1000.0, 'avg by () (rate(container_cpu_seconds_total{}[2m]))')])]
 
+### purging
+
+#### [a-user-granted-nothing-may-not-remove-a-preset](/tests/scenario/bai_scenario/manager/prometheus_query_preset/test_purging.py) — pass
+
+같은 정의가 있고 아무 권한도 받지 않은 사용자가 지우면, 권한 부족으로 거부된다
+
+Given
+
+- 이미 있는 정의 하나와, user 한 명
+  - 질의 정의 preset-1
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+
+When
+
+- PrometheusQueryPresetAdapter.delete — user-1이 preset-1를 지움
+
+Then
+
+- 거부된다
+  - 거부: NotEnoughPermission
+
+#### [removing-an-id-nothing-answers-to-is-not-found-for-a-superadmin](/tests/scenario/bai_scenario/manager/prometheus_query_preset/test_purging.py) — pass
+
+슈퍼관리자가 아무것도 갖지 않은 id를 지우면, 대상이 없다는 것으로 거부된다
+
+Given
+
+- 이미 있는 정의 하나와, superadmin 한 명
+  - 질의 정의 preset-1
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+
+When
+
+- PrometheusQueryPresetAdapter.delete — user-1이 아무것도 갖지 않은 id를 지움
+
+Then
+
+- 거부된다
+  - 거부: EntityNotFoundError
+
+#### [the-superadmin-removes-a-preset](/tests/scenario/bai_scenario/manager/prometheus_query_preset/test_purging.py) — pass
+
+정의 하나가 있고 슈퍼관리자가 지우면, 지운 id를 실은 답이 온다
+
+Given
+
+- 이미 있는 정의 하나와, superadmin 한 명
+  - 질의 정의 preset-1
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+
+When
+
+- PrometheusQueryPresetAdapter.delete — user-1이 preset-1를 지움
+
+Then
+
+- 지운 정의를 답한다
+  - id: 심은 정의와 같다
+
+#### [turning-enforcement-off-lets-a-user-remove-a-preset](/tests/scenario/bai_scenario/manager/prometheus_query_preset/test_purging.py) — pass
+
+엔티티 권한 집행을 끄면 아무 권한도 받지 않은 사용자도 정의를 지운다. 이 문은 역할이 아니라 권한 그래프가 지키기 때문이다
+
+Given
+
+- 이미 있는 정의 하나와, user 한 명
+  - 질의 정의 preset-1
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+
+When
+
+- PrometheusQueryPresetAdapter.delete — user-1이 preset-1를 지움
+
+Then
+
+- 지운 정의를 답한다
+  - id: 심은 정의와 같다
+
 ### reading
 
 #### [a-call-carrying-no-user-may-not-read-a-preset](/tests/scenario/bai_scenario/manager/prometheus_query_preset/test_reading.py) — pass
@@ -1172,7 +1270,7 @@ Given
 
 When
 
-- PrometheusQueryPresetAdapter.get — 아무도 아닌 채로 preset-1을 조회
+- PrometheusQueryPresetAdapter.get — 사용자 컨텍스트 없이 preset-1을 조회
 
 Then
 
@@ -1238,104 +1336,6 @@ Then
 - 거부된다
   - 거부: EntityNotFoundError
 
-### retiring
-
-#### [a-user-granted-nothing-may-not-remove-a-preset](/tests/scenario/bai_scenario/manager/prometheus_query_preset/test_retiring.py) — pass
-
-같은 정의가 있고 아무 권한도 받지 않은 사용자가 지우면, 권한 부족으로 거부된다
-
-Given
-
-- 이미 있는 정의 하나와, user 한 명
-  - 질의 정의 preset-1
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-
-When
-
-- PrometheusQueryPresetAdapter.delete — user-1이 preset-1를 지움
-
-Then
-
-- 거부된다
-  - 거부: NotEnoughPermission
-
-#### [removing-an-id-nothing-answers-to-is-not-found-for-a-superadmin](/tests/scenario/bai_scenario/manager/prometheus_query_preset/test_retiring.py) — pass
-
-슈퍼관리자가 아무것도 갖지 않은 id를 지우면, 대상이 없다는 것으로 거부된다
-
-Given
-
-- 이미 있는 정의 하나와, superadmin 한 명
-  - 질의 정의 preset-1
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-
-When
-
-- PrometheusQueryPresetAdapter.delete — user-1이 아무것도 갖지 않은 id를 지움
-
-Then
-
-- 거부된다
-  - 거부: EntityNotFoundError
-
-#### [the-superadmin-removes-a-preset](/tests/scenario/bai_scenario/manager/prometheus_query_preset/test_retiring.py) — pass
-
-정의 하나가 있고 슈퍼관리자가 지우면, 지운 id를 실은 답이 온다
-
-Given
-
-- 이미 있는 정의 하나와, superadmin 한 명
-  - 질의 정의 preset-1
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-
-When
-
-- PrometheusQueryPresetAdapter.delete — user-1이 preset-1를 지움
-
-Then
-
-- 지운 정의를 답한다
-  - id: 심은 정의와 같다
-
-#### [turning-enforcement-off-lets-a-user-remove-a-preset](/tests/scenario/bai_scenario/manager/prometheus_query_preset/test_retiring.py) — pass
-
-엔티티 권한 집행을 끄면 아무 권한도 받지 않은 사용자도 정의를 지운다. 이 문은 역할이 아니라 권한 그래프가 지키기 때문이다
-
-Given
-
-- 이미 있는 정의 하나와, user 한 명
-  - 질의 정의 preset-1
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-
-When
-
-- PrometheusQueryPresetAdapter.delete — user-1이 preset-1를 지움
-
-Then
-
-- 지운 정의를 답한다
-  - id: 심은 정의와 같다
-
 ### searching
 
 #### [a-call-carrying-no-user-may-not-search-presets](/tests/scenario/bai_scenario/manager/prometheus_query_preset/test_searching.py) — pass
@@ -1349,7 +1349,7 @@ Given
 
 When
 
-- PrometheusQueryPresetAdapter.search — 아무도 아닌 채로 전체 조회
+- PrometheusQueryPresetAdapter.search — 사용자 컨텍스트 없이 전체 조회
 
 Then
 
