@@ -21,7 +21,6 @@ from bai_scenario.runner.planting import SeedingSession
 from bai_scenario.runner.steps import run_scenario
 
 from ai.backend.common.data.entity.container_registry import ContainerRegistryID
-from ai.backend.common.data.user.types import UserRole
 from ai.backend.manager.api.adapters.container_registry.adapter import ContainerRegistryAdapter
 from ai.backend.manager.errors.image import ContainerRegistryGroupsAssociationNotFound
 from ai.backend.manager.errors.permission import NotEnoughPermission
