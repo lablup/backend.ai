@@ -1,7 +1,7 @@
-"""자기 설정 읽기 — 세 스코프의 조각이 어떻게 하나로 접히는가.
+"""자기 설정 조회 — 세 스코프의 설정 조각이 어떻게 하나로 병합되는가.
 
-설정은 행이 없다. 세 테이블에 조각을 심어 두고 읽으면 병합 결과가 무엇인지가 이 표의
-전부이고, 병합 순서는 허용 항목의 순위가 쥔다.
+설정은 자체 행이 없다. 세 테이블에 조각을 미리 만들어 두고 조회하면 병합 결과가 무엇인지가 이
+모듈의 전부이고, 병합 순서는 허용 목록 항목의 순위가 결정한다.
 """
 
 from __future__ import annotations
@@ -42,7 +42,7 @@ MINE = {"theme": "solar", "menu": {"home": False}}
 
 @dataclass(frozen=True)
 class ReadingMine(When[AMergeAndACaller, AppConfigAdapter, GetAppConfigsPayload]):
-    """세션의 사용자와 도메인으로 읽는다. 이름은 심은 것에서 온다."""
+    """세션의 사용자와 도메인으로 조회한다. 이름은 미리 만들어 둔 것에서 읽는다."""
 
     @override
     def operation(self) -> str:
@@ -69,8 +69,8 @@ class ANameWithNoFragmentAnswersEmpty(
     @override
     def describe(self) -> str:
         return (
-            "정의만 있고 허용 항목도 조각도 없는 이름을 읽기 권한을 받은 사용자가 읽으면, "
-            "그 이름이 답에서 빠지지 않고 빈 설정으로 온다"
+            "정의만 있고 허용 목록 항목도 조각도 없는 이름을 읽기 권한을 받은 사용자가 조회하면, "
+            "그 이름이 응답에서 빠지지 않고 빈 설정으로 반환된다"
         )
 
     @override
@@ -97,8 +97,8 @@ class AnUnregisteredNameAnswersEmpty(
     @override
     def describe(self) -> str:
         return (
-            "정의조차 없는 이름을 읽기 권한을 받은 사용자가 읽으면, 정의가 없다고 거부되지 "
-            "않고 빈 설정으로 온다. 이 읽기는 정의를 보지 않고 조각만 본다"
+            "정의조차 없는 이름을 읽기 권한을 받은 사용자가 조회하면, 정의가 없다고 거부되지 "
+            "않고 빈 설정으로 반환된다. 이 조회는 정의를 확인하지 않고 조각만 본다"
         )
 
     @override
@@ -124,7 +124,7 @@ class OnlyAPublicFragmentAnswersItself(
 
     @override
     def describe(self) -> str:
-        return "공개 스코프에만 조각이 있는 이름을 읽으면, 그 조각의 값이 그대로 온다"
+        return "공개 스코프에만 조각이 있는 이름을 조회하면, 그 조각의 값이 그대로 반환된다"
 
     @override
     def given(self) -> Given[SeedingSession, AMergeAndACaller]:
@@ -150,7 +150,7 @@ class MyFragmentOverridesTheDomains(
     @override
     def describe(self) -> str:
         return (
-            "같은 이름에 도메인 조각과 자기 조각이 모두 있고 허용 항목이 기본 순위이면, "
+            "같은 이름에 도메인 조각과 자기 조각이 모두 있고 허용 목록 항목이 기본 순위이면, "
             "겹치는 키는 자기 값이 남고 겹치지 않는 키는 양쪽 모두 남는다"
         )
 
@@ -180,7 +180,7 @@ class TheDomainsFragmentOverridesThePublic(
     @override
     def describe(self) -> str:
         return (
-            "같은 이름에 공개 조각과 도메인 조각이 모두 있고 허용 항목이 기본 순위이면, "
+            "같은 이름에 공개 조각과 도메인 조각이 모두 있고 허용 목록 항목이 기본 순위이면, "
             "겹치는 키는 도메인 값이 남는다"
         )
 
@@ -210,8 +210,8 @@ class AFlippedRankLetsTheDomainWin(
     @override
     def describe(self) -> str:
         return (
-            "도메인 허용 항목의 순위를 사용자 항목보다 크게 두면, 같은 조각들에서 겹치는 키의 "
-            "승자가 도메인으로 뒤바뀐다. 순위는 허용 항목에 있고 값의 소유자는 바꿀 수 없다"
+            "도메인 허용 목록 항목의 순위를 사용자 항목보다 크게 두면, 같은 조각들에서 겹치는 키의 "
+            "우선순위가 도메인으로 뒤바뀐다. 순위는 허용 목록 항목에 있고 값의 소유자는 바꿀 수 없다"
         )
 
     @override
@@ -240,8 +240,8 @@ class NestedKeysMergeInside(
     @override
     def describe(self) -> str:
         return (
-            "같은 키 아래 중첩 사전을 담은 두 조각을 읽으면, 겹치지 않는 안쪽 키는 양쪽 모두 "
-            "남고 겹치는 안쪽 키만 뒤엣것이 남는다"
+            "같은 키 아래 중첩 사전을 담은 두 조각을 조회하면, 겹치지 않는 안쪽 키는 양쪽 모두 "
+            "남고 겹치는 안쪽 키만 뒤의 것이 남는다"
         )
 
     @override
@@ -280,7 +280,7 @@ class ListsAreReplacedWhole(
 
     @override
     def describe(self) -> str:
-        return "같은 키에 목록을 담은 두 조각을 읽으면, 뒤엣것의 목록만 남고 이어 붙지 않는다"
+        return "같은 키에 목록을 담은 두 조각을 조회하면, 뒤의 것의 목록만 남고 이어 붙지 않는다"
 
     @override
     def given(self) -> Given[SeedingSession, AMergeAndACaller]:
@@ -307,7 +307,7 @@ class AnExplicitNullOverrides(
     def describe(self) -> str:
         return (
             "앞 조각의 키에 값이 있고 뒤 조각이 같은 키를 비워 두면, 그 키는 비어 있는 채로 "
-            "온다. 빈 값도 덮는다"
+            "반환된다. 빈 값도 덮어쓴다"
         )
 
     @override
@@ -334,8 +334,8 @@ class AnotherUsersFragmentStaysOut(
     @override
     def describe(self) -> str:
         return (
-            "같은 도메인의 다른 사용자가 같은 이름에 조각을 두었어도, 자기 설정을 읽으면 "
-            "자기 조각의 값만 온다"
+            "같은 도메인의 다른 사용자가 같은 이름에 조각을 두었어도, 자기 설정을 조회하면 "
+            "자기 조각의 값만 반환된다"
         )
 
     @override
@@ -361,7 +361,7 @@ class AnotherDomainsFragmentStaysOut(
 
     @override
     def describe(self) -> str:
-        return "다른 도메인이 같은 이름에 조각을 두었어도, 자기 설정을 읽으면 자기 도메인 조각의 값만 온다"
+        return "다른 도메인이 같은 이름에 조각을 두었어도, 자기 설정을 조회하면 자기 도메인 조각의 값만 반환된다"
 
     @override
     def given(self) -> Given[SeedingSession, AMergeAndACaller]:
@@ -388,7 +388,7 @@ class SeveralNamesAnswerInRequestOrder(
 
     @override
     def describe(self) -> str:
-        return "이름 셋을 한 번에 읽으면, 각각의 병합 결과가 요청한 순서대로 온다"
+        return "이름 셋을 한 번에 조회하면, 각각의 병합 결과가 요청한 순서대로 반환된다"
 
     @override
     def given(self) -> Given[SeedingSession, AMergeAndACaller]:
@@ -413,7 +413,7 @@ class ANameAskedTwiceAnswersTwice(
 
     @override
     def describe(self) -> str:
-        return "같은 이름을 두 번 적어 읽으면, 같은 값이 두 번 온다"
+        return "같은 이름을 두 번 지정해 조회하면, 같은 값이 두 번 반환된다"
 
     @override
     def given(self) -> Given[SeedingSession, AMergeAndACaller]:
@@ -438,7 +438,7 @@ class AUserGrantedNothingMayNotRead(
 
     @override
     def describe(self) -> str:
-        return "아무 권한도 받지 않은 사용자가 자기 설정을 읽으면, 스코프 권한 문에서 권한 부족으로 거부된다"
+        return "아무 권한도 없는 사용자가 자기 설정을 조회하면, 스코프 권한 검사에서 권한 부족으로 거부된다"
 
     @override
     def given(self) -> Given[SeedingSession, AMergeAndACaller]:
@@ -464,8 +464,8 @@ class EnforcementOffLetsAnyoneRead(
     @override
     def describe(self) -> str:
         return (
-            "엔티티 권한 집행을 끄면 아무 권한도 받지 않은 사용자도 자기 설정을 읽는다. "
-            "이 문은 역할이 아니라 권한 그래프가 지키므로 스위치가 통한다"
+            "권한 검사를 끄면 아무 권한도 없는 사용자도 자기 설정을 조회할 수 있다. "
+            "이 조회는 역할이 아니라 권한 그래프로 보호되므로 스위치가 영향을 준다"
         )
 
     @override

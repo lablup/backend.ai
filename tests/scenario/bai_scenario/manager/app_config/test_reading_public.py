@@ -1,7 +1,7 @@
-"""공개 설정 읽기 — 문이 없는 읽기가 무엇을 보는가.
+"""공개 설정 조회 — 검사 없는 조회가 무엇을 보는가.
 
-인증도 권한도 보지 않는다. 아무도 지목하지 않으므로 공개 조각만 병합되고, 그것이 이 경로가
-안전한 근거다.
+인증도 권한도 확인하지 않는다. 아무 스코프도 지정하지 않으므로 공개 조각만 병합되고, 그것이 이
+경로가 안전한 근거다.
 """
 
 from __future__ import annotations
@@ -38,7 +38,7 @@ MINE = {"theme": "solar"}
 
 @dataclass(frozen=True)
 class ReadingPublic(When[AMergeAndACaller, AppConfigAdapter, GetAppConfigsPayload]):
-    """아무도 지목하지 않고 읽는다. 로그인한 채 부를 수도 있지만 그 사실은 쓰이지 않는다."""
+    """아무 스코프도 지정하지 않고 조회한다. 로그인한 채 호출할 수도 있지만 그 사실은 쓰이지 않는다."""
 
     signed_in: bool = False
 
@@ -71,8 +71,8 @@ class AnonymousReadsThePublicValueOnly(
     @override
     def describe(self) -> str:
         return (
-            "공개·도메인·사용자 조각이 모두 있는 이름을 로그인 없이 읽으면, 공개 조각의 값만 "
-            "온다. 도메인과 사용자 조각은 섞이지 않는다"
+            "공개·도메인·사용자 조각이 모두 있는 이름을 로그인 없이 조회하면, 공개 조각의 값만 "
+            "반환된다. 도메인과 사용자 조각은 섞이지 않는다"
         )
 
     @override
@@ -98,7 +98,7 @@ class ANameWithNoPublicFragmentAnswersEmpty(
 
     @override
     def describe(self) -> str:
-        return "사용자 조각만 있는 이름을 로그인 없이 읽으면, 빈 설정이 온다"
+        return "사용자 조각만 있는 이름을 로그인 없이 조회하면, 빈 설정이 반환된다"
 
     @override
     def given(self) -> Given[SeedingSession, AMergeAndACaller]:
@@ -124,8 +124,8 @@ class AnUnregisteredNameAnswersEmptyToo(
     @override
     def describe(self) -> str:
         return (
-            "정의조차 없는 이름을 로그인 없이 읽으면, 공개 조각이 없는 이름과 같은 빈 설정이 "
-            "온다. 이 읽기로는 어떤 이름이 등록돼 있는지 알 수 없다"
+            "정의조차 없는 이름을 로그인 없이 조회하면, 공개 조각이 없는 이름과 같은 빈 설정이 "
+            "반환된다. 이 조회로는 어떤 이름이 등록돼 있는지 알 수 없다"
         )
 
     @override
@@ -152,8 +152,8 @@ class ASignedInUserGetsTheSameAnswer(
     @override
     def describe(self) -> str:
         return (
-            "같은 조각 셋을 아무 권한도 없는 사용자가 로그인한 채 공개 읽기로 읽어도, 공개 "
-            "조각의 값만 온다. 이 읽기는 호출자를 아예 보지 않는다"
+            "같은 조각 셋을 아무 권한도 없는 사용자가 로그인한 채 공개 조회로 조회해도, 공개 "
+            "조각의 값만 반환된다. 이 조회는 호출자를 아예 보지 않는다"
         )
 
     @override
@@ -181,7 +181,7 @@ class SeveralNamesAnswerInRequestOrder(
 
     @override
     def describe(self) -> str:
-        return "이름 셋을 한 번에 로그인 없이 읽으면, 각각의 공개 값이 요청한 순서대로 온다"
+        return "이름 셋을 한 번에 로그인 없이 조회하면, 각각의 공개 값이 요청한 순서대로 반환된다"
 
     @override
     def given(self) -> Given[SeedingSession, AMergeAndACaller]:
