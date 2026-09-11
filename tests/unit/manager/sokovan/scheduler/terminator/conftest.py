@@ -97,9 +97,14 @@ def terminator(
     mock_valkey_schedule: AsyncMock,
 ) -> SessionTerminator:
     """Create SessionTerminator with mocked dependencies."""
+    db = MagicMock()
+    db_session = db.begin_readonly_session.return_value.__aenter__.return_value
+    scalar_result = MagicMock()
+    scalar_result.all.return_value = []
+    db_session.scalars = AsyncMock(return_value=scalar_result)
     return SessionTerminator(
         SessionTerminatorArgs(
-            db=MagicMock(),
+            db=db,
             repository=mock_repository,
             agent_client_pool=mock_agent_client_pool,
             valkey_schedule=mock_valkey_schedule,

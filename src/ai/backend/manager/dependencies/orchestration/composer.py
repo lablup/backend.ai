@@ -15,8 +15,8 @@ from ai.backend.common.types import ValkeyProfileTarget
 from ai.backend.manager.clients.agent import AgentClientPool
 from ai.backend.manager.clients.appproxy.client import AppProxyClientPool
 from ai.backend.manager.clients.prometheus.client import PrometheusClient
-from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.confidential.channel import ConfidentialChannel
+from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.idle import IdleCheckerHost
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.plugin.network import NetworkPluginContext

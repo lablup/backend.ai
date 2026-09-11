@@ -697,6 +697,7 @@ class NetworkTimeoutEventDispatcherIdleChecker(AbstractEventDispatcherIdleChecke
             ):
                 await self._update_timeout(session_id)
 
+    @override
     async def update_app_streaming_status(
         self,
         session_id: SessionId,

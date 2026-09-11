@@ -46,6 +46,15 @@ from ai.backend.manager.services.vfolder.services.file import VFolderFileService
 from ai.backend.manager.services.vfolder.services.vfolder import VFolderService
 
 
+def _mock_db_without_confidential_scaling_groups() -> MagicMock:
+    db = MagicMock()
+    db_session = db.begin_readonly_session.return_value.__aenter__.return_value
+    scalar_result = MagicMock()
+    scalar_result.all.return_value = []
+    db_session.scalars = AsyncMock(return_value=scalar_result)
+    return db
+
+
 @pytest.fixture
 def sample_vfolder_uuid() -> uuid.UUID:
     return uuid.uuid4()
@@ -114,7 +123,7 @@ class TestVFolderServicePurge:
             vfolder_repository=mock_vfolder_repository,
             user_repository=MagicMock(),
             valkey_stat_client=MagicMock(),
-            db=MagicMock(),
+            db=_mock_db_without_confidential_scaling_groups(),
         )
 
     @pytest.fixture

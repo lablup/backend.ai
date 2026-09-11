@@ -151,7 +151,7 @@ class ResourceOpts(BaseFieldModel):
     model_config = ConfigDict(extra="allow")
 
     @model_validator(mode="after")
-    def refuse_metadata_egress(self) -> "ResourceOpts":
+    def refuse_metadata_egress(self) -> ResourceOpts:
         named = sorted(
             key
             for key in (self.model_extra or {})

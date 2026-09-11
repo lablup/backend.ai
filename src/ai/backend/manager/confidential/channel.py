@@ -322,17 +322,13 @@ class ConfidentialChannel:
             await self._forsake(session_id, "no model definition reached the kernel")
             return
         definition = ModelDefinition.model_validate(inlined)
-        environ = dict(
-            entry.split("=", 1) for entry in (kernel.environ or []) if "=" in entry
-        )
+        environ = dict(entry.split("=", 1) for entry in (kernel.environ or []) if "=" in entry)
         definition = definition.with_args_appended(
             LegacyInferenceEnvTranslator.to_cli_args(environ)
         )
         for model in definition.models:
             if model.service is None or not model.service.start_command:
-                await self._forsake(
-                    session_id, f"model {model.name} names no service to start"
-                )
+                await self._forsake(session_id, f"model {model.name} names no service to start")
                 return
             log.info(
                 "starting model service {} of kernel {} over the guest channel",

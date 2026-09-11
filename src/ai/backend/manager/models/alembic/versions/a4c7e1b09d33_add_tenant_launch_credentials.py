@@ -43,7 +43,5 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    op.drop_index(
-        "ix_conf_launch_credential_unspent", table_name="confidential_launch_credentials"
-    )
+    op.drop_index("ix_conf_launch_credential_unspent", table_name="confidential_launch_credentials")
     op.drop_table("confidential_launch_credentials")

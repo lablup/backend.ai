@@ -68,6 +68,7 @@ class TestSokovanOrchestratorDependency:
             prometheus_client=MagicMock(),
             prometheus_query_preset_repository=MagicMock(),
             runtime_variant_repository=MagicMock(),
+            confidential_channel=MagicMock(),
         )
 
         async with dependency.provide(sokovan_input) as orchestrator:
@@ -101,6 +102,7 @@ class TestSokovanOrchestratorDependency:
         mock_create_handlers.return_value = MagicMock()
         mock_orchestrator_class.return_value = MagicMock()
 
+        db = MagicMock()
         scheduler_repo = MagicMock()
         deployment_repo = MagicMock()
         fair_share_repo = MagicMock()
@@ -110,10 +112,11 @@ class TestSokovanOrchestratorDependency:
         event_producer = MagicMock()
         valkey_schedule = MagicMock()
         route_controller = MagicMock()
+        confidential_channel = MagicMock()
 
         dependency = SokovanOrchestratorDependency()
         sokovan_input = SokovanOrchestratorInput(
-            db=MagicMock(),
+            db=db,
             scheduler_repository=scheduler_repo,
             deployment_repository=deployment_repo,
             replica_group_repository=MagicMock(),
@@ -134,14 +137,17 @@ class TestSokovanOrchestratorDependency:
             prometheus_client=MagicMock(),
             prometheus_query_preset_repository=MagicMock(),
             runtime_variant_repository=MagicMock(),
+            confidential_channel=confidential_channel,
         )
 
         async with dependency.provide(sokovan_input):
             mock_create_components.assert_called_once_with(
+                db,
                 scheduler_repo,
                 fair_share_repo,
                 config_provider,
                 agent_client_pool,
                 network_plugin_ctx,
                 valkey_schedule,
+                confidential_channel,
             )

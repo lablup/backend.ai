@@ -40,7 +40,9 @@ class SessionCommitRefused(_CocoRefusal):
 
 class LaunchOptionRefused(_CocoRefusal):
     error_type = _PREFIX + "launch-option-refused"
-    error_title = "Resource options the confidential runtime does not act on are refused, never dropped."
+    error_title = (
+        "Resource options the confidential runtime does not act on are refused, never dropped."
+    )
 
 
 class HostFileTransferRefused(_CocoRefusal):

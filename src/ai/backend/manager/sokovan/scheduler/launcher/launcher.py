@@ -545,8 +545,9 @@ class SessionLauncher:
                     "mode": "bridge",
                     "network_name": network_name,
                 }
-            elif session.cluster_mode == ClusterMode.MULTI_NODE and await self._confidential_enabled(
-                session
+            elif (
+                session.cluster_mode == ClusterMode.MULTI_NODE
+                and await self._confidential_enabled(session)
             ):
                 network_name = f"{CONFIDENTIAL_NETWORK_PREFIX}{session.session_id}"
                 network_config = {"mode": "bridge", "network_name": network_name}
@@ -672,9 +673,7 @@ class SessionLauncher:
         }
         tunnel_ports: dict[KernelId, int] = {}
         if len(session.kernels) > 1:
-            members, tunnel_ports = await self._allocate_tunnel_members(
-                session, opts, member_index
-            )
+            members, tunnel_ports = await self._allocate_tunnel_members(session, opts, member_index)
             resources.update(tunnel_resources(members))
         for kernel in session.kernels:
             resources[f"config-{kernel.kernel_id}"] = (

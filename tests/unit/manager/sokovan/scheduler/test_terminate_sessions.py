@@ -82,10 +82,16 @@ def mock_repository() -> MagicMock:
 @pytest.fixture
 def terminator(mock_repository: MagicMock, mock_agent_client_pool: MagicMock) -> SessionTerminator:
     """Create SessionTerminator instance with mocked dependencies."""
+    mock_db = MagicMock()
+    mock_db_session = AsyncMock()
+    mock_scaling_groups = MagicMock()
+    mock_scaling_groups.all.return_value = []
+    mock_db_session.scalars.return_value = mock_scaling_groups
+    mock_db.begin_readonly_session.return_value.__aenter__.return_value = mock_db_session
     mock_valkey_schedule = MagicMock()
     return SessionTerminator(
         SessionTerminatorArgs(
-            db=MagicMock(),
+            db=mock_db,
             repository=mock_repository,
             agent_client_pool=mock_agent_client_pool,
             valkey_schedule=mock_valkey_schedule,

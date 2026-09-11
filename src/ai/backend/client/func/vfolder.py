@@ -684,9 +684,7 @@ class VFolderByName(BaseFunction):
         await self.update_id_by_name()
         paths = await self._cipher()
         remote = await self._remote(path)
-        rqst = Request(
-            "GET", f"/folders/{self.request_key}/files", params={"path": remote or "."}
-        )
+        rqst = Request("GET", f"/folders/{self.request_key}/files", params={"path": remote or "."})
         async with rqst.fetch() as resp:
             result: dict[str, Any] = await resp.json()
         if paths is None:

@@ -25,16 +25,19 @@ LAUNCH_NONCE_SHAPE: Final = re.compile(r"\A[A-Za-z0-9_-]{16,128}\Z")
 
 
 def credential_statement(nonce: str, domain_name: str, image_digest: str, quota: int) -> bytes:
-    return LAUNCH_CREDENTIAL_CONTEXT + json.dumps(
-        {
-            "domain_name": domain_name,
-            "image_digest": image_digest,
-            "nonce": nonce,
-            "quota": quota,
-        },
-        sort_keys=True,
-        separators=(",", ":"),
-    ).encode()
+    return (
+        LAUNCH_CREDENTIAL_CONTEXT
+        + json.dumps(
+            {
+                "domain_name": domain_name,
+                "image_digest": image_digest,
+                "nonce": nonce,
+                "quota": quota,
+            },
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode()
+    )
 
 
 class LaunchAuthority:
@@ -72,10 +75,10 @@ class LaunchAuthority:
                 bytes.fromhex(signature),
                 credential_statement(nonce, domain_name, image_digest, quota),
             )
-        except (ValueError, InvalidSignature) as e:
+        except (ValueError, InvalidSignature) as exc:
             raise LaunchCredentialRefused(
-                extra_msg=f"the tenant launch authority did not sign this credential: {e}"
-            )
+                extra_msg=f"the tenant launch authority did not sign this credential: {exc}"
+            ) from exc
         async with self._db.begin_session() as db_session:
             seen = await db_session.scalar(
                 sa.select(ConfidentialLaunchCredentialRow.nonce).where(

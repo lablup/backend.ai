@@ -10,8 +10,8 @@ from dataclasses import dataclass
 
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.clients.agent.pool import AgentClientPool
-from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.confidential.channel import ConfidentialChannel
+from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.plugin.network import NetworkPluginContext

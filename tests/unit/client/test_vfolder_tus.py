@@ -168,6 +168,11 @@ async def test_vfolder_download(mocker: object) -> None:
                 status=HTTPStatus.OK,
                 payload={"id": source_vfolder_uuid.hex},
             )
+            m.post(
+                build_url(session.config, "/confidential/folder-keys"),
+                status=HTTPStatus.OK,
+                payload={"result": {"format": None}},
+            )
             # 1. Client to Manager throught Request
             m.post(
                 build_url(session.config, f"/folders/{source_vfolder_uuid.hex}/request-download"),

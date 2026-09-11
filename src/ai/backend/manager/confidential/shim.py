@@ -8,7 +8,7 @@ import logging
 import uuid
 from datetime import UTC, datetime, timedelta
 from http.cookies import SimpleCookie
-from typing import Any, Final, NamedTuple
+from typing import Any, Final, NamedTuple, cast
 
 import sqlalchemy as sa
 from cryptography.exceptions import InvalidSignature
@@ -344,7 +344,7 @@ class AuthorisationShim:
                     & (ConfidentialGuestClaimRow.expires_at > sa.func.now())
                 )
             )
-            if live < bound.quota:
+            if live is not None and live < bound.quota:
                 db_session.add(
                     ConfidentialGuestClaimRow(
                         nonce=nonce,
@@ -363,23 +363,26 @@ class AuthorisationShim:
         self, guest: str, domain_name: str, folder_id: uuid.UUID
     ) -> uuid.UUID | None:
         async with self._db.begin_readonly_session() as db_session:
-            return await db_session.scalar(
-                sa.select(ConfidentialSessionResourceRow.session_id)
-                .join(
-                    ConfidentialGuestClaimRow,
-                    ConfidentialGuestClaimRow.session_id
-                    == ConfidentialSessionResourceRow.session_id,
-                )
-                .where(
-                    (ConfidentialGuestClaimRow.guest == guest)
-                    & (ConfidentialGuestClaimRow.expires_at > sa.func.now())
-                    & (ConfidentialSessionResourceRow.kind == SessionResourceKind.FOLDER_KEY)
-                    & ConfidentialSessionResourceRow.deleted_at.is_(None)
-                    & ConfidentialSessionResourceRow.resource_path.startswith(f"{domain_name}/")
-                    & ConfidentialSessionResourceRow.resource_path.endswith(
-                        f"/{folder_key_tag(folder_id)}"
+            return cast(
+                uuid.UUID | None,
+                await db_session.scalar(
+                    sa.select(ConfidentialSessionResourceRow.session_id)
+                    .join(
+                        ConfidentialGuestClaimRow,
+                        ConfidentialGuestClaimRow.session_id
+                        == ConfidentialSessionResourceRow.session_id,
                     )
-                )
+                    .where(
+                        (ConfidentialGuestClaimRow.guest == guest)
+                        & (ConfidentialGuestClaimRow.expires_at > sa.func.now())
+                        & (ConfidentialSessionResourceRow.kind == SessionResourceKind.FOLDER_KEY)
+                        & ConfidentialSessionResourceRow.deleted_at.is_(None)
+                        & ConfidentialSessionResourceRow.resource_path.startswith(f"{domain_name}/")
+                        & ConfidentialSessionResourceRow.resource_path.endswith(
+                            f"/{folder_key_tag(folder_id)}"
+                        )
+                    )
+                ),
             )
 
     async def _launching_image_sessions(self, domain_name: str, tag: str) -> dict[uuid.UUID, str]:
@@ -400,9 +403,7 @@ class AuthorisationShim:
                 )
             ).all()
         return {
-            session_id: nonce
-            for session_id, image, nonce in rows
-            if image_key_tag(image) == tag
+            session_id: nonce for session_id, image, nonce in rows if image_key_tag(image) == tag
         }
 
     async def _authorise_image_key(

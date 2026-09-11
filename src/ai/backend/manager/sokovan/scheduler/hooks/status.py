@@ -20,9 +20,9 @@ from ai.backend.common.types import (
 )
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.clients.agent.pool import AgentClientPool
+from ai.backend.manager.confidential.channel import ConfidentialChannel
 from ai.backend.manager.confidential.tunnel import CONFIDENTIAL_NETWORK_PREFIX
 from ai.backend.manager.config.provider import ManagerConfigProvider
-from ai.backend.manager.confidential.channel import ConfidentialChannel
 from ai.backend.manager.data.sokovan import SessionWithKernels
 from ai.backend.manager.errors.common import ServerMisconfiguredError
 from ai.backend.manager.errors.resource import AgentNotAllocated

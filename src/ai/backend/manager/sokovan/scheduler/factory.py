@@ -8,8 +8,8 @@ from typing import TYPE_CHECKING
 
 from ai.backend.common.clients.valkey_client.valkey_schedule import ValkeyScheduleClient
 from ai.backend.manager.clients.agent import AgentClientPool
-from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.confidential.channel import ConfidentialChannel
+from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.repositories.fair_share import FairShareRepository

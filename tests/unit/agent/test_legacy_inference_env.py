@@ -6,8 +6,8 @@ from typing import Any, cast
 import pytest
 
 from ai.backend.agent.agent import AbstractAgent
-from ai.backend.agent.legacy_inference_env import LegacyInferenceEnvTranslator
 from ai.backend.common.config import ModelConfig
+from ai.backend.common.legacy_inference_env import LegacyInferenceEnvTranslator
 
 
 @dataclass(frozen=True)

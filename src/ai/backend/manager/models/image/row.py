@@ -841,6 +841,7 @@ async def bulk_get_image_configs(
             "is_local": resolved_image_info.image_ref.is_local,
             "digest": resolved_image_info.trimmed_digest,
             "labels": resolved_image_info.labels,
+            "process_config": resolved_image_info.process_config,
             "repo_digest": None,
             "registry": registry_info,
             "auto_pull": auto_pull,

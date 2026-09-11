@@ -109,9 +109,15 @@ def launcher(
     mock_valkey_schedule: AsyncMock,
 ) -> SessionLauncher:
     """Create SessionLauncher with mocked dependencies."""
+    db = MagicMock()
+    db_session = db.begin_readonly_session.return_value.__aenter__.return_value
+    scalar_result = MagicMock()
+    scalar_result.all.return_value = []
+    db_session.get = AsyncMock(return_value=None)
+    db_session.scalars = AsyncMock(return_value=scalar_result)
     return SessionLauncher(
         SessionLauncherArgs(
-            db=MagicMock(),
+            db=db,
             repository=mock_repository,
             agent_client_pool=mock_agent_client_pool,
             network_plugin_ctx=mock_network_plugin_ctx,
@@ -329,6 +335,7 @@ def _create_image_config_data(
         is_local=False,
         digest="sha256:abc123",
         labels={},
+        process_config={},
         registry_name="cr.backend.ai",
         registry_url="https://cr.backend.ai",
         registry_username=None,
