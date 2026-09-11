@@ -102,5 +102,5 @@ class InvalidSecretBinding(FieldError, web.HTTPInternalServerError):
     @override
     def field_error_code(self) -> FieldErrorCode:
         return FieldErrorCode(
-            SecretFieldType(), ActionOperationType.CREATE, ErrorDetail.INVALID_PARAMETERS
+            SecretFieldType(), ActionOperationType.CREATE, ErrorDetail.INTERNAL_ERROR
         )
