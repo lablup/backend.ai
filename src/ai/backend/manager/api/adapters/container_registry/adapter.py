@@ -25,6 +25,7 @@ from ai.backend.common.dto.manager.v2.container_registry.response import (
     UpdateContainerRegistryPayload,
 )
 from ai.backend.common.dto.manager.v2.container_registry.types import ContainerRegistryTypeFilter
+from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.data.container_registry.types import ContainerRegistryData
 from ai.backend.manager.errors.image import ContainerRegistryGroupsAssociationNotFound
@@ -36,6 +37,7 @@ from ai.backend.manager.models.container_registry.creators import (
     ContainerRegistryProjectCreator,
 )
 from ai.backend.manager.models.container_registry.orders import (
+    DEFAULT_BACKWARD_ORDER,
     DEFAULT_FORWARD_ORDER,
     TIEBREAKER_ORDER,
     resolve_order,
@@ -66,7 +68,16 @@ from ai.backend.manager.services.rbac.actions.relation.purge import PurgeRelatio
 from ai.backend.manager.services.rbac.processors import RbacProcessors
 from ai.backend.manager.types import OptionalState, TriState
 
-DEFAULT_PAGINATION_LIMIT = 10
+
+def _pagination_spec() -> PaginationSpec:
+    """How a page of registries is cut, in either mode. The order runs by id."""
+    return PaginationSpec(
+        forward_order=DEFAULT_FORWARD_ORDER,
+        backward_order=DEFAULT_BACKWARD_ORDER,
+        forward_condition_factory=ContainerRegistryConditions.by_cursor_forward,
+        backward_condition_factory=ContainerRegistryConditions.by_cursor_backward,
+        tiebreaker_order=TIEBREAKER_ORDER,
+    )
 
 
 class ContainerRegistryAdapter(BaseAdapter):
@@ -237,13 +248,25 @@ class ContainerRegistryAdapter(BaseAdapter):
         return DeleteContainerRegistryPayload(id=input.id)
 
     def build_querier(self, input: AdminSearchContainerRegistriesInput) -> BatchQuerier:
-        """Build a BatchQuerier from the search input DTO."""
-        conditions = self._convert_filter(input.filter) if input.filter else []
-        orders = self._convert_orders(input.order) if input.order else [DEFAULT_FORWARD_ORDER]
-        orders.append(TIEBREAKER_ORDER)
-        pagination = self._build_pagination(input)
+        """Build a BatchQuerier from the search input DTO.
 
-        return BatchQuerier(conditions=conditions, orders=orders, pagination=pagination)
+        Both pagination modes the request type carries are read here. Reading only
+        the offset pair dropped a caller's cursor without saying so.
+        """
+        conditions = self._convert_filter(input.filter) if input.filter else []
+        orders = self._convert_orders(input.order) if input.order else []
+
+        return self._build_querier(
+            conditions=conditions,
+            orders=orders,
+            pagination_spec=_pagination_spec(),
+            first=input.first,
+            after=input.after,
+            last=input.last,
+            before=input.before,
+            limit=input.limit,
+            offset=input.offset,
+        )
 
     def _convert_filter(self, filter: ContainerRegistryFilter) -> list[QueryCondition]:
         conditions: list[QueryCondition] = []
@@ -299,15 +322,8 @@ class ContainerRegistryAdapter(BaseAdapter):
     def _convert_orders(order: list[ContainerRegistryOrder]) -> list[QueryOrder]:
         return [resolve_order(o.field, o.direction) for o in order]
 
-    @staticmethod
-    def _build_pagination(input: AdminSearchContainerRegistriesInput) -> OffsetPagination:
-        return OffsetPagination(
-            limit=input.limit if input.limit is not None else DEFAULT_PAGINATION_LIMIT,
-            offset=input.offset if input.offset is not None else 0,
-        )
-
     async def batch_load_by_ids(
-        self, ids: Sequence[uuid.UUID]
+        self, ids: Sequence[ContainerRegistryID]
     ) -> list[ContainerRegistryNode | None]:
         """Batch load container registries by IDs for DataLoader use.
 

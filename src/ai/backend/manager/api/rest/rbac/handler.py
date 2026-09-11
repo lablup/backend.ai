@@ -13,12 +13,6 @@ from http import HTTPStatus
 from ai.backend.common.api_handlers import APIResponse, BodyParam, PathParam
 from ai.backend.common.data.entity.role import RoleID
 from ai.backend.common.data.entity.types import RuntimeEntityID
-from ai.backend.common.data.permission.types import (
-    EntityType as LegacyEntityType,
-)
-from ai.backend.common.data.permission.types import (
-    ScopeType,
-)
 from ai.backend.common.dto.manager.rbac import (
     AssignRoleRequest,
     AssignRoleResponse,
@@ -39,20 +33,17 @@ from ai.backend.common.dto.manager.rbac import (
     UpdateRoleRequest,
     UpdateRoleResponse,
 )
-from ai.backend.common.dto.manager.rbac.path import SearchEntitiesPathParam, SearchScopesPathParam
+from ai.backend.common.dto.manager.rbac.path import SearchScopesPathParam
 from ai.backend.common.dto.manager.rbac.request import (
     DeleteRoleRequest,
     PurgeRoleRequest,
-    SearchEntitiesRequest,
     SearchScopesRequest,
 )
 from ai.backend.common.dto.manager.rbac.response import (
     GetEntityTypesResponse,
     GetScopeTypesResponse,
-    SearchEntitiesResponse,
     SearchScopesResponse,
 )
-from ai.backend.common.exception import RBACTypeConversionError
 from ai.backend.manager.data.permission.role import UserRoleAssignmentInput, UserRoleRevocationInput
 from ai.backend.manager.dto.context import UserContext
 from ai.backend.manager.errors.permission import NotEnoughPermission
@@ -73,9 +64,6 @@ from ai.backend.manager.services.permission_contoller.actions.get_scope_types im
     GetScopeTypesAction,
 )
 from ai.backend.manager.services.permission_contoller.actions.purge_role import PurgeRoleAction
-from ai.backend.manager.services.permission_contoller.actions.search_entities import (
-    SearchEntitiesAction,
-)
 from ai.backend.manager.services.permission_contoller.actions.search_scopes import (
     SearchScopesAction,
 )
@@ -87,7 +75,6 @@ from ai.backend.manager.services.rbac.actions.role.revoke import RevokeRoleActio
 from ai.backend.manager.services.rbac.processors import RbacProcessors
 
 from .assigned_user_adapter import AssignedUserAdapter
-from .entity_adapter import EntityAdapter
 from .role_adapter import RoleAdapter
 from .scope_adapter import ScopeAdapter
 
@@ -106,7 +93,6 @@ class RBACHandler:
         self._role_adapter = RoleAdapter()
         self._assigned_user_adapter = AssignedUserAdapter()
         self._scope_adapter = ScopeAdapter()
-        self._entity_adapter = EntityAdapter()
 
     # Role Management Endpoints
 
@@ -308,13 +294,7 @@ class RBACHandler:
         action_result = await self._permission_controller.get_scope_types.wait_for_complete(
             GetScopeTypesAction()
         )
-        scope_types: list[ScopeType] = []
-        for et in action_result.element_types:
-            try:
-                scope_types.append(et.to_scope_type())
-            except RBACTypeConversionError:
-                pass
-        resp = GetScopeTypesResponse(items=scope_types)
+        resp = GetScopeTypesResponse(items=action_result.entity_types)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=resp)
 
     async def search_scopes(
@@ -328,9 +308,8 @@ class RBACHandler:
             raise NotEnoughPermission("Only superadmin can search scopes.")
 
         scope_type = path.parsed.scope_type
-        element_type = scope_type.to_element()
         querier = self._scope_adapter.build_querier(scope_type, body.parsed)
-        action = SearchScopesAction(element_type=element_type, querier=querier)
+        action = SearchScopesAction(scope_type=scope_type, querier=querier)
         action_result = await self._permission_controller.search_scopes.wait_for_complete(action)
         resp = SearchScopesResponse(
             items=[self._scope_adapter.convert_to_dto(item) for item in action_result.result.items],
@@ -355,41 +334,5 @@ class RBACHandler:
         action_result = await self._permission_controller.get_entity_types.wait_for_complete(
             GetEntityTypesAction()
         )
-        entity_types: list[LegacyEntityType] = []
-        for et in action_result.element_types:
-            try:
-                entity_types.append(et.to_entity_type())
-            except RBACTypeConversionError:
-                pass
-        resp = GetEntityTypesResponse(items=entity_types)
-        return APIResponse.build(status_code=HTTPStatus.OK, response_model=resp)
-
-    async def search_entities(
-        self,
-        path: PathParam[SearchEntitiesPathParam],
-        body: BodyParam[SearchEntitiesRequest],
-        ctx: UserContext,
-    ) -> APIResponse:
-        """Search entities within a scope by entity type with filters and pagination."""
-        if not ctx.is_superadmin:
-            raise NotEnoughPermission("Only superadmin can search entities.")
-
-        querier = self._entity_adapter.build_querier(
-            scope_type=path.parsed.scope_type.to_element(),
-            scope_id=path.parsed.scope_id,
-            entity_type=path.parsed.entity_type.to_element(),
-            request=body.parsed,
-        )
-        action = SearchEntitiesAction(querier=querier)
-        action_result = await self._permission_controller.search_entities.wait_for_complete(action)
-        resp = SearchEntitiesResponse(
-            items=[
-                self._entity_adapter.convert_to_dto(item) for item in action_result.result.items
-            ],
-            pagination=PaginationInfo(
-                total=action_result.result.total_count,
-                offset=body.parsed.offset,
-                limit=body.parsed.limit,
-            ),
-        )
+        resp = GetEntityTypesResponse(items=action_result.entity_types)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=resp)

@@ -11,7 +11,7 @@ import sqlalchemy as sa
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
 from ai.backend.client.v2.v2_registry import V2ClientRegistry
-from ai.backend.common.data.permission.types import ScopeType
+from ai.backend.common.data.entity.project import ProjectEntityType
 from ai.backend.common.dto.manager.v2.group.request import UnassignUsersFromProjectInput
 from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
 from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
@@ -55,7 +55,7 @@ class TestUnassignUsersFromProject:
                         )
                     )
                     .where(
-                        project.c.entity_type == ScopeType.PROJECT,
+                        project.c.entity_type == ProjectEntityType(),
                         project.c.entity_id == group_fixture,
                         member.c.entity_id.in_(assigned_users),
                     )
@@ -121,7 +121,7 @@ class TestUnassignUsersFromProject:
                         )
                     )
                     .where(
-                        project.c.entity_type == ScopeType.PROJECT,
+                        project.c.entity_type == ProjectEntityType(),
                         project.c.entity_id == group_fixture,
                         member.c.entity_id.in_(assigned_users[1:]),
                     )

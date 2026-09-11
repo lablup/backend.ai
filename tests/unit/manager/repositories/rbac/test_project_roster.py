@@ -10,13 +10,13 @@ import pytest
 import sqlalchemy as sa
 
 from ai.backend.common.data.entity.domain import DomainID, DomainName
-from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.project import ProjectEntityType, ProjectID
 from ai.backend.common.data.entity.role import RoleID
-from ai.backend.common.data.entity.user import UserID
+from ai.backend.common.data.entity.types import EntityType
+from ai.backend.common.data.entity.user import UserEntityType, UserID
 from ai.backend.common.data.permission.types import Permission
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
-from ai.backend.manager.data.permission.types import ScopeType
 from ai.backend.manager.data.project.types import ProjectType
 from ai.backend.manager.errors.resource import PersonalProjectMemberAdditionError
 from ai.backend.manager.models.agent import AgentRow
@@ -30,9 +30,6 @@ from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.project import ProjectRow
 from ai.backend.manager.models.rbac_models import RoleRow, UserRoleRow
-from ai.backend.manager.models.rbac_models.association_scopes_entities import (
-    AssociationScopesEntitiesRow,
-)
 from ai.backend.manager.models.replica_group import ReplicaGroupRow
 from ai.backend.manager.models.resource_group import ResourceGroupRow
 from ai.backend.manager.models.resource_policy import (
@@ -62,12 +59,12 @@ from ai.backend.testutils.fixtures import DomainFixtureData
 from ai.backend.testutils.virtual_entity import VirtualEntitySeeder
 
 
-def _node(entity_id: uuid.UUID, scope_type: ScopeType) -> sa.ScalarSelect[Any]:
+def _node(entity_id: uuid.UUID, scope_type: EntityType) -> sa.ScalarSelect[Any]:
     """The virtual entity node the id stands for."""
     return (
         sa.select(VirtualEntityRow.id)
         .where(
-            VirtualEntityRow.entity_type == scope_type.value,
+            VirtualEntityRow.entity_type == scope_type,
             VirtualEntityRow.entity_id == entity_id,
         )
         .scalar_subquery()
@@ -105,7 +102,6 @@ class TestEnrollUsersInProject:
                 UserRow,
                 KeyPairRow,
                 ProjectRow,
-                AssociationScopesEntitiesRow,
                 ContainerRegistryRow,
                 ImageRow,
                 VFolderRow,
@@ -226,7 +222,7 @@ class TestEnrollUsersInProject:
             )
             session.add(
                 VirtualEntityRow(
-                    entity_type=ScopeType.PROJECT.value,
+                    entity_type=ProjectEntityType(),
                     entity_id=project_id,
                 )
             )
@@ -266,7 +262,7 @@ class TestEnrollUsersInProject:
             )
             session.add(
                 VirtualEntityRow(
-                    entity_type=ScopeType.PROJECT.value,
+                    entity_type=ProjectEntityType(),
                     entity_id=project_id,
                 )
             )
@@ -354,7 +350,7 @@ class TestEnrollUsersInProject:
                 RoleRow(
                     id=role_id,
                     name=f"test-role-{role_id.hex[:8]}",
-                    scope_type=ScopeType.PROJECT.value,
+                    scope_type=ProjectEntityType(),
                     scope_id=test_project,
                 )
             )
@@ -394,7 +390,7 @@ class TestEnrollUsersInProject:
                 await session.scalars(
                     sa.select(EntityMembershipRow.member_entity_id).where(
                         EntityMembershipRow.virtual_entity_id
-                        == _node(test_project, ScopeType.PROJECT),
+                        == _node(test_project, ProjectEntityType()),
                         EntityMembershipRow.capped.is_(True),
                     )
                 )
@@ -438,7 +434,7 @@ class TestEnrollUsersInProject:
                 await session.scalars(
                     sa.select(EntityMembershipRow.member_entity_id).where(
                         EntityMembershipRow.virtual_entity_id
-                        == _node(test_project, ScopeType.PROJECT),
+                        == _node(test_project, ProjectEntityType()),
                         EntityMembershipRow.capped.is_(True),
                     )
                 )
@@ -525,9 +521,10 @@ class TestEnrollUsersInProject:
         async with db_with_cleanup.begin_readonly_session() as session:
             membership_id = await session.scalar(
                 sa.select(EntityMembershipRow.id).where(
-                    EntityMembershipRow.virtual_entity_id == _node(test_project, ScopeType.PROJECT),
+                    EntityMembershipRow.virtual_entity_id
+                    == _node(test_project, ProjectEntityType()),
                     EntityMembershipRow.member_entity_id
-                    == _node(same_domain_user_1, ScopeType.USER),
+                    == _node(same_domain_user_1, UserEntityType()),
                     EntityMembershipRow.capped.is_(True),
                 )
             )
@@ -540,16 +537,6 @@ class TestEnrollUsersInProject:
                 )
             ).all()
             assert set(caps) == {Permission.READ}
-            associations = (
-                await session.scalars(
-                    sa.select(AssociationScopesEntitiesRow).where(
-                        AssociationScopesEntitiesRow.scope_type == ScopeType.PROJECT,
-                        AssociationScopesEntitiesRow.scope_id == str(test_project),
-                        AssociationScopesEntitiesRow.entity_id == str(same_domain_user_1),
-                    )
-                )
-            ).all()
-            assert associations == []
 
     async def test_enroll_does_not_bind_project_into_user_scope(
         self,
@@ -567,13 +554,13 @@ class TestEnrollUsersInProject:
         async with db_with_cleanup.begin_readonly_session() as session:
             user_vs_id = await session.scalar(
                 sa.select(VirtualEntityRow.id).where(
-                    VirtualEntityRow.entity_type == ScopeType.USER.value,
+                    VirtualEntityRow.entity_type == UserEntityType(),
                     VirtualEntityRow.entity_id == same_domain_user_1,
                 )
             )
             project_vs_id = await session.scalar(
                 sa.select(VirtualEntityRow.id).where(
-                    VirtualEntityRow.entity_type == ScopeType.PROJECT.value,
+                    VirtualEntityRow.entity_type == ProjectEntityType(),
                     VirtualEntityRow.entity_id == test_project,
                 )
             )
@@ -649,7 +636,6 @@ class TestWithdrawUsersFromProject:
                 UserRow,
                 KeyPairRow,
                 ProjectRow,
-                AssociationScopesEntitiesRow,
                 ContainerRegistryRow,
                 ImageRow,
                 VFolderRow,
@@ -745,7 +731,7 @@ class TestWithdrawUsersFromProject:
             )
             session.add(
                 VirtualEntityRow(
-                    entity_type=ScopeType.PROJECT.value,
+                    entity_type=ProjectEntityType(),
                     entity_id=project_id,
                 )
             )
@@ -821,7 +807,7 @@ class TestWithdrawUsersFromProject:
                 RoleRow(
                     id=role_id,
                     name=f"test-role-{role_id.hex[:8]}",
-                    scope_type=ScopeType.PROJECT.value,
+                    scope_type=ProjectEntityType(),
                     scope_id=test_project,
                 )
             )
@@ -870,9 +856,9 @@ class TestWithdrawUsersFromProject:
         async with db_with_cleanup.begin_readonly_session() as session:
             membership_id = await session.scalar(
                 sa.select(EntityMembershipRow.id).where(
-                    EntityMembershipRow.virtual_entity_id == _node(project_id, ScopeType.PROJECT),
+                    EntityMembershipRow.virtual_entity_id == _node(project_id, ProjectEntityType()),
                     EntityMembershipRow.member_entity_id
-                    == _node(same_domain_user_1, ScopeType.USER),
+                    == _node(same_domain_user_1, UserEntityType()),
                 )
             )
             assert membership_id is None

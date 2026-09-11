@@ -5,19 +5,18 @@ Uses mocks for repository layer.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from ai.backend.common.data.permission.types import RBACElementType, ScopeType
+from ai.backend.common.data.entity.domain import DomainEntityType
+from ai.backend.common.data.entity.project import ProjectEntityType
+from ai.backend.manager.actions.registry.registry import ProcessorRegistry
 from ai.backend.manager.data.permission.id import ScopeId
 from ai.backend.manager.data.permission.types import ScopeData, ScopeListResult
 from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.repositories.base import BatchQuerier
-from ai.backend.manager.services.permission_contoller.actions.get_scope_types import (
-    GetScopeTypesAction,
-)
 from ai.backend.manager.services.permission_contoller.actions.search_scopes import (
     SearchScopesAction,
 )
@@ -29,39 +28,6 @@ if TYPE_CHECKING:
     from ai.backend.manager.repositories.permission_controller.repository import (
         PermissionControllerRepository,
     )
-
-
-class TestGetScopeTypes:
-    """Tests for get_scope_types service method."""
-
-    @pytest.fixture
-    def mock_repository(self) -> MagicMock:
-        """Create a mock repository."""
-        return MagicMock()
-
-    @pytest.fixture
-    def service(
-        self, mock_repository: PermissionControllerRepository
-    ) -> PermissionControllerService:
-        """Create service with mocked repository."""
-        return PermissionControllerService(
-            repository=mock_repository,
-            rbac_action_registry=[],
-        )
-
-    async def test_get_scope_types_returns_all_scope_types(
-        self,
-        service: PermissionControllerService,
-    ) -> None:
-        """Test get_scope_types returns all ScopeType enum values."""
-        action = GetScopeTypesAction()
-
-        result = await service.get_scope_types(action)
-
-        expected_types = list(RBACElementType)
-        assert len(result.element_types) == len(expected_types)
-        for scope_type in expected_types:
-            assert scope_type in result.element_types
 
 
 class TestSearchScopes:
@@ -76,12 +42,14 @@ class TestSearchScopes:
 
     @pytest.fixture
     def service(
-        self, mock_repository: PermissionControllerRepository
+        self,
+        mock_repository: PermissionControllerRepository,
+        processor_registry: ProcessorRegistry[Any],
     ) -> PermissionControllerService:
         """Create service with mocked repository."""
         return PermissionControllerService(
             repository=mock_repository,
-            rbac_action_registry=[],
+            action_registry=processor_registry,
         )
 
     async def test_search_scopes_calls_repository(
@@ -97,7 +65,7 @@ class TestSearchScopes:
         mock_result = ScopeListResult(
             items=[
                 ScopeData(
-                    id=ScopeId(scope_type=ScopeType.DOMAIN, scope_id=domain_name),
+                    id=ScopeId(scope_type=DomainEntityType(), scope_id=domain_name),
                     name=domain_name,
                 )
             ],
@@ -112,14 +80,14 @@ class TestSearchScopes:
             orders=[],
             pagination=OffsetPagination(limit=limit, offset=offset),
         )
-        action = SearchScopesAction(element_type=RBACElementType.DOMAIN, querier=querier)
+        action = SearchScopesAction(scope_type=DomainEntityType(), querier=querier)
 
         result = await service.search_scopes(action)
 
-        mock_repository.search_scopes.assert_called_once_with(RBACElementType.DOMAIN, querier)
+        mock_repository.search_scopes.assert_called_once_with(DomainEntityType(), querier)
         assert result.result.total_count == total_count
         assert len(result.result.items) == total_count
-        assert result.result.items[0].id.scope_type == ScopeType.DOMAIN
+        assert result.result.items[0].id.scope_type == DomainEntityType()
 
     async def test_search_scopes_returns_action_result(
         self,
@@ -138,11 +106,11 @@ class TestSearchScopes:
         mock_result = ScopeListResult(
             items=[
                 ScopeData(
-                    id=ScopeId(scope_type=ScopeType.PROJECT, scope_id=project_id_1),
+                    id=ScopeId(scope_type=ProjectEntityType(), scope_id=project_id_1),
                     name=project_name_1,
                 ),
                 ScopeData(
-                    id=ScopeId(scope_type=ScopeType.PROJECT, scope_id=project_id_2),
+                    id=ScopeId(scope_type=ProjectEntityType(), scope_id=project_id_2),
                     name=project_name_2,
                 ),
             ],
@@ -157,7 +125,7 @@ class TestSearchScopes:
             orders=[],
             pagination=OffsetPagination(limit=limit, offset=offset),
         )
-        action = SearchScopesAction(element_type=RBACElementType.PROJECT, querier=querier)
+        action = SearchScopesAction(scope_type=ProjectEntityType(), querier=querier)
 
         result = await service.search_scopes(action)
 

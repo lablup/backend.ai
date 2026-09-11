@@ -10,7 +10,6 @@ from ai.backend.common.data.entity.idle_checker import (
     IdleCheckerID,
 )
 from ai.backend.common.data.entity.types import EntityIdentifier, EntityType, RuntimeEntityID
-from ai.backend.common.data.permission.types import ScopeType
 from ai.backend.common.dto.manager.v2.common import OrderDirection
 from ai.backend.common.dto.manager.v2.idle_checker_assignment.request import (
     CreateIdleCheckerAssignmentInput,
@@ -224,13 +223,13 @@ class IdleCheckerAssignmentAdapter(BaseAdapter):
             if f.scope_type.equals is not None:
                 conditions.append(
                     IdleCheckerAssignmentConditions.by_scope_type_equals(
-                        ScopeType(f.scope_type.equals.value)
+                        EntityType.from_name(f.scope_type.equals.value)
                     )
                 )
             if f.scope_type.in_ is not None:
-                scope_types: list[ScopeType] = []
+                scope_types: list[EntityType] = []
                 for scope_type_dto in f.scope_type.in_:
-                    scope_types.append(ScopeType(scope_type_dto.value))
+                    scope_types.append(EntityType.from_name(scope_type_dto.value))
                 conditions.append(IdleCheckerAssignmentConditions.by_scope_type_in(scope_types))
         if f.scope_id is not None:
             condition = self.convert_uuid_filter(
@@ -315,7 +314,7 @@ class IdleCheckerAssignmentAdapter(BaseAdapter):
     def _data_to_node(data: IdleCheckerAssignmentData) -> IdleCheckerAssignmentNode:
         return IdleCheckerAssignmentNode(
             id=IdleCheckerAssignmentID(data.id),
-            scope_type=IdleCheckerScopeTypeDTO(data.scope_type.value),
+            scope_type=IdleCheckerScopeTypeDTO(str(data.scope_type)),
             scope_id=data.scope_id,
             idle_checker_id=data.idle_checker_id,
             enabled=data.enabled,

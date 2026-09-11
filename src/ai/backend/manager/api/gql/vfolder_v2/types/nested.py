@@ -9,6 +9,8 @@ from uuid import UUID
 import strawberry
 from strawberry import Info
 
+from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.dto.manager.v2.vfolder.types import (
     VFolderAccessControlInfo as VFolderAccessControlInfoDTO,
 )
@@ -181,7 +183,7 @@ class VFolderOwnershipInfoGQL:
     ):
         if self.user_id is None:
             return None
-        return await info.context.data_loaders.user_loader.load(self.user_id)
+        return await info.context.data_loaders.user_loader.load(UserID(self.user_id))
 
     @gql_field(
         description="The project that owns this virtual folder. Null for user-owned folders."
@@ -198,7 +200,7 @@ class VFolderOwnershipInfoGQL:
     ):
         if self.project_id is None:
             return None
-        return await info.context.data_loaders.project_loader.load(self.project_id)
+        return await info.context.data_loaders.project_loader.load(ProjectID(self.project_id))
 
     @gql_field(description="The user who originally created this virtual folder.")  # type: ignore[misc]
     async def creator(
@@ -213,4 +215,4 @@ class VFolderOwnershipInfoGQL:
     ):
         if self.creator_id is None:
             return None
-        return await info.context.data_loaders.user_loader.load(self.creator_id)
+        return await info.context.data_loaders.user_loader.load(UserID(self.creator_id))

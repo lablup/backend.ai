@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from typing import override
 
 from ai.backend.common.data.entity.role_preset import RolePresetEntityType, RolePresetID
-from ai.backend.common.data.entity.types import EntityType, ScopeRef, ScopeType
+from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
 from ai.backend.manager.actions.v2.ops.base import OperationScopeOpsAction
 from ai.backend.manager.data.role_preset.types import RolePermissionPresetData
 from ai.backend.manager.models.rbac_models.role_permission_preset.row import (
@@ -39,8 +39,8 @@ class SearchRolePermissionPresetsAction(
         return RolePresetEntityType()
 
     @override
-    def scope_targets(self) -> Sequence[ScopeRef]:
-        return (ScopeRef(scope_type=ScopeType(RolePresetEntityType()), scope_id=self.preset_id),)
+    def scope_targets(self) -> Sequence[EntityIdentifier]:
+        return (self.preset_id,)
 
     @override
     def operation_scopes(self) -> Sequence[OperationScope]:

@@ -3,7 +3,6 @@ from __future__ import annotations
 from collections.abc import Sequence
 from uuid import UUID
 
-from ai.backend.common.api_handlers import SENTINEL
 from ai.backend.common.data.entity.runtime_variant import RuntimeVariantID
 from ai.backend.common.dto.manager.v2.runtime_variant.request import (
     CreateRuntimeVariantInput,
@@ -66,7 +65,7 @@ class RuntimeVariantAdapter(BaseAdapter):
         self._runtime_variant = runtime_variant
 
     async def batch_load_by_ids(
-        self, ids: Sequence[UUID]
+        self, ids: Sequence[RuntimeVariantID]
     ) -> list[RuntimeVariantNode | Exception | None]:
         """Batch load runtime variants by id for DataLoader use.
 
@@ -141,16 +140,8 @@ class RuntimeVariantAdapter(BaseAdapter):
     ) -> UpdateRuntimeVariantPayload:
         updater = RuntimeVariantUpdater(
             variant_id=RuntimeVariantID(input.id),
-            name=OptionalState.update(input.name)
-            if input.name is not None
-            else OptionalState.nop(),
-            description=(
-                TriState.nop()
-                if input.description is SENTINEL
-                else TriState.nullify()
-                if input.description is None
-                else TriState.update(input.description)
-            ),
+            name=OptionalState.from_unset(input.name),
+            description=TriState.from_unset(input.description),
         )
         result = await self._runtime_variant.update.run(UpdateRuntimeVariantAction(updater=updater))
         return UpdateRuntimeVariantPayload(

@@ -87,7 +87,9 @@ class PrometheusQueryPresetAdapter(BaseAdapter):
     def __init__(self, prometheus_query_preset: PrometheusQueryPresetProcessors) -> None:
         self._prometheus_query_preset = prometheus_query_preset
 
-    async def batch_load_by_ids(self, ids: Sequence[UUID]) -> list[QueryDefinitionNode | None]:
+    async def batch_load_by_ids(
+        self, ids: Sequence[PrometheusQueryPresetID]
+    ) -> list[QueryDefinitionNode | None]:
         if not ids:
             return []
         searcher = PrometheusQueryPresetSearcher(

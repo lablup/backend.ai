@@ -9,7 +9,7 @@ from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.artifact.types import ArtifactRevisionData, ArtifactStatus
-from ai.backend.manager.errors.artifact import ArtifactNotApproved, ArtifactReadonly
+from ai.backend.manager.errors.artifact import ArtifactReadonly, ArtifactRevisionNotApproved
 from ai.backend.manager.errors.common import ServerMisconfiguredError
 from ai.backend.manager.errors.object_storage import ObjectStorageOperationNotSupported
 from ai.backend.manager.models.artifact_revision.queriers import ArtifactRevisionQuerier
@@ -88,7 +88,7 @@ class ObjectStorageService:
         )
 
         if revision_data.status != ArtifactStatus.AVAILABLE:
-            raise ArtifactNotApproved("Only available artifacts can be downloaded.")
+            raise ArtifactRevisionNotApproved("Only available artifacts can be downloaded.")
 
         storage_proxy_client = self._storage_manager.get_manager_facing_client(storage_data.host)
 

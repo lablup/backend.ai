@@ -16,7 +16,9 @@ from typing import Any, override
 
 import sqlalchemy as sa
 
-from ai.backend.common.data.permission.types import EntityType, RBACElementType
+from ai.backend.common.data.entity.types import EntityType
+from ai.backend.common.data.entity.user import UserEntityType
+from ai.backend.common.data.entity.vfolder import VFolderEntityType
 from ai.backend.manager.actions.action.bulk import BaseBulkAction
 from ai.backend.manager.actions.action.types import ActionTarget, SearchableActionTarget
 from ai.backend.manager.actions.types import ActionOperationType
@@ -65,7 +67,7 @@ class _MockSearchableBulkAction(BaseBulkAction[SearchableActionTarget]):
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return EntityType.VFOLDER
+        return VFolderEntityType()
 
     @override
     @classmethod
@@ -76,14 +78,14 @@ class _MockSearchableBulkAction(BaseBulkAction[SearchableActionTarget]):
 class TestSearchableActionTarget:
     def test_is_an_action_target(self) -> None:
         target = _SearchableRefTarget(
-            ref=RBACElementRef(element_type=RBACElementType.VFOLDER, element_id="vf-1"),
+            ref=RBACElementRef(element_type=VFolderEntityType(), element_id="vf-1"),
             scope=_StubOperationScope(column_value="vf-1"),
         )
 
         assert isinstance(target, ActionTarget)
 
     def test_exposes_both_rbac_ref_and_search_scope(self) -> None:
-        ref = RBACElementRef(element_type=RBACElementType.VFOLDER, element_id="vf-1")
+        ref = RBACElementRef(element_type=VFolderEntityType(), element_id="vf-1")
         scope = _StubOperationScope(column_value="vf-1")
         target = _SearchableRefTarget(ref=ref, scope=scope)
 
@@ -98,8 +100,8 @@ class TestBulkActionWithSearchableTarget:
         assert isinstance(action, BaseBulkAction)
 
     def test_targets_yield_searchable_contract(self) -> None:
-        ref_a = RBACElementRef(element_type=RBACElementType.VFOLDER, element_id="vf-a")
-        ref_b = RBACElementRef(element_type=RBACElementType.USER, element_id="u-b")
+        ref_a = RBACElementRef(element_type=VFolderEntityType(), element_id="vf-a")
+        ref_b = RBACElementRef(element_type=UserEntityType(), element_id="u-b")
         scope_a = _StubOperationScope(column_value="vf-a")
         scope_b = _StubOperationScope(column_value="u-b")
         action = _MockSearchableBulkAction(

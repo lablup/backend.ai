@@ -7,7 +7,11 @@ from __future__ import annotations
 
 import pytest
 
-from ai.backend.common.data.permission.types import GLOBAL_SCOPE_ID, ScopeType
+from ai.backend.common.data.entity.domain import DomainEntityType
+from ai.backend.common.data.entity.project import ProjectEntityType
+from ai.backend.common.data.entity.types import GlobalEntityType
+from ai.backend.common.data.entity.user import UserEntityType
+from ai.backend.common.data.permission.types import GLOBAL_SCOPE_ID
 from ai.backend.common.dto.manager.query import StringFilter
 from ai.backend.common.dto.manager.rbac.request import (
     ScopeFilter,
@@ -41,7 +45,7 @@ class TestScopeAdapterBuildQuerier:
             offset=offset,
         )
 
-        querier = adapter.build_querier(ScopeType.DOMAIN, request)
+        querier = adapter.build_querier(DomainEntityType(), request)
 
         assert querier.conditions == []
         assert querier.orders == []
@@ -64,7 +68,7 @@ class TestScopeAdapterBuildQuerier:
             offset=offset,
         )
 
-        querier = adapter.build_querier(ScopeType.DOMAIN, request)
+        querier = adapter.build_querier(DomainEntityType(), request)
 
         assert len(querier.conditions) == 1
         assert callable(querier.conditions[0])
@@ -84,7 +88,7 @@ class TestScopeAdapterBuildQuerier:
             offset=offset,
         )
 
-        querier = adapter.build_querier(ScopeType.DOMAIN, request)
+        querier = adapter.build_querier(DomainEntityType(), request)
 
         assert len(querier.conditions) == 1
         assert callable(querier.conditions[0])
@@ -104,7 +108,7 @@ class TestScopeAdapterBuildQuerier:
             offset=offset,
         )
 
-        querier = adapter.build_querier(ScopeType.DOMAIN, request)
+        querier = adapter.build_querier(DomainEntityType(), request)
 
         assert len(querier.conditions) == 1
 
@@ -123,7 +127,7 @@ class TestScopeAdapterBuildQuerier:
             offset=offset,
         )
 
-        querier = adapter.build_querier(ScopeType.DOMAIN, request)
+        querier = adapter.build_querier(DomainEntityType(), request)
 
         assert len(querier.conditions) == 1
 
@@ -143,7 +147,7 @@ class TestScopeAdapterBuildQuerier:
             offset=offset,
         )
 
-        querier = adapter.build_querier(ScopeType.DOMAIN, request)
+        querier = adapter.build_querier(DomainEntityType(), request)
 
         assert len(querier.orders) == 1
 
@@ -165,7 +169,7 @@ class TestScopeAdapterBuildQuerier:
             offset=offset,
         )
 
-        querier = adapter.build_querier(ScopeType.DOMAIN, request)
+        querier = adapter.build_querier(DomainEntityType(), request)
 
         assert len(querier.orders) == 1
 
@@ -189,7 +193,7 @@ class TestScopeAdapterBuildQuerier:
             offset=offset,
         )
 
-        querier = adapter.build_querier(ScopeType.PROJECT, request)
+        querier = adapter.build_querier(ProjectEntityType(), request)
 
         assert len(querier.conditions) == 1
         assert len(querier.orders) == 1
@@ -212,7 +216,7 @@ class TestScopeAdapterBuildQuerier:
             offset=offset,
         )
 
-        querier = adapter.build_querier(ScopeType.USER, request)
+        querier = adapter.build_querier(UserEntityType(), request)
 
         assert len(querier.conditions) == 1
 
@@ -226,7 +230,7 @@ class TestScopeAdapterBuildQuerier:
         )
 
         with pytest.raises(NotImplementedError):
-            adapter.build_querier(ScopeType.GLOBAL, request)
+            adapter.build_querier(GlobalEntityType(), request)
 
 
 class TestScopeAdapterConvertToDTO:
@@ -241,14 +245,14 @@ class TestScopeAdapterConvertToDTO:
         """Test converting domain scope data to DTO."""
         domain_name = "test-domain"
         scope_data = ScopeData(
-            id=ScopeId(scope_type=ScopeType.DOMAIN, scope_id=domain_name),
+            id=ScopeId(scope_type=DomainEntityType(), scope_id=domain_name),
             name=domain_name,
         )
 
         dto = adapter.convert_to_dto(scope_data)
 
         assert isinstance(dto, ScopeDTO)
-        assert dto.scope_type == ScopeType.DOMAIN
+        assert dto.scope_type == DomainEntityType()
         assert dto.scope_id == domain_name
         assert dto.name == domain_name
 
@@ -257,13 +261,13 @@ class TestScopeAdapterConvertToDTO:
         project_id = "550e8400-e29b-41d4-a716-446655440000"
         project_name = "my-project"
         scope_data = ScopeData(
-            id=ScopeId(scope_type=ScopeType.PROJECT, scope_id=project_id),
+            id=ScopeId(scope_type=ProjectEntityType(), scope_id=project_id),
             name=project_name,
         )
 
         dto = adapter.convert_to_dto(scope_data)
 
-        assert dto.scope_type == ScopeType.PROJECT
+        assert dto.scope_type == ProjectEntityType()
         assert dto.scope_id == project_id
         assert dto.name == project_name
 
@@ -272,25 +276,25 @@ class TestScopeAdapterConvertToDTO:
         user_id = "660e8400-e29b-41d4-a716-446655440001"
         username = "john_doe"
         scope_data = ScopeData(
-            id=ScopeId(scope_type=ScopeType.USER, scope_id=user_id),
+            id=ScopeId(scope_type=UserEntityType(), scope_id=user_id),
             name=username,
         )
 
         dto = adapter.convert_to_dto(scope_data)
 
-        assert dto.scope_type == ScopeType.USER
+        assert dto.scope_type == UserEntityType()
         assert dto.scope_id == user_id
         assert dto.name == username
 
     def test_convert_to_dto_global_scope(self, adapter: ScopeAdapter) -> None:
         """Test converting global scope data to DTO."""
         scope_data = ScopeData(
-            id=ScopeId(scope_type=ScopeType.GLOBAL, scope_id=GLOBAL_SCOPE_ID),
+            id=ScopeId(scope_type=GlobalEntityType(), scope_id=GLOBAL_SCOPE_ID),
             name=GLOBAL_SCOPE_ID,
         )
 
         dto = adapter.convert_to_dto(scope_data)
 
-        assert dto.scope_type == ScopeType.GLOBAL
+        assert dto.scope_type == GlobalEntityType()
         assert dto.scope_id == GLOBAL_SCOPE_ID
         assert dto.name == GLOBAL_SCOPE_ID

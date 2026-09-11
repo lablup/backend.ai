@@ -1,10 +1,9 @@
 from typing import override
 
-from ai.backend.common.data.entity.types import EntityIdentifier, EntityType, ScopeType
+from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
 
 __all__ = (
     "UserEntityType",
-    "USER_SCOPE_TYPE",
     "UserID",
 )
 
@@ -19,9 +18,6 @@ class UserEntityType(EntityType):
     @classmethod
     def description(cls) -> str:
         return "An account inside a domain."
-
-
-USER_SCOPE_TYPE = ScopeType(UserEntityType())
 
 
 class UserID(EntityIdentifier):

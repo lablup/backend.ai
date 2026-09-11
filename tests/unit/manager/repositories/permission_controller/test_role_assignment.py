@@ -8,10 +8,10 @@ from collections.abc import AsyncGenerator
 import pytest
 import sqlalchemy as sa
 
-from ai.backend.common.data.entity.domain import DomainID, DomainName
-from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.domain import DomainEntityType, DomainID, DomainName
+from ai.backend.common.data.entity.project import ProjectEntityType, ProjectID
 from ai.backend.common.data.entity.role import RoleEntityType
-from ai.backend.common.data.entity.user import UserID
+from ai.backend.common.data.entity.user import UserEntityType, UserID
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.permission.role import (
@@ -19,7 +19,6 @@ from ai.backend.manager.data.permission.role import (
     UserRoleRevocationInput,
 )
 from ai.backend.manager.data.permission.status import RoleStatus
-from ai.backend.manager.data.permission.types import EntityType, ScopeType
 from ai.backend.manager.data.project.types import ProjectType
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
@@ -32,9 +31,6 @@ from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.project import ProjectRow
 from ai.backend.manager.models.rbac_models import RoleRow, UserRoleRow
-from ai.backend.manager.models.rbac_models.association_scopes_entities import (
-    AssociationScopesEntitiesRow,
-)
 from ai.backend.manager.models.replica_group import ReplicaGroupRow
 from ai.backend.manager.models.resource_group import ResourceGroupRow
 from ai.backend.manager.models.resource_policy import (
@@ -97,7 +93,6 @@ class TestRoleAssignment:
                 UserRow,
                 KeyPairRow,
                 ProjectRow,
-                AssociationScopesEntitiesRow,
                 ContainerRegistryRow,
                 ImageRow,
                 VFolderRow,
@@ -189,7 +184,7 @@ class TestRoleAssignment:
             )
             session.add(
                 VirtualEntityRow(
-                    entity_type=ScopeType.PROJECT.value,
+                    entity_type=ProjectEntityType(),
                     entity_id=project_id,
                 )
             )
@@ -225,7 +220,7 @@ class TestRoleAssignment:
                     domain_id=domain_id,
                 )
             )
-            session.add(VirtualEntityRow(entity_type=ScopeType.USER.value, entity_id=user_uuid))
+            session.add(VirtualEntityRow(entity_type=UserEntityType(), entity_id=user_uuid))
             await session.commit()
         return user_uuid
 
@@ -253,7 +248,7 @@ class TestRoleAssignment:
                 RoleRow(
                     id=role_id,
                     name=f"project-role-{role_id.hex[:8]}",
-                    scope_type=ScopeType.PROJECT.value,
+                    scope_type=ProjectEntityType(),
                     scope_id=test_project,
                 )
             )
@@ -272,7 +267,7 @@ class TestRoleAssignment:
                 RoleRow(
                     id=role_id,
                     name=f"project-role2-{role_id.hex[:8]}",
-                    scope_type=ScopeType.PROJECT.value,
+                    scope_type=ProjectEntityType(),
                     scope_id=test_project,
                 )
             )
@@ -286,15 +281,13 @@ class TestRoleAssignment:
         role_id = uuid.uuid4()
         async with db_with_cleanup.begin_session() as session:
             session.add(
-                VirtualEntityRow(
-                    entity_type=ScopeType.DOMAIN.value, entity_id=test_domain.domain_id
-                )
+                VirtualEntityRow(entity_type=DomainEntityType(), entity_id=test_domain.domain_id)
             )
             session.add(
                 RoleRow(
                     id=role_id,
                     name=f"domain-role-{role_id.hex[:8]}",
-                    scope_type=ScopeType.DOMAIN.value,
+                    scope_type=DomainEntityType(),
                     scope_id=test_domain.domain_id,
                 )
             )
@@ -387,14 +380,14 @@ class TestRoleAssignment:
                         EntityMembershipRow.virtual_entity_id
                         == sa.select(VirtualEntityRow.id)
                         .where(
-                            VirtualEntityRow.entity_type == ScopeType.PROJECT.value,
+                            VirtualEntityRow.entity_type == ProjectEntityType(),
                             VirtualEntityRow.entity_id == test_project,
                         )
                         .scalar_subquery(),
                         EntityMembershipRow.member_entity_id
                         == sa.select(VirtualEntityRow.id)
                         .where(
-                            VirtualEntityRow.entity_type == ScopeType.USER.value,
+                            VirtualEntityRow.entity_type == UserEntityType(),
                             VirtualEntityRow.entity_id == user_1,
                         )
                         .scalar_subquery(),
@@ -402,15 +395,6 @@ class TestRoleAssignment:
                 )
             ).all()
             assert len(edges) == 1
-            assoc = await session.execute(
-                sa.select(AssociationScopesEntitiesRow.entity_id).where(
-                    AssociationScopesEntitiesRow.scope_type == ScopeType.PROJECT,
-                    AssociationScopesEntitiesRow.scope_id == str(test_project),
-                    AssociationScopesEntitiesRow.entity_type == EntityType.USER,
-                    AssociationScopesEntitiesRow.entity_id == str(user_1),
-                )
-            )
-            assert assoc.fetchall() == []
 
     async def test_join_member_does_not_bind_project_into_user_scope(
         self,
@@ -427,13 +411,13 @@ class TestRoleAssignment:
         async with db_with_cleanup.begin_readonly_session() as session:
             user_vs_id = await session.scalar(
                 sa.select(VirtualEntityRow.id).where(
-                    VirtualEntityRow.entity_type == ScopeType.USER.value,
+                    VirtualEntityRow.entity_type == UserEntityType(),
                     VirtualEntityRow.entity_id == user_1,
                 )
             )
             project_vs_id = await session.scalar(
                 sa.select(VirtualEntityRow.id).where(
-                    VirtualEntityRow.entity_type == ScopeType.PROJECT.value,
+                    VirtualEntityRow.entity_type == ProjectEntityType(),
                     VirtualEntityRow.entity_id == test_project,
                 )
             )
@@ -475,14 +459,14 @@ class TestRoleAssignment:
                         EntityMembershipRow.virtual_entity_id
                         == sa.select(VirtualEntityRow.id)
                         .where(
-                            VirtualEntityRow.entity_type == ScopeType.PROJECT.value,
+                            VirtualEntityRow.entity_type == ProjectEntityType(),
                             VirtualEntityRow.entity_id == test_project,
                         )
                         .scalar_subquery(),
                         EntityMembershipRow.member_entity_id
                         == sa.select(VirtualEntityRow.id)
                         .where(
-                            VirtualEntityRow.entity_type == ScopeType.USER.value,
+                            VirtualEntityRow.entity_type == UserEntityType(),
                             VirtualEntityRow.entity_id == user_1,
                         )
                         .scalar_subquery(),
@@ -509,14 +493,14 @@ class TestRoleAssignment:
                         EntityMembershipRow.virtual_entity_id
                         == sa.select(VirtualEntityRow.id)
                         .where(
-                            VirtualEntityRow.entity_type == ScopeType.PROJECT.value,
+                            VirtualEntityRow.entity_type == ProjectEntityType(),
                             VirtualEntityRow.entity_id == test_project,
                         )
                         .scalar_subquery(),
                         EntityMembershipRow.member_entity_id
                         == sa.select(VirtualEntityRow.id)
                         .where(
-                            VirtualEntityRow.entity_type == ScopeType.USER.value,
+                            VirtualEntityRow.entity_type == UserEntityType(),
                             VirtualEntityRow.entity_id == user_1,
                         )
                         .scalar_subquery(),
@@ -549,7 +533,7 @@ class TestRoleAssignment:
                     name=f"auto-role-{role_id.hex[:8]}",
                     auto_assign=auto_assign,
                     status=status,
-                    scope_type=ScopeType.PROJECT.value,
+                    scope_type=ProjectEntityType(),
                     scope_id=project_id,
                 )
             )
@@ -559,7 +543,7 @@ class TestRoleAssignment:
             await session.flush()
             project_node_id = await session.scalar(
                 sa.select(VirtualEntityRow.id).where(
-                    VirtualEntityRow.entity_type == ScopeType.PROJECT.value,
+                    VirtualEntityRow.entity_type == ProjectEntityType(),
                     VirtualEntityRow.entity_id == project_id,
                 )
             )

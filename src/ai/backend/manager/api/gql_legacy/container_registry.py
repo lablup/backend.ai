@@ -698,6 +698,22 @@ class ContainerRegistry(graphene.ObjectType):  # type: ignore[misc]
         )
 
     @classmethod
+    def from_dataclass(cls, data: ContainerRegistryData) -> ContainerRegistry:
+        return cls(
+            id=data.id,  # auto-converted to Relay global ID
+            hostname=data.registry_name,
+            config=ContainerRegistryConfig(
+                url=data.url,
+                type=str(data.type),
+                project=[data.project],
+                username=data.username,
+                password=PASSWORD_PLACEHOLDER if data.password is not None else None,
+                ssl_verify=data.ssl_verify,
+                is_global=data.is_global,
+            ),
+        )
+
+    @classmethod
     async def load_by_hostname(cls, ctx: GraphQueryContext, hostname: str) -> ContainerRegistry:
         async with ctx.db.begin_readonly_session() as session:
             return cls.from_row(
@@ -756,15 +772,10 @@ class CreateContainerRegistry(graphene.Mutation):  # type: ignore[misc]
         set_if_set(props, input_config, "ssl_verify")
         set_if_set(props, input_config, "is_global")
 
-        async with ctx.db.begin_session() as db_session:
-            reg_row = ContainerRegistryRow(id=ContainerRegistryID(uuid.uuid4()), **input_config)
-            db_session.add(reg_row)
-            await db_session.flush()
-            await db_session.refresh(reg_row)
-
-            return cls(
-                container_registry=ContainerRegistry.from_row(ctx, reg_row),
-            )
+        result = await ctx.processors.container_registry.create_container_registry.run(
+            CreateContainerRegistryAction(creator=ContainerRegistryCreator(**input_config))
+        )
+        return cls(container_registry=ContainerRegistry.from_dataclass(result.data))
 
 
 class ModifyContainerRegistry(graphene.Mutation):  # type: ignore[misc]
@@ -838,10 +849,16 @@ class DeleteContainerRegistry(graphene.Mutation):  # type: ignore[misc]
         hostname: str,
     ) -> DeleteContainerRegistry:
         ctx: GraphQueryContext = info.context
-        container_registry = await ContainerRegistry.load_by_hostname(ctx, hostname)
-        async with ctx.db.begin_session() as session:
-            stmt = sa.delete(ContainerRegistryRow).where(
-                ContainerRegistryRow.registry_name == hostname
+        async with ctx.db.begin_readonly_session() as session:
+            rows = await ContainerRegistryRow.list_by_registry_name(session, hostname)
+            container_registry = ContainerRegistry.from_row(ctx, rows[0])
+            registry_ids = [ContainerRegistryID(row.id) for row in rows]
+        # The hostname names a row per project, and the delete has always taken them
+        # all; each goes with the RBAC graph it left.
+        for registry_id in registry_ids:
+            await ctx.processors.container_registry.delete_container_registry.run(
+                DeleteContainerRegistryAction(
+                    purger=ContainerRegistryPurger(registry_id=registry_id)
+                )
             )
-            await session.execute(stmt)
         return cls(container_registry=container_registry)

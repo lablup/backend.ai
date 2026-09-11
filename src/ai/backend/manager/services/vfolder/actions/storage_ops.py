@@ -5,9 +5,9 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Any, override
 
-from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE
-from ai.backend.common.data.entity.types import ScopeRef
-from ai.backend.common.data.entity.user import USER_SCOPE_TYPE
+from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.types import EntityIdentifier
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.models.user import UserRole
 
@@ -148,11 +148,11 @@ class SearchHostsAction(VFolderScopeAction):
     resource_policy: Mapping[str, Any]
 
     @override
-    def scope_targets(self) -> Sequence[ScopeRef]:
+    def scope_targets(self) -> Sequence[EntityIdentifier]:
         """A project folder is bounded by the project, a user folder by its owner."""
         if self.group_id is not None:
-            return (ScopeRef(scope_type=PROJECT_SCOPE_TYPE, scope_id=self.group_id),)
-        return (ScopeRef(scope_type=USER_SCOPE_TYPE, scope_id=self.user_uuid),)
+            return (ProjectID(self.group_id),)
+        return (UserID(self.user_uuid),)
 
     @override
     @classmethod

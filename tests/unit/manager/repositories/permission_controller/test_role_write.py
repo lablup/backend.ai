@@ -9,19 +9,16 @@ from typing import TYPE_CHECKING
 import pytest
 import sqlalchemy as sa
 
-from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE, ProjectID
+from ai.backend.common.data.entity.project import ProjectEntityType, ProjectID
 from ai.backend.common.data.entity.role import RoleEntityType, RoleID
 from ai.backend.common.data.permission.types import RoleSource
 from ai.backend.manager.data.permission.role import RoleData
 from ai.backend.manager.data.permission.status import RoleStatus
+from ai.backend.manager.errors.base.entity import EntityNotFoundError
 from ai.backend.manager.errors.permission import VirtualEntityNotFound
-from ai.backend.manager.errors.repository import EntityNotFoundError
 from ai.backend.manager.errors.role_preset import SystemRoleNotEditable
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.entity_label.row import EntityLabelRow
-from ai.backend.manager.models.rbac_models.association_scopes_entities import (
-    AssociationScopesEntitiesRow,
-)
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.rbac_models.role.creators import RoleCreator
@@ -48,7 +45,6 @@ if TYPE_CHECKING:
 
 TABLES: Sequence[TableOrORM] = [
     RoleRow,
-    AssociationScopesEntitiesRow,
     PermissionRow,
     VirtualEntityRow,
     EntityMembershipRow,
@@ -78,7 +74,7 @@ class TestRoleWrite:
         role_id = RoleID(uuid.uuid4())
         project_id = ProjectID(uuid.uuid4())
         async with db.begin_session() as db_sess:
-            db_sess.add(VirtualEntityRow(entity_type=PROJECT_SCOPE_TYPE, entity_id=project_id))
+            db_sess.add(VirtualEntityRow(entity_type=ProjectEntityType(), entity_id=project_id))
             await db_sess.flush()
             await db_sess.execute(
                 sa.insert(RoleRow).values(
@@ -86,7 +82,7 @@ class TestRoleWrite:
                     name=f"role-{source.value}",
                     source=source,
                     status=RoleStatus.ACTIVE,
-                    scope_type=PROJECT_SCOPE_TYPE,
+                    scope_type=ProjectEntityType(),
                     scope_id=project_id,
                 )
             )
@@ -162,7 +158,7 @@ class TestRoleCreate:
     async def project_id(self, db_with_tables: ExtendedAsyncSAEngine) -> ProjectID:
         project_id = ProjectID(uuid.uuid4())
         async with db_with_tables.begin_session() as db_sess:
-            db_sess.add(VirtualEntityRow(entity_type=PROJECT_SCOPE_TYPE, entity_id=project_id))
+            db_sess.add(VirtualEntityRow(entity_type=ProjectEntityType(), entity_id=project_id))
         return project_id
 
     async def _owning_scope_ids(self, db: ExtendedAsyncSAEngine, role_id: RoleID) -> set[uuid.UUID]:
@@ -195,7 +191,7 @@ class TestRoleCreate:
 
         assert data.name == "reader"
         assert data.source == RoleSource.CUSTOM
-        assert (data.scope_type, data.scope_id) == (PROJECT_SCOPE_TYPE, project_id)
+        assert (data.scope_type, data.scope_id) == (ProjectEntityType(), project_id)
         assert await self._owning_scope_ids(db_with_tables, data.id) == {data.id, project_id}
 
     async def test_create_in_a_scope_without_a_node_fails(

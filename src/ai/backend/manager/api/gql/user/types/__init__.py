@@ -60,6 +60,7 @@ from .payloads import (
 from .scopes import (
     DomainUserScopeGQL,
     ProjectUserScopeGQL,
+    UserScopeGQL,
 )
 
 __all__ = [
@@ -88,6 +89,7 @@ __all__ = [
     # Scopes
     "DomainUserScopeGQL",
     "ProjectUserScopeGQL",
+    "UserScopeGQL",
     # Inputs
     "CreateUserInputGQL",
     "BulkCreateUserV2InputGQL",

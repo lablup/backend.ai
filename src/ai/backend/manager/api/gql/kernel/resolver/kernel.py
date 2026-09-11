@@ -5,6 +5,7 @@ from uuid import UUID
 import strawberry
 from strawberry import Info
 
+from ai.backend.common.data.entity.kernel import KernelID
 from ai.backend.common.dto.manager.v2.kernel.request import AdminSearchKernelsInput
 from ai.backend.common.types import KernelId, SessionId
 from ai.backend.manager.api.gql.base import encode_cursor
@@ -31,7 +32,7 @@ async def kernel_v2(
     info: Info[StrawberryGQLContext],
     id: UUID,
 ) -> KernelV2GQL | None:
-    kernel_info = await info.context.data_loaders.kernel_loader.load(KernelId(id))
+    kernel_info = await info.context.data_loaders.kernel_loader.load(KernelID(KernelId(id)))
     if kernel_info is None:
         return None
     return kernel_info

@@ -476,7 +476,7 @@ class SessionAdapter(BaseAdapter):
     # Batch load (DataLoader)
     # -------------------------------------------------------------------------
 
-    async def batch_load_by_ids(self, session_ids: Sequence[SessionId]) -> list[SessionNode | None]:
+    async def batch_load_by_ids(self, session_ids: Sequence[SessionID]) -> list[SessionNode | None]:
         """Batch load sessions by ID for DataLoader use.
 
         Returns SessionNode DTOs in the same order as the input session_ids list.
@@ -485,19 +485,19 @@ class SessionAdapter(BaseAdapter):
             return []
         querier = BatchQuerier(
             pagination=NoPagination(),
-            conditions=[SessionConditions.by_ids(session_ids)],
+            conditions=[SessionConditions.by_ids([SessionId(sid) for sid in session_ids])],
         )
         action_result = await self._session.search_sessions.run(
             SearchSessionsAction(querier=querier, user_id=UserID(self._require_user_id()))
         )
         nodes = await self._session_data_to_nodes(action_result.data)
-        session_map: dict[SessionId, SessionNode] = {
-            SessionId(data.id): node for data, node in zip(action_result.data, nodes, strict=True)
+        session_map: dict[SessionID, SessionNode] = {
+            SessionID(data.id): node for data, node in zip(action_result.data, nodes, strict=True)
         }
         return [session_map.get(session_id) for session_id in session_ids]
 
     async def batch_load_kernels_by_ids(
-        self, kernel_ids: Sequence[KernelId]
+        self, kernel_ids: Sequence[KernelID]
     ) -> list[KernelNode | None]:
         """Batch load kernels by ID for DataLoader use.
 
@@ -507,14 +507,14 @@ class SessionAdapter(BaseAdapter):
             return []
         querier = BatchQuerier(
             pagination=NoPagination(),
-            conditions=[KernelConditions.by_ids(kernel_ids)],
+            conditions=[KernelConditions.by_ids([KernelId(kid) for kid in kernel_ids])],
         )
         action_result = await self._session.search_kernels.run(
             SearchKernelsAction(querier=querier, user_id=UserID(self._require_user_id()))
         )
         nodes = await self._kernel_infos_to_nodes(action_result.data)
-        kernel_map: dict[KernelId, KernelNode] = {
-            info.id: node for info, node in zip(action_result.data, nodes, strict=True)
+        kernel_map: dict[KernelID, KernelNode] = {
+            KernelID(info.id): node for info, node in zip(action_result.data, nodes, strict=True)
         }
         return [kernel_map.get(kernel_id) for kernel_id in kernel_ids]
 
@@ -543,7 +543,7 @@ class SessionAdapter(BaseAdapter):
         )
 
     async def batch_resource_allocation_by_session(
-        self, session_ids: Sequence[SessionId]
+        self, session_ids: Sequence[SessionID]
     ) -> list[ResourceAllocationGQLDTO]:
         """Batch-aggregate resource_allocations per session for DataLoader use.
 
@@ -552,12 +552,14 @@ class SessionAdapter(BaseAdapter):
         if not session_ids:
             return []
         action_result = await self._session.batch_get_session_resource_allocation.run(
-            BatchGetSessionResourceAllocationAction(session_ids=list(session_ids))
+            BatchGetSessionResourceAllocationAction(
+                session_ids=[SessionId(sid) for sid in session_ids]
+            )
         )
         return [self._aggregate_to_allocation_dto(item.value) for item in action_result.items]
 
     async def batch_resource_allocation_by_kernel(
-        self, kernel_ids: Sequence[KernelId]
+        self, kernel_ids: Sequence[KernelID]
     ) -> list[ResourceAllocationGQLDTO]:
         """Batch-aggregate resource_allocations per kernel for DataLoader use.
 
@@ -566,18 +568,17 @@ class SessionAdapter(BaseAdapter):
         if not kernel_ids:
             return []
         action_result = await self._session.batch_get_kernel_resource_allocation.run(
-            BatchGetKernelResourceAllocationAction(
-                kernel_ids=[KernelID(kernel_id) for kernel_id in kernel_ids]
-            )
+            BatchGetKernelResourceAllocationAction(kernel_ids=list(kernel_ids))
         )
         return [
-            self._aggregate_to_allocation_dto(action_result.data.get(kid)) for kid in kernel_ids
+            self._aggregate_to_allocation_dto(action_result.data.get(KernelId(kid)))
+            for kid in kernel_ids
         ]
 
     async def _session_data_to_nodes(self, data: Sequence[SessionData]) -> list[SessionNode]:
         """Convert session data to nodes, batch-loading their slot allocations."""
         allocations = await self.batch_resource_allocation_by_session([
-            SessionId(item.id) for item in data
+            SessionID(item.id) for item in data
         ])
         return [
             self._session_data_to_node(item, allocation)
@@ -587,7 +588,7 @@ class SessionAdapter(BaseAdapter):
     async def _kernel_infos_to_nodes(self, data: Sequence[KernelInfo]) -> list[KernelNode]:
         """Convert kernel infos to nodes, batch-loading their slot allocations."""
         allocations = await self.batch_resource_allocation_by_kernel([
-            KernelId(item.id) for item in data
+            KernelID(item.id) for item in data
         ])
         return [
             self._kernel_info_to_node(item, allocation)
@@ -1071,18 +1072,20 @@ class SessionAdapter(BaseAdapter):
         return ExcludeSessionIdleChecksPayload(
             items=[
                 SessionIdleCheckTargetInfo(
-                    checker_id=pair.checker_id,
-                    session_id=SessionID(pair.session_id),
+                    checker_id=item.pair.checker_id,
+                    session_id=SessionID(item.pair.session_id),
                 )
-                for pair in result.success
+                for item in result.results
+                if item.applied
             ],
             failed=[
                 ExcludeSessionIdleChecksFailureInfo(
-                    checker_id=pair.checker_id,
-                    session_id=SessionID(pair.session_id),
-                    message=str(error),
+                    checker_id=item.pair.checker_id,
+                    session_id=SessionID(item.pair.session_id),
+                    message=str(item.error) if item.error is not None else "Not excluded.",
                 )
-                for pair, error in result.errors.items()
+                for item in result.results
+                if not item.applied
             ],
         )
 
@@ -1105,18 +1108,20 @@ class SessionAdapter(BaseAdapter):
         return IncludeSessionIdleChecksPayload(
             items=[
                 SessionIdleCheckTargetInfo(
-                    checker_id=pair.checker_id,
-                    session_id=SessionID(pair.session_id),
+                    checker_id=item.pair.checker_id,
+                    session_id=SessionID(item.pair.session_id),
                 )
-                for pair in result.success
+                for item in result.results
+                if item.applied
             ],
             failed=[
                 IncludeSessionIdleChecksFailureInfo(
-                    checker_id=pair.checker_id,
-                    session_id=SessionID(pair.session_id),
-                    message=str(error),
+                    checker_id=item.pair.checker_id,
+                    session_id=SessionID(item.pair.session_id),
+                    message=str(item.error) if item.error is not None else "Not included.",
                 )
-                for pair, error in result.errors.items()
+                for item in result.results
+                if not item.applied
             ],
         )
 

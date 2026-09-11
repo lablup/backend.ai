@@ -17,17 +17,14 @@ from ai.backend.common.data.entity.deployment_preset import DeploymentPresetEnti
 from ai.backend.common.data.entity.domain import DomainEntityType
 from ai.backend.common.data.entity.entity_label import EntityLabelFieldType
 from ai.backend.common.data.entity.entity_share import EntityShareEntityType
-from ai.backend.common.data.entity.etcd_config import EtcdConfigEntityType
-from ai.backend.common.data.entity.export import ExportEntityType
 from ai.backend.common.data.entity.fair_share import (
-    DomainFairShareEntityType,
-    ProjectFairShareEntityType,
-    UserFairShareEntityType,
+    DomainFairShareFieldType,
+    ProjectFairShareFieldType,
+    UserFairShareFieldType,
 )
 from ai.backend.common.data.entity.idle_checker import IdleCheckerEntityType
 from ai.backend.common.data.entity.image import ImageEntityType
 from ai.backend.common.data.entity.login_client_type import LoginClientTypeEntityType
-from ai.backend.common.data.entity.manager_admin import ManagerAdminEntityType
 from ai.backend.common.data.entity.model_card import ModelCardEntityType
 from ai.backend.common.data.entity.notification import (
     NotificationChannelEntityType,
@@ -54,11 +51,12 @@ from ai.backend.common.data.entity.role import RoleEntityType
 from ai.backend.common.data.entity.role_preset import RolePresetEntityType
 from ai.backend.common.data.entity.runtime_variant import RuntimeVariantEntityType
 from ai.backend.common.data.entity.runtime_variant_preset import RuntimeVariantPresetEntityType
-from ai.backend.common.data.entity.secret import SecretEntityType
+from ai.backend.common.data.entity.secret import SecretFieldType
 from ai.backend.common.data.entity.service_catalog import ServiceCatalogEntityType
 from ai.backend.common.data.entity.session import SessionEntityType
 from ai.backend.common.data.entity.session_template import SessionTemplateEntityType
 from ai.backend.common.data.entity.storage_namespace import StorageNamespaceEntityType
+from ai.backend.common.data.entity.types import GlobalEntityType
 from ai.backend.common.data.entity.usage_bucket import (
     DomainUsageBucketFieldType,
     ProjectUsageBucketFieldType,
@@ -68,7 +66,6 @@ from ai.backend.common.data.entity.user import UserEntityType
 from ai.backend.common.data.entity.vfolder import VFolderEntityType
 from ai.backend.common.data.entity.vfolder_invitation import VFolderInvitationEntityType
 from ai.backend.common.data.entity.vfs_storage import VFSStorageEntityType
-from ai.backend.manager.actions.action import RBAC_ACTION_REGISTRY
 from ai.backend.manager.actions.monitors import ActionMonitors
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
 from ai.backend.manager.actions.registry.types import (
@@ -79,16 +76,21 @@ from ai.backend.manager.actions.registry.types import (
     ProcessorDependencies,
 )
 from ai.backend.manager.actions.v2.bulk.validator.rbac import BulkOwnCheck
-from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.clients.prometheus.preset import PromQLTemplateRenderer
 from ai.backend.manager.data.artifact.types import ArtifactRevisionData
 from ai.backend.manager.data.audit_log.types import AuditLogData
 from ai.backend.manager.data.entity_label.types import EntityLabelData
+from ai.backend.manager.data.fair_share.types import (
+    DomainFairShareData,
+    ProjectFairShareData,
+    UserFairShareData,
+)
 from ai.backend.manager.data.resource_usage_history.types import (
     DomainUsageBucketData,
     ProjectUsageBucketData,
     UserUsageBucketData,
 )
+from ai.backend.manager.data.secret.types import SecretFieldData
 from ai.backend.manager.repositories.ops.repository import OpsRepository
 from ai.backend.manager.repositories.resource_allocation.repository import (
     ResourceAllocationRepository,
@@ -260,7 +262,7 @@ from ai.backend.manager.services.vfs_storage.processors import VFSStorageProcess
 from ai.backend.manager.services.vfs_storage.service import VFSStorageService
 
 
-def create_services(args: ServiceArgs) -> Services:
+def create_services(args: ServiceArgs, action_registry: ProcessorRegistry[Any]) -> Services:
     repositories = args.repositories
     return Services(
         agent=AgentService(
@@ -453,7 +455,7 @@ def create_services(args: ServiceArgs) -> Services:
         ),
         permission_controller=PermissionControllerService(
             repository=repositories.permission_controller.repository,
-            rbac_action_registry=RBAC_ACTION_REGISTRY,
+            action_registry=action_registry,
         ),
         vfs_storage=VFSStorageService(
             vfs_storage_repository=repositories.vfs_storage.repository,
@@ -521,16 +523,15 @@ def create_services(args: ServiceArgs) -> Services:
 def create_processors(
     args: ProcessorArgs,
     monitors: ActionMonitors,
-    validators: ActionValidators,
 ) -> ProcessorsBundle:
-    services = create_services(args.service_args)
     repositories = args.service_args.repositories
     # Legacy BaseAction-era packages consume the flat monitor list; packages migrated
     # to the pure-ABC frameworks pick the per-type monitors from `monitors` instead.
     action_monitors = monitors.legacy
     # One registry shared by every v2-wired package: each package wires through its
     # own group, and the registry's wired_specs() is the catalog of every
-    # registered action.
+    # registered action. Built before the services because the permission controller
+    # reads the catalog to answer what a role may permit.
     registry: ProcessorRegistry[Any] = ProcessorRegistry(
         ProcessorDependencies(
             monitors=monitors,
@@ -538,6 +539,7 @@ def create_processors(
             repository=OpsRepository(repositories.v2_ops_provider),
         )
     )
+    services = create_services(args.service_args, registry)
     # Every group is made through the area it belongs to, so every wiring names one.
     app_config_groups = registry.concern(ConcernMeta(Concern.APP_CONFIG))
     artifact_groups = registry.concern(ConcernMeta(Concern.ARTIFACT_REGISTRY))
@@ -581,15 +583,28 @@ def create_processors(
             action_monitors,
         ),
         etcd_config=EtcdConfigProcessors(
-            system_groups.group(GroupMeta(EtcdConfigEntityType())), services.etcd_config
+            system_groups.group(GroupMeta(GlobalEntityType())), services.etcd_config
         ),
         export=ExportProcessors(
-            visibility_groups.group(GroupMeta(ExportEntityType())), services.export
+            visibility_groups.group(GroupMeta(UserEntityType())),
+            visibility_groups.group(GroupMeta(SessionEntityType())),
+            visibility_groups.group(GroupMeta(ProjectEntityType())),
+            visibility_groups.group(GroupMeta(GlobalEntityType())),
+            visibility_groups.dangling_field_group(
+                FieldGroupMeta(AuditLogFieldType()), AuditLogData
+            ),
+            services.export,
         ),
         fair_share=FairShareProcessors(
-            resource_group_groups.group(GroupMeta(DomainFairShareEntityType())),
-            resource_group_groups.group(GroupMeta(ProjectFairShareEntityType())),
-            resource_group_groups.group(GroupMeta(UserFairShareEntityType())),
+            resource_group_groups.dangling_field_group(
+                FieldGroupMeta(DomainFairShareFieldType()), DomainFairShareData
+            ),
+            resource_group_groups.dangling_field_group(
+                FieldGroupMeta(ProjectFairShareFieldType()), ProjectFairShareData
+            ),
+            resource_group_groups.dangling_field_group(
+                FieldGroupMeta(UserFairShareFieldType()), UserFairShareData
+            ),
             services.fair_share,
         ),
         project=ProjectProcessors(
@@ -645,10 +660,11 @@ def create_processors(
             resource_policy_groups.group(GroupMeta(KeyPairResourcePolicyEntityType()))
         ),
         manager_admin=ManagerAdminProcessors(
-            system_groups.group(GroupMeta(ManagerAdminEntityType())), services.manager_admin
+            system_groups.group(GroupMeta(GlobalEntityType())), services.manager_admin
         ),
         secret=SecretProcessors(
-            system_groups.group(GroupMeta(SecretEntityType())), services.secret
+            system_groups.dangling_field_group(FieldGroupMeta(SecretFieldType()), SecretFieldData),
+            services.secret,
         ),
         user_resource_policy=UserResourcePolicyProcessors(
             resource_policy_groups.group(GroupMeta(UserResourcePolicyEntityType()))
@@ -758,7 +774,6 @@ def create_processors(
             rbac_groups.group(GroupMeta(RoleEntityType())),
             services.permission_controller,
             action_monitors,
-            validators,
         ),
         vfs_storage=VFSStorageProcessors(
             artifact_groups.group(GroupMeta(VFSStorageEntityType())), services.vfs_storage

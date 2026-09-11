@@ -14,6 +14,7 @@ from strawberry.scalars import JSON
 
 from ai.backend.common.config import DEFAULT_SHELL
 from ai.backend.common.data.entity.image import ImageID
+from ai.backend.common.data.entity.runtime_variant import RuntimeVariantID
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
 from ai.backend.common.dto.manager.v2.deployment.request import (
     DeploymentStrategyInput as DeploymentStrategyInputDTO,
@@ -418,7 +419,9 @@ class DeploymentRevisionPresetGQL(PydanticNodeMixin[NodeDTO]):
         ]
         | None
     ):
-        return await info.context.data_loaders.runtime_variant_loader.load(self.runtime_variant_id)
+        return await info.context.data_loaders.runtime_variant_loader.load(
+            RuntimeVariantID(self.runtime_variant_id)
+        )
 
     @gql_added_field(
         BackendAIGQLMeta(
@@ -1003,11 +1006,11 @@ class UpdateDeploymentRevisionPresetInputGQL(PydanticInputMixin[UpdateInputDTO])
             added_version="26.4.4",
             description="New runtime variant for the preset. Omit to leave unchanged.",
         ),
-        default=None,
+        default=UNSET,
     )
-    name: str | None = gql_field(default=None, description="New name.")
-    description: str | None = gql_field(default=None, description="New description.")
-    rank: int | None = gql_field(default=None, description="New rank.")
+    name: str | None = gql_field(default=UNSET, description="New name.")
+    description: str | None = gql_field(default=UNSET, description="New description.")
+    rank: int | None = gql_field(default=UNSET, description="New rank.")
     open_to_public: bool | None = gql_field(
         default=UNSET,
         description="Default open_to_public for deployments created from this preset. "
@@ -1061,42 +1064,42 @@ class UpdateDeploymentRevisionPresetInputGQL(PydanticInputMixin[UpdateInputDTO])
             added_version="26.4.4",
             description="Replace resource slot allocations. Omit to leave unchanged.",
         ),
-        default=None,
+        default=UNSET,
     )
     resource_opts: list[ResourceOptsEntryInput] | None = gql_added_field(
         BackendAIGQLMeta(
             added_version="26.4.4",
             description="Replace additional resource options. Omit to leave unchanged.",
         ),
-        default=None,
+        default=UNSET,
     )
     cluster_mode: ClusterModeGQL | None = gql_added_field(
         BackendAIGQLMeta(
             added_version="26.4.4",
             description="New cluster topology mode. Omit to leave unchanged.",
         ),
-        default=None,
+        default=UNSET,
     )
     cluster_size: int | None = gql_added_field(
         BackendAIGQLMeta(
             added_version="26.4.4",
             description="New cluster size. Omit to leave unchanged.",
         ),
-        default=None,
+        default=UNSET,
     )
     environ: list[EnvironEntryInputGQL] | None = gql_added_field(
         BackendAIGQLMeta(
             added_version="26.4.4",
             description="Replace environment variables. Omit to leave unchanged.",
         ),
-        default=None,
+        default=UNSET,
     )
     preset_values: list[RuntimeVariantPresetValueEntryInputGQL] | None = gql_added_field(
         BackendAIGQLMeta(
             added_version="26.4.4",
             description="Replace runtime variant preset values. Omit to leave unchanged.",
         ),
-        default=None,
+        default=UNSET,
     )
 
 

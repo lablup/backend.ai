@@ -13,12 +13,13 @@ from ai.backend.common.data.entity.types import (
     EntityType,
     RuntimeEntityID,
 )
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.idle_checker.types import (
     CheckerType,
     IdleCheckerSpec,
+    IdleCheckPhase,
     UtilizationThresholdEntry,
 )
-from ai.backend.common.data.permission.types import ScopeType
 from ai.backend.common.types import SessionId, SessionTypes
 
 
@@ -54,7 +55,7 @@ class SessionUtilizationQuery:
 @dataclass(frozen=True)
 class IdleCheckerAssignmentData:
     id: IdleCheckerAssignmentID
-    scope_type: ScopeType
+    scope_type: EntityType
     scope_id: uuid.UUID
     idle_checker_id: IdleCheckerID
     enabled: bool
@@ -63,7 +64,7 @@ class IdleCheckerAssignmentData:
 
     def scope_entity(self) -> EntityIdentifier:
         """The scope the checker is bound to, as the entity it is."""
-        return RuntimeEntityID(EntityType(self.scope_type.value), self.scope_id)
+        return RuntimeEntityID(self.scope_type, self.scope_id)
 
 
 @dataclass(frozen=True)
@@ -81,3 +82,27 @@ class IdleCheckerData(EntityData):
     @override
     def entity_id(self) -> EntityIdentifier:
         return self.id
+
+
+@dataclass(frozen=True)
+class SessionIdleCheckData:
+    """One checker's state on one session."""
+
+    session_id: SessionId
+    idle_checker_id: IdleCheckerID
+    expire_at: datetime | None
+    last_status: IdleCheckPhase
+    last_message: str
+    is_manual: bool
+    manually_triggered_by: UserID | None
+
+
+@dataclass(frozen=True)
+class IdleJudgmentData:
+    """One session's judgment from one checker, persisted onto its session_idle_checks row."""
+
+    session_id: SessionId
+    checker_id: IdleCheckerID
+    status: IdleCheckPhase
+    expire_at: datetime
+    message: str

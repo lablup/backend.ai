@@ -13,7 +13,7 @@ import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.engine import Connection
 
-from ai.backend.manager.data.permission.id import ScopeType
+from ai.backend.common.data.entity.user import UserEntityType
 from ai.backend.manager.models.rbac_models.migration.enums import (
     EntityType,
     OperationType,
@@ -117,7 +117,7 @@ def _migrate_new_entity_type(db_conn: Connection) -> None:
 def _associate_model_deployments_to_scopes(db_conn: Connection) -> None:
     """Associate all endpoints (model deployments) to user scopes based on created_user."""
     offset = 0
-    scope_type = ScopeType.USER.value
+    scope_type = str(UserEntityType())
     entity_type = EntityType.MODEL_DEPLOYMENT.value
 
     while True:

@@ -9,6 +9,9 @@ from uuid import UUID
 from strawberry import Info
 from strawberry.relay import Connection, Edge, NodeID
 
+from ai.backend.common.data.entity.prometheus_query_preset_category import (
+    PrometheusQueryPresetCategoryID,
+)
 from ai.backend.common.dto.manager.v2.prometheus_query_preset.response import (
     CreateQueryDefinitionGQLPayload as CreateQueryDefinitionGQLPayloadDTO,
 )
@@ -63,7 +66,9 @@ class QueryDefinitionGQL(PydanticNodeMixin[QueryDefinitionNode]):
     async def category(self, info: Info[StrawberryGQLContext]) -> CategoryGQL | None:
         if self.category_id is None:
             return None
-        return await info.context.data_loaders.category_loader.load(self.category_id)
+        return await info.context.data_loaders.category_loader.load(
+            PrometheusQueryPresetCategoryID(self.category_id)
+        )
 
 
 QueryDefinitionEdge = Edge[QueryDefinitionGQL]

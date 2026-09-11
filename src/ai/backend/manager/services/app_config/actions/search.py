@@ -6,8 +6,8 @@ from typing import override
 
 from ai.backend.common.data.entity.app_config import AppConfigEntityType
 from ai.backend.common.data.entity.domain import DomainID
-from ai.backend.common.data.entity.types import EntityIdentifier, EntityType, ScopeRef
-from ai.backend.common.data.entity.user import USER_SCOPE_TYPE, UserID
+from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.manager.actions.v2.ops.base import OperationScopeOpsAction
 from ai.backend.manager.actions.v2.scope.result import BaseScopeActionResult
 from ai.backend.manager.data.app_config.types import AppConfigData, AppConfigFragmentData
@@ -50,8 +50,8 @@ class SearchAppConfigsAction(
         return "search_app_configs"
 
     @override
-    def scope_targets(self) -> Sequence[ScopeRef]:
-        return (ScopeRef(scope_type=USER_SCOPE_TYPE, scope_id=self.user_id),)
+    def scope_targets(self) -> Sequence[EntityIdentifier]:
+        return (self.user_id,)
 
     @override
     def operation_scopes(self) -> Sequence[OperationScope]:
@@ -90,7 +90,7 @@ class AnonymousSearchAppConfigsAction(
         return "anonymous_search_app_configs"
 
     @override
-    def scope_targets(self) -> Sequence[ScopeRef]:
+    def scope_targets(self) -> Sequence[EntityIdentifier]:
         return ()
 
     @override

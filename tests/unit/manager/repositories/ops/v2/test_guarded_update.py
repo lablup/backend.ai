@@ -26,7 +26,15 @@ import sqlalchemy as sa
 from aiohttp import web
 from sqlalchemy.orm import InstrumentedAttribute, Mapped, mapped_column
 
-from ai.backend.common.data.entity.types import FieldData
+from ai.backend.common.data.entity.types import (
+    DanglingFieldType,
+    EntityIdentifier,
+    EntityType,
+    FieldData,
+    FieldIdentifier,
+    FieldType,
+    RuntimeEntityID,
+)
 from ai.backend.common.exception import (
     BackendAIError,
     ErrorCode,
@@ -85,6 +93,37 @@ _TERMINAL = "terminal"
 _PINNED_NOTE = "pinned"
 
 
+class _RowEntityType(EntityType):
+    @override
+    @classmethod
+    def name(cls) -> str:
+        return "guarded_row"
+
+    @override
+    @classmethod
+    def description(cls) -> str:
+        return "A row the guarded write tests operate on."
+
+
+class _RowFieldType(DanglingFieldType):
+    @override
+    @classmethod
+    def name(cls) -> str:
+        return "guarded_row_field"
+
+    @override
+    @classmethod
+    def description(cls) -> str:
+        return "The same row reached as a field row."
+
+
+class _RowFieldID(FieldIdentifier):
+    @override
+    @classmethod
+    def field_type(cls) -> FieldType:
+        return _RowFieldType()
+
+
 @dataclass
 class _StatusUpdater(GuardedDataUpdater[GuardedUpdateTestRow, _RowData]):
     """Writes a row's status unless it already reached the terminal one, or is pinned."""
@@ -103,8 +142,8 @@ class _StatusUpdater(GuardedDataUpdater[GuardedUpdateTestRow, _RowData]):
         return GuardedUpdateTestRow.id
 
     @override
-    def target_id_value(self) -> UUID:
-        return self.row_id
+    def target_id_value(self) -> EntityIdentifier:
+        return RuntimeEntityID(_RowEntityType(), self.row_id)
 
     @override
     def guard_checks(self) -> Sequence[GuardCheck]:
@@ -151,8 +190,8 @@ class _NonTerminalPurger(GuardedFieldPurger[GuardedUpdateTestRow, _RowData]):
         return GuardedUpdateTestRow.id
 
     @override
-    def target_id_value(self) -> UUID:
-        return self.row_id
+    def target_id_value(self) -> FieldIdentifier:
+        return _RowFieldID(self.row_id)
 
     @override
     def guard_checks(self) -> Sequence[GuardCheck]:

@@ -14,20 +14,14 @@ import pytest
 import sqlalchemy as sa
 from sqlalchemy import Table
 
+from ai.backend.common.data.entity.project import ProjectEntityType
 from ai.backend.common.data.entity.types import EntityType
 from ai.backend.manager.data.permission.status import RoleStatus
 from ai.backend.manager.data.permission.types import Permission, RoleSource
-from ai.backend.manager.data.permission.types import ScopeType as LegacyScopeType
 from ai.backend.manager.models.alembic.versions.a7d2c9e41b58_give_roles_their_scope import (
     backfill,
 )
-from ai.backend.manager.models.rbac_models.association_scopes_entities import (
-    AssociationScopesEntitiesRow,
-)
-from ai.backend.manager.models.rbac_models.permission.object_permission import (
-    ObjectPermissionRow,
-)
-from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
+from ai.backend.manager.models.base import GUID
 from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.rbac_models.role_preset.row import RolePresetRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -36,12 +30,52 @@ from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingR
 from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
 from ai.backend.testutils.db import HasTable, with_tables
 
+# The permission rows carried a scope when this migration ran; the column is gone from
+# the model since, so the pre-migration shape is declared here.
+_metadata = sa.MetaData()
+_permissions = sa.Table(
+    "permissions",
+    _metadata,
+    sa.Column("id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v7()")),
+    sa.Column("role_id", GUID, nullable=False),
+    sa.Column("scope_type", sa.String(32), nullable=False),
+    sa.Column("scope_id", sa.String(64), nullable=False),
+    sa.Column("entity_type", sa.String(32), nullable=False),
+    sa.Column("permission", sa.Integer, nullable=False),
+    sa.Column("all_fields", sa.Boolean, nullable=False, server_default=sa.true()),
+    sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now()),
+)
+
+# The migration clears the association rows of the roles it drops; the table is gone
+# from the models since, so its pre-migration shape is declared here too.
+_association_scopes_entities = sa.Table(
+    "association_scopes_entities",
+    _metadata,
+    sa.Column("id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v7()")),
+    sa.Column("scope_type", sa.String(32), nullable=False),
+    sa.Column("scope_id", sa.String(64), nullable=False),
+    sa.Column("entity_type", sa.String(32), nullable=False),
+    sa.Column("entity_id", sa.String(64), nullable=False),
+)
+
+# The migration clears the object permissions of the roles it drops; that table is gone
+# from the models since, so its pre-migration shape is declared here too.
+_object_permissions = sa.Table(
+    "object_permissions",
+    _metadata,
+    sa.Column("id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v7()")),
+    sa.Column("role_id", GUID, nullable=False),
+    sa.Column("entity_type", sa.String(32), nullable=False),
+    sa.Column("entity_id", sa.String(64), nullable=False),
+    sa.Column("operation", sa.String(32), nullable=False),
+)
+
 _TABLES: list[Table | type[HasTable]] = [
     RolePresetRow,
     RoleRow,
-    PermissionRow,
-    ObjectPermissionRow,
-    AssociationScopesEntitiesRow,
+    _permissions,
+    _association_scopes_entities,
+    _object_permissions,
     VirtualEntityRow,
     EntityMembershipRow,
     ScopeBindingRow,
@@ -71,7 +105,7 @@ async def _add_scope(db: ExtendedAsyncSAEngine) -> uuid.UUID:
 
 async def _add_preset(db: ExtendedAsyncSAEngine) -> uuid.UUID:
     async with db.begin_session() as session:
-        preset = RolePresetRow(name="member", scope_type=LegacyScopeType.PROJECT)
+        preset = RolePresetRow(name="member", scope_type=ProjectEntityType())
         session.add(preset)
         await session.flush()
         return preset.id
@@ -120,13 +154,13 @@ async def _add_role(
                     )
                 )
         for index, scope_id in enumerate(permissions_in):
-            session.add(
-                PermissionRow(
+            await session.execute(
+                sa.insert(_permissions).values(
                     role_id=role_id,
                     scope_type=_PROJECT,
                     scope_id=str(scope_id),
                     entity_type=EntityType(f"entity-{index}"),
-                    permission=Permission.READ,
+                    permission=int(Permission.READ),
                 )
             )
     return role_id

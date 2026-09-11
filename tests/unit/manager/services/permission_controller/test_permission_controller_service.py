@@ -7,38 +7,25 @@ from __future__ import annotations
 
 import uuid
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
+from ai.backend.common.data.entity.domain import DomainEntityType
 from ai.backend.common.data.entity.permission import PermissionID
-from ai.backend.common.data.entity.role import RoleID
-from ai.backend.common.data.entity.types import EntityType, ScopeType
+from ai.backend.common.data.entity.project import ProjectEntityType
+from ai.backend.common.data.entity.role import RoleEntityType, RoleID
+from ai.backend.common.data.entity.types import EntityType
+from ai.backend.common.data.entity.user import UserEntityType
 from ai.backend.common.data.permission.types import (
-    EntityType as LegacyEntityType,
-)
-from ai.backend.common.data.permission.types import (
-    OperationType,
     Permission,
-    RBACElementType,
-    RelationType,
     RoleSource,
+    role_scope_types,
 )
-from ai.backend.common.data.permission.types import (
-    ScopeType as LegacyScopeType,
-)
-from ai.backend.manager.actions.action import RBAC_ACTION_REGISTRY
-from ai.backend.manager.actions.action.rbac import RBACActionName
+from ai.backend.manager.actions.registry.registry import ProcessorRegistry
+from ai.backend.manager.actions.registry.types import GroupMeta
 from ai.backend.manager.data.common.types import SearchResult
-from ai.backend.manager.data.permission.association_scopes_entities import (
-    AssociationScopesEntitiesData,
-)
-from ai.backend.manager.data.permission.entity import EntityData
-from ai.backend.manager.data.permission.id import ObjectId, ScopeId
-from ai.backend.manager.data.permission.object_permission import (
-    ObjectPermissionData,
-)
 from ai.backend.manager.data.permission.permission import PermissionData
 from ai.backend.manager.data.permission.role import (
     AssignedUserData,
@@ -57,15 +44,12 @@ from ai.backend.manager.services.permission_contoller.actions.get_permission_mat
 from ai.backend.manager.services.permission_contoller.actions.get_role_detail import (
     GetRoleDetailAction,
 )
+from ai.backend.manager.services.permission_contoller.actions.get_scope_types import (
+    GetScopeTypesAction,
+)
 from ai.backend.manager.services.permission_contoller.actions.permission import (
     CreatePermissionAction,
     DeletePermissionAction,
-)
-from ai.backend.manager.services.permission_contoller.actions.search_element_associations import (
-    SearchElementAssociationsAction,
-)
-from ai.backend.manager.services.permission_contoller.actions.search_entities import (
-    SearchEntitiesAction,
 )
 from ai.backend.manager.services.permission_contoller.actions.search_permissions import (
     SearchPermissionsAction,
@@ -73,6 +57,9 @@ from ai.backend.manager.services.permission_contoller.actions.search_permissions
 from ai.backend.manager.services.permission_contoller.actions.search_roles import SearchRolesAction
 from ai.backend.manager.services.permission_contoller.actions.search_users_assigned_to_role import (
     SearchUsersAssignedToRoleAction,
+)
+from ai.backend.manager.services.permission_contoller.processors import (
+    PermissionControllerProcessors,
 )
 from ai.backend.manager.services.permission_contoller.service import (
     PermissionControllerService,
@@ -112,7 +99,6 @@ def _make_role_detail_data(
     *,
     role_id: RoleID | None = None,
     name: str = "test-role",
-    object_permissions: list[ObjectPermissionData] | None = None,
 ) -> RoleDetailData:
     now = datetime.now(tz=UTC)
     return RoleDetailData(
@@ -120,7 +106,6 @@ def _make_role_detail_data(
         name=name,
         source=RoleSource.CUSTOM,
         status=RoleStatus.ACTIVE,
-        object_permissions=object_permissions or [],
         created_at=now,
         updated_at=now,
         deleted_at=None,
@@ -146,11 +131,13 @@ class TestGetRoleDetail:
 
     @pytest.fixture
     def service(
-        self, mock_repository: PermissionControllerRepository
+        self,
+        mock_repository: PermissionControllerRepository,
+        processor_registry: ProcessorRegistry[Any],
     ) -> PermissionControllerService:
         return PermissionControllerService(
             repository=mock_repository,
-            rbac_action_registry=[],
+            action_registry=processor_registry,
         )
 
     async def test_get_role_detail_returns_full_detail(
@@ -159,13 +146,7 @@ class TestGetRoleDetail:
         mock_repository: MagicMock,
     ) -> None:
         role_id = RoleID(uuid.uuid4())
-        obj_perm = ObjectPermissionData(
-            id=uuid.uuid4(),
-            role_id=role_id,
-            object_id=ObjectId(entity_type=LegacyEntityType.USER, entity_id="user-1"),
-            operation=OperationType.READ,
-        )
-        detail = _make_role_detail_data(role_id=role_id, object_permissions=[obj_perm])
+        detail = _make_role_detail_data(role_id=role_id, name="detail-role")
         mock_repository.get_role_with_permissions.return_value = detail
 
         action = GetRoleDetailAction(role_id=role_id)
@@ -173,21 +154,7 @@ class TestGetRoleDetail:
 
         mock_repository.get_role_with_permissions.assert_called_once_with(role_id)
         assert result.role.id == role_id
-        assert len(result.role.object_permissions) == 1
-
-    async def test_get_role_detail_empty_permissions(
-        self,
-        service: PermissionControllerService,
-        mock_repository: MagicMock,
-    ) -> None:
-        role_id = RoleID(uuid.uuid4())
-        detail = _make_role_detail_data(role_id=role_id, object_permissions=[])
-        mock_repository.get_role_with_permissions.return_value = detail
-
-        action = GetRoleDetailAction(role_id=role_id)
-        result = await service.get_role_detail(action)
-
-        assert result.role.object_permissions == []
+        assert result.role.name == "detail-role"
 
 
 class TestSearchRoles:
@@ -199,11 +166,13 @@ class TestSearchRoles:
 
     @pytest.fixture
     def service(
-        self, mock_repository: PermissionControllerRepository
+        self,
+        mock_repository: PermissionControllerRepository,
+        processor_registry: ProcessorRegistry[Any],
     ) -> PermissionControllerService:
         return PermissionControllerService(
             repository=mock_repository,
-            rbac_action_registry=[],
+            action_registry=processor_registry,
         )
 
     async def test_search_roles_delegates_querier(
@@ -277,11 +246,13 @@ class TestSearchUsersAssignedToRole:
 
     @pytest.fixture
     def service(
-        self, mock_repository: PermissionControllerRepository
+        self,
+        mock_repository: PermissionControllerRepository,
+        processor_registry: ProcessorRegistry[Any],
     ) -> PermissionControllerService:
         return PermissionControllerService(
             repository=mock_repository,
-            rbac_action_registry=[],
+            action_registry=processor_registry,
         )
 
     async def test_search_users_returns_assigned_users(
@@ -342,14 +313,16 @@ class TestCreatePermission:
 
     @pytest.fixture
     def service(
-        self, mock_repository: PermissionControllerRepository
+        self,
+        mock_repository: PermissionControllerRepository,
+        processor_registry: ProcessorRegistry[Any],
     ) -> PermissionControllerService:
         return PermissionControllerService(
             repository=mock_repository,
-            rbac_action_registry=[],
+            action_registry=processor_registry,
         )
 
-    async def test_create_permission_with_scope(
+    async def test_create_permission_delegates_to_repository(
         self,
         service: PermissionControllerService,
         mock_repository: MagicMock,
@@ -357,41 +330,19 @@ class TestCreatePermission:
         perm_data = PermissionData(
             id=PermissionID(uuid.uuid4()),
             role_id=RoleID(uuid.uuid4()),
-            scope_type=ScopeType(EntityType(LegacyScopeType.DOMAIN)),
-            scope_id="test-domain",
-            entity_type=EntityType(LegacyEntityType.USER),
+            entity_type=EntityType(UserEntityType()),
             permission=Permission.READ,
             created_at=datetime.now(UTC),
         )
         mock_repository.create_permission.return_value = perm_data
 
         creator = MagicMock()
-        action = CreatePermissionAction(creator=creator)
+        role_id = RoleID(uuid.uuid4())
+        action = CreatePermissionAction(role_id=role_id, creator=creator)
         result = await service.create_permission(action)
 
-        mock_repository.create_permission.assert_called_once_with(creator)
-        assert result.data.scope_type == LegacyScopeType.DOMAIN.value
-
-    async def test_create_permission_global_scope(
-        self,
-        service: PermissionControllerService,
-        mock_repository: MagicMock,
-    ) -> None:
-        perm_data = PermissionData(
-            id=PermissionID(uuid.uuid4()),
-            role_id=RoleID(uuid.uuid4()),
-            scope_type=ScopeType(EntityType(LegacyScopeType.GLOBAL)),
-            scope_id="global",
-            entity_type=EntityType(LegacyEntityType.USER),
-            permission=Permission.CREATE,
-            created_at=datetime.now(UTC),
-        )
-        mock_repository.create_permission.return_value = perm_data
-
-        action = CreatePermissionAction(creator=MagicMock())
-        result = await service.create_permission(action)
-
-        assert result.data.scope_type == LegacyScopeType.GLOBAL.value
+        mock_repository.create_permission.assert_called_once_with(role_id, creator)
+        assert result.data.id == perm_data.id
 
 
 class TestDeletePermission:
@@ -403,11 +354,13 @@ class TestDeletePermission:
 
     @pytest.fixture
     def service(
-        self, mock_repository: PermissionControllerRepository
+        self,
+        mock_repository: PermissionControllerRepository,
+        processor_registry: ProcessorRegistry[Any],
     ) -> PermissionControllerService:
         return PermissionControllerService(
             repository=mock_repository,
-            rbac_action_registry=[],
+            action_registry=processor_registry,
         )
 
     async def test_delete_permission_delegates_to_repository(
@@ -418,9 +371,7 @@ class TestDeletePermission:
         perm_data = PermissionData(
             id=PermissionID(uuid.uuid4()),
             role_id=RoleID(uuid.uuid4()),
-            scope_type=ScopeType(EntityType(LegacyScopeType.DOMAIN)),
-            scope_id="test-domain",
-            entity_type=EntityType(LegacyEntityType.USER),
+            entity_type=EntityType(UserEntityType()),
             permission=Permission.READ,
             created_at=datetime.now(UTC),
         )
@@ -443,11 +394,13 @@ class TestSearchPermissions:
 
     @pytest.fixture
     def service(
-        self, mock_repository: PermissionControllerRepository
+        self,
+        mock_repository: PermissionControllerRepository,
+        processor_registry: ProcessorRegistry[Any],
     ) -> PermissionControllerService:
         return PermissionControllerService(
             repository=mock_repository,
-            rbac_action_registry=[],
+            action_registry=processor_registry,
         )
 
     async def test_search_permissions_delegates_querier(
@@ -458,9 +411,7 @@ class TestSearchPermissions:
         perm = PermissionData(
             id=PermissionID(uuid.uuid4()),
             role_id=RoleID(uuid.uuid4()),
-            scope_type=ScopeType(EntityType(LegacyScopeType.DOMAIN)),
-            scope_id="test-domain",
-            entity_type=EntityType(LegacyEntityType.USER),
+            entity_type=EntityType(UserEntityType()),
             permission=Permission.READ,
             created_at=datetime.now(UTC),
         )
@@ -499,213 +450,72 @@ class TestSearchPermissions:
         assert result.result.has_previous_page is True
 
 
-class TestGetEntityTypes:
-    @pytest.fixture
-    def mock_repository(self) -> MagicMock:
-        return MagicMock()
+class TestPermissionCatalog:
+    """What a role may permit comes from the ops wiring, not a hand-kept list."""
 
     @pytest.fixture
     def service(
-        self, mock_repository: PermissionControllerRepository
+        self,
+        processor_registry: ProcessorRegistry[Any],
     ) -> PermissionControllerService:
-        return PermissionControllerService(
-            repository=mock_repository,
-            rbac_action_registry=[],
-        )
-
-    async def test_get_entity_types_returns_all(
-        self,
-        service: PermissionControllerService,
-    ) -> None:
-        action = GetEntityTypesAction()
-        result = await service.get_entity_types(action)
-
-        expected = list(RBACElementType)
-        assert len(result.element_types) == len(expected)
-        for et in expected:
-            assert et in result.element_types
-
-
-class TestSearchEntities:
-    @pytest.fixture
-    def mock_repository(self) -> MagicMock:
-        repository = MagicMock()
-        repository.search_entities = AsyncMock()
-        return repository
-
-    @pytest.fixture
-    def service(
-        self, mock_repository: PermissionControllerRepository
-    ) -> PermissionControllerService:
-        return PermissionControllerService(
-            repository=mock_repository,
-            rbac_action_registry=[],
-        )
-
-    async def test_search_entities_delegates_querier(
-        self,
-        service: PermissionControllerService,
-        mock_repository: MagicMock,
-    ) -> None:
-        entity_data = EntityData(entity_type=LegacyEntityType.USER, entity_id="user-1")
-        mock_result = SearchResult(
-            items=[entity_data],
-            total_count=1,
-            has_next_page=False,
-            has_previous_page=False,
-        )
-        mock_repository.search_entities.return_value = mock_result
-
-        querier = _make_querier()
-        action = SearchEntitiesAction(querier=querier)
-        result = await service.search_entities(action)
-
-        mock_repository.search_entities.assert_called_once_with(querier)
-        assert result.result.total_count == 1
-        assert result.result.items[0].entity_type == LegacyEntityType.USER
-
-    async def test_search_entities_pagination(
-        self,
-        service: PermissionControllerService,
-        mock_repository: MagicMock,
-    ) -> None:
-        mock_result: SearchResult[EntityData] = SearchResult(
-            items=[],
-            total_count=100,
-            has_next_page=True,
-            has_previous_page=True,
-        )
-        mock_repository.search_entities.return_value = mock_result
-
-        action = SearchEntitiesAction(querier=_make_querier(limit=10, offset=50))
-        result = await service.search_entities(action)
-
-        assert result.result.total_count == 100
-        assert result.result.has_next_page is True
-
-
-class TestSearchElementAssociations:
-    @pytest.fixture
-    def mock_repository(self) -> MagicMock:
-        repository = MagicMock()
-        repository.search_element_associations = AsyncMock()
-        return repository
-
-    @pytest.fixture
-    def service(
-        self, mock_repository: PermissionControllerRepository
-    ) -> PermissionControllerService:
-        return PermissionControllerService(
-            repository=mock_repository,
-            rbac_action_registry=[],
-        )
-
-    async def test_search_element_associations_delegates_querier(
-        self,
-        service: PermissionControllerService,
-        mock_repository: MagicMock,
-    ) -> None:
-        assoc = AssociationScopesEntitiesData(
-            id=uuid.uuid4(),
-            scope_id=ScopeId(scope_type=LegacyScopeType.DOMAIN, scope_id="test-domain"),
-            object_id=ObjectId(entity_type=LegacyEntityType.USER, entity_id="user-1"),
-            relation_type=RelationType.AUTO,
-            permission_cap=Permission.full(),
-            registered_at=datetime.now(tz=UTC),
-        )
-        mock_result = SearchResult(
-            items=[assoc],
-            total_count=1,
-            has_next_page=False,
-            has_previous_page=False,
-        )
-        mock_repository.search_element_associations.return_value = mock_result
-
-        querier = _make_querier()
-        action = SearchElementAssociationsAction(querier=querier)
-        result = await service.search_element_associations(action)
-
-        mock_repository.search_element_associations.assert_called_once_with(querier)
-        assert result.result.total_count == 1
-
-    async def test_search_element_associations_pagination(
-        self,
-        service: PermissionControllerService,
-        mock_repository: MagicMock,
-    ) -> None:
-        mock_result: SearchResult[AssociationScopesEntitiesData] = SearchResult(
-            items=[],
-            total_count=30,
-            has_next_page=True,
-            has_previous_page=False,
-        )
-        mock_repository.search_element_associations.return_value = mock_result
-
-        action = SearchElementAssociationsAction(querier=_make_querier(limit=10, offset=0))
-        result = await service.search_element_associations(action)
-
-        assert result.result.total_count == 30
-        assert result.result.has_next_page is True
-
-
-class TestGetPermissionMatrix:
-    _GRANT_OPERATIONS = {
-        OperationType.GRANT_ALL,
-        OperationType.GRANT_READ,
-        OperationType.GRANT_UPDATE,
-        OperationType.GRANT_SOFT_DELETE,
-        OperationType.GRANT_HARD_DELETE,
-    }
-    _GRANT_ACTION_NAMES = {
-        RBACActionName.GRANT_ALL,
-        RBACActionName.GRANT_READ,
-        RBACActionName.GRANT_UPDATE,
-        RBACActionName.GRANT_SOFT_DELETE,
-        RBACActionName.GRANT_HARD_DELETE,
-    }
-
-    @pytest.fixture
-    def service(self) -> PermissionControllerService:
-        return PermissionControllerService(
+        service = PermissionControllerService(
             repository=MagicMock(),
-            rbac_action_registry=RBAC_ACTION_REGISTRY,
+            action_registry=processor_registry,
         )
+        # Wiring the package registers its operations in the same registry the service
+        # reads, as the production assembly does.
+        PermissionControllerProcessors(
+            processor_registry.group(GroupMeta(RoleEntityType())),
+            service=service,
+            action_monitors=[],
+        )
+        return service
 
-    async def test_matrix_excludes_grant_operations(
+    async def test_entity_types_are_the_wired_entities(
+        self,
+        service: PermissionControllerService,
+    ) -> None:
+        result = await service.get_entity_types(GetEntityTypesAction())
+
+        assert RoleEntityType() in result.entity_types
+        assert result.entity_types == sorted(set(result.entity_types))
+
+    async def test_scope_types_are_the_scopes_a_role_sits_in(
+        self,
+        service: PermissionControllerService,
+    ) -> None:
+        result = await service.get_scope_types(GetScopeTypesAction())
+
+        assert result.entity_types == [DomainEntityType(), ProjectEntityType(), UserEntityType()]
+
+    async def test_every_scope_carries_the_same_entities(
         self,
         service: PermissionControllerService,
     ) -> None:
         result = await service.get_permission_matrix(GetPermissionMatrixAction())
 
-        for entity_map in result.matrix.values():
-            for actions in entity_map.values():
-                for action_name, perm in actions.items():
-                    assert perm.operation not in self._GRANT_OPERATIONS
-                    assert action_name not in self._GRANT_ACTION_NAMES
+        assert set(result.matrix) == set(role_scope_types())
+        entity_maps = [sorted(entity_map) for entity_map in result.matrix.values()]
+        assert all(entities == entity_maps[0] for entities in entity_maps)
 
-    async def test_matrix_keeps_non_grant_registry_entries(
+    async def test_matrix_entities_match_the_entity_types(
         self,
         service: PermissionControllerService,
     ) -> None:
-        result = await service.get_permission_matrix(GetPermissionMatrixAction())
+        matrix = (await service.get_permission_matrix(GetPermissionMatrixAction())).matrix
+        entity_types = (await service.get_entity_types(GetEntityTypesAction())).entity_types
 
-        # Flatten matrix into (scope, entity, action_name) triples.
-        result_triples: set[tuple[RBACElementType, RBACElementType, RBACActionName]] = set()
-        for scope, entity_map in result.matrix.items():
-            for entity, actions in entity_map.items():
-                for action_name in actions:
-                    result_triples.add((scope, entity, action_name))
+        for entity_map in matrix.values():
+            assert sorted(entity_map) == entity_types
 
-        expected_non_grant = {
-            (
-                action_cls.permission_scope(),
-                action_cls.required_permission().element_type,
-                action_cls.action_name(),
-            )
-            for action_cls in RBAC_ACTION_REGISTRY
-            if action_cls.required_permission().operation not in self._GRANT_OPERATIONS
-        }
+    async def test_operations_name_the_wired_actions(
+        self,
+        service: PermissionControllerService,
+    ) -> None:
+        matrix = (await service.get_permission_matrix(GetPermissionMatrixAction())).matrix
 
-        # Every non-grant registry entry is present, and nothing extra leaked in.
-        assert result_triples == expected_non_grant
-        assert len(result_triples) > 0
+        operations = matrix[DomainEntityType()][RoleEntityType()]
+        assert operations
+        assert [op.name for op in operations] == sorted(op.name for op in operations)
+        for op in operations:
+            assert op.description

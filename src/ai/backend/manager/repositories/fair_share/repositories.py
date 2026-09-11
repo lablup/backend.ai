@@ -18,7 +18,7 @@ class FairShareRepositories:
 
     @classmethod
     def create(cls, args: RepositoryArgs) -> Self:
-        repository = FairShareRepository(args.db)
+        repository = FairShareRepository(args.db, args.v2_ops_provider)
 
         return cls(
             repository=repository,

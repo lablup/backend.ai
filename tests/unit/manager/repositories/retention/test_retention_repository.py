@@ -35,7 +35,7 @@ import sqlalchemy as sa
 from ai.backend.common.data.entity.deployment import DeploymentID
 from ai.backend.common.data.entity.deployment_token import DeploymentTokenID
 from ai.backend.common.data.entity.domain import DomainID
-from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE, ProjectID
+from ai.backend.common.data.entity.project import ProjectEntityType, ProjectID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.data.entity.session_group import SessionGroupID
 from ai.backend.common.data.entity.user import UserID
@@ -497,14 +497,14 @@ class TestTerminalStateFilter:
             db,
             [
                 RoleRow(
-                    scope_type=PROJECT_SCOPE_TYPE,
+                    scope_type=ProjectEntityType(),
                     scope_id=uuid.uuid4(),
                     name="deleted-old",
                     status=RoleStatus.DELETED,
                     deleted_at=_OLD,
                 ),
                 RoleRow(
-                    scope_type=PROJECT_SCOPE_TYPE,
+                    scope_type=ProjectEntityType(),
                     scope_id=uuid.uuid4(),
                     name="deleted-new",
                     status=RoleStatus.DELETED,
@@ -512,7 +512,7 @@ class TestTerminalStateFilter:
                 ),
                 # Active role: never deleted, deleted_at is NULL -> preserved.
                 RoleRow(
-                    scope_type=PROJECT_SCOPE_TYPE,
+                    scope_type=ProjectEntityType(),
                     scope_id=uuid.uuid4(),
                     name="active",
                     status=RoleStatus.ACTIVE,

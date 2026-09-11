@@ -39,6 +39,7 @@ enabled = false
 root_patterns = [
     "/",
     "/src",
+    "/tests/scenario",
     "/stubs",
     "/tools/pants-plugins",
 ]

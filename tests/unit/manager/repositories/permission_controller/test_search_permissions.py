@@ -11,13 +11,11 @@ from dataclasses import dataclass
 
 import pytest
 
+from ai.backend.common.data.entity.image import ImageEntityType
+from ai.backend.common.data.entity.session import SessionEntityType
+from ai.backend.common.data.entity.types import EntityType
 from ai.backend.common.data.entity.vfolder import VFolderEntityType
-from ai.backend.manager.data.permission.types import (
-    EntityType,
-    OperationType,
-    Permission,
-    ScopeType,
-)
+from ai.backend.manager.data.permission.types import Permission
 from ai.backend.manager.models.agent import AgentRow
 
 # ORM cluster registration: configure_mappers() (triggered when this isolated
@@ -31,7 +29,6 @@ from ai.backend.manager.models.rbac_models import UserRoleRow
 from ai.backend.manager.models.rbac_models.permission.conditions import (
     ScopedPermissionConditions,
 )
-from ai.backend.manager.models.rbac_models.permission.object_permission import ObjectPermissionRow
 from ai.backend.manager.models.rbac_models.permission.orders import (
     ScopedPermissionOrders,
 )
@@ -83,7 +80,6 @@ class TestSearchPermissions:
                 UserRow,
                 KeyPairRow,
                 PermissionRow,
-                ObjectPermissionRow,
             ],
         ):
             yield database_connection
@@ -116,17 +112,15 @@ class TestSearchPermissions:
             await db_sess.flush()
 
             for entity_type, operation in [
-                (EntityType.VFOLDER, OperationType.READ),
-                (EntityType.VFOLDER, OperationType.UPDATE),
-                (EntityType.SESSION, OperationType.CREATE),
-                (EntityType.IMAGE, OperationType.READ),
+                (VFolderEntityType(), Permission.READ),
+                (VFolderEntityType(), Permission.UPDATE),
+                (SessionEntityType(), Permission.CREATE),
+                (ImageEntityType(), Permission.READ),
             ]:
                 perm = PermissionRow(
                     role_id=role_id,
-                    scope_type=ScopeType.DOMAIN,
-                    scope_id="test-domain",
                     entity_type=entity_type,
-                    permission=Permission.from_operation(operation),
+                    permission=operation,
                 )
                 db_sess.add(perm)
                 await db_sess.flush()
@@ -151,7 +145,7 @@ class TestSearchPermissions:
 
         assert result.total_count == 2
         for item in result.items:
-            assert item.entity_type == EntityType.VFOLDER.value
+            assert item.entity_type == VFolderEntityType()
 
     async def test_search_permissions_ordered_by_entity_type(
         self,

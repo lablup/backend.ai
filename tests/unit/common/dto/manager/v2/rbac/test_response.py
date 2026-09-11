@@ -17,9 +17,7 @@ from ai.backend.common.dto.manager.v2.rbac.response import (
     UpdateRolePayload,
 )
 from ai.backend.common.dto.manager.v2.rbac.types import (
-    OperationTypeDTO,
     PermissionBitDTO,
-    RBACElementTypeDTO,
     RoleSourceDTO,
     RoleStatusDTO,
 )
@@ -411,36 +409,28 @@ class TestRoleNodeScope:
 
 
 class TestPermissionNodeBit:
-    """A permission row names the bit it holds, and keeps the deprecated action name."""
+    """A permission row names the bit it holds."""
 
-    def _node(self, permission: PermissionBitDTO, operation: OperationTypeDTO) -> PermissionNode:
+    def _node(self, permission: PermissionBitDTO) -> PermissionNode:
         return PermissionNode(
             id=uuid.uuid4(),
             role_id=uuid.uuid4(),
-            scope_type=RBACElementTypeDTO.PROJECT,
-            scope_id=str(_SCOPE_ID),
-            entity_type=RBACElementTypeDTO.VFOLDER,
+            entity_type=EntityType("vfolder"),
             permission=permission,
-            operation=operation,
             created_at=datetime.now(tz=UTC),
         )
 
-    def test_both_names_of_the_same_bit_are_carried(self) -> None:
-        node = self._node(PermissionBitDTO.SOFT_DELETE, OperationTypeDTO.SOFT_DELETE)
+    def test_the_bit_is_carried(self) -> None:
+        node = self._node(PermissionBitDTO.SOFT_DELETE)
 
         assert node.permission == PermissionBitDTO.SOFT_DELETE
-        assert node.operation == OperationTypeDTO.SOFT_DELETE
         assert node.permission.value == "soft_delete"
-        assert node.operation.value == "soft-delete"
 
     def test_the_bit_is_required(self) -> None:
         with pytest.raises(BackendAISchemaValidationFailed):
             PermissionNode.model_validate({
                 "id": str(uuid.uuid4()),
                 "role_id": str(uuid.uuid4()),
-                "scope_type": RBACElementTypeDTO.PROJECT.value,
-                "scope_id": str(_SCOPE_ID),
-                "entity_type": RBACElementTypeDTO.VFOLDER.value,
-                "operation": OperationTypeDTO.READ.value,
+                "entity_type": "vfolder",
                 "created_at": datetime.now(tz=UTC).isoformat(),
             })

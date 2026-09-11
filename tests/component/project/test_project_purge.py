@@ -14,18 +14,11 @@ import sqlalchemy as sa
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
 from ai.backend.client.v2.v2_registry import V2ClientRegistry
-from ai.backend.common.data.permission.types import RBACElementType, RelationType
+from ai.backend.common.data.entity.project import ProjectEntityType
 from ai.backend.common.dto.manager.v2.group.request import PurgeProjectInput
 from ai.backend.manager.data.permission.status import RoleStatus
-from ai.backend.manager.data.permission.types import (
-    EntityType,
-    Permission,
-    ScopeType,
-)
+from ai.backend.manager.data.permission.types import Permission
 from ai.backend.manager.models.project.row import ProjectRow
-from ai.backend.manager.models.rbac_models.association_scopes_entities import (
-    AssociationScopesEntitiesRow,
-)
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
@@ -66,7 +59,7 @@ async def project_with_rbac_rows(
         await conn.execute(
             sa.insert(VirtualEntityRow.__table__).values(
                 id=virtual_entity_id,
-                entity_type=ScopeType.PROJECT,
+                entity_type=ProjectEntityType(),
                 entity_id=project_id,
             )
         )
@@ -90,59 +83,29 @@ async def project_with_rbac_rows(
                     "id": admin_role_id,
                     "name": f"project-{scope_id[:8]}-admin",
                     "status": RoleStatus.ACTIVE,
-                    "scope_type": ScopeType.PROJECT.value,
+                    "scope_type": ProjectEntityType(),
                     "scope_id": project_id,
                 },
                 {
                     "id": member_role_id,
                     "name": f"project-{scope_id[:8]}-member",
                     "status": RoleStatus.ACTIVE,
-                    "scope_type": ScopeType.PROJECT.value,
+                    "scope_type": ProjectEntityType(),
                     "scope_id": project_id,
                 },
             ])
         )
         # Both per-project SYSTEM roles are registered in the project's own scope.
         await conn.execute(
-            sa.insert(AssociationScopesEntitiesRow.__table__).values([
-                {
-                    "scope_type": ScopeType.PROJECT,
-                    "scope_id": scope_id,
-                    "entity_type": EntityType.ROLE,
-                    "entity_id": str(admin_role_id),
-                    "relation_type": RelationType.AUTO,
-                },
-                {
-                    "scope_type": ScopeType.PROJECT,
-                    "scope_id": scope_id,
-                    "entity_type": EntityType.ROLE,
-                    "entity_id": str(member_role_id),
-                    "relation_type": RelationType.AUTO,
-                },
-                # Project registered as an entity in the domain scope.
-                {
-                    "scope_type": ScopeType.DOMAIN,
-                    "scope_id": domain_fixture.domain_name,
-                    "entity_type": EntityType.PROJECT,
-                    "entity_id": scope_id,
-                    "relation_type": RelationType.AUTO,
-                },
-            ])
-        )
-        await conn.execute(
             sa.insert(PermissionRow.__table__).values([
                 {
                     "role_id": admin_role_id,
-                    "scope_type": ScopeType.PROJECT,
-                    "scope_id": scope_id,
-                    "entity_type": EntityType.PROJECT,
+                    "entity_type": ProjectEntityType(),
                     "permission": Permission.UPDATE,
                 },
                 {
                     "role_id": member_role_id,
-                    "scope_type": ScopeType.PROJECT,
-                    "scope_id": scope_id,
-                    "entity_type": EntityType.PROJECT,
+                    "entity_type": ProjectEntityType(),
                     "permission": Permission.READ,
                 },
             ])
@@ -158,21 +121,13 @@ async def project_with_rbac_rows(
             )
         )
         await conn.execute(
-            AssociationScopesEntitiesRow.__table__.delete().where(
-                sa.or_(
-                    AssociationScopesEntitiesRow.__table__.c.scope_id == scope_id,
-                    AssociationScopesEntitiesRow.__table__.c.entity_id == scope_id,
-                )
-            )
-        )
-        await conn.execute(
             RoleRow.__table__.delete().where(
                 RoleRow.__table__.c.id.in_([admin_role_id, member_role_id])
             )
         )
         await conn.execute(
             VirtualEntityRow.__table__.delete().where(
-                VirtualEntityRow.__table__.c.entity_type == ScopeType.PROJECT,
+                VirtualEntityRow.__table__.c.entity_type == ProjectEntityType(),
                 VirtualEntityRow.__table__.c.entity_id == project_id,
             )
         )
@@ -202,30 +157,14 @@ class TestProjectPurgeRBACCleanup:
                 .select_from(ProjectRow)
                 .where(ProjectRow.id == project_id)
             )
-            ase_after = await conn.scalar(
-                sa.select(sa.func.count())
-                .select_from(AssociationScopesEntitiesRow)
-                .where(
-                    sa.or_(
-                        sa.and_(
-                            AssociationScopesEntitiesRow.scope_type == RBACElementType.PROJECT,
-                            AssociationScopesEntitiesRow.scope_id == scope_id,
-                        ),
-                        sa.and_(
-                            AssociationScopesEntitiesRow.entity_type == RBACElementType.PROJECT,
-                            AssociationScopesEntitiesRow.entity_id == scope_id,
-                        ),
-                    )
-                )
-            )
             permissions_after = await conn.scalar(
                 sa.select(sa.func.count())
                 .select_from(PermissionRow)
+                .join(RoleRow, RoleRow.id == PermissionRow.role_id)
                 .where(
-                    PermissionRow.scope_type == RBACElementType.PROJECT,
-                    PermissionRow.scope_id == scope_id,
+                    RoleRow.scope_type == ProjectEntityType(),
+                    RoleRow.scope_id == project_id,
                 )
             )
         assert group_row == 0, "Group row should be removed after purge"
-        assert ase_after == 0, "association_scopes_entities rows should be cleaned up after purge"
-        assert permissions_after == 0, "scope-bound permissions should be cleaned up after purge"
+        assert permissions_after == 0, "the roles permissions should be gone after purge"
