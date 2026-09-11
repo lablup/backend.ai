@@ -1,4 +1,4 @@
-"""로그인 클라이언트 종류 지우기 — 누가 지울 수 있고, 집행을 끄면 무엇이 열리는가."""
+"""로그인 클라이언트 종류 삭제 — 누가 삭제할 수 있고, 권한 검사를 끄면 무엇이 허용되는가."""
 
 from __future__ import annotations
 
@@ -35,7 +35,7 @@ type RetiringStep = Scenario[SeedingSession, ATypeAndACaller, LoginClientTypeAda
 
 @dataclass(frozen=True)
 class Deleting(When[ATypeAndACaller, LoginClientTypeAdapter, Deleted]):
-    """심은 종류 하나를 지운다."""
+    """미리 만들어 둔 종류 하나를 삭제한다."""
 
     unknown: bool = False
 
@@ -45,8 +45,8 @@ class Deleting(When[ATypeAndACaller, LoginClientTypeAdapter, Deleted]):
 
     @override
     def describe(self, laid: ATypeAndACaller) -> str:
-        target = "없는 id" if self.unknown else laid.client_type.name
-        return f"{laid.caller.username}이 {target}를 지움"
+        target = "존재하지 않는 id" if self.unknown else laid.client_type.name
+        return f"{laid.caller.username}이 {target} 삭제"
 
     @override
     async def call(self, adapter: LoginClientTypeAdapter, laid: ATypeAndACaller) -> Deleted:
@@ -64,7 +64,7 @@ class TheSuperadminDeletesAType(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 종류를 지우면 지운 종류의 id를 실은 답이 온다"
+        return "슈퍼관리자가 종류를 삭제하면 삭제한 종류의 id를 담은 응답이 반환된다"
 
     @override
     def given(self) -> Given[SeedingSession, ATypeAndACaller]:
@@ -89,7 +89,7 @@ class AnIdNothingAnswersToIsNotFound(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 아무 종류도 갖지 않은 id를 지우면 대상이 없다는 것으로 거부된다"
+        return "슈퍼관리자가 존재하지 않는 id를 삭제하면 대상을 찾을 수 없다는 이유로 거부된다"
 
     @override
     def given(self) -> Given[SeedingSession, ATypeAndACaller]:
@@ -114,7 +114,7 @@ class AUserGrantedNothingMayNotDelete(
 
     @override
     def describe(self) -> str:
-        return "아무 권한도 받지 않은 사용자가 종류를 지우면 권한 부족으로 거부된다"
+        return "아무 권한도 없는 사용자가 종류를 삭제하면 권한 부족으로 거부된다"
 
     @override
     def given(self) -> Given[SeedingSession, ATypeAndACaller]:
@@ -140,8 +140,8 @@ class EnforcementOffLetsAnyoneDelete(
     @override
     def describe(self) -> str:
         return (
-            "엔티티 권한 집행을 끄면 아무 권한도 받지 않은 사용자도 종류를 지운다. "
-            "이 문은 역할이 아니라 권한 그래프가 지키기 때문이다"
+            "권한 검사를 끄면 아무 권한도 없는 사용자도 종류를 삭제할 수 있다. "
+            "삭제는 역할이 아니라 권한 그래프로 보호되기 때문이다"
         )
 
     @override

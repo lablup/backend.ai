@@ -36,13 +36,13 @@ from ai.backend.testutils.scenario_steps import (
     Verdict,
 )
 
-DESCRIBED = "심어둔 로그인 클라이언트 종류"
-"""시드가 심는 종류의 설명. 시나리오가 기대값으로 다시 쓰므로 한 자리에 둔다."""
+DESCRIBED = "미리 만들어 둔 로그인 클라이언트 종류"
+"""시드가 미리 만들어 두는 종류의 설명. 시나리오가 기대값으로 다시 쓰므로 한 곳에 둔다."""
 
 
 @dataclass(frozen=True)
 class ATypeAndACaller:
-    """종류 하나와, 그것을 부를 사람."""
+    """종류 하나와, 그것을 호출할 사용자."""
 
     client_type: LoginClientTypeData
     caller: UserData
@@ -50,7 +50,7 @@ class ATypeAndACaller:
 
 @dataclass(frozen=True)
 class ManyTypesAndACaller:
-    """훑을 종류 여럿과, 훑을 사람. ``named``는 그중 골라낼 하나다."""
+    """검색 대상 종류 여럿과, 검색을 호출할 사용자. ``named``는 그중 이름 필터로 골라낼 하나다."""
 
     laid: tuple[LoginClientTypeData, ...]
     named: LoginClientTypeData
@@ -119,7 +119,7 @@ def type_verdicts(
 
 @dataclass(frozen=True)
 class TheNewTypeNode(Then[Any, LoginClientTypeNode]):
-    """방금 만든 종류가 통째로 온다. 이름과 설명은 시나리오가 정한 것이다."""
+    """방금 생성한 종류가 통째로 반환된다. 이름과 설명은 시나리오가 정한 값이다."""
 
     started: datetime
     named: str
@@ -127,7 +127,7 @@ class TheNewTypeNode(Then[Any, LoginClientTypeNode]):
 
     @override
     def says(self) -> str:
-        return "만든 종류 전체가 온다"
+        return "생성한 종류 전체가 반환된다"
 
     @override
     def look(self, laid: Any, answered: Answered[LoginClientTypeNode]) -> list[Verdict]:
@@ -144,7 +144,7 @@ class TheNewTypeNode(Then[Any, LoginClientTypeNode]):
 
 @dataclass(frozen=True)
 class TheTypeNode(Then[ATypeAndACaller, LoginClientTypeNode]):
-    """심은 종류가 통째로 온다. 바꾸는 요청은 바뀌어야 하는 자리만 인자로 준다."""
+    """미리 만들어 둔 종류가 통째로 반환된다. 수정 요청은 바뀌어야 하는 필드만 인자로 준다."""
 
     started: datetime
     named: str | Kept = KEPT
@@ -152,7 +152,7 @@ class TheTypeNode(Then[ATypeAndACaller, LoginClientTypeNode]):
 
     @override
     def says(self) -> str:
-        return "심은 종류 전체가 온다"
+        return "미리 만들어 둔 종류 전체가 반환된다"
 
     @override
     def look(self, laid: ATypeAndACaller, answered: Answered[LoginClientTypeNode]) -> list[Verdict]:
@@ -170,11 +170,11 @@ class TheTypeNode(Then[ATypeAndACaller, LoginClientTypeNode]):
 
 @dataclass(frozen=True)
 class EveryLaidTypeIsCounted(Then[ManyTypesAndACaller, SearchLoginClientTypesPayload]):
-    """심은 것이 모두 세어진다."""
+    """미리 만들어 둔 종류가 모두 집계된다."""
 
     @override
     def says(self) -> str:
-        return "심은 종류가 모두 세어진다"
+        return "미리 만들어 둔 종류가 모두 집계된다"
 
     @override
     def look(
@@ -197,11 +197,11 @@ class EveryLaidTypeIsCounted(Then[ManyTypesAndACaller, SearchLoginClientTypesPay
 
 @dataclass(frozen=True)
 class OnlyTheNamedTypeIsLeft(Then[ManyTypesAndACaller, SearchLoginClientTypesPayload]):
-    """걸러낸 그 하나만 남는다."""
+    """필터에 맞는 그 하나만 반환된다."""
 
     @override
     def says(self) -> str:
-        return "걸러낸 그 종류 하나만 남는다"
+        return "필터에 맞는 종류 하나만 반환된다"
 
     @override
     def look(
@@ -220,13 +220,13 @@ class OnlyTheNamedTypeIsLeft(Then[ManyTypesAndACaller, SearchLoginClientTypesPay
 
 @dataclass(frozen=True)
 class TheFirstPageOfTypes(Then[ManyTypesAndACaller, SearchLoginClientTypesPayload]):
-    """크기를 대지 않은 첫 쪽. 기본 크기만큼 오고 다음 쪽이 있다고 답한다."""
+    """크기를 지정하지 않은 첫 페이지. 기본 크기만큼 반환되고 다음 페이지가 있다고 응답한다."""
 
     size: int
 
     @override
     def says(self) -> str:
-        return "기본 크기의 첫 쪽이 온다"
+        return "기본 크기의 첫 페이지가 반환된다"
 
     @override
     def look(
@@ -245,11 +245,11 @@ class TheFirstPageOfTypes(Then[ManyTypesAndACaller, SearchLoginClientTypesPayloa
 
 @dataclass(frozen=True)
 class TheDeletedTypeId(Then[ATypeAndACaller, DeleteLoginClientTypePayload]):
-    """지운 종류의 id를 실은 답."""
+    """삭제한 종류의 id를 담은 응답."""
 
     @override
     def says(self) -> str:
-        return "지운 종류의 id가 온다"
+        return "삭제한 종류의 id가 반환된다"
 
     @override
     def look(
@@ -258,4 +258,6 @@ class TheDeletedTypeId(Then[ATypeAndACaller, DeleteLoginClientTypePayload]):
         payload = answered.response
         if payload is None:
             return [Refused(EntityNotFoundError, answered.raised)]
-        return [Held[UUID]("id", payload.id, SameAs[UUID](laid.client_type.id, "심은 종류"))]
+        return [
+            Held[UUID]("id", payload.id, SameAs[UUID](laid.client_type.id, "미리 만들어 둔 종류"))
+        ]
