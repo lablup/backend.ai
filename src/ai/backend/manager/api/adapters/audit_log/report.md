@@ -8,11 +8,11 @@ Not exercised by any scenario: batch_load_fields.
 
 #### [a-user-who-is-not-the-superadmin-may-not-read-by-id](/tests/scenario/bai_scenario/manager/audit_log/test_batch_loading.py) — pass
 
-슈퍼관리자도 모니터도 아닌 사용자가 id 둘을 읽으면, 요청 전체가 역할 부족으로 거부된다
+슈퍼관리자도 모니터도 아닌 사용자가 id 둘을 조회하면, 요청 전체가 역할 부족으로 거부된다
 
 Given
 
-- id로 집을 기록 둘과, user 한 명
+- id로 조회할 기록 둘과, user 한 명
   - 도메인 home-1
   - 도메인에 속한 사용자 한 명 준비
     - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
@@ -24,7 +24,7 @@ Given
 
 When
 
-- AuditLogAdapter.batch_load_by_ids — user-1이 있는 id 둘을 한 번에
+- AuditLogAdapter.batch_load_by_ids — user-1이 있는 id 둘을 한 번에 조회
 
 Then
 
@@ -33,11 +33,11 @@ Then
 
 #### [reading-an-empty-list-answers-empty-without-passing-the-gate](/tests/scenario/bai_scenario/manager/audit_log/test_batch_loading.py) — pass
 
-빈 id 목록으로 읽으면, 문도 지나지 않고 빈 답이 온다
+빈 id 목록으로 조회하면, 권한 검사도 거치지 않고 빈 응답이 반환된다
 
 Given
 
-- id로 집을 기록 둘과, superadmin 한 명
+- id로 조회할 기록 둘과, superadmin 한 명
   - 도메인 home-1
   - 도메인에 속한 사용자 한 명 준비
     - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
@@ -49,20 +49,20 @@ Given
 
 When
 
-- AuditLogAdapter.batch_load_by_ids — user-1이 빈 id 목록으로
+- AuditLogAdapter.batch_load_by_ids — user-1이 빈 id 목록으로 조회
 
 Then
 
-- 준 순서대로 노드가 오고, 없는 id 자리는 비어 있다
+- 요청한 순서대로 노드가 반환되고, 없는 id 자리는 비어 있다
   - length = 0
 
 #### [reading-present-and-absent-ids-answers-each-in-order-with-a-gap](/tests/scenario/bai_scenario/manager/audit_log/test_batch_loading.py) — pass
 
-있는 id 둘과 없는 id 하나를 한 번에 읽으면, 준 순서대로 오고 없는 자리는 비어 있다
+있는 id 둘과 없는 id 하나를 한 번에 조회하면, 요청한 순서대로 반환되고 없는 id 자리는 비어 있다
 
 Given
 
-- id로 집을 기록 둘과, superadmin 한 명
+- id로 조회할 기록 둘과, superadmin 한 명
   - 도메인 home-1
   - 도메인에 속한 사용자 한 명 준비
     - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
@@ -74,14 +74,14 @@ Given
 
 When
 
-- AuditLogAdapter.batch_load_by_ids — user-1이 있는 id 둘과 없는 id 하나를 한 번에
+- AuditLogAdapter.batch_load_by_ids — user-1이 있는 id 둘과 없는 id 하나를 한 번에 조회
 
 Then
 
-- 준 순서대로 노드가 오고, 없는 id 자리는 비어 있다
+- 요청한 순서대로 노드가 반환되고, 없는 id 자리는 비어 있다
   - length = 3
   - id: 무시함 — 데이터베이스가 만든다
-  - action_id: 무시함 — 실행마다 새로 생긴다
+  - action_id: 무시함 — 실행마다 새로 생성된다
   - operation = 'edited'
   - entity_type = 'user'
   - entity_id: 기록의 대상 엔티티와 같다
@@ -95,7 +95,7 @@ Then
   - triggered_by = None
   - slot[1] = None
   - id: 무시함 — 데이터베이스가 만든다
-  - action_id: 무시함 — 실행마다 새로 생긴다
+  - action_id: 무시함 — 실행마다 새로 생성된다
   - operation = 'created'
   - entity_type = 'user'
   - entity_id: 기록의 대상 엔티티와 같다
@@ -110,11 +110,11 @@ Then
 
 #### [the-monitor-role-reading-by-id-sees-the-same-nodes-as-the-superadmin](/tests/scenario/bai_scenario/manager/audit_log/test_batch_loading.py) — pass
 
-이 읽기도 읽기이므로 모니터 역할 사용자가 id 둘을 읽으면, 슈퍼관리자와 같은 답을 본다
+이 조회도 읽기 연산이므로 모니터 역할 사용자가 id 둘을 조회하면, 슈퍼관리자와 같은 응답을 받는다
 
 Given
 
-- id로 집을 기록 둘과, monitor 한 명
+- id로 조회할 기록 둘과, monitor 한 명
   - 도메인 home-1
   - 도메인에 속한 사용자 한 명 준비
     - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
@@ -126,14 +126,14 @@ Given
 
 When
 
-- AuditLogAdapter.batch_load_by_ids — user-1이 있는 id 둘을 한 번에
+- AuditLogAdapter.batch_load_by_ids — user-1이 있는 id 둘을 한 번에 조회
 
 Then
 
-- 준 순서대로 노드가 오고, 없는 id 자리는 비어 있다
+- 요청한 순서대로 노드가 반환되고, 없는 id 자리는 비어 있다
   - length = 2
   - id: 무시함 — 데이터베이스가 만든다
-  - action_id: 무시함 — 실행마다 새로 생긴다
+  - action_id: 무시함 — 실행마다 새로 생성된다
   - operation = 'edited'
   - entity_type = 'user'
   - entity_id: 기록의 대상 엔티티와 같다
@@ -146,7 +146,7 @@ Then
   - client_ip = None
   - triggered_by = None
   - id: 무시함 — 데이터베이스가 만든다
-  - action_id: 무시함 — 실행마다 새로 생긴다
+  - action_id: 무시함 — 실행마다 새로 생성된다
   - operation = 'created'
   - entity_type = 'user'
   - entity_id: 기록의 대상 엔티티와 같다
@@ -163,11 +163,11 @@ Then
 
 #### [a-scope-id-that-is-not-an-entity-id-is-refused](/tests/scenario/bai_scenario/manager/audit_log/test_scoped_searching.py) — pass
 
-지목한 id가 id 꼴이 아니면, 입력이 틀렸다는 이유로 거부된다
+지정한 id가 id 형식이 아니면, 잘못된 입력으로 거부된다
 
 Given
 
-- 서로 다른 프로젝트의 기록 둘과, 첫째 프로젝트에 읽기 권한 받은 user 한 명
+- 서로 다른 프로젝트의 기록 둘과, 첫째 프로젝트에 읽기 권한을 받은 user 한 명
   - 도메인 home-1
   - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
   - 프로젝트 team-1
@@ -184,7 +184,7 @@ Given
 
 When
 
-- AuditLogAdapter.scoped_search — user-1이 id 꼴이 아닌 값을 지목해 검색
+- AuditLogAdapter.scoped_search — user-1이 id 형식이 아닌 값을 지정해 검색
 
 Then
 
@@ -193,7 +193,7 @@ Then
 
 #### [a-status-filter-narrows-within-the-named-scope](/tests/scenario/bai_scenario/manager/audit_log/test_scoped_searching.py) — pass
 
-한 엔티티에 성공 기록과 거부 기록이 있을 때 그것을 지목하고 성공 상태로 걸러 검색하면, 성공한 것만 온다
+한 엔티티에 성공 기록과 거부 기록이 있을 때 그것을 지정하고 성공 상태 필터로 검색하면, 성공한 기록만 반환된다
 
 Given
 
@@ -213,17 +213,17 @@ Given
 
 When
 
-- AuditLogAdapter.scoped_search — user-1이 엔티티를 지목하고 성공 상태로 걸러 검색
+- AuditLogAdapter.scoped_search — user-1이 엔티티를 지정하고 성공 상태 필터로 검색
 
 Then
 
-- 지목한 기록이 순서대로, 그리고 그것만 온다
+- 지정한 기록이 순서대로, 그리고 그것만 반환된다
   - item_count = 1
   - total_count = 1
   - has_next_page = False
   - has_previous_page = False
   - id: 무시함 — 데이터베이스가 만든다
-  - action_id: 무시함 — 실행마다 새로 생긴다
+  - action_id: 무시함 — 실행마다 새로 생성된다
   - operation = 'succeeded'
   - entity_type = 'project'
   - entity_id: 기록의 대상 엔티티와 같다
@@ -238,11 +238,11 @@ Then
 
 #### [a-user-granted-nothing-may-not-read-even-the-records-they-triggered](/tests/scenario/bai_scenario/manager/audit_log/test_scoped_searching.py) — pass
 
-자기 자신에 읽기 권한을 받지 않은 사용자가 자기를 일으킨 사람으로 지목해 검색하면, 권한 부족으로 거부된다. 자기 기록을 읽는 문이 따로 없기 때문이다
+자기 자신에 읽기 권한을 받지 않은 사용자가 자기를 실행한 사용자로 지정해 검색하면, 권한 부족으로 거부된다. 자기 기록을 조회하는 호출이 따로 없기 때문이다
 
 Given
 
-- 두 사용자가 각각 일으킨 기록과, 그중 첫 사용자
+- 두 사용자가 각각 실행한 기록과, 그중 첫 사용자
   - 도메인 home-1
   - 도메인에 속한 사용자 한 명 준비
     - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
@@ -252,12 +252,12 @@ Given
     - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
     - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
     - 일반 사용자 user-2: 자기 키와 개인 프로젝트를 갖는다
-  - 일반 사용자 user-1: 'acted-by-me' 기록, 일으킨 사용자가 정해져 있음
-  - 일반 사용자 user-2: 'acted-by-another' 기록, 일으킨 사용자가 정해져 있음
+  - 일반 사용자 user-1: 'acted-by-me' 기록, 실행한 사용자가 정해져 있음
+  - 일반 사용자 user-2: 'acted-by-another' 기록, 실행한 사용자가 정해져 있음
 
 When
 
-- AuditLogAdapter.scoped_search — user-1이 일으킨 사용자를 지목해 검색
+- AuditLogAdapter.scoped_search — user-1이 실행한 사용자를 지정해 검색
 
 Then
 
@@ -266,11 +266,11 @@ Then
 
 #### [a-user-granted-nothing-may-not-scope-search-an-entity](/tests/scenario/bai_scenario/manager/audit_log/test_scoped_searching.py) — pass
 
-아무 권한도 받지 않은 사용자가 엔티티를 지목해 검색하면, 권한 부족으로 거부된다
+아무 권한도 없는 사용자가 엔티티를 지정해 검색하면, 권한 부족으로 거부된다
 
 Given
 
-- 서로 다른 프로젝트의 기록 둘과, 아무 권한도 받은 user 한 명
+- 서로 다른 프로젝트의 기록 둘과, 아무 권한도 없는 user 한 명
   - 도메인 home-1
   - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
   - 프로젝트 team-1
@@ -284,7 +284,7 @@ Given
 
 When
 
-- AuditLogAdapter.scoped_search — user-1이 엔티티를 지목해 검색
+- AuditLogAdapter.scoped_search — user-1이 엔티티를 지정해 검색
 
 Then
 
@@ -293,11 +293,11 @@ Then
 
 #### [a-user-granted-read-on-an-actor-reads-only-what-that-actor-triggered](/tests/scenario/bai_scenario/manager/audit_log/test_scoped_searching.py) — pass
 
-두 사용자가 각각 기록을 남겼고 한 사용자에 읽기 권한을 받은 사람이 그 사용자를 일으킨 사람으로 지목해 검색하면, 그 사용자가 일으킨 기록만 온다
+두 사용자가 각각 기록을 남겼고 한 사용자에 읽기 권한을 받은 사용자가 그 사용자를 실행한 사용자로 지정해 검색하면, 그 사용자가 실행한 기록만 반환된다
 
 Given
 
-- 두 사용자가 각각 일으킨 기록과, 그 사용자에 읽기 권한을 받은 다른 한 명
+- 두 사용자가 각각 실행한 기록과, 그 사용자에 대한 읽기 권한을 받은 다른 사용자 한 명
   - 도메인 home-1
   - 도메인에 속한 사용자 한 명 준비
     - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
@@ -310,25 +310,25 @@ Given
     - 사용자 정책 user-policy-3: 사용자 한 명당 폴더 10개까지
     - 키페어 정책 keypair-policy-3: 동시 세션 5개까지
     - 일반 사용자 user-3: 자기 키와 개인 프로젝트를 갖는다
-  - 일반 사용자 user-1: 'acted-by-me' 기록, 일으킨 사용자가 정해져 있음
-  - 일반 사용자 user-2: 'acted-by-another' 기록, 일으킨 사용자가 정해져 있음
+  - 일반 사용자 user-1: 'acted-by-me' 기록, 실행한 사용자가 정해져 있음
+  - 일반 사용자 user-2: 'acted-by-another' 기록, 실행한 사용자가 정해져 있음
   - 역할 record-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
   - 역할 record-reader-1: user 전체에 READ 허용
   - 일반 사용자 user-3: 역할 record-reader-1 보유
 
 When
 
-- AuditLogAdapter.scoped_search — user-3이 일으킨 사용자를 지목해 검색
+- AuditLogAdapter.scoped_search — user-3이 실행한 사용자를 지정해 검색
 
 Then
 
-- 지목한 기록이 순서대로, 그리고 그것만 온다
+- 지정한 기록이 순서대로, 그리고 그것만 반환된다
   - item_count = 1
   - total_count = 1
   - has_next_page = False
   - has_previous_page = False
   - id: 무시함 — 데이터베이스가 만든다
-  - action_id: 무시함 — 실행마다 새로 생긴다
+  - action_id: 무시함 — 실행마다 새로 생성된다
   - operation = 'acted-by-me'
   - entity_type = 'user'
   - entity_id: 기록의 대상 엔티티와 같다
@@ -339,15 +339,15 @@ Then
   - acted_as = None
   - duration = None
   - client_ip = None
-  - triggered_by: 일으킨 사용자와 같다
+  - triggered_by: 실행한 사용자와 같다
 
 #### [a-user-granted-read-on-an-entity-reads-only-that-entitys-records](/tests/scenario/bai_scenario/manager/audit_log/test_scoped_searching.py) — pass
 
-두 엔티티에 기록이 하나씩 있고 한쪽에만 읽기 권한을 받은 사용자가 그 엔티티를 지목해 검색하면, 그 엔티티의 기록만 온다
+두 엔티티에 기록이 하나씩 있고 한쪽에만 읽기 권한을 받은 사용자가 그 엔티티를 지정해 검색하면, 그 엔티티의 기록만 반환된다
 
 Given
 
-- 서로 다른 프로젝트의 기록 둘과, 첫째 프로젝트에 읽기 권한 받은 user 한 명
+- 서로 다른 프로젝트의 기록 둘과, 첫째 프로젝트에 읽기 권한을 받은 user 한 명
   - 도메인 home-1
   - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
   - 프로젝트 team-1
@@ -364,17 +364,17 @@ Given
 
 When
 
-- AuditLogAdapter.scoped_search — user-1이 엔티티를 지목해 검색
+- AuditLogAdapter.scoped_search — user-1이 엔티티를 지정해 검색
 
 Then
 
-- 지목한 기록이 순서대로, 그리고 그것만 온다
+- 지정한 기록이 순서대로, 그리고 그것만 반환된다
   - item_count = 1
   - total_count = 1
   - has_next_page = False
   - has_previous_page = False
   - id: 무시함 — 데이터베이스가 만든다
-  - action_id: 무시함 — 실행마다 새로 생긴다
+  - action_id: 무시함 — 실행마다 새로 생성된다
   - operation = 'edited'
   - entity_type = 'project'
   - entity_id: 기록의 대상 엔티티와 같다
@@ -389,11 +389,11 @@ Then
 
 #### [naming-an-entity-nothing-answers-to-is-refused-as-permission](/tests/scenario/bai_scenario/manager/audit_log/test_scoped_searching.py) — pass
 
-다른 엔티티에 읽기 권한을 받은 사용자가 아무것도 아닌 id를 지목해 검색하면, 그 id에 걸린 권한이 없어 권한 부족으로 거부된다
+다른 엔티티에 읽기 권한을 받은 사용자가 어느 엔티티도 아닌 id를 지정해 검색하면, 그 id에 부여된 권한이 없어 권한 부족으로 거부된다
 
 Given
 
-- 서로 다른 프로젝트의 기록 둘과, 첫째 프로젝트에 읽기 권한 받은 user 한 명
+- 서로 다른 프로젝트의 기록 둘과, 첫째 프로젝트에 읽기 권한을 받은 user 한 명
   - 도메인 home-1
   - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
   - 프로젝트 team-1
@@ -410,7 +410,7 @@ Given
 
 When
 
-- AuditLogAdapter.scoped_search — user-1이 엔티티를 지목해 검색
+- AuditLogAdapter.scoped_search — user-1이 엔티티를 지정해 검색
 
 Then
 
@@ -419,11 +419,11 @@ Then
 
 #### [naming-several-readable-entities-merges-their-records-newest-first](/tests/scenario/bai_scenario/manager/audit_log/test_scoped_searching.py) — pass
 
-두 엔티티에 모두 읽기 권한을 받은 사용자가 둘을 함께 지목해 검색하면, 두 기록이 다 오고 최근 것이 먼저다
+두 엔티티에 모두 읽기 권한을 받은 사용자가 둘을 함께 지정해 검색하면, 두 기록이 다 반환되고 최근 것이 먼저다
 
 Given
 
-- 서로 다른 프로젝트의 기록 둘과, 첫째·둘째 프로젝트에 읽기 권한 받은 user 한 명
+- 서로 다른 프로젝트의 기록 둘과, 첫째·둘째 프로젝트에 읽기 권한을 받은 user 한 명
   - 도메인 home-1
   - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
   - 프로젝트 team-1
@@ -443,17 +443,17 @@ Given
 
 When
 
-- AuditLogAdapter.scoped_search — user-1이 엔티티를 지목해 검색
+- AuditLogAdapter.scoped_search — user-1이 엔티티를 지정해 검색
 
 Then
 
-- 지목한 기록이 순서대로, 그리고 그것만 온다
+- 지정한 기록이 순서대로, 그리고 그것만 반환된다
   - item_count = 2
   - total_count = 2
   - has_next_page = False
   - has_previous_page = False
   - id: 무시함 — 데이터베이스가 만든다
-  - action_id: 무시함 — 실행마다 새로 생긴다
+  - action_id: 무시함 — 실행마다 새로 생성된다
   - operation = 'edited'
   - entity_type = 'project'
   - entity_id: 기록의 대상 엔티티와 같다
@@ -466,7 +466,7 @@ Then
   - client_ip = None
   - triggered_by = None
   - id: 무시함 — 데이터베이스가 만든다
-  - action_id: 무시함 — 실행마다 새로 생긴다
+  - action_id: 무시함 — 실행마다 새로 생성된다
   - operation = 'created'
   - entity_type = 'project'
   - entity_id: 기록의 대상 엔티티와 같다
@@ -481,7 +481,7 @@ Then
 
 #### [omitting-the-page-size-caps-a-scoped-page-and-says-more-follow](/tests/scenario/bai_scenario/manager/audit_log/test_scoped_searching.py) — pass
 
-지목한 엔티티에 기록이 많고 페이지 크기를 대지 않으면, 열 건까지 오고 다음 페이지가 있다고 답한다
+지정한 엔티티에 기록이 많고 페이지 크기를 지정하지 않으면, 10건까지 반환되고 다음 페이지가 있다고 응답한다
 
 Given
 
@@ -510,11 +510,11 @@ Given
 
 When
 
-- AuditLogAdapter.scoped_search — user-1이 엔티티를 지목해 검색
+- AuditLogAdapter.scoped_search — user-1이 엔티티를 지정해 검색
 
 Then
 
-- 기본 페이지 크기만큼 오고 다음 페이지가 있다고 답한다
+- 기본 페이지 크기만큼 반환되고 다음 페이지가 있다고 응답한다
   - items_count = 10
   - total_count = 11
   - has_next_page = True
@@ -522,11 +522,11 @@ Then
 
 #### [one-unreadable-entity-among-those-named-refuses-the-whole-read](/tests/scenario/bai_scenario/manager/audit_log/test_scoped_searching.py) — pass
 
-한쪽에만 읽기 권한을 받은 사용자가 두 엔티티를 함께 지목해 검색하면, 볼 수 있는 것만 주는 대신 요청 전체가 권한 부족으로 거부된다
+한쪽에만 읽기 권한을 받은 사용자가 두 엔티티를 함께 지정해 검색하면, 볼 수 있는 것만 주는 대신 요청 전체가 권한 부족으로 거부된다
 
 Given
 
-- 서로 다른 프로젝트의 기록 둘과, 첫째 프로젝트에 읽기 권한 받은 user 한 명
+- 서로 다른 프로젝트의 기록 둘과, 첫째 프로젝트에 읽기 권한을 받은 user 한 명
   - 도메인 home-1
   - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
   - 프로젝트 team-1
@@ -543,7 +543,7 @@ Given
 
 When
 
-- AuditLogAdapter.scoped_search — user-1이 엔티티를 지목해 검색
+- AuditLogAdapter.scoped_search — user-1이 엔티티를 지정해 검색
 
 Then
 
@@ -552,11 +552,11 @@ Then
 
 #### [the-monitor-role-without-a-grant-may-not-scope-search](/tests/scenario/bai_scenario/manager/audit_log/test_scoped_searching.py) — pass
 
-모니터 역할 사용자라도 권한 없이 엔티티를 지목해 검색하면, 권한 부족으로 거부된다. 모니터가 지나는 것은 역할 문뿐이고 이 문은 권한 그래프가 지킨다
+모니터 역할 사용자라도 권한 없이 엔티티를 지정해 검색하면, 권한 부족으로 거부된다. 모니터가 통과하는 것은 역할 검사뿐이고 이 검색은 권한 그래프로 보호된다
 
 Given
 
-- 서로 다른 프로젝트의 기록 둘과, 아무 권한도 받은 monitor 한 명
+- 서로 다른 프로젝트의 기록 둘과, 아무 권한도 없는 monitor 한 명
   - 도메인 home-1
   - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
   - 프로젝트 team-1
@@ -570,7 +570,7 @@ Given
 
 When
 
-- AuditLogAdapter.scoped_search — user-1이 엔티티를 지목해 검색
+- AuditLogAdapter.scoped_search — user-1이 엔티티를 지정해 검색
 
 Then
 
@@ -579,11 +579,11 @@ Then
 
 #### [the-superadmin-naming-an-entity-nothing-answers-to-sees-an-empty-page](/tests/scenario/bai_scenario/manager/audit_log/test_scoped_searching.py) — pass
 
-슈퍼관리자가 아무것도 아닌 id를 지목해 검색하면, 권한 검사를 지나 빈 답을 본다. 대상 없음으로 거부하는 자리가 아니다
+슈퍼관리자가 어느 엔티티도 아닌 id를 지정해 검색하면, 권한 검사를 통과해 빈 응답을 받는다. 대상 없음으로 거부하는 경우가 아니다
 
 Given
 
-- 서로 다른 프로젝트의 기록 둘과, 아무 권한도 받은 superadmin 한 명
+- 서로 다른 프로젝트의 기록 둘과, 아무 권한도 없는 superadmin 한 명
   - 도메인 home-1
   - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
   - 프로젝트 team-1
@@ -597,7 +597,7 @@ Given
 
 When
 
-- AuditLogAdapter.scoped_search — user-1이 엔티티를 지목해 검색
+- AuditLogAdapter.scoped_search — user-1이 엔티티를 지정해 검색
 
 Then
 
@@ -609,11 +609,11 @@ Then
 
 #### [turning-enforcement-off-reads-a-named-entitys-records-without-a-grant](/tests/scenario/bai_scenario/manager/audit_log/test_scoped_searching.py) — pass
 
-엔티티 권한 집행을 끄면 아무 권한도 받지 않은 사용자도 엔티티를 지목해 그 기록을 읽는다. 이 문은 권한 그래프가 지키기 때문이다
+권한 검사를 끄면 아무 권한도 없는 사용자도 엔티티를 지정해 그 기록을 검색할 수 있다. 이 검색은 권한 그래프로 보호되기 때문이다
 
 Given
 
-- 서로 다른 프로젝트의 기록 둘과, 아무 권한도 받은 user 한 명
+- 서로 다른 프로젝트의 기록 둘과, 아무 권한도 없는 user 한 명
   - 도메인 home-1
   - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
   - 프로젝트 team-1
@@ -627,17 +627,17 @@ Given
 
 When
 
-- AuditLogAdapter.scoped_search — user-1이 엔티티를 지목해 검색
+- AuditLogAdapter.scoped_search — user-1이 엔티티를 지정해 검색
 
 Then
 
-- 지목한 기록이 순서대로, 그리고 그것만 온다
+- 지정한 기록이 순서대로, 그리고 그것만 반환된다
   - item_count = 1
   - total_count = 1
   - has_next_page = False
   - has_previous_page = False
   - id: 무시함 — 데이터베이스가 만든다
-  - action_id: 무시함 — 실행마다 새로 생긴다
+  - action_id: 무시함 — 실행마다 새로 생성된다
   - operation = 'edited'
   - entity_type = 'project'
   - entity_id: 기록의 대상 엔티티와 같다
@@ -654,7 +654,7 @@ Then
 
 #### [a-cursor-that-cannot-be-decoded-is-refused](/tests/scenario/bai_scenario/manager/audit_log/test_searching.py) — pass
 
-해석할 수 없는 커서로 검색하면, 커서가 틀렸다는 이유로 거부된다
+해석할 수 없는 커서로 검색하면, 잘못된 커서로 거부된다
 
 Given
 
@@ -670,7 +670,7 @@ Given
 
 When
 
-- AuditLogAdapter.admin_search — user-1이 깨진 커서로 검색
+- AuditLogAdapter.admin_search — user-1이 손상된 커서로 검색
 
 Then
 
@@ -679,7 +679,7 @@ Then
 
 #### [a-status-filter-narrows-the-answer-to-the-status-it-names](/tests/scenario/bai_scenario/manager/audit_log/test_searching.py) — pass
 
-성공 기록과 거부 기록이 섞여 있을 때 성공 상태로 걸러 검색하면, 성공한 것만 온다
+성공 기록과 거부 기록이 섞여 있을 때 성공 상태 필터로 검색하면, 성공한 기록만 반환된다
 
 Given
 
@@ -695,17 +695,17 @@ Given
 
 When
 
-- AuditLogAdapter.admin_search — user-1이 성공 상태로 걸러 검색
+- AuditLogAdapter.admin_search — user-1이 성공 상태 필터로 검색
 
 Then
 
-- 지목한 기록이 순서대로, 그리고 그것만 온다
+- 지정한 기록이 순서대로, 그리고 그것만 반환된다
   - item_count = 1
   - total_count = 1
   - has_next_page = False
   - has_previous_page = False
   - id: 무시함 — 데이터베이스가 만든다
-  - action_id: 무시함 — 실행마다 새로 생긴다
+  - action_id: 무시함 — 실행마다 새로 생성된다
   - operation = 'succeeded'
   - entity_type = 'user'
   - entity_id: 기록의 대상 엔티티와 같다
@@ -745,7 +745,7 @@ Then
 
 #### [an-actor-filter-narrows-the-answer-to-the-user-who-triggered-it](/tests/scenario/bai_scenario/manager/audit_log/test_searching.py) — pass
 
-두 사용자가 각각 기록을 남겼을 때 한 사용자로 걸러 검색하면, 그 사용자가 일으킨 것만 온다
+두 사용자가 각각 기록을 남겼을 때 한 사용자 필터로 검색하면, 그 사용자가 실행한 기록만 반환된다
 
 Given
 
@@ -762,22 +762,22 @@ Given
     - 사용자 정책 user-policy-3: 사용자 한 명당 폴더 10개까지
     - 키페어 정책 keypair-policy-3: 동시 세션 5개까지
     - 슈퍼관리자 user-3: 자기 키와 개인 프로젝트를 갖는다
-  - 일반 사용자 user-1: 'acted-by-me' 기록, 일으킨 사용자가 정해져 있음
-  - 일반 사용자 user-2: 'acted-by-another' 기록, 일으킨 사용자가 정해져 있음
+  - 일반 사용자 user-1: 'acted-by-me' 기록, 실행한 사용자가 정해져 있음
+  - 일반 사용자 user-2: 'acted-by-another' 기록, 실행한 사용자가 정해져 있음
 
 When
 
-- AuditLogAdapter.admin_search — user-3이 일으킨 사용자로 걸러 검색
+- AuditLogAdapter.admin_search — user-3이 실행한 사용자 필터로 검색
 
 Then
 
-- 지목한 기록이 순서대로, 그리고 그것만 온다
+- 지정한 기록이 순서대로, 그리고 그것만 반환된다
   - item_count = 1
   - total_count = 1
   - has_next_page = False
   - has_previous_page = False
   - id: 무시함 — 데이터베이스가 만든다
-  - action_id: 무시함 — 실행마다 새로 생긴다
+  - action_id: 무시함 — 실행마다 새로 생성된다
   - operation = 'acted-by-me'
   - entity_type = 'user'
   - entity_id: 기록의 대상 엔티티와 같다
@@ -788,11 +788,11 @@ Then
   - acted_as = None
   - duration = None
   - client_ip = None
-  - triggered_by: 일으킨 사용자와 같다
+  - triggered_by: 실행한 사용자와 같다
 
 #### [naming-two-pagination-modes-at-once-is-refused](/tests/scenario/bai_scenario/manager/audit_log/test_searching.py) — pass
 
-오프셋 방식과 커서 방식을 함께 주고 검색하면, 입력이 틀렸다는 이유로 거부된다
+오프셋 방식과 커서 방식을 함께 지정해 검색하면, 잘못된 입력으로 거부된다
 
 Given
 
@@ -808,7 +808,7 @@ Given
 
 When
 
-- AuditLogAdapter.admin_search — user-1이 두 페이지 방식을 함께 주고 검색
+- AuditLogAdapter.admin_search — user-1이 두 페이지 방식을 함께 지정해 검색
 
 Then
 
@@ -817,7 +817,7 @@ Then
 
 #### [omitting-the-page-size-caps-the-page-and-says-more-follow](/tests/scenario/bai_scenario/manager/audit_log/test_searching.py) — pass
 
-페이지 크기를 대지 않고 검색하면, 열 건까지 오고 다음 페이지가 있다고 답한다
+페이지 크기를 지정하지 않고 검색하면, 10건까지 반환되고 다음 페이지가 있다고 응답한다
 
 Given
 
@@ -846,7 +846,7 @@ When
 
 Then
 
-- 기본 페이지 크기만큼 오고 다음 페이지가 있다고 답한다
+- 기본 페이지 크기만큼 반환되고 다음 페이지가 있다고 응답한다
   - items_count = 10
   - total_count = 11
   - has_next_page = True
@@ -854,7 +854,7 @@ Then
 
 #### [the-monitor-role-searching-sees-the-same-records-as-the-superadmin](/tests/scenario/bai_scenario/manager/audit_log/test_searching.py) — pass
 
-검색은 읽기이므로 모니터 역할 사용자도 전역 문을 지나 슈퍼관리자와 같은 답을 본다
+검색은 읽기 연산이므로 모니터 역할 사용자도 전역 역할 검사를 통과해 슈퍼관리자와 같은 응답을 받는다
 
 Given
 
@@ -874,13 +874,13 @@ When
 
 Then
 
-- 지목한 기록이 순서대로, 그리고 그것만 온다
+- 지정한 기록이 순서대로, 그리고 그것만 반환된다
   - item_count = 2
   - total_count = 2
   - has_next_page = False
   - has_previous_page = False
   - id: 무시함 — 데이터베이스가 만든다
-  - action_id: 무시함 — 실행마다 새로 생긴다
+  - action_id: 무시함 — 실행마다 새로 생성된다
   - operation = 'edited'
   - entity_type = 'user'
   - entity_id: 기록의 대상 엔티티와 같다
@@ -893,7 +893,7 @@ Then
   - client_ip = None
   - triggered_by = None
   - id: 무시함 — 데이터베이스가 만든다
-  - action_id: 무시함 — 실행마다 새로 생긴다
+  - action_id: 무시함 — 실행마다 새로 생성된다
   - operation = 'created'
   - entity_type = 'user'
   - entity_id: 기록의 대상 엔티티와 같다
@@ -908,7 +908,7 @@ Then
 
 #### [the-superadmin-searching-without-a-filter-sees-every-record-newest-first](/tests/scenario/bai_scenario/manager/audit_log/test_searching.py) — pass
 
-기록 둘이 있고 슈퍼관리자가 필터 없이 검색하면, 둘 다 오고 최근 것이 먼저다
+기록 둘이 있고 슈퍼관리자가 필터 없이 검색하면, 둘 다 반환되고 최근 것이 먼저다
 
 Given
 
@@ -928,13 +928,13 @@ When
 
 Then
 
-- 지목한 기록이 순서대로, 그리고 그것만 온다
+- 지정한 기록이 순서대로, 그리고 그것만 반환된다
   - item_count = 2
   - total_count = 2
   - has_next_page = False
   - has_previous_page = False
   - id: 무시함 — 데이터베이스가 만든다
-  - action_id: 무시함 — 실행마다 새로 생긴다
+  - action_id: 무시함 — 실행마다 새로 생성된다
   - operation = 'edited'
   - entity_type = 'user'
   - entity_id: 기록의 대상 엔티티와 같다
@@ -947,7 +947,7 @@ Then
   - client_ip = None
   - triggered_by = None
   - id: 무시함 — 데이터베이스가 만든다
-  - action_id: 무시함 — 실행마다 새로 생긴다
+  - action_id: 무시함 — 실행마다 새로 생성된다
   - operation = 'created'
   - entity_type = 'user'
   - entity_id: 기록의 대상 엔티티와 같다
@@ -962,7 +962,7 @@ Then
 
 #### [turning-enforcement-off-does-not-let-a-plain-user-search-every-record](/tests/scenario/bai_scenario/manager/audit_log/test_searching.py) — pass
 
-엔티티 권한 집행을 꺼도 슈퍼관리자가 아닌 사용자는 전체를 검색할 수 없다. 이 문은 권한 그래프가 아니라 역할이 지킨다
+권한 검사를 꺼도 슈퍼관리자가 아닌 사용자는 전체를 검색할 수 없다. 이 검색은 권한 그래프가 아니라 역할로 보호된다
 
 Given
 
