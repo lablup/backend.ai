@@ -7,9 +7,10 @@ from __future__ import annotations
 from typing import Any, Self
 from uuid import UUID
 
-from pydantic import Field, field_validator
+from pydantic import Field, field_validator, model_validator
 
 from ai.backend.common.api_handlers import BaseRequestModel
+from ai.backend.common.container_registry import validate_registry_project, validate_registry_url
 from ai.backend.common.dto.manager.query import StringFilter
 
 from .types import (
@@ -77,6 +78,7 @@ class CreateContainerRegistryInput(BaseRequestModel):
         stripped = v.strip()
         if not stripped:
             raise ValueError("url must not be blank")
+        validate_registry_url(stripped)
         return stripped
 
     @field_validator("registry_name", mode="before")
@@ -86,6 +88,11 @@ class CreateContainerRegistryInput(BaseRequestModel):
         if not stripped:
             raise ValueError("registry_name must not be blank")
         return stripped
+
+    @model_validator(mode="after")
+    def harbor_project_required(self) -> Self:
+        validate_registry_project(self.type, self.project)
+        return self
 
 
 class UpdateContainerRegistryInput(BaseRequestModel):

@@ -113,6 +113,14 @@ class ContainerRegistryAdapter(BaseAdapter):
         input: CreateContainerRegistryInput,
     ) -> CreateContainerRegistryPayload:
         """Create a new container registry (superadmin only)."""
+        data = await self.create_registry(input)
+        return CreateContainerRegistryPayload(registry=self._data_to_dto(data))
+
+    async def create_registry(
+        self,
+        input: CreateContainerRegistryInput,
+    ) -> ContainerRegistryData:
+        """Create the registry and link it to the projects the input names."""
         creator = ContainerRegistryCreator(
             url=input.url,
             type=input.type,
@@ -135,7 +143,7 @@ class ContainerRegistryAdapter(BaseAdapter):
                     remove=input.allowed_groups.remove,
                 ),
             )
-        return CreateContainerRegistryPayload(registry=self._data_to_dto(result.data))
+        return result.data
 
     async def admin_update(
         self,
