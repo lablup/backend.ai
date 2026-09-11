@@ -906,7 +906,7 @@ Then
 
 #### [purging-an-image-takes-its-aliases-with-it](/tests/scenario/bai_scenario/manager/image/test_retiring.py) — pass
 
-별칭이 붙은 이미지를 지우면 이미지와 별칭이 함께 사라진다
+별칭이 붙은 이미지도 지워지고 지워진 이미지가 답으로 온다. 별칭이 함께 사라지는 것은 답에 실리지 않아 이 행이 보지 못한다
 
 Given
 
@@ -977,15 +977,18 @@ Then
 
 #### [a-condition-given-from-outside-narrows-before-the-callers-filter](/tests/scenario/bai_scenario/manager/image/test_searching.py) — pass
 
-바깥에서 한 레지스트리로 좁혀 준 조건이 먼저 걸리므로, 그 레지스트리의 이미지만 답으로 온다
+이미지가 두 레지스트리에 나뉘어 있을 때 바깥에서 한쪽으로 좁혀 주면, 그 레지스트리의 이미지만 답으로 오고 다른 쪽은 세어지지 않는다
 
 Given
 
-- 레지스트리 하나와 그 안의 이미지 2개, superadmin 한 명
+- 레지스트리 둘, 한쪽에 이미지 2개와 다른 쪽에 2개, superadmin 한 명
   - 도메인 home-1
-  - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
-  - 이미지 image-0-1: x86_64 이미지
-  - 이미지 image-1-1: x86_64 이미지
+  - 컨테이너 레지스트리 wanted-1: 이미지를 가져오는 곳
+  - 컨테이너 레지스트리 other-1: 이미지를 가져오는 곳
+  - 이미지 here-0-1: x86_64 이미지
+  - 이미지 here-1-1: x86_64 이미지
+  - 이미지 there-0-1: x86_64 이미지
+  - 이미지 there-1-1: x86_64 이미지
   - 도메인에 속한 사용자 한 명 준비
     - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
     - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
@@ -999,7 +1002,7 @@ When
 Then
 
 - 심은 이미지가 모두 세어진다
-  - items = ['image-0-1', 'image-1-1']
+  - items = ['here-0-1', 'here-1-1']
   - total_count = 2
   - has_next_page = False
   - has_previous_page = False
@@ -1214,6 +1217,35 @@ Then
   - items = 50
   - total_count = 51
   - has_next_page = True
+  - has_previous_page = False
+
+#### [searching-aliases-answers-with-the-one-that-was-attached](/tests/scenario/bai_scenario/manager/image/test_searching.py) — pass
+
+별칭이 붙어 있을 때 슈퍼관리자가 별칭을 검색하면 그 별칭이 답으로 온다
+
+Given
+
+- 별칭이 붙은 이미지 하나, superadmin 한 명
+  - 도메인 home-1
+  - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
+  - 이미지 image-1: x86_64 이미지
+  - 이미지 image-1: 별칭 seeded-alias
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+
+When
+
+- ImageAdapter.admin_search_image_aliases — user-1이 별칭을 검색함
+
+Then
+
+- 붙여 둔 별칭이 답으로 온다
+  - items = ['seeded-alias']
+  - total_count = 1
+  - has_next_page = False
   - has_previous_page = False
 
 #### [searching-aliases-when-none-were-attached-answers-empty](/tests/scenario/bai_scenario/manager/image/test_searching.py) — pass
