@@ -131,7 +131,7 @@ class NoAcceleratorsAreLeft(Then[AnImageAndACaller, ImageNode]):
 
 
 @dataclass(frozen=True)
-class TheTagIsChanged(Scenario[SeedingSession, AnImageAndACaller, ImageAdapter, ImageNode]):
+class ChangingOnlyTheTag(Scenario[SeedingSession, AnImageAndACaller, ImageAdapter, ImageNode]):
     @override
     def summary(self) -> str:
         return "changing-only-the-tag-leaves-every-other-field-alone"
@@ -179,7 +179,7 @@ class AnEmptyEditChangesNothing(
 
 
 @dataclass(frozen=True)
-class TheAcceleratorsAreCleared(
+class ClearingTheAcceleratorList(
     Scenario[SeedingSession, AnImageAndACaller, ImageAdapter, ImageNode]
 ):
     @override
@@ -253,9 +253,9 @@ class APlainUserMayNotEdit(Scenario[SeedingSession, AnImageAndACaller, ImageAdap
 
 
 SCENARIOS: list[Any] = [
-    TheTagIsChanged(),
+    ChangingOnlyTheTag(),
     AnEmptyEditChangesNothing(),
-    TheAcceleratorsAreCleared(),
+    ClearingTheAcceleratorList(),
     EditingWhatIsNotThere(),
     APlainUserMayNotEdit(),
 ]

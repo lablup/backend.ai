@@ -161,7 +161,7 @@ class TheAliasOrderIsKept(Then[AnAliasAndACaller, LoadedAliases]):
 
 
 @dataclass(frozen=True)
-class MissingIdsLeaveHoles(
+class LoadingKeepsTheOrderAndLeavesHoles(
     Scenario[SeedingSession, ManyImagesAndACaller, ImageAdapter, LoadedImages]
 ):
     @override
@@ -242,7 +242,7 @@ class APlainUserIsRefusedWholesale(
 
 
 @dataclass(frozen=True)
-class AliasIdsLeaveHolesToo(
+class LoadingAliasesKeepsTheOrderToo(
     Scenario[SeedingSession, AnAliasAndACaller, ImageAdapter, LoadedAliases]
 ):
     @override
@@ -295,10 +295,10 @@ class APlainUserMayNotLoadAliases(
 
 
 SCENARIOS: list[Any] = [
-    MissingIdsLeaveHoles(),
+    LoadingKeepsTheOrderAndLeavesHoles(),
     AnEmptyListAsksNothing(),
     APlainUserIsRefusedWholesale(),
-    AliasIdsLeaveHolesToo(),
+    LoadingAliasesKeepsTheOrderToo(),
     APlainUserMayNotLoadAliases(),
 ]
 

@@ -166,7 +166,7 @@ class TheRemovedAlias(Then[AnAliasAndACaller, AliasImagePayload]):
 
 
 @dataclass(frozen=True)
-class AnAliasIsAttached(
+class AliasingAnswersWithTheAliasAndItsImage(
     Scenario[SeedingSession, AnImageAndACaller, ImageAdapter, AliasImagePayload]
 ):
     @override
@@ -191,7 +191,7 @@ class AnAliasIsAttached(
 
 
 @dataclass(frozen=True)
-class AnAliasIsRemoved(
+class DealiasingAnswersWithTheRemovedAlias(
     Scenario[SeedingSession, AnAliasAndACaller, ImageAdapter, AliasImagePayload]
 ):
     @override
@@ -344,8 +344,8 @@ class APlainUserMayNotDealias(
 
 
 SCENARIOS: list[Any] = [
-    AnAliasIsAttached(),
-    AnAliasIsRemoved(),
+    AliasingAnswersWithTheAliasAndItsImage(),
+    DealiasingAnswersWithTheRemovedAlias(),
     AliasingWhatIsNotThere(),
     AnAliasAnotherImageHolds(),
     DealiasingWhatIsNotThere(),
