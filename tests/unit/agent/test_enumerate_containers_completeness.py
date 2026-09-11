@@ -83,87 +83,75 @@ class TestReconstructResourceUsageSkipsAPartialListing:
 
 
 class TestDockerEnumerateContainers:
-    """The real `DockerAgent.enumerate_containers`, with aiodocker stubbed out."""
+    """The docker backend narrows from the listing, then describes only its own kernels."""
 
     @staticmethod
-    def _container(kernel_id: KernelId, *, show: Any) -> MagicMock:
+    def _entry(
+        kernel_id: KernelId | None,
+        *,
+        state: str = "running",
+        owner: str = "test-agent",
+        show: Any = None,
+    ) -> MagicMock:
         container = MagicMock()
         container._id = f"cid-{kernel_id}"
-        container.show = show
-        container.__getitem__ = lambda _self, key: {
-            "State": {"Status": "running"},
-            "Config": {"Labels": {LabelName.OWNER_AGENT: "test-agent"}},
-        }[key]
+        container.show = show if show is not None else AsyncMock()
+        name = f"/kernel.{kernel_id}" if kernel_id is not None else "/some-other-container"
+        payload = {"Names": [name], "State": state, "Labels": {LabelName.OWNER_AGENT: owner}}
+        container.__getitem__ = lambda _self, key: payload[key]
         return container
 
-    def _patch(
-        self,
-        monkeypatch: pytest.MonkeyPatch,
-        pairs: list[tuple[KernelId, MagicMock]],
-    ) -> Any:
+    def _agent(self, monkeypatch: pytest.MonkeyPatch, entries: list[MagicMock]) -> Any:
         agent = MagicMock()
         agent.id = AgentId("test-agent")
         docker = MagicMock()
-        docker.containers.list = AsyncMock(return_value=[c for _, c in pairs])
+        docker.containers.list = AsyncMock(return_value=entries)
         docker.close = AsyncMock()
-        by_container = {id(c): kid for kid, c in pairs}
-
-        async def _kernel_id_of(container: Any) -> KernelId:
-            return by_container[id(container)]
-
         monkeypatch.setattr(docker_agent, "Docker", lambda *a, **kw: docker)
-        monkeypatch.setattr(docker_agent, "get_kernel_id_from_container", _kernel_id_of)
         monkeypatch.setattr(docker_agent, "container_from_docker_container", lambda c: MagicMock())
-        return agent
+        return agent, docker
 
-    async def test_a_container_that_cannot_be_described_refuses_the_listing(
+    async def test_only_our_kernels_are_described(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """The listing already says which containers are ours; the rest cost nothing."""
+        mine = self._entry(KernelId(uuid4()))
+        theirs = self._entry(KernelId(uuid4()), owner="another-agent")
+        not_a_kernel = self._entry(None)
+        exited = self._entry(KernelId(uuid4()), state="exited")
+        agent, _ = self._agent(monkeypatch, [mine, theirs, not_a_kernel, exited])
+
+        result = await docker_agent.DockerAgent.enumerate_containers(agent)
+
+        assert len(result) == 1
+        mine.show.assert_awaited_once()
+        for skipped in (theirs, not_a_kernel, exited):
+            skipped.show.assert_not_awaited()
+
+    async def test_a_kernel_that_cannot_be_described_refuses_the_listing(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        good_id, bad_id = KernelId(uuid4()), KernelId(uuid4())
-        agent = self._patch(
-            monkeypatch,
-            [
-                (good_id, self._container(good_id, show=AsyncMock())),
-                (
-                    bad_id,
-                    self._container(
-                        bad_id, show=AsyncMock(side_effect=RuntimeError("inspect failed"))
-                    ),
-                ),
-            ],
+        good = self._entry(KernelId(uuid4()))
+        bad = self._entry(
+            KernelId(uuid4()), show=AsyncMock(side_effect=RuntimeError("inspect failed"))
         )
+        agent, _ = self._agent(monkeypatch, [good, bad])
 
         with pytest.raises(ContainerEnumerationIncomplete):
             await docker_agent.DockerAgent.enumerate_containers(agent)
 
-    async def test_a_container_removed_mid_listing_is_absence_not_a_refusal(
+    async def test_a_kernel_removed_mid_listing_is_absence_not_a_refusal(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        """A 404 between the listing and the describe is the one absence this may infer."""
-        gone_id = KernelId(uuid4())
-        agent = self._patch(
-            monkeypatch,
-            [
-                (
-                    gone_id,
-                    self._container(
-                        gone_id,
-                        show=AsyncMock(
-                            side_effect=DockerError(HTTPStatus.NOT_FOUND, "no such container")
-                        ),
-                    ),
-                )
-            ],
+        gone = self._entry(
+            KernelId(uuid4()),
+            show=AsyncMock(side_effect=DockerError(HTTPStatus.NOT_FOUND, "no such container")),
         )
+        agent, _ = self._agent(monkeypatch, [gone])
 
         assert await docker_agent.DockerAgent.enumerate_containers(agent) == []
 
-    async def test_a_complete_listing_is_returned(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        kernel_id = KernelId(uuid4())
-        agent = self._patch(
-            monkeypatch, [(kernel_id, self._container(kernel_id, show=AsyncMock()))]
-        )
+    async def test_a_failing_listing_propagates(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        agent, docker = self._agent(monkeypatch, [])
+        docker.containers.list = AsyncMock(side_effect=RuntimeError("docker is unreachable"))
 
-        result = await docker_agent.DockerAgent.enumerate_containers(agent)
-
-        assert [kid for kid, _ in result] == [kernel_id]
+        with pytest.raises(RuntimeError):
+            await docker_agent.DockerAgent.enumerate_containers(agent)

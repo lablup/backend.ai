@@ -1785,50 +1785,51 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
         self,
         status_filter: frozenset[ContainerStatus] = ACTIVE_STATUS_SET,
     ) -> Sequence[tuple[KernelId, Container]]:
-        result = []
-        fetch_tasks = []
+        # Narrowed from the listing first. The name, state and labels that decide whether a
+        # container is ours at all are already in it, so only the survivors -- this agent's
+        # kernels -- are worth a describe, instead of every container on the host.
+        ours: list[tuple[KernelId, DockerContainer]] = []
         async with closing_async(Docker()) as docker:
             for container in await docker.containers.list():
+                names = container["Names"] or []
+                kernel_id = await get_kernel_id_from_container(names[0] if names else "")
+                if kernel_id is None:
+                    continue
+                if container["State"] not in status_filter:
+                    continue
+                labels = container["Labels"] or {}
+                if self.id != AgentId(labels.get(LabelName.OWNER_AGENT, "")):
+                    continue
+                ours.append((kernel_id, container))
 
-                async def _fetch_container_info(container: DockerContainer) -> None:
-                    kernel_id_str: str = "(unknown)"
-                    try:
-                        kernel_id = await get_kernel_id_from_container(container)
-                        if kernel_id is None:
-                            return
-                        kernel_id_str = str(kernel_id)
-                        if container["State"]["Status"] in status_filter:
-                            owner_id = AgentId(
-                                container["Config"]["Labels"].get(LabelName.OWNER_AGENT, "")
-                            )
-                            if self.id == owner_id:
-                                await container.show()
-                                result.append(
-                                    (
-                                        kernel_id,
-                                        container_from_docker_container(container),
-                                    ),
-                                )
-                    except DockerError as e:
-                        if e.status == HTTPStatus.NOT_FOUND:
-                            # Removed between the listing and the describe: genuinely absent, and
-                            # the only absence this method is allowed to infer.
-                            log.warning(e.message)
-                            return
-                        raise
-                    except asyncio.CancelledError:
-                        pass
-                    except Exception:
-                        log.exception(
-                            "error while fetching container information (cid:{}, k:{})",
-                            container._id,
-                            kernel_id_str,
-                        )
-                        raise
+            result: list[tuple[KernelId, Container]] = []
 
-                fetch_tasks.append(_fetch_container_info(container))
+            async def _describe(kernel_id: KernelId, container: DockerContainer) -> None:
+                try:
+                    await container.show()
+                except DockerError as e:
+                    if e.status == HTTPStatus.NOT_FOUND:
+                        # Removed between the listing and the describe: genuinely absent, and
+                        # the only absence this method is allowed to infer.
+                        log.warning(e.message)
+                        return
+                    raise
+                except asyncio.CancelledError:
+                    pass
+                except Exception:
+                    log.exception(
+                        "error while fetching container information (cid:{}, k:{})",
+                        container._id,
+                        kernel_id,
+                    )
+                    raise
+                else:
+                    result.append((kernel_id, container_from_docker_container(container)))
 
-            outcomes = await asyncio.gather(*fetch_tasks, return_exceptions=True)
+            outcomes = await asyncio.gather(
+                *(_describe(kernel_id, container) for kernel_id, container in ours),
+                return_exceptions=True,
+            )
         raise_if_enumeration_incomplete(outcomes)
         return result
 
