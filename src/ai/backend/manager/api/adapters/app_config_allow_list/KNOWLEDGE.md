@@ -1,7 +1,7 @@
 ---
 name: app-config-allow-list-adapter-scenarios
 type: reference
-description: what the app config allow-list adapter guarantees, as scenarios; an entry opens one registered name to one scope kind and carries the rank that orders the merge, the rank defaults by scope kind, only the rank can change, and purging an entry takes its fragments with it
+description: what the app config allow-list adapter guarantees, as scenarios; an entry opens one registered name to one scope kind and carries the rank that orders the merge, the rank defaults by scope kind, only the rank can change, and purging an entry takes its fragments with it; the tests in tests/scenario/bai_scenario/manager/app_config_allow_list match these one for one
 scope: src/ai/backend/manager/api/adapters/app_config_allow_list
 keywords: [app config allow list, scenario, adapter, rank, superadmin, cascade]
 generated:
@@ -62,9 +62,12 @@ status: draft
 
 | 시나리오 | 상황 | 요청 | 결과 |
 |---|---|---|---|
-| 있는 것, 없는 것, 볼 수 없는 것을 섞어 읽는다 | 항목 둘 중 하나에만 읽기 권한 있음 | 그 둘과 없는 id 하나를 한 번에 | 목록 순서대로. 권한 있는 것은 노드, 없는 id 자리는 비어서, 볼 수 없는 것은 그 자리만 거부 |
+| 있는 것, 없는 것, 볼 수 없는 것을 섞어 읽는다 | 항목 둘 중 하나에만 읽기 권한 있음 | 그 둘과 없는 id 하나를 한 번에 | 목록 순서대로. 권한 있는 것은 노드, 볼 수 없는 것과 없는 id는 그 자리만 거부 |
 | 슈퍼관리자가 섞어 읽는다 | 항목 둘 | 그 둘과 없는 id 하나를 한 번에 | 둘은 노드, 없는 id 자리는 비어서 |
 | 빈 목록을 준다 | 항목 하나 | 빈 id 목록 | 빈 답. 배선을 부르지 않는다 |
+
+없는 id도 슈퍼관리자가 아닌 사람에게는 거부 원소다. 권한 검사가 원소마다 먼저 도는데 없는
+행에는 걸린 권한도 없기 때문이고, 빈 자리로 오는 것은 그 검사를 지나가는 슈퍼관리자에게뿐이다.
 
 ## 훑기
 
@@ -75,7 +78,7 @@ status: draft
 | 스코프 종류로 걸러 훑는다 | 세 종류에 항목이 하나씩, 전역 역할 있음 | 사용자 종류 필터 조회 | 사용자 항목만 남는다 |
 | 순위 순으로 정렬해 훑는다 | 순위가 다른 항목 셋, 전역 역할 있음 | 순위 오름차순 조회 | 순위 순서대로 온다 |
 | 페이지 크기를 생략한다 | 항목 열하나, 전역 역할 있음 | 크기 없이 조회 | 열 건까지 오고 다음 쪽이 있다고 답한다 |
-| 슈퍼관리자가 아닌 사용자가 훑는다 | 전역 역할 없음, 어느 항목에나 읽기 권한 있음 | 전체 조회 | 역할로 거부 |
+| 슈퍼관리자가 아닌 사용자가 훑는다 | 전역 역할 없음, 자기 스코프에서 항목 읽기 권한 있음 | 전체 조회 | 역할로 거부 |
 
 ## 순위 고치기
 
@@ -97,13 +100,13 @@ status: draft
 | 시나리오 | 상황 | 요청 | 결과 |
 |---|---|---|---|
 | 지우기 권한을 받은 사용자가 지운다 | 조각이 딸리지 않은 항목, 그 항목에 지우기 권한 있음 | 지우기 | 지운 id를 실은 답 |
-| 조각이 딸린 항목을 지운다 | 항목 하나, 그 아래 조각 하나, 지우기 권한 있음 | 지우기 | 지워지고 조각도 함께 사라진다 |
+| 조각이 딸린 항목을 지운다 | 항목 하나, 그 아래 조각 하나, 지우기 권한 있음 | 지우기 | 조각이 막지 않고 지운 id를 실은 답 |
 | 아무 권한도 받지 않은 사용자가 지운다 | 같은 항목 | 지우기 | 권한 부족으로 거부 |
 | 슈퍼관리자가 아무것도 갖지 않은 id를 지운다 | 슈퍼관리자 | 없는 id를 지우기 | 대상 없음으로 거부 |
 
 조각이 딸려 있어도 지우기를 막는 검사가 없다. 조각은 데이터베이스가 함께 지우므로 행은
-사라지지만, 그 조각이 권한 그래프에 남긴 자리는 그대로 남는다. 줄을 적기 전에 그 자리를
-어떻게 할 것인지 정한다.
+사라지지만, 그 조각이 권한 그래프에 남긴 자리는 그대로 남는다. 시나리오는 답만 보므로 함께
+사라지는 것은 줄에 적지 않는다. 남는 자리를 어떻게 할 것인지는 따로 정한다.
 
 항목이 사라지면 조각도 사라지므로, 그 뒤의 병합은 그 스코프에 조각이 없었던 것과 같다.
 그 답은 병합 읽기 문서의 조각 없는 줄들이 본다.
@@ -112,4 +115,5 @@ status: draft
 
 ## 아직 적지 않은 것
 
-없다. 어댑터가 내놓는 여섯 호출이 모두 위에 있다.
+어댑터가 내놓는 여섯 호출이 모두 위에 있다. 실행 결과에 남는 `batch_load_fields`는 어댑터
+공통 바탕이 물려주는 필드 읽기이고, 이 엔티티는 필드를 갖지 않아 부를 자리가 없다.
