@@ -21,6 +21,7 @@ from bai_scenario.components.vfolder.callers import (
     SomeoneWhoMadeAFolderThemselves,
     SomeoneWhoseFolderIsGone,
     SomeoneWhoseFolderIsInTheTrash,
+    SomeoneWhoseKeypairClosesTheHost,
 )
 from bai_scenario.components.vfolder.stage import (
     STORAGE_HOST,
@@ -40,7 +41,11 @@ from ai.backend.common.dto.manager.v2.vfolder.response import (
 )
 from ai.backend.manager.api.adapters.vfolder.adapter import VFolderAdapter
 from ai.backend.manager.errors.permission import NotEnoughPermission
-from ai.backend.manager.errors.storage import VFolderAlreadyExists, VFolderInvalidParameter
+from ai.backend.manager.errors.storage import (
+    InsufficientStoragePermission,
+    VFolderAlreadyExists,
+    VFolderInvalidParameter,
+)
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import (
     Answered,
@@ -354,6 +359,34 @@ class ANameAPurgedFolderLeftBehindIsFree(
 
 
 @dataclass(frozen=True)
+class TheKeypairPolicyClosesTheHost(
+    Scenario[SeedingSession, AFolderMakerAndTheirDomain, VFolderAdapter, VFolderNode]
+):
+    @override
+    def summary(self) -> str:
+        return "a-keypair-policy-that-closes-the-host-stops-the-create"
+
+    @override
+    def describe(self) -> str:
+        return (
+            "폴더를 만들 권한은 받았지만 키페어 정책이 그 호스트에서 만들기를 막아둔 사용자가 "
+            "만들려 하면, 권한이 아니라 저장소 쪽이 막는다"
+        )
+
+    @override
+    def given(self) -> Given[SeedingSession, AFolderMakerAndTheirDomain]:
+        return SomeoneWhoseKeypairClosesTheHost()
+
+    @override
+    def when(self) -> When[AFolderMakerAndTheirDomain, VFolderAdapter, VFolderNode]:
+        return MakingAFolder(named="denied-by-host", on_host=STORAGE_HOST)
+
+    @override
+    def then(self) -> Then[AFolderMakerAndTheirDomain, VFolderNode]:
+        return TheCallIsRefused(InsufficientStoragePermission)
+
+
+@dataclass(frozen=True)
 class TheFolderAllowanceIsSpent(
     Scenario[SeedingSession, AFolderAndACaller, VFolderAdapter, VFolderNode]
 ):
@@ -453,6 +486,7 @@ SCENARIOS: list[CreatingStep] = [
     ANameStillHeldByTheTrashIsRefused(),
     ANameAPurgedFolderLeftBehindIsFree(started=datetime.now(UTC)),
     TheFolderAllowanceIsSpent(),
+    TheKeypairPolicyClosesTheHost(),
     NamingAProjectMakesItTheOwner(started=datetime.now(UTC)),
     EnforcementOffLetsAnyoneMakeOne(started=datetime.now(UTC)),
 ]

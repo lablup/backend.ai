@@ -12,6 +12,7 @@ from bai_scenario.components.vfolder.answers import (
     NoAnswer,
 )
 from bai_scenario.components.vfolder.callers import (
+    AProjectFolderTheProjectWouldNotLetGo,
     SomeoneElsesFolder,
     SomeoneElsesTrashedFolderAndABroadGrant,
     SomeoneGrantedOverTheDomainWithAFolder,
@@ -187,6 +188,34 @@ class ThePolicyClosesTheHost(Scenario[SeedingSession, AFolderAndACaller, VFolder
 
 
 @dataclass(frozen=True)
+class TheProjectDoesNotAnswerForDeleting(
+    Scenario[SeedingSession, AFolderAndACaller, VFolderAdapter, Answer]
+):
+    @override
+    def summary(self) -> str:
+        return "deleting-a-project-folder-asks-the-callers-keypair-policy-not-the-project"
+
+    @override
+    def describe(self) -> str:
+        return (
+            "프로젝트가 그 호스트에서 지우기를 막아두어도, 부르는 사람의 키페어 정책이 "
+            "허락하면 그 프로젝트의 폴더가 지워진다"
+        )
+
+    @override
+    def given(self) -> Given[SeedingSession, AFolderAndACaller]:
+        return AProjectFolderTheProjectWouldNotLetGo()
+
+    @override
+    def when(self) -> When[AFolderAndACaller, VFolderAdapter, Answer]:
+        return SendingItToTheTrash()
+
+    @override
+    def then(self) -> Then[AFolderAndACaller, Answer]:
+        return TheFolderIsPointedAt()
+
+
+@dataclass(frozen=True)
 class WhoeverDeletedItBringsItBack(
     Scenario[SeedingSession, AFolderAndACaller, VFolderAdapter, Answer]
 ):
@@ -276,6 +305,7 @@ SCENARIOS: list[RetiringStep] = [
     TheOwnerSendsTheirFolderToTheTrash(),
     AUserGrantedNothingMayNotDeleteIt(),
     ThePolicyClosesTheHost(),
+    TheProjectDoesNotAnswerForDeleting(),
     WhoeverDeletedItBringsItBack(),
     AUserGrantedNothingMayNotRestoreIt(),
     ABroadGrantStillDoesNotReachSomeoneElses(),

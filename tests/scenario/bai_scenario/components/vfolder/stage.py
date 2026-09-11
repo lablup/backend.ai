@@ -25,9 +25,14 @@ MAKING = (Permission.CREATE, Permission.READ)
 READING = (Permission.READ,)
 RETIRING = (Permission.READ, Permission.SOFT_DELETE)
 
-# The one host permission a delete asks the keypair policy for, taken away.
+# The one host permission a delete asks for, taken away.
 WITHOUT_DELETE = tuple(
     one for one in VFolderHostPermission if one is not VFolderHostPermission.DELETE
+)
+
+# The one host permission a create asks for, taken away.
+WITHOUT_CREATE = tuple(
+    one for one in VFolderHostPermission if one is not VFolderHostPermission.CREATE
 )
 
 

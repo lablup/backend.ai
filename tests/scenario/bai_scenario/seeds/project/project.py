@@ -26,6 +26,8 @@ class SeedProject(SeedRowFromTwo[DomainData, ProjectResourcePolicyData, ProjectD
 
     name_hint: str = "project"
     vfolder_hosts: Sequence[str] = field(default_factory=tuple)
+    host_permissions: Sequence[VFolderHostPermission] = tuple(VFolderHostPermission)
+    """What this project may do on those hosts. Everything, until a row narrows it."""
 
     @override
     def kind(self) -> str:
@@ -35,7 +37,11 @@ class SeedProject(SeedRowFromTwo[DomainData, ProjectResourcePolicyData, ProjectD
     def detail(self) -> str:
         if not self.vfolder_hosts:
             return ""
-        return f"이 프로젝트의 폴더는 {', '.join(self.vfolder_hosts)}에 놓을 수 있다"
+        said = f"이 프로젝트의 폴더는 {', '.join(self.vfolder_hosts)}에 놓을 수 있다"
+        if set(self.host_permissions) != set(VFolderHostPermission):
+            named = ", ".join(sorted(one.value for one in self.host_permissions))
+            return f"{said}, 그 호스트에서 할 수 있는 것은 {named}뿐이다"
+        return said
 
     @override
     def name(self, naming: Naming) -> str:
@@ -45,13 +51,14 @@ class SeedProject(SeedRowFromTwo[DomainData, ProjectResourcePolicyData, ProjectD
     def seed(
         self, name: str, first: DomainData, second: ProjectResourcePolicyData
     ) -> ProjectCreator:
+        allowed = VFolderHostPermissionMap()
+        for host in self.vfolder_hosts:
+            allowed[host] = set(self.host_permissions)
         return ProjectCreator(
             name=name,
             domain_id=first.id,
             domain_name=first.name,
             description=f"{name} was already here",
             resource_policy=second.name,
-            allowed_vfolder_hosts=VFolderHostPermissionMap({
-                host: set(VFolderHostPermission) for host in self.vfolder_hosts
-            }),
+            allowed_vfolder_hosts=allowed,
         )

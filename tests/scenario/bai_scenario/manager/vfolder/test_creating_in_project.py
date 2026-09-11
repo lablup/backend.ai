@@ -12,6 +12,7 @@ from bai_scenario.components.vfolder.answers import (
     TheFolderBelongsToTheProject,
 )
 from bai_scenario.components.vfolder.callers import (
+    AProjectThatClosesTheHost,
     SomeoneGrantedNothingOnAProject,
     SomeoneGrantedOnAProject,
     SomeoneNamingTheirPersonalProject,
@@ -154,6 +155,34 @@ class AProjectGrantMakesAProjectFolder(
 
 
 @dataclass(frozen=True)
+class TheProjectClosesTheHost(
+    Scenario[SeedingSession, AProjectAndACaller, VFolderAdapter, VFolderNode]
+):
+    @override
+    def summary(self) -> str:
+        return "a-project-that-closes-the-host-stops-the-create"
+
+    @override
+    def describe(self) -> str:
+        return (
+            "프로젝트가 그 호스트에서 만들기를 막아두면, 부르는 사람의 키페어 정책이 그 "
+            "호스트를 모두 허락하더라도 프로젝트 폴더를 만들 수 없다"
+        )
+
+    @override
+    def given(self) -> Given[SeedingSession, AProjectAndACaller]:
+        return AProjectThatClosesTheHost()
+
+    @override
+    def when(self) -> When[AProjectAndACaller, VFolderAdapter, VFolderNode]:
+        return MakingAFolderUnderTheProject(named="denied-by-host")
+
+    @override
+    def then(self) -> Then[AProjectAndACaller, VFolderNode]:
+        return TheCallIsRefused(InsufficientStoragePermission)
+
+
+@dataclass(frozen=True)
 class NoProjectGrantMakesNoProjectFolder(
     Scenario[SeedingSession, AProjectAndACaller, VFolderAdapter, VFolderNode]
 ):
@@ -184,6 +213,7 @@ class NoProjectGrantMakesNoProjectFolder(
 SCENARIOS: list[CreatingStep] = [
     AProjectGrantMakesAProjectFolder(started=datetime.now(UTC)),
     NoProjectGrantMakesNoProjectFolder(),
+    TheProjectClosesTheHost(),
     APersonalProjectMayNotBeNamed(),
 ]
 

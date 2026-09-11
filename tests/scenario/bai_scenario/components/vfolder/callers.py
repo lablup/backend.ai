@@ -17,6 +17,8 @@ from bai_scenario.components.vfolder.stage import (
     READING,
     RETIRING,
     STORAGE_HOST,
+    WITHOUT_CREATE,
+    WITHOUT_DELETE,
     AFolderAndACaller,
     AFolderMakerAndTheirDomain,
     APersonalProjectAndItsOwner,
@@ -541,6 +543,128 @@ class SomeoneGrantedOnAProject(Given[Any, AProjectAndACaller]):
             )
         await seeding.granting(role, caller, role_id=lambda r: r.id, user_id=lambda u: UserID(u.id))
         return AProjectAndACaller(seeding.made(project), seeding.made(caller))
+
+
+@dataclass(frozen=True)
+class SomeoneWhoseKeypairClosesTheHost(Given[Any, AFolderMakerAndTheirDomain]):
+    """자기 스코프에 생성 권한을 받았지만, 키페어 정책이 그 호스트에서 만들기를 막아둔 사용자.
+
+    개인 폴더가 놓일 호스트를 허락하는 것은 키페어 정책이다.
+    """
+
+    @override
+    def describe(self) -> str:
+        return (
+            "자기 스코프에 생성 권한은 받았지만 키페어 정책이 그 호스트에서 만들기를 막아둔 사용자"
+        )
+
+    @override
+    async def lay(self, seeding: SeedingSession) -> AFolderMakerAndTheirDomain:
+        domain = await seeding.creating(
+            SeedDomain(name_hint="home", description=WAS_HERE, vfolder_hosts=[STORAGE_HOST])
+        )
+        caller = await seeding.within(
+            SomeoneOf(
+                domain,
+                name_hint="granted-user",
+                vfolder_hosts=[STORAGE_HOST],
+                host_permissions=WITHOUT_CREATE,
+            )
+        )
+        role = await seeding.creating_from(
+            SeedRole(lambda u: UserID(u.id), name_hint="folder-role"), caller
+        )
+        for one in MAKING:
+            await seeding.adding(
+                SeedPermission(entity_type=VFolderEntityType(), permission=one), role
+            )
+        await seeding.granting(role, caller, role_id=lambda r: r.id, user_id=lambda u: UserID(u.id))
+        return AFolderMakerAndTheirDomain(seeding.made(domain), seeding.made(caller))
+
+
+@dataclass(frozen=True)
+class AProjectThatClosesTheHost(Given[Any, AProjectAndACaller]):
+    """그 호스트에서 만들기를 막아둔 프로젝트와, 거기에 생성 권한을 받은 사용자.
+
+    부르는 사람의 키페어 정책은 그 호스트를 전부 허락한다. 프로젝트 폴더가 놓일 호스트를
+    답하는 것이 프로젝트 행이라는 것을 보는 자리다.
+    """
+
+    @override
+    def describe(self) -> str:
+        return "그 호스트에서 만들기를 막아둔 프로젝트와, 거기에 생성 권한을 받은 사용자"
+
+    @override
+    async def lay(self, seeding: SeedingSession) -> AProjectAndACaller:
+        domain = await seeding.creating(
+            SeedDomain(name_hint="home", description=WAS_HERE, vfolder_hosts=[STORAGE_HOST])
+        )
+        policy = await seeding.once(SeedProjectPolicy())
+        project = await seeding.creating_from_two(
+            SeedProject(
+                name_hint="team",
+                vfolder_hosts=[STORAGE_HOST],
+                host_permissions=WITHOUT_CREATE,
+            ),
+            domain,
+            policy,
+        )
+        caller = await seeding.within(
+            SomeoneOf(domain, name_hint="granted-user", vfolder_hosts=[STORAGE_HOST])
+        )
+        role = await seeding.creating_from(
+            SeedRole(lambda p: ProjectID(p.id), name_hint="folder-role"), project
+        )
+        for one in MAKING:
+            await seeding.adding(
+                SeedPermission(entity_type=VFolderEntityType(), permission=one), role
+            )
+        await seeding.granting(role, caller, role_id=lambda r: r.id, user_id=lambda u: UserID(u.id))
+        return AProjectAndACaller(seeding.made(project), seeding.made(caller))
+
+
+@dataclass(frozen=True)
+class AProjectFolderTheProjectWouldNotLetGo(Given[Any, AFolderAndACaller]):
+    """그 호스트에서 지우기를 막아둔 프로젝트가 가진 폴더와, 그것을 지울 사용자.
+
+    부르는 사람의 키페어 정책은 지우기를 허락한다. 지우기가 어느 쪽을 묻는지 보는 자리다.
+    """
+
+    @override
+    def describe(self) -> str:
+        return "그 호스트에서 지우기를 막아둔 프로젝트가 가진 폴더와, 키페어 정책은 지우기를 허락받은 사용자"
+
+    @override
+    async def lay(self, seeding: SeedingSession) -> AFolderAndACaller:
+        domain = await seeding.creating(
+            SeedDomain(name_hint="home", description=WAS_HERE, vfolder_hosts=[STORAGE_HOST])
+        )
+        policy = await seeding.once(SeedProjectPolicy())
+        project = await seeding.creating_from_two(
+            SeedProject(
+                name_hint="team",
+                vfolder_hosts=[STORAGE_HOST],
+                host_permissions=WITHOUT_DELETE,
+            ),
+            domain,
+            policy,
+        )
+        caller = await seeding.within(
+            SomeoneOf(domain, name_hint="granted-user", vfolder_hosts=[STORAGE_HOST])
+        )
+        role = await seeding.creating_from(
+            SeedRole(lambda d: DomainID(d.id), name_hint="folder-role"), domain
+        )
+        for one in RETIRING:
+            await seeding.adding(
+                SeedPermission(entity_type=VFolderEntityType(), permission=one), role
+            )
+        await seeding.granting(role, caller, role_id=lambda r: r.id, user_id=lambda u: UserID(u.id))
+        folder = await seeding.creating_from_two(
+            SeedProjectFolderOf(host=STORAGE_HOST), caller, project
+        )
+        made = seeding.made(caller)
+        return AFolderAndACaller(seeding.made(folder), made, made)
 
 
 @dataclass(frozen=True)

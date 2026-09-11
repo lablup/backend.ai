@@ -353,6 +353,33 @@ Then
   - quota: 무시함 — 저장소가 답하는 값이라 여기서 말할 수 없다
   - metadata.created_at: 이 실행이 쓴 시각
 
+#### [a-keypair-policy-that-closes-the-host-stops-the-create](/tests/scenario/bai_scenario/manager/vfolder/test_creating.py) — pass
+
+폴더를 만들 권한은 받았지만 키페어 정책이 그 호스트에서 만들기를 막아둔 사용자가 만들려 하면, 권한이 아니라 저장소 쪽이 막는다
+
+Given
+
+- 자기 스코프에 생성 권한은 받았지만 키페어 정책이 그 호스트에서 만들기를 막아둔 사용자
+  - 도메인 home-1: 이 도메인의 폴더는 local:volume1에 놓을 수 있다
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지, 폴더는 local:volume1에 놓을 수 있다, 그 호스트에서 할 수 있는 것은 delete-vfolder, download-file, invite-others, modify-vfolder, mount-in-session, set-user-specific-permission, upload-file뿐이다
+    - 일반 사용자 granted-user-1: 자기 키와 개인 프로젝트를 갖는다
+  - 역할 folder-role-1: 이 역할이 앉은 스코프 안에서만 통한다
+  - 역할 folder-role-1: vfolder 전체에 CREATE 허용
+  - 역할 folder-role-1: vfolder 전체에 READ 허용
+  - 일반 사용자 granted-user-1: 역할 folder-role-1 보유
+
+When
+
+- VFolderAdapter.create — granted-user-1이 local:volume1에 denied-by-host이라는 폴더를 만듦
+
+Then
+
+- 거부된다
+  - 거부: InsufficientStoragePermission
+
 #### [a-name-a-purged-folder-left-behind-can-be-taken-again](/tests/scenario/bai_scenario/manager/vfolder/test_creating.py) — pass
 
 저장소에서 완전히 사라진 폴더와 같은 이름으로 만들면, 그 이름은 이미 풀려 있으므로 그 이름을 쓴 새 폴더가 만들어진다
@@ -603,6 +630,34 @@ Then
   - metadata.created_at: 이 실행이 쓴 시각
 
 ### creating_in_project
+
+#### [a-project-that-closes-the-host-stops-the-create](/tests/scenario/bai_scenario/manager/vfolder/test_creating_in_project.py) — pass
+
+프로젝트가 그 호스트에서 만들기를 막아두면, 부르는 사람의 키페어 정책이 그 호스트를 모두 허락하더라도 프로젝트 폴더를 만들 수 없다
+
+Given
+
+- 그 호스트에서 만들기를 막아둔 프로젝트와, 거기에 생성 권한을 받은 사용자
+  - 도메인 home-1: 이 도메인의 폴더는 local:volume1에 놓을 수 있다
+  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+  - 프로젝트 team-1: 이 프로젝트의 폴더는 local:volume1에 놓을 수 있다, 그 호스트에서 할 수 있는 것은 delete-vfolder, download-file, invite-others, modify-vfolder, mount-in-session, set-user-specific-permission, upload-file뿐이다
+  - 도메인에 속한 사용자 한 명 준비
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지, 폴더는 local:volume1에 놓을 수 있다
+    - 일반 사용자 granted-user-1: 자기 키와 개인 프로젝트를 갖는다
+  - 역할 folder-role-1: 이 역할이 앉은 스코프 안에서만 통한다
+  - 역할 folder-role-1: vfolder 전체에 CREATE 허용
+  - 역할 folder-role-1: vfolder 전체에 READ 허용
+  - 일반 사용자 granted-user-1: 역할 folder-role-1 보유
+
+When
+
+- VFolderAdapter.create_in_project — granted-user-1이 team-1 아래 denied-by-host이라는 폴더를 만듦
+
+Then
+
+- 거부된다
+  - 거부: InsufficientStoragePermission
 
 #### [a-user-granted-nothing-on-the-project-may-not-make-a-folder-there](/tests/scenario/bai_scenario/manager/vfolder/test_creating_in_project.py) — pass
 
@@ -1025,6 +1080,35 @@ Then
 
 - 거부된다
   - 거부: NotEnoughPermission
+
+#### [deleting-a-project-folder-asks-the-callers-keypair-policy-not-the-project](/tests/scenario/bai_scenario/manager/vfolder/test_retiring.py) — pass
+
+프로젝트가 그 호스트에서 지우기를 막아두어도, 부르는 사람의 키페어 정책이 허락하면 그 프로젝트의 폴더가 지워진다
+
+Given
+
+- 그 호스트에서 지우기를 막아둔 프로젝트가 가진 폴더와, 키페어 정책은 지우기를 허락받은 사용자
+  - 도메인 home-1: 이 도메인의 폴더는 local:volume1에 놓을 수 있다
+  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+  - 프로젝트 team-1: 이 프로젝트의 폴더는 local:volume1에 놓을 수 있다, 그 호스트에서 할 수 있는 것은 create-vfolder, download-file, invite-others, modify-vfolder, mount-in-session, set-user-specific-permission, upload-file뿐이다
+  - 도메인에 속한 사용자 한 명 준비
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지, 폴더는 local:volume1에 놓을 수 있다
+    - 일반 사용자 granted-user-1: 자기 키와 개인 프로젝트를 갖는다
+  - 역할 folder-role-1: 이 역할이 앉은 스코프 안에서만 통한다
+  - 역할 folder-role-1: vfolder 전체에 READ 허용
+  - 역할 folder-role-1: vfolder 전체에 SOFT_DELETE 허용
+  - 일반 사용자 granted-user-1: 역할 folder-role-1 보유
+  - 프로젝트 폴더 project-folder-1: 프로젝트가 소유하고, 개인 소유자는 없다
+
+When
+
+- VFolderAdapter.delete — granted-user-1이 project-folder-1을 지움
+
+Then
+
+- 답이 그 폴더를 가리킨다
+  - id: 심어둔 폴더와 같다
 
 #### [whoever-sent-a-folder-to-the-trash-brings-it-back](/tests/scenario/bai_scenario/manager/vfolder/test_retiring.py) — pass
 
