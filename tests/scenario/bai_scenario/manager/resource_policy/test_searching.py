@@ -9,6 +9,7 @@ import pytest
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.resource_policy import (
     FAMILIES,
+    KEYPAIR,
     EveryLaidPolicyIsFound,
     Family,
     ManyPoliciesAndACaller,
@@ -24,7 +25,16 @@ from ai.backend.common.data.user.types import UserRole
 from ai.backend.manager.api.adapters.resource_policy.adapter import ResourcePolicyAdapter
 from ai.backend.manager.errors.auth import InsufficientPrivilege
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.scenario_steps import Given, Scenario, Then, When
+from ai.backend.testutils.scenario_steps import (
+    Answered,
+    Given,
+    Refused,
+    Same,
+    Scenario,
+    Then,
+    Verdict,
+    When,
+)
 
 type SearchingStep = Scenario[
     SeedingSession, ManyPoliciesAndACaller[Any], ResourcePolicyAdapter, Searched
@@ -73,6 +83,47 @@ class SearchingByName(When[ManyPoliciesAndACaller[Any], ResourcePolicyAdapter, S
     ) -> Searched:
         with ActingAs(laid.caller):
             return await self.family.search(adapter, named=laid.named.name)
+
+
+@dataclass(frozen=True)
+class SearchingByHolder(When[ManyPoliciesAndACaller[Any], ResourcePolicyAdapter, Searched]):
+    """부르는 사람 자신의 키페어가 매인 정책으로 걸러 검색한다."""
+
+    @override
+    def operation(self) -> str:
+        return KEYPAIR.calls.search
+
+    @override
+    def describe(self, laid: ManyPoliciesAndACaller[Any]) -> str:
+        return f"{laid.caller.username}이 자기 키페어로 걸러 검색"
+
+    @override
+    async def call(
+        self, adapter: ResourcePolicyAdapter, laid: ManyPoliciesAndACaller[Any]
+    ) -> Searched:
+        with ActingAs(laid.caller):
+            return await KEYPAIR.search_held_by(adapter, laid.caller.id)
+
+
+@dataclass(frozen=True)
+class OnlyTheHeldOneIsFound(Then[ManyPoliciesAndACaller[Any], Searched]):
+    """부르는 사람의 키페어가 매인 그 하나만 온다."""
+
+    @override
+    def says(self) -> str:
+        return "부르는 사람의 키페어가 매인 키페어 정책 하나만 온다"
+
+    @override
+    def look(
+        self, laid: ManyPoliciesAndACaller[Any], answered: Answered[Searched]
+    ) -> list[Verdict]:
+        payload = answered.response
+        if payload is None:
+            return [Refused(InsufficientPrivilege, answered.raised)]
+        return [
+            Same("items", [one.name for one in payload.items], [laid.held.name]),
+            Same("total_count", payload.total_count, 1),
+        ]
 
 
 @dataclass(frozen=True)
@@ -136,6 +187,34 @@ class FilteringByNameLeavesThatOne(
 
 
 @dataclass(frozen=True)
+class FilteringByHolderLeavesTheirs(
+    Scenario[SeedingSession, ManyPoliciesAndACaller[Any], ResourcePolicyAdapter, Searched]
+):
+    @override
+    def summary(self) -> str:
+        return "filtering-keypair-policy-search-by-a-user-leaves-the-one-their-keypair-holds"
+
+    @override
+    def describe(self) -> str:
+        return (
+            "키페어 정책 여럿이 있고 슈퍼관리자가 어느 사용자의 키페어로 걸러 검색하면, "
+            "그 사용자의 키페어가 매인 정책만 온다"
+        )
+
+    @override
+    def given(self) -> Given[SeedingSession, ManyPoliciesAndACaller[Any]]:
+        return ManyPoliciesAndSomeone(KEYPAIR, role=UserRole.SUPERADMIN)
+
+    @override
+    def when(self) -> When[ManyPoliciesAndACaller[Any], ResourcePolicyAdapter, Searched]:
+        return SearchingByHolder()
+
+    @override
+    def then(self) -> Then[ManyPoliciesAndACaller[Any], Searched]:
+        return OnlyTheHeldOneIsFound()
+
+
+@dataclass(frozen=True)
 class AMonitorFindsEveryOne(
     Scenario[SeedingSession, ManyPoliciesAndACaller[Any], ResourcePolicyAdapter, Searched]
 ):
@@ -195,6 +274,7 @@ class APlainUserMayNotSearch(
 SCENARIOS: list[SearchingStep] = [
     *(TheSuperadminFindsEveryOne(family) for family in FAMILIES),
     *(FilteringByNameLeavesThatOne(family) for family in FAMILIES),
+    FilteringByHolderLeavesTheirs(),
     *(AMonitorFindsEveryOne(family) for family in FAMILIES),
     *(APlainUserMayNotSearch(family) for family in FAMILIES),
 ]
