@@ -12,6 +12,14 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import Any, override
 
+from bai_scenario.seeds.domain.domain import SeedDomain
+from bai_scenario.seeds.rbac.role import SeedPermission, SeedRole
+from bai_scenario.seeds.resource_policy.keypair import SeedKeypairPolicy
+from bai_scenario.seeds.resource_policy.project import SeedProjectPolicy
+from bai_scenario.seeds.resource_policy.user import SeedUserPolicy
+from bai_scenario.seeds.seeder import Laid, Seeder, SeedNest
+from bai_scenario.seeds.user.user import SeedUserOf
+
 from ai.backend.common.data.entity.domain import DomainEntityType
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.user.types import UserRole
@@ -31,13 +39,6 @@ from ai.backend.testutils.scenario_steps import (
     Then,
     Verdict,
 )
-from bai_scenario.seeds.domain.domain import SeedDomain
-from bai_scenario.seeds.rbac.role import SeedPermission, SeedRole
-from bai_scenario.seeds.resource_policy.keypair import SeedKeypairPolicy
-from bai_scenario.seeds.resource_policy.project import SeedProjectPolicy
-from bai_scenario.seeds.resource_policy.user import SeedUserPolicy
-from bai_scenario.seeds.seeder import Laid, Seeder, SeedNest
-from bai_scenario.seeds.user.user import SeedUserOf
 
 WAS_HERE = "이미 있던 도메인"
 """시드가 심는 도메인의 설명. 시나리오가 기대값으로 다시 쓰므로 한 자리에 둔다."""
@@ -252,6 +253,7 @@ class SomeoneOf(SeedNest[Laid[UserData]]):
     domain: Laid[DomainData]
     role: UserRole = UserRole.USER
     vfolder_hosts: Sequence[str] = ()
+    max_vfolder_count: int = 10
 
     @override
     def kind(self) -> str:
@@ -260,7 +262,7 @@ class SomeoneOf(SeedNest[Laid[UserData]]):
     @override
     def lay(self, seed: Seeder) -> Laid[UserData]:
         seed.once(SeedProjectPolicy())
-        policy = seed.creating(SeedUserPolicy())
+        policy = seed.creating(SeedUserPolicy(max_vfolder_count=self.max_vfolder_count))
         key_policy = seed.creating(SeedKeypairPolicy(vfolder_hosts=self.vfolder_hosts))
         return seed.provisioning(SeedUserOf(role=self.role), self.domain, policy, key_policy)
 

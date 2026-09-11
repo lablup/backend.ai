@@ -1,37 +1,71 @@
 ---
 name: vfolder-adapter-scenarios
+description: vfolder adapter guarantees as scenarios; folder creation under the caller's own scope or a project scope, the defaults an omitted field takes, and the deletion states that free a folder name
 type: reference
-description: what the vfolder adapter guarantees, as scenarios; the tests in tests/scenario/bai_scenario/manager/vfolder match these
 scope: src/ai/backend/manager/api/adapters/vfolder
-keywords: [vfolder, scenario, adapter, rbac, ownership]
+keywords: [vfolder, scenario, adapter, rbac, enforcement, scope, project, folder-name, trash]
 generated:
   by: claude-code/opus-5
-  at: 2026-09-10
+  at: 2026-09-11
 status: draft
 ---
 # 폴더 어댑터 — 시나리오
 
-규칙은 상위 디렉터리의 `AGENTS.md`에 있다.
+규칙은 상위 디렉터리의 `AGENTS.md`에 있다. 여기 적힌 내용과 실행 결과가 어긋나면 문장 쪽을
+먼저 의심한다.
 
-개인 폴더는 만든 사람의 스코프에 생긴다. 그래서 폴더를 만들 권한은 그 사용자 자신에게
-걸린다. 폴더가 놓일 스토리지 호스트는 도메인과 키페어 정책이 함께 허용해야 한다.
+폴더는 언제나 어떤 스코프 안에 만들어진다. 개인 폴더는 만든 사람 본인의 스코프에, 프로젝트
+폴더는 그 프로젝트의 스코프에 생긴다. 그래서 도메인과 달리 권한을 받은 일반 사용자로 세우는
+시나리오가 성립하고, 권한을 확인하는 시나리오의 호출자는 superadmin이 아니다.
+
+만들기를 막는 것은 요청이 지정한 스코프의 권한이다 — 개인 폴더는 호출자 본인, 프로젝트
+폴더는 그 프로젝트다. RBAC enforcement를 끄면 이 검사는 통과한다. 어떤 요청이 어떤 권한을
+요구하는지는 액션 레이어의 `KNOWLEDGE.md`에 있다.
+
+**여기서 받은 권한은 만들기까지만 미친다.** 개인 폴더는 그 사람의 개인 프로젝트 안에
+만들어지고, 만들어진 뒤에는 그 프로젝트를 기준으로 권한을 판정한다. 그래서 호출자 본인
+스코프에 받은 권한으로는 이미 만들어진 폴더를 읽거나 지울 수 없다.
 
 ## 만들기
 
 | 시나리오 | 상황 | 요청 | 결과 |
 |---|---|---|---|
-| 권한을 받은 사용자가 만든다 | 자기 스코프에 폴더 생성 권한 | 만들기 | 소유가 그 사용자에게 있음 |
-| 아무 권한도 받지 않은 사용자가 만든다 | 권한 없음 | 만들기 | 권한 부족으로 거부 |
+| 내 폴더로 만든다 | 호출자 본인 스코프에 생성 권한 | 호스트를 지정해 만들기 | 그 사용자가 소유자인 폴더 전체 |
+| 프로젝트를 지정해 프로젝트 폴더로 만든다 | 그 프로젝트에 생성 권한 | 프로젝트를 지정해 만들기 | 소유자가 그 프로젝트인 폴더, 개인 소유자는 없음 |
+| 이름만 주고 만든다 | 호출자 본인 스코프에 생성 권한 | 이름만 주고 만들기 | 지정하지 않은 값은 기본값이 되고, 폴더는 기본 호스트에 놓인다 |
+| 아무 권한도 받지 않은 사용자가 만든다 | 호출자 본인 스코프에 아무 권한도 없음 | 만들기 | 권한 부족으로 거부 |
+| RBAC enforcement를 끄면 권한 없이도 만들어진다 | RBAC enforcement 꺼짐, 호출자 본인 스코프에 아무 권한도 없음 | 만들기 | 만들어진다 |
+| 자원 정책의 허용 개수를 다 쓴 사용자가 만든다 | 호출자 본인 스코프에 생성 권한, 폴더를 하나만 허용하는 사용자 자원 정책, 이미 하나 보유 | 만들기 | 허용 개수를 넘어 거부 |
+| 살아 있는 폴더의 이름으로 만든다 | 같은 이름의 자기 폴더가 하나 있음 | 그 이름으로 만들기 | 이름이 중복되어 거부 |
+| 휴지통에 있는 폴더의 이름으로 만든다 | 같은 이름의 자기 폴더를 휴지통에 보내 둠 | 그 이름으로 만들기 | 이름이 중복되어 거부 |
+| 완전히 사라진 폴더의 이름으로 만든다 | 같은 이름의 자기 폴더가 저장소에서 완전히 사라짐 | 그 이름으로 만들기 | 그 이름을 쓴 새 폴더가 만들어진다 |
 
-## 조회
+이름은 한 프로젝트 안에서 한 번만 설 수 있는데, 그 판정에서 빠지는 상태는 저장소에서 완전히
+사라진 것뿐이다. 휴지통에 있는 동안에는 이름이 아직 잡혀 있다. 되살리면 그 이름으로 돌아와야
+하기 때문이다.
+
+## 프로젝트에 만들기
 
 | 시나리오 | 상황 | 요청 | 결과 |
 |---|---|---|---|
-| 폴더를 만든 적 없는 사용자가 자기 것을 본다 | 폴더 없음 | 자기 폴더 조회 | 비어 있음 |
+| 프로젝트 권한을 받은 사용자가 만든다 | 그 프로젝트에 생성 권한 | 프로젝트 아래 만들기 | 소유자가 그 프로젝트인 폴더 전체 |
+| 아무 권한도 받지 않은 사용자가 만든다 | 그 프로젝트에 아무 권한도 없음 | 프로젝트 아래 만들기 | 권한 부족으로 거부 |
 
 ## 아직 적지 않은 것
 
-`admin_search`, `batch_load_by_ids`, `batch_load_fields`, `bulk_delete`, `bulk_purge`,
-`clone`, `create_download_session`, `create_in_project`, `create_upload_session`,
-`delete`, `delete_files`, `deploy`, `get`, `get_folder_usage`, `list_files`, `mkdir`,
-`move_file`, `project_search`, `purge`, `restore`.
+개인 프로젝트를 지정해 폴더를 만들려는 요청은 거부되어야 하지만, 그 프로젝트의 id를 앞
+단계에서 읽을 방법이 없어 시나리오를 만들지 못했다. 사용자 생성이 함께 만들어진 개인
+프로젝트까지 돌려주게 되면 그때 추가한다.
+
+아래 여덟 개는 스토리지를 거치지 않는 나머지 호출이다. 만들기와 같은 방식으로 이어서 적는다.
+
+`get`, `my_search`, `project_search`, `admin_search`, `batch_load_by_ids`, `delete`,
+`restore`, `bulk_delete`.
+
+아래 열한 개는 폴더 안의 파일을 다루거나 스토리지 프록시를 거치는 호출이다. 따로 조사한다.
+
+`clone`, `create_download_session`, `create_upload_session`, `delete_files`, `deploy`,
+`get_folder_usage`, `list_files`, `mkdir`, `move_file`, `purge`, `bulk_purge`.
+
+`batch_load_fields`는 모든 어댑터가 물려받는 공용 도우미일 뿐 이 엔티티의 호출이 아니다.
+실행 보고서에는 함께 집계되지만 여기에 적을 내용은 없다.
