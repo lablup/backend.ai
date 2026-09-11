@@ -161,6 +161,53 @@ Then
 
 ### scoped_searching
 
+#### [a-record-tagged-with-a-scope-is-found-by-searching-that-scope](/tests/scenario/bai_scenario/manager/audit_log/test_scoped_searching.py) — pass
+
+다른 엔티티에 대한 기록이 한 프로젝트를 스코프로 달고 있을 때 그 프로젝트를 지목해 검색하면, 대상 엔티티가 그 프로젝트가 아니어도 그 기록이 온다
+
+Given
+
+- 다른 엔티티에 대한 기록이 한 프로젝트를 스코프로 달고 있고, 그 프로젝트에 읽기 권한을 받은 사용자 한 명
+  - 도메인 home-1
+  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+  - 프로젝트 team-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+    - 일반 사용자 user-2: 자기 키와 개인 프로젝트를 갖는다
+  - 일반 사용자 user-1: 'linked' 기록, 스코프 1개 달림
+  - 역할 record-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
+  - 역할 record-reader-1: project 전체에 READ 허용
+  - 일반 사용자 user-2: 역할 record-reader-1 보유
+
+When
+
+- AuditLogAdapter.scoped_search — user-2이 엔티티를 지정해 검색
+
+Then
+
+- 지정한 기록이 순서대로, 그리고 그것만 반환된다
+  - item_count = 1
+  - total_count = 1
+  - has_next_page = False
+  - has_previous_page = False
+  - id: 무시함 — 데이터베이스가 만든다
+  - action_id: 무시함 — 실행마다 새로 생성된다
+  - operation = 'linked'
+  - entity_type = 'user'
+  - entity_id: 기록의 대상 엔티티와 같다
+  - status = <AuditLogStatus.SUCCESS: 'success'>
+  - description = 'linked was recorded'
+  - created_at = datetime.datetime(2026, 1, 2, 0, 0, tzinfo=datetime.timezone.utc)
+  - request_id = None
+  - acted_as = None
+  - duration = None
+  - client_ip = None
+  - triggered_by = None
+
 #### [a-scope-id-that-is-not-an-entity-id-is-refused](/tests/scenario/bai_scenario/manager/audit_log/test_scoped_searching.py) — pass
 
 지정한 id가 id 형식이 아니면, 잘못된 입력으로 거부된다
