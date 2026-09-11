@@ -1,7 +1,7 @@
-"""정책 지우기 — soft-delete 없이 행을 바로 없앤다.
+"""정책 삭제 — soft-delete 없이 행을 바로 지운다.
 
-지우기 spec에는 충돌 검사가 없다. 아직 쓰이는 정책을 막는 것은 데이터베이스의 외래 키라,
-거부가 저장소의 제약 위반 오류로 온다.
+삭제 spec에는 충돌 검사가 없다. 아직 사용 중인 정책의 삭제를 막는 것은 데이터베이스의 외래
+키이므로, 거부가 저장소의 제약 위반 오류로 온다.
 """
 
 from __future__ import annotations
@@ -44,7 +44,7 @@ NOBODY = "nobody"
 
 @dataclass(frozen=True)
 class Purged:
-    """지운 뒤 남은 것. 답한 이름과, 그 이름으로 다시 검색했을 때 세어진 수."""
+    """삭제 뒤의 상태. 응답에 담긴 이름과, 그 이름으로 다시 검색했을 때의 건수."""
 
     name: str
     left: int
@@ -55,7 +55,7 @@ type RetiringStep = Scenario[SeedingSession, APolicyAndACaller[Any], ResourcePol
 
 @dataclass(frozen=True)
 class Purging(When[APolicyAndACaller[Any], ResourcePolicyAdapter, Purged]):
-    """정책을 지우고, 같은 이름으로 다시 검색한다. 이름을 대지 않으면 심은 정책을 지운다."""
+    """정책을 삭제하고 같은 이름으로 다시 검색한다. 이름을 지정하지 않으면 미리 만들어 둔 정책을 삭제한다."""
 
     family: Family[Any, Any]
     named: str | None = None
@@ -66,7 +66,7 @@ class Purging(When[APolicyAndACaller[Any], ResourcePolicyAdapter, Purged]):
 
     @override
     def describe(self, laid: APolicyAndACaller[Any]) -> str:
-        return f"{laid.caller.username}이 {self.named or laid.policy.name}을 지우고 다시 검색"
+        return f"{laid.caller.username}이 {self.named or laid.policy.name} 삭제 후 같은 이름으로 다시 검색"
 
     @override
     async def call(self, adapter: ResourcePolicyAdapter, laid: APolicyAndACaller[Any]) -> Purged:
@@ -79,11 +79,11 @@ class Purging(When[APolicyAndACaller[Any], ResourcePolicyAdapter, Purged]):
 
 @dataclass(frozen=True)
 class TheNameIsAnsweredAndGone(Then[APolicyAndACaller[Any], Purged]):
-    """지운 이름이 답으로 오고, 그 이름으로는 더 찾을 수 없다."""
+    """삭제한 이름이 응답에 담기고, 그 이름으로는 더 이상 검색되지 않는다."""
 
     @override
     def says(self) -> str:
-        return "지운 이름이 답으로 오고 다시 검색하면 없다"
+        return "삭제한 이름이 반환되고 다시 검색하면 없다"
 
     @override
     def look(self, laid: APolicyAndACaller[Any], answered: Answered[Purged]) -> list[Verdict]:
@@ -109,8 +109,8 @@ class TheSuperadminPurgesAnUnusedPolicy(
     @override
     def describe(self) -> str:
         return (
-            f"아무도 쓰지 않는 {self.family.kind}을 슈퍼관리자가 지우면, 지운 이름이 답으로 "
-            "오고 이어서 검색하면 없다"
+            f"아무도 사용하지 않는 {self.family.kind}을 슈퍼관리자가 삭제하면, 삭제한 이름이 "
+            "반환되고 이어서 검색하면 없다"
         )
 
     @override
@@ -139,8 +139,8 @@ class APolicyStillHeldIsRefused(
     @override
     def describe(self) -> str:
         return (
-            f"누군가 아직 매여 있는 {self.family.kind}을 슈퍼관리자가 지우려 하면, "
-            "아직 참조된다는 이유로 거부된다. 막는 것은 지우기 spec이 아니라 외래 키다"
+            f"아직 누군가에게 할당된 {self.family.kind}을 슈퍼관리자가 삭제하려 하면, "
+            "아직 참조 중이라는 이유로 거부된다. 막는 것은 삭제 spec이 아니라 외래 키다"
         )
 
     @override
@@ -169,8 +169,8 @@ class AUserGrantedNothingMayNotPurge(
     @override
     def describe(self) -> str:
         return (
-            f"같은 {self.family.kind}이 있고 아무 권한도 받지 않은 사용자가 지우려 하면, "
-            "지우기 문에 닿기 전에 이름을 해석할 수 없다는 이유로 거부된다"
+            f"같은 {self.family.kind}이 있고 아무 권한도 없는 사용자가 삭제하려 하면, "
+            "삭제 로직에 이르기 전에 정책을 찾을 수 없다는 이유로 거부된다"
         )
 
     @override
@@ -199,8 +199,8 @@ class ANameNothingAnswersToIsUnresolvable(
     @override
     def describe(self) -> str:
         return (
-            f"슈퍼관리자가 어느 {self.family.kind}도 갖지 않은 이름을 지우려 하면, "
-            "이름을 해석할 수 없다는 이유로 거부된다"
+            f"슈퍼관리자가 어느 {self.family.kind}에도 없는 이름을 삭제하려 하면, "
+            "정책을 찾을 수 없다는 이유로 거부된다"
         )
 
     @override

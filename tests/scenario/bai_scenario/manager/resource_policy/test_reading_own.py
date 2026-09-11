@@ -1,6 +1,6 @@
-"""자기 정책 읽기 — 부르는 사람 자신의 스코프에 걸린 권한이 지킨다.
+"""자기 정책 조회 — 호출자 자신의 스코프에 부여된 권한으로 보호된다.
 
-요청을 받지 않고 부르는 사람이 곧 입력이다. 사용자 정책은 그 사람의 행이 바로 가리킨다.
+요청 본문이 없고 호출자 자신이 곧 입력이다. 사용자 정책은 사용자 행이 직접 가리킨다.
 """
 
 from __future__ import annotations
@@ -41,7 +41,7 @@ type OwnStep = Scenario[SeedingSession, APolicyAndACaller[Any], ResourcePolicyAd
 
 @dataclass(frozen=True)
 class ReadingMine(When[APolicyAndACaller[Any], ResourcePolicyAdapter, Any]):
-    """부르는 사람 자신의 정책을 읽는다. 요청은 없다."""
+    """호출자 자신의 정책을 조회한다. 요청 본문은 없다."""
 
     family: OwnFamily[Any, Any]
 
@@ -74,7 +74,7 @@ class TheGrantedUserReadsTheirOwn(
     def describe(self) -> str:
         return (
             f"자기 스코프에서 {self.family.kind}을 읽을 권한을 받은 사용자가 자기 정책을 "
-            "조회하면, 그 사람이 매인 정책 전체가 답으로 온다"
+            "조회하면, 그 사용자에게 할당된 정책 전체가 반환된다"
         )
 
     @override
@@ -103,8 +103,8 @@ class AUserGrantedNothingMayNotReadTheirOwn(
     @override
     def describe(self) -> str:
         return (
-            f"아무 권한도 받지 않은 사용자가 자기 {self.family.kind}을 조회하면 권한 부족으로 "
-            "거부된다. 자기 것을 읽는 호출도 범위만 좁히지 않고 권한을 본다"
+            f"아무 권한도 없는 사용자가 자기 {self.family.kind}을 조회하면 권한 부족으로 "
+            "거부된다. 자기 정책을 읽는 호출도 범위만 좁히는 것이 아니라 권한을 검사한다"
         )
 
     @override
@@ -134,8 +134,8 @@ class EnforcementOffOpensTheirOwn(
     @override
     def describe(self) -> str:
         return (
-            f"엔티티 권한 집행을 끄면 아무 권한도 받지 않은 사용자도 자기 {self.family.kind}을 "
-            "읽을 수 있다. 이 문은 권한 그래프가 지키기 때문이다"
+            f"권한 검사를 끄면 아무 권한도 없는 사용자도 자기 {self.family.kind}을 "
+            "조회할 수 있다. 이 호출은 권한 그래프로 보호되기 때문이다"
         )
 
     @override

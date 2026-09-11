@@ -1,7 +1,8 @@
-"""정책을 이름으로 읽기 — 누가 읽을 수 있고, 이름이 무엇을 숨기는가.
+"""정책을 이름으로 조회 — 누가 조회할 수 있고, 이름이 무엇을 숨기는가.
 
-이름을 해석하는 단계가 먼저 돌고, 없는 이름과 권한이 닿지 않는 이름을 같은 이유로
-거부한다. 슈퍼관리자에게도 같아서 대상 없음으로 거부되는 줄이 없다.
+이름을 정책으로 풀어내는 단계가 먼저 실행되고, 존재하지 않는 이름과 권한이 미치지 않는
+이름을 같은 이유로 거부한다. 슈퍼관리자에게도 동일하므로 "대상 없음"으로 거부되는
+시나리오가 따로 없다.
 """
 
 from __future__ import annotations
@@ -44,7 +45,7 @@ type ReadingStep = Scenario[SeedingSession, APolicyAndACaller[Any], ResourcePoli
 
 @dataclass(frozen=True)
 class ReadingByName(When[APolicyAndACaller[Any], ResourcePolicyAdapter, Any]):
-    """이름으로 읽는다. 이름을 대지 않으면 심은 정책의 이름을 쓴다."""
+    """이름으로 조회한다. 이름을 지정하지 않으면 미리 만들어 둔 정책의 이름을 쓴다."""
 
     family: Family[Any, Any]
     named: str | None = None
@@ -55,7 +56,7 @@ class ReadingByName(When[APolicyAndACaller[Any], ResourcePolicyAdapter, Any]):
 
     @override
     def describe(self, laid: APolicyAndACaller[Any]) -> str:
-        return f"{laid.caller.username}이 {self.named or laid.policy.name}으로 조회"
+        return f"{laid.caller.username}이 {self.named or laid.policy.name} 이름으로 조회"
 
     @override
     async def call(self, adapter: ResourcePolicyAdapter, laid: APolicyAndACaller[Any]) -> Any:
@@ -78,7 +79,7 @@ class TheSuperadminReadsItByName(
     def describe(self) -> str:
         return (
             f"{self.family.kind} 하나가 있고 슈퍼관리자가 이름으로 조회하면, "
-            "그 정책 전체가 답으로 온다"
+            "그 정책 전체가 반환된다"
         )
 
     @override
@@ -107,8 +108,8 @@ class AUserGrantedNothingMayNotRead(
     @override
     def describe(self) -> str:
         return (
-            f"같은 {self.family.kind}이 있고 아무 권한도 받지 않은 사용자가 이름으로 조회하면, "
-            "이름을 해석할 수 없다는 이유로 거부된다"
+            f"같은 {self.family.kind}이 있고 아무 권한도 없는 사용자가 이름으로 조회하면, "
+            "정책을 찾을 수 없다는 이유로 거부된다"
         )
 
     @override
@@ -139,9 +140,9 @@ class ANameNothingAnswersToIsUnresolvable(
     @override
     def describe(self) -> str:
         return (
-            f"슈퍼관리자가 어느 {self.family.kind}도 갖지 않은 이름으로 조회하면, 대상이 없다는 "
-            "것이 아니라 이름을 해석할 수 없다는 이유로 거부된다. 그 이름이 있는지를 "
-            "거부가 말하지 않는다"
+            f"슈퍼관리자가 어느 {self.family.kind}에도 없는 이름으로 조회하면, 권한 없음과 "
+            "구분되지 않는 '정책을 찾을 수 없음'으로 거부된다. 거부 응답은 그 이름이 "
+            "존재하는지 알려 주지 않는다"
         )
 
     @override
@@ -171,8 +172,8 @@ class EnforcementOffOpensTheRead(
     @override
     def describe(self) -> str:
         return (
-            f"엔티티 권한 집행을 끄면 아무 권한도 받지 않은 사용자도 {self.family.kind}을 "
-            "이름으로 읽을 수 있다. 이 문은 역할이 아니라 권한 그래프가 지키기 때문이다"
+            f"권한 검사를 끄면 아무 권한도 없는 사용자도 {self.family.kind}을 "
+            "이름으로 조회할 수 있다. 이 호출은 역할이 아니라 권한 그래프로 보호되기 때문이다"
         )
 
     @override
