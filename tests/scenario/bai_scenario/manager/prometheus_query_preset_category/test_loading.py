@@ -1,6 +1,6 @@
-"""여러 id로 읽기 — 원소마다 답한다.
+"""여러 id로 조회 — 원소마다 응답한다.
 
-인증만 보므로 거부 원소는 생기지 않고, 없는 id만 빈 자리로 온다.
+인증만 확인하므로 거부 원소는 생기지 않고, 없는 id만 빈 항목으로 반환된다.
 """
 
 from __future__ import annotations
@@ -37,7 +37,7 @@ type LoadingStep = Scenario[SeedingSession, ManyCategoriesAndACaller, Adapter, L
 
 @dataclass(frozen=True)
 class LoadingTheLaidAndOneUnknown(When[ManyCategoriesAndACaller, Adapter, Loaded]):
-    """심은 것들의 id 뒤에 아무것도 갖지 않은 id 하나를 붙여 한 번에 읽는다."""
+    """미리 만들어 둔 카테고리들의 id 뒤에 존재하지 않는 id 하나를 붙여 한 번에 조회한다."""
 
     @override
     def operation(self) -> str:
@@ -45,7 +45,7 @@ class LoadingTheLaidAndOneUnknown(When[ManyCategoriesAndACaller, Adapter, Loaded
 
     @override
     def describe(self, laid: ManyCategoriesAndACaller) -> str:
-        return f"{laid.caller.username}이 심은 분류 {len(laid.laid)}개의 id와 없는 id 하나를 한 번에 조회"
+        return f"{laid.caller.username}이 미리 만들어 둔 카테고리 {len(laid.laid)}개의 id와 없는 id 하나를 한 번에 조회"
 
     @override
     async def call(self, adapter: Adapter, laid: ManyCategoriesAndACaller) -> Loaded:
@@ -56,7 +56,7 @@ class LoadingTheLaidAndOneUnknown(When[ManyCategoriesAndACaller, Adapter, Loaded
 
 @dataclass(frozen=True)
 class LoadingNothing(When[ManyCategoriesAndACaller, Adapter, Loaded]):
-    """빈 id 목록으로 읽는다."""
+    """빈 id 목록으로 조회한다."""
 
     @override
     def operation(self) -> str:
@@ -83,8 +83,8 @@ class TheLaidAndTheUnknownComeBackInOrder(
     @override
     def describe(self) -> str:
         return (
-            "분류 둘과 없는 id 하나를 섞어 한 번에 읽으면, 있는 둘은 노드로 없는 하나는 "
-            "빈 자리로 오고 순서가 준 순서와 같다"
+            "카테고리 둘과 없는 id 하나를 섞어 한 번에 조회하면, 있는 둘은 노드로 없는 하나는 "
+            "빈 항목으로 반환되고 순서가 요청한 순서와 같다"
         )
 
     @override
@@ -110,7 +110,7 @@ class AnEmptyListAnswersNothing(
 
     @override
     def describe(self) -> str:
-        return "분류가 있어도 빈 id 목록으로 읽으면, 빈 답이 온다"
+        return "카테고리가 있어도 빈 id 목록으로 조회하면, 빈 응답이 반환된다"
 
     @override
     def given(self) -> Given[SeedingSession, ManyCategoriesAndACaller]:
