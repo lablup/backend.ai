@@ -305,6 +305,7 @@ class SessionEntityData(EntityData):
     network_type: NetworkType | None
     network_id: str | None
     replica_id: ReplicaID | None
+    created_at: datetime = field(compare=False)
 
     @override
     def entity_id(self) -> SessionID:
