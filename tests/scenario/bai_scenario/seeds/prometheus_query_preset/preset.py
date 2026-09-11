@@ -30,6 +30,10 @@ TEMPLATE = "avg by (${{group_by}}) (rate(container_cpu_seconds_total{${{labels}}
 UNRENDERABLE = "up${{ nope }}"
 """A template the renderer refuses: it names a variable no placeholder provides."""
 
+EMPTY_WITHOUT_LABELS = "${{labels}}"
+"""A template the renderer accepts that renders to nothing when no label is given.
+Prometheus refuses the empty query it becomes."""
+
 
 @dataclass(frozen=True)
 class SeedPreset(SeedRow[PrometheusQueryPresetData]):
@@ -51,6 +55,8 @@ class SeedPreset(SeedRow[PrometheusQueryPresetData]):
         says: list[str] = []
         if self.query_template == UNRENDERABLE:
             says.append("렌더러가 받지 않는 템플릿을 갖고 있다")
+        if self.query_template == EMPTY_WITHOUT_LABELS:
+            says.append("라벨 없이는 빈 질의로 렌더되는 템플릿을 갖고 있다")
         if self.time_window is not None:
             says.append(f"창이 {self.time_window}로 적혀 있다")
         if self.filter_labels:

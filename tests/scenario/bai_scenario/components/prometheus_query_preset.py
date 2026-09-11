@@ -16,7 +16,7 @@ from uuid import UUID
 
 from bai_scenario.components.domain import WrittenByThisRun
 from bai_scenario.components.prometheus_query_preset_category import PAGE, lay_someone
-from bai_scenario.fakes.prometheus import ANSWERED_AT, ANSWERED_RESULT_TYPE, ANSWERED_VALUE
+from bai_scenario.fakes.prometheus import ANSWERED_AT, INSTANT
 from bai_scenario.seeds.prometheus_query_preset.preset import (
     METRIC,
     TEMPLATE,
@@ -476,12 +476,16 @@ class NothingIsAnswered(Then[Any, list[PresetNodeAnswer]]):
 
 
 @dataclass(frozen=True)
-class TheOneSampleAnswered(Then[Any, QueryDefinitionResultInfo]):
-    """대역이 답하기로 한 결과가 그대로 실려 온다."""
+class TheQueryAnswered(Then[Any, QueryDefinitionResultInfo]):
+    """대역이 답한 결과가 그대로 실려 온다. 샘플의 값이 대역이 받은 질의이므로, 무엇이
+    Prometheus에 닿았는지를 여기서 본다."""
+
+    query: str
+    result_type: str = INSTANT
 
     @override
     def says(self) -> str:
-        return "대역이 답한 결과가 그대로 온다"
+        return "대역이 받은 질의를 실은 결과가 온다"
 
     @override
     def look(self, laid: Any, answered: Answered[QueryDefinitionResultInfo]) -> list[Verdict]:
@@ -490,7 +494,7 @@ class TheOneSampleAnswered(Then[Any, QueryDefinitionResultInfo]):
             return [Refused(PrometheusQueryPresetNotFound, answered.raised)]
         return [
             Same("status", result.status, "success"),
-            Same("result_type", result.result_type, ANSWERED_RESULT_TYPE),
+            Same("result_type", result.result_type, self.result_type),
             Same(
                 "result",
                 [
@@ -500,7 +504,7 @@ class TheOneSampleAnswered(Then[Any, QueryDefinitionResultInfo]):
                     )
                     for one in result.result
                 ],
-                [([], [(ANSWERED_AT, ANSWERED_VALUE)])],
+                [([], [(ANSWERED_AT, self.query)])],
             ),
         ]
 

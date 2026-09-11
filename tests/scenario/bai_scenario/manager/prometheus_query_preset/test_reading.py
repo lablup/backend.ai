@@ -166,21 +166,22 @@ class NobodyMayNotRead(
         return TheCallIsRefused(UserNotFound)
 
 
-@pytest.mark.parametrize(
-    "scenario",
-    [
-        AUserGrantedNothingReadsIt(started=datetime.now(UTC)),
-        AnUnknownIdIsNotFound(),
-    ],
-    ids=lambda s: s.summary(),
-)
+SCENARIOS: list[ReadingStep] = [
+    AUserGrantedNothingReadsIt(started=datetime.now(UTC)),
+    AnUnknownIdIsNotFound(),
+]
+
+NOBODY_SCENARIOS: list[NobodyStep] = [NobodyMayNotRead()]
+
+
+@pytest.mark.parametrize("scenario", SCENARIOS, ids=lambda s: s.summary())
 async def test_reading(
     scenario: ReadingStep, adapter: PrometheusQueryPresetAdapter, engine: ExtendedAsyncSAEngine
 ) -> None:
     await run_scenario(scenario, adapter, engine)
 
 
-@pytest.mark.parametrize("scenario", [NobodyMayNotRead()], ids=lambda s: s.summary())
+@pytest.mark.parametrize("scenario", NOBODY_SCENARIOS, ids=lambda s: s.summary())
 async def test_reading_as_nobody(
     scenario: NobodyStep, adapter: PrometheusQueryPresetAdapter, engine: ExtendedAsyncSAEngine
 ) -> None:
