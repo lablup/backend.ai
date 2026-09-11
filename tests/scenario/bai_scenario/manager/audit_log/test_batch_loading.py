@@ -12,8 +12,6 @@ from uuid import uuid4
 import pytest
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.audit_log import (
-    OP_EARLY,
-    OP_LATE,
     RecordsToLoad,
     TheNodesInOrder,
     TwoRecordsToRead,
@@ -115,7 +113,7 @@ class TheNodesComeBackWithAGap(Scenario[SeedingSession, RecordsToLoad, AuditLogA
 
     @override
     def then(self) -> Then[RecordsToLoad, Loaded]:
-        return TheNodesInOrder((OP_LATE, None, OP_EARLY))
+        return TheNodesInOrder(("first", "gap", "second"))
 
 
 @dataclass(frozen=True)
@@ -163,7 +161,7 @@ class TheMonitorRoleReadsById(Scenario[SeedingSession, RecordsToLoad, AuditLogAd
 
     @override
     def then(self) -> Then[RecordsToLoad, Loaded]:
-        return TheNodesInOrder((OP_LATE, OP_EARLY))
+        return TheNodesInOrder(("first", "second"))
 
 
 @dataclass(frozen=True)

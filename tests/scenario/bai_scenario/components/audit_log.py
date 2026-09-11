@@ -16,7 +16,7 @@ from uuid import UUID, uuid4
 
 from bai_scenario.components.domain import WAS_HERE, SomeoneOf
 from bai_scenario.runner.planting import SeedingSession
-from bai_scenario.seeds.audit_log.audit_log import SeedAuditRecord
+from bai_scenario.seeds.audit_log.audit_log import SeedAuditRecord, SeedScopedAuditRecord
 from bai_scenario.seeds.domain.domain import SeedDomain
 from bai_scenario.seeds.project.project import SeedProject
 from bai_scenario.seeds.rbac.role import SeedPermission, SeedRole
@@ -28,6 +28,7 @@ from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
 from ai.backend.common.data.entity.user import UserEntityType, UserID
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.v2.audit_log.response import AuditLogNode, SearchAuditLogsPayload
+from ai.backend.common.dto.manager.v2.audit_log.types import AuditLogStatus
 from ai.backend.manager.actions.types import OperationStatus
 from ai.backend.manager.data.domain.types import DomainData
 from ai.backend.manager.data.permission.types import Permission
@@ -35,44 +36,98 @@ from ai.backend.manager.data.user.types import UserData
 from ai.backend.testutils.scenario_steps import (
     Answered,
     Given,
+    Held,
     Same,
+    SameAs,
+    Skipped,
     Then,
     Verdict,
 )
 
 # Two clearly ordered timestamps, so a "newest first" answer is a fixed order rather than
-# whatever the clock did during the run. No assertion compares a record's created_at
-# against the run window, so the values need not be recent.
+# whatever the clock did during the run.
 EARLY = datetime(2026, 1, 1, tzinfo=UTC)
 LATE = datetime(2026, 1, 2, tzinfo=UTC)
 
-# The operation each record carries — the field a scenario reads a record back by, since
-# its id is made by the database.
+# The operation each record carries — a field a scenario can name and compare, since the
+# id is made by the database.
 OP_LATE = "edited"
 OP_EARLY = "created"
 OP_OK = "succeeded"
 OP_DENIED = "was-refused"
 OP_MINE = "acted-by-me"
 OP_THEIRS = "acted-by-another"
+OP_SCOPED = "linked"
+
+
+@dataclass(frozen=True)
+class ExpectedRecord:
+    """The whole of one record's answer, save the ids the database and each run make.
+
+    ``entity_id`` and ``triggered_by`` are ids earlier steps made, compared as coming from
+    those rows rather than by value; the rest is fixed by the seed.
+    """
+
+    operation: str
+    entity_type: str
+    entity_id: UUID
+    created_at: datetime
+    status: AuditLogStatus = AuditLogStatus.SUCCESS
+    triggered_by: UUID | None = None
+
+
+def look_node(node: AuditLogNode, expected: ExpectedRecord) -> list[Verdict]:
+    """The whole node, checked. The ids the database and the run make are skipped; the
+    owner and actor are read as coming from the rows earlier steps laid."""
+    verdicts: list[Verdict] = [
+        Skipped("id", "데이터베이스가 만든다"),
+        Skipped("action_id", "실행마다 새로 생긴다"),
+        Same("operation", node.operation, expected.operation),
+        Same("entity_type", node.entity_type, expected.entity_type),
+        Held(
+            "entity_id",
+            node.entity_id,
+            SameAs[str | None](str(expected.entity_id), "기록의 대상 엔티티"),
+        ),
+        Same("status", node.status, expected.status),
+        Same("description", node.description, f"{expected.operation} was recorded"),
+        Same("created_at", node.created_at, expected.created_at),
+        Same("request_id", node.request_id, None),
+        Same("acted_as", node.acted_as, None),
+        Same("duration", node.duration, None),
+        Same("client_ip", node.client_ip, None),
+    ]
+    if expected.triggered_by is None:
+        verdicts.append(Same("triggered_by", node.triggered_by, None))
+    else:
+        verdicts.append(
+            Held(
+                "triggered_by",
+                node.triggered_by,
+                SameAs[str | None](str(expected.triggered_by), "일으킨 사용자"),
+            )
+        )
+    return verdicts
 
 
 @dataclass(frozen=True)
 class RecordsAndACaller:
-    """Records that exist and the person asking. ``visible_ops`` is the answer expected,
+    """Records that exist and the person asking. ``visible`` is the answer expected,
     newest first; ``filter_triggered`` is the actor a filtering read narrows to."""
 
     caller: UserData
-    visible_ops: tuple[str, ...]
+    visible: tuple[ExpectedRecord, ...]
     filter_triggered: UUID | None = None
 
 
 @dataclass(frozen=True)
 class RecordsToLoad:
-    """Two records to name by id, and the person asking."""
+    """Two records to name by id, and the person asking. Each pairs the id to name with
+    the node expected back."""
 
     caller: UserData
-    first: tuple[UUID, str]
-    second: tuple[UUID, str]
+    first: tuple[UUID, ExpectedRecord]
+    second: tuple[UUID, ExpectedRecord]
 
 
 @dataclass(frozen=True)
@@ -81,7 +136,7 @@ class ScopedEntities:
 
     caller: UserData
     named: tuple[UUID, ...]
-    visible_ops: tuple[str, ...]
+    visible: tuple[ExpectedRecord, ...]
 
 
 @dataclass(frozen=True)
@@ -90,7 +145,7 @@ class ScopedActors:
 
     caller: UserData
     named: tuple[UUID, ...]
-    visible_ops: tuple[str, ...]
+    visible: tuple[ExpectedRecord, ...]
 
 
 async def grant_reading(
@@ -148,11 +203,7 @@ async def lay_two_projects(
             entity_type=ProjectEntityType(),
             scope_of=lambda p: ProjectID(p.id),
         )
-    return (
-        seeding.made(caller),
-        seeding.made(first).id,
-        seeding.made(second).id,
-    )
+    return seeding.made(caller), seeding.made(first).id, seeding.made(second).id
 
 
 async def lay_two_actors(
@@ -218,7 +269,14 @@ class TwoRecordsGlobally(Given[Any, RecordsAndACaller]):
             SeedAuditRecord(owner_of=lambda u: UserID(u.id), operation=OP_EARLY, created_at=EARLY),
             caller,
         )
-        return RecordsAndACaller(seeding.made(caller), (OP_LATE, OP_EARLY))
+        made = seeding.made(caller)
+        return RecordsAndACaller(
+            made,
+            (
+                ExpectedRecord(OP_LATE, "user", made.id, LATE),
+                ExpectedRecord(OP_EARLY, "user", made.id, EARLY),
+            ),
+        )
 
 
 @dataclass(frozen=True)
@@ -246,7 +304,8 @@ class MixedStatusGlobally(Given[Any, RecordsAndACaller]):
             ),
             caller,
         )
-        return RecordsAndACaller(seeding.made(caller), (OP_OK,))
+        made = seeding.made(caller)
+        return RecordsAndACaller(made, (ExpectedRecord(OP_OK, "user", made.id, LATE),))
 
 
 @dataclass(frozen=True)
@@ -283,7 +342,11 @@ class TwoActorsGlobally(Given[Any, RecordsAndACaller]):
             second,
         )
         caller = await seeding.within(SomeoneOf(domain, role=UserRole.SUPERADMIN))
-        return RecordsAndACaller(seeding.made(caller), (OP_MINE,), filter_triggered=first_id)
+        return RecordsAndACaller(
+            seeding.made(caller),
+            (ExpectedRecord(OP_MINE, "user", first_id, LATE, triggered_by=first_id),),
+            filter_triggered=first_id,
+        )
 
 
 @dataclass(frozen=True)
@@ -332,10 +395,11 @@ class TwoRecordsToRead(Given[Any, RecordsToLoad]):
             SeedAuditRecord(owner_of=lambda u: UserID(u.id), operation=OP_EARLY, created_at=EARLY),
             caller,
         )
+        made = seeding.made(caller)
         return RecordsToLoad(
-            seeding.made(caller),
-            (seeding.made(first).id, OP_LATE),
-            (seeding.made(second).id, OP_EARLY),
+            made,
+            (seeding.made(first).id, ExpectedRecord(OP_LATE, "user", made.id, LATE)),
+            (seeding.made(second).id, ExpectedRecord(OP_EARLY, "user", made.id, EARLY)),
         )
 
 
@@ -366,11 +430,20 @@ class ProjectRecords(Given[Any, ScopedEntities]):
         )
         match self.name:
             case "both":
-                return ScopedEntities(caller, (first, second), (OP_LATE, OP_EARLY))
+                return ScopedEntities(
+                    caller,
+                    (first, second),
+                    (
+                        ExpectedRecord(OP_LATE, "project", first, LATE),
+                        ExpectedRecord(OP_EARLY, "project", second, EARLY),
+                    ),
+                )
             case "unknown":
                 return ScopedEntities(caller, (uuid4(),), ())
             case _:
-                return ScopedEntities(caller, (first,), (OP_LATE,))
+                return ScopedEntities(
+                    caller, (first,), (ExpectedRecord(OP_LATE, "project", first, LATE),)
+                )
 
 
 @dataclass(frozen=True)
@@ -408,7 +481,10 @@ class OneProjectMixedStatus(Given[Any, ScopedEntities]):
             entity_type=ProjectEntityType(),
             scope_of=lambda p: ProjectID(p.id),
         )
-        return ScopedEntities(seeding.made(caller), (seeding.made(project).id,), (OP_OK,))
+        pid = seeding.made(project).id
+        return ScopedEntities(
+            seeding.made(caller), (pid,), (ExpectedRecord(OP_OK, "project", pid, LATE),)
+        )
 
 
 @dataclass(frozen=True)
@@ -445,6 +521,50 @@ class OneProjectManyRecords(Given[Any, ScopedEntities]):
 
 
 @dataclass(frozen=True)
+class ARecordScopedToAProject(Given[Any, ScopedEntities]):
+    """A record about a user, tagged with a project scope, and a caller granted READ on
+    that project. The record's own entity is not the project, so only the scope tag makes
+    a search by the project find it."""
+
+    @override
+    def describe(self) -> str:
+        return (
+            "다른 엔티티에 대한 기록이 한 프로젝트를 스코프로 달고 있고, 그 프로젝트에 읽기 "
+            "권한을 받은 사용자 한 명"
+        )
+
+    @override
+    async def lay(self, seeding: SeedingSession) -> ScopedEntities:
+        domain = await seeding.creating(SeedDomain(name_hint="home", description=WAS_HERE))
+        policy = await seeding.once(SeedProjectPolicy())
+        project = await seeding.creating_from_two(SeedProject(name_hint="team"), domain, policy)
+        subject = await seeding.within(SomeoneOf(domain))
+        pid = seeding.made(project).id
+        await seeding.adding_with_nested(
+            SeedScopedAuditRecord(
+                owner_of=lambda u: UserID(u.id),
+                operation=OP_SCOPED,
+                created_at=LATE,
+                scopes=((ProjectEntityType(), pid),),
+            ),
+            subject,
+        )
+        caller = await seeding.within(SomeoneOf(domain))
+        await grant_reading(
+            seeding,
+            project,
+            caller,
+            entity_type=ProjectEntityType(),
+            scope_of=lambda p: ProjectID(p.id),
+        )
+        return ScopedEntities(
+            seeding.made(caller),
+            (pid,),
+            (ExpectedRecord(OP_SCOPED, "user", seeding.made(subject).id, LATE),),
+        )
+
+
+@dataclass(frozen=True)
 class ActorRecords(Given[Any, ScopedActors]):
     """Two users who each triggered a record, and a caller. ``caller_is_first`` makes the
     caller the first actor; ``grant`` gives a separate reader READ on the first user."""
@@ -464,15 +584,19 @@ class ActorRecords(Given[Any, ScopedActors]):
         caller, first_id, _second_id = await lay_two_actors(
             seeding, caller_is_first=self.caller_is_first, grant_first_to_caller=self.grant
         )
-        return ScopedActors(caller, (first_id,), (OP_MINE,))
+        return ScopedActors(
+            caller,
+            (first_id,),
+            (ExpectedRecord(OP_MINE, "user", first_id, LATE, triggered_by=first_id),),
+        )
 
 
 @dataclass(frozen=True)
 class TheRecordsAnswered(Then[Any, SearchAuditLogsPayload]):
-    """The records named come back, in the order named, and only those.
+    """The records expected come back, in order and whole, and only those.
 
-    A page of records, so the answer is the set found and the counts, not one node
-    compared whole.
+    Each item is checked field by field against what was laid; a page carries the counts
+    the run promises besides.
     """
 
     @override
@@ -484,12 +608,15 @@ class TheRecordsAnswered(Then[Any, SearchAuditLogsPayload]):
         payload = answered.response
         if payload is None:
             return [Same("answer", repr(answered.raised), "a page of records")]
-        return [
-            Same("items", [one.operation for one in payload.items], list(laid.visible_ops)),
-            Same("total_count", payload.total_count, len(laid.visible_ops)),
+        verdicts: list[Verdict] = [
+            Same("item_count", len(payload.items), len(laid.visible)),
+            Same("total_count", payload.total_count, len(laid.visible)),
             Same("has_next_page", payload.has_next_page, False),
             Same("has_previous_page", payload.has_previous_page, False),
         ]
+        for node, expected in zip(payload.items, laid.visible, strict=False):
+            verdicts.extend(look_node(node, expected))
+        return verdicts
 
 
 @dataclass(frozen=True)
@@ -518,13 +645,14 @@ class ThePageIsCapped(Then[Any, SearchAuditLogsPayload]):
 
 @dataclass(frozen=True)
 class TheNodesInOrder(Then[RecordsToLoad, list[AuditLogNode | None]]):
-    """Each id gets its node in the order named; an id nothing answers to gets a gap."""
+    """Each id gets its node whole and in the order named; an id nothing answers to gets
+    a gap. ``slots`` reads the expected nodes off what was laid."""
 
-    expected: tuple[str | None, ...]
+    slots: tuple[str, ...]
 
     @override
     def says(self) -> str:
-        return "준 순서대로 오고, 없는 id 자리는 비어 있다"
+        return "준 순서대로 노드가 오고, 없는 id 자리는 비어 있다"
 
     @override
     def look(
@@ -533,5 +661,16 @@ class TheNodesInOrder(Then[RecordsToLoad, list[AuditLogNode | None]]):
         nodes = answered.response
         if nodes is None:
             return [Same("answer", repr(answered.raised), "a list of nodes")]
-        got = [None if node is None else node.operation for node in nodes]
-        return [Same("operations", got, list(self.expected))]
+        by = {"first": laid.first[1], "second": laid.second[1]}
+        expected = [None if slot == "gap" else by[slot] for slot in self.slots]
+        verdicts: list[Verdict] = [Same("length", len(nodes), len(expected))]
+        for index, (node, exp) in enumerate(zip(nodes, expected, strict=False)):
+            if exp is None:
+                verdicts.append(Same(f"slot[{index}]", node, None))
+            else:
+                verdicts.extend(
+                    look_node(node, exp)
+                    if node is not None
+                    else [Same(f"slot[{index}]", node, "a node")]
+                )
+        return verdicts

@@ -14,6 +14,7 @@ import pytest
 from bai_scenario.components.answers import NothingIsFound, TheCallIsRefused
 from bai_scenario.components.audit_log import (
     ActorRecords,
+    ARecordScopedToAProject,
     OneProjectManyRecords,
     OneProjectMixedStatus,
     ProjectRecords,
@@ -517,8 +518,37 @@ class ReadingOnesOwnActorRecordsNeedsAGrant(
         return TheCallIsRefused(NotEnoughPermission)
 
 
+@dataclass(frozen=True)
+class ARecordIsFoundByItsScopeTag(
+    Scenario[SeedingSession, ScopedEntities, AuditLogAdapter, Searched]
+):
+    @override
+    def summary(self) -> str:
+        return "a-record-tagged-with-a-scope-is-found-by-searching-that-scope"
+
+    @override
+    def describe(self) -> str:
+        return (
+            "다른 엔티티에 대한 기록이 한 프로젝트를 스코프로 달고 있을 때 그 프로젝트를 지목해 "
+            "검색하면, 대상 엔티티가 그 프로젝트가 아니어도 그 기록이 온다"
+        )
+
+    @override
+    def given(self) -> Given[SeedingSession, ScopedEntities]:
+        return ARecordScopedToAProject()
+
+    @override
+    def when(self) -> When[ScopedEntities, AuditLogAdapter, Searched]:
+        return ScopedSearchingEntities()
+
+    @override
+    def then(self) -> Then[ScopedEntities, Searched]:
+        return TheRecordsAnswered()
+
+
 ENTITY_SCENARIOS: list[EntityStep] = [
     TheGrantedUserReadsAnEntity(),
+    ARecordIsFoundByItsScopeTag(),
     NamingSeveralEntitiesMerges(),
     AStatusFilterNarrowsWithinScope(),
     OmittingThePageSizeCapsThePage(),
