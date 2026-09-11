@@ -4,45 +4,9 @@
 
 Not exercised by any scenario: batch_load_fields.
 
-### allowing
+### allowing_projects
 
-#### [a-linked-project-is-removed-from-the-allowed-list](/tests/scenario/bai_scenario/manager/container_registry/test_allowing.py) — pass
-
-이미 연결된 프로젝트는 허용 목록에서 뺄 수 있다
-
-Given
-
-- 레지스트리 하나, 프로젝트 하나, 레지스트리, 프로젝트에 권한 있음인 사용자 한 명, 둘은 이미 연결돼 있음
-  - 도메인 home-1
-  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-  - 프로젝트 project-1
-  - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
-  - 프로젝트 project-1 가 이미지를 볼 수 있는 컨테이너 레지스트리 host-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - registry-linker 권한을 받은 사용자 준비
-    - 역할 registry-linker-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 registry-linker-1: container_registry 전체에 CREATE 허용
-    - 역할 registry-linker-1: container_registry 전체에 SOFT_DELETE 허용
-    - 일반 사용자 user-1: 역할 registry-linker-1 보유
-  - project-linker 권한을 받은 사용자 준비
-    - 역할 project-linker-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 project-linker-1: container_registry 전체에 CREATE 허용
-    - 역할 project-linker-1: container_registry 전체에 SOFT_DELETE 허용
-    - 일반 사용자 user-1: 역할 project-linker-1 보유
-
-When
-
-- ContainerRegistryAdapter.apply_allowed_groups — user-1이 허용 목록에서 뺌
-
-Then
-
-- 답이 없고 예외도 없다
-  - 거부: NotEnoughPermission
-
-#### [a-superadmin-naming-a-project-that-does-not-exist-is-refused](/tests/scenario/bai_scenario/manager/container_registry/test_allowing.py) — pass
+#### [a-superadmin-naming-a-project-that-does-not-exist-is-refused](/tests/scenario/bai_scenario/manager/container_registry/test_allowing_projects.py) — pass
 
 존재하지 않는 프로젝트를 허용 목록에 넣으려 하면 그 프로젝트가 없다는 이유로 거부된다
 
@@ -57,16 +21,16 @@ Given
     - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
     - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
     - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - registry-linker 권한을 받은 사용자 준비
-    - 역할 registry-linker-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 registry-linker-1: container_registry 전체에 CREATE 허용
-    - 역할 registry-linker-1: container_registry 전체에 SOFT_DELETE 허용
-    - 슈퍼관리자 user-1: 역할 registry-linker-1 보유
-  - project-linker 권한을 받은 사용자 준비
-    - 역할 project-linker-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 project-linker-1: container_registry 전체에 CREATE 허용
-    - 역할 project-linker-1: container_registry 전체에 SOFT_DELETE 허용
-    - 슈퍼관리자 user-1: 역할 project-linker-1 보유
+  - allow-on-registry 권한을 받은 사용자 준비
+    - 역할 allow-on-registry-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 allow-on-registry-1: container_registry 전체에 CREATE 허용
+    - 역할 allow-on-registry-1: container_registry 전체에 SOFT_DELETE 허용
+    - 슈퍼관리자 user-1: 역할 allow-on-registry-1 보유
+  - allow-on-project 권한을 받은 사용자 준비
+    - 역할 allow-on-project-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 allow-on-project-1: container_registry 전체에 CREATE 허용
+    - 역할 allow-on-project-1: container_registry 전체에 SOFT_DELETE 허용
+    - 슈퍼관리자 user-1: 역할 allow-on-project-1 보유
 
 When
 
@@ -77,9 +41,9 @@ Then
 - 거부된다
   - 거부: ProjectNotFound
 
-#### [a-superadmin-removing-a-project-that-was-never-linked-is-refused](/tests/scenario/bai_scenario/manager/container_registry/test_allowing.py) — pass
+#### [a-superadmin-removing-a-project-that-was-never-allowed-is-refused](/tests/scenario/bai_scenario/manager/container_registry/test_allowing_projects.py) — pass
 
-지목한 프로젝트 중 실제로 연결된 것이 하나도 없으면, 뺄 것이 없다는 이유로 거부된다
+지목한 프로젝트 중 실제로 허용된 것이 하나도 없으면, 뺄 것이 없다는 이유로 거부된다
 
 Given
 
@@ -92,16 +56,16 @@ Given
     - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
     - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
     - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - registry-linker 권한을 받은 사용자 준비
-    - 역할 registry-linker-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 registry-linker-1: container_registry 전체에 CREATE 허용
-    - 역할 registry-linker-1: container_registry 전체에 SOFT_DELETE 허용
-    - 슈퍼관리자 user-1: 역할 registry-linker-1 보유
-  - project-linker 권한을 받은 사용자 준비
-    - 역할 project-linker-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 project-linker-1: container_registry 전체에 CREATE 허용
-    - 역할 project-linker-1: container_registry 전체에 SOFT_DELETE 허용
-    - 슈퍼관리자 user-1: 역할 project-linker-1 보유
+  - allow-on-registry 권한을 받은 사용자 준비
+    - 역할 allow-on-registry-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 allow-on-registry-1: container_registry 전체에 CREATE 허용
+    - 역할 allow-on-registry-1: container_registry 전체에 SOFT_DELETE 허용
+    - 슈퍼관리자 user-1: 역할 allow-on-registry-1 보유
+  - allow-on-project 권한을 받은 사용자 준비
+    - 역할 allow-on-project-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 allow-on-project-1: container_registry 전체에 CREATE 허용
+    - 역할 allow-on-project-1: container_registry 전체에 SOFT_DELETE 허용
+    - 슈퍼관리자 user-1: 역할 allow-on-project-1 보유
 
 When
 
@@ -112,7 +76,7 @@ Then
 - 거부된다
   - 거부: ContainerRegistryGroupsAssociationNotFound
 
-#### [a-user-granted-on-both-scopes-links-a-project-to-a-registry](/tests/scenario/bai_scenario/manager/container_registry/test_allowing.py) — pass
+#### [a-user-granted-on-both-scopes-allows-a-project-on-a-registry](/tests/scenario/bai_scenario/manager/container_registry/test_allowing_projects.py) — pass
 
 레지스트리와 프로젝트 두 스코프 모두에 권한을 받은 사용자는 그 프로젝트를 허용 목록에 넣을 수 있다
 
@@ -127,16 +91,16 @@ Given
     - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
     - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
     - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - registry-linker 권한을 받은 사용자 준비
-    - 역할 registry-linker-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 registry-linker-1: container_registry 전체에 CREATE 허용
-    - 역할 registry-linker-1: container_registry 전체에 SOFT_DELETE 허용
-    - 일반 사용자 user-1: 역할 registry-linker-1 보유
-  - project-linker 권한을 받은 사용자 준비
-    - 역할 project-linker-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 project-linker-1: container_registry 전체에 CREATE 허용
-    - 역할 project-linker-1: container_registry 전체에 SOFT_DELETE 허용
-    - 일반 사용자 user-1: 역할 project-linker-1 보유
+  - allow-on-registry 권한을 받은 사용자 준비
+    - 역할 allow-on-registry-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 allow-on-registry-1: container_registry 전체에 CREATE 허용
+    - 역할 allow-on-registry-1: container_registry 전체에 SOFT_DELETE 허용
+    - 일반 사용자 user-1: 역할 allow-on-registry-1 보유
+  - allow-on-project 권한을 받은 사용자 준비
+    - 역할 allow-on-project-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 allow-on-project-1: container_registry 전체에 CREATE 허용
+    - 역할 allow-on-project-1: container_registry 전체에 SOFT_DELETE 허용
+    - 일반 사용자 user-1: 역할 allow-on-project-1 보유
 
 When
 
@@ -147,9 +111,81 @@ Then
 - 답이 없고 예외도 없다
   - 거부: NotEnoughPermission
 
-#### [holding-only-one-of-the-two-scopes-is-not-enough-to-link](/tests/scenario/bai_scenario/manager/container_registry/test_allowing.py) — pass
+#### [allowing-a-project-that-is-already-allowed-is-not-an-error](/tests/scenario/bai_scenario/manager/container_registry/test_allowing_projects.py) — pass
 
-레지스트리에만 권한을 받고 프로젝트에는 받지 못한 사용자가 연결하려 하면, 관계 동작은 지목한 스코프를 모두 보므로 권한 부족으로 막힌다
+이미 허용된 프로젝트를 다시 허용 목록에 넣어도 거부되지 않는다. 그 쌍은 데이터베이스에서 건너뛴다
+
+Given
+
+- 레지스트리 하나, 프로젝트 하나, 레지스트리, 프로젝트에 권한 있음인 사용자 한 명, 프로젝트는 이미 허용돼 있음
+  - 도메인 home-1
+  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+  - 프로젝트 project-1
+  - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
+  - 프로젝트 project-1 가 이미지를 볼 수 있는 컨테이너 레지스트리 host-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+  - allow-on-registry 권한을 받은 사용자 준비
+    - 역할 allow-on-registry-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 allow-on-registry-1: container_registry 전체에 CREATE 허용
+    - 역할 allow-on-registry-1: container_registry 전체에 SOFT_DELETE 허용
+    - 일반 사용자 user-1: 역할 allow-on-registry-1 보유
+  - allow-on-project 권한을 받은 사용자 준비
+    - 역할 allow-on-project-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 allow-on-project-1: container_registry 전체에 CREATE 허용
+    - 역할 allow-on-project-1: container_registry 전체에 SOFT_DELETE 허용
+    - 일반 사용자 user-1: 역할 allow-on-project-1 보유
+
+When
+
+- ContainerRegistryAdapter.apply_allowed_groups — user-1이 허용 목록에 넣음
+
+Then
+
+- 답이 없고 예외도 없다
+  - 거부: NotEnoughPermission
+
+#### [an-allowed-project-is-removed-from-the-allowed-list](/tests/scenario/bai_scenario/manager/container_registry/test_allowing_projects.py) — pass
+
+이미 허용된 프로젝트는 허용 목록에서 뺄 수 있다
+
+Given
+
+- 레지스트리 하나, 프로젝트 하나, 레지스트리, 프로젝트에 권한 있음인 사용자 한 명, 프로젝트는 이미 허용돼 있음
+  - 도메인 home-1
+  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+  - 프로젝트 project-1
+  - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
+  - 프로젝트 project-1 가 이미지를 볼 수 있는 컨테이너 레지스트리 host-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+  - allow-on-registry 권한을 받은 사용자 준비
+    - 역할 allow-on-registry-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 allow-on-registry-1: container_registry 전체에 CREATE 허용
+    - 역할 allow-on-registry-1: container_registry 전체에 SOFT_DELETE 허용
+    - 일반 사용자 user-1: 역할 allow-on-registry-1 보유
+  - allow-on-project 권한을 받은 사용자 준비
+    - 역할 allow-on-project-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 allow-on-project-1: container_registry 전체에 CREATE 허용
+    - 역할 allow-on-project-1: container_registry 전체에 SOFT_DELETE 허용
+    - 일반 사용자 user-1: 역할 allow-on-project-1 보유
+
+When
+
+- ContainerRegistryAdapter.apply_allowed_groups — user-1이 허용 목록에서 뺌
+
+Then
+
+- 답이 없고 예외도 없다
+  - 거부: NotEnoughPermission
+
+#### [holding-only-one-of-the-two-scopes-is-not-enough-to-allow-a-project](/tests/scenario/bai_scenario/manager/container_registry/test_allowing_projects.py) — pass
+
+레지스트리에만 권한을 받고 프로젝트에는 받지 못한 사용자가 프로젝트를 허용하려 하면, 관계 동작은 지목한 스코프를 모두 보므로 권한 부족으로 막힌다
 
 Given
 
@@ -162,11 +198,11 @@ Given
     - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
     - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
     - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - registry-linker 권한을 받은 사용자 준비
-    - 역할 registry-linker-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 registry-linker-1: container_registry 전체에 CREATE 허용
-    - 역할 registry-linker-1: container_registry 전체에 SOFT_DELETE 허용
-    - 일반 사용자 user-1: 역할 registry-linker-1 보유
+  - allow-on-registry 권한을 받은 사용자 준비
+    - 역할 allow-on-registry-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 allow-on-registry-1: container_registry 전체에 CREATE 허용
+    - 역할 allow-on-registry-1: container_registry 전체에 SOFT_DELETE 허용
+    - 일반 사용자 user-1: 역할 allow-on-registry-1 보유
 
 When
 
@@ -177,45 +213,9 @@ Then
 - 거부된다
   - 거부: NotEnoughPermission
 
-#### [linking-a-project-that-is-already-linked-is-not-an-error](/tests/scenario/bai_scenario/manager/container_registry/test_allowing.py) — pass
+#### [turning-enforcement-off-lets-an-ungranted-user-allow-a-project](/tests/scenario/bai_scenario/manager/container_registry/test_allowing_projects.py) — pass
 
-이미 연결된 프로젝트를 다시 허용 목록에 넣어도 거부되지 않는다. 그 쌍은 데이터베이스에서 건너뛴다
-
-Given
-
-- 레지스트리 하나, 프로젝트 하나, 레지스트리, 프로젝트에 권한 있음인 사용자 한 명, 둘은 이미 연결돼 있음
-  - 도메인 home-1
-  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-  - 프로젝트 project-1
-  - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
-  - 프로젝트 project-1 가 이미지를 볼 수 있는 컨테이너 레지스트리 host-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - registry-linker 권한을 받은 사용자 준비
-    - 역할 registry-linker-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 registry-linker-1: container_registry 전체에 CREATE 허용
-    - 역할 registry-linker-1: container_registry 전체에 SOFT_DELETE 허용
-    - 일반 사용자 user-1: 역할 registry-linker-1 보유
-  - project-linker 권한을 받은 사용자 준비
-    - 역할 project-linker-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 project-linker-1: container_registry 전체에 CREATE 허용
-    - 역할 project-linker-1: container_registry 전체에 SOFT_DELETE 허용
-    - 일반 사용자 user-1: 역할 project-linker-1 보유
-
-When
-
-- ContainerRegistryAdapter.apply_allowed_groups — user-1이 허용 목록에 넣음
-
-Then
-
-- 답이 없고 예외도 없다
-  - 거부: NotEnoughPermission
-
-#### [turning-enforcement-off-lets-an-ungranted-user-link-a-project](/tests/scenario/bai_scenario/manager/container_registry/test_allowing.py) — pass
-
-엔티티 권한 집행을 끄면 아무 권한도 받지 않은 사용자도 연결할 수 있다. 이 문은 역할이 아니라 권한 그래프가 지키기 때문이다
+엔티티 권한 집행을 끄면 아무 권한도 받지 않은 사용자도 프로젝트를 허용할 수 있다. 이 문은 역할이 아니라 권한 그래프가 지키기 때문이다
 
 Given
 
@@ -240,40 +240,9 @@ Then
 
 ### creating
 
-#### [a-password-given-at-creation-does-not-come-back-in-the-answer](/tests/scenario/bai_scenario/manager/container_registry/test_creating.py) — pass
+#### [a-project-named-while-creating-is-allowed-on-the-new-registry](/tests/scenario/bai_scenario/manager/container_registry/test_creating.py) — pass
 
-슈퍼관리자가 계정과 비밀번호를 함께 주고 만들면, 계정 이름은 답에 실리지만 비밀번호 자리는 노드에 아예 없다
-
-Given
-
-- 레지스트리 없음, 도메인 하나에 속한 superadmin 한 명
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-
-When
-
-- ContainerRegistryAdapter.admin_create — user-1이 허용 목록 없이 https://made.scenario.local로 만듦
-
-Then
-
-- 만든 레지스트리 전체가 온다
-  - url = 'https://made.scenario.local'
-  - registry_name = 'made-registry'
-  - type = <ContainerRegistryType.DOCKER: 'docker'>
-  - project = None
-  - username = 'someone'
-  - ssl_verify = True
-  - is_global = True
-  - extra = None
-  - id: 무시함 — 데이터베이스가 만든다
-
-#### [a-project-named-while-creating-is-linked-to-the-new-registry](/tests/scenario/bai_scenario/manager/container_registry/test_creating.py) — pass
-
-슈퍼관리자는 허용 프로젝트를 함께 주고 레지스트리를 만들 수 있다. 연결이 함께 쓰이는 것은 답에 실리지 않아 이 행이 보지 못한다
+슈퍼관리자는 허용 프로젝트를 함께 주고 레지스트리를 만들 수 있다. 허용 목록이 함께 쓰이는 것은 답에 실리지 않아 이 행이 보지 못한다
 
 Given
 
@@ -286,16 +255,16 @@ Given
     - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
     - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
     - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - registry-linker 권한을 받은 사용자 준비
-    - 역할 registry-linker-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 registry-linker-1: container_registry 전체에 CREATE 허용
-    - 역할 registry-linker-1: container_registry 전체에 SOFT_DELETE 허용
-    - 슈퍼관리자 user-1: 역할 registry-linker-1 보유
-  - project-linker 권한을 받은 사용자 준비
-    - 역할 project-linker-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 project-linker-1: container_registry 전체에 CREATE 허용
-    - 역할 project-linker-1: container_registry 전체에 SOFT_DELETE 허용
-    - 슈퍼관리자 user-1: 역할 project-linker-1 보유
+  - allow-on-registry 권한을 받은 사용자 준비
+    - 역할 allow-on-registry-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 allow-on-registry-1: container_registry 전체에 CREATE 허용
+    - 역할 allow-on-registry-1: container_registry 전체에 SOFT_DELETE 허용
+    - 슈퍼관리자 user-1: 역할 allow-on-registry-1 보유
+  - allow-on-project 권한을 받은 사용자 준비
+    - 역할 allow-on-project-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 allow-on-project-1: container_registry 전체에 CREATE 허용
+    - 역할 allow-on-project-1: container_registry 전체에 SOFT_DELETE 허용
+    - 슈퍼관리자 user-1: 역할 allow-on-project-1 보유
 
 When
 
@@ -329,16 +298,16 @@ Given
     - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
     - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
     - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - registry-linker 권한을 받은 사용자 준비
-    - 역할 registry-linker-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 registry-linker-1: container_registry 전체에 CREATE 허용
-    - 역할 registry-linker-1: container_registry 전체에 SOFT_DELETE 허용
-    - 슈퍼관리자 user-1: 역할 registry-linker-1 보유
-  - project-linker 권한을 받은 사용자 준비
-    - 역할 project-linker-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 project-linker-1: container_registry 전체에 CREATE 허용
-    - 역할 project-linker-1: container_registry 전체에 SOFT_DELETE 허용
-    - 슈퍼관리자 user-1: 역할 project-linker-1 보유
+  - allow-on-registry 권한을 받은 사용자 준비
+    - 역할 allow-on-registry-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 allow-on-registry-1: container_registry 전체에 CREATE 허용
+    - 역할 allow-on-registry-1: container_registry 전체에 SOFT_DELETE 허용
+    - 슈퍼관리자 user-1: 역할 allow-on-registry-1 보유
+  - allow-on-project 권한을 받은 사용자 준비
+    - 역할 allow-on-project-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 allow-on-project-1: container_registry 전체에 CREATE 허용
+    - 역할 allow-on-project-1: container_registry 전체에 SOFT_DELETE 허용
+    - 슈퍼관리자 user-1: 역할 allow-on-project-1 보유
 
 When
 
@@ -723,19 +692,17 @@ Then
 - 거부된다
   - 거부: InsufficientPrivilege
 
-#### [deleting-a-registry-a-project-is-linked-to-takes-the-link-with-it](/tests/scenario/bai_scenario/manager/container_registry/test_retiring.py) — pass
+#### [deleting-a-registry-answers-with-the-id-it-removed](/tests/scenario/bai_scenario/manager/container_registry/test_retiring.py) — pass
 
-허용 프로젝트가 딸린 레지스트리를 지우면, 외래 키를 통해 그 연결까지 함께 사라진다
+슈퍼관리자가 레지스트리를 지우면 지운 id가 답으로 온다
 
 Given
 
-- 레지스트리 하나, superadmin 한 명, 프로젝트 하나가 이미 허용돼 있음
+- 레지스트리 하나, superadmin 한 명
   - 도메인 home-1
   - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
-  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-  - 프로젝트 project-1
-  - 프로젝트 project-1 가 이미지를 볼 수 있는 컨테이너 레지스트리 host-1
   - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
     - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
     - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
     - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
@@ -749,17 +716,19 @@ Then
 - 지운 id가 답으로 온다
   - id: 심은 레지스트리의 id와 같다
 
-#### [deleting-a-registry-answers-with-the-id-it-removed](/tests/scenario/bai_scenario/manager/container_registry/test_retiring.py) — pass
+#### [deleting-a-registry-takes-its-allowed-projects-with-it](/tests/scenario/bai_scenario/manager/container_registry/test_retiring.py) — pass
 
-슈퍼관리자가 레지스트리를 지우면 지운 id가 답으로 온다
+허용 프로젝트가 딸린 레지스트리를 지우면, 외래 키를 통해 그 허용 목록까지 함께 사라진다
 
 Given
 
-- 레지스트리 하나, superadmin 한 명
+- 레지스트리 하나, superadmin 한 명, 프로젝트 하나가 이미 허용돼 있음
   - 도메인 home-1
   - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
+  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+  - 프로젝트 project-1
+  - 프로젝트 project-1 가 이미지를 볼 수 있는 컨테이너 레지스트리 host-1
   - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
     - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
     - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
     - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
