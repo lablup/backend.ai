@@ -1,8 +1,8 @@
-"""정의 실행하기 — 읽을 수 있어도 실행은 권한 그래프가 지킨다.
+"""프리셋 실행 — 조회할 수 있어도 실행은 권한 그래프로 보호된다.
 
-실행은 저장된 정의를 읽어 Prometheus에 질의한다. 대역이 답하는 샘플의 값이 대역이 받은
-질의라, 창과 라벨이 어떻게 들어갔는지를 답에서 본다. 라벨 검사는 정의가 허용 목록을 둔
-때만 돌고, 대역을 부르기 전에 돈다.
+실행은 저장된 프리셋을 읽어 Prometheus에 질의한다. 모의 서버가 응답하는 샘플의 값이 모의
+서버가 받은 질의라, 시간 창과 라벨이 어떻게 들어갔는지를 응답에서 확인한다. 라벨 검사는
+프리셋이 허용 목록을 둔 때만 실행되고, 모의 서버를 호출하기 전에 실행된다.
 """
 
 from __future__ import annotations
@@ -67,7 +67,7 @@ type ExecutingStep = Scenario[
 
 @dataclass(frozen=True)
 class Executing(When[APresetAndACaller, PrometheusQueryPresetAdapter, Result]):
-    """심은 정의를 실행한다. 창, 구간, 라벨은 준 것만 싣는다."""
+    """미리 만들어 둔 프리셋을 실행한다. 시간 창, 조회 구간, 라벨은 지정한 것만 담는다."""
 
     filter_labels: tuple[tuple[str, str], ...] = ()
     group_labels: Sequence[str] = ()
@@ -81,14 +81,16 @@ class Executing(When[APresetAndACaller, PrometheusQueryPresetAdapter, Result]):
 
     @override
     def describe(self, laid: APresetAndACaller) -> str:
-        target = "아무것도 갖지 않은 id" if self.other is not None else laid.preset.name
-        how = [f"{key}={value} 라벨로" for key, value in self.filter_labels]
-        how.extend(f"{one}로 묶어" for one in self.group_labels)
+        target = "존재하지 않는 id" if self.other is not None else laid.preset.name
+        how = [f"필터 라벨 {key}={value}" for key, value in self.filter_labels]
+        how.extend(f"그룹 라벨 {one}" for one in self.group_labels)
         if self.time_window is not None:
-            how.append(f"창 {self.time_window}로")
+            how.append(f"시간 창 {self.time_window}")
         if self.over_a_range:
-            how.append("구간을 주고")
-        return f"{laid.caller.username}이 {target}을 {', '.join(how) or '아무것도 주지 않고'} 실행"
+            how.append("조회 구간 지정")
+        return (
+            f"{laid.caller.username}이 {target} 실행 ({', '.join(how) or '아무것도 지정하지 않음'})"
+        )
 
     @override
     async def call(self, adapter: PrometheusQueryPresetAdapter, laid: APresetAndACaller) -> Result:
@@ -125,8 +127,8 @@ class TheSuperadminRunsItWithoutARange(
     @override
     def describe(self) -> str:
         return (
-            "창이 없는 정의를 슈퍼관리자가 창을 주고 구간 없이 실행하면, 순간 질의로 답하고 "
-            "대역이 받은 질의에 요청의 창이 들어 있다"
+            "시간 창이 없는 프리셋을 슈퍼관리자가 시간 창을 지정하고 조회 구간 없이 실행하면, 순간 질의로 "
+            "응답하고 모의 서버가 받은 질의에 요청의 시간 창이 들어 있다"
         )
 
     @override
@@ -152,7 +154,7 @@ class RunningOverARangeIsARangeQuery(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 시작·끝·간격을 주고 실행하면, 대역이 범위 질의로 답한다"
+        return "슈퍼관리자가 시작·끝·간격을 지정해 실행하면, 모의 서버가 범위 질의로 응답한다"
 
     @override
     def given(self) -> Given[SeedingSession, APresetAndACaller]:
@@ -179,9 +181,7 @@ class ThePresetWindowFillsInForTheRequest(
 
     @override
     def describe(self) -> str:
-        return (
-            "창이 적힌 정의를 슈퍼관리자가 창 없이 실행하면, 대역이 받은 질의의 창이 정의의 창이다"
-        )
+        return "시간 창이 설정된 프리셋을 슈퍼관리자가 시간 창 없이 실행하면, 모의 서버가 받은 질의의 시간 창이 프리셋의 시간 창이다"
 
     @override
     def given(self) -> Given[SeedingSession, APresetAndACaller]:
@@ -207,8 +207,8 @@ class TheServerWindowFillsInForBoth(
     @override
     def describe(self) -> str:
         return (
-            "창이 없는 정의를 슈퍼관리자가 창 없이 실행하면, "
-            "대역이 받은 질의의 창이 서버 설정의 기본 창이다"
+            "시간 창이 없는 프리셋을 슈퍼관리자가 시간 창 없이 실행하면, "
+            "모의 서버가 받은 질의의 시간 창이 서버 설정의 기본 시간 창이다"
         )
 
     @override
@@ -239,8 +239,8 @@ class TheRequestWindowWinsOverThePreset(
     @override
     def describe(self) -> str:
         return (
-            "창이 적힌 정의를 슈퍼관리자가 다른 창을 주고 실행하면, "
-            "대역이 받은 질의의 창이 요청의 창이다"
+            "시간 창이 설정된 프리셋을 슈퍼관리자가 다른 시간 창을 지정해 실행하면, "
+            "모의 서버가 받은 질의의 시간 창이 요청의 시간 창이다"
         )
 
     @override
@@ -267,8 +267,8 @@ class AnAllowedFilterLabelReachesTheQuery(
     @override
     def describe(self) -> str:
         return (
-            "필터 라벨을 제한해 둔 정의를 슈퍼관리자가 그 목록 안의 라벨로 실행하면, "
-            "대역이 받은 질의에 그 라벨이 정확히 일치하는 조건으로 들어 있다"
+            "필터 라벨을 제한해 둔 프리셋을 슈퍼관리자가 그 목록 안의 라벨로 실행하면, "
+            "모의 서버가 받은 질의에 그 라벨이 정확히 일치하는 조건으로 들어 있다"
         )
 
     @override
@@ -299,8 +299,8 @@ class AnAllowedGroupLabelReachesTheQuery(
     @override
     def describe(self) -> str:
         return (
-            "묶음 라벨을 제한해 둔 정의를 슈퍼관리자가 그 목록 안의 라벨로 실행하면, "
-            "대역이 받은 질의의 묶음에 그 라벨이 들어 있다"
+            "그룹 라벨을 제한해 둔 프리셋을 슈퍼관리자가 그 목록 안의 라벨로 실행하면, "
+            "모의 서버가 받은 질의의 그룹에 그 라벨이 들어 있다"
         )
 
     @override
@@ -329,8 +329,8 @@ class AFilterLabelOutsideTheListIsRefused(
     @override
     def describe(self) -> str:
         return (
-            "필터 라벨을 제한해 둔 정의를 슈퍼관리자가 그 목록에 없는 라벨로 실행하면, "
-            "외부에 질의하기 전에 라벨로 거부된다"
+            "필터 라벨을 제한해 둔 프리셋을 슈퍼관리자가 그 목록에 없는 라벨로 실행하면, "
+            "외부에 질의하기 전에 라벨 오류로 거부된다"
         )
 
     @override
@@ -357,8 +357,8 @@ class AGroupLabelOutsideTheListIsRefused(
     @override
     def describe(self) -> str:
         return (
-            "묶음 라벨을 제한해 둔 정의를 슈퍼관리자가 그 목록에 없는 라벨로 실행하면, "
-            "같은 자리에서 라벨로 거부된다"
+            "그룹 라벨을 제한해 둔 프리셋을 슈퍼관리자가 그 목록에 없는 라벨로 실행하면, "
+            "같은 단계에서 라벨 오류로 거부된다"
         )
 
     @override
@@ -385,8 +385,8 @@ class AnUnrestrictedPresetTakesAnyLabel(
     @override
     def describe(self) -> str:
         return (
-            "허용 라벨 목록이 빈 정의를 슈퍼관리자가 아무 라벨이나 주고 실행하면, "
-            "대역이 받은 질의에 그 라벨이 들어 있다"
+            "허용 라벨 목록이 빈 프리셋을 슈퍼관리자가 아무 라벨이나 지정해 실행하면, "
+            "모의 서버가 받은 질의에 그 라벨이 들어 있다"
         )
 
     @override
@@ -415,8 +415,8 @@ class PrometheusRefusingTheQueryIsPassedOn(
     @override
     def describe(self) -> str:
         return (
-            "라벨 없이는 빈 질의로 렌더되는 정의를 슈퍼관리자가 라벨 없이 실행하면, "
-            "Prometheus가 그 질의를 거부하고 그 거부가 지표를 얻지 못했다는 이유로 그대로 올라온다"
+            "라벨 없이는 빈 질의로 렌더되는 프리셋을 슈퍼관리자가 라벨 없이 실행하면, "
+            "Prometheus가 그 질의를 거부하고 그 거부가 지표를 얻지 못했다는 이유로 그대로 전파된다"
         )
 
     @override
@@ -443,8 +443,8 @@ class AUserGrantedNothingMayNotRun(
     @override
     def describe(self) -> str:
         return (
-            "아무 권한도 받지 않은 사용자는 정의를 읽을 수 있지만 실행하면 권한 부족으로 "
-            "거부된다. 이 엔티티는 어느 스코프에도 없어 역할로는 권한을 받을 길이 없다"
+            "아무 권한도 없는 사용자는 프리셋을 조회할 수 있지만 실행하면 권한 부족으로 "
+            "거부된다. 이 엔티티는 어느 스코프에도 속하지 않아 역할로는 권한을 받을 방법이 없다"
         )
 
     @override
@@ -472,8 +472,8 @@ class EnforcementOffLetsAnyoneRun(
     @override
     def describe(self) -> str:
         return (
-            "엔티티 권한 집행을 끄면 아무 권한도 받지 않은 사용자도 정의를 실행한다. "
-            "이 문은 역할이 아니라 권한 그래프가 지키기 때문이다"
+            "권한 검사를 끄면 아무 권한도 없는 사용자도 프리셋을 실행할 수 있다. "
+            "실행은 역할이 아니라 권한 그래프로 보호되기 때문이다"
         )
 
     @override
@@ -504,8 +504,8 @@ class AnUnknownIdIsRefusedAsPermission(
     @override
     def describe(self) -> str:
         return (
-            "아무 권한도 받지 않은 사용자가 아무것도 갖지 않은 id로 실행하면, 대상이 없다는 "
-            "것이 아니라 권한 부족으로 거부된다. 없는 행에는 걸린 권한도 없기 때문이다"
+            "아무 권한도 없는 사용자가 존재하지 않는 id로 실행하면, 대상 없음이 아니라 "
+            "권한 부족으로 거부된다. 없는 행에는 부여된 권한도 없기 때문이다"
         )
 
     @override
@@ -532,8 +532,8 @@ class AnUnknownIdIsNotFoundForASuperadmin(
     @override
     def describe(self) -> str:
         return (
-            "슈퍼관리자가 아무것도 갖지 않은 id로 실행하면, 대상이 없다는 것으로 거부된다. "
-            "실행은 서비스가 정의를 직접 읽어 내므로 고치기와 지우기의 대상 없음과 종류가 다르다"
+            "슈퍼관리자가 존재하지 않는 id로 실행하면, 대상을 찾을 수 없다는 이유로 거부된다. "
+            "실행은 서비스가 프리셋을 직접 읽어서 내는 오류라 수정과 삭제의 대상 없음과 종류가 다르다"
         )
 
     @override

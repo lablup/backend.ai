@@ -65,7 +65,7 @@ PAGE = 10
 
 @dataclass(frozen=True)
 class ACatalogAndACaller:
-    """부를 사람 한 명과, 있다면 정의를 넣을 분류 하나."""
+    """호출자 한 명과, 있다면 프리셋을 넣을 카테고리 하나."""
 
     caller: UserData
     category: PrometheusQueryPresetCategoryData | None = None
@@ -73,7 +73,7 @@ class ACatalogAndACaller:
 
 @dataclass(frozen=True)
 class APresetAndACaller:
-    """이미 있는 정의 하나와, 그것을 부를 사람. ``elsewhere``는 옮겨 갈 다른 분류다."""
+    """이미 있는 프리셋 하나와, 그것을 호출할 사용자. ``elsewhere``는 옮겨 갈 다른 카테고리다."""
 
     preset: PrometheusQueryPresetData
     caller: UserData
@@ -82,14 +82,14 @@ class APresetAndACaller:
 
 @dataclass(frozen=True)
 class APresetAlone:
-    """정의 하나뿐, 부를 사람이 없다."""
+    """프리셋 하나뿐이고, 호출자가 없다."""
 
     preset: PrometheusQueryPresetData
 
 
 @dataclass(frozen=True)
 class ManyPresetsAndACaller:
-    """훑을 정의 여럿과, 훑을 사람. ``named``는 그중 골라낼 하나, ``category``는 걸러낼 분류다."""
+    """검색 대상 프리셋 여럿과, 검색을 호출할 사용자. ``named``는 그중 이름 필터로 골라낼 하나, ``category``는 필터로 쓸 카테고리다."""
 
     laid: tuple[PrometheusQueryPresetData, ...]
     named: PrometheusQueryPresetData
@@ -98,7 +98,7 @@ class ManyPresetsAndACaller:
 
 
 async def lay_someone(seeding: Any, role: UserRole) -> Laid[UserData]:
-    """부를 사람 한 명. 사용자는 도메인에 속해야 하므로 도메인 하나가 함께 깔린다."""
+    """호출자 한 명. 사용자는 도메인에 속해야 하므로 도메인 하나를 함께 만든다."""
     domain = await seeding.creating(SeedDomain(name_hint="home", description=WAS_HERE))
     laid: Laid[UserData] = await seeding.within(SomeoneOf(domain, role=role))
     return laid
@@ -106,13 +106,13 @@ async def lay_someone(seeding: Any, role: UserRole) -> Laid[UserData]:
 
 @dataclass(frozen=True)
 class JustSomeone(Given[Any, ACatalogAndACaller]):
-    """정의도 분류도 없이, 부를 사람 한 명."""
+    """프리셋도 카테고리도 없이, 호출자 한 명."""
 
     role: UserRole = UserRole.USER
 
     @override
     def describe(self) -> str:
-        return f"정의가 하나도 없고, {self.role.value} 한 명"
+        return f"프리셋이 하나도 없고, {self.role.value} 한 명"
 
     @override
     async def lay(self, seeding: Any) -> ACatalogAndACaller:
@@ -122,13 +122,13 @@ class JustSomeone(Given[Any, ACatalogAndACaller]):
 
 @dataclass(frozen=True)
 class ACategoryAndSomeone(Given[Any, ACatalogAndACaller]):
-    """분류 하나와, 부를 사람 한 명."""
+    """카테고리 하나와, 호출자 한 명."""
 
     role: UserRole = UserRole.USER
 
     @override
     def describe(self) -> str:
-        return f"분류 하나와, {self.role.value} 한 명"
+        return f"카테고리 하나와, {self.role.value} 한 명"
 
     @override
     async def lay(self, seeding: Any) -> ACatalogAndACaller:
@@ -139,7 +139,7 @@ class ACategoryAndSomeone(Given[Any, ACatalogAndACaller]):
 
 @dataclass(frozen=True)
 class APresetAndSomeone(Given[Any, APresetAndACaller]):
-    """이미 있는 정의 하나와, 부를 사람 한 명."""
+    """이미 있는 프리셋 하나와, 호출자 한 명."""
 
     role: UserRole = UserRole.USER
     query_template: str = TEMPLATE
@@ -149,7 +149,7 @@ class APresetAndSomeone(Given[Any, APresetAndACaller]):
 
     @override
     def describe(self) -> str:
-        return f"이미 있는 정의 하나와, {self.role.value} 한 명"
+        return f"이미 있는 프리셋 하나와, {self.role.value} 한 명"
 
     @override
     async def lay(self, seeding: Any) -> APresetAndACaller:
@@ -167,13 +167,13 @@ class APresetAndSomeone(Given[Any, APresetAndACaller]):
 
 @dataclass(frozen=True)
 class APresetInOneOfTwoCategories(Given[Any, APresetAndACaller]):
-    """분류 둘과 한쪽에 속한 정의 하나, 그리고 부를 사람 한 명."""
+    """카테고리 둘과 한쪽에 속한 프리셋 하나, 그리고 호출자 한 명."""
 
     role: UserRole = UserRole.USER
 
     @override
     def describe(self) -> str:
-        return f"분류 둘과 한쪽에 속한 정의 하나, {self.role.value} 한 명"
+        return f"카테고리 둘과 한쪽에 속한 프리셋 하나, {self.role.value} 한 명"
 
     @override
     async def lay(self, seeding: Any) -> APresetAndACaller:
@@ -190,11 +190,11 @@ class APresetInOneOfTwoCategories(Given[Any, APresetAndACaller]):
 
 @dataclass(frozen=True)
 class APresetAndNobody(Given[Any, APresetAlone]):
-    """정의 하나뿐이고, 부를 사람은 없다."""
+    """프리셋 하나뿐이고, 호출자는 없다."""
 
     @override
     def describe(self) -> str:
-        return "이미 있는 정의 하나, 부를 사람 없음"
+        return "이미 있는 프리셋 하나, 호출자 없음"
 
     @override
     async def lay(self, seeding: Any) -> APresetAlone:
@@ -204,14 +204,14 @@ class APresetAndNobody(Given[Any, APresetAlone]):
 
 @dataclass(frozen=True)
 class ManyPresetsAndSomeone(Given[Any, ManyPresetsAndACaller]):
-    """정의 여럿과, 부를 사람 한 명."""
+    """프리셋 여럿과, 호출자 한 명."""
 
     role: UserRole = UserRole.USER
     besides: int = 1
 
     @override
     def describe(self) -> str:
-        return f"정의 {self.besides + 1}개와, {self.role.value} 한 명"
+        return f"프리셋 {self.besides + 1}개와, {self.role.value} 한 명"
 
     @override
     async def lay(self, seeding: Any) -> ManyPresetsAndACaller:
@@ -229,17 +229,17 @@ class ManyPresetsAndSomeone(Given[Any, ManyPresetsAndACaller]):
 
 @dataclass(frozen=True)
 class PresetsInTwoCategories(Given[Any, ManyPresetsAndACaller]):
-    """두 분류에 나뉜 정의들과, 부를 사람 한 명.
+    """두 카테고리에 나뉜 프리셋들과, 호출자 한 명.
 
-    답으로 오는 ``laid``는 ``category``에 속한 것뿐이다. 다른 분류의 정의는 심기만 하고
-    답하지 않으므로, 걸러 훑은 결과에 섞여 나오면 그 자리에서 어긋난다.
+    반환하는 ``laid``는 ``category``에 속한 것뿐이다. 다른 카테고리의 프리셋은 만들어 두기만
+    하고 반환하지 않으므로, 필터 검색 결과에 섞여 나오면 그 자리에서 불일치가 드러난다.
     """
 
     role: UserRole = UserRole.USER
 
     @override
     def describe(self) -> str:
-        return f"두 분류에 나뉜 정의 셋과, {self.role.value} 한 명"
+        return f"두 카테고리에 나뉜 프리셋 셋과, {self.role.value} 한 명"
 
     @override
     async def lay(self, seeding: Any) -> ManyPresetsAndACaller:
@@ -259,9 +259,10 @@ class PresetsInTwoCategories(Given[Any, ManyPresetsAndACaller]):
 
 @dataclass(frozen=True)
 class TheNewPresetNode(Then[Any, PresetNodeAnswer]):
-    """방금 만든 정의가 통째로 온다. 요청이 정한 것만 여기로 받는다.
+    """방금 생성한 프리셋이 통째로 반환된다. 기대값은 요청이 지정한 값에서 읽는다.
 
-    이름을 대지 않으면 심은 정의의 이름을 기대한다. 같은 이름으로 다시 만드는 줄이 그렇다.
+    이름을 지정하지 않으면 미리 만들어 둔 프리셋의 이름을 기대한다. 같은 이름으로 다시 생성하는
+    시나리오가 그렇다.
     """
 
     started: datetime
@@ -275,7 +276,7 @@ class TheNewPresetNode(Then[Any, PresetNodeAnswer]):
 
     @override
     def says(self) -> str:
-        return "만든 정의 전체가 온다"
+        return "생성한 프리셋 전체가 반환된다"
 
     @override
     def look(self, laid: Any, answered: Answered[PresetNodeAnswer]) -> list[Verdict]:
@@ -287,7 +288,7 @@ class TheNewPresetNode(Then[Any, PresetNodeAnswer]):
             Held(
                 "category_id",
                 node.category_id,
-                SameAs[UUID | None](laid.category.id, "심은 분류"),
+                SameAs[UUID | None](laid.category.id, "미리 만들어 둔 카테고리"),
             )
             if self.under_the_category
             else Same("category_id", node.category_id, None)
@@ -310,10 +311,10 @@ class TheNewPresetNode(Then[Any, PresetNodeAnswer]):
 
 @dataclass(frozen=True)
 class ThePresetNode(Then[APresetAndACaller, PresetNodeAnswer]):
-    """심은 정의가 통째로 온다. 값은 심은 것에서 읽는다.
+    """미리 만들어 둔 프리셋이 통째로 반환된다. 기대값은 미리 만들어 둔 데이터에서 읽는다.
 
-    바꾸는 요청이 이것을 쓸 때는 바뀌어야 하는 자리만 인자로 받는다. 나머지가 조용히 함께
-    움직이면 그 자리에서 어긋난다.
+    수정 요청이 이 검사를 쓸 때는 바뀌어야 하는 필드만 인자로 받는다. 나머지 필드가 함께 바뀌면
+    그 필드에서 불일치가 드러난다.
     """
 
     started: datetime
@@ -325,14 +326,18 @@ class ThePresetNode(Then[APresetAndACaller, PresetNodeAnswer]):
 
     @override
     def says(self) -> str:
-        return "심은 정의 전체가 온다"
+        return "미리 만들어 둔 프리셋 전체가 반환된다"
 
     def _category_seen(self, got: UUID | None, laid: APresetAndACaller) -> Verdict:
         if self.moved_elsewhere and laid.elsewhere is not None:
-            return Held("category_id", got, SameAs[UUID | None](laid.elsewhere.id, "다른 분류"))
+            return Held("category_id", got, SameAs[UUID | None](laid.elsewhere.id, "다른 카테고리"))
         if laid.preset.category_id is None:
             return Same("category_id", got, None)
-        return Held("category_id", got, SameAs[UUID | None](laid.preset.category_id, "심은 분류"))
+        return Held(
+            "category_id",
+            got,
+            SameAs[UUID | None](laid.preset.category_id, "미리 만들어 둔 카테고리"),
+        )
 
     @override
     def look(self, laid: APresetAndACaller, answered: Answered[PresetNodeAnswer]) -> list[Verdict]:
@@ -342,7 +347,7 @@ class ThePresetNode(Then[APresetAndACaller, PresetNodeAnswer]):
         seeded = laid.preset
         written = WrittenByThisRun(self.started)
         return [
-            Held("id", node.id, SameAs[UUID](seeded.id, "심은 정의")),
+            Held("id", node.id, SameAs[UUID](seeded.id, "미리 만들어 둔 프리셋")),
             Same("name", node.name, self.named if self.named is not None else seeded.name),
             Same(
                 "description",
@@ -373,11 +378,11 @@ class ThePresetNode(Then[APresetAndACaller, PresetNodeAnswer]):
 
 @dataclass(frozen=True)
 class EveryLaidPresetIsFound(Then[ManyPresetsAndACaller, SearchQueryDefinitionsPayload]):
-    """심은 정의가 모두, 그리고 그것만 세어진다."""
+    """미리 만들어 둔 프리셋이 모두, 그리고 그것만 집계된다."""
 
     @override
     def says(self) -> str:
-        return "심은 정의가 모두, 그리고 그것만 세어진다"
+        return "미리 만들어 둔 프리셋이 모두, 그리고 그것만 집계된다"
 
     @override
     def look(
@@ -400,11 +405,11 @@ class EveryLaidPresetIsFound(Then[ManyPresetsAndACaller, SearchQueryDefinitionsP
 
 @dataclass(frozen=True)
 class OnePageOfThemComesBack(Then[ManyPresetsAndACaller, SearchQueryDefinitionsPayload]):
-    """크기를 대지 않은 훑기는 한 쪽 분량만 답하고, 다음 쪽이 있다고 말한다."""
+    """크기를 지정하지 않은 검색은 한 페이지 분량만 응답하고, 다음 페이지가 있다고 알린다."""
 
     @override
     def says(self) -> str:
-        return "한 쪽만 오고 다음 쪽이 있다고 답한다"
+        return "한 페이지만 반환되고 다음 페이지가 있다고 응답한다"
 
     @override
     def look(
@@ -442,11 +447,11 @@ def node_of(seeded: PrometheusQueryPresetData) -> QueryDefinitionNode:
 
 @dataclass(frozen=True)
 class TheBatchAnswersInOrder(Then[ManyPresetsAndACaller, list[PresetNodeAnswer]]):
-    """준 순서대로 답한다. 심은 것은 노드 전체로, 마지막의 없는 id는 빈 자리로."""
+    """요청한 순서대로 응답한다. 미리 만들어 둔 것은 노드 전체로, 마지막의 없는 id는 빈 항목으로."""
 
     @override
     def says(self) -> str:
-        return "준 순서대로, 없는 id 자리는 비어서 온다"
+        return "요청한 순서대로, 없는 id 자리는 비어서 반환된다"
 
     @override
     def look(
@@ -463,7 +468,9 @@ class TheBatchAnswersInOrder(Then[ManyPresetsAndACaller, list[PresetNodeAnswer]]
                 Held(
                     f"[{at}]",
                     got,
-                    SameAs[PresetNodeAnswer](node_of(wanted), f"{at + 1}번째로 준 id의 정의 전체"),
+                    SameAs[PresetNodeAnswer](
+                        node_of(wanted), f"{at + 1}번째로 요청한 id의 프리셋 전체"
+                    ),
                 )
             )
         seen.append(Same(f"[{len(laid.laid)}]", answer[-1], None))
@@ -472,11 +479,11 @@ class TheBatchAnswersInOrder(Then[ManyPresetsAndACaller, list[PresetNodeAnswer]]
 
 @dataclass(frozen=True)
 class NothingIsAnswered(Then[Any, list[PresetNodeAnswer]]):
-    """빈 목록에는 빈 답이다."""
+    """빈 목록에는 빈 응답이다."""
 
     @override
     def says(self) -> str:
-        return "빈 답이 온다"
+        return "빈 응답이 반환된다"
 
     @override
     def look(self, laid: Any, answered: Answered[list[PresetNodeAnswer]]) -> list[Verdict]:
@@ -488,15 +495,15 @@ class NothingIsAnswered(Then[Any, list[PresetNodeAnswer]]):
 
 @dataclass(frozen=True)
 class TheQueryAnswered(Then[Any, QueryDefinitionResultInfo]):
-    """대역이 답한 결과가 그대로 실려 온다. 샘플의 값이 대역이 받은 질의이므로, 무엇이
-    Prometheus에 닿았는지를 여기서 본다."""
+    """모의 서버가 응답한 결과가 그대로 담겨 반환된다. 샘플의 값이 모의 서버가 받은 질의이므로,
+    무엇이 Prometheus에 전달됐는지를 여기서 확인한다."""
 
     query: str
     result_type: str = INSTANT
 
     @override
     def says(self) -> str:
-        return "대역이 받은 질의를 실은 결과가 온다"
+        return "모의 서버가 받은 질의를 담은 결과가 반환된다"
 
     @override
     def look(self, laid: Any, answered: Answered[QueryDefinitionResultInfo]) -> list[Verdict]:
@@ -522,11 +529,11 @@ class TheQueryAnswered(Then[Any, QueryDefinitionResultInfo]):
 
 @dataclass(frozen=True)
 class TheRemovedOneIsNamed(Then[APresetAndACaller, DeleteQueryDefinitionPayload]):
-    """지운 정의가 무엇인지 답한다."""
+    """삭제한 프리셋이 무엇인지 응답한다."""
 
     @override
     def says(self) -> str:
-        return "지운 정의를 답한다"
+        return "삭제한 프리셋을 응답한다"
 
     @override
     def look(
@@ -535,4 +542,4 @@ class TheRemovedOneIsNamed(Then[APresetAndACaller, DeleteQueryDefinitionPayload]
         payload = answered.response
         if payload is None:
             return [Refused(EntityNotFoundError, answered.raised)]
-        return [Held("id", payload.id, SameAs[UUID](laid.preset.id, "심은 정의"))]
+        return [Held("id", payload.id, SameAs[UUID](laid.preset.id, "미리 만들어 둔 프리셋"))]

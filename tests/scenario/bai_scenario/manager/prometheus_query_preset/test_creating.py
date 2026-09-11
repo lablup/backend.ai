@@ -1,7 +1,7 @@
-"""정의 만들기 — 누가 만들 수 있고, 무엇이 템플릿과 분류를 막는가.
+"""프리셋 생성 — 누가 생성할 수 있고, 무엇이 템플릿과 카테고리를 막는가.
 
-만들기는 전역 역할이 지키고 렌더러가 템플릿을 본 뒤에야 행을 쓴다. 이름은 유일하지 않고,
-없는 분류는 저장소의 참조 제약이 거부한다.
+생성은 전역 역할이 있어야 하고 렌더러가 템플릿을 검사한 뒤에야 행을 쓴다. 이름은 유일하지 않고,
+존재하지 않는 카테고리는 저장소의 참조 제약이 거부한다.
 """
 
 from __future__ import annotations
@@ -78,7 +78,7 @@ def _create_input(
 
 @dataclass(frozen=True)
 class Creating(When[ACatalogAndACaller, PrometheusQueryPresetAdapter, PresetNodeAnswer]):
-    """정의 하나를 만든다. 분류는 심은 것을 가리키거나, 아무것도 갖지 않은 id를 대거나, 없다."""
+    """프리셋 하나를 생성한다. 카테고리는 미리 만들어 둔 것을 가리키거나, 존재하지 않는 id를 지정하거나, 없다."""
 
     named: str = MADE
     query_template: str = TEMPLATE
@@ -94,10 +94,10 @@ class Creating(When[ACatalogAndACaller, PrometheusQueryPresetAdapter, PresetNode
     def describe(self, laid: ACatalogAndACaller) -> str:
         where = ""
         if self.under_the_category:
-            where = " 심은 분류 아래에"
+            where = " 미리 만들어 둔 카테고리 아래에"
         elif self.under_an_unknown_category:
-            where = " 아무것도 갖지 않은 분류 id 아래에"
-        return f"{laid.caller.username}이{where} {self.named}으로 만듦"
+            where = " 존재하지 않는 카테고리 id 아래에"
+        return f"{laid.caller.username}이{where} 이름 {self.named}(으)로 생성"
 
     @override
     async def call(
@@ -119,7 +119,7 @@ class Creating(When[ACatalogAndACaller, PrometheusQueryPresetAdapter, PresetNode
 class CreatingUnderTheSameName(
     When[APresetAndACaller, PrometheusQueryPresetAdapter, PresetNodeAnswer]
 ):
-    """심은 정의와 같은 이름으로 하나 더 만든다."""
+    """미리 만들어 둔 프리셋과 같은 이름으로 하나 더 생성한다."""
 
     @override
     def operation(self) -> str:
@@ -127,7 +127,7 @@ class CreatingUnderTheSameName(
 
     @override
     def describe(self, laid: APresetAndACaller) -> str:
-        return f"{laid.caller.username}이 이미 있는 {laid.preset.name}으로 다시 만듦"
+        return f"{laid.caller.username}이 이미 있는 이름 {laid.preset.name}(으)로 다시 생성"
 
     @override
     async def call(
@@ -151,8 +151,8 @@ class TheRequiredValuesMakeAWholeNode(
     @override
     def describe(self) -> str:
         return (
-            "슈퍼관리자가 이름, 지표 이름, 템플릿, 허용 라벨 목록만 주고 만들면, "
-            "순위는 0이고 분류·설명·창은 비어 있는 노드 전체가 답으로 온다"
+            "슈퍼관리자가 이름, 지표 이름, 템플릿, 허용 라벨 목록만 지정해 생성하면, "
+            "순위는 0이고 카테고리·설명·시간 창은 비어 있는 노드 전체가 반환된다"
         )
 
     @override
@@ -180,7 +180,7 @@ class FiledUnderACategory(
 
     @override
     def describe(self) -> str:
-        return "분류 하나가 있고 슈퍼관리자가 그 분류를 지정해 만들면, 답의 분류가 그것을 가리킨다"
+        return "카테고리 하나가 있고 슈퍼관리자가 그 카테고리를 지정해 생성하면, 응답의 카테고리가 그것을 가리킨다"
 
     @override
     def given(self) -> Given[SeedingSession, ACatalogAndACaller]:
@@ -207,7 +207,7 @@ class WithAWindow(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 창을 함께 주고 만들면, 노드에 그 창이 실린다"
+        return "슈퍼관리자가 시간 창을 함께 지정해 생성하면, 노드에 그 시간 창이 담긴다"
 
     @override
     def given(self) -> Given[SeedingSession, ACatalogAndACaller]:
@@ -232,7 +232,7 @@ class AnUnrenderableTemplateIsRefused(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 렌더러가 받지 않는 템플릿을 주고 만들면, 템플릿으로 거부된다"
+        return "슈퍼관리자가 렌더러가 받지 않는 템플릿으로 생성하면, 템플릿 오류로 거부된다"
 
     @override
     def given(self) -> Given[SeedingSession, ACatalogAndACaller]:
@@ -258,7 +258,7 @@ class AnUnknownCategoryIsRefused(
     @override
     def describe(self) -> str:
         return (
-            "슈퍼관리자가 아무것도 갖지 않은 분류 id를 지정해 만들면, 분류가 없다는 이유로 "
+            "슈퍼관리자가 존재하지 않는 카테고리 id를 지정해 생성하면, 카테고리가 없다는 이유로 "
             "거부된다. 저장소의 참조 제약이 막는 것이고 도메인 오류로 옮겨져 있지 않다"
         )
 
@@ -288,8 +288,8 @@ class TheSameNameIsAllowedTwice(
     @override
     def describe(self) -> str:
         return (
-            "이미 어떤 정의가 쓰고 있는 이름으로 슈퍼관리자가 다시 만들면, 만들어진다. "
-            "정의의 이름에는 유일 제약이 없다"
+            "이미 다른 프리셋이 사용 중인 이름으로 슈퍼관리자가 다시 생성하면, 생성된다. "
+            "프리셋의 이름에는 유일 제약이 없다"
         )
 
     @override
@@ -315,7 +315,7 @@ class APlainUserMayNotCreate(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 아닌 사용자가 정의를 만들려 하면, 역할로 막힌다"
+        return "슈퍼관리자가 아닌 사용자가 프리셋을 생성하려 하면, 역할 부족으로 거부된다"
 
     @override
     def given(self) -> Given[SeedingSession, ACatalogAndACaller]:
@@ -341,8 +341,8 @@ class AMonitorMayNotCreate(
     @override
     def describe(self) -> str:
         return (
-            "모니터 역할이 정의를 만들려 하면, 역할로 막힌다. "
-            "전역 문은 읽기에만 그 역할을 지나게 한다"
+            "모니터 역할이 프리셋을 생성하려 하면, 역할 부족으로 거부된다. "
+            "전역 역할 검사는 읽기에만 그 역할을 허용한다"
         )
 
     @override
@@ -370,8 +370,8 @@ class EnforcementOffChangesNothing(
     @override
     def describe(self) -> str:
         return (
-            "엔티티 권한 집행을 꺼도 정의 만들기는 여전히 막힌다. "
-            "이 문은 권한 그래프가 아니라 역할이 지키기 때문이다"
+            "권한 검사를 꺼도 프리셋 생성은 여전히 거부된다. "
+            "생성은 권한 그래프가 아니라 역할로 보호되기 때문이다"
         )
 
     @override

@@ -1,7 +1,7 @@
-"""정의 읽기 — 인증만 본다.
+"""프리셋 조회 — 인증만 확인한다.
 
-읽기는 권한을 보지 않으므로, 없는 id는 누구에게나 대상 없음이다. 권한 문이 있는 실행과
-고치기의 없는 id와 다르다.
+조회는 권한을 검사하지 않으므로, 존재하지 않는 id는 누구에게나 대상 없음이다. 권한 검사가 있는
+실행과 수정의 없는 id와 다르다.
 """
 
 from __future__ import annotations
@@ -43,7 +43,7 @@ type NobodyStep = Scenario[
 
 @dataclass(frozen=True)
 class ReadingById(When[APresetAndACaller, PrometheusQueryPresetAdapter, PresetNodeAnswer]):
-    """id로 읽는다. id를 대지 않으면 심은 정의의 id를 쓴다."""
+    """id로 조회한다. id를 지정하지 않으면 미리 만들어 둔 프리셋의 id를 쓴다."""
 
     named: UUID | None = None
 
@@ -53,8 +53,8 @@ class ReadingById(When[APresetAndACaller, PrometheusQueryPresetAdapter, PresetNo
 
     @override
     def describe(self, laid: APresetAndACaller) -> str:
-        called = "아무것도 갖지 않은 id" if self.named is not None else laid.preset.name
-        return f"{laid.caller.username}이 {called}로 조회"
+        called = "존재하지 않는 id" if self.named is not None else laid.preset.name
+        return f"{laid.caller.username}이 {called}(으)로 조회"
 
     @override
     async def call(
@@ -68,7 +68,7 @@ class ReadingById(When[APresetAndACaller, PrometheusQueryPresetAdapter, PresetNo
 
 @dataclass(frozen=True)
 class ReadingAsNobody(When[APresetAlone, PrometheusQueryPresetAdapter, PresetNodeAnswer]):
-    """사용자 컨텍스트 없이 id로 읽는다."""
+    """사용자 컨텍스트 없이 id로 조회한다."""
 
     @override
     def operation(self) -> str:
@@ -76,7 +76,7 @@ class ReadingAsNobody(When[APresetAlone, PrometheusQueryPresetAdapter, PresetNod
 
     @override
     def describe(self, laid: APresetAlone) -> str:
-        return f"사용자 컨텍스트 없이 {laid.preset.name}을 조회"
+        return f"사용자 컨텍스트 없이 {laid.preset.name} 조회"
 
     @override
     async def call(
@@ -98,7 +98,9 @@ class AUserGrantedNothingReadsIt(
 
     @override
     def describe(self) -> str:
-        return "정의 하나가 있고 아무 권한도 받지 않은 사용자가 id로 조회하면, 그 정의 전체가 답으로 온다"
+        return (
+            "프리셋 하나가 있고 아무 권한도 없는 사용자가 id로 조회하면, 그 프리셋 전체가 반환된다"
+        )
 
     @override
     def given(self) -> Given[SeedingSession, APresetAndACaller]:
@@ -124,8 +126,8 @@ class AnUnknownIdIsNotFound(
     @override
     def describe(self) -> str:
         return (
-            "아무 권한도 받지 않은 사용자가 아무것도 갖지 않은 id로 조회하면, 대상이 없다는 "
-            "것으로 거부된다. 읽기는 인증만 보므로 권한 문이 먼저 막지 않는다"
+            "아무 권한도 없는 사용자가 존재하지 않는 id로 조회하면, 대상을 찾을 수 없다는 "
+            "이유로 거부된다. 조회는 인증만 확인하므로 권한 검사가 먼저 막지 않는다"
         )
 
     @override
@@ -151,7 +153,7 @@ class NobodyMayNotRead(
 
     @override
     def describe(self) -> str:
-        return "정의 하나가 있고 사용자 컨텍스트 없이 id로 조회하면, 인증으로 거부된다"
+        return "프리셋 하나가 있고 사용자 컨텍스트 없이 id로 조회하면, 인증 실패로 거부된다"
 
     @override
     def given(self) -> Given[SeedingSession, APresetAlone]:

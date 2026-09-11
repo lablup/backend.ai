@@ -1,6 +1,6 @@
-"""정의 지우기 — 누가 지울 수 있는가.
+"""프리셋 삭제 — 누가 삭제할 수 있는가.
 
-이 어댑터에는 soft delete가 없다. 지우면 행이 사라지고 되살리는 문도 없다.
+이 어댑터에는 soft delete가 없다. 삭제하면 행이 사라지고 되살리는 호출도 없다.
 """
 
 from __future__ import annotations
@@ -52,7 +52,7 @@ type PurgingStep = Scenario[
 
 @dataclass(frozen=True)
 class Removing(When[APresetAndACaller, PrometheusQueryPresetAdapter, Removed]):
-    """정의 하나를 지운다. id를 대지 않으면 심은 정의를 지운다."""
+    """프리셋 하나를 삭제한다. id를 지정하지 않으면 미리 만들어 둔 프리셋을 삭제한다."""
 
     other: UUID | None = None
 
@@ -62,8 +62,8 @@ class Removing(When[APresetAndACaller, PrometheusQueryPresetAdapter, Removed]):
 
     @override
     def describe(self, laid: APresetAndACaller) -> str:
-        called = "아무것도 갖지 않은 id" if self.other is not None else laid.preset.name
-        return f"{laid.caller.username}이 {called}를 지움"
+        called = "존재하지 않는 id" if self.other is not None else laid.preset.name
+        return f"{laid.caller.username}이 {called} 삭제"
 
     @override
     async def call(self, adapter: PrometheusQueryPresetAdapter, laid: APresetAndACaller) -> Removed:
@@ -82,7 +82,7 @@ class TheSuperadminRemovesIt(
 
     @override
     def describe(self) -> str:
-        return "정의 하나가 있고 슈퍼관리자가 지우면, 지운 id를 실은 답이 온다"
+        return "프리셋 하나가 있고 슈퍼관리자가 삭제하면, 삭제한 id를 담은 응답이 반환된다"
 
     @override
     def given(self) -> Given[SeedingSession, APresetAndACaller]:
@@ -107,7 +107,7 @@ class AUserGrantedNothingMayNotRemove(
 
     @override
     def describe(self) -> str:
-        return "같은 정의가 있고 아무 권한도 받지 않은 사용자가 지우면, 권한 부족으로 거부된다"
+        return "같은 프리셋이 있고 아무 권한도 없는 사용자가 삭제하면, 권한 부족으로 거부된다"
 
     @override
     def given(self) -> Given[SeedingSession, APresetAndACaller]:
@@ -134,8 +134,8 @@ class EnforcementOffLetsAnyoneRemove(
     @override
     def describe(self) -> str:
         return (
-            "엔티티 권한 집행을 끄면 아무 권한도 받지 않은 사용자도 정의를 지운다. "
-            "이 문은 역할이 아니라 권한 그래프가 지키기 때문이다"
+            "권한 검사를 끄면 아무 권한도 없는 사용자도 프리셋을 삭제할 수 있다. "
+            "삭제는 역할이 아니라 권한 그래프로 보호되기 때문이다"
         )
 
     @override
@@ -165,7 +165,7 @@ class AnUnknownIdIsNotFoundForASuperadmin(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 아무것도 갖지 않은 id를 지우면, 대상이 없다는 것으로 거부된다"
+        return "슈퍼관리자가 존재하지 않는 id를 삭제하면, 대상을 찾을 수 없다는 이유로 거부된다"
 
     @override
     def given(self) -> Given[SeedingSession, APresetAndACaller]:

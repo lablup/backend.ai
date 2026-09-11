@@ -20,15 +20,15 @@ class SeedCategory(SeedRow[PrometheusQueryPresetCategoryData]):
     """A category in the global preset catalog. The name is the seeder's."""
 
     name_hint: str = "category"
-    description: str | None = "심어둔 분류"
+    description: str | None = "미리 만들어 둔 카테고리"
 
     @override
     def kind(self) -> str:
-        return "분류"
+        return "카테고리"
 
     @override
     def detail(self) -> str:
-        return "" if self.description is not None else "설명이 없다"
+        return "" if self.description is not None else "설명 없음"
 
     @override
     def name(self, naming: Naming) -> str:

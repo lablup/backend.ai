@@ -40,7 +40,7 @@ class SeedPreset(SeedRow[PrometheusQueryPresetData]):
     """A query preset in the global catalog, filed under no category."""
 
     name_hint: str = "preset"
-    description: str | None = "심어둔 질의 정의"
+    description: str | None = "미리 만들어 둔 질의 프리셋"
     query_template: str = TEMPLATE
     time_window: str | None = None
     filter_labels: Sequence[str] = ()
@@ -48,21 +48,21 @@ class SeedPreset(SeedRow[PrometheusQueryPresetData]):
 
     @override
     def kind(self) -> str:
-        return "질의 정의"
+        return "질의 프리셋"
 
     @override
     def detail(self) -> str:
         says: list[str] = []
         if self.query_template == UNRENDERABLE:
-            says.append("렌더러가 받지 않는 템플릿을 갖고 있다")
+            says.append("렌더러가 받지 않는 템플릿을 갖는다")
         if self.query_template == EMPTY_WITHOUT_LABELS:
-            says.append("라벨 없이는 빈 질의로 렌더되는 템플릿을 갖고 있다")
+            says.append("라벨 없이는 빈 질의로 렌더되는 템플릿을 갖는다")
         if self.time_window is not None:
-            says.append(f"창이 {self.time_window}로 적혀 있다")
+            says.append(f"시간 창이 {self.time_window}(으)로 설정돼 있다")
         if self.filter_labels:
-            says.append(f"필터 라벨을 {', '.join(self.filter_labels)}로 제한한다")
+            says.append(f"필터 라벨을 {', '.join(self.filter_labels)}(으)로 제한한다")
         if self.group_labels:
-            says.append(f"묶음 라벨을 {', '.join(self.group_labels)}로 제한한다")
+            says.append(f"그룹 라벨을 {', '.join(self.group_labels)}(으)로 제한한다")
         return ", ".join(says)
 
     @override
@@ -94,7 +94,7 @@ class SeedPresetIn(SeedRowFrom[PrometheusQueryPresetCategoryData, PrometheusQuer
 
     @override
     def detail(self) -> str:
-        return ", ".join(one for one in ("분류 아래에 있다", self.preset.detail()) if one)
+        return ", ".join(one for one in ("카테고리에 속한다", self.preset.detail()) if one)
 
     @override
     def name(self, naming: Naming) -> str:

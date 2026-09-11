@@ -1,4 +1,4 @@
-"""정의 훑기 — 인증된 사용자 누구나, 이름과 분류로 걸러서."""
+"""프리셋 검색 — 인증된 사용자 누구나, 이름과 카테고리 필터로."""
 
 from __future__ import annotations
 
@@ -53,7 +53,7 @@ type NobodyStep = Scenario[SeedingSession, APresetAlone, PrometheusQueryPresetAd
 
 @dataclass(frozen=True)
 class SearchingEverything(When[ManyPresetsAndACaller, PrometheusQueryPresetAdapter, Searched]):
-    """필터도 크기도 없이 전체를 훑는다."""
+    """필터도 크기도 없이 전체를 검색한다."""
 
     @override
     def operation(self) -> str:
@@ -73,7 +73,7 @@ class SearchingEverything(When[ManyPresetsAndACaller, PrometheusQueryPresetAdapt
 
 @dataclass(frozen=True)
 class SearchingByName(When[ManyPresetsAndACaller, PrometheusQueryPresetAdapter, Searched]):
-    """심은 것 중 골라낸 하나의 이름으로 걸러 훑는다."""
+    """미리 만들어 둔 프리셋 중 골라낸 하나의 이름을 필터로 검색한다."""
 
     @override
     def operation(self) -> str:
@@ -81,7 +81,7 @@ class SearchingByName(When[ManyPresetsAndACaller, PrometheusQueryPresetAdapter, 
 
     @override
     def describe(self, laid: ManyPresetsAndACaller) -> str:
-        return f"{laid.caller.username}이 이름 {laid.named.name}으로 걸러 조회"
+        return f"{laid.caller.username}이 {laid.named.name} 이름 필터로 조회"
 
     @override
     async def call(
@@ -97,7 +97,7 @@ class SearchingByName(When[ManyPresetsAndACaller, PrometheusQueryPresetAdapter, 
 
 @dataclass(frozen=True)
 class SearchingByCategory(When[ManyPresetsAndACaller, PrometheusQueryPresetAdapter, Searched]):
-    """심은 분류로 걸러 훑는다."""
+    """미리 만들어 둔 카테고리를 필터로 검색한다."""
 
     @override
     def operation(self) -> str:
@@ -105,7 +105,7 @@ class SearchingByCategory(When[ManyPresetsAndACaller, PrometheusQueryPresetAdapt
 
     @override
     def describe(self, laid: ManyPresetsAndACaller) -> str:
-        return f"{laid.caller.username}이 분류로 걸러 조회"
+        return f"{laid.caller.username}이 카테고리 필터로 조회"
 
     @override
     async def call(
@@ -125,7 +125,7 @@ class SearchingByCategory(When[ManyPresetsAndACaller, PrometheusQueryPresetAdapt
 
 @dataclass(frozen=True)
 class SearchingAsNobody(When[APresetAlone, PrometheusQueryPresetAdapter, Searched]):
-    """사용자 컨텍스트 없이 훑는다."""
+    """사용자 컨텍스트 없이 검색한다."""
 
     @override
     def operation(self) -> str:
@@ -142,11 +142,11 @@ class SearchingAsNobody(When[APresetAlone, PrometheusQueryPresetAdapter, Searche
 
 @dataclass(frozen=True)
 class OnlyTheNamedOneIsFound(Then[ManyPresetsAndACaller, Searched]):
-    """골라낸 하나만 세어진다."""
+    """골라낸 하나만 집계된다."""
 
     @override
     def says(self) -> str:
-        return "이름으로 고른 하나만 세어진다"
+        return "이름 필터에 맞는 하나만 집계된다"
 
     @override
     def look(self, laid: ManyPresetsAndACaller, answered: Answered[Searched]) -> list[Verdict]:
@@ -171,7 +171,7 @@ class AnyoneCountsEveryOne(
 
     @override
     def describe(self) -> str:
-        return "정의 둘이 있고 아무 권한도 받지 않은 사용자가 필터 없이 훑으면, 둘을 모두 센다"
+        return "프리셋 둘이 있고 아무 권한도 없는 사용자가 필터 없이 검색하면, 둘 다 집계된다"
 
     @override
     def given(self) -> Given[SeedingSession, ManyPresetsAndACaller]:
@@ -196,7 +196,7 @@ class FilteringByNameKeepsThatOne(
 
     @override
     def describe(self) -> str:
-        return "이름이 다른 정의 셋이 있을 때 이름으로 걸러 훑으면, 그 이름의 것만 남는다"
+        return "이름이 다른 프리셋 셋이 있을 때 이름 필터로 검색하면, 그 이름의 프리셋만 반환된다"
 
     @override
     def given(self) -> Given[SeedingSession, ManyPresetsAndACaller]:
@@ -221,7 +221,7 @@ class FilteringByCategoryKeepsItsOwn(
 
     @override
     def describe(self) -> str:
-        return "두 분류에 정의가 나뉘어 있을 때 한 분류로 걸러 훑으면, 그 분류의 것만 남는다"
+        return "두 카테고리에 프리셋이 나뉘어 있을 때 한 카테고리 필터로 검색하면, 그 카테고리의 프리셋만 반환된다"
 
     @override
     def given(self) -> Given[SeedingSession, ManyPresetsAndACaller]:
@@ -246,7 +246,7 @@ class OmittingThePageSizeAnswersTen(
 
     @override
     def describe(self) -> str:
-        return "정의 열하나가 있을 때 크기 없이 훑으면, 열 건까지 오고 다음 쪽이 있다고 답한다"
+        return "프리셋 11개가 있을 때 크기 없이 검색하면, 10건까지 반환되고 다음 페이지가 있다고 응답한다"
 
     @override
     def given(self) -> Given[SeedingSession, ManyPresetsAndACaller]:
@@ -271,7 +271,7 @@ class NobodyMayNotSearch(
 
     @override
     def describe(self) -> str:
-        return "정의 하나가 있고 사용자 컨텍스트 없이 훑으면, 인증으로 거부된다"
+        return "프리셋 하나가 있고 사용자 컨텍스트 없이 검색하면, 인증 실패로 거부된다"
 
     @override
     def given(self) -> Given[SeedingSession, APresetAlone]:

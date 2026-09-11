@@ -1,7 +1,7 @@
-"""정의 고치기 — 누가 고칠 수 있고, 무엇이 템플릿과 분류를 막는가.
+"""프리셋 수정 — 누가 수정할 수 있고, 무엇이 템플릿과 카테고리를 막는가.
 
-템플릿 검증은 요청이 템플릿을 준 때만 돈다. 필터 라벨과 묶음 라벨은 한 자리에 같이
-저장되지만 하나만 고쳐도 다른 하나가 지워지지 않는다.
+템플릿 검증은 요청이 템플릿을 지정한 때만 실행된다. 필터 라벨과 그룹 라벨은 한 컬럼에 같이
+저장되지만 하나만 수정해도 다른 하나가 지워지지 않는다.
 """
 
 from __future__ import annotations
@@ -59,7 +59,7 @@ type EditingStep = Scenario[
 
 @dataclass(frozen=True)
 class Editing(When[APresetAndACaller, PrometheusQueryPresetAdapter, PresetNodeAnswer]):
-    """심은 정의를 고친다. 대지 않은 자리는 요청에서 빠진다."""
+    """미리 만들어 둔 프리셋을 수정한다. 지정하지 않은 필드는 요청에서 빠진다."""
 
     named: str | None = None
     query_template: str | None = None
@@ -75,22 +75,22 @@ class Editing(When[APresetAndACaller, PrometheusQueryPresetAdapter, PresetNodeAn
 
     @override
     def describe(self, laid: APresetAndACaller) -> str:
-        target = "아무것도 갖지 않은 id" if self.other is not None else laid.preset.name
+        target = "존재하지 않는 id" if self.other is not None else laid.preset.name
         changed = [
             what
             for what, asked in (
-                ("이름을 바꿈", self.named is not None),
-                ("템플릿을 바꿈", self.query_template is not None),
-                ("설명을 비움", self.clear_description),
-                ("다른 분류로 옮김", self.move_elsewhere),
-                ("아무것도 갖지 않은 분류 id로 옮김", self.under_an_unknown_category),
-                ("필터 라벨을 바꿈", self.filter_labels is not None),
+                ("이름 변경", self.named is not None),
+                ("템플릿 변경", self.query_template is not None),
+                ("설명 비우기", self.clear_description),
+                ("다른 카테고리로 이동", self.move_elsewhere),
+                ("존재하지 않는 카테고리 id로 이동", self.under_an_unknown_category),
+                ("필터 라벨 변경", self.filter_labels is not None),
             )
             if asked
         ]
         if not changed:
-            return f"{laid.caller.username}이 {target}을 아무것도 바꾸지 않고 고침"
-        return f"{laid.caller.username}이 {target}의 {', '.join(changed)}"
+            return f"{laid.caller.username}이 {target} 수정 (빈 요청)"
+        return f"{laid.caller.username}이 {target} 수정 ({', '.join(changed)})"
 
     def _category(self, laid: APresetAndACaller) -> UUID | Sentinel | None:
         if self.move_elsewhere and laid.elsewhere is not None:
@@ -134,7 +134,7 @@ class TheSuperadminRetunesTheTemplate(
 
     @override
     def describe(self) -> str:
-        return "정의 하나가 있고 슈퍼관리자가 템플릿만 고치면, 템플릿은 새 값이고 나머지는 그대로다"
+        return "프리셋 하나가 있고 슈퍼관리자가 템플릿만 수정하면, 템플릿은 새 값이고 나머지는 그대로다"
 
     @override
     def given(self) -> Given[SeedingSession, APresetAndACaller]:
@@ -161,7 +161,7 @@ class ClearingTheDescription(
 
     @override
     def describe(self) -> str:
-        return "설명이 있는 정의를 슈퍼관리자가 설명을 비우며 고치면, 설명이 없어진다"
+        return "설명이 있는 프리셋을 슈퍼관리자가 설명을 비우도록 수정하면, 설명이 없어진다"
 
     @override
     def given(self) -> Given[SeedingSession, APresetAndACaller]:
@@ -188,7 +188,7 @@ class MovingToAnotherCategory(
 
     @override
     def describe(self) -> str:
-        return "분류 둘 중 한쪽에 속한 정의를 슈퍼관리자가 다른 분류로 옮기면, 답의 분류가 그것을 가리킨다"
+        return "카테고리 둘 중 한쪽에 속한 프리셋을 슈퍼관리자가 다른 카테고리로 옮기면, 응답의 카테고리가 그것을 가리킨다"
 
     @override
     def given(self) -> Given[SeedingSession, APresetAndACaller]:
@@ -216,8 +216,8 @@ class ChangingOnlyTheFilterLabels(
     @override
     def describe(self) -> str:
         return (
-            "필터 라벨과 묶음 라벨이 모두 있는 정의를 슈퍼관리자가 필터 라벨만 고치면, "
-            "필터 라벨은 새 값이고 묶음 라벨은 그대로다"
+            "필터 라벨과 그룹 라벨이 모두 있는 프리셋을 슈퍼관리자가 필터 라벨만 수정하면, "
+            "필터 라벨은 새 값이고 그룹 라벨은 그대로다"
         )
 
     @override
@@ -247,7 +247,9 @@ class GivingNothingChangesNothing(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 값을 하나도 주지 않고 고치면, 아무것도 바뀌지 않은 노드가 답으로 온다"
+        return (
+            "슈퍼관리자가 값을 하나도 지정하지 않고 수정하면, 아무것도 바뀌지 않은 노드가 반환된다"
+        )
 
     @override
     def given(self) -> Given[SeedingSession, APresetAndACaller]:
@@ -272,7 +274,7 @@ class AnUnrenderableTemplateIsRefused(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 렌더러가 받지 않는 템플릿으로 고치면, 템플릿으로 거부된다"
+        return "슈퍼관리자가 렌더러가 받지 않는 템플릿으로 수정하면, 템플릿 오류로 거부된다"
 
     @override
     def given(self) -> Given[SeedingSession, APresetAndACaller]:
@@ -300,8 +302,8 @@ class AStoredBadTemplateDoesNotBlockOtherChanges(
     @override
     def describe(self) -> str:
         return (
-            "렌더러가 받지 않는 템플릿을 가진 정의를 슈퍼관리자가 이름만 고치면, 이름은 새 값이다. "
-            "템플릿 검증은 요청이 템플릿을 준 때만 돈다"
+            "렌더러가 받지 않는 템플릿을 가진 프리셋을 슈퍼관리자가 이름만 수정하면, 이름은 새 값이다. "
+            "템플릿 검증은 요청이 템플릿을 지정한 때만 실행된다"
         )
 
     @override
@@ -328,7 +330,7 @@ class AnUnknownCategoryIsRefused(
     @override
     def describe(self) -> str:
         return (
-            "슈퍼관리자가 아무것도 갖지 않은 분류 id로 고치면, 분류가 없다는 이유로 거부된다. "
+            "슈퍼관리자가 존재하지 않는 카테고리 id로 수정하면, 카테고리가 없다는 이유로 거부된다. "
             "저장소의 참조 제약이 막는 것이고 도메인 오류로 옮겨져 있지 않다"
         )
 
@@ -356,8 +358,8 @@ class AUserGrantedNothingMayNotEdit(
     @override
     def describe(self) -> str:
         return (
-            "같은 정의가 있고 아무 권한도 받지 않은 사용자가 이름을 고치면, 권한 부족으로 "
-            "거부된다. 이 엔티티는 어느 스코프에도 없어 권한을 받을 길이 없다"
+            "같은 프리셋이 있고 아무 권한도 없는 사용자가 이름을 수정하면, 권한 부족으로 "
+            "거부된다. 이 엔티티는 어느 스코프에도 속하지 않아 권한을 받을 방법이 없다"
         )
 
     @override
@@ -387,8 +389,8 @@ class EnforcementOffLetsAnyoneEdit(
     @override
     def describe(self) -> str:
         return (
-            "엔티티 권한 집행을 끄면 아무 권한도 받지 않은 사용자도 정의를 고친다. "
-            "이 문은 역할이 아니라 권한 그래프가 지키기 때문이다"
+            "권한 검사를 끄면 아무 권한도 없는 사용자도 프리셋을 수정할 수 있다. "
+            "수정은 역할이 아니라 권한 그래프로 보호되기 때문이다"
         )
 
     @override
@@ -418,7 +420,9 @@ class AnUnknownIdIsNotFoundForASuperadmin(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 아무것도 갖지 않은 id의 이름을 고치면, 대상이 없다는 것으로 거부된다"
+        return (
+            "슈퍼관리자가 존재하지 않는 id의 이름을 수정하면, 대상을 찾을 수 없다는 이유로 거부된다"
+        )
 
     @override
     def given(self) -> Given[SeedingSession, APresetAndACaller]:
