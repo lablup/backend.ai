@@ -1,7 +1,7 @@
 ---
 name: app-config-adapter-scenarios
 type: reference
-description: what the merged app config read guarantees, as scenarios; a value with no row of its own, built by merging fragments in allow-list rank order, read either at the caller's own scope or anonymously from the public fragments alone
+description: what the merged app config read guarantees, as scenarios; a value with no row of its own, built by merging fragments in allow-list rank order, read either at the caller's own scope or anonymously from the public fragments alone; the tests in tests/scenario/bai_scenario/manager/app_config match these one for one
 scope: src/ai/backend/manager/api/adapters/app_config
 keywords: [app config, scenario, adapter, merge, rank, anonymous, rbac]
 generated:
@@ -87,4 +87,5 @@ app config는 행이 없다. 읽을 때마다 세 테이블의 조각을 병합�
 
 ## 아직 적지 않은 것
 
-없다. 어댑터가 내놓는 두 호출이 모두 위에 있다.
+어댑터가 내놓는 두 호출이 모두 위에 있다. 실행 결과에 남는 `batch_load_fields`는 어댑터
+공통 바탕이 물려주는 필드 읽기이고, 이 엔티티는 필드를 갖지 않아 부를 자리가 없다.

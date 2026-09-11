@@ -1,7 +1,7 @@
 ---
 name: app-config-definition-adapter-scenarios
 type: reference
-description: what the app config definition adapter guarantees, as scenarios; the superadmin role on registering and listing names, the entity gate on reading and purging one, the cascade that takes an unregistered name's allow-list entries and fragments with it
+description: what the app config definition adapter guarantees, as scenarios; the superadmin role on registering and listing names, the entity gate on reading and purging one, the cascade that takes an unregistered name's allow-list entries and fragments with it; the tests in tests/scenario/bai_scenario/manager/app_config_definition match these one for one
 scope: src/ai/backend/manager/api/adapters/app_config_definition
 keywords: [app config definition, scenario, adapter, superadmin, cascade]
 generated:
@@ -60,12 +60,14 @@ status: draft
 
 | 시나리오 | 상황 | 요청 | 결과 |
 |---|---|---|---|
-| 있는 것, 없는 것, 볼 수 없는 것을 섞어 읽는다 | 정의 둘 중 하나에만 읽기 권한 있음 | 그 둘과 없는 id 하나를 한 번에 | 목록 순서대로. 권한 있는 것은 노드, 없는 id 자리는 비어서, 볼 수 없는 것은 그 자리만 거부 |
+| 있는 것, 없는 것, 볼 수 없는 것을 섞어 읽는다 | 정의 둘 중 하나에만 읽기 권한 있음 | 그 둘과 없는 id 하나를 한 번에 | 목록 순서대로. 권한 있는 것은 노드, 볼 수 없는 것과 없는 id는 그 자리만 거부 |
 | 슈퍼관리자가 섞어 읽는다 | 정의 둘 | 그 둘과 없는 id 하나를 한 번에 | 둘은 노드, 없는 id 자리는 비어서 |
 | 빈 목록을 준다 | 정의 하나 | 빈 id 목록 | 빈 답. 배선을 부르지 않는다 |
 
-권한이 없으면 요청 전체가 막히지 않고 그 원소만 거부된다. 없는 id와 볼 수 없는 id가 다른
-것으로 답하므로 셋을 한 요청에 섞는다.
+권한이 없으면 요청 전체가 막히지 않고 그 원소만 거부된다. 없는 id도 슈퍼관리자가 아닌
+사람에게는 거부 원소다. 권한 검사가 원소마다 먼저 도는데 없는 행에는 걸린 권한도 없기
+때문이고, 빈 자리로 오는 것은 그 검사를 지나가는 슈퍼관리자에게뿐이다. 그래서 셋을 한 요청에
+섞고 두 사람으로 나누어 본다.
 
 ## 훑기
 
@@ -75,7 +77,7 @@ status: draft
 | 이름으로 걸러 훑는다 | 이름이 다른 정의 여럿, 전역 역할 있음 | 이름 필터 조회 | 그 이름의 것만 남는다 |
 | 이름 순으로 정렬해 훑는다 | 정의 셋, 전역 역할 있음 | 이름 오름차순 조회 | 이름 순서대로 온다 |
 | 페이지 크기를 생략한다 | 정의 열하나, 전역 역할 있음 | 크기 없이 조회 | 열 건까지 오고 다음 쪽이 있다고 답한다 |
-| 슈퍼관리자가 아닌 사용자가 훑는다 | 전역 역할 없음, 어느 정의에나 읽기 권한 있음 | 전체 조회 | 역할로 거부 |
+| 슈퍼관리자가 아닌 사용자가 훑는다 | 전역 역할 없음, 자기 스코프에서 정의 읽기 권한 있음 | 전체 조회 | 역할로 거부 |
 
 마지막 줄의 상황에 읽기 권한을 함께 두는 이유는, 하나를 읽는 문과 전체를 훑는 문이 다르다는
 것을 못박기 위해서다. 정의마다 읽을 수 있어도 전체 훑기는 역할이 지킨다.
@@ -85,16 +87,17 @@ status: draft
 | 시나리오 | 상황 | 요청 | 결과 |
 |---|---|---|---|
 | 지우기 권한을 받은 사용자가 지운다 | 아무것도 딸리지 않은 정의, 그 정의에 지우기 권한 있음 | 지우기 | 지운 id를 실은 답 |
-| 허용 항목과 조각이 딸린 정의를 지운다 | 정의 하나, 그 이름의 허용 항목 하나, 그 아래 조각 하나, 지우기 권한 있음 | 지우기 | 지워지고 허용 항목과 조각도 함께 사라진다 |
+| 허용 항목과 조각이 딸린 정의를 지운다 | 정의 하나, 그 이름의 허용 항목 하나, 그 아래 조각 하나, 지우기 권한 있음 | 지우기 | 딸린 것이 막지 않고 지운 id를 실은 답 |
 | 아무 권한도 받지 않은 사용자가 지운다 | 같은 정의 | 지우기 | 권한 부족으로 거부 |
 | 슈퍼관리자가 아무것도 갖지 않은 id를 지운다 | 슈퍼관리자 | 없는 id를 지우기 | 대상 없음으로 거부 |
 
 딸린 것이 있어도 지우기를 막는 검사가 없다. 허용 항목과 조각은 데이터베이스가 함께 지우므로
-행은 사라지지만, 그 행들이 권한 그래프에 남긴 자리는 그대로 남는다. 줄을 적기 전에 그 자리를
-어떻게 할 것인지 정한다.
+행은 사라지지만, 그 행들이 권한 그래프에 남긴 자리는 그대로 남는다. 시나리오는 답만 보므로
+함께 사라지는 것은 줄에 적지 않는다. 남는 자리를 어떻게 할 것인지는 따로 정한다.
 
 이 어댑터에는 soft delete가 없다. 지우면 행이 사라지고 되살리는 문도 없다.
 
 ## 아직 적지 않은 것
 
-없다. 어댑터가 내놓는 다섯 호출이 모두 위에 있다.
+어댑터가 내놓는 다섯 호출이 모두 위에 있다. 실행 결과에 남는 `batch_load_fields`는 어댑터
+공통 바탕이 물려주는 필드 읽기이고, 이 엔티티는 필드를 갖지 않아 부를 자리가 없다.
