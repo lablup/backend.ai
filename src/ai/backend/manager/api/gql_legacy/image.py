@@ -104,7 +104,7 @@ from .base import (
     ResourceLimit,
     ResourceLimitInput,
     batch_multiresult_in_scalar_stream,
-    extract_object_uuid,
+    extract_image_uuid,
     generate_sql_info_for_gql_connection,
 )
 from .gql_relay import AsyncNode, Connection, ConnectionResolverResult, ResolvedGlobalID
@@ -773,7 +773,7 @@ class ForgetImageById(graphene.Mutation):  # type: ignore[misc]
         image_id: str,
     ) -> ForgetImageById:
         log.info("forget image {0} by API request", image_id)
-        image_uuid = extract_object_uuid(info, image_id, "image")
+        image_uuid = extract_image_uuid(info, image_id)
 
         ctx: GraphQueryContext = info.context
 
@@ -869,7 +869,7 @@ class PurgeImageById(graphene.Mutation):  # type: ignore[misc]
         options: PurgeImageOptions,
     ) -> PurgeImageById:
         log.info("purge image row {0} by API request", image_id)
-        image_uuid = extract_object_uuid(info, image_id, "image")
+        image_uuid = extract_image_uuid(info, image_id)
 
         ctx: GraphQueryContext = info.context
         result = await ctx.processors.image.purge_image_by_id.run(
@@ -910,7 +910,7 @@ class UntagImageFromRegistry(graphene.Mutation):  # type: ignore[misc]
         info: graphene.ResolveInfo,
         image_id: str,
     ) -> UntagImageFromRegistry:
-        image_uuid = extract_object_uuid(info, image_id, "image")
+        image_uuid = extract_image_uuid(info, image_id)
 
         log.info("remove image from registry {0} by API request", str(image_uuid))
         ctx: GraphQueryContext = info.context

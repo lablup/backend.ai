@@ -101,15 +101,15 @@ one place per domain.
 | `ObjectNotFound` | names its row kind only as the `object_name` string, so it has no type to answer with |
 | `ObjectNotFound` raised in `clients/container_registry/harbor.py` | a Harbor quota, the registry's own object |
 | `ObjectNotFound` raised in `services/resource_group/service.py` | the AppProxy client pool the manager was started without |
-| `ObjectNotFound` raised in `api/gql_legacy/base.py` | `extract_object_uuid` takes its row kind as a caller-supplied string |
 | `ObjectNotFound` raised in `services/auth/service.py` | "no such project or not a member" is one answer for two cases on purpose, so it names no row |
 | `URLNotFound`, `MethodNotAllowed`, `ServerFrozen`, `NotImplementedAPI`, `InvalidAPIParameters`, `InvalidGraphQLParameters`, `InvalidCursor` | the request — its path, method, parameters or cursor — refused before a row is reached |
 | `RateLimitExceeded` | how often the caller asks, not a row |
-| `GenericBadRequest`, `GenericForbidden` | every site refuses the caller ("only authorized requests", "not the account owner"), not a row |
+| `GenericBadRequest` | the request itself — an unsupported API version, an unknown scheduler operation, a parameter left out — or a Harbor quota that already exists |
+| `GenericForbidden` | every site refuses the caller ("only authorized requests", "not the account owner"), not a row |
 | `Forbidden` | every site is about a vfolder, but it reports `ErrorOperation.ACCESS`, which no `ActionOperationType` maps to, and the WebUI branches on `vfolder_access_forbidden` |
 | `RejectedByHook` | a plugin hook's answer; `plugin` is a system domain by the `AGENTS.md` table |
 | `InternalServerError`, `ServerMisconfiguredError`, `ServiceUnavailable` | the manager itself |
-| `RepositoryError`, `UpsertEmptyResultError`, `UnsupportedCompositePrimaryKeyError`, `EmptyOperationScopeError`, `AmbiguousEntityKeyError` | a schema or invariant fault the generic ops hit: a key that is not unique, a composite primary key, an empty scope. The row's kind is at hand in the lookup, but what failed is the key |
+| `RepositoryError`, `UpsertEmptyResultError`, `UnsupportedCompositePrimaryKeyError`, `EmptyOperationScopeError`, `AmbiguousEntityKeyError` | a schema or invariant fault the generic ops hit: a key that is not unique, a composite primary key, an empty scope, an upsert that returned no row. The row's kind is at hand in the lookup, but what failed is the key |
 | `RepositoryIntegrityError` and its five SQLSTATE kinds | what an `IntegrityErrorCheck` matches on by `violation_type`; the row-facing error is the check's `error` |
 | `InvalidBgtaskId` | `bgtask` has no `EntityType` or `FieldType`; it is a system domain by the `AGENTS.md` table |
 
