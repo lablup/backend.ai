@@ -82,12 +82,12 @@ class Executing(When[APresetAndACaller, PrometheusQueryPresetAdapter, Result]):
     @override
     def describe(self, laid: APresetAndACaller) -> str:
         target = "아무것도 갖지 않은 id" if self.other is not None else laid.preset.name
-        how = [f"{key}={value}" for key, value in self.filter_labels]
-        how.extend(f"묶음 {one}" for one in self.group_labels)
+        how = [f"{key}={value} 라벨로" for key, value in self.filter_labels]
+        how.extend(f"{one}로 묶어" for one in self.group_labels)
         if self.time_window is not None:
-            how.append(f"창 {self.time_window}")
+            how.append(f"창 {self.time_window}로")
         if self.over_a_range:
-            how.append("구간")
+            how.append("구간을 주고")
         return f"{laid.caller.username}이 {target}을 {', '.join(how) or '아무것도 주지 않고'} 실행"
 
     @override
@@ -443,7 +443,7 @@ class AUserGrantedNothingMayNotRun(
     @override
     def describe(self) -> str:
         return (
-            "정의를 읽을 수는 있는 아무 권한도 받지 않은 사용자가 실행하면, 권한 부족으로 "
+            "아무 권한도 받지 않은 사용자는 정의를 읽을 수 있지만 실행하면 권한 부족으로 "
             "거부된다. 이 엔티티는 어느 스코프에도 없어 역할로는 권한을 받을 길이 없다"
         )
 
