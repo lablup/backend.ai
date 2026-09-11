@@ -81,7 +81,7 @@ async def test_rg_domain_search_is_answered_for_the_resource_group(
     denying_scope: _DenyingScopeValidator,
     regular_user: UserData,
 ) -> None:
-    processors = DomainProcessors(registry.group(GroupMeta(DomainEntityType())), MagicMock(), [])
+    processors = DomainProcessors(registry.group(GroupMeta(DomainEntityType())), MagicMock())
     resource_group_id = ResourceGroupID(uuid.uuid4())
     action = ScopedSearchDomainsAction(
         items=[ResourceGroupDomainScopeItem(resource_group_id=resource_group_id)],

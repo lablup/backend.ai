@@ -1,6 +1,5 @@
 from ai.backend.common.data.entity.permission import PermissionFieldType
 from ai.backend.common.data.entity.user_role import UserRoleFieldType
-from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.registry.field import LookupFieldGroup
 from ai.backend.manager.actions.registry.group import ProcessorGroup
 from ai.backend.manager.actions.registry.types import FieldGroupMeta
@@ -146,7 +145,6 @@ class PermissionControllerProcessors:
         role_group: ProcessorGroup[RoleData],
         user_group: ProcessorGroup[UserData],
         service: PermissionControllerService,
-        action_monitors: list[ActionMonitor],
     ) -> None:
         self.create_role = role_group.entity_create_ops(CreateRoleAction)
         self.update_role = role_group.single_update_ops(UpdateRoleAction)

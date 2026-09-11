@@ -134,7 +134,6 @@ def agent_processors(
     return AgentProcessors(
         processor_registry.group(GroupMeta(AgentEntityType())),
         service,
-        [],
     )
 
 

@@ -63,7 +63,6 @@ def permission_controller_processors(
         processor_registry.group(GroupMeta(RoleEntityType())),
         processor_registry.group(GroupMeta(UserEntityType())),
         service=service,
-        action_monitors=[],
     )
 
 

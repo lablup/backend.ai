@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from typing import Any
 
-from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.registry.group import ProcessorGroup
 from ai.backend.manager.actions.registry.relation import RelationGroup
 from ai.backend.manager.actions.v2.relation.processor import RelationActionProcessor
@@ -96,7 +95,6 @@ class RbacProcessors:
         service: RbacRelationService,
         roster_service: RbacRosterService,
         role_service: RbacRoleService,
-        action_monitors: list[ActionMonitor],
     ) -> None:
         self.create_relation = group.relation(CreateRelationAction, service.create)
         self.purge_relation = group.relation(PurgeRelationAction, service.purge)

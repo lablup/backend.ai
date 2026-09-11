@@ -149,7 +149,6 @@ def agent_processors_mock(processor_registry: ProcessorRegistry[Any]) -> AgentPr
     return AgentProcessors(
         processor_registry.group(GroupMeta(AgentEntityType())),
         AsyncMock(),
-        [],
     )
 
 

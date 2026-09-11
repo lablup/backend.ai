@@ -525,9 +525,6 @@ def create_processors(
     monitors: ActionMonitors,
 ) -> ProcessorsBundle:
     repositories = args.service_args.repositories
-    # Legacy BaseAction-era packages consume the flat monitor list; packages migrated
-    # to the pure-ABC frameworks pick the per-type monitors from `monitors` instead.
-    action_monitors = monitors.legacy
     # One registry shared by every v2-wired package: each package wires through its
     # own group, and the registry's wired_specs() is the catalog of every
     # registered action. Built before the services because the permission controller
@@ -568,7 +565,6 @@ def create_processors(
         agent=AgentProcessors(
             resource_group_groups.group(GroupMeta(AgentEntityType())),
             services.agent,
-            action_monitors,
         ),
         app_config=AppConfigProcessors(
             app_config_groups.group(GroupMeta(AppConfigEntityType())),
@@ -580,7 +576,6 @@ def create_processors(
         domain=DomainProcessors(
             organization_groups.group(GroupMeta(DomainEntityType())),
             services.domain,
-            action_monitors,
         ),
         etcd_config=EtcdConfigProcessors(
             system_groups.group(GroupMeta(GlobalEntityType())), services.etcd_config
@@ -707,7 +702,6 @@ def create_processors(
             services.rbac_relation,
             services.rbac_roster,
             services.rbac_role,
-            action_monitors,
         ),
         entity_share=EntityShareProcessors(
             rbac_groups.group(GroupMeta(EntityShareEntityType())),
@@ -774,7 +768,6 @@ def create_processors(
             rbac_groups.group(GroupMeta(RoleEntityType())),
             rbac_groups.group(GroupMeta(UserEntityType())),
             services.permission_controller,
-            action_monitors,
         ),
         vfs_storage=VFSStorageProcessors(
             artifact_groups.group(GroupMeta(VFSStorageEntityType())), services.vfs_storage

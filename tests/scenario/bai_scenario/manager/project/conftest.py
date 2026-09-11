@@ -101,12 +101,10 @@ async def adapter(
         RbacRelationService(RbacRelationRepository(RelationOpsProvider(engine))),
         RbacRosterService(roster_repository),
         RbacRoleService(PermissionControllerRepository(engine), roster_repository),
-        [],
     )
     domain = DomainProcessors(
         registry.group(GroupMeta(DomainEntityType())),
         DomainService(DomainRepository(engine, provider)),
-        [],
     )
     user = UserProcessors(
         registry.group(GroupMeta(UserEntityType())),

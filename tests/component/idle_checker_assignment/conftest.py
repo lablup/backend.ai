@@ -214,7 +214,6 @@ def rbac_processors(
             PermissionControllerRepository(database_engine),
             RbacRosterRepository(RosterOpsProvider(database_engine)),
         ),
-        [],
     )
 
 

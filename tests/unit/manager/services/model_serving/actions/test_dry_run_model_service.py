@@ -29,7 +29,6 @@ from ai.backend.common.types import (
     VFolderMount,
     VFolderUsageMode,
 )
-from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.deployment.types import (
@@ -84,10 +83,6 @@ class TestDryRunModelService:
     @pytest.fixture
     def mock_storage_manager(self) -> MagicMock:
         return MagicMock(spec=StorageSessionManager)
-
-    @pytest.fixture
-    def mock_action_monitor(self) -> MagicMock:
-        return MagicMock(spec=ActionMonitor)
 
     @pytest.fixture
     def mock_event_dispatcher(self) -> MagicMock:
@@ -582,10 +577,6 @@ class TestDryRunWithDeploymentConfigOverrides:
         return MagicMock(spec=StorageSessionManager)
 
     @pytest.fixture
-    def mock_action_monitor(self) -> MagicMock:
-        return MagicMock(spec=ActionMonitor)
-
-    @pytest.fixture
     def mock_event_dispatcher(self) -> MagicMock:
         mock = MagicMock(spec=EventDispatcher)
         mock.dispatch = AsyncMock()
@@ -876,10 +867,6 @@ class TestDryRunExtraMountsHandling:
     @pytest.fixture
     def mock_storage_manager(self) -> MagicMock:
         return MagicMock(spec=StorageSessionManager)
-
-    @pytest.fixture
-    def mock_action_monitor(self) -> MagicMock:
-        return MagicMock(spec=ActionMonitor)
 
     @pytest.fixture
     def mock_event_dispatcher(self) -> MagicMock:

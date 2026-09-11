@@ -12,9 +12,7 @@ import os
 from dataclasses import asdict, dataclass, field
 from typing import Any, override
 
-from ai.backend.manager.actions.action.base import BaseAction, BaseActionTriggerMeta, ProcessResult
 from ai.backend.manager.actions.monitors import ActionMonitors
-from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.v2.bulk.monitor.base import BulkActionMonitor
 from ai.backend.manager.actions.v2.bulk.result import BulkActionProcessResult
 from ai.backend.manager.actions.v2.bulk.trigger import BulkActionTriggerMeta
@@ -63,26 +61,12 @@ class ActionRecorder:
 
     def monitors(self) -> ActionMonitors:
         return ActionMonitors(
-            legacy=[_Legacy(self)],
             single_entity=[_SingleEntity(self)],
             bulk=[_Bulk(self)],
             scope=[_Scope(self)],
             global_scope=[_Global(self)],
             lookup=[_Lookup(self)],
         )
-
-
-class _Legacy(ActionMonitor):
-    def __init__(self, recorder: ActionRecorder) -> None:
-        self._r = recorder
-
-    @override
-    async def prepare(self, action: BaseAction, meta: BaseActionTriggerMeta) -> None:
-        return None
-
-    @override
-    async def done(self, action: BaseAction, result: ProcessResult) -> None:
-        self._r.add("legacy", type(action).__name__, result.meta.status)
 
 
 class _SingleEntity(SingleEntityActionMonitor):
