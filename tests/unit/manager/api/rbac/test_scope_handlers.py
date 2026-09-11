@@ -13,7 +13,10 @@ from uuid import uuid4
 import pytest
 
 from ai.backend.common.api_handlers import BodyParam, PathParam
-from ai.backend.common.data.permission.types import RBACElementType, ScopeType
+from ai.backend.common.data.entity.domain import DomainEntityType
+from ai.backend.common.data.entity.project import ProjectEntityType
+from ai.backend.common.data.entity.types import EntityType
+from ai.backend.common.data.entity.user import UserEntityType
 from ai.backend.common.dto.manager.rbac.path import SearchScopesPathParam
 from ai.backend.common.dto.manager.rbac.request import SearchScopesRequest
 from ai.backend.manager.api.rest.rbac.handler import RBACHandler
@@ -65,11 +68,7 @@ def make_test_user_ctx() -> UserContext:
 class TestGetScopeTypesHandler:
     """Tests for get_scope_types handler."""
 
-    # Count only RBACElementType members convertible to ScopeType
-    # (the handler filters out non-convertible element types)
-    EXPECTED_SCOPE_TYPES_COUNT = len([
-        et for et in RBACElementType if et.value in {st.value for st in ScopeType}
-    ])
+    SCOPE_TYPES: list[EntityType] = [DomainEntityType(), ProjectEntityType(), UserEntityType()]
 
     @pytest.fixture
     def mock_permission_controller(self) -> MagicMock:
@@ -86,7 +85,7 @@ class TestGetScopeTypesHandler:
         """Test get_scope_types returns all scope types for superadmin."""
         handler = make_test_handler(mock_permission_controller)
         ctx = make_test_superadmin_ctx()
-        action_result = GetScopeTypesActionResult(element_types=list(RBACElementType))
+        action_result = GetScopeTypesActionResult(entity_types=self.SCOPE_TYPES)
         mock_permission_controller.get_scope_types.wait_for_complete.return_value = action_result
 
         response = await handler.get_scope_types(ctx=ctx)
@@ -95,7 +94,7 @@ class TestGetScopeTypesHandler:
         response_json = response.to_json
         assert isinstance(response_json, dict)
         assert "items" in response_json
-        assert len(response_json["items"]) == self.EXPECTED_SCOPE_TYPES_COUNT
+        assert response_json["items"] == self.SCOPE_TYPES
 
     async def test_get_scope_types_rejects_non_superadmin(
         self,
@@ -114,7 +113,7 @@ class TestSearchScopesHandler:
 
     # Constants
     TEST_DOMAIN_NAME = "test-domain"
-    TEST_SCOPE_TYPE = ScopeType.DOMAIN
+    TEST_SCOPE_TYPE = DomainEntityType()
     DEFAULT_LIMIT = 10
     DEFAULT_OFFSET = 0
     PAGINATION_LIMIT = 5
@@ -130,7 +129,7 @@ class TestSearchScopesHandler:
         return pc
 
     @staticmethod
-    def _make_path_param(scope_type: ScopeType) -> PathParam[SearchScopesPathParam]:
+    def _make_path_param(scope_type: EntityType) -> PathParam[SearchScopesPathParam]:
         param = MagicMock(spec=PathParam)
         param.parsed = SearchScopesPathParam(scope_type=scope_type)
         return param
@@ -214,7 +213,7 @@ class TestSearchScopesHandler:
         assert isinstance(response_json, dict)
         assert "items" in response_json
         assert len(response_json["items"]) == len(single_scope_result.result.items)
-        assert response_json["items"][0]["scope_type"] == self.TEST_SCOPE_TYPE.value
+        assert response_json["items"][0]["scope_type"] == self.TEST_SCOPE_TYPE
         assert response_json["items"][0]["name"] == self.TEST_DOMAIN_NAME
 
     async def test_search_scopes_with_pagination(
@@ -257,7 +256,7 @@ class TestSearchScopesHandler:
         mock_permission_controller.search_scopes.wait_for_complete.assert_called_once()
         call_args = mock_permission_controller.search_scopes.wait_for_complete.call_args
         action = call_args[0][0]
-        assert action.element_type == self.TEST_SCOPE_TYPE.to_element()
+        assert action.scope_type == self.TEST_SCOPE_TYPE
 
     async def test_search_scopes_rejects_non_superadmin(
         self,

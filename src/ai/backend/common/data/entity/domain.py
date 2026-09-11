@@ -1,15 +1,9 @@
 from typing import override
 
-from ai.backend.common.data.entity.types import (
-    EntityIdentifier,
-    EntityType,
-    NaturalKey,
-    ScopeType,
-)
+from ai.backend.common.data.entity.types import EntityIdentifier, EntityType, NaturalKey
 
 __all__ = (
     "DomainEntityType",
-    "DOMAIN_SCOPE_TYPE",
     "DomainID",
     "DomainName",
 )
@@ -25,9 +19,6 @@ class DomainEntityType(EntityType):
     @classmethod
     def description(cls) -> str:
         return "The top-level tenant holding projects and users."
-
-
-DOMAIN_SCOPE_TYPE = ScopeType(DomainEntityType())
 
 
 class DomainID(EntityIdentifier):

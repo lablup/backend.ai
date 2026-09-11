@@ -71,6 +71,8 @@ class RuntimeVariantPresetData(EntityData):
     default_value: str | None
     key: str
     required: bool
+    added_version: str | None
+    deprecated_version: str | None
     category: str | None
     ui_type: str | None
     display_name: str | None

@@ -25,7 +25,6 @@ from sqlalchemy.orm.strategy_options import _AbstractLoad
 from sqlalchemy.sql.expression import SQLColumnExpression
 
 from ai.backend.common.data.entity.domain import DomainID
-from ai.backend.common.data.entity.types import ScopeID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.types import ReadableCIDR
@@ -207,7 +206,7 @@ class UserRow(LifecycleTimestampsMixin, Base):
     )
 
     @classmethod
-    def scope_id_expr(cls) -> SQLColumnExpression[ScopeID]:
+    def scope_id_expr(cls) -> SQLColumnExpression[UserID]:
         return cls.uuid
 
     @classmethod

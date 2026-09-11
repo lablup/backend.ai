@@ -42,6 +42,11 @@ from ai.backend.manager.models.fair_share.scopes import (
     ProjectFairShareOperationScope,
     UserFairShareOperationScope,
 )
+from ai.backend.manager.models.fair_share.upserters import (
+    DomainFairShareUpserter,
+    ProjectFairShareUpserter,
+    UserFairShareUpserter,
+)
 from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.project import AssocGroupUserRow, ProjectRow
 from ai.backend.manager.models.rbac_models import RoleRow, UserRoleRow
@@ -66,14 +71,15 @@ from ai.backend.manager.models.user import (
     UserStatus,
 )
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.base import BatchQuerier, Creator
+from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
+from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
+from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.fair_share import (
-    DomainFairShareCreatorSpec,
     FairShareRepository,
-    ProjectFairShareCreatorSpec,
-    UserFairShareCreatorSpec,
 )
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.secret.types import SecretValue
+from ai.backend.manager.types import TriState
 from ai.backend.testutils.db import with_tables
 from ai.backend.testutils.fixtures import DomainFixtureData
 
@@ -111,6 +117,8 @@ class TestSearchDomainFairSharesEntityBased:
                 DomainFairShareRow,
                 ProjectFairShareRow,
                 UserFairShareRow,
+                VirtualEntityRow,
+                EntityMembershipRow,
             ],
         ):
             yield database_connection
@@ -143,7 +151,7 @@ class TestSearchDomainFairSharesEntityBased:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> FairShareRepository:
-        return FairShareRepository(db_with_cleanup)
+        return FairShareRepository(db_with_cleanup, V2DBOpsProvider(db_with_cleanup))
 
     @pytest.fixture
     async def domain_with_record(
@@ -173,14 +181,13 @@ class TestSearchDomainFairSharesEntityBased:
             )
             await db_sess.commit()
 
-        await fair_share_repository.create_domain_fair_share(
-            Creator(
-                spec=DomainFairShareCreatorSpec(
-                    resource_group=resource_group,
-                    resource_group_id=RESOURCE_GROUP_ID,
-                    domain_name=domain_name,
-                    weight=Decimal("2.0"),  # Explicit weight for use_default=False
-                )
+        await fair_share_repository.upsert_domain_fair_share(
+            DomainFairShareUpserter(
+                resource_group=resource_group,
+                resource_group_id=RESOURCE_GROUP_ID,
+                domain_name=domain_name,
+                # Explicit weight for use_default=False
+                weight=TriState.update(Decimal("2.0")),
             )
         )
         return DomainFixtureData(domain_name=DomainName(domain_name), domain_id=domain_id)
@@ -340,14 +347,13 @@ class TestSearchDomainFairSharesEntityBased:
             await db_sess.commit()
 
         for name in domain_names[:2]:
-            await fair_share_repository.create_domain_fair_share(
-                Creator(
-                    spec=DomainFairShareCreatorSpec(
-                        resource_group=resource_group,
-                        resource_group_id=RESOURCE_GROUP_ID,
-                        domain_name=name,
-                        weight=Decimal("2.0"),  # Explicit weight for use_default=False
-                    )
+            await fair_share_repository.upsert_domain_fair_share(
+                DomainFairShareUpserter(
+                    resource_group=resource_group,
+                    resource_group_id=RESOURCE_GROUP_ID,
+                    domain_name=name,
+                    # Explicit weight for use_default=False
+                    weight=TriState.update(Decimal("2.0")),
                 )
             )
         return domain_names
@@ -683,6 +689,8 @@ class TestSearchProjectFairSharesEntityBased:
                 DomainFairShareRow,
                 ProjectFairShareRow,
                 UserFairShareRow,
+                VirtualEntityRow,
+                EntityMembershipRow,
             ],
         ):
             yield database_connection
@@ -742,7 +750,7 @@ class TestSearchProjectFairSharesEntityBased:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> FairShareRepository:
-        return FairShareRepository(db_with_cleanup)
+        return FairShareRepository(db_with_cleanup, V2DBOpsProvider(db_with_cleanup))
 
     @pytest.fixture
     async def project_with_record(
@@ -782,15 +790,14 @@ class TestSearchProjectFairSharesEntityBased:
             )
             await db_sess.commit()
 
-        await fair_share_repository.create_project_fair_share(
-            Creator(
-                spec=ProjectFairShareCreatorSpec(
-                    resource_group=resource_group,
-                    resource_group_id=RESOURCE_GROUP_ID,
-                    project_id=project_id,
-                    domain_name=domain_name,
-                    weight=Decimal("2.0"),  # Explicit weight for use_default=False
-                )
+        await fair_share_repository.upsert_project_fair_share(
+            ProjectFairShareUpserter(
+                resource_group=resource_group,
+                resource_group_id=RESOURCE_GROUP_ID,
+                project_id=project_id,
+                domain_name=domain_name,
+                # Explicit weight for use_default=False
+                weight=TriState.update(Decimal("2.0")),
             )
         )
         return project_id
@@ -1074,6 +1081,8 @@ class TestSearchUserFairSharesEntityBased:
                 DomainFairShareRow,
                 ProjectFairShareRow,
                 UserFairShareRow,
+                VirtualEntityRow,
+                EntityMembershipRow,
             ],
         ):
             yield database_connection
@@ -1170,7 +1179,7 @@ class TestSearchUserFairSharesEntityBased:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> FairShareRepository:
-        return FairShareRepository(db_with_cleanup)
+        return FairShareRepository(db_with_cleanup, V2DBOpsProvider(db_with_cleanup))
 
     async def _create_user(
         self,
@@ -1258,16 +1267,15 @@ class TestSearchUserFairSharesEntityBased:
         """Create a user with fair share record."""
         user_uuid = await self._create_user(db_with_cleanup, domain_name, project_id)
 
-        await fair_share_repository.create_user_fair_share(
-            Creator(
-                spec=UserFairShareCreatorSpec(
-                    resource_group=resource_group,
-                    resource_group_id=RESOURCE_GROUP_ID,
-                    user_uuid=user_uuid,
-                    project_id=project_id,
-                    domain_name=domain_name,
-                    weight=Decimal("2.0"),  # Explicit weight for use_default=False
-                )
+        await fair_share_repository.upsert_user_fair_share(
+            UserFairShareUpserter(
+                resource_group=resource_group,
+                resource_group_id=RESOURCE_GROUP_ID,
+                user_uuid=user_uuid,
+                project_id=project_id,
+                domain_name=domain_name,
+                # Explicit weight for use_default=False
+                weight=TriState.update(Decimal("2.0")),
             )
         )
         return user_uuid

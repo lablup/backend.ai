@@ -69,5 +69,5 @@ the entity type, shape, operation, gate and backing.
 
 - An update or purge naming no row raises `EntityNotFoundError`, not
   `IdleCheckerNotFound`.
-- ops knows no domain, so the entity type travels in the message. Both are 404 and
-  only the `error_type` string differs.
+- ops reads the entity type off the identifier, so the code's domain is the same
+  `idle_checker`; both are 404 and only the `error_type` string differs.

@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from uuid import UUID
 
-from ai.backend.common.data.entity.types import EntityID, EntityType
+from ai.backend.common.data.entity.types import EntityType
 from ai.backend.common.data.entity.virtual_entity import VirtualEntityID
 from ai.backend.common.data.permission.types import Permission
 
@@ -17,7 +18,7 @@ __all__ = (
 class VirtualEntityData:
     id: VirtualEntityID
     entity_type: EntityType
-    entity_id: EntityID
+    entity_id: UUID
 
 
 @dataclass(frozen=True)

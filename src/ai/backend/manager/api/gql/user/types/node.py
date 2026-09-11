@@ -14,8 +14,10 @@ from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.dto.manager.v2.user.response import UserNode
 from ai.backend.common.dto.manager.v2.user.types import UserFairShareScope, UserUsageScope
 from ai.backend.common.exception import InvalidAPIParameters
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
+    gql_added_field,
     gql_connection_type,
     gql_federation_type,
     gql_field,
@@ -46,6 +48,11 @@ if TYPE_CHECKING:
         ProjectV2OrderBy,
     )
     from ai.backend.manager.api.gql.project_v2.types.node import ProjectV2Connection
+    from ai.backend.manager.api.gql.resource_group.types import (
+        ResourceGroupConnection,
+        ResourceGroupFilterGQL,
+        ResourceGroupOrderByGQL,
+    )
 
 
 @gql_pydantic_input(
@@ -271,6 +278,80 @@ class UserV2GQL(PydanticNodeMixin[UserNode]):
             count=payload.total_count,
         )
 
+    @gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Resource groups this user may schedule on.",
+        )
+    )  # type: ignore[misc]
+    async def resource_groups(
+        self,
+        info: Info[StrawberryGQLContext],
+        filter: Annotated[
+            ResourceGroupFilterGQL,
+            strawberry.lazy("ai.backend.manager.api.gql.resource_group.types"),
+        ]
+        | None = None,
+        order_by: list[
+            Annotated[
+                ResourceGroupOrderByGQL,
+                strawberry.lazy("ai.backend.manager.api.gql.resource_group.types"),
+            ]
+        ]
+        | None = None,
+        before: str | None = None,
+        after: str | None = None,
+        first: int | None = None,
+        last: int | None = None,
+        limit: int | None = None,
+        offset: int | None = None,
+    ) -> (
+        Annotated[
+            ResourceGroupConnection,
+            strawberry.lazy("ai.backend.manager.api.gql.resource_group.types"),
+        ]
+        | None
+    ):
+        from strawberry.relay import PageInfo
+
+        from ai.backend.common.dto.manager.v2.rbac.types import UUIDScope
+        from ai.backend.common.dto.manager.v2.resource_group.request import (
+            ScopedSearchResourceGroupsInput,
+        )
+        from ai.backend.common.dto.manager.v2.resource_group.types import ResourceGroupScope
+        from ai.backend.manager.api.gql.base import encode_cursor
+        from ai.backend.manager.api.gql.resource_group.types import (
+            ResourceGroupConnection,
+            ResourceGroupEdge,
+            ResourceGroupGQL,
+        )
+
+        payload = await info.context.adapters.resource_group.scoped_search(
+            ScopedSearchResourceGroupsInput(
+                scope=ResourceGroupScope(user=[UUIDScope(value=UUID(str(self.id)))]),
+                filter=filter.to_pydantic() if filter else None,
+                order=[o.to_pydantic() for o in order_by] if order_by else None,
+                first=first,
+                after=after,
+                last=last,
+                before=before,
+                limit=limit,
+                offset=offset,
+            )
+        )
+        nodes = [ResourceGroupGQL.from_pydantic(data) for data in payload.items]
+        edges = [ResourceGroupEdge(node=node, cursor=encode_cursor(node.id)) for node in nodes]
+        return ResourceGroupConnection(
+            edges=edges,
+            page_info=PageInfo(
+                has_next_page=payload.has_next_page,
+                has_previous_page=payload.has_previous_page,
+                start_cursor=edges[0].cursor if edges else None,
+                end_cursor=edges[-1].cursor if edges else None,
+            ),
+            count=payload.total_count,
+        )
+
     @classmethod
     @override
     async def resolve_nodes(  # type: ignore[override]  # Strawberry Node uses AwaitableOrValue overloads incompatible with async def
@@ -281,7 +362,7 @@ class UserV2GQL(PydanticNodeMixin[UserNode]):
         required: bool = False,
     ) -> Iterable[Self | None]:
         results = await info.context.data_loaders.user_loader.load_many([
-            UUID(nid) for nid in node_ids
+            UserID(UUID(nid)) for nid in node_ids
         ])
         return cast(list[Self | None], results)
 

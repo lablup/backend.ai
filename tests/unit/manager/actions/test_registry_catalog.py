@@ -35,11 +35,10 @@ from ai.backend.common.data.entity.deployment_preset import DeploymentPresetEnti
 from ai.backend.common.data.entity.domain import DomainEntityType
 from ai.backend.common.data.entity.entity_label import EntityLabelFieldType
 from ai.backend.common.data.entity.entity_share import EntityShareEntityType
-from ai.backend.common.data.entity.export import ExportEntityType
 from ai.backend.common.data.entity.fair_share import (
-    DomainFairShareEntityType,
-    ProjectFairShareEntityType,
-    UserFairShareEntityType,
+    DomainFairShareFieldType,
+    ProjectFairShareFieldType,
+    UserFairShareFieldType,
 )
 from ai.backend.common.data.entity.idle_checker import IdleCheckerEntityType
 from ai.backend.common.data.entity.image import ImageEntityType
@@ -75,6 +74,7 @@ from ai.backend.common.data.entity.service_catalog import ServiceCatalogEntityTy
 from ai.backend.common.data.entity.session import SessionEntityType
 from ai.backend.common.data.entity.session_template import SessionTemplateEntityType
 from ai.backend.common.data.entity.storage_namespace import StorageNamespaceEntityType
+from ai.backend.common.data.entity.types import GlobalEntityType
 from ai.backend.common.data.entity.user import UserEntityType
 from ai.backend.common.data.entity.vfolder import VFolderEntityType
 from ai.backend.common.data.entity.vfolder_invitation import VFolderInvitationEntityType
@@ -105,6 +105,11 @@ from ai.backend.manager.actions.v2.validators import ActionValidators
 from ai.backend.manager.data.artifact.types import ArtifactRevisionData
 from ai.backend.manager.data.audit_log.types import AuditLogData
 from ai.backend.manager.data.entity_label.types import EntityLabelData
+from ai.backend.manager.data.fair_share.types import (
+    DomainFairShareData,
+    ProjectFairShareData,
+    UserFairShareData,
+)
 from ai.backend.manager.data.secret.types import SecretFieldData
 from ai.backend.manager.repositories.ops.repository import OpsRepository
 from ai.backend.manager.services.agent.actions.bulk_get import BulkGetAgentsAction
@@ -443,9 +448,7 @@ def test_every_defined_v2_action_is_wired() -> None:
     StorageNamespaceProcessors(registry.group(GroupMeta(StorageNamespaceEntityType())))
     DeploymentPresetProcessors(registry.group(GroupMeta(DeploymentPresetEntityType())), MagicMock())
     DomainProcessors(registry.group(GroupMeta(DomainEntityType())), MagicMock(), [])
-    PermissionControllerProcessors(
-        registry.group(GroupMeta(RoleEntityType())), MagicMock(), [], MagicMock()
-    )
+    PermissionControllerProcessors(registry.group(GroupMeta(RoleEntityType())), MagicMock(), [])
     ProjectProcessors(registry.group(GroupMeta(ProjectEntityType())), MagicMock())
     UserProcessors(
         registry.group(GroupMeta(UserEntityType())),
@@ -457,9 +460,15 @@ def test_every_defined_v2_action_is_wired() -> None:
         MagicMock(),
     )
     FairShareProcessors(
-        fair_share_groups.group(GroupMeta(DomainFairShareEntityType())),
-        fair_share_groups.group(GroupMeta(ProjectFairShareEntityType())),
-        fair_share_groups.group(GroupMeta(UserFairShareEntityType())),
+        fair_share_groups.dangling_field_group(
+            FieldGroupMeta(DomainFairShareFieldType()), DomainFairShareData
+        ),
+        fair_share_groups.dangling_field_group(
+            FieldGroupMeta(ProjectFairShareFieldType()), ProjectFairShareData
+        ),
+        fair_share_groups.dangling_field_group(
+            FieldGroupMeta(UserFairShareFieldType()), UserFairShareData
+        ),
         MagicMock(),
     )
     ResourcePresetProcessors(registry.group(GroupMeta(ResourcePresetEntityType())), MagicMock())
@@ -480,7 +489,14 @@ def test_every_defined_v2_action_is_wired() -> None:
         registry.group(GroupMeta(ContainerRegistryEntityType())), MagicMock()
     )
     ImageProcessors(registry.group(GroupMeta(ImageEntityType())), MagicMock())
-    ExportProcessors(registry.group(GroupMeta(ExportEntityType())), MagicMock())
+    ExportProcessors(
+        registry.group(GroupMeta(UserEntityType())),
+        registry.group(GroupMeta(SessionEntityType())),
+        registry.group(GroupMeta(ProjectEntityType())),
+        registry.group(GroupMeta(GlobalEntityType())),
+        registry.dangling_field_group(FieldGroupMeta(AuditLogFieldType()), AuditLogData),
+        MagicMock(),
+    )
     TemplateProcessors(registry.group(GroupMeta(SessionTemplateEntityType())), MagicMock())
     SchedulingHistoryProcessors(
         scheduling_history_groups.group(GroupMeta(SessionEntityType())),

@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
-from pydantic import Field
+from pydantic import Field, model_validator
 
 from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.dto.manager.query import StringFilter, UUIDFilter
+from ai.backend.common.dto.manager.v2.rbac.types import UUIDScope
 from ai.backend.common.types import SlotTypes
 
 from .types import (
@@ -22,7 +23,9 @@ __all__ = (
     "AdminSearchResourceAllocationsInput",
     "AdminSearchResourceSlotTypesInput",
     "AgentResourceFilter",
+    "AgentResourceScope",
     "AgentResourceOrder",
+    "ScopedSearchAgentResourcesInput",
     "AllocatedResourceSlotFilter",
     "AllocatedResourceSlotOrder",
     "CreateResourceSlotTypeInput",
@@ -185,6 +188,35 @@ class AgentResourceOrder(BaseRequestModel):
 
     field: AgentResourceOrderField = Field(description="Field to order by.")
     direction: OrderDirection = Field(default=OrderDirection.ASC, description="Order direction.")
+
+
+class AgentResourceScope(BaseRequestModel):
+    """Scope for the scoped agent resource query.
+
+    Each list is OR'd internally. Raises an error if every field is empty.
+    """
+
+    agent: list[UUIDScope] | None = Field(
+        default=None, description="Agents whose slot rows are being read"
+    )
+
+    @model_validator(mode="after")
+    def _require_non_empty(self) -> AgentResourceScope:
+        if not self.agent:
+            raise ValueError("AgentResourceScope requires a non-empty value for 'agent'")
+        return self
+
+
+class ScopedSearchAgentResourcesInput(BaseRequestModel):
+    """Input for searching the slot rows the named agents carry."""
+
+    scope: AgentResourceScope = Field(description="Scope (OR across all items).")
+    filter: AgentResourceFilter | None = Field(default=None, description="Filter conditions.")
+    order: list[AgentResourceOrder] | None = Field(
+        default=None, description="Order specifications."
+    )
+    limit: int | None = Field(default=None, ge=1, description="Maximum items to return.")
+    offset: int | None = Field(default=None, ge=0, description="Number of items to skip.")
 
 
 class AdminSearchAgentResourcesInput(BaseRequestModel):

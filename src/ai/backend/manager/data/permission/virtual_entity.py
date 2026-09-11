@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from ai.backend.common.data.entity.types import EntityIdentifier, EntityType, ScopeRef
+from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
 from ai.backend.common.data.entity.user import UserID
 
 
@@ -22,5 +22,5 @@ class GovernCheckKey:
     scope's virtual entity (itself included)."""
 
     user_id: UserID
-    scope: ScopeRef
+    scope: EntityIdentifier
     entity_type: EntityType

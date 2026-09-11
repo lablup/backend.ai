@@ -7,12 +7,7 @@ from typing import override
 from ai.backend.common.data.app_config.types import AppConfigScopeType
 from ai.backend.common.data.entity.app_config import AppConfigScopeID
 from ai.backend.common.data.entity.app_config_fragment import AppConfigFragmentEntityType
-from ai.backend.common.data.entity.types import (
-    EntityIdentifier,
-    EntityType,
-    ScopeRef,
-    ScopeType,
-)
+from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
 from ai.backend.manager.actions.v2.ops.base import OperationScopeOpsAction
 from ai.backend.manager.data.app_config.types import AppConfigFragmentData
 from ai.backend.manager.models.app_config_fragment.row import AppConfigFragmentRow
@@ -47,11 +42,11 @@ class ScopedSearchAppConfigFragmentAction(
         return "search_app_config_fragments"
 
     @override
-    def scope_targets(self) -> Sequence[ScopeRef]:
+    def scope_targets(self) -> Sequence[EntityIdentifier]:
         owner = self.owner
         if owner is None:
             return ()
-        return (ScopeRef(scope_type=ScopeType(owner.entity_type()), scope_id=owner),)
+        return (owner,)
 
     @override
     def operation_scopes(self) -> Sequence[OperationScope]:

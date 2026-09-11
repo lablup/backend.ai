@@ -12,13 +12,12 @@ from uuid import UUID, uuid4
 import pytest
 from dateutil.tz import tzutc
 
-from ai.backend.common.data.entity.deployment import DEPLOYMENT_SCOPE_TYPE, DeploymentID
+from ai.backend.common.data.entity.deployment import DeploymentID
 from ai.backend.common.data.entity.kernel_scheduling_history import KernelSchedulingHistoryID
 from ai.backend.common.data.entity.replica import ReplicaID
 from ai.backend.common.data.entity.replica_group import ReplicaGroupID
 from ai.backend.common.data.entity.replica_group_history import ReplicaGroupHistoryID
-from ai.backend.common.data.entity.session import SESSION_SCOPE_TYPE, SessionEntityType, SessionID
-from ai.backend.common.data.entity.types import ScopeRef
+from ai.backend.common.data.entity.session import SessionEntityType, SessionID
 from ai.backend.common.types import KernelId, SessionId
 from ai.backend.manager.data.deployment.types import (
     DeploymentHandlerCategory,
@@ -425,9 +424,7 @@ class TestSearchKernelScopedHistoryAction:
         assert result.items == [history_item]
         # Authorized via session read: kernel permission records are intentionally
         # empty, so the session is the scope the search is bounded by.
-        assert action.scope_targets() == (
-            ScopeRef(scope_type=SESSION_SCOPE_TYPE, scope_id=_SESSION_ID),
-        )
+        assert action.scope_targets() == (SessionID(_SESSION_ID),)
         assert action.entity_type() == SessionEntityType()
         mock_repository.search_kernel_scoped_history.assert_awaited_once_with(
             querier=querier,
@@ -485,9 +482,7 @@ class TestScopedSearchReplicaGroupHistoryAction:
 
         assert result.items == [replica_group_history]
         # A replica group is no scope of its own, so the deployment bounds the search.
-        assert action.scope_targets() == (
-            ScopeRef(scope_type=DEPLOYMENT_SCOPE_TYPE, scope_id=_DEPLOYMENT_ID),
-        )
+        assert action.scope_targets() == (_DEPLOYMENT_ID,)
         mock_repository.scoped_search_replica_group_history.assert_awaited_once_with(
             querier=querier,
             scopes=[DeploymentReplicaGroupHistoryOperationScope(deployment_id=_DEPLOYMENT_ID)],

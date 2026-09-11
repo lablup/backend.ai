@@ -4,12 +4,12 @@ import secrets
 import uuid
 from collections.abc import AsyncIterator, Callable, Coroutine
 from typing import Any
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import MagicMock
 
 import pytest
 
 from ai.backend.client.v2.registry import BackendAIClientRegistry
-from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE
+from ai.backend.common.data.entity.project import ProjectEntityType
 from ai.backend.common.data.entity.role import RoleEntityType
 from ai.backend.common.data.entity.user import UserEntityType
 from ai.backend.common.dto.manager.rbac.request import (
@@ -19,8 +19,6 @@ from ai.backend.common.dto.manager.rbac.request import (
 from ai.backend.common.dto.manager.rbac.response import CreateRoleResponse
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
 from ai.backend.manager.actions.registry.types import Concern, ConcernMeta, GroupMeta
-from ai.backend.manager.actions.validators import ActionValidators
-from ai.backend.manager.actions.validators.rbac import RBACValidators
 from ai.backend.manager.api.rest.admin.handler import AdminHandler
 from ai.backend.manager.api.rest.admin.registry import register_admin_routes
 from ai.backend.manager.api.rest.rbac.handler import RBACHandler
@@ -39,7 +37,6 @@ from ai.backend.manager.services.permission_contoller.processors import (
 from ai.backend.manager.services.permission_contoller.service import PermissionControllerService
 from ai.backend.manager.services.rbac.processors import RbacProcessors
 from ai.backend.manager.services.rbac.service import RbacRoleService
-from ai.backend.testutils.action_validators import mock_virtual_entity_rbac_validators
 
 RoleFactory = Callable[..., Coroutine[Any, Any, CreateRoleResponse]]
 
@@ -52,17 +49,12 @@ def permission_controller_processors(
     repo = PermissionControllerRepository(database_engine)
     service = PermissionControllerService(
         repo,
-        rbac_action_registry=[],
-    )
-    validators = ActionValidators(
-        virtual_entity_rbac=mock_virtual_entity_rbac_validators(),
-        rbac=RBACValidators(scope=AsyncMock()),
+        action_registry=processor_registry,
     )
     return PermissionControllerProcessors(
         processor_registry.group(GroupMeta(RoleEntityType())),
         service=service,
         action_monitors=[],
-        validators=validators,
     )
 
 
@@ -125,7 +117,7 @@ async def role_factory(
         unique = secrets.token_hex(4)
         params: dict[str, Any] = {
             "name": f"test-role-{unique}",
-            "scope_type": PROJECT_SCOPE_TYPE,
+            "scope_type": ProjectEntityType(),
             "scope_id": group_fixture,
             "description": f"Test role {unique}",
         }

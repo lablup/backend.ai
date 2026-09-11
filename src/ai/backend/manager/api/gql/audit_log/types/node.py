@@ -12,6 +12,9 @@ import strawberry
 from strawberry import Info
 from strawberry.relay import Connection, Edge, NodeID
 
+from ai.backend.common.data.entity.audit_log import AuditLogID
+from ai.backend.common.data.entity.types import EntityType, RuntimeEntityID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.dto.manager.v2.audit_log.response import AuditLogNode
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.decorators import (
@@ -26,6 +29,7 @@ from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 
 if TYPE_CHECKING:
+    from ai.backend.manager.api.gql.rbac.types.entity_node import EntityNodeGQL
     from ai.backend.manager.api.gql.user.types.node import UserV2GQL
 
 
@@ -91,6 +95,36 @@ class AuditLogV2GQL(PydanticNodeMixin[AuditLogNode]):
         )
     )
 
+    @gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description=(
+                "The entity the logged operation acted on. Null when the log names no entity, "
+                "or when the recorded id does not name one that still exists."
+            ),
+        )
+    )  # type: ignore[misc]
+    async def entity(
+        self,
+        info: Info[StrawberryGQLContext],
+    ) -> (
+        Annotated[
+            EntityNodeGQL,
+            strawberry.lazy("ai.backend.manager.api.gql.rbac.types.entity_node"),
+        ]
+        | None
+    ):
+        if self.entity_type is None or self.entity_id is None:
+            return None
+        try:
+            entity_uuid = UUID(self.entity_id)
+        except ValueError:
+            # Older rows recorded a name rather than a uuid; those name no node.
+            return None
+        return await info.context.data_loaders.entity_node_loader.load(
+            RuntimeEntityID(EntityType(self.entity_type), entity_uuid)
+        )
+
     @gql_field(
         description="The user who triggered this audit log entry, resolved from triggered_by UUID."
     )  # type: ignore[misc]
@@ -110,7 +144,7 @@ class AuditLogV2GQL(PydanticNodeMixin[AuditLogNode]):
             user_uuid = UUID(self.triggered_by)
         except ValueError:
             return None
-        user_data = await info.context.data_loaders.user_loader.load(user_uuid)
+        user_data = await info.context.data_loaders.user_loader.load(UserID(user_uuid))
         if user_data is None:
             return None
         return user_data
@@ -136,7 +170,7 @@ class AuditLogV2GQL(PydanticNodeMixin[AuditLogNode]):
     ):
         if self.acted_as is None:
             return None
-        user_data = await info.context.data_loaders.user_loader.load(self.acted_as)
+        user_data = await info.context.data_loaders.user_loader.load(UserID(self.acted_as))
         if user_data is None:
             return None
         return user_data
@@ -151,7 +185,7 @@ class AuditLogV2GQL(PydanticNodeMixin[AuditLogNode]):
         required: bool = False,
     ) -> Iterable[Self | None]:
         results = await info.context.data_loaders.audit_log_loader.load_many([
-            UUID(nid) for nid in node_ids
+            AuditLogID(UUID(nid)) for nid in node_ids
         ])
         return cast(list[Self | None], results)
 

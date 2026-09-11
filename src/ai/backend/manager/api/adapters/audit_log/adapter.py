@@ -60,7 +60,7 @@ class AuditLogAdapter(BaseAdapter):
     def __init__(self, audit_log: AuditLogProcessors) -> None:
         self._audit_log = audit_log
 
-    async def batch_load_by_ids(self, ids: Sequence[uuid.UUID]) -> list[AuditLogNode | None]:
+    async def batch_load_by_ids(self, ids: Sequence[AuditLogID]) -> list[AuditLogNode | None]:
         """Batch load audit logs by their IDs for DataLoader use.
 
         Returns AuditLogNode DTOs in the same order as the input ids list.
@@ -147,7 +147,7 @@ class AuditLogAdapter(BaseAdapter):
                 ) from e
             items.append(
                 EntityAuditLogScopeItem(
-                    owner=RuntimeEntityID(EntityType(entity_scope.entity_type.value), entity_id),
+                    owner=RuntimeEntityID(EntityType(entity_scope.entity_type), entity_id),
                 )
             )
         for user_scope in input.scope.triggered_user or []:
@@ -164,6 +164,17 @@ class AuditLogAdapter(BaseAdapter):
                 starts_with_factory=AuditLogConditions.by_entity_type_starts_with,
                 ends_with_factory=AuditLogConditions.by_entity_type_ends_with,
                 in_factory=AuditLogConditions.by_entity_type_in,
+            )
+            if condition is not None:
+                conditions.append(condition)
+        if f.entity_id is not None:
+            condition = self.convert_string_filter(
+                f.entity_id,
+                contains_factory=AuditLogConditions.by_entity_id_contains,
+                equals_factory=AuditLogConditions.by_entity_id_equals,
+                starts_with_factory=AuditLogConditions.by_entity_id_starts_with,
+                ends_with_factory=AuditLogConditions.by_entity_id_ends_with,
+                in_factory=AuditLogConditions.by_entity_id_in,
             )
             if condition is not None:
                 conditions.append(condition)

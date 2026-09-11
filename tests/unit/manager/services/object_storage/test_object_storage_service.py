@@ -27,7 +27,7 @@ from ai.backend.manager.data.object_storage.types import (
     ObjectStorageData,
 )
 from ai.backend.manager.data.storage_namespace.types import StorageNamespaceData
-from ai.backend.manager.errors.artifact import ArtifactNotApproved, ArtifactReadonly
+from ai.backend.manager.errors.artifact import ArtifactReadonly, ArtifactRevisionNotApproved
 from ai.backend.manager.errors.common import ServerMisconfiguredError
 from ai.backend.manager.errors.object_storage import ObjectStorageOperationNotSupported
 from ai.backend.manager.repositories.artifact.repository import ArtifactRepository
@@ -240,7 +240,7 @@ class TestObjectStorageService:
             key="model.bin",
         )
 
-        with pytest.raises(ArtifactNotApproved):
+        with pytest.raises(ArtifactRevisionNotApproved):
             await object_storage_service.get_presigned_download_url(action)
 
     async def test_get_download_presigned_url_no_reservoir_config(

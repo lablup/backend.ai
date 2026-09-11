@@ -66,7 +66,7 @@ class RuntimeVariantAdapter(BaseAdapter):
         self._runtime_variant = runtime_variant
 
     async def batch_load_by_ids(
-        self, ids: Sequence[UUID]
+        self, ids: Sequence[RuntimeVariantID]
     ) -> list[RuntimeVariantNode | Exception | None]:
         """Batch load runtime variants by id for DataLoader use.
 

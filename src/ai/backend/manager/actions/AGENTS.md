@@ -20,6 +20,18 @@ decides the shape. Do not create new subclasses of the legacy `BaseAction` bases
 | `single_field` / `bulk_field` | field rows |
 | `relation` | two entities, linked or unlinked |
 
+## Searching within scopes
+
+- A `scope`-shaped search takes `items: Sequence[<Entity>ScopeItem]` and nothing else
+  standing for a scope. One action per entity, never one per scope kind.
+- `ScopeItem` (`actions/v2/ops/base.py`) declares the pair every item answers with:
+  `scope_ref()` names the scope the read is authorized against, `operation_scope()` the
+  rows it is restricted to. Declaring them together is what keeps a read from being
+  authorized against one thing and served another.
+- The action lists both back: `scope_targets()` is every item's `scope_ref()`, and
+  `operation_scopes()` every item's `operation_scope()`. Ops ORs the conditions; the gate
+  authorizes each scope, so a caller naming one they cannot see is refused the whole read.
+
 ## Linking two entities
 
 - The shape splits on **whether one side is contained in the other**.

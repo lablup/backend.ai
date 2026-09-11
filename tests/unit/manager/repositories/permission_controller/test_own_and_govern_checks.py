@@ -16,26 +16,17 @@ import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ai.backend.common.data.entity.domain import DomainID
-from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE, ProjectEntityType, ProjectID
+from ai.backend.common.data.entity.project import ProjectEntityType, ProjectID
 from ai.backend.common.data.entity.resource_group import ResourceGroupEntityType
 from ai.backend.common.data.entity.role_preset import RolePresetEntityType, RolePresetID
 from ai.backend.common.data.entity.session import SessionEntityType, SessionID
-from ai.backend.common.data.entity.types import EntityID, EntityType, ScopeRef, ScopeType
-from ai.backend.common.data.entity.user import USER_SCOPE_TYPE, UserID
+from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
+from ai.backend.common.data.entity.user import UserEntityType, UserID
 from ai.backend.common.data.entity.vfolder import VFolderEntityType, VFolderUUID
 from ai.backend.common.data.entity.virtual_entity import VirtualEntityID
 from ai.backend.common.data.permission.types import Permission
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.data.permission.status import RoleStatus
-from ai.backend.manager.data.permission.types import (
-    EntityType as PermEntityType,
-)
-from ai.backend.manager.data.permission.types import (
-    OperationType,
-)
-from ai.backend.manager.data.permission.types import (
-    ScopeType as PermScopeType,
-)
 from ai.backend.manager.data.permission.virtual_entity import (
     GovernCheckKey,
     OwnCheckKey,
@@ -52,10 +43,6 @@ from ai.backend.manager.models.entity_label.row import EntityLabelRow
 from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.project import ProjectRow
 from ai.backend.manager.models.rbac_models import UserRoleRow
-from ai.backend.manager.models.rbac_models.association_scopes_entities import (
-    AssociationScopesEntitiesRow,
-)
-from ai.backend.manager.models.rbac_models.permission.object_permission import ObjectPermissionRow
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.resource_group import ResourceGroupForDomainRow
@@ -104,12 +91,12 @@ class VSChainFixture:
     virtual_entity_id: VirtualEntityID = field(
         default_factory=lambda: VirtualEntityID(uuid.uuid4())
     )
-    owner_scope_id: uuid.UUID = field(default_factory=uuid.uuid4)
+    owner_scope_id: ProjectID = field(default_factory=lambda: ProjectID(uuid.uuid4()))
     bound_scope_id: uuid.UUID = field(default_factory=uuid.uuid4)
     bound_scope_node_id: VirtualEntityID = field(
         default_factory=lambda: VirtualEntityID(uuid.uuid4())
     )
-    entity_id: EntityID = field(default_factory=uuid.uuid4)
+    entity_id: uuid.UUID = field(default_factory=uuid.uuid4)
     entity_node_id: VirtualEntityID = field(default_factory=lambda: VirtualEntityID(uuid.uuid4()))
 
 
@@ -127,8 +114,6 @@ class VSChainSpec:
 def _single_bit_rows(
     *,
     role_id: uuid.UUID,
-    scope_type: object,
-    scope_id: str,
     entity_type: object,
     permission: Permission,
 ) -> list[PermissionRow]:
@@ -136,8 +121,6 @@ def _single_bit_rows(
     return [
         PermissionRow(
             role_id=role_id,
-            scope_type=scope_type,
-            scope_id=scope_id,
             entity_type=entity_type,
             permission=bit,
         )
@@ -165,8 +148,6 @@ class TestCheckPermissionViaVirtualEntity:
                 UserRow,
                 KeyPairRow,
                 PermissionRow,
-                ObjectPermissionRow,
-                AssociationScopesEntitiesRow,
                 VirtualEntityRow,
                 ScopeBindingRow,
                 EntityLabelRow,
@@ -222,13 +203,19 @@ class TestCheckPermissionViaVirtualEntity:
             db_sess.add(user)
             await db_sess.flush()
 
-            db_sess.add(VirtualEntityRow(entity_type=EntityType("domain"), entity_id=domain_id))
+            db_sess.add(
+                VirtualEntityRow(
+                    id=ids.bound_scope_node_id,
+                    entity_type=EntityType("project"),
+                    entity_id=ids.bound_scope_id,
+                )
+            )
             role = RoleRow(
                 id=ids.role_id,
                 name="test-role",
                 status=role_status,
-                scope_type=EntityType("domain"),
-                scope_id=domain_id,
+                scope_type=EntityType("project"),
+                scope_id=ids.bound_scope_id,
             )
             db_sess.add(role)
             await db_sess.flush()
@@ -239,21 +226,16 @@ class TestCheckPermissionViaVirtualEntity:
     def _chain_nodes(
         self,
         ids: VSChainFixture,
-        scope_type: ScopeType,
+        scope_type: EntityType,
         entity_type: EntityType,
     ) -> list[VirtualEntityRow]:
-        """The three nodes a chain names: the owner scope (the virtual entity itself),
-        the bound scope, and the member entity."""
+        """The nodes a chain names beyond the bound scope, which is made with the role:
+        the owner scope (the virtual entity itself) and the member entity."""
         return [
             VirtualEntityRow(
                 id=ids.virtual_entity_id,
                 entity_type=scope_type,
                 entity_id=ids.owner_scope_id,
-            ),
-            VirtualEntityRow(
-                id=ids.bound_scope_node_id,
-                entity_type=scope_type,
-                entity_id=ids.bound_scope_id,
             ),
             VirtualEntityRow(
                 id=ids.entity_node_id,
@@ -276,9 +258,7 @@ class TestCheckPermissionViaVirtualEntity:
             db_sess.add(
                 DomainRow(id=domain_id, name=domain_name, total_resource_slots=ResourceSlot())
             )
-            db_sess.add_all(
-                self._chain_nodes(ids, ScopeType(ProjectEntityType()), _TARGET_ENTITY_TYPE)
-            )
+            db_sess.add_all(self._chain_nodes(ids, ProjectEntityType(), _TARGET_ENTITY_TYPE))
             await db_sess.flush()
 
             db_sess.add(
@@ -295,9 +275,7 @@ class TestCheckPermissionViaVirtualEntity:
             db_sess.add_all(
                 _single_bit_rows(
                     role_id=ids.role_id,
-                    scope_type=PermScopeType.PROJECT,
-                    scope_id=str(ids.bound_scope_id),
-                    entity_type=PermEntityType.VFOLDER,
+                    entity_type=VFolderEntityType(),
                     permission=spec.granted,
                 )
             )
@@ -543,9 +521,7 @@ class TestCheckPermissionViaVirtualEntity:
         """The chain of :meth:`_build_chain`, over an entity type the legacy enum
         does not name."""
         async with db.begin_session() as db_sess:
-            db_sess.add_all(
-                self._chain_nodes(ids, ScopeType(ProjectEntityType()), _UNMAPPED_ENTITY_TYPE)
-            )
+            db_sess.add_all(self._chain_nodes(ids, ProjectEntityType(), _UNMAPPED_ENTITY_TYPE))
             await db_sess.flush()
             db_sess.add(
                 ScopeBindingRow(
@@ -562,8 +538,6 @@ class TestCheckPermissionViaVirtualEntity:
             db_sess.add(
                 PermissionRow(
                     role_id=ids.role_id,
-                    scope_type=ScopeType(ProjectEntityType()),
-                    scope_id=str(ids.bound_scope_id),
                     entity_type=_UNMAPPED_ENTITY_TYPE,
                     permission=Permission.READ,
                 )
@@ -598,15 +572,11 @@ class TestCheckPermissionViaVirtualEntity:
         async with db_with_rbac_tables.begin_session() as db_sess:
             await db_sess.execute(
                 sa.text(
-                    "INSERT INTO permissions"
-                    " (role_id, scope_type, scope_id, entity_type, permission)"
-                    " VALUES"
-                    " (:role_id, :scope_type, :scope_id, :entity_type, :permission)"
+                    "INSERT INTO permissions (role_id, entity_type, permission)"
+                    " VALUES (:role_id, :entity_type, :permission)"
                 ),
                 {
                     "role_id": fixture_ids.role_id,
-                    "scope_type": str(ScopeType(ProjectEntityType())),
-                    "scope_id": str(fixture_ids.bound_scope_id),
                     "entity_type": str(_UNMAPPED_ENTITY_TYPE),
                     "permission": int(Permission.READ),
                 },
@@ -639,8 +609,6 @@ class TestUserRosterEnrollment:
                 UserRow,
                 KeyPairRow,
                 PermissionRow,
-                ObjectPermissionRow,
-                AssociationScopesEntitiesRow,
                 VirtualEntityRow,
                 ScopeBindingRow,
                 EntityMembershipRow,
@@ -679,9 +647,9 @@ class TestUserRosterEnrollment:
         self,
         db: ExtendedAsyncSAEngine,
         ids: VSChainFixture,
-        project_id: uuid.UUID,
-        entity_type: PermEntityType = PermEntityType.VFOLDER,
-        operation: OperationType = OperationType.READ,
+        project_id: ProjectID,
+        entity_type: EntityType | None = None,
+        operation: Permission = Permission.READ,
         permission: Permission = Permission.READ,
     ) -> None:
         """Give the user a role holding ``permission`` over ``entity_type`` on the
@@ -735,14 +703,17 @@ class TestUserRosterEnrollment:
                     resource_policy=project_policy_name,
                 )
             )
-            db_sess.add(VirtualEntityRow(entity_type=EntityType("domain"), entity_id=domain_id))
+            await self._provision_scope(
+                db_sess,
+                project_id,
+            )
             db_sess.add(
                 RoleRow(
                     id=ids.role_id,
                     name="project-role",
                     status=RoleStatus.ACTIVE,
-                    scope_type=EntityType("domain"),
-                    scope_id=domain_id,
+                    scope_type=EntityType("project"),
+                    scope_id=project_id,
                 )
             )
             await db_sess.flush()
@@ -750,9 +721,7 @@ class TestUserRosterEnrollment:
             db_sess.add_all(
                 _single_bit_rows(
                     role_id=ids.role_id,
-                    scope_type=PermScopeType.PROJECT,
-                    scope_id=str(project_id),
-                    entity_type=entity_type,
+                    entity_type=entity_type or VFolderEntityType(),
                     permission=permission,
                 )
             )
@@ -768,7 +737,7 @@ class TestUserRosterEnrollment:
         async with db.begin_session() as db_sess:
             user_vs_id = await db_sess.scalar(
                 sa.select(VirtualEntityRow.id).where(
-                    VirtualEntityRow.entity_type == USER_SCOPE_TYPE,
+                    VirtualEntityRow.entity_type == UserEntityType(),
                     VirtualEntityRow.entity_id == ids.user_id,
                 )
             )
@@ -800,7 +769,7 @@ class TestUserRosterEnrollment:
         async with db.begin_session() as db_sess:
             project_ve_id = await db_sess.scalar(
                 sa.select(VirtualEntityRow.id).where(
-                    VirtualEntityRow.entity_type == PROJECT_SCOPE_TYPE,
+                    VirtualEntityRow.entity_type == ProjectEntityType(),
                     VirtualEntityRow.entity_id == project_id,
                 )
             )
@@ -820,28 +789,28 @@ class TestUserRosterEnrollment:
         self,
         db: ExtendedAsyncSAEngine,
         roster_provider: RosterOpsProvider,
-        project_scope: ScopeRef,
-        user_scope: ScopeRef,
+        project_scope: EntityIdentifier,
+        user_scope: EntityIdentifier,
         user_id: UserID,
     ) -> None:
         async with db.begin_session() as db_sess:
             for scope in (project_scope, user_scope):
                 await self._provision_scope(db_sess, scope)
         async with roster_provider.write_ops() as roster:
-            await roster.join_member(ProjectID(project_scope.scope_id), user_id)
+            await roster.join_member(ProjectID(project_scope), user_id)
 
-    async def _provision_scope(self, db_sess: AsyncSession, scope: ScopeRef) -> None:
+    async def _provision_scope(self, db_sess: AsyncSession, scope: EntityIdentifier) -> None:
         """The node a scope stands as, with the self membership and self binding an
         entity creation writes for it. Idempotent."""
         node_id = await db_sess.scalar(
             sa.select(VirtualEntityRow.id).where(
-                VirtualEntityRow.entity_type == scope.scope_type,
-                VirtualEntityRow.entity_id == scope.scope_id,
+                VirtualEntityRow.entity_type == scope.entity_type(),
+                VirtualEntityRow.entity_id == scope,
             )
         )
         if node_id is not None:
             return
-        node = VirtualEntityRow(entity_type=scope.scope_type, entity_id=scope.scope_id)
+        node = VirtualEntityRow(entity_type=scope.entity_type(), entity_id=scope)
         db_sess.add(node)
         await db_sess.flush()
         db_sess.add(
@@ -861,8 +830,8 @@ class TestUserRosterEnrollment:
     ) -> None:
         """A project-scope grant must not resolve onto a vfolder enrolled only in the
         member user's own virtual entity: no row binds that scope into the project."""
-        project_scope = ScopeRef(scope_type=PROJECT_SCOPE_TYPE, scope_id=ids.owner_scope_id)
-        user_scope = ScopeRef(scope_type=USER_SCOPE_TYPE, scope_id=ids.user_id)
+        project_scope = ids.owner_scope_id
+        user_scope = ids.user_id
         await self._grant_on_project(db_with_rbac_tables, ids, ids.owner_scope_id)
 
         await self._enroll_user_in_project(
@@ -890,14 +859,14 @@ class TestUserRosterEnrollment:
     ) -> None:
         """The same grant does reach a session enrolled in the project's virtual entity,
         so the check above fails for the intended reason and not by accident."""
-        project_scope = ScopeRef(scope_type=PROJECT_SCOPE_TYPE, scope_id=ids.owner_scope_id)
-        user_scope = ScopeRef(scope_type=USER_SCOPE_TYPE, scope_id=ids.user_id)
+        project_scope = ids.owner_scope_id
+        user_scope = ids.user_id
         session_id = uuid.uuid4()
         await self._grant_on_project(
             db_with_rbac_tables,
             ids,
             ids.owner_scope_id,
-            entity_type=PermEntityType.SESSION,
+            entity_type=SessionEntityType(),
         )
 
         await self._enroll_user_in_project(
@@ -921,8 +890,8 @@ class TestUserRosterEnrollment:
     async def _put_vfolder_in_project_vs(
         self,
         db: ExtendedAsyncSAEngine,
-        project_id: uuid.UUID,
-        vfolder_id: uuid.UUID,
+        project_id: ProjectID,
+        vfolder_id: VFolderUUID,
         cap: Permission | None,
     ) -> None:
         """Put a vfolder into the project's virtual entity: shared under ``cap``, or
@@ -930,7 +899,7 @@ class TestUserRosterEnrollment:
         async with db.begin_session() as db_sess:
             project_ve_id = await db_sess.scalar(
                 sa.select(VirtualEntityRow.id).where(
-                    VirtualEntityRow.entity_type == PROJECT_SCOPE_TYPE,
+                    VirtualEntityRow.entity_type == ProjectEntityType(),
                     VirtualEntityRow.entity_id == project_id,
                 )
             )
@@ -960,14 +929,14 @@ class TestUserRosterEnrollment:
         """A project role holding session READ reaches sessions under a vfolder the
         project owns, and not under one merely shared into it: a share answers for
         the shared entity's own type only."""
-        project_scope = ScopeRef(scope_type=PROJECT_SCOPE_TYPE, scope_id=ids.owner_scope_id)
-        user_scope = ScopeRef(scope_type=USER_SCOPE_TYPE, scope_id=ids.user_id)
-        vfolder_id = uuid.uuid4()
+        project_scope = ids.owner_scope_id
+        user_scope = ids.user_id
+        vfolder_id = VFolderUUID(uuid.uuid4())
         await self._grant_on_project(
             db_with_rbac_tables,
             ids,
             ids.owner_scope_id,
-            entity_type=PermEntityType.SESSION,
+            entity_type=SessionEntityType(),
         )
         await self._enroll_user_in_project(
             db_with_rbac_tables, roster_provider, project_scope, user_scope, ids.user_id
@@ -978,7 +947,7 @@ class TestUserRosterEnrollment:
 
         key = GovernCheckKey(
             user_id=ids.user_id,
-            scope=ScopeRef(scope_type=ScopeType(VFolderEntityType()), scope_id=vfolder_id),
+            scope=vfolder_id,
             entity_type=SessionEntityType(),
         )
         result = await repository.governed_permissions([key])
@@ -996,7 +965,7 @@ class TestUserRosterEnrollment:
         async with db.begin_session() as db_sess:
             project_ve_id = await db_sess.scalar(
                 sa.select(VirtualEntityRow.id).where(
-                    VirtualEntityRow.entity_type == PROJECT_SCOPE_TYPE,
+                    VirtualEntityRow.entity_type == ProjectEntityType(),
                     VirtualEntityRow.entity_id == project_id,
                 )
             )
@@ -1044,14 +1013,14 @@ class TestUserRosterEnrollment:
         """A project governing a resource group under READ reaches what the resource
         group owns, and not what was merely shared to the resource group: a share
         answers to the resource group's own scope only."""
-        project_scope = ScopeRef(scope_type=PROJECT_SCOPE_TYPE, scope_id=ids.owner_scope_id)
-        user_scope = ScopeRef(scope_type=USER_SCOPE_TYPE, scope_id=ids.user_id)
+        project_scope = ids.owner_scope_id
+        user_scope = ids.user_id
         other_project_id = uuid.uuid4()
         await self._grant_on_project(
             db_with_rbac_tables,
             ids,
             ids.owner_scope_id,
-            entity_type=PermEntityType.PROJECT,
+            entity_type=ProjectEntityType(),
         )
         await self._enroll_user_in_project(
             db_with_rbac_tables, roster_provider, project_scope, user_scope, ids.user_id
@@ -1077,14 +1046,14 @@ class TestUserRosterEnrollment:
     ) -> None:
         """A project role holding user UPDATE resolves to READ over the member user:
         the roster enrollment caps every project-to-user row to read."""
-        project_scope = ScopeRef(scope_type=PROJECT_SCOPE_TYPE, scope_id=ids.owner_scope_id)
-        user_scope = ScopeRef(scope_type=USER_SCOPE_TYPE, scope_id=ids.user_id)
+        project_scope = ids.owner_scope_id
+        user_scope = ids.user_id
         await self._grant_on_project(
             db_with_rbac_tables,
             ids,
             ids.owner_scope_id,
-            entity_type=PermEntityType.USER,
-            operation=OperationType.UPDATE,
+            entity_type=UserEntityType(),
+            operation=Permission.UPDATE,
             permission=Permission.READ | Permission.UPDATE,
         )
 

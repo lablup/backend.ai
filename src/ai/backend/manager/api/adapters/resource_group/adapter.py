@@ -16,6 +16,7 @@ if TYPE_CHECKING:
 from ai.backend.common.data.entity.domain import DomainID, DomainName
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID, ResourceGroupName
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.filter_specs import StringMatchSpec
 from ai.backend.common.dto.manager.v2.fair_share.types import (
     ResourceSlotEntryInfo,
@@ -31,6 +32,7 @@ from ai.backend.common.dto.manager.v2.resource_group.request import (
     ResourceGroupFilter,
     ResourceGroupOrder,
     ResourceWeightEntryInput,
+    ScopedSearchResourceGroupsInput,
     UpdateAllowedDomainsForResourceGroupInput,
     UpdateAllowedProjectsForResourceGroupInput,
     UpdateAllowedResourceGroupsForDomainInput,
@@ -62,6 +64,7 @@ from ai.backend.common.dto.manager.v2.resource_group.types import (
     PreemptionModeDTO,
     ResourceGroupOrderDirection,
     ResourceGroupOrderField,
+    ResourceGroupScope,
     SchedulerTypeDTO,
 )
 from ai.backend.common.exception import DomainNotFound
@@ -152,6 +155,7 @@ from ai.backend.manager.services.resource_group.actions.scoped_search import (
     ProjectResourceGroupScopeItem,
     ResourceGroupScopeItem,
     ScopedSearchResourceGroupsAction,
+    UserResourceGroupScopeItem,
 )
 from ai.backend.manager.services.resource_group.actions.update import UpdateResourceGroupAction
 from ai.backend.manager.services.resource_group.actions.update_fair_share_spec import (
@@ -348,6 +352,52 @@ class ResourceGroupAdapter(BaseAdapter):
             total_count=action_result.total_count,
             has_next_page=action_result.has_next_page,
             has_previous_page=action_result.has_previous_page,
+        )
+
+    def _scope_items(self, scope: ResourceGroupScope) -> list[ResourceGroupScopeItem]:
+        """The scope items the request named, in the order the input lists them."""
+        items: list[ResourceGroupScopeItem] = [
+            DomainResourceGroupScopeItem(domain_id=DomainID(entry.value))
+            for entry in scope.domain or ()
+        ]
+        items.extend(
+            ProjectResourceGroupScopeItem(project_id=ProjectID(entry.value))
+            for entry in scope.project or ()
+        )
+        items.extend(
+            UserResourceGroupScopeItem(user_id=UserID(entry.value)) for entry in scope.user or ()
+        )
+        return items
+
+    async def scoped_search(
+        self,
+        input: ScopedSearchResourceGroupsInput,
+    ) -> ResourceGroupSearchPayload:
+        """Search the resource groups the named scopes reach, combined with OR."""
+        conditions = self._convert_filter(input.filter) if input.filter else []
+        orders = self._convert_orders(input.order) if input.order else []
+        searcher = self._build_searcher(
+            ResourceGroupSearcher,
+            conditions=conditions,
+            orders=orders,
+            pagination_spec=_resource_group_pagination_spec(),
+            first=input.first,
+            after=input.after,
+            last=input.last,
+            before=input.before,
+            limit=input.limit,
+            offset=input.offset,
+        )
+        result = await self._resource_group.scoped_search_resource_groups.run(
+            ScopedSearchResourceGroupsAction(
+                items=self._scope_items(input.scope), searcher=searcher
+            )
+        )
+        return ResourceGroupSearchPayload(
+            items=[self._data_to_detail_node(data) for data in result.items],
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
         )
 
     def _convert_filter(self, filter_: ResourceGroupFilter) -> list[QueryCondition]:

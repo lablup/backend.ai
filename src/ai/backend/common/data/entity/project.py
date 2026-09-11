@@ -1,10 +1,9 @@
 from typing import override
 
-from ai.backend.common.data.entity.types import EntityIdentifier, EntityType, ScopeType
+from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
 
 __all__ = (
     "ProjectEntityType",
-    "PROJECT_SCOPE_TYPE",
     "ProjectID",
 )
 
@@ -19,9 +18,6 @@ class ProjectEntityType(EntityType):
     @classmethod
     def description(cls) -> str:
         return "A group of users inside a domain that owns sessions and vfolders."
-
-
-PROJECT_SCOPE_TYPE = ScopeType(ProjectEntityType())
 
 
 class ProjectID(EntityIdentifier):

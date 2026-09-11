@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from typing import override
 
 from ai.backend.common.data.entity.artifact import ArtifactEntityType, ArtifactID
-from ai.backend.common.data.entity.types import EntityType, ScopeRef, ScopeType
+from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
 from ai.backend.manager.actions.v2.ops.base import OperationScopeOpsAction
 from ai.backend.manager.data.artifact.types import ArtifactRevisionData
 from ai.backend.manager.models.artifact_revision.row import ArtifactRevisionRow
@@ -37,8 +37,8 @@ class GetArtifactRevisionsAction(
         return "get_artifact_revisions"
 
     @override
-    def scope_targets(self) -> Sequence[ScopeRef]:
-        return (ScopeRef(scope_type=ScopeType(ArtifactEntityType()), scope_id=self.artifact_id),)
+    def scope_targets(self) -> Sequence[EntityIdentifier]:
+        return (self.artifact_id,)
 
     @override
     def operation_scopes(self) -> Sequence[OperationScope]:

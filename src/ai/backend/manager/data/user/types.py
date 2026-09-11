@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import enum
-from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any, Self, override
@@ -10,16 +9,9 @@ from uuid import UUID
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.types import EntityData
 from ai.backend.common.data.entity.user import UserID
-from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.manager.data.common.bulk import BulkCreateFailure, BulkUpdateFailure
 from ai.backend.manager.data.keypair.types import KeyPairData
-from ai.backend.manager.data.permission.id import ScopeId
-from ai.backend.manager.data.permission.types import (
-    EntityType,
-    OperationType,
-    ScopeType,
-)
 from ai.backend.manager.errors.resource import DataTransformationFailed
 
 
@@ -106,22 +98,8 @@ class UserData(EntityData):
     container_gids: list[int] | None = field(compare=False)
     integration_name: str | None = None
 
-    def scope_id(self) -> ScopeId:
-        return ScopeId(
-            scope_type=ScopeType.USER,
-            scope_id=str(self.id),
-        )
-
     def role_name(self) -> str:
         return f"user-{str(self.id)[:8]}"
-
-    def entity_operations(self) -> Mapping[RBACElementType, Iterable[OperationType]]:
-        resource_entity_permissions = {
-            entity.to_element(): OperationType.owner_operations()
-            for entity in EntityType.owner_accessible_entity_types_in_user()
-        }
-        user_permissions = OperationType.owner_operations() - {OperationType.CREATE}
-        return {RBACElementType.USER: user_permissions, **resource_entity_permissions}
 
     @classmethod
     def from_row(cls, row: Any) -> Self:

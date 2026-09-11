@@ -5,13 +5,15 @@ from __future__ import annotations
 from decimal import Decimal
 from enum import StrEnum
 from functools import cached_property
+from typing import Annotated
 from uuid import UUID
 
-from pydantic import Field
+from pydantic import Field, StringConstraints
 
 from ai.backend.common.api_handlers import BaseRequestModel, BaseResponseModel
 
 __all__ = (
+    "SEM_VERSION_PATTERN",
     "BinarySizeInfo",
     "BinarySizeInput",
     "EnvironmentVariableEntryInfo",
@@ -24,8 +26,21 @@ __all__ = (
     "ResourceSlotEntryInput",
     "ResourceSlotInfo",
     "VFolderHostPermissionEntryInfo",
+    "String64",
+    "SemVersion",
     "VFolderHostPermissionEntryInput",
 )
+
+SEM_VERSION_PATTERN = r"^[0-9]{1,9}([.][0-9]{1,9}){0,2}$"
+
+SemVersion = Annotated[str, StringConstraints(pattern=SEM_VERSION_PATTERN)]
+"""A version as one to three dot-separated numbers, each of at most nine digits.
+
+Neither a prerelease suffix nor build metadata is accepted, so this is narrower than
+semver proper.
+"""
+
+String64 = Annotated[str, StringConstraints(min_length=1, max_length=64)]
 
 
 class BinarySizeInput(BaseRequestModel):

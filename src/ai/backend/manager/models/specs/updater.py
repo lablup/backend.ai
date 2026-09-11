@@ -10,10 +10,10 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from collections.abc import Sequence
 from typing import Any, final, override
-from uuid import UUID
 
 from sqlalchemy.orm import InstrumentedAttribute
 
+from ai.backend.common.data.entity.types import EntityIdentifier, FieldIdentifier
 from ai.backend.manager.models.base import Base
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.specs.types import GuardCheck, IntegrityErrorCheck
@@ -48,8 +48,8 @@ class GuardedDataUpdater[TRow: Base, TData](ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def target_id_value(self) -> UUID:
-        """Return the id of the row to write."""
+    def target_id_value(self) -> EntityIdentifier | FieldIdentifier:
+        """Return the id of the row to write: the entity's, or the field row's own."""
         raise NotImplementedError
 
     @abstractmethod

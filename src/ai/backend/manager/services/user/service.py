@@ -11,7 +11,7 @@ from ai.backend.common.exception import InvalidAPIParameters
 from ai.backend.common.types import AccessKey
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
-from ai.backend.manager.data.dotfile.types import DotfileEntries
+from ai.backend.manager.data.dotfile.types import DotfileEntries, normalize_newlines
 from ai.backend.manager.data.user.types import (
     BulkPurgeError,
     BulkUserPurgeResultData,
@@ -417,7 +417,7 @@ class UserService:
     async def update_bootstrap_script(
         self, action: UpdateBootstrapScriptAction
     ) -> UpdateBootstrapScriptActionResult:
-        script = action.script.strip()
+        script = normalize_newlines(action.script).strip()
         if len(script) > MAXIMUM_DOTFILE_SIZE:
             raise DotfileCreationFailed("Maximum bootstrap script length reached")
         keypair = await self._user_repository.admin_get_keypair(action.access_key)

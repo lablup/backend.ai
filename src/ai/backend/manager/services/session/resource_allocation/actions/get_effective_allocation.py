@@ -4,9 +4,9 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any, override
 
-from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE, ProjectID
+from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.session import SessionEntityType
-from ai.backend.common.data.entity.types import EntityIdentifier, EntityType, ScopeRef
+from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.types import AccessKey
 from ai.backend.manager.actions.types import ActionOperationType
@@ -35,8 +35,8 @@ class GetEffectiveAllocationAction(BaseScopeAction):
         return SessionEntityType()
 
     @override
-    def scope_targets(self) -> Sequence[ScopeRef]:
-        return (ScopeRef(scope_type=PROJECT_SCOPE_TYPE, scope_id=self.project_id),)
+    def scope_targets(self) -> Sequence[EntityIdentifier]:
+        return (self.project_id,)
 
     @override
     @classmethod

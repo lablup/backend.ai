@@ -1,7 +1,6 @@
 import uuid
 
 from ai.backend.common.data.entity.permission import PermissionFieldType, PermissionID
-from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.role import RoleID
 from ai.backend.common.data.entity.session import SessionEntityType
 from ai.backend.manager.data.permission.types import Permission
@@ -15,22 +14,16 @@ from ai.backend.manager.models.rbac_models.permission.scopes import PermissionOp
 class TestRolePermissionCreator:
     def test_the_row_is_built_under_the_role_that_owns_it(self) -> None:
         role_id = RoleID(uuid.uuid4())
-        scope = ProjectID(uuid.uuid4())
-        creator = RolePermissionCreator(
-            scope=scope, entity_type=SessionEntityType(), permission=Permission.READ
-        )
+        creator = RolePermissionCreator(entity_type=SessionEntityType(), permission=Permission.READ)
 
         row = creator.build_row(role_id)
 
         assert row.role_id == role_id
-        assert row.scope_type == "project"
-        assert row.scope_id == str(scope)
         assert row.entity_type == "session"
         assert row.permission == Permission.READ
 
     def test_a_duplicate_entry_is_mapped_to_a_domain_error(self) -> None:
         creator = RolePermissionCreator(
-            scope=ProjectID(uuid.uuid4()),
             entity_type=SessionEntityType(),
             permission=Permission.READ,
         )
@@ -42,7 +35,6 @@ class TestRolePermissionCreator:
     def test_the_field_id_is_read_off_the_settled_row(self) -> None:
         permission_id = PermissionID(uuid.uuid4())
         creator = RolePermissionCreator(
-            scope=ProjectID(uuid.uuid4()),
             entity_type=SessionEntityType(),
             permission=Permission.READ,
         )

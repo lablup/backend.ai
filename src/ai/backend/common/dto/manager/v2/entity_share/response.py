@@ -3,12 +3,13 @@
 from __future__ import annotations
 
 from datetime import datetime
+from uuid import UUID
 
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
 from ai.backend.common.data.entity.entity_share import EntityShareID
-from ai.backend.common.data.entity.types import EntityID, EntityType
+from ai.backend.common.data.entity.types import EntityType
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.dto.manager.v2.entity_share.types import EntityShareStatusDTO
 from ai.backend.common.dto.manager.v2.rbac.types import PermissionBitDTO
@@ -28,14 +29,14 @@ class EntityShareNode(BaseResponseModel):
     recipient_entity_type: EntityType | None = Field(
         default=None, description="Type of the scope the offer goes to, once it names one"
     )
-    recipient_entity_id: EntityID | None = Field(
+    recipient_entity_id: UUID | None = Field(
         default=None, description="Id of the scope the offer goes to, once it names one"
     )
     recipient_email: str | None = Field(
         default=None, description="Address the offer goes to, when it names one"
     )
     target_entity_type: EntityType = Field(description="Type of the entity being offered")
-    target_entity_id: EntityID = Field(description="Id of the entity being offered")
+    target_entity_id: UUID = Field(description="Id of the entity being offered")
     permissions: list[PermissionBitDTO] = Field(
         description="Permissions the offer caps at; empty for no ceiling"
     )

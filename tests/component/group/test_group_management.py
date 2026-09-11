@@ -25,8 +25,8 @@ from ai.backend.client.v2.exceptions import (
 )
 from ai.backend.client.v2.registry import BackendAIClientRegistry
 from ai.backend.common.container_registry import ContainerRegistryType
+from ai.backend.common.data.entity.project import ProjectEntityType
 from ai.backend.common.data.entity.resource_group import ResourceGroupID, ResourceGroupName
-from ai.backend.common.data.permission.types import ScopeType
 from ai.backend.common.dto.manager.deployment.types import OrderDirection
 from ai.backend.common.dto.manager.group.request import GroupFilter, SearchGroupsRequest
 from ai.backend.common.dto.manager.group.response import (
@@ -81,7 +81,7 @@ async def test_group_for_deletion(
         await conn.execute(
             sa.insert(VirtualEntityRow.__table__).values(
                 id=virtual_entity_id,
-                entity_type=ScopeType.PROJECT,
+                entity_type=ProjectEntityType(),
                 entity_id=group_id,
             )
         )
@@ -104,7 +104,7 @@ async def test_group_for_deletion(
     async with db_engine.begin() as conn:
         await conn.execute(
             VirtualEntityRow.__table__.delete().where(
-                VirtualEntityRow.__table__.c.entity_type == ScopeType.PROJECT,
+                VirtualEntityRow.__table__.c.entity_type == ProjectEntityType(),
                 VirtualEntityRow.__table__.c.entity_id == group_id,
             )
         )
@@ -147,7 +147,7 @@ async def group_with_vfolder_mounted(
         await conn.execute(
             sa.insert(VirtualEntityRow.__table__).values(
                 id=virtual_entity_id,
-                entity_type=ScopeType.PROJECT,
+                entity_type=ProjectEntityType(),
                 entity_id=group_id,
             )
         )
@@ -238,7 +238,7 @@ async def group_with_vfolder_mounted(
         )
         await conn.execute(
             VirtualEntityRow.__table__.delete().where(
-                VirtualEntityRow.__table__.c.entity_type == ScopeType.PROJECT,
+                VirtualEntityRow.__table__.c.entity_type == ProjectEntityType(),
                 VirtualEntityRow.__table__.c.entity_id == group_id,
             )
         )
@@ -280,7 +280,7 @@ async def group_with_active_kernel(
         await conn.execute(
             sa.insert(VirtualEntityRow.__table__).values(
                 id=virtual_entity_id,
-                entity_type=ScopeType.PROJECT,
+                entity_type=ProjectEntityType(),
                 entity_id=group_id,
             )
         )
@@ -355,7 +355,7 @@ async def group_with_active_kernel(
         )
         await conn.execute(
             VirtualEntityRow.__table__.delete().where(
-                VirtualEntityRow.__table__.c.entity_type == ScopeType.PROJECT,
+                VirtualEntityRow.__table__.c.entity_type == ProjectEntityType(),
                 VirtualEntityRow.__table__.c.entity_id == group_id,
             )
         )
@@ -396,7 +396,7 @@ async def group_with_active_endpoint(
         await conn.execute(
             sa.insert(VirtualEntityRow.__table__).values(
                 id=virtual_entity_id,
-                entity_type=ScopeType.PROJECT,
+                entity_type=ProjectEntityType(),
                 entity_id=group_id,
             )
         )
@@ -474,7 +474,7 @@ async def group_with_active_endpoint(
         )
         await conn.execute(
             VirtualEntityRow.__table__.delete().where(
-                VirtualEntityRow.__table__.c.entity_type == ScopeType.PROJECT,
+                VirtualEntityRow.__table__.c.entity_type == ProjectEntityType(),
                 VirtualEntityRow.__table__.c.entity_id == group_id,
             )
         )
@@ -510,7 +510,7 @@ async def multiple_test_groups(
             await conn.execute(
                 sa.insert(VirtualEntityRow.__table__).values(
                     id=virtual_entity_id,
-                    entity_type=ScopeType.PROJECT,
+                    entity_type=ProjectEntityType(),
                     entity_id=group_id,
                 )
             )
@@ -537,7 +537,7 @@ async def multiple_test_groups(
         for group_id in group_ids:
             await conn.execute(
                 VirtualEntityRow.__table__.delete().where(
-                    VirtualEntityRow.__table__.c.entity_type == ScopeType.PROJECT,
+                    VirtualEntityRow.__table__.c.entity_type == ProjectEntityType(),
                     VirtualEntityRow.__table__.c.entity_id == group_id,
                 )
             )

@@ -11,7 +11,6 @@ from sqlalchemy.orm import selectinload
 
 from ai.backend.common.data.entity.agent import AgentUUID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
-from ai.backend.common.exception import AgentNotFound
 from ai.backend.common.types import AgentId, ImageID
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.data.agent.types import (
@@ -23,16 +22,17 @@ from ai.backend.manager.data.agent.types import (
 )
 from ai.backend.manager.data.image.types import ImageDataWithDetails, ImageIdentifier
 from ai.backend.manager.data.kernel.types import KernelInfo, KernelStatus
-from ai.backend.manager.errors.agent import AgentHasConflictingSessions
+from ai.backend.manager.errors.agent import AgentHasConflictingSessions, AgentNotFound
 from ai.backend.manager.errors.resource import ResourceGroupNotFound, UnresolvableResourceGroup
 from ai.backend.manager.models.agent import AgentRow, agents
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.resource_group import ResourceGroupRow
 from ai.backend.manager.models.resource_slot import AgentResourceRow
+from ai.backend.manager.models.resource_slot.upserters import AgentResourceUpserter
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.base import BulkUpserter, execute_bulk_upserter
 from ai.backend.manager.repositories.base.querier import BatchQuerier, execute_batch_querier
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -44,9 +44,11 @@ class AgentDBSource:
     """Database source for agent-related operations."""
 
     _db: ExtendedAsyncSAEngine
+    _v2_ops: V2DBOpsProvider
 
-    def __init__(self, db: ExtendedAsyncSAEngine) -> None:
+    def __init__(self, db: ExtendedAsyncSAEngine, v2_ops: V2DBOpsProvider) -> None:
         self._db = db
+        self._v2_ops = v2_ops
 
     async def get_images_by_image_identifiers(
         self, image_identifiers: list[ImageIdentifier]
@@ -280,11 +282,12 @@ class AgentDBSource:
     async def sync_agent_resource_capacity(
         self,
         agent_id: AgentId,
-        bulk_upserter: BulkUpserter[AgentResourceRow],
+        agent_uuid: AgentUUID,
+        upserters: Sequence[AgentResourceUpserter],
         reported_slot_names: Collection[str],
     ) -> int:
-        """Bulk UPSERT agent resource capacity rows and drop the slots the agent
-        no longer reports.
+        """UPSERT agent resource capacity rows and drop the slots the agent no
+        longer reports.
 
         On INSERT: sets capacity (used defaults to 0).
         On CONFLICT: updates capacity only.
@@ -294,12 +297,9 @@ class AgentDBSource:
         Returns:
             Number of rows upserted.
         """
+        async with self._v2_ops.write_ops() as w:
+            written = await w.atomic_upsert_field_entities(agent_uuid, upserters)
         async with self._db.begin_session_read_committed() as db_sess:
-            result = await execute_bulk_upserter(
-                db_sess,
-                bulk_upserter,
-                index_elements=["agent_id", "slot_name"],
-            )
             await db_sess.execute(
                 sa.delete(AgentResourceRow).where(
                     (AgentResourceRow.agent_id == str(agent_id))
@@ -309,4 +309,4 @@ class AgentDBSource:
                     & (AgentResourceRow.prereserved == 0)
                 )
             )
-            return result.upserted_count
+        return len(written)

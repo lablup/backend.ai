@@ -82,6 +82,7 @@ def resource_allocation_processors(
         db=database_engine,
         valkey_stat=valkey_clients.stat,
         config_provider=config_provider,
+        v2_ops_provider=V2DBOpsProvider(database_engine),
     )
     service = ResourceAllocationService(
         resource_allocation_repository=ra_repo,

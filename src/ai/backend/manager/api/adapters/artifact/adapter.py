@@ -240,7 +240,7 @@ class ArtifactAdapter(BaseAdapter):
         ]
 
     async def batch_load_revisions_by_ids(
-        self, revision_ids: Sequence[UUID]
+        self, revision_ids: Sequence[ArtifactRevisionID]
     ) -> list[ArtifactRevisionNode | Exception | None]:
         """Batch load artifact revisions by their IDs for DataLoader use, checked per artifact."""
         if not revision_ids:

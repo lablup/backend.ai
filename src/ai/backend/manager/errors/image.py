@@ -8,6 +8,9 @@ from typing import override
 
 from aiohttp import web
 
+from ai.backend.common.data.entity.container_registry import ContainerRegistryEntityType
+from ai.backend.common.data.entity.image import ImageEntityType
+from ai.backend.common.data.entity.image_alias import ImageAliasFieldType
 from ai.backend.common.exception import (
     BackendAIError,
     ErrorCode,
@@ -15,58 +18,47 @@ from ai.backend.common.exception import (
     ErrorDomain,
     ErrorOperation,
 )
+from ai.backend.manager.actions.types import ActionOperationType
+from ai.backend.manager.errors.base.entity import EntityError, EntityErrorCode
+from ai.backend.manager.errors.base.field import FieldError, FieldErrorCode
 
 from .common import InternalServerError, ObjectNotFound
 
 
-class ImageNotFound(ObjectNotFound):
+class ImageNotFound(EntityError, ObjectNotFound):
     object_name = "environment image"
 
     @override
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.IMAGE,
-            operation=ErrorOperation.READ,
-            error_detail=ErrorDetail.NOT_FOUND,
-        )
+    def entity_error_code(self) -> EntityErrorCode:
+        return EntityErrorCode(ImageEntityType(), ActionOperationType.GET, ErrorDetail.NOT_FOUND)
 
 
-class ImagePurgeInProgress(BackendAIError, web.HTTPConflict):
+class ImagePurgeInProgress(EntityError, web.HTTPConflict):
     """Raised when a write names an image a purge is working through."""
 
     error_type = "https://api.backend.ai/probs/image-purge-in-progress"
     error_title = "Image is being purged."
 
     @override
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.IMAGE,
-            operation=ErrorOperation.UPDATE,
-            error_detail=ErrorDetail.CONFLICT,
-        )
+    def entity_error_code(self) -> EntityErrorCode:
+        return EntityErrorCode(ImageEntityType(), ActionOperationType.UPDATE, ErrorDetail.CONFLICT)
 
 
-class ImageAliasNotFound(ObjectNotFound):
+class ImageAliasNotFound(FieldError, ObjectNotFound):
     object_name = "image alias"
 
     @override
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.IMAGE_ALIAS,
-            operation=ErrorOperation.READ,
-            error_detail=ErrorDetail.NOT_FOUND,
-        )
+    def field_error_code(self) -> FieldErrorCode:
+        return FieldErrorCode(ImageAliasFieldType(), ActionOperationType.GET, ErrorDetail.NOT_FOUND)
 
 
-class ContainerRegistryNotFound(ObjectNotFound):
+class ContainerRegistryNotFound(EntityError, ObjectNotFound):
     object_name = "container_registry"
 
     @override
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.CONTAINER_REGISTRY,
-            operation=ErrorOperation.READ,
-            error_detail=ErrorDetail.NOT_FOUND,
+    def entity_error_code(self) -> EntityErrorCode:
+        return EntityErrorCode(
+            ContainerRegistryEntityType(), ActionOperationType.GET, ErrorDetail.NOT_FOUND
         )
 
 
@@ -95,28 +87,24 @@ class ContainerRegistryWebhookAuthorizationFailed(BackendAIError, web.HTTPUnauth
         )
 
 
-class HarborWebhookContainerRegistryRowNotFound(InternalServerError):
+class HarborWebhookContainerRegistryRowNotFound(EntityError, InternalServerError):
     error_type = "https://api.backend.ai/probs/webhook/harbor/container-registry-not-found"
     error_title = "Container registry row not found."
 
     @override
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.CONTAINER_REGISTRY,
-            operation=ErrorOperation.READ,
-            error_detail=ErrorDetail.NOT_FOUND,
+    def entity_error_code(self) -> EntityErrorCode:
+        return EntityErrorCode(
+            ContainerRegistryEntityType(), ActionOperationType.GET, ErrorDetail.NOT_FOUND
         )
 
 
-class UnknownImageReferenceError(ObjectNotFound):
+class UnknownImageReferenceError(EntityError, ObjectNotFound):
     object_name = "image reference"
 
     @override
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.IMAGE,
-            operation=ErrorOperation.READ,
-            error_detail=ErrorDetail.INTERNAL_ERROR,
+    def entity_error_code(self) -> EntityErrorCode:
+        return EntityErrorCode(
+            ImageEntityType(), ActionOperationType.GET, ErrorDetail.INTERNAL_ERROR
         )
 
 
@@ -135,33 +123,18 @@ class ImageAccessForbiddenError(BackendAIError):
         )
 
 
-class ForgetImageNotFoundError(BackendAIError, web.HTTPNotFound):
-    error_type = "https://api.backend.ai/probs/generic-not-found"
-    error_title = "The image you are trying to delete does not exist."
-
-    @override
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.IMAGE,
-            operation=ErrorOperation.SOFT_DELETE,
-            error_detail=ErrorDetail.NOT_FOUND,
-        )
-
-
-class AliasImageActionValueError(BackendAIError, web.HTTPBadRequest):
+class AliasImageActionValueError(FieldError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/invalid-parameters"
     error_title = "Invalid parameters for image alias."
 
     @override
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.IMAGE_ALIAS,
-            operation=ErrorOperation.CREATE,
-            error_detail=ErrorDetail.INVALID_PARAMETERS,
+    def field_error_code(self) -> FieldErrorCode:
+        return FieldErrorCode(
+            ImageAliasFieldType(), ActionOperationType.CREATE, ErrorDetail.INVALID_PARAMETERS
         )
 
 
-class AliasImageActionDBError(BackendAIError, web.HTTPInternalServerError):
+class AliasImageActionDBError(FieldError, web.HTTPInternalServerError):
     """
     This can occur when an image alias with the same value already exists.
     """
@@ -170,28 +143,24 @@ class AliasImageActionDBError(BackendAIError, web.HTTPInternalServerError):
     error_title = "Database error while managing image alias."
 
     @override
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.IMAGE_ALIAS,
-            operation=ErrorOperation.UPDATE,
-            error_detail=ErrorDetail.ALREADY_EXISTS,
+    def field_error_code(self) -> FieldErrorCode:
+        return FieldErrorCode(
+            ImageAliasFieldType(), ActionOperationType.UPDATE, ErrorDetail.ALREADY_EXISTS
         )
 
 
-class UpdateImageActionValueError(BackendAIError, web.HTTPBadRequest):
+class UpdateImageActionValueError(EntityError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/invalid-parameters"
     error_title = "Invalid parameters for image modification."
 
     @override
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.IMAGE,
-            operation=ErrorOperation.UPDATE,
-            error_detail=ErrorDetail.INVALID_PARAMETERS,
+    def entity_error_code(self) -> EntityErrorCode:
+        return EntityErrorCode(
+            ImageEntityType(), ActionOperationType.UPDATE, ErrorDetail.INVALID_PARAMETERS
         )
 
 
-class PurgeImageActionByIdObjectDBError(BackendAIError, web.HTTPInternalServerError):
+class PurgeImageActionByIdObjectDBError(EntityError, web.HTTPInternalServerError):
     """
     This can occur when the alias of the image you are trying to delete already exists.
     """
@@ -200,21 +169,17 @@ class PurgeImageActionByIdObjectDBError(BackendAIError, web.HTTPInternalServerEr
     error_title = "Database error while purging image."
 
     @override
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.IMAGE,
-            operation=ErrorOperation.HARD_DELETE,
-            error_detail=ErrorDetail.INTERNAL_ERROR,
+    def entity_error_code(self) -> EntityErrorCode:
+        return EntityErrorCode(
+            ImageEntityType(), ActionOperationType.PURGE, ErrorDetail.INTERNAL_ERROR
         )
 
 
-class RegistryNotFoundForImage(ObjectNotFound):
+class RegistryNotFoundForImage(EntityError, ObjectNotFound):
     object_name = "registry for image"
 
     @override
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.CONTAINER_REGISTRY,
-            operation=ErrorOperation.READ,
-            error_detail=ErrorDetail.NOT_FOUND,
+    def entity_error_code(self) -> EntityErrorCode:
+        return EntityErrorCode(
+            ContainerRegistryEntityType(), ActionOperationType.GET, ErrorDetail.NOT_FOUND
         )

@@ -11,7 +11,6 @@ from __future__ import annotations
 from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Any, override
-from uuid import UUID
 
 import sqlalchemy as sa
 from sqlalchemy.orm import InstrumentedAttribute
@@ -65,7 +64,7 @@ class _RecipientInvitationUpdater(GuardedDataUpdater[EntityShareRow, EntityShare
         return EntityShareRow.id
 
     @override
-    def target_id_value(self) -> UUID:
+    def target_id_value(self) -> EntityShareID:
         return self.share_id
 
     def addressed_to_scope(self) -> QueryCondition:
@@ -214,7 +213,7 @@ class EntityShareRevokeUpdater(GuardedDataUpdater[EntityShareRow, EntityShareDat
         return EntityShareRow.id
 
     @override
-    def target_id_value(self) -> UUID:
+    def target_id_value(self) -> EntityShareID:
         return self.share_id
 
     @override
@@ -263,7 +262,7 @@ class EntityShareCancelUpdater(GuardedDataUpdater[EntityShareRow, EntityShareDat
         return EntityShareRow.id
 
     @override
-    def target_id_value(self) -> UUID:
+    def target_id_value(self) -> EntityShareID:
         return self.share_id
 
     @override

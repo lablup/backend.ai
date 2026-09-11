@@ -4,8 +4,8 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.common.data.entity.types import EntityType, ScopeRef
-from ai.backend.common.data.entity.user import USER_SCOPE_TYPE, UserEntityType, UserID
+from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
+from ai.backend.common.data.entity.user import UserEntityType, UserID
 from ai.backend.manager.actions.v2.ops.base import OperationScopeOpsAction
 from ai.backend.manager.data.error_log.types import ErrorLogData
 from ai.backend.manager.models.error_log.row import ErrorLogRow
@@ -27,8 +27,8 @@ class SearchErrorLogsAction(OperationScopeOpsAction[ErrorLogRow, ErrorLogData]):
         return UserEntityType()
 
     @override
-    def scope_targets(self) -> Sequence[ScopeRef]:
-        return (ScopeRef(scope_type=USER_SCOPE_TYPE, scope_id=self.user_id),)
+    def scope_targets(self) -> Sequence[EntityIdentifier]:
+        return (self.user_id,)
 
     @override
     def operation_scopes(self) -> Sequence[OperationScope]:

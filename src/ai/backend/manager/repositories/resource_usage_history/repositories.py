@@ -18,7 +18,7 @@ class ResourceUsageHistoryRepositories:
 
     @classmethod
     def create(cls, args: RepositoryArgs) -> Self:
-        repository = ResourceUsageHistoryRepository(args.db)
+        repository = ResourceUsageHistoryRepository(args.db, args.v2_ops_provider)
 
         return cls(
             repository=repository,

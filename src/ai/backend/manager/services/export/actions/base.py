@@ -6,59 +6,43 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.common.data.entity.domain import DOMAIN_SCOPE_TYPE, DomainID
-from ai.backend.common.data.entity.export import ExportEntityType
-from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE, ProjectID
-from ai.backend.common.data.entity.types import EntityIdentifier, EntityType, ScopeRef
-from ai.backend.common.data.entity.user import USER_SCOPE_TYPE, UserID
+from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.types import EntityIdentifier
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.manager.actions.v2.global_scope.base import BaseGlobalAction
 from ai.backend.manager.actions.v2.scope.base import BaseScopeAction
 from ai.backend.manager.actions.v2.scope.result import BaseScopeActionResult
 
 
-@dataclass
+@dataclass(frozen=True)
 class ExportAction(BaseGlobalAction):
     """Base for an export that spans the installation."""
 
-    @override
-    @classmethod
-    def entity_type(cls) -> EntityType:
-        return ExportEntityType()
 
-
-@dataclass
+@dataclass(frozen=True)
 class ExportUserScopeAction(BaseScopeAction):
     """Base for an export of what belongs to one user."""
 
     user_uuid: UserID
 
     @override
-    @classmethod
-    def entity_type(cls) -> EntityType:
-        return ExportEntityType()
-
-    @override
-    def scope_targets(self) -> Sequence[ScopeRef]:
-        return (ScopeRef(scope_type=USER_SCOPE_TYPE, scope_id=self.user_uuid),)
+    def scope_targets(self) -> Sequence[EntityIdentifier]:
+        return (self.user_uuid,)
 
 
-@dataclass
+@dataclass(frozen=True)
 class ExportProjectScopeAction(BaseScopeAction):
     """Base for an export of what belongs to one project."""
 
     project_id: ProjectID
 
     @override
-    @classmethod
-    def entity_type(cls) -> EntityType:
-        return ExportEntityType()
-
-    @override
-    def scope_targets(self) -> Sequence[ScopeRef]:
-        return (ScopeRef(scope_type=PROJECT_SCOPE_TYPE, scope_id=self.project_id),)
+    def scope_targets(self) -> Sequence[EntityIdentifier]:
+        return (self.project_id,)
 
 
-@dataclass
+@dataclass(frozen=True)
 class ExportDomainScopeAction(BaseScopeAction):
     """Base for an export of what belongs to one domain."""
 
@@ -66,16 +50,11 @@ class ExportDomainScopeAction(BaseScopeAction):
     domain_name: str
 
     @override
-    @classmethod
-    def entity_type(cls) -> EntityType:
-        return ExportEntityType()
-
-    @override
-    def scope_targets(self) -> Sequence[ScopeRef]:
-        return (ScopeRef(scope_type=DOMAIN_SCOPE_TYPE, scope_id=self.domain_id),)
+    def scope_targets(self) -> Sequence[EntityIdentifier]:
+        return (self.domain_id,)
 
 
-@dataclass
+@dataclass(frozen=True)
 class ExportScopeActionResult(BaseScopeActionResult):
     """An export names no entity: what it wrote is a file, not a row."""
 

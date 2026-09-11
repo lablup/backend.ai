@@ -10,6 +10,7 @@ from decimal import Decimal
 
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
+from ai.backend.common.data.entity.types import FieldData
 from ai.backend.common.types import ResourceSlot, SlotQuantity
 
 
@@ -141,7 +142,7 @@ class FairShareData:
 
 
 @dataclass(frozen=True)
-class DomainFairShareData:
+class DomainFairShareData(FieldData):
     """Domain-level fair share data."""
 
     resource_group: str
@@ -152,7 +153,7 @@ class DomainFairShareData:
 
 
 @dataclass(frozen=True)
-class ProjectFairShareData:
+class ProjectFairShareData(FieldData):
     """Project-level fair share data."""
 
     resource_group: str
@@ -164,7 +165,7 @@ class ProjectFairShareData:
 
 
 @dataclass(frozen=True)
-class UserFairShareData:
+class UserFairShareData(FieldData):
     """User-level fair share data."""
 
     resource_group: str

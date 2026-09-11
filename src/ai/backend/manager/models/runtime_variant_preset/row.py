@@ -6,6 +6,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 from ai.backend.common.data.entity.runtime_variant import RuntimeVariantID
 from ai.backend.common.data.entity.runtime_variant_preset import RuntimeVariantPresetID
 from ai.backend.common.dto.manager.v2.runtime_variant_preset.types import (
+    VERSION_PREFIX_PATTERN,
     PresetTarget,
     PresetValueType,
     UIOption,
@@ -23,6 +24,15 @@ from ai.backend.manager.models.base import GUID, Base, PydanticColumn
 from ai.backend.manager.models.mixins.timestamp import LifecycleTimestampsMixin
 
 __all__ = ("RuntimeVariantPresetRow",)
+
+
+def _version_segment_sql(column: str, position: int) -> str:
+    """One segment of a version's numeric prefix, zero-filled, NULL where there is none."""
+    return (
+        f"CASE WHEN {column} ~ '{VERSION_PREFIX_PATTERN}'"
+        f" THEN (string_to_array(substring({column} from '{VERSION_PREFIX_PATTERN}'), '.')"
+        f"::int[] || ARRAY[0, 0, 0])[{position}] END"
+    )
 
 
 class RuntimeVariantPresetRow(LifecycleTimestampsMixin, Base):
@@ -57,6 +67,50 @@ class RuntimeVariantPresetRow(LifecycleTimestampsMixin, Base):
     key: Mapped[str] = mapped_column("key", sa.String(length=256), nullable=False)
     required: Mapped[bool] = mapped_column(
         "required", sa.Boolean, nullable=False, server_default=sa.false()
+    )
+
+    # Half-open: added_version <= v < deprecated_version. NULL means unbounded on that side.
+    added_version: Mapped[str | None] = mapped_column("added_version", sa.Text, nullable=True)
+    deprecated_version: Mapped[str | None] = mapped_column(
+        "deprecated_version", sa.Text, nullable=True
+    )
+
+    # Split on write for the filter and the ordering. Padded, so 1 == 1.0 == 1.0.0.
+    added_version_major: Mapped[int | None] = mapped_column(
+        "added_version_major",
+        sa.Integer,
+        sa.Computed(_version_segment_sql("added_version", 1), persisted=True),
+        nullable=True,
+    )
+    added_version_minor: Mapped[int | None] = mapped_column(
+        "added_version_minor",
+        sa.Integer,
+        sa.Computed(_version_segment_sql("added_version", 2), persisted=True),
+        nullable=True,
+    )
+    added_version_patch: Mapped[int | None] = mapped_column(
+        "added_version_patch",
+        sa.Integer,
+        sa.Computed(_version_segment_sql("added_version", 3), persisted=True),
+        nullable=True,
+    )
+    deprecated_version_major: Mapped[int | None] = mapped_column(
+        "deprecated_version_major",
+        sa.Integer,
+        sa.Computed(_version_segment_sql("deprecated_version", 1), persisted=True),
+        nullable=True,
+    )
+    deprecated_version_minor: Mapped[int | None] = mapped_column(
+        "deprecated_version_minor",
+        sa.Integer,
+        sa.Computed(_version_segment_sql("deprecated_version", 2), persisted=True),
+        nullable=True,
+    )
+    deprecated_version_patch: Mapped[int | None] = mapped_column(
+        "deprecated_version_patch",
+        sa.Integer,
+        sa.Computed(_version_segment_sql("deprecated_version", 3), persisted=True),
+        nullable=True,
     )
 
     # UI metadata
@@ -102,6 +156,8 @@ class RuntimeVariantPresetRow(LifecycleTimestampsMixin, Base):
             default_value=self.default_value,
             key=self.key,
             required=self.required,
+            added_version=self.added_version,
+            deprecated_version=self.deprecated_version,
             category=self.category,
             ui_type=ui_option_data.ui_type if ui_option_data is not None else None,
             display_name=self.display_name,

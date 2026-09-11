@@ -6,7 +6,7 @@ from collections.abc import Sequence
 
 from ai.backend.common.api_handlers import Sentinel
 from ai.backend.common.data.entity.domain import DomainID, DomainName
-from ai.backend.common.data.entity.resource_group import ResourceGroupName
+from ai.backend.common.data.entity.resource_group import ResourceGroupID, ResourceGroupName
 from ai.backend.common.dto.manager.query import StringFilter
 from ai.backend.common.dto.manager.v2.domain.request import (
     AdminSearchDomainsInput,
@@ -16,6 +16,7 @@ from ai.backend.common.dto.manager.v2.domain.request import (
     DomainOrder,
     PurgeDomainInput,
     RestoreDomainInput,
+    ScopedSearchDomainsInput,
     UpdateDomainInput,
 )
 from ai.backend.common.dto.manager.v2.domain.response import (
@@ -154,6 +155,41 @@ class DomainAdapter(BaseAdapter):
 
         result = await self._domain.global_search.run(GlobalSearchDomainsAction(searcher=searcher))
 
+        return AdminSearchDomainsPayload(
+            items=[self._domain_data_to_node(item) for item in result.items],
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+        )
+
+    async def scoped_search(
+        self,
+        input: ScopedSearchDomainsInput,
+    ) -> AdminSearchDomainsPayload:
+        """Search the domains the named scopes reach, combined with OR."""
+        conditions = self._convert_domain_filter(input.filter) if input.filter else []
+        orders = self._convert_orders(input.order) if input.order else []
+        searcher = self._build_searcher(
+            DomainSearcher,
+            conditions=conditions,
+            orders=orders,
+            pagination_spec=_DOMAIN_PAGINATION_SPEC,
+            first=input.first,
+            after=input.after,
+            last=input.last,
+            before=input.before,
+            limit=input.limit,
+            offset=input.offset,
+        )
+        result = await self._domain.scoped_search.run(
+            ScopedSearchDomainsAction(
+                items=[
+                    ResourceGroupDomainScopeItem(resource_group_id=ResourceGroupID(entry.value))
+                    for entry in input.scope.resource_group or ()
+                ],
+                searcher=searcher,
+            )
+        )
         return AdminSearchDomainsPayload(
             items=[self._domain_data_to_node(item) for item in result.items],
             total_count=result.total_count,
