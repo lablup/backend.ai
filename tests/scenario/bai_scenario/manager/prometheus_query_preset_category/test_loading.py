@@ -45,9 +45,7 @@ class LoadingTheLaidAndOneUnknown(When[ManyCategoriesAndACaller, Adapter, Loaded
 
     @override
     def describe(self, laid: ManyCategoriesAndACaller) -> str:
-        return (
-            f"{laid.caller.username}이 심은 {len(laid.laid)}개의 id와 없는 id 하나를 한 번에 조회"
-        )
+        return f"{laid.caller.username}이 심은 분류 {len(laid.laid)}개의 id와 없는 id 하나를 한 번에 조회"
 
     @override
     async def call(self, adapter: Adapter, laid: ManyCategoriesAndACaller) -> Loaded:

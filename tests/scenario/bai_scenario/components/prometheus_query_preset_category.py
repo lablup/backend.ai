@@ -217,7 +217,7 @@ class TheCategoryNode(Then[ACategoryAndACaller, CategoryNodeAnswer]):
 
 @dataclass(frozen=True)
 class EveryLaidCategoryIsFound(Then[ManyCategoriesAndACaller, SearchCategoriesPayload]):
-    """답으로 받은 분류가 모두, 그리고 그것만 세어진다."""
+    """심은 분류가 모두, 그리고 그것만 세어진다."""
 
     @override
     def says(self) -> str:
@@ -244,7 +244,7 @@ class EveryLaidCategoryIsFound(Then[ManyCategoriesAndACaller, SearchCategoriesPa
 
 @dataclass(frozen=True)
 class OnePageOfThemComesBack(Then[ManyCategoriesAndACaller, SearchCategoriesPayload]):
-    """크기를 대지 않은 훑기가 한 쪽만 답하고, 나머지가 있다고 말한다."""
+    """크기를 대지 않은 훑기는 한 쪽 분량만 답하고, 다음 쪽이 있다고 말한다."""
 
     @override
     def says(self) -> str:
