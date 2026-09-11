@@ -21,8 +21,8 @@ class SeedResourceSlotType(SeedRow[ResourceSlotTypeData]):
     slot_type: SlotTypes = SlotTypes.COUNT
     required: bool = False
     enabled: bool = True
-    display_name: str = "심어둔 슬롯"
-    description: str = "심어둔 슬롯 종류"
+    display_name: str = "미리 만들어 둔 슬롯"
+    description: str = "미리 만들어 둔 슬롯 종류"
     display_unit: str = ""
     display_icon: str = ""
     number_format: NumberFormat = NumberFormat()

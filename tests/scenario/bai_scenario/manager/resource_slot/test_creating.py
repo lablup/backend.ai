@@ -1,4 +1,4 @@
-"""슬롯 종류 만들기 — 생략한 항목이 무엇으로 채워지고, 누가 만들 수 있는가."""
+"""슬롯 종류 생성 — 생략한 항목이 무엇으로 채워지고, 누가 생성할 수 있는가."""
 
 from __future__ import annotations
 
@@ -37,7 +37,7 @@ type CreatingStep = Scenario[SeedingSession, Any, ResourceSlotAdapter, ResourceS
 
 @dataclass(frozen=True)
 class Creating(When[ACaller, ResourceSlotAdapter, ResourceSlotTypeNode]):
-    """슬롯 종류 하나를 만든다. 답이 실은 노드를 벗겨서 준다."""
+    """슬롯 종류 하나를 생성한다. 응답에 담긴 노드를 꺼내서 준다."""
 
     named: str = MADE
     slot_type: SlotTypes = SlotTypes.COUNT
@@ -49,8 +49,8 @@ class Creating(When[ACaller, ResourceSlotAdapter, ResourceSlotTypeNode]):
 
     @override
     def describe(self, laid: ACaller) -> str:
-        how = "표시 항목까지 주고" if self.shown else "이름과 종류만 주고"
-        return f"{laid.caller.username}이 {self.slot_type.value} 종류 {self.named}를 {how} 만듦"
+        how = "표시 항목까지 지정해" if self.shown else "이름과 종류만 지정해"
+        return f"{laid.caller.username}이 {self.slot_type.value} 종류 슬롯 {self.named}(을)를 {how} 생성"
 
     @override
     async def call(self, adapter: ResourceSlotAdapter, laid: ACaller) -> ResourceSlotTypeNode:
@@ -76,7 +76,7 @@ class Creating(When[ACaller, ResourceSlotAdapter, ResourceSlotTypeNode]):
 
 @dataclass(frozen=True)
 class CreatingWithTheLaidName(When[ASlotTypeAndACaller, ResourceSlotAdapter, ResourceSlotTypeNode]):
-    """심어둔 슬롯 종류와 같은 이름으로 만든다."""
+    """미리 만들어 둔 슬롯 종류와 같은 이름으로 생성한다."""
 
     @override
     def operation(self) -> str:
@@ -84,7 +84,7 @@ class CreatingWithTheLaidName(When[ASlotTypeAndACaller, ResourceSlotAdapter, Res
 
     @override
     def describe(self, laid: ASlotTypeAndACaller) -> str:
-        return f"{laid.caller.username}이 이미 있는 {laid.slot_type.slot_name}으로 다시 만듦"
+        return f"{laid.caller.username}이 이미 있는 이름 {laid.slot_type.slot_name}(으)로 다시 생성"
 
     @override
     async def call(
@@ -110,8 +110,8 @@ class TheSuperadminMakesOneWithANameAndAKind(
     @override
     def describe(self) -> str:
         return (
-            "슈퍼관리자가 슬롯 이름과 종류만 주고 만들면, 표시용 문자열은 모두 비고 필수 여부는 거짓, "
-            "사용 여부는 참, 순위는 0, 숫자 서식은 십진에 반올림 없음인 노드가 온다"
+            "슈퍼관리자가 슬롯 이름과 종류만 지정해 생성하면, 표시용 문자열은 모두 비고 필수 여부는 거짓, "
+            "사용 여부는 참, 순위는 0, 숫자 서식은 십진에 반올림 없음인 노드가 반환된다"
         )
 
     @override
@@ -137,7 +137,7 @@ class EveryDisplayValueComesBackAsGiven(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 표시 이름·설명·단위·아이콘·서식·순위까지 주고 만들면, 준 값이 그대로 실린 노드가 온다"
+        return "슈퍼관리자가 표시 이름·설명·단위·아이콘·서식·순위까지 지정해 생성하면, 지정한 값이 그대로 담긴 노드가 반환된다"
 
     @override
     def given(self) -> Given[SeedingSession, ACaller]:
@@ -175,7 +175,7 @@ class EachKindIsAccepted(
 
     @override
     def describe(self) -> str:
-        return f"슈퍼관리자가 {self.slot_type.value} 종류로 만들면 그 종류가 실린 노드가 온다"
+        return f"슈퍼관리자가 {self.slot_type.value} 종류로 생성하면 그 종류가 담긴 노드가 반환된다"
 
     @override
     def given(self) -> Given[SeedingSession, ACaller]:
@@ -201,7 +201,7 @@ class ANameAlreadyTakenIsRefused(
     @override
     def describe(self) -> str:
         return (
-            "같은 이름의 슬롯 종류가 있을 때 그 이름으로 다시 만들면, 이름이 겹친다는 이유로 거부된다. "
+            "같은 이름의 슬롯 종류가 있을 때 그 이름으로 다시 생성하면, 이름 중복으로 거부된다. "
             "이 행은 다섯 테이블의 참조 대상이라 덮어쓰지 않는다"
         )
 
@@ -228,7 +228,7 @@ class AUserWhoIsNotTheSuperadminMayNotCreate(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 아닌 사용자가 슬롯 종류를 만들면 역할로 거부된다"
+        return "슈퍼관리자가 아닌 사용자가 슬롯 종류를 생성하면 역할 부족으로 거부된다"
 
     @override
     def given(self) -> Given[SeedingSession, ACaller]:
@@ -254,8 +254,8 @@ class EnforcementOffStillNeedsTheSuperadmin(
     @override
     def describe(self) -> str:
         return (
-            "엔티티 권한 집행을 꺼도 슈퍼관리자가 아니면 슬롯 종류를 만들지 못한다. "
-            "이 문은 권한 그래프가 아니라 역할이라 스위치와 무관하다"
+            "권한 검사를 꺼도 슈퍼관리자가 아니면 슬롯 종류를 생성하지 못한다. "
+            "생성은 권한 그래프가 아니라 역할로 보호되므로 스위치와 무관하다"
         )
 
     @override

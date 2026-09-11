@@ -34,16 +34,16 @@ from ai.backend.testutils.scenario_steps import (
     Verdict,
 )
 
-DISPLAYED = "심어둔 슬롯"
-"""시드가 심는 슬롯 종류의 표시 이름. 시나리오가 기대값으로 다시 쓰므로 한 자리에 둔다."""
+DISPLAYED = "미리 만들어 둔 슬롯"
+"""시드가 미리 만들어 두는 슬롯 종류의 표시 이름. 시나리오가 기대값으로 다시 쓰므로 한 곳에 둔다."""
 
 DECIMAL = NumberFormatInfo(binary=False, round_length=0)
-"""서식을 생략하면 어댑터가 넣는 값. 십진에 반올림 없음."""
+"""서식을 생략하면 어댑터가 채우는 기본값. 십진에 반올림 없음."""
 
 
 @dataclass(frozen=True)
 class ASlotTypeAndACaller:
-    """슬롯 종류 하나와, 그것을 부를 사람."""
+    """슬롯 종류 하나와, 그것을 호출할 사용자."""
 
     slot_type: ResourceSlotTypeData
     caller: UserData
@@ -51,7 +51,7 @@ class ASlotTypeAndACaller:
 
 @dataclass(frozen=True)
 class ManySlotTypesAndACaller:
-    """훑을 슬롯 종류 여럿과, 훑을 사람. ``named``는 그중 골라낼 하나다."""
+    """검색 대상 슬롯 종류 여럿과, 검색을 호출할 사용자. ``named``는 그중 이름 필터로 골라낼 하나다."""
 
     laid: tuple[ResourceSlotTypeData, ...]
     named: ResourceSlotTypeData
@@ -135,7 +135,7 @@ def slot_type_verdicts(
 
 @dataclass(frozen=True)
 class TheNewSlotTypeNode(Then[Any, ResourceSlotTypeNode]):
-    """방금 만든 슬롯 종류가 통째로 온다. 요청이 정한 것만 여기로 받는다."""
+    """방금 생성한 슬롯 종류가 통째로 반환된다. 기대값은 요청이 지정한 값에서 읽는다."""
 
     named: str
     slot_type: SlotTypes
@@ -150,7 +150,7 @@ class TheNewSlotTypeNode(Then[Any, ResourceSlotTypeNode]):
 
     @override
     def says(self) -> str:
-        return "만든 슬롯 종류 전체가 온다"
+        return "생성한 슬롯 종류 전체가 반환된다"
 
     @override
     def look(self, laid: Any, answered: Answered[ResourceSlotTypeNode]) -> list[Verdict]:
@@ -174,14 +174,14 @@ class TheNewSlotTypeNode(Then[Any, ResourceSlotTypeNode]):
 
 @dataclass(frozen=True)
 class TheSlotTypeNode(Then[ASlotTypeAndACaller, ResourceSlotTypeNode]):
-    """심은 슬롯 종류가 통째로 온다. 바꾸는 요청은 바뀌어야 하는 자리만 인자로 준다."""
+    """미리 만들어 둔 슬롯 종류가 통째로 반환된다. 수정 요청은 바뀌어야 하는 필드만 인자로 준다."""
 
     display_name: str | Kept = KEPT
     enabled: bool | Kept = KEPT
 
     @override
     def says(self) -> str:
-        return "심은 슬롯 종류 전체가 온다"
+        return "미리 만들어 둔 슬롯 종류 전체가 반환된다"
 
     @override
     def look(
@@ -214,11 +214,11 @@ class TheSlotTypeNode(Then[ASlotTypeAndACaller, ResourceSlotTypeNode]):
 class EveryLaidSlotTypeIsCounted(
     Then[ManySlotTypesAndACaller, AdminSearchResourceSlotTypesPayload]
 ):
-    """심은 것이 모두 세어진다."""
+    """미리 만들어 둔 슬롯 종류가 모두 집계된다."""
 
     @override
     def says(self) -> str:
-        return "심은 슬롯 종류가 모두 세어진다"
+        return "미리 만들어 둔 슬롯 종류가 모두 집계된다"
 
     @override
     def look(
@@ -245,11 +245,11 @@ class EveryLaidSlotTypeIsCounted(
 class OnlyTheNamedSlotTypeIsLeft(
     Then[ManySlotTypesAndACaller, AdminSearchResourceSlotTypesPayload]
 ):
-    """걸러낸 그 하나만 남는다."""
+    """필터에 맞는 그 하나만 반환된다."""
 
     @override
     def says(self) -> str:
-        return "걸러낸 그 슬롯 종류 하나만 남는다"
+        return "필터에 맞는 슬롯 종류 하나만 반환된다"
 
     @override
     def look(
@@ -270,13 +270,13 @@ class OnlyTheNamedSlotTypeIsLeft(
 
 @dataclass(frozen=True)
 class TheFirstPageOfSlotTypes(Then[ManySlotTypesAndACaller, AdminSearchResourceSlotTypesPayload]):
-    """크기를 대지 않은 첫 쪽. 기본 크기만큼 오고 다음 쪽이 있다고 답한다."""
+    """크기를 지정하지 않은 첫 페이지. 기본 크기만큼 반환되고 다음 페이지가 있다고 응답한다."""
 
     size: int
 
     @override
     def says(self) -> str:
-        return "기본 크기의 첫 쪽이 온다"
+        return "기본 크기의 첫 페이지가 반환된다"
 
     @override
     def look(
@@ -297,11 +297,11 @@ class TheFirstPageOfSlotTypes(Then[ManySlotTypesAndACaller, AdminSearchResourceS
 
 @dataclass(frozen=True)
 class TheDeletedSlotName(Then[ASlotTypeAndACaller, PurgeResourceSlotTypePayload]):
-    """지운 슬롯 종류의 이름을 실은 답."""
+    """삭제한 슬롯 종류의 이름을 담은 응답."""
 
     @override
     def says(self) -> str:
-        return "지운 슬롯 종류의 이름이 온다"
+        return "삭제한 슬롯 종류의 이름이 반환된다"
 
     @override
     def look(
