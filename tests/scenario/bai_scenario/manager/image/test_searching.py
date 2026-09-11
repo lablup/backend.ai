@@ -14,6 +14,7 @@ from bai_scenario.components.image import (
     ByCursor,
     ByOffset,
     ByTwoModesAtOnce,
+    Filled,
     ImagesInTwoRegistries,
     ManyImagesAndACaller,
     ManyImagesAndSomeone,
@@ -40,7 +41,7 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import (
     Answered,
     Given,
-    Refused,
+    Held,
     Same,
     Scenario,
     Then,
@@ -160,9 +161,7 @@ class TheAttachedAliasIsFound(Then[AnAliasAndACaller, AdminSearchImageAliasesPay
     ) -> list[Verdict]:
         payload = answered.response
         if payload is None:
-            return [
-                Refused(type(answered.raised) if answered.raised else Exception, answered.raised)
-            ]
+            return [Held("답", answered.response, Filled())]
         return [
             Same("items", [one.alias for one in payload.items], [laid.alias.alias]),
             Same("total_count", payload.total_count, 1),
@@ -185,9 +184,7 @@ class EveryLaidImageIsCounted(Then[ManyImagesAndACaller, AdminSearchImagesPayloa
     ) -> list[Verdict]:
         payload = answered.response
         if payload is None:
-            return [
-                Refused(type(answered.raised) if answered.raised else Exception, answered.raised)
-            ]
+            return [Held("답", answered.response, Filled())]
         return [
             Same(
                 "items",
@@ -216,9 +213,7 @@ class OnePageComesBack(Then[ManyImagesAndACaller, AdminSearchImagesPayload]):
     ) -> list[Verdict]:
         payload = answered.response
         if payload is None:
-            return [
-                Refused(type(answered.raised) if answered.raised else Exception, answered.raised)
-            ]
+            return [Held("답", answered.response, Filled())]
         return [
             Same("items", len(payload.items), self.size),
             Same("total_count", payload.total_count, len(laid.laid)),
@@ -241,9 +236,7 @@ class NoAliasIsFound(Then[ManyImagesAndACaller, AdminSearchImageAliasesPayload])
     ) -> list[Verdict]:
         payload = answered.response
         if payload is None:
-            return [
-                Refused(type(answered.raised) if answered.raised else Exception, answered.raised)
-            ]
+            return [Held("답", answered.response, Filled())]
         return [
             Same("items", list(payload.items), []),
             Same("total_count", payload.total_count, 0),

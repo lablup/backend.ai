@@ -31,14 +31,9 @@ from ai.backend.manager.errors.image import ImageAccessForbiddenError, ImageNotF
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import (
-    Answered,
     Given,
-    Refused,
-    Same,
     Scenario,
-    Skipped,
     Then,
-    Verdict,
     When,
 )
 
@@ -85,30 +80,6 @@ class RetiringTheAliased(When[AnAliasAndACaller, ImageAdapter, ImageNode]):
         with ActingAs(laid.caller):
             payload = await adapter.admin_purge(PurgeImageInput(image_id=laid.image.id))
         return payload.item
-
-
-@dataclass(frozen=True)
-class TheRetiredImageComesBack(Then[AnAliasAndACaller, ImageNode]):
-    """지운 이미지가 답으로 온다."""
-
-    @override
-    def says(self) -> str:
-        return "지운 이미지가 답으로 온다"
-
-    @override
-    def look(self, laid: AnAliasAndACaller, answered: Answered[ImageNode]) -> list[Verdict]:
-        node = answered.response
-        if node is None:
-            return [
-                Refused(type(answered.raised) if answered.raised else Exception, answered.raised)
-            ]
-        return [
-            Same("name", node.name, laid.image.name),
-            Same("registry", node.registry, laid.image.registry),
-            Same("architecture", node.architecture, laid.image.architecture),
-            Skipped("id", "데이터베이스가 만든다"),
-            Skipped("last_used_at", "세션이 쓰는 값이라 이 실행이 말할 수 없다"),
-        ]
 
 
 @dataclass(frozen=True)
@@ -189,7 +160,7 @@ class PurgingTakesTheAliasesWithIt(
 
     @override
     def then(self) -> Then[AnAliasAndACaller, ImageNode]:
-        return TheRetiredImageComesBack()
+        return TheImageNode()
 
 
 @dataclass(frozen=True)

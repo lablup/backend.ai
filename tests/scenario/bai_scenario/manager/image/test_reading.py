@@ -11,6 +11,7 @@ from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.image import (
     AnAliasAndACaller,
     AnAliasAndSomeone,
+    Filled,
     ManyImagesAndACaller,
     ManyImagesAndSomeone,
 )
@@ -28,7 +29,7 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import (
     Answered,
     Given,
-    Refused,
+    Held,
     Same,
     Scenario,
     Then,
@@ -104,9 +105,7 @@ class TheImageOrderIsKept(Then[ManyImagesAndACaller, LoadedImages]):
     def look(self, laid: ManyImagesAndACaller, answered: Answered[LoadedImages]) -> list[Verdict]:
         got = answered.response
         if got is None:
-            return [
-                Refused(type(answered.raised) if answered.raised else Exception, answered.raised)
-            ]
+            return [Held("답", answered.response, Filled())]
         return [
             Same("length", len(got), 3),
             Same(
@@ -129,9 +128,7 @@ class NothingIsAsked(Then[ManyImagesAndACaller, LoadedImages]):
     def look(self, laid: ManyImagesAndACaller, answered: Answered[LoadedImages]) -> list[Verdict]:
         got = answered.response
         if got is None:
-            return [
-                Refused(type(answered.raised) if answered.raised else Exception, answered.raised)
-            ]
+            return [Held("답", answered.response, Filled())]
         return [Same("items", got, [])]
 
 
@@ -147,9 +144,7 @@ class TheAliasOrderIsKept(Then[AnAliasAndACaller, LoadedAliases]):
     def look(self, laid: AnAliasAndACaller, answered: Answered[LoadedAliases]) -> list[Verdict]:
         got = answered.response
         if got is None:
-            return [
-                Refused(type(answered.raised) if answered.raised else Exception, answered.raised)
-            ]
+            return [Held("답", answered.response, Filled())]
         return [
             Same("length", len(got), 2),
             Same(

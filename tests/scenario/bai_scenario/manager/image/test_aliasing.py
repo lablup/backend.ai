@@ -15,6 +15,7 @@ from bai_scenario.components.image import (
     AnImageAndACaller,
     AnImageAndSomeone,
     AnImageTheCallerMade,
+    Filled,
     Target,
     TheLaidImage,
 )
@@ -34,7 +35,6 @@ from ai.backend.testutils.scenario_steps import (
     Answered,
     Given,
     Held,
-    Refused,
     Same,
     SameAs,
     Scenario,
@@ -131,9 +131,7 @@ class TheAliasAndItsImage(Then[AnImageAndACaller, AliasImagePayload]):
     def look(self, laid: AnImageAndACaller, answered: Answered[AliasImagePayload]) -> list[Verdict]:
         payload = answered.response
         if payload is None:
-            return [
-                Refused(type(answered.raised) if answered.raised else Exception, answered.raised)
-            ]
+            return [Held("답", answered.response, Filled())]
         wanted: UUID = laid.image.id
         return [
             Same("alias", payload.alias, self.alias),
@@ -154,9 +152,7 @@ class TheRemovedAlias(Then[AnAliasAndACaller, AliasImagePayload]):
     def look(self, laid: AnAliasAndACaller, answered: Answered[AliasImagePayload]) -> list[Verdict]:
         payload = answered.response
         if payload is None:
-            return [
-                Refused(type(answered.raised) if answered.raised else Exception, answered.raised)
-            ]
+            return [Held("답", answered.response, Filled())]
         wanted: UUID = laid.image.id
         return [
             Same("alias", payload.alias, laid.alias.alias),
