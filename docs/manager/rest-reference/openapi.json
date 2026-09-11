@@ -13574,7 +13574,7 @@
         "type": "object"
       },
       "UpdateLoginClientTypeInput": {
-        "description": "Input for updating a login client type.\n\nFields default to \"no change\". For ``description``, pass ``null`` to clear the\nexisting value; omit the field (SENTINEL) to leave it untouched.",
+        "description": "Input for updating a login client type.\n\nEvery field defaults to UNSET (no change). ``description`` accepts ``null`` to clear.",
         "properties": {
           "name": {
             "anyOf": [
@@ -13587,7 +13587,6 @@
                 "type": "null"
               }
             ],
-            "default": null,
             "description": "Updated name. Omit to leave unchanged.",
             "title": "Name"
           },
@@ -13597,14 +13596,10 @@
                 "type": "string"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
-            "description": "Updated description. Use null to clear, omit to leave unchanged.",
+            "description": "Updated description. Omit to leave unchanged; null clears.",
             "title": "Description"
           }
         },

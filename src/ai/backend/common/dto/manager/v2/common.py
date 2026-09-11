@@ -26,6 +26,7 @@ __all__ = (
     "ResourceSlotEntryInput",
     "ResourceSlotInfo",
     "VFolderHostPermissionEntryInfo",
+    "String64",
     "SemVersion",
     "VFolderHostPermissionEntryInput",
 )
@@ -38,6 +39,8 @@ SemVersion = Annotated[str, StringConstraints(pattern=SEM_VERSION_PATTERN)]
 Neither a prerelease suffix nor build metadata is accepted, so this is narrower than
 semver proper.
 """
+
+String64 = Annotated[str, StringConstraints(min_length=1, max_length=64)]
 
 
 class BinarySizeInput(BaseRequestModel):
