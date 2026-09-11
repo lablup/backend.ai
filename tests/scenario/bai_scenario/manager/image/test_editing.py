@@ -8,9 +8,12 @@ from typing import Any, override
 import pytest
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.image import (
+    Accelerators,
     AnIdThatHoldsNothing,
     AnImageAndACaller,
     AnImageAndSomeone,
+    NoAccelerator,
+    OneAccelerator,
     Target,
     TheImageNode,
     TheLaidImage,
@@ -41,7 +44,7 @@ class Editing(When[AnImageAndACaller, ImageAdapter, ImageNode]):
     """이미지를 고친다. 값을 주지 않은 자리는 건드리지 않는다."""
 
     tag: str | None = None
-    clearing_accelerators: bool = False
+    accelerators: Accelerators | None = None
     at: Target = field(default_factory=TheLaidImage)
 
     @override
@@ -53,8 +56,10 @@ class Editing(When[AnImageAndACaller, ImageAdapter, ImageNode]):
         who = laid.caller.username
         if isinstance(self.at, AnIdThatHoldsNothing):
             return f"{who}이 {self.at.says()}를 고침"
-        if self.clearing_accelerators:
-            return f"{who}이 {laid.image.name}의 가속기 목록을 비움"
+        if self.accelerators is not None:
+            named = self.accelerators.named()
+            put = "비움" if named is None else f"{named}로 적음"
+            return f"{who}이 {laid.image.name}의 가속기 목록을 {put}"
         if self.tag is not None:
             return f"{who}이 {laid.image.name}의 태그를 {self.tag}로 고침"
         return f"{who}이 아무 값도 주지 않고 고침"
@@ -65,8 +70,8 @@ class Editing(When[AnImageAndACaller, ImageAdapter, ImageNode]):
         asked: dict[str, Any] = {"image_id": target}
         if self.tag is not None:
             asked["tag"] = self.tag
-        if self.clearing_accelerators:
-            asked["supported_accelerators"] = None
+        if self.accelerators is not None:
+            asked["supported_accelerators"] = self.accelerators.named()
         with ActingAs(laid.caller):
             payload = await adapter.admin_update(UpdateImageInput(**asked))
         return payload.item
@@ -137,15 +142,40 @@ class ClearingTheAcceleratorList(
 
     @override
     def given(self) -> Given[SeedingSession, AnImageAndACaller]:
-        return AnImageAndSomeone(role=UserRole.SUPERADMIN)
+        return AnImageAndSomeone(role=UserRole.SUPERADMIN, accelerators=OneAccelerator())
 
     @override
     def when(self) -> When[AnImageAndACaller, ImageAdapter, ImageNode]:
-        return Editing(clearing_accelerators=True)
+        return Editing(accelerators=NoAccelerator())
 
     @override
     def then(self) -> Then[AnImageAndACaller, ImageNode]:
         return TheImageNode()
+
+
+@dataclass(frozen=True)
+class WritingTheAcceleratorList(
+    Scenario[SeedingSession, AnImageAndACaller, ImageAdapter, ImageNode]
+):
+    @override
+    def summary(self) -> str:
+        return "writing-an-accelerator-onto-an-image-that-had-none"
+
+    @override
+    def describe(self) -> str:
+        return "슈퍼관리자가 가속기 이름을 주면 그 이름이 적힌 노드가 온다"
+
+    @override
+    def given(self) -> Given[SeedingSession, AnImageAndACaller]:
+        return AnImageAndSomeone(role=UserRole.SUPERADMIN)
+
+    @override
+    def when(self) -> When[AnImageAndACaller, ImageAdapter, ImageNode]:
+        return Editing(accelerators=OneAccelerator())
+
+    @override
+    def then(self) -> Then[AnImageAndACaller, ImageNode]:
+        return TheImageNode(accelerators=OneAccelerator())
 
 
 @dataclass(frozen=True)
@@ -198,6 +228,7 @@ SCENARIOS: list[Any] = [
     ChangingOnlyTheTag(),
     AnEmptyEditChangesNothing(),
     ClearingTheAcceleratorList(),
+    WritingTheAcceleratorList(),
     EditingWhatIsNotThere(),
     APlainUserMayNotEdit(),
 ]
