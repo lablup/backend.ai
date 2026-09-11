@@ -21398,8 +21398,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Updated resource group name. Leave null to keep existing value.",
+            "description": "Updated resource group name. Omit to leave unchanged.",
             "title": "Name"
           },
           "description": {
@@ -21408,14 +21407,10 @@
                 "type": "string"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
-            "description": "Updated description. Use SENTINEL to clear, null to keep existing value.",
+            "description": "Updated description. Omit to leave unchanged; null clears.",
             "title": "Description"
           },
           "is_active": {
@@ -21427,8 +21422,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Whether the resource group is active. Leave null to keep existing value.",
+            "description": "Whether the resource group is active. Omit to leave unchanged.",
             "title": "Is Active"
           },
           "is_default": {
@@ -21440,8 +21434,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Whether this is the default resource group. At most one resource group may hold the flag, so setting it to true is rejected while another one holds it; clear that one first. Leave null to keep existing value.",
+            "description": "Whether this is the default resource group. At most one resource group may hold the flag, so setting it to true is rejected while another one holds it; clear that one first. Omit to leave unchanged.",
             "title": "Is Default"
           },
           "total_resource_slots": {
@@ -21451,14 +21444,10 @@
                 "type": "object"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
-            "description": "Updated total resource slot limits. Use SENTINEL to clear, null to keep existing value.",
+            "description": "Updated total resource slot limits. Omit to leave unchanged; null clears.",
             "title": "Total Resource Slots"
           },
           "allowed_vfolder_hosts": {
@@ -21468,14 +21457,10 @@
                 "type": "object"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
-            "description": "Updated allowed vfolder host permissions. Use SENTINEL to clear, null to keep existing value.",
+            "description": "Updated allowed vfolder host permissions. Omit to leave unchanged; null clears.",
             "title": "Allowed Vfolder Hosts"
           },
           "integration_name": {
@@ -21484,14 +21469,10 @@
                 "type": "string"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
-            "description": "Updated external integration ID. Use SENTINEL to clear, null to keep existing value.",
+            "description": "Updated external integration ID. Omit to leave unchanged; null clears.",
             "title": "Integration Name"
           },
           "resource_policy": {
@@ -21500,14 +21481,10 @@
                 "type": "string"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
-            "description": "Updated resource policy name. Use SENTINEL to clear, null to keep existing value.",
+            "description": "Updated resource policy name. Omit to leave unchanged; null clears.",
             "title": "Resource Policy"
           }
         },
@@ -21563,8 +21540,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Half-life for exponential decay in days. Leave null to keep existing value.",
+            "description": "Half-life for exponential decay in days. Omit to leave unchanged.",
             "title": "Half Life Days"
           },
           "lookback_days": {
@@ -21576,8 +21552,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Total lookback period in days. Leave null to keep existing value.",
+            "description": "Total lookback period in days. Omit to leave unchanged.",
             "title": "Lookback Days"
           },
           "decay_unit_days": {
@@ -21589,8 +21564,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Granularity of decay buckets in days. Leave null to keep existing value.",
+            "description": "Granularity of decay buckets in days. Omit to leave unchanged.",
             "title": "Decay Unit Days"
           },
           "default_weight": {
@@ -21606,8 +21580,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Default weight for entities. Leave null to keep existing value.",
+            "description": "Default weight for entities. Omit to leave unchanged.",
             "title": "Default Weight"
           },
           "resource_weights": {
@@ -21622,8 +21595,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Resource weights for fair share calculation. Leave null to keep existing values.",
+            "description": "Resource weights for fair share calculation. Omit to leave unchanged.",
             "title": "Resource Weights"
           }
         },
@@ -21704,8 +21676,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Whether the resource group is active. Leave null to keep existing value.",
+            "description": "Whether the resource group is active. Omit to leave unchanged.",
             "title": "Is Active"
           },
           "is_public": {
@@ -21717,8 +21688,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Whether the resource group is public. Leave null to keep existing value.",
+            "description": "Whether the resource group is public. Omit to leave unchanged.",
             "title": "Is Public"
           },
           "is_default": {
@@ -21730,8 +21700,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Whether this is the default resource group. At most one resource group may hold the flag, so setting it to true is rejected while another one holds it; clear that one first. Leave null to keep existing value.",
+            "description": "Whether this is the default resource group. At most one resource group may hold the flag, so setting it to true is rejected while another one holds it; clear that one first. Omit to leave unchanged.",
             "title": "Is Default"
           },
           "description": {
@@ -21743,8 +21712,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Human-readable description. Leave null to keep existing value.",
+            "description": "Human-readable description. Omit to leave unchanged; null clears.",
             "title": "Description"
           },
           "app_proxy_addr": {
@@ -21756,8 +21724,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "App proxy address. Leave null to keep existing value.",
+            "description": "App proxy address. Omit to leave unchanged; null clears.",
             "title": "App Proxy Addr"
           },
           "appproxy_api_token": {
@@ -21769,8 +21736,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "App proxy API token. Leave null to keep existing value.",
+            "description": "App proxy API token. Omit to leave unchanged; null clears.",
             "title": "Appproxy Api Token"
           },
           "use_host_network": {
@@ -21782,8 +21748,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Whether to use host network mode. Leave null to keep existing value.",
+            "description": "Whether to use host network mode. Omit to leave unchanged.",
             "title": "Use Host Network"
           },
           "scheduler_type": {
@@ -21795,8 +21760,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Scheduler type value (fifo/lifo/drf/fair-share). Leave null to keep existing.",
+            "description": "Scheduler type value (fifo/lifo/drf/fair-share). Omit to leave unchanged.",
             "title": "Scheduler Type"
           },
           "preemption": {
@@ -21808,8 +21772,8 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Preemption configuration. Leave null to keep existing value."
+            "description": "Preemption configuration. Omit to leave unchanged.",
+            "title": "Preemption"
           }
         },
         "required": [
