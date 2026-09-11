@@ -35,7 +35,6 @@ from ai.backend.manager.data.user.types import UserData
 from ai.backend.testutils.scenario_steps import (
     Answered,
     Given,
-    Refused,
     Same,
     Then,
     Verdict,
@@ -484,7 +483,7 @@ class TheRecordsAnswered(Then[Any, SearchAuditLogsPayload]):
     def look(self, laid: Any, answered: Answered[SearchAuditLogsPayload]) -> list[Verdict]:
         payload = answered.response
         if payload is None:
-            return [Refused(Exception, answered.raised)]
+            return [Same("answer", repr(answered.raised), "a page of records")]
         return [
             Same("items", [one.operation for one in payload.items], list(laid.visible_ops)),
             Same("total_count", payload.total_count, len(laid.visible_ops)),
@@ -508,7 +507,7 @@ class ThePageIsCapped(Then[Any, SearchAuditLogsPayload]):
     def look(self, laid: Any, answered: Answered[SearchAuditLogsPayload]) -> list[Verdict]:
         payload = answered.response
         if payload is None:
-            return [Refused(Exception, answered.raised)]
+            return [Same("answer", repr(answered.raised), "a page of records")]
         return [
             Same("items_count", len(payload.items), self.size),
             Same("total_count", payload.total_count, self.total),
@@ -533,6 +532,6 @@ class TheNodesInOrder(Then[RecordsToLoad, list[AuditLogNode | None]]):
     ) -> list[Verdict]:
         nodes = answered.response
         if nodes is None:
-            return [Refused(Exception, answered.raised)]
+            return [Same("answer", repr(answered.raised), "a list of nodes")]
         got = [None if node is None else node.operation for node in nodes]
         return [Same("operations", got, list(self.expected))]
