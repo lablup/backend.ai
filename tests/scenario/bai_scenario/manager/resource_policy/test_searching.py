@@ -1,4 +1,4 @@
-"""정책 검색 — 전역 superadmin 역할이 지키고, 읽기라 모니터도 지난다."""
+"""정책 검색 — 전역 superadmin 역할이 필요하지만, 읽기 연산이라 모니터 역할도 통과한다."""
 
 from __future__ import annotations
 
@@ -55,7 +55,7 @@ class SearchingEverything(When[ManyPoliciesAndACaller[Any], ResourcePolicyAdapte
 
 @dataclass(frozen=True)
 class SearchingByName(When[ManyPoliciesAndACaller[Any], ResourcePolicyAdapter, Searched]):
-    """심은 것 중 하나의 이름으로 걸러 검색한다."""
+    """미리 만들어 둔 정책 중 하나의 이름을 필터로 검색한다."""
 
     family: Family[Any, Any]
 
@@ -65,7 +65,7 @@ class SearchingByName(When[ManyPoliciesAndACaller[Any], ResourcePolicyAdapter, S
 
     @override
     def describe(self, laid: ManyPoliciesAndACaller[Any]) -> str:
-        return f"{laid.caller.username}이 {laid.named.name}으로 걸러 검색"
+        return f"{laid.caller.username}이 {laid.named.name} 이름 필터로 검색"
 
     @override
     async def call(
@@ -89,7 +89,7 @@ class TheSuperadminFindsEveryOne(
     def describe(self) -> str:
         return (
             f"{self.family.kind} 여럿이 있고 슈퍼관리자가 필터 없이 전체를 검색하면, "
-            "심은 것이 모두, 그리고 그것만 온다"
+            "미리 만들어 둔 정책이 모두, 그리고 그것만 반환된다"
         )
 
     @override
@@ -118,8 +118,8 @@ class FilteringByNameLeavesThatOne(
     @override
     def describe(self) -> str:
         return (
-            f"이름이 다른 {self.family.kind} 여럿이 있고 슈퍼관리자가 그중 한 이름으로 걸러 "
-            "검색하면, 그 이름의 것만 온다"
+            f"이름이 다른 {self.family.kind} 여럿이 있고 슈퍼관리자가 그중 한 이름을 필터로 "
+            "검색하면, 그 이름의 정책만 반환된다"
         )
 
     @override
@@ -148,8 +148,8 @@ class AMonitorFindsEveryOne(
     @override
     def describe(self) -> str:
         return (
-            f"모니터 역할 사용자가 {self.family.kind} 전체를 검색하면 슈퍼관리자와 같은 답이 "
-            "온다. 역할 문이 읽기는 모니터에게도 열어 주기 때문이다"
+            f"모니터 역할 사용자가 {self.family.kind} 전체를 검색하면 슈퍼관리자와 같은 응답이 "
+            "반환된다. 역할 검사가 읽기는 모니터에게도 허용하기 때문이다"
         )
 
     @override
@@ -177,7 +177,7 @@ class APlainUserMayNotSearch(
 
     @override
     def describe(self) -> str:
-        return f"슈퍼관리자가 아닌 사용자가 {self.family.kind} 전체를 검색하려 하면 역할로 막힌다"
+        return f"슈퍼관리자가 아닌 사용자가 {self.family.kind} 전체를 검색하려 하면 역할 부족으로 거부된다"
 
     @override
     def given(self) -> Given[SeedingSession, ManyPoliciesAndACaller[Any]]:
