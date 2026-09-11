@@ -1,8 +1,8 @@
 """The session adapter, assembled for one row.
 
 A session read answers through a service whose constructor demands eleven dependencies.
-Ten of them are named unwired here, so a row that reaches one fails saying which rather
-than passing against a mock that answered on its own.
+Three of them run against the real database and the real Valkey server; the other eight
+are named unwired, so a row that reaches one fails saying which.
 """
 
 from __future__ import annotations
@@ -17,10 +17,9 @@ from bai_scenario.fakes.storage_proxy import (
     FakeStorageSessionManager,
 )
 from bai_scenario.runner.unwired import unwired
+from bai_scenario.valkey import ScenarioValkey
 
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
-from ai.backend.common.clients.valkey_client.valkey_schedule.client import ValkeyScheduleClient
-from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.data.entity.resource_group import ResourceGroupEntityType
 from ai.backend.common.data.entity.session import SessionEntityType
 from ai.backend.common.etcd import AbstractKVStore
@@ -76,6 +75,7 @@ async def adapter(
     validators: V2ActionValidators,
     monitors: ActionMonitors,
     storage: FakeStorageProxyManagerFacingClient,
+    valkey: ScenarioValkey,
 ) -> SessionAdapter:
     provider = V2DBOpsProvider(engine)
     registry: ProcessorRegistry[Any] = ProcessorRegistry(
@@ -88,8 +88,8 @@ async def adapter(
     scheduler_repository = SchedulerRepository(
         engine,
         ReconcileOpsProvider(engine),
-        unwired(ValkeyStatClient, "only a scheduling run reads the per-agent hints"),
-        unwired(ValkeyScheduleClient, "only a scheduling run marks work"),
+        valkey.stat,
+        valkey.schedule,
         config,
         FakeStorageSessionManager({"local": storage}),
     )
@@ -110,7 +110,7 @@ async def adapter(
                     config_provider=config,
                     storage_manager=FakeStorageSessionManager({"local": storage}),
                     event_producer=unwired(EventProducer, "nothing here waits on the event"),
-                    valkey_schedule=unwired(ValkeyScheduleClient, "only a run marks work"),
+                    valkey_schedule=valkey.schedule,
                     network_plugin_ctx=unwired(
                         NetworkPluginContext, "no session asks for a network"
                     ),

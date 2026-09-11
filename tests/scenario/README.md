@@ -1,6 +1,6 @@
 # 시나리오 테스트
 
-어댑터 하나를 실제 데이터베이스와 함께 돌려, 요청 하나가 무엇을 답하는지 확인한다.
+어댑터 하나를 실제 데이터베이스와 실제 Valkey와 함께 돌려, 요청 하나가 무엇을 답하는지 확인한다.
 규칙은 `AGENTS.md`, 배경은 `KNOWLEDGE.md`에 있다.
 
 ## 한 행이 어떻게 도는가
@@ -48,7 +48,7 @@ class TheDomainNode(Then[ADomainAndACaller, DomainNode]):
 | `bai_scenario/runner/` | 시나리오 실행과 검사, 픽스처로 심는 자리 |
 | `bai_scenario/setup/` | 공용 셋업이 무엇을 만드는지 확인하는 테스트 |
 | `bai_scenario/fakes/` | 외부 서비스 대역 |
-| `bai_scenario/{db,schema,config,validators,monitors}.py` | 실행 하나가 필요로 하는 것 |
+| `bai_scenario/{db,schema,config,valkey,monitors}.py` | 실행 하나가 필요로 하는 것 |
 
 패키지는 자랄 것에만 둔다. 파일 하나로 끝나는 것은 위 모듈들처럼 평평하게 둔다.
 
