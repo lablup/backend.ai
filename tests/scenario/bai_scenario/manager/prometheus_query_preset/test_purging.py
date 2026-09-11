@@ -45,7 +45,7 @@ from ai.backend.testutils.scenario_steps import (
 ENFORCEMENT = "manager.rbac.enforcement_enabled"
 
 type Removed = DeleteQueryDefinitionPayload
-type RetiringStep = Scenario[
+type PurgingStep = Scenario[
     SeedingSession, APresetAndACaller, PrometheusQueryPresetAdapter, Removed
 ]
 
@@ -180,7 +180,7 @@ class AnUnknownIdIsNotFoundForASuperadmin(
         return TheCallIsRefused(EntityNotFoundError)
 
 
-SCENARIOS: list[RetiringStep] = [
+SCENARIOS: list[PurgingStep] = [
     TheSuperadminRemovesIt(),
     AUserGrantedNothingMayNotRemove(),
     EnforcementOffLetsAnyoneRemove(),
@@ -189,7 +189,7 @@ SCENARIOS: list[RetiringStep] = [
 
 
 @pytest.mark.parametrize("scenario", SCENARIOS, ids=lambda s: s.summary())
-async def test_retiring(
-    scenario: RetiringStep, adapter: PrometheusQueryPresetAdapter, engine: ExtendedAsyncSAEngine
+async def test_purging(
+    scenario: PurgingStep, adapter: PrometheusQueryPresetAdapter, engine: ExtendedAsyncSAEngine
 ) -> None:
     await run_scenario(scenario, adapter, engine)
