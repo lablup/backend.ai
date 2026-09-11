@@ -1,6 +1,7 @@
-"""마스킹 정책 지우기 — id로 지목해 누가 지울 수 있고, 집행을 끄면 무엇이 열리는가.
+"""마스킹 정책 삭제 — id로 지정해 누가 삭제할 수 있고, 권한 검사를 끄면 무엇이 허용되는가.
 
-넣기는 대상으로 행을 찾고 지우기는 id로 찾는다. 하나를 읽는 호출이 없어 id는 심은 행에서 읽는다.
+등록은 대상으로 행을 찾고 삭제는 id로 찾는다. 하나를 읽는 호출이 없어 id는 미리 만들어 둔 행에서
+읽는다.
 """
 
 from __future__ import annotations
@@ -39,7 +40,7 @@ type RetiringStep = Scenario[
 
 @dataclass(frozen=True)
 class Purging(When[AMaskingPolicyAndACaller, ClientIPMaskingAdapter, ClientIPMaskingPolicyNode]):
-    """심은 정책을 id로 지운다. 답이 실은 노드를 벗겨서 준다."""
+    """미리 만들어 둔 정책을 id로 삭제한다. 응답에 담긴 노드를 꺼내서 준다."""
 
     unknown: bool = False
 
@@ -49,8 +50,10 @@ class Purging(When[AMaskingPolicyAndACaller, ClientIPMaskingAdapter, ClientIPMas
 
     @override
     def describe(self, laid: AMaskingPolicyAndACaller) -> str:
-        target = "없는 id" if self.unknown else f"{laid.policy.target_type.value} 정책"
-        return f"{laid.caller.username}이 {target}을 지움"
+        target = (
+            "존재하지 않는 id" if self.unknown else f"{laid.policy.target_type.value} 대상 정책"
+        )
+        return f"{laid.caller.username}이 {target} 삭제"
 
     @override
     async def call(
@@ -77,7 +80,7 @@ class TheSuperadminPurgesAPolicy(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 정책을 id로 지우면 지운 정책 전체를 실은 답이 온다"
+        return "슈퍼관리자가 정책을 id로 삭제하면 삭제한 정책 전체를 담은 응답이 반환된다"
 
     @override
     def given(self) -> Given[SeedingSession, AMaskingPolicyAndACaller]:
@@ -106,7 +109,7 @@ class AnIdNothingAnswersToIsNotFound(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 아무 정책도 갖지 않은 id를 지우면 대상이 없다는 것으로 거부된다"
+        return "슈퍼관리자가 존재하지 않는 id를 삭제하면 대상을 찾을 수 없다는 이유로 거부된다"
 
     @override
     def given(self) -> Given[SeedingSession, AMaskingPolicyAndACaller]:
@@ -135,7 +138,7 @@ class AUserGrantedNothingMayNotPurge(
 
     @override
     def describe(self) -> str:
-        return "아무 권한도 받지 않은 사용자가 정책을 지우면 권한 부족으로 거부된다. 넣기가 역할로 거부되는 것과 다른 문이다"
+        return "아무 권한도 없는 사용자가 정책을 삭제하면 권한 부족으로 거부된다. 등록이 역할 부족으로 거부되는 것과는 다른 검사다"
 
     @override
     def given(self) -> Given[SeedingSession, AMaskingPolicyAndACaller]:
@@ -167,8 +170,8 @@ class AUserGrantedNothingPurgingAnUnknownIdIsRefusedForPermission(
     @override
     def describe(self) -> str:
         return (
-            "아무 권한도 받지 않은 사용자가 없는 id를 지우면 대상 없음이 아니라 권한 부족으로 "
-            "거부된다. 권한 검사가 먼저 돌고 없는 행에는 걸린 권한도 없다"
+            "아무 권한도 없는 사용자가 존재하지 않는 id를 삭제하면 대상 없음이 아니라 권한 부족으로 "
+            "거부된다. 권한 검사가 먼저 실행되고 없는 행에는 부여된 권한도 없기 때문이다"
         )
 
     @override
@@ -202,8 +205,8 @@ class EnforcementOffLetsAnyonePurge(
     @override
     def describe(self) -> str:
         return (
-            "엔티티 권한 집행을 끄면 아무 권한도 받지 않은 사용자도 정책을 지운다. "
-            "지우기의 문은 넣기와 달리 권한 그래프라 스위치가 통한다"
+            "권한 검사를 끄면 아무 권한도 없는 사용자도 정책을 삭제할 수 있다. "
+            "삭제는 등록과 달리 권한 그래프로 보호되므로 스위치가 영향을 준다"
         )
 
     @override

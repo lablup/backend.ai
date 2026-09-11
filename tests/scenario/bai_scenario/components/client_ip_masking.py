@@ -38,12 +38,12 @@ from ai.backend.testutils.scenario_steps import (
 
 IPV4 = 24
 IPV6 = 48
-"""시드가 심는 정책의 접두 길이."""
+"""시드가 미리 만들어 두는 정책의 접두 길이."""
 
 
 @dataclass(frozen=True)
 class AMaskingPolicyAndACaller:
-    """정책 하나와, 그것을 부를 사람."""
+    """정책 하나와, 그것을 호출할 사용자."""
 
     policy: ClientIPMaskingPolicyData
     caller: UserData
@@ -51,7 +51,7 @@ class AMaskingPolicyAndACaller:
 
 @dataclass(frozen=True)
 class ManyMaskingPoliciesAndACaller:
-    """훑을 정책 여럿과, 훑을 사람. ``laid``는 답에 나와야 하는 것만이고 ``named``는 그중 하나다."""
+    """검색 대상 정책 여럿과, 검색을 호출할 사용자. ``laid``는 응답에 나와야 하는 것만이고 ``named``는 그중 하나다."""
 
     laid: tuple[ClientIPMaskingPolicyData, ...]
     named: ClientIPMaskingPolicyData
@@ -133,7 +133,7 @@ class MaskingPoliciesOfEveryTarget(Given[Any, ManyMaskingPoliciesAndACaller]):
 
 @dataclass(frozen=True)
 class MaskingPoliciesOfMixedModes(Given[Any, ManyMaskingPoliciesAndACaller]):
-    """자르는 정책 둘과 버리는 정책 하나, 사용자 한 명. ``laid``는 자르는 둘이다."""
+    """truncate 모드 정책 둘과 drop 모드 정책 하나, 사용자 한 명. ``laid``는 truncate 둘이다."""
 
     role: UserRole = UserRole.USER
 
@@ -193,7 +193,7 @@ def masking_verdicts(
 
 @dataclass(frozen=True)
 class TheNewMaskingPolicyNode(Then[Any, ClientIPMaskingPolicyNode]):
-    """방금 넣은 정책이 통째로 온다. 요청이 정한 것만 여기로 받는다."""
+    """방금 등록한 정책이 통째로 반환된다. 기대값은 요청이 지정한 값에서 읽는다."""
 
     started: datetime
     target: ClientIPMaskingTarget
@@ -203,7 +203,7 @@ class TheNewMaskingPolicyNode(Then[Any, ClientIPMaskingPolicyNode]):
 
     @override
     def says(self) -> str:
-        return "넣은 정책 전체가 온다"
+        return "등록한 정책 전체가 반환된다"
 
     @override
     def look(self, laid: Any, answered: Answered[ClientIPMaskingPolicyNode]) -> list[Verdict]:
@@ -223,7 +223,7 @@ class TheNewMaskingPolicyNode(Then[Any, ClientIPMaskingPolicyNode]):
 
 @dataclass(frozen=True)
 class TheSameRowRewritten(Then[AMaskingPolicyAndACaller, ClientIPMaskingPolicyNode]):
-    """심은 정책이 같은 id로, 준 값으로 통째로 바뀌어 온다."""
+    """미리 만들어 둔 정책이 같은 id를 유지한 채, 지정한 값으로 통째로 바뀌어 반환된다."""
 
     started: datetime
     mode: ClientIPMaskingMode | Kept = KEPT
@@ -232,7 +232,7 @@ class TheSameRowRewritten(Then[AMaskingPolicyAndACaller, ClientIPMaskingPolicyNo
 
     @override
     def says(self) -> str:
-        return "같은 id의 행이 준 값으로 바뀌어 온다"
+        return "같은 id의 행이 지정한 값으로 바뀌어 반환된다"
 
     @override
     def look(
@@ -244,7 +244,7 @@ class TheSameRowRewritten(Then[AMaskingPolicyAndACaller, ClientIPMaskingPolicyNo
         seed = laid.policy
         return masking_verdicts(
             node,
-            identity=Held[UUID]("id", node.id, SameAs[UUID](seed.id, "심은 정책")),
+            identity=Held[UUID]("id", node.id, SameAs[UUID](seed.id, "미리 만들어 둔 정책")),
             target=seed.target_type,
             mode=seed.mode if isinstance(self.mode, Kept) else self.mode,
             ipv4=seed.ipv4_prefix if isinstance(self.ipv4, Kept) else self.ipv4,
@@ -257,11 +257,11 @@ class TheSameRowRewritten(Then[AMaskingPolicyAndACaller, ClientIPMaskingPolicyNo
 class TheLaidMaskingPoliciesAreLeft(
     Then[ManyMaskingPoliciesAndACaller, AdminSearchClientIPMaskingPoliciesPayload]
 ):
-    """답에 나와야 하는 것들이 모두, 그리고 그것들만 남는다."""
+    """응답에 나와야 하는 정책이 모두, 그리고 그것만 반환된다."""
 
     @override
     def says(self) -> str:
-        return "답에 나와야 하는 정책만 남는다"
+        return "응답에 나와야 하는 정책만 반환된다"
 
     @override
     def look(
@@ -288,11 +288,11 @@ class TheLaidMaskingPoliciesAreLeft(
 class OnlyTheNamedMaskingPolicyIsLeft(
     Then[ManyMaskingPoliciesAndACaller, AdminSearchClientIPMaskingPoliciesPayload]
 ):
-    """걸러낸 그 하나만 남는다."""
+    """필터에 맞는 그 하나만 반환된다."""
 
     @override
     def says(self) -> str:
-        return "걸러낸 그 정책 하나만 남는다"
+        return "필터에 맞는 정책 하나만 반환된다"
 
     @override
     def look(
@@ -317,13 +317,13 @@ class OnlyTheNamedMaskingPolicyIsLeft(
 
 @dataclass(frozen=True)
 class TheDeletedMaskingPolicy(Then[AMaskingPolicyAndACaller, ClientIPMaskingPolicyNode]):
-    """지운 정책이 통째로 온다. 값은 심은 것에서 읽는다."""
+    """삭제한 정책이 통째로 반환된다. 기대값은 미리 만들어 둔 데이터에서 읽는다."""
 
     started: datetime
 
     @override
     def says(self) -> str:
-        return "지운 정책 전체가 온다"
+        return "삭제한 정책 전체가 반환된다"
 
     @override
     def look(
@@ -335,7 +335,7 @@ class TheDeletedMaskingPolicy(Then[AMaskingPolicyAndACaller, ClientIPMaskingPoli
         seed = laid.policy
         return masking_verdicts(
             node,
-            identity=Held[UUID]("id", node.id, SameAs[UUID](seed.id, "심은 정책")),
+            identity=Held[UUID]("id", node.id, SameAs[UUID](seed.id, "미리 만들어 둔 정책")),
             target=seed.target_type,
             mode=seed.mode,
             ipv4=seed.ipv4_prefix,

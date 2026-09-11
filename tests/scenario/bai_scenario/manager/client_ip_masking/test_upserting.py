@@ -1,6 +1,6 @@
-"""마스킹 정책 넣기 — 대상마다 하나이고, 넣기는 있던 행을 통째로 바꾸며, 누가 넣을 수 있는가.
+"""마스킹 정책 등록 — 대상마다 하나이고, 등록은 있던 행을 통째로 바꾸며, 누가 등록할 수 있는가.
 
-접두 길이가 범위를 벗어나는 요청은 여기 없다. 요청 타입이 이미 막는다.
+접두 길이가 범위를 벗어나는 요청은 여기 없다. 요청 타입이 이미 막기 때문이다.
 """
 
 from __future__ import annotations
@@ -49,7 +49,7 @@ type UpsertingStep = Scenario[
 
 @dataclass(frozen=True)
 class Upserting(When[ACaller, ClientIPMaskingAdapter, ClientIPMaskingPolicyNode]):
-    """한 대상에 정책을 넣는다. 답이 실은 노드를 벗겨서 준다."""
+    """한 대상에 정책을 등록한다. 응답에 담긴 노드를 꺼내서 준다."""
 
     target: ClientIPMaskingTarget = ClientIPMaskingTarget.DEFAULT
     mode: ClientIPMaskingMode = ClientIPMaskingMode.TRUNCATE
@@ -64,8 +64,8 @@ class Upserting(When[ACaller, ClientIPMaskingAdapter, ClientIPMaskingPolicyNode]
     def describe(self, laid: ACaller) -> str:
         prefixes = "" if self.ipv4 is None and self.ipv6 is None else " 접두 길이와 함께"
         return (
-            f"{laid.caller.username}이 {self.target.value} 대상에 {self.mode.value} 정책을"
-            f"{prefixes} 넣음"
+            f"{laid.caller.username}이 {self.target.value} 대상에 {self.mode.value} 모드 정책을"
+            f"{prefixes} 등록"
         )
 
     @override
@@ -88,7 +88,7 @@ class Upserting(When[ACaller, ClientIPMaskingAdapter, ClientIPMaskingPolicyNode]
 class UpsertingTheLaidTargetAgain(
     When[AMaskingPolicyAndACaller, ClientIPMaskingAdapter, ClientIPMaskingPolicyNode]
 ):
-    """심은 정책의 대상에 다시 넣는다."""
+    """미리 만들어 둔 정책의 대상에 다시 등록한다."""
 
     mode: ClientIPMaskingMode = ClientIPMaskingMode.DROP
     ipv4: int | None = IPV4
@@ -103,7 +103,7 @@ class UpsertingTheLaidTargetAgain(
         prefixes = "" if self.ipv4 is None and self.ipv6 is None else " 접두 길이와 함께"
         return (
             f"{laid.caller.username}이 {laid.policy.target_type.value} 대상에 "
-            f"{self.mode.value} 정책을{prefixes} 다시 넣음"
+            f"{self.mode.value} 모드 정책을{prefixes} 다시 등록"
         )
 
     @override
@@ -134,7 +134,7 @@ class TheSuperadminPutsAPolicyOnATarget(
 
     @override
     def describe(self) -> str:
-        return "정책이 없을 때 슈퍼관리자가 대상·모드·두 접두 길이로 넣으면 준 값이 그대로 실린 노드가 온다"
+        return "정책이 없을 때 슈퍼관리자가 대상·모드·두 접두 길이를 지정해 등록하면 지정한 값이 그대로 담긴 노드가 반환된다"
 
     @override
     def given(self) -> Given[SeedingSession, ACaller]:
@@ -167,7 +167,7 @@ class OmittedPrefixesStayEmpty(
 
     @override
     def describe(self) -> str:
-        return "대상과 모드만 주고 넣으면 두 접두 길이가 빈 노드가 온다"
+        return "대상과 모드만 지정해 등록하면 두 접두 길이가 비어 있는 노드가 반환된다"
 
     @override
     def given(self) -> Given[SeedingSession, ACaller]:
@@ -201,7 +201,7 @@ class EachTargetTakesAPolicy(
 
     @override
     def describe(self) -> str:
-        return f"슈퍼관리자가 {self.target.value} 대상에 넣으면 그 대상이 실린 노드가 온다"
+        return f"슈퍼관리자가 {self.target.value} 대상에 등록하면 그 대상이 담긴 노드가 반환된다"
 
     @override
     def given(self) -> Given[SeedingSession, ACaller]:
@@ -235,7 +235,7 @@ class EachModeIsKept(
 
     @override
     def describe(self) -> str:
-        return f"슈퍼관리자가 {self.mode.value} 모드로 넣으면 그 모드가 실린 노드가 온다"
+        return f"슈퍼관리자가 {self.mode.value} 모드로 등록하면 그 모드가 담긴 노드가 반환된다"
 
     @override
     def given(self) -> Given[SeedingSession, ACaller]:
@@ -270,7 +270,7 @@ class PuttingOnATakenTargetRewritesTheRow(
 
     @override
     def describe(self) -> str:
-        return "이미 정책이 있는 대상에 다른 모드로 넣으면, 새 행이 아니라 같은 id의 행이 새 모드로 바뀐 노드가 온다"
+        return "이미 정책이 있는 대상에 다른 모드로 등록하면, 새 행이 아니라 같은 id의 행이 새 모드로 바뀐 노드가 반환된다"
 
     @override
     def given(self) -> Given[SeedingSession, AMaskingPolicyAndACaller]:
@@ -302,8 +302,8 @@ class PuttingAgainWithoutPrefixesClearsThem(
     @override
     def describe(self) -> str:
         return (
-            "접두 길이가 있는 정책의 대상에 대상과 모드만 주고 다시 넣으면 접두 길이가 비워진다. "
-            "넣기는 합치지 않고 행을 통째로 바꾼다"
+            "접두 길이가 있는 정책의 대상에 대상과 모드만 지정해 다시 등록하면 접두 길이가 비워진다. "
+            "등록은 기존 값과 병합하지 않고 행을 통째로 바꾼다"
         )
 
     @override
@@ -331,7 +331,7 @@ class AUserWhoIsNotTheSuperadminMayNotPut(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 아닌 사용자가 정책을 넣으면 역할로 거부된다"
+        return "슈퍼관리자가 아닌 사용자가 정책을 등록하면 역할 부족으로 거부된다"
 
     @override
     def given(self) -> Given[SeedingSession, ACaller]:
@@ -356,7 +356,7 @@ class TheMonitorMayNotPut(
 
     @override
     def describe(self) -> str:
-        return "모니터 역할이 정책을 넣으면 역할로 거부된다. 모니터는 전역 역할 문의 읽기만 지난다"
+        return "모니터 역할이 정책을 등록하면 역할 부족으로 거부된다. 모니터는 전역 역할 검사에서 읽기만 통과한다"
 
     @override
     def given(self) -> Given[SeedingSession, ACaller]:
@@ -383,8 +383,8 @@ class EnforcementOffStillNeedsTheSuperadmin(
     @override
     def describe(self) -> str:
         return (
-            "엔티티 권한 집행을 꺼도 슈퍼관리자가 아니면 정책을 넣지 못한다. "
-            "이 문은 권한 그래프가 아니라 역할이라 스위치와 무관하다"
+            "권한 검사를 꺼도 슈퍼관리자가 아니면 정책을 등록하지 못한다. "
+            "등록은 권한 그래프가 아니라 역할로 보호되므로 스위치와 무관하다"
         )
 
     @override
