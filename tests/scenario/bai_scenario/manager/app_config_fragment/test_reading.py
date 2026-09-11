@@ -1,7 +1,7 @@
-"""id로 조각 읽기 — 그 조각 자체에 걸린 권한을 본다.
+"""id로 설정 조각 조회 — 그 조각 자체에 부여된 권한을 검사한다.
 
-공개 조각은 스코프로 읽을 때는 누구나 보지만 id로 읽을 때는 그렇지 않다. 어느 스코프에도
-속하지 않아 그 조각 자체에 앉은 역할 말고는 닿는 역할이 없기 때문이다.
+공개 조각은 스코프로 조회할 때는 누구나 볼 수 있지만 id로 조회할 때는 그렇지 않다. 어느
+스코프에도 속하지 않아 그 조각 자체에 부여된 역할 말고는 도달하는 역할이 없기 때문이다.
 """
 
 from __future__ import annotations
@@ -40,7 +40,7 @@ type ReadingStep = Scenario[
 
 @dataclass(frozen=True)
 class ReadingById(When[AFragmentAndACaller, AppConfigFragmentAdapter, AppConfigFragmentNode]):
-    """id로 읽는다. id를 대지 않으면 심은 조각의 id를 쓴다."""
+    """id로 조회한다. id를 지정하지 않으면 미리 만들어 둔 조각의 id를 쓴다."""
 
     other: UUID | None = None
 
@@ -51,11 +51,9 @@ class ReadingById(When[AFragmentAndACaller, AppConfigFragmentAdapter, AppConfigF
     @override
     def describe(self, laid: AFragmentAndACaller) -> str:
         called = (
-            "아무것도 갖지 않은 id"
-            if self.other is not None
-            else f"{laid.fragment.config_name}의 조각"
+            "존재하지 않는 id" if self.other is not None else f"{laid.fragment.config_name}의 조각"
         )
-        return f"{laid.caller.username}이 {called}으로 조회"
+        return f"{laid.caller.username}이 {called} 조회"
 
     @override
     async def call(
@@ -78,7 +76,7 @@ class TheGrantedUserReadsTheirOwn(
 
     @override
     def describe(self) -> str:
-        return "자기 조각 하나가 있고 자기 스코프에 읽기 권한을 받은 사용자가 id로 조회하면, 그 조각 전체가 답으로 온다"
+        return "자기 조각 하나가 있고 자기 스코프에 읽기 권한을 받은 사용자가 id로 조회하면, 그 조각 전체가 반환된다"
 
     @override
     def given(self) -> Given[SeedingSession, AFragmentAndACaller]:
@@ -130,7 +128,7 @@ class APublicFragmentByIdNeedsAGrant(
     def describe(self) -> str:
         return (
             "공개 조각을 아무 권한도 없는 사용자가 id로 조회하면, 권한 부족으로 거부된다. "
-            "스코프로 읽을 때와 반대로, id 읽기는 그 조각 자체에 걸린 권한을 본다"
+            "스코프로 조회할 때와 반대로, id 조회는 그 조각 자체에 부여된 권한을 검사한다"
         )
 
     @override
@@ -157,8 +155,8 @@ class AnUnknownIdIsRefusedAsPermission(
     @override
     def describe(self) -> str:
         return (
-            "자기 스코프에 읽기 권한을 받은 사용자가 아무것도 갖지 않은 id로 조회하면, 대상이 "
-            "없다는 것이 아니라 권한 부족으로 거부된다. 없는 행에는 걸린 권한도 없기 때문이다"
+            "자기 스코프에 읽기 권한을 받은 사용자가 존재하지 않는 id로 조회하면, 대상 없음이 "
+            "아니라 권한 부족으로 거부된다. 없는 행에는 부여된 권한도 없기 때문이다"
         )
 
     @override
@@ -185,8 +183,8 @@ class AnUnknownIdIsNotFoundForASuperadmin(
     @override
     def describe(self) -> str:
         return (
-            "슈퍼관리자가 아무것도 갖지 않은 id로 조회하면, 대상이 없다는 것으로 거부된다. "
-            "권한 검사를 지나가는 사람만 이 답을 본다"
+            "슈퍼관리자가 존재하지 않는 id로 조회하면, 대상을 찾을 수 없다는 이유로 거부된다. "
+            "권한 검사를 통과하는 사용자만 이 응답을 본다"
         )
 
     @override

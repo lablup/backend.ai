@@ -1,8 +1,8 @@
-"""여러 id로 조각 읽기 — 원소마다 답한다.
+"""여러 id로 설정 조각 조회 — 원소마다 응답한다.
 
 권한이 없으면 요청 전체가 막히지 않고 그 원소만 거부된다. 없는 id도 슈퍼관리자가 아닌
-사람에게는 거부 원소다. 권한 검사가 원소마다 먼저 도는데 없는 행에는 걸린 권한도 없기
-때문이고, 빈 자리로 오는 것은 그 검사를 지나가는 슈퍼관리자에게뿐이다.
+사용자에게는 거부 원소다. 권한 검사가 원소마다 먼저 실행되는데 없는 행에는 부여된 권한도
+없기 때문이고, 빈 항목으로 반환되는 것은 그 검사를 통과하는 슈퍼관리자에게뿐이다.
 """
 
 from __future__ import annotations
@@ -48,7 +48,7 @@ type LoadingStep = Scenario[
 
 @dataclass(frozen=True)
 class LoadingByIds(When[SomeFragmentsAndACaller, AppConfigFragmentAdapter, Loaded]):
-    """자기 조각, 남의 조각, 아무것도 갖지 않은 id를 한 번에 읽는다. 빈 목록을 줄 수도 있다."""
+    """자기 조각, 남의 조각, 존재하지 않는 id를 한 번에 조회한다. 빈 목록을 줄 수도 있다."""
 
     nothing: bool = False
 
@@ -60,7 +60,7 @@ class LoadingByIds(When[SomeFragmentsAndACaller, AppConfigFragmentAdapter, Loade
     def describe(self, laid: SomeFragmentsAndACaller) -> str:
         if self.nothing:
             return f"{laid.caller.username}이 빈 id 목록으로 조회"
-        return f"{laid.caller.username}이 자기 조각, 다른 사용자의 조각, 아무것도 갖지 않은 id를 한 번에 조회"
+        return f"{laid.caller.username}이 자기 조각, 다른 사용자의 조각, 존재하지 않는 id를 한 번에 조회"
 
     @override
     async def call(
@@ -75,11 +75,11 @@ class LoadingByIds(When[SomeFragmentsAndACaller, AppConfigFragmentAdapter, Loade
 
 @dataclass(frozen=True)
 class OneNodeAndTwoRefused(Then[SomeFragmentsAndACaller, Loaded]):
-    """첫째는 노드, 둘째와 셋째는 그 자리만 거부."""
+    """첫째는 노드, 둘째와 셋째는 그 항목만 거부된다."""
 
     @override
     def says(self) -> str:
-        return "자기 것은 노드, 남의 것과 없는 id는 그 자리만 거부된다"
+        return "자기 것은 노드, 남의 것과 없는 id는 그 항목만 거부된다"
 
     @override
     def look(self, laid: SomeFragmentsAndACaller, answered: Answered[Loaded]) -> list[Verdict]:
@@ -95,7 +95,7 @@ class OneNodeAndTwoRefused(Then[SomeFragmentsAndACaller, Loaded]):
             Held[object](
                 "items[0].id",
                 getattr(items[0], "id", items[0]),
-                SameAs[object](laid.mine[0].id, "심은 자기 조각"),
+                SameAs[object](laid.mine[0].id, "미리 만들어 둔 자기 조각"),
             ),
             Refused(NotEnoughPermission, second if isinstance(second, BaseException) else None),
             Refused(NotEnoughPermission, third if isinstance(third, BaseException) else None),
@@ -104,11 +104,11 @@ class OneNodeAndTwoRefused(Then[SomeFragmentsAndACaller, Loaded]):
 
 @dataclass(frozen=True)
 class TwoNodesOneMissing(Then[SomeFragmentsAndACaller, Loaded]):
-    """둘은 노드, 셋째는 빈 자리."""
+    """둘은 노드, 셋째는 빈 항목."""
 
     @override
     def says(self) -> str:
-        return "있는 둘은 노드로, 없는 id 자리는 비어서 온다"
+        return "있는 둘은 노드로, 없는 id 자리는 비어서 반환된다"
 
     @override
     def look(self, laid: SomeFragmentsAndACaller, answered: Answered[Loaded]) -> list[Verdict]:
@@ -123,12 +123,12 @@ class TwoNodesOneMissing(Then[SomeFragmentsAndACaller, Loaded]):
             Held[object](
                 "items[0].id",
                 getattr(items[0], "id", items[0]),
-                SameAs[object](laid.mine[0].id, "심은 자기 조각"),
+                SameAs[object](laid.mine[0].id, "미리 만들어 둔 자기 조각"),
             ),
             Held[object](
                 "items[1].id",
                 getattr(items[1], "id", items[1]),
-                SameAs[object](laid.theirs.id, "심은 남의 조각"),
+                SameAs[object](laid.theirs.id, "미리 만들어 둔 남의 조각"),
             ),
             Same("items[2]", items[2], None),
         ]
@@ -136,11 +136,11 @@ class TwoNodesOneMissing(Then[SomeFragmentsAndACaller, Loaded]):
 
 @dataclass(frozen=True)
 class NothingIsAnswered(Then[SomeFragmentsAndACaller, Loaded]):
-    """빈 답."""
+    """빈 응답."""
 
     @override
     def says(self) -> str:
-        return "빈 답이 온다"
+        return "빈 응답이 반환된다"
 
     @override
     def look(self, laid: SomeFragmentsAndACaller, answered: Answered[Loaded]) -> list[Verdict]:
@@ -162,7 +162,7 @@ class MixedIdsAreAnsweredEach(
     def describe(self) -> str:
         return (
             "자기 스코프에만 읽기 권한을 받은 사용자가 자기 조각, 다른 사용자의 조각, 없는 id를 "
-            "한 번에 읽으면, 목록 순서대로 자기 것은 노드, 남의 것과 없는 id는 그 자리만 권한 "
+            "한 번에 조회하면, 목록 순서대로 자기 것은 노드, 남의 것과 없는 id는 그 항목만 권한 "
             "부족으로 거부된다"
         )
 
@@ -190,8 +190,8 @@ class TheSuperadminSeesBoth(
     @override
     def describe(self) -> str:
         return (
-            "슈퍼관리자가 조각 둘과 없는 id 하나를 한 번에 읽으면, 둘은 노드로 오고 없는 id "
-            "자리는 비어서 온다. 권한 검사를 지나가는 사람만 빈 자리를 본다"
+            "슈퍼관리자가 조각 둘과 없는 id 하나를 한 번에 조회하면, 둘은 노드로 반환되고 없는 id "
+            "자리는 비어 있다. 권한 검사를 통과하는 사용자만 빈 항목을 본다"
         )
 
     @override
@@ -217,7 +217,7 @@ class AnEmptyListAnswersEmpty(
 
     @override
     def describe(self) -> str:
-        return "빈 id 목록을 주면 빈 답이 온다. 배선을 부르지 않는다"
+        return "빈 id 목록을 주면 빈 응답이 반환된다. 하위 계층을 호출하지 않는다"
 
     @override
     def given(self) -> Given[SeedingSession, SomeFragmentsAndACaller]:

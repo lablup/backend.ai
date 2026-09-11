@@ -1,7 +1,7 @@
-"""조각 훑기 — 한 스코프 훑기와 전체 훑기가 서로 다른 문으로 막는다.
+"""설정 조각 검색 — 한 스코프 검색과 전체 검색이 서로 다른 검사로 막는다.
 
-한 스코프 훑기는 지목한 소유자의 스코프에 걸린 읽기 권한이 지키고, 공개 스코프에는 지킬
-스코프가 없어 인증만으로 답한다. 전체 훑기는 전역 역할이 지킨다.
+한 스코프 검색은 지정한 소유자의 스코프에 부여된 읽기 권한을 검사하고, 공개 스코프에는 보호할
+스코프가 없어 인증만으로 응답한다. 전체 검색은 전역 역할이 있어야 한다.
 """
 
 from __future__ import annotations
@@ -64,7 +64,7 @@ type SearchingStep = Scenario[
 
 @dataclass(frozen=True)
 class SearchingTheScope(When[ManyFragmentsAndACaller, AppConfigFragmentAdapter, Searched]):
-    """심은 자리 하나를 지목해 훑는다. 이름을 걸 수도 있다."""
+    """미리 만들어 둔 스코프 하나를 지정해 검색한다. 이름 필터를 걸 수도 있다."""
 
     by_name: bool = False
 
@@ -74,8 +74,8 @@ class SearchingTheScope(When[ManyFragmentsAndACaller, AppConfigFragmentAdapter, 
 
     @override
     def describe(self, laid: ManyFragmentsAndACaller) -> str:
-        how = f"이름 {laid.named}으로 걸러" if self.by_name else "필터 없이"
-        return f"{laid.caller.username}이 {SCOPE_NAMES[laid.scope_type]} 스코프를 지목해 {how} 조회"
+        how = f"{laid.named} 이름 필터로" if self.by_name else "필터 없이"
+        return f"{laid.caller.username}이 {SCOPE_NAMES[laid.scope_type]} 스코프를 지정해 {how} 조회"
 
     @override
     async def call(
@@ -102,7 +102,7 @@ class SearchingTheScope(When[ManyFragmentsAndACaller, AppConfigFragmentAdapter, 
 
 @dataclass(frozen=True)
 class SearchingTwoScopes(When[ManyFragmentsAndACaller, AppConfigFragmentAdapter, Searched]):
-    """자기 도메인과 자기 자신을 함께 지목해 훑는다."""
+    """자기 도메인과 자기 자신을 함께 지정해 검색한다."""
 
     @override
     def operation(self) -> str:
@@ -110,7 +110,7 @@ class SearchingTwoScopes(When[ManyFragmentsAndACaller, AppConfigFragmentAdapter,
 
     @override
     def describe(self, laid: ManyFragmentsAndACaller) -> str:
-        return f"{laid.caller.username}이 도메인과 사용자를 함께 지목해 조회"
+        return f"{laid.caller.username}이 도메인과 사용자를 함께 지정해 조회"
 
     @override
     async def call(
@@ -129,7 +129,7 @@ class SearchingTwoScopes(When[ManyFragmentsAndACaller, AppConfigFragmentAdapter,
 
 @dataclass(frozen=True)
 class SearchingEverything(When[ManyFragmentsAndACaller, AppConfigFragmentAdapter, Searched]):
-    """스코프 없이 전체를 훑는다. 종류나 이름을 걸 수도 있다."""
+    """스코프 없이 전체를 검색한다. 종류나 이름 필터를 걸 수도 있다."""
 
     kind: AppConfigScopeType | None = None
     by_name: bool = False
@@ -141,9 +141,9 @@ class SearchingEverything(When[ManyFragmentsAndACaller, AppConfigFragmentAdapter
     @override
     def describe(self, laid: ManyFragmentsAndACaller) -> str:
         if self.kind is not None:
-            return f"{laid.caller.username}이 {SCOPE_NAMES[self.kind]} 종류로 걸러 전체 조회"
+            return f"{laid.caller.username}이 {SCOPE_NAMES[self.kind]} 종류 필터로 전체 조회"
         if self.by_name:
-            return f"{laid.caller.username}이 이름 {laid.named}으로 걸러 전체 조회"
+            return f"{laid.caller.username}이 {laid.named} 이름 필터로 전체 조회"
         return f"{laid.caller.username}이 필터 없이 전체 조회"
 
     @override
@@ -161,7 +161,7 @@ class SearchingEverything(When[ManyFragmentsAndACaller, AppConfigFragmentAdapter
 
 @dataclass(frozen=True)
 class SearchingAnotherUser(When[ManyFragmentsAndACaller, AppConfigFragmentAdapter, Searched]):
-    """다른 사용자의 스코프를 지목해 훑는다. 그 사용자는 조각을 하나 갖고 있다."""
+    """다른 사용자의 스코프를 지정해 검색한다. 그 사용자는 조각을 하나 갖고 있다."""
 
     @override
     def operation(self) -> str:
@@ -169,7 +169,7 @@ class SearchingAnotherUser(When[ManyFragmentsAndACaller, AppConfigFragmentAdapte
 
     @override
     def describe(self, laid: ManyFragmentsAndACaller) -> str:
-        return f"{laid.caller.username}이 다른 사용자를 지목해 조회"
+        return f"{laid.caller.username}이 다른 사용자를 지정해 조회"
 
     @override
     async def call(
@@ -187,13 +187,13 @@ class SearchingAnotherUser(When[ManyFragmentsAndACaller, AppConfigFragmentAdapte
 
 @dataclass(frozen=True)
 class EveryFragmentIsCounted(Then[ManyFragmentsAndACaller, Searched]):
-    """심은 조각이 스코프를 가리지 않고 모두 세어진다."""
+    """미리 만들어 둔 조각이 스코프를 가리지 않고 모두 집계된다."""
 
     count: int
 
     @override
     def says(self) -> str:
-        return "스코프를 가리지 않고 심은 조각이 모두 세어진다"
+        return "스코프를 가리지 않고 미리 만들어 둔 조각이 모두 집계된다"
 
     @override
     def look(self, laid: ManyFragmentsAndACaller, answered: Answered[Searched]) -> list[Verdict]:
@@ -220,7 +220,7 @@ class TheGrantedUserCountsTheirOwn(
     def describe(self) -> str:
         return (
             "자기 조각 둘과 다른 사용자의 조각 하나가 있고 자기 스코프에 읽기 권한을 받은 "
-            "사용자가 자기 스코프를 훑으면, 자기 둘만 센다"
+            "사용자가 자기 스코프를 검색하면, 자기 조각 둘만 집계된다"
         )
 
     @override
@@ -246,7 +246,7 @@ class FilteringByNameKeepsOne(
 
     @override
     def describe(self) -> str:
-        return "자기 조각 둘이 있고 읽기 권한을 받은 사용자가 이름으로 걸러 훑으면, 그 이름의 것만 남는다"
+        return "자기 조각 둘이 있고 읽기 권한을 받은 사용자가 이름 필터로 검색하면, 그 이름의 조각만 반환된다"
 
     @override
     def given(self) -> Given[SeedingSession, ManyFragmentsAndACaller]:
@@ -271,7 +271,7 @@ class NoPageSizeMeansTen(
 
     @override
     def describe(self) -> str:
-        return "자기 조각 열하나가 있고 읽기 권한을 받은 사용자가 크기 없이 훑으면, 열 건까지 오고 다음 쪽이 있다고 답한다"
+        return "자기 조각 11개가 있고 읽기 권한을 받은 사용자가 크기 없이 검색하면, 10건까지 반환되고 다음 페이지가 있다고 응답한다"
 
     @override
     def given(self) -> Given[SeedingSession, ManyFragmentsAndACaller]:
@@ -297,8 +297,8 @@ class AnyoneSignedInSearchesThePublic(
     @override
     def describe(self) -> str:
         return (
-            "공개 조각 둘이 있고 아무 권한도 없는 사용자가 공개 스코프를 지목해 훑으면, 둘을 "
-            "모두 센다. 공개 조각에는 지킬 스코프가 없다"
+            "공개 조각 둘이 있고 아무 권한도 없는 사용자가 공개 스코프를 지정해 검색하면, 둘 다 "
+            "집계된다. 공개 조각에는 보호할 스코프가 없다"
         )
 
     @override
@@ -325,8 +325,8 @@ class TwoScopesAtOnceAreRefused(
     @override
     def describe(self) -> str:
         return (
-            "읽기 권한을 받은 사용자가 도메인과 사용자를 함께 지목해 훑으면, 입력이 틀렸다는 "
-            "이유로 거부된다. 이 훑기는 한 스코프에서만 돈다"
+            "읽기 권한을 받은 사용자가 도메인과 사용자를 함께 지정해 검색하면, 잘못된 입력으로 "
+            "거부된다. 이 검색은 한 스코프에서만 실행된다"
         )
 
     @override
@@ -352,7 +352,7 @@ class AnotherUsersScopeIsRefused(
 
     @override
     def describe(self) -> str:
-        return "자기 스코프에만 읽기 권한을 받은 사용자가 다른 사용자를 지목해 훑으면, 권한 부족으로 거부된다"
+        return "자기 스코프에만 읽기 권한을 받은 사용자가 다른 사용자를 지정해 검색하면, 권한 부족으로 거부된다"
 
     @override
     def given(self) -> Given[SeedingSession, ManyFragmentsAndACaller]:
@@ -377,7 +377,7 @@ class AMissingDomainIsNotFoundForASuperadmin(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 아무 도메인도 아닌 id를 지목해 훑으면, 대상이 없다는 것으로 거부된다"
+        return "슈퍼관리자가 어느 도메인도 아닌 id를 지정해 검색하면, 대상을 찾을 수 없다는 이유로 거부된다"
 
     @override
     def given(self) -> Given[SeedingSession, ManyFragmentsAndACaller]:
@@ -404,7 +404,7 @@ class TheSuperadminCountsEveryOne(
 
     @override
     def describe(self) -> str:
-        return "공개·도메인·사용자 스코프에 조각 넷이 있고 슈퍼관리자가 전체를 훑으면, 넷을 모두 센다. 이 문은 전역 역할이다"
+        return "공개·도메인·사용자 스코프에 조각 넷이 있고 슈퍼관리자가 전체를 검색하면, 넷 다 집계된다. 전체 검색은 전역 역할로 보호된다"
 
     @override
     def given(self) -> Given[SeedingSession, ManyFragmentsAndACaller]:
@@ -431,7 +431,7 @@ class FilteringByKindKeepsThatKind(
 
     @override
     def describe(self) -> str:
-        return "세 종류에 조각이 하나씩 있고 슈퍼관리자가 사용자 종류로 걸러 훑으면, 사용자 조각만 남는다"
+        return "세 종류에 조각이 하나씩 있고 슈퍼관리자가 사용자 종류 필터로 검색하면, 사용자 조각만 반환된다"
 
     @override
     def given(self) -> Given[SeedingSession, ManyFragmentsAndACaller]:
@@ -458,9 +458,7 @@ class FilteringEverythingByNameKeepsOne(
 
     @override
     def describe(self) -> str:
-        return (
-            "이름이 다른 조각 여럿이 있고 슈퍼관리자가 이름으로 걸러 훑으면, 그 이름의 것만 남는다"
-        )
+        return "이름이 다른 조각 여럿이 있고 슈퍼관리자가 이름 필터로 검색하면, 그 이름의 조각만 반환된다"
 
     @override
     def given(self) -> Given[SeedingSession, ManyFragmentsAndACaller]:
@@ -486,8 +484,8 @@ class AGrantDoesNotOpenTheGlobalDoor(
     @override
     def describe(self) -> str:
         return (
-            "자기 도메인 스코프에 읽기 권한을 받았지만 슈퍼관리자가 아닌 사용자가 전체를 훑으면, "
-            "역할로 거부된다. 한 스코프를 훑는 문과 전체를 훑는 문이 다르다"
+            "자기 도메인 스코프에 읽기 권한을 받았지만 슈퍼관리자가 아닌 사용자가 전체를 검색하면, "
+            "역할 부족으로 거부된다. 한 스코프를 검색하는 경로와 전체를 검색하는 경로가 다르다"
         )
 
     @override
