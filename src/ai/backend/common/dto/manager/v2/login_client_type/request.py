@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
-from typing import Annotated, Self
+from typing import Self
 
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.dto.manager.query import DateTimeFilter, StringFilter
+from ai.backend.common.dto.manager.v2.common import Name64
 from ai.backend.common.dto.manager.v2.login_client_type.types import (
     LoginClientTypeOrderField,
     OrderDirection,
@@ -43,7 +44,7 @@ class UpdateLoginClientTypeInput(BaseRequestModel):
     Every field defaults to UNSET (no change). ``description`` accepts ``null`` to clear.
     """
 
-    name: Annotated[str, Field(min_length=1, max_length=64)] | None | Unset = Field(
+    name: Name64 | None | Unset = Field(
         default=UNSET,
         description="Updated name. Omit to leave unchanged.",
     )
