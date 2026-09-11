@@ -177,6 +177,7 @@ def permission_controller_processors(
     )
     return PermissionControllerProcessors(
         processor_registry.group(GroupMeta(RoleEntityType())),
+        processor_registry.group(GroupMeta(UserEntityType())),
         service=service,
         action_monitors=[],
     )

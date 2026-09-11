@@ -53,8 +53,8 @@ from ai.backend.manager.services.permission_contoller.actions import (
     CreateRoleAction,
     DeleteRoleAction,
     GetRoleDetailAction,
+    GlobalSearchRoleAssignmentsAction,
     GlobalSearchRolesAction,
-    SearchUsersAssignedToRoleAction,
     UpdateRoleAction,
 )
 from ai.backend.manager.services.permission_contoller.actions.get_entity_types import (
@@ -259,10 +259,8 @@ class RBACHandler:
             raise NotEnoughPermission("Only superadmin can search assigned users.")
 
         querier = self._assigned_user_adapter.build_querier(path.parsed, body.parsed)
-        action_result = (
-            await self._permission_controller.search_users_assigned_to_role.wait_for_complete(
-                SearchUsersAssignedToRoleAction(querier=querier)
-            )
+        action_result = await self._permission_controller.global_search_role_assignments.run(
+            GlobalSearchRoleAssignmentsAction(querier=querier)
         )
         resp = SearchUsersAssignedToRoleResponse(
             users=[

@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import uuid
 from collections import defaultdict
 from collections.abc import Callable, Collection, Mapping, Sequence
 from datetime import UTC, datetime
@@ -21,6 +20,7 @@ from ai.backend.common.data.entity.types import (
     RuntimeEntityID,
 )
 from ai.backend.common.data.entity.user import UserEntityType, UserID
+from ai.backend.common.data.entity.user_role import UserRoleAssignmentID
 from ai.backend.common.data.permission.types import Permission
 from ai.backend.common.dto.manager.rbac import (
     OrderDirection,
@@ -184,11 +184,15 @@ from ai.backend.manager.models.rbac_models.role.orders import RoleOrders
 from ai.backend.manager.models.rbac_models.role.scopes import ScopedRoleOperationScope
 from ai.backend.manager.models.rbac_models.role.updaters import RoleSoftDeleteUpdater, RoleUpdater
 from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
+from ai.backend.manager.models.rbac_models.user_role.searchers import UserRoleSearcher
 from ai.backend.manager.models.specs.pagination import NoPagination, OffsetPagination
 from ai.backend.manager.models.specs.permission import PermissionEntry
 from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.services.permission_contoller.actions.add_role_permission import (
     AddRolePermissionAction,
+)
+from ai.backend.manager.services.permission_contoller.actions.bulk_get_assignments import (
+    BulkGetRoleAssignmentsAction,
 )
 from ai.backend.manager.services.permission_contoller.actions.bulk_get_permissions import (
     BulkGetPermissionsAction,
@@ -228,9 +232,11 @@ from ai.backend.manager.services.permission_contoller.actions.search_roles_in_sc
     SearchRolesInScopeAction,
     SearchRolesInScopeActionResult,
 )
+from ai.backend.manager.services.permission_contoller.actions.search_user_roles import (
+    SearchUserRolesAction,
+)
 from ai.backend.manager.services.permission_contoller.actions.search_users_assigned_to_role import (
-    SearchUsersAssignedToRoleAction,
-    SearchUsersAssignedToRoleActionResult,
+    GlobalSearchRoleAssignmentsAction,
 )
 from ai.backend.manager.services.permission_contoller.actions.update_permission import (
     UpdatePermissionAction,
@@ -377,19 +383,16 @@ class RBACAdapter(BaseAdapter):
         """
         if not assignment_ids:
             return []
-        querier = BatchQuerier(
-            pagination=NoPagination(),
-            conditions=[AssignedUserConditions.by_ids(assignment_ids)],
-        )
-        action_result: SearchUsersAssignedToRoleActionResult = (
-            await self._permission_controller.search_users_assigned_to_role.wait_for_complete(
-                SearchUsersAssignedToRoleAction(querier=querier)
+        got = await self._permission_controller.bulk_get_role_assignments.run(
+            BulkGetRoleAssignmentsAction(
+                assignment_ids=[UserRoleAssignmentID(aid) for aid in assignment_ids]
             )
         )
-        assignment_map: dict[UUID, RoleAssignmentNode] = {
-            data.id: self._assignment_data_to_node(data) for data in action_result.result.items
+        assignment_map = {
+            field_id: self._assignment_data_to_node(data)
+            for field_id, data in got.successes.items()
         }
-        return [assignment_map.get(aid) for aid in assignment_ids]
+        return [assignment_map.get(UserRoleAssignmentID(aid)) for aid in assignment_ids]
 
     async def batch_load_permissions_by_role_ids(
         self, role_ids: Sequence[RoleID]
@@ -409,76 +412,6 @@ class RBACAdapter(BaseAdapter):
         for item in found.items:
             result_map[item.role_id].append(self._permission_data_to_node(item))
         return [result_map.get(role_id, []) for role_id in role_ids]
-
-    async def batch_load_role_assignments_by_user_ids(
-        self, user_ids: Sequence[UserID]
-    ) -> list[list[RoleAssignmentNode]]:
-        """Batch load role assignments grouped by user_id for DataLoader use.
-
-        Returns a list of assignment lists, one per user_id (empty list if no assignments).
-        """
-        if not user_ids:
-            return []
-        querier = BatchQuerier(
-            pagination=NoPagination(),
-            conditions=[AssignedUserConditions.by_user_ids(user_ids)],
-        )
-        action_result: SearchUsersAssignedToRoleActionResult = (
-            await self._permission_controller.search_users_assigned_to_role.wait_for_complete(
-                SearchUsersAssignedToRoleAction(querier=querier)
-            )
-        )
-        result_map: dict[UUID, list[RoleAssignmentNode]] = defaultdict(list)
-        for item in action_result.result.items:
-            result_map[item.user_id].append(self._assignment_data_to_node(item))
-        return [result_map.get(user_id, []) for user_id in user_ids]
-
-    async def batch_load_assignments_by_role_ids(
-        self, role_ids: Sequence[RoleID]
-    ) -> list[list[RoleAssignmentNode]]:
-        """Batch load role assignments grouped by role_id for DataLoader use.
-
-        Returns a list of assignment lists, one per role_id (empty list if no assignments).
-        """
-        if not role_ids:
-            return []
-        querier = BatchQuerier(
-            pagination=NoPagination(),
-            conditions=[AssignedUserConditions.by_role_ids(role_ids)],
-        )
-        action_result: SearchUsersAssignedToRoleActionResult = (
-            await self._permission_controller.search_users_assigned_to_role.wait_for_complete(
-                SearchUsersAssignedToRoleAction(querier=querier)
-            )
-        )
-        result_map: dict[UUID, list[RoleAssignmentNode]] = defaultdict(list)
-        for item in action_result.result.items:
-            result_map[item.role_id].append(self._assignment_data_to_node(item))
-        return [result_map.get(role_id, []) for role_id in role_ids]
-
-    async def batch_load_role_assignments_by_role_and_user_ids(
-        self, pairs: Sequence[tuple[uuid.UUID, uuid.UUID]]
-    ) -> list[RoleAssignmentNode | None]:
-        """Batch load role assignments by (role_id, user_id) compound key for DataLoader use.
-
-        Returns RoleAssignmentNode DTOs in the same order as the input pairs list.
-        """
-        if not pairs:
-            return []
-        querier = BatchQuerier(
-            pagination=NoPagination(),
-            conditions=[AssignedUserConditions.by_role_and_user_ids(pairs)],
-        )
-        action_result: SearchUsersAssignedToRoleActionResult = (
-            await self._permission_controller.search_users_assigned_to_role.wait_for_complete(
-                SearchUsersAssignedToRoleAction(querier=querier)
-            )
-        )
-        result_map: dict[tuple[uuid.UUID, uuid.UUID], RoleAssignmentNode] = {
-            (item.role_id, item.user_id): self._assignment_data_to_node(item)
-            for item in action_result.result.items
-        }
-        return [result_map.get(pair) for pair in pairs]
 
     # ------------------------------------------------------------------ permission catalog
 
@@ -694,9 +627,30 @@ class RBACAdapter(BaseAdapter):
         me = current_user()
         if me is None:
             raise UnreachableError("User context is not available")
-        return await self._search_role_assignments(
-            input,
-            base_conditions=[AssignedUserConditions.by_user_id(me.user_id)],
+        found = await self._permission_controller.search_user_roles.run(
+            SearchUserRolesAction(
+                user_ids=[UserID(me.user_id)],
+                searcher=self._build_searcher(
+                    UserRoleSearcher,
+                    conditions=(
+                        self._convert_assignment_filter(input.filter) if input.filter else []
+                    ),
+                    orders=(self._convert_assignment_orders(input.order) if input.order else []),
+                    pagination_spec=_assignment_pagination_spec(),
+                    first=input.first,
+                    after=input.after,
+                    last=input.last,
+                    before=input.before,
+                    limit=input.limit,
+                    offset=input.offset,
+                ),
+            )
+        )
+        return SearchResult(
+            items=[self._assignment_data_to_node(item) for item in found.items],
+            total_count=found.total_count,
+            has_next_page=found.has_next_page,
+            has_previous_page=found.has_previous_page,
         )
 
     async def admin_search_role_assignments(
@@ -727,10 +681,8 @@ class RBACAdapter(BaseAdapter):
             offset=input.offset,
             base_conditions=base_conditions,
         )
-        action_result: SearchUsersAssignedToRoleActionResult = (
-            await self._permission_controller.search_users_assigned_to_role.wait_for_complete(
-                SearchUsersAssignedToRoleAction(querier=querier)
-            )
+        action_result = await self._permission_controller.global_search_role_assignments.run(
+            GlobalSearchRoleAssignmentsAction(querier=querier)
         )
         raw = action_result.result
         return SearchResult(

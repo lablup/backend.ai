@@ -772,6 +772,7 @@ def create_processors(
         ),
         permission_controller=PermissionControllerProcessors(
             rbac_groups.group(GroupMeta(RoleEntityType())),
+            rbac_groups.group(GroupMeta(UserEntityType())),
             services.permission_controller,
             action_monitors,
         ),

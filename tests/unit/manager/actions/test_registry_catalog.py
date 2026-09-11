@@ -448,7 +448,12 @@ def test_every_defined_v2_action_is_wired() -> None:
     StorageNamespaceProcessors(registry.group(GroupMeta(StorageNamespaceEntityType())))
     DeploymentPresetProcessors(registry.group(GroupMeta(DeploymentPresetEntityType())), MagicMock())
     DomainProcessors(registry.group(GroupMeta(DomainEntityType())), MagicMock(), [])
-    PermissionControllerProcessors(registry.group(GroupMeta(RoleEntityType())), MagicMock(), [])
+    PermissionControllerProcessors(
+        registry.group(GroupMeta(RoleEntityType())),
+        registry.group(GroupMeta(UserEntityType())),
+        MagicMock(),
+        [],
+    )
     ProjectProcessors(registry.group(GroupMeta(ProjectEntityType())), MagicMock())
     UserProcessors(
         registry.group(GroupMeta(UserEntityType())),

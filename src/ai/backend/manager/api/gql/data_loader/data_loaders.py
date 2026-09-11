@@ -1065,60 +1065,6 @@ class DataLoaders:
         return DataLoader(load_fn=load_fn)
 
     @cached_property
-    def role_assignment_by_role_and_user_loader(
-        self,
-    ) -> DataLoader[tuple[RoleID, UserID], RoleAssignmentGQL | None]:
-        adapter = self._adapters.rbac
-
-        async def load_fn(
-            pairs: list[tuple[RoleID, UserID]],
-        ) -> list[RoleAssignmentGQL | None]:
-            from ai.backend.manager.api.gql.rbac.types.role import (  # pants: no-infer-dep
-                RoleAssignmentGQL as RAG,
-            )
-
-            dtos = await adapter.batch_load_role_assignments_by_role_and_user_ids(pairs)
-            return [RAG.from_pydantic(dto) if dto is not None else None for dto in dtos]
-
-        return DataLoader(load_fn=load_fn)
-
-    @cached_property
-    def role_assignments_by_user_loader(
-        self,
-    ) -> DataLoader[UserID, list[RoleAssignmentGQL]]:
-        adapter = self._adapters.rbac
-
-        async def load_fn(user_ids: list[UserID]) -> list[list[RoleAssignmentGQL]]:
-            from ai.backend.manager.api.gql.rbac.types.role import (  # pants: no-infer-dep
-                RoleAssignmentGQL as RAG,
-            )
-
-            dtos = await adapter.batch_load_role_assignments_by_user_ids(user_ids)
-            return [
-                [RAG.from_pydantic(dto) for dto in user_assignments] for user_assignments in dtos
-            ]
-
-        return DataLoader(load_fn=load_fn)
-
-    @cached_property
-    def assignments_by_role_loader(
-        self,
-    ) -> DataLoader[RoleID, list[RoleAssignmentGQL]]:
-        adapter = self._adapters.rbac
-
-        async def load_fn(role_ids: list[RoleID]) -> list[list[RoleAssignmentGQL]]:
-            from ai.backend.manager.api.gql.rbac.types.role import (  # pants: no-infer-dep
-                RoleAssignmentGQL as RAG,
-            )
-
-            dtos = await adapter.batch_load_assignments_by_role_ids(role_ids)
-            return [
-                [RAG.from_pydantic(dto) for dto in role_assignments] for role_assignments in dtos
-            ]
-
-        return DataLoader(load_fn=load_fn)
-
-    @cached_property
     def runtime_variant_loader(
         self,
     ) -> DataLoader[RuntimeVariantID, RuntimeVariantGQL | None]:

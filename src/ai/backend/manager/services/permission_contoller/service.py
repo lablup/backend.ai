@@ -49,8 +49,8 @@ from ai.backend.manager.services.permission_contoller.actions.search_scopes impo
     GlobalSearchScopesActionResult,
 )
 from ai.backend.manager.services.permission_contoller.actions.search_users_assigned_to_role import (
-    SearchUsersAssignedToRoleAction,
-    SearchUsersAssignedToRoleActionResult,
+    GlobalSearchRoleAssignmentsAction,
+    GlobalSearchRoleAssignmentsActionResult,
 )
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -93,13 +93,13 @@ class PermissionControllerService:
         return GlobalSearchPermissionsActionResult(result=result)
 
     async def search_users_assigned_to_role(
-        self, action: SearchUsersAssignedToRoleAction
-    ) -> SearchUsersAssignedToRoleActionResult:
+        self, action: GlobalSearchRoleAssignmentsAction
+    ) -> GlobalSearchRoleAssignmentsActionResult:
         """Search users assigned to a specific role with pagination and filtering."""
         result = await self._repository.search_users_assigned_to_role(
             querier=action.querier,
         )
-        return SearchUsersAssignedToRoleActionResult(result=result)
+        return GlobalSearchRoleAssignmentsActionResult(result=result)
 
     async def replace_role_permissions(
         self, action: ReplaceRolePermissionsAction

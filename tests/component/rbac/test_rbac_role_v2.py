@@ -14,6 +14,7 @@ from ai.backend.client.v2.config import ClientConfig
 from ai.backend.client.v2.exceptions import PermissionDeniedError
 from ai.backend.client.v2.v2_registry import V2ClientRegistry
 from ai.backend.common.data.entity.role import RoleEntityType
+from ai.backend.common.data.entity.user import UserEntityType
 from ai.backend.common.dto.manager.v2.rbac.request import (
     AssignRoleInput,
     RevokeRoleInput,
@@ -60,6 +61,7 @@ def permission_controller_processors(
     service = PermissionControllerService(repo, action_registry=processor_registry)
     return PermissionControllerProcessors(
         processor_registry.group(GroupMeta(RoleEntityType())),
+        processor_registry.group(GroupMeta(UserEntityType())),
         service=service,
         action_monitors=[],
     )

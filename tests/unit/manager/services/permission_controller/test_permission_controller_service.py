@@ -55,7 +55,7 @@ from ai.backend.manager.services.permission_contoller.actions.search_roles impor
     GlobalSearchRolesAction,
 )
 from ai.backend.manager.services.permission_contoller.actions.search_users_assigned_to_role import (
-    SearchUsersAssignedToRoleAction,
+    GlobalSearchRoleAssignmentsAction,
 )
 from ai.backend.manager.services.permission_contoller.processors import (
     PermissionControllerProcessors,
@@ -276,7 +276,7 @@ class TestSearchUsersAssignedToRole:
         mock_repository.search_users_assigned_to_role.return_value = mock_result
 
         querier = _make_querier()
-        action = SearchUsersAssignedToRoleAction(querier=querier)
+        action = GlobalSearchRoleAssignmentsAction(querier=querier)
         result = await service.search_users_assigned_to_role(action)
 
         mock_repository.search_users_assigned_to_role.assert_called_once_with(querier=querier)
@@ -296,7 +296,7 @@ class TestSearchUsersAssignedToRole:
         )
         mock_repository.search_users_assigned_to_role.return_value = mock_result
 
-        action = SearchUsersAssignedToRoleAction(querier=_make_querier())
+        action = GlobalSearchRoleAssignmentsAction(querier=_make_querier())
         result = await service.search_users_assigned_to_role(action)
 
         assert result.result.total_count == 0
@@ -384,6 +384,7 @@ class TestPermissionCatalog:
         # reads, as the production assembly does.
         PermissionControllerProcessors(
             processor_registry.group(GroupMeta(RoleEntityType())),
+            processor_registry.group(GroupMeta(UserEntityType())),
             service=service,
             action_monitors=[],
         )

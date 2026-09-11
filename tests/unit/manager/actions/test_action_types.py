@@ -2,24 +2,9 @@
 
 import pytest
 
-from ai.backend.common.data.entity.types import EntityType
 from ai.backend.common.data.permission.types import Permission
 from ai.backend.common.exception import ErrorOperation
-from ai.backend.manager.actions.action.base import BaseAction
 from ai.backend.manager.actions.types import ActionOperationType
-
-# Import representative concrete action classes across different entity types
-# and operation types to verify enum usage at runtime.
-from ai.backend.manager.services.permission_contoller.actions.search_users_assigned_to_role import (
-    SearchUsersAssignedToRoleAction,
-)
-
-# Legacy-family actions only. The v2 families answer with
-# ``ai.backend.common.data.entity.types.EntityType``, a distinct NewType, so mixing
-# them in would conflate two type systems rather than test either one.
-_REPRESENTATIVE_ACTION_CLASSES: list[type[BaseAction]] = [
-    SearchUsersAssignedToRoleAction,
-]
 
 
 class TestActionOperationType:
@@ -98,28 +83,3 @@ class TestActionOperationType:
     def test_is_str_subclass(self) -> None:
         for v in ActionOperationType:
             assert isinstance(v, str)
-
-
-class TestAllActionClassesUseEnums:
-    """Verify that representative concrete action classes return proper enum types."""
-
-    def test_entity_type_returns_enum(self) -> None:
-        for cls in _REPRESENTATIVE_ACTION_CLASSES:
-            result = cls.entity_type()
-            assert isinstance(result, EntityType), (
-                f"{cls.__name__}.entity_type() returned {type(result).__name__} "
-                f"({result!r}), expected EntityType"
-            )
-
-    def test_operation_type_returns_enum(self) -> None:
-        for cls in _REPRESENTATIVE_ACTION_CLASSES:
-            result = cls.operation_type()
-            assert isinstance(result, ActionOperationType), (
-                f"{cls.__name__}.operation_type() returned {type(result).__name__} "
-                f"({result!r}), expected ActionOperationType"
-            )
-
-    def test_covers_the_operations_legacy_actions_declare(self) -> None:
-        """The legacy family is down to one search; the v2 bases carry every other shape."""
-        covered = {cls.operation_type() for cls in _REPRESENTATIVE_ACTION_CLASSES}
-        assert covered == {ActionOperationType.SEARCH}

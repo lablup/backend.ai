@@ -22,8 +22,8 @@ from .search_roles_in_scope import (
     SearchRolesInScopeActionResult,
 )
 from .search_users_assigned_to_role import (
-    SearchUsersAssignedToRoleAction,
-    SearchUsersAssignedToRoleActionResult,
+    GlobalSearchRoleAssignmentsAction,
+    GlobalSearchRoleAssignmentsActionResult,
 )
 from .update_permission import UpdatePermissionAction
 from .update_role import UpdateRoleAction
@@ -46,8 +46,8 @@ __all__ = [
     "SearchRolesInScopeActionResult",
     "GlobalSearchPermissionsAction",
     "GlobalSearchPermissionsActionResult",
-    "SearchUsersAssignedToRoleAction",
-    "SearchUsersAssignedToRoleActionResult",
+    "GlobalSearchRoleAssignmentsAction",
+    "GlobalSearchRoleAssignmentsActionResult",
     "UpdatePermissionAction",
     "UpdateRoleAction",
 ]
