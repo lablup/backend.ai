@@ -86,6 +86,62 @@ class AuditLogConditions:
 
     by_entity_type_in = staticmethod(make_string_in_factory(AuditLogRow.entity_type))
 
+    # --- entity_id string filters ---
+
+    @staticmethod
+    def by_entity_id_contains(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = AuditLogRow.entity_id.ilike(f"%{spec.value}%")
+            else:
+                condition = AuditLogRow.entity_id.like(f"%{spec.value}%")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_entity_id_equals(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = sa.func.lower(AuditLogRow.entity_id) == spec.value.lower()
+            else:
+                condition = AuditLogRow.entity_id == spec.value
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_entity_id_starts_with(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = AuditLogRow.entity_id.ilike(f"{spec.value}%")
+            else:
+                condition = AuditLogRow.entity_id.like(f"{spec.value}%")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_entity_id_ends_with(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = AuditLogRow.entity_id.ilike(f"%{spec.value}")
+            else:
+                condition = AuditLogRow.entity_id.like(f"%{spec.value}")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    by_entity_id_in = staticmethod(make_string_in_factory(AuditLogRow.entity_id))
+
     # --- operation string filters ---
 
     @staticmethod
