@@ -8,7 +8,7 @@ from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.dto.manager.query import DateTimeFilter, StringFilter
-from ai.backend.common.dto.manager.v2.common import Name64
+from ai.backend.common.dto.manager.v2.common import String64
 from ai.backend.common.dto.manager.v2.login_client_type.types import (
     LoginClientTypeOrderField,
     OrderDirection,
@@ -44,7 +44,7 @@ class UpdateLoginClientTypeInput(BaseRequestModel):
     Every field defaults to UNSET (no change). ``description`` accepts ``null`` to clear.
     """
 
-    name: Name64 | None | Unset = Field(
+    name: String64 | None | Unset = Field(
         default=UNSET,
         description="Updated name. Omit to leave unchanged.",
     )
