@@ -127,11 +127,10 @@ class AnEmptyListAnswersNothing(
         return NothingIsAnswered()
 
 
-@pytest.mark.parametrize(
-    "scenario",
-    [TheLaidAndTheUnknownComeBackInOrder(), AnEmptyListAnswersNothing()],
-    ids=lambda s: s.summary(),
-)
+SCENARIOS: list[LoadingStep] = [TheLaidAndTheUnknownComeBackInOrder(), AnEmptyListAnswersNothing()]
+
+
+@pytest.mark.parametrize("scenario", SCENARIOS, ids=lambda s: s.summary())
 async def test_loading(
     scenario: LoadingStep, adapter: Adapter, engine: ExtendedAsyncSAEngine
 ) -> None:
