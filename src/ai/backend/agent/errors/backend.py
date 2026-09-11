@@ -45,3 +45,22 @@ class InstanceAlreadyExistsError(BackendAIError, web.HTTPConflict):
             operation=ErrorOperation.CREATE,
             error_detail=ErrorDetail.ALREADY_EXISTS,
         )
+
+
+class ContainerEnumerationIncomplete(BackendAIError, web.HTTPServiceUnavailable):
+    """Raised when the backend could not describe every container it listed.
+
+    A caller diffs its own bookkeeping against this listing, so a short one reads as "these are
+    gone" and gets kernels destroyed and ports re-issued. Not answering is the safe failure.
+    """
+
+    error_type = "https://api.backend.ai/probs/agent/container-enumeration-incomplete"
+    error_title = "Could not enumerate every container."
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.AGENT,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.UNAVAILABLE,
+        )

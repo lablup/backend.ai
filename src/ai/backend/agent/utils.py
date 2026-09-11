@@ -8,7 +8,7 @@ import logging
 import platform
 import re
 import resource
-from collections.abc import Mapping, MutableMapping
+from collections.abc import Iterable, Mapping, MutableMapping
 from contextlib import AbstractAsyncContextManager
 from decimal import Decimal
 from pathlib import Path
@@ -28,6 +28,7 @@ import aiodocker
 import trafaret as t
 from aiodocker.docker import DockerContainer
 
+from ai.backend.agent.errors.backend import ContainerEnumerationIncomplete
 from ai.backend.common import identity
 from ai.backend.common.asyncio import current_loop
 from ai.backend.common.cgroup import (
@@ -169,6 +170,25 @@ async def read_tail(path: Path, nbytes: int) -> bytes:
 
     loop = current_loop()
     return await loop.run_in_executor(None, _read_tail)
+
+
+def raise_if_enumeration_incomplete(outcomes: Iterable[Any]) -> None:
+    """Turn the failures an `asyncio.gather(..., return_exceptions=True)` collected into a refusal.
+
+    A container the backend could not describe is missing from the listing but not from the host,
+    and callers read the listing as the whole truth -- they release its ports and destroy it.
+    """
+    failures: list[BaseException] = []
+    for outcome in outcomes:
+        if isinstance(outcome, asyncio.CancelledError):
+            raise outcome
+        if isinstance(outcome, BaseException):
+            failures.append(outcome)
+    if failures:
+        raise ContainerEnumerationIncomplete(
+            f"could not describe {len(failures)} of the listed container(s);"
+            f" first failure: {failures[0]!r}"
+        )
 
 
 async def get_kernel_id_from_container(val: str | DockerContainer) -> KernelId | None:

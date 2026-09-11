@@ -1076,6 +1076,9 @@ class KubernetesAgent(
 
             fetch_tasks.append(_fetch_container_info(deployment))
 
+        # Deliberately NOT guarded by `raise_if_enumeration_incomplete`: this backend's listing
+        # raises for every pod today (it parses the pod name as a UUID and reads a field that does
+        # not exist), so refusing would stop the agent from starting at all.
         await asyncio.gather(*fetch_tasks, return_exceptions=True)
         return result
 

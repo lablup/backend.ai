@@ -68,6 +68,7 @@ from ai.backend.agent.errors import (
     InvalidChunkSizeError,
     KernelNotFoundError,
 )
+from ai.backend.agent.errors.backend import ContainerEnumerationIncomplete
 from ai.backend.agent.etcd import AgentEtcdClientView
 from ai.backend.agent.health.heartbeat import HeartbeatTask
 from ai.backend.agent.legacy_inference_env import LegacyInferenceEnvTranslator
@@ -1770,8 +1771,16 @@ class AbstractAgent[
         """
         Reconstruct the resource alloc maps for each compute plugin from
         ``/home/config/resource.txt`` files in the kernel containers managed by this agent.
+
+        A listing that came back short is skipped rather than raised: nothing has been cleared
+        yet, so the maps keep their previous, correct contents, and this runs on teardown paths
+        that must not be stranded by a transient backend hiccup.
         """
-        containers = await self.enumerate_containers()
+        try:
+            containers = await self.enumerate_containers()
+        except ContainerEnumerationIncomplete as e:
+            log.warning("not reconstructing the resource usage from a partial listing: {}", e)
+            return
         async with self.resource_lock:
             for computer_ctx in self.computers.values():
                 computer_ctx.alloc_map.clear()

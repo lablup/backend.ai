@@ -112,6 +112,7 @@ from ai.backend.agent.utils import (
     get_kernel_id_from_container,
     get_safe_ulimit,
     host_pid_to_container_pid,
+    raise_if_enumeration_incomplete,
     update_nested_dict,
 )
 from ai.backend.common.asyncio import current_loop
@@ -1810,6 +1811,8 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                                 )
                     except DockerError as e:
                         if e.status == HTTPStatus.NOT_FOUND:
+                            # Removed between the listing and the describe: genuinely absent, and
+                            # the only absence this method is allowed to infer.
                             log.warning(e.message)
                             return
                         raise
@@ -1821,10 +1824,12 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                             container._id,
                             kernel_id_str,
                         )
+                        raise
 
                 fetch_tasks.append(_fetch_container_info(container))
 
-            await asyncio.gather(*fetch_tasks, return_exceptions=True)
+            outcomes = await asyncio.gather(*fetch_tasks, return_exceptions=True)
+        raise_if_enumeration_incomplete(outcomes)
         return result
 
     @override
