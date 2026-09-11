@@ -97,6 +97,7 @@ one place per domain.
 | `ArtifactScanLimitExceededError` | bounds a scan request's `limit` before any row is named |
 | `ArtifactImportDelegationError` | reports two returned lists disagreeing in length |
 | `ArtifactDeletionError`, `RemoteReservoirArtifactImportError`, `ReservoirConnectionError`, `RemoteReservoirScanError` | report a storage-proxy or remote reservoir call failing |
+| `InvalidContainerRegistryProject`, `InvalidContainerRegistryURL` | one validator answers the create path and `modify_registry`, so neither declares an operation that holds for both |
 
 ## The legacy neighbor is a different kind
 
