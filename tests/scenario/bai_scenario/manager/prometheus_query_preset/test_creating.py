@@ -151,7 +151,7 @@ class TheRequiredValuesMakeAWholeNode(
     @override
     def describe(self) -> str:
         return (
-            "슈퍼관리자가 이름과 지표 이름과 템플릿과 허용 라벨 목록만 주고 만들면, "
+            "슈퍼관리자가 이름, 지표 이름, 템플릿, 허용 라벨 목록만 주고 만들면, "
             "순위는 0이고 분류·설명·창은 비어 있는 노드 전체가 답으로 온다"
         )
 

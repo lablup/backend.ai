@@ -46,9 +46,7 @@ class LoadingTheLaidAndOneUnknown(
 
     @override
     def describe(self, laid: ManyPresetsAndACaller) -> str:
-        return (
-            f"{laid.caller.username}이 심은 {len(laid.laid)}개의 id와 없는 id 하나를 한 번에 조회"
-        )
+        return f"{laid.caller.username}이 심은 정의 {len(laid.laid)}개의 id와 없는 id 하나를 한 번에 조회"
 
     @override
     async def call(

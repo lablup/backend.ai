@@ -79,16 +79,18 @@ class Editing(When[APresetAndACaller, PrometheusQueryPresetAdapter, PresetNodeAn
         changed = [
             what
             for what, asked in (
-                ("이름", self.named is not None),
-                ("템플릿", self.query_template is not None),
-                ("설명 비움", self.clear_description),
-                ("다른 분류로", self.move_elsewhere),
-                ("없는 분류로", self.under_an_unknown_category),
-                ("필터 라벨", self.filter_labels is not None),
+                ("이름을 바꿈", self.named is not None),
+                ("템플릿을 바꿈", self.query_template is not None),
+                ("설명을 비움", self.clear_description),
+                ("다른 분류로 옮김", self.move_elsewhere),
+                ("아무것도 갖지 않은 분류 id로 옮김", self.under_an_unknown_category),
+                ("필터 라벨을 바꿈", self.filter_labels is not None),
             )
             if asked
         ]
-        return f"{laid.caller.username}이 {target}의 {', '.join(changed) or '아무것도'} 수정"
+        if not changed:
+            return f"{laid.caller.username}이 {target}을 아무것도 바꾸지 않고 고침"
+        return f"{laid.caller.username}이 {target}의 {', '.join(changed)}"
 
     def _category(self, laid: APresetAndACaller) -> UUID | Sentinel | None:
         if self.move_elsewhere and laid.elsewhere is not None:
@@ -186,7 +188,7 @@ class MovingToAnotherCategory(
 
     @override
     def describe(self) -> str:
-        return "분류 둘 중 한쪽에 속한 정의를 슈퍼관리자가 다른 분류로 고치면, 분류가 새 값이다"
+        return "분류 둘 중 한쪽에 속한 정의를 슈퍼관리자가 다른 분류로 옮기면, 답의 분류가 그것을 가리킨다"
 
     @override
     def given(self) -> Given[SeedingSession, APresetAndACaller]:

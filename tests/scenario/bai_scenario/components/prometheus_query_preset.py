@@ -65,7 +65,7 @@ PAGE = 10
 
 @dataclass(frozen=True)
 class ACatalogAndACaller:
-    """부를 사람 한 명과, 지정할 수 있는 분류가 있으면 그것."""
+    """부를 사람 한 명과, 있다면 정의를 넣을 분류 하나."""
 
     caller: UserData
     category: PrometheusQueryPresetCategoryData | None = None
@@ -106,7 +106,7 @@ async def lay_someone(seeding: Any, role: UserRole) -> Laid[UserData]:
 
 @dataclass(frozen=True)
 class JustSomeone(Given[Any, ACatalogAndACaller]):
-    """정의도 분류도 없는 목록과, 부를 사람 한 명."""
+    """정의도 분류도 없이, 부를 사람 한 명."""
 
     role: UserRole = UserRole.USER
 
@@ -373,7 +373,7 @@ class ThePresetNode(Then[APresetAndACaller, PresetNodeAnswer]):
 
 @dataclass(frozen=True)
 class EveryLaidPresetIsFound(Then[ManyPresetsAndACaller, SearchQueryDefinitionsPayload]):
-    """답으로 받은 정의가 모두, 그리고 그것만 세어진다."""
+    """심은 정의가 모두, 그리고 그것만 세어진다."""
 
     @override
     def says(self) -> str:
@@ -400,7 +400,7 @@ class EveryLaidPresetIsFound(Then[ManyPresetsAndACaller, SearchQueryDefinitionsP
 
 @dataclass(frozen=True)
 class OnePageOfThemComesBack(Then[ManyPresetsAndACaller, SearchQueryDefinitionsPayload]):
-    """크기를 대지 않은 훑기가 한 쪽만 답하고, 나머지가 있다고 말한다."""
+    """크기를 대지 않은 훑기는 한 쪽 분량만 답하고, 다음 쪽이 있다고 말한다."""
 
     @override
     def says(self) -> str:
