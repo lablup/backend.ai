@@ -10,6 +10,7 @@ from pydantic import Field
 from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.dto.manager.defs import DEFAULT_PAGE_LIMIT, MAX_PAGE_LIMIT
 from ai.backend.common.dto.manager.query import DateTimeFilter, StringFilter, UUIDFilter
+from ai.backend.common.dto.manager.v2.common import String64
 from ai.backend.common.dto.manager.v2.domain.types import (
     DomainOrderField,
     DomainProjectFilter,
@@ -61,10 +62,9 @@ class CreateDomainInput(BaseRequestModel):
 class UpdateDomainInput(BaseRequestModel):
     """Input for updating domain information. All fields optional — only provided fields will be updated."""
 
-    name: str | None | Unset = Field(
+    name: String64 | None | Unset = Field(
         default=UNSET,
         description="New domain name. Omit to leave unchanged.",
-        max_length=64,
     )
     description: str | None | Unset = Field(
         default=UNSET,
