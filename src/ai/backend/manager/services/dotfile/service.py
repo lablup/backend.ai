@@ -7,7 +7,11 @@ from typing import Final
 from ai.backend.common import msgpack
 from ai.backend.common.dto.manager.config.types import MAXIMUM_DOTFILE_SIZE
 from ai.backend.logging.utils import BraceStyleAdapter
-from ai.backend.manager.data.dotfile.types import DotfileQueryResult, DotfileScope
+from ai.backend.manager.data.dotfile.types import (
+    DotfileQueryResult,
+    DotfileScope,
+    normalize_newlines,
+)
 from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.resource import DomainNotFound, ProjectNotFound
 from ai.backend.manager.errors.storage import (
@@ -160,7 +164,7 @@ class DotfileService:
         self, action: UpdateBootstrapScriptAction
     ) -> UpdateBootstrapScriptActionResult:
         """Update a user's bootstrap script."""
-        script = action.script.strip()
+        script = normalize_newlines(action.script).strip()
         if len(script) > MAXIMUM_DOTFILE_SIZE:
             raise DotfileCreationFailed("Maximum bootstrap script length reached")
         await self._repository.save_bootstrap_script(action.access_key, script)
