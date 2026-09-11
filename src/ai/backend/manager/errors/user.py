@@ -3,6 +3,7 @@ from typing import override
 from aiohttp import web
 
 from ai.backend.common.data.entity.keypair import KeyPairFieldType
+from ai.backend.common.data.entity.resource_policy import UserResourcePolicyEntityType
 from ai.backend.common.data.entity.user import UserEntityType
 from ai.backend.common.exception import ErrorDetail
 from ai.backend.manager.actions.types import ActionOperationType
@@ -91,6 +92,17 @@ class UserPurgeFailure(EntityError, web.HTTPInternalServerError):
     def entity_error_code(self) -> EntityErrorCode:
         return EntityErrorCode(
             UserEntityType(), ActionOperationType.PURGE, ErrorDetail.INTERNAL_ERROR
+        )
+
+
+class UserResourcePolicyNotFound(EntityError, web.HTTPNotFound):
+    error_type = "https://api.backend.ai/probs/user-resource-policy-not-found"
+    error_title = "The user resource policy does not exist."
+
+    @override
+    def entity_error_code(self) -> EntityErrorCode:
+        return EntityErrorCode(
+            UserResourcePolicyEntityType(), ActionOperationType.GET, ErrorDetail.NOT_FOUND
         )
 
 

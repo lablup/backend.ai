@@ -10,7 +10,6 @@ from ai.backend.common.data.entity.project import ProjectEntityType
 from ai.backend.common.data.entity.role import RoleID
 from ai.backend.common.data.entity.user import UserEntityType, UserID
 from ai.backend.logging.utils import BraceStyleAdapter
-from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.permission.id import ScopeId
 from ai.backend.manager.data.permission.permission import (
     PermissionData,
@@ -38,8 +37,8 @@ from ai.backend.manager.data.permission.virtual_entity import (
     GovernCheckKey,
     OwnCheckKey,
 )
-from ai.backend.manager.errors.base.field import FieldNotFoundError
 from ai.backend.manager.errors.permission import (
+    PermissionNotFound,
     RoleAlreadyAssigned,
     RoleNotAssigned,
     RoleNotFound,
@@ -92,16 +91,13 @@ class PermissionDBSource:
         Delete a permission entry.
 
         Raises:
-            FieldNotFoundError: If permission does not exist
+            PermissionNotFound: If permission does not exist
         """
         async with self._ops.write_ops() as w:
             data = await w.purge_field_entity(purger)
             if data is None:
-                permission_id = purger.target_id_value()
-                raise FieldNotFoundError(
-                    f"Permission with ID {permission_id} does not exist.",
-                    field_type=permission_id.field_type(),
-                    operation=ActionOperationType.PURGE,
+                raise PermissionNotFound(
+                    f"Permission with ID {purger.target_id_value()} does not exist."
                 )
             return data
 
@@ -113,16 +109,13 @@ class PermissionDBSource:
         Update a permission entry.
 
         Raises:
-            FieldNotFoundError: If permission does not exist
+            PermissionNotFound: If permission does not exist
         """
         async with self._ops.write_ops() as w:
             data = await w.update_data(updater)
             if data is None:
-                permission_id = updater.target_id_value()
-                raise FieldNotFoundError(
-                    f"Permission with ID {permission_id} does not exist.",
-                    field_type=permission_id.field_type(),
-                    operation=ActionOperationType.UPDATE,
+                raise PermissionNotFound(
+                    f"Permission with ID {updater.target_id_value()} does not exist."
                 )
             return data
 
