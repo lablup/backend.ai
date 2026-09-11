@@ -120,7 +120,7 @@ class VFolderGone(EntityError, web.HTTPGone):
 
 
 class VFolderBadRequest(BackendAIError, web.HTTPBadRequest):
-    error_type = "https://api.backend.ai/probs/vfolder-bad-request"
+    error_type = "https://api.backend.ai/probs/vfolder-operation-failed"
     error_title = "Virtual folder operation has failed due to bad request."
 
     @override
@@ -132,7 +132,7 @@ class VFolderBadRequest(BackendAIError, web.HTTPBadRequest):
         )
 
 
-class VFolderOperationFailed(BackendAIError, web.HTTPInternalServerError):
+class VFolderOperationFailed(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/vfolder-operation-failed"
     error_title = "Virtual folder operation has failed."
 
@@ -156,7 +156,7 @@ class VFolderFilterStatusFailed(EntityError, web.HTTPBadRequest):
         )
 
 
-class VFolderFilterStatusNotAvailable(BackendAIError, web.HTTPInternalServerError):
+class VFolderFilterStatusNotAvailable(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/vfolder-filter-status-not-available"
     error_title = "There is no available virtual folder to filter its status."
 
@@ -169,7 +169,7 @@ class VFolderFilterStatusNotAvailable(BackendAIError, web.HTTPInternalServerErro
         )
 
 
-class VFolderPermissionError(BackendAIError, web.HTTPForbidden):
+class VFolderPermissionError(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/vfolder-permission-error"
     error_title = "The virtual folder does not permit the specified permission."
 
@@ -193,7 +193,7 @@ class VFolderInvitationNotFound(EntityError, web.HTTPNotFound):
         )
 
 
-class VFolderCreationFailure(BackendAIError, web.HTTPInternalServerError):
+class VFolderCreationFailure(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/vfolder-creation-failed"
     error_title = "Virtual folder creation failed."
 
@@ -239,7 +239,7 @@ class VFolderHasLinkedModelCard(EntityError, web.HTTPBadRequest):
         )
 
 
-class InsufficientStoragePermission(BackendAIError, web.HTTPForbidden):
+class InsufficientStoragePermission(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/storage-permission-not-allowed"
     error_title = "The specified storage permission is not allowed."
 
@@ -266,7 +266,7 @@ class VFolderInvalidParameter(BackendAIError, web.HTTPBadRequest):
 
 
 class DotfileCreationFailed(BackendAIError, web.HTTPBadRequest):
-    error_type = "https://api.backend.ai/probs/dotfile-creation-failed"
+    error_type = "https://api.backend.ai/probs/generic-bad-request"
     error_title = "Dotfile creation has failed."
 
     @override
@@ -274,12 +274,12 @@ class DotfileCreationFailed(BackendAIError, web.HTTPBadRequest):
         return ErrorCode(
             domain=ErrorDomain.DOTFILE,
             operation=ErrorOperation.CREATE,
-            error_detail=ErrorDetail.INVALID_PARAMETERS,
+            error_detail=ErrorDetail.INTERNAL_ERROR,
         )
 
 
-class DotfileAlreadyExists(BackendAIError, web.HTTPConflict):
-    error_type = "https://api.backend.ai/probs/dotfile-already-exists"
+class DotfileAlreadyExists(BackendAIError, web.HTTPBadRequest):
+    error_type = "https://api.backend.ai/probs/generic-bad-request"
     error_title = "Dotfile already exists."
 
     @override
@@ -303,7 +303,7 @@ class DotfileNotFound(ObjectNotFound):
         )
 
 
-class DotfileVFolderPathConflict(BackendAIError, web.HTTPConflict):
+class DotfileVFolderPathConflict(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/dotfile-vfolder-path-conflict"
     error_title = "The dotfile path conflicts with a virtual folder path."
 
@@ -364,7 +364,7 @@ class UnexpectedStorageProxyResponseError(BackendAIError, web.HTTPInternalServer
         return ErrorCode(
             domain=ErrorDomain.STORAGE_PROXY,
             operation=ErrorOperation.REQUEST,
-            error_detail=ErrorDetail.INTERNAL_ERROR,
+            error_detail=ErrorDetail.UNREACHABLE,
         )
 
 
