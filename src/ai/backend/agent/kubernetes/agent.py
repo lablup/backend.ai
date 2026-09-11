@@ -561,7 +561,7 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
             if bootstrap := self.kernel_config.get("bootstrap_script"):
 
                 def _write_user_bootstrap_script() -> None:
-                    (self.work_dir / "bootstrap.sh").write_text(bootstrap)
+                    (self.work_dir / "bootstrap.sh").write_text(bootstrap.replace("\r\n", "\n"))
                     if KernelFeatures.UID_MATCH in self.kernel_features:
                         uid = self.local_config.container.kernel_uid
                         gid = self.local_config.container.kernel_gid
@@ -658,7 +658,9 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
             else:
                 file_path = self.work_dir / dotfile["path"]
             file_path.parent.mkdir(parents=True, exist_ok=True)
-            await loop.run_in_executor(None, file_path.write_text, dotfile["data"])
+            await loop.run_in_executor(
+                None, file_path.write_text, dotfile["data"].replace("\r\n", "\n")
+            )
 
             tmp = Path(file_path)
             while tmp != self.work_dir:

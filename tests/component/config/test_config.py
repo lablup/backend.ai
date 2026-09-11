@@ -238,7 +238,7 @@ class TestBootstrapScript:
         unique = secrets.token_hex(4)
         script_content = f"#!/bin/bash\necho 'hello {unique}'"
         update_result = await admin_registry.config.update_bootstrap_script(
-            UpdateBootstrapScriptRequest(script=script_content)
+            UpdateBootstrapScriptRequest(script=script_content.replace("\n", "\r\n"))
         )
         assert isinstance(update_result, UpdateBootstrapScriptResponse)
         get_result = await admin_registry.config.get_bootstrap_script()

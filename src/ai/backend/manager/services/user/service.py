@@ -417,7 +417,7 @@ class UserService:
     async def update_bootstrap_script(
         self, action: UpdateBootstrapScriptAction
     ) -> UpdateBootstrapScriptActionResult:
-        script = action.script.strip()
+        script = action.script.replace("\r\n", "\n").strip()
         if len(script) > MAXIMUM_DOTFILE_SIZE:
             raise DotfileCreationFailed("Maximum bootstrap script length reached")
         keypair = await self._user_repository.admin_get_keypair(action.access_key)

@@ -14,7 +14,7 @@ def extract_dotfiles() -> None:
         file_path = work_dir / dotfile["path"]
         try:
             file_path.parent.mkdir(parents=True, exist_ok=True)
-            file_path.write_text(dotfile["data"])
+            file_path.write_text(dotfile["data"].replace("\r\n", "\n"))
         except OSError:
             print(f"failed to write dotfile: {file_path}", file=sys.stderr)
         try:

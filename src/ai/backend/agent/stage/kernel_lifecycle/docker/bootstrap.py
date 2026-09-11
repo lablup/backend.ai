@@ -66,7 +66,7 @@ class BootstrapProvisioner(Provisioner[BootstrapSpec, BootstrapResult]):
             return None
 
         bootstrap_path = spec.work_dir / "bootstrap.sh"
-        bootstrap_path.write_text(spec.bootstrap_script)
+        bootstrap_path.write_text(spec.bootstrap_script.replace("\r\n", "\n"))
 
         # Set proper ownership
         owner_determiner = PathOwnerDeterminer.by_kernel_features(

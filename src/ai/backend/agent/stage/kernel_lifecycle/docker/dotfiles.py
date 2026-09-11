@@ -153,6 +153,7 @@ class DotfilesProvisioner(Provisioner[DotfilesSpec, DotfilesResult]):
         return file_path
 
     def _write_dotfile(self, dotfile_content: str, dotfile_path: Path) -> None:
+        dotfile_content = dotfile_content.replace("\r\n", "\n")
         if not dotfile_content.endswith("\n"):
             dotfile_content += "\n"
         dotfile_path.write_text(dotfile_content)

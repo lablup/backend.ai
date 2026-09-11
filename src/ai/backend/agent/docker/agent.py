@@ -964,7 +964,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
             if bootstrap := self.kernel_config.get("bootstrap_script"):
 
                 def _write_user_bootstrap_script() -> None:
-                    (self.work_dir / "bootstrap.sh").write_text(bootstrap)
+                    (self.work_dir / "bootstrap.sh").write_text(bootstrap.replace("\r\n", "\n"))
                     if ouid is not None or ogid is not None:
                         self._chown_paths_if_root([self.work_dir / "bootstrap.sh"], ouid, ogid)
                     else:
@@ -1069,7 +1069,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                 file_path = self.work_dir / dotfile["path"]
             file_path.parent.mkdir(parents=True, exist_ok=True)
 
-            dotfile_content = dotfile["data"]
+            dotfile_content = dotfile["data"].replace("\r\n", "\n")
             if not dotfile_content.endswith("\n"):
                 dotfile_content += "\n"
             await loop.run_in_executor(None, file_path.write_text, dotfile_content)

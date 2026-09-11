@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import enum
 import uuid
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Any
 
 from ai.backend.common import msgpack
@@ -69,12 +69,14 @@ class DotfileEntries:
             raise DotfileAlreadyExists
         if len(self.entries) >= MAXIMUM_DOTFILE_COUNT:
             raise DotfileCreationFailed("Dotfile creation limit reached")
+        entry = replace(entry, data=entry.data.replace("\r\n", "\n"))
         return DotfileEntries(entries=(*self.entries, entry))
 
     def replaced(self, entry: DotfileEntry) -> DotfileEntries:
         kept = tuple(e for e in self.entries if e.path != entry.path)
         if len(kept) == len(self.entries):
             raise DotfileNotFound
+        entry = replace(entry, data=entry.data.replace("\r\n", "\n"))
         return DotfileEntries(entries=(*kept, entry))
 
     def removed(self, path: str) -> DotfileEntries:
