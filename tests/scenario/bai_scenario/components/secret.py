@@ -37,12 +37,12 @@ from ai.backend.testutils.scenario_steps import Answered, Given, Refused, Same, 
 
 KEY_ID = SecretKeyId("k1")
 KEY_MATERIAL = SecretKeyMaterial(base64.b64encode(b"0123456789abcdef0123456789abcdef").decode())
-"""설정 키 제공자가 쥐는 키 하나. 설정 오버라이드와 시드가 같은 키를 쓴다."""
+"""설정 키 제공자가 보유하는 키 하나. 설정 오버라이드와 시드가 같은 키를 쓴다."""
 
 WRITE_PROVIDER = "secret_encryption.write_provider_type"
 CONFIG_PROVIDER = "secret_encryption.config_provider"
 CONFIG_KEYS: dict[str, Any] = {"active_key_id": KEY_ID, "keys": {KEY_ID: KEY_MATERIAL}}
-"""설정 키 제공자를 켜는 오버라이드. 쓰기 제공자는 행마다 따로 고른다."""
+"""설정 키 제공자를 켜는 오버라이드. 쓰기 제공자는 시나리오마다 따로 고른다."""
 
 
 def config_key_pool(write_provider: KeyProviderType) -> KeyProviderPool:
@@ -60,7 +60,7 @@ def config_key_pool(write_provider: KeyProviderType) -> KeyProviderPool:
 
 @dataclass(frozen=True)
 class AKeyringAndACaller:
-    """부를 사람과, 그 사람까지 센 비밀 키의 수. 평문인 것과 설정 키로 암호화된 것을 따로 센다."""
+    """호출자와, 호출자까지 포함한 비밀 키의 수. 평문인 것과 설정 키로 암호화된 것을 따로 센다."""
 
     caller: UserData
     plaintext: int
@@ -69,7 +69,7 @@ class AKeyringAndACaller:
 
 @dataclass(frozen=True)
 class SomeoneWithASecret(SeedNest[Laid[UserData]]):
-    """비밀 키가 미리 준비된 사용자 한 명. 암호화된 것을 심는 유일한 길이다."""
+    """비밀 키를 미리 정해 둔 사용자 한 명. 암호화된 비밀 키를 넣는 유일한 방법이다."""
 
     domain: Laid[Any]
     secret_key: SecretValue
@@ -91,7 +91,7 @@ class SomeoneWithASecret(SeedNest[Laid[UserData]]):
 
 @dataclass(frozen=True)
 class UsersHoldingSecrets(Given[Any, AKeyringAndACaller]):
-    """부를 사람과 그 옆의 사용자들. 평문 비밀을 든 사람과 암호화된 비밀을 든 사람의 수를 정한다."""
+    """호출자와 그 밖의 사용자들. 평문 비밀 키를 가진 사용자와 암호화된 비밀 키를 가진 사용자의 수를 정한다."""
 
     role: UserRole = UserRole.SUPERADMIN
     plaintext_besides: int = 1
@@ -102,9 +102,9 @@ class UsersHoldingSecrets(Given[Any, AKeyringAndACaller]):
     def describe(self) -> str:
         parts = [f"{role_named(self.role)} 한 명"]
         if self.plaintext_besides:
-            parts.append(f"평문 비밀 키를 든 사용자 {self.plaintext_besides}명")
+            parts.append(f"평문 비밀 키를 가진 사용자 {self.plaintext_besides}명")
         if self.encrypted_besides:
-            parts.append(f"설정 키로 암호화된 비밀 키를 든 사용자 {self.encrypted_besides}명")
+            parts.append(f"설정 키로 암호화된 비밀 키를 가진 사용자 {self.encrypted_besides}명")
         return ", ".join(parts)
 
     @override
@@ -159,13 +159,13 @@ def status_verdicts(
 
 @dataclass(frozen=True)
 class TheStatusCountsWhatIsLaid(Then[AKeyringAndACaller, AdminSecretStatusPayload]):
-    """심은 비밀 키를 쥔 키마다 센 집계가 온다."""
+    """미리 만들어 둔 비밀 키를 암호화 키별로 센 집계가 반환된다."""
 
     write_provider: KeyProviderType
 
     @override
     def says(self) -> str:
-        return "심은 비밀 키가 쥔 키마다 세어져 온다"
+        return "미리 만들어 둔 비밀 키가 암호화 키별로 집계되어 반환된다"
 
     @override
     def look(
@@ -185,13 +185,13 @@ class TheStatusCountsWhatIsLaid(Then[AKeyringAndACaller, AdminSecretStatusPayloa
 
 @dataclass(frozen=True)
 class EveryRowIsRewrittenOntoTheWriter(Then[AKeyringAndACaller, AdminReencryptSecretsPayload]):
-    """심은 비밀 키를 모두 훑어 모두 다시 쓰고, 그 뒤의 상태는 전부 쓰기 제공자에 있다."""
+    """미리 만들어 둔 비밀 키를 모두 스캔해 모두 다시 쓰고, 그 뒤의 상태는 전부 쓰기 제공자로 암호화돼 있다."""
 
     write_provider: KeyProviderType
 
     @override
     def says(self) -> str:
-        return "모두 훑어 모두 다시 쓰고, 전부 쓰기 제공자로 옮겨진 상태가 온다"
+        return "모두 스캔해 모두 다시 쓰고, 전부 쓰기 제공자로 옮겨진 상태가 반환된다"
 
     @override
     def look(

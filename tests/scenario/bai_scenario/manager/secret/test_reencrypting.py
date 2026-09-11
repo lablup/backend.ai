@@ -1,7 +1,7 @@
-"""다시 암호화하기 — 저장된 비밀 키 전부를 쓰기 제공자로 다시 쓰고, 누가 돌릴 수 있는가.
+"""재암호화 — 저장된 비밀 키 전부를 쓰기 제공자로 다시 쓰고, 누가 실행할 수 있는가.
 
-훑기는 모든 행을 같게 다룬다. 이미 쓰기 제공자의 키에 있는 것도 다시 쓰므로 다시 쓴 수는 언제나
-훑은 수와 같고, 쓰기 제공자가 평문이면 값을 평문으로 되돌린다.
+스캔은 모든 행을 동일하게 다룬다. 이미 쓰기 제공자의 키로 암호화된 것도 다시 쓰므로 다시 쓴 수는
+언제나 스캔한 수와 같고, 쓰기 제공자가 평문이면 값을 평문으로 되돌린다.
 """
 
 from __future__ import annotations
@@ -38,7 +38,7 @@ type ReencryptingStep = Scenario[SeedingSession, AKeyringAndACaller, SecretAdapt
 
 @dataclass(frozen=True)
 class Reencrypting(When[AKeyringAndACaller, SecretAdapter, Reencrypted]):
-    """저장된 비밀 키 전부를 다시 암호화한다."""
+    """저장된 비밀 키 전부를 재암호화한다."""
 
     @override
     def operation(self) -> str:
@@ -46,7 +46,7 @@ class Reencrypting(When[AKeyringAndACaller, SecretAdapter, Reencrypted]):
 
     @override
     def describe(self, laid: AKeyringAndACaller) -> str:
-        return f"{laid.caller.username}이 비밀 키 전부를 다시 암호화"
+        return f"{laid.caller.username}이 비밀 키 전부를 재암호화"
 
     @override
     async def call(self, adapter: SecretAdapter, laid: AKeyringAndACaller) -> Reencrypted:
@@ -65,8 +65,8 @@ class PlaintextSecretsMoveOntoTheConfigKey(
     @override
     def describe(self) -> str:
         return (
-            "설정 키가 쓰기 제공자일 때 평문 비밀 키 둘을 다시 암호화하면, 둘을 훑어 둘을 다시 썼다는 "
-            "답과 함께 그 키가 둘을 쥐고 평문은 없는 상태가 온다"
+            "설정 키가 쓰기 제공자일 때 평문 비밀 키 둘을 재암호화하면, 둘을 스캔해 둘을 다시 썼다는 "
+            "응답과 함께 둘 다 그 키로 암호화되고 평문은 없는 상태가 반환된다"
         )
 
     @override
@@ -97,8 +97,8 @@ class SecretsAlreadyOnTheKeyAreRewrittenAgain(
     @override
     def describe(self) -> str:
         return (
-            "설정 키가 쓰기 제공자이고 비밀 키 둘이 이미 그 키에 있을 때 다시 암호화하면, 둘을 훑어 "
-            "둘을 다시 썼다는 답이 오고 상태는 그대로 그 키가 둘이다"
+            "설정 키가 쓰기 제공자이고 비밀 키 둘이 이미 그 키로 암호화돼 있을 때 재암호화하면, 둘을 "
+            "스캔해 둘을 다시 썼다는 응답이 반환되고 상태는 그대로 그 키로 암호화된 것 둘이다"
         )
 
     @override
@@ -134,8 +134,8 @@ class APlainWriterRewritesPlaintextAsPlaintext(
     @override
     def describe(self) -> str:
         return (
-            "쓰기 제공자가 평문일 때 평문 비밀 키 둘을 다시 암호화하면, 둘을 훑어 둘을 다시 썼다는 답이 "
-            "오고 상태는 그대로 평문 둘이다. 다시 쓴 수는 값이 바뀌었는지가 아니라 행을 다시 썼는지를 센다"
+            "쓰기 제공자가 평문일 때 평문 비밀 키 둘을 재암호화하면, 둘을 스캔해 둘을 다시 썼다는 응답이 "
+            "반환되고 상태는 그대로 평문 둘이다. 다시 쓴 수는 값이 바뀌었는지가 아니라 행을 다시 썼는지를 센다"
         )
 
     @override
@@ -162,8 +162,8 @@ class APlainWriterTurnsEncryptedSecretsBackToPlaintext(
     @override
     def describe(self) -> str:
         return (
-            "쓰기 제공자가 평문이고 설정 키 제공자는 읽기용으로만 있을 때 그 키로 암호화된 비밀 키를 "
-            "다시 암호화하면, 하나를 훑어 하나를 다시 썼다는 답이 오고 상태는 평문뿐이다"
+            "쓰기 제공자가 평문이고 설정 키 제공자는 읽기 전용일 때 그 키로 암호화된 비밀 키를 "
+            "재암호화하면, 하나를 스캔해 하나를 다시 썼다는 응답이 반환되고 상태는 평문뿐이다"
         )
 
     @override
@@ -195,7 +195,7 @@ class TheMonitorMayNotReencrypt(
 
     @override
     def describe(self) -> str:
-        return "모니터 역할이 다시 암호화를 돌리면 역할로 거부된다. 상태는 읽을 수 있지만 훑기는 쓰기라 지나지 못한다"
+        return "모니터 역할이 재암호화를 실행하면 역할 부족으로 거부된다. 상태는 조회할 수 있지만 재암호화는 쓰기 연산이라 통과하지 못한다"
 
     @override
     def given(self) -> Given[SeedingSession, AKeyringAndACaller]:
@@ -220,7 +220,7 @@ class AUserWhoIsNotTheSuperadminMayNotReencrypt(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 아닌 사용자가 다시 암호화를 돌리면 역할로 거부된다"
+        return "슈퍼관리자가 아닌 사용자가 재암호화를 실행하면 역할 부족으로 거부된다"
 
     @override
     def given(self) -> Given[SeedingSession, AKeyringAndACaller]:
