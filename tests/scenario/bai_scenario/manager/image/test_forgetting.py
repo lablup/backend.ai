@@ -274,7 +274,7 @@ class AnUngrantedUserMayNotRestore(
 
     @override
     def describe(self) -> str:
-        return "아무 권한도 받지 않은 사용자가 잊힌 이미지를 되살리려 하면 권한 부족으로 막힌다"
+        return "아무 권한도 받지 않은 사용자가 이미지를 되살리려 하면 권한 부족으로 막힌다"
 
     @override
     def given(self) -> Given[SeedingSession, AnImageAndACaller]:
