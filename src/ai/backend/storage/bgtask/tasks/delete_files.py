@@ -44,12 +44,12 @@ class FileDeleteTaskHandler(BaseBackgroundTaskHandler[FileDeleteManifest, None])
 
     @override
     async def execute(self, manifest: FileDeleteManifest) -> None:
-        async with self._volume_pool.get_volume_by_name(manifest.volume) as volume:
-            await volume.delete_files(
-                manifest.vfolder_id,
-                manifest.relpaths,
-                recursive=manifest.recursive,
-            )
+        volume = self._volume_pool.get_volume_by_name(manifest.volume)
+        await volume.delete_files(
+            manifest.vfolder_id,
+            manifest.relpaths,
+            recursive=manifest.recursive,
+        )
 
     @classmethod
     @override

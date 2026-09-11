@@ -55,11 +55,11 @@ class VFolderCloneTaskHandler(BaseBackgroundTaskHandler[VFolderCloneManifest, No
     @override
     async def execute(self, manifest: VFolderCloneManifest) -> None:
         try:
-            async with self._volume_pool.get_volume_by_name(manifest.volume) as volume:
-                await volume.clone_vfolder(
-                    manifest.src_vfolder,
-                    manifest.dst_vfolder,
-                )
+            volume = self._volume_pool.get_volume_by_name(manifest.volume)
+            await volume.clone_vfolder(
+                manifest.src_vfolder,
+                manifest.dst_vfolder,
+            )
         except Exception as e:
             log.exception(
                 f"VFolder cloning task failed. (src_vfid:{manifest.src_vfolder}, dst_vfid:{manifest.dst_vfolder}, e:{e!s})"

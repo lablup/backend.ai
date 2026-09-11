@@ -29,9 +29,6 @@ from setproctitle import setproctitle
 from ai.backend.common.config import (
     ConfigurationError,
 )
-from ai.backend.common.defs import (
-    NOOP_STORAGE_VOLUME_NAME,
-)
 from ai.backend.common.dependencies import DependencyBuilderStack
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.metrics.multiprocess_setup import cleanup_prometheus_multiprocess_dir
@@ -66,7 +63,6 @@ from .plugin import (
     StorageClientWebappPluginContext,
     StorageManagerWebappPluginContext,
 )
-from .volumes.noop import init_noop_volume
 from .watcher import main_job
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -268,11 +264,7 @@ async def api_ctx(
                 manager_api_app,
             )
         )
-        try:
-            yield client_api_app, manager_api_app, internal_api_app
-        finally:
-            # volume instances are lazily initialized upon their first usage by the API layers.
-            await root_ctx.shutdown_volumes()
+        yield client_api_app, manager_api_app, internal_api_app
 
 
 async def _on_prepare(_request: web.Request, response: web.StreamResponse) -> None:
@@ -357,9 +349,6 @@ async def server_main(
             volume_stats_observer=dep_resources.storage.volume_stats.observer,
             volume_stats_state=dep_resources.storage.volume_stats.state,
             backends={**dep_resources.plugins.backends},
-            volumes={
-                NOOP_STORAGE_VOLUME_NAME: init_noop_volume(etcd, event_dispatcher, event_producer)
-            },
             artifact_verifier_ctx=ArtifactVerifierContext(),
         )
         await root_ctx.init_storage_artifact_verifier_plugin()
