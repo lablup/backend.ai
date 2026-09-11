@@ -5,7 +5,6 @@ from __future__ import annotations
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import Any, override
-from uuid import UUID
 
 from sqlalchemy.orm import InstrumentedAttribute
 
@@ -56,7 +55,7 @@ class UserUpdater(DataUpdater[UserRow, UserData]):
         return UserRow.uuid
 
     @override
-    def target_id_value(self) -> UUID:
+    def target_id_value(self) -> UserID:
         return self.user_id
 
     @override

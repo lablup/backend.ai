@@ -3,7 +3,6 @@ from __future__ import annotations
 from collections.abc import Sequence
 from uuid import UUID
 
-from ai.backend.common.api_handlers import SENTINEL
 from ai.backend.common.data.entity.runtime_variant import RuntimeVariantID
 from ai.backend.common.data.entity.runtime_variant_preset import RuntimeVariantPresetID
 from ai.backend.common.dto.manager.v2.runtime_variant_preset.request import (
@@ -69,6 +68,9 @@ from ai.backend.manager.services.runtime_variant_preset.actions.search import (
 from ai.backend.manager.services.runtime_variant_preset.actions.update import (
     UpdateRuntimeVariantPresetAction,
 )
+from ai.backend.manager.services.runtime_variant_preset.processors import (
+    RuntimeVariantPresetProcessors,
+)
 from ai.backend.manager.types import OptionalState, TriState
 
 
@@ -101,6 +103,11 @@ def _convert_ui_option_data(opt: UIOptionData | None) -> UIOption | None:
 
 
 class RuntimeVariantPresetAdapter(BaseAdapter):
+    _runtime_variant_preset: RuntimeVariantPresetProcessors
+
+    def __init__(self, runtime_variant_preset: RuntimeVariantPresetProcessors) -> None:
+        self._runtime_variant_preset = runtime_variant_preset
+
     async def search(
         self,
         input: SearchRuntimeVariantPresetsInput,
@@ -119,7 +126,7 @@ class RuntimeVariantPresetAdapter(BaseAdapter):
             limit=input.limit,
             offset=input.offset,
         )
-        result = await self._processors.runtime_variant_preset.public_search.run(
+        result = await self._runtime_variant_preset.public_search.run(
             SearchRuntimeVariantPresetsAction(searcher=searcher)
         )
         return SearchRuntimeVariantPresetsPayload(
@@ -130,12 +137,14 @@ class RuntimeVariantPresetAdapter(BaseAdapter):
         )
 
     async def get(self, preset_id: UUID) -> RuntimeVariantPresetNode:
-        result = await self._processors.runtime_variant_preset.public_get.run(
+        result = await self._runtime_variant_preset.public_get.run(
             GetRuntimeVariantPresetAction(preset_id=RuntimeVariantPresetID(preset_id))
         )
         return self._data_to_node(result.data)
 
-    async def batch_load_by_ids(self, ids: Sequence[UUID]) -> list[RuntimeVariantPresetNode | None]:
+    async def batch_load_by_ids(
+        self, ids: Sequence[RuntimeVariantPresetID]
+    ) -> list[RuntimeVariantPresetNode | None]:
         """Batch-load presets by id, aligned to ``ids`` order (``None`` for missing)."""
         if not ids:
             return []
@@ -143,7 +152,7 @@ class RuntimeVariantPresetAdapter(BaseAdapter):
             pagination=OffsetPagination(limit=len(ids)),
             conditions=[RuntimeVariantPresetConditions.by_ids(ids)],
         )
-        result = await self._processors.runtime_variant_preset.public_search.run(
+        result = await self._runtime_variant_preset.public_search.run(
             SearchRuntimeVariantPresetsAction(searcher=searcher)
         )
         node_map = {item.id: self._data_to_node(item) for item in result.items}
@@ -162,11 +171,13 @@ class RuntimeVariantPresetAdapter(BaseAdapter):
             default_value=input.default_value,
             key=input.key,
             required=input.required,
+            added_version=input.added_version,
+            deprecated_version=input.deprecated_version,
             category=input.category,
             display_name=input.display_name,
             ui_option=input.ui_option,
         )
-        result = await self._processors.runtime_variant_preset.global_create.run(
+        result = await self._runtime_variant_preset.global_create.run(
             CreateRuntimeVariantPresetAction(creator=creator)
         )
         return CreateRuntimeVariantPresetPayload(preset=self._data_to_node(result.data))
@@ -177,71 +188,27 @@ class RuntimeVariantPresetAdapter(BaseAdapter):
     ) -> UpdateRuntimeVariantPresetPayload:
         updater = RuntimeVariantPresetUpdater(
             preset_id=RuntimeVariantPresetID(input.id),
-            name=(
-                OptionalState.update(input.name) if input.name is not None else OptionalState.nop()
-            ),
-            description=(
-                TriState.nop()
-                if input.description is SENTINEL
-                else TriState.nullify()
-                if input.description is None
-                else TriState.update(input.description)
-            ),
-            rank=(
-                OptionalState.update(input.rank) if input.rank is not None else OptionalState.nop()
-            ),
-            preset_target=(
-                OptionalState.update(input.preset_target)
-                if input.preset_target is not None
-                else OptionalState.nop()
-            ),
-            value_type=(
-                OptionalState.update(input.value_type)
-                if input.value_type is not None
-                else OptionalState.nop()
-            ),
-            default_value=(
-                TriState.nop()
-                if input.default_value is SENTINEL
-                else TriState.nullify()
-                if input.default_value is None
-                else TriState.update(input.default_value)
-            ),
-            key=(OptionalState.update(input.key) if input.key is not None else OptionalState.nop()),
-            required=(
-                OptionalState.update(input.required)
-                if input.required is not None
-                else OptionalState.nop()
-            ),
-            category=(
-                TriState.nop()
-                if input.category is SENTINEL
-                else TriState.nullify()
-                if input.category is None
-                else TriState.update(input.category)
-            ),
-            display_name=(
-                TriState.nop()
-                if input.display_name is SENTINEL
-                else TriState.nullify()
-                if input.display_name is None
-                else TriState.update(input.display_name)
-            ),
-            ui_option=(
-                TriState.nop()
-                if input.ui_option is SENTINEL
-                else TriState.nullify()
-                if input.ui_option is None
-                else TriState.update(input.ui_option)
-            ),
+            name=OptionalState.from_unset(input.name),
+            description=TriState.from_unset(input.description),
+            rank=OptionalState.from_unset(input.rank),
+            preset_target=OptionalState.from_unset(input.preset_target),
+            value_type=OptionalState.from_unset(input.value_type),
+            default_value=TriState.from_unset(input.default_value),
+            key=OptionalState.from_unset(input.key),
+            required=OptionalState.from_unset(input.required),
+            added_version=TriState.from_unset(input.added_version),
+            deprecated_version=TriState.from_unset(input.deprecated_version),
+            category=TriState.from_unset(input.category),
+            display_name=TriState.from_unset(input.display_name),
+            ui_option=TriState.from_unset(input.ui_option),
         )
-        result = await self._processors.runtime_variant_preset.update.run(
+        result = await self._runtime_variant_preset.update.run(
             UpdateRuntimeVariantPresetAction(updater=updater)
         )
         return UpdateRuntimeVariantPresetPayload(preset=self._data_to_node(result.preset))
 
     async def delete(self, preset_id: UUID) -> DeleteRuntimeVariantPresetPayload:
-        result = await self._processors.runtime_variant_preset.purge.run(
+        result = await self._runtime_variant_preset.purge.run(
             PurgeRuntimeVariantPresetAction(id=RuntimeVariantPresetID(preset_id))
         )
         return DeleteRuntimeVariantPresetPayload(id=result.data.id)
@@ -267,6 +234,10 @@ class RuntimeVariantPresetAdapter(BaseAdapter):
             )
             if cond:
                 conditions.append(cond)
+        if filter_.runtime_version is not None:
+            conditions.append(
+                RuntimeVariantPresetConditions.by_valid_at_version(filter_.runtime_version)
+            )
         if filter_.AND:
             for sub in filter_.AND:
                 conditions.extend(self._convert_filter(sub))
@@ -295,6 +266,10 @@ class RuntimeVariantPresetAdapter(BaseAdapter):
                     result.append(RuntimeVariantPresetOrders.rank(ascending))
                 case RuntimeVariantPresetOrderField.CREATED_AT:
                     result.append(RuntimeVariantPresetOrders.created_at(ascending))
+                case RuntimeVariantPresetOrderField.ADDED_VERSION:
+                    result.extend(RuntimeVariantPresetOrders.added_version(ascending))
+                case RuntimeVariantPresetOrderField.DEPRECATED_VERSION:
+                    result.extend(RuntimeVariantPresetOrders.deprecated_version(ascending))
         return result
 
     @staticmethod
@@ -312,6 +287,8 @@ class RuntimeVariantPresetAdapter(BaseAdapter):
                 key=data.key,
             ),
             required=data.required,
+            added_version=data.added_version,
+            deprecated_version=data.deprecated_version,
             category=data.category,
             ui_type=data.ui_type,
             display_name=data.display_name,

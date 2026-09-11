@@ -1,29 +1,30 @@
 from typing import override
 
-from ai.backend.common.data.entity.types import (
-    EntityIdentifier,
-    EntityType,
-    NaturalKey,
-    ScopeType,
-)
+from ai.backend.common.data.entity.types import EntityIdentifier, EntityType, NaturalKey
 
 __all__ = (
-    "DOMAIN_ENTITY_TYPE",
-    "DOMAIN_SCOPE_TYPE",
+    "DomainEntityType",
     "DomainID",
     "DomainName",
 )
 
 
-# Raw string mirroring the RBAC-managed RBACElementType.DOMAIN value.
-DOMAIN_ENTITY_TYPE = EntityType("domain")
-DOMAIN_SCOPE_TYPE = ScopeType(DOMAIN_ENTITY_TYPE)
+class DomainEntityType(EntityType):
+    @override
+    @classmethod
+    def name(cls) -> str:
+        return "domain"
+
+    @override
+    @classmethod
+    def description(cls) -> str:
+        return "The top-level tenant holding projects and users."
 
 
 class DomainID(EntityIdentifier):
     @override
     def entity_type(self) -> EntityType:
-        return DOMAIN_ENTITY_TYPE
+        return DomainEntityType()
 
 
 class DomainName(NaturalKey):

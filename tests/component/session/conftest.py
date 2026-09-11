@@ -14,18 +14,18 @@ from dateutil.tz import tzutc
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
-from ai.backend.common.data.entity.agent import AGENT_ENTITY_TYPE
-from ai.backend.common.data.entity.domain import DOMAIN_ENTITY_TYPE
-from ai.backend.common.data.entity.project import PROJECT_ENTITY_TYPE
+from ai.backend.common.data.entity.agent import AgentEntityType
+from ai.backend.common.data.entity.domain import DomainEntityType
+from ai.backend.common.data.entity.project import ProjectEntityType
 from ai.backend.common.data.entity.resource_group import (
-    RESOURCE_GROUP_ENTITY_TYPE,
+    ResourceGroupEntityType,
     ResourceGroupID,
     ResourceGroupName,
 )
-from ai.backend.common.data.entity.resource_preset import RESOURCE_PRESET_ENTITY_TYPE
-from ai.backend.common.data.entity.session import SESSION_ENTITY_TYPE, SessionID
-from ai.backend.common.data.entity.user import USER_ENTITY_TYPE
-from ai.backend.common.data.entity.vfolder import VFOLDER_ENTITY_TYPE
+from ai.backend.common.data.entity.resource_preset import ResourcePresetEntityType
+from ai.backend.common.data.entity.session import SessionEntityType, SessionID
+from ai.backend.common.data.entity.user import UserEntityType
+from ai.backend.common.data.entity.vfolder import VFolderEntityType
 from ai.backend.common.plugin.monitor import ErrorPluginContext
 from ai.backend.common.types import AgentId, SessionTypes
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
@@ -49,7 +49,6 @@ from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.kernel import kernels
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.ops import DBOpsProvider
 from ai.backend.manager.repositories.session.repository import SessionRepository
 from ai.backend.manager.services.agent.processors import AgentProcessors
 from ai.backend.manager.services.auth.processors import AuthProcessors
@@ -99,7 +98,7 @@ def session_repository(
     """Real ``SessionRepository`` exposed as a fixture so individual tests can
     override or stub specific methods (e.g., ``resolve_image``) without
     monkey-patching the class globally."""
-    return SessionRepository(database_engine, DBOpsProvider(database_engine))
+    return SessionRepository(database_engine)
 
 
 @pytest.fixture()
@@ -129,15 +128,15 @@ async def session_processors(
     service = SessionService(args)
     groups = processor_registry.concern(ConcernMeta(Concern.RESOURCE_GROUP))
     return SessionProcessors(
-        processor_registry.group(GroupMeta(SESSION_ENTITY_TYPE)),
-        groups.group(GroupMeta(RESOURCE_GROUP_ENTITY_TYPE)),
+        processor_registry.group(GroupMeta(SessionEntityType())),
+        groups.group(GroupMeta(ResourceGroupEntityType())),
         ResourceAllocationProcessors(
-            groups.group(GroupMeta(USER_ENTITY_TYPE)),
-            groups.group(GroupMeta(PROJECT_ENTITY_TYPE)),
-            groups.group(GroupMeta(DOMAIN_ENTITY_TYPE)),
-            groups.group(GroupMeta(RESOURCE_GROUP_ENTITY_TYPE)),
-            groups.group(GroupMeta(SESSION_ENTITY_TYPE)),
-            groups.group(GroupMeta(RESOURCE_PRESET_ENTITY_TYPE)),
+            groups.group(GroupMeta(UserEntityType())),
+            groups.group(GroupMeta(ProjectEntityType())),
+            groups.group(GroupMeta(DomainEntityType())),
+            groups.group(GroupMeta(ResourceGroupEntityType())),
+            groups.group(GroupMeta(SessionEntityType())),
+            groups.group(GroupMeta(ResourcePresetEntityType())),
             AsyncMock(),
         ),
         service,
@@ -148,7 +147,7 @@ async def session_processors(
 def agent_processors_mock(processor_registry: ProcessorRegistry[Any]) -> AgentProcessors:
     """AgentProcessors with a mocked AgentService."""
     return AgentProcessors(
-        processor_registry.group(GroupMeta(AGENT_ENTITY_TYPE)),
+        processor_registry.group(GroupMeta(AgentEntityType())),
         AsyncMock(),
         [],
     )
@@ -157,7 +156,7 @@ def agent_processors_mock(processor_registry: ProcessorRegistry[Any]) -> AgentPr
 @pytest.fixture()
 def vfolder_processors_mock(processor_registry: ProcessorRegistry[Any]) -> VFolderProcessors:
     """VFolderProcessors with a mocked VFolderService."""
-    return VFolderProcessors(processor_registry.group(GroupMeta(VFOLDER_ENTITY_TYPE)), AsyncMock())
+    return VFolderProcessors(processor_registry.group(GroupMeta(VFolderEntityType())), AsyncMock())
 
 
 @pytest.fixture()
@@ -175,10 +174,10 @@ def server_module_registries(
         register_session_routes(
             SessionHandler(
                 project=ProjectProcessors(
-                    processor_registry.group(GroupMeta(PROJECT_ENTITY_TYPE)), AsyncMock()
+                    processor_registry.group(GroupMeta(ProjectEntityType())), AsyncMock()
                 ),
                 user=UserProcessors(
-                    processor_registry.group(GroupMeta(USER_ENTITY_TYPE)),
+                    processor_registry.group(GroupMeta(UserEntityType())),
                     AsyncMock(),
                 ),
                 auth=auth_processors,

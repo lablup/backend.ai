@@ -76,7 +76,7 @@ def check(
 
     @asynccontextmanager
     async def _initialize_and_check_all_components(
-        config_path: Path,
+        config_path: Path | None,
         probe: HealthProbe,
     ) -> AsyncIterator[None]:
         """
@@ -174,10 +174,7 @@ def check(
         print("Initializing and checking components...\n")
 
         try:
-            async with _initialize_and_check_all_components(
-                config_path or Path("storage-proxy.toml"),
-                probe,
-            ):
+            async with _initialize_and_check_all_components(config_path, probe):
                 pass
         except Exception as e:
             print(f"✗ Failed to initialize dependencies: {str(e).strip()}\n")

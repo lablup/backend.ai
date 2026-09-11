@@ -393,7 +393,7 @@ class TestCheckScalingGroup:
         self,
         mock_conn: MagicMock,
     ) -> None:
-        """Test that check_scaling_group raises ResourceGroupSessionTypeNotAllowed (422)
+        """Test that check_scaling_group raises ResourceGroupSessionTypeNotAllowed (400)
         when requesting BATCH session on INTERACTIVE-only scaling group"""
         mock_sgroup = MagicMock()
         mock_sgroup.name = "test-sgroup"
@@ -415,7 +415,7 @@ class TestCheckScalingGroup:
                     domain_name="test-domain",
                     group_id="test-group-id",
                 )
-            assert exc_info.value.status_code == 422
+            assert exc_info.value.status_code == 400
 
     async def test_check_scaling_group_succeeds_with_allowed_session_type(
         self,

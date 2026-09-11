@@ -11,16 +11,17 @@ import pytest
 import sqlalchemy as sa
 from sqlalchemy import Table
 
-from ai.backend.common.data.entity.domain import DomainID, DomainName
+from ai.backend.common.data.entity.domain import DomainEntityType, DomainID, DomainName
+from ai.backend.common.data.entity.project import ProjectEntityType
 from ai.backend.common.data.entity.role_preset import RolePresetID
+from ai.backend.common.data.entity.session import SessionEntityType
 from ai.backend.common.data.entity.types import EntityType
+from ai.backend.common.data.entity.vfolder import VFolderEntityType
 from ai.backend.common.data.permission.types import Permission
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.permission.status import RoleStatus
-from ai.backend.manager.data.permission.types import EntityType as LegacyEntityType
-from ai.backend.manager.data.permission.types import OperationType, RoleSource
-from ai.backend.manager.data.permission.types import ScopeType as LegacyScopeType
+from ai.backend.manager.data.permission.types import RoleSource
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.keypair import KeyPairRow
@@ -125,15 +126,15 @@ async def _add_role(
                 source=RoleSource.SYSTEM,
                 status=RoleStatus.ACTIVE,
                 role_preset_id=preset_id,
+                scope_type=ProjectEntityType(),
+                scope_id=project_id,
             )
         )
         await sess.flush()
         sess.add(
             PermissionRow(
                 role_id=role_id,
-                scope_type=EntityType("project"),
-                scope_id=str(project_id),
-                entity_type=EntityType("vfolder"),
+                entity_type=VFolderEntityType(),
                 permission=Permission.READ,
                 all_fields=True,
             )
@@ -209,7 +210,7 @@ async def scene(db: ExtendedAsyncSAEngine) -> Scene:
         )
         sess.add(VirtualEntityRow(entity_type="project", entity_id=project_id))
         preset = RolePresetRow(
-            name="member", scope_type=LegacyScopeType.PROJECT, auto_assign=False, deleted=False
+            name="member", scope_type=ProjectEntityType(), auto_assign=False, deleted=False
         )
         sess.add(preset)
         await sess.flush()
@@ -217,8 +218,8 @@ async def scene(db: ExtendedAsyncSAEngine) -> Scene:
         sess.add(
             RolePermissionPresetRow(
                 role_preset_id=preset_id,
-                entity_type=LegacyEntityType.VFOLDER,
-                operation=OperationType.READ,
+                entity_type=VFolderEntityType(),
+                permission=Permission.READ,
             )
         )
     derived = await _add_role(db, project_id, "member-x", preset_id=preset_id)
@@ -238,7 +239,7 @@ async def scene(db: ExtendedAsyncSAEngine) -> Scene:
 async def _set_preset_grants(
     db: ExtendedAsyncSAEngine,
     preset_id: uuid.UUID,
-    grants: set[tuple[LegacyEntityType, OperationType]],
+    grants: set[tuple[EntityType, Permission]],
 ) -> None:
     async with db.begin_session() as sess:
         await sess.execute(
@@ -246,10 +247,10 @@ async def _set_preset_grants(
                 RolePermissionPresetRow.role_preset_id == preset_id
             )
         )
-        for entity_type, operation in grants:
+        for entity_type, permission in grants:
             sess.add(
                 RolePermissionPresetRow(
-                    role_preset_id=preset_id, entity_type=entity_type, operation=operation
+                    role_preset_id=preset_id, entity_type=entity_type, permission=permission
                 )
             )
 
@@ -304,9 +305,9 @@ class TestSyncPresetRoles:
             db,
             scene.preset_id,
             {
-                (LegacyEntityType.VFOLDER, OperationType.READ),
-                (LegacyEntityType.SESSION, OperationType.READ),
-                (LegacyEntityType.SESSION, OperationType.UPDATE),
+                (VFolderEntityType(), Permission.READ),
+                (SessionEntityType(), Permission.READ),
+                (SessionEntityType(), Permission.UPDATE),
             },
         )
 
@@ -321,9 +322,7 @@ class TestSyncPresetRoles:
     async def test_a_grant_the_preset_dropped_is_revoked(
         self, db: ExtendedAsyncSAEngine, provider: RolePresetOpsProvider, scene: Scene
     ) -> None:
-        await _set_preset_grants(
-            db, scene.preset_id, {(LegacyEntityType.SESSION, OperationType.READ)}
-        )
+        await _set_preset_grants(db, scene.preset_id, {(SessionEntityType(), Permission.READ)})
 
         await _sync(provider, scene.preset_id)
 
@@ -376,7 +375,7 @@ class TestSyncPresetRoles:
         self, db: ExtendedAsyncSAEngine, provider: RolePresetOpsProvider, scene: Scene
     ) -> None:
         await _set_preset_grants(db, scene.preset_id, set())
-        await _edit_preset(db, scene.preset_id, scope_type=LegacyScopeType.DOMAIN, name="renamed")
+        await _edit_preset(db, scene.preset_id, scope_type=DomainEntityType(), name="renamed")
 
         await _sync(provider, scene.preset_id)
 

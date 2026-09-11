@@ -11,6 +11,7 @@ from ai.backend.common.dto.manager.v2.user.request import (
     CreateUserInput,
     DeleteUserInput,
     RestoreUserInput,
+    ScopedSearchUsersInput,
     SearchUsersRequest,
     UpdateUserInput,
 )
@@ -81,6 +82,14 @@ class V2UserHandler:
     ) -> APIResponse:
         """Restore a soft-deleted user (superadmin only)."""
         result = await self._adapter.restore_user_by_id(body.parsed)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def scoped_search(
+        self,
+        body: BodyParam[ScopedSearchUsersInput],
+    ) -> APIResponse:
+        """Search the users the named scopes reach, combined with OR."""
+        result = await self._adapter.scoped_search(body.parsed)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
     async def domain_search(

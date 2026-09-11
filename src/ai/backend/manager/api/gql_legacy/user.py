@@ -19,7 +19,7 @@ from graphql import Undefined
 from sqlalchemy.engine.row import Row
 
 from ai.backend.common.data.entity.domain import DomainID, DomainName
-from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE
+from ai.backend.common.data.entity.project import ProjectEntityType
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.exception import UserNotFound
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
@@ -107,7 +107,7 @@ __all__ = (
 
 def _project_membership_join(base_table: sa.Table | sa.sql.Join) -> sa.sql.Join:
     """Join the base users selectable to groups via the virtual-entity membership pairs."""
-    ms = user_scope_membership_query(PROJECT_SCOPE_TYPE).subquery()
+    ms = user_scope_membership_query(ProjectEntityType()).subquery()
     return sa.join(
         base_table,
         ms,
@@ -482,7 +482,9 @@ class UserNode(graphene.ObjectType):  # type: ignore[misc]
             before=before,
             last=last,
         )
-        membership_filter = user_scope_membership_exists(PROJECT_SCOPE_TYPE, ProjectRow.id, self.id)
+        membership_filter = user_scope_membership_exists(
+            ProjectEntityType(), ProjectRow.id, self.id
+        )
         prj_query = query.where(membership_filter)
         cnt_query = cnt_query.where(membership_filter)
         result: list[GroupNode] = []
@@ -521,7 +523,7 @@ class UserGroup(graphene.ObjectType):  # type: ignore[misc]
         cls, ctx: GraphQueryContext, user_ids: Sequence[UUID]
     ) -> Sequence[Sequence[UserGroup]]:
         async with ctx.db.begin() as conn:
-            ms = user_scope_membership_query(PROJECT_SCOPE_TYPE).subquery()
+            ms = user_scope_membership_query(ProjectEntityType()).subquery()
             j = groups.join(ms, groups.c.id == ms.c.scope_id)
             query = (
                 sa.select(
@@ -674,7 +676,7 @@ class User(graphene.ObjectType):  # type: ignore[misc]
         )
         if group_id is not None:
             query = query.where(
-                user_scope_membership_exists(PROJECT_SCOPE_TYPE, group_id, users.c.uuid)
+                user_scope_membership_exists(ProjectEntityType(), group_id, users.c.uuid)
             )
         if ctx.user["role"] != UserRole.SUPERADMIN:
             query = query.where(users.c.domain_name == ctx.user["domain_name"])
@@ -746,7 +748,7 @@ class User(graphene.ObjectType):  # type: ignore[misc]
         query = sa.select(sa.func.count()).select_from(users)
         if group_id is not None:
             query = query.where(
-                user_scope_membership_exists(PROJECT_SCOPE_TYPE, group_id, users.c.uuid)
+                user_scope_membership_exists(ProjectEntityType(), group_id, users.c.uuid)
             )
         if domain_name is not None:
             query = query.where(users.c.domain_name == domain_name)
@@ -784,7 +786,7 @@ class User(graphene.ObjectType):  # type: ignore[misc]
         )
         if group_id is not None:
             query = query.where(
-                user_scope_membership_exists(PROJECT_SCOPE_TYPE, group_id, users.c.uuid)
+                user_scope_membership_exists(ProjectEntityType(), group_id, users.c.uuid)
             )
         if domain_name is not None:
             query = query.where(users.c.domain_name == domain_name)

@@ -8,7 +8,7 @@ import pytest
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
-from ai.backend.common.data.entity.vfs_storage import VFS_STORAGE_ENTITY_TYPE, VFSStorageID
+from ai.backend.common.data.entity.vfs_storage import VFSStorageEntityType, VFSStorageID
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
 from ai.backend.manager.actions.registry.types import GroupMeta
 from ai.backend.manager.api.rest.middleware import auth as _auth_api
@@ -42,7 +42,7 @@ def vfs_storage_processors(
         storage_manager=storage_manager,
     )
     return VFSStorageProcessors(
-        processor_registry.group(GroupMeta(VFS_STORAGE_ENTITY_TYPE)), service
+        processor_registry.group(GroupMeta(VFSStorageEntityType())), service
     )
 
 

@@ -8,7 +8,11 @@ from strawberry import Info
 from strawberry.relay import PageInfo
 
 from ai.backend.common.data.entity.domain import DomainName
-from ai.backend.common.dto.manager.v2.group.request import AdminSearchProjectsInput
+from ai.backend.common.dto.manager.v2.group.request import (
+    AdminSearchProjectsInput,
+    ScopedSearchProjectsInput,
+)
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
@@ -17,6 +21,7 @@ from ai.backend.manager.api.gql.decorators import (
 from ai.backend.manager.api.gql.domain_v2.types import DomainV2GQL
 from ai.backend.manager.api.gql.project_v2.types import (
     DomainProjectScope,
+    ProjectScopeGQL,
     ProjectV2Connection,
     ProjectV2Filter,
     ProjectV2GQL,
@@ -63,6 +68,54 @@ async def admin_projects_v2(
     check_admin_only()
     payload = await info.context.adapters.project.admin_search(
         AdminSearchProjectsInput(
+            filter=filter.to_pydantic() if filter else None,
+            order=[o.to_pydantic() for o in order_by] if order_by else None,
+            first=first,
+            after=after,
+            last=last,
+            before=before,
+            limit=limit,
+            offset=offset,
+        )
+    )
+    nodes = [ProjectV2GQL.from_pydantic(node) for node in payload.items]
+    edges = [ProjectV2Edge(node=node, cursor=encode_cursor(str(node.id))) for node in nodes]
+    return ProjectV2Connection(
+        edges=edges,
+        page_info=PageInfo(
+            has_next_page=payload.has_next_page,
+            has_previous_page=payload.has_previous_page,
+            start_cursor=edges[0].cursor if edges else None,
+            end_cursor=edges[-1].cursor if edges else None,
+        ),
+        count=payload.total_count,
+    )
+
+
+@gql_root_field(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description=(
+            "Page through the projects the named scopes reach, combined with OR. "
+            "Every scope is authorized before the read runs."
+        ),
+    )
+)  # type: ignore[misc]
+async def scoped_projects_v2(
+    info: Info[StrawberryGQLContext],
+    scope: ProjectScopeGQL,
+    filter: ProjectV2Filter | None = None,
+    order_by: list[ProjectV2OrderBy] | None = None,
+    before: str | None = None,
+    after: str | None = None,
+    first: int | None = None,
+    last: int | None = None,
+    limit: int | None = None,
+    offset: int | None = None,
+) -> ProjectV2Connection | None:
+    payload = await info.context.adapters.project.scoped_search(
+        ScopedSearchProjectsInput(
+            scope=scope.to_pydantic(),
             filter=filter.to_pydantic() if filter else None,
             order=[o.to_pydantic() for o in order_by] if order_by else None,
             first=first,

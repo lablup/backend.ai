@@ -132,3 +132,36 @@ class VFolderPurger(EntityPurger[VFolderRow, VFolderData]):
     @override
     def to_data(self, row: VFolderRow) -> VFolderData:
         return row.to_data()
+
+
+@dataclass
+class VFolderInviteeInvitationBatchPurger(
+    EntityBatchPurger[VFolderInvitationRow, VFolderInvitationID]
+):
+    """Clears one invitee's invitations to the named vfolders, each with its graph.
+
+    What :class:`VFolderInvitationBatchPurger` does for a whole folder, narrowed to
+    the invitee whose standing on those folders is being replaced.
+    """
+
+    vfolder_ids: Sequence[UUID]
+    invitee_email: str
+
+    @override
+    def entity_id(self, row: VFolderInvitationRow) -> VFolderInvitationID:
+        return VFolderInvitationID(row.id)
+
+    @override
+    def build_subquery(self) -> sa.sql.Select[tuple[VFolderInvitationRow]]:
+        return sa.select(VFolderInvitationRow).where(
+            VFolderInvitationRow.vfolder.in_(self.vfolder_ids),
+            VFolderInvitationRow.invitee == self.invitee_email,
+        )
+
+    @override
+    def conflict_checks(self) -> Sequence[ConflictCheck]:
+        return ()
+
+    @override
+    def to_data(self, row: VFolderInvitationRow) -> VFolderInvitationID:
+        return VFolderInvitationID(row.id)

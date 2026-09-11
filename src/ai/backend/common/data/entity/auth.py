@@ -1,8 +1,17 @@
+from typing import override
+
 from ai.backend.common.data.entity.types import EntityType
 
-__all__ = ("AUTH_ENTITY_TYPE",)
+__all__ = ("AuthEntityType",)
 
 
-# Raw string mirroring the RBAC-managed EntityType.AUTH value. It names the credential
-# and login-session state that answers for no other entity.
-AUTH_ENTITY_TYPE = EntityType("auth")
+class AuthEntityType(EntityType):
+    @override
+    @classmethod
+    def name(cls) -> str:
+        return "auth"
+
+    @override
+    @classmethod
+    def description(cls) -> str:
+        return "An authentication operation that names no user, such as a login."

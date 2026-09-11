@@ -127,3 +127,37 @@ class FieldUpserter[TOwnerID: EntityIdentifier, TRow: Base, TData: FieldData](AB
     @abstractmethod
     def to_data(self, row: TRow) -> TData:
         raise NotImplementedError
+
+
+class DanglingFieldUpserter[TRow: Base, TData: FieldData](ABC):
+    """Upsert spec of a row written without an owner to build under.
+
+    What :class:`DanglingFieldCreator` is to the field create, this is to the field
+    upsert: no owner names the row, so what it says about the entities it concerns is
+    the spec's own value like every other column.
+    """
+
+    @abstractmethod
+    def row_class(self) -> type[TRow]:
+        raise NotImplementedError
+
+    @abstractmethod
+    def index_elements(self) -> list[str]:
+        """The column names conflict detection keys on."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def integrity_error_checks(self) -> Sequence[IntegrityErrorCheck]:
+        raise NotImplementedError
+
+    @abstractmethod
+    def build_insert_values(self) -> dict[str, Any]:
+        raise NotImplementedError
+
+    @abstractmethod
+    def build_update_values(self) -> dict[str, Any]:
+        raise NotImplementedError
+
+    @abstractmethod
+    def to_data(self, row: TRow) -> TData:
+        raise NotImplementedError

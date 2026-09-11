@@ -4,7 +4,6 @@ from collections.abc import Collection, Sequence
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any, override
-from uuid import UUID
 
 from sqlalchemy.orm import InstrumentedAttribute
 
@@ -42,7 +41,7 @@ class SessionUpdater(DataUpdater[SessionRow, SessionData]):
         return SessionRow.id
 
     @override
-    def target_id_value(self) -> UUID:
+    def target_id_value(self) -> SessionID:
         return self.session_id
 
     @property

@@ -222,12 +222,15 @@ def update(
     from ai.backend.common.dto.manager.v2.deployment.request import (
         UpdateDeploymentInput,
     )
+    from ai.backend.common.tristate.unset import UNSET
 
     body = UpdateDeploymentInput(
-        name=name,
-        replica_count=replicas,
-        open_to_public=open_to_public,
-        preferred_domain_name=preferred_domain_name,
+        name=name if name is not None else UNSET,
+        replica_count=replicas if replicas is not None else UNSET,
+        open_to_public=open_to_public if open_to_public is not None else UNSET,
+        preferred_domain_name=(
+            preferred_domain_name if preferred_domain_name is not None else UNSET
+        ),
     )
 
     async def _run() -> None:

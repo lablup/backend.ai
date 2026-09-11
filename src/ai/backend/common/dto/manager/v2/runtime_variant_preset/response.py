@@ -27,6 +27,12 @@ class RuntimeVariantPresetNode(BaseResponseModel):
     required: bool = Field(
         description="Whether this preset param must be supplied on a deployment revision.",
     )
+    added_version: str | None = Field(
+        default=None, description="Runtime version this preset became available in."
+    )
+    deprecated_version: str | None = Field(
+        default=None, description="Runtime version this preset was removed in, exclusive."
+    )
     category: str | None = Field(default=None, description="UI category group.")
     ui_type: str | None = Field(
         default=None, description="UI type for rendering (slider, number, choice, text)."

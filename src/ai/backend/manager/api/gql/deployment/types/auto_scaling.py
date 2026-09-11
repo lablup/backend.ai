@@ -13,6 +13,9 @@ import strawberry
 from strawberry import ID, UNSET, Info
 from strawberry.relay import Connection, Edge, NodeID
 
+from ai.backend.common.data.entity.prometheus_query_preset import (
+    PrometheusQueryPresetID,
+)
 from ai.backend.common.dto.manager.v2.auto_scaling_rule.request import (
     CreateAutoScalingRuleInput as CreateAutoScalingRuleInputDTO,
 )
@@ -149,7 +152,7 @@ class AutoScalingRule(PydanticNodeMixin[AutoScalingRuleNodeDTO]):
         if self.prometheus_query_preset_id is None:
             return None
         return await info.context.data_loaders.query_definition_loader.load(
-            UUID(str(self.prometheus_query_preset_id))
+            PrometheusQueryPresetID(UUID(str(self.prometheus_query_preset_id)))
         )
 
     @classmethod

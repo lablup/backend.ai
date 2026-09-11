@@ -34,8 +34,8 @@ from ai.backend.manager.data.artifact.types import (
 from ai.backend.manager.data.artifact_registries.types import ArtifactRegistryData
 from ai.backend.manager.data.association.types import AssociationArtifactsStoragesData
 from ai.backend.manager.errors.artifact import (
-    ArtifactDeletionBadRequestError,
     ArtifactImportBadRequestError,
+    ArtifactRevisionDeletionBadRequestError,
 )
 from ai.backend.manager.errors.artifact_registry import InvalidArtifactRegistryTypeError
 from ai.backend.manager.errors.common import ServerMisconfiguredError
@@ -1588,7 +1588,7 @@ class TestCleanupArtifactRevisionAction:
         mock_artifact_repository: MagicMock,
         mock_revision_ops: MagicMock,
     ) -> None:
-        """SCANNED state raises ArtifactDeletionBadRequestError"""
+        """SCANNED state raises ArtifactRevisionDeletionBadRequestError"""
         now = datetime.now(UTC)
         revision = ArtifactRevisionData(
             id=ArtifactRevisionID(uuid.uuid4()),
@@ -1607,7 +1607,7 @@ class TestCleanupArtifactRevisionAction:
 
         action = CleanupArtifactRevisionAction(artifact_revision_id=revision.id)
 
-        with pytest.raises(ArtifactDeletionBadRequestError):
+        with pytest.raises(ArtifactRevisionDeletionBadRequestError):
             await service.cleanup(action)
 
     async def test_pulling_state_raises_bad_request(
@@ -1616,7 +1616,7 @@ class TestCleanupArtifactRevisionAction:
         mock_artifact_repository: MagicMock,
         mock_revision_ops: MagicMock,
     ) -> None:
-        """PULLING state raises ArtifactDeletionBadRequestError"""
+        """PULLING state raises ArtifactRevisionDeletionBadRequestError"""
         now = datetime.now(UTC)
         revision = ArtifactRevisionData(
             id=ArtifactRevisionID(uuid.uuid4()),
@@ -1635,7 +1635,7 @@ class TestCleanupArtifactRevisionAction:
 
         action = CleanupArtifactRevisionAction(artifact_revision_id=revision.id)
 
-        with pytest.raises(ArtifactDeletionBadRequestError):
+        with pytest.raises(ArtifactRevisionDeletionBadRequestError):
             await service.cleanup(action)
 
     async def test_vfs_storage_fallback(

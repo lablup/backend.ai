@@ -25,6 +25,7 @@ def register_v2_user_routes(
     reg.add("PATCH", "/{user_id}", handler.update_user, middlewares=[superadmin_required])
     reg.add("POST", "/delete", handler.delete_user, middlewares=[superadmin_required])
     reg.add("POST", "/restore", handler.restore_user, middlewares=[superadmin_required])
+    reg.add("POST", "/scoped/search", handler.scoped_search, middlewares=[auth_required])
     reg.add(
         "POST",
         "/domains/{domain_name}/search",

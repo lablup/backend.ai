@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import override
 
 from ai.backend.common.dependencies import NonMonitorableDependencyProvider
+from ai.backend.logging.types import LogLevel
 from ai.backend.storage.config.loaders import load_local_config
 from ai.backend.storage.config.unified import StorageProxyUnifiedConfig
 
@@ -15,7 +16,8 @@ from ai.backend.storage.config.unified import StorageProxyUnifiedConfig
 class ConfigProviderInput:
     """Input for config provider."""
 
-    config_path: Path
+    config_path: Path | None
+    log_level: LogLevel = LogLevel.NOTSET
 
 
 class ConfigProvider(
@@ -34,5 +36,5 @@ class ConfigProvider(
         self, setup_input: ConfigProviderInput
     ) -> AsyncIterator[StorageProxyUnifiedConfig]:
         """Load and provide storage proxy configuration."""
-        config = load_local_config(setup_input.config_path)
+        config = load_local_config(setup_input.config_path, log_level=setup_input.log_level)
         yield config

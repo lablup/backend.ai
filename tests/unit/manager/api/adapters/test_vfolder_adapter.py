@@ -96,7 +96,12 @@ class TestVFolderAdapterMySearch:
 
     @pytest.fixture
     def adapter(self, mock_processors: MagicMock) -> VFolderAdapter:
-        return VFolderAdapter(mock_processors)
+        return VFolderAdapter(
+            mock_processors.vfolder,
+            mock_processors.vfolder_file,
+            mock_processors.vfolder_admin,
+            mock_processors.deployment,
+        )
 
     async def test_my_search_calls_processor_with_user_scope(
         self,
@@ -194,7 +199,12 @@ class TestVFolderAdapterProjectSearch:
 
     @pytest.fixture
     def adapter(self, mock_processors: MagicMock) -> VFolderAdapter:
-        return VFolderAdapter(mock_processors)
+        return VFolderAdapter(
+            mock_processors.vfolder,
+            mock_processors.vfolder_file,
+            mock_processors.vfolder_admin,
+            mock_processors.deployment,
+        )
 
     async def test_project_search_calls_processor_with_project_scope(
         self,
@@ -233,7 +243,7 @@ class TestVFolderAdapterConvertFilter:
 
     @pytest.fixture
     def adapter(self) -> VFolderAdapter:
-        return VFolderAdapter(MagicMock())
+        return VFolderAdapter(MagicMock(), MagicMock(), MagicMock(), MagicMock())
 
     @pytest.mark.parametrize("value", [True, False])
     def test_cloneable_filter_produces_condition(
@@ -268,7 +278,12 @@ class TestVFolderAdapterGetFolderUsage:
 
     @pytest.fixture
     def adapter(self, mock_processors: MagicMock) -> VFolderAdapter:
-        return VFolderAdapter(mock_processors)
+        return VFolderAdapter(
+            mock_processors.vfolder,
+            mock_processors.vfolder_file,
+            mock_processors.vfolder_admin,
+            mock_processors.deployment,
+        )
 
     async def test_maps_usage_data_to_dto(
         self,

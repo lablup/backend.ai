@@ -47,6 +47,7 @@ from ai.backend.manager.models.resource_usage_history import (
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.resource_usage_history.db_source.db_source import (
     ResourceUsageHistoryDBSource,
 )
@@ -119,7 +120,7 @@ class TestUsageBucketEntries:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> ResourceUsageHistoryDBSource:
-        return ResourceUsageHistoryDBSource(db_with_cleanup)
+        return ResourceUsageHistoryDBSource(db_with_cleanup, V2DBOpsProvider(db_with_cleanup))
 
     async def test_increment_domain_buckets_creates_entries(
         self,

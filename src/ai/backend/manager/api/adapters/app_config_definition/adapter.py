@@ -53,6 +53,7 @@ from ai.backend.manager.services.app_config.actions.definition.get import (
 from ai.backend.manager.services.app_config.actions.definition.purge import (
     PurgeAppConfigDefinitionAction,
 )
+from ai.backend.manager.services.app_config.processors import AppConfigProcessors
 
 
 @lru_cache(maxsize=1)
@@ -69,11 +70,16 @@ def _get_app_config_definition_pagination_spec() -> PaginationSpec:
 class AppConfigDefinitionAdapter(BaseAdapter):
     """Adapter for app config definition domain operations (admin-only)."""
 
+    _app_config: AppConfigProcessors
+
+    def __init__(self, app_config: AppConfigProcessors) -> None:
+        self._app_config = app_config
+
     async def admin_create(
         self, input: CreateAppConfigDefinitionInput
     ) -> CreateAppConfigDefinitionPayload:
         creator = AppConfigDefinitionCreator(config_name=input.config_name)
-        action_result = await self._processors.app_config.definition_global_create.run(
+        action_result = await self._app_config.definition_global_create.run(
             CreateAppConfigDefinitionAction(creator=creator)
         )
         return CreateAppConfigDefinitionPayload(
@@ -81,7 +87,7 @@ class AppConfigDefinitionAdapter(BaseAdapter):
         )
 
     async def admin_get(self, definition_id: AppConfigDefinitionID) -> AppConfigDefinitionNode:
-        action_result = await self._processors.app_config.definition_get.run(
+        action_result = await self._app_config.definition_get.run(
             GetAppConfigDefinitionAction(definition_id=definition_id)
         )
         return self._data_to_node(action_result.data)
@@ -97,7 +103,7 @@ class AppConfigDefinitionAdapter(BaseAdapter):
         if not ids:
             return []
         entity_ids = [AppConfigDefinitionID(value) for value in ids]
-        result = await self._processors.app_config.definition_bulk_get.run(
+        result = await self._app_config.definition_bulk_get.run(
             BulkGetAppConfigDefinitionsAction(ids=entity_ids)
         )
         return [
@@ -124,7 +130,7 @@ class AppConfigDefinitionAdapter(BaseAdapter):
             limit=input.limit,
             offset=input.offset,
         )
-        action_result = await self._processors.app_config.definition_global_search.run(
+        action_result = await self._app_config.definition_global_search.run(
             AdminSearchAppConfigDefinitionsAction(searcher=searcher)
         )
         return SearchAppConfigDefinitionsPayload(
@@ -137,7 +143,7 @@ class AppConfigDefinitionAdapter(BaseAdapter):
     async def admin_purge(
         self, input: PurgeAppConfigDefinitionInput
     ) -> PurgeAppConfigDefinitionPayload:
-        action_result = await self._processors.app_config.definition_purge.run(
+        action_result = await self._app_config.definition_purge.run(
             PurgeAppConfigDefinitionAction(definition_id=AppConfigDefinitionID(input.id))
         )
         return PurgeAppConfigDefinitionPayload(id=action_result.data.id)

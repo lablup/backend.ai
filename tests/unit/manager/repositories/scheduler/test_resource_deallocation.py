@@ -16,7 +16,9 @@ from decimal import Decimal
 import pytest
 import sqlalchemy as sa
 from dateutil.tz import tzutc
+from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
+from ai.backend.common.data.entity.agent import AgentUUID
 from ai.backend.common.data.entity.domain import DomainID, DomainName
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.data.user.types import UserRole
@@ -43,7 +45,6 @@ from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.project import ProjectRow
 from ai.backend.manager.models.rbac_models import (
-    AssociationScopesEntitiesRow,
     EntityFieldRow,
     RoleRow,
     UserRoleRow,
@@ -65,6 +66,11 @@ from ai.backend.manager.repositories.scheduler.db_source.db_source import Schedu
 from ai.backend.manager.secret.types import SecretValue
 from ai.backend.testutils.db import with_tables
 from ai.backend.testutils.fixtures import DomainFixtureData
+
+
+async def _agent_uuid(db_sess: SASession, agent_id: str) -> AgentUUID:
+    """The agent's entity id, which the slot row records beside its name."""
+    return (await db_sess.scalars(sa.select(AgentRow.uuid).where(AgentRow.id == agent_id))).one()
 
 
 class TestForceTerminateResourceDeallocation:
@@ -89,7 +95,6 @@ class TestForceTerminateResourceDeallocation:
                 UserRow,
                 KeyPairRow,
                 ProjectRow,
-                AssociationScopesEntitiesRow,
                 EntityFieldRow,
                 AgentRow,
                 ContainerRegistryRow,
@@ -446,6 +451,7 @@ class TestForceTerminateResourceDeallocation:
                         db_sess.add(
                             AgentResourceRow(
                                 agent_id=agent_id,
+                                agent_uuid=await _agent_uuid(db_sess, agent_id),
                                 slot_name=slot_name,
                                 capacity=capacity,
                                 used=used,
@@ -665,7 +671,6 @@ class TestBulkTerminateResourceDeallocation:
                 UserRow,
                 KeyPairRow,
                 ProjectRow,
-                AssociationScopesEntitiesRow,
                 EntityFieldRow,
                 AgentRow,
                 ContainerRegistryRow,
@@ -1016,6 +1021,7 @@ class TestBulkTerminateResourceDeallocation:
                     db_sess.add(
                         AgentResourceRow(
                             agent_id=agent_id,
+                            agent_uuid=await _agent_uuid(db_sess, agent_id),
                             slot_name=slot_name,
                             capacity=capacity,
                             used=used,
@@ -1118,7 +1124,6 @@ class TestNegativeValueGuard:
                 UserRow,
                 KeyPairRow,
                 ProjectRow,
-                AssociationScopesEntitiesRow,
                 EntityFieldRow,
                 AgentRow,
                 ContainerRegistryRow,
@@ -1462,6 +1467,7 @@ class TestNegativeValueGuard:
                 db_sess.add(
                     AgentResourceRow(
                         agent_id=test_agent_id,
+                        agent_uuid=await _agent_uuid(db_sess, test_agent_id),
                         slot_name=slot_name,
                         capacity=capacity,
                         used=used,

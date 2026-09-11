@@ -43,14 +43,21 @@ from ai.backend.manager.models.resource_policy import (
     UserResourcePolicyRow,
 )
 from ai.backend.manager.models.resource_preset import ResourcePresetRow
+from ai.backend.manager.models.resource_preset.creators import ResourcePresetCreator
 from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.models.runtime_variant import RuntimeVariantRow
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderRow
-from ai.backend.manager.repositories.base.creator import Creator
-from ai.backend.manager.repositories.resource_preset.creators import ResourcePresetCreatorSpec
+from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
+from ai.backend.manager.models.virtual_entity.entity_membership_cap import EntityMembershipCapRow
+from ai.backend.manager.models.virtual_entity.entity_membership_field import (
+    EntityMembershipFieldRow,
+)
+from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
+from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.resource_preset.repository import ResourcePresetRepository
 from ai.backend.testutils.db import with_tables
 
@@ -93,6 +100,11 @@ class TestResourcePresetCacheInvalidation:
                 ReplicaGroupRow,
                 RoutingRow,
                 ResourcePresetRow,
+                VirtualEntityRow,
+                ScopeBindingRow,
+                EntityMembershipRow,
+                EntityMembershipCapRow,
+                EntityMembershipFieldRow,
                 sgroups_for_domains,  # association table
                 sgroups_for_keypairs,  # association table
                 sgroups_for_groups,  # association table
@@ -127,15 +139,13 @@ class TestResourcePresetCacheInvalidation:
     async def sample_preset_creator(
         self,
         test_scaling_group_name: str,
-    ) -> AsyncGenerator[Creator[ResourcePresetRow], None]:
+    ) -> AsyncGenerator[ResourcePresetCreator, None]:
         """Create sample resource preset creator for testing"""
-        creator = Creator(
-            spec=ResourcePresetCreatorSpec(
-                name=f"test-preset-{uuid.uuid4().hex[:8]}",
-                resource_slots=ResourceSlot({"cpu": "2", "mem": "4G"}),
-                shared_memory="1 GiB",
-                resource_group_name=test_scaling_group_name,
-            )
+        creator = ResourcePresetCreator(
+            name=f"test-preset-{uuid.uuid4().hex[:8]}",
+            resource_slots=ResourceSlot({"cpu": "2", "mem": "4G"}),
+            shared_memory="1 GiB",
+            resource_group_name=test_scaling_group_name,
         )
         yield creator
 
@@ -180,13 +190,14 @@ class TestResourcePresetCacheInvalidation:
             db=db_with_cleanup,
             valkey_stat=valkey_stat,
             config_provider=mock_config_provider,
+            v2_ops_provider=V2DBOpsProvider(db_with_cleanup),
         )
         yield repo
 
     async def test_create_preset_invalidates_cache(
         self,
         resource_preset_repository: ResourcePresetRepository,
-        sample_preset_creator: Creator[ResourcePresetRow],
+        sample_preset_creator: ResourcePresetCreator,
     ) -> None:
         """Test that creating a preset invalidates all preset caches"""
         # Get reference to cache source and valkey stat

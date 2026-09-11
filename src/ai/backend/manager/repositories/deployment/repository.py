@@ -86,7 +86,7 @@ from ai.backend.manager.data.resource.types import ResourceGroupProxyTarget
 from ai.backend.manager.data.session.creation import DeploymentContext
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.errors.service import EndpointNotFound
-from ai.backend.manager.models.deployment_policy import DeploymentPolicyRow
+from ai.backend.manager.models.deployment_policy.purgers import DeploymentPolicyPurger
 from ai.backend.manager.models.deployment_policy.upserters import DeploymentPolicyUpserter
 from ai.backend.manager.models.deployment_revision.creators import DeploymentRevisionCreator
 from ai.backend.manager.models.endpoint.creators import DeploymentCreator, EndpointTokenCreator
@@ -102,7 +102,6 @@ from ai.backend.manager.models.specs.creator import FieldToCreate
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderOwnershipType
 from ai.backend.manager.repositories.base import BatchQuerier
-from ai.backend.manager.repositories.base.purger import Purger, PurgerResult
 from ai.backend.manager.repositories.deployment.types import (
     DeploymentHistoryToCreate,
     RouteData,
@@ -1431,12 +1430,12 @@ class DeploymentRepository:
     @deployment_repository_resilience.apply()
     async def delete_deployment_policy(
         self,
-        purger: Purger[DeploymentPolicyRow],
-    ) -> PurgerResult[DeploymentPolicyRow] | None:
-        """Delete a deployment policy by primary key.
+        purger: DeploymentPolicyPurger,
+    ) -> DeploymentPolicyData | None:
+        """Delete a deployment policy.
 
         Returns:
-            PurgerResult containing the deleted row, or None if no policy existed.
+            The deleted policy, or None if no policy existed.
         """
         return await self._db_source.delete_deployment_policy(purger)
 

@@ -9,7 +9,8 @@ import pytest
 
 from ai.backend.common.contexts.user import with_triggered_user, with_user
 from ai.backend.common.data.entity.domain import DomainID
-from ai.backend.common.data.permission.types import EntityType
+from ai.backend.common.data.entity.session import SessionEntityType
+from ai.backend.common.data.entity.types import EntityType
 from ai.backend.common.data.user.types import UserData, UserRole
 from ai.backend.common.exception import ErrorCode
 from ai.backend.manager.actions.action import (
@@ -47,7 +48,7 @@ class MockAction(BaseAction):
     @classmethod
     @override
     def entity_type(cls) -> EntityType:
-        return EntityType.SESSION
+        return SessionEntityType()
 
     @classmethod
     @override

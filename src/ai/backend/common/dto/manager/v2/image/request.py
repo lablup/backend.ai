@@ -9,8 +9,9 @@ from uuid import UUID
 
 from pydantic import Field, field_validator
 
-from ai.backend.common.api_handlers import SENTINEL, BaseRequestModel, Sentinel
+from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.dto.manager.query import DateTimeFilter, StringFilter, UUIDFilter
+from ai.backend.common.tristate.unset import UNSET, Unset
 
 from .types import ImageOrderField, ImageStatusType, OrderDirection
 
@@ -234,21 +235,42 @@ class UpdateImageInput(BaseRequestModel):
     """Input for updating an image by ID. All fields optional -- only provided fields will be updated."""
 
     image_id: UUID = Field(description="ID of the image to update.")
-    name: str | None = Field(default=None, description="Updated canonical name.")
-    registry: str | None = Field(default=None, description="Updated registry hostname.")
-    image: str | None = Field(default=None, description="Updated namespace/path within registry.")
-    tag: str | None = Field(default=None, description="Updated image tag.")
-    architecture: str | None = Field(default=None, description="Updated CPU architecture.")
-    is_local: bool | None = Field(default=None, description="Updated local-only status.")
-    size_bytes: int | None = Field(default=None, description="Updated image size in bytes.")
-    type: str | None = Field(
-        default=None, description="Updated image type (compute, system, service)."
+    name: str | None | Unset = Field(
+        default=UNSET, description="Updated canonical name. Omit to leave unchanged."
     )
-    config_digest: str | None = Field(default=None, description="Updated config digest.")
-    labels: dict[str, str] | None = Field(default=None, description="Updated labels dict.")
-    supported_accelerators: str | Sentinel | None = Field(
-        default=SENTINEL, description="Updated accelerator string. Set to null to clear."
+    registry: str | None | Unset = Field(
+        default=UNSET, description="Updated registry hostname. Omit to leave unchanged."
     )
-    resource_limits: dict[str, Any] | None = Field(
-        default=None, description="Updated resource limits dict."
+    image: str | None | Unset = Field(
+        default=UNSET,
+        description="Updated namespace/path within registry. Omit to leave unchanged.",
+    )
+    tag: str | None | Unset = Field(
+        default=UNSET, description="Updated image tag. Omit to leave unchanged."
+    )
+    architecture: str | None | Unset = Field(
+        default=UNSET, description="Updated CPU architecture. Omit to leave unchanged."
+    )
+    is_local: bool | None | Unset = Field(
+        default=UNSET, description="Updated local-only status. Omit to leave unchanged."
+    )
+    size_bytes: int | None | Unset = Field(
+        default=UNSET, description="Updated image size in bytes. Omit to leave unchanged."
+    )
+    type: str | None | Unset = Field(
+        default=UNSET,
+        description="Updated image type (compute, system, service). Omit to leave unchanged.",
+    )
+    config_digest: str | None | Unset = Field(
+        default=UNSET, description="Updated config digest. Omit to leave unchanged."
+    )
+    labels: dict[str, str] | None | Unset = Field(
+        default=UNSET, description="Updated labels dict. Omit to leave unchanged."
+    )
+    supported_accelerators: str | None | Unset = Field(
+        default=UNSET,
+        description="Updated accelerator string. Omit to leave unchanged; null clears.",
+    )
+    resource_limits: dict[str, Any] | None | Unset = Field(
+        default=UNSET, description="Updated resource limits dict. Omit to leave unchanged."
     )

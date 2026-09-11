@@ -19,67 +19,66 @@ import re
 from typing import Any
 from unittest.mock import MagicMock
 
-from ai.backend.common.data.entity.agent import AGENT_ENTITY_TYPE
-from ai.backend.common.data.entity.app_config import (
-    APP_CONFIG_ALLOW_LIST_ENTITY_TYPE,
-    APP_CONFIG_ENTITY_TYPE,
-    APP_CONFIG_FRAGMENT_ENTITY_TYPE,
-)
-from ai.backend.common.data.entity.app_config_definition import APP_CONFIG_DEFINITION_ENTITY_TYPE
-from ai.backend.common.data.entity.artifact import ARTIFACT_ENTITY_TYPE
-from ai.backend.common.data.entity.artifact_registry import ARTIFACT_REGISTRY_ENTITY_TYPE
-from ai.backend.common.data.entity.artifact_revision import ARTIFACT_REVISION_FIELD_TYPE
-from ai.backend.common.data.entity.audit_log import AUDIT_LOG_FIELD_TYPE
-from ai.backend.common.data.entity.auth import AUTH_ENTITY_TYPE
-from ai.backend.common.data.entity.container_registry import CONTAINER_REGISTRY_ENTITY_TYPE
-from ai.backend.common.data.entity.deployment import DEPLOYMENT_ENTITY_TYPE
-from ai.backend.common.data.entity.deployment_preset import DEPLOYMENT_PRESET_ENTITY_TYPE
-from ai.backend.common.data.entity.domain import DOMAIN_ENTITY_TYPE
-from ai.backend.common.data.entity.entity_label import ENTITY_LABEL_FIELD_TYPE
-from ai.backend.common.data.entity.entity_share import ENTITY_SHARE_ENTITY_TYPE
-from ai.backend.common.data.entity.export import EXPORT_ENTITY_TYPE
+from ai.backend.common.data.entity.agent import AgentEntityType
+from ai.backend.common.data.entity.app_config import AppConfigEntityType
+from ai.backend.common.data.entity.app_config_allow_list import AppConfigAllowListEntityType
+from ai.backend.common.data.entity.app_config_definition import AppConfigDefinitionEntityType
+from ai.backend.common.data.entity.app_config_fragment import AppConfigFragmentEntityType
+from ai.backend.common.data.entity.artifact import ArtifactEntityType
+from ai.backend.common.data.entity.artifact_registry import ArtifactRegistryEntityType
+from ai.backend.common.data.entity.artifact_revision import ArtifactRevisionFieldType
+from ai.backend.common.data.entity.audit_log import AuditLogFieldType
+from ai.backend.common.data.entity.auth import AuthEntityType
+from ai.backend.common.data.entity.container_registry import ContainerRegistryEntityType
+from ai.backend.common.data.entity.deployment import DeploymentEntityType
+from ai.backend.common.data.entity.deployment_preset import DeploymentPresetEntityType
+from ai.backend.common.data.entity.domain import DomainEntityType
+from ai.backend.common.data.entity.entity_label import EntityLabelFieldType
+from ai.backend.common.data.entity.entity_share import EntityShareEntityType
 from ai.backend.common.data.entity.fair_share import (
-    DOMAIN_FAIR_SHARE_ENTITY_TYPE,
-    PROJECT_FAIR_SHARE_ENTITY_TYPE,
-    USER_FAIR_SHARE_ENTITY_TYPE,
+    DomainFairShareFieldType,
+    ProjectFairShareFieldType,
+    UserFairShareFieldType,
 )
-from ai.backend.common.data.entity.idle_checker import IDLE_CHECKER_ENTITY_TYPE
-from ai.backend.common.data.entity.image import IMAGE_ENTITY_TYPE
-from ai.backend.common.data.entity.login_client_type import LOGIN_CLIENT_TYPE_ENTITY_TYPE
-from ai.backend.common.data.entity.model_card import MODEL_CARD_ENTITY_TYPE
+from ai.backend.common.data.entity.idle_checker import IdleCheckerEntityType
+from ai.backend.common.data.entity.image import ImageEntityType
+from ai.backend.common.data.entity.login_client_type import LoginClientTypeEntityType
+from ai.backend.common.data.entity.model_card import ModelCardEntityType
 from ai.backend.common.data.entity.notification import (
-    NOTIFICATION_CHANNEL_ENTITY_TYPE,
-    NOTIFICATION_RULE_ENTITY_TYPE,
+    NotificationChannelEntityType,
+    NotificationRuleEntityType,
 )
-from ai.backend.common.data.entity.object_storage import OBJECT_STORAGE_ENTITY_TYPE
-from ai.backend.common.data.entity.project import PROJECT_ENTITY_TYPE
+from ai.backend.common.data.entity.object_storage import ObjectStorageEntityType
+from ai.backend.common.data.entity.project import ProjectEntityType
 from ai.backend.common.data.entity.prometheus_query_preset import (
-    PROMETHEUS_QUERY_PRESET_ENTITY_TYPE,
+    PrometheusQueryPresetEntityType,
 )
 from ai.backend.common.data.entity.prometheus_query_preset_category import (
-    PROMETHEUS_QUERY_PRESET_CATEGORY_ENTITY_TYPE,
+    PrometheusQueryPresetCategoryEntityType,
 )
-from ai.backend.common.data.entity.resource_group import RESOURCE_GROUP_ENTITY_TYPE
+from ai.backend.common.data.entity.resource_group import ResourceGroupEntityType
 from ai.backend.common.data.entity.resource_policy import (
-    KEYPAIR_RESOURCE_POLICY_ENTITY_TYPE,
-    PROJECT_RESOURCE_POLICY_ENTITY_TYPE,
-    USER_RESOURCE_POLICY_ENTITY_TYPE,
+    KeyPairResourcePolicyEntityType,
+    ProjectResourcePolicyEntityType,
+    UserResourcePolicyEntityType,
 )
-from ai.backend.common.data.entity.resource_preset import RESOURCE_PRESET_ENTITY_TYPE
-from ai.backend.common.data.entity.resource_slot import RESOURCE_SLOT_TYPE_ENTITY_TYPE
-from ai.backend.common.data.entity.retention_policy import RETENTION_POLICY_ENTITY_TYPE
-from ai.backend.common.data.entity.role import ROLE_ENTITY_TYPE
-from ai.backend.common.data.entity.role_preset import ROLE_PRESET_ENTITY_TYPE
-from ai.backend.common.data.entity.runtime_variant import RUNTIME_VARIANT_ENTITY_TYPE
-from ai.backend.common.data.entity.runtime_variant_preset import RUNTIME_VARIANT_PRESET_ENTITY_TYPE
-from ai.backend.common.data.entity.service_catalog import SERVICE_CATALOG_ENTITY_TYPE
-from ai.backend.common.data.entity.session import SESSION_ENTITY_TYPE
-from ai.backend.common.data.entity.session_template import SESSION_TEMPLATE_ENTITY_TYPE
-from ai.backend.common.data.entity.storage_namespace import STORAGE_NAMESPACE_ENTITY_TYPE
-from ai.backend.common.data.entity.user import USER_ENTITY_TYPE
-from ai.backend.common.data.entity.vfolder import VFOLDER_ENTITY_TYPE
-from ai.backend.common.data.entity.vfolder_invitation import VFOLDER_INVITATION_ENTITY_TYPE
-from ai.backend.common.data.entity.vfs_storage import VFS_STORAGE_ENTITY_TYPE
+from ai.backend.common.data.entity.resource_preset import ResourcePresetEntityType
+from ai.backend.common.data.entity.resource_slot import ResourceSlotTypeEntityType
+from ai.backend.common.data.entity.retention_policy import RetentionPolicyEntityType
+from ai.backend.common.data.entity.role import RoleEntityType
+from ai.backend.common.data.entity.role_preset import RolePresetEntityType
+from ai.backend.common.data.entity.runtime_variant import RuntimeVariantEntityType
+from ai.backend.common.data.entity.runtime_variant_preset import RuntimeVariantPresetEntityType
+from ai.backend.common.data.entity.secret import SecretFieldType
+from ai.backend.common.data.entity.service_catalog import ServiceCatalogEntityType
+from ai.backend.common.data.entity.session import SessionEntityType
+from ai.backend.common.data.entity.session_template import SessionTemplateEntityType
+from ai.backend.common.data.entity.storage_namespace import StorageNamespaceEntityType
+from ai.backend.common.data.entity.types import GlobalEntityType
+from ai.backend.common.data.entity.user import UserEntityType
+from ai.backend.common.data.entity.vfolder import VFolderEntityType
+from ai.backend.common.data.entity.vfolder_invitation import VFolderInvitationEntityType
+from ai.backend.common.data.entity.vfs_storage import VFSStorageEntityType
 from ai.backend.manager.actions.monitors import ActionMonitors
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
 from ai.backend.manager.actions.registry.types import (
@@ -106,6 +105,12 @@ from ai.backend.manager.actions.v2.validators import ActionValidators
 from ai.backend.manager.data.artifact.types import ArtifactRevisionData
 from ai.backend.manager.data.audit_log.types import AuditLogData
 from ai.backend.manager.data.entity_label.types import EntityLabelData
+from ai.backend.manager.data.fair_share.types import (
+    DomainFairShareData,
+    ProjectFairShareData,
+    UserFairShareData,
+)
+from ai.backend.manager.data.secret.types import SecretFieldData
 from ai.backend.manager.repositories.ops.repository import OpsRepository
 from ai.backend.manager.services.agent.actions.bulk_get import BulkGetAgentsAction
 from ai.backend.manager.services.agent.actions.bulk_load_container_counts import (
@@ -272,6 +277,7 @@ from ai.backend.manager.services.scheduling_history.actions.lookup_owner import 
 from ai.backend.manager.services.scheduling_history.processors import (
     SchedulingHistoryProcessors,
 )
+from ai.backend.manager.services.secret.processors import SecretProcessors
 from ai.backend.manager.services.service_catalog.processors import ServiceCatalogProcessors
 from ai.backend.manager.services.session.actions.compute_schedule import (
     ComputeScheduleAction,
@@ -345,8 +351,8 @@ def test_every_defined_v2_action_is_wired() -> None:
     # through it, so its wired_actions() is the complete catalog of registered actions.
     registry = _ops_registry()
     fair_share_groups = registry.concern(ConcernMeta(Concern.RESOURCE_GROUP))
-    artifact_revisions = registry.group(GroupMeta(ARTIFACT_ENTITY_TYPE)).field_group(
-        FieldGroupMeta(ARTIFACT_REVISION_FIELD_TYPE),
+    artifact_revisions = registry.group(GroupMeta(ArtifactEntityType())).field_group(
+        FieldGroupMeta(ArtifactRevisionFieldType()),
         ArtifactRevisionData,
         LookupArtifactRevisionOwnerAction,
         LookupBulkArtifactRevisionOwnerAction,
@@ -355,159 +361,172 @@ def test_every_defined_v2_action_is_wired() -> None:
     scheduling_history_groups = registry.concern(ConcernMeta(Concern.SESSION))
     resource_allocation_groups = registry.concern(ConcernMeta(Concern.RESOURCE_GROUP))
     agent_groups = registry.concern(ConcernMeta(Concern.RESOURCE_GROUP))
-    AgentProcessors(agent_groups.group(GroupMeta(AGENT_ENTITY_TYPE)), MagicMock(), [])
+    AgentProcessors(agent_groups.group(GroupMeta(AgentEntityType())), MagicMock(), [])
     AppConfigProcessors(
-        registry.group(GroupMeta(APP_CONFIG_ENTITY_TYPE)),
-        registry.group(GroupMeta(APP_CONFIG_DEFINITION_ENTITY_TYPE)),
-        registry.group(GroupMeta(APP_CONFIG_ALLOW_LIST_ENTITY_TYPE)),
-        registry.group(GroupMeta(APP_CONFIG_FRAGMENT_ENTITY_TYPE)),
+        registry.group(GroupMeta(AppConfigEntityType())),
+        registry.group(GroupMeta(AppConfigDefinitionEntityType())),
+        registry.group(GroupMeta(AppConfigAllowListEntityType())),
+        registry.group(GroupMeta(AppConfigFragmentEntityType())),
         MagicMock(),
     )
     ResourceSlotProcessors(
-        resource_slot_groups.group(GroupMeta(RESOURCE_SLOT_TYPE_ENTITY_TYPE)),
-        resource_slot_groups.group(GroupMeta(SESSION_ENTITY_TYPE)),
-        resource_slot_groups.group(GroupMeta(AGENT_ENTITY_TYPE)),
+        resource_slot_groups.group(GroupMeta(ResourceSlotTypeEntityType())),
+        resource_slot_groups.group(GroupMeta(SessionEntityType())),
+        resource_slot_groups.group(GroupMeta(AgentEntityType())),
         MagicMock(),
     )
     IdleCheckerProcessors(
-        registry.group(GroupMeta(IDLE_CHECKER_ENTITY_TYPE)),
-        registry.group(GroupMeta(SESSION_ENTITY_TYPE)),
+        registry.group(GroupMeta(IdleCheckerEntityType())),
+        registry.group(GroupMeta(SessionEntityType())),
         MagicMock(),
     )
     IdleCheckerAssignmentProcessors(
-        scheduling_history_groups.group(GroupMeta(IDLE_CHECKER_ENTITY_TYPE)),
+        scheduling_history_groups.group(GroupMeta(IdleCheckerEntityType())),
         MagicMock(),
     )
-    RetentionPolicyProcessors(registry.group(GroupMeta(RETENTION_POLICY_ENTITY_TYPE)))
-    LoginClientTypeProcessors(registry.group(GroupMeta(LOGIN_CLIENT_TYPE_ENTITY_TYPE)))
-    ServiceCatalogProcessors(registry.group(GroupMeta(SERVICE_CATALOG_ENTITY_TYPE)))
-    ProjectResourcePolicyProcessors(registry.group(GroupMeta(PROJECT_RESOURCE_POLICY_ENTITY_TYPE)))
-    UserResourcePolicyProcessors(registry.group(GroupMeta(USER_RESOURCE_POLICY_ENTITY_TYPE)))
-    KeypairResourcePolicyProcessors(registry.group(GroupMeta(KEYPAIR_RESOURCE_POLICY_ENTITY_TYPE)))
-    RolePresetProcessors(registry.group(GroupMeta(ROLE_PRESET_ENTITY_TYPE)), MagicMock())
-    EntityShareProcessors(registry.group(GroupMeta(ENTITY_SHARE_ENTITY_TYPE)), MagicMock())
+    RetentionPolicyProcessors(registry.group(GroupMeta(RetentionPolicyEntityType())))
+    LoginClientTypeProcessors(registry.group(GroupMeta(LoginClientTypeEntityType())))
+    ServiceCatalogProcessors(registry.group(GroupMeta(ServiceCatalogEntityType())))
+    ProjectResourcePolicyProcessors(registry.group(GroupMeta(ProjectResourcePolicyEntityType())))
+    UserResourcePolicyProcessors(registry.group(GroupMeta(UserResourcePolicyEntityType())))
+    KeypairResourcePolicyProcessors(registry.group(GroupMeta(KeyPairResourcePolicyEntityType())))
+    RolePresetProcessors(registry.group(GroupMeta(RolePresetEntityType())), MagicMock())
+    EntityShareProcessors(registry.group(GroupMeta(EntityShareEntityType())), MagicMock())
     rbac_groups = registry.concern(ConcernMeta(Concern.RBAC))
     RbacProcessors(
         rbac_groups.relation_group(),
-        rbac_groups.group(GroupMeta(USER_ENTITY_TYPE)),
+        rbac_groups.group(GroupMeta(UserEntityType())),
         MagicMock(),
         MagicMock(),
         MagicMock(),
         [],
     )
-    RuntimeVariantProcessors(registry.group(GroupMeta(RUNTIME_VARIANT_ENTITY_TYPE)))
+    RuntimeVariantProcessors(registry.group(GroupMeta(RuntimeVariantEntityType())))
     ObjectStorageProcessors(
-        registry.group(GroupMeta(OBJECT_STORAGE_ENTITY_TYPE)),
+        registry.group(GroupMeta(ObjectStorageEntityType())),
         artifact_revisions,
         MagicMock(),
     )
-    VFSStorageProcessors(registry.group(GroupMeta(VFS_STORAGE_ENTITY_TYPE)), MagicMock())
+    VFSStorageProcessors(registry.group(GroupMeta(VFSStorageEntityType())), MagicMock())
     NotificationProcessors(
-        registry.group(GroupMeta(NOTIFICATION_CHANNEL_ENTITY_TYPE)),
-        registry.group(GroupMeta(NOTIFICATION_RULE_ENTITY_TYPE)),
+        registry.group(GroupMeta(NotificationChannelEntityType())),
+        registry.group(GroupMeta(NotificationRuleEntityType())),
         MagicMock(),
     )
     PrometheusQueryPresetCategoryProcessors(
-        registry.group(GroupMeta(PROMETHEUS_QUERY_PRESET_CATEGORY_ENTITY_TYPE))
+        registry.group(GroupMeta(PrometheusQueryPresetCategoryEntityType()))
     )
     MetricProcessors(
-        registry.group(GroupMeta(PROMETHEUS_QUERY_PRESET_ENTITY_TYPE)),
-        registry.group(GroupMeta(USER_ENTITY_TYPE)),
-        registry.group(GroupMeta(SESSION_ENTITY_TYPE)),
+        registry.group(GroupMeta(PrometheusQueryPresetEntityType())),
+        registry.group(GroupMeta(UserEntityType())),
+        registry.group(GroupMeta(SessionEntityType())),
         MagicMock(),
     )
     RuntimeVariantPresetProcessors(
-        registry.group(GroupMeta(RUNTIME_VARIANT_PRESET_ENTITY_TYPE)), MagicMock()
+        registry.group(GroupMeta(RuntimeVariantPresetEntityType())), MagicMock()
     )
     AuditLogProcessors(
-        registry.dangling_field_group(FieldGroupMeta(AUDIT_LOG_FIELD_TYPE), AuditLogData)
+        registry.dangling_field_group(FieldGroupMeta(AuditLogFieldType()), AuditLogData)
+    )
+    SecretProcessors(
+        registry.concern(ConcernMeta(Concern.SYSTEM)).dangling_field_group(
+            FieldGroupMeta(SecretFieldType()), SecretFieldData
+        ),
+        MagicMock(),
     )
     EntityLabelProcessors(
         registry.dangling_lookup_field_group(
-            FieldGroupMeta(ENTITY_LABEL_FIELD_TYPE),
+            FieldGroupMeta(EntityLabelFieldType()),
             EntityLabelData,
             LookupEntityLabelOwnerAction,
             LookupBulkEntityLabelOwnerAction,
         )
     )
     PrometheusQueryPresetProcessors(
-        registry.group(GroupMeta(PROMETHEUS_QUERY_PRESET_ENTITY_TYPE)), MagicMock()
+        registry.group(GroupMeta(PrometheusQueryPresetEntityType())), MagicMock()
     )
-    StorageNamespaceProcessors(registry.group(GroupMeta(STORAGE_NAMESPACE_ENTITY_TYPE)))
-    DeploymentPresetProcessors(
-        registry.group(GroupMeta(DEPLOYMENT_PRESET_ENTITY_TYPE)), MagicMock()
-    )
-    DomainProcessors(registry.group(GroupMeta(DOMAIN_ENTITY_TYPE)), MagicMock(), [])
-    PermissionControllerProcessors(
-        registry.group(GroupMeta(ROLE_ENTITY_TYPE)), MagicMock(), [], MagicMock()
-    )
-    ProjectProcessors(registry.group(GroupMeta(PROJECT_ENTITY_TYPE)), MagicMock())
+    StorageNamespaceProcessors(registry.group(GroupMeta(StorageNamespaceEntityType())))
+    DeploymentPresetProcessors(registry.group(GroupMeta(DeploymentPresetEntityType())), MagicMock())
+    DomainProcessors(registry.group(GroupMeta(DomainEntityType())), MagicMock(), [])
+    PermissionControllerProcessors(registry.group(GroupMeta(RoleEntityType())), MagicMock(), [])
+    ProjectProcessors(registry.group(GroupMeta(ProjectEntityType())), MagicMock())
     UserProcessors(
-        registry.group(GroupMeta(USER_ENTITY_TYPE)),
+        registry.group(GroupMeta(UserEntityType())),
         MagicMock(),
     )
     AuthProcessors(
-        registry.group(GroupMeta(AUTH_ENTITY_TYPE)),
-        registry.group(GroupMeta(USER_ENTITY_TYPE)),
+        registry.group(GroupMeta(AuthEntityType())),
+        registry.group(GroupMeta(UserEntityType())),
         MagicMock(),
     )
     FairShareProcessors(
-        fair_share_groups.group(GroupMeta(DOMAIN_FAIR_SHARE_ENTITY_TYPE)),
-        fair_share_groups.group(GroupMeta(PROJECT_FAIR_SHARE_ENTITY_TYPE)),
-        fair_share_groups.group(GroupMeta(USER_FAIR_SHARE_ENTITY_TYPE)),
+        fair_share_groups.dangling_field_group(
+            FieldGroupMeta(DomainFairShareFieldType()), DomainFairShareData
+        ),
+        fair_share_groups.dangling_field_group(
+            FieldGroupMeta(ProjectFairShareFieldType()), ProjectFairShareData
+        ),
+        fair_share_groups.dangling_field_group(
+            FieldGroupMeta(UserFairShareFieldType()), UserFairShareData
+        ),
         MagicMock(),
     )
-    ResourcePresetProcessors(registry.group(GroupMeta(RESOURCE_PRESET_ENTITY_TYPE)), MagicMock())
-    ResourceGroupProcessors(registry.group(GroupMeta(RESOURCE_GROUP_ENTITY_TYPE)), MagicMock())
+    ResourcePresetProcessors(registry.group(GroupMeta(ResourcePresetEntityType())), MagicMock())
+    ResourceGroupProcessors(registry.group(GroupMeta(ResourceGroupEntityType())), MagicMock())
     ArtifactProcessors(
-        registry.group(GroupMeta(ARTIFACT_ENTITY_TYPE)),
+        registry.group(GroupMeta(ArtifactEntityType())),
         artifact_revisions,
         ArtifactRevisionProcessors(
-            registry.group(GroupMeta(ARTIFACT_ENTITY_TYPE)),
+            registry.group(GroupMeta(ArtifactEntityType())),
             artifact_revisions,
             MagicMock(),
         ),
         MagicMock(),
     )
-    ArtifactRegistryProcessors(
-        registry.group(GroupMeta(ARTIFACT_REGISTRY_ENTITY_TYPE)), MagicMock()
-    )
-    ModelCardProcessors(registry.group(GroupMeta(MODEL_CARD_ENTITY_TYPE)), MagicMock())
+    ArtifactRegistryProcessors(registry.group(GroupMeta(ArtifactRegistryEntityType())), MagicMock())
+    ModelCardProcessors(registry.group(GroupMeta(ModelCardEntityType())), MagicMock())
     ContainerRegistryProcessors(
-        registry.group(GroupMeta(CONTAINER_REGISTRY_ENTITY_TYPE)), MagicMock()
+        registry.group(GroupMeta(ContainerRegistryEntityType())), MagicMock()
     )
-    ImageProcessors(registry.group(GroupMeta(IMAGE_ENTITY_TYPE)), MagicMock())
-    ExportProcessors(registry.group(GroupMeta(EXPORT_ENTITY_TYPE)), MagicMock())
-    TemplateProcessors(registry.group(GroupMeta(SESSION_TEMPLATE_ENTITY_TYPE)), MagicMock())
+    ImageProcessors(registry.group(GroupMeta(ImageEntityType())), MagicMock())
+    ExportProcessors(
+        registry.group(GroupMeta(UserEntityType())),
+        registry.group(GroupMeta(SessionEntityType())),
+        registry.group(GroupMeta(ProjectEntityType())),
+        registry.group(GroupMeta(GlobalEntityType())),
+        registry.dangling_field_group(FieldGroupMeta(AuditLogFieldType()), AuditLogData),
+        MagicMock(),
+    )
+    TemplateProcessors(registry.group(GroupMeta(SessionTemplateEntityType())), MagicMock())
     SchedulingHistoryProcessors(
-        scheduling_history_groups.group(GroupMeta(SESSION_ENTITY_TYPE)),
-        scheduling_history_groups.group(GroupMeta(DEPLOYMENT_ENTITY_TYPE)),
-        scheduling_history_groups.group(GroupMeta(DEPLOYMENT_ENTITY_TYPE)),
+        scheduling_history_groups.group(GroupMeta(SessionEntityType())),
+        scheduling_history_groups.group(GroupMeta(DeploymentEntityType())),
+        scheduling_history_groups.group(GroupMeta(DeploymentEntityType())),
         MagicMock(),
     )
     SessionProcessors(
-        registry.group(GroupMeta(SESSION_ENTITY_TYPE)),
-        resource_allocation_groups.group(GroupMeta(RESOURCE_GROUP_ENTITY_TYPE)),
+        registry.group(GroupMeta(SessionEntityType())),
+        resource_allocation_groups.group(GroupMeta(ResourceGroupEntityType())),
         ResourceAllocationProcessors(
-            resource_allocation_groups.group(GroupMeta(USER_ENTITY_TYPE)),
-            resource_allocation_groups.group(GroupMeta(PROJECT_ENTITY_TYPE)),
-            resource_allocation_groups.group(GroupMeta(DOMAIN_ENTITY_TYPE)),
-            resource_allocation_groups.group(GroupMeta(RESOURCE_GROUP_ENTITY_TYPE)),
-            resource_allocation_groups.group(GroupMeta(SESSION_ENTITY_TYPE)),
-            resource_allocation_groups.group(GroupMeta(RESOURCE_PRESET_ENTITY_TYPE)),
+            resource_allocation_groups.group(GroupMeta(UserEntityType())),
+            resource_allocation_groups.group(GroupMeta(ProjectEntityType())),
+            resource_allocation_groups.group(GroupMeta(DomainEntityType())),
+            resource_allocation_groups.group(GroupMeta(ResourceGroupEntityType())),
+            resource_allocation_groups.group(GroupMeta(SessionEntityType())),
+            resource_allocation_groups.group(GroupMeta(ResourcePresetEntityType())),
             MagicMock(),
         ),
         MagicMock(),
     )
-    DeploymentProcessors(registry.group(GroupMeta(DEPLOYMENT_ENTITY_TYPE)), MagicMock())
-    VFolderProcessors(registry.group(GroupMeta(VFOLDER_ENTITY_TYPE)), MagicMock())
-    VFolderAdminProcessors(registry.group(GroupMeta(VFOLDER_ENTITY_TYPE)), MagicMock())
-    VFolderFileProcessors(registry.group(GroupMeta(VFOLDER_ENTITY_TYPE)), MagicMock())
-    VFolderInviteProcessors(registry.group(GroupMeta(VFOLDER_INVITATION_ENTITY_TYPE)), MagicMock())
-    VFolderSharingProcessors(registry.group(GroupMeta(VFOLDER_ENTITY_TYPE)), MagicMock())
-    ModelServingProcessors(registry.group(GroupMeta(DEPLOYMENT_ENTITY_TYPE)), MagicMock())
+    DeploymentProcessors(registry.group(GroupMeta(DeploymentEntityType())), MagicMock())
+    VFolderProcessors(registry.group(GroupMeta(VFolderEntityType())), MagicMock())
+    VFolderAdminProcessors(registry.group(GroupMeta(VFolderEntityType())), MagicMock())
+    VFolderFileProcessors(registry.group(GroupMeta(VFolderEntityType())), MagicMock())
+    VFolderInviteProcessors(registry.group(GroupMeta(VFolderInvitationEntityType())), MagicMock())
+    VFolderSharingProcessors(registry.group(GroupMeta(VFolderEntityType())), MagicMock())
+    ModelServingProcessors(registry.group(GroupMeta(DeploymentEntityType())), MagicMock())
     ModelServingAutoScalingProcessors(
-        registry.group(GroupMeta(DEPLOYMENT_ENTITY_TYPE)), MagicMock()
+        registry.group(GroupMeta(DeploymentEntityType())), MagicMock()
     )
 
     # One action class may be wired more than once -- an owner lookup is built by every
@@ -553,21 +572,21 @@ def test_resource_preset_reads_keep_their_judged_gates() -> None:
     so it is judged on that entity like the update and the delete beside it.
     """
     registry = _ops_registry()
-    ResourcePresetProcessors(registry.group(GroupMeta(RESOURCE_PRESET_ENTITY_TYPE)), MagicMock())
+    ResourcePresetProcessors(registry.group(GroupMeta(ResourcePresetEntityType())), MagicMock())
 
     judged = {
         ListResourcePresetsAction: (
-            RESOURCE_PRESET_ENTITY_TYPE,
+            ResourcePresetEntityType(),
             ActionKind.GLOBAL,
             ActionGate.PUBLIC,
         ),
         CheckResourcePresetsAction: (
-            RESOURCE_PRESET_ENTITY_TYPE,
+            ResourcePresetEntityType(),
             ActionKind.GLOBAL,
             ActionGate.PUBLIC,
         ),
         GetResourcePresetAction: (
-            RESOURCE_PRESET_ENTITY_TYPE,
+            ResourcePresetEntityType(),
             ActionKind.SINGLE_ENTITY,
             ActionGate.PERMISSION,
         ),
@@ -588,18 +607,18 @@ def test_resource_domain_and_agent_reads_keep_their_judged_gates() -> None:
     """
     registry = _ops_registry()
     resource_group_groups = registry.concern(ConcernMeta(Concern.RESOURCE_GROUP))
-    AgentProcessors(resource_group_groups.group(GroupMeta(AGENT_ENTITY_TYPE)), MagicMock(), [])
-    DomainProcessors(registry.group(GroupMeta(DOMAIN_ENTITY_TYPE)), MagicMock(), [])
+    AgentProcessors(resource_group_groups.group(GroupMeta(AgentEntityType())), MagicMock(), [])
+    DomainProcessors(registry.group(GroupMeta(DomainEntityType())), MagicMock(), [])
     SessionProcessors(
-        registry.group(GroupMeta(SESSION_ENTITY_TYPE)),
-        resource_group_groups.group(GroupMeta(RESOURCE_GROUP_ENTITY_TYPE)),
+        registry.group(GroupMeta(SessionEntityType())),
+        resource_group_groups.group(GroupMeta(ResourceGroupEntityType())),
         ResourceAllocationProcessors(
-            resource_group_groups.group(GroupMeta(USER_ENTITY_TYPE)),
-            resource_group_groups.group(GroupMeta(PROJECT_ENTITY_TYPE)),
-            resource_group_groups.group(GroupMeta(DOMAIN_ENTITY_TYPE)),
-            resource_group_groups.group(GroupMeta(RESOURCE_GROUP_ENTITY_TYPE)),
-            resource_group_groups.group(GroupMeta(SESSION_ENTITY_TYPE)),
-            resource_group_groups.group(GroupMeta(RESOURCE_PRESET_ENTITY_TYPE)),
+            resource_group_groups.group(GroupMeta(UserEntityType())),
+            resource_group_groups.group(GroupMeta(ProjectEntityType())),
+            resource_group_groups.group(GroupMeta(DomainEntityType())),
+            resource_group_groups.group(GroupMeta(ResourceGroupEntityType())),
+            resource_group_groups.group(GroupMeta(SessionEntityType())),
+            resource_group_groups.group(GroupMeta(ResourcePresetEntityType())),
             MagicMock(),
         ),
         MagicMock(),
@@ -607,48 +626,48 @@ def test_resource_domain_and_agent_reads_keep_their_judged_gates() -> None:
 
     judged = {
         ComputeScheduleAction: (
-            RESOURCE_GROUP_ENTITY_TYPE,
+            ResourceGroupEntityType(),
             ActionKind.SINGLE_ENTITY,
             ActionGate.PERMISSION,
         ),
         GetDomainAction: (
-            DOMAIN_ENTITY_TYPE,
+            DomainEntityType(),
             ActionKind.SINGLE_ENTITY,
             ActionGate.PERMISSION,
         ),
-        GetTotalResourcesAction: (AGENT_ENTITY_TYPE, ActionKind.GLOBAL, ActionGate.PERMISSION),
+        GetTotalResourcesAction: (AgentEntityType(), ActionKind.GLOBAL, ActionGate.PERMISSION),
         # Admin search surfaces only: the DataLoaders read per named agent below.
-        SearchAgentsAction: (AGENT_ENTITY_TYPE, ActionKind.GLOBAL, ActionGate.PERMISSION),
-        LoadContainerCountsAction: (AGENT_ENTITY_TYPE, ActionKind.GLOBAL, ActionGate.PERMISSION),
+        SearchAgentsAction: (AgentEntityType(), ActionKind.GLOBAL, ActionGate.PERMISSION),
+        LoadContainerCountsAction: (AgentEntityType(), ActionKind.GLOBAL, ActionGate.PERMISSION),
         # What the DataLoaders read: checked per agent.
-        BulkGetAgentsAction: (AGENT_ENTITY_TYPE, ActionKind.BULK, ActionGate.PERMISSION),
+        BulkGetAgentsAction: (AgentEntityType(), ActionKind.BULK, ActionGate.PERMISSION),
         BulkLoadContainerCountsAction: (
-            AGENT_ENTITY_TYPE,
+            AgentEntityType(),
             ActionKind.BULK,
             ActionGate.PERMISSION,
         ),
         BulkLoadAgentPermissionsAction: (
-            AGENT_ENTITY_TYPE,
+            AgentEntityType(),
             ActionKind.BULK,
             ActionGate.PERMISSION,
         ),
         # The lookup carries no permission; the read that follows it is checked.
-        LookupAgentAction: (AGENT_ENTITY_TYPE, ActionKind.LOOKUP, ActionGate.PUBLIC),
-        BulkLookupAgentsAction: (AGENT_ENTITY_TYPE, ActionKind.LOOKUP, ActionGate.PUBLIC),
+        LookupAgentAction: (AgentEntityType(), ActionKind.LOOKUP, ActionGate.PUBLIC),
+        BulkLookupAgentsAction: (AgentEntityType(), ActionKind.LOOKUP, ActionGate.PUBLIC),
         # The slot rows are field rows of the agent: read per named agent, owner resolved
         # through the lookups the field group builds.
         LookupAgentResourceOwnerAction: (
-            AGENT_ENTITY_TYPE,
+            AgentEntityType(),
             ActionKind.LOOKUP,
             ActionGate.PERMISSION,
         ),
         LookupBulkAgentResourceOwnerAction: (
-            AGENT_ENTITY_TYPE,
+            AgentEntityType(),
             ActionKind.LOOKUP,
             ActionGate.PERMISSION,
         ),
         ScopedSearchAgentResourcesAction: (
-            AGENT_ENTITY_TYPE,
+            AgentEntityType(),
             ActionKind.BULK,
             ActionGate.PERMISSION,
         ),
@@ -664,16 +683,14 @@ def test_resource_domain_and_agent_reads_keep_their_judged_gates() -> None:
 def test_artifact_registry_metas_read_is_a_partial_bulk_permission_read() -> None:
     """The named registries are read one permission check per registry, not superadmin-only."""
     registry = _ops_registry()
-    ArtifactRegistryProcessors(
-        registry.group(GroupMeta(ARTIFACT_REGISTRY_ENTITY_TYPE)), MagicMock()
-    )
+    ArtifactRegistryProcessors(registry.group(GroupMeta(ArtifactRegistryEntityType())), MagicMock())
 
     recorded = {
         record.action_cls: (record.entity_type, record.kind, record.gate)
         for record in registry.wired_processors()
     }
     assert recorded[GetArtifactRegistryMetasAction] == (
-        ARTIFACT_REGISTRY_ENTITY_TYPE,
+        ArtifactRegistryEntityType(),
         ActionKind.BULK,
         ActionGate.PERMISSION,
     )
@@ -682,14 +699,14 @@ def test_artifact_registry_metas_read_is_a_partial_bulk_permission_read() -> Non
 def test_rg_domain_read_is_a_scoped_permission_read() -> None:
     """The domains a resource group serves are read within the resource-group scope."""
     registry = _ops_registry()
-    DomainProcessors(registry.group(GroupMeta(DOMAIN_ENTITY_TYPE)), MagicMock(), [])
+    DomainProcessors(registry.group(GroupMeta(DomainEntityType())), MagicMock(), [])
 
     recorded = {
         record.action_cls: (record.entity_type, record.kind, record.gate)
         for record in registry.wired_processors()
     }
     assert recorded[ScopedSearchDomainsAction] == (
-        DOMAIN_ENTITY_TYPE,
+        DomainEntityType(),
         ActionKind.SCOPE,
         ActionGate.PERMISSION,
     )
@@ -698,14 +715,14 @@ def test_rg_domain_read_is_a_scoped_permission_read() -> None:
 def test_scoped_deployment_read_is_a_scoped_permission_read() -> None:
     """A user's own deployments and a project's deployments are read within that scope."""
     registry = _ops_registry()
-    DeploymentProcessors(registry.group(GroupMeta(DEPLOYMENT_ENTITY_TYPE)), MagicMock())
+    DeploymentProcessors(registry.group(GroupMeta(DeploymentEntityType())), MagicMock())
 
     recorded = {
         record.action_cls: (record.entity_type, record.kind, record.gate)
         for record in registry.wired_processors()
     }
     assert recorded[ScopedSearchDeploymentsAction] == (
-        DEPLOYMENT_ENTITY_TYPE,
+        DeploymentEntityType(),
         ActionKind.SCOPE,
         ActionGate.PERMISSION,
     )
@@ -718,11 +735,11 @@ def test_field_data_loader_reads_are_partial_permission_reads() -> None:
     permission-gated record: it refuses nothing, the read that follows answers per owner.
     """
     registry = _ops_registry()
-    DeploymentProcessors(registry.group(GroupMeta(DEPLOYMENT_ENTITY_TYPE)), MagicMock())
+    DeploymentProcessors(registry.group(GroupMeta(DeploymentEntityType())), MagicMock())
     SchedulingHistoryProcessors(
-        registry.group(GroupMeta(SESSION_ENTITY_TYPE)),
-        registry.group(GroupMeta(DEPLOYMENT_ENTITY_TYPE)),
-        registry.group(GroupMeta(DEPLOYMENT_ENTITY_TYPE)),
+        registry.group(GroupMeta(SessionEntityType())),
+        registry.group(GroupMeta(DeploymentEntityType())),
+        registry.group(GroupMeta(DeploymentEntityType())),
         MagicMock(),
     )
 
@@ -731,7 +748,7 @@ def test_field_data_loader_reads_are_partial_permission_reads() -> None:
         for record in registry.wired_processors()
         if record.kind == ActionKind.BULK
     }
-    partial = (DEPLOYMENT_ENTITY_TYPE, ActionKind.BULK, ActionGate.PERMISSION)
+    partial = (DeploymentEntityType(), ActionKind.BULK, ActionGate.PERMISSION)
     assert recorded[BulkGetRevisionsAction] == partial
     assert recorded[BulkGetReplicasAction] == partial
     assert recorded[BulkGetRoutesAction] == partial
@@ -740,12 +757,12 @@ def test_field_data_loader_reads_are_partial_permission_reads() -> None:
     assert recorded[BulkGetDeploymentHistoriesAction] == partial
     assert recorded[BulkGetRouteHistoriesAction] == partial
     assert recorded[BulkGetSessionHistoriesAction] == (
-        SESSION_ENTITY_TYPE,
+        SessionEntityType(),
         ActionKind.BULK,
         ActionGate.PERMISSION,
     )
     assert recorded[BulkGetKernelHistoriesAction] == (
-        SESSION_ENTITY_TYPE,
+        SessionEntityType(),
         ActionKind.BULK,
         ActionGate.PERMISSION,
     )
@@ -770,24 +787,24 @@ def test_entity_data_loader_reads_are_checked_per_entity_except_domains() -> Non
     entity; the domain one is public, since a regular user holds no read on domains.
     """
     registry = _ops_registry()
-    ResourceGroupProcessors(registry.group(GroupMeta(RESOURCE_GROUP_ENTITY_TYPE)), MagicMock())
-    DomainProcessors(registry.group(GroupMeta(DOMAIN_ENTITY_TYPE)), MagicMock(), [])
+    ResourceGroupProcessors(registry.group(GroupMeta(ResourceGroupEntityType())), MagicMock())
+    DomainProcessors(registry.group(GroupMeta(DomainEntityType())), MagicMock(), [])
     NotificationProcessors(
-        registry.group(GroupMeta(NOTIFICATION_CHANNEL_ENTITY_TYPE)),
-        registry.group(GroupMeta(NOTIFICATION_RULE_ENTITY_TYPE)),
+        registry.group(GroupMeta(NotificationChannelEntityType())),
+        registry.group(GroupMeta(NotificationRuleEntityType())),
         MagicMock(),
     )
-    artifact_revisions = registry.group(GroupMeta(ARTIFACT_ENTITY_TYPE)).field_group(
-        FieldGroupMeta(ARTIFACT_REVISION_FIELD_TYPE),
+    artifact_revisions = registry.group(GroupMeta(ArtifactEntityType())).field_group(
+        FieldGroupMeta(ArtifactRevisionFieldType()),
         ArtifactRevisionData,
         LookupArtifactRevisionOwnerAction,
         LookupBulkArtifactRevisionOwnerAction,
     )
     ArtifactProcessors(
-        registry.group(GroupMeta(ARTIFACT_ENTITY_TYPE)),
+        registry.group(GroupMeta(ArtifactEntityType())),
         artifact_revisions,
         ArtifactRevisionProcessors(
-            registry.group(GroupMeta(ARTIFACT_ENTITY_TYPE)),
+            registry.group(GroupMeta(ArtifactEntityType())),
             artifact_revisions,
             MagicMock(),
         ),
@@ -799,42 +816,42 @@ def test_entity_data_loader_reads_are_checked_per_entity_except_domains() -> Non
         for record in registry.wired_processors()
     }
     assert recorded[BulkGetResourceGroupsAction] == (
-        RESOURCE_GROUP_ENTITY_TYPE,
+        ResourceGroupEntityType(),
         ActionKind.BULK,
         ActionGate.PERMISSION,
     )
     assert recorded[BulkLookupResourceGroupsAction] == (
-        RESOURCE_GROUP_ENTITY_TYPE,
+        ResourceGroupEntityType(),
         ActionKind.LOOKUP,
         ActionGate.PUBLIC,
     )
     assert recorded[BulkGetChannelsAction] == (
-        NOTIFICATION_CHANNEL_ENTITY_TYPE,
+        NotificationChannelEntityType(),
         ActionKind.BULK,
         ActionGate.PERMISSION,
     )
     assert recorded[BulkGetRulesAction] == (
-        NOTIFICATION_RULE_ENTITY_TYPE,
+        NotificationRuleEntityType(),
         ActionKind.BULK,
         ActionGate.PERMISSION,
     )
     assert recorded[BulkGetArtifactsAction] == (
-        ARTIFACT_ENTITY_TYPE,
+        ArtifactEntityType(),
         ActionKind.BULK,
         ActionGate.PERMISSION,
     )
     assert recorded[BulkGetArtifactRevisionsAction] == (
-        ARTIFACT_ENTITY_TYPE,
+        ArtifactEntityType(),
         ActionKind.BULK,
         ActionGate.PERMISSION,
     )
     assert recorded[BulkGetDomainsAction] == (
-        DOMAIN_ENTITY_TYPE,
+        DomainEntityType(),
         ActionKind.BULK,
         ActionGate.PUBLIC,
     )
     assert recorded[BulkLookupDomainsAction] == (
-        DOMAIN_ENTITY_TYPE,
+        DomainEntityType(),
         ActionKind.LOOKUP,
         ActionGate.PUBLIC,
     )
