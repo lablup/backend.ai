@@ -4,21 +4,96 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import override
+from typing import Any, override
 from uuid import UUID
 
 import sqlalchemy as sa
 
+from ai.backend.common.data.entity.domain import DomainEntityType, DomainID
 from ai.backend.common.data.entity.project import ProjectEntityType
 from ai.backend.common.data.entity.session import SessionEntityType
-from ai.backend.manager.errors.resource import ProjectNotFound
+from ai.backend.common.data.entity.user import UserEntityType, UserID
+from ai.backend.manager.errors.resource import DomainNotFound, ProjectNotFound
+from ai.backend.manager.errors.user import UserNotFound
 from ai.backend.manager.models.clauses import QueryCondition
+from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.project.row import ProjectRow
 from ai.backend.manager.models.scopes import ExistenceCheck, OperationScope
 from ai.backend.manager.models.session.row import SessionRow
+from ai.backend.manager.models.user.row import UserRow
 from ai.backend.manager.models.virtual_entity.queries import scope_membership_exists
 
-__all__ = ("ProjectSessionOperationScope",)
+__all__ = (
+    "DomainSessionOperationScope",
+    "ProjectSessionOperationScope",
+    "UserSessionOperationScope",
+)
+
+
+@dataclass(frozen=True)
+class DomainSessionOperationScope(OperationScope):
+    """The sessions of one domain."""
+
+    domain_id: DomainID
+
+    @override
+    def to_condition(self) -> QueryCondition:
+        domain_id = self.domain_id
+
+        # TODO(BA-7571): drop the column term once the ownership backfill lands.
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return sa.or_(
+                SessionRow.domain_id == domain_id,
+                scope_membership_exists(
+                    DomainEntityType(), domain_id, SessionEntityType(), SessionRow.id
+                ),
+            )
+
+        return inner
+
+    @property
+    @override
+    def existence_checks(self) -> Sequence[ExistenceCheck[Any]]:
+        return [
+            ExistenceCheck(
+                column=DomainRow.id,
+                value=self.domain_id,
+                error=DomainNotFound(str(self.domain_id)),
+            ),
+        ]
+
+
+@dataclass(frozen=True)
+class UserSessionOperationScope(OperationScope):
+    """The sessions one user holds."""
+
+    user_id: UserID
+
+    @override
+    def to_condition(self) -> QueryCondition:
+        user_id = self.user_id
+
+        # TODO(BA-7571): drop the column term once the ownership backfill lands.
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return sa.or_(
+                SessionRow.user_uuid == user_id,
+                scope_membership_exists(
+                    UserEntityType(), user_id, SessionEntityType(), SessionRow.id
+                ),
+            )
+
+        return inner
+
+    @property
+    @override
+    def existence_checks(self) -> Sequence[ExistenceCheck[Any]]:
+        return [
+            ExistenceCheck(
+                column=UserRow.uuid,
+                value=self.user_id,
+                error=UserNotFound(f"User {self.user_id} not found"),
+            ),
+        ]
 
 
 @dataclass(frozen=True)

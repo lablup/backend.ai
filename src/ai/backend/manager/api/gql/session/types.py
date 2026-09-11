@@ -78,11 +78,18 @@ from ai.backend.common.dto.manager.v2.session.response import (
 )
 from ai.backend.common.dto.manager.v2.session.types import (
     ProjectSessionScope,
+    SessionScope,
     SessionStatusFilter,
 )
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.types import ImageID, SessionId
-from ai.backend.manager.api.gql.base import OrderDirection, StringFilter, UUIDFilter, encode_cursor
+from ai.backend.manager.api.gql.base import (
+    OrderDirection,
+    StringFilter,
+    UUIDFilter,
+    UUIDScopeGQL,
+    encode_cursor,
+)
 from ai.backend.manager.api.gql.common.types import (
     ClusterModeGQL,
     SessionV2ResultGQL,
@@ -913,4 +920,28 @@ class IncludeSessionIdleChecksPayloadGQL:
     )
     failed: list[IncludeSessionIdleChecksFailureInfoGQL] = gql_field(
         description="Pairs that could not be included."
+    )
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description=(
+            "Scope for the scoped session query. Each list is OR'd internally and "
+            "across lists, and every scope named is authorized before the read runs."
+        ),
+        added_version=NEXT_RELEASE_VERSION,
+    ),
+    name="SessionScope",
+)
+class SessionScopeGQL(PydanticInputMixin[SessionScope]):
+    """The scopes a session read is answered for."""
+
+    domain: list[UUIDScopeGQL] | None = gql_field(
+        default=None, description="Domains whose sessions are being read."
+    )
+    project: list[UUIDScopeGQL] | None = gql_field(
+        default=None, description="Projects whose sessions are being read."
+    )
+    user: list[UUIDScopeGQL] | None = gql_field(
+        default=None, description="Users whose sessions are being read."
     )

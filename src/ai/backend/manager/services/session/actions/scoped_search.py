@@ -7,25 +7,63 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import override
 
+from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.session import SessionEntityType
 from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.manager.actions.v2.ops.base import OperationScopeOpsAction, ScopeItem
 from ai.backend.manager.data.session.types import SessionEntityData
 from ai.backend.manager.models.scopes import OperationScope
 from ai.backend.manager.models.session.row import SessionRow
-from ai.backend.manager.models.session.scopes import ProjectSessionOperationScope
+from ai.backend.manager.models.session.scopes import (
+    DomainSessionOperationScope,
+    ProjectSessionOperationScope,
+    UserSessionOperationScope,
+)
 from ai.backend.manager.models.session.searchers import SessionSearcher
 
 __all__ = (
+    "DomainSessionScopeItem",
     "ProjectSessionScopeItem",
     "ScopedSearchSessionsAction",
     "SessionScopeItem",
+    "UserSessionScopeItem",
 )
 
 
 class SessionScopeItem(ScopeItem, ABC):
     """One side a session is reachable from."""
+
+
+@dataclass(frozen=True)
+class DomainSessionScopeItem(SessionScopeItem):
+    """The sessions of one domain."""
+
+    domain_id: DomainID
+
+    @override
+    def scope_id(self) -> EntityIdentifier:
+        return self.domain_id
+
+    @override
+    def operation_scope(self) -> OperationScope:
+        return DomainSessionOperationScope(domain_id=self.domain_id)
+
+
+@dataclass(frozen=True)
+class UserSessionScopeItem(SessionScopeItem):
+    """The sessions one user holds."""
+
+    user_id: UserID
+
+    @override
+    def scope_id(self) -> EntityIdentifier:
+        return self.user_id
+
+    @override
+    def operation_scope(self) -> OperationScope:
+        return UserSessionOperationScope(user_id=self.user_id)
 
 
 @dataclass(frozen=True)

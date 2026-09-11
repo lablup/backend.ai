@@ -12,6 +12,7 @@ from uuid import UUID
 import sqlalchemy as sa
 
 from ai.backend.common.contexts.user import current_user
+from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.kernel import KernelID
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.resource_slot import ResourceSlotName
@@ -58,6 +59,7 @@ from ai.backend.common.dto.manager.v2.session.request import (
     EnqueueSessionInput,
     ExcludeSessionIdleChecksInput,
     IncludeSessionIdleChecksInput,
+    ScopedSearchSessionsInput,
     SessionFilter,
     SessionOrder,
     ShutdownSessionServiceInput,
@@ -84,7 +86,11 @@ from ai.backend.common.dto.manager.v2.session.response import (
     TerminateSessionsPayload,
     UpdateSessionPayload,
 )
-from ai.backend.common.dto.manager.v2.session.types import ClusterModeEnum, SessionStatusFilter
+from ai.backend.common.dto.manager.v2.session.types import (
+    ClusterModeEnum,
+    SessionScope,
+    SessionStatusFilter,
+)
 from ai.backend.common.types import (
     AccessKey,
     AgentId,
@@ -173,8 +179,11 @@ from ai.backend.manager.services.session.actions.get_container_logs import (
 from ai.backend.manager.services.session.actions.get_session import GetSessionAction
 from ai.backend.manager.services.session.actions.rename_session import RenameSessionAction
 from ai.backend.manager.services.session.actions.scoped_search import (
+    DomainSessionScopeItem,
     ProjectSessionScopeItem,
     ScopedSearchSessionsAction,
+    SessionScopeItem,
+    UserSessionScopeItem,
 )
 from ai.backend.manager.services.session.actions.search import SearchSessionsAction
 from ai.backend.manager.services.session.actions.search_kernel import SearchKernelsAction
@@ -716,6 +725,54 @@ class SessionAdapter(BaseAdapter):
             total_count=action_result.total_count,
             has_next_page=action_result.has_next_page,
             has_previous_page=action_result.has_previous_page,
+        )
+
+    def _scope_items(self, scope: SessionScope) -> list[SessionScopeItem]:
+        """The scope items the request named, in the order the input lists them."""
+        items: list[SessionScopeItem] = [
+            DomainSessionScopeItem(domain_id=DomainID(entry.value)) for entry in scope.domain or ()
+        ]
+        items.extend(
+            ProjectSessionScopeItem(project_id=ProjectID(entry.value))
+            for entry in scope.project or ()
+        )
+        items.extend(
+            UserSessionScopeItem(user_id=UserID(entry.value)) for entry in scope.user or ()
+        )
+        return items
+
+    async def scoped_search(
+        self,
+        input: ScopedSearchSessionsInput,
+    ) -> AdminSearchSessionsPayload:
+        """Search the sessions the named scopes reach, combined with OR."""
+        action_result = await self._session.scoped_search.run(
+            ScopedSearchSessionsAction(
+                items=self._scope_items(input.scope),
+                searcher=self._build_scoped_session_searcher(input),
+            )
+        )
+        return AdminSearchSessionsPayload(
+            items=await self._session_data_to_nodes([
+                item.to_session_data() for item in action_result.items
+            ]),
+            total_count=action_result.total_count,
+            has_next_page=action_result.has_next_page,
+            has_previous_page=action_result.has_previous_page,
+        )
+
+    def _build_scoped_session_searcher(self, input: ScopedSearchSessionsInput) -> SessionSearcher:
+        return self._build_searcher(
+            SessionSearcher,
+            conditions=self._convert_session_filter(input.filter) if input.filter else [],
+            orders=self._convert_session_orders(input.order) if input.order else [],
+            pagination_spec=_SESSION_PAGINATION_SPEC,
+            first=input.first,
+            after=input.after,
+            last=input.last,
+            before=input.before,
+            limit=input.limit,
+            offset=input.offset,
         )
 
     def _build_session_searcher(self, input: AdminSearchSessionsInput) -> SessionSearcher:
