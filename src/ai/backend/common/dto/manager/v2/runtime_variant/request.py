@@ -6,7 +6,7 @@ from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.dto.manager.query import StringFilter
-from ai.backend.common.dto.manager.v2.common import OrderDirection
+from ai.backend.common.dto.manager.v2.common import OrderDirection, String128
 from ai.backend.common.dto.manager.v2.runtime_variant.types import RuntimeVariantOrderField
 from ai.backend.common.tristate.unset import UNSET, Unset
 
@@ -20,10 +20,8 @@ class CreateRuntimeVariantInput(BaseRequestModel):
 
 class UpdateRuntimeVariantInput(BaseRequestModel):
     id: UUID = Field(description="ID of the runtime variant to update.")
-    name: str | None | Unset = Field(
+    name: String128 | None | Unset = Field(
         default=UNSET,
-        min_length=1,
-        max_length=128,
         description="New name. Omit to leave unchanged.",
     )
     description: str | None | Unset = Field(
