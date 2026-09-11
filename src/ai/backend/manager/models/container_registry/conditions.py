@@ -19,6 +19,26 @@ class ContainerRegistryConditions:
     """Query conditions for container registries."""
 
     @staticmethod
+    def by_cursor_forward(cursor_id: str) -> QueryCondition:
+        """Rows after the cursor in the default order, which runs by id descending."""
+        cursor_uuid = uuid.UUID(cursor_id)
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return ContainerRegistryRow.id < cursor_uuid
+
+        return inner
+
+    @staticmethod
+    def by_cursor_backward(cursor_id: str) -> QueryCondition:
+        """Rows before the cursor, read in the order that walks back to it."""
+        cursor_uuid = uuid.UUID(cursor_id)
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return ContainerRegistryRow.id > cursor_uuid
+
+        return inner
+
+    @staticmethod
     def by_ids(registry_ids: Collection[uuid.UUID]) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return ContainerRegistryRow.id.in_(registry_ids)
