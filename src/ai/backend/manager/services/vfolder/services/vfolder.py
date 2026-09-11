@@ -38,7 +38,7 @@ from ai.backend.manager.data.vfolder.types import (
     VFolderMountPermission,
     VFolderUsageData,
 )
-from ai.backend.manager.errors.common import Forbidden, InternalServerError, ObjectNotFound
+from ai.backend.manager.errors.common import Forbidden, InternalServerError
 from ai.backend.manager.errors.kernel import BackendAgentError
 from ai.backend.manager.errors.resource import ProjectNotFound
 from ai.backend.manager.errors.storage import (
@@ -309,7 +309,7 @@ class VFolderService:
         # Get user info using repository
         user_info = await self._vfolder_repository.get_user_info(action.user_uuid)
         if not user_info:
-            raise ObjectNotFound(object_name="User")
+            raise UserNotFound()
         user_role, user_domain_name = user_info
 
         # Get all accessible vfolders to check for name conflicts
@@ -348,7 +348,7 @@ class VFolderService:
         # Get user info using repository
         user_info = await self._vfolder_repository.get_user_info(action.user_uuid)
         if not user_info:
-            raise ObjectNotFound(object_name="User")
+            raise UserNotFound()
         user_role, user_domain_name = user_info
 
         # Use repository to get accessible vfolders
@@ -417,7 +417,7 @@ class VFolderService:
         # Get user info using repository
         user_info = await self._vfolder_repository.get_user_info(action.user_uuid)
         if not user_info:
-            raise ObjectNotFound(object_name="User")
+            raise UserNotFound()
         user_role, user_domain_name = user_info
 
         # Use repository to get accessible vfolders

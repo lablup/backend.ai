@@ -33,7 +33,7 @@ from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.model_serving.types import UserData as ModelServingUserData
 from ai.backend.manager.data.user.types import UserData, UserStatus
 from ai.backend.manager.errors.auth import AuthorizationFailed
-from ai.backend.manager.errors.common import ObjectNotFound
+from ai.backend.manager.errors.user import UserNotFound
 from ai.backend.manager.models.base import (
     GUID,
     Base,
@@ -274,7 +274,7 @@ class UserRow(LifecycleTimestampsMixin, Base):
         Returns:
             The UserRow instance that matches the UUID.
         Raises:
-            ObjectNotFound: If user not found.
+            UserNotFound: If user not found.
         """
         rows = await cls.query_by_condition(
             [by_user_uuid(user_uuid)],
@@ -285,7 +285,7 @@ class UserRow(LifecycleTimestampsMixin, Base):
             db=db,
         )
         if not rows:
-            raise ObjectNotFound(f"User with id {user_uuid} not found")
+            raise UserNotFound(f"User with id {user_uuid} not found")
         return rows[0]
 
     def to_model_serving_user_data(self) -> ModelServingUserData:

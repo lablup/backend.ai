@@ -561,7 +561,7 @@ class TestGetWsproxyVersion:
         resource_group_service: ResourceGroupService,
         mock_repository: MagicMock,
     ) -> None:
-        """Non-allowed scaling group raises ObjectNotFound."""
+        """Non-allowed scaling group raises ResourceGroupNotFound."""
         mock_repository.list_allowed_sgroups = AsyncMock(return_value=[])
 
         action = GetWsproxyVersionAction(
@@ -571,7 +571,7 @@ class TestGetWsproxyVersion:
             access_key="AKTEST123",
         )
 
-        with pytest.raises(ObjectNotFound):
+        with pytest.raises(ResourceGroupNotFound):
             await resource_group_service.get_wsproxy_version(action)
 
     async def test_wsproxy_addr_not_set_returns_v1(

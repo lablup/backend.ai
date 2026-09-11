@@ -125,9 +125,9 @@ from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.auth import InsufficientPrivilege
-from ai.backend.manager.errors.common import ObjectNotFound
 from ai.backend.manager.errors.image import ImageNotFound
 from ai.backend.manager.errors.kernel import TooManyKernelsFound
+from ai.backend.manager.errors.resource import AgentNotFound, DomainNotFound
 from ai.backend.manager.models.image.row import (
     ImageLoadFilter,
     PublicImageLoadFilter,
@@ -1346,7 +1346,7 @@ class Query(graphene.ObjectType):  # type: ignore[misc]
             ctx.config_provider.config.manager.hide_agents
             and ctx.user["role"] != UserRole.SUPERADMIN
         ):
-            raise ObjectNotFound(object_name="agent")
+            raise AgentNotFound()
 
         loader = ctx.dataloader_manager.get_loader_by_func(
             ctx,
@@ -1378,7 +1378,7 @@ class Query(graphene.ObjectType):  # type: ignore[misc]
             ctx.config_provider.config.manager.hide_agents
             and ctx.user["role"] != UserRole.SUPERADMIN
         ):
-            raise ObjectNotFound(object_name="agent")
+            raise AgentNotFound()
 
         total_count = await AgentSummary.load_count(
             ctx,
@@ -1476,7 +1476,7 @@ class Query(graphene.ObjectType):  # type: ignore[misc]
         if ctx.user["role"] != UserRole.SUPERADMIN:
             if name != ctx.user["domain_name"]:
                 # prevent querying other domains if not superadmin
-                raise ObjectNotFound(object_name="domain")
+                raise DomainNotFound()
         loader = ctx.dataloader_manager.get_loader(ctx, "Domain.by_name")
         return cast(Domain, await loader.load(name))
 

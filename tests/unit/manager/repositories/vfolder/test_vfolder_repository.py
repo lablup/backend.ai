@@ -43,7 +43,6 @@ from ai.backend.manager.data.vfolder.types import (
     VFolderOwnershipType,
 )
 from ai.backend.manager.defs import DEFAULT_ROLE
-from ai.backend.manager.errors.common import ObjectNotFound
 from ai.backend.manager.errors.storage import (
     VFolderAlreadyExists,
     VFolderDeletionNotAllowed,
@@ -52,7 +51,7 @@ from ai.backend.manager.errors.storage import (
     VFolderInvalidParameter,
     VFolderNotFound,
 )
-from ai.backend.manager.errors.user import UserNotFound
+from ai.backend.manager.errors.user import KeyPairNotFound, UserNotFound
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.deployment_auto_scaling_policy import DeploymentAutoScalingPolicyRow
@@ -879,7 +878,7 @@ class TestVfolderRepositoryAllowedVfolderHosts:
         user_with_active_keypair: uuid.UUID,
     ) -> None:
         """A keypair that is not the default one does not supply the policy."""
-        with pytest.raises(ObjectNotFound):
+        with pytest.raises(KeyPairNotFound):
             await vfolder_repository.get_allowed_vfolder_hosts(
                 user_uuid=user_with_active_keypair,
                 group_uuid=None,
@@ -889,7 +888,7 @@ class TestVfolderRepositoryAllowedVfolderHosts:
         self,
         vfolder_repository: VfolderRepository,
     ) -> None:
-        """Unknown user UUID raises UserNotFound rather than ObjectNotFound."""
+        """Unknown user UUID raises UserNotFound rather than KeyPairNotFound."""
         with pytest.raises(UserNotFound):
             await vfolder_repository.get_allowed_vfolder_hosts(
                 user_uuid=uuid.uuid4(),

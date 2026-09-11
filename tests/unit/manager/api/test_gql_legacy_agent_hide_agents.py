@@ -12,7 +12,7 @@ import graphene
 import pytest
 
 from ai.backend.manager.api.gql_legacy.schema import Query
-from ai.backend.manager.errors.common import ObjectNotFound
+from ai.backend.manager.errors.resource import AgentNotFound
 from ai.backend.manager.models.user import UserRole
 
 
@@ -74,7 +74,7 @@ class TestAgentSummaryHideAgents:
     async def test_agent_summary_blocks_non_superadmin(
         self, mock_info_with_hide_agents_true: MagicMock
     ) -> None:
-        with pytest.raises(ObjectNotFound):
+        with pytest.raises(AgentNotFound):
             await Query.resolve_agent_summary(
                 None,
                 mock_info_with_hide_agents_true,
@@ -115,7 +115,7 @@ class TestAgentSummaryHideAgents:
     async def test_agent_summary_list_blocks_non_superadmin(
         self, mock_info_with_hide_agents_true: MagicMock
     ) -> None:
-        with pytest.raises(ObjectNotFound):
+        with pytest.raises(AgentNotFound):
             await Query.resolve_agent_summary_list(
                 None,
                 mock_info_with_hide_agents_true,

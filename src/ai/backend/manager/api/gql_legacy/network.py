@@ -20,9 +20,10 @@ from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.network.types import NetworkData
 from ai.backend.manager.errors.common import (
     GenericForbidden,
-    ObjectNotFound,
     ServerMisconfiguredError,
 )
+from ai.backend.manager.errors.network import NetworkNotFound
+from ai.backend.manager.errors.resource import ProjectNotFound
 from ai.backend.manager.models.minilang import FieldSpecItem, OrderSpecItem
 from ai.backend.manager.models.minilang.ordering import QueryOrderParser
 from ai.backend.manager.models.minilang.queryfilter import QueryFilterParser
@@ -268,7 +269,7 @@ class CreateNetwork(graphene.Mutation):  # type: ignore[misc]
             try:
                 project = await ProjectRow.get(db_session, project_id, load_resource_policy=True)
             except NoResultFound as e:
-                raise ObjectNotFound(object_name="project") from e
+                raise ProjectNotFound() from e
 
             if (
                 graph_ctx.user["role"] != UserRole.SUPERADMIN
@@ -348,14 +349,14 @@ class ModifyNetwork(graphene.Mutation):  # type: ignore[misc]
         try:
             _network_id = uuid.UUID(raw_network_id)
         except ValueError as e:
-            raise ObjectNotFound("network") from e
+            raise NetworkNotFound() from e
 
         graph_ctx: GraphQueryContext = info.context
         async with graph_ctx.db.begin_session(commit_on_end=True) as db_session:
             try:
                 row = await NetworkRow.get(db_session, _network_id, load_project=True)
             except NoResultFound as e:
-                raise ObjectNotFound(object_name="network") from e
+                raise NetworkNotFound() from e
 
             if (
                 graph_ctx.user["role"] != UserRole.SUPERADMIN
@@ -397,13 +398,13 @@ class DeleteNetwork(graphene.Mutation):  # type: ignore[misc]
         try:
             _network_id = uuid.UUID(raw_network_id)
         except ValueError as e:
-            raise ObjectNotFound("network") from e
+            raise NetworkNotFound() from e
 
         async with graph_ctx.db.begin_session(commit_on_end=True) as db_session:
             try:
                 row = await NetworkRow.get(db_session, _network_id, load_project=True)
             except NoResultFound as e:
-                raise ObjectNotFound(object_name="network") from e
+                raise NetworkNotFound() from e
 
             if (
                 graph_ctx.user["role"] != UserRole.SUPERADMIN

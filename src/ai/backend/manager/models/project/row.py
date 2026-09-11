@@ -39,7 +39,7 @@ from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.permission.permission_defs import ProjectPermission
 from ai.backend.manager.data.project.types import ProjectData, ProjectStatus, ProjectType
 from ai.backend.manager.defs import RESERVED_DOTFILES
-from ai.backend.manager.errors.common import ObjectNotFound
+from ai.backend.manager.errors.resource import ProjectNotFound
 from ai.backend.manager.models.association_container_registries_groups import (
     AssociationContainerRegistriesGroupsRow,
 )
@@ -333,7 +333,7 @@ class ProjectRow(LifecycleTimestampsMixin, Base):
         Returns:
             The ProjectRow instance that matches the project ID.
         Raises:
-            ObjectNotFound: If the project not found.
+            ProjectNotFound: If the project not found.
         """
         rows = await cls.query_by_condition(
             [by_id(project_id)],
@@ -341,7 +341,7 @@ class ProjectRow(LifecycleTimestampsMixin, Base):
             db=db,
         )
         if not rows:
-            raise ObjectNotFound(f"Project with id {project_id} not found")
+            raise ProjectNotFound(f"Project with id {project_id} not found")
         return rows[0]
 
 

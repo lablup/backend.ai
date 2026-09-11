@@ -13,7 +13,7 @@ from ai.backend.common.data.entity.types import EntityType
 from ai.backend.common.data.entity.vfolder import VFolderEntityType
 from ai.backend.common.data.permission.types import Permission
 from ai.backend.manager.data.permission.permission import PermissionData
-from ai.backend.manager.errors.common import ObjectNotFound
+from ai.backend.manager.errors.base.field import FieldNotFoundError
 from ai.backend.manager.errors.permission import PermissionAlreadyGranted
 from ai.backend.manager.models.rbac_models.permission.creators import RolePermissionCreator
 from ai.backend.manager.models.rbac_models.permission.purgers import RolePermissionPurger
@@ -168,8 +168,8 @@ class TestPermissionDelete:
             DeletePermissionAction(purger=RolePermissionPurger(PermissionID(perm_id)))
         )
 
-        # Second delete must raise ObjectNotFound
-        with pytest.raises(ObjectNotFound):
+        # Second delete must raise FieldNotFoundError
+        with pytest.raises(FieldNotFoundError):
             await permission_controller_processors.delete_permission.wait_for_complete(
                 DeletePermissionAction(purger=RolePermissionPurger(PermissionID(perm_id)))
             )
@@ -178,8 +178,8 @@ class TestPermissionDelete:
         self,
         permission_controller_processors: PermissionControllerProcessors,
     ) -> None:
-        """F-BIZ-2: Delete non-existent permission_id → ObjectNotFound."""
-        with pytest.raises(ObjectNotFound):
+        """F-BIZ-2: Delete non-existent permission_id → FieldNotFoundError."""
+        with pytest.raises(FieldNotFoundError):
             await permission_controller_processors.delete_permission.wait_for_complete(
                 DeletePermissionAction(purger=RolePermissionPurger(PermissionID(uuid.uuid4())))
             )
