@@ -3,13 +3,13 @@ name: entity-type-catalog
 type: reference
 description: entity classification (Entity/Public entity/Global/Field/Virtual), ownership and reference relations, the foreign-key rule for assignments
 scope: src/ai/backend/common/data/entity
-keywords: [EntityType, FieldType, DanglingFieldType, EntityCreator, GlobalEntityCreator, FieldEntityCreator, EntityMembershipEntityType, member_of, virtual entity, ownership, entity relation]
+keywords: [EntityType, FieldType, DanglingFieldType, EntityCreator, GlobalEntityCreator, FieldEntityCreator, member_of, virtual entity, ownership, entity relation]
 sources:
   - src/ai/backend/common/data/entity
   - src/ai/backend/manager/models
 generated:
   by: claude-code/opus-5
-  at: 2026-09-10
+  at: 2026-08-16
 status: draft
 ---
 
@@ -239,9 +239,7 @@ Built without a row of its own. It exists only as the subject of audit and autho
 
 ## Out of scope
 
-A virtual entity is the layer that expresses ownership, not an entity. The node is what
-stays out; the `entity_memberships` edge declares `EntityMembershipEntityType` of its own,
-so what names an edge is not the node id.
+A virtual entity is the layer that expresses ownership, not an entity.
 
 ### What names a node
 

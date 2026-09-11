@@ -3,8 +3,7 @@ from __future__ import annotations
 import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, mapped_column
 
-from ai.backend.common.data.entity.entity_membership import EntityMembershipID
-from ai.backend.common.data.permission.id import EntityMembershipCapID
+from ai.backend.common.data.permission.id import EntityMembershipCapID, EntityMembershipID
 from ai.backend.common.data.permission.types import Permission
 from ai.backend.manager.models.base import GUID, Base, IntFlagType
 

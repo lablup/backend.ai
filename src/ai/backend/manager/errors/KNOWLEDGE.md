@@ -56,6 +56,7 @@ one place per domain.
 | Error | Why it stays |
 |---|---|
 | `RoleAlreadyAssigned`, `RoleNotAssigned` | the `user_roles` row has no `EntityType` or `FieldType` |
+| `GroupMembershipNotFoundError` | it reads the `entity_memberships` edge, whose id is a plain `NewType` in `data/permission/id.py`, no `EntityType` |
 | `InvalidFieldPermission` | validates a requested field scope for both permission entries and entity shares, so it names no one row kind |
 | `VirtualEntityNotFound` | `data/entity/virtual_entity.py` declares an id alone, no `EntityType` |
 | `NotEnoughPermission`, `InsufficientPrivilege` | an authorization denial about the caller, not about a row |

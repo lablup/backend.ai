@@ -3,6 +3,7 @@ from uuid import UUID
 
 __all__ = (
     "EntityMembershipCapID",
+    "EntityMembershipID",
     "FieldPath",
 )
 
@@ -10,4 +11,5 @@ __all__ = (
 # A path covers its descendants.
 FieldPath = NewType("FieldPath", str)
 
+EntityMembershipID = NewType("EntityMembershipID", UUID)
 EntityMembershipCapID = NewType("EntityMembershipCapID", UUID)
