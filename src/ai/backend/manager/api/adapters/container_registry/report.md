@@ -8,7 +8,7 @@ Not exercised by any scenario: batch_load_fields.
 
 #### [a-linked-project-is-removed-from-the-allowed-list](/tests/scenario/bai_scenario/manager/container_registry/test_allowing.py) — pass
 
-이미 연결된 프로젝트를 허용 목록에서 빼면 그 연결이 사라진다
+이미 연결된 프로젝트는 허용 목록에서 뺄 수 있다
 
 Given
 
@@ -114,7 +114,7 @@ Then
 
 #### [a-user-granted-on-both-scopes-links-a-project-to-a-registry](/tests/scenario/bai_scenario/manager/container_registry/test_allowing.py) — pass
 
-레지스트리와 프로젝트 두 스코프 모두에 권한을 받은 사용자가 그 프로젝트를 허용 목록에 넣으면 연결이 만들어진다
+레지스트리와 프로젝트 두 스코프 모두에 권한을 받은 사용자는 그 프로젝트를 허용 목록에 넣을 수 있다
 
 Given
 
@@ -179,7 +179,7 @@ Then
 
 #### [linking-a-project-that-is-already-linked-is-not-an-error](/tests/scenario/bai_scenario/manager/container_registry/test_allowing.py) — pass
 
-이미 연결된 프로젝트를 다시 허용 목록에 넣어도, 그 쌍은 데이터베이스에서 건너뛰므로 오류가 아니다
+이미 연결된 프로젝트를 다시 허용 목록에 넣어도 거부되지 않는다. 그 쌍은 데이터베이스에서 건너뛴다
 
 Given
 
@@ -273,7 +273,7 @@ Then
 
 #### [a-project-named-while-creating-is-linked-to-the-new-registry](/tests/scenario/bai_scenario/manager/container_registry/test_creating.py) — pass
 
-슈퍼관리자가 허용 프로젝트를 함께 주고 레지스트리를 만들면, 레지스트리와 그 프로젝트의 연결이 함께 만들어진다
+슈퍼관리자는 허용 프로젝트를 함께 주고 레지스트리를 만들 수 있다. 연결이 함께 쓰이는 것은 답에 실리지 않아 이 행이 보지 못한다
 
 Given
 
