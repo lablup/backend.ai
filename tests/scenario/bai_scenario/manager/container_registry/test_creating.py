@@ -48,8 +48,6 @@ class Creating(When[Any, ContainerRegistryAdapter, ContainerRegistryNode]):
     """레지스트리를 만든다. 허용 프로젝트를 주면 허용 목록까지 함께 쓴다."""
 
     url: str = A_URL
-    username: str | None = None
-    password: str | None = None
     allowed: AllowedGroups = field(default_factory=NoProjects)
 
     @override
@@ -68,8 +66,6 @@ class Creating(When[Any, ContainerRegistryAdapter, ContainerRegistryNode]):
                     url=self.url,
                     registry_name=A_NAME,
                     type=ContainerRegistryType.DOCKER,
-                    username=self.username,
-                    password=self.password,
                     allowed_groups=self.allowed.of(laid),
                 )
             )
@@ -102,34 +98,6 @@ class CreatingWithOnlyTheRequiredValues(
     @override
     def then(self) -> Then[Any, ContainerRegistryNode]:
         return TheNewRegistryNode(url=A_URL, registry_name=A_NAME)
-
-
-@dataclass(frozen=True)
-class CreatingWithAPasswordHidesIt(
-    Scenario[SeedingSession, ACallerWithNoRegistry, ContainerRegistryAdapter, ContainerRegistryNode]
-):
-    @override
-    def summary(self) -> str:
-        return "a-password-given-at-creation-does-not-come-back-in-the-answer"
-
-    @override
-    def describe(self) -> str:
-        return (
-            "슈퍼관리자가 계정과 비밀번호를 함께 주고 만들면, "
-            "계정 이름은 답에 실리지만 비밀번호 자리는 노드에 아예 없다"
-        )
-
-    @override
-    def given(self) -> Given[SeedingSession, ACallerWithNoRegistry]:
-        return NoRegistryYet(role=UserRole.SUPERADMIN)
-
-    @override
-    def when(self) -> When[Any, ContainerRegistryAdapter, ContainerRegistryNode]:
-        return Creating(username="someone", password="a-secret")
-
-    @override
-    def then(self) -> Then[Any, ContainerRegistryNode]:
-        return TheNewRegistryNode(url=A_URL, registry_name=A_NAME, username="someone")
 
 
 @dataclass(frozen=True)
@@ -285,7 +253,6 @@ class EnforcementOffChangesNothing(
 
 SCENARIOS: list[CreatingStep] = [
     CreatingWithOnlyTheRequiredValues(),
-    CreatingWithAPasswordHidesIt(),
     CreatingTakesAnAddressTheUpdateWouldRefuse(),
     AllowingAProjectWhileCreating(),
     AProjectThatIsNotThereIsRefused(),
