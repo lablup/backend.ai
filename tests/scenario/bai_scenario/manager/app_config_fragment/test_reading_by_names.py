@@ -1,7 +1,7 @@
-"""이름으로 조각 읽기 — 한 스코프의 조각을 이름 자리마다 답한다.
+"""이름으로 설정 조각 조회 — 한 스코프의 조각을 이름 항목마다 응답한다.
 
-자기 조각 읽기는 사용자 스코프 하나만 본다. 지목한 스코프 읽기는 그 스코프의 권한이
-지키되, 공개 스코프에는 지킬 스코프가 없어 인증만으로 답한다.
+자기 조각 조회는 사용자 스코프 하나만 본다. 지정한 스코프 조회는 그 스코프의 권한을
+검사하되, 공개 스코프에는 보호할 스코프가 없어 인증만으로 응답한다.
 """
 
 from __future__ import annotations
@@ -48,7 +48,7 @@ type ScopedStep = Scenario[SeedingSession, ATargetAndACaller, AppConfigFragmentA
 
 @dataclass(frozen=True)
 class ReadingMineByNames(When[AReadingPlace, AppConfigFragmentAdapter, ByNames]):
-    """자기 스코프의 조각을 심은 이름들로 읽는다."""
+    """자기 스코프의 조각을 미리 만들어 둔 이름들로 조회한다."""
 
     @override
     def operation(self) -> str:
@@ -68,7 +68,7 @@ class ReadingMineByNames(When[AReadingPlace, AppConfigFragmentAdapter, ByNames])
 
 @dataclass(frozen=True)
 class ReadingAtByName(When[ATargetAndACaller, AppConfigFragmentAdapter, ByNames]):
-    """지목한 스코프의 조각을 이름으로 읽는다."""
+    """지정한 스코프의 조각을 이름으로 조회한다."""
 
     @override
     def operation(self) -> str:
@@ -76,7 +76,7 @@ class ReadingAtByName(When[ATargetAndACaller, AppConfigFragmentAdapter, ByNames]
 
     @override
     def describe(self, laid: ATargetAndACaller) -> str:
-        return f"{laid.caller.username}이 {SCOPE_NAMES[laid.scope_type]} 스코프를 지목해 {laid.name}의 조각을 조회"
+        return f"{laid.caller.username}이 {SCOPE_NAMES[laid.scope_type]} 스코프를 지정해 {laid.name}의 조각을 조회"
 
     @override
     async def call(self, adapter: AppConfigFragmentAdapter, laid: ATargetAndACaller) -> ByNames:
@@ -92,7 +92,7 @@ class ReadingAtByName(When[ATargetAndACaller, AppConfigFragmentAdapter, ByNames]
 
 @dataclass(frozen=True)
 class ReadingElsewhereByName(When[ATargetAndACaller, AppConfigFragmentAdapter, ByNames]):
-    """지목한 종류의, 아무것도 갖지 않은 id를 지목해 읽는다."""
+    """지정한 종류의, 존재하지 않는 id를 지정해 조회한다."""
 
     @override
     def operation(self) -> str:
@@ -100,7 +100,7 @@ class ReadingElsewhereByName(When[ATargetAndACaller, AppConfigFragmentAdapter, B
 
     @override
     def describe(self, laid: ATargetAndACaller) -> str:
-        return f"{laid.caller.username}이 아무 {SCOPE_NAMES[laid.scope_type]}도 아닌 id를 지목해 {laid.name}의 조각을 조회"
+        return f"{laid.caller.username}이 어느 {SCOPE_NAMES[laid.scope_type]}도 아닌 id를 지정해 {laid.name}의 조각을 조회"
 
     @override
     async def call(self, adapter: AppConfigFragmentAdapter, laid: ATargetAndACaller) -> ByNames:
@@ -122,8 +122,8 @@ class EachNameIsAnsweredInOrder(
     @override
     def describe(self) -> str:
         return (
-            "사용자 스코프에 열린 이름 셋 중 둘에 자기 조각이 있고 읽기 권한을 받은 사용자가 "
-            "셋을 읽으면, 세 자리가 요청 순서대로 오고 조각이 없는 자리는 비어 있다"
+            "사용자 스코프에 허용된 이름 셋 중 둘에 자기 조각이 있고 읽기 권한을 받은 사용자가 "
+            "셋을 조회하면, 세 항목이 요청 순서대로 반환되고 조각이 없는 항목은 비어 있다"
         )
 
     @override
@@ -149,7 +149,7 @@ class AnotherUsersFragmentStaysOut(
 
     @override
     def describe(self) -> str:
-        return "같은 이름에 다른 사용자의 조각이 있어도, 자기 조각을 읽으면 자기 것만 온다"
+        return "같은 이름에 다른 사용자의 조각이 있어도, 자기 조각을 조회하면 자기 것만 반환된다"
 
     @override
     def given(self) -> Given[SeedingSession, AReadingPlace]:
@@ -175,8 +175,8 @@ class TheDomainsFragmentStaysOut(
     @override
     def describe(self) -> str:
         return (
-            "같은 이름에 자기 도메인의 조각이 있어도, 자기 조각을 읽으면 자기 것만 온다. "
-            "이 읽기는 사용자 스코프 하나만 본다"
+            "같은 이름에 자기 도메인의 조각이 있어도, 자기 조각을 조회하면 자기 것만 반환된다. "
+            "이 조회는 사용자 스코프 하나만 본다"
         )
 
     @override
@@ -202,7 +202,9 @@ class AUserGrantedNothingMayNotReadMine(
 
     @override
     def describe(self) -> str:
-        return "자기 조각이 있어도 아무 권한도 받지 않은 사용자가 이름으로 읽으면, 권한 부족으로 거부된다"
+        return (
+            "자기 조각이 있어도 아무 권한도 없는 사용자가 이름으로 조회하면, 권한 부족으로 거부된다"
+        )
 
     @override
     def given(self) -> Given[SeedingSession, AReadingPlace]:
@@ -227,7 +229,7 @@ class TheGrantedUserReadsTheDomains(
 
     @override
     def describe(self) -> str:
-        return "도메인 조각이 있고 그 도메인 스코프에 읽기 권한을 받은 사용자가 도메인을 지목해 읽으면, 그 조각이 온다"
+        return "도메인 조각이 있고 그 도메인 스코프에 읽기 권한을 받은 사용자가 도메인을 지정해 조회하면, 그 조각이 반환된다"
 
     @override
     def given(self) -> Given[SeedingSession, ATargetAndACaller]:
@@ -255,8 +257,8 @@ class AnyoneSignedInReadsThePublic(
     @override
     def describe(self) -> str:
         return (
-            "공개 조각이 있고 아무 권한도 없는 사용자가 공개 스코프를 지목해 읽으면, 그 조각이 "
-            "온다. 공개 조각에는 지킬 스코프가 없다"
+            "공개 조각이 있고 아무 권한도 없는 사용자가 공개 스코프를 지정해 조회하면, 그 조각이 "
+            "반환된다. 공개 조각에는 보호할 스코프가 없다"
         )
 
     @override
@@ -282,7 +284,7 @@ class AnotherUsersScopeIsRefused(
 
     @override
     def describe(self) -> str:
-        return "자기 스코프에만 읽기 권한을 받은 사용자가 다른 사용자를 지목해 읽으면, 권한 부족으로 거부된다"
+        return "자기 스코프에만 읽기 권한을 받은 사용자가 다른 사용자를 지정해 조회하면, 권한 부족으로 거부된다"
 
     @override
     def given(self) -> Given[SeedingSession, ATargetAndACaller]:
@@ -310,8 +312,8 @@ class AMissingDomainIsNotFoundForASuperadmin(
     @override
     def describe(self) -> str:
         return (
-            "슈퍼관리자가 아무 도메인도 아닌 id를 지목해 읽으면, 대상이 없다는 것으로 거부된다. "
-            "권한 검사를 지나가는 사람만 이 답을 본다"
+            "슈퍼관리자가 어느 도메인도 아닌 id를 지정해 조회하면, 대상을 찾을 수 없다는 이유로 거부된다. "
+            "권한 검사를 통과하는 사용자만 이 응답을 본다"
         )
 
     @override
@@ -338,8 +340,8 @@ class AMissingDomainIsRefusedAsPermission(
     @override
     def describe(self) -> str:
         return (
-            "자기 도메인에 읽기 권한을 받은 사용자가 아무 도메인도 아닌 id를 지목해 읽으면, "
-            "대상이 없다는 것이 아니라 권한 부족으로 거부된다"
+            "자기 도메인에 읽기 권한을 받은 사용자가 어느 도메인도 아닌 id를 지정해 조회하면, "
+            "대상 없음이 아니라 권한 부족으로 거부된다"
         )
 
     @override

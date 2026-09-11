@@ -1,8 +1,8 @@
-"""조각 지우기 — 하나씩, 그리고 여럿을 한 번에.
+"""설정 조각 삭제 — 하나씩, 그리고 여럿을 한 번에.
 
-지우기는 허용 항목을 보지 않는다. 조각은 허용 항목이 있는 동안만 존재하므로, 있는 조각은
-언제나 자기 스코프에서 지울 수 있다. 여럿을 지우면 원소마다 답하고, 이 어댑터에는 soft
-delete가 없다.
+삭제는 허용 목록 항목을 확인하지 않는다. 조각은 허용 목록 항목이 있는 동안만 존재하므로, 있는
+조각은 언제나 자기 스코프에서 삭제할 수 있다. 여럿을 삭제하면 원소마다 응답하고, 이 어댑터에는
+soft delete가 없다.
 """
 
 from __future__ import annotations
@@ -62,7 +62,7 @@ type BulkStep = Scenario[
 
 @dataclass(frozen=True)
 class Purging(When[AFragmentAndACaller, AppConfigFragmentAdapter, Purged]):
-    """조각 하나를 지운다. id를 대지 않으면 심은 조각을 지운다."""
+    """설정 조각 하나를 삭제한다. id를 지정하지 않으면 미리 만들어 둔 조각을 삭제한다."""
 
     other: UUID | None = None
 
@@ -73,11 +73,9 @@ class Purging(When[AFragmentAndACaller, AppConfigFragmentAdapter, Purged]):
     @override
     def describe(self, laid: AFragmentAndACaller) -> str:
         called = (
-            "아무것도 갖지 않은 id"
-            if self.other is not None
-            else f"{laid.fragment.config_name}의 조각"
+            "존재하지 않는 id" if self.other is not None else f"{laid.fragment.config_name}의 조각"
         )
-        return f"{laid.caller.username}이 {called}을 지움"
+        return f"{laid.caller.username}이 {called} 삭제"
 
     @override
     async def call(self, adapter: AppConfigFragmentAdapter, laid: AFragmentAndACaller) -> Purged:
@@ -88,7 +86,7 @@ class Purging(When[AFragmentAndACaller, AppConfigFragmentAdapter, Purged]):
 
 @dataclass(frozen=True)
 class PurgingMany(When[SomeFragmentsAndACaller, AppConfigFragmentAdapter, BulkPurged]):
-    """자기 조각들, 남의 조각, 아무것도 갖지 않은 id를 한 번에 지운다."""
+    """자기 조각들, 남의 조각, 존재하지 않는 id를 한 번에 삭제한다."""
 
     @override
     def operation(self) -> str:
@@ -98,7 +96,7 @@ class PurgingMany(When[SomeFragmentsAndACaller, AppConfigFragmentAdapter, BulkPu
     def describe(self, laid: SomeFragmentsAndACaller) -> str:
         return (
             f"{laid.caller.username}이 자기 조각 {len(laid.mine)}개, 다른 사용자의 조각, "
-            "아무것도 갖지 않은 id를 한 번에 지움"
+            "존재하지 않는 id를 한 번에 삭제"
         )
 
     @override
@@ -112,27 +110,27 @@ class PurgingMany(When[SomeFragmentsAndACaller, AppConfigFragmentAdapter, BulkPu
 
 @dataclass(frozen=True)
 class ThePurgedOneIsNamed(Then[AFragmentAndACaller, Purged]):
-    """지운 조각이 무엇인지 id로 답한다."""
+    """삭제한 조각이 무엇인지 id로 응답한다."""
 
     @override
     def says(self) -> str:
-        return "지운 조각의 id를 답한다"
+        return "삭제한 조각의 id를 응답한다"
 
     @override
     def look(self, laid: AFragmentAndACaller, answered: Answered[Purged]) -> list[Verdict]:
         payload = answered.response
         if payload is None:
             return [Refused(NotEnoughPermission, answered.raised)]
-        return [Held("id", payload.id, SameAs(laid.fragment.id, "심은 조각"))]
+        return [Held("id", payload.id, SameAs(laid.fragment.id, "미리 만들어 둔 조각"))]
 
 
 @dataclass(frozen=True)
 class MineArePurgedTheRestFail(Then[SomeFragmentsAndACaller, BulkPurged]):
-    """자기 것은 지워진 목록에, 남의 것과 없는 id는 실패 목록에 온다."""
+    """자기 것은 삭제된 목록에, 남의 것과 없는 id는 실패 목록에 반환된다."""
 
     @override
     def says(self) -> str:
-        return "자기 것은 지워진 목록에, 남의 것과 없는 id는 실패 목록에 온다"
+        return "자기 것은 삭제된 목록에, 남의 것과 없는 id는 실패 목록에 반환된다"
 
     @override
     def look(self, laid: SomeFragmentsAndACaller, answered: Answered[BulkPurged]) -> list[Verdict]:
@@ -143,25 +141,25 @@ class MineArePurgedTheRestFail(Then[SomeFragmentsAndACaller, BulkPurged]):
             Held[list[UUID]](
                 "items",
                 list(payload.items),
-                SameAs[list[UUID]]([one.id for one in laid.mine], "심은 자기 조각들"),
+                SameAs[list[UUID]]([one.id for one in laid.mine], "미리 만들어 둔 자기 조각들"),
             ),
             Same("failed", len(payload.failed), 2),
             Held[UUID | None](
                 "failed[0].id",
                 payload.failed[0].id if payload.failed else None,
-                SameAs[UUID | None](laid.theirs.id, "심은 남의 조각"),
+                SameAs[UUID | None](laid.theirs.id, "미리 만들어 둔 남의 조각"),
             ),
-            Skipped("failed[*].message", "이유는 글로 오고, 글은 바뀌어도 되는 값이다"),
+            Skipped("failed[*].message", "이유는 문자열로 오고, 문자열은 바뀌어도 되는 값이다"),
         ]
 
 
 @dataclass(frozen=True)
 class BothArePurgedTheMissingFails(Then[SomeFragmentsAndACaller, BulkPurged]):
-    """둘은 지워진 목록에, 없는 id는 실패 목록에 온다."""
+    """둘은 삭제된 목록에, 없는 id는 실패 목록에 반환된다."""
 
     @override
     def says(self) -> str:
-        return "있는 둘은 지워진 목록에, 없는 id는 실패 목록에 온다"
+        return "있는 둘은 삭제된 목록에, 없는 id는 실패 목록에 반환된다"
 
     @override
     def look(self, laid: SomeFragmentsAndACaller, answered: Answered[BulkPurged]) -> list[Verdict]:
@@ -172,10 +170,12 @@ class BothArePurgedTheMissingFails(Then[SomeFragmentsAndACaller, BulkPurged]):
             Held[list[UUID]](
                 "items",
                 list(payload.items),
-                SameAs[list[UUID]]([*(one.id for one in laid.mine), laid.theirs.id], "심은 조각들"),
+                SameAs[list[UUID]](
+                    [*(one.id for one in laid.mine), laid.theirs.id], "미리 만들어 둔 조각들"
+                ),
             ),
             Same("failed", len(payload.failed), 1),
-            Skipped("failed[*].message", "이유는 글로 오고, 글은 바뀌어도 되는 값이다"),
+            Skipped("failed[*].message", "이유는 문자열로 오고, 문자열은 바뀌어도 되는 값이다"),
         ]
 
 
@@ -189,7 +189,7 @@ class TheGrantedUserPurgesTheirOwn(
 
     @override
     def describe(self) -> str:
-        return "자기 조각 하나가 있고 자기 스코프에 지우기 권한을 받은 사용자가 지우면, 지운 id를 실은 답이 온다"
+        return "자기 조각 하나가 있고 자기 스코프에 삭제 권한을 받은 사용자가 삭제하면, 삭제한 id를 담은 응답이 반환된다"
 
     @override
     def given(self) -> Given[SeedingSession, AFragmentAndACaller]:
@@ -214,7 +214,7 @@ class AnotherUsersFragmentIsRefused(
 
     @override
     def describe(self) -> str:
-        return "다른 사용자의 조각을 자기 스코프에만 지우기 권한을 받은 사용자가 지우면, 권한 부족으로 거부된다"
+        return "다른 사용자의 조각을 자기 스코프에만 삭제 권한을 받은 사용자가 삭제하면, 권한 부족으로 거부된다"
 
     @override
     def given(self) -> Given[SeedingSession, AFragmentAndACaller]:
@@ -239,7 +239,7 @@ class ReadingIsNotEnoughToPurge(
 
     @override
     def describe(self) -> str:
-        return "자기 조각에 읽기 권한만 받은 사용자가 지우면, 권한 부족으로 거부된다. 지우기는 읽기와 다른 문이다"
+        return "자기 조각에 읽기 권한만 받은 사용자가 삭제하면, 권한 부족으로 거부된다. 삭제는 읽기와 다른 권한을 검사한다"
 
     @override
     def given(self) -> Given[SeedingSession, AFragmentAndACaller]:
@@ -264,7 +264,7 @@ class AnUnknownIdIsNotFoundForASuperadmin(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 아무것도 갖지 않은 id를 지우면, 대상이 없다는 것으로 거부된다"
+        return "슈퍼관리자가 존재하지 않는 id를 삭제하면, 대상을 찾을 수 없다는 이유로 거부된다"
 
     @override
     def given(self) -> Given[SeedingSession, AFragmentAndACaller]:
@@ -290,9 +290,9 @@ class MixedIdsArePurgedEach(
     @override
     def describe(self) -> str:
         return (
-            "자기 스코프에만 지우기 권한을 받은 사용자가 자기 조각 둘, 다른 사용자의 조각, 없는 "
-            "id를 한 번에 지우면, 자기 둘은 지워진 목록에, 남의 것과 없는 id는 실패 목록에 이유를 "
-            "달고 온다"
+            "자기 스코프에만 삭제 권한을 받은 사용자가 자기 조각 둘, 다른 사용자의 조각, 없는 "
+            "id를 한 번에 삭제하면, 자기 둘은 삭제된 목록에, 남의 것과 없는 id는 실패 목록에 이유와 "
+            "함께 반환된다"
         )
 
     @override
@@ -318,7 +318,7 @@ class TheSuperadminPurgesBoth(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 조각 둘과 없는 id 하나를 한 번에 지우면, 둘은 지워진 목록에, 없는 id는 실패 목록에 온다"
+        return "슈퍼관리자가 조각 둘과 없는 id 하나를 한 번에 삭제하면, 둘은 삭제된 목록에, 없는 id는 실패 목록에 반환된다"
 
     @override
     def given(self) -> Given[SeedingSession, SomeFragmentsAndACaller]:

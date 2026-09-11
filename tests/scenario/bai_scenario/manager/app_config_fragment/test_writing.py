@@ -1,7 +1,8 @@
-"""조각 쓰기 — 누가 어디에 쓸 수 있고, 허용 항목이 무엇을 막는가.
+"""설정 조각 쓰기 — 누가 어디에 쓸 수 있고, 허용 목록 항목이 무엇을 막는가.
 
-자기 조각 쓰기와 지목한 스코프에 쓰기가 한 표에 있다. 소유자가 있는 쓰기는 그 소유자의
-스코프에 걸린 권한이 지키고, 공개 조각 쓰기는 답할 스코프가 없어 전역 역할이 지킨다.
+자기 조각 쓰기와 지정한 스코프에 쓰기가 한 모듈에 있다. 소유자가 있는 쓰기는 그 소유자의
+스코프에 부여된 권한을 검사하고, 공개 조각 쓰기는 대응하는 스코프가 없어 전역 역할이 있어야
+한다.
 """
 
 from __future__ import annotations
@@ -60,7 +61,7 @@ REPLACED: Mapping[str, Any] = MappingProxyType({"menu": {"docs": True}})
 
 @dataclass(frozen=True)
 class WritingMine(When[AWritingPlace, AppConfigFragmentAdapter, Written]):
-    """자기 스코프에 쓴다. 이름은 심은 것에서, 값은 시나리오가 정한 것에서 온다."""
+    """자기 스코프에 쓴다. 이름은 미리 만들어 둔 것에서, 값은 시나리오가 정한 것에서 읽는다."""
 
     configs: tuple[Mapping[str, Any], ...] = (FIRST,)
 
@@ -70,7 +71,7 @@ class WritingMine(When[AWritingPlace, AppConfigFragmentAdapter, Written]):
 
     @override
     def describe(self, laid: AWritingPlace) -> str:
-        return f"{laid.caller.username}이 {', '.join(laid.names)}에 자기 조각을 씀"
+        return f"{laid.caller.username}이 {', '.join(laid.names)}에 자기 조각 쓰기"
 
     @override
     async def call(self, adapter: AppConfigFragmentAdapter, laid: AWritingPlace) -> Written:
@@ -86,7 +87,7 @@ class WritingMine(When[AWritingPlace, AppConfigFragmentAdapter, Written]):
 
 @dataclass(frozen=True)
 class WritingAt(When[ATargetAndACaller, AppConfigFragmentAdapter, Written]):
-    """지목한 스코프에 쓴다."""
+    """지정한 스코프에 쓴다."""
 
     config: Mapping[str, Any] = FIRST
 
@@ -96,7 +97,7 @@ class WritingAt(When[ATargetAndACaller, AppConfigFragmentAdapter, Written]):
 
     @override
     def describe(self, laid: ATargetAndACaller) -> str:
-        return f"{laid.caller.username}이 {SCOPE_NAMES[laid.scope_type]} 스코프를 지목해 {laid.name}에 조각을 씀"
+        return f"{laid.caller.username}이 {SCOPE_NAMES[laid.scope_type]} 스코프를 지정해 {laid.name}에 조각 쓰기"
 
     @override
     async def call(self, adapter: AppConfigFragmentAdapter, laid: ATargetAndACaller) -> Written:
@@ -128,8 +129,8 @@ class TheGrantedUserWritesTheirFirstFragment(
     @override
     def describe(self) -> str:
         return (
-            "쓰기 권한을 받은 사용자가 자기 조각을 처음 쓰면, 요청이 주지 않은 소유자와 스코프 "
-            "종류가 호출자에서 채워진 노드가 답으로 온다"
+            "쓰기 권한을 받은 사용자가 자기 조각을 처음 쓰면, 요청이 지정하지 않은 소유자와 스코프 "
+            "종류가 호출자 정보로 채워진 노드가 반환된다"
         )
 
     @override
@@ -159,7 +160,7 @@ class WritingAgainReplacesTheValueWhole(
     def describe(self) -> str:
         return (
             "이미 자기 조각이 있는 이름에 다른 키를 담아 다시 쓰면, id는 그대로인 채 값은 "
-            "새것뿐이다. 이전 키가 남지 않는다"
+            "새 값뿐이다. 이전 키가 남지 않는다"
         )
 
     @override
@@ -187,7 +188,7 @@ class SeveralNamesAreWrittenAtOnce(
 
     @override
     def describe(self) -> str:
-        return "사용자 스코프에 열린 이름 둘에 한 번에 쓰면, 둘 다 쓰이고 요청 순서대로 온다"
+        return "사용자 스코프에 허용된 이름 둘에 한 번에 쓰면, 둘 다 쓰이고 요청 순서대로 반환된다"
 
     @override
     def given(self) -> Given[SeedingSession, AWritingPlace]:
@@ -213,7 +214,7 @@ class OneNameNotAllowedSinksTheWholeWrite(
     @override
     def describe(self) -> str:
         return (
-            "열린 이름과 열리지 않은 이름을 함께 쓰면, 쓰기 허용 안 됨으로 거부된다. 쓰기는 "
+            "허용된 이름과 허용되지 않은 이름을 함께 쓰면, 쓰기 허용 안 됨으로 거부된다. 쓰기는 "
             "전부 아니면 전무다"
         )
 
@@ -266,8 +267,8 @@ class ANameOpenedToAnotherKindIsRefused(
     @override
     def describe(self) -> str:
         return (
-            "도메인 종류에만 열린 이름에 쓰기 권한을 받은 사용자가 자기 조각을 쓰면, 쓰기 허용 "
-            "안 됨으로 거부된다. 등록되지 않은 이름과 같은 문이다"
+            "도메인 종류에만 허용된 이름에 쓰기 권한을 받은 사용자가 자기 조각을 쓰면, 쓰기 허용 "
+            "안 됨으로 거부된다. 등록되지 않은 이름과 같은 검사다"
         )
 
     @override
@@ -294,8 +295,8 @@ class CreateAloneIsNotEnough(
     @override
     def describe(self) -> str:
         return (
-            "자기 스코프에 만들기 권한만 있고 고치기 권한이 없는 사용자가 쓰면, 권한 부족으로 "
-            "거부된다. 쓰기는 만들기와 고치기 둘 다를 요구한다"
+            "자기 스코프에 생성 권한만 있고 수정 권한이 없는 사용자가 쓰면, 권한 부족으로 "
+            "거부된다. 쓰기는 생성과 수정 권한 둘 다를 요구한다"
         )
 
     @override
@@ -321,9 +322,7 @@ class AUserGrantedNothingMayNotWrite(
 
     @override
     def describe(self) -> str:
-        return (
-            "사용자 종류에 열린 이름에 아무 권한도 받지 않은 사용자가 쓰면, 권한 부족으로 거부된다"
-        )
+        return "사용자 종류에 허용된 이름에 아무 권한도 없는 사용자가 쓰면, 권한 부족으로 거부된다"
 
     @override
     def given(self) -> Given[SeedingSession, AWritingPlace]:
@@ -351,8 +350,8 @@ class EnforcementOffLetsAnyoneWrite(
     @override
     def describe(self) -> str:
         return (
-            "엔티티 권한 집행을 끄면 아무 권한도 받지 않은 사용자도 자기 조각을 쓴다. "
-            "이 문은 역할이 아니라 권한 그래프가 지키므로 스위치가 통한다"
+            "권한 검사를 끄면 아무 권한도 없는 사용자도 자기 조각을 쓸 수 있다. "
+            "자기 조각 쓰기는 역할이 아니라 권한 그래프로 보호되므로 스위치가 영향을 준다"
         )
 
     @override
@@ -384,7 +383,7 @@ class TheGrantedUserWritesADomainFragment(
 
     @override
     def describe(self) -> str:
-        return "자기 도메인 스코프에 쓰기 권한을 받은 사용자가 도메인을 지목해 쓰면, 스코프 종류는 도메인이고 소유자는 그 도메인이다"
+        return "자기 도메인 스코프에 쓰기 권한을 받은 사용자가 도메인을 지정해 쓰면, 스코프 종류는 도메인이고 소유자는 그 도메인이다"
 
     @override
     def given(self) -> Given[SeedingSession, ATargetAndACaller]:
@@ -411,7 +410,7 @@ class TheSuperadminWritesAPublicFragment(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 공개 스코프를 지목해 쓰면, 스코프 종류는 공개이고 소유자 자리는 비어 있다. 이 문은 전역 역할이다"
+        return "슈퍼관리자가 공개 스코프를 지정해 쓰면, 스코프 종류는 공개이고 소유자 필드는 비어 있다. 공개 쓰기는 전역 역할로 보호된다"
 
     @override
     def given(self) -> Given[SeedingSession, ATargetAndACaller]:
@@ -438,7 +437,7 @@ class APlainUserMayNotWritePublic(
     def describe(self) -> str:
         return (
             "자기 도메인 스코프에 쓰기 권한을 받았어도 슈퍼관리자가 아닌 사용자가 공개 스코프를 "
-            "지목해 쓰면, 역할로 거부된다. 공개 조각에는 답할 스코프가 없다"
+            "지정해 쓰면, 역할 부족으로 거부된다. 공개 조각에는 대응하는 스코프가 없다"
         )
 
     @override
@@ -465,8 +464,8 @@ class EnforcementOffDoesNotOpenPublic(
     @override
     def describe(self) -> str:
         return (
-            "엔티티 권한 집행을 꺼도 슈퍼관리자가 아니면 공개 조각을 못 쓴다. "
-            "이 문은 권한 그래프가 아니라 역할이 지키기 때문이다"
+            "권한 검사를 꺼도 슈퍼관리자가 아니면 공개 조각을 쓸 수 없다. "
+            "공개 쓰기는 권한 그래프가 아니라 역할로 보호되기 때문이다"
         )
 
     @override
@@ -496,7 +495,7 @@ class AnotherUsersScopeIsRefused(
 
     @override
     def describe(self) -> str:
-        return "자기 스코프에만 쓰기 권한을 받은 사용자가 다른 사용자를 지목해 쓰면, 권한 부족으로 거부된다"
+        return "자기 스코프에만 쓰기 권한을 받은 사용자가 다른 사용자를 지정해 쓰면, 권한 부족으로 거부된다"
 
     @override
     def given(self) -> Given[SeedingSession, ATargetAndACaller]:
@@ -522,8 +521,8 @@ class AnOwnerNothingAnswersToIsRefused(
     @override
     def describe(self) -> str:
         return (
-            "슈퍼관리자가 아무 사용자도 아닌 id를 소유자로 지목해 쓰면, 소유자 없음으로 "
-            "거부된다. 소유자가 있는지는 권한 그래프에서 본다"
+            "슈퍼관리자가 어느 사용자도 아닌 id를 소유자로 지정해 쓰면, 소유자 없음으로 "
+            "거부된다. 소유자가 있는지는 권한 그래프에서 확인한다"
         )
 
     @override

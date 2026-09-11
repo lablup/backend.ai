@@ -57,19 +57,19 @@ from ai.backend.testutils.scenario_steps import (
 
 FRAGMENT = AppConfigFragmentEntityType()
 WRITING = (Permission.CREATE, Permission.UPDATE)
-"""쓰기는 만들 수도 바꿀 수도 있으므로 둘 다를 요구한다."""
+"""쓰기는 생성일 수도 수정일 수도 있으므로 둘 다 요구한다."""
 
 
 def _who(granted: Sequence[Permission], role: UserRole, seat: str = "자기 스코프에서") -> str:
     if role == UserRole.SUPERADMIN:
         return "슈퍼관리자 한 명"
     if not granted:
-        return "조각 권한을 하나도 받지 않은 사용자 한 명"
-    return f"{seat} 조각에 {names_of(granted)} 권한을 받은 사용자 한 명"
+        return "설정 조각 권한이 하나도 없는 사용자 한 명"
+    return f"{seat} 설정 조각에 대한 {names_of(granted)} 권한을 받은 사용자 한 명"
 
 
 class Target(enum.StrEnum):
-    """지목한 스코프에 쓰거나 읽는 줄이 어디를 지목하는가."""
+    """지정한 스코프에 쓰거나 조회하는 시나리오가 어디를 지정하는가."""
 
     HOME_DOMAIN = "home_domain"
     PUBLIC = "public"
@@ -94,7 +94,7 @@ class Target(enum.StrEnum):
             case Target.ANOTHER_USER:
                 return "다른 사용자"
             case Target.NOBODY:
-                return "아무 사용자도 아닌 id"
+                return "어느 사용자도 아닌 id"
 
 
 # --- writing ---------------------------------------------------------------------
@@ -102,7 +102,7 @@ class Target(enum.StrEnum):
 
 @dataclass(frozen=True)
 class AWritingPlace:
-    """자기 조각을 쓸 이름들과, 쓸 사람. ``existing``은 첫 이름에 이미 있는 자기 조각이다."""
+    """자기 조각을 쓸 설정 이름들과, 쓸 사용자. ``existing``은 첫 이름에 이미 있는 자기 조각이다."""
 
     caller: UserData
     names: tuple[str, ...]
@@ -119,10 +119,10 @@ class AWritingPlace:
 
 @dataclass(frozen=True)
 class MyWritingPlace(Given[Any, AWritingPlace]):
-    """이름 몇 개와, 자기 스코프에 정해진 쓰기 권한만 받은 사용자 한 명.
+    """설정 이름 몇 개와, 자기 스코프에 지정한 쓰기 권한만 받은 사용자 한 명.
 
-    첫 이름은 ``kinds``에 열리고, ``more_opened``개는 사용자 종류에 더 열리며,
-    ``more_unopened``개는 어느 종류에도 열리지 않는다. ``defined``를 끄면 이름을 등록조차
+    첫 이름은 ``kinds``에 허용되고, ``more_opened``개는 사용자 종류에 추가로 허용되며,
+    ``more_unopened``개는 어느 종류에도 허용되지 않는다. ``defined``를 끄면 이름을 등록조차
     하지 않는다.
     """
 
@@ -138,15 +138,15 @@ class MyWritingPlace(Given[Any, AWritingPlace]):
     def describe(self) -> str:
         who = _who(self.granted, self.role)
         if not self.defined:
-            return f"등록되지 않은 이름과, {who}"
+            return f"등록되지 않은 설정 이름과, {who}"
         opened = "·".join(SCOPE_NAMES[one] for one in self.kinds)
-        what = f"{opened} 스코프에 열린 이름 하나"
+        what = f"{opened} 스코프에 허용된 설정 이름 하나"
         if self.existing is not None:
             what = f"{what}에 이미 있는 자기 조각"
         if self.more_opened:
-            what = f"{what}, 사용자 스코프에 열린 이름 {self.more_opened}개"
+            what = f"{what}, 사용자 스코프에 허용된 설정 이름 {self.more_opened}개"
         if self.more_unopened:
-            what = f"{what}, 어느 스코프에도 열리지 않은 이름 {self.more_unopened}개"
+            what = f"{what}, 어느 스코프에도 허용되지 않은 설정 이름 {self.more_unopened}개"
         return f"{what}와, {who}"
 
     @override
@@ -183,7 +183,7 @@ class MyWritingPlace(Given[Any, AWritingPlace]):
 
 @dataclass(frozen=True)
 class ATargetAndACaller:
-    """지목할 스코프와, 그 안에서 쓰거나 읽을 이름, 그리고 부를 사람."""
+    """지정할 스코프와, 그 안에서 쓰거나 조회할 설정 이름, 그리고 호출할 사용자."""
 
     caller: UserData
     domain: DomainData
@@ -203,11 +203,12 @@ class ATargetAndACaller:
 
 @dataclass(frozen=True)
 class SomewhereToTarget(Given[Any, ATargetAndACaller]):
-    """지목할 자리 하나를 열어 두고, 그 자리에 대해 정해진 권한만 받은 사용자 한 명.
+    """지정할 스코프 하나에 설정 이름을 허용해 두고, 그 스코프에 대해 지정한 권한만 받은 사용자 한 명.
 
-    자기 도메인을 지목하는 줄은 역할을 그 도메인에 앉히고, 다른 사용자를 지목하는 줄은
-    자기 스코프에 앉힌다. 공개 스코프 줄의 역할은 자기 도메인에 앉아 스코프 권한이 전역
-    문을 열지 못한다는 것을 보인다. ``laid``를 켜면 그 자리에 조각을 하나 심어 둔다.
+    자기 도메인을 지정하는 시나리오는 역할을 그 도메인에 부여하고, 다른 사용자를 지정하는
+    시나리오는 자기 스코프에 부여한다. 공개 스코프 시나리오의 역할은 자기 도메인에 부여되어,
+    스코프 권한으로는 전역 역할 검사를 통과하지 못한다는 것을 보인다. ``laid``를 켜면 그
+    스코프에 설정 조각을 하나 미리 만들어 둔다.
     """
 
     target: Target
@@ -218,9 +219,9 @@ class SomewhereToTarget(Given[Any, ATargetAndACaller]):
     @override
     def describe(self) -> str:
         seat = "자기 스코프에서" if self.target == Target.ANOTHER_USER else "자기 도메인에서"
-        what = f"{self.target.says()}에 열린 이름 하나"
+        what = f"{self.target.says()}에 허용된 설정 이름 하나"
         if self.laid is not None:
-            what = f"{what}와 거기 놓인 조각 하나"
+            what = f"{what}와 거기 있는 설정 조각 하나"
         return f"{what}, 그리고 {_who(self.granted, self.role, seat)}"
 
     @override
@@ -274,10 +275,10 @@ class SomewhereToTarget(Given[Any, ATargetAndACaller]):
 
 @dataclass(frozen=True)
 class TheWrittenFragments(Then[AWritingPlace | ATargetAndACaller, UpsertAppConfigFragmentsPayload]):
-    """쓴 조각이 요청 순서대로 통째로 온다.
+    """쓴 설정 조각이 요청 순서대로 통째로 반환된다.
 
-    값은 시나리오가 정한 것이고, 소유자와 종류는 심은 자리에서 읽는다. ``replacing``이면
-    첫 조각의 id가 이미 있던 조각과 같아야 한다.
+    값은 시나리오가 정한 것이고, 소유자와 종류는 미리 만들어 둔 스코프에서 읽는다.
+    ``replacing``이면 첫 조각의 id가 이미 있던 조각과 같아야 한다.
     """
 
     started: datetime
@@ -286,7 +287,7 @@ class TheWrittenFragments(Then[AWritingPlace | ATargetAndACaller, UpsertAppConfi
 
     @override
     def says(self) -> str:
-        return "쓴 조각 전체가 요청 순서대로 온다"
+        return "쓴 설정 조각 전체가 요청 순서대로 반환된다"
 
     @override
     def look(
@@ -321,7 +322,7 @@ class TheWrittenFragments(Then[AWritingPlace | ATargetAndACaller, UpsertAppConfi
                     node.scope_id,
                     SameAs[UUID | None](
                         laid.scope_id,
-                        "지목한 소유자" if laid.scope_id is not None else "소유자 없음",
+                        "지정한 소유자" if laid.scope_id is not None else "소유자 없음",
                     ),
                 ),
                 Same(f"items[{i}].config", node.config, dict(config)),
@@ -336,7 +337,7 @@ class TheWrittenFragments(Then[AWritingPlace | ATargetAndACaller, UpsertAppConfi
 
 @dataclass(frozen=True)
 class AReadingPlace:
-    """이름으로 읽을 자리. ``mine``은 이름마다 자기 조각이 있으면 그것, 없으면 빈 자리다."""
+    """이름으로 조회할 대상. ``mine``은 이름마다 자기 조각이 있으면 그것, 없으면 빈 항목이다."""
 
     caller: UserData
     names: tuple[str, ...]
@@ -345,10 +346,11 @@ class AReadingPlace:
 
 @dataclass(frozen=True)
 class MyFragmentsLaid(Given[Any, AReadingPlace]):
-    """사용자 스코프에 열린 이름 몇 개에 자기 조각을 심어 두고, 그것을 읽을 사용자 한 명.
+    """사용자 스코프에 허용된 설정 이름 몇 개에 자기 조각을 미리 만들어 두고, 그것을 조회할 사용자 한 명.
 
-    ``mine_on``에 든 자리에만 자기 조각이 놓인다. 첫 이름에는 ``anothers``와 ``domains``로
-    다른 사용자와 자기 도메인의 조각을 함께 둘 수 있다. 답하지 않으므로 섞이면 어긋난다.
+    ``mine_on``에 든 위치에만 자기 조각이 만들어진다. 첫 이름에는 ``anothers``와 ``domains``로
+    다른 사용자와 자기 도메인의 조각을 함께 둘 수 있다. 반환하지 않으므로 섞이면 불일치가
+    드러난다.
     """
 
     names: int = 1
@@ -360,7 +362,7 @@ class MyFragmentsLaid(Given[Any, AReadingPlace]):
 
     @override
     def describe(self) -> str:
-        what = f"사용자 스코프에 열린 이름 {self.names}개 중 {len(self.mine_on)}개에 놓인 자기 조각"
+        what = f"사용자 스코프에 허용된 설정 이름 {self.names}개 중 {len(self.mine_on)}개에 있는 자기 조각"
         if self.anothers is not None:
             what = f"{what}, 같은 이름의 다른 사용자 조각"
         if self.domains is not None:
@@ -414,11 +416,11 @@ class MyFragmentsLaid(Given[Any, AReadingPlace]):
 
 @dataclass(frozen=True)
 class EachNameAnsweredWithMine(Then[AReadingPlace, list[AppConfigFragmentNode | None]]):
-    """이름마다 자기 조각이 있으면 그것, 없으면 빈 자리가 요청 순서대로 온다."""
+    """이름마다 자기 조각이 있으면 그것, 없으면 빈 항목이 요청 순서대로 반환된다."""
 
     @override
     def says(self) -> str:
-        return "이름마다 자기 조각이 있으면 그 조각, 없으면 빈 자리가 요청 순서대로 온다"
+        return "이름마다 자기 조각이 있으면 그 조각, 없으면 빈 항목이 요청 순서대로 반환된다"
 
     @override
     def look(
@@ -436,7 +438,7 @@ class EachNameAnsweredWithMine(Then[AReadingPlace, list[AppConfigFragmentNode | 
                     Held[object](
                         f"items[{i}].id",
                         getattr(got, "id", got),
-                        SameAs[object](mine.id, "심은 자기 조각"),
+                        SameAs[object](mine.id, "미리 만들어 둔 자기 조각"),
                     )
                 )
                 seen.append(Same(f"items[{i}].config", getattr(got, "config", got), mine.config))
@@ -445,11 +447,11 @@ class EachNameAnsweredWithMine(Then[AReadingPlace, list[AppConfigFragmentNode | 
 
 @dataclass(frozen=True)
 class TheTargetsFragmentByName(Then[ATargetAndACaller, list[AppConfigFragmentNode | None]]):
-    """지목한 자리에 심은 조각 하나가 온다."""
+    """지정한 스코프에 미리 만들어 둔 설정 조각 하나가 반환된다."""
 
     @override
     def says(self) -> str:
-        return "지목한 자리의 조각 하나가 온다"
+        return "지정한 스코프의 설정 조각 하나가 반환된다"
 
     @override
     def look(
@@ -467,14 +469,14 @@ class TheTargetsFragmentByName(Then[ATargetAndACaller, list[AppConfigFragmentNod
             Held[object](
                 "items[0].id",
                 getattr(got, "id", got),
-                SameAs[object](laid.fragment.id, "심은 조각"),
+                SameAs[object](laid.fragment.id, "미리 만들어 둔 조각"),
             ),
             Same("items[0].scope_type", getattr(got, "scope_type", got), laid.scope_type),
             Held[object](
                 "items[0].scope_id",
                 getattr(got, "scope_id", got),
                 SameAs[object](
-                    laid.scope_id, "지목한 소유자" if laid.scope_id is not None else "소유자 없음"
+                    laid.scope_id, "지정한 소유자" if laid.scope_id is not None else "소유자 없음"
                 ),
             ),
             Same("items[0].config", getattr(got, "config", got), laid.fragment.config),
@@ -486,7 +488,7 @@ class TheTargetsFragmentByName(Then[ATargetAndACaller, list[AppConfigFragmentNod
 
 @dataclass(frozen=True)
 class ManyFragmentsAndACaller:
-    """훑을 조각들과, 훑을 사람. ``laid``는 답에 나와야 하는 것뿐이다."""
+    """검색 대상 설정 조각들과, 검색을 호출할 사용자. ``laid``는 응답에 나와야 하는 것뿐이다."""
 
     caller: UserData
     domain: DomainData
@@ -499,11 +501,11 @@ class ManyFragmentsAndACaller:
 
 @dataclass(frozen=True)
 class FragmentsLaidAcross(Given[Any, ManyFragmentsAndACaller]):
-    """스코프 종류마다 조각을 심고, 그중 한 자리를 훑을 사용자 한 명.
+    """스코프 종류마다 설정 조각을 미리 만들어 두고, 그중 한 스코프를 검색할 사용자 한 명.
 
     ``mine``개는 자기 조각, ``publics``개는 공개 조각, ``domains``개는 자기 도메인 조각이고
-    ``anothers``는 같은 도메인의 다른 사용자 조각 수다. 이름은 조각마다 하나씩 연다.
-    ``answers``가 어느 스코프의 것이 답에 나와야 하는지 정하고, 지목하는 자리도 그것이다.
+    ``anothers``는 같은 도메인의 다른 사용자 조각 수다. 설정 이름은 조각마다 하나씩 허용한다.
+    ``answers``가 어느 스코프의 것이 응답에 나와야 하는지 정하고, 지정하는 스코프도 그것이다.
     """
 
     mine: int = 0
@@ -527,7 +529,7 @@ class FragmentsLaidAcross(Given[Any, ManyFragmentsAndACaller]):
         if self.publics:
             parts.append(f"공개 조각 {self.publics}개")
         seat = "자기 도메인에서" if self.answers == AppConfigScopeType.DOMAIN else "자기 스코프에서"
-        return f"{', '.join(parts) or '아무 조각도 없음'}과, {_who(self.granted, self.role, seat)}"
+        return f"{', '.join(parts) or '설정 조각 없음'}과, {_who(self.granted, self.role, seat)}"
 
     @override
     async def lay(self, seeding: Any) -> ManyFragmentsAndACaller:
@@ -616,11 +618,11 @@ class FragmentsLaidAcross(Given[Any, ManyFragmentsAndACaller]):
 
 @dataclass(frozen=True)
 class EveryAnsweringFragmentIsFound(Then[ManyFragmentsAndACaller, SearchAppConfigFragmentPayload]):
-    """답에 나와야 하는 조각이 모두, 그리고 그것만 세어진다."""
+    """응답에 나와야 하는 설정 조각이 모두, 그리고 그것만 집계된다."""
 
     @override
     def says(self) -> str:
-        return "그 자리의 조각이 모두, 그리고 그것만 세어진다"
+        return "그 스코프의 설정 조각이 모두, 그리고 그것만 집계된다"
 
     @override
     def look(
@@ -643,11 +645,11 @@ class EveryAnsweringFragmentIsFound(Then[ManyFragmentsAndACaller, SearchAppConfi
 
 @dataclass(frozen=True)
 class OnlyTheNamedFragmentIsFound(Then[ManyFragmentsAndACaller, SearchAppConfigFragmentPayload]):
-    """골라낸 이름의 조각만 남는다."""
+    """필터에 맞는 이름의 조각만 반환된다."""
 
     @override
     def says(self) -> str:
-        return "이름으로 고른 조각만 남는다"
+        return "이름 필터에 맞는 설정 조각만 반환된다"
 
     @override
     def look(
@@ -666,14 +668,14 @@ class OnlyTheNamedFragmentIsFound(Then[ManyFragmentsAndACaller, SearchAppConfigF
 
 @dataclass(frozen=True)
 class OnlyOneKindsFragmentsAreFound(Then[ManyFragmentsAndACaller, SearchAppConfigFragmentPayload]):
-    """고른 종류의 조각만 남는다."""
+    """필터에 맞는 종류의 조각만 반환된다."""
 
     kind: AppConfigScopeType
     count: int
 
     @override
     def says(self) -> str:
-        return f"{SCOPE_NAMES[self.kind]} 종류의 조각만 남는다"
+        return f"{SCOPE_NAMES[self.kind]} 종류의 설정 조각만 반환된다"
 
     @override
     def look(
@@ -690,11 +692,11 @@ class OnlyOneKindsFragmentsAreFound(Then[ManyFragmentsAndACaller, SearchAppConfi
 
 @dataclass(frozen=True)
 class TenFragmentsComeWithANextPage(Then[ManyFragmentsAndACaller, SearchAppConfigFragmentPayload]):
-    """크기를 대지 않으면 열 건까지 오고 다음 쪽이 있다고 답한다."""
+    """크기를 지정하지 않으면 10건까지 반환되고 다음 페이지가 있다고 응답한다."""
 
     @override
     def says(self) -> str:
-        return "열 건까지 오고 다음 쪽이 있다고 답한다"
+        return "10건까지 반환되고 다음 페이지가 있다고 응답한다"
 
     @override
     def look(
@@ -715,7 +717,7 @@ class TenFragmentsComeWithANextPage(Then[ManyFragmentsAndACaller, SearchAppConfi
 
 
 class Whose(enum.StrEnum):
-    """id로 다루는 조각이 누구의 것인가."""
+    """id로 다루는 설정 조각이 누구의 것인가."""
 
     MINE = "mine"
     ANOTHERS = "anothers"
@@ -733,7 +735,7 @@ class Whose(enum.StrEnum):
 
 @dataclass(frozen=True)
 class AFragmentAndACaller:
-    """조각 하나와, 그것을 부를 사람."""
+    """설정 조각 하나와, 그것을 호출할 사용자."""
 
     caller: UserData
     fragment: AppConfigFragmentData
@@ -742,7 +744,7 @@ class AFragmentAndACaller:
 
 @dataclass(frozen=True)
 class AFragmentAndSomeone(Given[Any, AFragmentAndACaller]):
-    """조각 하나와, 자기 스코프에 정해진 권한만 받은 사용자 한 명."""
+    """설정 조각 하나와, 자기 스코프에 지정한 권한만 받은 사용자 한 명."""
 
     whose: Whose = Whose.MINE
     granted: tuple[Permission, ...] = ()
@@ -795,13 +797,13 @@ class AFragmentAndSomeone(Given[Any, AFragmentAndACaller]):
 
 @dataclass(frozen=True)
 class TheFragmentNode(Then[AFragmentAndACaller, AppConfigFragmentNode]):
-    """심은 조각이 통째로 온다."""
+    """미리 만들어 둔 설정 조각이 통째로 반환된다."""
 
     started: datetime
 
     @override
     def says(self) -> str:
-        return "심은 조각 전체가 온다"
+        return "미리 만들어 둔 설정 조각 전체가 반환된다"
 
     @override
     def look(
@@ -812,14 +814,15 @@ class TheFragmentNode(Then[AFragmentAndACaller, AppConfigFragmentNode]):
             return [Refused(NotEnoughPermission, answered.raised)]
         written = WrittenByThisRun(self.started)
         return [
-            Held("id", node.id, SameAs(laid.fragment.id, "심은 조각")),
+            Held("id", node.id, SameAs(laid.fragment.id, "미리 만들어 둔 조각")),
             Same("config_name", node.config_name, laid.fragment.config_name),
             Same("scope_type", node.scope_type, AppConfigScopeType.of_owner(laid.owner)),
             Held[object](
                 "scope_id",
                 node.scope_id,
                 SameAs[object](
-                    laid.owner, "심은 조각의 소유자" if laid.owner is not None else "소유자 없음"
+                    laid.owner,
+                    "미리 만들어 둔 조각의 소유자" if laid.owner is not None else "소유자 없음",
                 ),
             ),
             Same("config", node.config, laid.fragment.config),
@@ -830,7 +833,7 @@ class TheFragmentNode(Then[AFragmentAndACaller, AppConfigFragmentNode]):
 
 @dataclass(frozen=True)
 class SomeFragmentsAndACaller:
-    """id로 함께 다룰 조각들과, 다룰 사람. 앞의 ``mine``은 자기 것, ``theirs``는 남의 것이다."""
+    """id로 함께 다룰 설정 조각들과, 호출할 사용자. 앞의 ``mine``은 자기 것, ``theirs``는 남의 것이다."""
 
     caller: UserData
     mine: tuple[AppConfigFragmentData, ...]
@@ -839,7 +842,7 @@ class SomeFragmentsAndACaller:
 
 @dataclass(frozen=True)
 class SomeFragmentsAndSomeone(Given[Any, SomeFragmentsAndACaller]):
-    """자기 조각 몇 개와 다른 사용자의 조각 하나, 그리고 자기 스코프에 정해진 권한만 받은 사용자."""
+    """자기 조각 몇 개와 다른 사용자의 조각 하나, 그리고 자기 스코프에 지정한 권한만 받은 사용자."""
 
     mine: int = 1
     granted: tuple[Permission, ...] = ()

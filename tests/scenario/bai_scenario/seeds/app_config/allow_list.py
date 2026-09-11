@@ -19,7 +19,7 @@ SCOPE_NAMES = {
     AppConfigScopeType.DOMAIN: "도메인",
     AppConfigScopeType.USER: "사용자",
 }
-"""스코프 종류를 레포트가 부르는 말."""
+"""레포트에서 스코프 종류를 가리키는 이름."""
 
 
 @dataclass(frozen=True)
@@ -36,13 +36,13 @@ class SeedAllowListEntry(SeedRowFrom[AppConfigDefinitionData, AppConfigAllowList
 
     @override
     def kind(self) -> str:
-        return "허용 항목"
+        return "허용 목록 항목"
 
     @override
     def detail(self) -> str:
-        opened = f"{SCOPE_NAMES[self.scope_type]} 스코프가 이 이름을 채울 수 있다"
+        opened = f"{SCOPE_NAMES[self.scope_type]} 스코프에서 이 이름의 설정을 지정할 수 있다"
         if self.rank is None:
-            return f"{opened}, 순위는 그 종류의 기본값"
+            return f"{opened}, 순위는 그 스코프 종류의 기본값"
         return f"{opened}, 순위 {self.rank}"
 
     @override
