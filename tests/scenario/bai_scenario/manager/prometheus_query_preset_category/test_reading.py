@@ -59,7 +59,7 @@ class ReadingById(When[ACategoryAndACaller, Adapter, CategoryNodeAnswer]):
 
 @dataclass(frozen=True)
 class ReadingAsNobody(When[ACategoryAlone, Adapter, CategoryNodeAnswer]):
-    """아무도 아닌 채로 id로 읽는다."""
+    """사용자 컨텍스트 없이 id로 읽는다."""
 
     @override
     def operation(self) -> str:
@@ -67,7 +67,7 @@ class ReadingAsNobody(When[ACategoryAlone, Adapter, CategoryNodeAnswer]):
 
     @override
     def describe(self, laid: ACategoryAlone) -> str:
-        return f"아무도 아닌 채로 {laid.category.name}을 조회"
+        return f"사용자 컨텍스트 없이 {laid.category.name}을 조회"
 
     @override
     async def call(self, adapter: Adapter, laid: ACategoryAlone) -> CategoryNodeAnswer:
