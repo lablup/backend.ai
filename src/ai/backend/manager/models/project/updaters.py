@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Collection, Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Any, override
 
@@ -35,8 +35,8 @@ class ProjectUpdater(GuardedDataUpdater[ProjectRow, ProjectData]):
     total_resource_slots: OptionalState[ResourceSlot] = field(
         default_factory=OptionalState[ResourceSlot].nop
     )
-    allowed_vfolder_hosts: OptionalState[dict[str, str]] = field(
-        default_factory=OptionalState[dict[str, str]].nop
+    allowed_vfolder_hosts: OptionalState[Mapping[str, Collection[str]]] = field(
+        default_factory=OptionalState[Mapping[str, Collection[str]]].nop
     )
     integration_name: TriState[str] = field(default_factory=TriState[str].nop)
     resource_policy: OptionalState[str] = field(default_factory=OptionalState[str].nop)

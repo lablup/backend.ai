@@ -50,10 +50,11 @@ class FullUserCreator:
 
 @dataclass
 class FullUserCreatorResult:
-    """A fully provisioned user and the keypair it authorizes with."""
+    """A provisioned user, its keypair, and its personal project."""
 
     user: UserData
     keypair: KeyPairData
+    personal_project: ProjectData
 
 
 class V2UserWriteOps(V2RosterWriteOps):
@@ -91,8 +92,8 @@ class V2UserWriteOps(V2RosterWriteOps):
         user_id = UserID(user.id)
         await self._grant_auto_assign_roles([user_id, domain_id], user_id)
         keypair = await self._create_default_keypair(user, creation)
-        await self._create_personal_project(user_id, user.username, domain_id)
-        return FullUserCreatorResult(user=user, keypair=keypair)
+        personal_project = await self._create_personal_project(user_id, user.username, domain_id)
+        return FullUserCreatorResult(user=user, keypair=keypair, personal_project=personal_project)
 
     async def _create_default_keypair(
         self, user: UserData, creation: FullUserCreator
