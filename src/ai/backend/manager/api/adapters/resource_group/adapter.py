@@ -65,6 +65,7 @@ from ai.backend.common.dto.manager.v2.resource_group.types import (
     SchedulerTypeDTO,
 )
 from ai.backend.common.exception import DomainNotFound
+from ai.backend.common.tristate.unset import Unset
 from ai.backend.common.types import PreemptionMode, PreemptionOrder, SlotQuantity
 from ai.backend.manager.api.adapter_options.deployment.options import (
     deployment_options_from_input,
@@ -595,6 +596,20 @@ class ResourceGroupAdapter(BaseAdapter):
             resource_group=self._data_to_detail_node(action_result.resource_group),
         )
 
+    @staticmethod
+    def _convert_scheduler_state(value: str | None | Unset) -> OptionalState[str]:
+        if isinstance(value, Unset) or value is None:
+            return OptionalState.nop()
+        return OptionalState.update(SchedulerType(value).value)
+
+    @staticmethod
+    def _convert_preemption_state(
+        value: PreemptionConfigInputDTO | None | Unset,
+    ) -> OptionalState[DataPreemptionConfig]:
+        if isinstance(value, Unset) or value is None:
+            return OptionalState.nop()
+        return OptionalState.update(_preemption_input_to_domain(value))
+
     async def update_config(
         self,
         input: UpdateResourceGroupConfigInput,
@@ -616,12 +631,8 @@ class ResourceGroupAdapter(BaseAdapter):
             wsproxy_addr=TriState.from_unset(input.app_proxy_addr),
             wsproxy_api_token=TriState.from_unset(input.appproxy_api_token),
             use_host_network=OptionalState.from_unset(input.use_host_network),
-            scheduler=OptionalState.from_unset(input.scheduler_type).map(
-                lambda v: SchedulerType(v).value
-            ),
-            preemption_config=OptionalState.from_unset(input.preemption).map(
-                _preemption_input_to_domain
-            ),
+            scheduler=self._convert_scheduler_state(input.scheduler_type),
+            preemption_config=self._convert_preemption_state(input.preemption),
         )
 
         action_result = await self._resource_group.update_resource_group.run(
