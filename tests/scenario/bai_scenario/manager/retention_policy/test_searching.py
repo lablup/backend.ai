@@ -1,6 +1,7 @@
-"""보존 정책 훑기 — 필터가 무엇을 좁히고, 누가 물을 수 있는가.
+"""보존 정책 검색 — 필터가 무엇을 좁히고, 누가 검색할 수 있는가.
 
-카테고리가 여덟뿐이라 정책도 여덟을 넘지 못한다. 열 건을 넘겨 다음 쪽을 보는 줄은 없다.
+카테고리가 여덟뿐이라 정책도 여덟을 넘지 못한다. 열 건을 넘겨 다음 페이지를 확인하는 시나리오는
+없다.
 """
 
 from __future__ import annotations
@@ -42,7 +43,7 @@ type SearchingStep = Scenario[
 
 @dataclass(frozen=True)
 class SearchingEveryPolicy(When[ManyPoliciesAndACaller, RetentionPolicyAdapter, Searched]):
-    """필터 없이 전체를 훑는다."""
+    """필터 없이 전체를 검색한다."""
 
     @override
     def operation(self) -> str:
@@ -60,7 +61,7 @@ class SearchingEveryPolicy(When[ManyPoliciesAndACaller, RetentionPolicyAdapter, 
 
 @dataclass(frozen=True)
 class SearchingByCategory(When[ManyPoliciesAndACaller, RetentionPolicyAdapter, Searched]):
-    """골라낸 하나의 카테고리로 걸러 훑는다."""
+    """골라낸 하나의 카테고리를 필터로 검색한다."""
 
     @override
     def operation(self) -> str:
@@ -68,7 +69,7 @@ class SearchingByCategory(When[ManyPoliciesAndACaller, RetentionPolicyAdapter, S
 
     @override
     def describe(self, laid: ManyPoliciesAndACaller) -> str:
-        return f"{laid.caller.username}이 {laid.named.category.value}로 걸러 조회"
+        return f"{laid.caller.username}이 {laid.named.category.value} 카테고리 필터로 조회"
 
     @override
     async def call(self, adapter: RetentionPolicyAdapter, laid: ManyPoliciesAndACaller) -> Searched:
@@ -82,7 +83,7 @@ class SearchingByCategory(When[ManyPoliciesAndACaller, RetentionPolicyAdapter, S
 
 @dataclass(frozen=True)
 class SearchingTheActiveOnes(When[ManyPoliciesAndACaller, RetentionPolicyAdapter, Searched]):
-    """활성인 것만 걸러 훑는다."""
+    """활성인 정책만 필터로 검색한다."""
 
     @override
     def operation(self) -> str:
@@ -90,7 +91,7 @@ class SearchingTheActiveOnes(When[ManyPoliciesAndACaller, RetentionPolicyAdapter
 
     @override
     def describe(self, laid: ManyPoliciesAndACaller) -> str:
-        return f"{laid.caller.username}이 활성인 것만 조회"
+        return f"{laid.caller.username}이 활성 필터로 조회"
 
     @override
     async def call(self, adapter: RetentionPolicyAdapter, laid: ManyPoliciesAndACaller) -> Searched:
@@ -110,7 +111,7 @@ class TheSuperadminCountsEveryPolicy(
 
     @override
     def describe(self) -> str:
-        return "카테고리가 다른 정책 둘이 있을 때 슈퍼관리자가 필터 없이 조회하면 둘을 모두 센다"
+        return "카테고리가 다른 정책 둘이 있을 때 슈퍼관리자가 필터 없이 조회하면 둘 다 집계된다"
 
     @override
     def given(self) -> Given[SeedingSession, ManyPoliciesAndACaller]:
@@ -135,7 +136,7 @@ class ACategoryFilterNarrows(
 
     @override
     def describe(self) -> str:
-        return "카테고리가 다른 정책 여럿 중 하나의 카테고리로 걸러 조회하면 그 카테고리의 것 하나만 남는다"
+        return "카테고리가 다른 정책 여럿 중 하나의 카테고리를 필터로 조회하면 그 카테고리의 정책 하나만 반환된다"
 
     @override
     def given(self) -> Given[SeedingSession, ManyPoliciesAndACaller]:
@@ -160,7 +161,7 @@ class AnEnabledFilterKeepsTheActive(
 
     @override
     def describe(self) -> str:
-        return "활성과 비활성이 섞여 있을 때 활성 필터로 조회하면 활성인 것만 남는다"
+        return "활성과 비활성이 섞여 있을 때 활성 필터로 조회하면 활성인 정책만 반환된다"
 
     @override
     def given(self) -> Given[SeedingSession, ManyPoliciesAndACaller]:
@@ -185,7 +186,7 @@ class TheMonitorSearchesLikeTheSuperadmin(
 
     @override
     def describe(self) -> str:
-        return "모니터 역할이 필터 없이 조회하면 슈퍼관리자와 같은 답이 온다. 전역 역할 문은 모니터의 읽기를 지나게 한다"
+        return "모니터 역할이 필터 없이 조회하면 슈퍼관리자와 같은 응답이 반환된다. 전역 역할 검사는 모니터의 읽기를 허용한다"
 
     @override
     def given(self) -> Given[SeedingSession, ManyPoliciesAndACaller]:
@@ -210,7 +211,7 @@ class AUserWhoIsNotTheSuperadminMayNotSearch(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 아닌 사용자가 전체 조회를 요청하면 역할로 거부된다"
+        return "슈퍼관리자가 아닌 사용자가 전체 조회를 요청하면 역할 부족으로 거부된다"
 
     @override
     def given(self) -> Given[SeedingSession, ManyPoliciesAndACaller]:
