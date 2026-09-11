@@ -38,7 +38,7 @@ def role_named(role: UserRole) -> str:
 
 @dataclass(frozen=True)
 class ACaller:
-    """부를 사람 한 명."""
+    """호출자 한 명."""
 
     caller: UserData
 
@@ -52,7 +52,7 @@ async def lay_a_caller(seeding: Any, role: UserRole = UserRole.USER) -> Laid[Use
 
 @dataclass(frozen=True)
 class SomeoneAlone(Given[Any, ACaller]):
-    """사용자 한 명, 그리고 아무 행도 없음."""
+    """사용자 한 명만 있고 다른 데이터는 없다."""
 
     role: UserRole = UserRole.USER
 

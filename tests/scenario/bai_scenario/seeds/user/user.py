@@ -59,7 +59,7 @@ class SeedUserOf(SeedUser[DomainData, UserResourcePolicyData, KeyPairResourcePol
     @override
     def detail(self) -> str:
         if self.secret_key is not None and not isinstance(self.secret_key.content, str):
-            return "자기 키와 개인 프로젝트를 갖는다, 키의 비밀 키는 암호화돼 있다"
+            return "자기 키와 개인 프로젝트를 갖는다, 비밀 키는 암호화돼 있다"
         return "자기 키와 개인 프로젝트를 갖는다"
 
     @override
