@@ -232,25 +232,24 @@ class EnforcementOffChangesNothing(
         return TheCallIsRefused(InsufficientPrivilege)
 
 
-@pytest.mark.parametrize(
-    "scenario",
-    [
-        TheNameAloneMakesAWholeNode(started=datetime.now(UTC)),
-        TheDescriptionComesBackAsGiven(started=datetime.now(UTC)),
-        APlainUserMayNotCreate(),
-        EnforcementOffChangesNothing(),
-    ],
-    ids=lambda s: s.summary(),
-)
+SCENARIOS: list[CreatingStep] = [
+    TheNameAloneMakesAWholeNode(started=datetime.now(UTC)),
+    TheDescriptionComesBackAsGiven(started=datetime.now(UTC)),
+    APlainUserMayNotCreate(),
+    EnforcementOffChangesNothing(),
+]
+
+REPEATING_SCENARIOS: list[RepeatingStep] = [ANameAnotherCategoryHoldsIsRefused()]
+
+
+@pytest.mark.parametrize("scenario", SCENARIOS, ids=lambda s: s.summary())
 async def test_creating(
     scenario: CreatingStep, adapter: Adapter, engine: ExtendedAsyncSAEngine
 ) -> None:
     await run_scenario(scenario, adapter, engine)
 
 
-@pytest.mark.parametrize(
-    "scenario", [ANameAnotherCategoryHoldsIsRefused()], ids=lambda s: s.summary()
-)
+@pytest.mark.parametrize("scenario", REPEATING_SCENARIOS, ids=lambda s: s.summary())
 async def test_creating_beside_another(
     scenario: RepeatingStep, adapter: Adapter, engine: ExtendedAsyncSAEngine
 ) -> None:

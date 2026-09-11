@@ -177,16 +177,15 @@ class AnUnknownIdIsNotFoundForASuperadmin(
         return TheCallIsRefused(EntityNotFoundError)
 
 
-@pytest.mark.parametrize(
-    "scenario",
-    [
-        TheSuperadminRemovesIt(),
-        AUserGrantedNothingMayNotRemove(),
-        EnforcementOffLetsAnyoneRemove(),
-        AnUnknownIdIsNotFoundForASuperadmin(),
-    ],
-    ids=lambda s: s.summary(),
-)
+SCENARIOS: list[RetiringStep] = [
+    TheSuperadminRemovesIt(),
+    AUserGrantedNothingMayNotRemove(),
+    EnforcementOffLetsAnyoneRemove(),
+    AnUnknownIdIsNotFoundForASuperadmin(),
+]
+
+
+@pytest.mark.parametrize("scenario", SCENARIOS, ids=lambda s: s.summary())
 async def test_retiring(
     scenario: RetiringStep, adapter: Adapter, engine: ExtendedAsyncSAEngine
 ) -> None:

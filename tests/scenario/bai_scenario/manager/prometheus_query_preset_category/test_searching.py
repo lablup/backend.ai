@@ -223,18 +223,23 @@ class NobodyMayNotSearch(Scenario[SeedingSession, ACategoryAlone, Adapter, Searc
         return TheCallIsRefused(UserNotFound)
 
 
-@pytest.mark.parametrize(
-    "scenario",
-    [AnyoneCountsEveryOne(), FilteringByNameKeepsThatOne(), OmittingThePageSizeAnswersTen()],
-    ids=lambda s: s.summary(),
-)
+SCENARIOS: list[SearchingStep] = [
+    AnyoneCountsEveryOne(),
+    FilteringByNameKeepsThatOne(),
+    OmittingThePageSizeAnswersTen(),
+]
+
+NOBODY_SCENARIOS: list[NobodyStep] = [NobodyMayNotSearch()]
+
+
+@pytest.mark.parametrize("scenario", SCENARIOS, ids=lambda s: s.summary())
 async def test_searching(
     scenario: SearchingStep, adapter: Adapter, engine: ExtendedAsyncSAEngine
 ) -> None:
     await run_scenario(scenario, adapter, engine)
 
 
-@pytest.mark.parametrize("scenario", [NobodyMayNotSearch()], ids=lambda s: s.summary())
+@pytest.mark.parametrize("scenario", NOBODY_SCENARIOS, ids=lambda s: s.summary())
 async def test_searching_as_nobody(
     scenario: NobodyStep, adapter: Adapter, engine: ExtendedAsyncSAEngine
 ) -> None:
