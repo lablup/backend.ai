@@ -27,6 +27,7 @@ __all__ = (
     "ResourceSlotInfo",
     "VFolderHostPermissionEntryInfo",
     "String64",
+    "String128",
     "SemVersion",
     "VFolderHostPermissionEntryInput",
 )
@@ -41,6 +42,7 @@ semver proper.
 """
 
 String64 = Annotated[str, StringConstraints(min_length=1, max_length=64)]
+String128 = Annotated[str, StringConstraints(min_length=1, max_length=128)]
 
 
 class BinarySizeInput(BaseRequestModel):

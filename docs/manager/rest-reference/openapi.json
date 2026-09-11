@@ -25557,8 +25557,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "New name.",
+            "description": "New name. Omit to leave unchanged.",
             "title": "Name"
           },
           "description": {
@@ -25567,14 +25566,10 @@
                 "type": "string"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
-            "description": "New description.",
+            "description": "Updated description. Omit to leave unchanged; null clears.",
             "title": "Description"
           }
         },
