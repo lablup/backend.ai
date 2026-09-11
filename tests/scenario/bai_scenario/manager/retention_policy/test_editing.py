@@ -1,4 +1,4 @@
-"""보존 정책 고치기 — 무엇이 바뀌고 무엇이 그대로 남으며, 누가 고칠 수 있는가."""
+"""보존 정책 수정 — 무엇이 바뀌고 무엇이 그대로 남으며, 누가 수정할 수 있는가."""
 
 from __future__ import annotations
 
@@ -40,7 +40,7 @@ type EditingStep = Scenario[SeedingSession, Any, RetentionPolicyAdapter, Retenti
 
 @dataclass(frozen=True)
 class Editing(When[APolicyAndACaller, RetentionPolicyAdapter, RetentionPolicyNode]):
-    """심은 정책을 고친다. 답이 실은 노드를 벗겨서 준다."""
+    """미리 만들어 둔 정책을 수정한다. 응답에 담긴 노드를 꺼내서 준다."""
 
     days: int | None = None
     enabled: bool | None = None
@@ -52,13 +52,15 @@ class Editing(When[APolicyAndACaller, RetentionPolicyAdapter, RetentionPolicyNod
 
     @override
     def describe(self, laid: APolicyAndACaller) -> str:
-        target = "없는 id" if self.unknown else f"{laid.policy.category.value} 정책"
+        target = (
+            "존재하지 않는 id" if self.unknown else f"{laid.policy.category.value} 카테고리 정책"
+        )
         changing = []
         if self.days is not None:
             changing.append("보존 일수")
         if self.enabled is not None:
             changing.append("활성 여부")
-        return f"{laid.caller.username}이 {target}의 {' 및 '.join(changing) or '아무것도'} 고침"
+        return f"{laid.caller.username}이 {target}의 {' 및 '.join(changing) or '아무것도'} 수정"
 
     @override
     async def call(
@@ -79,7 +81,7 @@ class Editing(When[APolicyAndACaller, RetentionPolicyAdapter, RetentionPolicyNod
 class MovingToATakenCategory(
     When[ManyPoliciesAndACaller, RetentionPolicyAdapter, RetentionPolicyNode]
 ):
-    """골라낸 하나의 카테고리를 옆에 있는 다른 정책의 카테고리로 바꾼다."""
+    """골라낸 하나의 카테고리를 함께 만들어 둔 다른 정책의 카테고리로 바꾼다."""
 
     @override
     def operation(self) -> str:
@@ -89,8 +91,8 @@ class MovingToATakenCategory(
     def describe(self, laid: ManyPoliciesAndACaller) -> str:
         other = next(one for one in laid.laid if one.id != laid.named.id)
         return (
-            f"{laid.caller.username}이 {laid.named.category.value} 정책의 카테고리를 "
-            f"{other.category.value}로 고침"
+            f"{laid.caller.username}이 {laid.named.category.value} 카테고리 정책의 카테고리를 "
+            f"{other.category.value}(으)로 수정"
         )
 
     @override
@@ -117,7 +119,7 @@ class TheDaysChangeAndTheRestStays(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 보존 일수만 고치면, 일수는 새 값이 되고 카테고리와 활성 여부는 그대로 남는다"
+        return "슈퍼관리자가 보존 일수만 수정하면, 일수는 새 값이 되고 카테고리와 활성 여부는 그대로 유지된다"
 
     @override
     def given(self) -> Given[SeedingSession, APolicyAndACaller]:
@@ -144,7 +146,7 @@ class DisablingIt(
 
     @override
     def describe(self) -> str:
-        return "활성 정책의 활성 여부를 내리면 비활성 상태를 실은 노드가 온다"
+        return "활성 정책의 활성 여부를 끄면 비활성 상태가 담긴 노드가 반환된다"
 
     @override
     def given(self) -> Given[SeedingSession, APolicyAndACaller]:
@@ -171,7 +173,7 @@ class AnEmptyEditChangesNothing(
 
     @override
     def describe(self) -> str:
-        return "값을 하나도 주지 않고 고치면 아무것도 바뀌지 않은 노드가 온다"
+        return "값을 하나도 지정하지 않고 수정하면 아무것도 바뀌지 않은 노드가 반환된다"
 
     @override
     def given(self) -> Given[SeedingSession, APolicyAndACaller]:
@@ -197,8 +199,8 @@ class MovingToATakenCategoryIsRefused(
     @override
     def describe(self) -> str:
         return (
-            "정책 둘 중 한쪽의 카테고리를 다른 쪽 것으로 바꾸면, 카테고리가 겹친다는 이유로 거부된다. "
-            "만들 때와 달리 저장소의 제약 위반이 그대로 온다"
+            "정책 둘 중 한쪽의 카테고리를 다른 쪽 카테고리로 바꾸면, 카테고리 중복으로 거부된다. "
+            "생성할 때와 달리 저장소의 제약 위반이 그대로 전파된다"
         )
 
     @override
@@ -224,7 +226,7 @@ class TheSuperadminEditingAnUnknownIdIsNotFound(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 아무 정책도 갖지 않은 id를 고치면 대상이 없다는 것으로 거부된다"
+        return "슈퍼관리자가 존재하지 않는 id를 수정하면 대상을 찾을 수 없다는 이유로 거부된다"
 
     @override
     def given(self) -> Given[SeedingSession, APolicyAndACaller]:
@@ -249,7 +251,7 @@ class AUserGrantedNothingMayNotEdit(
 
     @override
     def describe(self) -> str:
-        return "아무 권한도 받지 않은 사용자가 정책을 고치면 권한 부족으로 거부된다"
+        return "아무 권한도 없는 사용자가 정책을 수정하면 권한 부족으로 거부된다"
 
     @override
     def given(self) -> Given[SeedingSession, APolicyAndACaller]:
@@ -278,8 +280,8 @@ class EnforcementOffLetsAnyoneEdit(
     @override
     def describe(self) -> str:
         return (
-            "엔티티 권한 집행을 끄면 아무 권한도 받지 않은 사용자도 정책을 고친다. "
-            "이 문은 역할이 아니라 권한 그래프가 지키기 때문이다"
+            "권한 검사를 끄면 아무 권한도 없는 사용자도 정책을 수정할 수 있다. "
+            "수정은 역할이 아니라 권한 그래프로 보호되기 때문이다"
         )
 
     @override

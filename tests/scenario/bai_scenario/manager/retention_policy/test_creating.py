@@ -1,6 +1,6 @@
-"""보존 정책 만들기 — 카테고리마다 하나이고, 누가 만들 수 있는가.
+"""보존 정책 생성 — 카테고리마다 하나이고, 누가 생성할 수 있는가.
 
-보존 일수가 하루보다 짧은 요청은 여기 없다. 요청 타입이 이미 막는다.
+보존 일수가 하루보다 짧은 요청은 여기 없다. 요청 타입이 이미 막기 때문이다.
 """
 
 from __future__ import annotations
@@ -39,7 +39,7 @@ type CreatingStep = Scenario[SeedingSession, Any, RetentionPolicyAdapter, Retent
 
 @dataclass(frozen=True)
 class Creating(When[ACaller, RetentionPolicyAdapter, RetentionPolicyNode]):
-    """정책 하나를 만든다. 답이 실은 노드를 벗겨서 준다."""
+    """정책 하나를 생성한다. 응답에 담긴 노드를 꺼내서 준다."""
 
     category: RetentionCategory = RetentionCategory.SESSIONS
     enabled: bool = True
@@ -51,7 +51,7 @@ class Creating(When[ACaller, RetentionPolicyAdapter, RetentionPolicyNode]):
     @override
     def describe(self, laid: ACaller) -> str:
         state = "" if self.enabled else " 비활성으로"
-        return f"{laid.caller.username}이 {self.category.value} 정책을{state} 만듦"
+        return f"{laid.caller.username}이 {self.category.value} 카테고리 정책을{state} 생성"
 
     @override
     async def call(self, adapter: RetentionPolicyAdapter, laid: ACaller) -> RetentionPolicyNode:
@@ -68,7 +68,7 @@ class Creating(When[ACaller, RetentionPolicyAdapter, RetentionPolicyNode]):
 class CreatingTheLaidCategoryAgain(
     When[APolicyAndACaller, RetentionPolicyAdapter, RetentionPolicyNode]
 ):
-    """심어둔 정책과 같은 카테고리로 다시 만든다."""
+    """미리 만들어 둔 정책과 같은 카테고리로 다시 생성한다."""
 
     @override
     def operation(self) -> str:
@@ -76,7 +76,7 @@ class CreatingTheLaidCategoryAgain(
 
     @override
     def describe(self, laid: APolicyAndACaller) -> str:
-        return f"{laid.caller.username}이 이미 있는 {laid.policy.category.value} 정책을 다시 만듦"
+        return f"{laid.caller.username}이 이미 있는 {laid.policy.category.value} 카테고리 정책을 다시 생성"
 
     @override
     async def call(
@@ -104,8 +104,8 @@ class TheSuperadminMakesOneNeverSwept(
     @override
     def describe(self) -> str:
         return (
-            "슈퍼관리자가 카테고리와 보존 일수만 주고 만들면, 활성 여부는 참이고 마지막 청소 시각은 "
-            "비어 있는 노드가 온다"
+            "슈퍼관리자가 카테고리와 보존 일수만 지정해 생성하면, 활성 여부는 참이고 마지막 정리 시각은 "
+            "비어 있는 노드가 반환된다"
         )
 
     @override
@@ -135,7 +135,7 @@ class AnInactiveOneIsMadeInactive(
 
     @override
     def describe(self) -> str:
-        return "활성 여부를 거짓으로 주고 만들면 비활성 상태를 실은 노드가 온다"
+        return "활성 여부를 거짓으로 지정해 생성하면 비활성 상태가 담긴 노드가 반환된다"
 
     @override
     def given(self) -> Given[SeedingSession, ACaller]:
@@ -165,7 +165,7 @@ class EachCategoryIsAccepted(
 
     @override
     def describe(self) -> str:
-        return f"슈퍼관리자가 {self.category.value} 카테고리의 정책을 만들면 그 카테고리가 실린 노드가 온다"
+        return f"슈퍼관리자가 {self.category.value} 카테고리의 정책을 생성하면 그 카테고리가 담긴 노드가 반환된다"
 
     @override
     def given(self) -> Given[SeedingSession, ACaller]:
@@ -190,7 +190,7 @@ class ASecondPolicyForACategoryIsRefused(
 
     @override
     def describe(self) -> str:
-        return "어떤 카테고리의 정책이 이미 있을 때 같은 카테고리로 다시 만들면, 카테고리가 겹친다는 이유로 거부된다"
+        return "어떤 카테고리의 정책이 이미 있을 때 같은 카테고리로 다시 생성하면, 카테고리 중복으로 거부된다"
 
     @override
     def given(self) -> Given[SeedingSession, APolicyAndACaller]:
@@ -215,7 +215,7 @@ class AUserWhoIsNotTheSuperadminMayNotCreate(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 아닌 사용자가 정책을 만들면 역할로 거부된다"
+        return "슈퍼관리자가 아닌 사용자가 정책을 생성하면 역할 부족으로 거부된다"
 
     @override
     def given(self) -> Given[SeedingSession, ACaller]:
@@ -240,7 +240,7 @@ class TheMonitorMayNotCreate(
 
     @override
     def describe(self) -> str:
-        return "모니터 역할이 정책을 만들면 역할로 거부된다. 모니터는 전역 역할 문의 읽기만 지난다"
+        return "모니터 역할이 정책을 생성하면 역할 부족으로 거부된다. 모니터는 전역 역할 검사에서 읽기만 통과한다"
 
     @override
     def given(self) -> Given[SeedingSession, ACaller]:
@@ -266,8 +266,8 @@ class EnforcementOffStillNeedsTheSuperadmin(
     @override
     def describe(self) -> str:
         return (
-            "엔티티 권한 집행을 꺼도 슈퍼관리자가 아니면 정책을 만들지 못한다. "
-            "이 문은 권한 그래프가 아니라 역할이라 스위치와 무관하다"
+            "권한 검사를 꺼도 슈퍼관리자가 아니면 정책을 생성하지 못한다. "
+            "생성은 권한 그래프가 아니라 역할로 보호되므로 스위치와 무관하다"
         )
 
     @override

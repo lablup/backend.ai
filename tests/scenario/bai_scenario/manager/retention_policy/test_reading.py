@@ -1,4 +1,4 @@
-"""보존 정책 읽기 — 다른 카탈로그와 달리 하나를 읽는 것도 권한 문을 지난다."""
+"""보존 정책 조회 — 다른 카탈로그와 달리 하나를 조회하는 것도 권한 검사를 거친다."""
 
 from __future__ import annotations
 
@@ -36,7 +36,7 @@ type ReadingStep = Scenario[
 
 @dataclass(frozen=True)
 class ReadingById(When[APolicyAndACaller, RetentionPolicyAdapter, RetentionPolicyNode]):
-    """id로 읽는다. 없는 id를 대면 아무 행도 갖지 않은 id를 쓴다."""
+    """id로 조회한다. ``unknown``이면 어느 행에도 없는 id를 쓴다."""
 
     unknown: bool = False
 
@@ -46,8 +46,10 @@ class ReadingById(When[APolicyAndACaller, RetentionPolicyAdapter, RetentionPolic
 
     @override
     def describe(self, laid: APolicyAndACaller) -> str:
-        target = "없는 id" if self.unknown else f"{laid.policy.category.value} 정책"
-        return f"{laid.caller.username}이 {target}을 조회"
+        target = (
+            "존재하지 않는 id" if self.unknown else f"{laid.policy.category.value} 카테고리 정책"
+        )
+        return f"{laid.caller.username}이 {target} 조회"
 
     @override
     async def call(
@@ -69,7 +71,7 @@ class TheSuperadminReadsAPolicy(
 
     @override
     def describe(self) -> str:
-        return "정책 하나가 있고 슈퍼관리자가 id로 조회하면, 그 정책 전체가 온다"
+        return "정책 하나가 있고 슈퍼관리자가 id로 조회하면, 그 정책 전체가 반환된다"
 
     @override
     def given(self) -> Given[SeedingSession, APolicyAndACaller]:
@@ -95,8 +97,8 @@ class AUserGrantedNothingMayNotRead(
     @override
     def describe(self) -> str:
         return (
-            "아무 권한도 받지 않은 사용자가 id로 조회하면 권한 부족으로 거부된다. "
-            "인증만으로 읽히는 다른 카탈로그와 달리 이 읽기는 권한 문을 지난다"
+            "아무 권한도 없는 사용자가 id로 조회하면 권한 부족으로 거부된다. "
+            "인증만으로 조회되는 다른 카탈로그와 달리 이 조회는 권한 검사를 거친다"
         )
 
     @override
@@ -122,7 +124,7 @@ class TheSuperadminReadingAnUnknownIdIsNotFound(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 아무 정책도 갖지 않은 id로 조회하면 대상이 없다는 것으로 거부된다"
+        return "슈퍼관리자가 존재하지 않는 id로 조회하면 대상을 찾을 수 없다는 이유로 거부된다"
 
     @override
     def given(self) -> Given[SeedingSession, APolicyAndACaller]:
@@ -148,8 +150,8 @@ class AUserGrantedNothingReadingAnUnknownIdIsRefusedForPermission(
     @override
     def describe(self) -> str:
         return (
-            "아무 권한도 받지 않은 사용자가 없는 id로 조회하면 대상 없음이 아니라 권한 부족으로 "
-            "거부된다. 권한 검사가 먼저 돌고 없는 행에는 걸린 권한도 없다"
+            "아무 권한도 없는 사용자가 존재하지 않는 id로 조회하면 대상 없음이 아니라 권한 부족으로 "
+            "거부된다. 권한 검사가 먼저 실행되고 없는 행에는 부여된 권한도 없기 때문이다"
         )
 
     @override
@@ -179,8 +181,8 @@ class EnforcementOffLetsAnyoneRead(
     @override
     def describe(self) -> str:
         return (
-            "엔티티 권한 집행을 끄면 아무 권한도 받지 않은 사용자도 정책을 읽는다. "
-            "이 문은 역할이 아니라 권한 그래프가 지키기 때문이다"
+            "권한 검사를 끄면 아무 권한도 없는 사용자도 정책을 조회할 수 있다. "
+            "조회는 역할이 아니라 권한 그래프로 보호되기 때문이다"
         )
 
     @override

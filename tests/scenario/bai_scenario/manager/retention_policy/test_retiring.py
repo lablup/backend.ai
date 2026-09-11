@@ -1,4 +1,4 @@
-"""보존 정책 지우기 — 지우기와 완전히 지우기가 같은 일을 하고, 누가 지울 수 있는가."""
+"""보존 정책 삭제 — 삭제와 완전 삭제가 같은 일을 하고, 누가 삭제할 수 있는가."""
 
 from __future__ import annotations
 
@@ -36,7 +36,7 @@ type RetiringStep = Scenario[SeedingSession, APolicyAndACaller, RetentionPolicyA
 
 @dataclass(frozen=True)
 class Deleting(When[APolicyAndACaller, RetentionPolicyAdapter, DeleteRetentionPolicyPayload]):
-    """심은 정책을 지운다."""
+    """미리 만들어 둔 정책을 삭제한다."""
 
     unknown: bool = False
 
@@ -46,8 +46,10 @@ class Deleting(When[APolicyAndACaller, RetentionPolicyAdapter, DeleteRetentionPo
 
     @override
     def describe(self, laid: APolicyAndACaller) -> str:
-        target = "없는 id" if self.unknown else f"{laid.policy.category.value} 정책"
-        return f"{laid.caller.username}이 {target}을 지움"
+        target = (
+            "존재하지 않는 id" if self.unknown else f"{laid.policy.category.value} 카테고리 정책"
+        )
+        return f"{laid.caller.username}이 {target} 삭제"
 
     @override
     async def call(
@@ -61,7 +63,7 @@ class Deleting(When[APolicyAndACaller, RetentionPolicyAdapter, DeleteRetentionPo
 
 @dataclass(frozen=True)
 class Purging(When[APolicyAndACaller, RetentionPolicyAdapter, PurgeRetentionPolicyPayload]):
-    """심은 정책을 완전히 지운다."""
+    """미리 만들어 둔 정책을 완전 삭제한다."""
 
     @override
     def operation(self) -> str:
@@ -69,7 +71,7 @@ class Purging(When[APolicyAndACaller, RetentionPolicyAdapter, PurgeRetentionPoli
 
     @override
     def describe(self, laid: APolicyAndACaller) -> str:
-        return f"{laid.caller.username}이 {laid.policy.category.value} 정책을 완전히 지움"
+        return f"{laid.caller.username}이 {laid.policy.category.value} 카테고리 정책 완전 삭제"
 
     @override
     async def call(
@@ -91,7 +93,7 @@ class TheSuperadminDeletesAPolicy(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 정책을 지우면 지운 정책의 id를 실은 답이 온다"
+        return "슈퍼관리자가 정책을 삭제하면 삭제한 정책의 id를 담은 응답이 반환된다"
 
     @override
     def given(self) -> Given[SeedingSession, APolicyAndACaller]:
@@ -116,7 +118,7 @@ class PurgingIsTheSameHardDelete(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 정책을 완전히 지우면 지우기와 같은 답이 온다. 둘 다 행을 없애고 soft delete는 없다"
+        return "슈퍼관리자가 정책을 완전 삭제하면 삭제와 같은 응답이 반환된다. 둘 다 행을 지우고 soft delete는 없다"
 
     @override
     def given(self) -> Given[SeedingSession, APolicyAndACaller]:
@@ -143,7 +145,7 @@ class AnIdNothingAnswersToIsNotFound(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 아무 정책도 갖지 않은 id를 지우면 대상이 없다는 것으로 거부된다"
+        return "슈퍼관리자가 존재하지 않는 id를 삭제하면 대상을 찾을 수 없다는 이유로 거부된다"
 
     @override
     def given(self) -> Given[SeedingSession, APolicyAndACaller]:
@@ -170,7 +172,7 @@ class AUserGrantedNothingMayNotDelete(
 
     @override
     def describe(self) -> str:
-        return "아무 권한도 받지 않은 사용자가 정책을 지우면 권한 부족으로 거부된다"
+        return "아무 권한도 없는 사용자가 정책을 삭제하면 권한 부족으로 거부된다"
 
     @override
     def given(self) -> Given[SeedingSession, APolicyAndACaller]:
@@ -195,7 +197,7 @@ class AUserGrantedNothingMayNotPurge(
 
     @override
     def describe(self) -> str:
-        return "아무 권한도 받지 않은 사용자가 정책을 완전히 지우면 권한 부족으로 거부된다"
+        return "아무 권한도 없는 사용자가 정책을 완전 삭제하면 권한 부족으로 거부된다"
 
     @override
     def given(self) -> Given[SeedingSession, APolicyAndACaller]:
@@ -224,8 +226,8 @@ class EnforcementOffLetsAnyoneDelete(
     @override
     def describe(self) -> str:
         return (
-            "엔티티 권한 집행을 끄면 아무 권한도 받지 않은 사용자도 정책을 지운다. "
-            "이 문은 역할이 아니라 권한 그래프가 지키기 때문이다"
+            "권한 검사를 끄면 아무 권한도 없는 사용자도 정책을 삭제할 수 있다. "
+            "삭제는 역할이 아니라 권한 그래프로 보호되기 때문이다"
         )
 
     @override

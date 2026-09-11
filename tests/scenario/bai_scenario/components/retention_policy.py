@@ -37,12 +37,12 @@ from ai.backend.testutils.scenario_steps import (
 )
 
 KEPT_DAYS = 30
-"""시드가 심는 정책의 보존 일수."""
+"""시드가 미리 만들어 두는 정책의 보존 일수."""
 
 
 @dataclass(frozen=True)
 class APolicyAndACaller:
-    """정책 하나와, 그것을 부를 사람."""
+    """정책 하나와, 그것을 호출할 사용자."""
 
     policy: RetentionPolicyData
     caller: UserData
@@ -50,7 +50,7 @@ class APolicyAndACaller:
 
 @dataclass(frozen=True)
 class ManyPoliciesAndACaller:
-    """훑을 정책 여럿과, 훑을 사람. ``laid``는 답에 나와야 하는 것만이고 ``named``는 그중 하나다."""
+    """검색 대상 정책 여럿과, 검색을 호출할 사용자. ``laid``는 응답에 나와야 하는 것만이고 ``named``는 그중 하나다."""
 
     laid: tuple[RetentionPolicyData, ...]
     named: RetentionPolicyData
@@ -146,7 +146,7 @@ def policy_verdicts(
 
 @dataclass(frozen=True)
 class TheNewPolicyNode(Then[Any, RetentionPolicyNode]):
-    """방금 만든 정책이 통째로 온다. 요청이 정한 것만 여기로 받는다."""
+    """방금 생성한 정책이 통째로 반환된다. 기대값은 요청이 지정한 값에서 읽는다."""
 
     started: datetime
     category: RetentionCategory
@@ -155,7 +155,7 @@ class TheNewPolicyNode(Then[Any, RetentionPolicyNode]):
 
     @override
     def says(self) -> str:
-        return "만든 정책 전체가 온다"
+        return "생성한 정책 전체가 반환된다"
 
     @override
     def look(self, laid: Any, answered: Answered[RetentionPolicyNode]) -> list[Verdict]:
@@ -173,7 +173,7 @@ class TheNewPolicyNode(Then[Any, RetentionPolicyNode]):
 
 @dataclass(frozen=True)
 class ThePolicyNode(Then[APolicyAndACaller, RetentionPolicyNode]):
-    """심은 정책이 통째로 온다. 바꾸는 요청은 바뀌어야 하는 자리만 인자로 준다."""
+    """미리 만들어 둔 정책이 통째로 반환된다. 수정 요청은 바뀌어야 하는 필드만 인자로 준다."""
 
     started: datetime
     days: int | Kept = KEPT
@@ -181,7 +181,7 @@ class ThePolicyNode(Then[APolicyAndACaller, RetentionPolicyNode]):
 
     @override
     def says(self) -> str:
-        return "심은 정책 전체가 온다"
+        return "미리 만들어 둔 정책 전체가 반환된다"
 
     @override
     def look(
@@ -202,11 +202,11 @@ class ThePolicyNode(Then[APolicyAndACaller, RetentionPolicyNode]):
 
 @dataclass(frozen=True)
 class TheLaidPoliciesAreLeft(Then[ManyPoliciesAndACaller, SearchRetentionPoliciesPayload]):
-    """답에 나와야 하는 것들이 모두, 그리고 그것들만 남는다."""
+    """응답에 나와야 하는 정책이 모두, 그리고 그것만 반환된다."""
 
     @override
     def says(self) -> str:
-        return "답에 나와야 하는 정책만 남는다"
+        return "응답에 나와야 하는 정책만 반환된다"
 
     @override
     def look(
@@ -229,11 +229,11 @@ class TheLaidPoliciesAreLeft(Then[ManyPoliciesAndACaller, SearchRetentionPolicie
 
 @dataclass(frozen=True)
 class OnlyTheNamedPolicyIsLeft(Then[ManyPoliciesAndACaller, SearchRetentionPoliciesPayload]):
-    """걸러낸 그 하나만 남는다."""
+    """필터에 맞는 그 하나만 반환된다."""
 
     @override
     def says(self) -> str:
-        return "걸러낸 그 정책 하나만 남는다"
+        return "필터에 맞는 정책 하나만 반환된다"
 
     @override
     def look(
@@ -252,15 +252,15 @@ class OnlyTheNamedPolicyIsLeft(Then[ManyPoliciesAndACaller, SearchRetentionPolic
 
 @dataclass(frozen=True)
 class TheDeletedPolicyId(Then[APolicyAndACaller, Any]):
-    """지운 정책의 id를 실은 답. 지우기와 완전히 지우기가 같은 모양으로 답한다."""
+    """삭제한 정책의 id를 담은 응답. 삭제와 완전 삭제가 같은 형태로 응답한다."""
 
     @override
     def says(self) -> str:
-        return "지운 정책의 id가 온다"
+        return "삭제한 정책의 id가 반환된다"
 
     @override
     def look(self, laid: APolicyAndACaller, answered: Answered[Any]) -> list[Verdict]:
         payload = answered.response
         if payload is None:
             return [Refused(EntityNotFoundError, answered.raised)]
-        return [Held[UUID]("id", payload.id, SameAs[UUID](laid.policy.id, "심은 정책"))]
+        return [Held[UUID]("id", payload.id, SameAs[UUID](laid.policy.id, "미리 만들어 둔 정책"))]
