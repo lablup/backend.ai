@@ -33,7 +33,6 @@ from ai.backend.common.dto.manager.v2.app_config_allow_list.response import (
 from ai.backend.manager.api.adapters.app_config_allow_list.adapter import (
     AppConfigAllowListAdapter,
 )
-from ai.backend.manager.data.permission.types import Permission
 from ai.backend.manager.errors.base.entity import EntityNotFoundError
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -79,22 +78,24 @@ class ChangingTheRank(When[AnEntryAndACaller, AppConfigAllowListAdapter, AppConf
 
 
 @dataclass(frozen=True)
-class TheGrantedUserChangesTheRank(
+class TheSuperadminChangesTheRank(
     Scenario[SeedingSession, AnEntryAndACaller, AppConfigAllowListAdapter, AppConfigAllowListNode]
 ):
     started: datetime
 
     @override
     def summary(self) -> str:
-        return "a-user-granted-update-on-the-entry-changes-its-rank"
+        return "the-superadmin-changes-an-entrys-rank"
 
     @override
     def describe(self) -> str:
-        return "항목 하나에 고치기 권한을 받은 사용자가 순위를 바꾸면, 순위는 새 값이고 이름과 종류는 그대로다"
+        return (
+            "항목 하나가 있고 슈퍼관리자가 순위를 바꾸면, 순위는 새 값이고 이름과 종류는 그대로다"
+        )
 
     @override
     def given(self) -> Given[SeedingSession, AnEntryAndACaller]:
-        return AnEntryAndSomeone(opened=AppConfigScopeType.USER, granted=(Permission.UPDATE,))
+        return AnEntryAndSomeone(opened=AppConfigScopeType.USER, role=UserRole.SUPERADMIN)
 
     @override
     def when(self) -> When[AnEntryAndACaller, AppConfigAllowListAdapter, AppConfigAllowListNode]:
@@ -117,11 +118,11 @@ class AnEmptyEditChangesNothing(
 
     @override
     def describe(self) -> str:
-        return "고치기 권한을 받은 사용자가 아무 값도 주지 않고 고치면, 아무것도 바뀌지 않은 노드가 온다"
+        return "슈퍼관리자가 아무 값도 주지 않고 고치면, 아무것도 바뀌지 않은 노드가 온다"
 
     @override
     def given(self) -> Given[SeedingSession, AnEntryAndACaller]:
-        return AnEntryAndSomeone(opened=AppConfigScopeType.USER, granted=(Permission.UPDATE,))
+        return AnEntryAndSomeone(opened=AppConfigScopeType.USER, role=UserRole.SUPERADMIN)
 
     @override
     def when(self) -> When[AnEntryAndACaller, AppConfigAllowListAdapter, AppConfigAllowListNode]:
@@ -138,13 +139,11 @@ class AUserGrantedNothingMayNotEdit(
 ):
     @override
     def summary(self) -> str:
-        return "a-user-granted-nothing-may-not-change-a-rank"
+        return "a-user-who-is-not-the-superadmin-may-not-change-a-rank"
 
     @override
     def describe(self) -> str:
-        return (
-            "같은 항목이 있고 아무 권한도 받지 않은 사용자가 순위를 고치면, 권한 부족으로 거부된다"
-        )
+        return "같은 항목이 있고 슈퍼관리자가 아닌 사용자가 순위를 고치면, 권한 부족으로 거부된다"
 
     @override
     def given(self) -> Given[SeedingSession, AnEntryAndACaller]:
@@ -185,7 +184,7 @@ class AnUnknownIdIsNotFoundForASuperadmin(
 
 
 SCENARIOS: list[EditingStep] = [
-    TheGrantedUserChangesTheRank(started=datetime.now(UTC)),
+    TheSuperadminChangesTheRank(started=datetime.now(UTC)),
     AnEmptyEditChangesNothing(started=datetime.now(UTC)),
     AUserGrantedNothingMayNotEdit(),
     AnUnknownIdIsNotFoundForASuperadmin(),

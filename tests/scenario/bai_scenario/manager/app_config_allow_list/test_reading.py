@@ -1,7 +1,7 @@
-"""허용 항목 읽기 — 누가 어느 항목을 읽을 수 있는가.
+"""허용 항목 읽기 — 슈퍼관리자만 읽는다.
 
-항목은 어느 스코프에도 속하지 않으므로 역할이 앉을 자리는 그 항목 자체뿐이다. 없는 id는
-슈퍼관리자와 그렇지 않은 사람에게 다른 것으로 거부된다.
+항목은 어느 스코프에도 속하지 않아 역할이 닿지 않는다. 슈퍼관리자는 지나가고 그 밖의
+사용자는 권한 부족으로 거부되며, 없는 id는 슈퍼관리자에게만 대상 없음으로 답한다.
 """
 
 from __future__ import annotations
@@ -31,7 +31,6 @@ from ai.backend.common.dto.manager.v2.app_config_allow_list.response import (
 from ai.backend.manager.api.adapters.app_config_allow_list.adapter import (
     AppConfigAllowListAdapter,
 )
-from ai.backend.manager.data.permission.types import Permission
 from ai.backend.manager.errors.base.entity import EntityNotFoundError
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -72,22 +71,22 @@ class ReadingById(When[AnEntryAndACaller, AppConfigAllowListAdapter, AppConfigAl
 
 
 @dataclass(frozen=True)
-class TheGrantedUserReadsIt(
+class TheSuperadminReadsIt(
     Scenario[SeedingSession, AnEntryAndACaller, AppConfigAllowListAdapter, AppConfigAllowListNode]
 ):
     started: datetime
 
     @override
     def summary(self) -> str:
-        return "a-user-granted-read-on-the-entry-reads-it-by-id"
+        return "the-superadmin-reads-an-entry-by-id"
 
     @override
     def describe(self) -> str:
-        return "항목 하나가 있고 그 항목에 읽기 권한을 받은 사용자가 id로 조회하면, 그 항목 전체가 답으로 온다"
+        return "항목 하나가 있고 슈퍼관리자가 id로 조회하면, 그 항목 전체가 답으로 온다"
 
     @override
     def given(self) -> Given[SeedingSession, AnEntryAndACaller]:
-        return AnEntryAndSomeone(opened=AppConfigScopeType.USER, granted=(Permission.READ,))
+        return AnEntryAndSomeone(opened=AppConfigScopeType.USER, role=UserRole.SUPERADMIN)
 
     @override
     def when(self) -> When[AnEntryAndACaller, AppConfigAllowListAdapter, AppConfigAllowListNode]:
@@ -104,11 +103,14 @@ class AUserGrantedNothingMayNotRead(
 ):
     @override
     def summary(self) -> str:
-        return "a-user-granted-nothing-may-not-read-an-entry"
+        return "a-user-who-is-not-the-superadmin-may-not-read-an-entry"
 
     @override
     def describe(self) -> str:
-        return "같은 항목이 있고 아무 권한도 받지 않은 사용자가 조회하면, 권한 부족으로 거부된다"
+        return (
+            "같은 항목이 있고 슈퍼관리자가 아닌 사용자가 조회하면, 권한 부족으로 거부된다. "
+            "항목은 어느 스코프에도 속하지 않아 역할로 열 수 없다"
+        )
 
     @override
     def given(self) -> Given[SeedingSession, AnEntryAndACaller]:
@@ -117,34 +119,6 @@ class AUserGrantedNothingMayNotRead(
     @override
     def when(self) -> When[AnEntryAndACaller, AppConfigAllowListAdapter, AppConfigAllowListNode]:
         return ReadingById()
-
-    @override
-    def then(self) -> Then[AnEntryAndACaller, AppConfigAllowListNode]:
-        return TheCallIsRefused(NotEnoughPermission)
-
-
-@dataclass(frozen=True)
-class AnUnknownIdIsRefusedAsPermission(
-    Scenario[SeedingSession, AnEntryAndACaller, AppConfigAllowListAdapter, AppConfigAllowListNode]
-):
-    @override
-    def summary(self) -> str:
-        return "an-id-nothing-answers-to-is-refused-as-permission-for-a-plain-user"
-
-    @override
-    def describe(self) -> str:
-        return (
-            "다른 항목에 읽기 권한을 받은 사용자가 아무것도 갖지 않은 id로 조회하면, 대상이 "
-            "없다는 것이 아니라 권한 부족으로 거부된다. 없는 행에는 걸린 권한도 없기 때문이다"
-        )
-
-    @override
-    def given(self) -> Given[SeedingSession, AnEntryAndACaller]:
-        return AnEntryAndSomeone(opened=AppConfigScopeType.USER, granted=(Permission.READ,))
-
-    @override
-    def when(self) -> When[AnEntryAndACaller, AppConfigAllowListAdapter, AppConfigAllowListNode]:
-        return ReadingById(other=uuid4())
 
     @override
     def then(self) -> Then[AnEntryAndACaller, AppConfigAllowListNode]:
@@ -180,9 +154,8 @@ class AnUnknownIdIsNotFoundForASuperadmin(
 
 
 SCENARIOS: list[ReadingStep] = [
-    TheGrantedUserReadsIt(started=datetime.now(UTC)),
+    TheSuperadminReadsIt(started=datetime.now(UTC)),
     AUserGrantedNothingMayNotRead(),
-    AnUnknownIdIsRefusedAsPermission(),
     AnUnknownIdIsNotFoundForASuperadmin(),
 ]
 

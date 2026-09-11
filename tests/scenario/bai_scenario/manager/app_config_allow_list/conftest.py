@@ -1,17 +1,29 @@
-"""The app config allow-list adapter, assembled for one row."""
+"""The app config allow-list adapter, assembled for one row.
+
+The only place in the allow-list scenarios that knows how the app config processors are
+built. The four app config adapters share the bundle, so each package builds it the same
+way.
+"""
 
 from __future__ import annotations
 
 from typing import Any
 
 import pytest
-from bai_scenario.components.app_config import app_config_processors
 
+from ai.backend.common.data.entity.app_config import AppConfigEntityType
+from ai.backend.common.data.entity.app_config_allow_list import AppConfigAllowListEntityType
+from ai.backend.common.data.entity.app_config_definition import AppConfigDefinitionEntityType
+from ai.backend.common.data.entity.app_config_fragment import AppConfigFragmentEntityType
 from ai.backend.manager.actions.monitors import ActionMonitors
+from ai.backend.manager.actions.registry.registry import ProcessorRegistry
+from ai.backend.manager.actions.registry.types import GroupMeta, ProcessorDependencies
 from ai.backend.manager.actions.v2.validators import ActionValidators as V2ActionValidators
-from ai.backend.manager.api.adapters.app_config_allow_list.adapter import (
-    AppConfigAllowListAdapter,
-)
+from ai.backend.manager.api.adapters.app_config_allow_list.adapter import AppConfigAllowListAdapter
+from ai.backend.manager.repositories.ops.repository import OpsRepository
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
+from ai.backend.manager.services.app_config.processors import AppConfigProcessors
+from ai.backend.manager.services.app_config.service import AppConfigService
 
 
 @pytest.fixture
@@ -20,4 +32,16 @@ async def adapter(
     validators: V2ActionValidators,
     monitors: ActionMonitors,
 ) -> AppConfigAllowListAdapter:
-    return AppConfigAllowListAdapter(app_config_processors(engine, validators, monitors))
+    repository: OpsRepository[Any] = OpsRepository(V2DBOpsProvider(engine))
+    registry: ProcessorRegistry[Any] = ProcessorRegistry(
+        ProcessorDependencies(monitors=monitors, validators=validators, repository=repository)
+    )
+    return AppConfigAllowListAdapter(
+        AppConfigProcessors(
+            registry.group(GroupMeta(AppConfigEntityType())),
+            registry.group(GroupMeta(AppConfigDefinitionEntityType())),
+            registry.group(GroupMeta(AppConfigAllowListEntityType())),
+            registry.group(GroupMeta(AppConfigFragmentEntityType())),
+            AppConfigService(repository),
+        )
+    )

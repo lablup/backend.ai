@@ -64,7 +64,7 @@ Then
 
 Given
 
-- 허용 항목이 없는 정의 하나와, 허용 항목 권한을 하나도 받지 않은 사용자 한 명
+- 허용 항목이 없는 정의 하나와, 아무 권한도 받지 않은 사용자 한 명
   - 도메인 home-1
   - 도메인에 속한 사용자 한 명 준비
     - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
@@ -177,14 +177,13 @@ Given
 
 - 공개 스코프에 연 허용 항목 하나와, 슈퍼관리자 한 명
   - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
   - 설정 정의 config-1: 이 이름의 설정이 등록돼 있다
   - 허용 항목 entry-1: 공개 스코프가 이 이름을 채울 수 있다, 순위는 그 종류의 기본값
-  - 허용 항목 권한을 하나도 받지 않은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
 
 When
 
@@ -201,7 +200,7 @@ Then
 
 Given
 
-- 허용 항목이 없는 정의 하나와, 허용 항목 권한을 하나도 받지 않은 사용자 한 명
+- 허용 항목이 없는 정의 하나와, 아무 권한도 받지 않은 사용자 한 명
   - 도메인 home-1
   - 도메인에 속한 사용자 한 명 준비
     - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
@@ -221,22 +220,21 @@ Then
 
 ### editing
 
-#### [a-user-granted-nothing-may-not-change-a-rank](/tests/scenario/bai_scenario/manager/app_config_allow_list/test_editing.py) — pass
+#### [a-user-who-is-not-the-superadmin-may-not-change-a-rank](/tests/scenario/bai_scenario/manager/app_config_allow_list/test_editing.py) — pass
 
-같은 항목이 있고 아무 권한도 받지 않은 사용자가 순위를 고치면, 권한 부족으로 거부된다
+같은 항목이 있고 슈퍼관리자가 아닌 사용자가 순위를 고치면, 권한 부족으로 거부된다
 
 Given
 
-- 사용자 스코프에 연 허용 항목 하나와, 허용 항목 권한을 하나도 받지 않은 사용자 한 명
+- 사용자 스코프에 연 허용 항목 하나와, 아무 권한도 받지 않은 사용자 한 명
   - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
   - 설정 정의 config-1: 이 이름의 설정이 등록돼 있다
   - 허용 항목 entry-1: 사용자 스코프가 이 이름을 채울 수 있다, 순위는 그 종류의 기본값
-  - 허용 항목 권한을 하나도 받지 않은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
 
 When
 
@@ -247,59 +245,21 @@ Then
 - 거부된다
   - 거부: NotEnoughPermission
 
-#### [a-user-granted-update-on-the-entry-changes-its-rank](/tests/scenario/bai_scenario/manager/app_config_allow_list/test_editing.py) — pass
-
-항목 하나에 고치기 권한을 받은 사용자가 순위를 바꾸면, 순위는 새 값이고 이름과 종류는 그대로다
-
-Given
-
-- 사용자 스코프에 연 허용 항목 하나와, 그 항목에 UPDATE 권한을 받은 사용자 한 명
-  - 도메인 home-1
-  - 설정 정의 config-1: 이 이름의 설정이 등록돼 있다
-  - 허용 항목 entry-1: 사용자 스코프가 이 이름을 채울 수 있다, 순위는 그 종류의 기본값
-  - 허용 항목 entry-1에서 허용 항목에 UPDATE 권한을 받은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 seated-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 seated-1: app_config_allow_list 전체에 UPDATE 허용
-    - 일반 사용자 user-1: 역할 seated-1 보유
-
-When
-
-- AppConfigAllowListAdapter.admin_update — user-1이 config-1의 항목을 순위를 150으로 수정
-
-Then
-
-- 심은 허용 항목 전체가 온다
-  - id: 심은 허용 항목와 같다
-  - config_name = 'config-1'
-  - scope_type = <AppConfigScopeType.USER: 'user'>
-  - rank = 150
-  - created_at: 이 실행이 쓴 시각
-  - updated_at: 이 실행이 쓴 시각
-
 #### [an-edit-carrying-no-value-changes-nothing](/tests/scenario/bai_scenario/manager/app_config_allow_list/test_editing.py) — pass
 
-고치기 권한을 받은 사용자가 아무 값도 주지 않고 고치면, 아무것도 바뀌지 않은 노드가 온다
+슈퍼관리자가 아무 값도 주지 않고 고치면, 아무것도 바뀌지 않은 노드가 온다
 
 Given
 
-- 사용자 스코프에 연 허용 항목 하나와, 그 항목에 UPDATE 권한을 받은 사용자 한 명
+- 사용자 스코프에 연 허용 항목 하나와, 슈퍼관리자 한 명
   - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
   - 설정 정의 config-1: 이 이름의 설정이 등록돼 있다
   - 허용 항목 entry-1: 사용자 스코프가 이 이름을 채울 수 있다, 순위는 그 종류의 기본값
-  - 허용 항목 entry-1에서 허용 항목에 UPDATE 권한을 받은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 seated-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 seated-1: app_config_allow_list 전체에 UPDATE 허용
-    - 일반 사용자 user-1: 역할 seated-1 보유
 
 When
 
@@ -323,14 +283,13 @@ Given
 
 - 공개 스코프에 연 허용 항목 하나와, 슈퍼관리자 한 명
   - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
   - 설정 정의 config-1: 이 이름의 설정이 등록돼 있다
   - 허용 항목 entry-1: 공개 스코프가 이 이름을 채울 수 있다, 순위는 그 종류의 기본값
-  - 허용 항목 권한을 하나도 받지 않은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
 
 When
 
@@ -341,53 +300,53 @@ Then
 - 거부된다
   - 거부: EntityNotFoundError
 
-### purging
+#### [the-superadmin-changes-an-entrys-rank](/tests/scenario/bai_scenario/manager/app_config_allow_list/test_editing.py) — pass
 
-#### [a-user-granted-hard-delete-on-the-entry-purges-it](/tests/scenario/bai_scenario/manager/app_config_allow_list/test_purging.py) — pass
-
-조각이 딸리지 않은 항목에 지우기 권한을 받은 사용자가 지우면, 지운 id를 실은 답이 온다
+항목 하나가 있고 슈퍼관리자가 순위를 바꾸면, 순위는 새 값이고 이름과 종류는 그대로다
 
 Given
 
-- 사용자 스코프에 연 허용 항목 하나와, 그 항목에 HARD_DELETE 권한을 받은 사용자 한 명
+- 사용자 스코프에 연 허용 항목 하나와, 슈퍼관리자 한 명
   - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
   - 설정 정의 config-1: 이 이름의 설정이 등록돼 있다
   - 허용 항목 entry-1: 사용자 스코프가 이 이름을 채울 수 있다, 순위는 그 종류의 기본값
-  - 허용 항목 entry-1에서 허용 항목에 HARD_DELETE 권한을 받은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 seated-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 seated-1: app_config_allow_list 전체에 HARD_DELETE 허용
-    - 일반 사용자 user-1: 역할 seated-1 보유
 
 When
 
-- AppConfigAllowListAdapter.admin_purge — user-1이 config-1의 항목을 지움
+- AppConfigAllowListAdapter.admin_update — user-1이 config-1의 항목을 순위를 150으로 수정
 
 Then
 
-- 지운 허용 항목의 id를 답한다
+- 심은 허용 항목 전체가 온다
   - id: 심은 허용 항목와 같다
+  - config_name = 'config-1'
+  - scope_type = <AppConfigScopeType.USER: 'user'>
+  - rank = 150
+  - created_at: 이 실행이 쓴 시각
+  - updated_at: 이 실행이 쓴 시각
 
-#### [a-user-granted-nothing-may-not-purge-an-entry](/tests/scenario/bai_scenario/manager/app_config_allow_list/test_purging.py) — pass
+### purging
 
-같은 항목이 있고 아무 권한도 받지 않은 사용자가 지우면, 권한 부족으로 거부된다
+#### [a-user-who-is-not-the-superadmin-may-not-purge-an-entry](/tests/scenario/bai_scenario/manager/app_config_allow_list/test_purging.py) — pass
+
+같은 항목이 있고 슈퍼관리자가 아닌 사용자가 지우면, 권한 부족으로 거부된다
 
 Given
 
-- 사용자 스코프에 연 허용 항목 하나와, 허용 항목 권한을 하나도 받지 않은 사용자 한 명
+- 사용자 스코프에 연 허용 항목 하나와, 아무 권한도 받지 않은 사용자 한 명
   - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
   - 설정 정의 config-1: 이 이름의 설정이 등록돼 있다
   - 허용 항목 entry-1: 사용자 스코프가 이 이름을 채울 수 있다, 순위는 그 종류의 기본값
-  - 허용 항목 권한을 하나도 받지 않은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
 
 When
 
@@ -400,24 +359,20 @@ Then
 
 #### [an-entry-holding-a-fragment-is-still-purged](/tests/scenario/bai_scenario/manager/app_config_allow_list/test_purging.py) — pass
 
-조각이 딸린 항목을 지우기 권한을 받은 사용자가 지우면, 조각이 막지 않고 지운 id를 실은 답이 온다
+조각이 딸린 항목을 슈퍼관리자가 지우면, 조각이 막지 않고 지운 id를 실은 답이 온다
 
 Given
 
-- 조각이 딸린 공개 스코프에 연 허용 항목 하나와, 그 항목에 HARD_DELETE 권한을 받은 사용자 한 명
+- 조각이 딸린 공개 스코프에 연 허용 항목 하나와, 슈퍼관리자 한 명
   - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
   - 설정 정의 config-1: 이 이름의 설정이 등록돼 있다
   - 허용 항목 entry-1: 공개 스코프가 이 이름을 채울 수 있다, 순위는 그 종류의 기본값
   - 공개 조각 public-fragment-1: 값 {'theme': 'light'}
-  - 허용 항목 entry-1에서 허용 항목에 HARD_DELETE 권한을 받은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 seated-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 seated-1: app_config_allow_list 전체에 HARD_DELETE 허용
-    - 일반 사용자 user-1: 역할 seated-1 보유
 
 When
 
@@ -436,14 +391,13 @@ Given
 
 - 공개 스코프에 연 허용 항목 하나와, 슈퍼관리자 한 명
   - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
   - 설정 정의 config-1: 이 이름의 설정이 등록돼 있다
   - 허용 항목 entry-1: 공개 스코프가 이 이름을 채울 수 있다, 순위는 그 종류의 기본값
-  - 허용 항목 권한을 하나도 받지 않은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
 
 When
 
@@ -454,24 +408,48 @@ Then
 - 거부된다
   - 거부: EntityNotFoundError
 
-### reading
+#### [the-superadmin-purges-an-entry](/tests/scenario/bai_scenario/manager/app_config_allow_list/test_purging.py) — pass
 
-#### [a-user-granted-nothing-may-not-read-an-entry](/tests/scenario/bai_scenario/manager/app_config_allow_list/test_reading.py) — pass
-
-같은 항목이 있고 아무 권한도 받지 않은 사용자가 조회하면, 권한 부족으로 거부된다
+조각이 딸리지 않은 항목을 슈퍼관리자가 지우면, 지운 id를 실은 답이 온다
 
 Given
 
-- 사용자 스코프에 연 허용 항목 하나와, 허용 항목 권한을 하나도 받지 않은 사용자 한 명
+- 사용자 스코프에 연 허용 항목 하나와, 슈퍼관리자 한 명
   - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
   - 설정 정의 config-1: 이 이름의 설정이 등록돼 있다
   - 허용 항목 entry-1: 사용자 스코프가 이 이름을 채울 수 있다, 순위는 그 종류의 기본값
-  - 허용 항목 권한을 하나도 받지 않은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+
+When
+
+- AppConfigAllowListAdapter.admin_purge — user-1이 config-1의 항목을 지움
+
+Then
+
+- 지운 허용 항목의 id를 답한다
+  - id: 심은 허용 항목와 같다
+
+### reading
+
+#### [a-user-who-is-not-the-superadmin-may-not-read-an-entry](/tests/scenario/bai_scenario/manager/app_config_allow_list/test_reading.py) — pass
+
+같은 항목이 있고 슈퍼관리자가 아닌 사용자가 조회하면, 권한 부족으로 거부된다. 항목은 어느 스코프에도 속하지 않아 역할로 열 수 없다
+
+Given
+
+- 사용자 스코프에 연 허용 항목 하나와, 아무 권한도 받지 않은 사용자 한 명
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+  - 설정 정의 config-1: 이 이름의 설정이 등록돼 있다
+  - 허용 항목 entry-1: 사용자 스코프가 이 이름을 채울 수 있다, 순위는 그 종류의 기본값
 
 When
 
@@ -482,25 +460,46 @@ Then
 - 거부된다
   - 거부: NotEnoughPermission
 
-#### [a-user-granted-read-on-the-entry-reads-it-by-id](/tests/scenario/bai_scenario/manager/app_config_allow_list/test_reading.py) — pass
+#### [an-id-nothing-answers-to-is-not-found-for-a-superadmin](/tests/scenario/bai_scenario/manager/app_config_allow_list/test_reading.py) — pass
 
-항목 하나가 있고 그 항목에 읽기 권한을 받은 사용자가 id로 조회하면, 그 항목 전체가 답으로 온다
+슈퍼관리자가 아무것도 갖지 않은 id로 조회하면, 대상이 없다는 것으로 거부된다. 권한 검사를 지나가는 사람만 이 답을 본다
 
 Given
 
-- 사용자 스코프에 연 허용 항목 하나와, 그 항목에 READ 권한을 받은 사용자 한 명
+- 공개 스코프에 연 허용 항목 하나와, 슈퍼관리자 한 명
   - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+  - 설정 정의 config-1: 이 이름의 설정이 등록돼 있다
+  - 허용 항목 entry-1: 공개 스코프가 이 이름을 채울 수 있다, 순위는 그 종류의 기본값
+
+When
+
+- AppConfigAllowListAdapter.admin_get — user-1이 아무것도 갖지 않은 id으로 조회
+
+Then
+
+- 거부된다
+  - 거부: EntityNotFoundError
+
+#### [the-superadmin-reads-an-entry-by-id](/tests/scenario/bai_scenario/manager/app_config_allow_list/test_reading.py) — pass
+
+항목 하나가 있고 슈퍼관리자가 id로 조회하면, 그 항목 전체가 답으로 온다
+
+Given
+
+- 사용자 스코프에 연 허용 항목 하나와, 슈퍼관리자 한 명
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
   - 설정 정의 config-1: 이 이름의 설정이 등록돼 있다
   - 허용 항목 entry-1: 사용자 스코프가 이 이름을 채울 수 있다, 순위는 그 종류의 기본값
-  - 허용 항목 entry-1에서 허용 항목에 READ 권한을 받은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 seated-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 seated-1: app_config_allow_list 전체에 READ 허용
-    - 일반 사용자 user-1: 역할 seated-1 보유
 
 When
 
@@ -516,83 +515,24 @@ Then
   - created_at: 이 실행이 쓴 시각
   - updated_at: 이 실행이 쓴 시각
 
-#### [an-id-nothing-answers-to-is-not-found-for-a-superadmin](/tests/scenario/bai_scenario/manager/app_config_allow_list/test_reading.py) — pass
-
-슈퍼관리자가 아무것도 갖지 않은 id로 조회하면, 대상이 없다는 것으로 거부된다. 권한 검사를 지나가는 사람만 이 답을 본다
-
-Given
-
-- 공개 스코프에 연 허용 항목 하나와, 슈퍼관리자 한 명
-  - 도메인 home-1
-  - 설정 정의 config-1: 이 이름의 설정이 등록돼 있다
-  - 허용 항목 entry-1: 공개 스코프가 이 이름을 채울 수 있다, 순위는 그 종류의 기본값
-  - 허용 항목 권한을 하나도 받지 않은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-
-When
-
-- AppConfigAllowListAdapter.admin_get — user-1이 아무것도 갖지 않은 id으로 조회
-
-Then
-
-- 거부된다
-  - 거부: EntityNotFoundError
-
-#### [an-id-nothing-answers-to-is-refused-as-permission-for-a-plain-user](/tests/scenario/bai_scenario/manager/app_config_allow_list/test_reading.py) — pass
-
-다른 항목에 읽기 권한을 받은 사용자가 아무것도 갖지 않은 id로 조회하면, 대상이 없다는 것이 아니라 권한 부족으로 거부된다. 없는 행에는 걸린 권한도 없기 때문이다
-
-Given
-
-- 사용자 스코프에 연 허용 항목 하나와, 그 항목에 READ 권한을 받은 사용자 한 명
-  - 도메인 home-1
-  - 설정 정의 config-1: 이 이름의 설정이 등록돼 있다
-  - 허용 항목 entry-1: 사용자 스코프가 이 이름을 채울 수 있다, 순위는 그 종류의 기본값
-  - 허용 항목 entry-1에서 허용 항목에 READ 권한을 받은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 seated-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 seated-1: app_config_allow_list 전체에 READ 허용
-    - 일반 사용자 user-1: 역할 seated-1 보유
-
-When
-
-- AppConfigAllowListAdapter.admin_get — user-1이 아무것도 갖지 않은 id으로 조회
-
-Then
-
-- 거부된다
-  - 거부: NotEnoughPermission
-
 ### reading_many
 
-#### [a-readable-an-unreadable-and-a-missing-id-are-each-answered-in-order-for-a-plain-user](/tests/scenario/bai_scenario/manager/app_config_allow_list/test_reading_many.py) — pass
+#### [a-user-who-is-not-the-superadmin-is-refused-per-id](/tests/scenario/bai_scenario/manager/app_config_allow_list/test_reading_many.py) — pass
 
-항목 둘 중 첫째에만 읽기 권한을 받은 사용자가 그 둘과 없는 id 하나를 한 번에 읽으면, 목록 순서대로 첫째는 노드, 둘째와 없는 id는 그 자리만 권한 부족으로 거부된다. 없는 행에는 걸린 권한도 없다
+슈퍼관리자가 아닌 사용자가 항목 둘과 없는 id 하나를 한 번에 읽으면, 요청 전체가 막히는 것이 아니라 세 자리 모두 그 자리만 권한 부족으로 거부된다
 
 Given
 
-- 한 이름을 두 스코프에 연 허용 항목 둘과, 그중 첫째에만 읽기 권한을 받은 사용자 한 명
+- 한 이름을 두 스코프에 연 허용 항목 둘과, 아무 권한도 받지 않은 사용자 한 명
   - 도메인 home-1
   - 설정 정의 config-1: 이 이름의 설정이 등록돼 있다
   - 허용 항목 first-1: 공개 스코프가 이 이름을 채울 수 있다, 순위는 그 종류의 기본값
   - 허용 항목 second-1: 사용자 스코프가 이 이름을 채울 수 있다, 순위는 그 종류의 기본값
-  - 허용 항목 first-1에서 허용 항목에 READ 권한을 받은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 seated-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 seated-1: app_config_allow_list 전체에 READ 허용
-    - 일반 사용자 user-1: 역할 seated-1 보유
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
 
 When
 
@@ -600,9 +540,9 @@ When
 
 Then
 
-- 권한 있는 것은 노드, 볼 수 없는 것과 없는 id는 그 자리만 거부된다
+- 있는 둘도 없는 id도 그 자리만 거부된다
   - items = 3
-  - items[0].id: 심은 첫째 항목와 같다
+  - 거부: NotEnoughPermission
   - 거부: NotEnoughPermission
   - 거부: NotEnoughPermission
 
@@ -612,17 +552,16 @@ Then
 
 Given
 
-- 한 이름을 두 스코프에 연 허용 항목 둘과, 허용 항목 권한을 하나도 받지 않은 사용자 한 명
+- 한 이름을 두 스코프에 연 허용 항목 둘과, 아무 권한도 받지 않은 사용자 한 명
   - 도메인 home-1
   - 설정 정의 config-1: 이 이름의 설정이 등록돼 있다
   - 허용 항목 first-1: 공개 스코프가 이 이름을 채울 수 있다, 순위는 그 종류의 기본값
   - 허용 항목 second-1: 사용자 스코프가 이 이름을 채울 수 있다, 순위는 그 종류의 기본값
-  - 허용 항목 권한을 하나도 받지 않은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
 
 When
 
@@ -644,12 +583,11 @@ Given
   - 설정 정의 config-1: 이 이름의 설정이 등록돼 있다
   - 허용 항목 first-1: 공개 스코프가 이 이름을 채울 수 있다, 순위는 그 종류의 기본값
   - 허용 항목 second-1: 사용자 스코프가 이 이름을 채울 수 있다, 순위는 그 종류의 기본값
-  - 허용 항목 권한을 하나도 받지 않은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
 
 When
 
@@ -665,27 +603,23 @@ Then
 
 ### searching
 
-#### [a-user-granted-read-may-not-search-every-entry](/tests/scenario/bai_scenario/manager/app_config_allow_list/test_searching.py) — pass
+#### [a-user-who-is-not-the-superadmin-may-not-search-entries](/tests/scenario/bai_scenario/manager/app_config_allow_list/test_searching.py) — pass
 
-허용 항목 읽기 권한을 받았지만 슈퍼관리자가 아닌 사용자가 전체를 훑으면, 역할로 거부된다. 하나를 읽는 문과 전체를 훑는 문이 다르다
+슈퍼관리자가 아닌 사용자가 전체를 훑으면, 역할로 거부된다
 
 Given
 
-- 이름 2개에 각각 공개 스코프로 연 허용 항목들과, 자기 스코프에서 허용 항목에 READ 권한을 받은 사용자 한 명
+- 이름 2개에 각각 공개 스코프로 연 허용 항목들과, 아무 권한도 받지 않은 사용자 한 명
   - 도메인 home-1
   - 설정 정의 wanted-1: 이 이름의 설정이 등록돼 있다
   - 허용 항목 entry-1: 공개 스코프가 이 이름을 채울 수 있다, 순위는 그 종류의 기본값
   - 설정 정의 other-1: 이 이름의 설정이 등록돼 있다
   - 허용 항목 entry-2: 공개 스코프가 이 이름을 채울 수 있다, 순위는 그 종류의 기본값
-  - 자기 스코프에서 허용 항목에 READ 권한을 받은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 own-scope-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 own-scope-1: app_config_allow_list 전체에 READ 허용
-    - 일반 사용자 user-1: 역할 own-scope-1 보유
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
 
 When
 
@@ -710,12 +644,11 @@ Given
   - 설정 정의 other-1: 이 이름의 설정이 등록돼 있다
   - 허용 항목 entry-3: 공개 스코프가 이 이름을 채울 수 있다, 순위는 그 종류의 기본값
   - 허용 항목 entry-4: 사용자 스코프가 이 이름을 채울 수 있다, 순위는 그 종류의 기본값
-  - 허용 항목 권한을 하나도 받지 않은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
 
 When
 
@@ -741,12 +674,11 @@ Given
   - 허용 항목 entry-1: 공개 스코프가 이 이름을 채울 수 있다, 순위는 그 종류의 기본값
   - 허용 항목 entry-2: 도메인 스코프가 이 이름을 채울 수 있다, 순위는 그 종류의 기본값
   - 허용 항목 entry-3: 사용자 스코프가 이 이름을 채울 수 있다, 순위는 그 종류의 기본값
-  - 허용 항목 권한을 하나도 받지 않은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
 
 When
 
@@ -788,12 +720,11 @@ Given
   - 허용 항목 entry-10: 공개 스코프가 이 이름을 채울 수 있다, 순위는 그 종류의 기본값
   - 설정 정의 other-10: 이 이름의 설정이 등록돼 있다
   - 허용 항목 entry-11: 공개 스코프가 이 이름을 채울 수 있다, 순위는 그 종류의 기본값
-  - 허용 항목 권한을 하나도 받지 않은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
 
 When
 
@@ -819,12 +750,11 @@ Given
   - 허용 항목 entry-1: 공개 스코프가 이 이름을 채울 수 있다, 순위는 그 종류의 기본값
   - 허용 항목 entry-2: 도메인 스코프가 이 이름을 채울 수 있다, 순위는 그 종류의 기본값
   - 허용 항목 entry-3: 사용자 스코프가 이 이름을 채울 수 있다, 순위는 그 종류의 기본값
-  - 허용 항목 권한을 하나도 받지 않은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
 
 When
 
@@ -850,12 +780,11 @@ Given
   - 설정 정의 other-1: 이 이름의 설정이 등록돼 있다
   - 허용 항목 entry-3: 공개 스코프가 이 이름을 채울 수 있다, 순위는 그 종류의 기본값
   - 허용 항목 entry-4: 사용자 스코프가 이 이름을 채울 수 있다, 순위는 그 종류의 기본값
-  - 허용 항목 권한을 하나도 받지 않은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
 
 When
 

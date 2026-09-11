@@ -1,4 +1,4 @@
-"""허용 항목 지우기 — 누가 지울 수 있고, 딸린 조각이 막지 않는다.
+"""허용 항목 지우기 — 슈퍼관리자만 지우고, 딸린 조각이 막지 않는다.
 
 조각은 데이터베이스가 함께 지운다. 이 어댑터에는 soft delete가 없다.
 """
@@ -27,7 +27,6 @@ from ai.backend.common.dto.manager.v2.app_config_allow_list.response import (
 from ai.backend.manager.api.adapters.app_config_allow_list.adapter import (
     AppConfigAllowListAdapter,
 )
-from ai.backend.manager.data.permission.types import Permission
 from ai.backend.manager.errors.base.entity import EntityNotFoundError
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -91,22 +90,20 @@ class ThePurgedOneIsNamed(Then[AnEntryAndACaller, Purged]):
 
 
 @dataclass(frozen=True)
-class TheGrantedUserPurgesIt(
+class TheSuperadminPurgesIt(
     Scenario[SeedingSession, AnEntryAndACaller, AppConfigAllowListAdapter, Purged]
 ):
     @override
     def summary(self) -> str:
-        return "a-user-granted-hard-delete-on-the-entry-purges-it"
+        return "the-superadmin-purges-an-entry"
 
     @override
     def describe(self) -> str:
-        return (
-            "조각이 딸리지 않은 항목에 지우기 권한을 받은 사용자가 지우면, 지운 id를 실은 답이 온다"
-        )
+        return "조각이 딸리지 않은 항목을 슈퍼관리자가 지우면, 지운 id를 실은 답이 온다"
 
     @override
     def given(self) -> Given[SeedingSession, AnEntryAndACaller]:
-        return AnEntryAndSomeone(opened=AppConfigScopeType.USER, granted=(Permission.HARD_DELETE,))
+        return AnEntryAndSomeone(opened=AppConfigScopeType.USER, role=UserRole.SUPERADMIN)
 
     @override
     def when(self) -> When[AnEntryAndACaller, AppConfigAllowListAdapter, Purged]:
@@ -127,11 +124,11 @@ class AFragmentDoesNotBlockIt(
 
     @override
     def describe(self) -> str:
-        return "조각이 딸린 항목을 지우기 권한을 받은 사용자가 지우면, 조각이 막지 않고 지운 id를 실은 답이 온다"
+        return "조각이 딸린 항목을 슈퍼관리자가 지우면, 조각이 막지 않고 지운 id를 실은 답이 온다"
 
     @override
     def given(self) -> Given[SeedingSession, AnEntryAndACaller]:
-        return AnEntryAndSomeone(granted=(Permission.HARD_DELETE,), with_fragment=True)
+        return AnEntryAndSomeone(role=UserRole.SUPERADMIN, with_fragment=True)
 
     @override
     def when(self) -> When[AnEntryAndACaller, AppConfigAllowListAdapter, Purged]:
@@ -148,11 +145,11 @@ class AUserGrantedNothingMayNotPurge(
 ):
     @override
     def summary(self) -> str:
-        return "a-user-granted-nothing-may-not-purge-an-entry"
+        return "a-user-who-is-not-the-superadmin-may-not-purge-an-entry"
 
     @override
     def describe(self) -> str:
-        return "같은 항목이 있고 아무 권한도 받지 않은 사용자가 지우면, 권한 부족으로 거부된다"
+        return "같은 항목이 있고 슈퍼관리자가 아닌 사용자가 지우면, 권한 부족으로 거부된다"
 
     @override
     def given(self) -> Given[SeedingSession, AnEntryAndACaller]:
@@ -193,7 +190,7 @@ class AnUnknownIdIsNotFoundForASuperadmin(
 
 
 SCENARIOS: list[PurgingStep] = [
-    TheGrantedUserPurgesIt(),
+    TheSuperadminPurgesIt(),
     AFragmentDoesNotBlockIt(),
     AUserGrantedNothingMayNotPurge(),
     AnUnknownIdIsNotFoundForASuperadmin(),

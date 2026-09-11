@@ -40,7 +40,6 @@ from ai.backend.common.dto.manager.v2.common import OrderDirection
 from ai.backend.manager.api.adapters.app_config_allow_list.adapter import (
     AppConfigAllowListAdapter,
 )
-from ai.backend.manager.data.permission.types import Permission
 from ai.backend.manager.errors.auth import InsufficientPrivilege
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import Given, Scenario, Then, When
@@ -289,23 +288,20 @@ class NoPageSizeMeansTen(
 
 
 @dataclass(frozen=True)
-class AGrantDoesNotOpenTheGlobalDoor(
+class APlainUserMayNotSearch(
     Scenario[SeedingSession, ManyEntriesAndACaller, AppConfigAllowListAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
-        return "a-user-granted-read-may-not-search-every-entry"
+        return "a-user-who-is-not-the-superadmin-may-not-search-entries"
 
     @override
     def describe(self) -> str:
-        return (
-            "허용 항목 읽기 권한을 받았지만 슈퍼관리자가 아닌 사용자가 전체를 훑으면, 역할로 "
-            "거부된다. 하나를 읽는 문과 전체를 훑는 문이 다르다"
-        )
+        return "슈퍼관리자가 아닌 사용자가 전체를 훑으면, 역할로 거부된다"
 
     @override
     def given(self) -> Given[SeedingSession, ManyEntriesAndACaller]:
-        return EntriesLaidAcross(names=2, granted=(Permission.READ,))
+        return EntriesLaidAcross(names=2)
 
     @override
     def when(self) -> When[ManyEntriesAndACaller, AppConfigAllowListAdapter, Searched]:
@@ -322,7 +318,7 @@ SCENARIOS: list[SearchingStep] = [
     FilteringByKindKeepsThatKind(),
     OrderingByRankSortsThem(),
     NoPageSizeMeansTen(),
-    AGrantDoesNotOpenTheGlobalDoor(),
+    APlainUserMayNotSearch(),
 ]
 
 
