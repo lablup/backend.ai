@@ -8,7 +8,7 @@ Not exercised by any scenario: batch_load_fields.
 
 #### [a-user-who-is-not-the-superadmin-may-not-create-a-variant](/tests/scenario/bai_scenario/manager/runtime_variant/test_creating.py) — pass
 
-슈퍼관리자가 아닌 사용자가 변형을 만들면 역할로 거부된다
+슈퍼관리자가 아닌 사용자가 변형을 생성하면 역할 부족으로 거부된다
 
 Given
 
@@ -22,7 +22,7 @@ Given
 
 When
 
-- RuntimeVariantAdapter.create — user-1이 vllm 변형을 만듦
+- RuntimeVariantAdapter.create — user-1이 vllm 변형을 생성
 
 Then
 
@@ -31,7 +31,7 @@ Then
 
 #### [a-variant-made-with-a-description-carries-it-back](/tests/scenario/bai_scenario/manager/runtime_variant/test_creating.py) — pass
 
-슈퍼관리자가 이름과 설명을 함께 주고 만들면, 준 값이 그대로 실린 노드가 온다
+슈퍼관리자가 이름과 설명을 함께 지정해 생성하면, 지정한 값이 그대로 담긴 노드가 반환된다
 
 Given
 
@@ -45,14 +45,14 @@ Given
 
 When
 
-- RuntimeVariantAdapter.create — user-1이 vllm 변형을 만듦
+- RuntimeVariantAdapter.create — user-1이 vllm 변형을 생성
 
 Then
 
-- 만든 변형 전체가 온다
+- 생성한 변형 전체가 반환된다
   - id: 무시함 — 데이터베이스가 만든다
   - name = 'vllm'
-  - description = '새로 적은 설명'
+  - description = '새로 지정한 설명'
   - reads_vfolder_config_files = False
   - default_model_definition = RuntimeVariantModelDefinitionInfo(models=None)
   - created_at: 이 실행이 쓴 시각
@@ -60,7 +60,7 @@ Then
 
 #### [a-variant-name-already-taken-is-refused](/tests/scenario/bai_scenario/manager/runtime_variant/test_creating.py) — pass
 
-같은 이름의 변형이 이미 있을 때 그 이름으로 다시 만들면, 이름이 겹친다는 이유로 거부된다
+같은 이름의 변형이 이미 있을 때 그 이름으로 다시 생성하면, 이름 중복으로 거부된다
 
 Given
 
@@ -75,7 +75,7 @@ Given
 
 When
 
-- RuntimeVariantAdapter.create — user-1이 이미 있는 variant-1으로 다시 만듦
+- RuntimeVariantAdapter.create — user-1이 이미 있는 이름 variant-1(으)로 다시 생성
 
 Then
 
@@ -84,7 +84,7 @@ Then
 
 #### [the-superadmin-makes-a-variant-with-a-name-alone](/tests/scenario/bai_scenario/manager/runtime_variant/test_creating.py) — pass
 
-슈퍼관리자가 이름만 주고 변형을 만들면, 설명은 비고 폴더 설정 파일은 읽지 않으며 모델 정의는 코드가 못박은 기본값인 노드가 온다
+슈퍼관리자가 이름만 지정해 변형을 생성하면, 설명은 비고 폴더 설정 파일은 읽지 않으며 모델 정의는 코드가 정해 둔 기본값인 노드가 반환된다
 
 Given
 
@@ -98,11 +98,11 @@ Given
 
 When
 
-- RuntimeVariantAdapter.create — user-1이 vllm 변형을 만듦
+- RuntimeVariantAdapter.create — user-1이 vllm 변형을 생성
 
 Then
 
-- 만든 변형 전체가 온다
+- 생성한 변형 전체가 반환된다
   - id: 무시함 — 데이터베이스가 만든다
   - name = 'vllm'
   - description = None
@@ -113,7 +113,7 @@ Then
 
 #### [turning-enforcement-off-does-not-let-a-user-create-a-variant](/tests/scenario/bai_scenario/manager/runtime_variant/test_creating.py) — pass
 
-엔티티 권한 집행을 꺼도 슈퍼관리자가 아니면 변형을 만들지 못한다. 이 문은 권한 그래프가 아니라 역할이라 스위치와 무관하다
+권한 검사를 꺼도 슈퍼관리자가 아니면 변형을 생성하지 못한다. 생성은 권한 그래프가 아니라 역할로 보호되므로 스위치와 무관하다
 
 Given
 
@@ -127,7 +127,7 @@ Given
 
 When
 
-- RuntimeVariantAdapter.create — user-1이 vllm 변형을 만듦
+- RuntimeVariantAdapter.create — user-1이 vllm 변형을 생성
 
 Then
 
@@ -138,7 +138,7 @@ Then
 
 #### [a-user-granted-nothing-editing-an-unknown-variant-id-is-refused-for-permission](/tests/scenario/bai_scenario/manager/runtime_variant/test_editing.py) — pass
 
-아무 권한도 받지 않은 사용자가 없는 id를 고치면 대상 없음이 아니라 권한 부족으로 거부된다. 권한 검사가 먼저 돌고 없는 행에는 걸린 권한도 없다
+아무 권한도 없는 사용자가 존재하지 않는 id를 수정하면 대상 없음이 아니라 권한 부족으로 거부된다. 권한 검사가 먼저 실행되고 없는 행에는 부여된 권한도 없기 때문이다
 
 Given
 
@@ -153,7 +153,7 @@ Given
 
 When
 
-- RuntimeVariantAdapter.update — user-1이 없는 id의 이름 고침
+- RuntimeVariantAdapter.update — user-1이 존재하지 않는 id의 이름 수정
 
 Then
 
@@ -162,7 +162,7 @@ Then
 
 #### [a-user-granted-nothing-may-not-edit-a-variant](/tests/scenario/bai_scenario/manager/runtime_variant/test_editing.py) — pass
 
-아무 권한도 받지 않은 사용자가 변형을 고치면 권한 부족으로 거부된다. 변형은 어느 스코프에도 없어 그 권한을 받을 길이 없다
+아무 권한도 없는 사용자가 변형을 수정하면 권한 부족으로 거부된다. 변형은 어느 스코프에도 속하지 않아 그 권한을 받을 방법이 없다
 
 Given
 
@@ -177,7 +177,7 @@ Given
 
 When
 
-- RuntimeVariantAdapter.update — user-1이 variant-1의 이름 고침
+- RuntimeVariantAdapter.update — user-1이 variant-1의 이름 수정
 
 Then
 
@@ -186,7 +186,7 @@ Then
 
 #### [an-edit-giving-no-value-changes-nothing](/tests/scenario/bai_scenario/manager/runtime_variant/test_editing.py) — pass
 
-값을 하나도 주지 않고 고치면 아무것도 바뀌지 않은 노드가 온다
+값을 하나도 지정하지 않고 수정하면 아무것도 바뀌지 않은 노드가 반환된다
 
 Given
 
@@ -201,14 +201,14 @@ Given
 
 When
 
-- RuntimeVariantAdapter.update — user-1이 variant-1의 아무것도 고침
+- RuntimeVariantAdapter.update — user-1이 variant-1의 아무것도 수정
 
 Then
 
-- 심은 변형 전체가 온다
+- 미리 만들어 둔 변형 전체가 반환된다
   - id: 무시함 — 데이터베이스가 만든다
   - name = 'variant-1'
-  - description = '심어둔 런타임 변형'
+  - description = '미리 만들어 둔 런타임 변형'
   - reads_vfolder_config_files = False
   - default_model_definition = RuntimeVariantModelDefinitionInfo(models=None)
   - created_at: 이 실행이 쓴 시각
@@ -216,7 +216,7 @@ Then
 
 #### [clearing-a-variant-description-leaves-it-empty](/tests/scenario/bai_scenario/manager/runtime_variant/test_editing.py) — pass
 
-설명이 있는 변형의 설명을 비우는 수정을 하면, 설명이 없어진다
+설명이 있는 변형에 설명을 비우는 수정을 하면, 설명이 없어진다
 
 Given
 
@@ -231,11 +231,11 @@ Given
 
 When
 
-- RuntimeVariantAdapter.update — user-1이 variant-1의 설명 고침
+- RuntimeVariantAdapter.update — user-1이 variant-1의 설명 수정
 
 Then
 
-- 심은 변형 전체가 온다
+- 미리 만들어 둔 변형 전체가 반환된다
   - id: 무시함 — 데이터베이스가 만든다
   - name = 'variant-1'
   - description = None
@@ -246,7 +246,7 @@ Then
 
 #### [renaming-a-variant-leaves-its-description-alone](/tests/scenario/bai_scenario/manager/runtime_variant/test_editing.py) — pass
 
-슈퍼관리자가 변형의 이름만 바꾸면, 이름은 새 값이 되고 설명은 그대로 남는다
+슈퍼관리자가 변형의 이름만 바꾸면, 이름은 새 값이 되고 설명은 그대로 유지된다
 
 Given
 
@@ -261,14 +261,14 @@ Given
 
 When
 
-- RuntimeVariantAdapter.update — user-1이 variant-1의 이름 고침
+- RuntimeVariantAdapter.update — user-1이 variant-1의 이름 수정
 
 Then
 
-- 심은 변형 전체가 온다
+- 미리 만들어 둔 변형 전체가 반환된다
   - id: 무시함 — 데이터베이스가 만든다
   - name = 'renamed'
-  - description = '심어둔 런타임 변형'
+  - description = '미리 만들어 둔 런타임 변형'
   - reads_vfolder_config_files = False
   - default_model_definition = RuntimeVariantModelDefinitionInfo(models=None)
   - created_at: 이 실행이 쓴 시각
@@ -276,7 +276,7 @@ Then
 
 #### [renaming-a-variant-to-a-name-already-taken-is-refused](/tests/scenario/bai_scenario/manager/runtime_variant/test_editing.py) — pass
 
-변형 둘 중 한쪽의 이름을 다른 쪽 이름으로 바꾸면, 이름이 겹친다는 이유로 거부된다. 만들 때와 달리 저장소의 제약 위반이 그대로 온다
+변형 둘 중 한쪽의 이름을 다른 쪽 이름으로 바꾸면, 이름 중복으로 거부된다. 생성할 때와 달리 저장소의 제약 위반이 그대로 전파된다
 
 Given
 
@@ -292,7 +292,7 @@ Given
 
 When
 
-- RuntimeVariantAdapter.update — user-1이 wanted-1의 이름을 other-1으로 고침
+- RuntimeVariantAdapter.update — user-1이 wanted-1의 이름을 other-1(으)로 수정
 
 Then
 
@@ -301,7 +301,7 @@ Then
 
 #### [the-superadmin-editing-a-variant-id-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/runtime_variant/test_editing.py) — pass
 
-슈퍼관리자가 아무 변형도 갖지 않은 id를 고치면 대상이 없다는 것으로 거부된다
+슈퍼관리자가 존재하지 않는 id를 수정하면 대상을 찾을 수 없다는 이유로 거부된다
 
 Given
 
@@ -316,7 +316,7 @@ Given
 
 When
 
-- RuntimeVariantAdapter.update — user-1이 없는 id의 이름 고침
+- RuntimeVariantAdapter.update — user-1이 존재하지 않는 id의 이름 수정
 
 Then
 
@@ -325,7 +325,7 @@ Then
 
 #### [turning-enforcement-off-lets-a-user-edit-a-variant](/tests/scenario/bai_scenario/manager/runtime_variant/test_editing.py) — pass
 
-엔티티 권한 집행을 끄면 아무 권한도 받지 않은 사용자도 변형을 고친다. 이 문은 역할이 아니라 권한 그래프가 지키기 때문이다
+권한 검사를 끄면 아무 권한도 없는 사용자도 변형을 수정할 수 있다. 수정은 역할이 아니라 권한 그래프로 보호되기 때문이다
 
 Given
 
@@ -340,14 +340,14 @@ Given
 
 When
 
-- RuntimeVariantAdapter.update — user-1이 variant-1의 이름 고침
+- RuntimeVariantAdapter.update — user-1이 variant-1의 이름 수정
 
 Then
 
-- 심은 변형 전체가 온다
+- 미리 만들어 둔 변형 전체가 반환된다
   - id: 무시함 — 데이터베이스가 만든다
   - name = 'renamed'
-  - description = '심어둔 런타임 변형'
+  - description = '미리 만들어 둔 런타임 변형'
   - reads_vfolder_config_files = False
   - default_model_definition = RuntimeVariantModelDefinitionInfo(models=None)
   - created_at: 이 실행이 쓴 시각
@@ -357,7 +357,7 @@ Then
 
 #### [a-user-granted-nothing-reads-a-variant-by-id](/tests/scenario/bai_scenario/manager/runtime_variant/test_reading.py) — pass
 
-아무 권한도 받지 않은 사용자가 id로 조회하면, 그 변형 전체가 온다. 이 읽기는 인증만 본다
+아무 권한도 없는 사용자가 id로 조회하면, 그 변형 전체가 반환된다. 이 조회는 인증만 확인한다
 
 Given
 
@@ -372,14 +372,14 @@ Given
 
 When
 
-- RuntimeVariantAdapter.get — user-1이 variant-1로 조회
+- RuntimeVariantAdapter.get — user-1이 variant-1(으)로 조회
 
 Then
 
-- 심은 변형 전체가 온다
+- 미리 만들어 둔 변형 전체가 반환된다
   - id: 무시함 — 데이터베이스가 만든다
   - name = 'variant-1'
-  - description = '심어둔 런타임 변형'
+  - description = '미리 만들어 둔 런타임 변형'
   - reads_vfolder_config_files = False
   - default_model_definition = RuntimeVariantModelDefinitionInfo(models=None)
   - created_at: 이 실행이 쓴 시각
@@ -387,7 +387,7 @@ Then
 
 #### [a-variant-name-resolves-to-its-id-for-any-user](/tests/scenario/bai_scenario/manager/runtime_variant/test_reading.py) — pass
 
-아무 권한도 받지 않은 사용자가 이름을 해석하면 그 변형의 id가 온다
+아무 권한도 없는 사용자가 이름을 id로 변환하면 그 변형의 id가 반환된다
 
 Given
 
@@ -402,16 +402,16 @@ Given
 
 When
 
-- RuntimeVariantAdapter.resolve_by_name — user-1이 variant-1을 id로 해석
+- RuntimeVariantAdapter.resolve_by_name — user-1이 이름 variant-1(을)를 id로 변환
 
 Then
 
-- 심은 변형의 id가 온다
-  - id: 심은 변형와 같다
+- 미리 만들어 둔 변형의 id가 반환된다
+  - id: 미리 만들어 둔 변형와 같다
 
 #### [an-empty-id-list-answers-empty-without-a-call](/tests/scenario/bai_scenario/manager/runtime_variant/test_reading.py) — pass
 
-빈 id 목록을 주면 빈 답이 온다. 배선을 부르지 않는다
+빈 id 목록을 주면 빈 응답이 반환된다. 하위 계층을 호출하지 않는다
 
 Given
 
@@ -430,12 +430,12 @@ When
 
 Then
 
-- 빈 답이 온다
+- 빈 응답이 반환된다
   - items = []
 
 #### [reading-a-variant-id-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/runtime_variant/test_reading.py) — pass
 
-아무 변형도 갖지 않은 id로 조회하면 대상이 없다는 것으로 거부된다
+존재하지 않는 id로 조회하면 대상을 찾을 수 없다는 이유로 거부된다
 
 Given
 
@@ -450,7 +450,7 @@ Given
 
 When
 
-- RuntimeVariantAdapter.get — user-1이 없는 id로 조회
+- RuntimeVariantAdapter.get — user-1이 존재하지 않는 id(으)로 조회
 
 Then
 
@@ -459,7 +459,7 @@ Then
 
 #### [resolving-a-variant-name-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/runtime_variant/test_reading.py) — pass
 
-아무 변형도 갖지 않은 이름을 해석하면 대상이 없다는 것으로 거부된다. 이 해석에는 뒤따르는 권한 검사가 없어 없다는 사실이 그대로 드러난다
+존재하지 않는 이름을 id로 변환하면 대상을 찾을 수 없다는 이유로 거부된다. 이 변환에는 뒤따르는 권한 검사가 없어 존재하지 않는다는 사실이 그대로 드러난다
 
 Given
 
@@ -474,7 +474,7 @@ Given
 
 When
 
-- RuntimeVariantAdapter.resolve_by_name — user-1이 no-such-variant을 id로 해석
+- RuntimeVariantAdapter.resolve_by_name — user-1이 이름 no-such-variant(을)를 id로 변환
 
 Then
 
@@ -483,7 +483,7 @@ Then
 
 #### [variants-read-by-many-ids-come-back-in-the-order-asked](/tests/scenario/bai_scenario/manager/runtime_variant/test_reading.py) — pass
 
-있는 id 둘과 없는 id 하나를 한 번에 읽으면, 준 순서대로 오고 없는 id 자리는 비어서 온다
+있는 id 둘과 없는 id 하나를 한 번에 조회하면, 요청한 순서대로 반환되고 없는 id 자리는 비어 있다
 
 Given
 
@@ -499,22 +499,22 @@ Given
 
 When
 
-- RuntimeVariantAdapter.batch_load_by_ids — user-1이 심은 2개와 없는 id 하나를 한 번에 조회
+- RuntimeVariantAdapter.batch_load_by_ids — user-1이 미리 만들어 둔 2개와 없는 id 하나를 한 번에 조회
 
 Then
 
-- 준 순서대로, 없는 id 자리는 비어서 온다
+- 요청한 순서대로, 없는 id 자리는 비어서 반환된다
   - len(items) = 3
   - items[0].id: 무시함 — 데이터베이스가 만든다
   - items[0].name = 'wanted-1'
-  - items[0].description = '심어둔 런타임 변형'
+  - items[0].description = '미리 만들어 둔 런타임 변형'
   - items[0].reads_vfolder_config_files = False
   - items[0].default_model_definition = RuntimeVariantModelDefinitionInfo(models=None)
   - items[0].created_at: 이 실행이 쓴 시각
   - items[0].updated_at: 이 실행이 쓴 시각
   - items[1].id: 무시함 — 데이터베이스가 만든다
   - items[1].name = 'other-1'
-  - items[1].description = '심어둔 런타임 변형'
+  - items[1].description = '미리 만들어 둔 런타임 변형'
   - items[1].reads_vfolder_config_files = False
   - items[1].default_model_definition = RuntimeVariantModelDefinitionInfo(models=None)
   - items[1].created_at: 이 실행이 쓴 시각
@@ -525,7 +525,7 @@ Then
 
 #### [a-user-granted-nothing-may-not-delete-a-variant](/tests/scenario/bai_scenario/manager/runtime_variant/test_retiring.py) — pass
 
-아무 권한도 받지 않은 사용자가 변형을 지우면 권한 부족으로 거부된다
+아무 권한도 없는 사용자가 변형을 삭제하면 권한 부족으로 거부된다
 
 Given
 
@@ -540,7 +540,7 @@ Given
 
 When
 
-- RuntimeVariantAdapter.delete — user-1이 variant-1를 지움
+- RuntimeVariantAdapter.delete — user-1이 variant-1 삭제
 
 Then
 
@@ -549,7 +549,7 @@ Then
 
 #### [a-user-granted-nothing-may-not-delete-many-variants](/tests/scenario/bai_scenario/manager/runtime_variant/test_retiring.py) — pass
 
-아무 권한도 받지 않은 사용자가 변형 둘을 한 번에 지우면 권한 부족으로 거부된다
+아무 권한도 없는 사용자가 변형 둘을 한 번에 삭제하면 권한 부족으로 거부된다
 
 Given
 
@@ -565,7 +565,7 @@ Given
 
 When
 
-- RuntimeVariantAdapter.bulk_delete — user-1이 2개를 한 번에 지움
+- RuntimeVariantAdapter.bulk_delete — user-1이 2개를 한 번에 삭제
 
 Then
 
@@ -574,7 +574,7 @@ Then
 
 #### [an-unknown-id-in-a-bulk-delete-is-not-found-after-the-ones-before-it-are-gone](/tests/scenario/bai_scenario/manager/runtime_variant/test_retiring.py) — pass
 
-있는 id 뒤에 없는 id를 붙여 한 번에 지우면 대상이 없다는 것으로 거부된다. 한 트랜잭션이 아니라 앞의 것은 이미 지워져 있다
+있는 id 뒤에 없는 id를 붙여 한 번에 삭제하면 대상을 찾을 수 없다는 이유로 거부된다. 한 트랜잭션이 아니므로 앞의 것은 이미 삭제되어 있다
 
 Given
 
@@ -589,7 +589,7 @@ Given
 
 When
 
-- RuntimeVariantAdapter.bulk_delete — user-1이 variant-1와 없는 id를 한 번에 지움
+- RuntimeVariantAdapter.bulk_delete — user-1이 variant-1(와)과 없는 id를 한 번에 삭제
 
 Then
 
@@ -598,7 +598,7 @@ Then
 
 #### [deleting-a-variant-id-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/runtime_variant/test_retiring.py) — pass
 
-슈퍼관리자가 아무 변형도 갖지 않은 id를 지우면 대상이 없다는 것으로 거부된다
+슈퍼관리자가 존재하지 않는 id를 삭제하면 대상을 찾을 수 없다는 이유로 거부된다
 
 Given
 
@@ -613,7 +613,7 @@ Given
 
 When
 
-- RuntimeVariantAdapter.delete — user-1이 없는 id를 지움
+- RuntimeVariantAdapter.delete — user-1이 존재하지 않는 id 삭제
 
 Then
 
@@ -622,7 +622,7 @@ Then
 
 #### [the-superadmin-deletes-a-variant](/tests/scenario/bai_scenario/manager/runtime_variant/test_retiring.py) — pass
 
-슈퍼관리자가 변형을 지우면 지운 변형의 id를 실은 답이 온다
+슈퍼관리자가 변형을 삭제하면 삭제한 변형의 id를 담은 응답이 반환된다
 
 Given
 
@@ -637,16 +637,16 @@ Given
 
 When
 
-- RuntimeVariantAdapter.delete — user-1이 variant-1를 지움
+- RuntimeVariantAdapter.delete — user-1이 variant-1 삭제
 
 Then
 
-- 지운 변형의 id가 온다
-  - id: 심은 변형와 같다
+- 삭제한 변형의 id가 반환된다
+  - id: 미리 만들어 둔 변형와 같다
 
 #### [the-superadmin-deletes-many-variants-at-once](/tests/scenario/bai_scenario/manager/runtime_variant/test_retiring.py) — pass
 
-슈퍼관리자가 변형 둘을 한 번에 지우면, 답은 요청한 id의 수를 그대로 싣는다
+슈퍼관리자가 변형 둘을 한 번에 삭제하면, 응답에는 요청한 id의 수가 그대로 담긴다
 
 Given
 
@@ -662,16 +662,16 @@ Given
 
 When
 
-- RuntimeVariantAdapter.bulk_delete — user-1이 2개를 한 번에 지움
+- RuntimeVariantAdapter.bulk_delete — user-1이 2개를 한 번에 삭제
 
 Then
 
-- 요청한 id의 수가 온다
+- 요청한 id의 수가 반환된다
   - deleted_count = 2
 
 #### [turning-enforcement-off-lets-a-user-delete-a-variant](/tests/scenario/bai_scenario/manager/runtime_variant/test_retiring.py) — pass
 
-엔티티 권한 집행을 끄면 아무 권한도 받지 않은 사용자도 변형을 지운다. 이 문은 역할이 아니라 권한 그래프가 지키기 때문이다
+권한 검사를 끄면 아무 권한도 없는 사용자도 변형을 삭제할 수 있다. 삭제는 역할이 아니라 권한 그래프로 보호되기 때문이다
 
 Given
 
@@ -686,18 +686,18 @@ Given
 
 When
 
-- RuntimeVariantAdapter.delete — user-1이 variant-1를 지움
+- RuntimeVariantAdapter.delete — user-1이 variant-1 삭제
 
 Then
 
-- 지운 변형의 id가 온다
-  - id: 심은 변형와 같다
+- 삭제한 변형의 id가 반환된다
+  - id: 미리 만들어 둔 변형와 같다
 
 ### searching
 
 #### [a-name-filter-narrows-the-answer-to-the-variant-it-names](/tests/scenario/bai_scenario/manager/runtime_variant/test_searching.py) — pass
 
-변형 여럿 중 하나의 이름으로 걸러 조회하면, 답에는 그 이름의 변형만 남는다
+변형 여럿 중 하나의 이름을 필터로 조회하면, 응답에는 그 이름의 변형만 남는다
 
 Given
 
@@ -714,11 +714,11 @@ Given
 
 When
 
-- RuntimeVariantAdapter.search — user-1이 wanted-1으로 걸러 조회
+- RuntimeVariantAdapter.search — user-1이 wanted-1 이름 필터로 조회
 
 Then
 
-- 걸러낸 그 변형 하나만 남는다
+- 필터에 맞는 변형 하나만 반환된다
   - items = ['wanted-1']
   - total_count = 1
   - has_next_page = False
@@ -726,7 +726,7 @@ Then
 
 #### [a-user-granted-nothing-counts-every-variant-laid](/tests/scenario/bai_scenario/manager/runtime_variant/test_searching.py) — pass
 
-변형 둘이 있을 때 아무 권한도 받지 않은 사용자가 필터 없이 조회하면 둘을 모두 센다
+변형 둘이 있을 때 아무 권한도 없는 사용자가 필터 없이 조회하면 둘 다 집계된다
 
 Given
 
@@ -746,7 +746,7 @@ When
 
 Then
 
-- 심은 변형이 모두 세어진다
+- 미리 만들어 둔 변형이 모두 집계된다
   - items = ['other-1', 'wanted-1']
   - total_count = 2
   - has_next_page = False
@@ -754,7 +754,7 @@ Then
 
 #### [omitting-the-page-size-answers-ten-variants-and-a-next-page](/tests/scenario/bai_scenario/manager/runtime_variant/test_searching.py) — pass
 
-변형 열하나가 있을 때 크기 없이 조회하면 열 건까지 오고 다음 쪽이 있다고 답한다
+변형 11개가 있을 때 크기 없이 조회하면 10건까지 반환되고 다음 페이지가 있다고 응답한다
 
 Given
 
@@ -783,7 +783,7 @@ When
 
 Then
 
-- 기본 크기의 첫 쪽이 온다
+- 기본 크기의 첫 페이지가 반환된다
   - len(items) = 10
   - total_count = 11
   - has_next_page = True
