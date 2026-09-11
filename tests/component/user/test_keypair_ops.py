@@ -70,7 +70,7 @@ mutation IssueMyKeypair {
 
 # GQL error extension codes produced by GQLExceptionHandlerExtension
 # ErrorCode.__str__() formats as "{domain}_{operation}_{error_detail}" (underscore-separated)
-_GQL_ERR_FORBIDDEN = "keypair_read_forbidden"
+_GQL_ERR_FORBIDDEN = "user-keypair_read_forbidden"
 # An access key naming no keypair ends at the lookup that resolves it into a row id,
 # which reports under the keypair field's own domain rather than the database's.
 _GQL_ERR_NO_ROW = "user-keypair_read_not-found"
