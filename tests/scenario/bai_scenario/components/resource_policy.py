@@ -140,7 +140,7 @@ class LaidHolder:
     project_policy: Laid[ProjectResourcePolicyData]
 
 
-class Family[D, N](ABC):
+class Family[PolicyData, PolicyNode](ABC):
     """정책 한 종류. 어떻게 심고, 어댑터의 어느 호출로 읽고 쓰고, 답의 어느 자리를 보는지."""
 
     @property
@@ -172,22 +172,24 @@ class Family[D, N](ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def seed(self, name_hint: str = "policy", *, holding_optional: bool = False) -> SeedRow[D]:
+    def seed(
+        self, name_hint: str = "policy", *, holding_optional: bool = False
+    ) -> SeedRow[PolicyData]:
         """정책 하나. ``holding_optional``이면 비울 수 있는 항목에 값을 둔다."""
         raise NotImplementedError
 
     @abstractmethod
-    def own_of(self, holder: LaidHolder) -> Laid[D]:
+    def own_of(self, holder: LaidHolder) -> Laid[PolicyData]:
         """그 사용자가 매인 이 종류의 정책."""
         raise NotImplementedError
 
     @abstractmethod
-    def view(self, node: N) -> dict[str, Any]:
+    def view(self, node: PolicyNode) -> dict[str, Any]:
         """답의 자리들을 견줄 수 있는 값으로."""
         raise NotImplementedError
 
     @abstractmethod
-    def seeded_view(self, seeded: D) -> dict[str, Any]:
+    def seeded_view(self, seeded: PolicyData) -> dict[str, Any]:
         """심은 것을 답과 같은 자리로."""
         raise NotImplementedError
 
@@ -208,11 +210,11 @@ class Family[D, N](ABC):
         raise NotImplementedError
 
     @abstractmethod
-    async def create(self, adapter: ResourcePolicyAdapter, asked: Any) -> N:
+    async def create(self, adapter: ResourcePolicyAdapter, asked: Any) -> PolicyNode:
         raise NotImplementedError
 
     @abstractmethod
-    async def read(self, adapter: ResourcePolicyAdapter, name: str) -> N:
+    async def read(self, adapter: ResourcePolicyAdapter, name: str) -> PolicyNode:
         raise NotImplementedError
 
     @abstractmethod
@@ -220,7 +222,7 @@ class Family[D, N](ABC):
         raise NotImplementedError
 
     @abstractmethod
-    async def update(self, adapter: ResourcePolicyAdapter, name: str, asked: Any) -> N:
+    async def update(self, adapter: ResourcePolicyAdapter, name: str, asked: Any) -> PolicyNode:
         raise NotImplementedError
 
     @abstractmethod
@@ -239,7 +241,7 @@ class Family[D, N](ABC):
         return out
 
 
-class OwnFamily[D, N](Family[D, N]):
+class OwnFamily[PolicyData, PolicyNode](Family[PolicyData, PolicyNode]):
     """부르는 사람 자신의 것을 읽는 호출이 있고, 생략하거나 비울 수 있는 항목이 있는 정책."""
 
     @property
@@ -257,7 +259,7 @@ class OwnFamily[D, N](Family[D, N]):
         raise NotImplementedError
 
     @abstractmethod
-    async def read_mine(self, adapter: ResourcePolicyAdapter) -> N:
+    async def read_mine(self, adapter: ResourcePolicyAdapter) -> PolicyNode:
         raise NotImplementedError
 
 
@@ -865,23 +867,23 @@ OWN_FAMILIES: tuple[OwnFamily[Any, Any], ...] = (KEYPAIR, USER)
 
 
 @dataclass(frozen=True)
-class APolicyAndACaller[D]:
+class APolicyAndACaller[PolicyData]:
     """정책 하나와, 그것을 부를 사람."""
 
-    policy: D
+    policy: PolicyData
     caller: UserData
 
 
 @dataclass(frozen=True)
-class ManyPoliciesAndACaller[D]:
+class ManyPoliciesAndACaller[PolicyData]:
     """검색할 정책 여럿과, 검색할 사람.
 
     ``named``는 그중 이름으로 골라낼 하나, ``held``는 부르는 사람 자신이 매인 하나다.
     """
 
-    laid: tuple[D, ...]
-    named: D
-    held: D
+    laid: tuple[PolicyData, ...]
+    named: PolicyData
+    held: PolicyData
     caller: UserData
 
 
