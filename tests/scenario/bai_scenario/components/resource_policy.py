@@ -79,7 +79,7 @@ class Calls:
 
 @dataclass(frozen=True)
 class Ask:
-    """만들기 요청 하나와, 그 요청이 답에 남겨야 하는 것."""
+    """생성 요청 하나와, 그 요청이 응답에 남겨야 하는 값."""
 
     asked: Any
     says: str
@@ -88,7 +88,7 @@ class Ask:
 
 @dataclass(frozen=True)
 class Edit:
-    """고치기 요청 하나와, 그 요청이 바꿔야 하는 자리."""
+    """수정 요청 하나와, 그 요청이 바꿔야 하는 필드."""
 
     asked: Any
     says: str
@@ -97,7 +97,7 @@ class Edit:
 
 @dataclass(frozen=True)
 class LaidHolder:
-    """정책에 매인 사용자 한 명과 그 정책들의 손잡이."""
+    """정책이 할당된 사용자 한 명과, 그 사용자에게 할당된 정책들의 참조."""
 
     domain: Laid[DomainData]
     user: Laid[UserData]
@@ -107,18 +107,18 @@ class LaidHolder:
 
 
 class Family[PolicyData, PolicyNode](ABC):
-    """정책 한 종류. 어떻게 심고, 어댑터의 어느 호출로 읽고 쓰고, 답의 어느 자리를 보는지."""
+    """정책 한 종류. 어떻게 미리 만들어 두고, 어댑터의 어느 호출로 읽고 쓰며, 응답의 어느 필드를 검사하는지."""
 
     @property
     @abstractmethod
     def label(self) -> str:
-        """kebab 영문. 시나리오 요약에 붙는다."""
+        """kebab-case 영문. 시나리오 요약에 붙는다."""
         raise NotImplementedError
 
     @property
     @abstractmethod
     def kind(self) -> str:
-        """레포트가 이 정책을 부르는 이름."""
+        """레포트에서 이 정책 종류를 가리키는 이름."""
         raise NotImplementedError
 
     @property
@@ -134,7 +134,7 @@ class Family[PolicyData, PolicyNode](ABC):
     @property
     @abstractmethod
     def fields(self) -> tuple[str, ...]:
-        """이름과 시각 말고 답이 싣는 자리."""
+        """이름과 시각을 제외하고 응답에 담기는 필드."""
         raise NotImplementedError
 
     @abstractmethod
@@ -143,17 +143,17 @@ class Family[PolicyData, PolicyNode](ABC):
 
     @abstractmethod
     def own_of(self, holder: LaidHolder) -> Laid[PolicyData]:
-        """그 사용자가 매인 이 종류의 정책."""
+        """그 사용자에게 할당된, 이 종류의 정책."""
         raise NotImplementedError
 
     @abstractmethod
     def view(self, node: PolicyNode) -> dict[str, Any]:
-        """답의 자리들을 견줄 수 있는 값으로."""
+        """응답의 필드들을 비교 가능한 값으로 바꾼다."""
         raise NotImplementedError
 
     @abstractmethod
     def seeded_view(self, seeded: PolicyData) -> dict[str, Any]:
-        """심은 것을 답과 같은 자리로."""
+        """미리 만들어 둔 데이터를 응답과 같은 필드 구성으로 바꾼다."""
         raise NotImplementedError
 
     @abstractmethod
@@ -193,7 +193,7 @@ class Family[PolicyData, PolicyNode](ABC):
         raise NotImplementedError
 
     def verdicts(self, node: Any, wanted: Mapping[str, Any], started: datetime) -> list[Verdict]:
-        """답의 모든 자리를 본다. 이름은 id 자리에도 실린다."""
+        """응답의 모든 필드를 검사한다. 이름은 id 필드에도 그대로 담긴다."""
         got = self.view(node)
         out: list[Verdict] = [
             Same("id", node.id, wanted["name"]),
@@ -277,7 +277,7 @@ class ProjectPolicies(Family[ProjectResourcePolicyData, ProjectResourcePolicyNod
                 max_quota_scope_size=BinarySizeInput(expr="1g"),
                 max_network_count=5,
             ),
-            "모든 값을 주고",
+            "모든 값을 지정해",
             {
                 "name": name,
                 "max_vfolder_count": 20,
@@ -290,17 +290,17 @@ class ProjectPolicies(Family[ProjectResourcePolicyData, ProjectResourcePolicyNod
     def one_limit(self) -> Edit:
         return Edit(
             UpdateProjectResourcePolicyInput(max_vfolder_count=20),
-            "폴더 수를 20으로",
+            "폴더 수 20으로 변경",
             {"max_vfolder_count": 20},
         )
 
     @override
     def nothing(self) -> Edit:
-        return Edit(UpdateProjectResourcePolicyInput(), "아무것도 대지 않고")
+        return Edit(UpdateProjectResourcePolicyInput(), "빈 요청")
 
     @override
     def clearing_a_non_nullable(self) -> Edit:
-        return Edit(UpdateProjectResourcePolicyInput(max_vfolder_count=None), "폴더 수를 비우도록")
+        return Edit(UpdateProjectResourcePolicyInput(max_vfolder_count=None), "폴더 수 비우기")
 
     @override
     async def create(self, adapter: ResourcePolicyAdapter, asked: Any) -> ProjectResourcePolicyNode:
@@ -346,7 +346,7 @@ FAMILIES: tuple[Family[Any, Any], ...] = (PROJECT,)
 
 @dataclass(frozen=True)
 class APolicyAndACaller[PolicyData]:
-    """정책 하나와, 그것을 부를 사람."""
+    """정책 하나와, 그것을 호출할 사용자."""
 
     policy: PolicyData
     caller: UserData
@@ -354,7 +354,7 @@ class APolicyAndACaller[PolicyData]:
 
 @dataclass(frozen=True)
 class ManyPoliciesAndACaller[PolicyData]:
-    """검색할 정책 여럿과, 검색할 사람. ``named``는 그중 골라낼 하나다."""
+    """검색 대상 정책 여럿과, 검색을 호출할 사용자. ``named``는 그중 이름 필터로 골라낼 하나다."""
 
     laid: tuple[PolicyData, ...]
     named: PolicyData
@@ -363,11 +363,11 @@ class ManyPoliciesAndACaller[PolicyData]:
 
 @dataclass(frozen=True)
 class SomeoneHeldToPolicies(SeedNest[LaidHolder]):
-    """정책들에 매인 사용자 한 명. 매니저가 사용자를 만드는 경로를 그대로 탄다.
+    """정책들이 할당된 사용자 한 명. 매니저가 사용자를 만드는 경로를 그대로 사용한다.
 
-    그 경로가 사용자 정책과 키페어 정책의 이름을 행에 적고, 딸려 생기는 개인 프로젝트가
-    매니저가 못박은 이름의 프로젝트 정책을 찾는다. 이 표가 그 정책들을 읽고 지우므로
-    손잡이를 함께 답한다.
+    그 경로는 사용자 정책과 키페어 정책의 이름을 사용자 행에 기록하고, 함께 생성되는 개인
+    프로젝트는 매니저가 정해 둔 이름의 프로젝트 정책을 찾는다. 시나리오가 그 정책들을 읽고
+    삭제하므로 참조를 함께 반환한다.
     """
 
     domain: Laid[DomainData]
@@ -375,7 +375,7 @@ class SomeoneHeldToPolicies(SeedNest[LaidHolder]):
 
     @override
     def kind(self) -> str:
-        return "정책에 매인 사용자 한 명 준비"
+        return "정책이 할당된 사용자 한 명 준비"
 
     @override
     def lay(self, seed: Seeder) -> LaidHolder:
@@ -398,7 +398,7 @@ class SomeoneHeldToPolicies(SeedNest[LaidHolder]):
 
 
 async def lay_a_holder(seeding: Any, *, role: UserRole) -> LaidHolder:
-    """도메인 하나와, 그 안에 정책에 매인 사용자 한 명."""
+    """도메인 하나와, 그 도메인에 속하며 정책이 할당된 사용자 한 명."""
     domain = await seeding.creating(SeedDomain(name_hint="home", description=WAS_HERE))
     holder: LaidHolder = await seeding.within(SomeoneHeldToPolicies(domain, role=role))
     return holder
@@ -406,14 +406,14 @@ async def lay_a_holder(seeding: Any, *, role: UserRole) -> LaidHolder:
 
 @dataclass(frozen=True)
 class APolicyAndSomeone(Given[Any, APolicyAndACaller[Any]]):
-    """정책 하나와, 다른 정책에 매인 사용자 한 명. 지목하는 정책을 아무도 쓰지 않는다."""
+    """정책 하나와, 다른 정책이 할당된 사용자 한 명. 대상 정책은 아무도 사용하지 않는다."""
 
     family: Family[Any, Any]
     role: UserRole = UserRole.USER
 
     @override
     def describe(self) -> str:
-        return f"아무도 쓰지 않는 {self.family.kind} 하나와, {self.role.value} 한 명"
+        return f"아무도 사용하지 않는 {self.family.kind} 하나와, {self.role.value} 한 명"
 
     @override
     async def lay(self, seeding: Any) -> APolicyAndACaller[Any]:
@@ -424,14 +424,14 @@ class APolicyAndSomeone(Given[Any, APolicyAndACaller[Any]]):
 
 @dataclass(frozen=True)
 class AHeldPolicyAndSomeone(Given[Any, APolicyAndACaller[Any]]):
-    """부르는 사람 자신이 매인 정책. 그 사람의 키페어·행·개인 프로젝트가 아직 이 이름을 가리킨다."""
+    """호출자 자신에게 할당된 정책. 그 사용자의 키페어·사용자 행·개인 프로젝트가 아직 이 이름을 참조한다."""
 
     family: Family[Any, Any]
     role: UserRole = UserRole.SUPERADMIN
 
     @override
     def describe(self) -> str:
-        return f"{self.role.value} 한 명과, 그 사람이 아직 매여 있는 {self.family.kind}"
+        return f"{self.role.value} 한 명과, 그 사용자에게 아직 할당된 {self.family.kind}"
 
     @override
     async def lay(self, seeding: Any) -> APolicyAndACaller[Any]:
@@ -443,7 +443,7 @@ class AHeldPolicyAndSomeone(Given[Any, APolicyAndACaller[Any]]):
 
 @dataclass(frozen=True)
 class ManyPoliciesAndSomeone(Given[Any, ManyPoliciesAndACaller[Any]]):
-    """정책 여럿과, 그중 하나에 매인 사용자 한 명."""
+    """정책 여럿과, 그중 하나가 할당된 사용자 한 명."""
 
     family: Family[Any, Any]
     role: UserRole = UserRole.USER
@@ -452,7 +452,7 @@ class ManyPoliciesAndSomeone(Given[Any, ManyPoliciesAndACaller[Any]]):
     @override
     def describe(self) -> str:
         return (
-            f"{self.family.kind} {self.besides + 2}개와, 그중 하나에 매인 {self.role.value} 한 명"
+            f"{self.family.kind} {self.besides + 2}개와, 그중 하나가 할당된 {self.role.value} 한 명"
         )
 
     @override
@@ -469,10 +469,10 @@ class ManyPoliciesAndSomeone(Given[Any, ManyPoliciesAndACaller[Any]]):
 
 @dataclass(frozen=True)
 class ThePolicyNode(Then[APolicyAndACaller[Any], Any]):
-    """심은 정책이 통째로 온다. 값은 심은 것에서 읽는다.
+    """미리 만들어 둔 정책이 통째로 반환된다. 기대값은 미리 만들어 둔 데이터에서 읽는다.
 
-    바꾸는 요청이 이것을 쓸 때는 바뀌어야 하는 자리만 ``changed``로 받는다. 나머지가
-    조용히 함께 움직이면 그 자리에서 어긋난다.
+    수정 요청이 이 검사를 쓸 때는 바뀌어야 하는 필드만 ``changed``로 받는다. 나머지 필드가
+    함께 바뀌면 그 필드에서 불일치가 드러난다.
     """
 
     family: Family[Any, Any]
@@ -481,7 +481,7 @@ class ThePolicyNode(Then[APolicyAndACaller[Any], Any]):
 
     @override
     def says(self) -> str:
-        return f"심은 {self.family.kind} 전체가 온다"
+        return f"미리 만들어 둔 {self.family.kind} 전체가 반환된다"
 
     @override
     def look(self, laid: APolicyAndACaller[Any], answered: Answered[Any]) -> list[Verdict]:
@@ -494,7 +494,7 @@ class ThePolicyNode(Then[APolicyAndACaller[Any], Any]):
 
 @dataclass(frozen=True)
 class TheNewPolicyNode(Then[Any, Any]):
-    """방금 만든 정책이 통째로 온다. 요청이 정한 것만 여기로 받는다."""
+    """방금 생성한 정책이 통째로 반환된다. 기대값은 요청이 지정한 값에서 읽는다."""
 
     family: Family[Any, Any]
     started: datetime
@@ -502,7 +502,7 @@ class TheNewPolicyNode(Then[Any, Any]):
 
     @override
     def says(self) -> str:
-        return f"만든 {self.family.kind} 전체가 온다"
+        return f"생성한 {self.family.kind} 전체가 반환된다"
 
     @override
     def look(self, laid: Any, answered: Answered[Any]) -> list[Verdict]:
@@ -514,13 +514,13 @@ class TheNewPolicyNode(Then[Any, Any]):
 
 @dataclass(frozen=True)
 class EveryLaidPolicyIsFound(Then[ManyPoliciesAndACaller[Any], Searched]):
-    """심은 것이 모두, 그리고 그것만 온다."""
+    """미리 만들어 둔 정책이 모두, 그리고 그것만 반환된다."""
 
     family: Family[Any, Any]
 
     @override
     def says(self) -> str:
-        return f"심은 {self.family.kind}이 모두, 그리고 그것만 온다"
+        return f"미리 만들어 둔 {self.family.kind}이 모두, 그리고 그것만 반환된다"
 
     @override
     def look(
@@ -541,13 +541,13 @@ class EveryLaidPolicyIsFound(Then[ManyPoliciesAndACaller[Any], Searched]):
 
 @dataclass(frozen=True)
 class OnlyTheNamedOneIsFound(Then[ManyPoliciesAndACaller[Any], Searched]):
-    """걸러낸 그 하나만 온다."""
+    """필터에 맞는 그 하나만 반환된다."""
 
     family: Family[Any, Any]
 
     @override
     def says(self) -> str:
-        return f"걸러낸 {self.family.kind} 하나만 온다"
+        return f"필터에 맞는 {self.family.kind} 하나만 반환된다"
 
     @override
     def look(
