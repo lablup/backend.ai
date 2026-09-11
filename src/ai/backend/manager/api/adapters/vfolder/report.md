@@ -18,14 +18,14 @@ Given
     - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
     - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
     - 키페어 정책 keypair-policy-1: 동시 세션 5개까지, 폴더는 local:volume1에 놓을 수 있다
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 일반 사용자 granted-user-1: 자기 키와 개인 프로젝트를 갖는다
   - 역할 folder-role-1: 이 역할이 앉은 스코프 안에서만 통한다
   - 역할 folder-role-1: vfolder 전체에 READ 허용
-  - 일반 사용자 user-1: 역할 folder-role-1 보유
+  - 일반 사용자 granted-user-1: 역할 folder-role-1 보유
 
 When
 
-- VFolderAdapter.admin_search — user-1이 전체를 조회
+- VFolderAdapter.admin_search — granted-user-1이 전체를 조회
 
 Then
 
@@ -44,19 +44,19 @@ Given
     - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
     - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
     - 키페어 정책 keypair-policy-1: 동시 세션 5개까지, 폴더는 local:volume1에 놓을 수 있다
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 일반 사용자 neighbour-1: 자기 키와 개인 프로젝트를 갖는다
     - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
     - 키페어 정책 keypair-policy-2: 동시 세션 5개까지, 폴더는 local:volume1에 놓을 수 있다
-    - 일반 사용자 user-2: 자기 키와 개인 프로젝트를 갖는다
+    - 일반 사용자 neighbour-2: 자기 키와 개인 프로젝트를 갖는다
     - 사용자 정책 user-policy-3: 사용자 한 명당 폴더 10개까지
     - 키페어 정책 keypair-policy-3: 동시 세션 5개까지, 폴더는 local:volume1에 놓을 수 있다
-    - 모니터 user-3: 자기 키와 개인 프로젝트를 갖는다
+    - 모니터 monitor-1: 자기 키와 개인 프로젝트를 갖는다
   - 폴더 theirs-1: 소유자가 이미 만들어 둔 것이다
   - 폴더 theirs-2: 소유자가 이미 만들어 둔 것이다
 
 When
 
-- VFolderAdapter.admin_search — user-3이 전체를 조회
+- VFolderAdapter.admin_search — monitor-1이 전체를 조회
 
 Then
 
@@ -78,19 +78,19 @@ Given
     - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
     - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
     - 키페어 정책 keypair-policy-1: 동시 세션 5개까지, 폴더는 local:volume1에 놓을 수 있다
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 일반 사용자 neighbour-1: 자기 키와 개인 프로젝트를 갖는다
     - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
     - 키페어 정책 keypair-policy-2: 동시 세션 5개까지, 폴더는 local:volume1에 놓을 수 있다
-    - 일반 사용자 user-2: 자기 키와 개인 프로젝트를 갖는다
+    - 일반 사용자 neighbour-2: 자기 키와 개인 프로젝트를 갖는다
     - 사용자 정책 user-policy-3: 사용자 한 명당 폴더 10개까지
     - 키페어 정책 keypair-policy-3: 동시 세션 5개까지, 폴더는 local:volume1에 놓을 수 있다
-    - 슈퍼관리자 user-3: 자기 키와 개인 프로젝트를 갖는다
+    - 슈퍼관리자 superadmin-1: 자기 키와 개인 프로젝트를 갖는다
   - 폴더 theirs-1: 소유자가 이미 만들어 둔 것이다
   - 폴더 theirs-2: 소유자가 이미 만들어 둔 것이다
 
 When
 
-- VFolderAdapter.admin_search — user-3이 전체를 조회
+- VFolderAdapter.admin_search — superadmin-1이 전체를 조회
 
 Then
 
@@ -112,11 +112,11 @@ Given
     - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
     - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
     - 키페어 정책 keypair-policy-1: 동시 세션 5개까지, 폴더는 local:volume1에 놓을 수 있다
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 일반 사용자 ungranted-user-1: 자기 키와 개인 프로젝트를 갖는다
 
 When
 
-- VFolderAdapter.admin_search — user-1이 전체를 조회
+- VFolderAdapter.admin_search — ungranted-user-1이 전체를 조회
 
 Then
 
@@ -137,15 +137,15 @@ Given
     - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
     - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
     - 키페어 정책 keypair-policy-1: 동시 세션 5개까지, 폴더는 local:volume1에 놓을 수 있다
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 일반 사용자 granted-user-1: 자기 키와 개인 프로젝트를 갖는다
   - 역할 folder-role-1: 이 역할이 앉은 스코프 안에서만 통한다
   - 역할 folder-role-1: vfolder 전체에 READ 허용
-  - 일반 사용자 user-1: 역할 folder-role-1 보유
+  - 일반 사용자 granted-user-1: 역할 folder-role-1 보유
   - 폴더 folder-1: 소유자가 이미 만들어 둔 것이다
 
 When
 
-- VFolderAdapter.batch_load_by_ids — user-1이 자기 폴더 id로 조회
+- VFolderAdapter.batch_load_by_ids — granted-user-1이 자기 폴더 id로 조회
 
 Then
 
@@ -164,11 +164,11 @@ Given
     - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
     - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
     - 키페어 정책 keypair-policy-1: 동시 세션 5개까지, 폴더는 local:volume1에 놓을 수 있다
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 일반 사용자 ungranted-user-1: 자기 키와 개인 프로젝트를 갖는다
 
 When
 
-- VFolderAdapter.batch_load_by_ids — user-1이 빈 목록으로 조회
+- VFolderAdapter.batch_load_by_ids — ungranted-user-1이 빈 목록으로 조회
 
 Then
 
@@ -187,19 +187,19 @@ Given
     - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
     - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
     - 키페어 정책 keypair-policy-1: 동시 세션 5개까지, 폴더는 local:volume1에 놓을 수 있다
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 일반 사용자 neighbour-1: 자기 키와 개인 프로젝트를 갖는다
     - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
     - 키페어 정책 keypair-policy-2: 동시 세션 5개까지, 폴더는 local:volume1에 놓을 수 있다
-    - 일반 사용자 user-2: 자기 키와 개인 프로젝트를 갖는다
+    - 일반 사용자 neighbour-2: 자기 키와 개인 프로젝트를 갖는다
     - 사용자 정책 user-policy-3: 사용자 한 명당 폴더 10개까지
     - 키페어 정책 keypair-policy-3: 동시 세션 5개까지, 폴더는 local:volume1에 놓을 수 있다
-    - 슈퍼관리자 user-3: 자기 키와 개인 프로젝트를 갖는다
+    - 슈퍼관리자 superadmin-1: 자기 키와 개인 프로젝트를 갖는다
   - 폴더 theirs-1: 소유자가 이미 만들어 둔 것이다
   - 폴더 theirs-2: 소유자가 이미 만들어 둔 것이다
 
 When
 
-- VFolderAdapter.batch_load_by_ids — user-3이 폴더 2개와 없는 id 하나를 함께 조회
+- VFolderAdapter.batch_load_by_ids — superadmin-1이 폴더 2개와 없는 id 하나를 함께 조회
 
 Then
 
@@ -222,17 +222,17 @@ Given
     - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
     - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
     - 키페어 정책 keypair-policy-1: 동시 세션 5개까지, 폴더는 local:volume1에 놓을 수 있다
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 일반 사용자 granted-user-1: 자기 키와 개인 프로젝트를 갖는다
   - 역할 folder-role-1: 이 역할이 앉은 스코프 안에서만 통한다
   - 역할 folder-role-1: vfolder 전체에 READ 허용
   - 역할 folder-role-1: vfolder 전체에 SOFT_DELETE 허용
-  - 일반 사용자 user-1: 역할 folder-role-1 보유
+  - 일반 사용자 granted-user-1: 역할 folder-role-1 보유
   - 폴더 folder-1: 소유자가 이미 만들어 둔 것이다
   - 폴더 folder-2: 소유자가 이미 만들어 둔 것이다
 
 When
 
-- VFolderAdapter.bulk_delete — user-1이 폴더 2개를 함께 지움
+- VFolderAdapter.bulk_delete — granted-user-1이 폴더 2개를 함께 지움
 
 Then
 
@@ -255,21 +255,21 @@ Given
     - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
     - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
     - 키페어 정책 keypair-policy-1: 동시 세션 5개까지, 폴더는 local:volume1에 놓을 수 있다
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 일반 사용자 granted-user-1: 자기 키와 개인 프로젝트를 갖는다
     - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
     - 키페어 정책 keypair-policy-2: 동시 세션 5개까지, 폴더는 local:volume1에 놓을 수 있다
-    - 일반 사용자 user-2: 자기 키와 개인 프로젝트를 갖는다
+    - 일반 사용자 neighbour-1: 자기 키와 개인 프로젝트를 갖는다
   - 역할 folder-role-1: 이 역할이 앉은 스코프 안에서만 통한다
   - 역할 folder-role-1: vfolder 전체에 READ 허용
   - 역할 folder-role-1: vfolder 전체에 SOFT_DELETE 허용
-  - 일반 사용자 user-1: 역할 folder-role-1 보유
+  - 일반 사용자 granted-user-1: 역할 folder-role-1 보유
   - 폴더 folder-1: 소유자가 이미 만들어 둔 것이다
   - 도메인 elsewhere-1: 이 도메인의 폴더는 local:volume1에 놓을 수 있다
   - 폴더 theirs-1: 소유자가 이미 만들어 둔 것이다
 
 When
 
-- VFolderAdapter.bulk_delete — user-1이 폴더 2개를 함께 지움
+- VFolderAdapter.bulk_delete — granted-user-1이 폴더 2개를 함께 지움
 
 Then
 
@@ -294,16 +294,16 @@ Given
     - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
     - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 1개까지
     - 키페어 정책 keypair-policy-1: 동시 세션 5개까지, 폴더는 local:volume1에 놓을 수 있다
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 일반 사용자 granted-user-1: 자기 키와 개인 프로젝트를 갖는다
   - 역할 folder-role-1: 이 역할이 앉은 스코프 안에서만 통한다
   - 역할 folder-role-1: vfolder 전체에 CREATE 허용
   - 역할 folder-role-1: vfolder 전체에 READ 허용
-  - 일반 사용자 user-1: 역할 folder-role-1 보유
+  - 일반 사용자 granted-user-1: 역할 folder-role-1 보유
   - 폴더 folder-1: 소유자가 이미 만들어 둔 것이다
 
 When
 
-- VFolderAdapter.create — user-1이 one-too-many이라는 폴더를 만듦
+- VFolderAdapter.create — granted-user-1이 one-too-many이라는 폴더를 만듦
 
 Then
 
@@ -322,15 +322,15 @@ Given
     - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
     - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
     - 키페어 정책 keypair-policy-1: 동시 세션 5개까지, 폴더는 local:volume1에 놓을 수 있다
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 일반 사용자 granted-user-1: 자기 키와 개인 프로젝트를 갖는다
   - 역할 folder-role-1: 이 역할이 앉은 스코프 안에서만 통한다
   - 역할 folder-role-1: vfolder 전체에 CREATE 허용
   - 역할 folder-role-1: vfolder 전체에 READ 허용
-  - 일반 사용자 user-1: 역할 folder-role-1 보유
+  - 일반 사용자 granted-user-1: 역할 folder-role-1 보유
 
 When
 
-- VFolderAdapter.create — user-1이 local:volume1에 work이라는 폴더를 만듦
+- VFolderAdapter.create — granted-user-1이 local:volume1에 work이라는 폴더를 만듦
 
 Then
 
@@ -342,7 +342,7 @@ Then
   - access_control.ownership_type = 'user'
   - ownership.user_id: 소유자와 같다
   - ownership.creator_id: 만든 사람와 같다
-  - ownership.creator_email = 'user-1@scenario.local'
+  - ownership.creator_email = 'granted-user-1@scenario.local'
   - unmanaged_path = None
   - id: 무시함 — 데이터베이스가 만든다
   - status: 무시함 — 폴더가 만들어지는 동안 오가는 값이다
@@ -365,16 +365,16 @@ Given
     - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
     - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
     - 키페어 정책 keypair-policy-1: 동시 세션 5개까지, 폴더는 local:volume1에 놓을 수 있다
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 일반 사용자 granted-user-1: 자기 키와 개인 프로젝트를 갖는다
   - 역할 folder-role-1: 이 역할이 앉은 스코프 안에서만 통한다
   - 역할 folder-role-1: vfolder 전체에 CREATE 허용
   - 역할 folder-role-1: vfolder 전체에 READ 허용
-  - 일반 사용자 user-1: 역할 folder-role-1 보유
+  - 일반 사용자 granted-user-1: 역할 folder-role-1 보유
   - 폴더 folder-1: 소유자가 이미 만들어 둔 것이다
 
 When
 
-- VFolderAdapter.create — user-1이 folder-1이라는 폴더를 만듦
+- VFolderAdapter.create — granted-user-1이 folder-1이라는 폴더를 만듦
 
 Then
 
@@ -386,7 +386,7 @@ Then
   - access_control.ownership_type = 'user'
   - ownership.user_id: 소유자와 같다
   - ownership.creator_id: 만든 사람와 같다
-  - ownership.creator_email = 'user-1@scenario.local'
+  - ownership.creator_email = 'granted-user-1@scenario.local'
   - unmanaged_path = None
   - id: 무시함 — 데이터베이스가 만든다
   - status: 무시함 — 폴더가 만들어지는 동안 오가는 값이다
@@ -409,16 +409,16 @@ Given
     - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
     - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
     - 키페어 정책 keypair-policy-1: 동시 세션 5개까지, 폴더는 local:volume1에 놓을 수 있다
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 일반 사용자 granted-user-1: 자기 키와 개인 프로젝트를 갖는다
   - 역할 folder-role-1: 이 역할이 앉은 스코프 안에서만 통한다
   - 역할 folder-role-1: vfolder 전체에 CREATE 허용
   - 역할 folder-role-1: vfolder 전체에 READ 허용
-  - 일반 사용자 user-1: 역할 folder-role-1 보유
+  - 일반 사용자 granted-user-1: 역할 folder-role-1 보유
   - 폴더 folder-1: 소유자가 지워 휴지통에 있다
 
 When
 
-- VFolderAdapter.create — user-1이 folder-1이라는 폴더를 만듦
+- VFolderAdapter.create — granted-user-1이 folder-1이라는 폴더를 만듦
 
 Then
 
@@ -437,16 +437,16 @@ Given
     - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
     - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
     - 키페어 정책 keypair-policy-1: 동시 세션 5개까지, 폴더는 local:volume1에 놓을 수 있다
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 일반 사용자 granted-user-1: 자기 키와 개인 프로젝트를 갖는다
   - 역할 folder-role-1: 이 역할이 앉은 스코프 안에서만 통한다
   - 역할 folder-role-1: vfolder 전체에 CREATE 허용
   - 역할 folder-role-1: vfolder 전체에 READ 허용
-  - 일반 사용자 user-1: 역할 folder-role-1 보유
+  - 일반 사용자 granted-user-1: 역할 folder-role-1 보유
   - 폴더 folder-1: 소유자가 이미 만들어 둔 것이다
 
 When
 
-- VFolderAdapter.create — user-1이 folder-1이라는 폴더를 만듦
+- VFolderAdapter.create — granted-user-1이 folder-1이라는 폴더를 만듦
 
 Then
 
@@ -465,11 +465,11 @@ Given
     - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
     - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
     - 키페어 정책 keypair-policy-1: 동시 세션 5개까지, 폴더는 local:volume1에 놓을 수 있다
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 일반 사용자 ungranted-user-1: 자기 키와 개인 프로젝트를 갖는다
 
 When
 
-- VFolderAdapter.create — user-1이 local:volume1에 denied이라는 폴더를 만듦
+- VFolderAdapter.create — ungranted-user-1이 local:volume1에 denied이라는 폴더를 만듦
 
 Then
 
@@ -488,15 +488,15 @@ Given
     - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
     - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
     - 키페어 정책 keypair-policy-1: 동시 세션 5개까지, 폴더는 local:volume1에 놓을 수 있다
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 일반 사용자 granted-user-1: 자기 키와 개인 프로젝트를 갖는다
   - 역할 folder-role-1: 이 역할이 앉은 스코프 안에서만 통한다
   - 역할 folder-role-1: vfolder 전체에 CREATE 허용
   - 역할 folder-role-1: vfolder 전체에 READ 허용
-  - 일반 사용자 user-1: 역할 folder-role-1 보유
+  - 일반 사용자 granted-user-1: 역할 folder-role-1 보유
 
 When
 
-- VFolderAdapter.create — user-1이 호스트를 대지 않고 plain이라는 폴더를 만듦
+- VFolderAdapter.create — granted-user-1이 호스트를 대지 않고 plain이라는 폴더를 만듦
 
 Then
 
@@ -508,7 +508,7 @@ Then
   - access_control.ownership_type = 'user'
   - ownership.user_id: 소유자와 같다
   - ownership.creator_id: 만든 사람와 같다
-  - ownership.creator_email = 'user-1@scenario.local'
+  - ownership.creator_email = 'granted-user-1@scenario.local'
   - unmanaged_path = None
   - id: 무시함 — 데이터베이스가 만든다
   - status: 무시함 — 폴더가 만들어지는 동안 오가는 값이다
@@ -532,15 +532,15 @@ Given
   - 도메인에 속한 사용자 한 명 준비
     - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
     - 키페어 정책 keypair-policy-1: 동시 세션 5개까지, 폴더는 local:volume1에 놓을 수 있다
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 일반 사용자 granted-user-1: 자기 키와 개인 프로젝트를 갖는다
   - 역할 folder-role-1: 이 역할이 앉은 스코프 안에서만 통한다
   - 역할 folder-role-1: vfolder 전체에 CREATE 허용
   - 역할 folder-role-1: vfolder 전체에 READ 허용
-  - 일반 사용자 user-1: 역할 folder-role-1 보유
+  - 일반 사용자 granted-user-1: 역할 folder-role-1 보유
 
 When
 
-- VFolderAdapter.create — user-1이 team-1 아래 shared이라는 폴더를 만듦
+- VFolderAdapter.create — granted-user-1이 team-1 아래 shared이라는 폴더를 만듦
 
 Then
 
@@ -552,7 +552,7 @@ Then
   - access_control.ownership_type = 'group'
   - ownership.user_id = None
   - ownership.creator_id: 만든 사람와 같다
-  - ownership.creator_email = 'user-1@scenario.local'
+  - ownership.creator_email = 'granted-user-1@scenario.local'
   - unmanaged_path = None
   - id: 무시함 — 데이터베이스가 만든다
   - status: 무시함 — 폴더가 만들어지는 동안 오가는 값이다
@@ -575,11 +575,11 @@ Given
     - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
     - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
     - 키페어 정책 keypair-policy-1: 동시 세션 5개까지, 폴더는 local:volume1에 놓을 수 있다
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 일반 사용자 ungranted-user-1: 자기 키와 개인 프로젝트를 갖는다
 
 When
 
-- VFolderAdapter.create — user-1이 local:volume1에 unguarded이라는 폴더를 만듦
+- VFolderAdapter.create — ungranted-user-1이 local:volume1에 unguarded이라는 폴더를 만듦
 
 Then
 
@@ -591,7 +591,7 @@ Then
   - access_control.ownership_type = 'user'
   - ownership.user_id: 소유자와 같다
   - ownership.creator_id: 만든 사람와 같다
-  - ownership.creator_email = 'user-1@scenario.local'
+  - ownership.creator_email = 'ungranted-user-1@scenario.local'
   - unmanaged_path = None
   - id: 무시함 — 데이터베이스가 만든다
   - status: 무시함 — 폴더가 만들어지는 동안 오가는 값이다
@@ -617,11 +617,11 @@ Given
   - 도메인에 속한 사용자 한 명 준비
     - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
     - 키페어 정책 keypair-policy-1: 동시 세션 5개까지, 폴더는 local:volume1에 놓을 수 있다
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 일반 사용자 ungranted-user-1: 자기 키와 개인 프로젝트를 갖는다
 
 When
 
-- VFolderAdapter.create_in_project — user-1이 team-1 아래 denied이라는 폴더를 만듦
+- VFolderAdapter.create_in_project — ungranted-user-1이 team-1 아래 denied이라는 폴더를 만듦
 
 Then
 
@@ -641,15 +641,15 @@ Given
   - 도메인에 속한 사용자 한 명 준비
     - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
     - 키페어 정책 keypair-policy-1: 동시 세션 5개까지, 폴더는 local:volume1에 놓을 수 있다
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 일반 사용자 granted-user-1: 자기 키와 개인 프로젝트를 갖는다
   - 역할 folder-role-1: 이 역할이 앉은 스코프 안에서만 통한다
   - 역할 folder-role-1: vfolder 전체에 CREATE 허용
   - 역할 folder-role-1: vfolder 전체에 READ 허용
-  - 일반 사용자 user-1: 역할 folder-role-1 보유
+  - 일반 사용자 granted-user-1: 역할 folder-role-1 보유
 
 When
 
-- VFolderAdapter.create_in_project — user-1이 team-1 아래 team이라는 폴더를 만듦
+- VFolderAdapter.create_in_project — granted-user-1이 team-1 아래 team이라는 폴더를 만듦
 
 Then
 
@@ -661,7 +661,7 @@ Then
   - access_control.ownership_type = 'group'
   - ownership.user_id = None
   - ownership.creator_id: 만든 사람와 같다
-  - ownership.creator_email = 'user-1@scenario.local'
+  - ownership.creator_email = 'granted-user-1@scenario.local'
   - unmanaged_path = None
   - id: 무시함 — 데이터베이스가 만든다
   - status: 무시함 — 폴더가 만들어지는 동안 오가는 값이다
@@ -684,15 +684,15 @@ Given
     - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
     - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
     - 키페어 정책 keypair-policy-1: 동시 세션 5개까지, 폴더는 local:volume1에 놓을 수 있다
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 일반 사용자 granted-user-1: 자기 키와 개인 프로젝트를 갖는다
   - 역할 folder-role-1: 이 역할이 앉은 스코프 안에서만 통한다
   - 역할 folder-role-1: vfolder 전체에 CREATE 허용
   - 역할 folder-role-1: vfolder 전체에 READ 허용
-  - 일반 사용자 user-1: 역할 folder-role-1 보유
+  - 일반 사용자 granted-user-1: 역할 folder-role-1 보유
 
 When
 
-- VFolderAdapter.create_in_project — user-1이 자기 개인 프로젝트 아래 mine이라는 폴더를 만듦
+- VFolderAdapter.create_in_project — granted-user-1이 자기 개인 프로젝트 아래 mine이라는 폴더를 만듦
 
 Then
 
@@ -713,15 +713,15 @@ Given
     - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
     - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
     - 키페어 정책 keypair-policy-1: 동시 세션 5개까지, 폴더는 local:volume1에 놓을 수 있다
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 일반 사용자 granted-user-1: 자기 키와 개인 프로젝트를 갖는다
   - 역할 folder-role-1: 이 역할이 앉은 스코프 안에서만 통한다
   - 역할 folder-role-1: vfolder 전체에 READ 허용
-  - 일반 사용자 user-1: 역할 folder-role-1 보유
+  - 일반 사용자 granted-user-1: 역할 folder-role-1 보유
   - 폴더 folder-1: 소유자가 이미 만들어 둔 것이다
 
 When
 
-- VFolderAdapter.get — user-1이 folder-1을 id로 조회
+- VFolderAdapter.get — granted-user-1이 folder-1을 id로 조회
 
 Then
 
@@ -733,7 +733,7 @@ Then
   - access_control.ownership_type = 'user'
   - ownership.user_id: 소유자와 같다
   - ownership.creator_id: 만든 사람와 같다
-  - ownership.creator_email = 'user-1@scenario.local'
+  - ownership.creator_email = 'granted-user-1@scenario.local'
   - unmanaged_path = None
   - id: 무시함 — 데이터베이스가 만든다
   - status: 무시함 — 폴더가 만들어지는 동안 오가는 값이다
@@ -756,19 +756,19 @@ Given
     - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
     - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
     - 키페어 정책 keypair-policy-1: 동시 세션 5개까지, 폴더는 local:volume1에 놓을 수 있다
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 일반 사용자 owner-1: 자기 키와 개인 프로젝트를 갖는다
     - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
     - 키페어 정책 keypair-policy-2: 동시 세션 5개까지, 폴더는 local:volume1에 놓을 수 있다
-    - 일반 사용자 user-2: 자기 키와 개인 프로젝트를 갖는다
+    - 일반 사용자 other-user-1: 자기 키와 개인 프로젝트를 갖는다
   - 역할 owner-role-1: 이 역할이 앉은 스코프 안에서만 통한다
   - 역할 owner-role-1: vfolder 전체에 CREATE 허용
   - 역할 owner-role-1: vfolder 전체에 READ 허용
-  - 일반 사용자 user-1: 역할 owner-role-1 보유
+  - 일반 사용자 owner-1: 역할 owner-role-1 보유
   - 폴더 folder-1: 소유자가 이미 만들어 둔 것이다
 
 When
 
-- VFolderAdapter.get — user-2이 folder-1을 id로 조회
+- VFolderAdapter.get — other-user-1이 folder-1을 id로 조회
 
 Then
 
@@ -787,14 +787,14 @@ Given
     - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
     - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
     - 키페어 정책 keypair-policy-1: 동시 세션 5개까지, 폴더는 local:volume1에 놓을 수 있다
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 일반 사용자 granted-user-1: 자기 키와 개인 프로젝트를 갖는다
   - 역할 folder-role-1: 이 역할이 앉은 스코프 안에서만 통한다
   - 역할 folder-role-1: vfolder 전체에 READ 허용
-  - 일반 사용자 user-1: 역할 folder-role-1 보유
+  - 일반 사용자 granted-user-1: 역할 folder-role-1 보유
 
 When
 
-- VFolderAdapter.get — user-1이 아무 폴더도 갖지 않은 id로 조회
+- VFolderAdapter.get — granted-user-1이 아무 폴더도 갖지 않은 id로 조회
 
 Then
 
@@ -813,11 +813,11 @@ Given
     - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
     - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
     - 키페어 정책 keypair-policy-1: 동시 세션 5개까지, 폴더는 local:volume1에 놓을 수 있다
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 슈퍼관리자 superadmin-1: 자기 키와 개인 프로젝트를 갖는다
 
 When
 
-- VFolderAdapter.get — user-1이 아무 폴더도 갖지 않은 id로 조회
+- VFolderAdapter.get — superadmin-1이 아무 폴더도 갖지 않은 id로 조회
 
 Then
 
@@ -836,19 +836,19 @@ Given
     - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
     - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
     - 키페어 정책 keypair-policy-1: 동시 세션 5개까지, 폴더는 local:volume1에 놓을 수 있다
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 일반 사용자 owner-1: 자기 키와 개인 프로젝트를 갖는다
     - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
     - 키페어 정책 keypair-policy-2: 동시 세션 5개까지, 폴더는 local:volume1에 놓을 수 있다
-    - 슈퍼관리자 user-2: 자기 키와 개인 프로젝트를 갖는다
+    - 슈퍼관리자 superadmin-1: 자기 키와 개인 프로젝트를 갖는다
   - 역할 owner-role-1: 이 역할이 앉은 스코프 안에서만 통한다
   - 역할 owner-role-1: vfolder 전체에 CREATE 허용
   - 역할 owner-role-1: vfolder 전체에 READ 허용
-  - 일반 사용자 user-1: 역할 owner-role-1 보유
+  - 일반 사용자 owner-1: 역할 owner-role-1 보유
   - 폴더 folder-1: 소유자가 이미 만들어 둔 것이다
 
 When
 
-- VFolderAdapter.get — user-2이 folder-1을 id로 조회
+- VFolderAdapter.get — superadmin-1이 folder-1을 id로 조회
 
 Then
 
@@ -860,7 +860,7 @@ Then
   - access_control.ownership_type = 'user'
   - ownership.user_id: 소유자와 같다
   - ownership.creator_id: 만든 사람와 같다
-  - ownership.creator_email = 'user-1@scenario.local'
+  - ownership.creator_email = 'owner-1@scenario.local'
   - unmanaged_path = None
   - id: 무시함 — 데이터베이스가 만든다
   - status: 무시함 — 폴더가 만들어지는 동안 오가는 값이다
@@ -885,23 +885,23 @@ Given
     - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
     - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
     - 키페어 정책 keypair-policy-1: 동시 세션 5개까지, 폴더는 local:volume1에 놓을 수 있다
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 일반 사용자 owner-1: 자기 키와 개인 프로젝트를 갖는다
     - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
     - 키페어 정책 keypair-policy-2: 동시 세션 5개까지, 폴더는 local:volume1에 놓을 수 있다
-    - 일반 사용자 user-2: 자기 키와 개인 프로젝트를 갖는다
+    - 일반 사용자 other-user-1: 자기 키와 개인 프로젝트를 갖는다
   - 역할 owner-role-1: 이 역할이 앉은 스코프 안에서만 통한다
   - 역할 owner-role-1: vfolder 전체에 CREATE 허용
   - 역할 owner-role-1: vfolder 전체에 READ 허용
-  - 일반 사용자 user-1: 역할 owner-role-1 보유
+  - 일반 사용자 owner-1: 역할 owner-role-1 보유
   - 폴더 folder-1: 소유자가 지워 휴지통에 있다
   - 역할 folder-role-1: 이 역할이 앉은 스코프 안에서만 통한다
   - 역할 folder-role-1: vfolder 전체에 READ 허용
   - 역할 folder-role-1: vfolder 전체에 SOFT_DELETE 허용
-  - 일반 사용자 user-2: 역할 folder-role-1 보유
+  - 일반 사용자 other-user-1: 역할 folder-role-1 보유
 
 When
 
-- VFolderAdapter.restore — user-2이 folder-1을 되살림
+- VFolderAdapter.restore — other-user-1이 folder-1을 되살림
 
 Then
 
@@ -920,16 +920,16 @@ Given
     - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
     - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
     - 키페어 정책 keypair-policy-1: 동시 세션 5개까지, 폴더는 local:volume1에 놓을 수 있다
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 일반 사용자 granted-user-1: 자기 키와 개인 프로젝트를 갖는다
   - 역할 folder-role-1: 이 역할이 앉은 스코프 안에서만 통한다
   - 역할 folder-role-1: vfolder 전체에 READ 허용
   - 역할 folder-role-1: vfolder 전체에 SOFT_DELETE 허용
-  - 일반 사용자 user-1: 역할 folder-role-1 보유
+  - 일반 사용자 granted-user-1: 역할 folder-role-1 보유
   - 폴더 folder-1: 소유자가 이미 만들어 둔 것이다
 
 When
 
-- VFolderAdapter.delete — user-1이 folder-1을 지움
+- VFolderAdapter.delete — granted-user-1이 folder-1을 지움
 
 Then
 
@@ -948,16 +948,16 @@ Given
     - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
     - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
     - 키페어 정책 keypair-policy-1: 동시 세션 5개까지, 폴더는 local:volume1에 놓을 수 있다, 그 호스트에서 할 수 있는 것은 create-vfolder, download-file, invite-others, modify-vfolder, mount-in-session, set-user-specific-permission, upload-file뿐이다
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 일반 사용자 granted-user-1: 자기 키와 개인 프로젝트를 갖는다
   - 역할 folder-role-1: 이 역할이 앉은 스코프 안에서만 통한다
   - 역할 folder-role-1: vfolder 전체에 READ 허용
   - 역할 folder-role-1: vfolder 전체에 SOFT_DELETE 허용
-  - 일반 사용자 user-1: 역할 folder-role-1 보유
+  - 일반 사용자 granted-user-1: 역할 folder-role-1 보유
   - 폴더 folder-1: 소유자가 이미 만들어 둔 것이다
 
 When
 
-- VFolderAdapter.delete — user-1이 folder-1을 지움
+- VFolderAdapter.delete — granted-user-1이 folder-1을 지움
 
 Then
 
@@ -976,19 +976,19 @@ Given
     - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
     - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
     - 키페어 정책 keypair-policy-1: 동시 세션 5개까지, 폴더는 local:volume1에 놓을 수 있다
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 일반 사용자 owner-1: 자기 키와 개인 프로젝트를 갖는다
     - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
     - 키페어 정책 keypair-policy-2: 동시 세션 5개까지, 폴더는 local:volume1에 놓을 수 있다
-    - 일반 사용자 user-2: 자기 키와 개인 프로젝트를 갖는다
+    - 일반 사용자 other-user-1: 자기 키와 개인 프로젝트를 갖는다
   - 역할 owner-role-1: 이 역할이 앉은 스코프 안에서만 통한다
   - 역할 owner-role-1: vfolder 전체에 CREATE 허용
   - 역할 owner-role-1: vfolder 전체에 READ 허용
-  - 일반 사용자 user-1: 역할 owner-role-1 보유
+  - 일반 사용자 owner-1: 역할 owner-role-1 보유
   - 폴더 folder-1: 소유자가 이미 만들어 둔 것이다
 
 When
 
-- VFolderAdapter.delete — user-2이 folder-1을 지움
+- VFolderAdapter.delete — other-user-1이 folder-1을 지움
 
 Then
 
@@ -1007,19 +1007,19 @@ Given
     - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
     - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
     - 키페어 정책 keypair-policy-1: 동시 세션 5개까지, 폴더는 local:volume1에 놓을 수 있다
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 일반 사용자 owner-1: 자기 키와 개인 프로젝트를 갖는다
     - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
     - 키페어 정책 keypair-policy-2: 동시 세션 5개까지, 폴더는 local:volume1에 놓을 수 있다
-    - 일반 사용자 user-2: 자기 키와 개인 프로젝트를 갖는다
+    - 일반 사용자 other-user-1: 자기 키와 개인 프로젝트를 갖는다
   - 역할 owner-role-1: 이 역할이 앉은 스코프 안에서만 통한다
   - 역할 owner-role-1: vfolder 전체에 CREATE 허용
   - 역할 owner-role-1: vfolder 전체에 READ 허용
-  - 일반 사용자 user-1: 역할 owner-role-1 보유
+  - 일반 사용자 owner-1: 역할 owner-role-1 보유
   - 폴더 folder-1: 소유자가 지워 휴지통에 있다
 
 When
 
-- VFolderAdapter.restore — user-2이 folder-1을 되살림
+- VFolderAdapter.restore — other-user-1이 folder-1을 되살림
 
 Then
 
@@ -1038,16 +1038,16 @@ Given
     - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
     - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
     - 키페어 정책 keypair-policy-1: 동시 세션 5개까지, 폴더는 local:volume1에 놓을 수 있다
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 일반 사용자 granted-user-1: 자기 키와 개인 프로젝트를 갖는다
   - 역할 folder-role-1: 이 역할이 앉은 스코프 안에서만 통한다
   - 역할 folder-role-1: vfolder 전체에 READ 허용
   - 역할 folder-role-1: vfolder 전체에 SOFT_DELETE 허용
-  - 일반 사용자 user-1: 역할 folder-role-1 보유
+  - 일반 사용자 granted-user-1: 역할 folder-role-1 보유
   - 폴더 folder-1: 소유자가 지워 휴지통에 있다
 
 When
 
-- VFolderAdapter.restore — user-1이 folder-1을 되살림
+- VFolderAdapter.restore — granted-user-1이 folder-1을 되살림
 
 Then
 
@@ -1069,11 +1069,11 @@ Given
   - 도메인에 속한 사용자 한 명 준비
     - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
     - 키페어 정책 keypair-policy-1: 동시 세션 5개까지, 폴더는 local:volume1에 놓을 수 있다
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 일반 사용자 ungranted-user-1: 자기 키와 개인 프로젝트를 갖는다
 
 When
 
-- VFolderAdapter.project_search — user-1이 team-1의 폴더를 조회
+- VFolderAdapter.project_search — ungranted-user-1이 team-1의 폴더를 조회
 
 Then
 
@@ -1093,19 +1093,19 @@ Given
   - 도메인에 속한 사용자 한 명 준비
     - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
     - 키페어 정책 keypair-policy-1: 동시 세션 5개까지, 폴더는 local:volume1에 놓을 수 있다
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 일반 사용자 granted-user-1: 자기 키와 개인 프로젝트를 갖는다
     - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
     - 키페어 정책 keypair-policy-2: 동시 세션 5개까지, 폴더는 local:volume1에 놓을 수 있다
-    - 일반 사용자 user-2: 자기 키와 개인 프로젝트를 갖는다
+    - 일반 사용자 neighbour-1: 자기 키와 개인 프로젝트를 갖는다
   - 역할 folder-role-1: 이 역할이 앉은 스코프 안에서만 통한다
   - 역할 folder-role-1: vfolder 전체에 READ 허용
-  - 일반 사용자 user-1: 역할 folder-role-1 보유
+  - 일반 사용자 granted-user-1: 역할 folder-role-1 보유
   - 프로젝트 폴더 project-folder-1: 프로젝트가 소유하고, 개인 소유자는 없다
   - 폴더 theirs-1: 소유자가 이미 만들어 둔 것이다
 
 When
 
-- VFolderAdapter.project_search — user-1이 team-1의 폴더를 조회
+- VFolderAdapter.project_search — granted-user-1이 team-1의 폴더를 조회
 
 Then
 
@@ -1129,11 +1129,11 @@ Given
     - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
     - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
     - 키페어 정책 keypair-policy-1: 동시 세션 5개까지, 폴더는 local:volume1에 놓을 수 있다
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 일반 사용자 ungranted-user-1: 자기 키와 개인 프로젝트를 갖는다
 
 When
 
-- VFolderAdapter.my_search — user-1이 자기 폴더를 조회
+- VFolderAdapter.my_search — ungranted-user-1이 자기 폴더를 조회
 
 Then
 
@@ -1152,14 +1152,14 @@ Given
     - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
     - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
     - 키페어 정책 keypair-policy-1: 동시 세션 5개까지, 폴더는 local:volume1에 놓을 수 있다
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 일반 사용자 granted-user-1: 자기 키와 개인 프로젝트를 갖는다
   - 역할 folder-role-1: 이 역할이 앉은 스코프 안에서만 통한다
   - 역할 folder-role-1: vfolder 전체에 READ 허용
-  - 일반 사용자 user-1: 역할 folder-role-1 보유
+  - 일반 사용자 granted-user-1: 역할 folder-role-1 보유
 
 When
 
-- VFolderAdapter.my_search — user-1이 자기 폴더를 조회
+- VFolderAdapter.my_search — granted-user-1이 자기 폴더를 조회
 
 Then
 
@@ -1181,10 +1181,10 @@ Given
     - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
     - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 11개까지
     - 키페어 정책 keypair-policy-1: 동시 세션 5개까지, 폴더는 local:volume1에 놓을 수 있다
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 일반 사용자 granted-user-1: 자기 키와 개인 프로젝트를 갖는다
   - 역할 folder-role-1: 이 역할이 앉은 스코프 안에서만 통한다
   - 역할 folder-role-1: vfolder 전체에 READ 허용
-  - 일반 사용자 user-1: 역할 folder-role-1 보유
+  - 일반 사용자 granted-user-1: 역할 folder-role-1 보유
   - 폴더 folder-1: 소유자가 이미 만들어 둔 것이다
   - 폴더 folder-2: 소유자가 이미 만들어 둔 것이다
   - 폴더 folder-3: 소유자가 이미 만들어 둔 것이다
@@ -1199,7 +1199,7 @@ Given
 
 When
 
-- VFolderAdapter.my_search — user-1이 자기 폴더를 조회
+- VFolderAdapter.my_search — granted-user-1이 자기 폴더를 조회
 
 Then
 
@@ -1221,20 +1221,20 @@ Given
     - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
     - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
     - 키페어 정책 keypair-policy-1: 동시 세션 5개까지, 폴더는 local:volume1에 놓을 수 있다
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 일반 사용자 granted-user-1: 자기 키와 개인 프로젝트를 갖는다
     - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
     - 키페어 정책 keypair-policy-2: 동시 세션 5개까지, 폴더는 local:volume1에 놓을 수 있다
-    - 일반 사용자 user-2: 자기 키와 개인 프로젝트를 갖는다
+    - 일반 사용자 neighbour-1: 자기 키와 개인 프로젝트를 갖는다
   - 역할 folder-role-1: 이 역할이 앉은 스코프 안에서만 통한다
   - 역할 folder-role-1: vfolder 전체에 READ 허용
-  - 일반 사용자 user-1: 역할 folder-role-1 보유
+  - 일반 사용자 granted-user-1: 역할 folder-role-1 보유
   - 폴더 folder-1: 소유자가 이미 만들어 둔 것이다
   - 폴더 folder-2: 소유자가 이미 만들어 둔 것이다
   - 폴더 theirs-1: 소유자가 이미 만들어 둔 것이다
 
 When
 
-- VFolderAdapter.my_search — user-1이 자기 폴더를 조회
+- VFolderAdapter.my_search — granted-user-1이 자기 폴더를 조회
 
 Then
 

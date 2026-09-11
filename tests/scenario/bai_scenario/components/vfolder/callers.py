@@ -61,7 +61,9 @@ class SomeoneGrantedOverThemselves(Given[Any, AFolderMakerAndTheirDomain]):
         domain = await seeding.creating(
             SeedDomain(name_hint="home", description=WAS_HERE, vfolder_hosts=[STORAGE_HOST])
         )
-        caller = await seeding.within(SomeoneOf(domain, vfolder_hosts=[STORAGE_HOST]))
+        caller = await seeding.within(
+            SomeoneOf(domain, name_hint="granted-user", vfolder_hosts=[STORAGE_HOST])
+        )
         role = await seeding.creating_from(
             SeedRole(lambda u: UserID(u.id), name_hint="folder-role"), caller
         )
@@ -88,8 +90,9 @@ class SomeoneGrantedNothing(Given[Any, AFolderMakerAndTheirDomain]):
         domain = await seeding.creating(
             SeedDomain(name_hint="home", description=WAS_HERE, vfolder_hosts=[STORAGE_HOST])
         )
+        named = "ungranted-user" if self.role is UserRole.USER else self.role.value
         caller = await seeding.within(
-            SomeoneOf(domain, role=self.role, vfolder_hosts=[STORAGE_HOST])
+            SomeoneOf(domain, role=self.role, name_hint=named, vfolder_hosts=[STORAGE_HOST])
         )
         return AFolderMakerAndTheirDomain(seeding.made(domain), seeding.made(caller))
 
@@ -115,7 +118,10 @@ class SomeoneWhoMadeAFolderThemselves(Given[Any, AFolderAndACaller]):
         )
         caller = await seeding.within(
             SomeoneOf(
-                domain, vfolder_hosts=[STORAGE_HOST], max_vfolder_count=self.max_vfolder_count
+                domain,
+                name_hint="granted-user",
+                vfolder_hosts=[STORAGE_HOST],
+                max_vfolder_count=self.max_vfolder_count,
             )
         )
         role = await seeding.creating_from(
@@ -148,7 +154,9 @@ class SomeoneWhoseFolderIsInTheTrash(Given[Any, AFolderAndACaller]):
         domain = await seeding.creating(
             SeedDomain(name_hint="home", description=WAS_HERE, vfolder_hosts=[STORAGE_HOST])
         )
-        caller = await seeding.within(SomeoneOf(domain, vfolder_hosts=[STORAGE_HOST]))
+        caller = await seeding.within(
+            SomeoneOf(domain, name_hint="granted-user", vfolder_hosts=[STORAGE_HOST])
+        )
         role = await seeding.creating_from(
             SeedRole(lambda u: UserID(u.id), name_hint="folder-role"), caller
         )
@@ -180,7 +188,9 @@ class SomeoneWhoseFolderIsGone(Given[Any, AFolderAndACaller]):
         domain = await seeding.creating(
             SeedDomain(name_hint="home", description=WAS_HERE, vfolder_hosts=[STORAGE_HOST])
         )
-        caller = await seeding.within(SomeoneOf(domain, vfolder_hosts=[STORAGE_HOST]))
+        caller = await seeding.within(
+            SomeoneOf(domain, name_hint="granted-user", vfolder_hosts=[STORAGE_HOST])
+        )
         role = await seeding.creating_from(
             SeedRole(lambda u: UserID(u.id), name_hint="folder-role"), caller
         )
@@ -220,7 +230,12 @@ class SomeoneGrantedOverTheDomainWithAFolder(Given[Any, AFolderAndACaller]):
             SeedDomain(name_hint="home", description=WAS_HERE, vfolder_hosts=[STORAGE_HOST])
         )
         caller = await seeding.within(
-            SomeoneOf(domain, vfolder_hosts=[STORAGE_HOST], host_permissions=self.host_permissions)
+            SomeoneOf(
+                domain,
+                name_hint="granted-user",
+                vfolder_hosts=[STORAGE_HOST],
+                host_permissions=self.host_permissions,
+            )
         )
         role = await seeding.creating_from(
             SeedRole(lambda d: DomainID(d.id), name_hint="folder-role"), domain
@@ -253,7 +268,9 @@ class SomeoneElsesFolder(Given[Any, AFolderAndACaller]):
         domain = await seeding.creating(
             SeedDomain(name_hint="home", description=WAS_HERE, vfolder_hosts=[STORAGE_HOST])
         )
-        owner = await seeding.within(SomeoneOf(domain, vfolder_hosts=[STORAGE_HOST]))
+        owner = await seeding.within(
+            SomeoneOf(domain, name_hint="owner", vfolder_hosts=[STORAGE_HOST])
+        )
         owners_role = await seeding.creating_from(
             SeedRole(lambda d: DomainID(d.id), name_hint="owner-role"), domain
         )
@@ -268,7 +285,12 @@ class SomeoneElsesFolder(Given[Any, AFolderAndACaller]):
             SeedFolderOf(host=STORAGE_HOST, status=self.status), owner
         )
         caller = await seeding.within(
-            SomeoneOf(domain, role=self.role, vfolder_hosts=[STORAGE_HOST])
+            SomeoneOf(
+                domain,
+                role=self.role,
+                name_hint="other-user" if self.role is UserRole.USER else self.role.value,
+                vfolder_hosts=[STORAGE_HOST],
+            )
         )
         return AFolderAndACaller(seeding.made(folder), seeding.made(caller), seeding.made(owner))
 
@@ -289,7 +311,9 @@ class SomeoneElsesTrashedFolderAndABroadGrant(Given[Any, AFolderAndACaller]):
         domain = await seeding.creating(
             SeedDomain(name_hint="home", description=WAS_HERE, vfolder_hosts=[STORAGE_HOST])
         )
-        owner = await seeding.within(SomeoneOf(domain, vfolder_hosts=[STORAGE_HOST]))
+        owner = await seeding.within(
+            SomeoneOf(domain, name_hint="owner", vfolder_hosts=[STORAGE_HOST])
+        )
         owners_role = await seeding.creating_from(
             SeedRole(lambda d: DomainID(d.id), name_hint="owner-role"), domain
         )
@@ -303,7 +327,9 @@ class SomeoneElsesTrashedFolderAndABroadGrant(Given[Any, AFolderAndACaller]):
         folder = await seeding.creating_from(
             SeedFolderOf(host=STORAGE_HOST, status=VFolderOperationStatus.DELETE_PENDING), owner
         )
-        caller = await seeding.within(SomeoneOf(domain, vfolder_hosts=[STORAGE_HOST]))
+        caller = await seeding.within(
+            SomeoneOf(domain, name_hint="other-user", vfolder_hosts=[STORAGE_HOST])
+        )
         callers_role = await seeding.creating_from(
             SeedRole(lambda d: DomainID(d.id), name_hint="folder-role"), domain
         )
@@ -334,7 +360,12 @@ class TheirFoldersAndANeighbours(Given[Any, FoldersAndACaller]):
             SeedDomain(name_hint="home", description=WAS_HERE, vfolder_hosts=[STORAGE_HOST])
         )
         caller = await seeding.within(
-            SomeoneOf(domain, vfolder_hosts=[STORAGE_HOST], max_vfolder_count=max(self.own, 10))
+            SomeoneOf(
+                domain,
+                name_hint="granted-user",
+                vfolder_hosts=[STORAGE_HOST],
+                max_vfolder_count=max(self.own, 10),
+            )
         )
         role = await seeding.creating_from(
             SeedRole(lambda u: UserID(u.id), name_hint="folder-role"), caller
@@ -350,7 +381,9 @@ class TheirFoldersAndANeighbours(Given[Any, FoldersAndACaller]):
         ]
         others = []
         for _ in range(self.others):
-            neighbour = await seeding.within(SomeoneOf(domain, vfolder_hosts=[STORAGE_HOST]))
+            neighbour = await seeding.within(
+                SomeoneOf(domain, name_hint="neighbour", vfolder_hosts=[STORAGE_HOST])
+            )
             others.append(
                 await seeding.creating_from(
                     SeedFolderOf(host=STORAGE_HOST, name_hint="theirs"), neighbour
@@ -380,14 +413,21 @@ class FoldersOfTwoOthers(Given[Any, FoldersAndACaller]):
         )
         folders = []
         for _ in range(2):
-            neighbour = await seeding.within(SomeoneOf(domain, vfolder_hosts=[STORAGE_HOST]))
+            neighbour = await seeding.within(
+                SomeoneOf(domain, name_hint="neighbour", vfolder_hosts=[STORAGE_HOST])
+            )
             folders.append(
                 await seeding.creating_from(
                     SeedFolderOf(host=STORAGE_HOST, name_hint="theirs"), neighbour
                 )
             )
         caller = await seeding.within(
-            SomeoneOf(domain, role=self.role, vfolder_hosts=[STORAGE_HOST])
+            SomeoneOf(
+                domain,
+                role=self.role,
+                name_hint=self.role.value,
+                vfolder_hosts=[STORAGE_HOST],
+            )
         )
         return FoldersAndACaller(
             tuple(seeding.made(one) for one in folders), (), seeding.made(caller)
@@ -409,7 +449,9 @@ class TheirFoldersToDelete(Given[Any, FoldersAndACaller]):
         domain = await seeding.creating(
             SeedDomain(name_hint="home", description=WAS_HERE, vfolder_hosts=[STORAGE_HOST])
         )
-        caller = await seeding.within(SomeoneOf(domain, vfolder_hosts=[STORAGE_HOST]))
+        caller = await seeding.within(
+            SomeoneOf(domain, name_hint="granted-user", vfolder_hosts=[STORAGE_HOST])
+        )
         role = await seeding.creating_from(
             SeedRole(lambda d: DomainID(d.id), name_hint="folder-role"), domain
         )
@@ -442,7 +484,9 @@ class FoldersTheCallerMayAndMayNotDelete(Given[Any, FoldersAndACaller]):
         home = await seeding.creating(
             SeedDomain(name_hint="home", description=WAS_HERE, vfolder_hosts=[STORAGE_HOST])
         )
-        caller = await seeding.within(SomeoneOf(home, vfolder_hosts=[STORAGE_HOST]))
+        caller = await seeding.within(
+            SomeoneOf(home, name_hint="granted-user", vfolder_hosts=[STORAGE_HOST])
+        )
         role = await seeding.creating_from(
             SeedRole(lambda d: DomainID(d.id), name_hint="folder-role"), home
         )
@@ -455,7 +499,9 @@ class FoldersTheCallerMayAndMayNotDelete(Given[Any, FoldersAndACaller]):
         elsewhere = await seeding.creating(
             SeedDomain(name_hint="elsewhere", description=WAS_HERE, vfolder_hosts=[STORAGE_HOST])
         )
-        neighbour = await seeding.within(SomeoneOf(elsewhere, vfolder_hosts=[STORAGE_HOST]))
+        neighbour = await seeding.within(
+            SomeoneOf(elsewhere, name_hint="neighbour", vfolder_hosts=[STORAGE_HOST])
+        )
         theirs = await seeding.creating_from(
             SeedFolderOf(host=STORAGE_HOST, name_hint="theirs"), neighbour
         )
@@ -483,7 +529,9 @@ class SomeoneGrantedOnAProject(Given[Any, AProjectAndACaller]):
         project = await seeding.creating_from_two(
             SeedProject(name_hint="team", vfolder_hosts=[STORAGE_HOST]), domain, policy
         )
-        caller = await seeding.within(SomeoneOf(domain, vfolder_hosts=[STORAGE_HOST]))
+        caller = await seeding.within(
+            SomeoneOf(domain, name_hint="granted-user", vfolder_hosts=[STORAGE_HOST])
+        )
         role = await seeding.creating_from(
             SeedRole(lambda p: ProjectID(p.id), name_hint="folder-role"), project
         )
@@ -512,7 +560,9 @@ class SomeoneGrantedNothingOnAProject(Given[Any, AProjectAndACaller]):
         project = await seeding.creating_from_two(
             SeedProject(name_hint="team", vfolder_hosts=[STORAGE_HOST]), domain, policy
         )
-        caller = await seeding.within(SomeoneOf(domain, vfolder_hosts=[STORAGE_HOST]))
+        caller = await seeding.within(
+            SomeoneOf(domain, name_hint="ungranted-user", vfolder_hosts=[STORAGE_HOST])
+        )
         return AProjectAndACaller(seeding.made(project), seeding.made(caller))
 
 
@@ -533,7 +583,9 @@ class SomeoneNamingTheirPersonalProject(Given[Any, APersonalProjectAndItsOwner])
         domain = await seeding.creating(
             SeedDomain(name_hint="home", description=WAS_HERE, vfolder_hosts=[STORAGE_HOST])
         )
-        caller = await seeding.within(SomeoneOf(domain, vfolder_hosts=[STORAGE_HOST]))
+        caller = await seeding.within(
+            SomeoneOf(domain, name_hint="granted-user", vfolder_hosts=[STORAGE_HOST])
+        )
         personal = await seeding.looking_up(
             PersonalProjectOfUserLookup(user_id=UserID(seeding.made(caller).id))
         )
@@ -570,7 +622,9 @@ class AProjectFolderAndANeighboursOwn(Given[Any, AProjectAndACaller]):
         project = await seeding.creating_from_two(
             SeedProject(name_hint="team", vfolder_hosts=[STORAGE_HOST]), domain, policy
         )
-        caller = await seeding.within(SomeoneOf(domain, vfolder_hosts=[STORAGE_HOST]))
+        caller = await seeding.within(
+            SomeoneOf(domain, name_hint="granted-user", vfolder_hosts=[STORAGE_HOST])
+        )
         role = await seeding.creating_from(
             SeedRole(lambda p: ProjectID(p.id), name_hint="folder-role"), project
         )
@@ -582,7 +636,9 @@ class AProjectFolderAndANeighboursOwn(Given[Any, AProjectAndACaller]):
         theirs = await seeding.creating_from_two(
             SeedProjectFolderOf(host=STORAGE_HOST), caller, project
         )
-        neighbour = await seeding.within(SomeoneOf(domain, vfolder_hosts=[STORAGE_HOST]))
+        neighbour = await seeding.within(
+            SomeoneOf(domain, name_hint="neighbour", vfolder_hosts=[STORAGE_HOST])
+        )
         personal = await seeding.creating_from(
             SeedFolderOf(host=STORAGE_HOST, name_hint="theirs"), neighbour
         )

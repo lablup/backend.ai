@@ -253,6 +253,8 @@ class SomeoneOf(SeedNest[Laid[UserData]]):
 
     domain: Laid[DomainData]
     role: UserRole = UserRole.USER
+    name_hint: str = "user"
+    """이 사람이 그 시나리오에서 무엇인지. 레포트가 이 이름으로 부른다."""
     vfolder_hosts: Sequence[str] = ()
     max_vfolder_count: int = 10
     host_permissions: Sequence[VFolderHostPermission] = tuple(VFolderHostPermission)
@@ -270,7 +272,9 @@ class SomeoneOf(SeedNest[Laid[UserData]]):
                 vfolder_hosts=self.vfolder_hosts, host_permissions=self.host_permissions
             )
         )
-        return seed.provisioning(SeedUserOf(role=self.role), self.domain, policy, key_policy)
+        return seed.provisioning(
+            SeedUserOf(role=self.role, name_hint=self.name_hint), self.domain, policy, key_policy
+        )
 
 
 @dataclass(frozen=True)
