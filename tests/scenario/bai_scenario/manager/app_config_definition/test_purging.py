@@ -1,6 +1,6 @@
-"""정의 지우기 — 슈퍼관리자만 지우고, 딸린 것이 막지 않는다.
+"""설정 정의 삭제 — 슈퍼관리자만 삭제할 수 있고, 딸린 것이 막지 않는다.
 
-허용 항목과 조각은 데이터베이스가 함께 지운다. 이 어댑터에는 soft delete가 없다.
+허용 목록 항목과 설정 조각은 데이터베이스가 함께 삭제한다. 이 어댑터에는 soft delete가 없다.
 """
 
 from __future__ import annotations
@@ -52,7 +52,7 @@ type PurgingStep = Scenario[
 
 @dataclass(frozen=True)
 class Purging(When[ADefinitionAndACaller, AppConfigDefinitionAdapter, Purged]):
-    """정의 하나를 지운다. id를 대지 않으면 심은 정의를 지운다."""
+    """설정 정의 하나를 삭제한다. id를 지정하지 않으면 미리 만들어 둔 정의를 삭제한다."""
 
     other: UUID | None = None
 
@@ -62,8 +62,8 @@ class Purging(When[ADefinitionAndACaller, AppConfigDefinitionAdapter, Purged]):
 
     @override
     def describe(self, laid: ADefinitionAndACaller) -> str:
-        called = "아무것도 갖지 않은 id" if self.other is not None else laid.definition.config_name
-        return f"{laid.caller.username}이 {called}를 지움"
+        called = "존재하지 않는 id" if self.other is not None else laid.definition.config_name
+        return f"{laid.caller.username}이 {called} 삭제"
 
     @override
     async def call(
@@ -76,18 +76,20 @@ class Purging(When[ADefinitionAndACaller, AppConfigDefinitionAdapter, Purged]):
 
 @dataclass(frozen=True)
 class ThePurgedOneIsNamed(Then[ADefinitionAndACaller, Purged]):
-    """지운 정의가 무엇인지 id로 답한다."""
+    """삭제한 설정 정의가 무엇인지 id로 응답한다."""
 
     @override
     def says(self) -> str:
-        return "지운 정의의 id를 답한다"
+        return "삭제한 설정 정의의 id를 응답한다"
 
     @override
     def look(self, laid: ADefinitionAndACaller, answered: Answered[Purged]) -> list[Verdict]:
         payload = answered.response
         if payload is None:
             return [Refused(NotEnoughPermission, answered.raised)]
-        return [Held("id", payload.id, SameAs[UUID](laid.definition.id, "심은 정의"))]
+        return [
+            Held("id", payload.id, SameAs[UUID](laid.definition.id, "미리 만들어 둔 설정 정의"))
+        ]
 
 
 @dataclass(frozen=True)
@@ -100,7 +102,7 @@ class TheSuperadminPurgesIt(
 
     @override
     def describe(self) -> str:
-        return "아무것도 딸리지 않은 정의를 슈퍼관리자가 지우면, 지운 id를 실은 답이 온다"
+        return "아무것도 딸리지 않은 설정 정의를 슈퍼관리자가 삭제하면, 삭제한 id를 담은 응답이 반환된다"
 
     @override
     def given(self) -> Given[SeedingSession, ADefinitionAndACaller]:
@@ -125,7 +127,7 @@ class EntriesAndFragmentsDoNotBlockIt(
 
     @override
     def describe(self) -> str:
-        return "허용 항목과 조각이 딸린 정의를 슈퍼관리자가 지우면, 딸린 것이 막지 않고 지운 id를 실은 답이 온다"
+        return "허용 목록 항목과 설정 조각이 딸린 설정 정의를 슈퍼관리자가 삭제하면, 딸린 것이 막지 않고 삭제한 id를 담은 응답이 반환된다"
 
     @override
     def given(self) -> Given[SeedingSession, ADefinitionAndACaller]:
@@ -150,7 +152,7 @@ class AUserGrantedNothingMayNotPurge(
 
     @override
     def describe(self) -> str:
-        return "같은 정의가 있고 슈퍼관리자가 아닌 사용자가 지우면, 권한 부족으로 거부된다"
+        return "같은 설정 정의가 있고 슈퍼관리자가 아닌 사용자가 삭제하면, 권한 부족으로 거부된다"
 
     @override
     def given(self) -> Given[SeedingSession, ADefinitionAndACaller]:
@@ -175,7 +177,7 @@ class AnUnknownIdIsNotFoundForASuperadmin(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 아무것도 갖지 않은 id를 지우면, 대상이 없다는 것으로 거부된다"
+        return "슈퍼관리자가 존재하지 않는 id를 삭제하면, 대상을 찾을 수 없다는 이유로 거부된다"
 
     @override
     def given(self) -> Given[SeedingSession, ADefinitionAndACaller]:

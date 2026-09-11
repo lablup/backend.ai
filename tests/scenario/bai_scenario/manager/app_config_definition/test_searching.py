@@ -1,4 +1,4 @@
-"""정의 훑기 — 전역 역할이 지킨다."""
+"""설정 정의 검색 — 전역 역할로 보호된다."""
 
 from __future__ import annotations
 
@@ -48,7 +48,7 @@ type SearchingStep = Scenario[
 
 @dataclass(frozen=True)
 class SearchingEverything(When[ManyDefinitionsAndACaller, AppConfigDefinitionAdapter, Searched]):
-    """필터 없이 전체를 훑는다."""
+    """필터 없이 전체를 검색한다."""
 
     @override
     def operation(self) -> str:
@@ -68,7 +68,7 @@ class SearchingEverything(When[ManyDefinitionsAndACaller, AppConfigDefinitionAda
 
 @dataclass(frozen=True)
 class SearchingByName(When[ManyDefinitionsAndACaller, AppConfigDefinitionAdapter, Searched]):
-    """골라낼 하나의 이름으로 거른다."""
+    """골라낸 하나의 이름을 필터로 검색한다."""
 
     @override
     def operation(self) -> str:
@@ -76,7 +76,7 @@ class SearchingByName(When[ManyDefinitionsAndACaller, AppConfigDefinitionAdapter
 
     @override
     def describe(self, laid: ManyDefinitionsAndACaller) -> str:
-        return f"{laid.caller.username}이 이름 {laid.named.config_name}으로 걸러 조회"
+        return f"{laid.caller.username}이 {laid.named.config_name} 이름 필터로 조회"
 
     @override
     async def call(
@@ -94,7 +94,7 @@ class SearchingByName(When[ManyDefinitionsAndACaller, AppConfigDefinitionAdapter
 
 @dataclass(frozen=True)
 class SearchingInNameOrder(When[ManyDefinitionsAndACaller, AppConfigDefinitionAdapter, Searched]):
-    """이름 오름차순으로 정렬해 훑는다."""
+    """이름 오름차순으로 정렬해 검색한다."""
 
     @override
     def operation(self) -> str:
@@ -131,7 +131,7 @@ class TheSuperadminCountsEveryOne(
 
     @override
     def describe(self) -> str:
-        return "정의 셋이 있고 슈퍼관리자가 필터 없이 전체를 훑으면, 셋을 모두 센다. 이 문은 전역 역할이다"
+        return "설정 정의 셋이 있고 슈퍼관리자가 필터 없이 전체를 검색하면, 셋 다 집계된다. 검색은 전역 역할로 보호된다"
 
     @override
     def given(self) -> Given[SeedingSession, ManyDefinitionsAndACaller]:
@@ -156,9 +156,7 @@ class FilteringByNameKeepsOne(
 
     @override
     def describe(self) -> str:
-        return (
-            "이름이 다른 정의 여럿이 있고 슈퍼관리자가 이름으로 걸러 훑으면, 그 이름의 것만 남는다"
-        )
+        return "이름이 다른 설정 정의 여럿이 있고 슈퍼관리자가 이름 필터로 검색하면, 그 이름의 정의만 반환된다"
 
     @override
     def given(self) -> Given[SeedingSession, ManyDefinitionsAndACaller]:
@@ -183,7 +181,7 @@ class OrderingByNameSortsThem(
 
     @override
     def describe(self) -> str:
-        return "정의 셋이 있고 슈퍼관리자가 이름 오름차순으로 훑으면, 이름 순서대로 온다"
+        return "설정 정의 셋이 있고 슈퍼관리자가 이름 오름차순으로 검색하면, 이름 순서대로 반환된다"
 
     @override
     def given(self) -> Given[SeedingSession, ManyDefinitionsAndACaller]:
@@ -208,7 +206,7 @@ class NoPageSizeMeansTen(
 
     @override
     def describe(self) -> str:
-        return "정의 열하나가 있고 슈퍼관리자가 크기 없이 훑으면, 열 건까지 오고 다음 쪽이 있다고 답한다"
+        return "설정 정의 11개가 있고 슈퍼관리자가 크기 없이 검색하면, 10건까지 반환되고 다음 페이지가 있다고 응답한다"
 
     @override
     def given(self) -> Given[SeedingSession, ManyDefinitionsAndACaller]:
@@ -233,7 +231,7 @@ class APlainUserMayNotSearch(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 아닌 사용자가 전체를 훑으면, 역할로 거부된다"
+        return "슈퍼관리자가 아닌 사용자가 전체를 검색하면, 역할 부족으로 거부된다"
 
     @override
     def given(self) -> Given[SeedingSession, ManyDefinitionsAndACaller]:

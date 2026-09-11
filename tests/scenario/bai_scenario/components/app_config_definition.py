@@ -41,14 +41,12 @@ from ai.backend.testutils.scenario_steps import (
 
 
 def _who(role: UserRole) -> str:
-    return (
-        "슈퍼관리자 한 명" if role == UserRole.SUPERADMIN else "아무 권한도 받지 않은 사용자 한 명"
-    )
+    return "슈퍼관리자 한 명" if role == UserRole.SUPERADMIN else "아무 권한도 없는 사용자 한 명"
 
 
 @dataclass(frozen=True)
 class ADefinitionAndACaller:
-    """정의 하나와, 그것을 부를 사람."""
+    """설정 정의 하나와, 그것을 호출할 사용자."""
 
     domain: DomainData
     caller: UserData
@@ -57,9 +55,9 @@ class ADefinitionAndACaller:
 
 @dataclass(frozen=True)
 class ADefinitionAndSomeone(Given[Any, ADefinitionAndACaller]):
-    """정의 하나와, 슈퍼관리자 또는 아무 권한도 받지 않은 사용자 한 명.
+    """설정 정의 하나와, 슈퍼관리자 또는 아무 권한도 없는 사용자 한 명.
 
-    ``with_fragment``는 그 이름에 공개 허용 항목과 공개 조각을 딸려 둔다.
+    ``with_fragment``는 그 이름에 공개 허용 목록 항목과 공개 설정 조각을 함께 만들어 둔다.
     """
 
     role: UserRole = UserRole.USER
@@ -67,7 +65,11 @@ class ADefinitionAndSomeone(Given[Any, ADefinitionAndACaller]):
 
     @override
     def describe(self) -> str:
-        what = "허용 항목과 조각이 딸린 정의 하나" if self.with_fragment else "정의 하나"
+        what = (
+            "허용 목록 항목과 설정 조각이 딸린 설정 정의 하나"
+            if self.with_fragment
+            else "설정 정의 하나"
+        )
         return f"{what}와, {_who(self.role)}"
 
     @override
@@ -89,7 +91,7 @@ class ADefinitionAndSomeone(Given[Any, ADefinitionAndACaller]):
 
 @dataclass(frozen=True)
 class ManyDefinitionsAndACaller:
-    """훑을 정의 여럿과, 훑을 사람. ``named``는 그중 골라낼 하나다."""
+    """검색 대상 설정 정의 여럿과, 검색을 호출할 사용자. ``named``는 그중 이름 필터로 골라낼 하나다."""
 
     caller: UserData
     laid: tuple[AppConfigDefinitionData, ...]
@@ -98,14 +100,14 @@ class ManyDefinitionsAndACaller:
 
 @dataclass(frozen=True)
 class ManyDefinitionsAndSomeone(Given[Any, ManyDefinitionsAndACaller]):
-    """정의 여럿과, 슈퍼관리자 또는 아무 권한도 받지 않은 사용자 한 명."""
+    """설정 정의 여럿과, 슈퍼관리자 또는 아무 권한도 없는 사용자 한 명."""
 
     count: int = 3
     role: UserRole = UserRole.USER
 
     @override
     def describe(self) -> str:
-        return f"정의 {self.count}개와, {_who(self.role)}"
+        return f"설정 정의 {self.count}개와, {_who(self.role)}"
 
     @override
     async def lay(self, seeding: Any) -> ManyDefinitionsAndACaller:
@@ -124,7 +126,7 @@ class ManyDefinitionsAndSomeone(Given[Any, ManyDefinitionsAndACaller]):
 
 @dataclass(frozen=True)
 class TwoDefinitionsAndACaller:
-    """id로 함께 읽을 정의 둘과, 읽을 사람."""
+    """id로 함께 조회할 설정 정의 둘과, 조회할 사용자."""
 
     caller: UserData
     first: AppConfigDefinitionData
@@ -133,13 +135,13 @@ class TwoDefinitionsAndACaller:
 
 @dataclass(frozen=True)
 class TwoDefinitionsAndSomeone(Given[Any, TwoDefinitionsAndACaller]):
-    """정의 둘과, 슈퍼관리자 또는 아무 권한도 받지 않은 사용자 한 명."""
+    """설정 정의 둘과, 슈퍼관리자 또는 아무 권한도 없는 사용자 한 명."""
 
     role: UserRole = UserRole.USER
 
     @override
     def describe(self) -> str:
-        return f"정의 둘과, {_who(self.role)}"
+        return f"설정 정의 둘과, {_who(self.role)}"
 
     @override
     async def lay(self, seeding: Any) -> TwoDefinitionsAndACaller:
@@ -156,13 +158,13 @@ class TwoDefinitionsAndSomeone(Given[Any, TwoDefinitionsAndACaller]):
 
 @dataclass(frozen=True)
 class TheDefinitionNode(Then[ADefinitionAndACaller, AppConfigDefinitionNode]):
-    """심은 정의가 통째로 온다."""
+    """미리 만들어 둔 설정 정의가 통째로 반환된다."""
 
     started: datetime
 
     @override
     def says(self) -> str:
-        return "심은 정의 전체가 온다"
+        return "미리 만들어 둔 설정 정의 전체가 반환된다"
 
     @override
     def look(
@@ -173,7 +175,7 @@ class TheDefinitionNode(Then[ADefinitionAndACaller, AppConfigDefinitionNode]):
             return [Refused(NotEnoughPermission, answered.raised)]
         written = WrittenByThisRun(self.started)
         return [
-            Held("id", node.id, SameAs[UUID](laid.definition.id, "심은 정의")),
+            Held("id", node.id, SameAs[UUID](laid.definition.id, "미리 만들어 둔 설정 정의")),
             Same("config_name", node.config_name, laid.definition.config_name),
             Held("created_at", node.created_at, written),
             Held("updated_at", node.updated_at, written),
@@ -182,14 +184,14 @@ class TheDefinitionNode(Then[ADefinitionAndACaller, AppConfigDefinitionNode]):
 
 @dataclass(frozen=True)
 class TheNewDefinitionNode(Then[Any, AppConfigDefinitionNode]):
-    """방금 등록한 정의가 통째로 온다. 이름은 시나리오가 정한 것이다."""
+    """방금 등록한 설정 정의가 통째로 반환된다. 이름은 시나리오가 정한 값이다."""
 
     started: datetime
     named: str
 
     @override
     def says(self) -> str:
-        return "등록한 정의 전체가 온다"
+        return "등록한 설정 정의 전체가 반환된다"
 
     @override
     def look(self, laid: Any, answered: Answered[AppConfigDefinitionNode]) -> list[Verdict]:
@@ -209,11 +211,11 @@ class TheNewDefinitionNode(Then[Any, AppConfigDefinitionNode]):
 class EveryLaidDefinitionIsFound(
     Then[ManyDefinitionsAndACaller, SearchAppConfigDefinitionsPayload]
 ):
-    """심은 정의가 모두, 그리고 그것만 세어진다."""
+    """미리 만들어 둔 설정 정의가 모두, 그리고 그것만 집계된다."""
 
     @override
     def says(self) -> str:
-        return "심은 정의가 모두, 그리고 그것만 세어진다"
+        return "미리 만들어 둔 설정 정의가 모두, 그리고 그것만 집계된다"
 
     @override
     def look(
@@ -240,11 +242,11 @@ class EveryLaidDefinitionIsFound(
 class OnlyTheNamedDefinitionIsFound(
     Then[ManyDefinitionsAndACaller, SearchAppConfigDefinitionsPayload]
 ):
-    """골라낸 하나만 남는다."""
+    """필터에 맞는 하나만 반환된다."""
 
     @override
     def says(self) -> str:
-        return "이름으로 고른 정의만 남는다"
+        return "이름 필터에 맞는 설정 정의만 반환된다"
 
     @override
     def look(
@@ -267,11 +269,11 @@ class OnlyTheNamedDefinitionIsFound(
 class DefinitionsComeInNameOrder(
     Then[ManyDefinitionsAndACaller, SearchAppConfigDefinitionsPayload]
 ):
-    """이름 오름차순으로 온다."""
+    """이름 오름차순으로 반환된다."""
 
     @override
     def says(self) -> str:
-        return "이름 순서대로 온다"
+        return "이름 순서대로 반환된다"
 
     @override
     def look(
@@ -294,11 +296,11 @@ class DefinitionsComeInNameOrder(
 
 @dataclass(frozen=True)
 class TenComeWithANextPage(Then[ManyDefinitionsAndACaller, SearchAppConfigDefinitionsPayload]):
-    """크기를 대지 않으면 열 건까지 오고 다음 쪽이 있다고 답한다."""
+    """크기를 지정하지 않으면 10건까지 반환되고 다음 페이지가 있다고 응답한다."""
 
     @override
     def says(self) -> str:
-        return "열 건까지 오고 다음 쪽이 있다고 답한다"
+        return "10건까지 반환되고 다음 페이지가 있다고 응답한다"
 
     @override
     def look(

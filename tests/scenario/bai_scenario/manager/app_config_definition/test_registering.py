@@ -1,4 +1,4 @@
-"""정의 등록하기 — 누가 이름을 등록할 수 있고, 무엇이 이름을 막는가."""
+"""설정 정의 등록 — 누가 이름을 등록할 수 있고, 무엇이 이름을 막는가."""
 
 from __future__ import annotations
 
@@ -43,7 +43,7 @@ FRESH = "fresh-config"
 
 @dataclass(frozen=True)
 class Registering(When[ADefinitionAndACaller, AppConfigDefinitionAdapter, AppConfigDefinitionNode]):
-    """이름을 등록한다. 이름을 대지 않으면 심은 정의의 이름을 그대로 쓴다."""
+    """설정 이름을 등록한다. 이름을 지정하지 않으면 미리 만들어 둔 정의의 이름을 그대로 쓴다."""
 
     named: str | None = None
 
@@ -53,7 +53,9 @@ class Registering(When[ADefinitionAndACaller, AppConfigDefinitionAdapter, AppCon
 
     @override
     def describe(self, laid: ADefinitionAndACaller) -> str:
-        return f"{laid.caller.username}이 {self.named or laid.definition.config_name}을 등록"
+        return (
+            f"{laid.caller.username}이 설정 이름 {self.named or laid.definition.config_name} 등록"
+        )
 
     @override
     async def call(
@@ -80,8 +82,8 @@ class TheSuperadminRegistersAName(
     @override
     def describe(self) -> str:
         return (
-            "슈퍼관리자가 이름만 주고 정의를 등록하면, 이름은 준 그대로이고 id와 시각은 "
-            "서버가 채운 노드가 답으로 온다. 이 문은 전역 역할이다"
+            "슈퍼관리자가 이름만 지정해 설정 정의를 등록하면, 이름은 지정한 그대로이고 id와 시각은 "
+            "서버가 채운 노드가 반환된다. 등록은 전역 역할로 보호된다"
         )
 
     @override
@@ -112,8 +114,8 @@ class ANameAlreadyRegisteredIsRefused(
     @override
     def describe(self) -> str:
         return (
-            "이미 등록된 이름으로 슈퍼관리자가 다시 등록하면 거부되지만, 답이 이름이 겹친다고 "
-            "말하지 않고 데이터베이스의 제약 위반이 그대로 올라온다"
+            "이미 등록된 이름으로 슈퍼관리자가 다시 등록하면 거부되지만, 응답이 이름 중복이라고 "
+            "알려 주지 않고 데이터베이스의 제약 위반이 그대로 전파된다"
         )
 
     @override
@@ -143,7 +145,7 @@ class APlainUserMayNotRegister(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 아닌 사용자가 정의를 등록하려 하면, 역할로 거부된다"
+        return "슈퍼관리자가 아닌 사용자가 설정 정의를 등록하려 하면, 역할 부족으로 거부된다"
 
     @override
     def given(self) -> Given[SeedingSession, ADefinitionAndACaller]:
@@ -174,8 +176,8 @@ class EnforcementOffChangesNothing(
     @override
     def describe(self) -> str:
         return (
-            "엔티티 권한 집행을 꺼도 정의 등록은 여전히 막힌다. "
-            "이 문은 권한 그래프가 아니라 역할이 지키기 때문이다"
+            "권한 검사를 꺼도 설정 정의 등록은 여전히 거부된다. "
+            "등록은 권한 그래프가 아니라 역할로 보호되기 때문이다"
         )
 
     @override

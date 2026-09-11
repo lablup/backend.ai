@@ -52,15 +52,15 @@ from ai.backend.testutils.scenario_steps import (
 ENFORCEMENT = "manager.rbac.enforcement_enabled"
 
 UNREGISTERED = "unregistered"
-"""아무 정의도 갖지 않은 이름. 심은 것이 아니므로 리터럴로 둔다."""
+"""등록되지 않은 설정 이름. 미리 만들어 두는 값이 아니므로 리터럴로 둔다."""
 
 ENTITY_NAMES: Mapping[EntityType, str] = {
     AppConfigEntityType(): "설정",
     AppConfigDefinitionEntityType(): "설정 정의",
-    AppConfigAllowListEntityType(): "허용 항목",
-    AppConfigFragmentEntityType(): "조각",
+    AppConfigAllowListEntityType(): "허용 목록 항목",
+    AppConfigFragmentEntityType(): "설정 조각",
 }
-"""권한이 걸리는 엔티티 종류를 레포트가 부르는 말."""
+"""레포트에서 권한 대상 엔티티 종류를 가리키는 이름."""
 
 
 def names_of(granted: Sequence[Permission]) -> str:
@@ -69,9 +69,9 @@ def names_of(granted: Sequence[Permission]) -> str:
 
 @dataclass(frozen=True)
 class SomeoneGrantedOnTheirOwn(SeedNest[Laid[UserData]]):
-    """자기 스코프에 앉은 역할로, 한 엔티티 종류에 정해진 권한만 받은 사용자.
+    """자기 스코프에 부여된 역할로, 한 엔티티 종류에 지정한 권한만 받은 사용자.
 
-    권한을 하나도 대지 않으면 역할을 만들지 않는다.
+    권한을 하나도 지정하지 않으면 역할을 만들지 않는다.
     """
 
     domain: Laid[DomainData]
@@ -83,8 +83,8 @@ class SomeoneGrantedOnTheirOwn(SeedNest[Laid[UserData]]):
     def kind(self) -> str:
         what = ENTITY_NAMES[self.entity_type]
         if not self.granted:
-            return f"{what} 권한을 하나도 받지 않은 사용자 준비"
-        return f"자기 스코프에서 {what}에 {names_of(self.granted)} 권한을 받은 사용자 준비"
+            return f"{what} 권한이 하나도 없는 사용자 준비"
+        return f"자기 스코프에서 {what}에 대한 {names_of(self.granted)} 권한을 받은 사용자 준비"
 
     @override
     def lay(self, seed: Seeder) -> Laid[UserData]:
@@ -100,9 +100,9 @@ class SomeoneGrantedOnTheirOwn(SeedNest[Laid[UserData]]):
 
 @dataclass(frozen=True)
 class SomeoneGrantedOn[Seat](SeedNest[Laid[UserData]]):
-    """주어진 스코프 행에 앉은 역할로, 한 엔티티 종류에 정해진 권한만 받은 사용자.
+    """지정한 스코프 행에 부여된 역할로, 한 엔티티 종류에 지정한 권한만 받은 사용자.
 
-    도메인에 앉히면 그 도메인 안의 것을 다스린다.
+    도메인 스코프에 부여하면 그 도메인 안의 엔티티를 관리한다.
     """
 
     domain: Laid[DomainData]
@@ -116,8 +116,8 @@ class SomeoneGrantedOn[Seat](SeedNest[Laid[UserData]]):
     def kind(self) -> str:
         what = ENTITY_NAMES[self.entity_type]
         if not self.granted:
-            return f"{what} 권한을 하나도 받지 않은 사용자 준비"
-        return f"{self.seat.describe}에서 {what}에 {names_of(self.granted)} 권한을 받은 사용자 준비"
+            return f"{what} 권한이 하나도 없는 사용자 준비"
+        return f"{self.seat.describe}에서 {what}에 대한 {names_of(self.granted)} 권한을 받은 사용자 준비"
 
     @override
     def lay(self, seed: Seeder) -> Laid[UserData]:
@@ -133,7 +133,7 @@ class SomeoneGrantedOn[Seat](SeedNest[Laid[UserData]]):
 
 @dataclass(frozen=True)
 class LaidDesign:
-    """정의 하나와, 그 이름을 여는 허용 항목들의 손잡이."""
+    """설정 정의 하나와, 그 이름을 허용하는 허용 목록 항목들의 참조."""
 
     definition: Laid[AppConfigDefinitionData]
     entries: Mapping[AppConfigScopeType, Laid[AppConfigAllowListData]]
@@ -141,7 +141,7 @@ class LaidDesign:
 
 @dataclass(frozen=True)
 class ADesignOf(SeedNest[LaidDesign]):
-    """이름 하나를 등록하고, 대준 스코프 종류마다 허용 항목을 연다.
+    """설정 이름 하나를 등록하고, 지정한 스코프 종류마다 허용 목록 항목을 만든다.
 
     ``ranks``에 없는 종류는 그 종류의 기본 순위를 받는다.
     """
@@ -153,9 +153,9 @@ class ADesignOf(SeedNest[LaidDesign]):
     @override
     def kind(self) -> str:
         if not self.allowed:
-            return "아무 스코프에도 열리지 않은 이름 준비"
+            return "어느 스코프에도 허용되지 않은 설정 이름 준비"
         opened = "·".join(SCOPE_NAMES[one] for one in self.allowed)
-        return f"{opened} 스코프에 열린 이름 준비"
+        return f"{opened} 스코프에 허용된 설정 이름 준비"
 
     @override
     def lay(self, seed: Seeder) -> LaidDesign:
@@ -182,7 +182,7 @@ def user_owner(user: UserData) -> EntityIdentifier:
 
 @dataclass(frozen=True)
 class AMergeAndACaller:
-    """병합해 읽을 이름들과, 그것을 읽을 사람."""
+    """병합해 읽을 설정 이름들과, 그것을 읽을 사용자."""
 
     caller: UserData
     names: tuple[str, ...]
@@ -190,11 +190,11 @@ class AMergeAndACaller:
 
 @dataclass(frozen=True)
 class AConfigLaidAcross(Given[Any, AMergeAndACaller]):
-    """이름 하나에 세 스코프의 조각을 심어 두고, 그 도메인의 사용자 한 명.
+    """설정 이름 하나에 세 스코프의 설정 조각을 미리 만들어 두고, 그 도메인의 사용자 한 명.
 
-    값을 대준 스코프에만 조각이 놓이고, 그 종류의 허용 항목은 조각과 함께 열린다. 다른
-    사용자와 다른 도메인의 조각은 같은 이름에 심되 답하지 않으므로, 병합에 섞이면 그 자리에서
-    어긋난다.
+    값을 지정한 스코프에만 설정 조각이 만들어지고, 그 종류의 허용 목록 항목은 조각과 함께
+    만들어진다. 다른 사용자와 다른 도메인의 조각은 같은 이름에 만들어 두되 반환하지 않으므로,
+    병합에 섞이면 그 자리에서 불일치가 드러난다.
     """
 
     public: Mapping[str, Any] | None = None
@@ -227,13 +227,13 @@ class AConfigLaidAcross(Given[Any, AMergeAndACaller]):
         who = (
             "자기 스코프에서 설정 읽기 권한을 받은 사용자 한 명"
             if self.granted
-            else "설정 권한을 하나도 받지 않은 사용자 한 명"
+            else "설정 권한이 하나도 없는 사용자 한 명"
         )
         if not self.defined:
-            return f"등록되지 않은 이름과, {who}"
+            return f"등록되지 않은 설정 이름과, {who}"
         laid = [SCOPE_NAMES[one] for one in self._allowed()]
-        where = "·".join(laid) if laid else "아무 스코프에도 열리지 않은"
-        return f"{where} 스코프에 열린 이름 하나와, {who}"
+        where = "·".join(laid) if laid else "어느 스코프에도 허용되지 않은"
+        return f"{where} 스코프에 허용된 설정 이름 하나와, {who}"
 
     @override
     async def lay(self, seeding: Any) -> AMergeAndACaller:
@@ -293,7 +293,7 @@ class AConfigLaidAcross(Given[Any, AMergeAndACaller]):
 
 @dataclass(frozen=True)
 class SeveralConfigsLaid(Given[Any, AMergeAndACaller]):
-    """공개 조각을 하나씩 가진 이름 여럿과, 그 도메인의 사용자 한 명."""
+    """공개 설정 조각을 하나씩 가진 설정 이름 여럿과, 그 도메인의 사용자 한 명."""
 
     publics: tuple[Mapping[str, Any], ...]
     granted: bool = True
@@ -303,9 +303,9 @@ class SeveralConfigsLaid(Given[Any, AMergeAndACaller]):
         who = (
             "자기 스코프에서 설정 읽기 권한을 받은 사용자 한 명"
             if self.granted
-            else "설정 권한을 하나도 받지 않은 사용자 한 명"
+            else "설정 권한이 하나도 없는 사용자 한 명"
         )
-        return f"공개 조각을 하나씩 가진 이름 {len(self.publics)}개와, {who}"
+        return f"공개 설정 조각을 하나씩 가진 설정 이름 {len(self.publics)}개와, {who}"
 
     @override
     async def lay(self, seeding: Any) -> AMergeAndACaller:
@@ -329,13 +329,13 @@ class SeveralConfigsLaid(Given[Any, AMergeAndACaller]):
 
 @dataclass(frozen=True)
 class TheMergedConfigs(Then[AMergeAndACaller, GetAppConfigsPayload]):
-    """요청한 이름마다 하나씩, 요청 순서대로, 병합된 설정이 통째로 온다."""
+    """요청한 이름마다 하나씩, 요청 순서대로, 병합된 설정이 통째로 반환된다."""
 
     wanted: tuple[Mapping[str, Any], ...]
 
     @override
     def says(self) -> str:
-        return "요청한 이름마다 병합된 설정이 온다"
+        return "요청한 이름마다 병합된 설정이 반환된다"
 
     @override
     def look(

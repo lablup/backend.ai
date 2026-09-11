@@ -34,7 +34,7 @@ class SeedFragmentOf[Owner](SeedRowFromTwo[AppConfigAllowListData, Owner, AppCon
 
     @override
     def kind(self) -> str:
-        return "조각"
+        return "설정 조각"
 
     @override
     def detail(self) -> str:
@@ -64,7 +64,7 @@ class SeedPublicFragment(SeedRowFrom[AppConfigAllowListData, AppConfigFragmentDa
 
     @override
     def kind(self) -> str:
-        return "공개 조각"
+        return "공개 설정 조각"
 
     @override
     def detail(self) -> str:
