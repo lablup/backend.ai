@@ -10,8 +10,9 @@ from uuid import UUID
 
 from pydantic import Field, field_validator
 
-from ai.backend.common.api_handlers import SENTINEL, BaseRequestModel, Sentinel
+from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.dto.manager.query import StringFilter
+from ai.backend.common.tristate.unset import UNSET, Unset
 from ai.backend.common.types import ServiceCatalogStatus
 
 from .types import OrderDirection, ServiceCatalogOrderField, ServiceCatalogStatusFilter
@@ -89,21 +90,27 @@ class CreateServiceCatalogInput(BaseRequestModel):
 class UpdateServiceCatalogInput(BaseRequestModel):
     """Input for updating an existing service catalog entry."""
 
-    display_name: str | None = Field(
-        default=None,
-        description="Updated display name",
+    display_name: str | None | Unset = Field(
+        default=UNSET,
+        description="Updated display name. Omit to leave unchanged.",
     )
-    version: str | None = Field(default=None, description="Updated version string")
-    labels: dict[str, Any] | Sentinel | None = Field(
-        default=SENTINEL, description="Updated labels. Use SENTINEL to clear."
+    version: str | None | Unset = Field(
+        default=UNSET, description="Updated version string. Omit to leave unchanged."
     )
-    status: ServiceCatalogStatus | None = Field(default=None, description="Updated service status")
-    config_hash: str | None = Field(default=None, description="Updated configuration hash")
+    labels: dict[str, Any] | None | Unset = Field(
+        default=UNSET, description="Updated labels. Omit to leave unchanged; null clears."
+    )
+    status: ServiceCatalogStatus | None | Unset = Field(
+        default=UNSET, description="Updated service status. Omit to leave unchanged."
+    )
+    config_hash: str | None | Unset = Field(
+        default=UNSET, description="Updated configuration hash. Omit to leave unchanged."
+    )
 
     @field_validator("display_name")
     @classmethod
-    def display_name_must_not_be_blank(cls, v: str | None) -> str | None:
-        if v is None:
+    def display_name_must_not_be_blank(cls, v: str | None | Unset) -> str | None | Unset:
+        if not isinstance(v, str):
             return v
         stripped = v.strip()
         if not stripped:
