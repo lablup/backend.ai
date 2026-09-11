@@ -354,6 +354,48 @@ class TestUpdateContainerRegistryInput:
         assert restored.type == ContainerRegistryType.GITLAB
 
 
+class TestUpdateContainerRegistryInputRegistryRules:
+    """Tests for the URL and Harbor project rules on UpdateContainerRegistryInput."""
+
+    @pytest.mark.parametrize("url", ["http://", "https://"])
+    def test_url_without_host_rejected(self, url: str) -> None:
+        with pytest.raises(BackendAISchemaValidationFailed, match=f"Invalid URL format: {url}"):
+            UpdateContainerRegistryInput.model_validate({"id": str(uuid.uuid4()), "url": url})
+
+    @pytest.mark.parametrize(
+        "registry_type",
+        [ContainerRegistryType.HARBOR, ContainerRegistryType.HARBOR2],
+        ids=lambda registry_type: registry_type.value,
+    )
+    def test_harbor_type_without_project_accepted(
+        self, registry_type: ContainerRegistryType
+    ) -> None:
+        req = UpdateContainerRegistryInput(id=uuid.uuid4(), type=registry_type)
+        assert req.project is None
+
+    @pytest.mark.parametrize(
+        "case",
+        [
+            _RejectedProjectCase(project="", message="Invalid project name length."),
+            _RejectedProjectCase(project="a" * 256, message="Invalid project name length."),
+            _RejectedProjectCase(project="Project", message="Invalid project name format."),
+            _RejectedProjectCase(project="project--name", message="Invalid project name format."),
+        ],
+        ids=lambda case: case.project[:12] or "empty",
+    )
+    def test_harbor_type_with_project_rejected(self, case: _RejectedProjectCase) -> None:
+        with pytest.raises(BackendAISchemaValidationFailed, match=case.message):
+            UpdateContainerRegistryInput.model_validate({
+                "id": str(uuid.uuid4()),
+                "type": "harbor",
+                "project": case.project,
+            })
+
+    def test_project_without_type_accepted(self) -> None:
+        req = UpdateContainerRegistryInput(id=uuid.uuid4(), project="Project")
+        assert req.project == "Project"
+
+
 class TestUpdateContainerRegistryInputValidationFailures:
     """Tests for UpdateContainerRegistryInput validation failures."""
 

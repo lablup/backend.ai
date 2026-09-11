@@ -21,11 +21,7 @@ from ai.backend.manager.data.container_registry.types import (
 from ai.backend.manager.data.image.types import ImageStatus
 from ai.backend.manager.data.permission.global_entity import global_entity_id
 from ai.backend.manager.errors.image import ContainerRegistryNotFound
-from ai.backend.manager.models.container_registry import (
-    ContainerRegistryRow,
-    ContainerRegistryValidator,
-    ContainerRegistryValidatorArgs,
-)
+from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.container_registry.creators import ContainerRegistryCreator
 from ai.backend.manager.models.container_registry.purgers import ContainerRegistryPurger
 from ai.backend.manager.models.container_registry.searchable_fields import (
@@ -91,14 +87,6 @@ class ContainerRegistryRepository:
             data = await w.update_data(updater)
             if data is None:
                 raise ContainerRegistryNotFound(f"Container registry not found (id:{registry_id})")
-            if updater.build_values():
-                ContainerRegistryValidator(
-                    ContainerRegistryValidatorArgs(
-                        type=data.type,
-                        project=data.project,
-                        url=data.url,
-                    )
-                ).validate()
             return data
 
     async def set_global(self, updater: ContainerRegistryGlobalUpdater) -> ContainerRegistryData:
