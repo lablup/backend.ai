@@ -110,18 +110,18 @@ class ARegistryAndSomeone(Given[Any, ARegistryAndACaller]):
 
     role: UserRole = UserRole.USER
     name_hint: str = "host"
-    linked: bool = False
+    allowed: bool = False
 
     @override
     def describe(self) -> str:
-        allowed = ", 프로젝트 하나가 이미 허용돼 있음" if self.linked else ""
+        allowed = ", 프로젝트 하나가 이미 허용돼 있음" if self.allowed else ""
         return f"레지스트리 하나, {self.role.value} 한 명{allowed}"
 
     @override
     async def lay(self, seeding: Any) -> ARegistryAndACaller:
         domain = await seeding.creating(SeedDomain(name_hint="home"))
         registry = await seeding.creating(SeedContainerRegistry(name_hint=self.name_hint))
-        if self.linked:
+        if self.allowed:
             policy = await seeding.once(SeedProjectPolicy())
             project = await seeding.creating_from_two(SeedProject(), domain, policy)
             await seeding.linking(AllowProject(), project, registry)
@@ -166,7 +166,7 @@ class ARegistryAndAProjectToAllow(Given[Any, ARegistryToAllowAndACaller]):
     role: UserRole = UserRole.USER
     on_registry: bool = True
     on_project: bool = True
-    linked: bool = False
+    allowed: bool = False
 
     @override
     def describe(self) -> str:
@@ -176,7 +176,7 @@ class ARegistryAndAProjectToAllow(Given[Any, ARegistryToAllowAndACaller]):
             if given
         ]
         holds = ", ".join(held) + "에 권한 있음" if held else "아무 권한도 없음"
-        already = ", 둘은 이미 연결돼 있음" if self.linked else ""
+        already = ", 프로젝트는 이미 허용돼 있음" if self.allowed else ""
         return f"레지스트리 하나, 프로젝트 하나, {holds}인 사용자 한 명{already}"
 
     @override
@@ -185,27 +185,27 @@ class ARegistryAndAProjectToAllow(Given[Any, ARegistryToAllowAndACaller]):
         policy = await seeding.once(SeedProjectPolicy())
         project = await seeding.creating_from_two(SeedProject(), domain, policy)
         registry = await seeding.creating(SeedContainerRegistry(name_hint="host"))
-        if self.linked:
+        if self.allowed:
             await seeding.linking(AllowProject(), project, registry)
         caller = await seeding.within(SomeoneOf(domain, role=self.role))
         if self.on_registry:
             await seeding.within(
-                SomeoneLinkingIn(
+                SomeoneAllowingIn(
                     registry,
                     caller,
                     scope_of=lambda one: ContainerRegistryID(one.id),
                     entity_type=ContainerRegistryEntityType(),
-                    name_hint="registry-linker",
+                    name_hint="allow-on-registry",
                 )
             )
         if self.on_project:
             await seeding.within(
-                SomeoneLinkingIn(
+                SomeoneAllowingIn(
                     project,
                     caller,
                     scope_of=lambda one: ProjectID(one.id),
                     entity_type=ContainerRegistryEntityType(),
-                    name_hint="project-linker",
+                    name_hint="allow-on-project",
                 )
             )
         return ARegistryToAllowAndACaller(
@@ -215,15 +215,15 @@ class ARegistryAndAProjectToAllow(Given[Any, ARegistryToAllowAndACaller]):
         )
 
 
-LINKING = (Permission.CREATE, Permission.SOFT_DELETE)
-"""연결을 붙이고 떼는 데 드는 권한. 붙이기는 생성이고 떼기는 삭제로 친다.
+ALLOWING = (Permission.CREATE, Permission.SOFT_DELETE)
+"""허용 목록에 넣고 빼는 데 드는 권한. 넣기는 생성이고 빼기는 삭제로 친다.
 
 한 행이 한 비트만 담으므로 둘을 따로 심는다."""
 
 
 @dataclass(frozen=True)
-class SomeoneLinkingIn[ScopeData](SeedNest[Laid[None]]):
-    """그 스코프 안에서 레지스트리 연결을 다룰 수 있는 역할을 사용자에게 준다.
+class SomeoneAllowingIn[ScopeData](SeedNest[Laid[None]]):
+    """그 스코프 안에서 레지스트리 허용 목록을 고칠 수 있는 역할을 사용자에게 준다.
 
     관계 동작은 자기 엔티티 종류를 선언하지 않는다. 지목한 스코프마다 대상 엔티티 종류로
     권한을 묻기 때문에, 프로젝트 스코프에서도 레지스트리 종류로 적는다.
@@ -242,7 +242,7 @@ class SomeoneLinkingIn[ScopeData](SeedNest[Laid[None]]):
     @override
     def lay(self, seed: Seeder) -> Laid[None]:
         role = seed.creating_from(SeedRole(self.scope_of, name_hint=self.name_hint), self.scope)
-        for allowed in LINKING:
+        for allowed in ALLOWING:
             seed.adding(SeedPermission(entity_type=self.entity_type, permission=allowed), role)
         return seed.granting(
             role, self.someone, role_id=lambda r: r.id, user_id=lambda u: UserID(u.id)

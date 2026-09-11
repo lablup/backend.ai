@@ -1,4 +1,4 @@
-"""허용 프로젝트 붙이고 떼기 — 이 어댑터에서 권한 그래프가 지키는 유일한 자리."""
+"""허용 목록에 프로젝트 넣고 빼기 — 이 어댑터에서 권한 그래프가 지키는 유일한 자리."""
 
 from __future__ import annotations
 
@@ -41,13 +41,13 @@ from ai.backend.testutils.scenario_steps import (
 
 ENFORCEMENT = "manager.rbac.enforcement_enabled"
 
-type AllowingStep = Scenario[
+type AllowingProjectsStep = Scenario[
     SeedingSession, ARegistryToAllowAndACaller, ContainerRegistryAdapter, None
 ]
 
 
 @dataclass(frozen=True)
-class Allowing(When[ARegistryToAllowAndACaller, ContainerRegistryAdapter, None]):
+class AllowingProjects(When[ARegistryToAllowAndACaller, ContainerRegistryAdapter, None]):
     """허용 목록을 고친다. 넣을 것과 뺄 것을 함께 준다."""
 
     change: GroupChange = field(default_factory=Adding)
@@ -74,7 +74,7 @@ class Allowing(When[ARegistryToAllowAndACaller, ContainerRegistryAdapter, None])
 class TheCallReturnsNothing(Then[ARegistryToAllowAndACaller, None]):
     """이 호출은 답을 싣지 않는다. 예외 없이 끝나는 것이 성공이다.
 
-    연결이 실제로 쓰였는지는 이 자리에서 볼 수 없다. 답이 없으므로 확인하려면 그다음 읽기가
+    허용 목록이 실제로 바뀌었는지는 이 자리에서 볼 수 없다. 답이 없으므로 확인하려면 그다음 읽기가
     필요한데, 시나리오 한 줄은 호출 하나를 두고 짝을 세우는 자리다.
     """
 
@@ -90,12 +90,12 @@ class TheCallReturnsNothing(Then[ARegistryToAllowAndACaller, None]):
 
 
 @dataclass(frozen=True)
-class LinkingWithBothScopesGranted(
+class AllowingWithBothScopesGranted(
     Scenario[SeedingSession, ARegistryToAllowAndACaller, ContainerRegistryAdapter, None]
 ):
     @override
     def summary(self) -> str:
-        return "a-user-granted-on-both-scopes-links-a-project-to-a-registry"
+        return "a-user-granted-on-both-scopes-allows-a-project-on-a-registry"
 
     @override
     def describe(self) -> str:
@@ -110,7 +110,7 @@ class LinkingWithBothScopesGranted(
 
     @override
     def when(self) -> When[ARegistryToAllowAndACaller, ContainerRegistryAdapter, None]:
-        return Allowing()
+        return AllowingProjects()
 
     @override
     def then(self) -> Then[ARegistryToAllowAndACaller, None]:
@@ -118,27 +118,27 @@ class LinkingWithBothScopesGranted(
 
 
 @dataclass(frozen=True)
-class LinkingTwiceIsNotAnError(
+class AllowingTwiceIsNotAnError(
     Scenario[SeedingSession, ARegistryToAllowAndACaller, ContainerRegistryAdapter, None]
 ):
     @override
     def summary(self) -> str:
-        return "linking-a-project-that-is-already-linked-is-not-an-error"
+        return "allowing-a-project-that-is-already-allowed-is-not-an-error"
 
     @override
     def describe(self) -> str:
         return (
-            "이미 연결된 프로젝트를 다시 허용 목록에 넣어도 거부되지 않는다. "
+            "이미 허용된 프로젝트를 다시 허용 목록에 넣어도 거부되지 않는다. "
             "그 쌍은 데이터베이스에서 건너뛴다"
         )
 
     @override
     def given(self) -> Given[SeedingSession, ARegistryToAllowAndACaller]:
-        return ARegistryAndAProjectToAllow(linked=True)
+        return ARegistryAndAProjectToAllow(allowed=True)
 
     @override
     def when(self) -> When[ARegistryToAllowAndACaller, ContainerRegistryAdapter, None]:
-        return Allowing()
+        return AllowingProjects()
 
     @override
     def then(self) -> Then[ARegistryToAllowAndACaller, None]:
@@ -146,24 +146,24 @@ class LinkingTwiceIsNotAnError(
 
 
 @dataclass(frozen=True)
-class RemovingALinkedProject(
+class RemovingAnAllowedProject(
     Scenario[SeedingSession, ARegistryToAllowAndACaller, ContainerRegistryAdapter, None]
 ):
     @override
     def summary(self) -> str:
-        return "a-linked-project-is-removed-from-the-allowed-list"
+        return "an-allowed-project-is-removed-from-the-allowed-list"
 
     @override
     def describe(self) -> str:
-        return "이미 연결된 프로젝트는 허용 목록에서 뺄 수 있다"
+        return "이미 허용된 프로젝트는 허용 목록에서 뺄 수 있다"
 
     @override
     def given(self) -> Given[SeedingSession, ARegistryToAllowAndACaller]:
-        return ARegistryAndAProjectToAllow(linked=True)
+        return ARegistryAndAProjectToAllow(allowed=True)
 
     @override
     def when(self) -> When[ARegistryToAllowAndACaller, ContainerRegistryAdapter, None]:
-        return Allowing(change=Removing())
+        return AllowingProjects(change=Removing())
 
     @override
     def then(self) -> Then[ARegistryToAllowAndACaller, None]:
@@ -190,7 +190,7 @@ class AProjectThatIsNotThereIsRefused(
 
     @override
     def when(self) -> When[ARegistryToAllowAndACaller, ContainerRegistryAdapter, None]:
-        return Allowing(change=AddingWhatIsGone())
+        return AllowingProjects(change=AddingWhatIsGone())
 
     @override
     def then(self) -> Then[ARegistryToAllowAndACaller, None]:
@@ -198,16 +198,16 @@ class AProjectThatIsNotThereIsRefused(
 
 
 @dataclass(frozen=True)
-class RemovingWhatIsNotLinkedIsRefused(
+class RemovingWhatIsNotAllowedIsRefused(
     Scenario[SeedingSession, ARegistryToAllowAndACaller, ContainerRegistryAdapter, None]
 ):
     @override
     def summary(self) -> str:
-        return "a-superadmin-removing-a-project-that-was-never-linked-is-refused"
+        return "a-superadmin-removing-a-project-that-was-never-allowed-is-refused"
 
     @override
     def describe(self) -> str:
-        return "지목한 프로젝트 중 실제로 연결된 것이 하나도 없으면, 뺄 것이 없다는 이유로 거부된다"
+        return "지목한 프로젝트 중 실제로 허용된 것이 하나도 없으면, 뺄 것이 없다는 이유로 거부된다"
 
     @override
     def given(self) -> Given[SeedingSession, ARegistryToAllowAndACaller]:
@@ -215,7 +215,7 @@ class RemovingWhatIsNotLinkedIsRefused(
 
     @override
     def when(self) -> When[ARegistryToAllowAndACaller, ContainerRegistryAdapter, None]:
-        return Allowing(change=Removing())
+        return AllowingProjects(change=Removing())
 
     @override
     def then(self) -> Then[ARegistryToAllowAndACaller, None]:
@@ -228,12 +228,12 @@ class OneScopeIsNotEnough(
 ):
     @override
     def summary(self) -> str:
-        return "holding-only-one-of-the-two-scopes-is-not-enough-to-link"
+        return "holding-only-one-of-the-two-scopes-is-not-enough-to-allow-a-project"
 
     @override
     def describe(self) -> str:
         return (
-            "레지스트리에만 권한을 받고 프로젝트에는 받지 못한 사용자가 연결하려 하면, "
+            "레지스트리에만 권한을 받고 프로젝트에는 받지 못한 사용자가 프로젝트를 허용하려 하면, "
             "관계 동작은 지목한 스코프를 모두 보므로 권한 부족으로 막힌다"
         )
 
@@ -243,7 +243,7 @@ class OneScopeIsNotEnough(
 
     @override
     def when(self) -> When[ARegistryToAllowAndACaller, ContainerRegistryAdapter, None]:
-        return Allowing()
+        return AllowingProjects()
 
     @override
     def then(self) -> Then[ARegistryToAllowAndACaller, None]:
@@ -257,12 +257,12 @@ class EnforcementOffOpensThisGate(
 ):
     @override
     def summary(self) -> str:
-        return "turning-enforcement-off-lets-an-ungranted-user-link-a-project"
+        return "turning-enforcement-off-lets-an-ungranted-user-allow-a-project"
 
     @override
     def describe(self) -> str:
         return (
-            "엔티티 권한 집행을 끄면 아무 권한도 받지 않은 사용자도 연결할 수 있다. "
+            "엔티티 권한 집행을 끄면 아무 권한도 받지 않은 사용자도 프로젝트를 허용할 수 있다. "
             "이 문은 역할이 아니라 권한 그래프가 지키기 때문이다"
         )
 
@@ -276,27 +276,27 @@ class EnforcementOffOpensThisGate(
 
     @override
     def when(self) -> When[ARegistryToAllowAndACaller, ContainerRegistryAdapter, None]:
-        return Allowing()
+        return AllowingProjects()
 
     @override
     def then(self) -> Then[ARegistryToAllowAndACaller, None]:
         return TheCallReturnsNothing()
 
 
-SCENARIOS: list[AllowingStep] = [
-    LinkingWithBothScopesGranted(),
-    LinkingTwiceIsNotAnError(),
-    RemovingALinkedProject(),
+SCENARIOS: list[AllowingProjectsStep] = [
+    AllowingWithBothScopesGranted(),
+    AllowingTwiceIsNotAnError(),
+    RemovingAnAllowedProject(),
     AProjectThatIsNotThereIsRefused(),
-    RemovingWhatIsNotLinkedIsRefused(),
+    RemovingWhatIsNotAllowedIsRefused(),
     OneScopeIsNotEnough(),
     EnforcementOffOpensThisGate(),
 ]
 
 
 @pytest.mark.parametrize("scenario", SCENARIOS, ids=lambda s: s.summary())
-async def test_allowing(
-    scenario: AllowingStep,
+async def test_allowing_projects(
+    scenario: AllowingProjectsStep,
     adapter: ContainerRegistryAdapter,
     engine: ExtendedAsyncSAEngine,
 ) -> None:
