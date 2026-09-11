@@ -10,9 +10,10 @@ from __future__ import annotations
 import uuid
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from typing import Any, override
 
-from bai_scenario.components.domain import SomeoneOf
+from bai_scenario.components.domain import SomeoneOf, WrittenByThisRun
 from bai_scenario.seeds.domain.domain import SeedDomain
 from bai_scenario.seeds.image.image import SeedAlias, SeedImage
 from bai_scenario.seeds.image.registry import SeedContainerRegistry
@@ -24,16 +25,22 @@ from ai.backend.common.data.entity.image import ImageEntityType
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.v2.image.response import ImageNode
+from ai.backend.common.dto.manager.v2.image.types import (
+    ImageResourceLimitGQLInfo,
+    ImageResourceLimitInfo,
+)
 from ai.backend.manager.data.container_registry.types import ContainerRegistryData
 from ai.backend.manager.data.image.types import ImageAliasData, ImageData, ImageStatus
 from ai.backend.manager.data.permission.types import Permission
 from ai.backend.manager.data.user.types import UserData
-from ai.backend.manager.errors.base.entity import EntityNotFoundError
+from ai.backend.manager.defs import INTRINSIC_SLOTS_MIN
 from ai.backend.testutils.scenario_steps import (
     Answered,
+    Condition,
     Given,
-    Refused,
+    Held,
     Same,
+    SameAs,
     Skipped,
     Then,
     Verdict,
@@ -41,6 +48,18 @@ from ai.backend.testutils.scenario_steps import (
 
 NOTHING = uuid.UUID("00000000-0000-0000-0000-0000000000ff")
 """아무 행도 갖지 않는 id. 대상이 없을 때 무엇이 오는지 보려고 지목한다."""
+
+DEFAULT_LIMITS = [
+    ImageResourceLimitInfo(key=str(slot), min=str(least), max=None)
+    for slot, least in sorted(INTRINSIC_SLOTS_MIN.items())
+]
+"""라벨로 아무 하한도 적지 않은 이미지에 채워지는 하한. 값은 src가 정한 것에서 읽는다."""
+
+DEFAULT_LIMITS_GQL = [
+    ImageResourceLimitGQLInfo(key=str(slot), min=str(least), max="Infinity")
+    for slot, least in sorted(INTRINSIC_SLOTS_MIN.items())
+]
+"""같은 하한을 GQL 모양으로 적은 것. 상한이 없는 자리에 Infinity가 들어간다."""
 
 REACHING = (Permission.READ, Permission.SOFT_DELETE, Permission.HARD_DELETE)
 """이미지를 읽고 잊고 지우는 데 드는 권한.
@@ -291,30 +310,100 @@ class SomeoneReachingImages(SeedNest[Laid[None]]):
 
 
 @dataclass(frozen=True)
-class TheImageNode(Then[AnImageAndACaller, ImageNode]):
-    """심은 이미지가 통째로 온다. 시나리오가 바꾼 자리만 여기로 받는다."""
+class Filled(Condition[Any]):
+    """채워져 온다. 비어 있으면 그 안의 자리들을 볼 수 없다."""
+
+    @override
+    def says(self) -> str:
+        return "채워져 온다"
+
+    @override
+    def holds(self, got: Any) -> bool:
+        return got is not None
+
+
+@dataclass(frozen=True)
+class TheImageNode(Then[Any, ImageNode]):
+    """심은 이미지가 통째로 온다. 시나리오가 바꾼 자리만 여기로 받는다.
+
+    이미지를 담은 전제면 무엇이든 받는다. 이미지 하나를 `image`로 들고 있으면 된다.
+    """
 
     status: ImageStatus | None = None
+    tag: str | None = None
 
     @override
     def says(self) -> str:
         return "심은 이미지 전체가 온다"
 
     @override
-    def look(self, laid: AnImageAndACaller, answered: Answered[ImageNode]) -> list[Verdict]:
+    def look(self, laid: Any, answered: Answered[ImageNode]) -> list[Verdict]:
         node = answered.response
         if node is None:
-            return [Refused(EntityNotFoundError, answered.raised)]
+            return [Held("답", node, Filled())]
+        identity, metadata, requirements = node.identity, node.metadata, node.requirements
+        if identity is None or metadata is None or requirements is None:
+            return [
+                Held("identity", identity, Filled()),
+                Held("metadata", metadata, Filled()),
+                Held("requirements", requirements, Filled()),
+            ]
+        image: ImageData = laid.image
+        planted: uuid.UUID = image.id
+        status = self.status or image.status
+        written = WrittenByThisRun(datetime.now(UTC))
         return [
-            Same("name", node.name, laid.image.name),
-            Same("registry", node.registry, laid.image.registry),
-            Same("architecture", node.architecture, laid.image.architecture),
-            Same("tag", node.tag, laid.image.tag),
-            Same("status", node.status, self.status or laid.image.status),
-            Same("is_local", node.is_local, laid.image.is_local),
-            Same("size_bytes", node.size_bytes, laid.image.size_bytes),
-            Skipped("id", "데이터베이스가 만든다"),
+            Held("id", node.id, SameAs(planted, "심은 이미지의 id")),
+            Same("name", node.name, image.name),
+            Same("image", node.image, image.image),
+            Same("registry", node.registry, image.registry),
+            Held(
+                "registry_id",
+                node.registry_id,
+                SameAs(image.registry_id, "심은 레지스트리의 id"),
+            ),
+            Same("project", node.project, image.project),
+            Same("tag", node.tag, self.tag or image.tag),
+            Same("architecture", node.architecture, image.architecture),
+            Same("size_bytes", node.size_bytes, image.size_bytes),
+            Same("type", node.type, image.type),
+            Same("status", node.status, status),
+            Same("labels", node.labels, []),
+            Same("tags", node.tags, []),
+            Same(
+                "resource_limits",
+                sorted(node.resource_limits, key=lambda one: one.key),
+                DEFAULT_LIMITS,
+            ),
+            Same("accelerators", node.accelerators, None),
+            Same("config_digest", node.config_digest, image.config_digest),
+            Same("is_local", node.is_local, image.is_local),
+            Held("created_at", node.created_at, written),
             Skipped("last_used_at", "세션이 쓰는 값이라 이 실행이 말할 수 없다"),
+            Same("identity.canonical_name", identity.canonical_name, image.name),
+            Same("identity.namespace", identity.namespace, image.image),
+            Same("identity.architecture", identity.architecture, image.architecture),
+            Same("metadata.digest", metadata.digest, image.config_digest),
+            Same("metadata.size_bytes", metadata.size_bytes, image.size_bytes),
+            Held("metadata.created_at", metadata.created_at, written),
+            Held(
+                "metadata.last_used_at",
+                metadata.last_used_at,
+                SameAs(node.last_used_at, "노드의 last_used_at"),
+            ),
+            Same("metadata.tags", metadata.tags, []),
+            Same("metadata.labels", metadata.labels, []),
+            Same("metadata.status", metadata.status, status),
+            Same(
+                "requirements.supported_accelerators",
+                requirements.supported_accelerators,
+                ["*"],
+            ),
+            Same(
+                "requirements.resource_limits",
+                sorted(requirements.resource_limits, key=lambda one: one.key),
+                DEFAULT_LIMITS_GQL,
+            ),
         ]
 
 
