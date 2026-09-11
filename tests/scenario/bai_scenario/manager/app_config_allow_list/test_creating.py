@@ -1,7 +1,7 @@
-"""허용 항목 만들기 — 누가 열 수 있고, 순위를 생략하면 무엇이 되는가.
+"""허용 목록 항목 생성 — 누가 생성할 수 있고, 순위를 생략하면 무엇이 되는가.
 
-순위 생략을 세 줄로 두는 이유는, 생략했을 때의 값이 스코프 종류마다 다르고 그 값이 병합의
-기본 순서이기 때문이다.
+순위 생략을 세 시나리오로 두는 이유는, 생략했을 때의 값이 스코프 종류마다 다르고 그 값이
+병합의 기본 순서이기 때문이다.
 """
 
 from __future__ import annotations
@@ -48,7 +48,7 @@ type CreatingStep = Scenario[
 
 @dataclass(frozen=True)
 class Opening(When[AnEntryAndACaller, AppConfigAllowListAdapter, AppConfigAllowListNode]):
-    """심은 이름을 한 스코프 종류에 연다. 순위를 대지 않으면 생략한다."""
+    """미리 만들어 둔 설정 이름을 한 스코프 종류에 허용한다. 순위를 지정하지 않으면 생략한다."""
 
     scope_type: AppConfigScopeType
     rank: int | None = None
@@ -59,10 +59,8 @@ class Opening(When[AnEntryAndACaller, AppConfigAllowListAdapter, AppConfigAllowL
 
     @override
     def describe(self, laid: AnEntryAndACaller) -> str:
-        how = f"순위 {self.rank}로" if self.rank is not None else "순위 없이"
-        return (
-            f"{laid.caller.username}이 {laid.name}을 {SCOPE_NAMES[self.scope_type]} 종류에 {how} 엶"
-        )
+        how = f"순위 {self.rank}" if self.rank is not None else "순위 생략"
+        return f"{laid.caller.username}이 {laid.name}을(를) {SCOPE_NAMES[self.scope_type]} 종류에 허용 ({how})"
 
     @override
     async def call(
@@ -91,8 +89,8 @@ class LeavingTheRankOutTakesTheDefault(
     @override
     def describe(self) -> str:
         return (
-            f"슈퍼관리자가 순위를 생략하고 {SCOPE_NAMES[self.scope_type]} 종류의 허용 항목을 "
-            f"만들면, 순위 {self.scope_type.default_rank()}이 매겨진다. 이 문은 전역 역할이다"
+            f"슈퍼관리자가 순위를 생략하고 {SCOPE_NAMES[self.scope_type]} 종류의 허용 목록 항목을 "
+            f"생성하면, 순위 {self.scope_type.default_rank()}이 매겨진다. 생성은 전역 역할로 보호된다"
         )
 
     @override
@@ -122,7 +120,7 @@ class AGivenRankIsKept(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 기본값 사이의 순위를 주고 허용 항목을 만들면, 그 값이 그대로 저장된다"
+        return "슈퍼관리자가 기본값 사이의 순위를 지정해 허용 목록 항목을 생성하면, 그 값이 그대로 저장된다"
 
     @override
     def given(self) -> Given[SeedingSession, AnEntryAndACaller]:
@@ -147,7 +145,7 @@ class AnUnregisteredNameIsRefused(
 
     @override
     def describe(self) -> str:
-        return "같은 이름의 정의가 없을 때 슈퍼관리자가 허용 항목을 만들려 하면, 정의 없음으로 거부된다"
+        return "같은 이름의 설정 정의가 없을 때 슈퍼관리자가 허용 목록 항목을 생성하려 하면, 정의 없음으로 거부된다"
 
     @override
     def given(self) -> Given[SeedingSession, AnEntryAndACaller]:
@@ -173,8 +171,8 @@ class OpeningTheSameKindTwiceIsRefused(
     @override
     def describe(self) -> str:
         return (
-            "이미 그 종류에 열린 이름을 슈퍼관리자가 같은 종류에 다시 열면 거부되지만, 답이 "
-            "겹친다고 말하지 않고 데이터베이스의 제약 위반이 그대로 올라온다"
+            "이미 그 종류에 허용된 이름을 슈퍼관리자가 같은 종류에 다시 허용하면 거부되지만, 응답이 "
+            "중복이라고 알려 주지 않고 데이터베이스의 제약 위반이 그대로 전파된다"
         )
 
     @override
@@ -200,7 +198,7 @@ class APlainUserMayNotOpen(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 아닌 사용자가 허용 항목을 만들려 하면, 역할로 거부된다"
+        return "슈퍼관리자가 아닌 사용자가 허용 목록 항목을 생성하려 하면, 역할 부족으로 거부된다"
 
     @override
     def given(self) -> Given[SeedingSession, AnEntryAndACaller]:
@@ -227,8 +225,8 @@ class EnforcementOffChangesNothing(
     @override
     def describe(self) -> str:
         return (
-            "엔티티 권한 집행을 꺼도 허용 항목 만들기는 여전히 막힌다. "
-            "이 문은 권한 그래프가 아니라 역할이 지키기 때문이다"
+            "권한 검사를 꺼도 허용 목록 항목 생성은 여전히 거부된다. "
+            "생성은 권한 그래프가 아니라 역할로 보호되기 때문이다"
         )
 
     @override

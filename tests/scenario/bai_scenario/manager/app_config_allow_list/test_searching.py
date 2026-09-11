@@ -1,4 +1,4 @@
-"""허용 항목 훑기 — 전역 역할이 지킨다."""
+"""허용 목록 항목 검색 — 전역 역할로 보호된다."""
 
 from __future__ import annotations
 
@@ -54,7 +54,7 @@ EVERY_KIND = (AppConfigScopeType.PUBLIC, AppConfigScopeType.DOMAIN, AppConfigSco
 
 @dataclass(frozen=True)
 class SearchingEverything(When[ManyEntriesAndACaller, AppConfigAllowListAdapter, Searched]):
-    """필터 없이 전체를 훑는다."""
+    """필터 없이 전체를 검색한다."""
 
     @override
     def operation(self) -> str:
@@ -74,7 +74,7 @@ class SearchingEverything(When[ManyEntriesAndACaller, AppConfigAllowListAdapter,
 
 @dataclass(frozen=True)
 class SearchingByName(When[ManyEntriesAndACaller, AppConfigAllowListAdapter, Searched]):
-    """골라낼 이름으로 거른다."""
+    """골라낸 이름을 필터로 검색한다."""
 
     @override
     def operation(self) -> str:
@@ -82,7 +82,7 @@ class SearchingByName(When[ManyEntriesAndACaller, AppConfigAllowListAdapter, Sea
 
     @override
     def describe(self, laid: ManyEntriesAndACaller) -> str:
-        return f"{laid.caller.username}이 이름 {laid.named}으로 걸러 조회"
+        return f"{laid.caller.username}이 {laid.named} 이름 필터로 조회"
 
     @override
     async def call(
@@ -98,7 +98,7 @@ class SearchingByName(When[ManyEntriesAndACaller, AppConfigAllowListAdapter, Sea
 
 @dataclass(frozen=True)
 class SearchingOneKind(When[ManyEntriesAndACaller, AppConfigAllowListAdapter, Searched]):
-    """스코프 종류 하나로 거른다."""
+    """스코프 종류 하나를 필터로 검색한다."""
 
     kind: AppConfigScopeType
 
@@ -108,7 +108,7 @@ class SearchingOneKind(When[ManyEntriesAndACaller, AppConfigAllowListAdapter, Se
 
     @override
     def describe(self, laid: ManyEntriesAndACaller) -> str:
-        return f"{laid.caller.username}이 {SCOPE_NAMES[self.kind]} 종류로 걸러 조회"
+        return f"{laid.caller.username}이 {SCOPE_NAMES[self.kind]} 종류 필터로 조회"
 
     @override
     async def call(
@@ -126,7 +126,7 @@ class SearchingOneKind(When[ManyEntriesAndACaller, AppConfigAllowListAdapter, Se
 
 @dataclass(frozen=True)
 class SearchingInRankOrder(When[ManyEntriesAndACaller, AppConfigAllowListAdapter, Searched]):
-    """순위 오름차순으로 정렬해 훑는다."""
+    """순위 오름차순으로 정렬해 검색한다."""
 
     @override
     def operation(self) -> str:
@@ -162,7 +162,7 @@ class TheSuperadminCountsEveryOne(
 
     @override
     def describe(self) -> str:
-        return "이름 둘에 항목 넷이 있고 슈퍼관리자가 필터 없이 전체를 훑으면, 넷을 모두 센다. 이 문은 전역 역할이다"
+        return "이름 둘에 항목 넷이 있고 슈퍼관리자가 필터 없이 전체를 검색하면, 넷 다 집계된다. 검색은 전역 역할로 보호된다"
 
     @override
     def given(self) -> Given[SeedingSession, ManyEntriesAndACaller]:
@@ -191,7 +191,9 @@ class FilteringByNameKeepsThatNames(
 
     @override
     def describe(self) -> str:
-        return "이름 둘에 항목 넷이 있고 슈퍼관리자가 이름으로 걸러 훑으면, 그 이름의 것만 남는다"
+        return (
+            "이름 둘에 항목 넷이 있고 슈퍼관리자가 이름 필터로 검색하면, 그 이름의 항목만 반환된다"
+        )
 
     @override
     def given(self) -> Given[SeedingSession, ManyEntriesAndACaller]:
@@ -220,7 +222,7 @@ class FilteringByKindKeepsThatKind(
 
     @override
     def describe(self) -> str:
-        return "세 종류에 항목이 하나씩 있고 슈퍼관리자가 사용자 종류로 걸러 훑으면, 사용자 항목만 남는다"
+        return "세 종류에 항목이 하나씩 있고 슈퍼관리자가 사용자 종류 필터로 검색하면, 사용자 항목만 반환된다"
 
     @override
     def given(self) -> Given[SeedingSession, ManyEntriesAndACaller]:
@@ -245,9 +247,7 @@ class OrderingByRankSortsThem(
 
     @override
     def describe(self) -> str:
-        return (
-            "순위가 다른 항목 셋이 있고 슈퍼관리자가 순위 오름차순으로 훑으면, 순위 순서대로 온다"
-        )
+        return "순위가 다른 항목 셋이 있고 슈퍼관리자가 순위 오름차순으로 검색하면, 순위 순서대로 반환된다"
 
     @override
     def given(self) -> Given[SeedingSession, ManyEntriesAndACaller]:
@@ -272,7 +272,7 @@ class NoPageSizeMeansTen(
 
     @override
     def describe(self) -> str:
-        return "항목 열하나가 있고 슈퍼관리자가 크기 없이 훑으면, 열 건까지 오고 다음 쪽이 있다고 답한다"
+        return "항목 11개가 있고 슈퍼관리자가 크기 없이 검색하면, 10건까지 반환되고 다음 페이지가 있다고 응답한다"
 
     @override
     def given(self) -> Given[SeedingSession, ManyEntriesAndACaller]:
@@ -297,7 +297,7 @@ class APlainUserMayNotSearch(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 아닌 사용자가 전체를 훑으면, 역할로 거부된다"
+        return "슈퍼관리자가 아닌 사용자가 전체를 검색하면, 역할 부족으로 거부된다"
 
     @override
     def given(self) -> Given[SeedingSession, ManyEntriesAndACaller]:

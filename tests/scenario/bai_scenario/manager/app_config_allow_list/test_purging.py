@@ -1,6 +1,6 @@
-"""허용 항목 지우기 — 슈퍼관리자만 지우고, 딸린 조각이 막지 않는다.
+"""허용 목록 항목 삭제 — 슈퍼관리자만 삭제할 수 있고, 딸린 설정 조각이 막지 않는다.
 
-조각은 데이터베이스가 함께 지운다. 이 어댑터에는 soft delete가 없다.
+설정 조각은 데이터베이스가 함께 삭제한다. 이 어댑터에는 soft delete가 없다.
 """
 
 from __future__ import annotations
@@ -48,7 +48,7 @@ type PurgingStep = Scenario[SeedingSession, AnEntryAndACaller, AppConfigAllowLis
 
 @dataclass(frozen=True)
 class Purging(When[AnEntryAndACaller, AppConfigAllowListAdapter, Purged]):
-    """항목 하나를 지운다. id를 대지 않으면 심은 항목을 지운다."""
+    """항목 하나를 삭제한다. id를 지정하지 않으면 미리 만들어 둔 항목을 삭제한다."""
 
     other: UUID | None = None
 
@@ -58,8 +58,8 @@ class Purging(When[AnEntryAndACaller, AppConfigAllowListAdapter, Purged]):
 
     @override
     def describe(self, laid: AnEntryAndACaller) -> str:
-        called = "아무것도 갖지 않은 id" if self.other is not None else f"{laid.name}의 항목"
-        return f"{laid.caller.username}이 {called}을 지움"
+        called = "존재하지 않는 id" if self.other is not None else f"{laid.name}의 항목"
+        return f"{laid.caller.username}이 {called} 삭제"
 
     @override
     async def call(self, adapter: AppConfigAllowListAdapter, laid: AnEntryAndACaller) -> Purged:
@@ -75,18 +75,20 @@ class Purging(When[AnEntryAndACaller, AppConfigAllowListAdapter, Purged]):
 
 @dataclass(frozen=True)
 class ThePurgedOneIsNamed(Then[AnEntryAndACaller, Purged]):
-    """지운 항목이 무엇인지 id로 답한다."""
+    """삭제한 항목이 무엇인지 id로 응답한다."""
 
     @override
     def says(self) -> str:
-        return "지운 허용 항목의 id를 답한다"
+        return "삭제한 허용 목록 항목의 id를 응답한다"
 
     @override
     def look(self, laid: AnEntryAndACaller, answered: Answered[Purged]) -> list[Verdict]:
         payload = answered.response
         if payload is None or laid.entry is None:
             return [Refused(NotEnoughPermission, answered.raised)]
-        return [Held("id", payload.id, SameAs[UUID](laid.entry.id, "심은 허용 항목"))]
+        return [
+            Held("id", payload.id, SameAs[UUID](laid.entry.id, "미리 만들어 둔 허용 목록 항목"))
+        ]
 
 
 @dataclass(frozen=True)
@@ -99,7 +101,9 @@ class TheSuperadminPurgesIt(
 
     @override
     def describe(self) -> str:
-        return "조각이 딸리지 않은 항목을 슈퍼관리자가 지우면, 지운 id를 실은 답이 온다"
+        return (
+            "설정 조각이 딸리지 않은 항목을 슈퍼관리자가 삭제하면, 삭제한 id를 담은 응답이 반환된다"
+        )
 
     @override
     def given(self) -> Given[SeedingSession, AnEntryAndACaller]:
@@ -124,7 +128,7 @@ class AFragmentDoesNotBlockIt(
 
     @override
     def describe(self) -> str:
-        return "조각이 딸린 항목을 슈퍼관리자가 지우면, 조각이 막지 않고 지운 id를 실은 답이 온다"
+        return "설정 조각이 딸린 항목을 슈퍼관리자가 삭제하면, 조각이 막지 않고 삭제한 id를 담은 응답이 반환된다"
 
     @override
     def given(self) -> Given[SeedingSession, AnEntryAndACaller]:
@@ -149,7 +153,7 @@ class AUserGrantedNothingMayNotPurge(
 
     @override
     def describe(self) -> str:
-        return "같은 항목이 있고 슈퍼관리자가 아닌 사용자가 지우면, 권한 부족으로 거부된다"
+        return "같은 항목이 있고 슈퍼관리자가 아닌 사용자가 삭제하면, 권한 부족으로 거부된다"
 
     @override
     def given(self) -> Given[SeedingSession, AnEntryAndACaller]:
@@ -174,7 +178,7 @@ class AnUnknownIdIsNotFoundForASuperadmin(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 아무것도 갖지 않은 id를 지우면, 대상이 없다는 것으로 거부된다"
+        return "슈퍼관리자가 존재하지 않는 id를 삭제하면, 대상을 찾을 수 없다는 이유로 거부된다"
 
     @override
     def given(self) -> Given[SeedingSession, AnEntryAndACaller]:

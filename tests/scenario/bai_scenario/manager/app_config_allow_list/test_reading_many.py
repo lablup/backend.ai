@@ -1,7 +1,7 @@
-"""여러 id로 허용 항목 읽기 — 원소마다 답한다.
+"""여러 id로 허용 목록 항목 조회 — 원소마다 응답한다.
 
 슈퍼관리자가 아니면 요청 전체가 막히는 것이 아니라 원소마다 거부된다. 없는 id도 마찬가지로
-거부 원소이고, 빈 자리로 오는 것은 검사를 지나가는 슈퍼관리자에게뿐이다.
+거부 원소이고, 빈 항목으로 반환되는 것은 검사를 통과하는 슈퍼관리자에게뿐이다.
 """
 
 from __future__ import annotations
@@ -48,7 +48,7 @@ type LoadingStep = Scenario[SeedingSession, TwoEntriesAndACaller, AppConfigAllow
 
 @dataclass(frozen=True)
 class LoadingByIds(When[TwoEntriesAndACaller, AppConfigAllowListAdapter, Loaded]):
-    """심은 둘과 아무것도 갖지 않은 id 하나를 한 번에 읽는다. 빈 목록을 줄 수도 있다."""
+    """미리 만들어 둔 둘과 존재하지 않는 id 하나를 한 번에 조회한다. 빈 목록을 줄 수도 있다."""
 
     nothing: bool = False
 
@@ -60,7 +60,7 @@ class LoadingByIds(When[TwoEntriesAndACaller, AppConfigAllowListAdapter, Loaded]
     def describe(self, laid: TwoEntriesAndACaller) -> str:
         if self.nothing:
             return f"{laid.caller.username}이 빈 id 목록으로 조회"
-        return f"{laid.caller.username}이 항목 둘과 아무것도 갖지 않은 id를 한 번에 조회"
+        return f"{laid.caller.username}이 항목 둘과 존재하지 않는 id를 한 번에 조회"
 
     @override
     async def call(self, adapter: AppConfigAllowListAdapter, laid: TwoEntriesAndACaller) -> Loaded:
@@ -73,11 +73,11 @@ class LoadingByIds(When[TwoEntriesAndACaller, AppConfigAllowListAdapter, Loaded]
 
 @dataclass(frozen=True)
 class EveryIdIsRefused(Then[TwoEntriesAndACaller, Loaded]):
-    """세 자리 모두 그 자리만 거부."""
+    """세 항목 모두 그 항목만 거부된다."""
 
     @override
     def says(self) -> str:
-        return "있는 둘도 없는 id도 그 자리만 거부된다"
+        return "있는 둘도 없는 id도 그 항목만 거부된다"
 
     @override
     def look(self, laid: TwoEntriesAndACaller, answered: Answered[Loaded]) -> list[Verdict]:
@@ -98,11 +98,11 @@ class EveryIdIsRefused(Then[TwoEntriesAndACaller, Loaded]):
 
 @dataclass(frozen=True)
 class TwoNodesOneMissing(Then[TwoEntriesAndACaller, Loaded]):
-    """둘은 노드, 셋째는 빈 자리."""
+    """둘은 노드, 셋째는 빈 항목."""
 
     @override
     def says(self) -> str:
-        return "있는 둘은 노드로, 없는 id 자리는 비어서 온다"
+        return "있는 둘은 노드로, 없는 id 자리는 비어서 반환된다"
 
     @override
     def look(self, laid: TwoEntriesAndACaller, answered: Answered[Loaded]) -> list[Verdict]:
@@ -117,12 +117,12 @@ class TwoNodesOneMissing(Then[TwoEntriesAndACaller, Loaded]):
             Held[object](
                 "items[0].id",
                 getattr(items[0], "id", items[0]),
-                SameAs[object](laid.first.id, "심은 첫째 항목"),
+                SameAs[object](laid.first.id, "미리 만들어 둔 첫째 항목"),
             ),
             Held[object](
                 "items[1].id",
                 getattr(items[1], "id", items[1]),
-                SameAs[object](laid.second.id, "심은 둘째 항목"),
+                SameAs[object](laid.second.id, "미리 만들어 둔 둘째 항목"),
             ),
             Same("items[2]", items[2], None),
         ]
@@ -130,11 +130,11 @@ class TwoNodesOneMissing(Then[TwoEntriesAndACaller, Loaded]):
 
 @dataclass(frozen=True)
 class NothingIsAnswered(Then[TwoEntriesAndACaller, Loaded]):
-    """빈 답."""
+    """빈 응답."""
 
     @override
     def says(self) -> str:
-        return "빈 답이 온다"
+        return "빈 응답이 반환된다"
 
     @override
     def look(self, laid: TwoEntriesAndACaller, answered: Answered[Loaded]) -> list[Verdict]:
@@ -155,8 +155,8 @@ class APlainUserIsRefusedPerId(
     @override
     def describe(self) -> str:
         return (
-            "슈퍼관리자가 아닌 사용자가 항목 둘과 없는 id 하나를 한 번에 읽으면, 요청 전체가 "
-            "막히는 것이 아니라 세 자리 모두 그 자리만 권한 부족으로 거부된다"
+            "슈퍼관리자가 아닌 사용자가 항목 둘과 없는 id 하나를 한 번에 조회하면, 요청 전체가 "
+            "막히는 것이 아니라 세 항목 모두 그 항목만 권한 부족으로 거부된다"
         )
 
     @override
@@ -183,8 +183,8 @@ class TheSuperadminSeesBoth(
     @override
     def describe(self) -> str:
         return (
-            "슈퍼관리자가 항목 둘과 없는 id 하나를 한 번에 읽으면, 둘은 노드로 오고 없는 id "
-            "자리는 비어서 온다. 권한 검사를 지나가는 사람만 빈 자리를 본다"
+            "슈퍼관리자가 항목 둘과 없는 id 하나를 한 번에 조회하면, 둘은 노드로 반환되고 없는 id "
+            "자리는 비어 있다. 권한 검사를 통과하는 사용자만 빈 항목을 본다"
         )
 
     @override
@@ -210,7 +210,7 @@ class AnEmptyListAnswersEmpty(
 
     @override
     def describe(self) -> str:
-        return "빈 id 목록을 주면 빈 답이 온다. 배선을 부르지 않는다"
+        return "빈 id 목록을 주면 빈 응답이 반환된다. 하위 계층을 호출하지 않는다"
 
     @override
     def given(self) -> Given[SeedingSession, TwoEntriesAndACaller]:
