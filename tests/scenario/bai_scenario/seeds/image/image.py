@@ -29,6 +29,7 @@ class SeedImage(SeedRowFrom[ContainerRegistryData, ImageData]):
     status: ImageStatus = ImageStatus.ALIVE
     customized: bool = False
     creator_id: UserID | None = None
+    accelerators: str | None = None
 
     @override
     def kind(self) -> str:
@@ -41,6 +42,8 @@ class SeedImage(SeedRowFrom[ContainerRegistryData, ImageData]):
             marks.append(f"상태는 {self.status.value}")
         if self.customized:
             marks.append("커스터마이즈된 것이라 주인이 있다")
+        if self.accelerators is not None:
+            marks.append(f"가속기는 {self.accelerators}")
         return ", ".join(marks)
 
     @override
@@ -64,6 +67,7 @@ class SeedImage(SeedRowFrom[ContainerRegistryData, ImageData]):
             status=self.status,
             customized=self.customized,
             creator_id=self.creator_id,
+            accelerators=self.accelerators,
         )
 
 
