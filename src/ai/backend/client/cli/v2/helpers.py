@@ -16,6 +16,8 @@ import click
 from pydantic import TypeAdapter, ValidationError
 from yarl import URL
 
+from ai.backend.common.tristate.unset import UNSET, Unset
+
 if TYPE_CHECKING:
     from ai.backend.client.v2.v2_registry import V2ClientRegistry
     from ai.backend.common.dto.manager.v2.entity_label.request import EntityLabelNestedFilter
@@ -210,6 +212,20 @@ def run_async(coro_fn: Callable[[], Awaitable[None]]) -> None:
         detail = title or msg or str(e)
         click.echo(f"Error ({status}): {detail}", err=True)
         sys.exit(1)
+
+
+def nullable_option[T](value: T | None, set_null: bool, *, option: str) -> T | None | Unset:
+    """Resolve a ``--<option>`` / ``--set-null-<option>`` pair for a nullable field.
+
+    Omitted stays ``UNSET`` (unchanged); the flag clears with ``None``.
+    """
+    if value is not None and set_null:
+        raise click.UsageError(f"--{option} and --set-null-{option} are mutually exclusive.")
+    if set_null:
+        return None
+    if value is None:
+        return UNSET
+    return value
 
 
 def print_result(data: Any) -> None:

@@ -9,6 +9,7 @@ import click
 from ai.backend.client.cli.v2.helpers import (
     create_v2_registry,
     load_v2_config,
+    nullable_option,
     parse_order_options,
     print_result,
 )
@@ -145,6 +146,12 @@ def create(name: str, domain_name: str, description: str | None, is_default: boo
 @click.argument("name", type=str)
 @click.option("--description", default=None, help="Human-readable description.")
 @click.option(
+    "--set-null-description",
+    is_flag=True,
+    default=False,
+    help="Clear the description. Mutually exclusive with --description.",
+)
+@click.option(
     "--set-active/--unset-active",
     "is_active",
     default=None,
@@ -165,6 +172,7 @@ def create(name: str, domain_name: str, description: str | None, is_default: boo
 def update(
     name: str,
     description: str | None,
+    set_null_description: bool,
     is_active: bool | None,
     is_public: bool | None,
     is_default: bool | None,
@@ -173,7 +181,8 @@ def update(
     from ai.backend.common.dto.manager.v2.resource_group.request import (
         UpdateResourceGroupConfigInput,
     )
-    from ai.backend.common.tristate.unset import UNSET
+
+    description_value = nullable_option(description, set_null_description, option="description")
 
     async def _run() -> None:
         registry = await create_v2_registry(load_v2_config())
@@ -182,7 +191,7 @@ def update(
                 name,
                 UpdateResourceGroupConfigInput(
                     resource_group_name=name,
-                    description=UNSET if description is None else description,
+                    description=description_value,
                     is_active=is_active,
                     is_public=is_public,
                     is_default=is_default,
