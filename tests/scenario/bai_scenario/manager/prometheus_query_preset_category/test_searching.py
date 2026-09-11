@@ -91,7 +91,7 @@ class SearchingByName(When[ManyCategoriesAndACaller, Adapter, Searched]):
 
 @dataclass(frozen=True)
 class SearchingAsNobody(When[ACategoryAlone, Adapter, Searched]):
-    """아무도 아닌 채로 훑는다."""
+    """사용자 컨텍스트 없이 훑는다."""
 
     @override
     def operation(self) -> str:
@@ -99,7 +99,7 @@ class SearchingAsNobody(When[ACategoryAlone, Adapter, Searched]):
 
     @override
     def describe(self, laid: ACategoryAlone) -> str:
-        return "아무도 아닌 채로 전체 조회"
+        return "사용자 컨텍스트 없이 전체 조회"
 
     @override
     async def call(self, adapter: Adapter, laid: ACategoryAlone) -> Searched:
