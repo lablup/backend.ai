@@ -1,4 +1,4 @@
-"""이미지 검색 — 오프셋만 읽는 검색과, 커서를 읽는 검색."""
+"""이미지 검색 — 오프셋만 사용하는 검색과, 커서를 사용하는 검색."""
 
 from __future__ import annotations
 
@@ -50,12 +50,12 @@ from ai.backend.testutils.scenario_steps import (
 )
 
 DEFAULT_PAGE = 50
-"""요청이 크기를 생략했을 때 어댑터가 채우는 한 쪽의 크기."""
+"""요청이 크기를 생략했을 때 어댑터가 채우는 한 페이지의 크기."""
 
 
 @dataclass(frozen=True)
 class Searching(When[ManyImagesAndACaller, ImageAdapter, AdminSearchImagesPayload]):
-    """오프셋만 읽는 검색."""
+    """오프셋만 사용하는 검색."""
 
     paging: Paging = field(default_factory=ByOffset)
 
@@ -77,7 +77,7 @@ class Searching(When[ManyImagesAndACaller, ImageAdapter, AdminSearchImagesPayloa
 
 @dataclass(frozen=True)
 class SearchingWithACursor(When[ManyImagesAndACaller, ImageAdapter, AdminSearchImagesPayload]):
-    """커서를 읽는 검색. 바깥에서 준 조건도 이 경로에만 있다."""
+    """커서를 사용하는 검색. 상위 계층이 지정하는 조건도 이 경로에만 있다."""
 
     paging: Paging = field(default_factory=ByOffset)
     narrowed: bool = False
@@ -127,7 +127,7 @@ class SearchingAliases(When[ManyImagesAndACaller, ImageAdapter, AdminSearchImage
 
 @dataclass(frozen=True)
 class SearchingTheAliasesOf(When[AnAliasAndACaller, ImageAdapter, AdminSearchImageAliasesPayload]):
-    """별칭이 붙은 전제 위에서 별칭을 검색한다."""
+    """별칭이 등록된 전제에서 별칭을 검색한다."""
 
     @override
     def operation(self) -> str:
@@ -149,11 +149,11 @@ class SearchingTheAliasesOf(When[AnAliasAndACaller, ImageAdapter, AdminSearchIma
 
 @dataclass(frozen=True)
 class TheAttachedAliasIsFound(Then[AnAliasAndACaller, AdminSearchImageAliasesPayload]):
-    """붙여 둔 별칭 하나가 답으로 온다."""
+    """등록해 둔 별칭 1개가 반환된다."""
 
     @override
     def says(self) -> str:
-        return "붙여 둔 별칭이 답으로 온다"
+        return "등록해 둔 별칭이 반환된다"
 
     @override
     def look(
@@ -161,7 +161,7 @@ class TheAttachedAliasIsFound(Then[AnAliasAndACaller, AdminSearchImageAliasesPay
     ) -> list[Verdict]:
         payload = answered.response
         if payload is None:
-            return [Held("답", answered.response, Filled())]
+            return [Held("응답", answered.response, Filled())]
         return [
             Same("items", [one.alias for one in payload.items], [laid.alias.alias]),
             Same("total_count", payload.total_count, 1),
@@ -172,11 +172,11 @@ class TheAttachedAliasIsFound(Then[AnAliasAndACaller, AdminSearchImageAliasesPay
 
 @dataclass(frozen=True)
 class EveryLaidImageIsCounted(Then[ManyImagesAndACaller, AdminSearchImagesPayload]):
-    """심은 것이 모두 세어진다."""
+    """미리 만들어 둔 이미지가 모두 집계된다."""
 
     @override
     def says(self) -> str:
-        return "심은 이미지가 모두 세어진다"
+        return "미리 만들어 둔 이미지가 모두 집계된다"
 
     @override
     def look(
@@ -184,7 +184,7 @@ class EveryLaidImageIsCounted(Then[ManyImagesAndACaller, AdminSearchImagesPayloa
     ) -> list[Verdict]:
         payload = answered.response
         if payload is None:
-            return [Held("답", answered.response, Filled())]
+            return [Held("응답", answered.response, Filled())]
         return [
             Same(
                 "items",
@@ -199,13 +199,13 @@ class EveryLaidImageIsCounted(Then[ManyImagesAndACaller, AdminSearchImagesPayloa
 
 @dataclass(frozen=True)
 class OnePageComesBack(Then[ManyImagesAndACaller, AdminSearchImagesPayload]):
-    """정한 만큼만 오고, 다음 쪽이 있다고 답한다."""
+    """지정한 개수만 반환되고, 다음 페이지가 있다고 알린다."""
 
     size: int
 
     @override
     def says(self) -> str:
-        return "정한 만큼만 오고 다음 쪽이 있다고 답한다"
+        return "지정한 개수만 반환되고 다음 페이지가 있다고 알린다"
 
     @override
     def look(
@@ -213,7 +213,7 @@ class OnePageComesBack(Then[ManyImagesAndACaller, AdminSearchImagesPayload]):
     ) -> list[Verdict]:
         payload = answered.response
         if payload is None:
-            return [Held("답", answered.response, Filled())]
+            return [Held("응답", answered.response, Filled())]
         return [
             Same("length", len(payload.items), self.size),
             Same("total_count", payload.total_count, len(laid.laid)),
@@ -224,7 +224,7 @@ class OnePageComesBack(Then[ManyImagesAndACaller, AdminSearchImagesPayload]):
 
 @dataclass(frozen=True)
 class NoAliasIsFound(Then[ManyImagesAndACaller, AdminSearchImageAliasesPayload]):
-    """별칭을 하나도 붙이지 않았으므로 비어 있다."""
+    """별칭을 하나도 등록하지 않았으므로 비어 있다."""
 
     @override
     def says(self) -> str:
@@ -236,7 +236,7 @@ class NoAliasIsFound(Then[ManyImagesAndACaller, AdminSearchImageAliasesPayload])
     ) -> list[Verdict]:
         payload = answered.response
         if payload is None:
-            return [Held("답", answered.response, Filled())]
+            return [Held("응답", answered.response, Filled())]
         return [
             Same("items", list(payload.items), []),
             Same("total_count", payload.total_count, 0),
@@ -255,7 +255,7 @@ class SearchingWithoutAFilterCountsEvery(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 조건 없이 검색하면 심어둔 이미지가 모두 답으로 온다"
+        return "슈퍼관리자가 조건 없이 검색하면 미리 만들어 둔 이미지가 모두 반환된다"
 
     @override
     def given(self) -> Given[SeedingSession, ManyImagesAndACaller]:
@@ -280,9 +280,7 @@ class ThePageSizeDefaultsToFifty(
 
     @override
     def describe(self) -> str:
-        return (
-            "슈퍼관리자가 페이지 크기를 생략하고 검색하면, 쉰 건까지만 오고 다음 쪽이 있다고 답한다"
-        )
+        return "슈퍼관리자가 페이지 크기를 생략하고 검색하면, 50개까지만 반환되고 다음 페이지가 있다고 알린다"
 
     @override
     def given(self) -> Given[SeedingSession, ManyImagesAndACaller]:
@@ -307,7 +305,7 @@ class APlainUserMayNotSearch(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 아닌 사용자가 이미지를 검색하려 하면 역할로 막힌다"
+        return "슈퍼관리자가 아닌 사용자가 이미지를 검색하려 하면 역할 부족으로 거부된다"
 
     @override
     def given(self) -> Given[SeedingSession, ManyImagesAndACaller]:
@@ -332,7 +330,7 @@ class ACursorReadsFromTheFront(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 커서로 앞에서부터 읽으면 정한 만큼 오고 다음 쪽이 있다고 답한다"
+        return "슈퍼관리자가 커서로 앞에서부터 조회하면 지정한 개수만 반환되고 다음 페이지가 있다고 알린다"
 
     @override
     def given(self) -> Given[SeedingSession, ManyImagesAndACaller]:
@@ -358,8 +356,8 @@ class TheBaseConditionNarrowsFirst(
     @override
     def describe(self) -> str:
         return (
-            "이미지가 두 레지스트리에 나뉘어 있을 때 바깥에서 한쪽으로 좁혀 주면, "
-            "그 레지스트리의 이미지만 답으로 오고 다른 쪽은 세어지지 않는다"
+            "이미지가 레지스트리 2개에 나뉘어 있을 때 상위 계층이 한쪽으로 좁혀 주면, "
+            "그 레지스트리의 이미지만 반환되고 다른 쪽은 집계되지 않는다"
         )
 
     @override
@@ -386,8 +384,8 @@ class TwoPaginationModesAreRefused(
     @override
     def describe(self) -> str:
         return (
-            "크기와 커서를 함께 주면 입력이 틀렸다는 이유로 거부된다. "
-            "요청 타입이 아니라 어댑터가 페이지 방식을 고르면서 낸다"
+            "크기와 커서를 함께 지정하면 입력이 잘못되어 거부된다. "
+            "요청 타입이 아니라 어댑터가 페이지 방식을 고르는 과정에서 발생한다"
         )
 
     @override
@@ -413,7 +411,7 @@ class ABrokenCursorIsRefused(
 
     @override
     def describe(self) -> str:
-        return "읽을 수 없는 커서 값을 주면 커서가 틀렸다는 이유로 거부된다"
+        return "해석할 수 없는 커서 값을 지정하면 커서가 잘못되어 거부된다"
 
     @override
     def given(self) -> Given[SeedingSession, ManyImagesAndACaller]:
@@ -438,7 +436,7 @@ class SearchingAliasesWithNoneAttached(
 
     @override
     def describe(self) -> str:
-        return "별칭을 하나도 붙이지 않은 상태에서 슈퍼관리자가 별칭을 검색하면 답이 비어 있다"
+        return "별칭을 하나도 등록하지 않은 상태에서 슈퍼관리자가 별칭을 검색하면 응답이 비어 있다"
 
     @override
     def given(self) -> Given[SeedingSession, ManyImagesAndACaller]:
@@ -463,7 +461,7 @@ class SearchingAliasesFindsTheAttachedOne(
 
     @override
     def describe(self) -> str:
-        return "별칭이 붙어 있을 때 슈퍼관리자가 별칭을 검색하면 그 별칭이 답으로 온다"
+        return "별칭이 등록되어 있을 때 슈퍼관리자가 별칭을 검색하면 그 별칭이 반환된다"
 
     @override
     def given(self) -> Given[SeedingSession, AnAliasAndACaller]:
@@ -488,7 +486,7 @@ class APlainUserMayNotSearchAliases(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 아닌 사용자가 별칭을 검색하려 하면 역할로 막힌다"
+        return "슈퍼관리자가 아닌 사용자가 별칭을 검색하려 하면 역할 부족으로 거부된다"
 
     @override
     def given(self) -> Given[SeedingSession, ManyImagesAndACaller]:

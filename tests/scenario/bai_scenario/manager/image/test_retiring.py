@@ -1,4 +1,4 @@
-"""이미지 지우기 — 행까지 없애고, 별칭도 함께 사라진다."""
+"""이미지 완전 삭제 — 행까지 없애고, 별칭도 함께 사라진다."""
 
 from __future__ import annotations
 
@@ -40,7 +40,7 @@ from ai.backend.testutils.scenario_steps import (
 
 @dataclass(frozen=True)
 class Retiring(When[AnImageAndACaller, ImageAdapter, ImageNode]):
-    """이미지를 지운다. 행이 사라지고 되살릴 수 없다."""
+    """이미지를 완전 삭제한다. 행이 사라지고 복원할 수 없다."""
 
     at: Target = field(default_factory=TheLaidImage)
 
@@ -52,8 +52,8 @@ class Retiring(When[AnImageAndACaller, ImageAdapter, ImageNode]):
     def describe(self, laid: AnImageAndACaller) -> str:
         who = laid.caller.username
         if isinstance(self.at, AnIdThatHoldsNothing):
-            return f"{who}이 {self.at.says()}를 지움"
-        return f"{who}이 {laid.image.name}을 지움"
+            return f"{who}이 {self.at.says()} 완전 삭제"
+        return f"{who}이 {laid.image.name} 완전 삭제"
 
     @override
     async def call(self, adapter: ImageAdapter, laid: AnImageAndACaller) -> ImageNode:
@@ -65,7 +65,7 @@ class Retiring(When[AnImageAndACaller, ImageAdapter, ImageNode]):
 
 @dataclass(frozen=True)
 class RetiringTheAliased(When[AnAliasAndACaller, ImageAdapter, ImageNode]):
-    """별칭이 붙은 이미지를 지운다."""
+    """별칭이 등록된 이미지를 완전 삭제한다."""
 
     @override
     def operation(self) -> str:
@@ -73,7 +73,7 @@ class RetiringTheAliased(When[AnAliasAndACaller, ImageAdapter, ImageNode]):
 
     @override
     def describe(self, laid: AnAliasAndACaller) -> str:
-        return f"{laid.caller.username}이 별칭 {laid.alias.alias}가 붙은 이미지를 지움"
+        return f"{laid.caller.username}이 별칭 {laid.alias.alias}가 등록된 이미지를 완전 삭제"
 
     @override
     async def call(self, adapter: ImageAdapter, laid: AnAliasAndACaller) -> ImageNode:
@@ -92,7 +92,7 @@ class PurgingAnswersWithTheRemovedImage(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 이미지를 지우면 지워진 이미지가 답으로 오고 되살릴 수 없다"
+        return "슈퍼관리자가 이미지를 완전 삭제하면 삭제된 이미지가 반환되고 복원할 수 없다"
 
     @override
     def given(self) -> Given[SeedingSession, AnImageAndACaller]:
@@ -118,8 +118,8 @@ class TheMakerOfACustomImageMayPurgeIt(
     @override
     def describe(self) -> str:
         return (
-            "자기가 만든 커스텀 이미지에 권한까지 받은 사용자가 그것을 지우면, "
-            "게이트와 소유권 검사를 모두 지나 지워진 이미지가 답으로 온다"
+            "자기가 만든 커스텀 이미지에 권한까지 받은 사용자가 그것을 완전 삭제하면, "
+            "엔티티 권한과 소유권 검사를 모두 통과해 삭제된 이미지가 반환된다"
         )
 
     @override
@@ -146,8 +146,8 @@ class PurgingTakesTheAliasesWithIt(
     @override
     def describe(self) -> str:
         return (
-            "별칭이 붙은 이미지도 지워지고 지워진 이미지가 답으로 온다. "
-            "별칭이 함께 사라지는 것은 답에 실리지 않아 이 행이 보지 못한다"
+            "별칭이 등록된 이미지도 삭제되고 삭제된 이미지가 반환된다. "
+            "별칭이 함께 사라지는 것은 응답에 담기지 않아 이 시나리오로는 확인할 수 없다"
         )
 
     @override
@@ -171,7 +171,7 @@ class RetiringWhatIsNotThere(Scenario[SeedingSession, AnImageAndACaller, ImageAd
 
     @override
     def describe(self) -> str:
-        return "아무 이미지도 갖지 않은 id를 지우려 하면 이미지가 없다는 이유로 거부된다"
+        return "어느 이미지도 가리키지 않는 id를 완전 삭제하려 하면 대상을 찾을 수 없어 거부된다"
 
     @override
     def given(self) -> Given[SeedingSession, AnImageAndACaller]:
@@ -196,7 +196,7 @@ class AnUngrantedUserMayNotRetire(
 
     @override
     def describe(self) -> str:
-        return "아무 권한도 받지 않은 사용자가 이미지를 지우려 하면 권한 부족으로 막힌다"
+        return "아무 권한도 받지 않은 사용자가 이미지를 완전 삭제하려 하면 권한 부족으로 거부된다"
 
     @override
     def given(self) -> Given[SeedingSession, AnImageAndACaller]:
@@ -222,8 +222,8 @@ class AGrantIsNotOwnershipHereEither(
     @override
     def describe(self) -> str:
         return (
-            "주인 없는 이미지는 그 이미지에 권한을 받은 사용자라도 지울 수 없다. "
-            "게이트를 지난 뒤 소유권 검사가 막는다"
+            "소유자가 없는 이미지는 그 이미지에 권한을 받은 사용자라도 완전 삭제할 수 없다. "
+            "엔티티 권한을 통과한 뒤 소유권 검사에서 거부된다"
         )
 
     @override

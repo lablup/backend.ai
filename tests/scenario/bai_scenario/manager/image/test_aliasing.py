@@ -1,4 +1,4 @@
-"""별칭 붙이고 떼기 — 이미지의 필드이지만 문은 전역 역할이다."""
+"""별칭 등록과 해제 — 이미지에 딸린 값이지만 전역 역할로 보호된다."""
 
 from __future__ import annotations
 
@@ -50,7 +50,7 @@ A_NAME_NO_IMAGE_HOLDS = "no-such-alias"
 
 @dataclass(frozen=True)
 class Aliasing(When[AnImageAndACaller, ImageAdapter, AliasImagePayload]):
-    """이미지에 별칭을 붙인다."""
+    """이미지에 별칭을 등록한다."""
 
     at: Target = field(default_factory=TheLaidImage)
     alias: str = A_NEW_ALIAS
@@ -63,8 +63,8 @@ class Aliasing(When[AnImageAndACaller, ImageAdapter, AliasImagePayload]):
     def describe(self, laid: AnImageAndACaller) -> str:
         who = laid.caller.username
         if isinstance(self.at, AnIdThatHoldsNothing):
-            return f"{who}이 {self.at.says()}에 별칭을 붙임"
-        return f"{who}이 {laid.image.name}에 별칭 {self.alias}를 붙임"
+            return f"{who}이 {self.at.says()}에 별칭 등록"
+        return f"{who}이 {laid.image.name}에 별칭 {self.alias} 등록"
 
     @override
     async def call(self, adapter: ImageAdapter, laid: AnImageAndACaller) -> AliasImagePayload:
@@ -75,7 +75,7 @@ class Aliasing(When[AnImageAndACaller, ImageAdapter, AliasImagePayload]):
 
 @dataclass(frozen=True)
 class AliasingTheTaken(When[AnAliasAndACaller, ImageAdapter, AliasImagePayload]):
-    """이미 다른 이미지가 쓰고 있는 별칭을 붙인다."""
+    """이미 다른 이미지가 사용 중인 별칭을 등록한다."""
 
     @override
     def operation(self) -> str:
@@ -83,7 +83,7 @@ class AliasingTheTaken(When[AnAliasAndACaller, ImageAdapter, AliasImagePayload])
 
     @override
     def describe(self, laid: AnAliasAndACaller) -> str:
-        return f"{laid.caller.username}이 이미 쓰이는 별칭 {laid.alias.alias}를 붙임"
+        return f"{laid.caller.username}이 이미 사용 중인 별칭 {laid.alias.alias} 등록"
 
     @override
     async def call(self, adapter: ImageAdapter, laid: AnAliasAndACaller) -> AliasImagePayload:
@@ -95,7 +95,7 @@ class AliasingTheTaken(When[AnAliasAndACaller, ImageAdapter, AliasImagePayload])
 
 @dataclass(frozen=True)
 class Dealiasing(When[AnAliasAndACaller, ImageAdapter, AliasImagePayload]):
-    """붙은 별칭을 뗀다. 이 호출은 id가 아니라 별칭 이름으로 지목한다."""
+    """등록된 별칭을 해제한다. 이 호출은 id가 아니라 별칭 이름으로 대상을 지정한다."""
 
     named: str | None = None
 
@@ -107,8 +107,8 @@ class Dealiasing(When[AnAliasAndACaller, ImageAdapter, AliasImagePayload]):
     def describe(self, laid: AnAliasAndACaller) -> str:
         who = laid.caller.username
         if self.named is not None:
-            return f"{who}이 아무 이미지도 갖지 않은 별칭을 뗌"
-        return f"{who}이 별칭 {laid.alias.alias}를 뗌"
+            return f"{who}이 어느 이미지도 가리키지 않는 별칭 해제"
+        return f"{who}이 별칭 {laid.alias.alias} 해제"
 
     @override
     async def call(self, adapter: ImageAdapter, laid: AnAliasAndACaller) -> AliasImagePayload:
@@ -119,45 +119,45 @@ class Dealiasing(When[AnAliasAndACaller, ImageAdapter, AliasImagePayload]):
 
 @dataclass(frozen=True)
 class TheAliasAndItsImage(Then[AnImageAndACaller, AliasImagePayload]):
-    """붙인 별칭과 그 별칭이 가리키는 이미지가 답으로 온다."""
+    """등록한 별칭과 그 별칭이 가리키는 이미지가 반환된다."""
 
     alias: str
 
     @override
     def says(self) -> str:
-        return "붙인 별칭과 그 이미지의 id가 온다"
+        return "등록한 별칭과 그 이미지의 id가 반환된다"
 
     @override
     def look(self, laid: AnImageAndACaller, answered: Answered[AliasImagePayload]) -> list[Verdict]:
         payload = answered.response
         if payload is None:
-            return [Held("답", answered.response, Filled())]
+            return [Held("응답", answered.response, Filled())]
         wanted: UUID = laid.image.id
         return [
             Same("alias", payload.alias, self.alias),
-            Held("image_id", payload.image_id, SameAs(wanted, "심은 이미지의 id")),
-            Skipped("alias_id", "데이터베이스가 만든다"),
+            Held("image_id", payload.image_id, SameAs(wanted, "미리 만들어 둔 이미지의 id")),
+            Skipped("alias_id", "데이터베이스가 생성한다"),
         ]
 
 
 @dataclass(frozen=True)
 class TheRemovedAlias(Then[AnAliasAndACaller, AliasImagePayload]):
-    """떼어낸 별칭과 그 이미지가 답으로 온다."""
+    """해제한 별칭과 그 이미지가 반환된다."""
 
     @override
     def says(self) -> str:
-        return "떼어낸 별칭과 그 이미지의 id가 온다"
+        return "해제한 별칭과 그 이미지의 id가 반환된다"
 
     @override
     def look(self, laid: AnAliasAndACaller, answered: Answered[AliasImagePayload]) -> list[Verdict]:
         payload = answered.response
         if payload is None:
-            return [Held("답", answered.response, Filled())]
+            return [Held("응답", answered.response, Filled())]
         wanted: UUID = laid.image.id
         return [
             Same("alias", payload.alias, laid.alias.alias),
-            Held("image_id", payload.image_id, SameAs(wanted, "심은 이미지의 id")),
-            Skipped("alias_id", "데이터베이스가 만든다"),
+            Held("image_id", payload.image_id, SameAs(wanted, "미리 만들어 둔 이미지의 id")),
+            Skipped("alias_id", "데이터베이스가 생성한다"),
         ]
 
 
@@ -171,7 +171,7 @@ class AliasingAnswersWithTheAliasAndItsImage(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 이미지에 별칭을 붙이면 그 별칭과 가리키는 이미지가 답으로 온다"
+        return "슈퍼관리자가 이미지에 별칭을 등록하면 그 별칭과 가리키는 이미지가 반환된다"
 
     @override
     def given(self) -> Given[SeedingSession, AnImageAndACaller]:
@@ -196,7 +196,7 @@ class DealiasingAnswersWithTheRemovedAlias(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 붙은 별칭을 떼면 떼어낸 별칭과 그 이미지가 답으로 온다"
+        return "슈퍼관리자가 등록된 별칭을 해제하면 해제된 별칭과 그 이미지가 반환된다"
 
     @override
     def given(self) -> Given[SeedingSession, AnAliasAndACaller]:
@@ -221,7 +221,7 @@ class AliasingWhatIsNotThere(
 
     @override
     def describe(self) -> str:
-        return "아무 이미지도 갖지 않은 id에 별칭을 붙이려 하면 이미지가 없다는 이유로 거부된다"
+        return "어느 이미지도 가리키지 않는 id에 별칭을 등록하려 하면 대상을 찾을 수 없어 거부된다"
 
     @override
     def given(self) -> Given[SeedingSession, AnImageAndACaller]:
@@ -246,7 +246,7 @@ class AnAliasAnotherImageHolds(
 
     @override
     def describe(self) -> str:
-        return "이미 쓰이고 있는 별칭을 붙이려 하면 별칭이 겹친다는 이유로 거부된다"
+        return "이미 사용 중인 별칭을 등록하려 하면 유니크 제약 위반으로 거부된다"
 
     @override
     def given(self) -> Given[SeedingSession, AnAliasAndACaller]:
@@ -271,7 +271,7 @@ class DealiasingWhatIsNotThere(
 
     @override
     def describe(self) -> str:
-        return "아무 이미지도 갖지 않은 별칭을 떼려 하면 별칭이 없다는 이유로 거부된다"
+        return "어느 이미지도 가리키지 않는 별칭을 해제하려 하면 대상을 찾을 수 없어 거부된다"
 
     @override
     def given(self) -> Given[SeedingSession, AnAliasAndACaller]:
@@ -297,8 +297,8 @@ class TheOwnerStillMayNotAlias(
     @override
     def describe(self) -> str:
         return (
-            "자기가 만든 커스텀 이미지라도 별칭은 붙일 수 없다. "
-            "별칭을 붙이는 문은 그 이미지의 권한이 아니라 역할이 지키기 때문이다"
+            "자기가 만든 커스텀 이미지라도 별칭은 등록할 수 없다. "
+            "별칭 등록은 그 이미지의 권한이 아니라 전역 역할로 보호되기 때문이다"
         )
 
     @override
@@ -324,7 +324,7 @@ class APlainUserMayNotDealias(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 아닌 사용자가 별칭을 떼려 하면 역할로 막힌다"
+        return "슈퍼관리자가 아닌 사용자가 별칭을 해제하려 하면 역할 부족으로 거부된다"
 
     @override
     def given(self) -> Given[SeedingSession, AnAliasAndACaller]:
