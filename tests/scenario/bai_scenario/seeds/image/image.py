@@ -5,11 +5,19 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import override
 
+from bai_scenario.seeds.seeder import Naming, SeedField, SeedRowFrom
+
 from ai.backend.common.data.entity.container_registry import ContainerRegistryID
+from ai.backend.common.data.entity.image import ImageID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.manager.data.container_registry.types import ContainerRegistryData
-from ai.backend.manager.data.image.types import ImageData, ImageType
-from ai.backend.manager.models.image.creators import ImageCreator
-from bai_scenario.seeds.seeder import Naming, SeedRowFrom
+from ai.backend.manager.data.image.types import (
+    ImageAliasData,
+    ImageData,
+    ImageStatus,
+    ImageType,
+)
+from ai.backend.manager.models.image.creators import ImageAliasCreator, ImageCreator
 
 
 @dataclass(frozen=True)
@@ -18,6 +26,9 @@ class SeedImage(SeedRowFrom[ContainerRegistryData, ImageData]):
 
     name_hint: str = "image"
     architecture: str = "x86_64"
+    status: ImageStatus = ImageStatus.ALIVE
+    customized: bool = False
+    creator_id: UserID | None = None
 
     @override
     def kind(self) -> str:
@@ -25,7 +36,12 @@ class SeedImage(SeedRowFrom[ContainerRegistryData, ImageData]):
 
     @override
     def detail(self) -> str:
-        return f"{self.architecture} 이미지"
+        marks = [f"{self.architecture} 이미지"]
+        if self.status is not ImageStatus.ALIVE:
+            marks.append(f"상태는 {self.status.value}")
+        if self.customized:
+            marks.append("커스터마이즈된 것이라 주인이 있다")
+        return ", ".join(marks)
 
     @override
     def name(self, naming: Naming) -> str:
@@ -45,4 +61,31 @@ class SeedImage(SeedRowFrom[ContainerRegistryData, ImageData]):
             size_bytes=0,
             labels={},
             type=ImageType.COMPUTE,
+            status=self.status,
+            customized=self.customized,
+            creator_id=self.creator_id,
         )
+
+
+@dataclass(frozen=True)
+class SeedAlias(SeedField[ImageData, ImageAliasData]):
+    """One alias of an image.
+
+    The alias column is unique across every image, and each scenario runs against its
+    own copy of the schema, so a plain name is enough. A scenario that needs the name
+    reads it off the row this laid.
+    """
+
+    alias: str = "seeded-alias"
+
+    @override
+    def kind(self) -> str:
+        return f"별칭 {self.alias}"
+
+    @override
+    def owner_id(self, owner: ImageData) -> ImageID:
+        return ImageID(owner.id)
+
+    @override
+    def seed(self) -> ImageAliasCreator:
+        return ImageAliasCreator(alias=self.alias)
