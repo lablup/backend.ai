@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import uuid
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any, override
 
@@ -60,6 +60,49 @@ DEFAULT_LIMITS_GQL = [
     for slot, least in sorted(INTRINSIC_SLOTS_MIN.items())
 ]
 """같은 하한을 GQL 모양으로 적은 것. 상한이 없는 자리에 Infinity가 들어간다."""
+
+
+class Accelerators(ABC):
+    """이미지의 가속기 자리에 놓인 것."""
+
+    @abstractmethod
+    def named(self) -> str | None:
+        """이미지 행에 적히는 값."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def supported(self) -> list[str]:
+        """노드가 그 값을 풀어 답하는 목록."""
+        raise NotImplementedError
+
+
+@dataclass(frozen=True)
+class NoAccelerator(Accelerators):
+    """아무것도 적히지 않은 자리. 무엇이든 된다는 뜻으로 풀린다."""
+
+    @override
+    def named(self) -> str | None:
+        return None
+
+    @override
+    def supported(self) -> list[str]:
+        return ["*"]
+
+
+@dataclass(frozen=True)
+class OneAccelerator(Accelerators):
+    """가속기 하나가 적힌 자리."""
+
+    name: str = "cuda"
+
+    @override
+    def named(self) -> str | None:
+        return self.name
+
+    @override
+    def supported(self) -> list[str]:
+        return [self.name]
+
 
 REACHING = (Permission.READ, Permission.SOFT_DELETE, Permission.HARD_DELETE)
 """이미지를 읽고 잊고 지우는 데 드는 권한.
@@ -120,6 +163,7 @@ class AnImageAndSomeone(Given[Any, AnImageAndACaller]):
 
     role: UserRole = UserRole.USER
     status: ImageStatus = ImageStatus.ALIVE
+    accelerators: Accelerators = field(default_factory=NoAccelerator)
 
     @override
     def describe(self) -> str:
@@ -130,7 +174,9 @@ class AnImageAndSomeone(Given[Any, AnImageAndACaller]):
     async def lay(self, seeding: Any) -> AnImageAndACaller:
         domain = await seeding.creating(SeedDomain(name_hint="home"))
         registry = await seeding.creating(SeedContainerRegistry(name_hint="host"))
-        image = await seeding.creating_from(SeedImage(status=self.status), registry)
+        image = await seeding.creating_from(
+            SeedImage(status=self.status, accelerators=self.accelerators.named()), registry
+        )
         caller = await seeding.within(SomeoneOf(domain, role=self.role))
         return AnImageAndACaller(seeding.made(image), seeding.made(caller))
 
@@ -331,6 +377,7 @@ class TheImageNode(Then[Any, ImageNode]):
 
     status: ImageStatus | None = None
     tag: str | None = None
+    accelerators: Accelerators = field(default_factory=NoAccelerator)
 
     @override
     def says(self) -> str:
@@ -375,7 +422,7 @@ class TheImageNode(Then[Any, ImageNode]):
                 sorted(node.resource_limits, key=lambda one: one.key),
                 DEFAULT_LIMITS,
             ),
-            Same("accelerators", node.accelerators, None),
+            Same("accelerators", node.accelerators, self.accelerators.named()),
             Same("config_digest", node.config_digest, image.config_digest),
             Same("is_local", node.is_local, image.is_local),
             Held("created_at", node.created_at, written),
@@ -397,7 +444,7 @@ class TheImageNode(Then[Any, ImageNode]):
             Same(
                 "requirements.supported_accelerators",
                 requirements.supported_accelerators,
-                ["*"],
+                self.accelerators.supported(),
             ),
             Same(
                 "requirements.resource_limits",
