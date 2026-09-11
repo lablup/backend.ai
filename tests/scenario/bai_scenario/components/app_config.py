@@ -1,10 +1,10 @@
 """What an app config scenario table says besides the call.
 
-The four app config adapters share one processor bundle and one design: a definition
-registers a name, an allow-list entry opens it to one scope kind, and a fragment holds a
-value under that. What every table needs is here — how the bundle is built, the design
-laid as one nest, and the users a row calls as. The merged read's own situations are
-here too; the other three adapters keep theirs beside their tables.
+The four app config adapters share one design: a definition registers a name, an
+allow-list entry opens it to one scope kind, and a fragment holds a value under that.
+What every table needs is here — the design laid as one nest, and the users a row calls
+as. The merged read's own situations are here too; the other three adapters keep theirs
+beside their tables. How an adapter is built lives in each table's own conftest.
 """
 
 from __future__ import annotations
@@ -30,10 +30,6 @@ from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.v2.app_config.response import GetAppConfigsPayload
-from ai.backend.manager.actions.monitors import ActionMonitors
-from ai.backend.manager.actions.registry.registry import ProcessorRegistry
-from ai.backend.manager.actions.registry.types import GroupMeta, ProcessorDependencies
-from ai.backend.manager.actions.v2.validators import ActionValidators as V2ActionValidators
 from ai.backend.manager.data.app_config.types import (
     AppConfigAllowListData,
     AppConfigDefinitionData,
@@ -42,10 +38,6 @@ from ai.backend.manager.data.domain.types import DomainData
 from ai.backend.manager.data.permission.types import Permission
 from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.errors.permission import NotEnoughPermission
-from ai.backend.manager.repositories.ops.repository import OpsRepository
-from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
-from ai.backend.manager.services.app_config.processors import AppConfigProcessors
-from ai.backend.manager.services.app_config.service import AppConfigService
 from ai.backend.testutils.scenario_steps import (
     Answered,
     Given,
@@ -69,24 +61,6 @@ ENTITY_NAMES: Mapping[EntityType, str] = {
     AppConfigFragmentEntityType(): "조각",
 }
 """권한이 걸리는 엔티티 종류를 레포트가 부르는 말."""
-
-
-def app_config_processors(
-    engine: Any, validators: V2ActionValidators, monitors: ActionMonitors
-) -> AppConfigProcessors:
-    """The one bundle all four app config adapters are built on."""
-    provider = V2DBOpsProvider(engine)
-    repository: OpsRepository[Any] = OpsRepository(provider)
-    registry: ProcessorRegistry[Any] = ProcessorRegistry(
-        ProcessorDependencies(monitors=monitors, validators=validators, repository=repository)
-    )
-    return AppConfigProcessors(
-        registry.group(GroupMeta(AppConfigEntityType())),
-        registry.group(GroupMeta(AppConfigDefinitionEntityType())),
-        registry.group(GroupMeta(AppConfigAllowListEntityType())),
-        registry.group(GroupMeta(AppConfigFragmentEntityType())),
-        AppConfigService(repository),
-    )
 
 
 def names_of(granted: Sequence[Permission]) -> str:
@@ -126,10 +100,9 @@ class SomeoneGrantedOnTheirOwn(SeedNest[Laid[UserData]]):
 
 @dataclass(frozen=True)
 class SomeoneGrantedOn[Seat](SeedNest[Laid[UserData]]):
-    """주어진 행에 앉은 역할로, 한 엔티티 종류에 정해진 권한만 받은 사용자.
+    """주어진 스코프 행에 앉은 역할로, 한 엔티티 종류에 정해진 권한만 받은 사용자.
 
-    어느 스코프에도 속하지 않는 행은 역할이 앉을 자리가 그 행 자체뿐이다. 도메인처럼 스코프인
-    행에 앉히면 그 안의 것을 다스린다.
+    도메인에 앉히면 그 도메인 안의 것을 다스린다.
     """
 
     domain: Laid[DomainData]
