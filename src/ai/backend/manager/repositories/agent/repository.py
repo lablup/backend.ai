@@ -27,7 +27,7 @@ from ai.backend.manager.data.agent.types import (
 )
 from ai.backend.manager.data.image.types import ImageDataWithDetails, ImageIdentifier
 from ai.backend.manager.data.kernel.types import KernelInfo
-from ai.backend.manager.errors.resource import AgentNotFound
+from ai.backend.manager.errors.agent import AgentNotFound
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.agent.lookups import AgentNameLookup
 from ai.backend.manager.models.agent.updaters import AgentExitStatusUpdater, AgentStatusUpdater
