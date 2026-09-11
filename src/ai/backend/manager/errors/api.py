@@ -43,6 +43,19 @@ class InvalidAPIParameters(BackendAIError, web.HTTPBadRequest):
         )
 
 
+class GraphQLError(BackendAIError, web.HTTPBadRequest):
+    error_type = "https://api.backend.ai/probs/graphql-error"
+    error_title = "GraphQL-generated error."
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.API,
+            operation=ErrorOperation.GENERIC,
+            error_detail=ErrorDetail.INTERNAL_ERROR,
+        )
+
+
 class RateLimitExceeded(BackendAIError, web.HTTPTooManyRequests):
     error_type = "https://api.backend.ai/probs/rate-limit-exceeded"
     error_title = "You have reached your API query rate limit."
