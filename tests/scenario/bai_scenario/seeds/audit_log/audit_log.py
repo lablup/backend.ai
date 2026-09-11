@@ -14,7 +14,7 @@ from datetime import datetime
 from typing import Any, override
 from uuid import UUID, uuid4
 
-from bai_scenario.seeds.seeder import SeedField, SeedFieldWithNested
+from bai_scenario.seeds.seeder import SeedField, SeedFieldWithNestedRows
 
 from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
 from ai.backend.common.data.entity.user import UserID
@@ -73,7 +73,7 @@ class SeedAuditRecord[Owner](SeedField[Owner, AuditLogData]):
 
 
 @dataclass(frozen=True)
-class SeedScopedAuditRecord[Owner](SeedFieldWithNested[Owner, AuditLogData]):
+class SeedScopedAuditRecord[Owner](SeedFieldWithNestedRows[Owner, AuditLogData]):
     """A scope-action record: written under the entity it affected, tagged with the scopes
     the run covered. A search by one of those scopes finds it through ``audit_log_scopes``,
     not through the record's own entity.

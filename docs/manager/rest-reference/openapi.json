@@ -5424,8 +5424,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Updated deployment name",
+            "description": "Updated deployment name. Omit to leave unchanged.",
             "title": "Name"
           },
           "replica_count": {
@@ -5438,8 +5437,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Updated replica count",
+            "description": "Updated replica count. Omit to leave unchanged.",
             "title": "Replica Count"
           },
           "tags": {
@@ -5451,14 +5449,10 @@
                 "type": "array"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
-            "description": "Updated tags. Use SENTINEL to clear.",
+            "description": "Updated tags. Omit to leave unchanged; null clears.",
             "title": "Tags"
           },
           "open_to_public": {
@@ -5470,8 +5464,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Updated network visibility. None means no change.",
+            "description": "Updated network visibility. Omit to leave unchanged.",
             "title": "Open To Public"
           },
           "preferred_domain_name": {
@@ -5483,8 +5476,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Updated preferred domain name. None means no change.",
+            "description": "Updated preferred domain name. Omit to leave unchanged.",
             "title": "Preferred Domain Name"
           },
           "default_deployment_strategy": {
@@ -5496,8 +5488,8 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Updated deployment strategy. None means no change."
+            "description": "Updated deployment strategy. Omit to leave unchanged.",
+            "title": "Default Deployment Strategy"
           }
         },
         "title": "UpdateDeploymentInput",
@@ -7284,7 +7276,7 @@
         "type": "object"
       },
       "UpdateAutoScalingRuleInput": {
-        "description": "Input for updating an auto-scaling rule.\n\nFields default to SENTINEL (no change). Set a field to None to clear it.\nFields that cannot be cleared use None to signal no change.",
+        "description": "Input for updating an auto-scaling rule.\n\nEvery field defaults to UNSET (no change). Null clears only the nullable fields.",
         "properties": {
           "id": {
             "description": "ID of the auto-scaling rule to update",
@@ -7301,8 +7293,8 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Updated metric source. None means no change."
+            "description": "Updated metric source. Omit to leave unchanged.",
+            "title": "Metric Source"
           },
           "metric_name": {
             "anyOf": [
@@ -7313,8 +7305,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Updated metric name. None means no change.",
+            "description": "Updated metric name. Omit to leave unchanged.",
             "title": "Metric Name"
           },
           "min_threshold": {
@@ -7327,14 +7318,10 @@
                 "type": "string"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
-            "description": "Updated minimum threshold. SENTINEL = no change, None = clear.",
+            "description": "Updated minimum threshold. Omit to leave unchanged; null clears.",
             "title": "Min Threshold"
           },
           "max_threshold": {
@@ -7347,14 +7334,10 @@
                 "type": "string"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
-            "description": "Updated maximum threshold. SENTINEL = no change, None = clear.",
+            "description": "Updated maximum threshold. Omit to leave unchanged; null clears.",
             "title": "Max Threshold"
           },
           "step_size": {
@@ -7366,8 +7349,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Updated step size. None means no change.",
+            "description": "Updated step size. Omit to leave unchanged.",
             "title": "Step Size"
           },
           "time_window": {
@@ -7379,8 +7361,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Updated time window in seconds. None means no change.",
+            "description": "Updated time window in seconds. Omit to leave unchanged.",
             "title": "Time Window"
           },
           "min_replicas": {
@@ -7389,14 +7370,10 @@
                 "type": "integer"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
-            "description": "Updated minimum replicas. SENTINEL = no change, None = clear.",
+            "description": "Updated minimum replicas. Omit to leave unchanged; null clears.",
             "title": "Min Replicas"
           },
           "max_replicas": {
@@ -7405,14 +7382,10 @@
                 "type": "integer"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
-            "description": "Updated maximum replicas. SENTINEL = no change, None = clear.",
+            "description": "Updated maximum replicas. Omit to leave unchanged; null clears.",
             "title": "Max Replicas"
           },
           "prometheus_query_preset_id": {
@@ -7422,14 +7395,10 @@
                 "type": "string"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
-            "description": "Updated Prometheus query preset ID. SENTINEL = no change, None = clear.",
+            "description": "Updated Prometheus query preset ID. Omit to leave unchanged; null clears.",
             "title": "Prometheus Query Preset Id"
           }
         },
@@ -13605,7 +13574,7 @@
         "type": "object"
       },
       "UpdateLoginClientTypeInput": {
-        "description": "Input for updating a login client type.\n\nFields default to \"no change\". For ``description``, pass ``null`` to clear the\nexisting value; omit the field (SENTINEL) to leave it untouched.",
+        "description": "Input for updating a login client type.\n\nEvery field defaults to UNSET (no change). ``description`` accepts ``null`` to clear.",
         "properties": {
           "name": {
             "anyOf": [
@@ -13618,7 +13587,6 @@
                 "type": "null"
               }
             ],
-            "default": null,
             "description": "Updated name. Omit to leave unchanged.",
             "title": "Name"
           },
@@ -13628,14 +13596,10 @@
                 "type": "string"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
-            "description": "Updated description. Use null to clear, omit to leave unchanged.",
+            "description": "Updated description. Omit to leave unchanged; null clears.",
             "title": "Description"
           }
         },
@@ -25629,8 +25593,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "New name.",
+            "description": "New name. Omit to leave unchanged.",
             "title": "Name"
           },
           "description": {
@@ -25639,14 +25602,10 @@
                 "type": "string"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
-            "description": "New description.",
+            "description": "Updated description. Omit to leave unchanged; null clears.",
             "title": "Description"
           }
         },
