@@ -10,8 +10,8 @@ from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiv
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.types import AgentId, KernelId, SessionId
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.errors.agent import AgentNotAllocated
 from ai.backend.manager.errors.api import NotImplementedAPI
-from ai.backend.manager.errors.resource import AgentNotAllocated
 from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.repositories.stream.repository import StreamRepository
 from ai.backend.manager.services.stream.actions.execute_in_stream import (

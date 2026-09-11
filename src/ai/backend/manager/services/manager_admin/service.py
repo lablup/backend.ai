@@ -5,8 +5,8 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from ai.backend.manager.data.manager_status.types import ManagerStatus
+from ai.backend.manager.errors.agent import AgentNotFound
 from ai.backend.manager.errors.api import InvalidAPIParameters
-from ai.backend.manager.errors.resource import InstanceNotFound
 from ai.backend.manager.repositories.manager_admin.health import get_manager_db_cxn_status
 
 from .actions.fetch_status import FetchManagerStatusAction, FetchManagerStatusActionResult
@@ -147,7 +147,7 @@ class ManagerAdminService:
             action.agent_ids, action.schedulable
         )
         if rowcount < len(action.agent_ids):
-            raise InstanceNotFound()
+            raise AgentNotFound()
         return PerformSchedulerOpsActionResult()
 
     async def get_db_cxn_status(self, action: GetDbCxnStatusAction) -> GetDbCxnStatusActionResult:

@@ -111,7 +111,6 @@ from ai.backend.manager.errors.resource import (
     DomainNotFound,
     ProjectNotFound,
     ResourceGroupNotFound,
-    ResourceGroupProxyTargetNotFound,
     RuntimeVariantNotFound,
 )
 from ai.backend.manager.errors.service import (
@@ -1558,7 +1557,7 @@ class DeploymentDBSource:
             result = await db_sess.execute(query)
             rows = result.all()
             if not rows:
-                raise ResourceGroupProxyTargetNotFound(
+                raise ResourceGroupNotFound(
                     f"Scaling group proxy target not found for groups: {resource_group}"
                 )
             resource_group_targets: defaultdict[str, ResourceGroupProxyTarget | None] = defaultdict(

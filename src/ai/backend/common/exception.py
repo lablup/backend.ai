@@ -818,19 +818,6 @@ class ProcessorNotReadyError(BackendAIError, web.HTTPInternalServerError):
         )
 
 
-class AgentNotFound(BackendAIError, web.HTTPNotFound):
-    error_type = "https://api.backend.ai/probs/agent-not-found"
-    error_title = "Agent Not Found"
-
-    @override
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.AGENT,
-            operation=ErrorOperation.READ,
-            error_detail=ErrorDetail.NOT_FOUND,
-        )
-
-
 class ScalingGroupNotFoundError(BackendAIError, web.HTTPNotFound):
     error_type = "https://api.backend.ai/probs/scaling-group-not-found"
     error_title = "Scaling Group Not Found"
