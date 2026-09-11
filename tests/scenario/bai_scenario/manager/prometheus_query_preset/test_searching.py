@@ -125,7 +125,7 @@ class SearchingByCategory(When[ManyPresetsAndACaller, PrometheusQueryPresetAdapt
 
 @dataclass(frozen=True)
 class SearchingAsNobody(When[APresetAlone, PrometheusQueryPresetAdapter, Searched]):
-    """아무도 아닌 채로 훑는다."""
+    """사용자 컨텍스트 없이 훑는다."""
 
     @override
     def operation(self) -> str:
@@ -133,7 +133,7 @@ class SearchingAsNobody(When[APresetAlone, PrometheusQueryPresetAdapter, Searche
 
     @override
     def describe(self, laid: APresetAlone) -> str:
-        return "아무도 아닌 채로 전체 조회"
+        return "사용자 컨텍스트 없이 전체 조회"
 
     @override
     async def call(self, adapter: PrometheusQueryPresetAdapter, laid: APresetAlone) -> Searched:

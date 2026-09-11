@@ -68,7 +68,7 @@ class ReadingById(When[APresetAndACaller, PrometheusQueryPresetAdapter, PresetNo
 
 @dataclass(frozen=True)
 class ReadingAsNobody(When[APresetAlone, PrometheusQueryPresetAdapter, PresetNodeAnswer]):
-    """아무도 아닌 채로 id로 읽는다."""
+    """사용자 컨텍스트 없이 id로 읽는다."""
 
     @override
     def operation(self) -> str:
@@ -76,7 +76,7 @@ class ReadingAsNobody(When[APresetAlone, PrometheusQueryPresetAdapter, PresetNod
 
     @override
     def describe(self, laid: APresetAlone) -> str:
-        return f"아무도 아닌 채로 {laid.preset.name}을 조회"
+        return f"사용자 컨텍스트 없이 {laid.preset.name}을 조회"
 
     @override
     async def call(
