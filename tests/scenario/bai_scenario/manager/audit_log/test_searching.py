@@ -1,7 +1,7 @@
-"""감사 기록 전체 검색 — 전역 역할이 지키고, 읽기라서 모니터도 지난다.
+"""감사 기록 전체 검색 — 전역 역할이 필요하지만, 읽기 연산이라 모니터 역할도 통과한다.
 
-모니터 역할은 통과하지만 슈퍼관리자가 아닌 사용자는 막힌다. 이 문은 권한 그래프가 아니라
-역할이 지키므로 집행 스위치와 무관하다.
+모니터 역할은 통과하지만 슈퍼관리자가 아닌 사용자는 거부된다. 이 검색은 권한 그래프가 아니라
+역할로 보호되므로 권한 검사 스위치와 무관하다.
 """
 
 from __future__ import annotations
@@ -71,7 +71,7 @@ class SearchingEverything(When[RecordsAndACaller, AuditLogAdapter, Searched]):
 
 @dataclass(frozen=True)
 class SearchingBySuccess(When[RecordsAndACaller, AuditLogAdapter, Searched]):
-    """성공한 것만 남도록 상태로 거른다."""
+    """성공한 기록만 상태 필터로 검색한다."""
 
     @override
     def operation(self) -> str:
@@ -79,7 +79,7 @@ class SearchingBySuccess(When[RecordsAndACaller, AuditLogAdapter, Searched]):
 
     @override
     def describe(self, laid: RecordsAndACaller) -> str:
-        return f"{laid.caller.username}이 성공 상태로 걸러 검색"
+        return f"{laid.caller.username}이 성공 상태 필터로 검색"
 
     @override
     async def call(self, adapter: AuditLogAdapter, laid: RecordsAndACaller) -> Searched:
@@ -95,7 +95,7 @@ class SearchingBySuccess(When[RecordsAndACaller, AuditLogAdapter, Searched]):
 
 @dataclass(frozen=True)
 class SearchingByTriggeredUser(When[RecordsAndACaller, AuditLogAdapter, Searched]):
-    """일으킨 사용자로 거른다."""
+    """실행한 사용자를 필터로 검색한다."""
 
     @override
     def operation(self) -> str:
@@ -103,7 +103,7 @@ class SearchingByTriggeredUser(When[RecordsAndACaller, AuditLogAdapter, Searched
 
     @override
     def describe(self, laid: RecordsAndACaller) -> str:
-        return f"{laid.caller.username}이 일으킨 사용자로 걸러 검색"
+        return f"{laid.caller.username}이 실행한 사용자 필터로 검색"
 
     @override
     async def call(self, adapter: AuditLogAdapter, laid: RecordsAndACaller) -> Searched:
@@ -119,7 +119,7 @@ class SearchingByTriggeredUser(When[RecordsAndACaller, AuditLogAdapter, Searched
 
 @dataclass(frozen=True)
 class SearchingWithoutPageSize(When[RecordsAndACaller, AuditLogAdapter, Searched]):
-    """페이지 크기를 대지 않고 검색한다."""
+    """페이지 크기를 지정하지 않고 검색한다."""
 
     @override
     def operation(self) -> str:
@@ -137,7 +137,7 @@ class SearchingWithoutPageSize(When[RecordsAndACaller, AuditLogAdapter, Searched
 
 @dataclass(frozen=True)
 class SearchingWithMixedPagination(When[RecordsAndACaller, AuditLogAdapter, Searched]):
-    """오프셋 방식과 커서 방식을 함께 준다."""
+    """오프셋 방식과 커서 방식을 함께 지정한다."""
 
     @override
     def operation(self) -> str:
@@ -145,7 +145,7 @@ class SearchingWithMixedPagination(When[RecordsAndACaller, AuditLogAdapter, Sear
 
     @override
     def describe(self, laid: RecordsAndACaller) -> str:
-        return f"{laid.caller.username}이 두 페이지 방식을 함께 주고 검색"
+        return f"{laid.caller.username}이 두 페이지 방식을 함께 지정해 검색"
 
     @override
     async def call(self, adapter: AuditLogAdapter, laid: RecordsAndACaller) -> Searched:
@@ -163,7 +163,7 @@ class SearchingWithBadCursor(When[RecordsAndACaller, AuditLogAdapter, Searched])
 
     @override
     def describe(self, laid: RecordsAndACaller) -> str:
-        return f"{laid.caller.username}이 깨진 커서로 검색"
+        return f"{laid.caller.username}이 손상된 커서로 검색"
 
     @override
     async def call(self, adapter: AuditLogAdapter, laid: RecordsAndACaller) -> Searched:
@@ -183,7 +183,7 @@ class TheSuperadminSeesEveryRecord(
 
     @override
     def describe(self) -> str:
-        return "기록 둘이 있고 슈퍼관리자가 필터 없이 검색하면, 둘 다 오고 최근 것이 먼저다"
+        return "기록 둘이 있고 슈퍼관리자가 필터 없이 검색하면, 둘 다 반환되고 최근 것이 먼저다"
 
     @override
     def given(self) -> Given[SeedingSession, RecordsAndACaller]:
@@ -208,7 +208,7 @@ class TheMonitorRoleSeesEveryRecord(
 
     @override
     def describe(self) -> str:
-        return "검색은 읽기이므로 모니터 역할 사용자도 전역 문을 지나 슈퍼관리자와 같은 답을 본다"
+        return "검색은 읽기 연산이므로 모니터 역할 사용자도 전역 역할 검사를 통과해 슈퍼관리자와 같은 응답을 받는다"
 
     @override
     def given(self) -> Given[SeedingSession, RecordsAndACaller]:
@@ -259,8 +259,8 @@ class EnforcementOffStillNeedsTheRole(
     @override
     def describe(self) -> str:
         return (
-            "엔티티 권한 집행을 꺼도 슈퍼관리자가 아닌 사용자는 전체를 검색할 수 없다. "
-            "이 문은 권한 그래프가 아니라 역할이 지킨다"
+            "권한 검사를 꺼도 슈퍼관리자가 아닌 사용자는 전체를 검색할 수 없다. "
+            "이 검색은 권한 그래프가 아니라 역할로 보호된다"
         )
 
     @override
@@ -290,7 +290,9 @@ class OmittingThePageSizeCapsThePage(
 
     @override
     def describe(self) -> str:
-        return "페이지 크기를 대지 않고 검색하면, 열 건까지 오고 다음 페이지가 있다고 답한다"
+        return (
+            "페이지 크기를 지정하지 않고 검색하면, 10건까지 반환되고 다음 페이지가 있다고 응답한다"
+        )
 
     @override
     def given(self) -> Given[SeedingSession, RecordsAndACaller]:
@@ -315,7 +317,9 @@ class AStatusFilterNarrowsToSuccess(
 
     @override
     def describe(self) -> str:
-        return "성공 기록과 거부 기록이 섞여 있을 때 성공 상태로 걸러 검색하면, 성공한 것만 온다"
+        return (
+            "성공 기록과 거부 기록이 섞여 있을 때 성공 상태 필터로 검색하면, 성공한 기록만 반환된다"
+        )
 
     @override
     def given(self) -> Given[SeedingSession, RecordsAndACaller]:
@@ -340,7 +344,7 @@ class AnActorFilterNarrowsToOneUser(
 
     @override
     def describe(self) -> str:
-        return "두 사용자가 각각 기록을 남겼을 때 한 사용자로 걸러 검색하면, 그 사용자가 일으킨 것만 온다"
+        return "두 사용자가 각각 기록을 남겼을 때 한 사용자 필터로 검색하면, 그 사용자가 실행한 기록만 반환된다"
 
     @override
     def given(self) -> Given[SeedingSession, RecordsAndACaller]:
@@ -365,7 +369,7 @@ class TwoPaginationModesAreRefused(
 
     @override
     def describe(self) -> str:
-        return "오프셋 방식과 커서 방식을 함께 주고 검색하면, 입력이 틀렸다는 이유로 거부된다"
+        return "오프셋 방식과 커서 방식을 함께 지정해 검색하면, 잘못된 입력으로 거부된다"
 
     @override
     def given(self) -> Given[SeedingSession, RecordsAndACaller]:
@@ -390,7 +394,7 @@ class ABrokenCursorIsRefused(
 
     @override
     def describe(self) -> str:
-        return "해석할 수 없는 커서로 검색하면, 커서가 틀렸다는 이유로 거부된다"
+        return "해석할 수 없는 커서로 검색하면, 잘못된 커서로 거부된다"
 
     @override
     def given(self) -> Given[SeedingSession, RecordsAndACaller]:

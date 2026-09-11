@@ -43,7 +43,7 @@ class SeedAuditRecord[Owner](SeedField[Owner, AuditLogData]):
         if self.status is not OperationStatus.SUCCESS:
             parts.append(f"{self.status.value} 상태")
         if self.triggered_by is not None:
-            parts.append("일으킨 사용자가 정해져 있음")
+            parts.append("실행한 사용자가 정해져 있음")
         return ", ".join(parts)
 
     @override

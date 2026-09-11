@@ -1,6 +1,7 @@
-"""여러 id로 읽기 — id마다 답하는 모양이지만 전역 검색을 부른다.
+"""여러 id로 조회 — id마다 응답하는 형태이지만 전역 검색을 호출한다.
 
-그래서 권한이 없으면 id별로 갈리지 않고 요청 전체가 막힌다. 빈 목록은 문도 지나지 않는다.
+그래서 권한이 없으면 id별로 갈리지 않고 요청 전체가 거부된다. 빈 목록은 권한 검사도 거치지
+않는다.
 """
 
 from __future__ import annotations
@@ -34,7 +35,7 @@ type LoadingStep = Scenario[SeedingSession, RecordsToLoad, AuditLogAdapter, Load
 
 @dataclass(frozen=True)
 class LoadingWithAGap(When[RecordsToLoad, AuditLogAdapter, Loaded]):
-    """있는 id 둘 사이에 없는 id 하나를 끼워 읽는다."""
+    """있는 id 둘 사이에 없는 id 하나를 끼워 조회한다."""
 
     @override
     def operation(self) -> str:
@@ -42,7 +43,7 @@ class LoadingWithAGap(When[RecordsToLoad, AuditLogAdapter, Loaded]):
 
     @override
     def describe(self, laid: RecordsToLoad) -> str:
-        return f"{laid.caller.username}이 있는 id 둘과 없는 id 하나를 한 번에"
+        return f"{laid.caller.username}이 있는 id 둘과 없는 id 하나를 한 번에 조회"
 
     @override
     async def call(self, adapter: AuditLogAdapter, laid: RecordsToLoad) -> Loaded:
@@ -64,7 +65,7 @@ class LoadingNothing(When[RecordsToLoad, AuditLogAdapter, Loaded]):
 
     @override
     def describe(self, laid: RecordsToLoad) -> str:
-        return f"{laid.caller.username}이 빈 id 목록으로"
+        return f"{laid.caller.username}이 빈 id 목록으로 조회"
 
     @override
     async def call(self, adapter: AuditLogAdapter, laid: RecordsToLoad) -> Loaded:
@@ -74,7 +75,7 @@ class LoadingNothing(When[RecordsToLoad, AuditLogAdapter, Loaded]):
 
 @dataclass(frozen=True)
 class LoadingBoth(When[RecordsToLoad, AuditLogAdapter, Loaded]):
-    """있는 id 둘을 한 번에 읽는다."""
+    """있는 id 둘을 한 번에 조회한다."""
 
     @override
     def operation(self) -> str:
@@ -82,7 +83,7 @@ class LoadingBoth(When[RecordsToLoad, AuditLogAdapter, Loaded]):
 
     @override
     def describe(self, laid: RecordsToLoad) -> str:
-        return f"{laid.caller.username}이 있는 id 둘을 한 번에"
+        return f"{laid.caller.username}이 있는 id 둘을 한 번에 조회"
 
     @override
     async def call(self, adapter: AuditLogAdapter, laid: RecordsToLoad) -> Loaded:
@@ -101,7 +102,7 @@ class TheNodesComeBackWithAGap(Scenario[SeedingSession, RecordsToLoad, AuditLogA
 
     @override
     def describe(self) -> str:
-        return "있는 id 둘과 없는 id 하나를 한 번에 읽으면, 준 순서대로 오고 없는 자리는 비어 있다"
+        return "있는 id 둘과 없는 id 하나를 한 번에 조회하면, 요청한 순서대로 반환되고 없는 id 자리는 비어 있다"
 
     @override
     def given(self) -> Given[SeedingSession, RecordsToLoad]:
@@ -124,7 +125,7 @@ class AnEmptyListReadsNothing(Scenario[SeedingSession, RecordsToLoad, AuditLogAd
 
     @override
     def describe(self) -> str:
-        return "빈 id 목록으로 읽으면, 문도 지나지 않고 빈 답이 온다"
+        return "빈 id 목록으로 조회하면, 권한 검사도 거치지 않고 빈 응답이 반환된다"
 
     @override
     def given(self) -> Given[SeedingSession, RecordsToLoad]:
@@ -147,9 +148,7 @@ class TheMonitorRoleReadsById(Scenario[SeedingSession, RecordsToLoad, AuditLogAd
 
     @override
     def describe(self) -> str:
-        return (
-            "이 읽기도 읽기이므로 모니터 역할 사용자가 id 둘을 읽으면, 슈퍼관리자와 같은 답을 본다"
-        )
+        return "이 조회도 읽기 연산이므로 모니터 역할 사용자가 id 둘을 조회하면, 슈퍼관리자와 같은 응답을 받는다"
 
     @override
     def given(self) -> Given[SeedingSession, RecordsToLoad]:
@@ -172,9 +171,7 @@ class APlainUserMayNotReadById(Scenario[SeedingSession, RecordsToLoad, AuditLogA
 
     @override
     def describe(self) -> str:
-        return (
-            "슈퍼관리자도 모니터도 아닌 사용자가 id 둘을 읽으면, 요청 전체가 역할 부족으로 거부된다"
-        )
+        return "슈퍼관리자도 모니터도 아닌 사용자가 id 둘을 조회하면, 요청 전체가 역할 부족으로 거부된다"
 
     @override
     def given(self) -> Given[SeedingSession, RecordsToLoad]:

@@ -80,7 +80,7 @@ def look_node(node: AuditLogNode, expected: ExpectedRecord) -> list[Verdict]:
     owner and actor are read as coming from the rows earlier steps laid."""
     verdicts: list[Verdict] = [
         Skipped("id", "데이터베이스가 만든다"),
-        Skipped("action_id", "실행마다 새로 생긴다"),
+        Skipped("action_id", "실행마다 새로 생성된다"),
         Same("operation", node.operation, expected.operation),
         Same("entity_type", node.entity_type, expected.entity_type),
         Held(
@@ -103,7 +103,7 @@ def look_node(node: AuditLogNode, expected: ExpectedRecord) -> list[Verdict]:
             Held(
                 "triggered_by",
                 node.triggered_by,
-                SameAs[str | None](str(expected.triggered_by), "일으킨 사용자"),
+                SameAs[str | None](str(expected.triggered_by), "실행한 사용자"),
             )
         )
     return verdicts
@@ -380,7 +380,7 @@ class TwoRecordsToRead(Given[Any, RecordsToLoad]):
 
     @override
     def describe(self) -> str:
-        return f"id로 집을 기록 둘과, {self.role.value} 한 명"
+        return f"id로 조회할 기록 둘과, {self.role.value} 한 명"
 
     @override
     async def lay(self, seeding: SeedingSession) -> RecordsToLoad:
@@ -416,8 +416,10 @@ class ProjectRecords(Given[Any, ScopedEntities]):
     @override
     def describe(self) -> str:
         granted = [n for n, g in (("첫째", self.grant_first), ("둘째", self.grant_second)) if g]
-        holding = f"{'·'.join(granted)} 프로젝트에 읽기 권한" if granted else "아무 권한도"
-        return f"서로 다른 프로젝트의 기록 둘과, {holding} 받은 {self.role.value} 한 명"
+        holding = (
+            f"{'·'.join(granted)} 프로젝트에 읽기 권한을 받은" if granted else "아무 권한도 없는"
+        )
+        return f"서로 다른 프로젝트의 기록 둘과, {holding} {self.role.value} 한 명"
 
     @override
     async def lay(self, seeding: SeedingSession) -> ScopedEntities:
@@ -530,9 +532,11 @@ class ActorRecords(Given[Any, ScopedActors]):
     @override
     def describe(self) -> str:
         who = (
-            "그중 첫 사용자" if self.caller_is_first else "그 사용자에 읽기 권한을 받은 다른 한 명"
+            "그중 첫 사용자"
+            if self.caller_is_first
+            else "그 사용자에 대한 읽기 권한을 받은 다른 사용자 한 명"
         )
-        return f"두 사용자가 각각 일으킨 기록과, {who}"
+        return f"두 사용자가 각각 실행한 기록과, {who}"
 
     @override
     async def lay(self, seeding: SeedingSession) -> ScopedActors:
@@ -556,7 +560,7 @@ class TheRecordsAnswered(Then[Any, SearchAuditLogsPayload]):
 
     @override
     def says(self) -> str:
-        return "지목한 기록이 순서대로, 그리고 그것만 온다"
+        return "지정한 기록이 순서대로, 그리고 그것만 반환된다"
 
     @override
     def look(self, laid: Any, answered: Answered[SearchAuditLogsPayload]) -> list[Verdict]:
@@ -583,7 +587,7 @@ class ThePageIsCapped(Then[Any, SearchAuditLogsPayload]):
 
     @override
     def says(self) -> str:
-        return "기본 페이지 크기만큼 오고 다음 페이지가 있다고 답한다"
+        return "기본 페이지 크기만큼 반환되고 다음 페이지가 있다고 응답한다"
 
     @override
     def look(self, laid: Any, answered: Answered[SearchAuditLogsPayload]) -> list[Verdict]:
@@ -607,7 +611,7 @@ class TheNodesInOrder(Then[RecordsToLoad, list[AuditLogNode | None]]):
 
     @override
     def says(self) -> str:
-        return "준 순서대로 노드가 오고, 없는 id 자리는 비어 있다"
+        return "요청한 순서대로 노드가 반환되고, 없는 id 자리는 비어 있다"
 
     @override
     def look(
