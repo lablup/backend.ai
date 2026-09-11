@@ -14,7 +14,6 @@ from graphql import Undefined, UndefinedType
 from ai.backend.common.container_registry import AllowedGroupsModel, ContainerRegistryType
 from ai.backend.common.data.entity.container_registry import ContainerRegistryID
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.container_registry.types import ContainerRegistryData
 from ai.backend.manager.defs import PASSWORD_PLACEHOLDER
 from ai.backend.manager.models.container_registry import (
@@ -369,7 +368,6 @@ class CreateContainerRegistryNode(graphene.Mutation):  # type: ignore[misc]
                 url=url,
                 type=type,
                 project=cast(str | None, project if project is not Undefined else None),
-                operation=ActionOperationType.CREATE,
             )
         )
 

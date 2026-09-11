@@ -19,7 +19,6 @@ from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.data.entity.container_registry import ContainerRegistryID
 from ai.backend.common.exception import UnknownImageRegistry
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.container_registry.types import ContainerRegistryData
 from ai.backend.manager.errors.container_registry import (
     InvalidContainerRegistryProject,
@@ -50,7 +49,6 @@ class ContainerRegistryValidatorArgs:
     url: str
     type: ContainerRegistryType
     project: str | None
-    operation: ActionOperationType
 
 
 # TODO: Refactor this using inheritance
@@ -62,13 +60,11 @@ class ContainerRegistryValidator:
     _url: str
     _type: ContainerRegistryType
     _project: str | None
-    _operation: ActionOperationType
 
     def __init__(self, args: ContainerRegistryValidatorArgs) -> None:
         self._url = args.url
         self._type = args.type
         self._project = args.project
-        self._operation = args.operation
 
     def _is_valid_url(self, url: str) -> bool:
         try:
@@ -86,26 +82,18 @@ class ContainerRegistryValidator:
         """
         # Validate URL format
         if not self._is_valid_url(self._url):
-            raise InvalidContainerRegistryURL(
-                f"Invalid URL format: {self._url}", operation=self._operation
-            )
+            raise InvalidContainerRegistryURL(f"Invalid URL format: {self._url}")
 
         # Validate project name for Harbor
         match self._type:
             case ContainerRegistryType.HARBOR | ContainerRegistryType.HARBOR2:
                 if self._project is None:
-                    raise InvalidContainerRegistryProject(
-                        "Project name is required for Harbor.", operation=self._operation
-                    )
+                    raise InvalidContainerRegistryProject("Project name is required for Harbor.")
                 if not (1 <= len(self._project) <= 255):
-                    raise InvalidContainerRegistryProject(
-                        "Invalid project name length.", operation=self._operation
-                    )
+                    raise InvalidContainerRegistryProject("Invalid project name length.")
                 pattern = re.compile(r"^[a-z0-9]+(?:[._-][a-z0-9]+)*$")
                 if not pattern.match(self._project):
-                    raise InvalidContainerRegistryProject(
-                        "Invalid project name format.", operation=self._operation
-                    )
+                    raise InvalidContainerRegistryProject("Invalid project name format.")
             case _:
                 pass
 
