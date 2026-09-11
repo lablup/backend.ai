@@ -56,16 +56,12 @@ SEEDED_TYPE = ContainerRegistryType.DOCKER
 
 @dataclass(frozen=True)
 class AProjectAndACaller:
-    """프로젝트 하나와 부를 사람. 레지스트리를 아직 하나도 심지 않은 자리에 쓴다."""
-
     project: ProjectData
     caller: UserData
 
 
 @dataclass(frozen=True)
 class ARegistryAndACaller:
-    """레지스트리 하나와, 그것을 부를 사람."""
-
     registry: ContainerRegistryData
     caller: UserData
 
@@ -81,8 +77,6 @@ class ManyRegistriesAndACaller:
 
 @dataclass(frozen=True)
 class ARegistryToAllowAndACaller:
-    """레지스트리 하나, 프로젝트 하나, 그리고 부를 사람."""
-
     registry: ContainerRegistryData
     project: ProjectData
     caller: UserData
@@ -90,8 +84,6 @@ class ARegistryToAllowAndACaller:
 
 @dataclass(frozen=True)
 class NoRegistryYet(Given[Any, AProjectAndACaller]):
-    """레지스트리는 없고, 프로젝트 하나와 부를 사람 하나."""
-
     role: UserRole = UserRole.USER
 
     @override
@@ -109,8 +101,6 @@ class NoRegistryYet(Given[Any, AProjectAndACaller]):
 
 @dataclass(frozen=True)
 class ARegistryAndSomeone(Given[Any, ARegistryAndACaller]):
-    """레지스트리 하나와, 부를 사람 하나."""
-
     role: UserRole = UserRole.USER
     name_hint: str = "host"
     allowed: bool = False
@@ -134,8 +124,6 @@ class ARegistryAndSomeone(Given[Any, ARegistryAndACaller]):
 
 @dataclass(frozen=True)
 class ManyRegistriesAndSomeone(Given[Any, ManyRegistriesAndACaller]):
-    """레지스트리 여럿과, 부를 사람 하나."""
-
     role: UserRole = UserRole.SUPERADMIN
     besides: int = 1
 
@@ -161,10 +149,7 @@ class ManyRegistriesAndSomeone(Given[Any, ManyRegistriesAndACaller]):
 
 @dataclass(frozen=True)
 class ARegistryAndAProjectToAllow(Given[Any, ARegistryToAllowAndACaller]):
-    """레지스트리와 프로젝트, 그리고 두 스코프에 권한을 어디까지 받았는지 고른 사람.
-
-    관계 동작은 지목한 스코프가 모두 허용해야 실행된다. 그래서 한쪽만 주는 자리가 필요하다.
-    """
+    """관계 동작은 지목한 스코프가 모두 허용해야 실행된다. 그래서 한쪽만 주는 자리가 필요하다."""
 
     role: UserRole = UserRole.USER
     on_registry: bool = True
@@ -254,8 +239,6 @@ class SomeoneAllowingIn[ScopeData](SeedNest[Laid[None]]):
 
 @dataclass(frozen=True)
 class TheNewRegistryNode(Then[AProjectAndACaller, ContainerRegistryNode]):
-    """방금 만든 레지스트리가 통째로 온다. 시나리오가 정한 값만 여기로 받는다."""
-
     url: str
     registry_name: str
     kind: ContainerRegistryType = ContainerRegistryType.DOCKER
@@ -291,8 +274,6 @@ class TheNewRegistryNode(Then[AProjectAndACaller, ContainerRegistryNode]):
 
 @dataclass(frozen=True)
 class TheRegistryNode(Then[ARegistryAndACaller, ContainerRegistryNode]):
-    """심은 레지스트리가 통째로 온다. 시나리오가 바꾼 자리만 여기로 받는다."""
-
     url: str | None = None
 
     @override
@@ -333,8 +314,6 @@ class Target(ABC):
 
 @dataclass(frozen=True)
 class TheLaidRegistry(Target):
-    """전제가 심어 둔 그 레지스트리."""
-
     @override
     def says(self) -> str:
         return "심은 레지스트리"
@@ -346,8 +325,6 @@ class TheLaidRegistry(Target):
 
 @dataclass(frozen=True)
 class AnIdThatHoldsNothing(Target):
-    """아무 레지스트리도 갖지 않는 id."""
-
     @override
     def says(self) -> str:
         return "아무것도 갖지 않은 id"
@@ -371,8 +348,6 @@ class AllowedGroups(ABC):
 
 @dataclass(frozen=True)
 class NoProjects(AllowedGroups):
-    """허용 목록을 아예 주지 않는다."""
-
     @override
     def says(self) -> str:
         return "허용 목록 없이"
@@ -384,8 +359,6 @@ class NoProjects(AllowedGroups):
 
 @dataclass(frozen=True)
 class TheLaidProject(AllowedGroups):
-    """전제가 심어 둔 그 프로젝트를 허용한다."""
-
     @override
     def says(self) -> str:
         return "심은 프로젝트를 허용 목록에 넣고"
@@ -397,8 +370,6 @@ class TheLaidProject(AllowedGroups):
 
 @dataclass(frozen=True)
 class AProjectThatIsGone(AllowedGroups):
-    """아무 프로젝트도 갖지 않는 id를 허용하려 한다."""
-
     @override
     def says(self) -> str:
         return "없는 프로젝트를 허용 목록에 넣고"
@@ -422,8 +393,6 @@ class GroupChange(ABC):
 
 @dataclass(frozen=True)
 class Adding(GroupChange):
-    """그 프로젝트를 허용 목록에 넣는다."""
-
     @override
     def says(self) -> str:
         return "허용 목록에 넣음"
@@ -435,8 +404,6 @@ class Adding(GroupChange):
 
 @dataclass(frozen=True)
 class Removing(GroupChange):
-    """그 프로젝트를 허용 목록에서 뺀다."""
-
     @override
     def says(self) -> str:
         return "허용 목록에서 뺌"
@@ -448,8 +415,6 @@ class Removing(GroupChange):
 
 @dataclass(frozen=True)
 class AddingWhatIsGone(GroupChange):
-    """아무 프로젝트도 갖지 않는 id를 허용 목록에 넣으려 한다."""
-
     @override
     def says(self) -> str:
         return "없는 프로젝트를 허용 목록에 넣음"

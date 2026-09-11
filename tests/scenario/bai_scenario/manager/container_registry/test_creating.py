@@ -33,20 +33,11 @@ from ai.backend.manager.errors.resource import ProjectNotFound
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import Configured, Given, Scenario, Then, When
 
-ENFORCEMENT = "manager.rbac.enforcement_enabled"
-A_URL = "https://made.scenario.local"
-A_NAME = "made-registry"
-
-type CreatingStep = Scenario[
-    SeedingSession, AProjectAndACaller, ContainerRegistryAdapter, ContainerRegistryNode
-]
-
 
 @dataclass(frozen=True)
 class Creating(When[AProjectAndACaller, ContainerRegistryAdapter, ContainerRegistryNode]):
-    """레지스트리를 만든다. 허용 프로젝트를 주면 허용 목록까지 함께 쓴다."""
-
-    url: str = A_URL
+    url: str = "https://made.scenario.local"
+    registry_name: str = "made-registry"
     allowed: AllowedGroups = field(default_factory=NoProjects)
 
     @override
@@ -65,7 +56,7 @@ class Creating(When[AProjectAndACaller, ContainerRegistryAdapter, ContainerRegis
             payload = await adapter.admin_create(
                 CreateContainerRegistryInput(
                     url=self.url,
-                    registry_name=A_NAME,
+                    registry_name=self.registry_name,
                     type=ContainerRegistryType.DOCKER,
                     allowed_groups=self.allowed.of(laid),
                 )
@@ -93,12 +84,13 @@ class CreatingWithOnlyTheRequiredValues(
         return NoRegistryYet(role=UserRole.SUPERADMIN)
 
     @override
-    def when(self) -> When[AProjectAndACaller, ContainerRegistryAdapter, ContainerRegistryNode]:
+    def when(self) -> Creating:
         return Creating()
 
     @override
     def then(self) -> Then[AProjectAndACaller, ContainerRegistryNode]:
-        return TheNewRegistryNode(url=A_URL, registry_name=A_NAME)
+        sent = self.when()
+        return TheNewRegistryNode(url=sent.url, registry_name=sent.registry_name)
 
 
 @dataclass(frozen=True)
@@ -121,12 +113,13 @@ class AllowingAProjectWhileCreating(
         return NoRegistryYet(role=UserRole.SUPERADMIN)
 
     @override
-    def when(self) -> When[AProjectAndACaller, ContainerRegistryAdapter, ContainerRegistryNode]:
+    def when(self) -> Creating:
         return Creating(allowed=TheLaidProject())
 
     @override
     def then(self) -> Then[AProjectAndACaller, ContainerRegistryNode]:
-        return TheNewRegistryNode(url=A_URL, registry_name=A_NAME)
+        sent = self.when()
+        return TheNewRegistryNode(url=sent.url, registry_name=sent.registry_name)
 
 
 @dataclass(frozen=True)
@@ -203,7 +196,7 @@ class EnforcementOffChangesNothing(
 
     @override
     def config(self) -> Mapping[str, Any]:
-        return {ENFORCEMENT: False}
+        return {"manager.rbac.enforcement_enabled": False}
 
     @override
     def given(self) -> Given[SeedingSession, AProjectAndACaller]:
@@ -218,7 +211,9 @@ class EnforcementOffChangesNothing(
         return TheCallIsRefused(InsufficientPrivilege)
 
 
-SCENARIOS: list[CreatingStep] = [
+SCENARIOS: list[
+    Scenario[SeedingSession, AProjectAndACaller, ContainerRegistryAdapter, ContainerRegistryNode]
+] = [
     CreatingWithOnlyTheRequiredValues(),
     AllowingAProjectWhileCreating(),
     AProjectThatIsNotThereIsRefused(),
@@ -229,7 +224,9 @@ SCENARIOS: list[CreatingStep] = [
 
 @pytest.mark.parametrize("scenario", SCENARIOS, ids=lambda s: s.summary())
 async def test_creating(
-    scenario: CreatingStep,
+    scenario: Scenario[
+        SeedingSession, AProjectAndACaller, ContainerRegistryAdapter, ContainerRegistryNode
+    ],
     adapter: ContainerRegistryAdapter,
     engine: ExtendedAsyncSAEngine,
 ) -> None:

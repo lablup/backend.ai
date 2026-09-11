@@ -47,11 +47,9 @@ class SeedContainerRegistry(SeedRow[ContainerRegistryData]):
 
 @dataclass(frozen=True)
 class AllowProject(SeedLink[ProjectData, ContainerRegistryData]):
-    """That project may reach the images of this registry."""
-
     @override
     def kind(self) -> str:
-        return "가 이미지를 볼 수 있는"
+        return "이 허용된"
 
     @override
     def scope_id(self, scope: ProjectData) -> ProjectID:

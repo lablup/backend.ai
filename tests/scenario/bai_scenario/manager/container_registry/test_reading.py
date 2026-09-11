@@ -34,15 +34,10 @@ from ai.backend.testutils.scenario_steps import (
 )
 
 type Loaded = list[ContainerRegistryNode | None]
-type ReadingStep = Scenario[
-    SeedingSession, ManyRegistriesAndACaller, ContainerRegistryAdapter, Loaded
-]
 
 
 @dataclass(frozen=True)
 class Loading(When[ManyRegistriesAndACaller, ContainerRegistryAdapter, Loaded]):
-    """id 목록으로 한 번에 읽는다."""
-
     with_no_ids: bool = False
 
     @override
@@ -75,8 +70,6 @@ class Loading(When[ManyRegistriesAndACaller, ContainerRegistryAdapter, Loaded]):
 
 @dataclass(frozen=True)
 class TheOrderIsKeptAndTheHoleIsEmpty(Then[ManyRegistriesAndACaller, Loaded]):
-    """준 순서 그대로 오고, 없는 id 자리는 비어서 온다."""
-
     @override
     def says(self) -> str:
         return "준 순서 그대로 오고 없는 id 자리는 비어 있다"
@@ -100,8 +93,6 @@ class TheOrderIsKeptAndTheHoleIsEmpty(Then[ManyRegistriesAndACaller, Loaded]):
 
 @dataclass(frozen=True)
 class AnEmptyListComesBack(Then[ManyRegistriesAndACaller, Loaded]):
-    """빈 목록을 주면 빈 답이 온다."""
-
     @override
     def says(self) -> str:
         return "빈 답이 온다"
@@ -198,7 +189,9 @@ class APlainUserIsRefusedWholesale(
         return TheCallIsRefused(InsufficientPrivilege)
 
 
-SCENARIOS: list[ReadingStep] = [
+SCENARIOS: list[
+    Scenario[SeedingSession, ManyRegistriesAndACaller, ContainerRegistryAdapter, Loaded]
+] = [
     LoadingKeepsTheOrderAndLeavesHoles(),
     AnEmptyListAsksNothing(),
     APlainUserIsRefusedWholesale(),
@@ -207,7 +200,7 @@ SCENARIOS: list[ReadingStep] = [
 
 @pytest.mark.parametrize("scenario", SCENARIOS, ids=lambda s: s.summary())
 async def test_reading(
-    scenario: ReadingStep,
+    scenario: Scenario[SeedingSession, ManyRegistriesAndACaller, ContainerRegistryAdapter, Loaded],
     adapter: ContainerRegistryAdapter,
     engine: ExtendedAsyncSAEngine,
 ) -> None:

@@ -35,18 +35,9 @@ from ai.backend.manager.errors.image import ContainerRegistryNotFound
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import Given, Scenario, Then, When
 
-ANOTHER_URL = "https://moved.scenario.local"
-NO_HOST = "http://"
-
-type EditingStep = Scenario[
-    SeedingSession, ARegistryAndACaller, ContainerRegistryAdapter, ContainerRegistryNode
-]
-
 
 @dataclass(frozen=True)
 class Editing(When[ARegistryAndACaller, ContainerRegistryAdapter, ContainerRegistryNode]):
-    """레지스트리를 고친다. 값을 하나도 주지 않으면 아무것도 바뀌지 않는다."""
-
     url: str | None = None
     kind: ContainerRegistryType | None = None
     project: str | None = None
@@ -98,12 +89,12 @@ class ChangingOnlyTheAddress(
         return ARegistryAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
-    def when(self) -> When[ARegistryAndACaller, ContainerRegistryAdapter, ContainerRegistryNode]:
-        return Editing(url=ANOTHER_URL)
+    def when(self) -> Editing:
+        return Editing(url="https://moved.scenario.local")
 
     @override
     def then(self) -> Then[ARegistryAndACaller, ContainerRegistryNode]:
-        return TheRegistryNode(url=ANOTHER_URL)
+        return TheRegistryNode(url=self.when().url)
 
 
 @dataclass(frozen=True)
@@ -152,7 +143,7 @@ class AnAddressWithoutAHostIsRefused(
 
     @override
     def when(self) -> When[ARegistryAndACaller, ContainerRegistryAdapter, ContainerRegistryNode]:
-        return Editing(url=NO_HOST)
+        return Editing(url="http://")
 
     @override
     def then(self) -> Then[ARegistryAndACaller, ContainerRegistryNode]:
@@ -205,7 +196,7 @@ class AnIdThatHoldsNothingIsRefused(
 
     @override
     def when(self) -> When[ARegistryAndACaller, ContainerRegistryAdapter, ContainerRegistryNode]:
-        return Editing(url=ANOTHER_URL, at=AnIdThatHoldsNothing())
+        return Editing(url="https://moved.scenario.local", at=AnIdThatHoldsNothing())
 
     @override
     def then(self) -> Then[ARegistryAndACaller, ContainerRegistryNode]:
@@ -233,14 +224,16 @@ class APlainUserMayNotEdit(
 
     @override
     def when(self) -> When[ARegistryAndACaller, ContainerRegistryAdapter, ContainerRegistryNode]:
-        return Editing(url=ANOTHER_URL)
+        return Editing(url="https://moved.scenario.local")
 
     @override
     def then(self) -> Then[ARegistryAndACaller, ContainerRegistryNode]:
         return TheCallIsRefused(InsufficientPrivilege)
 
 
-SCENARIOS: list[EditingStep] = [
+SCENARIOS: list[
+    Scenario[SeedingSession, ARegistryAndACaller, ContainerRegistryAdapter, ContainerRegistryNode]
+] = [
     ChangingOnlyTheAddress(),
     AnEmptyEditChangesNothing(),
     AnAddressWithoutAHostIsRefused(),
@@ -252,7 +245,9 @@ SCENARIOS: list[EditingStep] = [
 
 @pytest.mark.parametrize("scenario", SCENARIOS, ids=lambda s: s.summary())
 async def test_editing(
-    scenario: EditingStep,
+    scenario: Scenario[
+        SeedingSession, ARegistryAndACaller, ContainerRegistryAdapter, ContainerRegistryNode
+    ],
     adapter: ContainerRegistryAdapter,
     engine: ExtendedAsyncSAEngine,
 ) -> None:

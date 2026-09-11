@@ -39,17 +39,9 @@ from ai.backend.testutils.scenario_steps import (
     When,
 )
 
-ENFORCEMENT = "manager.rbac.enforcement_enabled"
-
-type AllowingProjectsStep = Scenario[
-    SeedingSession, ARegistryToAllowAndACaller, ContainerRegistryAdapter, None
-]
-
 
 @dataclass(frozen=True)
 class AllowingProjects(When[ARegistryToAllowAndACaller, ContainerRegistryAdapter, None]):
-    """허용 목록을 고친다. 넣을 것과 뺄 것을 함께 준다."""
-
     change: GroupChange = field(default_factory=Adding)
 
     @override
@@ -268,7 +260,7 @@ class EnforcementOffOpensThisGate(
 
     @override
     def config(self) -> Mapping[str, Any]:
-        return {ENFORCEMENT: False}
+        return {"manager.rbac.enforcement_enabled": False}
 
     @override
     def given(self) -> Given[SeedingSession, ARegistryToAllowAndACaller]:
@@ -283,7 +275,9 @@ class EnforcementOffOpensThisGate(
         return TheCallReturnsNothing()
 
 
-SCENARIOS: list[AllowingProjectsStep] = [
+SCENARIOS: list[
+    Scenario[SeedingSession, ARegistryToAllowAndACaller, ContainerRegistryAdapter, None]
+] = [
     AllowingWithBothScopesGranted(),
     AllowingTwiceIsNotAnError(),
     RemovingAnAllowedProject(),
@@ -296,7 +290,7 @@ SCENARIOS: list[AllowingProjectsStep] = [
 
 @pytest.mark.parametrize("scenario", SCENARIOS, ids=lambda s: s.summary())
 async def test_allowing_projects(
-    scenario: AllowingProjectsStep,
+    scenario: Scenario[SeedingSession, ARegistryToAllowAndACaller, ContainerRegistryAdapter, None],
     adapter: ContainerRegistryAdapter,
     engine: ExtendedAsyncSAEngine,
 ) -> None:
