@@ -55,9 +55,10 @@ SEEDED_TYPE = ContainerRegistryType.DOCKER
 
 
 @dataclass(frozen=True)
-class ACallerWithNoRegistry:
-    """부를 사람 하나. 레지스트리를 아직 하나도 심지 않은 자리에 쓴다."""
+class AProjectAndACaller:
+    """프로젝트 하나와 부를 사람. 레지스트리를 아직 하나도 심지 않은 자리에 쓴다."""
 
+    project: ProjectData
     caller: UserData
 
 
@@ -88,20 +89,22 @@ class ARegistryToAllowAndACaller:
 
 
 @dataclass(frozen=True)
-class NoRegistryYet(Given[Any, ACallerWithNoRegistry]):
-    """레지스트리는 없고, 부를 사람만 하나."""
+class NoRegistryYet(Given[Any, AProjectAndACaller]):
+    """레지스트리는 없고, 프로젝트 하나와 부를 사람 하나."""
 
     role: UserRole = UserRole.USER
 
     @override
     def describe(self) -> str:
-        return f"레지스트리 없음, 도메인 하나에 속한 {self.role.value} 한 명"
+        return f"레지스트리 없음, 프로젝트 하나, 도메인 하나에 속한 {self.role.value} 한 명"
 
     @override
-    async def lay(self, seeding: Any) -> ACallerWithNoRegistry:
+    async def lay(self, seeding: Any) -> AProjectAndACaller:
         domain = await seeding.creating(SeedDomain(name_hint="home"))
+        policy = await seeding.once(SeedProjectPolicy())
+        project = await seeding.creating_from_two(SeedProject(), domain, policy)
         caller = await seeding.within(SomeoneOf(domain, role=self.role))
-        return ACallerWithNoRegistry(seeding.made(caller))
+        return AProjectAndACaller(seeding.made(project), seeding.made(caller))
 
 
 @dataclass(frozen=True)
@@ -250,7 +253,7 @@ class SomeoneAllowingIn[ScopeData](SeedNest[Laid[None]]):
 
 
 @dataclass(frozen=True)
-class TheNewRegistryNode(Then[Any, ContainerRegistryNode]):
+class TheNewRegistryNode(Then[AProjectAndACaller, ContainerRegistryNode]):
     """방금 만든 레지스트리가 통째로 온다. 시나리오가 정한 값만 여기로 받는다."""
 
     url: str
@@ -267,7 +270,9 @@ class TheNewRegistryNode(Then[Any, ContainerRegistryNode]):
         return "만든 레지스트리 전체가 온다"
 
     @override
-    def look(self, laid: Any, answered: Answered[ContainerRegistryNode]) -> list[Verdict]:
+    def look(
+        self, laid: AProjectAndACaller, answered: Answered[ContainerRegistryNode]
+    ) -> list[Verdict]:
         node = answered.response
         if node is None:
             return [Refused(EntityNotFoundError, answered.raised)]
@@ -360,7 +365,7 @@ class AllowedGroups(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def of(self, laid: Any) -> AllowedGroupsInput | None:
+    def of(self, laid: AProjectAndACaller) -> AllowedGroupsInput | None:
         raise NotImplementedError
 
 
@@ -373,7 +378,7 @@ class NoProjects(AllowedGroups):
         return "허용 목록 없이"
 
     @override
-    def of(self, laid: Any) -> AllowedGroupsInput | None:
+    def of(self, laid: AProjectAndACaller) -> AllowedGroupsInput | None:
         return None
 
 
@@ -386,7 +391,7 @@ class TheLaidProject(AllowedGroups):
         return "심은 프로젝트를 허용 목록에 넣고"
 
     @override
-    def of(self, laid: Any) -> AllowedGroupsInput:
+    def of(self, laid: AProjectAndACaller) -> AllowedGroupsInput:
         return AllowedGroupsInput(add=[str(laid.project.id)], remove=[])
 
 
@@ -399,7 +404,7 @@ class AProjectThatIsGone(AllowedGroups):
         return "없는 프로젝트를 허용 목록에 넣고"
 
     @override
-    def of(self, laid: Any) -> AllowedGroupsInput:
+    def of(self, laid: AProjectAndACaller) -> AllowedGroupsInput:
         return AllowedGroupsInput(add=[str(NOTHING)], remove=[])
 
 

@@ -223,12 +223,12 @@ class RemovingWhatIsNotAllowedIsRefused(
 
 
 @dataclass(frozen=True)
-class OneScopeIsNotEnough(
+class GrantedOnTheRegistryButNotTheProjectIsRefused(
     Scenario[SeedingSession, ARegistryToAllowAndACaller, ContainerRegistryAdapter, None]
 ):
     @override
     def summary(self) -> str:
-        return "holding-only-one-of-the-two-scopes-is-not-enough-to-allow-a-project"
+        return "a-user-granted-on-the-registry-but-not-the-project-is-refused"
 
     @override
     def describe(self) -> str:
@@ -289,7 +289,7 @@ SCENARIOS: list[AllowingProjectsStep] = [
     RemovingAnAllowedProject(),
     AProjectThatIsNotThereIsRefused(),
     RemovingWhatIsNotAllowedIsRefused(),
-    OneScopeIsNotEnough(),
+    GrantedOnTheRegistryButNotTheProjectIsRefused(),
     EnforcementOffOpensThisGate(),
 ]
 

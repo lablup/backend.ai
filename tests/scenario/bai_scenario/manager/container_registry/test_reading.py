@@ -2,13 +2,13 @@
 
 from __future__ import annotations
 
-import uuid
 from dataclasses import dataclass
 from typing import override
 
 import pytest
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.container_registry import (
+    NOTHING,
     ManyRegistriesAndACaller,
     ManyRegistriesAndSomeone,
 )
@@ -38,15 +38,12 @@ type ReadingStep = Scenario[
     SeedingSession, ManyRegistriesAndACaller, ContainerRegistryAdapter, Loaded
 ]
 
-MISSING = ContainerRegistryID(uuid.UUID("00000000-0000-0000-0000-0000000000ff"))
-"""아무 레지스트리도 갖지 않는 id. 빈 자리가 어디에 오는지 보려고 섞는다."""
-
 
 @dataclass(frozen=True)
 class Loading(When[ManyRegistriesAndACaller, ContainerRegistryAdapter, Loaded]):
     """id 목록으로 한 번에 읽는다."""
 
-    nothing_is_asked: bool = False
+    with_no_ids: bool = False
 
     @override
     def operation(self) -> str:
@@ -55,21 +52,25 @@ class Loading(When[ManyRegistriesAndACaller, ContainerRegistryAdapter, Loaded]):
     @override
     def describe(self, laid: ManyRegistriesAndACaller) -> str:
         who = laid.caller.username
-        if self.nothing_is_asked:
+        if self.with_no_ids:
             return f"{who}이 빈 id 목록으로 읽음"
         return f"{who}이 심은 것 둘과 없는 id 하나를 한 번에 읽음"
 
-    def _asked(self, laid: ManyRegistriesAndACaller) -> list[ContainerRegistryID]:
-        if self.nothing_is_asked:
+    def _ids(self, laid: ManyRegistriesAndACaller) -> list[ContainerRegistryID]:
+        if self.with_no_ids:
             return []
-        return [ContainerRegistryID(laid.laid[0].id), MISSING, ContainerRegistryID(laid.laid[1].id)]
+        return [
+            ContainerRegistryID(laid.laid[0].id),
+            ContainerRegistryID(NOTHING),
+            ContainerRegistryID(laid.laid[1].id),
+        ]
 
     @override
     async def call(
         self, adapter: ContainerRegistryAdapter, laid: ManyRegistriesAndACaller
     ) -> Loaded:
         with ActingAs(laid.caller):
-            return await adapter.batch_load_by_ids(self._asked(laid))
+            return await adapter.batch_load_by_ids(self._ids(laid))
 
 
 @dataclass(frozen=True)
@@ -98,7 +99,7 @@ class TheOrderIsKeptAndTheHoleIsEmpty(Then[ManyRegistriesAndACaller, Loaded]):
 
 
 @dataclass(frozen=True)
-class NothingIsAsked(Then[ManyRegistriesAndACaller, Loaded]):
+class AnEmptyListComesBack(Then[ManyRegistriesAndACaller, Loaded]):
     """빈 목록을 주면 빈 답이 온다."""
 
     @override
@@ -161,11 +162,11 @@ class AnEmptyListAsksNothing(
 
     @override
     def when(self) -> When[ManyRegistriesAndACaller, ContainerRegistryAdapter, Loaded]:
-        return Loading(nothing_is_asked=True)
+        return Loading(with_no_ids=True)
 
     @override
     def then(self) -> Then[ManyRegistriesAndACaller, Loaded]:
-        return NothingIsAsked()
+        return AnEmptyListComesBack()
 
 
 @dataclass(frozen=True)
@@ -180,7 +181,8 @@ class APlainUserIsRefusedWholesale(
     def describe(self) -> str:
         return (
             "슈퍼관리자가 아닌 사용자가 id 여럿을 한 번에 읽으려 하면, "
-            "원소별로 갈리지 않고 요청 전체가 역할로 막힌다"
+            "원소별로 갈리지 않고 요청 전체가 권한 부족으로 거부된다. "
+            "이 호출은 id를 보기 전에 부른 사람이 슈퍼관리자인지부터 본다"
         )
 
     @override

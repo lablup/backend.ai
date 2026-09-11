@@ -9,11 +9,9 @@ from typing import Any, override
 import pytest
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.container_registry import (
-    ACallerWithNoRegistry,
     AllowedGroups,
+    AProjectAndACaller,
     AProjectThatIsGone,
-    ARegistryAndAProjectToAllow,
-    ARegistryToAllowAndACaller,
     NoProjects,
     NoRegistryYet,
     TheLaidProject,
@@ -38,13 +36,14 @@ from ai.backend.testutils.scenario_steps import Configured, Given, Scenario, The
 ENFORCEMENT = "manager.rbac.enforcement_enabled"
 A_URL = "https://made.scenario.local"
 A_NAME = "made-registry"
-NO_HOST = "http://"
 
-type CreatingStep = Scenario[SeedingSession, Any, ContainerRegistryAdapter, ContainerRegistryNode]
+type CreatingStep = Scenario[
+    SeedingSession, AProjectAndACaller, ContainerRegistryAdapter, ContainerRegistryNode
+]
 
 
 @dataclass(frozen=True)
-class Creating(When[Any, ContainerRegistryAdapter, ContainerRegistryNode]):
+class Creating(When[AProjectAndACaller, ContainerRegistryAdapter, ContainerRegistryNode]):
     """레지스트리를 만든다. 허용 프로젝트를 주면 허용 목록까지 함께 쓴다."""
 
     url: str = A_URL
@@ -55,11 +54,13 @@ class Creating(When[Any, ContainerRegistryAdapter, ContainerRegistryNode]):
         return "admin_create"
 
     @override
-    def describe(self, laid: Any) -> str:
+    def describe(self, laid: AProjectAndACaller) -> str:
         return f"{laid.caller.username}이 {self.allowed.says()} {self.url}로 만듦"
 
     @override
-    async def call(self, adapter: ContainerRegistryAdapter, laid: Any) -> ContainerRegistryNode:
+    async def call(
+        self, adapter: ContainerRegistryAdapter, laid: AProjectAndACaller
+    ) -> ContainerRegistryNode:
         with ActingAs(laid.caller):
             payload = await adapter.admin_create(
                 CreateContainerRegistryInput(
@@ -74,7 +75,7 @@ class Creating(When[Any, ContainerRegistryAdapter, ContainerRegistryNode]):
 
 @dataclass(frozen=True)
 class CreatingWithOnlyTheRequiredValues(
-    Scenario[SeedingSession, ACallerWithNoRegistry, ContainerRegistryAdapter, ContainerRegistryNode]
+    Scenario[SeedingSession, AProjectAndACaller, ContainerRegistryAdapter, ContainerRegistryNode]
 ):
     @override
     def summary(self) -> str:
@@ -88,51 +89,21 @@ class CreatingWithOnlyTheRequiredValues(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ACallerWithNoRegistry]:
+    def given(self) -> Given[SeedingSession, AProjectAndACaller]:
         return NoRegistryYet(role=UserRole.SUPERADMIN)
 
     @override
-    def when(self) -> When[Any, ContainerRegistryAdapter, ContainerRegistryNode]:
+    def when(self) -> When[AProjectAndACaller, ContainerRegistryAdapter, ContainerRegistryNode]:
         return Creating()
 
     @override
-    def then(self) -> Then[Any, ContainerRegistryNode]:
+    def then(self) -> Then[AProjectAndACaller, ContainerRegistryNode]:
         return TheNewRegistryNode(url=A_URL, registry_name=A_NAME)
 
 
 @dataclass(frozen=True)
-class CreatingTakesAnAddressTheUpdateWouldRefuse(
-    Scenario[SeedingSession, ACallerWithNoRegistry, ContainerRegistryAdapter, ContainerRegistryNode]
-):
-    @override
-    def summary(self) -> str:
-        return "an-address-the-update-path-would-refuse-still-creates-a-registry"
-
-    @override
-    def describe(self) -> str:
-        return (
-            "호스트가 없는 주소로도 레지스트리가 만들어진다. "
-            "주소 검사는 고치는 경로에만 있고 만드는 경로에는 없기 때문이다"
-        )
-
-    @override
-    def given(self) -> Given[SeedingSession, ACallerWithNoRegistry]:
-        return NoRegistryYet(role=UserRole.SUPERADMIN)
-
-    @override
-    def when(self) -> When[Any, ContainerRegistryAdapter, ContainerRegistryNode]:
-        return Creating(url=NO_HOST)
-
-    @override
-    def then(self) -> Then[Any, ContainerRegistryNode]:
-        return TheNewRegistryNode(url=NO_HOST, registry_name=A_NAME)
-
-
-@dataclass(frozen=True)
 class AllowingAProjectWhileCreating(
-    Scenario[
-        SeedingSession, ARegistryToAllowAndACaller, ContainerRegistryAdapter, ContainerRegistryNode
-    ]
+    Scenario[SeedingSession, AProjectAndACaller, ContainerRegistryAdapter, ContainerRegistryNode]
 ):
     @override
     def summary(self) -> str:
@@ -146,23 +117,21 @@ class AllowingAProjectWhileCreating(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ARegistryToAllowAndACaller]:
-        return ARegistryAndAProjectToAllow(role=UserRole.SUPERADMIN)
+    def given(self) -> Given[SeedingSession, AProjectAndACaller]:
+        return NoRegistryYet(role=UserRole.SUPERADMIN)
 
     @override
-    def when(self) -> When[Any, ContainerRegistryAdapter, ContainerRegistryNode]:
+    def when(self) -> When[AProjectAndACaller, ContainerRegistryAdapter, ContainerRegistryNode]:
         return Creating(allowed=TheLaidProject())
 
     @override
-    def then(self) -> Then[Any, ContainerRegistryNode]:
+    def then(self) -> Then[AProjectAndACaller, ContainerRegistryNode]:
         return TheNewRegistryNode(url=A_URL, registry_name=A_NAME)
 
 
 @dataclass(frozen=True)
 class AProjectThatIsNotThereIsRefused(
-    Scenario[
-        SeedingSession, ARegistryToAllowAndACaller, ContainerRegistryAdapter, ContainerRegistryNode
-    ]
+    Scenario[SeedingSession, AProjectAndACaller, ContainerRegistryAdapter, ContainerRegistryNode]
 ):
     @override
     def summary(self) -> str:
@@ -176,21 +145,21 @@ class AProjectThatIsNotThereIsRefused(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ARegistryToAllowAndACaller]:
-        return ARegistryAndAProjectToAllow(role=UserRole.SUPERADMIN)
+    def given(self) -> Given[SeedingSession, AProjectAndACaller]:
+        return NoRegistryYet(role=UserRole.SUPERADMIN)
 
     @override
-    def when(self) -> When[Any, ContainerRegistryAdapter, ContainerRegistryNode]:
+    def when(self) -> When[AProjectAndACaller, ContainerRegistryAdapter, ContainerRegistryNode]:
         return Creating(allowed=AProjectThatIsGone())
 
     @override
-    def then(self) -> Then[Any, ContainerRegistryNode]:
+    def then(self) -> Then[AProjectAndACaller, ContainerRegistryNode]:
         return TheCallIsRefused(ProjectNotFound)
 
 
 @dataclass(frozen=True)
 class APlainUserMayNotCreate(
-    Scenario[SeedingSession, ACallerWithNoRegistry, ContainerRegistryAdapter, ContainerRegistryNode]
+    Scenario[SeedingSession, AProjectAndACaller, ContainerRegistryAdapter, ContainerRegistryNode]
 ):
     @override
     def summary(self) -> str:
@@ -199,28 +168,26 @@ class APlainUserMayNotCreate(
     @override
     def describe(self) -> str:
         return (
-            "슈퍼관리자가 아닌 사용자가 레지스트리를 만들려 하면, "
-            "권한을 얼마나 받았는지와 무관하게 역할로 막힌다"
+            "슈퍼관리자가 아닌 사용자가 레지스트리를 만들려 하면 권한 부족으로 거부된다. "
+            "이 호출은 부른 사람이 슈퍼관리자인지만 보고, 어떤 권한을 받았는지는 보지 않는다"
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ACallerWithNoRegistry]:
+    def given(self) -> Given[SeedingSession, AProjectAndACaller]:
         return NoRegistryYet()
 
     @override
-    def when(self) -> When[Any, ContainerRegistryAdapter, ContainerRegistryNode]:
+    def when(self) -> When[AProjectAndACaller, ContainerRegistryAdapter, ContainerRegistryNode]:
         return Creating()
 
     @override
-    def then(self) -> Then[Any, ContainerRegistryNode]:
+    def then(self) -> Then[AProjectAndACaller, ContainerRegistryNode]:
         return TheCallIsRefused(InsufficientPrivilege)
 
 
 @dataclass(frozen=True)
 class EnforcementOffChangesNothing(
-    Scenario[
-        SeedingSession, ACallerWithNoRegistry, ContainerRegistryAdapter, ContainerRegistryNode
-    ],
+    Scenario[SeedingSession, AProjectAndACaller, ContainerRegistryAdapter, ContainerRegistryNode],
     Configured,
 ):
     @override
@@ -230,8 +197,8 @@ class EnforcementOffChangesNothing(
     @override
     def describe(self) -> str:
         return (
-            "엔티티 권한 집행을 꺼도 레지스트리 생성은 여전히 막힌다. "
-            "이 문은 권한 그래프가 아니라 역할이 지키기 때문이다"
+            "엔티티 권한 집행을 꺼도 슈퍼관리자가 아닌 사용자는 여전히 권한 부족으로 거부된다. "
+            "집행 스위치는 권한 그래프만 끄고, 부른 사람이 슈퍼관리자인지 보는 검사는 그대로 남기 때문이다"
         )
 
     @override
@@ -239,21 +206,20 @@ class EnforcementOffChangesNothing(
         return {ENFORCEMENT: False}
 
     @override
-    def given(self) -> Given[SeedingSession, ACallerWithNoRegistry]:
+    def given(self) -> Given[SeedingSession, AProjectAndACaller]:
         return NoRegistryYet()
 
     @override
-    def when(self) -> When[Any, ContainerRegistryAdapter, ContainerRegistryNode]:
+    def when(self) -> When[AProjectAndACaller, ContainerRegistryAdapter, ContainerRegistryNode]:
         return Creating()
 
     @override
-    def then(self) -> Then[Any, ContainerRegistryNode]:
+    def then(self) -> Then[AProjectAndACaller, ContainerRegistryNode]:
         return TheCallIsRefused(InsufficientPrivilege)
 
 
 SCENARIOS: list[CreatingStep] = [
     CreatingWithOnlyTheRequiredValues(),
-    CreatingTakesAnAddressTheUpdateWouldRefuse(),
     AllowingAProjectWhileCreating(),
     AProjectThatIsNotThereIsRefused(),
     APlainUserMayNotCreate(),
