@@ -438,6 +438,57 @@ Then
   - deploying_revision_id = None
   - policy = None
 
+#### [the-superadmin-renames-anothers-deployment-without-a-grant](/tests/scenario/bai_scenario/manager/deployment/test_editing.py) — pass
+
+다른 사람이 만든 배포의 이름을 아무 권한도 받지 않은 슈퍼관리자가 바꾸면, 이름만 새 값이 된다. 역할이 권한 그래프를 지나간다
+
+Given
+
+- 다른 사람이 만든 배포 하나와, 아무 배포 권한도 받지 않은 슈퍼관리자 한 명
+  - 도메인 home-1
+  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+  - 프로젝트 team-1
+  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
+  - 배포 권한을 하나도 받지 않은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+  - 도메인에 속한 사용자 한 명 준비
+    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+    - 일반 사용자 user-2: 자기 키와 개인 프로젝트를 갖는다
+  - 배포 theirs-1: 복제를 1개 두려 한다, 아직 리비전이 없다
+
+When
+
+- DeploymentAdapter.update — user-1이 theirs-1를 이름을 renamed으로 수정
+
+Then
+
+- 심은 배포 전체가 온다
+  - id: 심은 배포와 같다
+  - metadata.project_id: 심은 프로젝트와 같다
+  - metadata.domain_name = 'home-1'
+  - metadata.name = 'renamed'
+  - metadata.status = <ModelDeploymentStatus.PENDING: 'PENDING'>
+  - metadata.tags = []
+  - metadata.resource_group_name = 'resource-group-1'
+  - metadata.created_at: 이 실행이 쓴 시각
+  - metadata.updated_at: 이 실행이 쓴 시각
+  - network_access.endpoint_url = None
+  - network_access.preferred_domain_name = None
+  - network_access.open_to_public = False
+  - replica_state.desired_replica_count = 1
+  - replica_state.replica_ids = []
+  - default_deployment_strategy.type = <DeploymentStrategy.ROLLING: 'ROLLING'>
+  - created_user_id: 심은 배포를 가진 사람와 같다
+  - options: 심은 배포의 옵션와 같다
+  - scaling_state = <ScalingState.STABLE: 'stable'>
+  - current_revision_id = None
+  - deploying_revision_id = None
+  - policy = None
+
 #### [updating-an-id-nothing-answers-to-is-not-found-for-a-superadmin](/tests/scenario/bai_scenario/manager/deployment/test_editing.py) — pass
 
 슈퍼관리자가 아무것도 갖지 않은 id를 수정하면, 대상이 없다는 것으로 거부된다
@@ -789,6 +840,57 @@ Then
 - 거부된다
   - 거부: NotEnoughPermission
 
+#### [the-superadmin-reads-anothers-deployment-without-a-grant](/tests/scenario/bai_scenario/manager/deployment/test_reading.py) — pass
+
+다른 사람이 만든 배포를 아무 권한도 받지 않은 슈퍼관리자가 id로 조회하면, 그 배포가 답으로 온다. 역할이 권한 그래프를 지나간다
+
+Given
+
+- 다른 사람이 만든 배포 하나와, 아무 배포 권한도 받지 않은 슈퍼관리자 한 명
+  - 도메인 home-1
+  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+  - 프로젝트 team-1
+  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
+  - 배포 권한을 하나도 받지 않은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+  - 도메인에 속한 사용자 한 명 준비
+    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+    - 일반 사용자 user-2: 자기 키와 개인 프로젝트를 갖는다
+  - 배포 theirs-1: 복제를 1개 두려 한다, 아직 리비전이 없다
+
+When
+
+- DeploymentAdapter.get — user-1이 theirs-1로 조회
+
+Then
+
+- 심은 배포 전체가 온다
+  - id: 심은 배포와 같다
+  - metadata.project_id: 심은 프로젝트와 같다
+  - metadata.domain_name = 'home-1'
+  - metadata.name = 'theirs-1'
+  - metadata.status = <ModelDeploymentStatus.PENDING: 'PENDING'>
+  - metadata.tags = []
+  - metadata.resource_group_name = 'resource-group-1'
+  - metadata.created_at: 이 실행이 쓴 시각
+  - metadata.updated_at: 이 실행이 쓴 시각
+  - network_access.endpoint_url = None
+  - network_access.preferred_domain_name = None
+  - network_access.open_to_public = False
+  - replica_state.desired_replica_count = 1
+  - replica_state.replica_ids = []
+  - default_deployment_strategy.type = <DeploymentStrategy.ROLLING: 'ROLLING'>
+  - created_user_id: 심은 배포를 가진 사람와 같다
+  - options: 심은 배포의 옵션와 같다
+  - scaling_state = <ScalingState.STABLE: 'stable'>
+  - current_revision_id = None
+  - deploying_revision_id = None
+  - policy = None
+
 ### retiring
 
 #### [a-user-granted-only-update-may-not-retire-a-deployment](/tests/scenario/bai_scenario/manager/deployment/test_retiring.py) — pass
@@ -877,6 +979,37 @@ Then
 
 - 거부된다
   - 거부: EndpointNotFound
+
+#### [the-superadmin-retires-anothers-deployment-without-a-grant](/tests/scenario/bai_scenario/manager/deployment/test_retiring.py) — pass
+
+다른 사람이 만든 배포를 아무 권한도 받지 않은 슈퍼관리자가 지우면, 그 배포를 지우기 시작했다고 답한다. 역할이 권한 그래프를 지나간다
+
+Given
+
+- 다른 사람이 만든 배포 하나와, 아무 배포 권한도 받지 않은 슈퍼관리자 한 명
+  - 도메인 home-1
+  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+  - 프로젝트 team-1
+  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
+  - 배포 권한을 하나도 받지 않은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+  - 도메인에 속한 사용자 한 명 준비
+    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+    - 일반 사용자 user-2: 자기 키와 개인 프로젝트를 갖는다
+  - 배포 theirs-1: 복제를 1개 두려 한다, 아직 리비전이 없다
+
+When
+
+- DeploymentAdapter.delete — user-1이 theirs-1를 지움
+
+Then
+
+- 지우기 시작한 배포를 답한다
+  - id: 심은 배포와 같다
 
 ### searching
 

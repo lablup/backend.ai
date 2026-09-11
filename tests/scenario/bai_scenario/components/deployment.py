@@ -77,14 +77,22 @@ class APlaceAndACaller:
 
 @dataclass(frozen=True)
 class ADeploymentAndACaller:
-    """이미 있는 배포 하나와, 그것을 부를 사람."""
+    """이미 있는 배포 하나와, 그것을 부를 사람.
+
+    ``owner``는 그 배포를 만든 사람이다. 대지 않으면 부르는 사람이 만든 것이다.
+    """
 
     place: APlaceAndACaller
     deployment: DeploymentInfo
+    owner: UserData | None = None
 
     @property
     def caller(self) -> UserData:
         return self.place.caller
+
+    @property
+    def made_by(self) -> UserData:
+        return self.owner if self.owner is not None else self.place.caller
 
 
 @dataclass(frozen=True)
@@ -303,6 +311,35 @@ class ADeploymentInThatPlace(Given[Any, ADeploymentAndACaller]):
             open_to_public=self.open_to_public,
         )
         return ADeploymentAndACaller(place=place.made(seeding), deployment=seeding.made(laid))
+
+
+@dataclass(frozen=True)
+class AnothersDeploymentAndASuperadmin(Given[Any, ADeploymentAndACaller]):
+    """다른 사람이 만든 배포 하나와, 아무 권한도 받지 않은 슈퍼관리자.
+
+    권한 그래프에 아무것도 걸리지 않은 사람이 역할만으로 남의 배포에 닿는지 보는 자리다.
+    """
+
+    @override
+    def describe(self) -> str:
+        return "다른 사람이 만든 배포 하나와, 아무 배포 권한도 받지 않은 슈퍼관리자 한 명"
+
+    @override
+    async def lay(self, seeding: Any) -> ADeploymentAndACaller:
+        place = await lay_a_place(seeding, role=UserRole.SUPERADMIN)
+        other = await seeding.within(SomeoneOf(place.domain))
+        theirs = LaidPlace(
+            domain=place.domain,
+            project=place.project,
+            resource_group=place.resource_group,
+            caller=other,
+        )
+        laid = await lay_a_deployment(seeding, theirs, name_hint="theirs")
+        return ADeploymentAndACaller(
+            place=place.made(seeding),
+            deployment=seeding.made(laid),
+            owner=seeding.made(other),
+        )
 
 
 @dataclass(frozen=True)
@@ -593,7 +630,7 @@ class TheDeploymentNode(Then[ADeploymentAndACaller, DeploymentNode]):
             Held(
                 "created_user_id",
                 node.created_user_id,
-                SameAs(place.caller.id, "심은 배포를 가진 사람"),
+                SameAs(laid.made_by.id, "심은 배포를 가진 사람"),
             ),
             Held(
                 "options",
