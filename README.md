@@ -324,6 +324,7 @@ Backend.AI supports plugin-based extensibility via Python package entrypoints:
 - [CUDA](src/ai/backend/accelerator/cuda_open) - NVIDIA GPU support
 - [Mock](src/ai/backend/accelerator/mock) - Development without actual GPUs
 - [ROCm](src/ai/backend/accelerator/rocm) - AMD GPU support
+- [AWS Neuron](src/ai/backend/accelerator/neuron) - AWS Trainium / Inferentia support (per-NeuronCore allocation)
 - [Furiosa](src/ai/backend/accelerator/furiosa) - Furiosa NPU (Warboy / RNGD) support
 - [Habana](src/ai/backend/accelerator/habana) - Intel Gaudi HPU (Gaudi 2, Gaudi 3) support
 - [Hyperaccel](src/ai/backend/accelerator/hyperaccel) - Hyperaccel LPU support
