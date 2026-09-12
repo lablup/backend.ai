@@ -110,5 +110,9 @@ def is_absent_error(exc: BaseException) -> bool:
     and rules were made says nothing about whether they are still there; it says this node can no
     longer clean up, which is a failure to report, not a teardown to record as done.
     """
+    if isinstance(exc, OSError):
+        # The command never ran, so it reported nothing about its target. ENOENT here names the
+        # missing binary, and its message carries a marker that would otherwise read as absence.
+        return False
     text = str(exc).lower()
     return any(marker in text for marker in _ABSENT_MARKERS)
