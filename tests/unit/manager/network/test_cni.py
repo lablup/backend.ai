@@ -12,6 +12,7 @@ import json
 import time
 from collections.abc import AsyncIterator, Mapping
 from typing import Any, TypeVar, cast, override
+from urllib.parse import unquote
 
 import pytest
 from etcd_client import ClientError
@@ -181,8 +182,12 @@ class FakeEtcd:
 
     async def get_prefix(self, prefix: str, **kwargs: Any) -> dict[str, str]:
         head = prefix.rstrip("/") + "/"
+        # Unquoted, as `make_dict_from_pairs` does to the last path component. A fake that keeps
+        # the escape hides every lookup that quotes when it should not.
         return {
-            key[len(head) :]: value for key, value in self.store.items() if key.startswith(head)
+            unquote(key[len(head) :]): value
+            for key, value in self.store.items()
+            if key.startswith(head)
         }
 
     async def iter_prefix(self, prefix: str, **kwargs: Any) -> AsyncIterator[tuple[str, str]]:
