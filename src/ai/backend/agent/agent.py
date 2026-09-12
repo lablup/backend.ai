@@ -1859,6 +1859,27 @@ class AbstractAgent[
         """
         return None
 
+    async def _published_host_ports(self) -> dict[ContainerId, set[int]]:
+        """This agent's own DNAT-published ports, by container.
+
+        Read from the rules themselves, which is the only record of them: a session-networked
+        kernel is published by the agent, not by Docker, so nothing in `container.ports` names
+        these. Empty on a listing that cannot be read -- the caller is restoring, and a port it
+        fails to reserve is the pre-existing behaviour, not a new one.
+        """
+        publisher = self.port_publisher()
+        if publisher is None:
+            return {}
+        try:
+            forwards = await publisher.list_forwards()
+        except Exception:
+            log.exception("could not read this node's published ports while restoring")
+            return {}
+        by_container: dict[ContainerId, set[int]] = {}
+        for forward in forwards:
+            by_container.setdefault(ContainerId(forward.container_id), set()).add(forward.host_port)
+        return by_container
+
     async def _reclaim_stale_port_forwards(self) -> None:
         """Give back the host ports of rules whose container this runtime no longer has.
 
@@ -2420,6 +2441,11 @@ class AbstractAgent[
                         self._iterate_batch_result(kernel_obj.kernel_id),
                     ),
                 )
+        # The ports this agent published itself, which Docker does not report: a session-networked
+        # kernel runs with no Docker network and is reached only through the agent's DNAT rules, so
+        # `container.ports` is empty for it and its live host ports would be handed out again on
+        # the first session after a restart.
+        published_host_ports = await self._published_host_ports()
         async with self.registry_lock:
             for kernel_id, container in await self.enumerate_containers(
                 ACTIVE_STATUS_SET | DEAD_STATUS_SET,
@@ -2433,6 +2459,8 @@ class AbstractAgent[
                     for p in container.ports:
                         if p.host_port is not None:
                             self.port_pool.discard(p.host_port)
+                    for host_port in published_host_ports.get(container.id, ()):
+                        self.port_pool.discard(host_port)
                     # Restore compute resources.
                     async with self.resource_lock:
                         for computer_ctx in self.computers.values():
