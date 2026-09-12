@@ -339,6 +339,50 @@ class TestNativeAttachStatic:
         )
 
 
+class TestTheForwardDropStaysLast:
+    """The DROP is what makes the bridge isolated, and it only works after the accepts.
+
+    Re-inserting only the MISSING rules with `-I` gives the intended order just once -- when all
+    five are absent. With only the DROP gone (a teardown that failed partway, then the index
+    reclaimed and the bridge rebuilt) `-I` puts it back at the head, ahead of the accepts, and
+    every packet to that bridge is dropped with nothing logged.
+    """
+
+    class _AcceptsAlreadyThere(_RunRecorder):
+        """`-C` says the accepts are present and only the DROP is missing."""
+
+        async def __call__(self, argv: Any, *, check: bool = True) -> tuple[int, bytes, bytes]:
+            argv = list(argv)
+            if argv[0] == "iptables" and "-C" in argv:
+                self.calls.append(argv)
+                return (1, b"", b"") if argv[-1] == "DROP" else (0, b"", b"")
+            return await super().__call__(argv, check=check)
+
+    async def test_the_drop_is_appended_when_only_it_is_missing(
+        self, tmp_path: Path, monkeypatch: Any
+    ) -> None:
+        rec = self._AcceptsAlreadyThere(existing={"bailo4097"})
+        monkeypatch.setattr(na, "_run", rec)
+        runner = NativeBridgeAttachRunner(uplink="eth0", ipam_state_dir=tmp_path)
+
+        await runner._ensure_forward_accept("bailo4097")
+
+        added = [c for c in rec.calls if c[0] == "iptables" and c[1] in ("-I", "-A")]
+        assert added == [["iptables", "-A", "FORWARD", "-o", "bailo4097", "-j", "DROP"]]
+
+    async def test_the_accepts_are_still_prepended(self, tmp_path: Path, monkeypatch: Any) -> None:
+        rec = _RunRecorder(existing={"bailo4097"})  # `-C` reports every rule absent
+        monkeypatch.setattr(na, "_run", rec)
+        runner = NativeBridgeAttachRunner(uplink="eth0", ipam_state_dir=tmp_path)
+
+        await runner._ensure_forward_accept("bailo4097")
+
+        flags = {c[1] for c in rec.calls if c[0] == "iptables" and c[1] in ("-I", "-A")}
+        assert flags == {"-I", "-A"}
+        appended = [c for c in rec.calls if c[:2] == ["iptables", "-A"]]
+        assert all(c[-1] == "DROP" for c in appended)
+
+
 class TestNativeAttachLocal:
     async def test_add_local_sets_gateway_default_route_and_nat(
         self, tmp_path: Path, monkeypatch: Any
@@ -375,7 +419,9 @@ class TestNativeAttachLocal:
             "iptables -I FORWARD -o bailo4097 -i eth0 "
             "-m conntrack --ctstate DNAT -j ACCEPT" in flat  # published-port ingress
         )
-        assert "iptables -I FORWARD -o bailo4097 -j DROP" in flat  # cross-session / unsolicited
+        # APPENDED, not inserted: it has to be evaluated after the accepts however many of
+        # them are already on the chain.
+        assert "iptables -A FORWARD -o bailo4097 -j DROP" in flat  # cross-session / unsolicited
         # the old blanket accept that leaked across sessions must be gone
         assert "iptables -I FORWARD -i bailo4097 -j ACCEPT" not in flat
 
