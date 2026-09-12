@@ -243,6 +243,17 @@ class EndpointGossip:
             # Not a session this node carries. Not an error -- a peer may still be announcing a
             # session this node has already torn down.
             return
+        # Verified under SOME key this node holds is not verified under THIS session's key, and
+        # `gossip_keys()` is the union of every session's. Without this, a peer that shares one
+        # session with us can rewrite the forwarding state of every other session we carry --
+        # the VTEP comes from the payload, so it also picks whose snapshot it replaces.
+        session_key = self._host.gossip_key(announcement.session_id)
+        if session_key is None or decode(data, [session_key]) is None:
+            log.warning(
+                "dropping an announcement for session {} signed under another session's key",
+                announcement.session_id,
+            )
+            return
         if not self._is_current(announcement):
             return
         session_id = announcement.session_id

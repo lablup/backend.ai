@@ -165,6 +165,44 @@ class TestWhatARunnerAppliesOnReceipt:
 
         assert receiver.programmed == []
 
+    async def test_an_announcement_signed_under_another_sessions_key_is_dropped(self) -> None:
+        """`gossip_keys()` is the union of every session's key, so verifying under ANY of them
+        lets a peer that shares one session rewrite the forwarding state of all the others -- and
+        the VTEP comes from the payload, so it picks whose snapshot it replaces too."""
+        receiver = FakeHost(
+            sessions={"s1": [], "s2": []},
+            peers={"s1": ["10.0.0.1", "10.0.0.2"], "s2": ["10.0.0.1", "10.0.0.2"]},
+            keys_by_session={"s1": "key-of-s1", "s2": "key-of-s2"},
+        )
+        # A peer that legitimately holds s1's key, announcing s2.
+        sender = FakeHost(
+            sessions={"s2": [_endpoint(1)]},
+            peers={"s2": ["10.0.0.1"]},
+            keys_by_session={"s2": "key-of-s1"},
+        )
+        datagram = _one_datagram(sender, "s2", vtep="10.0.0.2")
+
+        await EndpointGossip(receiver, vtep="10.0.0.1").on_datagram(datagram, ("10.0.0.2", 7947))
+
+        assert receiver.programmed == []
+
+    async def test_an_announcement_under_the_sessions_own_key_still_applies(self) -> None:
+        receiver = FakeHost(
+            sessions={"s1": [], "s2": []},
+            peers={"s1": ["10.0.0.1", "10.0.0.2"], "s2": ["10.0.0.1", "10.0.0.2"]},
+            keys_by_session={"s1": "key-of-s1", "s2": "key-of-s2"},
+        )
+        sender = FakeHost(
+            sessions={"s2": [_endpoint(1)]},
+            peers={"s2": ["10.0.0.1"]},
+            keys_by_session={"s2": "key-of-s2"},
+        )
+        datagram = _one_datagram(sender, "s2", vtep="10.0.0.2")
+
+        await EndpointGossip(receiver, vtep="10.0.0.1").on_datagram(datagram, ("10.0.0.2", 7947))
+
+        assert len(receiver.programmed) == 1
+
     async def test_a_repeat_announcement_programs_nothing_twice(self) -> None:
         sender = FakeHost(sessions={"s1": [_endpoint(1)]}, peers={"s1": ["10.0.0.1"]})
         receiver = FakeHost(sessions={"s1": []}, peers={"s1": ["10.0.0.1", "10.0.0.2"]})
