@@ -41,6 +41,12 @@ class HostPortObserver(AbstractObserver):
         for _, container in containers:
             for container_port in container.ports:
                 occupied_host_ports.add(container_port.host_port)
+        # And the ports this agent published itself. A session-networked kernel runs with
+        # `NetworkMode: none` and is reached only through the DNAT rules the agent installs, so
+        # Docker publishes nothing for it and `container.ports` is empty -- every one of its live
+        # host ports read as unused here and was handed to the next kernel, whose own DNAT rule
+        # then lost to the older one still in PREROUTING.
+        occupied_host_ports |= await self._published_host_ports()
 
         port_pool = self._agent.port_pool
         unused_ports = port_pool.used_ports() - occupied_host_ports
@@ -62,6 +68,21 @@ class HostPortObserver(AbstractObserver):
                 len(ports_to_release),
             )
             port_pool.release_many(ports_to_release)
+
+    async def _published_host_ports(self) -> set[int]:
+        """Host ports held by this agent's own DNAT rules, or an empty set if they cannot be read.
+
+        Empty on failure is safe here only because releasing needs `PORT_USAGE_THRESHOLD`
+        consecutive observations: one unreadable pass cannot release anything on its own.
+        """
+        publisher = self._agent.port_publisher()
+        if publisher is None:
+            return set()
+        try:
+            return {forward.host_port for forward in await publisher.list_forwards()}
+        except Exception:
+            log.exception("could not read this node's published ports; not counting them as used")
+            return set()
 
     @override
     def observe_interval(self) -> float:
