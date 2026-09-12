@@ -91,7 +91,11 @@ def _allocated_key(cidr: str) -> str:
 
 def _flat(listing: Mapping[str, Any]) -> dict[str, str]:
     """A prefix listing reduced to its leaf values. A key holding children, not a value, is
-    not a claim and is dropped."""
+    not a claim and is dropped.
+
+    Keyed by the CIDR itself: `_allocated_key` quotes the slash to keep it out of the path, and
+    etcd unquotes the last component on the way back, so a lookup must NOT quote again.
+    """
     return {key: value for key, value in listing.items() if isinstance(value, str)}
 
 
@@ -422,7 +426,7 @@ class SubnetAllocator:
         guard_keys = dict(guards or {})
         promoted: list[tuple[str, str]] = []
         for unit in self._units_of(subnet):
-            raw = allocated.get(quote(unit, safe=""))
+            raw = allocated.get(unit)
             if raw is None:
                 await self._undo_promotion(promoted, payload)
                 return False
@@ -517,8 +521,7 @@ class SubnetAllocator:
         return [
             unit
             for unit in units
-            if _claimed_subnet(allocated.get(quote(unit, safe=""), ""), session_id, generation)
-            is not None
+            if _claimed_subnet(allocated.get(unit, ""), session_id, generation) is not None
         ]
 
     async def _finish_partial_claim(
@@ -552,7 +555,7 @@ class SubnetAllocator:
             # bytes are not `payload`: releasing them all by one payload reports them stuck and
             # turns an ordinary skip into a stranded pool, while not releasing them at all leaves
             # the dead half of a block nobody can complete.
-            won: dict[str, str] = {unit: allocated[quote(unit, safe="")] for unit in ours}
+            won: dict[str, str] = {unit: allocated[unit] for unit in ours}
             for unit in missing:
                 if await self._etcd.compare_and_put(
                     _allocated_key(unit), payload, expected=None, guards=dict(guards or {})
@@ -877,10 +880,11 @@ class SubnetAllocator:
         if allocated is None:
             allocated = {}
             for unit in _unit_blocks(ipaddress.ip_network(subnet), self._block_prefixlen):
-                encoded = quote(str(unit), safe="")
+                # Keyed by the CIDR, as `pool_listing` hands it over: the quoting belongs to the
+                # etcd key alone, and a listing keyed the other way matched nothing here.
                 raw = await self._etcd.get(_allocated_key(str(unit)))
                 if isinstance(raw, str):
-                    allocated[encoded] = raw
+                    allocated[str(unit)] = raw
         return await self._claim_as_ours(
             allocated, subnet, session_id, generation, guards, take_stale=True
         )
