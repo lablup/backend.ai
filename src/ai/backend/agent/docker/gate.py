@@ -22,13 +22,22 @@ rootless base, whose wrapper has to install a seccomp filter before the exec.
 from __future__ import annotations
 
 import asyncio
+import logging
 import os
 from collections.abc import MutableMapping
 from pathlib import Path
 from typing import Any, Final
 
 from ai.backend.agent.errors.agent import ContainerStartupFailedError
-from ai.backend.agent.gate import GATE_MNT, GO_FIFO, PAUSE_SCRIPT_NAME, READY_MARKER, write_gate
+from ai.backend.agent.gate import (
+    GATE_MNT,
+    GO_FIFO,
+    PAUSE_SCRIPT_NAME,
+    READY_MARKER,
+    signal_go,
+    write_gate,
+)
+from ai.backend.logging import BraceStyleAdapter
 
 __all__ = (
     "GATE_WRAPPER",
@@ -40,6 +49,8 @@ __all__ = (
 
 #: How long to wait for the wrapper to park. It only has to write one file after Docker has set up
 #: its namespaces; longer than this means the container died or never started the entrypoint.
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+
 GATE_READY_TIMEOUT_SEC: Final = 30.0
 
 GATE_WRAPPER: Final = f"""#!/bin/sh
@@ -126,7 +137,10 @@ async def wait_gated_pid(
 
 
 def release_gate(gate_dir: Path) -> None:
-    """Let the wrapper exec the real command. Blocks only as long as the write takes: the reader is
-    already parked, which is what the ready marker attested."""
-    with (gate_dir / GO_FIFO).open("w") as f:
-        f.write("go\n")
+    """Let the wrapper exec the real command.
+
+    Delegates to `signal_go`, which does not block on a gate nothing is parked at: this is called
+    from a `finally`, including the paths where the container never reached the gate.
+    """
+    if not signal_go(gate_dir):
+        log.debug("nothing was parked at the gate {}; nothing to release", gate_dir)
