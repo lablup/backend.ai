@@ -481,6 +481,33 @@ class TestAdoptingALegacyStore:
         (d / ".layout").write_text(DEFAULT_LAYOUT.serialize())
         return d
 
+    async def test_a_legacy_claim_cut_from_another_pool_is_refused(
+        self, state_dir: Path, tmp_path: Path
+    ) -> None:
+        """Adoption used to WRITE the marker before the guard read it, so the guard compared the
+        configured pool with itself and always agreed -- while the adopted claim named a block cut
+        from the old one, and its bridge is on that subnet right now."""
+        legacy = tmp_path / "bai-enroot" / "net-local-subnet"
+        legacy.mkdir(parents=True)
+        (legacy / ".layout").write_text(
+            LocalSubnetLayout(
+                pool=ipaddress.ip_network("172.30.0.0/16"), block_prefixlen=24
+            ).serialize()
+        )
+        (legacy / "1").write_text("s-live")
+
+        alloc = LocalSubnetAllocator(
+            state_dir,
+            owner="i-en-104",
+            legacy_dir=legacy,
+            layout=LocalSubnetLayout(
+                pool=ipaddress.ip_network("172.30.0.0/16"), block_prefixlen=26
+            ),
+        )
+
+        with pytest.raises(LocalSubnetLayoutChanged, match="still cut from the old one"):
+            await alloc.lookup("s-live")
+
     async def test_a_legacy_claim_is_carried_over_at_the_same_index(
         self, state_dir: Path, legacy: Path
     ) -> None:
