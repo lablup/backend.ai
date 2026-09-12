@@ -781,7 +781,9 @@ class AsyncEtcd(AbstractKVStore):
                 last_key: bytes | None = None
                 for item in kvs:
                     raw_key = base64.b64decode(item["key"])
-                    raw_value = base64.b64decode(item["value"])
+                    # The JSON gateway omits protobuf defaults, so an empty value has no `value`
+                    # key at all -- the same reason `more` and `kvs` are read with defaults above.
+                    raw_value = base64.b64decode(item.get("value") or "")
                     last_key = raw_key
                     logical_key = self._demangle_key(raw_key).removeprefix(logical_scope_prefix)
                     yield logical_key, raw_value.decode(self.encoding)
