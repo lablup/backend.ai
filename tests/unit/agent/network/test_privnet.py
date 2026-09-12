@@ -1317,6 +1317,39 @@ class TestSessionBinding:
                 PrivNetRequest(PrivNetOp.ATTACH_CONTAINER, "sess-a", container_id="c-of-a")
             )
 
+    async def test_detaching_another_sessions_container_is_refused(self) -> None:
+        """The withdrawal side of the same binding. Its rules are keyed by container alone, so a
+        caller holding one session could drop a sibling's DNAT rules and attach record by naming
+        an id it read from LIST_PORTS."""
+        runtime = _StubRuntime(pid=4242, live={"c-of-s2": "sess-b"})
+        async with _Harness(runtime=runtime) as h:
+            await h.client().call(
+                PrivNetRequest(
+                    PrivNetOp.SETUP_SESSION,
+                    "sess-a",
+                    network_config={"backend": "bridge", "subnet": "172.30.16.0/24"},
+                )
+            )
+            with pytest.raises(PrivNetClientError, match="another session"):
+                await h.client().call(
+                    PrivNetRequest(PrivNetOp.DETACH_CONTAINER, "sess-a", container_id="c-of-s2")
+                )
+
+    async def test_unpublishing_another_sessions_ports_is_refused(self) -> None:
+        runtime = _StubRuntime(pid=4242, live={"c-of-s2": "sess-b"})
+        async with _Harness(runtime=runtime) as h:
+            await h.client().call(
+                PrivNetRequest(
+                    PrivNetOp.SETUP_SESSION,
+                    "sess-a",
+                    network_config={"backend": "bridge", "subnet": "172.30.17.0/24"},
+                )
+            )
+            with pytest.raises(PrivNetClientError, match="another session"):
+                await h.client().call(
+                    PrivNetRequest(PrivNetOp.UNPUBLISH_PORTS, "sess-a", container_id="c-of-s2")
+                )
+
     async def test_a_container_we_cannot_place_is_allowed(self) -> None:
         """The label is set on every path we know of; refusing on its absence would turn an
         unknown into a broken session. It is warned about instead."""
@@ -1392,6 +1425,34 @@ class TestConfiningAContainer:
                 await h.client().confine_container("sess-a", "c1", pid, {"memory.max": "1024"})
 
                 assert (cgroup_root / "backendai" / "c1" / "cgroup.procs").read_text() == str(pid)
+
+    async def test_a_cgroup_control_file_is_not_a_limit(self, cgroup_root: Path) -> None:
+        """`cgroup.procs` takes a pid and moves it in, so accepting it as a "limit" is
+        `_require_agents_process` by another door -- the victim is named as a value, not as
+        `cgroup_pid`, and the guard never sees it."""
+        async with _Harness(_StubRuntime(cgroup_root=cgroup_root)) as h:
+            with _a_leaf_process() as pid:
+                with pytest.raises(PrivNetClientError, match="cgroup control file"):
+                    await h.client().confine_container(
+                        "sess-a",
+                        "c1",
+                        pid,
+                        {"memory.max": "1024", "cgroup.procs": "1"},
+                    )
+
+                procs = cgroup_root / "backendai" / "c1" / "cgroup.procs"
+                assert "1\n" not in procs.read_text()
+                assert procs.read_text() == str(pid)
+
+    async def test_a_dotted_controller_limit_is_still_accepted(self, cgroup_root: Path) -> None:
+        """The refusal is of the cgroup core files, not of every file with a dot in it."""
+        async with _Harness(_StubRuntime(cgroup_root=cgroup_root)) as h:
+            with _a_leaf_process() as pid:
+                await h.client().confine_container(
+                    "sess-a", "c1", pid, {"memory.max": "1024", "pids.max": "64"}
+                )
+
+            assert (cgroup_root / "backendai" / "c1" / "pids.max").read_text() == "64"
 
     async def test_a_pid_that_is_not_the_agents_is_refused(self, cgroup_root: Path) -> None:
         """The one privilege boundary on this path: an unprivileged agent may only hand over its
@@ -2018,6 +2079,51 @@ class TestAdoptingALiveSession:
                         network_config={"backend": "bridge", "subnet": "172.30.55.0/24"},
                     )
                 )
+
+
+class TestReadoptingASessionKeepsWhatItWasBoundWith:
+    """A privnet restart under a live session re-adopts it. Two things were dropped on the way.
+
+    The digest names the VNI binding, so releasing without it leaves the claim on disk and every
+    later session drawing that VNI is refused. The peers are what this node announces to and
+    accepts announcements from -- and the agent's own `applied` map means it never re-sends them,
+    so an empty set here is permanent while `health()` stays green.
+    """
+
+    _CONFIG: dict[str, Any] = {
+        "backend": "vxlan",
+        "subnet": "10.128.7.0/24",
+        "vni": 4471,
+        "mtu": 1412,
+    }
+
+    async def test_the_peers_survive_the_restart(self, tmp_path: Path) -> None:
+        async with _Harness(_StubRuntime(pid=4242, live={"c1": "s1"}), state_dir=tmp_path) as first:
+            await first.setup("s1", **self._CONFIG)
+            resp = await first.client().call(
+                PrivNetRequest(PrivNetOp.ENSURE_SECURITY, "s1", vteps=("192.168.0.9",))
+            )
+            assert resp.ok, resp.error
+            assert first.server.gossip_peers("s1") == ["192.168.0.9"]
+
+        async with _Harness(
+            _StubRuntime(pid=4242, live={"c1": "s1"}), state_dir=tmp_path
+        ) as restarted:
+            assert restarted.server.gossip_peers("s1") == ["192.168.0.9"]
+
+    async def test_the_vni_binding_can_still_be_released(self, tmp_path: Path) -> None:
+        async with _Harness(_StubRuntime(pid=4242, live={"c1": "s1"}), state_dir=tmp_path) as first:
+            await first.setup("s1", **self._CONFIG)
+
+        async with _Harness(
+            _StubRuntime(pid=4242, live={"c1": "s1"}), state_dir=tmp_path
+        ) as restarted:
+            entry = restarted.server._sessions["s1"]
+            assert entry.digest == config_digest(self._CONFIG)
+            assert restarted.server._binding_of("s1", None) == (
+                self._CONFIG["vni"],
+                entry.digest,
+            )
 
 
 class TestAnAgentCannotNameAnotherSessionsVni:
