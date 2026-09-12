@@ -1063,6 +1063,23 @@ class TestAFirewallThisNodeCannotRead:
         assert await plugin.retry_fail_close() == frozenset()
         assert plaintext_drop_del_args(4097, 4789) in rec.calls
 
+    async def test_a_session_this_process_holds_is_not_swept(self) -> None:
+        """`spare` names the OTHER agents on this host. A session THIS process adopted at recovery
+        is in neither that set nor `still_up`, and the three rules the sweep removes are what keep
+        its traffic encrypted -- so a debt fired later stripped a live session's protection."""
+        rec = Recorder()
+        plugin = _plugin(rec)
+        await plugin.prepare_recovery()
+        await plugin.setup_session_network(_META, _SELF)
+        # The debt a transient listing failure leaves behind; it fires on the next retry.
+        plugin._rule_inventory_owed = True
+        plugin._reader = plugin._rule_inventory = _Listing(_iptables_save(_LEFTOVER_RULES))
+        rec.calls.clear()
+
+        await plugin.retry_fail_close()
+
+        assert plaintext_drop_del_args(_META.vni, 4789) not in rec.calls
+
     async def test_a_spared_vni_stays_spared_across_the_retry(self) -> None:
         # `retry_fail_close` has no caller to ask what to spare, so the preflight's set is kept:
         # sweeping without it disarms a co-located agent's live session.
@@ -3808,6 +3825,39 @@ class TestTheRekeyDeleteIsGuardedToo:
     through the kernel's (dst, spi, proto) lookup like every other, so it can take a colliding
     peer's SA -- and a rekey is not a reason to be less careful than a teardown."""
 
+    async def test_a_listing_that_could_not_run_is_not_permission_to_delete(
+        self, tmp_path: Path
+    ) -> None:
+        """The tolerant reader answers "" for a listing that failed, and "" reads as "no SA holds
+        that SPI". The guard's own handler was unreachable with it, so an `ip xfrm state` that
+        timed out under load deleted a co-located session's SA."""
+        rec = Recorder()
+        plugin = _plugin(rec, pair_journal=PairJournal(tmp_path / "p"))
+        await plugin.setup_session_network(_ENC_META, _SELF)
+        await plugin.add_peer("s1", _PEER)
+
+        # The two readers as they really differ: the tolerant one answers "" for a listing that
+        # could not run, the strict one raises. A guard that reads the tolerant one sees "no SA
+        # holds that SPI" and deletes.
+        def _tolerant(argv: Sequence[str]) -> str:
+            return ""
+
+        def _strict(argv: Sequence[str]) -> str:
+            if list(argv[:3]) == _STATE:
+                raise OverlayEncryptionUnavailable("`ip xfrm state` timed out")
+            return ""
+
+        plugin._reader = _Listing(_tolerant)
+        plugin._rule_inventory = _Listing(_strict)
+        rec.calls.clear()
+
+        with pytest.raises(OverlayEncryptionUnavailable):
+            await plugin.teardown_session_network("s1")
+
+        assert not any(argv[:4] == ["ip", "xfrm", "state", "del"] for argv in rec.calls), (
+            "an SA was deleted over a listing that never ran"
+        )
+
     async def test_a_foreign_sa_at_the_slots_spi_is_not_deleted(self, tmp_path: Path) -> None:
         generation = _TEST_GENERATION
 
@@ -3822,7 +3872,11 @@ class TestTheRekeyDeleteIsGuardedToo:
         # A stranger now holds the SPI the next generation's slot will reuse.
         stolen = _esp_spi("10.0.0.1", "10.0.0.2", generation + 2)
         held = _sa_listing("10.9.9.9", "10.0.0.2", [stolen])
-        plugin._reader = _Listing(lambda argv: held if list(argv[:3]) == _STATE else None)
+        # Both, as the constructor's contract says: the SA-ownership guards read the strict one,
+        # because "" from a listing that never ran would read as "that SPI is free".
+        plugin._reader = plugin._rule_inventory = _Listing(
+            lambda argv: held if list(argv[:3]) == _STATE else None
+        )
         # The kernel already holds that SPI, so the add on it is EEXIST -- as it would be on a
         # real host once the delete has been skipped.
         rec.fail_on = lambda argv: (

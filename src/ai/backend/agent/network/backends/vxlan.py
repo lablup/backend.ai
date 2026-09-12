@@ -2887,6 +2887,11 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
         for listing in listings:
             found |= parse_owned_vni_rules(listing)
         spared = set(spare)
+        # And this process's own live sessions. `spare` names the OTHER agents on this host, and
+        # at startup there is nothing of ours yet -- but `retry_fail_close` runs this again later,
+        # by which time a session we adopted at recovery is up with its device UP and in neither
+        # set. Sweeping it strips the very rules that keep its traffic encrypted.
+        spared |= {meta.vni for meta in self._sessions.values() if meta.vni is not None}
         held_up = {vni for vni in map(vni_of_dev, still_up) if vni is not None}
         # Rebuilt from this pass rather than updated: the listing is the whole answer, so a VNI it
         # no longer shows has no rules left to hold and must not keep the retry coming back.
@@ -3655,7 +3660,10 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
         Reading the table once is what tells them apart.
         """
         try:
-            existing = parse_sa_identities(await self._reader(["ip", "xfrm", "state"]))
+            # `_rule_inventory`, not `_reader`: the tolerant one answers "" for a listing that
+            # could not run, and here "" means "no SA holds that SPI, so deleting is safe" --
+            # the opposite of what a failed read says. The handler below was unreachable with it.
+            existing = parse_sa_identities(await self._rule_inventory(["ip", "xfrm", "state"]))
         except command.HOST_COMMAND_ERRORS as e:
             # Unverified is not permission to delete, for the same reason an unknown journal answer
             # is not: a leaked SA of ours keeps traffic encrypted, a wrongly deleted one does not.
@@ -3713,7 +3721,9 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
         except ValueError:
             return
         try:
-            existing = parse_sa_identities(await self._reader(["ip", "xfrm", "state"]))
+            # Strict for the same reason as the delete guard: "" from a listing that never ran
+            # reads as "that SPI is free", which is exactly the guess this refuses to make.
+            existing = parse_sa_identities(await self._rule_inventory(["ip", "xfrm", "state"]))
         except command.HOST_COMMAND_ERRORS as e:
             # We could not establish whose SA is there. Overwriting on a guess is the outcome this
             # guard exists to prevent.
