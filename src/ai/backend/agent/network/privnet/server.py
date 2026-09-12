@@ -280,6 +280,13 @@ def _make_cgroup(cgroup: Path, limits: Mapping[str, str], top_pid: int) -> None:
         if "/" in name or name.startswith("."):
             failed.append(f"{name} (not an interface file)")
             continue
+        # And only a CONTROLLER's file. `cgroup.procs` takes a pid and moves it in, which is
+        # `_require_agents_process` by another door: the caller names the victim as a limit value
+        # instead of as `cgroup_pid`. `cgroup.kill`, `cgroup.freeze` and `cgroup.subtree_control`
+        # are the same kind of lever.
+        if name.startswith("cgroup."):
+            failed.append(f"{name} (a cgroup control file, not a limit)")
+            continue
         try:
             (cgroup / name).write_text(value)
         except OSError as e:
@@ -1289,7 +1296,13 @@ class PrivNetServer:
         await backend.adopt_session_network(meta, self._self_member(meta.backend))
         peers = self._members_of(peer_vteps or ())
         await backend.restore_session_peer_ownership(session_id, peers)
-        entry = _SessionEntry(meta, backend)
+        # Both carried over, because nothing else puts them back. Without the digest the VNI is
+        # released under a name it was not bound under and the claim stays on disk; without the
+        # peers this node announces to nobody and drops every announcement it receives, and the
+        # agent's own `applied` map means it is never told them again.
+        binding = self._binding_of(session_id, raw_config)
+        entry = _SessionEntry(meta, backend, binding[1] if binding is not None else "")
+        entry.peer_vteps = {vtep for vtep in (peer_vteps or ()) if vtep}
         for container_id in (cid for cid, sid in live.items() if sid == session_id):
             record = attachments.get(container_id)
             if record is None:
@@ -2301,6 +2314,10 @@ class PrivNetServer:
         if req.container_id is None:
             raise policy.PolicyViolation("unpublish requires container_id")
         container_id = policy.validate_container_id(req.container_id)
+        # Needs no session ENTRY, but still the session's own container: the rules are keyed by
+        # container alone, so without this a caller could withdraw a sibling session's published
+        # ports by naming its id.
+        await self._require_container_of_session(container_id, req.session_id)
         return tuple(await self._forwarder.remove_container(container_id))
 
     async def _list_ports(self) -> tuple[ForwardEntry, ...]:
@@ -2372,6 +2389,11 @@ class PrivNetServer:
         if container_id is None:
             raise policy.PolicyViolation("detach requires container_id")
         container_id = policy.validate_container_id(container_id)
+        # The same bound the attach applies. Without it a caller holding one session could name a
+        # sibling's container id -- harvested from LIST_PORTS -- and have its DNAT rules and its
+        # attach record dropped, which leaks that session's veth and address when it dies. A
+        # container this node can no longer place is still allowed, as on attach.
+        await self._require_container_of_session(container_id, session_id)
         # Withdraw first, and unconditionally: a DNAT rule outliving its container would send the
         # next holder of that host port at an address that is about to disappear. Keyed by the
         # container's own tag, so it holds even if this privnet never saw the attach.
