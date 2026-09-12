@@ -366,16 +366,17 @@ class LocalSubnetAllocator:
         """The CIDR that block ``index`` names under this node's pool."""
         return self._layout.subnet(index)
 
-    def _read_layout(self) -> LocalSubnetLayout | None:
+    def _read_layout(self, directory: Path | None = None) -> LocalSubnetLayout | None:
         """The pool the journalled indices were cut from, or None for a store that has never been
         written."""
+        store = self._dir if directory is None else directory
         try:
-            return LocalSubnetLayout.deserialize((self._dir / _LAYOUT_FILE).read_text())
+            return LocalSubnetLayout.deserialize((store / _LAYOUT_FILE).read_text())
         except (FileNotFoundError, NotADirectoryError):
             return None
         except ValueError as e:
             raise LocalSubnetLayoutChanged(
-                f"the node-local subnet store {self._dir} has an unreadable layout marker: {e}"
+                f"the node-local subnet store {store} has an unreadable layout marker: {e}"
             ) from e
 
     def _write_layout(self) -> None:
@@ -435,16 +436,27 @@ class LocalSubnetAllocator:
         the pool means draining the node first, and we say so rather than guess.
         """
         indices = self._replay()
-        self._adopt_legacy(indices)
+        # BEFORE adopting: `_adopt_legacy` writes a claim, and a claim writes the marker ("the
+        # first claim is what marks a fresh store"). Reading after it therefore reads back the
+        # pool now configured, so the check below always agreed with itself and a node still
+        # serving blocks cut from the old pool passed it.
         recorded = self._read_layout()
-        if recorded is None and indices:
+        if recorded is None and self._legacy_dir is not None:
+            # A fresh node-wide store adopting from a per-agent one: the pool those claims were
+            # cut from is the LEGACY store's marker, not this one's.
+            recorded = self._read_layout(self._legacy_dir)
+        self._adopt_legacy(indices)
+        held = set(indices.values()) | self._foreign
+        if recorded is None and held:
             recorded = _LEGACY_LAYOUT  # an unmarked store with claims predates the marker
         if recorded == self._layout:
             return indices
-        if recorded is not None and indices:
+        # `held`, not `indices`: a co-located agent's live claims are just as much on the old
+        # pool, and they are not in this agent's journal.
+        if recorded is not None and held:
             raise LocalSubnetLayoutChanged(
                 f"this node's LOCAL subnet pool changed ({recorded} -> {self._layout}) while"
-                f" {len(indices)} session(s) still hold blocks cut from the old one"
+                f" {len(held)} block(s) on this node are still cut from the old one"
                 f" (store: {self._dir}). Their bridges are on the old subnets, which the new pool"
                 " cannot name. Drain this node (or terminate those sessions), or restore the"
                 " previous container.local-network-pool / container.local-network-block-size."
