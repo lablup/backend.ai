@@ -90,6 +90,16 @@ async def test_iter_prefix_pages_over_one_revision(etcd: AsyncEtcd) -> None:
     assert first_page + remaining == [(f"paged/{index}", f"value-{index}") for index in range(7)]
 
 
+async def test_iter_prefix_reads_a_key_whose_value_is_empty(etcd: AsyncEtcd) -> None:
+    """The JSON gateway omits protobuf defaults, so an empty value arrives with no `value` key."""
+    await etcd.put("paged/empty", "")
+    await etcd.put("paged/filled", "value")
+
+    items = [item async for item in etcd.iter_prefix("paged", page_size=1)]
+
+    assert items == [("paged/empty", ""), ("paged/filled", "value")]
+
+
 async def test_iter_prefix_keeps_scope_prefixes_internal(etcd: AsyncEtcd) -> None:
     await etcd.put("paged/global", "global", scope=ConfigScopes.GLOBAL)
     await etcd.put("paged/node", "node", scope=ConfigScopes.NODE)
