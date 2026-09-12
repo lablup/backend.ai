@@ -664,15 +664,28 @@ class NativeBridgeAttachRunner:
             ],
         ]
 
+    @staticmethod
+    def _is_forward_drop(rule: Sequence[str]) -> bool:
+        """The one rule of the set that must be evaluated last."""
+        return rule[-1] == "DROP"
+
     async def _ensure_forward_accept(self, bridge: str) -> None:
         uplink = await self._resolve_uplink()
         for rule in self._forward_accept_rules(bridge, uplink):
             rc, _, _ = await _run(["iptables", "-C", *rule], check=False)
-            if rc != 0:
-                # Checked: a host with a default-DROP FORWARD policy drops everything this
-                # bridge carries until these land, and xtables lock contention is exactly the
-                # transient the caller's retry exists for.
-                await _run(["iptables", "-I", *rule])
+            if rc == 0:
+                continue
+            # Checked: a host with a default-DROP FORWARD policy drops everything this
+            # bridge carries until these land, and xtables lock contention is exactly the
+            # transient the caller's retry exists for.
+            #
+            # The DROP is APPENDED and the accepts prepended, so the order holds however many of
+            # them are already there. Inserting all five put the DROP last only when all five were
+            # missing: with just the DROP gone -- a teardown that failed partway, then a rebuild --
+            # `-I` puts it back at the head, ahead of the accepts, and every packet to the bridge
+            # is dropped with nothing logged.
+            flag = "-A" if self._is_forward_drop(rule) else "-I"
+            await _run(["iptables", flag, *rule])
 
     async def _del_forward_accept(self, bridge: str) -> None:
         uplink = await self._resolve_uplink()
