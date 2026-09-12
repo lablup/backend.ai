@@ -310,6 +310,38 @@ class TestTheRecoveryMarkIsNotClearedEarly:
         assert "etcd was unreachable" in network.recovery_problems()["session:s1"]
 
 
+class TestARetryDoesNotDoubleTheCoordinator:
+    """`_resume_session` registers the coordinator before the rest of the resume, so a session can
+    be coordinated AND still marked unresumed. The guard asked for "not unresumed AND coordinated",
+    which let exactly that one through -- building a second coordinator, with a second watch and
+    reconcile pair, every 60s tick, and leaving the previous pair unreachable and uncancellable."""
+
+    async def test_a_coordinated_session_is_not_resumed_again(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        network = _network(vxlan=_Backend())
+
+        async def _inventory() -> tuple[dict[str, str], dict[str, str]]:
+            return {"c1": "s1"}, {"c1": "s1"}
+
+        monkeypatch.setattr(network, "_live_and_own_containers", _inventory)
+        resumed: list[str] = []
+
+        async def _resume_one(session_id: str, containers: object) -> bool:
+            resumed.append(session_id)
+            return True
+
+        monkeypatch.setattr(network, "_resume_one", _resume_one)
+        # The state a resume that failed after registering its coordinator leaves behind.
+        network._coordinators["s1"] = object()  # type: ignore[assignment]
+        network._unresumed["s1"] = "the resume did not finish"
+
+        await network.retry_recovery_fail_close()
+
+        assert resumed == []
+        assert "s1" in network._unresumed  # not claimed as recovered either
+
+
 class TestWithdrawingBeforeTheMemberKeyGoes:
     """Stopping the coordinator removes this node's member key, which is the manager's signal that
     this agent has let the session go. Doing that first and then failing to withdraw leaves the

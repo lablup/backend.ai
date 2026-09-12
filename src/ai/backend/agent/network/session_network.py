@@ -440,10 +440,25 @@ class SessionNetwork:
             self._unresumed.pop(session_id, None)
             log.info("session {} is gone; dropping its unresumed mark", session_id)
         for session_id in sorted(by_session):
-            if session_id not in self._unresumed and session_id in self._coordinators:
-                # Already resumed. Re-running would install a SECOND coordinator without stopping
-                # the first, leaving two sets of watch and reconcile tasks changing the same host
-                # state.
+            if session_id in self._coordinators:
+                # Already coordinated. Re-running would install a SECOND coordinator without
+                # stopping the first, leaving two sets of watch and reconcile tasks changing the
+                # same host state -- and the previous pair is unreachable, so nothing can cancel
+                # them. The coordinator alone decides this: `_resume_session` registers it before
+                # the rest of the resume, so a session can be both coordinated and still marked
+                # unresumed, and asking for "unresumed AND coordinated" let exactly that one
+                # through on every tick.
+                #
+                # The mark is kept. What failed after the registration is not known here, and
+                # clearing it would report a recovery that did not happen -- the node stays out
+                # of overlay service, which is the safe side, until it is restarted.
+                if (reason := self._unresumed.get(session_id)) is not None:
+                    log.warning(
+                        "session {} is coordinated but was not fully resumed ({}); not resuming"
+                        " it again, which would double its watch and reconcile tasks",
+                        session_id,
+                        reason,
+                    )
                 continue
             if not await self._resume_one(session_id, by_session[session_id]):
                 continue
