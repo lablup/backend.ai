@@ -1729,9 +1729,24 @@ class ScheduleCoordinator:
 
     async def handle_kernel_cancelled(self, event: KernelCancelledAnycastEvent) -> bool:
         """Handle kernel cancelled event through the kernel state engine."""
-        return await self._kernel_state_engine.mark_kernel_cancelled(
+        cancellation = await self._kernel_state_engine.mark_kernel_cancelled(
             event.kernel_id, event.session_id, event.reason
         )
+        if cancellation.session_cancelled:
+            # CANCELLED is written where the last kernel is cancelled, not by the promotion pass,
+            # so its hook is reached from here or not at all -- and the session's volatile network
+            # was created before any kernel started, so there is one to give back.
+            await self._execute_transition_hooks(
+                [
+                    SessionTransitionInfo(
+                        session_id=event.session_id,
+                        from_status=SessionStatus.PREPARED,
+                        reason=event.reason,
+                    )
+                ],
+                SessionStatus.CANCELLED,
+            )
+        return cancellation.kernel_cancelled
 
     async def handle_kernel_terminated(self, event: KernelTerminatedAnycastEvent) -> bool:
         """Handle kernel terminated event through the kernel state engine."""
