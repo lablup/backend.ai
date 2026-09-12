@@ -103,6 +103,33 @@ class TestACommandThatFinishes:
         assert (await command.run(["false"]))[0] == 2
 
 
+class TestAMissingBinaryIsNotAbsence:
+    """`is_absent_error`'s own docstring: a binary that is gone says nothing about the target."""
+
+    def test_a_missing_binary_is_a_failure_to_report(self) -> None:
+        exc = FileNotFoundError(2, "No such file or directory", "ip")
+        # Its message carries a marker that would otherwise read as absence.
+        assert "no such file or directory" in str(exc).lower()
+        assert not command.is_absent_error(exc)
+
+    def test_a_command_that_reported_absence_still_counts(self) -> None:
+        assert command.is_absent_error(
+            NetworkOperationFailed(
+                'command failed (rc=1): ip link del baix: Cannot find device "baix"'
+            )
+        )
+
+    def test_an_enoent_the_command_itself_printed_still_counts(self) -> None:
+        assert command.is_absent_error(
+            NetworkOperationFailed(
+                "command failed (rc=255): bridge fdb del: No such file or directory"
+            )
+        )
+
+    def test_a_permission_error_is_not_absence(self) -> None:
+        assert not command.is_absent_error(PermissionError(13, "Permission denied"))
+
+
 class TestNoHandlerCatchesTheWrongThing:
     """The dead-handler sweep, kept swept.
 
