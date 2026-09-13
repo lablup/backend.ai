@@ -57,6 +57,20 @@ class _Exec(Exception):
     pass
 
 
+def test_main_reports_exec_failure(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    def failing_execv(path: str, args: list[str]) -> None:
+        raise OSError(8, "Exec format error")
+
+    monkeypatch.setattr(entrypoint, "find_shell", lambda candidates=(): "/bin/bash")
+    monkeypatch.setattr(os, "execv", failing_execv)
+    with pytest.raises(SystemExit) as exc_info:
+        entrypoint.main(["python"])
+    assert exc_info.value.code == 126
+    assert "Exec format error" in capsys.readouterr().err
+
+
 def test_main_execs_shell_with_script_and_args(monkeypatch: pytest.MonkeyPatch) -> None:
     calls: list[tuple[str, list[str]]] = []
 

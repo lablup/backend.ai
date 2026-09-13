@@ -32,6 +32,8 @@ class TestKernelRunnerMountProvisionerDefaultMounts:
         mounts = provisioner._prepare_default_mounts()
         mount_targets = [str(m.target) for m in mounts]
         assert "/opt/kernel/entrypoint.sh" in mount_targets
+        assert "/opt/kernel/entrypoint.py" in mount_targets
+        assert "/opt/kernel/sha512_crypt.py" in mount_targets
         assert "/opt/kernel/extract_dotfiles.py" in mount_targets
         assert "/opt/kernel/fantompass.py" in mount_targets
         assert "/opt/kernel/hash_phrase.py" in mount_targets

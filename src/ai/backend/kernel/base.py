@@ -1038,7 +1038,9 @@ class BaseRunner(metaclass=ABCMeta):
             if isinstance(cmd, (list, tuple)):
                 exec_func = partial(asyncio.create_subprocess_exec, *map(str, cmd))
             else:
-                exec_func = partial(asyncio.create_subprocess_shell, str(cmd))
+                exec_func = partial(
+                    asyncio.create_subprocess_exec, find_posix_shell(), "-c", str(cmd)
+                )
             pipe_opts: dict[str, Any] = {}
             pipe_opts["stdout"] = asyncio.subprocess.PIPE
             pipe_opts["stderr"] = asyncio.subprocess.PIPE

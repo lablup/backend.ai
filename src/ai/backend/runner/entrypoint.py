@@ -19,6 +19,7 @@ SHELL_CANDIDATES: tuple[str, ...] = (
     "/bin/bash",
     "/usr/bin/bash",
     "/bin/ash",
+    "/usr/bin/ash",
     "/bin/dash",
     "/usr/bin/dash",
 )
@@ -42,7 +43,17 @@ def main(argv: list[str]) -> NoReturn:
             flush=True,
         )
         sys.exit(127)
-    os.execv(shell, [shell, ENTRYPOINT_SCRIPT, *argv])
+    # The shell runs under its own name; when /bin/sh is a symlink to bash this is the same
+    # POSIX mode as before, and the bash fallback runs the script in plain bash mode.
+    try:
+        os.execv(shell, [shell, ENTRYPOINT_SCRIPT, *argv])
+    except OSError as e:
+        print(
+            f"ERROR: cannot execute {shell} to run the kernel entrypoint: {e.strerror}",
+            file=sys.stderr,
+            flush=True,
+        )
+        sys.exit(126)
 
 
 if __name__ == "__main__":

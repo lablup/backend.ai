@@ -169,6 +169,10 @@ eof_sentinel = Sentinel.TOKEN
 LDD_GLIBC_REGEX = re.compile(r"^ldd \([^\)]+\) ([\d\.]+)$")
 LDD_MUSL_REGEX = re.compile(r"^musl libc .+$")
 
+_KERNEL_ENTRYPOINT_SCRIPT: Final[str] = "/opt/kernel/entrypoint.sh"
+_KERNEL_ENTRYPOINT_LAUNCHER: Final[str] = "/opt/kernel/entrypoint.py"
+_KRUNNER_PYTHON: Final[str] = "/opt/backend.ai/bin/python"
+
 known_glibc_distros: Final[dict[float, str]] = {
     2.17: "centos7.6",
     2.27: "ubuntu18.04",
@@ -178,6 +182,19 @@ known_glibc_distros: Final[dict[float, str]] = {
     2.35: "ubuntu22.04",
     2.39: "ubuntu24.04",
 }
+
+
+def _kernel_container_entrypoint(mounts: Sequence[Mount]) -> list[str]:
+    """
+    Start through the kernel runner Python when its launcher is mounted, so images without
+    /bin/sh work. A kernel created by an older agent restarts from its persisted mount list,
+    which has no launcher; it keeps the shell-script entrypoint. ``-I`` keeps user-supplied
+    PYTHON* variables and /opt/kernel off the launcher's interpreter.
+    """
+    if any(str(m.target) == _KERNEL_ENTRYPOINT_LAUNCHER for m in mounts):
+        return [_KRUNNER_PYTHON, "-I", _KERNEL_ENTRYPOINT_LAUNCHER]
+    return [_KERNEL_ENTRYPOINT_SCRIPT]
+
 
 deeplearning_image_keys = {
     "tensorflow",
@@ -1175,9 +1192,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
             "Privileged": False,
             "StopSignal": "SIGINT",
             "ExposedPorts": {f"{port}/tcp": {} for port in exposed_ports},
-            # Launched through the kernel runner Python so that images without /bin/sh
-            # (e.g., distroless bases with only bash) still start.
-            "EntryPoint": ["/opt/backend.ai/bin/python", "-s", "/opt/kernel/entrypoint.py"],
+            "EntryPoint": _kernel_container_entrypoint(resource_spec.mounts),
             "Cmd": cmdargs,
             "Env": [f"{k}={v}" for k, v in environ.items()],
             "WorkingDir": "/home/work",
