@@ -44,7 +44,7 @@ from .intrinsic import (
 from .jupyter_client import aexecute_interactive
 from .logging import BraceStyleAdapter, setup_logger, setup_logger_basic
 from .service import ServiceParser
-from .utils import TracebackSourceFilter, scan_proc_stats, wait_local_port_open
+from .utils import TracebackSourceFilter, find_posix_shell, scan_proc_stats, wait_local_port_open
 
 logger = logging.getLogger()
 logger.addFilter(TracebackSourceFilter(str(Path(__file__).parent)))
@@ -447,7 +447,7 @@ class BaseRunner(metaclass=ABCMeta):
         log.info("Running the user bootstrap script...")
         ret = 0
         try:
-            ret = await self.run_subproc(["/bin/sh", str(script_path)])
+            ret = await self.run_subproc([find_posix_shell(), str(script_path)])
         except Exception:
             log.exception("unexpected error while executing the user bootstrap script")
             ret = -1

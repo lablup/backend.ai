@@ -22,6 +22,29 @@ else:
 CLOCK_TICK: Final = os.sysconf("SC_CLK_TCK")
 
 
+POSIX_SHELL_CANDIDATES: Final = (
+    "/bin/sh",
+    "/usr/bin/sh",
+    "/bin/bash",
+    "/usr/bin/bash",
+    "/bin/ash",
+    "/bin/dash",
+    "/usr/bin/dash",
+)
+
+
+def find_posix_shell() -> str:
+    """
+    Return the first POSIX shell the image provides, in the same order as the container
+    entrypoint launcher (runner/entrypoint.py). Falls back to /bin/sh when none is found so the
+    caller still gets a meaningful "not found" error from exec.
+    """
+    for path in POSIX_SHELL_CANDIDATES:
+        if Path(path).is_file() and os.access(path, os.X_OK):
+            return path
+    return "/bin/sh"
+
+
 def find_executable(*paths: Path | str | bytes) -> Path | None:
     """
     Find the first executable regular file in the given list of paths.

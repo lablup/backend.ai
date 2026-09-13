@@ -1175,7 +1175,9 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
             "Privileged": False,
             "StopSignal": "SIGINT",
             "ExposedPorts": {f"{port}/tcp": {} for port in exposed_ports},
-            "EntryPoint": ["/opt/kernel/entrypoint.sh"],
+            # Launched through the kernel runner Python so that images without /bin/sh
+            # (e.g., distroless bases with only bash) still start.
+            "EntryPoint": ["/opt/backend.ai/bin/python", "-s", "/opt/kernel/entrypoint.py"],
             "Cmd": cmdargs,
             "Env": [f"{k}={v}" for k, v in environ.items()],
             "WorkingDir": "/home/work",
