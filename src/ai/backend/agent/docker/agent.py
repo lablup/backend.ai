@@ -114,6 +114,7 @@ from ai.backend.agent.utils import (
     host_pid_to_container_pid,
     update_nested_dict,
 )
+from ai.backend.common.arch import arch_name_aliases
 from ai.backend.common.asyncio import current_loop
 from ai.backend.common.cgroup import (
     CgroupController,
@@ -179,6 +180,9 @@ eof_sentinel = Sentinel.TOKEN
 
 LDD_GLIBC_REGEX = re.compile(r"^ldd \([^\)]+\) (\d+(?:\.\d+)?)[\d\.]*$")
 LDD_MUSL_REGEX = re.compile(r"^musl libc .+$")
+# Printed when the C library itself is executed (images without ldd), e.g.
+# "GNU C Library (Debian GLIBC 2.41-12+deb13u3) stable release version 2.41."
+LIBC_BANNER_GLIBC_REGEX = re.compile(r"^GNU C Library .*release version (\d+\.\d+)")
 
 # The merged seccomp profile written next to a kernel's scratch contents.
 _SECCOMP_PROFILE_FILENAME: Final[str] = "seccomp.json"
@@ -249,20 +253,46 @@ def _build_log_config(local_config: AgentUnifiedConfig) -> LogConfig:
     )
 
 
+def _distro_for_glibc_version(version: float) -> str:
+    if version in known_glibc_distros:
+        return known_glibc_distros[version]
+    for idx, known_version in enumerate(known_glibc_distros.keys()):
+        if version < known_version:
+            return list(known_glibc_distros.values())[max(idx - 1, 0)]
+    return list(known_glibc_distros.values())[-1]
+
+
 def _parse_distro_from_ldd_output(log_chunks: Sequence[str]) -> str | None:
+    """
+    Resolve the distro from the output of ``ldd --version`` or of the C library run directly.
+    """
     for line in "".join(log_chunks).splitlines():
         stripped_line = line.strip()
         if m := LDD_GLIBC_REGEX.search(stripped_line):
-            version = float(m.group(1))
-            if version in known_glibc_distros:
-                return known_glibc_distros[version]
-            for idx, known_version in enumerate(known_glibc_distros.keys()):
-                if version < known_version:
-                    return list(known_glibc_distros.values())[max(idx - 1, 0)]
-            return list(known_glibc_distros.values())[-1]
+            return _distro_for_glibc_version(float(m.group(1)))
+        if m := LIBC_BANNER_GLIBC_REGEX.search(stripped_line):
+            return _distro_for_glibc_version(float(m.group(1)))
         if LDD_MUSL_REGEX.search(stripped_line):
             return "alpine3.8"
     return None
+
+
+def _libc_probe_commands(arch: str) -> list[list[str]]:
+    """
+    Commands tried in order to learn an image's C library. ``ldd`` comes first so images that
+    have it keep the existing probe; the rest execute the library itself for images without ldd.
+    The library paths use the Linux spelling of the architecture (aarch64, x86_64).
+    """
+    arch = arch_name_aliases.get(arch.lower(), arch.lower())
+    return [
+        ["ldd", "--version"],
+        [f"/lib/{arch}-linux-gnu/libc.so.6"],
+        ["/lib64/libc.so.6"],
+        ["/usr/lib64/libc.so.6"],
+        ["/usr/lib/libc.so.6"],
+        ["/lib/libc.so.6"],
+        [f"/lib/ld-musl-{arch}.so.1"],
+    ]
 
 
 deeplearning_image_keys = {
@@ -1842,32 +1872,65 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                 return cached_distro
 
             image_ref = ImageRef.from_image_config(image)
-            container_config: dict[str, Any] = {
-                "Image": image_ref.short if image_ref.is_local else image_ref.canonical,
-                "Tty": True,
-                "Privileged": False,
-                "AttachStdin": False,
-                "AttachStdout": True,
-                "AttachStderr": True,
-                "HostConfig": {
-                    "Init": True,
-                },
-                "Entrypoint": [""],
-                "Cmd": ["ldd", "--version"],
-            }
+            image_name = image_ref.short if image_ref.is_local else image_ref.canonical
+            arch = image["architecture"] or get_arch_name()
+            resolved = await self._probe_image_distro(docker, image_name, arch)
+            await self.valkey_stat_client.set_image_distro(image_id, resolved)
+            return resolved
 
-            container = await docker.containers.create(container_config)
-            await container.start()
+    async def _probe_image_distro(self, docker: Docker, image_name: str, arch: str) -> str:
+        """
+        Run the libc probe commands in throwaway containers until one is recognized.
+        A command the image cannot execute (e.g., no ldd on a distroless base) is skipped.
+        """
+        tried: list[str] = []
+        for cmd in _libc_probe_commands(arch):
+            tried.append(" ".join(cmd))
+            output = await self._run_libc_probe(docker, image_name, cmd)
+            if output is None:
+                continue
+            distro = _parse_distro_from_ldd_output(output)
+            if distro is not None:
+                return distro
+        raise RuntimeError(
+            f"Could not determine the C library variant of {image_name} (tried: {', '.join(tried)})"
+        )
+
+    async def _run_libc_probe(
+        self, docker: Docker, image_name: str, cmd: list[str]
+    ) -> list[str] | None:
+        """Return the probe output, or None when the image cannot start the command."""
+        container_config: dict[str, Any] = {
+            "Image": image_name,
+            "Tty": True,
+            "Privileged": False,
+            "AttachStdin": False,
+            "AttachStdout": True,
+            "AttachStderr": True,
+            "HostConfig": {
+                "Init": True,
+            },
+            "Entrypoint": [""],
+            "Cmd": cmd,
+        }
+        container = await docker.containers.create(container_config)
+        try:
+            try:
+                await container.start()
+            except DockerError as e:
+                log.debug("libc probe {!r} cannot run on {}: {}", cmd, image_name, e.message)
+                return None
             await container.wait()  # wait until container finishes to prevent race condition
             container_log = await container.log(stdout=True, stderr=True, follow=False)
-            await container.stop()
-            await container.delete()
-            log.debug("response: {}", container_log)
-            distro = _parse_distro_from_ldd_output(container_log)
-            if distro is None:
-                raise RuntimeError("Could not determine the C library variant.")
-            await self.valkey_stat_client.set_image_distro(image_id, distro)
-            return distro
+            log.debug("libc probe {!r} on {}: {}", cmd, image_name, container_log)
+            return container_log
+        finally:
+            try:
+                await container.delete(force=True)
+            except DockerError as e:
+                log.warning(
+                    "failed to delete the libc probe container of {}: {}", image_name, e.message
+                )
 
     @override
     async def scan_images(self) -> ScanImagesResult:
