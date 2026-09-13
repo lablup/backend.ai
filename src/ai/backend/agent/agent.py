@@ -862,6 +862,10 @@ class AbstractAgent[
     port_pool: PortPool
 
     restarting_kernels: MutableMapping[KernelId, RestartTracker]
+    #: How many containers this NODE may be building at once. One semaphore for the agent, not one
+    #: per request: the number answers "what can this host start at the same time", and a
+    #: per-request one lets N concurrent sessions each run the configured number.
+    kernel_creation_sema: asyncio.Semaphore
     _local_cron: LocalCron | None
     container_lifecycle_queue: asyncio.Queue[ContainerLifecycleEvent | Sentinel]
 
@@ -1001,6 +1005,9 @@ class AbstractAgent[
         """
         self.resource_lock = asyncio.Lock()
         self.registry_lock = asyncio.Lock()
+        self.kernel_creation_sema = asyncio.Semaphore(
+            self.local_config.agent.kernel_creation_concurrency
+        )
         # Advertise which container runtime this agent runs. The manager pairs the cluster-network
         # driver against it: a driver only one backend can serve must not be handed to an agent of
         # the other kind, or the session comes up with kernels that cannot reach each other and
