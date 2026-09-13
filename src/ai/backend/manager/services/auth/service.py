@@ -787,29 +787,26 @@ class AuthService:
             return PublicResolveAccessKeyScopeResult(
                 requester_access_key=requester_ak,
                 owner_access_key=requester_ak,
+                owner_user_id=UserID(acting.user_id),
             )
         owner_ak = AccessKey(action.owner_access_key)
         try:
-            (
-                owner_domain,
-                owner_role,
-            ) = await self._auth_repository.get_delegation_target_by_access_key(
-                action.owner_access_key,
-            )
+            owner = await self._auth_repository.get_delegation_target_by_access_key(owner_ak)
         except ValueError as e:
             raise InvalidAPIParameters(str(e)) from e
         try:
             check_if_requester_is_eligible_to_act_as_target_user(
                 acting.role,
                 acting.domain_name,
-                owner_role,
-                owner_domain,
+                owner.role,
+                owner.domain_name,
             )
         except RuntimeError as e:
             raise GenericForbidden(str(e)) from e
         return PublicResolveAccessKeyScopeResult(
             requester_access_key=requester_ak,
             owner_access_key=owner_ak,
+            owner_user_id=owner.user_id,
         )
 
     async def resolve_user_scope(
@@ -818,17 +815,13 @@ class AuthService:
         acting = self._acting_user()
         if action.owner_user_email is None:
             return PublicResolveUserScopeResult(
-                owner_uuid=acting.user_id,
+                owner_uuid=UserID(acting.user_id),
                 owner_role=acting.role,
             )
         if not acting.is_superadmin:
             raise InvalidAPIParameters("Only superadmins may have user scopes.")
         try:
-            (
-                owner_uuid,
-                owner_role,
-                owner_domain,
-            ) = await self._auth_repository.get_delegation_target_by_email(
+            owner = await self._auth_repository.get_delegation_target_by_email(
                 action.owner_user_email,
             )
         except ValueError as e:
@@ -837,14 +830,14 @@ class AuthService:
             check_if_requester_is_eligible_to_act_as_target_user(
                 acting.role,
                 acting.domain_name,
-                owner_role,
-                owner_domain,
+                owner.role,
+                owner.domain_name,
             )
         except RuntimeError as e:
             raise GenericForbidden(str(e)) from e
         return PublicResolveUserScopeResult(
-            owner_uuid=owner_uuid,
-            owner_role=owner_role,
+            owner_uuid=owner.user_id,
+            owner_role=owner.role,
         )
 
     async def _check_password_age(self, user: RowMapping, auth_config: AuthConfig | None) -> None:

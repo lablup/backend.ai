@@ -6,11 +6,11 @@ from typing import override
 from aiohttp import web
 
 from ai.backend.manager.actions.types import ActionOperationType
-from ai.backend.manager.services.auth.actions.base import AuthGlobalAction
+from ai.backend.manager.services.auth.actions.base import UserGlobalAction
 
 
 @dataclass(frozen=True)
-class UpdatePasswordNoAuthAction(AuthGlobalAction):
+class UpdatePasswordNoAuthAction(UserGlobalAction):
     request: web.Request
     domain_name: str
     email: str

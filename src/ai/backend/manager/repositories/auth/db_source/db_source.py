@@ -22,11 +22,13 @@ from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
 from ai.backend.common.resilience.resilience import Resilience
+from ai.backend.common.types import AccessKey
 from ai.backend.manager.data.auth.login_session_types import (
     LoginAttemptResult,
     LoginSessionStatus,
 )
 from ai.backend.manager.data.auth.types import (
+    DelegationTargetUser,
     GroupMembershipData,
     KeyPairSigningMaterial,
     UserCreationData,
@@ -336,14 +338,16 @@ class AuthDBSource:
         )
 
     @auth_db_source_resilience.apply()
-    async def fetch_user_info_by_access_key(self, access_key: str) -> tuple[str, UserRole]:
-        """Join keypairs→users to get (domain_name, role) for the owner of *access_key*.
+    async def fetch_delegation_target_user_by_access_key(
+        self, access_key: AccessKey
+    ) -> DelegationTargetUser:
+        """Join keypairs→users to reach the owner of *access_key*.
 
         Raises ``ValueError`` if the access key is unknown.
         """
         async with self._db.begin_readonly() as conn:
             query = (
-                sa.select(users.c.domain_name, users.c.role)
+                sa.select(users.c.uuid, users.c.role, users.c.domain_name)
                 .select_from(sa.join(keypairs, users, keypairs.c.user == users.c.uuid))
                 .where(keypairs.c.access_key == access_key)
             )
@@ -351,11 +355,13 @@ class AuthDBSource:
             row = result.first()
             if row is None:
                 raise ValueError("Unknown owner access key")
-            return row.domain_name, row.role
+            return DelegationTargetUser(
+                user_id=UserID(row.uuid), role=row.role, domain_name=row.domain_name
+            )
 
     @auth_db_source_resilience.apply()
-    async def fetch_user_info_by_email(self, email: str) -> tuple[UUID, UserRole, str]:
-        """Fetch (uuid, role, domain_name) for a user identified by *email*.
+    async def fetch_delegation_target_user_by_email(self, email: str) -> DelegationTargetUser:
+        """Reach the user *email* identifies.
 
         Raises ``ValueError`` if the user is not found.
         """
@@ -369,7 +375,9 @@ class AuthDBSource:
             row = result.first()
             if row is None:
                 raise ValueError("Cannot delegate an unknown user")
-            return row.uuid, row.role, row.domain_name
+            return DelegationTargetUser(
+                user_id=UserID(row.uuid), role=row.role, domain_name=row.domain_name
+            )
 
     @auth_db_source_resilience.apply()
     async def fetch_user_uuid_by_email(self, email: str, domain_name: str) -> UUID | None:

@@ -207,6 +207,9 @@ decides the shape. Do not create new subclasses of the legacy `BaseAction` bases
   empty, so every authenticated caller may resolve. A bulk lookup feeding a
   `partial_bulk_get_ops` read is wired public: the read answers per entity, and a
   lookup refusing the whole batch over one entity would take that away.
+- `public_lookup` is the same empty second half for a lookup the domain runs itself.
+  Reach for it only where the service decides what the caller may resolve, so a
+  post-validator would ask the same question twice.
 - A lookup with post-validators answers a key naming nothing and a key the caller may
   not reach with one exception, so no status code says whether the key exists. The
   processor merges them; adapters must not split them apart again. The audit record

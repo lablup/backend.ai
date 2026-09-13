@@ -463,6 +463,24 @@ class ProcessorGroup[TData: EntityData]:
             post_validators=self._deps.validators.single_entity,
         )
 
+    def public_lookup[TAction: BaseLookupAction, TResult: BaseLookupActionResult](
+        self,
+        action_cls: type[TAction],
+        func: Callable[[TAction], Awaitable[TResult]],
+        *,
+        validators: Sequence[LookupActionValidator] = (),
+        monitors: Sequence[LookupActionMonitor] = (),
+    ) -> LookupActionProcessor[TAction, TResult]:
+        """A key every authenticated caller may resolve, run by the domain's own
+        implementation: no post-validators, so the resolved entity carries no
+        permission."""
+        self._record(action_cls, ActionKind.LOOKUP, ActionGate.PUBLIC, ActionBacking.CUSTOM)
+        return LookupActionProcessor(
+            func,
+            monitors=(*self._deps.monitors.lookup, *monitors),
+            validators=(*self._deps.validators.lookup, *validators),
+        )
+
     def lookup_ops[TAction: LookupEntityOpsAction[Any, Any]](
         self,
         action_cls: type[TAction],

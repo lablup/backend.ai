@@ -13,6 +13,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.dto.manager.model_serving.request import (
     NewServiceRequestModel,
@@ -84,6 +85,7 @@ class TestRunValidationUsesKeypairResourcePolicy:
         scope_result = PublicResolveAccessKeyScopeResult(
             requester_access_key=AccessKey("TESTACCESSKEY01"),
             owner_access_key=AccessKey("TESTACCESSKEY01"),
+            owner_user_id=UserID(uuid.uuid4()),
         )
         mock = MagicMock()
         mock.public_resolve_access_key_scope = MagicMock()

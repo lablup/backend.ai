@@ -2,11 +2,11 @@ from dataclasses import dataclass
 from typing import override
 
 from ai.backend.manager.actions.types import ActionOperationType
-from ai.backend.manager.services.auth.actions.base import AuthGlobalAction
+from ai.backend.manager.services.auth.actions.base import UserGlobalAction
 
 
 @dataclass(frozen=True)
-class GlobalUnblockUserAction(AuthGlobalAction):
+class GlobalUnblockUserAction(UserGlobalAction):
     """Clear the failed-login block a username carries.
 
     The block is login state rather than a column on the user, so the operation is an

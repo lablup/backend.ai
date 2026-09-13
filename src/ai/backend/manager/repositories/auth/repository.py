@@ -12,8 +12,10 @@ from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
 from ai.backend.common.resilience.resilience import Resilience
+from ai.backend.common.types import AccessKey
 from ai.backend.manager.data.auth.login_session_types import LoginAttemptResult
 from ai.backend.manager.data.auth.types import (
+    DelegationTargetUser,
     GroupMembershipData,
     KeyPairSigningMaterial,
     UserCreationData,
@@ -22,7 +24,7 @@ from ai.backend.manager.data.keypair.types import KeyPairData
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.specs.lookup import DataLookup
 from ai.backend.manager.models.specs.querier import DataQuerier
-from ai.backend.manager.models.user import UserRole, UserRow
+from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.user.creators import UserCreator
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.auth.db_source.db_source import (
@@ -125,12 +127,14 @@ class AuthRepository:
         return await self._db_source.lookup(lookup)
 
     @auth_repository_resilience.apply()
-    async def get_delegation_target_by_access_key(self, access_key: str) -> tuple[str, UserRole]:
-        return await self._db_source.fetch_user_info_by_access_key(access_key)
+    async def get_delegation_target_by_access_key(
+        self, access_key: AccessKey
+    ) -> DelegationTargetUser:
+        return await self._db_source.fetch_delegation_target_user_by_access_key(access_key)
 
     @auth_repository_resilience.apply()
-    async def get_delegation_target_by_email(self, email: str) -> tuple[UUID, UserRole, str]:
-        return await self._db_source.fetch_user_info_by_email(email)
+    async def get_delegation_target_by_email(self, email: str) -> DelegationTargetUser:
+        return await self._db_source.fetch_delegation_target_user_by_email(email)
 
     @auth_repository_resilience.apply()
     async def get_user_uuid_by_email(self, email: str, domain_name: str) -> UUID | None:
