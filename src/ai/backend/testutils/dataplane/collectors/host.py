@@ -30,6 +30,10 @@ OWNED_CHAIN_PREFIX = "BAI-VXLAN-"
 
 DEFAULT_IPTABLES_TABLES: tuple[str, ...] = ("filter", "nat", "mangle")
 
+#: IPv6 link-local, which the kernel keeps a neighbour cache of on its own account. The backend
+#: programs IPv4 ARP and bridge FDB entries; it never writes one of these.
+IPV6_LINK_LOCAL_PREFIX = "fe80:"
+
 
 class NetworkLinkCollector:
     """Netlink devices belonging to the backend, on one node.
@@ -340,6 +344,13 @@ class NeighbourCollector:
                 continue
             dev = _value_after(tokens, "dev")
             if dev is None or not self._is_ours(dev):
+                continue
+            if tokens[0].lower().startswith(IPV6_LINK_LOCAL_PREFIX):
+                # Nobody programmed this one. The kernel discovers a link-local neighbour on any
+                # device that has one and expires it on the ND cache's own timers, so whether it
+                # is there at the end of a scenario says nothing about that scenario -- but with
+                # sessions running side by side it is reliably *something*, reported as a leak in
+                # one run and as collateral in the next. Measured: two of seven concurrent runs.
                 continue
             found.add(
                 Resource(

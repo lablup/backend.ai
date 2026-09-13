@@ -366,6 +366,18 @@ class TestNeighbourCollector:
         )
         assert [r.detail for r in found] == ["02:42:0a:80:00:02"]
 
+    def test_the_kernels_own_link_local_neighbours_are_not_resources(self) -> None:
+        """Nothing in the backend writes an IPv6 link-local neighbour: the kernel discovers them
+        and expires them on its own timers. Counted, they turn a scenario running next to another
+        session into a leak report -- and the next run into a collateral one."""
+        collector = NeighbourCollector(FakeNode("n1", {}))
+        found = collector.parse_neigh(
+            "10.128.0.2 dev baibr4098 lladdr 02:42:0a:80:00:02 PERMANENT\n"
+            "fe80::42:aff:fe80:2 dev baibr4098 lladdr 02:42:0a:80:00:02 STALE\n"
+            "FE80::34ad:bdff:febe:5aa4 dev bailo7 lladdr 36:ad:bd:be:5a:a4 STALE\n"
+        )
+        assert {r.ident for r in found} == {"neigh 10.128.0.2 dev baibr4098"}
+
 
 # --- containerd collector ---------------------------------------------------------------------
 
