@@ -265,3 +265,120 @@ class TestTeardownRacingASetup:
             )
         finally:
             await session_driver.destroy(arriving.session_id)
+
+
+#: Of a concurrent batch, how many are killed while they are still being built. The rest have to
+#: come up anyway: a forced terminate is a per-session act, and its blast radius is the question.
+VICTIMS = 3
+
+#: The stage a victim is killed at, or past. Under load the window is not reliably observable --
+#: a kill that lands after RUNNING is still a forced kill amid concurrent work, and the scenario
+#: says so rather than pretending it caught the earlier stage.
+_KILL_AT = "CREATING"
+
+_CREATE_PATH = ("PENDING", "SCHEDULED", "PREPARING", "PULLING", "PREPARED", "CREATING", RUNNING)
+
+
+async def _reach_or_past(driver: SessionDriver, handle: SessionHandle, target: str) -> str:
+    """Poll until the session is at `target` or beyond it; returns where it actually was."""
+    wanted = _CREATE_PATH.index(target)
+    deadline = asyncio.get_running_loop().time() + 240.0
+    while True:
+        status = await driver.status(handle.session_id)
+        if status in ("TERMINATED", "CANCELLED", "ERROR"):
+            return status
+        if status in _CREATE_PATH and _CREATE_PATH.index(status) >= wanted:
+            return status
+        if asyncio.get_running_loop().time() >= deadline:
+            return f"stuck:{status}"
+        await asyncio.sleep(0.1)
+
+
+async def _kill_when_building(driver: SessionDriver, handle: SessionHandle) -> str:
+    stage = await _reach_or_past(driver, handle, _KILL_AT)
+    await driver.destroy(handle.session_id, wait=False, forced=True)
+    return stage
+
+
+async def _session_keys(etcd: AsyncEtcd, handle: SessionHandle, *, max_wait: float = 120.0) -> int:
+    prefix = f"network/session/{handle.session_id}/"
+    deadline = asyncio.get_running_loop().time() + max_wait
+    while True:
+        left = flatten(prefix, await etcd.get_prefix(prefix) or {})
+        if not left or asyncio.get_running_loop().time() >= deadline:
+            return len(left)
+        await asyncio.sleep(2.0)
+
+
+class TestForcedKillsAmidConcurrentWork:
+    """C6: half a batch force-killed while it is being built, the other half must not notice.
+
+    The two halves share everything a node has -- the VNI pool, the subnet journal, the node-wide
+    registry lock, the container runtime -- so a teardown that reaches past its own session, or a
+    create that gives up because somebody else's kill starved it, shows here and nowhere else.
+    """
+
+    async def test_c6_killing_half_a_batch_mid_create_leaves_the_other_half_whole(
+        self,
+        leak_guard: LeakGuard,
+        session_driver: SessionDriver,
+        etcd: AsyncEtcd,
+        session_spec: SessionSpec,
+    ) -> None:
+        spec = replace(
+            session_spec,
+            cluster_size=2,
+            cluster_mode=ClusterModeEnum.MULTI_NODE,
+        )
+        victims = [await session_driver.enqueue(spec, f"dp-c6-victim-{i}") for i in range(VICTIMS)]
+        survivors_pending = [
+            asyncio.create_task(session_driver.create(spec, f"dp-c6-live-{i}"))
+            for i in range(CONCURRENT_SESSIONS - VICTIMS)
+        ]
+        survivors: list[SessionHandle] = []
+        try:
+            stages = await asyncio.gather(
+                *(_kill_when_building(session_driver, v) for v in victims)
+            )
+            results = await asyncio.gather(*survivors_pending, return_exceptions=True)
+            survivors = [r for r in results if isinstance(r, SessionHandle)]
+            failures = [r for r in results if isinstance(r, BaseException)]
+
+            await asyncio.gather(
+                *(
+                    session_driver.wait_terminal(v.session_id, max_wait=_TERMINAL_BOUND)
+                    for v in victims
+                )
+            )
+            left = await asyncio.gather(*(_session_keys(etcd, v) for v in victims))
+
+            assert not failures, (
+                f"a session being created alongside {VICTIMS} forced kills did not come up: "
+                f"{failures} (kills landed at {stages})"
+            )
+            assert not any(left), (
+                f"a force-killed session kept its control-plane state: {dict(zip(stages, left, strict=True))}"
+            )
+            assert any(stage != RUNNING for stage in stages), (
+                f"every kill landed after the session was already running ({stages}); this rig is "
+                "too fast for the window and the scenario tested a teardown, not an abort"
+            )
+            for survivor in survivors:
+                assert await session_driver.status(survivor.session_id) == RUNNING, (
+                    "a session that came up next to the kills did not stay up"
+                )
+            metas = await _overlay_allocations(etcd)
+            live_vnis = [
+                metas[str(h.session_id)]["vni"] for h in survivors if str(h.session_id) in metas
+            ]
+            assert len(live_vnis) == len(survivors), (
+                "a surviving session lost its overlay record while its neighbours were killed"
+            )
+            assert not _duplicates(live_vnis), (
+                f"a killed session's VNI was handed to a live one: {live_vnis}"
+            )
+        finally:
+            for task in survivors_pending:
+                if not task.done():
+                    task.cancel()
+            await _destroy_all(session_driver, survivors)
