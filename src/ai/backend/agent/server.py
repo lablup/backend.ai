@@ -819,7 +819,11 @@ class AgentRPCServer(aobject):
         session_id = SessionId(UUID(raw_session_id))
         coros = []
         agent = self.runtime.get_agent(agent_id)
-        throttle_sema = asyncio.Semaphore(agent.local_config.agent.kernel_creation_concurrency)
+        # The agent's own, not one made here: a semaphore per RPC call bounds the kernels of ONE
+        # session, and `kernel-creation-concurrency` is a statement about the host. Six concurrent
+        # two-kernel sessions started twelve containers at once on a node configured for four,
+        # which is how a create came to miss the manager's RPC deadline and take its session down.
+        throttle_sema = agent.kernel_creation_sema
         for raw_kernel_id, raw_config in zip(raw_kernel_ids, raw_configs, strict=True):
             log.info(
                 "rpc::create_kernel(k:{0}, img:{1})",
