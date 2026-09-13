@@ -1,8 +1,10 @@
+from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Any, override
 
 from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.data.entity.container_registry import ContainerRegistryID
+from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.types import EntityData
 
 
@@ -53,3 +55,15 @@ class PerProjectContainerRegistryInfo:
     ssl_verify: bool
     is_global: bool
     extra: dict[str, Any]
+
+
+@dataclass(frozen=True)
+class RegistryProjectChange:
+    """Which projects an update starts allowing on a registry, and which it stops.
+
+    Carried with the update rather than applied beside it: the two writes share the
+    registry's own transaction, so a refused update leaves the links as they were.
+    """
+
+    add: Sequence[ProjectID] = ()
+    remove: Sequence[ProjectID] = ()
