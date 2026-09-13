@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 import click
 
@@ -16,7 +16,7 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 @click.group()
-def cli(args: Any) -> None:
+def cli() -> None:
     pass
 
 
