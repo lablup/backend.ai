@@ -42,6 +42,10 @@ from ai.backend.testutils.dataplane.collectors.host import (
 )
 from ai.backend.testutils.dataplane.guard import LeakGuard
 from ai.backend.testutils.dataplane.nodes import Node, SudoNode, parse_node_specs
+from ai.backend.testutils.dataplane.privnet_control import (
+    PrivnetControlConfig,
+    PrivnetController,
+)
 from ai.backend.testutils.dataplane.session import SessionDriver, SessionSpec
 
 ENV_NODES = "BAI_DATAPLANE_NODES"
@@ -93,6 +97,11 @@ class DataplaneConfig:
     agent registered in the group the scheduler is free to place a single-node session on either,
     and a co-location scenario that read the wrong node would find no kernel."""
     privnet_socket: str = "/run/backend.ai/privnet/net-privnet.sock"
+    privnet_start_cmd: tuple[str, ...] = ()
+    """How to bring the privnet daemon back on the first node. On a rig where the agent and its
+    helper are launched together this restarts both, which is what the helper's own upgrade
+    procedure requires: a restarted privnet under a still-running agent strands the sessions the
+    old pair was carrying."""
 
     @property
     def state_dirs(self) -> tuple[str, ...]:
@@ -191,6 +200,7 @@ def dataplane_config() -> DataplaneConfig:
             "BAI_DATAPLANE_PRIVNET_SOCKET", "/run/backend.ai/privnet/net-privnet.sock"
         ),
         agent_ids=tuple(p for p in _env("BAI_DATAPLANE_AGENT_IDS", "").split(",") if p),
+        privnet_start_cmd=tuple(shlex.split(_env("BAI_DATAPLANE_PRIVNET_START_CMD", ""))),
     )
 
 
@@ -390,7 +400,9 @@ async def session_driver(dataplane_config: DataplaneConfig) -> AsyncIterator[Ses
         ),
     )
     try:
-        yield SessionDriver(registry.session)
+        # Tagged with this process: pytest batches run in parallel, and two files that both name
+        # their session for the scenario it belongs to would otherwise collide in the manager.
+        yield SessionDriver(registry.session, run_tag=f"{os.getpid():x}")
     finally:
         await registry.close()
 
@@ -455,6 +467,28 @@ def agent_control(raw_nodes: Sequence[Node], dataplane_config: DataplaneConfig) 
             "BAI_DATAPLANE_AGENT_START_CMD is unset; restart scenarios cannot bring the agent back"
         )
     return AgentController(raw_nodes[0], config)
+
+
+@pytest.fixture
+def privnet_control(
+    raw_nodes: Sequence[Node], dataplane_config: DataplaneConfig
+) -> PrivnetController:
+    """Kill/restart control for the first node's privnet daemon.
+
+    On the unsudo'd node for the same reason as `agent_control`: the launcher takes the uid it
+    will trust from the caller, and nesting sudo makes the daemon trust root instead -- after
+    which every call the agent makes to it is refused.
+    """
+    config = PrivnetControlConfig(
+        start_cmd=dataplane_config.privnet_start_cmd,
+        socket_path=dataplane_config.privnet_socket,
+    )
+    if not config.configured:
+        _unavailable(
+            "BAI_DATAPLANE_PRIVNET_START_CMD is unset; a scenario that kills the privnet cannot "
+            "bring it back"
+        )
+    return PrivnetController(raw_nodes[0], config)
 
 
 @pytest.fixture

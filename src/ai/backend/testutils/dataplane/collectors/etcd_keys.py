@@ -24,9 +24,15 @@ from ai.backend.testutils.dataplane.collectors.base import Resource
 
 DEFAULT_PREFIXES: tuple[str, ...] = ("network/session/", "network/agent/")
 
-#: Fields that say *when* a record was written or *which run of the agent* wrote it, rather than
-#: what it holds. A record whose only difference is one of these is the same record.
-_VOLATILE_FIELDS: Final = frozenset({"updated_at", "boot_id"})
+#: Fields that say *when* a record was written, *which run of the agent* wrote it, or how the node
+#: is feeling, rather than what it holds. A record whose only difference is one of these is the
+#: same record.
+#:
+#: ``readiness`` is here because it is a health signal and not a resource: a node that is busy
+#: recovering says so in its caps, and a scenario that ran while it stopped or started saying so
+#: had the change reported as a leaked record AND a lost one -- the guard's loudest failure, for a
+#: node that owns exactly what it owned before.
+_VOLATILE_FIELDS: Final = frozenset({"updated_at", "boot_id", "readiness"})
 
 #: Agent keys whose whole value IS the incarnation: the boot id, and the readiness digest that is
 #: computed over it. A restart rotates both by design, so a scenario that restarts the agent would
