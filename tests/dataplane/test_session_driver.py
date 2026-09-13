@@ -190,3 +190,24 @@ class TestRunningIsNotFinal:
 class TestNaming:
     def test_name_is_capped_at_the_managers_limit(self) -> None:
         assert len(unique_name("x" * 80, suffix="abc")) == 64
+
+
+class TestRunTag:
+    """The runner's business, not the scenario's."""
+
+    async def test_an_untagged_driver_enqueues_the_name_it_was_given(self) -> None:
+        api = FakeSessionApi(["RUNNING"])
+        handle = await _driver(api).enqueue(SessionSpec(uuid4(), uuid4()), "dp-x")
+        assert handle.name == "dp-x"
+        assert api.enqueued[0].session_name == "dp-x"
+
+    async def test_a_tagged_driver_makes_the_name_unique_and_reports_what_it_used(self) -> None:
+        """Two pytest processes running two files both want "dp-x", and the manager refuses the
+        second: a name is unique per user among the live sessions. The handle has to carry the
+        name that was actually enqueued, or a scenario that looks its session up by name finds
+        nothing."""
+        api = FakeSessionApi(["RUNNING"])
+        driver = SessionDriver(api, interval=0, max_wait=10, run_tag="beef")
+        handle = await driver.enqueue(SessionSpec(uuid4(), uuid4()), "dp-x")
+        assert handle.name == "dp-x-beef"
+        assert api.enqueued[0].session_name == "dp-x-beef"

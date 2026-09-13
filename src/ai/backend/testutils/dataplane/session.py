@@ -152,11 +152,29 @@ class SessionDriver:
     _api: SessionApi
     _interval: float
     _max_wait: float
+    _run_tag: str | None
 
-    def __init__(self, api: SessionApi, *, interval: float = 2.0, max_wait: float = 300.0) -> None:
+    def __init__(
+        self,
+        api: SessionApi,
+        *,
+        interval: float = 2.0,
+        max_wait: float = 300.0,
+        run_tag: str | None = None,
+    ) -> None:
+        """`run_tag`, when given, is appended to every session name this driver enqueues.
+
+        A scenario names its session for what it is -- "dp-g14" -- and two scenarios in two pytest
+        processes then ask for the same name at the same time, which the manager refuses outright:
+        a name is unique per user among the live sessions. The same refusal greets the next run
+        after a crash left one of them alive. Neither is anything the scenario is about, so the
+        tag is the runner's business and not the scenario's, and the handle carries the name that
+        was actually used.
+        """
         self._api = api
         self._interval = interval
         self._max_wait = max_wait
+        self._run_tag = run_tag
 
     async def status(self, session_id: UUID) -> str:
         return _status_of(await self._api.get(session_id))
@@ -192,11 +210,32 @@ class SessionDriver:
                 )
             await asyncio.sleep(self._interval)
 
-    async def create(self, spec: SessionSpec, name: str) -> SessionHandle:
+    async def enqueue(self, spec: SessionSpec, name: str) -> SessionHandle:
+        """Submit the session and return at once, without waiting for it to run.
+
+        What an abort scenario needs: the fault it injects has to land while the session is still
+        being built, and `create` only returns once that window has already closed.
+        """
+        if self._run_tag:
+            name = unique_name(name, suffix=self._run_tag)
         payload = await self._api.enqueue(spec.to_enqueue_input(name))
-        session_id = _session_id_of(payload)
-        await self.wait_until(session_id, frozenset({RUNNING}))
-        return SessionHandle(session_id=session_id, name=name)
+        return SessionHandle(session_id=_session_id_of(payload), name=name)
+
+    async def create(self, spec: SessionSpec, name: str) -> SessionHandle:
+        handle = await self.enqueue(spec, name)
+        await self.wait_until(handle.session_id, frozenset({RUNNING}))
+        return handle
+
+    async def wait_terminal(self, session_id: UUID, *, max_wait: float | None = None) -> str:
+        """Wait for a session to stop, whichever way it stopped.
+
+        A session aborted before it ever ran ends CANCELLED and one aborted after its kernels
+        existed ends TERMINATED; both are a finished teardown for a scenario's purposes, and which
+        one happened is the caller's to assert on.
+        """
+        return await self.wait_until(
+            session_id, frozenset({TERMINATED, "CANCELLED"}), max_wait=max_wait
+        )
 
     async def destroy(self, session_id: UUID, *, wait: bool = True, forced: bool = False) -> None:
         await self._api.terminate(TerminateSessionsInput(session_ids=[session_id], forced=forced))

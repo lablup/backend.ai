@@ -92,7 +92,10 @@ class TestCrossNodeDataPath:
         cross_node_spec: SessionSpec,
         node_pair: tuple[Node, Node],
     ) -> None:
-        async with session_driver.session(cross_node_spec, "dp-g17") as handle:
+        # Not "dp-g17": `test_ipam.py` names its own session that, and a session name is unique
+        # per user among the live ones -- with the two files in different pytest batches they run
+        # at the same time and the second enqueue is refused outright.
+        async with session_driver.session(cross_node_spec, "dp-g17-mtu") as handle:
             (node_a, pid_a, ip_a), (node_b, pid_b, ip_b) = await self._spread_endpoints(
                 node_pair, handle
             )
