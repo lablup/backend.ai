@@ -169,6 +169,51 @@ DB가 리셋된 뒤 남은 옛 찌꺼기이고 에이전트 버그가 아니다.
 | B6 | 세션의 커널 A가 이미지 pull 중, 커널 B가 조기 실패 | **세션 네트워크가 무너지지 않음** (B가 마지막 커널로 오인되지 않음) | I | `tracker.reserve` — 컨테이너가 아닌 `ensure_session` 시점부터 카운트 | 🔴회귀 ⬜ |
 | B7 | `apply_network` 실패 → 커널 정리 | **scratch 디렉터리 반환** | I | 결함 **BUG3** — 하네스가 재현함(`8a3bffe5`). `scratch prepared` 다음 단계가 실패하면 scratch가 남음 | 🔴재현됨 ⬜ |
 
+### B10-B17 — 생성 중 강제종료 (`test_create_abort.py`, 2026-09-13 실행)
+
+주입 지점은 지연 시간이 아니라 **상태**다. 이 리그의 생성은 10초에 끝나고 CREATING은 2초 미만이라,
+초 단위로 자는 시나리오는 매 실행마다 다른 단계에서 주입하고 자기가 적어 놓은 단계에는 닿지 못한다.
+창을 놓치면 그 세션은 정상 경로로 정리하고 다시 enqueue한다(`_ABORT_ATTEMPTS`) — 이미지가 따뜻하면
+폴링 두 번 사이에 창이 닫히는데, 그걸 제품 실패로 읽지 않기 위해서다.
+
+3노드(i-dk-104 / i-dk-112 / i-dk-156)에서 8/8 통과. B13은 노드쌍을 바꿔 **104↔112**와 **104↔156**
+양쪽으로 각각 돌렸다.
+
+| ID | 시나리오 | 기대 | 기준 | 근거 | 상태 |
+|---|---|---|---|---|---|
+| B10 | PENDING에서 forced terminate | 종단 도달, VNI·블록 애초에 0, delta 0 | I | 단계별 롤백이 그 단계만큼만 되돌리는지 | ✅ |
+| B11 | PREPARING에서 forced terminate | 종단 도달, delta 0 | I | | ✅ |
+| B12 | CREATING(에이전트가 데이터플레인 구축 중)에서 forced terminate | 종단 도달, delta 0 | I | | ✅ |
+| B13 | 2노드 MULTI_NODE를 CREATING에서 forced terminate | 양 노드 baseline 복귀, `network/session/<id>/` 소멸 | I | 결함 **BUG6** — 아래. 수정 후 통과 | 🔴재현됨 ✅ |
+
+> B13은 죽이기 전에 `members/`를 읽어 **두 노드가 실제로 이 세션을 쥐고 있었는지** 먼저 확인한다.
+> 스케줄러가 한 노드에 몰아넣어도 teardown은 깨끗하니 그냥 통과하는데, 그건 아무것도 검증하지 않은
+> 통과다 — A 그룹 재시작 시나리오가 핀 고정 전까지 그랬던 것과 같은 함정이다.
+| B14 | 같은 노드에 RUNNING 오버레이 세션을 둔 채 B12 | 동거 세션의 자원·커널 간 도달성 무손상(collateral 0) | I | 디바이스 이름·체인·블록 저널이 노드 전역이라 남의 것을 같이 지울 수 있다 | ✅ |
+| B15 | 생성 중 agent SIGKILL → 재시작 | 종단 도달, 재시작의 reclaim 후 delta 0 | I | `_reclaim_orphans` (B5의 실행판) | ✅ |
+| B16 | 생성 중 privnet SIGKILL → privnet+agent 재기동 | CREATING에 매달리지 않음, delta 0 | I | privnet 불통 중 생성이 남긴 반제품 | ✅ |
+| B17 | 랜덤 단계에서 8회 반복 중단 | 누적 delta 0, VNI/블록/IP 누수 0 | I | 한 번의 통과로는 보이지 않는 축적 | ✅ |
+
+**BUG6 — forced terminate가 오버레이 할당을 영구히 붙잡는다.** (2026-09-13 측정, 수정됨)
+
+`mark_sessions_terminating(forced=True)`는 TERMINATING을 건너뛰고 TERMINATED를 바로 쓴다. 훅은
+코디네이터의 promotion 패스에서만 실행되므로 `TerminatedTransitionHook` — `destroy_network`를 부르는
+유일한 곳 — 이 돌지 않았다. 결과: MULTI_NODE 세션을 강제 종료할 때마다 `meta`(VNI·/24), `endpoints/*`,
+`ipam/*`와 풀 클레임(`network/ipam/vni/*`, `network/ipam/allocated/*`)이 영구히 남는다. 25분 뒤에도,
+멤버 레코드가 모두 사라진 뒤에도 남았다. 풀 리컨실러는 세션 레코드가 있으면 live로 보므로 회수하지 않는다.
+
+대조 실험으로 원인을 좁혔다 — **생성 중단이 아니라 `forced` 자체**다:
+
+| 주입 | 결과 |
+|---|---|
+| RUNNING + `forced=True` | 키 5개 잔존 (영구) |
+| CREATING + `forced=False` | 0 |
+| RUNNING + `forced=False` | 0 |
+
+`CANCELLED` 훅이 닿지 않던 `231f85c838`과 같은 모양의 결함이고, 세 번째 작성자(강제 종료 경로)가
+남아 있었다. 수정은 `CleanupForceTerminatedHandler`가 컨테이너 정리 RPC 뒤에 TERMINATED 훅을 돌리고,
+네트워크가 돌아오기 전까지 세션 id를 Valkey에 남겨 다음 주기에 재시도하게 한다.
+
 ## C. teardown 중 중단 / 동시성
 
 | ID | 시나리오 | 기대 | 기준 | 근거 | 상태 |
