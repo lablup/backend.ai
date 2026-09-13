@@ -351,6 +351,7 @@ class TestTheForwardDropStaysLast:
     class _AcceptsAlreadyThere(_RunRecorder):
         """`-C` says the accepts are present and only the DROP is missing."""
 
+        @override
         async def __call__(self, argv: Any, *, check: bool = True) -> tuple[int, bytes, bytes]:
             argv = list(argv)
             if argv[0] == "iptables" and "-C" in argv:
