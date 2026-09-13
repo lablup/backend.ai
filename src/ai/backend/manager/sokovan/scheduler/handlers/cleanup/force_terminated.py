@@ -9,8 +9,13 @@ from typing import TYPE_CHECKING, override
 from ai.backend.common.clients.valkey_client.valkey_schedule.client import ValkeyScheduleClient
 from ai.backend.common.types import SessionId
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.data.session.types import SessionStatus
+from ai.backend.manager.models.session.conditions import SessionConditions
+from ai.backend.manager.models.specs.pagination import NoPagination
+from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
 from ai.backend.manager.sokovan.scheduler.handlers.cleanup.base import CleanupHandler
+from ai.backend.manager.sokovan.scheduler.hooks import HookRegistry
 
 if TYPE_CHECKING:
     from ai.backend.manager.sokovan.scheduler.terminator.terminator import SessionTerminator
@@ -26,19 +31,33 @@ class CleanupForceTerminatedHandler(CleanupHandler):
     This handler reads force-terminated session IDs from Valkey, fetches kernel/agent
     info from DB, and sends destroy RPCs to ensure containers are cleaned up.
 
-    Only successfully cleaned-up session IDs are removed from Valkey; failed ones
-    remain for retry on the next cycle.
+    Skipping the promotion pass also skips the TERMINATED hook, so this handler runs it:
+    the session's volatile network is given back here or nowhere. An overlay session that
+    kept it held its VNI, its subnet and its endpoint reservations in etcd for good --
+    measured on a two-node rig, one VNI and one /24 burned per forced terminate.
+
+    Only fully cleaned-up session IDs are removed from Valkey; the rest remain for retry
+    on the next cycle. "Fully" includes the network: the overlay teardown refuses while any
+    node still holds the VNI, and the agents have only just been told to destroy their
+    kernels, so a first attempt that defers is the ordinary case.
     """
+
+    _terminator: SessionTerminator
+    _repository: SchedulerRepository
+    _valkey_schedule: ValkeyScheduleClient
+    _hook_registry: HookRegistry
 
     def __init__(
         self,
         terminator: SessionTerminator,
         repository: SchedulerRepository,
         valkey_schedule: ValkeyScheduleClient,
+        hook_registry: HookRegistry,
     ) -> None:
         self._terminator = terminator
         self._repository = repository
         self._valkey_schedule = valkey_schedule
+        self._hook_registry = hook_registry
 
     @classmethod
     @override
@@ -69,12 +88,14 @@ class CleanupForceTerminatedHandler(CleanupHandler):
         for session_data in terminating_sessions:
             try:
                 await self._terminator.terminate_sessions_for_handler([session_data])
-                succeeded_ids.append(session_data.session_id)
             except Exception:
                 log.exception(
                     "Failed to send cleanup RPC for force-terminated session {}",
                     session_data.session_id,
                 )
+                continue
+            if await self._release_network(session_data.session_id):
+                succeeded_ids.append(session_data.session_id)
 
         if succeeded_ids:
             await self._valkey_schedule.remove_force_terminated_sessions(succeeded_ids)
@@ -83,3 +104,40 @@ class CleanupForceTerminatedHandler(CleanupHandler):
                 len(succeeded_ids),
                 len(terminating_sessions) - len(succeeded_ids),
             )
+
+    async def _release_network(self, session_id: SessionId) -> bool:
+        """Run the TERMINATED hook for one session, i.e. give its volatile network back.
+
+        Returns whether the session is done with. False keeps it in Valkey, which is this
+        handler's retry: the overlay teardown declines until every node that held the VNI has
+        withdrawn, and that happens after the destroy RPCs sent just above have run.
+        """
+        hook = self._hook_registry.get_hook(SessionStatus.TERMINATED)
+        if hook is None:
+            return True
+        querier = BatchQuerier(
+            pagination=NoPagination(),
+            conditions=[SessionConditions.by_ids([session_id])],
+        )
+        sessions = await self._repository.search_sessions_with_kernels_for_handler(querier)
+        if not sessions:
+            # The row is gone; nothing names the network any more and nothing can give it back
+            # from here. Dropping the id stops an unbounded retry over a session that no longer
+            # exists -- what the network pool's own reconciler is for.
+            log.warning(
+                "No session data for force-terminated session {}; its network cannot be released"
+                " from here",
+                session_id,
+            )
+            return True
+        for session in sessions:
+            try:
+                await hook.execute(session)
+            except Exception as e:
+                log.info(
+                    "Force-terminated session {} still holds its network ({}); retrying next cycle",
+                    session_id,
+                    e,
+                )
+                return False
+        return True
