@@ -1020,6 +1020,7 @@ class SessionNetwork:
                 # here). Session-network setup is per node, not per kernel — do it once.
                 return meta
             coordinator: SessionNetworkCoordinator | None = None
+            backend: AbstractNetworkAgentPluginV2[Any] | None = None
             adopted = False
             try:
                 backend = self._resolve_backend(meta)
@@ -1076,7 +1077,7 @@ class SessionNetwork:
                 # could stop, on devices no teardown would ever look for.
                 if coordinator is not None and not adopted:
                     await asyncio.shield(
-                        asyncio.ensure_future(self._stop_quietly(coordinator, session_id))
+                        asyncio.ensure_future(self._stop_quietly(coordinator, session_id, backend))
                     )
                 self._tracker.release_pending(kernel_id)
                 raise
@@ -1690,21 +1691,53 @@ class SessionNetwork:
             if container.owner_agent_id is not None
         }
 
-    @staticmethod
-    async def _stop_quietly(coordinator: SessionNetworkCoordinator, session_id: str) -> None:
+    async def _stop_quietly(
+        self,
+        coordinator: SessionNetworkCoordinator,
+        session_id: str,
+        backend: AbstractNetworkAgentPluginV2[Any] | None = None,
+    ) -> None:
         """Stop a coordinator that never got registered, reporting rather than raising.
 
         The caller is already unwinding and has a failure to re-raise; a second one from the
         cleanup would replace it with something less useful.
+
+        An unwind that fails is not dropped, though. `stop()` withdraws this node's member record
+        only once the data plane is actually gone, and the manager reads that record to decide
+        whether the session's VNI and subnet may be given back -- so a half-built session left
+        here keeps the whole session in TERMINATING for as long as this process runs. Measured on
+        a two-node rig while the node's privnet was down: 48 minutes, of which 28 were after the
+        privnet was back, and only an agent restart ended it.
         """
         try:
             await coordinator.stop(session_id)
         except Exception:
             log.exception(
-                "could not unwind the half-built network of session {}; its devices and LOCAL"
-                " block stay until recovery reclaims them",
+                "could not unwind the half-built network of session {}; retrying until it comes"
+                " down",
                 session_id,
             )
+            self._park_for_teardown_retry(session_id, coordinator, backend)
+
+    def _park_for_teardown_retry(
+        self,
+        session_id: str,
+        coordinator: SessionNetworkCoordinator,
+        backend: AbstractNetworkAgentPluginV2[Any] | None,
+    ) -> None:
+        """Hand a half-built session to the retry that finishes failed teardowns.
+
+        The same machinery a failed `teardown_session` uses, and for the same reason: the host
+        error that stopped it is usually transient, and the only thing that can act on it coming
+        back is something that tries again. `_tearing_down` refuses a new kernel of this session
+        on this node in the meantime -- rebuilding on top of half-built devices that a retry is
+        about to delete is the one outcome worse than refusing.
+        """
+        self._coordinators.setdefault(session_id, coordinator)
+        if backend is not None:
+            self._session_backends.setdefault(session_id, backend)
+        self._tearing_down.add(session_id)
+        self._schedule_teardown_retry(session_id)
 
     async def _retry_pending_detaches(self, session_id: str) -> None:
         """Detach again for every container of this session whose detach did not go through.
