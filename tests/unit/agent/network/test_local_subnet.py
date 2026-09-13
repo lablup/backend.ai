@@ -491,7 +491,7 @@ class TestAdoptingALegacyStore:
         legacy.mkdir(parents=True)
         (legacy / ".layout").write_text(
             LocalSubnetLayout(
-                pool=ipaddress.ip_network("172.30.0.0/16"), block_prefixlen=24
+                pool=ipaddress.IPv4Network("172.30.0.0/16"), block_prefixlen=24
             ).serialize()
         )
         (legacy / "1").write_text("s-live")
@@ -501,7 +501,7 @@ class TestAdoptingALegacyStore:
             owner="i-en-104",
             legacy_dir=legacy,
             layout=LocalSubnetLayout(
-                pool=ipaddress.ip_network("172.30.0.0/16"), block_prefixlen=26
+                pool=ipaddress.IPv4Network("172.30.0.0/16"), block_prefixlen=26
             ),
         )
 

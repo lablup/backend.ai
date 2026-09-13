@@ -1078,7 +1078,7 @@ class TestAFirewallThisNodeCannotRead:
 
         await plugin.retry_fail_close()
 
-        assert plaintext_drop_del_args(_META.vni, 4789) not in rec.calls
+        assert plaintext_drop_del_args(4097, 4789) not in rec.calls
 
     async def test_a_spared_vni_stays_spared_across_the_retry(self) -> None:
         # `retry_fail_close` has no caller to ask what to spare, so the preflight's set is kept:
