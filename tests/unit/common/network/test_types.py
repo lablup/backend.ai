@@ -11,6 +11,7 @@ from ai.backend.common.network.types import (
     NetworkAttachSpec,
     NetworkBackendKind,
     NetworkRole,
+    OverlayEncryptionPolicy,
     SessionNetMeta,
 )
 
@@ -194,3 +195,33 @@ class TestAgentNetworkCaps:
         # default_factory must not share a single list instance across instances
         a.backends.append("vxlan")
         assert b.backends == []
+
+
+class TestOverlayEncryptionPolicy:
+    """What an operator's configuration means, read back from a store that keeps only text."""
+
+    @pytest.mark.parametrize(
+        ("configured", "expected"),
+        [
+            ("required", OverlayEncryptionPolicy.REQUIRED),
+            ("prefer", OverlayEncryptionPolicy.PREFER),
+            ("disabled", OverlayEncryptionPolicy.DISABLED),
+            (True, OverlayEncryptionPolicy.REQUIRED),
+            (False, OverlayEncryptionPolicy.DISABLED),
+            ("true", OverlayEncryptionPolicy.REQUIRED),
+            ("false", OverlayEncryptionPolicy.DISABLED),
+            ("  TRUE  ", OverlayEncryptionPolicy.REQUIRED),
+            (None, OverlayEncryptionPolicy.REQUIRED),
+        ],
+    )
+    def test_every_spelling_the_documentation_promises(
+        self, configured: object, expected: OverlayEncryptionPolicy
+    ) -> None:
+        """`true`/`false` are documented aliases, and etcd returns them as text: read as words they
+        used to fall through to the typo branch, which handed the operator who asked for no
+        encryption the strictest policy there is."""
+        assert OverlayEncryptionPolicy.parse(configured) is expected
+
+    def test_a_typo_is_not_read_as_permission(self) -> None:
+        assert OverlayEncryptionPolicy.parse("disabledd") is OverlayEncryptionPolicy.REQUIRED
+        assert OverlayEncryptionPolicy.parse("off") is OverlayEncryptionPolicy.REQUIRED
