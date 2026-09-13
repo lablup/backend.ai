@@ -82,6 +82,7 @@ from ai.backend.manager.services.app_config.actions.search import (
     SearchAppConfigsActionResult,
 )
 from ai.backend.manager.services.app_config.service import AppConfigService
+from ai.backend.manager.services.app_config.validators import FragmentOwnerExistsValidator
 
 
 class AppConfigProcessors:
@@ -93,7 +94,8 @@ class AppConfigProcessors:
 
     Only the merged read keeps a service; every other operation runs straight against
     ops. A fragment write splits by who answers for it — an owned one at that owner's
-    scope, a public one behind the SUPERADMIN gate.
+    scope, a public one behind the SUPERADMIN gate. The owned write also checks that
+    its owner exists, since the row has no foreign key to refuse a missing one.
     """
 
     search_app_configs: ScopeActionProcessor[SearchAppConfigsAction, SearchAppConfigsActionResult]
@@ -203,7 +205,8 @@ class AppConfigProcessors:
         )
 
         self.fragment_bulk_upsert = fragment_group.entity_atomic_upsert_ops(
-            BulkUpsertAppConfigFragmentsAction
+            BulkUpsertAppConfigFragmentsAction,
+            validators=(FragmentOwnerExistsValidator(fragment_group.deps.repository),),
         )
         self.fragment_global_bulk_upsert = fragment_group.global_atomic_upsert_ops(
             GlobalBulkUpsertAppConfigFragmentsAction
