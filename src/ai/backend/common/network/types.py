@@ -527,6 +527,12 @@ class EndpointPlan:
         return next((a for a in self.attachments if a.role is NetworkRole.OVERLAY), None)
 
 
+#: What a boolean looks like once it has been through a config store that keeps only text. The
+#: value `true` means REQUIRED and `false` means DISABLED however it was spelled -- reading the
+#: word as a typo would hand an operator who asked for no encryption the strictest policy there is.
+_BOOLEAN_SPELLINGS: Final[dict[str, bool]] = {"true": True, "false": False}
+
+
 class OverlayEncryptionPolicy(StrEnum):
     """What an operator means by asking for overlay encryption.
 
@@ -548,13 +554,17 @@ class OverlayEncryptionPolicy(StrEnum):
         """The policy an operator's configuration asks for, defaulting to `REQUIRED`.
 
         Booleans are accepted because that is what this setting used to be: `true` is `REQUIRED`
-        and `false` is `DISABLED`, which is what each meant to whoever wrote it. An unrecognised
-        value is `REQUIRED` too -- a typo in a security setting must not be read as permission.
+        and `false` is `DISABLED`, which is what each meant to whoever wrote it. Spelled either
+        way, too -- etcd hands every value back as text, so the operator who wrote the boolean and
+        the operator who wrote the word must not get different policies. An unrecognised value is
+        `REQUIRED` -- a typo in a security setting must not be read as permission.
         """
         if value is None:
             return cls.REQUIRED
         if isinstance(value, bool):
             return cls.REQUIRED if value else cls.DISABLED
+        if (spelled := str(value).strip().lower()) in _BOOLEAN_SPELLINGS:
+            return cls.REQUIRED if _BOOLEAN_SPELLINGS[spelled] else cls.DISABLED
         try:
             return cls(str(value).strip().lower())
         except ValueError:
