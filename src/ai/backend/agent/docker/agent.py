@@ -59,6 +59,7 @@ from ai.backend.agent.config.unified import (
 from ai.backend.agent.errors import (
     ContainerCreationError,
     InvalidArgumentError,
+    UnsupportedBaseDistroError,
     UnsupportedResource,
 )
 from ai.backend.agent.errors.resources import PortPoolExhaustedError
@@ -183,6 +184,18 @@ LDD_MUSL_REGEX = re.compile(r"^musl libc .+$")
 # Printed when the C library itself is executed (images without ldd), e.g.
 # "GNU C Library (Debian GLIBC 2.41-12+deb13u3) stable release version 2.41."
 LIBC_BANNER_GLIBC_REGEX = re.compile(r"^GNU C Library .*release version (\d+\.\d+)")
+# Upper bound for one libc probe container (start, run, exit). The probe executes paths
+# from an untrusted image, so a hang must not stall session creation.
+_LIBC_PROBE_TIMEOUT_SEC: Final[float] = 30.0
+# Docker reports these when the probe command does not exist or cannot be executed in the
+# image; anything else from the daemon is a real error and must surface as such.
+_LIBC_PROBE_EXEC_FAILURE_MARKERS: Final[tuple[str, ...]] = (
+    "executable file not found",
+    "no such file or directory",
+    "not a directory",
+    "exec format error",
+    "permission denied",
+)
 
 # The merged seccomp profile written next to a kernel's scratch contents.
 _SECCOMP_PROFILE_FILENAME: Final[str] = "seccomp.json"
@@ -253,6 +266,14 @@ def _build_log_config(local_config: AgentUnifiedConfig) -> LogConfig:
     )
 
 
+def _is_libc_probe_exec_failure(e: DockerError) -> bool:
+    """True when the daemon says the probe command cannot run, or the container is already gone."""
+    if e.status == HTTPStatus.NOT_FOUND:
+        return True
+    message = str(e.message).lower()
+    return any(marker in message for marker in _LIBC_PROBE_EXEC_FAILURE_MARKERS)
+
+
 def _distro_for_glibc_version(version: float) -> str:
     if version in known_glibc_distros:
         return known_glibc_distros[version]
@@ -279,9 +300,10 @@ def _parse_distro_from_ldd_output(log_chunks: Sequence[str]) -> str | None:
 
 def _libc_probe_commands(arch: str) -> list[list[str]]:
     """
-    Commands tried in order to learn an image's C library. ``ldd`` comes first so images that
-    have it keep the existing probe; the rest execute the library itself for images without ldd.
-    The library paths use the Linux spelling of the architecture (aarch64, x86_64).
+    Commands tried in order to learn an image's C library. ``ldd`` is authoritative and comes
+    first so images that have it keep the existing probe; the rest execute the library itself
+    for images without ldd and are best-effort (a musl image carrying a glibc compat layer would
+    answer as glibc). The library paths use the Linux spelling of the architecture.
     """
     arch = arch_name_aliases.get(arch.lower(), arch.lower())
     return [
@@ -1881,7 +1903,8 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
     async def _probe_image_distro(self, docker: Docker, image_name: str, arch: str) -> str:
         """
         Run the libc probe commands in throwaway containers until one is recognized.
-        A command the image cannot execute (e.g., no ldd on a distroless base) is skipped.
+        A command the image cannot execute (e.g., no ldd on a distroless base) is skipped;
+        any other daemon error is raised as-is so host problems are not reported as image ones.
         """
         tried: list[str] = []
         for cmd in _libc_probe_commands(arch):
@@ -1892,14 +1915,17 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
             distro = _parse_distro_from_ldd_output(output)
             if distro is not None:
                 return distro
-        raise RuntimeError(
+        raise UnsupportedBaseDistroError(
             f"Could not determine the C library variant of {image_name} (tried: {', '.join(tried)})"
         )
 
     async def _run_libc_probe(
         self, docker: Docker, image_name: str, cmd: list[str]
     ) -> list[str] | None:
-        """Return the probe output, or None when the image cannot start the command."""
+        """
+        Return the probe output, or None when the image cannot run the command or it hangs.
+        The container is removed in every case; removal is shielded from cancellation.
+        """
         container_config: dict[str, Any] = {
             "Image": image_name,
             "Tty": True,
@@ -1916,21 +1942,30 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
         container = await docker.containers.create(container_config)
         try:
             try:
-                await container.start()
+                async with asyncio.timeout(_LIBC_PROBE_TIMEOUT_SEC):
+                    await container.start()
+                    await container.wait()
+                    container_log = await container.log(stdout=True, stderr=True, follow=False)
+                log.debug("libc probe {!r} on {}: {}", cmd, image_name, container_log)
+                return container_log
             except DockerError as e:
+                if not _is_libc_probe_exec_failure(e):
+                    raise
                 log.debug("libc probe {!r} cannot run on {}: {}", cmd, image_name, e.message)
                 return None
-            await container.wait()  # wait until container finishes to prevent race condition
-            container_log = await container.log(stdout=True, stderr=True, follow=False)
-            log.debug("libc probe {!r} on {}: {}", cmd, image_name, container_log)
-            return container_log
+            except TimeoutError:
+                log.warning(
+                    "libc probe {!r} on {} did not finish within {}s; skipping it",
+                    cmd,
+                    image_name,
+                    _LIBC_PROBE_TIMEOUT_SEC,
+                )
+                return None
         finally:
             try:
-                await container.delete(force=True)
-            except DockerError as e:
-                log.warning(
-                    "failed to delete the libc probe container of {}: {}", image_name, e.message
-                )
+                await asyncio.shield(container.delete(force=True))
+            except (DockerError, aiohttp.ClientError, TimeoutError) as e:
+                log.warning("failed to delete the libc probe container of {}: {!r}", image_name, e)
 
     @override
     async def scan_images(self) -> ScanImagesResult:

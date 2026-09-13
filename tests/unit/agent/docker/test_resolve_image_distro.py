@@ -5,6 +5,7 @@ resolve the C library of images that have no ``ldd`` by executing the library it
 
 from __future__ import annotations
 
+import asyncio
 from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
 from typing import Any
@@ -14,7 +15,8 @@ import pytest
 from aiodocker.exceptions import DockerError
 from pytest_mock import MockerFixture
 
-from ai.backend.agent.docker.agent import DockerAgent
+from ai.backend.agent.docker.agent import DockerAgent, _libc_probe_commands
+from ai.backend.agent.errors import UnsupportedBaseDistroError
 from ai.backend.common.types import AutoPullBehavior, ImageConfig
 
 LDD_OUTPUT = ["ldd (Ubuntu GLIBC 2.35-0ubuntu3.4) 2.35\n"]
@@ -31,9 +33,26 @@ LDD = ("ldd", "--version")
 MULTIARCH_GLIBC = ("/lib/x86_64-linux-gnu/libc.so.6",)
 MUSL_LOADER_ARM64 = ("/lib/ld-musl-aarch64.so.1",)
 
-# Answers keyed by probe command: output chunks, or None when the binary is absent from the image
-# (Docker then fails the container start with an OCI "executable file not found" error).
-ProbeAnswers = dict[tuple[str, ...], list[str] | None]
+# Answers keyed by probe command: output chunks, None when the binary is absent from the image
+# (Docker then fails the container start with an OCI "executable file not found" error), or an
+# exception instance to raise from the given lifecycle call.
+ProbeAnswers = dict[tuple[str, ...], "list[str] | None | ProbeFailure"]
+
+
+class ProbeFailure:
+    """Make one lifecycle call of the probe container raise ``error``."""
+
+    def __init__(self, at: str, error: BaseException) -> None:
+        self.at = at  # "start", "wait", "log", "delete"
+        self.error = error
+
+
+def _exec_not_found(cmd: tuple[str, ...]) -> DockerError:
+    return DockerError(
+        500,
+        "OCI runtime create failed: runc create failed: unable to start container process: "
+        f'exec: "{cmd[0]}": stat {cmd[0]}: no such file or directory',
+    )
 
 
 def _image_config(
@@ -76,22 +95,24 @@ class FakeProbeDocker:
         cmd = tuple(config["Cmd"])
         answer = self.answers.get(cmd)
         container = MagicMock()
-        if answer is None:
-            container.start = AsyncMock(
-                side_effect=DockerError(
-                    400,
-                    "OCI runtime create failed: runc create failed: unable to start "
-                    f'container process: exec: "{cmd[0]}": stat {cmd[0]}: '
-                    "no such file or directory",
-                )
-            )
-        else:
-            container.start = AsyncMock()
+        container.start = AsyncMock()
         container.wait = AsyncMock()
-        container.log = AsyncMock(return_value=answer or [])
+        container.log = AsyncMock(return_value=[])
+        delete_error: BaseException | None = None
+        if answer is None:
+            container.start = AsyncMock(side_effect=_exec_not_found(cmd))
+        elif isinstance(answer, ProbeFailure):
+            if answer.at == "delete":
+                delete_error = answer.error
+            else:
+                setattr(container, answer.at, AsyncMock(side_effect=answer.error))
+        else:
+            container.log = AsyncMock(return_value=answer)
 
         async def _delete(**_kwargs: Any) -> None:
             self.deleted.append(cmd)
+            if delete_error is not None:
+                raise delete_error
 
         container.delete = _delete
         return container
@@ -254,11 +275,107 @@ class TestResolveImageDistroWithoutLdd:
         fake = probe_docker({})
         image = _image_config("cr.backend.ai/stable/app:scratch", "cr", is_local=False)
 
-        with pytest.raises(RuntimeError, match="tried: ldd --version, /lib/x86_64-linux-gnu"):
+        with pytest.raises(
+            UnsupportedBaseDistroError, match="tried: ldd --version, /lib/x86_64-linux-gnu"
+        ):
             await agent.resolve_image_distro(image)
 
-        assert len(fake.created_commands) == 7
+        assert fake.created_commands == [tuple(c) for c in _libc_probe_commands("x86_64")]
         assert fake.deleted == fake.created_commands
         set_image_distro = agent.valkey_stat_client.set_image_distro
         assert isinstance(set_image_distro, AsyncMock)
         set_image_distro.assert_not_awaited()
+
+    async def test_daemon_failure_on_start_is_raised_not_skipped(
+        self,
+        agent: DockerAgent,
+        probe_docker: Callable[[ProbeAnswers], FakeProbeDocker],
+    ) -> None:
+        """A host-side failure (shim, cgroups, disk) must surface as itself, not as an image error."""
+        shim_error = DockerError(500, "failed to create shim task: OCI runtime create failed")
+        fake = probe_docker({LDD: ProbeFailure("start", shim_error), MULTIARCH_GLIBC: GLIBC_BANNER})
+        image = _image_config("cr.backend.ai/stable/python:3.9", "cr", is_local=False)
+
+        with pytest.raises(DockerError, match="shim"):
+            await agent.resolve_image_distro(image)
+
+        assert fake.created_commands == [LDD], "no further probe after a daemon failure"
+        assert fake.deleted == [LDD], "the failed probe container is still removed"
+
+    async def test_missing_image_on_create_is_raised(
+        self,
+        agent: DockerAgent,
+        probe_docker: Callable[[ProbeAnswers], FakeProbeDocker],
+    ) -> None:
+        fake = probe_docker({LDD: LDD_OUTPUT})
+        original_create = fake.containers.create
+
+        async def _create(config: dict[str, Any]) -> MagicMock:
+            raise DockerError(404, "No such image: cr.backend.ai/stable/missing:1")
+
+        fake.containers.create = _create
+        image = _image_config("cr.backend.ai/stable/missing:1", "cr", is_local=False)
+
+        with pytest.raises(DockerError, match="No such image"):
+            await agent.resolve_image_distro(image)
+        fake.containers.create = original_create
+
+    async def test_container_gone_during_wait_is_skipped(
+        self,
+        agent: DockerAgent,
+        probe_docker: Callable[[ProbeAnswers], FakeProbeDocker],
+    ) -> None:
+        """An externally pruned probe container (404 from wait) is treated like a failed probe."""
+        gone = DockerError(404, "No such container: abc")
+        fake = probe_docker({LDD: ProbeFailure("wait", gone), MULTIARCH_GLIBC: GLIBC_BANNER})
+        image = _image_config("cr.backend.ai/stable/app:pruned", "cr", is_local=False)
+
+        assert await agent.resolve_image_distro(image) == "ubuntu24.04"
+        assert fake.created_commands == [LDD, MULTIARCH_GLIBC]
+        assert fake.deleted == [LDD, MULTIARCH_GLIBC]
+
+    async def test_hanging_probe_is_skipped_after_timeout(
+        self,
+        agent: DockerAgent,
+        probe_docker: Callable[[ProbeAnswers], FakeProbeDocker],
+        mocker: MockerFixture,
+    ) -> None:
+        """A probe binary that never exits must not stall session creation."""
+        mocker.patch("ai.backend.agent.docker.agent._LIBC_PROBE_TIMEOUT_SEC", 0.05)
+
+        async def _hang() -> None:
+            await asyncio.sleep(10)
+
+        fake = probe_docker({
+            LDD: ProbeFailure("wait", RuntimeError("unused")),
+            MULTIARCH_GLIBC: GLIBC_BANNER,
+        })
+        # Replace the injected failure with a genuine hang on wait().
+        original_create = fake.containers.create
+
+        async def _create(config: dict[str, Any]) -> MagicMock:
+            container: MagicMock = await original_create(config)
+            if tuple(config["Cmd"]) == LDD:
+                container.wait = _hang
+            return container
+
+        fake.containers.create = _create
+        image = _image_config("cr.backend.ai/stable/app:hang", "cr", is_local=False)
+
+        assert await agent.resolve_image_distro(image) == "ubuntu24.04"
+        assert fake.deleted == [LDD, MULTIARCH_GLIBC]
+
+    async def test_delete_failure_is_logged_and_result_kept(
+        self,
+        agent: DockerAgent,
+        probe_docker: Callable[[ProbeAnswers], FakeProbeDocker],
+    ) -> None:
+        fake = probe_docker({
+            LDD: ProbeFailure("delete", DockerError(409, "removal already in progress")),
+            MULTIARCH_GLIBC: GLIBC_BANNER,
+        })
+        # The ldd probe "runs" (start ok, empty log -> unrecognized) and its delete fails.
+        image = _image_config("cr.backend.ai/stable/app:busy", "cr", is_local=False)
+
+        assert await agent.resolve_image_distro(image) == "ubuntu24.04"
+        assert fake.deleted == [LDD, MULTIARCH_GLIBC]
