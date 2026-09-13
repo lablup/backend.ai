@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import uuid
+from dataclasses import dataclass
 
 import pytest
 from pydantic import ValidationError
@@ -113,6 +114,7 @@ class TestCreateContainerRegistryInput:
             url="https://harbor.example.com",
             registry_name="harbor-registry",
             type=ContainerRegistryType.HARBOR2,
+            project="library",
         )
         assert req.type == ContainerRegistryType.HARBOR2
 
@@ -186,6 +188,117 @@ class TestCreateContainerRegistryInputValidationFailures:
             })
 
 
+@dataclass(frozen=True)
+class _RejectedProjectCase:
+    project: str
+    message: str
+
+
+class TestCreateContainerRegistryInputRegistryRules:
+    """Tests for the URL and Harbor project rules on CreateContainerRegistryInput."""
+
+    @pytest.mark.parametrize(
+        "url",
+        [
+            "http://example.com",
+            "https://registry.example.com/v2",
+            "192.168.1.100:5000",
+            "localhost",
+            "registry.local",
+            "example.com:8080",
+        ],
+    )
+    def test_url_accepted(self, url: str) -> None:
+        req = CreateContainerRegistryInput(
+            url=url,
+            registry_name="my-registry",
+            type=ContainerRegistryType.DOCKER,
+        )
+        assert req.url == url
+
+    @pytest.mark.parametrize("url", ["http://", "https://"])
+    def test_url_without_host_rejected(self, url: str) -> None:
+        with pytest.raises(BackendAISchemaValidationFailed, match=f"Invalid URL format: {url}"):
+            CreateContainerRegistryInput.model_validate({
+                "url": url,
+                "registry_name": "my-registry",
+                "type": "docker",
+            })
+
+    @pytest.mark.parametrize(
+        "registry_type",
+        [ContainerRegistryType.HARBOR, ContainerRegistryType.HARBOR2],
+        ids=lambda registry_type: registry_type.value,
+    )
+    def test_harbor_without_project_rejected(self, registry_type: ContainerRegistryType) -> None:
+        with pytest.raises(
+            BackendAISchemaValidationFailed, match=r"Project name is required for Harbor\."
+        ):
+            CreateContainerRegistryInput.model_validate({
+                "url": "https://harbor.example.com",
+                "registry_name": "harbor-registry",
+                "type": registry_type.value,
+            })
+
+    @pytest.mark.parametrize(
+        "registry_type",
+        [
+            ContainerRegistryType.DOCKER,
+            ContainerRegistryType.GITHUB,
+            ContainerRegistryType.GITLAB,
+            ContainerRegistryType.ECR,
+            ContainerRegistryType.ECR_PUB,
+            ContainerRegistryType.LOCAL,
+            ContainerRegistryType.OCP,
+        ],
+        ids=lambda registry_type: registry_type.value,
+    )
+    def test_non_harbor_without_project_accepted(
+        self, registry_type: ContainerRegistryType
+    ) -> None:
+        req = CreateContainerRegistryInput(
+            url="https://registry.example.com",
+            registry_name="my-registry",
+            type=registry_type,
+        )
+        assert req.project is None
+
+    @pytest.mark.parametrize(
+        "case",
+        [
+            _RejectedProjectCase(project="", message="Invalid project name length."),
+            _RejectedProjectCase(project="a" * 256, message="Invalid project name length."),
+            _RejectedProjectCase(project="-project", message="Invalid project name format."),
+            _RejectedProjectCase(project="project.", message="Invalid project name format."),
+            _RejectedProjectCase(project="Project", message="Invalid project name format."),
+            _RejectedProjectCase(project="project name", message="Invalid project name format."),
+            _RejectedProjectCase(project="project--name", message="Invalid project name format."),
+        ],
+        ids=lambda case: case.project[:12] or "empty",
+    )
+    def test_harbor_project_rejected(self, case: _RejectedProjectCase) -> None:
+        with pytest.raises(BackendAISchemaValidationFailed, match=case.message):
+            CreateContainerRegistryInput.model_validate({
+                "url": "https://harbor.example.com",
+                "registry_name": "harbor-registry",
+                "type": "harbor",
+                "project": case.project,
+            })
+
+    @pytest.mark.parametrize(
+        "project",
+        ["p", "project1", "my-project", "my_project", "my.project", "project-name_test", "a" * 255],
+    )
+    def test_harbor_project_accepted(self, project: str) -> None:
+        req = CreateContainerRegistryInput(
+            url="https://harbor.example.com",
+            registry_name="harbor-registry",
+            type=ContainerRegistryType.HARBOR,
+            project=project,
+        )
+        assert req.project == project
+
+
 class TestUpdateContainerRegistryInput:
     """Tests for UpdateContainerRegistryInput model creation and validation."""
 
@@ -239,6 +352,48 @@ class TestUpdateContainerRegistryInput:
         assert restored.id == reg_id
         assert restored.url == "https://updated.example.com"
         assert restored.type == ContainerRegistryType.GITLAB
+
+
+class TestUpdateContainerRegistryInputRegistryRules:
+    """Tests for the URL and Harbor project rules on UpdateContainerRegistryInput."""
+
+    @pytest.mark.parametrize("url", ["http://", "https://"])
+    def test_url_without_host_rejected(self, url: str) -> None:
+        with pytest.raises(BackendAISchemaValidationFailed, match=f"Invalid URL format: {url}"):
+            UpdateContainerRegistryInput.model_validate({"id": str(uuid.uuid4()), "url": url})
+
+    @pytest.mark.parametrize(
+        "registry_type",
+        [ContainerRegistryType.HARBOR, ContainerRegistryType.HARBOR2],
+        ids=lambda registry_type: registry_type.value,
+    )
+    def test_harbor_type_without_project_accepted(
+        self, registry_type: ContainerRegistryType
+    ) -> None:
+        req = UpdateContainerRegistryInput(id=uuid.uuid4(), type=registry_type)
+        assert req.project is None
+
+    @pytest.mark.parametrize(
+        "case",
+        [
+            _RejectedProjectCase(project="", message="Invalid project name length."),
+            _RejectedProjectCase(project="a" * 256, message="Invalid project name length."),
+            _RejectedProjectCase(project="Project", message="Invalid project name format."),
+            _RejectedProjectCase(project="project--name", message="Invalid project name format."),
+        ],
+        ids=lambda case: case.project[:12] or "empty",
+    )
+    def test_harbor_type_with_project_rejected(self, case: _RejectedProjectCase) -> None:
+        with pytest.raises(BackendAISchemaValidationFailed, match=case.message):
+            UpdateContainerRegistryInput.model_validate({
+                "id": str(uuid.uuid4()),
+                "type": "harbor",
+                "project": case.project,
+            })
+
+    def test_project_without_type_accepted(self) -> None:
+        req = UpdateContainerRegistryInput(id=uuid.uuid4(), project="Project")
+        assert req.project == "Project"
 
 
 class TestUpdateContainerRegistryInputValidationFailures:
