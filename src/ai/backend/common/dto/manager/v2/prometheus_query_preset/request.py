@@ -11,6 +11,9 @@ from uuid import UUID
 from pydantic import Field, NonNegativeInt, field_validator
 
 from ai.backend.common.api_handlers import BaseRequestModel
+from ai.backend.common.data.entity.prometheus_query_preset_category import (
+    PrometheusQueryPresetCategoryID,
+)
 from ai.backend.common.dto.clients.prometheus.defs import PROMETHEUS_DURATION_PATTERN
 from ai.backend.common.dto.manager.query import StringFilter, UUIDFilter
 from ai.backend.common.tristate.unset import UNSET, Unset
@@ -114,7 +117,7 @@ class ModifyQueryDefinitionInput(BaseRequestModel):
     rank: NonNegativeInt | None | Unset = Field(
         default=UNSET, description="Updated sort rank. Omit to leave unchanged."
     )
-    category_id: UUID | None | Unset = Field(
+    category_id: PrometheusQueryPresetCategoryID | None | Unset = Field(
         default=UNSET,
         description="Updated category ID. Omit to leave unchanged; null clears.",
     )

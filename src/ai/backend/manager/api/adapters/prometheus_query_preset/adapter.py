@@ -41,7 +41,6 @@ from ai.backend.common.dto.manager.v2.prometheus_query_preset.types import (
     OrderDirection,
     QueryDefinitionOptionsInfo,
 )
-from ai.backend.common.tristate.unset import Unset
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.data.prometheus_query_preset import (
@@ -329,13 +328,7 @@ class PrometheusQueryPresetAdapter(BaseAdapter):
             name=OptionalState.from_unset(input.name),
             description=TriState.from_unset(input.description),
             rank=OptionalState.from_unset(input.rank),
-            category_id=(
-                TriState.nop()
-                if isinstance(input.category_id, Unset)
-                else TriState.nullify()
-                if input.category_id is None
-                else TriState.update(PrometheusQueryPresetCategoryID(input.category_id))
-            ),
+            category_id=TriState.from_unset(input.category_id),
             metric_name=OptionalState.from_unset(input.metric_name),
             query_template=OptionalState.from_unset(input.query_template),
             time_window=TriState.from_unset(input.time_window),
