@@ -1067,6 +1067,55 @@ def parse_sa_identities(listing: str) -> dict[tuple[str, int], tuple[str, int | 
     return found
 
 
+def parse_sa_material(
+    listing: str,
+) -> dict[tuple[str, int], tuple[str, int | None, str | None, str | None]]:
+    """``{(dst, spi): (src, reqid, aead algorithm, key+salt hex)}`` for every ESP SA on the node.
+
+    `parse_sa_identities` answers "whose SA sits at this identity"; this one answers "and what is
+    it protecting with". The two are not the same question and only the second can tell one
+    generation's SA from another's: `_esp_spi` folds in the pair and the generation SLOT, so
+    generations three apart derive the same SPI and a different key.
+
+    None for the algorithm or the key means the listing did not show them -- a format this does not
+    know, or a reader without the privilege to see key material. The caller must read that as
+    "cannot tell", never as "matches".
+    """
+    found: dict[tuple[str, int], tuple[str, int | None, str | None, str | None]] = {}
+    src: str | None = None
+    dst: str | None = None
+    current: tuple[str, int] | None = None
+    for line in listing.splitlines():
+        if line.startswith("src "):
+            tokens = line.split()
+            raw_dst = _value_after(tokens, "dst")
+            src = tokens[1].split("/")[0]
+            dst = raw_dst.split("/")[0] if raw_dst is not None else None
+            current = None
+            continue
+        stripped = line.strip()
+        tokens = stripped.split()
+        if stripped.startswith("proto esp") and src is not None and dst is not None:
+            raw_spi = _value_after(tokens, "spi")
+            raw_reqid = _value_after(tokens, "reqid")
+            if raw_spi is None:
+                continue
+            try:
+                spi = int(raw_spi, 0)
+            except ValueError:
+                continue
+            try:
+                reqid = int(raw_reqid, 0) if raw_reqid is not None else None
+            except ValueError:
+                reqid = None
+            current = (dst, spi)
+            found[current] = (src, reqid, None, None)
+        elif stripped.startswith("aead ") and current is not None and len(tokens) >= 3:
+            known_src, known_reqid, _, _ = found[current]
+            found[current] = (known_src, known_reqid, tokens[1], tokens[2])
+    return found
+
+
 def parse_owned_policies(listing: str, mark: str) -> dict[tuple[str, str, int], int]:
     """``{(src, dst, dport): template SPI}`` for the OUTBOUND UDP policies carrying ``mark`` and
     this backend's template.
@@ -1974,6 +2023,28 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
                         )
                 return
             break
+        # The bridge's own forward-accept, for every session on this node and not just the
+        # encrypted ones. It is not protection -- it is what keeps a session's packets moving on a
+        # host that filters FORWARD by default -- and it is installed once, at setup or adoption.
+        # One insert lost to an xtables lock held at the wrong moment would otherwise hold that
+        # session's traffic down for the rest of its life while the session reported itself READY.
+        # The snapshot already carries the filter table, so noticing costs nothing.
+        for session_id, meta in list(self._sessions.items()):
+            if meta.vni is None or rule_is_present(
+                snapshot.table("filter"), _forward_accept_rule(meta.vni)
+            ):
+                continue
+            try:
+                await self._ensure_forward_accept(meta.vni)
+            except Exception as e:
+                log.warning(
+                    "session {}'s bridge forward-accept rule is missing and could not be put back"
+                    " ({}); on a host that filters FORWARD by default its traffic will not pass",
+                    session_id,
+                    e,
+                )
+            else:
+                log.info("put session {}'s bridge forward-accept rule back", session_id)
         for session_id, meta, vni in encrypted:
             try:
                 async with self._session_guard(session_id):
@@ -3392,7 +3463,9 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
             return True  # another session on this node already programmed this pair
         #: The host's SAs, read at most once per call and only when a slot is about to be
         #: rewritten. None means the listing could not be read -- see `_kernel_sa_identities`.
-        existing_sas: dict[tuple[str, int], tuple[str, int | None]] | None = None
+        existing_sas: (
+            dict[tuple[str, int], tuple[str, int | None, str | None, str | None]] | None
+        ) = None
         read_sas = False
         try:
             for target_generation in target_generations:
@@ -3419,7 +3492,7 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
                 # is the one the add would have written -- same pair, same generation, same key.
                 # Leaving it alone is what keeps both ends' counters where they are.
                 if not read_sas:
-                    existing_sas = await self._kernel_sa_identities()
+                    existing_sas = await self._kernel_sa_material()
                     read_sas = True
                 if existing_sas is not None and self._already_installed(add_args, existing_sas):
                     slot_generations[slot] = target_generation
@@ -3750,17 +3823,17 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
             )
         return kept
 
-    async def _kernel_sa_identities(
+    async def _kernel_sa_material(
         self,
-    ) -> dict[tuple[str, int], tuple[str, int | None]] | None:
-        """``{(dst, spi): (src, reqid)}`` for the SAs on this host, or None if it cannot be read.
+    ) -> dict[tuple[str, int], tuple[str, int | None, str | None, str | None]] | None:
+        """What the SAs on this host are, and what they protect with, or None if it cannot be read.
 
         None is not "there are none": a listing that did not run says nothing, and the caller uses
         this to decide whether an SA may be left alone. Unknown therefore means "reprogram", which
         is the answer that cannot leave a stale key behind.
         """
         try:
-            return parse_sa_identities(await self._rule_inventory(["ip", "xfrm", "state"]))
+            return parse_sa_material(await self._rule_inventory(["ip", "xfrm", "state"]))
         except command.HOST_COMMAND_ERRORS as e:
             log.debug("could not read this host's ESP SAs before programming a pair: {}", e)
             return None
@@ -3768,13 +3841,19 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
     @staticmethod
     def _already_installed(
         add_args: Sequence[Sequence[str]],
-        existing: Mapping[tuple[str, int], tuple[str, int | None]],
+        existing: Mapping[tuple[str, int], tuple[str, int | None, str | None, str | None]],
     ) -> bool:
         """Whether the kernel already holds exactly the SAs these `add`s would install.
 
-        Identity is (dst, spi) plus our src and our reqid. The SPI is derived from the directed
-        pair AND the key generation, so an SA of ours sitting at one is this generation's -- the
-        very one the add would write, with the same key material.
+        The identity is not enough and this is the whole reason the check reads key material.
+        `_esp_spi` folds in the VTEP pair and the generation SLOT -- three of them -- so an SA two
+        rotations old sits at the very same (dst, spi) with a key nobody uses any more. Adopting it
+        on identity alone would keep a retired key protecting live traffic where both ends still
+        held it, and black-hole the tunnel where only one did.
+
+        So the algorithm and the key+salt this add carries must be what the kernel already has, to
+        the byte. Anything the listing does not show -- an unknown format, a reader that cannot see
+        key material -- is "cannot tell", and reprograms.
         """
         for args in add_args:
             tokens = list(args)
@@ -3790,7 +3869,18 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
             except ValueError:
                 return False
             holder = existing.get((dst, spi))
-            if holder is None or holder[0] != src or holder[1] != XFRM_REQID:
+            if holder is None:
+                return False
+            held_src, held_reqid, held_alg, held_key = holder
+            if held_src != src or held_reqid != XFRM_REQID:
+                return False
+            if held_alg is None or held_key is None:
+                return False
+            try:
+                aead_at = tokens.index("aead")
+            except ValueError:
+                return False
+            if tokens[aead_at + 1 : aead_at + 3] != [held_alg, held_key]:
                 return False
         return True
 

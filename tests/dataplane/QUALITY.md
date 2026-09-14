@@ -5,25 +5,34 @@ the automated checks and a successful two-node privnet run against the exact rel
 
 ## Required command
 
+**One process, one scenario at a time.** The whole suite, run serially, against the exact release
+commit:
+
 ```bash
 BAI_REQUIRE_DATAPLANE=1 \
 BAI_DATAPLANE_RUNTIME=docker \
 BAI_DATAPLANE_PRIVNET_MODE=1 \
 BAI_DATAPLANE_PRIVNET_SOCKET=/run/backend.ai/privnet/net-privnet.sock \
-pants test \
-  tests/dataplane/test_cluster_session.py \
-  tests/dataplane/test_cross_node.py \
-  tests/dataplane/test_cross_node_mtu.py \
-  tests/dataplane/test_ipam.py \
-  tests/dataplane/test_overlay_isolation.py \
-  tests/dataplane/test_encrypted_dataplane.py \
-  tests/dataplane/test_agent_restart.py \
-  tests/dataplane/test_restart_reachability.py
+./py -m pytest tests/dataplane/ -q --no-header -p no:cacheprovider -rA
 ```
+
+**Not `pants test`.** Pants splits the files into batches and runs the batches in parallel, and
+every scenario here drives the same hosts: one batch restarts the agent while another is creating a
+session on it, and each batch's leak guard sees the others' sessions as its own delta. Measured on
+the three-node rig: the parallel form reported fourteen failures where the serial one, on the same
+commit and the same rig minutes later, reported none.
+
+`pants test tests/dataplane/...` is still the right command for the harness's own tests
+(`test_harness_selfcheck.py`, `test_session_driver.py`, `test_agent_control.py`) -- those touch no
+host and are safe in parallel.
 
 `BAI_REQUIRE_DATAPLANE=1` converts every skip and xfail to a failure. It also requires two distinct
 nodes, one distinct agent ID per node, Docker, privnet mode, and a reachable privnet socket from the
 agent account on every node.
+
+**Start from a drained rig and check it afterwards.** No non-terminal session, no
+`network/session/` or `network/ipam/` key in etcd, no `bai*` link on any node -- before and after.
+A run that starts on a dirty rig reports the dirt as its own.
 
 ## Required environment
 
@@ -39,6 +48,7 @@ agent account on every node.
 | `BAI_DATAPLANE_ETCD_ADDR` | etcd endpoint used by the release candidate |
 | `BAI_DATAPLANE_AGENT_START_CMD` | Command that restarts the agent under its service account |
 | `BAI_DATAPLANE_PRIVNET_MODE` | Must be `1` |
+| `BAI_DATAPLANE_PRIVNET_START_CMD` | Restarts the privileged helper on the first node, ALONE -- the scenario that kills it proves nothing if the agent comes back with it |
 | `BAI_DATAPLANE_PRIVNET_SOCKET` | Reachable Unix socket used by the agent |
 
 Pants forwards all `BAI_DATAPLANE_*` variables into its test sandbox. With
