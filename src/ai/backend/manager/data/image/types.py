@@ -26,6 +26,11 @@ class ImageStatus(enum.StrEnum):
         """Statuses a purge is working through. Writes are refused while in one."""
         return frozenset({cls.PURGING, cls.PURGE_ERROR})
 
+    @classmethod
+    def restorable(cls) -> frozenset[ImageStatus]:
+        """Statuses restore brings back to ALIVE: a forgotten image, or a live one left as is."""
+        return frozenset({cls.ALIVE, cls.DELETED})
+
 
 class ImageOrderField(enum.StrEnum):
     NAME = "NAME"

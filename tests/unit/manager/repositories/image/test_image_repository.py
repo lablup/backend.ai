@@ -13,6 +13,7 @@ from unittest.mock import MagicMock
 from uuid import UUID, uuid4
 
 import pytest
+import sqlalchemy as sa
 
 from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.data.entity.container_registry import ContainerRegistryID
@@ -732,3 +733,107 @@ class TestImageRepositoryLastUsedAt:
         result = await image_repository.fetch_image_by_id(img.id)
         assert result.last_used_at is not None
         assert abs(result.last_used_at.timestamp() - newer.timestamp()) < 1.0
+
+
+class TestImageRepositoryRestore:
+    """Restore reaches an image in any status, not only a live one."""
+
+    @pytest.fixture
+    async def db_with_cleanup(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+        async with with_tables(
+            database_connection,
+            [
+                DomainRow,
+                UserResourcePolicyRow,
+                KeyPairResourcePolicyRow,
+                UserRow,
+                KeyPairRow,
+                ContainerRegistryRow,
+                ImageRow,
+                ImageAliasRow,
+            ],
+        ):
+            yield database_connection
+
+    @pytest.fixture
+    def image_repository(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> ImageRepository:
+        return ImageRepository(
+            db=db_with_cleanup,
+            ops_provider=V2DBOpsProvider(db_with_cleanup),
+            valkey_image=MagicMock(),
+            config_provider=MagicMock(),
+        )
+
+    @pytest.fixture
+    async def test_registry_id(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> UUID:
+        registry_id = uuid4()
+        async with db_with_cleanup.begin_session() as db_sess:
+            db_sess.add(
+                ContainerRegistryRow(
+                    id=ContainerRegistryID(registry_id),
+                    url="https://registry.example.com",
+                    registry_name="registry.example.com",
+                    type=ContainerRegistryType.DOCKER,
+                    project="test_project",
+                    is_global=True,
+                )
+            )
+            await db_sess.flush()
+        return registry_id
+
+    @pytest.fixture
+    async def image_id(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_registry_id: UUID,
+        status: ImageStatus,
+    ) -> ImageID:
+        """An image inserted in the status the case names."""
+        image = ImageRow(
+            name="registry.example.com/test_project/python:3.9",
+            image="python",
+            tag="3.9",
+            registry="registry.example.com",
+            registry_id=test_registry_id,
+            project="test_project",
+            architecture="x86_64",
+            config_digest=f"sha256:{uuid4().hex}",
+            size_bytes=1000000,
+            type=ImageType.COMPUTE,
+            status=status,
+            accelerators=None,
+            labels={},
+            resources={},
+        )
+        async with db_with_cleanup.begin_session() as db_sess:
+            db_sess.add(image)
+            await db_sess.flush()
+            return ImageID(image.id)
+
+    @pytest.mark.parametrize(
+        "status",
+        [ImageStatus.ALIVE, ImageStatus.DELETED],
+        ids=lambda status: status.value,
+    )
+    async def test_restore_marks_the_image_alive(
+        self,
+        image_repository: ImageRepository,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        image_id: ImageID,
+        status: ImageStatus,
+    ) -> None:
+        result = await image_repository.restore_image_by_id(image_id)
+
+        assert result.status == ImageStatus.ALIVE
+        async with db_with_cleanup.begin_readonly_session() as db_sess:
+            stored = await db_sess.scalar(sa.select(ImageRow.status).where(ImageRow.id == image_id))
+        assert stored == ImageStatus.ALIVE
