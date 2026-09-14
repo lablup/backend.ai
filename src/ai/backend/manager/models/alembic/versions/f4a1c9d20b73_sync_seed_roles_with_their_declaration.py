@@ -600,6 +600,60 @@ _PRESETS: Final[tuple[_Preset, ...]] = (
     ),
 )
 
+# Every entity type this build knows, as `mgr ops types` reports them: the entity
+# rows and the unclassified ones, which have no identifier class but are permitted
+# all the same. A permission row naming anything else is left over from a rename.
+_ENTITY_TYPES: Final[frozenset[str]] = frozenset({
+    "agent",
+    "app_config",
+    "app_config_allow_list",
+    "app_config_definition",
+    "app_config_fragment",
+    "artifact",
+    "artifact_registry",
+    "auth",
+    "client_ip_masking_policy",
+    "container_registry",
+    "deployment",
+    "deployment_preset",
+    "domain",
+    "entity_share",
+    "global",
+    "idle_checker",
+    "image",
+    "keypair_resource_policy",
+    "login_client_type",
+    "model_card",
+    "network",
+    "notification_channel",
+    "notification_rule",
+    "object_storage",
+    "project",
+    "project_resource_policy",
+    "prometheus_query_preset",
+    "prometheus_query_preset_category",
+    "resource_group",
+    "resource_preset",
+    "resource_slot_type",
+    "retention_policy",
+    "role",
+    "role_preset",
+    "runtime_variant",
+    "runtime_variant_preset",
+    "scope_admin",
+    "service_catalog",
+    "session",
+    "session_group",
+    "session_template",
+    "storage_namespace",
+    "user",
+    "user_resource_policy",
+    "vfolder",
+    "vfolder_invitation",
+    "vfs_storage",
+})
+
+
 # The entity type each retired name is answered by now, or None where the owning
 # entity answers and the row goes.
 _RETIRED: Final[dict[str, str | None]] = {
@@ -610,6 +664,27 @@ _RETIRED: Final[dict[str, str | None]] = {
     "vfolder:data": None,
     "session:app_service": None,
 }
+
+
+# Which preset a seed role was made from, by its scope and the suffix its name ends in.
+# Two naming rules are in the wild -- `role_domain_x_admin` and `domain-x-admin` -- so
+# both separators are read.
+_ADMIN_SUFFIXES: Final[tuple[str, ...]] = ("_admin", "-admin")
+_MEMBER_SUFFIXES: Final[tuple[str, ...]] = ("_member", "-member")
+
+
+def _preset_for(scope_type: str, name: str) -> str | None:
+    """The id of the preset this role was made from, or None where nothing says."""
+    by_scope = {preset.scope_type: preset for preset in _PRESETS}
+    if scope_type == "user":
+        return by_scope["user"].id
+    if scope_type not in ("domain", "project"):
+        return None
+    if name.endswith(_ADMIN_SUFFIXES):
+        return next((p.id for p in _PRESETS if p.name == f"{scope_type}_admin"), None)
+    if name.endswith(_MEMBER_SUFFIXES):
+        return next((p.id for p in _PRESETS if p.name == f"{scope_type}_member"), None)
+    return None
 
 
 def _retire_names(conn: sa.engine.Connection) -> None:
@@ -719,11 +794,116 @@ def _write_role_permissions(conn: sa.engine.Connection) -> None:
             )
 
 
+def _sweep_unknown_types(conn: sa.engine.Connection) -> None:
+    """Drop the permission rows naming something that is no longer an entity type.
+
+    Stated as what is kept rather than what goes: a name missed by the retirement map
+    above would otherwise survive, and every one of them fails to load."""
+    conn.execute(
+        sa.text("DELETE FROM permissions WHERE entity_type <> ALL(:kept)").bindparams(
+            sa.bindparam("kept", sorted(_ENTITY_TYPES), type_=sa.ARRAY(sa.Text))
+        )
+    )
+
+
+def _link_roles(conn: sa.engine.Connection) -> None:
+    """Name the preset each seed role was made from, where nothing named it yet.
+
+    The presets were all soft-deleted when the earlier backfill ran, and it skipped
+    deleted ones, so a database carries seed roles that point at nothing. Linking
+    rather than recreating is what keeps the assignments: who holds a role lives only
+    in `user_roles`, and a role's own rows go with it."""
+    rows = conn.execute(
+        sa.text("SELECT id, scope_type, name FROM roles WHERE role_preset_id IS NULL")
+    ).all()
+    linked = [
+        {"b_role_id": row.id, "b_preset_id": preset_id}
+        for row in rows
+        if (preset_id := _preset_for(str(row.scope_type), str(row.name))) is not None
+    ]
+    if linked:
+        conn.execute(
+            sa.text("UPDATE roles SET role_preset_id = :b_preset_id WHERE id = :b_role_id"),
+            linked,
+        )
+
+
+def _drop_unlinked_system_roles(conn: sa.engine.Connection) -> None:
+    """Drop the system roles no preset accounts for.
+
+    A preset is the only thing that makes a system role, so one without a preset is
+    left over from a rule that no longer runs. A role made by hand is never a system
+    one, so nothing of anyone's goes here. The role's permissions and assignments go
+    with it, as its foreign keys say."""
+    conn.execute(sa.text("DELETE FROM roles WHERE source = 'system' AND role_preset_id IS NULL"))
+
+
+def _grant_auto_assign_roles(conn: sa.engine.Connection) -> None:
+    """Give every project member the roles their project assigns on its own, and put
+    them on its roster.
+
+    Which users a project holds is the only part of a seed role's assignment a database
+    still states for itself, so the roles a project hands out without being asked are
+    the ones recoverable here. Who administers a project is not stated anywhere but the
+    assignment `_link_roles` kept.
+
+    The roster edge carries the membership: a role held without it reaches nothing."""
+    pairs = conn.execute(
+        sa.text("""
+            SELECT r.id AS role_id, agu.user_id AS user_id, r.scope_id AS project_id
+            FROM roles r
+            JOIN association_groups_users agu ON agu.group_id = r.scope_id
+            WHERE r.scope_type = 'project'
+              AND r.auto_assign IS TRUE
+              AND r.status = 'active'
+        """)
+    ).all()
+    for pair in pairs:
+        conn.execute(
+            sa.text("""
+                INSERT INTO user_roles (user_id, role_id)
+                VALUES (:user_id, :role_id)
+                ON CONFLICT (user_id, role_id) DO NOTHING
+            """).bindparams(user_id=pair.user_id, role_id=pair.role_id)
+        )
+        _share_membership(conn, str(pair.project_id), str(pair.user_id))
+
+
+def _share_membership(conn: sa.engine.Connection, project_id: str, user_id: str) -> None:
+    """Put the user on the project's roster: the share edge and the read cap on it.
+
+    Left alone where it already stands, so a project whose roster the graph already
+    holds keeps the caps it was given."""
+    membership_id = conn.execute(
+        sa.text("""
+            INSERT INTO entity_memberships (virtual_entity_id, member_entity_id, capped)
+            SELECT scope.id, member.id, TRUE
+            FROM virtual_entities scope, virtual_entities member
+            WHERE scope.entity_type = 'project' AND scope.entity_id = :project_id
+              AND member.entity_type = 'user' AND member.entity_id = :user_id
+            ON CONFLICT (virtual_entity_id, member_entity_id) DO NOTHING
+            RETURNING id
+        """).bindparams(project_id=project_id, user_id=user_id)
+    ).scalar()
+    if membership_id is None:
+        return
+    conn.execute(
+        sa.text("""
+            INSERT INTO entity_membership_caps (membership_id, permission, all_fields)
+            VALUES (:membership_id, 1, TRUE)
+        """).bindparams(membership_id=membership_id)
+    )
+
+
 def upgrade() -> None:
     conn = op.get_bind()
     _retire_names(conn)
+    _sweep_unknown_types(conn)
     _write_presets(conn)
+    _link_roles(conn)
+    _drop_unlinked_system_roles(conn)
     _write_role_permissions(conn)
+    _grant_auto_assign_roles(conn)
 
 
 def downgrade() -> None:

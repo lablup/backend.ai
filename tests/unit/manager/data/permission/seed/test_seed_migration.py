@@ -33,7 +33,8 @@ def migration() -> Any:
 @pytest.fixture(scope="module")
 def fixture() -> dict[str, Any]:
     path = _REPOSITORY / "fixtures/manager/example-roles.json"
-    return json.loads(path.read_text(encoding="utf-8"))
+    loaded: dict[str, Any] = json.loads(path.read_text(encoding="utf-8"))
+    return loaded
 
 
 class TestMigrationMatchesFixture:
@@ -90,3 +91,56 @@ class TestMigrationMatchesFixture:
     ) -> None:
         declared = {preset.id for preset in migration._PRESETS}
         assert {role["role_preset_id"] for role in fixture["roles"]} <= declared
+
+
+class TestEntityTypeSweep:
+    def test_the_seed_names_only_kept_types(self, migration: Any, fixture: dict[str, Any]) -> None:
+        """What the sweep keeps covers what the seed writes, or it deletes the seed."""
+        named = {row["entity_type"] for row in fixture["permissions"]}
+        assert named <= migration._ENTITY_TYPES
+
+    def test_the_retired_names_are_not_kept(self, migration: Any) -> None:
+        for name, replacement in migration._RETIRED.items():
+            assert name not in migration._ENTITY_TYPES, name
+            if replacement is not None:
+                assert replacement in migration._ENTITY_TYPES, replacement
+
+
+class TestPresetMapping:
+    def test_every_seed_role_maps_to_the_preset_it_carries(
+        self, migration: Any, fixture: dict[str, Any]
+    ) -> None:
+        for role in fixture["roles"]:
+            assert (
+                migration._preset_for(role["scope_type"], role["name"]) == role["role_preset_id"]
+            ), role["name"]
+
+    @pytest.mark.parametrize(
+        ("scope_type", "name", "preset"),
+        [
+            ("domain", "domain-default-admin", "domain_admin"),
+            ("project", "project-2de2b969-admin", "project_admin"),
+            ("project", "project-2de2b969-member", "project_member"),
+            ("user", "user-alice", "user_owner"),
+        ],
+    )
+    def test_the_runtime_naming_rule_maps_too(
+        self, migration: Any, scope_type: str, name: str, preset: str
+    ) -> None:
+        """Two naming rules are in the wild; a role made by either is still seed-owned."""
+        by_id = {p.id: p.name for p in migration._PRESETS}
+        assert by_id[migration._preset_for(scope_type, name)] == preset
+
+    @pytest.mark.parametrize(
+        ("scope_type", "name"),
+        [
+            ("domain", "role_superadmin"),
+            ("domain", "role_monitor"),
+            ("project", "a-role-someone-made"),
+            ("resource_group", "role_resource_group_admin"),
+        ],
+    )
+    def test_what_no_preset_made_maps_to_nothing(
+        self, migration: Any, scope_type: str, name: str
+    ) -> None:
+        assert migration._preset_for(scope_type, name) is None

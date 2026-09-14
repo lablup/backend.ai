@@ -147,7 +147,7 @@ class RoleFixture:
                     ProjectEntityType(),
                     group["id"],
                     f"role_project_{short}_member",
-                    "custom",
+                    "system",
                 )
             )
         for user in self._users:
