@@ -287,13 +287,19 @@ class ImageDBSource:
         """
         return await self._fetch_image(image_id, [ImageStatus.ALIVE])
 
-    async def validate_image_ownership(self, image_id: ImageID, user_id: UUID) -> bool:
+    async def validate_image_ownership(
+        self,
+        image_id: ImageID,
+        user_id: UUID,
+        status_filter: list[ImageStatus] | None = None,
+    ) -> bool:
         """
         Checks if the image was committed for the user.
         Returns True if it was, False otherwise.
         Raises ImageNotFound if image doesn't exist.
         """
-        image = await self._fetch_image(image_id, [ImageStatus.ALIVE])
+        statuses = [ImageStatus.ALIVE] if status_filter is None else status_filter
+        image = await self._fetch_image(image_id, statuses)
         return image.customized and image.creator_id == user_id
 
     async def insert_image_alias(

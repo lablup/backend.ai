@@ -7,7 +7,7 @@ from ai.backend.common.exception import UnknownImageReference
 from ai.backend.common.types import AgentId, ImageID
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
-from ai.backend.manager.data.image.types import ImageWithAgentInstallStatus
+from ai.backend.manager.data.image.types import ImageStatus, ImageWithAgentInstallStatus
 from ai.backend.manager.errors.image import ImageAccessForbiddenError, ImageNotFound
 from ai.backend.manager.models.image import (
     ImageIdentifier,
@@ -128,7 +128,12 @@ class ImageService:
         self._image_repository = image_repository
         self._config_provider = config_provider
 
-    async def _validate_image_ownership(self, image_id: ImageID, user_id: UUID) -> None:
+    async def _validate_image_ownership(
+        self,
+        image_id: ImageID,
+        user_id: UUID,
+        status_filter: list[ImageStatus] | None = None,
+    ) -> None:
         """
         Validates that user owns the image.
         Raises ImageAccessForbiddenError if user doesn't own the image.
@@ -136,7 +141,9 @@ class ImageService:
         Note: Non-customized images are not owned by anyone,
         so ownership validation fails for them.
         """
-        if not await self._image_repository.validate_image_ownership(image_id, user_id):
+        if not await self._image_repository.validate_image_ownership(
+            image_id, user_id, status_filter
+        ):
             raise ImageAccessForbiddenError()
 
     async def get_images_by_canonicals(
@@ -243,7 +250,9 @@ class ImageService:
         user = current_user()
         is_superadmin = user is not None and user.role == UserRole.SUPERADMIN
         if not is_superadmin and user is not None:
-            await self._validate_image_ownership(action.image_id, user.user_id)
+            await self._validate_image_ownership(
+                action.image_id, user.user_id, status_filter=list(ImageStatus.restorable())
+            )
         data = await self._image_repository.restore_image_by_id(action.image_id)
         return RestoreImageByIdActionResult(image=data)
 
