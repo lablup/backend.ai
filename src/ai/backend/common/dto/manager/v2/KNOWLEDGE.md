@@ -44,6 +44,8 @@ where a field is defined exactly one, so the surfaces cannot diverge.
 
 ## The DTO default never reaches the GraphQL SDL
 
-- `gql_pydantic_input` is a plain `@strawberry.input` plus `PydanticInputMixin`; strawberry's pydantic integration, which copies pydantic defaults into the schema, is banned by ruff for inputs.
-- So a GQL input field's default is its own `gql_field(default=strawberry.UNSET)`, which prints as "no default"; the DTO's `UNSET` is applied only when `to_pydantic()` skips the field.
-- `tests/unit/manager/api/gql/test_schema_defaults.py` fails if an `Unset` or legacy `Sentinel` value ever appears as an input default.
+- A field the client leaves out lands on the GQL input class first, not on the DTO. The class's own `gql_field(default=strawberry.UNSET)` marks it as "not sent".
+- The default the SDL prints is that GQL class default, and `strawberry.UNSET` prints as no default at all.
+- `PydanticInputMixin.to_pydantic()` builds the DTO from the GQL object and leaves the "not sent" fields out of the constructor call.
+- The DTO's `default=UNSET` only fills those left-out fields. It never reaches the SDL.
+- That is why `schema.py` no longer rewrites `Sentinel` defaults to `Undefined`; `tests/unit/manager/api/gql/test_schema_defaults.py` fails if an `Unset` or `Sentinel` value ever appears as an input default.
