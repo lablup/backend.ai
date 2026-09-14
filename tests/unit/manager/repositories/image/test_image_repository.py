@@ -24,6 +24,7 @@ from ai.backend.common.types import BinarySize, KernelId, SessionId
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.domain import DomainRow
+from ai.backend.manager.models.entity_label.row import EntityLabelRow
 from ai.backend.manager.models.image import ImageAliasRow, ImageRow, ImageStatus, ImageType
 from ai.backend.manager.models.image.conditions import ImageConditions
 from ai.backend.manager.models.kernel import KernelRow
@@ -39,6 +40,7 @@ from ai.backend.manager.models.session.row import SessionRow
 from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
 from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.image.repository import ImageRepository
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
@@ -69,6 +71,8 @@ class TestImageRepositorySearch:
                 ContainerRegistryRow,
                 ImageRow,
                 ImageAliasRow,
+                VirtualEntityRow,
+                EntityLabelRow,
             ],
         ):
             yield database_connection
@@ -443,6 +447,27 @@ class TestImageRepositorySearch:
         result = await image_repository.search_images(querier)
         assert result.total_count == 1
         assert "python:3.9" in str(result.items[0].name)
+
+    async def test_purge_image_removes_its_aliases(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        image_repository: ImageRepository,
+        images_with_aliases: list[ImageID],
+    ) -> None:
+        image_id = images_with_aliases[0]
+
+        removed = await image_repository.delete_image_with_aliases(image_id)
+
+        async with db_with_cleanup.begin_readonly_session() as db_sess:
+            remaining_image = await db_sess.get(ImageRow, image_id)
+            remaining_aliases = await db_sess.scalar(
+                sa.select(sa.func.count())
+                .select_from(ImageAliasRow)
+                .where(ImageAliasRow.image_id == image_id)
+            )
+        assert removed.id == image_id
+        assert remaining_image is None
+        assert remaining_aliases == 0
 
 
 class TestImageRepositoryLastUsedAt:

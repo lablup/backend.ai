@@ -2,12 +2,15 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from typing import Any, override
 
 import pytest
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.image import (
+    DEFAULT_LIMITS,
+    DEFAULT_LIMITS_GQL,
     Accelerators,
     AnIdThatHoldsNothing,
     AnImageAndACaller,
@@ -25,7 +28,12 @@ from bai_scenario.runner.steps import run_scenario
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.v2.image.request import UpdateImageInput
 from ai.backend.common.dto.manager.v2.image.response import ImageNode
+from ai.backend.common.dto.manager.v2.image.types import (
+    ImageResourceLimitGQLInfo,
+    ImageResourceLimitInfo,
+)
 from ai.backend.manager.api.adapters.image.adapter import ImageAdapter
+from ai.backend.manager.data.image.types import ImageType
 from ai.backend.manager.errors.auth import InsufficientPrivilege
 from ai.backend.manager.errors.image import ImageNotFound
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -37,6 +45,41 @@ from ai.backend.testutils.scenario_steps import (
 )
 
 A_NEW_TAG = "moved"
+UPDATED_DIGEST = f"sha256:{'f' * 64}"
+SCALAR_UPDATES: Mapping[str, Any] = {
+    "name": "updated-image",
+    "registry": "updated.example.com",
+    "image": "team/updated-image",
+    "architecture": "aarch64",
+    "size_bytes": 2048,
+    "type": ImageType.SERVICE.value,
+    "config_digest": UPDATED_DIGEST,
+    "is_local": True,
+}
+UPDATED_LABELS = {"purpose": "scenario"}
+UPDATED_RESOURCES: Mapping[str, Any] = {"cpu": {"min": "2", "max": "4"}}
+UPDATED_LIMITS = sorted(
+    [
+        ImageResourceLimitInfo(
+            key=one.key,
+            min="2" if one.key == "cpu" else one.min,
+            max="4" if one.key == "cpu" else one.max,
+        )
+        for one in DEFAULT_LIMITS
+    ],
+    key=lambda one: one.key,
+)
+UPDATED_LIMITS_GQL = sorted(
+    [
+        ImageResourceLimitGQLInfo(
+            key=one.key,
+            min="2" if one.key == "cpu" else one.min,
+            max="4" if one.key == "cpu" else one.max,
+        )
+        for one in DEFAULT_LIMITS_GQL
+    ],
+    key=lambda one: one.key,
+)
 
 
 @dataclass(frozen=True)
@@ -45,6 +88,7 @@ class Editing(When[AnImageAndACaller, ImageAdapter, ImageNode]):
 
     tag: str | None = None
     accelerators: Accelerators | None = None
+    updates: Mapping[str, Any] = field(default_factory=dict)
     at: Target = field(default_factory=TheLaidImage)
 
     @override
@@ -62,6 +106,8 @@ class Editing(When[AnImageAndACaller, ImageAdapter, ImageNode]):
             return f"{who}이 {laid.image.name}의 가속기 목록을 {put}"
         if self.tag is not None:
             return f"{who}이 {laid.image.name}의 태그를 {self.tag}로 수정"
+        if self.updates:
+            return f"{who}이 {laid.image.name}의 여러 필드를 함께 수정"
         return f"{who}이 값을 하나도 지정하지 않고 수정"
 
     @override
@@ -72,6 +118,7 @@ class Editing(When[AnImageAndACaller, ImageAdapter, ImageNode]):
             asked["tag"] = self.tag
         if self.accelerators is not None:
             asked["supported_accelerators"] = self.accelerators.named()
+        asked.update(self.updates)
         with ActingAs(laid.caller):
             payload = await adapter.admin_update(UpdateImageInput(**asked))
         return payload.item
@@ -181,6 +228,74 @@ class WritingTheAcceleratorList(
 
 
 @dataclass(frozen=True)
+class ChangingTheRemainingScalarFields(
+    Scenario[SeedingSession, AnImageAndACaller, ImageAdapter, ImageNode]
+):
+    @override
+    def summary(self) -> str:
+        return "changing-the-remaining-scalar-fields-returns-the-new-values"
+
+    @override
+    def describe(self) -> str:
+        return "슈퍼관리자가 이름과 레지스트리 등의 기본 필드를 함께 수정하면 지정한 값이 반환된다"
+
+    @override
+    def given(self) -> Given[SeedingSession, AnImageAndACaller]:
+        return AnImageAndSomeone(role=UserRole.SUPERADMIN)
+
+    @override
+    def when(self) -> When[AnImageAndACaller, ImageAdapter, ImageNode]:
+        return Editing(updates=SCALAR_UPDATES)
+
+    @override
+    def then(self) -> Then[AnImageAndACaller, ImageNode]:
+        return TheImageNode(
+            name="updated-image",
+            registry="updated.example.com",
+            image="team/updated-image",
+            architecture="aarch64",
+            size_bytes=2048,
+            image_type=ImageType.SERVICE,
+            config_digest=UPDATED_DIGEST,
+            is_local=True,
+        )
+
+
+@dataclass(frozen=True)
+class ChangingLabelsAndResourceLimits(
+    Scenario[SeedingSession, AnImageAndACaller, ImageAdapter, ImageNode]
+):
+    @override
+    def summary(self) -> str:
+        return "changing-labels-and-resource-limits-returns-the-new-values"
+
+    @override
+    def describe(self) -> str:
+        return "슈퍼관리자가 레이블과 CPU 하한·상한을 수정하면 지정한 값이 반환된다"
+
+    @override
+    def given(self) -> Given[SeedingSession, AnImageAndACaller]:
+        return AnImageAndSomeone(role=UserRole.SUPERADMIN)
+
+    @override
+    def when(self) -> When[AnImageAndACaller, ImageAdapter, ImageNode]:
+        return Editing(
+            updates={
+                "labels": UPDATED_LABELS,
+                "resource_limits": UPDATED_RESOURCES,
+            }
+        )
+
+    @override
+    def then(self) -> Then[AnImageAndACaller, ImageNode]:
+        return TheImageNode(
+            labels=UPDATED_LABELS,
+            resource_limits=UPDATED_LIMITS,
+            resource_limits_gql=UPDATED_LIMITS_GQL,
+        )
+
+
+@dataclass(frozen=True)
 class EditingWhatIsNotThere(Scenario[SeedingSession, AnImageAndACaller, ImageAdapter, ImageNode]):
     @override
     def summary(self) -> str:
@@ -188,7 +303,7 @@ class EditingWhatIsNotThere(Scenario[SeedingSession, AnImageAndACaller, ImageAda
 
     @override
     def describe(self) -> str:
-        return "어느 이미지도 가리키지 않는 id를 수정하려 하면 대상을 찾을 수 없어 거부된다"
+        return "어느 이미지도 가리키지 않는 ID를 수정하려 하면 대상을 찾을 수 없어 거부된다"
 
     @override
     def given(self) -> Given[SeedingSession, AnImageAndACaller]:
@@ -211,7 +326,7 @@ class APlainUserMayNotEdit(Scenario[SeedingSession, AnImageAndACaller, ImageAdap
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 아닌 사용자가 이미지를 수정하려 하면 역할 부족으로 거부된다"
+        return "슈퍼관리자가 아닌 사용자가 이미지를 수정하려 하면 슈퍼관리자 권한 부족으로 거부된다"
 
     @override
     def given(self) -> Given[SeedingSession, AnImageAndACaller]:
@@ -231,6 +346,8 @@ SCENARIOS: list[Any] = [
     AnEmptyEditChangesNothing(),
     ClearingTheAcceleratorList(),
     WritingTheAcceleratorList(),
+    ChangingTheRemainingScalarFields(),
+    ChangingLabelsAndResourceLimits(),
     EditingWhatIsNotThere(),
     APlainUserMayNotEdit(),
 ]
