@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import AsyncGenerator
+from dataclasses import dataclass
+from datetime import UTC, datetime, timedelta
 
 import pytest
 
@@ -34,7 +36,11 @@ from ai.backend.manager.models.entity_share.row import EntityShareRow
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.resource_policy import UserResourcePolicyRow
-from ai.backend.manager.models.specs.pagination import CursorForwardPagination, OffsetPagination
+from ai.backend.manager.models.specs.pagination import (
+    CursorBackwardPagination,
+    CursorForwardPagination,
+    OffsetPagination,
+)
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
@@ -94,6 +100,51 @@ async def seeded_definitions(
         )
         definitions.append(definition)
     return definitions
+
+
+@pytest.fixture
+async def definitions_sharing_created_at(
+    database_connection: ExtendedAsyncSAEngine,
+    repository: OpsRepository[AppConfigDefinitionData],
+) -> list[AppConfigDefinitionID]:
+    """Three rows at one ``created_at`` and one older row, in ``(created_at DESC, id ASC)``
+    order — the order the adapter pages in."""
+    tied_at = datetime(2026, 1, 1, tzinfo=UTC)
+    rows = [
+        AppConfigDefinitionRow(
+            id=AppConfigDefinitionID(uuid.UUID(int=1)),
+            config_name="tied-1",
+            created_at=tied_at,
+            updated_at=tied_at,
+        ),
+        AppConfigDefinitionRow(
+            id=AppConfigDefinitionID(uuid.UUID(int=2)),
+            config_name="tied-2",
+            created_at=tied_at,
+            updated_at=tied_at,
+        ),
+        AppConfigDefinitionRow(
+            id=AppConfigDefinitionID(uuid.UUID(int=3)),
+            config_name="tied-3",
+            created_at=tied_at,
+            updated_at=tied_at,
+        ),
+        AppConfigDefinitionRow(
+            id=AppConfigDefinitionID(uuid.UUID(int=4)),
+            config_name="older",
+            created_at=tied_at - timedelta(days=1),
+            updated_at=tied_at - timedelta(days=1),
+        ),
+    ]
+    async with database_connection.begin_session() as db_sess:
+        db_sess.add_all(rows)
+    return [row.id for row in rows]
+
+
+@dataclass(frozen=True)
+class _CursorWalkCase:
+    cursor: int
+    expected: list[int]
 
 
 def _missing_id() -> AppConfigDefinitionID:
@@ -250,3 +301,65 @@ class TestAdminSearch:
             )
         )
         assert [item.id for item in result.items] == [d.id for d in by_created_desc[1:]]
+
+    @pytest.mark.parametrize(
+        "case",
+        [
+            _CursorWalkCase(cursor=0, expected=[1, 2, 3]),
+            _CursorWalkCase(cursor=1, expected=[2, 3]),
+            _CursorWalkCase(cursor=2, expected=[3]),
+            _CursorWalkCase(cursor=3, expected=[]),
+        ],
+        ids=lambda case: f"after-{case.cursor}",
+    )
+    async def test_admin_search_cursor_forward_continues_past_tied_created_at(
+        self,
+        repository: OpsRepository[AppConfigDefinitionData],
+        definitions_sharing_created_at: list[AppConfigDefinitionID],
+        case: _CursorWalkCase,
+    ) -> None:
+        cursor = definitions_sharing_created_at[case.cursor]
+        result = await repository.search_in_global(
+            AppConfigDefinitionSearcher(
+                pagination=CursorForwardPagination(
+                    first=10,
+                    cursor_order=AppConfigDefinitionOrders.created_at(ascending=False),
+                    cursor_condition=AppConfigDefinitionConditions.by_cursor_forward(str(cursor)),
+                ),
+                orders=[AppConfigDefinitionOrders.id(ascending=True)],
+            )
+        )
+        assert [item.id for item in result.items] == [
+            definitions_sharing_created_at[index] for index in case.expected
+        ]
+
+    @pytest.mark.parametrize(
+        "case",
+        [
+            _CursorWalkCase(cursor=0, expected=[]),
+            _CursorWalkCase(cursor=1, expected=[0]),
+            _CursorWalkCase(cursor=2, expected=[0, 1]),
+            _CursorWalkCase(cursor=3, expected=[0, 1, 2]),
+        ],
+        ids=lambda case: f"before-{case.cursor}",
+    )
+    async def test_admin_search_cursor_backward_keeps_tied_created_at(
+        self,
+        repository: OpsRepository[AppConfigDefinitionData],
+        definitions_sharing_created_at: list[AppConfigDefinitionID],
+        case: _CursorWalkCase,
+    ) -> None:
+        cursor = definitions_sharing_created_at[case.cursor]
+        result = await repository.search_in_global(
+            AppConfigDefinitionSearcher(
+                pagination=CursorBackwardPagination(
+                    last=10,
+                    cursor_order=AppConfigDefinitionOrders.created_at(ascending=True),
+                    cursor_condition=AppConfigDefinitionConditions.by_cursor_backward(str(cursor)),
+                ),
+                orders=[AppConfigDefinitionOrders.id(ascending=True)],
+            )
+        )
+        assert [item.id for item in result.items] == [
+            definitions_sharing_created_at[index] for index in case.expected
+        ]
