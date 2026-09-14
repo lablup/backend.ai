@@ -11275,6 +11275,13 @@
         "title": "SearchIdleCheckersInput",
         "type": "object"
       },
+      "NonEmptyList_SessionTypes_": {
+        "items": {
+          "$ref": "#/components/schemas/SessionTypes"
+        },
+        "minItems": 1,
+        "type": "array"
+      },
       "UpdateIdleCheckerInput": {
         "properties": {
           "id": {
@@ -11312,11 +11319,7 @@
           "target_session_types": {
             "anyOf": [
               {
-                "items": {
-                  "$ref": "#/components/schemas/SessionTypes"
-                },
-                "minItems": 1,
-                "type": "array"
+                "$ref": "#/components/schemas/NonEmptyList_SessionTypes_"
               },
               {
                 "type": "null"
