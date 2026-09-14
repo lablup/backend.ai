@@ -10,10 +10,14 @@ import sqlalchemy as sa
 
 from ai.backend.common.data.entity.domain import DomainEntityType, DomainID
 from ai.backend.common.data.entity.project import ProjectEntityType, ProjectID
+from ai.backend.common.data.entity.role import RoleID
+from ai.backend.manager.errors.permission import RoleNotFound
 from ai.backend.manager.errors.resource import DomainNotFound, ProjectNotFound
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.project import ProjectRow
+from ai.backend.manager.models.rbac_models.role.row import RoleRow
+from ai.backend.manager.models.rbac_models.user_role.row import UserRoleRow
 from ai.backend.manager.models.scopes import ExistenceCheck, OperationScope
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.virtual_entity.queries import user_scope_membership_exists
@@ -21,6 +25,7 @@ from ai.backend.manager.models.virtual_entity.queries import user_scope_membersh
 __all__ = (
     "DomainUserOperationScope",
     "ProjectUserOperationScope",
+    "RoleUserOperationScope",
 )
 
 
@@ -88,5 +93,34 @@ class ProjectUserOperationScope(OperationScope):
                 column=ProjectRow.id,
                 value=self.project_id,
                 error=ProjectNotFound(str(self.project_id)),
+            ),
+        ]
+
+
+@dataclass(frozen=True)
+class RoleUserOperationScope(OperationScope):
+    """Users assigned to one role."""
+
+    role_id: RoleID
+
+    @override
+    def to_condition(self) -> QueryCondition:
+        role_id = self.role_id
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return UserRow.uuid.in_(
+                sa.select(UserRoleRow.user_id).where(UserRoleRow.role_id == role_id)
+            )
+
+        return inner
+
+    @property
+    @override
+    def existence_checks(self) -> Sequence[ExistenceCheck[RoleID]]:
+        return [
+            ExistenceCheck(
+                column=RoleRow.id,
+                value=self.role_id,
+                error=RoleNotFound(str(self.role_id)),
             ),
         ]
