@@ -27,12 +27,14 @@ _BITS: Final[tuple[Permission, ...]] = (
     Permission.SOFT_DELETE,
     Permission.HARD_DELETE,
 )
-# Which seed roles a user is assigned, by the role their account carries. A superadmin
-# bypasses the RBAC check entirely, so it holds no scope role; a monitor holds none either.
+# Which seed roles a user is assigned by the role their account carries. A superadmin
+# bypasses the RBAC check entirely, so it holds no scope role; a monitor holds none
+# either. A role its preset marks auto_assign is not listed here: every member of the
+# scope holds it, which is what `auto_assign` means.
 _ASSIGNED: Final[Mapping[str, tuple[str, ...]]] = {
     "superadmin": ("user_owner",),
     "admin": ("user_owner", "domain_admin", "project_admin"),
-    "user": ("user_owner", "project_member"),
+    "user": ("user_owner",),
     "monitor": ("user_owner",),
 }
 
@@ -162,6 +164,22 @@ class RoleFixture:
             )
         return roles
 
+    def _auto_assigned(self, roles: Sequence[dict[str, Any]]) -> list[dict[str, Any]]:
+        """Every member of a scope holds the roles it assigns on its own."""
+        assigned: list[dict[str, Any]] = []
+        for role in roles:
+            if not self._seeds[role["__preset"]].auto_assign:
+                continue
+            for user in self._accounts_in(role["scope_id"]):
+                assigned.append({
+                    "id": _identify("user_role", user["uuid"], role["id"]),
+                    "user_id": user["uuid"],
+                    "role_id": role["id"],
+                    "granted_by": None,
+                    "granted_at": _TIMESTAMP,
+                })
+        return assigned
+
     def _user_roles(self, roles: Sequence[dict[str, Any]]) -> list[dict[str, Any]]:
         by_scope = {
             (role["scope_type"], role["scope_id"], role["__preset"]): role for role in roles
@@ -189,7 +207,9 @@ class RoleFixture:
                         "granted_by": None,
                         "granted_at": _TIMESTAMP,
                     })
-        return assigned
+        assigned.extend(self._auto_assigned(roles))
+        seen = {row["id"]: row for row in assigned}
+        return list(seen.values())
 
     def _permissions(self, roles: Sequence[dict[str, Any]]) -> list[dict[str, Any]]:
         rows: list[dict[str, Any]] = []

@@ -7,8 +7,11 @@ and what comes out is held against the fixture the declaration renders.
 
 from __future__ import annotations
 
+import json
+import pathlib
 import uuid
 from collections.abc import AsyncGenerator
+from typing import Any
 
 import pytest
 import sqlalchemy as sa
@@ -31,6 +34,7 @@ from ai.backend.manager.models.alembic.versions.f4a1c9d20b73_sync_seed_roles_wit
     _sweep_unknown_types,
     _write_presets,
     _write_role_permissions,
+    downgrade,
 )
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.hasher.types import PasswordInfo
@@ -261,6 +265,160 @@ def _run(conn: sa.engine.Connection) -> None:
     _grant_auto_assign_roles(conn)
 
 
+_REPOSITORY = pathlib.Path(__file__).resolve().parents[5]
+
+
+def _seed_files() -> tuple[dict[str, Any], dict[str, Any]]:
+    base = _REPOSITORY / "fixtures" / "manager"
+    accounts = json.loads((base / "example-users.json").read_text(encoding="utf-8"))
+    roles = json.loads((base / "example-roles.json").read_text(encoding="utf-8"))
+    return accounts, roles
+
+
+@pytest.fixture
+async def seeded_from_fixture(db: ExtendedAsyncSAEngine) -> dict[str, Any]:
+    """The seed's own subjects and roles, put back the way a database held them before
+    the declaration: no preset link, the permission rows the data migrations left, and
+    none of the assignments a scope hands out on its own."""
+    accounts, seed = _seed_files()
+    domain = accounts["domains"][0]
+    auto_ids = {role["id"] for role in seed["roles"] if role["auto_assign"]}
+    async with db.begin_session() as session:
+        session.add(
+            DomainRow(
+                id=uuid.UUID(domain["id"]),
+                name=domain["name"],
+                description="",
+                is_active=True,
+                total_resource_slots=ResourceSlot(),
+                allowed_vfolder_hosts=VFolderHostPermissionMap(),
+                allowed_docker_registries=[],
+                dotfiles=b"",
+                integration_id=None,
+            )
+        )
+        session.add(
+            ProjectResourcePolicyRow(
+                name="default", max_vfolder_count=0, max_quota_scope_size=-1, max_network_count=3
+            )
+        )
+        session.add(
+            UserResourcePolicyRow(
+                name="default",
+                max_vfolder_count=0,
+                max_quota_scope_size=-1,
+                max_session_count_per_model_session=1,
+                max_customized_image_count=0,
+            )
+        )
+        await session.flush()
+        for group in accounts["groups"]:
+            session.add(
+                ProjectRow(
+                    id=uuid.UUID(group["id"]),
+                    name=group["name"],
+                    domain_name=domain["name"],
+                    is_active=True,
+                    total_resource_slots=ResourceSlot(),
+                    allowed_vfolder_hosts=VFolderHostPermissionMap(),
+                    dotfiles=b"",
+                    type=ProjectType.GENERAL,
+                    resource_policy="default",
+                )
+            )
+        for user in accounts["users"]:
+            session.add(
+                UserRow(
+                    uuid=uuid.UUID(user["uuid"]),
+                    username=user["username"],
+                    email=user["email"],
+                    password=PasswordInfo(
+                        password="test-password",
+                        algorithm=PasswordHashAlgorithm.PBKDF2_SHA256,
+                        rounds=1_000,
+                        salt_size=32,
+                    ),
+                    need_password_change=False,
+                    domain_id=uuid.UUID(domain["id"]),
+                    domain_name=domain["name"],
+                    resource_policy="default",
+                )
+            )
+        await session.flush()
+        for row in accounts["association_groups_users"]:
+            await session.execute(
+                sa.insert(association_groups_users).values(
+                    user_id=uuid.UUID(row["user_id"]), group_id=uuid.UUID(row["group_id"])
+                )
+            )
+        for entity in accounts["virtual_entities"]:
+            session.add(
+                VirtualEntityRow(
+                    id=uuid.UUID(entity["id"]),
+                    entity_type=entity["entity_type"],
+                    entity_id=uuid.UUID(entity["entity_id"]),
+                )
+            )
+        for preset in seed["role_presets"]:
+            session.add(
+                RolePresetRow(
+                    id=uuid.UUID(preset["id"]),
+                    name=f"preset_{preset['name']}",
+                    scope_type=preset["scope_type"],
+                    auto_assign=preset["auto_assign"],
+                    deleted=True,
+                )
+            )
+        for role in seed["roles"]:
+            session.add(
+                RoleRow(
+                    id=uuid.UUID(role["id"]),
+                    name=role["name"],
+                    source=RoleSource(role["source"]),
+                    status=RoleStatus.ACTIVE,
+                    auto_assign=role["auto_assign"],
+                    scope_type=role["scope_type"],
+                    scope_id=uuid.UUID(role["scope_id"]),
+                )
+            )
+        await session.flush()
+        # What the data migrations left behind, on a role of each kind.
+        for role in seed["roles"][:2]:
+            for entity_type in ("model_deployment", "keypair", "session:app"):
+                session.add(
+                    PermissionRow(
+                        role_id=uuid.UUID(role["id"]),
+                        entity_type=entity_type,
+                        permission=1,
+                        all_fields=True,
+                    )
+                )
+        for row in seed["user_roles"]:
+            if row["role_id"] in auto_ids:
+                continue
+            session.add(
+                UserRoleRow(user_id=uuid.UUID(row["user_id"]), role_id=uuid.UUID(row["role_id"]))
+            )
+    by_role_id = {role["id"]: role for role in seed["roles"]}
+    return {
+        "expected_permissions": {
+            (by_role_id[row["role_id"]]["name"], row["entity_type"], row["permission"])
+            for row in seed["permissions"]
+        },
+        "expected_assignments": {
+            (row["user_id"], by_role_id[row["role_id"]]["name"]) for row in seed["user_roles"]
+        },
+        "expected_roles": {
+            (role["name"], role["scope_type"], role["role_preset_id"], role["source"])
+            for role in seed["roles"]
+        },
+        "expected_preset_permissions": {
+            (row["id"], row["role_preset_id"], row["entity_type"], row["permission"])
+            for row in seed["role_permission_presets"]
+        },
+    }
+
+
 class TestSyncSeedRoles:
     async def test_the_presets_come_back_live(
         self, db: ExtendedAsyncSAEngine, migrated: dict[str, uuid.UUID]
@@ -409,3 +567,130 @@ class TestSyncSeedRoles:
         async with db.begin() as conn:
             await conn.run_sync(lambda sync_conn: _run(sync_conn))
         assert await snapshot() == before
+
+
+class TestMigratedMatchesTheSeed:
+    """A database carried here holds what a database seeded from the fixture holds.
+
+    The seed's own subjects and roles go in without their preset links, carrying the
+    permission rows the data migrations left, and the assignments a scope hands out on
+    its own taken away. What the migration then writes is held against the fixture,
+    keyed by role name: a linked role keeps the id it came in with, so the rows are the
+    same rows under different role ids.
+    """
+
+    @pytest.fixture
+    async def carried(
+        self, db: ExtendedAsyncSAEngine, seeded_from_fixture: dict[str, Any]
+    ) -> dict[str, Any]:
+        async with db.begin() as conn:
+            await conn.run_sync(lambda sync_conn: _run(sync_conn))
+        return seeded_from_fixture
+
+    async def test_the_permissions_are_the_seed_s(
+        self, db: ExtendedAsyncSAEngine, carried: dict[str, Any]
+    ) -> None:
+        async with db.begin_readonly_session() as session:
+            rows = (
+                await session.execute(
+                    sa.select(RoleRow.name, PermissionRow.entity_type, PermissionRow.permission)
+                    .select_from(PermissionRow)
+                    .join(RoleRow, RoleRow.id == PermissionRow.role_id)
+                )
+            ).all()
+        written = {(row.name, row.entity_type, int(row.permission)) for row in rows}
+        assert written == carried["expected_permissions"]
+
+    async def test_the_assignments_are_the_seed_s(
+        self, db: ExtendedAsyncSAEngine, carried: dict[str, Any]
+    ) -> None:
+        async with db.begin_readonly_session() as session:
+            rows = (
+                await session.execute(
+                    sa.select(UserRoleRow.user_id, RoleRow.name)
+                    .select_from(UserRoleRow)
+                    .join(RoleRow, RoleRow.id == UserRoleRow.role_id)
+                )
+            ).all()
+        written = {(str(row.user_id), row.name) for row in rows}
+        assert written == carried["expected_assignments"]
+
+    async def test_the_roles_are_the_seed_s(
+        self, db: ExtendedAsyncSAEngine, carried: dict[str, Any]
+    ) -> None:
+        async with db.begin_readonly_session() as session:
+            rows = (await session.execute(sa.select(RoleRow))).scalars().all()
+        written = {
+            (row.name, str(row.scope_type), str(row.role_preset_id), row.source.value)
+            for row in rows
+        }
+        assert written == carried["expected_roles"]
+
+    async def test_the_preset_permissions_are_the_seed_s(
+        self, db: ExtendedAsyncSAEngine, carried: dict[str, Any]
+    ) -> None:
+        async with db.begin_readonly_session() as session:
+            rows = (await session.execute(sa.select(RolePermissionPresetRow))).scalars().all()
+        written = {
+            (str(row.id), str(row.role_preset_id), row.entity_type, int(row.permission))
+            for row in rows
+        }
+        assert written == carried["expected_preset_permissions"]
+
+
+class TestRepeating:
+    """Running it again adds nothing. `downgrade` undoes nothing -- what it replaced is
+    not recoverable -- so a cycle is the same as running it twice."""
+
+    async def _rows(self, db: ExtendedAsyncSAEngine) -> dict[str, set[tuple[str, ...]]]:
+        async with db.begin_readonly_session() as session:
+            permissions = (await session.execute(sa.select(PermissionRow))).scalars().all()
+            assignments = (await session.execute(sa.select(UserRoleRow))).scalars().all()
+            presets = (await session.execute(sa.select(RolePermissionPresetRow))).scalars().all()
+            roles = (await session.execute(sa.select(RoleRow))).scalars().all()
+            memberships = (await session.execute(sa.select(EntityMembershipRow))).scalars().all()
+            caps = (await session.execute(sa.select(EntityMembershipCapRow))).scalars().all()
+        return {
+            "permissions": {
+                (str(row.id), str(row.role_id), row.entity_type, str(int(row.permission)))
+                for row in permissions
+            },
+            "user_roles": {(str(row.user_id), str(row.role_id)) for row in assignments},
+            "role_permission_presets": {
+                (str(row.id), str(row.role_preset_id), row.entity_type, str(int(row.permission)))
+                for row in presets
+            },
+            "roles": {(str(row.id), row.name, str(row.role_preset_id)) for row in roles},
+            "entity_memberships": {
+                (str(row.virtual_entity_id), str(row.member_entity_id)) for row in memberships
+            },
+            "entity_membership_caps": {
+                (str(row.membership_id), str(int(row.permission))) for row in caps
+            },
+        }
+
+    async def test_a_second_run_writes_nothing_new(
+        self, db: ExtendedAsyncSAEngine, carried: dict[str, Any]
+    ) -> None:
+        before = await self._rows(db)
+        async with db.begin() as conn:
+            await conn.run_sync(lambda sync_conn: _run(sync_conn))
+        assert await self._rows(db) == before
+
+    async def test_a_cycle_writes_nothing_new(
+        self, db: ExtendedAsyncSAEngine, carried: dict[str, Any]
+    ) -> None:
+        before = await self._rows(db)
+        for _ in range(3):
+            downgrade()
+            async with db.begin() as conn:
+                await conn.run_sync(lambda sync_conn: _run(sync_conn))
+        assert await self._rows(db) == before
+
+    @pytest.fixture
+    async def carried(
+        self, db: ExtendedAsyncSAEngine, seeded_from_fixture: dict[str, Any]
+    ) -> dict[str, Any]:
+        async with db.begin() as conn:
+            await conn.run_sync(lambda sync_conn: _run(sync_conn))
+        return seeded_from_fixture
