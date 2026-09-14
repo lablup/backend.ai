@@ -14,6 +14,7 @@ from bai_scenario.components.container_registry import (
     RegistryTarget,
     SeededRegistry,
     TheUpdatedRegistryNode,
+    allowed_project_count,
 )
 from bai_scenario.runner.acting import ActingAs
 from bai_scenario.runner.planting import SeedingSession
@@ -22,6 +23,7 @@ from bai_scenario.runner.steps import run_scenario
 from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.v2.container_registry.request import (
+    AllowedGroupsInput,
     UpdateContainerRegistryInput,
 )
 from ai.backend.common.dto.manager.v2.container_registry.response import ContainerRegistryNode
@@ -45,6 +47,7 @@ class Editing(When[ARegistryAndACaller, ContainerRegistryAdapter, ContainerRegis
     url: str | None = None
     registry_type: ContainerRegistryType | None = None
     project: str | None = None
+    allow_project: bool = False
     target: RegistryTarget = field(default_factory=SeededRegistry)
 
     @override
@@ -60,6 +63,8 @@ class Editing(When[ARegistryAndACaller, ContainerRegistryAdapter, ContainerRegis
             return f"{who}이 주소를 {self.url}로 고침"
         if self.registry_type is not None:
             return f"{who}이 종류를 {self.registry_type.value}로 고침"
+        if self.allow_project:
+            return f"{who}이 심은 프로젝트를 허용 목록에 넣으며 고침"
         return f"{who}이 아무 값도 주지 않고 고침"
 
     @override
@@ -67,6 +72,10 @@ class Editing(When[ARegistryAndACaller, ContainerRegistryAdapter, ContainerRegis
         self, adapter: ContainerRegistryAdapter, laid: ARegistryAndACaller
     ) -> ContainerRegistryNode:
         registry_id = self.target.id_of(laid)
+        allowed_groups = None
+        if self.allow_project:
+            assert laid.project is not None
+            allowed_groups = AllowedGroupsInput(add=[str(laid.project.id)])
         with ActingAs(laid.caller):
             payload = await adapter.admin_update(
                 UpdateContainerRegistryInput(
@@ -74,6 +83,7 @@ class Editing(When[ARegistryAndACaller, ContainerRegistryAdapter, ContainerRegis
                     url=self.url,
                     type=self.registry_type,
                     project=self.project,
+                    allowed_groups=allowed_groups,
                 )
             )
         return payload.registry
@@ -123,6 +133,31 @@ class AnEmptyEditChangesNothing(
     @override
     def when(self) -> When[ARegistryAndACaller, ContainerRegistryAdapter, ContainerRegistryNode]:
         return Editing()
+
+    @override
+    def then(self) -> Then[ARegistryAndACaller, ContainerRegistryNode]:
+        return TheUpdatedRegistryNode()
+
+
+@dataclass(frozen=True)
+class AddingAllowedProjectWhileEditing(
+    Scenario[SeedingSession, ARegistryAndACaller, ContainerRegistryAdapter, ContainerRegistryNode]
+):
+    @override
+    def summary(self) -> str:
+        return "editing-a-registry-can-add-an-allowed-project"
+
+    @override
+    def describe(self) -> str:
+        return "슈퍼관리자가 레지스트리를 고치며 프로젝트를 허용하면 그 관계가 생성된다"
+
+    @override
+    def given(self) -> Given[SeedingSession, ARegistryAndACaller]:
+        return ARegistryAndSomeone(role=UserRole.SUPERADMIN, with_project=True)
+
+    @override
+    def when(self) -> When[ARegistryAndACaller, ContainerRegistryAdapter, ContainerRegistryNode]:
+        return Editing(allow_project=True)
 
     @override
     def then(self) -> Then[ARegistryAndACaller, ContainerRegistryNode]:
@@ -241,6 +276,7 @@ class APlainUserMayNotEdit(
 SCENARIOS: list[EditingScenario] = [
     ChangingOnlyTheAddress(),
     AnEmptyEditChangesNothing(),
+    AddingAllowedProjectWhileEditing(),
     AnAddressWithoutAHostIsRefused(),
     HarborWithoutAProjectIsRefused(),
     MissingRegistryIsRefused(),
@@ -255,3 +291,5 @@ async def test_editing(
     engine: ExtendedAsyncSAEngine,
 ) -> None:
     await run_scenario(scenario, adapter, engine)
+    expected_count = 1 if isinstance(scenario, AddingAllowedProjectWhileEditing) else 0
+    assert await allowed_project_count(engine) == expected_count

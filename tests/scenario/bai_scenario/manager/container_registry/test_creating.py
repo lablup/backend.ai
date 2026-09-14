@@ -16,6 +16,7 @@ from bai_scenario.components.container_registry import (
     NoRegistryYet,
     SeededProject,
     TheNewRegistryNode,
+    allowed_project_count,
 )
 from bai_scenario.runner.acting import ActingAs
 from bai_scenario.runner.planting import SeedingSession
@@ -107,10 +108,7 @@ class AllowingAProjectWhileCreating(
 
     @override
     def describe(self) -> str:
-        return (
-            "슈퍼관리자는 허용 프로젝트를 함께 주고 레지스트리를 만들 수 있다. "
-            "허용 목록이 함께 쓰이는 것은 답에 실리지 않아 이 행이 보지 못한다"
-        )
+        return "슈퍼관리자가 허용 프로젝트를 함께 주고 레지스트리를 만들면 그 관계도 생성된다"
 
     @override
     def given(self) -> Given[SeedingSession, AProjectAndACaller]:
@@ -231,3 +229,5 @@ async def test_creating(
     engine: ExtendedAsyncSAEngine,
 ) -> None:
     await run_scenario(scenario, adapter, engine)
+    expected_count = 1 if isinstance(scenario, AllowingAProjectWhileCreating) else 0
+    assert await allowed_project_count(engine) == expected_count

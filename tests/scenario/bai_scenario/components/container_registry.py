@@ -8,6 +8,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any, override
 
+import sqlalchemy as sa
 from bai_scenario.components.answers import MissingResponse
 from bai_scenario.components.domain import SomeoneOf
 from bai_scenario.runner.planting import SeedingSession
@@ -33,6 +34,10 @@ from ai.backend.manager.data.container_registry.types import ContainerRegistryDa
 from ai.backend.manager.data.permission.types import Permission
 from ai.backend.manager.data.project.types import ProjectData
 from ai.backend.manager.data.user.types import UserData
+from ai.backend.manager.models.association_container_registries_groups.row import (
+    AssociationContainerRegistriesGroupsRow,
+)
+from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import (
     Answered,
     Given,
@@ -56,6 +61,7 @@ class AProjectAndACaller:
 class ARegistryAndACaller:
     registry: ContainerRegistryData
     caller: UserData
+    project: ProjectData | None = None
 
 
 @dataclass(frozen=True)
@@ -95,23 +101,32 @@ class NoRegistryYet(Given[SeedingSession, AProjectAndACaller]):
 class ARegistryAndSomeone(Given[SeedingSession, ARegistryAndACaller]):
     role: UserRole = UserRole.USER
     name_hint: str = "host"
+    with_project: bool = False
     allowed: bool = False
 
     @override
     def describe(self) -> str:
-        allowed = ", 프로젝트 하나가 이미 허용돼 있음" if self.allowed else ""
-        return f"레지스트리 하나, {self.role.value} 한 명{allowed}"
+        project = ", 프로젝트 하나" if self.with_project or self.allowed else ""
+        allowed = "가 이미 허용돼 있음" if self.allowed else ""
+        return f"레지스트리 하나{project}{allowed}, {self.role.value} 한 명"
 
     @override
     async def lay(self, seeding: SeedingSession) -> ARegistryAndACaller:
         domain = await seeding.creating(SeedDomain(name_hint="home"))
         registry = await seeding.creating(SeedContainerRegistry(name_hint=self.name_hint))
-        if self.allowed:
+        project_data: ProjectData | None = None
+        if self.with_project or self.allowed:
             policy = await seeding.once(SeedProjectPolicy())
             project = await seeding.creating_from_two(SeedProject(), domain, policy)
-            await seeding.linking(AllowProject(), project, registry)
+            project_data = seeding.made(project)
+            if self.allowed:
+                await seeding.linking(AllowProject(), project, registry)
         caller = await seeding.within(SomeoneOf(domain, role=self.role))
-        return ARegistryAndACaller(seeding.made(registry), seeding.made(caller))
+        return ARegistryAndACaller(
+            registry=seeding.made(registry),
+            caller=seeding.made(caller),
+            project=project_data,
+        )
 
 
 @dataclass(frozen=True)
@@ -128,7 +143,13 @@ class ManyRegistriesAndSomeone(Given[SeedingSession, ManyRegistriesAndACaller]):
         domain = await seeding.creating(SeedDomain(name_hint="home"))
         wanted = await seeding.creating(SeedContainerRegistry(name_hint="wanted"))
         others = [
-            await seeding.creating(SeedContainerRegistry(name_hint="other"))
+            await seeding.creating(
+                SeedContainerRegistry(
+                    name_hint="other",
+                    registry_type=ContainerRegistryType.HARBOR2,
+                    is_global=False,
+                )
+            )
             for _ in range(self.besides)
         ]
         caller = await seeding.within(SomeoneOf(domain, role=self.role))
@@ -139,6 +160,9 @@ class ManyRegistriesAndSomeone(Given[SeedingSession, ManyRegistriesAndACaller]):
         )
 
 
+ALLOWING = (Permission.CREATE, Permission.SOFT_DELETE)
+
+
 @dataclass(frozen=True)
 class ARegistryAndAProjectToAllow(Given[SeedingSession, ARegistryToAllowAndACaller]):
     """관계 동작은 지목한 스코프가 모두 허용해야 실행된다. 그래서 한쪽만 주는 자리가 필요하다."""
@@ -147,6 +171,7 @@ class ARegistryAndAProjectToAllow(Given[SeedingSession, ARegistryToAllowAndACall
     on_registry: bool = True
     on_project: bool = True
     allowed: bool = False
+    permissions: tuple[Permission, ...] = ALLOWING
 
     @override
     def describe(self) -> str:
@@ -176,6 +201,7 @@ class ARegistryAndAProjectToAllow(Given[SeedingSession, ARegistryToAllowAndACall
                     scope_of=lambda one: ContainerRegistryID(one.id),
                     entity_type=ContainerRegistryEntityType(),
                     name_hint="allow-on-registry",
+                    permissions=self.permissions,
                 )
             )
         if self.on_project:
@@ -186,6 +212,7 @@ class ARegistryAndAProjectToAllow(Given[SeedingSession, ARegistryToAllowAndACall
                     scope_of=lambda one: ProjectID(one.id),
                     entity_type=ProjectEntityType(),
                     name_hint="allow-on-project",
+                    permissions=self.permissions,
                 )
             )
         return ARegistryToAllowAndACaller(
@@ -193,12 +220,6 @@ class ARegistryAndAProjectToAllow(Given[SeedingSession, ARegistryToAllowAndACall
             project=seeding.made(project),
             caller=seeding.made(caller),
         )
-
-
-ALLOWING = (Permission.CREATE, Permission.SOFT_DELETE)
-"""허용 목록에 넣고 빼는 데 드는 권한. 넣기는 생성이고 빼기는 삭제로 친다.
-
-한 행이 한 비트만 담으므로 둘을 따로 심는다."""
 
 
 @dataclass(frozen=True)
@@ -210,6 +231,7 @@ class SomeoneAllowingIn[ScopeData](SeedNest[Laid[None]]):
     scope_of: Callable[[ScopeData], EntityIdentifier]
     entity_type: EntityType
     name_hint: str
+    permissions: tuple[Permission, ...]
 
     @override
     def kind(self) -> str:
@@ -218,11 +240,17 @@ class SomeoneAllowingIn[ScopeData](SeedNest[Laid[None]]):
     @override
     def lay(self, seed: Seeder) -> Laid[None]:
         role = seed.creating_from(SeedRole(self.scope_of, name_hint=self.name_hint), self.scope)
-        for allowed in ALLOWING:
+        for allowed in self.permissions:
             seed.adding(SeedPermission(entity_type=self.entity_type, permission=allowed), role)
         return seed.granting(
             role, self.someone, role_id=lambda r: r.id, user_id=lambda u: UserID(u.id)
         )
+
+
+async def allowed_project_count(engine: ExtendedAsyncSAEngine) -> int:
+    async with engine.begin_readonly_session() as session:
+        query = sa.select(sa.func.count()).select_from(AssociationContainerRegistriesGroupsRow)
+        return int(await session.scalar(query) or 0)
 
 
 @dataclass(frozen=True)

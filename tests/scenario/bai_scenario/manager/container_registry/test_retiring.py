@@ -14,6 +14,7 @@ from bai_scenario.components.container_registry import (
     MissingRegistry,
     RegistryTarget,
     SeededRegistry,
+    allowed_project_count,
 )
 from bai_scenario.runner.acting import ActingAs
 from bai_scenario.runner.planting import SeedingSession
@@ -233,3 +234,4 @@ async def test_retiring(
     engine: ExtendedAsyncSAEngine,
 ) -> None:
     await run_scenario(scenario, adapter, engine)
+    assert await allowed_project_count(engine) == 0

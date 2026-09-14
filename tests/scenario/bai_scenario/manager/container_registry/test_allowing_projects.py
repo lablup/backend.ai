@@ -15,6 +15,7 @@ from bai_scenario.components.container_registry import (
     ARegistryAndAProjectToAllow,
     ARegistryToAllowAndACaller,
     RemoveProject,
+    allowed_project_count,
 )
 from bai_scenario.runner.acting import ActingAs
 from bai_scenario.runner.planting import SeedingSession
@@ -23,6 +24,7 @@ from bai_scenario.runner.steps import run_scenario
 from ai.backend.common.data.entity.container_registry import ContainerRegistryID
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.manager.api.adapters.container_registry.adapter import ContainerRegistryAdapter
+from ai.backend.manager.data.permission.types import Permission
 from ai.backend.manager.errors.image import ContainerRegistryGroupsAssociationNotFound
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.errors.resource import ProjectNotFound
@@ -137,6 +139,56 @@ class AddingExistingProjectIsIdempotent(
 
 
 @dataclass(frozen=True)
+class CreatePermissionIsEnoughToAddAProject(
+    Scenario[SeedingSession, ARegistryToAllowAndACaller, ContainerRegistryAdapter, None]
+):
+    @override
+    def summary(self) -> str:
+        return "create-permission-on-both-scopes-is-enough-to-allow-a-project"
+
+    @override
+    def describe(self) -> str:
+        return "양쪽 스코프에 생성 권한만 받은 사용자는 프로젝트를 허용 목록에 넣을 수 있다"
+
+    @override
+    def given(self) -> Given[SeedingSession, ARegistryToAllowAndACaller]:
+        return ARegistryAndAProjectToAllow(permissions=(Permission.CREATE,))
+
+    @override
+    def when(self) -> When[ARegistryToAllowAndACaller, ContainerRegistryAdapter, None]:
+        return ChangingAllowedProjects()
+
+    @override
+    def then(self) -> Then[ARegistryToAllowAndACaller, None]:
+        return TheCallReturnsNothing()
+
+
+@dataclass(frozen=True)
+class SoftDeletePermissionCannotAddAProject(
+    Scenario[SeedingSession, ARegistryToAllowAndACaller, ContainerRegistryAdapter, None]
+):
+    @override
+    def summary(self) -> str:
+        return "soft-delete-permission-does-not-allow-adding-a-project"
+
+    @override
+    def describe(self) -> str:
+        return "양쪽 스코프에 삭제 권한만 받은 사용자가 프로젝트를 추가하면 권한 부족으로 거부된다"
+
+    @override
+    def given(self) -> Given[SeedingSession, ARegistryToAllowAndACaller]:
+        return ARegistryAndAProjectToAllow(permissions=(Permission.SOFT_DELETE,))
+
+    @override
+    def when(self) -> When[ARegistryToAllowAndACaller, ContainerRegistryAdapter, None]:
+        return ChangingAllowedProjects()
+
+    @override
+    def then(self) -> Then[ARegistryToAllowAndACaller, None]:
+        return TheCallIsRefused(NotEnoughPermission)
+
+
+@dataclass(frozen=True)
 class RemovingAllowedProject(
     Scenario[SeedingSession, ARegistryToAllowAndACaller, ContainerRegistryAdapter, None]
 ):
@@ -159,6 +211,62 @@ class RemovingAllowedProject(
     @override
     def then(self) -> Then[ARegistryToAllowAndACaller, None]:
         return TheCallReturnsNothing()
+
+
+@dataclass(frozen=True)
+class SoftDeletePermissionIsEnoughToRemoveAProject(
+    Scenario[SeedingSession, ARegistryToAllowAndACaller, ContainerRegistryAdapter, None]
+):
+    @override
+    def summary(self) -> str:
+        return "soft-delete-permission-on-both-scopes-is-enough-to-remove-a-project"
+
+    @override
+    def describe(self) -> str:
+        return "양쪽 스코프에 삭제 권한만 받은 사용자는 허용 프로젝트를 제거할 수 있다"
+
+    @override
+    def given(self) -> Given[SeedingSession, ARegistryToAllowAndACaller]:
+        return ARegistryAndAProjectToAllow(
+            allowed=True,
+            permissions=(Permission.SOFT_DELETE,),
+        )
+
+    @override
+    def when(self) -> When[ARegistryToAllowAndACaller, ContainerRegistryAdapter, None]:
+        return ChangingAllowedProjects(change=RemoveProject())
+
+    @override
+    def then(self) -> Then[ARegistryToAllowAndACaller, None]:
+        return TheCallReturnsNothing()
+
+
+@dataclass(frozen=True)
+class CreatePermissionCannotRemoveAProject(
+    Scenario[SeedingSession, ARegistryToAllowAndACaller, ContainerRegistryAdapter, None]
+):
+    @override
+    def summary(self) -> str:
+        return "create-permission-does-not-allow-removing-a-project"
+
+    @override
+    def describe(self) -> str:
+        return "양쪽 스코프에 생성 권한만 받은 사용자가 프로젝트를 제거하면 권한 부족으로 거부된다"
+
+    @override
+    def given(self) -> Given[SeedingSession, ARegistryToAllowAndACaller]:
+        return ARegistryAndAProjectToAllow(
+            allowed=True,
+            permissions=(Permission.CREATE,),
+        )
+
+    @override
+    def when(self) -> When[ARegistryToAllowAndACaller, ContainerRegistryAdapter, None]:
+        return ChangingAllowedProjects(change=RemoveProject())
+
+    @override
+    def then(self) -> Then[ARegistryToAllowAndACaller, None]:
+        return TheCallIsRefused(NotEnoughPermission)
 
 
 @dataclass(frozen=True)
@@ -242,6 +350,34 @@ class MissingProjectPermissionIsRefused(
 
 
 @dataclass(frozen=True)
+class MissingRegistryPermissionIsRefused(
+    Scenario[SeedingSession, ARegistryToAllowAndACaller, ContainerRegistryAdapter, None]
+):
+    @override
+    def summary(self) -> str:
+        return "a-user-granted-on-the-project-but-not-the-registry-is-refused"
+
+    @override
+    def describe(self) -> str:
+        return (
+            "프로젝트에만 권한을 받고 레지스트리에는 받지 못한 사용자가 프로젝트를 허용하려 하면, "
+            "관계 동작은 지목한 스코프를 모두 보므로 권한 부족으로 막힌다"
+        )
+
+    @override
+    def given(self) -> Given[SeedingSession, ARegistryToAllowAndACaller]:
+        return ARegistryAndAProjectToAllow(on_registry=False)
+
+    @override
+    def when(self) -> When[ARegistryToAllowAndACaller, ContainerRegistryAdapter, None]:
+        return ChangingAllowedProjects()
+
+    @override
+    def then(self) -> Then[ARegistryToAllowAndACaller, None]:
+        return TheCallIsRefused(NotEnoughPermission)
+
+
+@dataclass(frozen=True)
 class DisabledEnforcementAllowsProject(
     Scenario[SeedingSession, ARegistryToAllowAndACaller, ContainerRegistryAdapter, None],
     Configured,
@@ -277,12 +413,32 @@ class DisabledEnforcementAllowsProject(
 SCENARIOS: list[AllowedProjectScenario] = [
     AddingProjectWithBothScopesGranted(),
     AddingExistingProjectIsIdempotent(),
+    CreatePermissionIsEnoughToAddAProject(),
+    SoftDeletePermissionCannotAddAProject(),
     RemovingAllowedProject(),
+    SoftDeletePermissionIsEnoughToRemoveAProject(),
+    CreatePermissionCannotRemoveAProject(),
     MissingProjectIsRefused(),
     RemovingUnlinkedProjectIsRefused(),
     MissingProjectPermissionIsRefused(),
+    MissingRegistryPermissionIsRefused(),
     DisabledEnforcementAllowsProject(),
 ]
+
+
+def expected_allowed_project_count(scenario: AllowedProjectScenario) -> int:
+    match scenario:
+        case (
+            AddingProjectWithBothScopesGranted()
+            | AddingExistingProjectIsIdempotent()
+            | CreatePermissionIsEnoughToAddAProject()
+            | DisabledEnforcementAllowsProject()
+        ):
+            return 1
+        case CreatePermissionCannotRemoveAProject():
+            return 1
+        case _:
+            return 0
 
 
 @pytest.mark.parametrize("scenario", SCENARIOS, ids=lambda s: s.summary())
@@ -292,3 +448,4 @@ async def test_allowing_projects(
     engine: ExtendedAsyncSAEngine,
 ) -> None:
     await run_scenario(scenario, adapter, engine)
+    assert await allowed_project_count(engine) == expected_allowed_project_count(scenario)

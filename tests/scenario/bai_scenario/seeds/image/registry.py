@@ -23,6 +23,8 @@ class SeedContainerRegistry(SeedRow[ContainerRegistryData]):
     """A registry. An image joins the one it came from, so it is laid first."""
 
     name_hint: str = "registry"
+    registry_type: ContainerRegistryType = ContainerRegistryType.DOCKER
+    is_global: bool = True
 
     @override
     def kind(self) -> str:
@@ -40,8 +42,9 @@ class SeedContainerRegistry(SeedRow[ContainerRegistryData]):
     def seed(self, name: str) -> ContainerRegistryCreator:
         return ContainerRegistryCreator(
             url=f"https://{name}.scenario.local",
-            type=ContainerRegistryType.DOCKER,
+            type=self.registry_type,
             registry_name=name,
+            is_global=self.is_global,
         )
 
 
