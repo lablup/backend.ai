@@ -11275,6 +11275,13 @@
         "title": "SearchIdleCheckersInput",
         "type": "object"
       },
+      "NonEmptyList_SessionTypes_": {
+        "items": {
+          "$ref": "#/components/schemas/SessionTypes"
+        },
+        "minItems": 1,
+        "type": "array"
+      },
       "UpdateIdleCheckerInput": {
         "properties": {
           "id": {
@@ -11294,7 +11301,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
+            "description": "Updated name. Omit to leave unchanged.",
             "title": "Name"
           },
           "description": {
@@ -11303,30 +11310,22 @@
                 "type": "string"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
-            "description": "Updated description. Omit to leave unchanged or pass null to clear.",
+            "description": "Updated description. Omit to leave unchanged; null clears.",
             "title": "Description"
           },
           "target_session_types": {
             "anyOf": [
               {
-                "items": {
-                  "$ref": "#/components/schemas/SessionTypes"
-                },
-                "minItems": 1,
-                "type": "array"
+                "$ref": "#/components/schemas/NonEmptyList_SessionTypes_"
               },
               {
                 "type": "null"
               }
             ],
-            "default": null,
+            "description": "Updated target session types. Omit to leave unchanged.",
             "title": "Target Session Types"
           },
           "initial_grace_period_seconds": {
@@ -11339,7 +11338,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
+            "description": "Updated initial grace period in seconds. Omit to leave unchanged.",
             "title": "Initial Grace Period Seconds"
           },
           "checker_spec": {
@@ -11351,7 +11350,8 @@
                 "type": "null"
               }
             ],
-            "default": null
+            "description": "Updated checker specification. Omit to leave unchanged.",
+            "title": "Checker Spec"
           }
         },
         "required": [
