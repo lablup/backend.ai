@@ -18151,7 +18151,7 @@
           "rank": {
             "anyOf": [
               {
-                "ge": 0,
+                "minimum": 0,
                 "type": "integer"
               },
               {
