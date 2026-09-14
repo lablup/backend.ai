@@ -150,7 +150,7 @@ class AForgottenImageCannotBeReached(
     def describe(self) -> str:
         return (
             "삭제된 이미지를 복원하려 하면 대상을 찾을 수 없어 거부된다. "
-            "id로 이미지를 조회하는 지점이 살아 있는 것만 대상으로 삼기 때문이다"
+            "ID로 이미지를 조회하는 지점이 살아 있는 것만 대상으로 삼기 때문이다"
         )
 
     @override
@@ -361,7 +361,7 @@ class AnImageBeingPurgedIsNotVisible(
     def describe(self) -> str:
         return (
             "완전 삭제 중인 이미지를 소프트 삭제하려 하면 대상을 찾을 수 없어 거부된다. "
-            "그 상태의 이미지는 id로 조회하는 지점에서 보이지 않는다"
+            "그 상태의 이미지는 ID로 조회하는 지점에서 보이지 않는다"
         )
 
     @override

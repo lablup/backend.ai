@@ -307,6 +307,29 @@ class OnlyTheNamedImageIsReturned(Then[ManyImagesAndACaller, AdminSearchImagesPa
 
 
 @dataclass(frozen=True)
+class OnlyTheAliveImageIsReturned(Then[ManyImagesAndACaller, AdminSearchImagesPayload]):
+    """삭제된 이미지는 제외하고 살아 있는 이미지만 반환된다."""
+
+    @override
+    def says(self) -> str:
+        return "살아 있는 이미지만 반환된다"
+
+    @override
+    def look(
+        self, laid: ManyImagesAndACaller, answered: Answered[AdminSearchImagesPayload]
+    ) -> list[Verdict]:
+        payload = answered.response
+        if payload is None:
+            return [Held("응답", answered.response, Filled())]
+        return [
+            Same("items", [one.name for one in payload.items], [str(laid.named.name)]),
+            Same("total_count", payload.total_count, 1),
+            Same("has_next_page", payload.has_next_page, False),
+            Same("has_previous_page", payload.has_previous_page, False),
+        ]
+
+
+@dataclass(frozen=True)
 class TheMiddleOfTheDescendingOrderIsReturned(Then[ManyImagesAndACaller, AdminSearchImagesPayload]):
     """이름 내림차순으로 정렬한 뒤 첫 항목을 제외한 2개가 반환된다."""
 
@@ -481,7 +504,7 @@ class SearchingByStatusReturnsOnlyAliveImages(
 
     @override
     def then(self) -> Then[ManyImagesAndACaller, AdminSearchImagesPayload]:
-        return EveryLaidImageIsCounted()
+        return OnlyTheAliveImageIsReturned()
 
 
 @dataclass(frozen=True)
