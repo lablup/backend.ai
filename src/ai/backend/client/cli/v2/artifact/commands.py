@@ -7,7 +7,12 @@ import json
 
 import click
 
-from ai.backend.client.cli.v2.helpers import create_v2_registry, load_v2_config, print_result
+from ai.backend.client.cli.v2.helpers import (
+    create_v2_registry,
+    load_v2_config,
+    nullable_option,
+    print_result,
+)
 
 from .revision import revision
 
@@ -62,16 +67,9 @@ def update(
     from ai.backend.common.dto.manager.v2.artifact.request import UpdateArtifactInput
     from ai.backend.common.tristate.unset import UNSET, Unset
 
-    if description is not None and set_null_description:
-        raise click.UsageError("--description and --set-null-description are mutually exclusive.")
-
     # An option the user did not pass stays UNSET so the field is left unchanged.
     readonly_value: bool | Unset = UNSET if readonly is None else readonly
-    desc_value: str | None | Unset = UNSET
-    if set_null_description:
-        desc_value = None
-    elif description is not None:
-        desc_value = description
+    desc_value = nullable_option(description, set_null_description, option="description")
 
     async def _run() -> None:
         registry = await create_v2_registry(load_v2_config())
