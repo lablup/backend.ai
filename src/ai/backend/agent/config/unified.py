@@ -16,6 +16,7 @@ from pathlib import Path
 from typing import (
     Annotated,
     Any,
+    Final,
     Self,
     cast,
 )
@@ -63,6 +64,9 @@ from ai.backend.logging.config import LoggingConfig
 from ai.backend.logging.validation_context import BaseConfigValidationContext
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+
+# Default of the removed `scaling-group` key, kept for the legacy `sgroup/<name>` etcd scope.
+LEGACY_SGROUP_NAME_FALLBACK: Final = "default"
 
 
 class EventLoopType(enum.StrEnum):
@@ -1328,9 +1332,9 @@ class OverridableAgentConfig(BaseConfigSchema):
             self.id = f"agent-{uuid4()}"
         return self.id
 
-    @property
-    def defaulted_initial_resource_group_name(self) -> str:
-        return self.initial_resource_group_name or "default"
+    def legacy_sgroup_name(self) -> str:
+        """Name used in the legacy `sgroup/<name>` etcd config scope."""
+        return self.initial_resource_group_name or LEGACY_SGROUP_NAME_FALLBACK
 
 
 class AgentConfig(CommonAgentConfig, OverridableAgentConfig):
