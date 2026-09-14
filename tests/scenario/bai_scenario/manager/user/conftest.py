@@ -10,8 +10,8 @@ from typing import Any
 
 import pytest
 from bai_scenario.runner.unwired import unwired
+from bai_scenario.valkey import ScenarioValkey
 
-from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.data.entity.domain import DomainEntityType
 from ai.backend.common.data.entity.user import UserEntityType
 from ai.backend.manager.actions.monitors import ActionMonitors
@@ -44,6 +44,7 @@ async def adapter(
     config: ManagerConfigProvider,
     validators: V2ActionValidators,
     monitors: ActionMonitors,
+    valkey: ScenarioValkey,
 ) -> UserAdapter:
     provider = V2DBOpsProvider(engine)
     registry: ProcessorRegistry[Any] = ProcessorRegistry(
@@ -58,7 +59,7 @@ async def adapter(
         registry.group(GroupMeta(UserEntityType())),
         UserService(
             unwired(StorageSessionManager, "only folder work reaches it"),
-            unwired(ValkeyStatClient, "only usage reads reach it"),
+            valkey.stat,
             unwired(AgentRegistry, "only session work reaches the agents"),
             UserRepository(engine, provider, ShareOpsProvider(engine), key_pool),
             unwired(SchedulingController, "only enqueue schedules"),

@@ -12,9 +12,9 @@ from bai_scenario.fakes.storage_proxy import (
     FakeStorageSessionManager,
 )
 from bai_scenario.runner.unwired import unwired
+from bai_scenario.valkey import ScenarioValkey
 
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
-from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.data.entity.vfolder import VFolderEntityType
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.manager.actions.monitors import ActionMonitors
@@ -55,6 +55,7 @@ async def adapter(
     validators: V2ActionValidators,
     monitors: ActionMonitors,
     storage: FakeStorageProxyManagerFacingClient,
+    valkey: ScenarioValkey,
 ) -> VFolderAdapter:
     provider = V2DBOpsProvider(engine)
     share_provider = ShareOpsProvider(engine)
@@ -77,7 +78,7 @@ async def adapter(
             share_provider,
             KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
         ),
-        valkey_stat_client=MagicMock(spec=ValkeyStatClient),
+        valkey_stat_client=valkey.stat,
     )
     return VFolderAdapter(
         VFolderProcessors(registry.group(GroupMeta(VFolderEntityType())), service),

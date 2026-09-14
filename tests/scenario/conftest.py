@@ -25,6 +25,7 @@ from bai_scenario.monitors import ActionRecorder
 from bai_scenario.runner.planting import SeedingSession
 from bai_scenario.seeds.ops import SeedOpsProvider
 from bai_scenario.seeds.seeder import Seeder
+from bai_scenario.valkey import ScenarioValkey
 
 from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
 from ai.backend.manager.actions.monitors import ActionMonitors
@@ -35,6 +36,7 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.permission_controller.repository import (
     PermissionControllerRepository,
 )
+from ai.backend.testutils.bootstrap import flush_redis
 from ai.backend.testutils.scenario_steps import Configured
 
 pytest_plugins = [
@@ -76,6 +78,28 @@ async def engine(template: TemplateDatabase, test_db: str) -> AsyncIterator[Any]
     await engine.dispose()
 
 
+@pytest.fixture(scope="session")
+def valkey_addr(redis_container: tuple[str, HostPortPairModel]) -> HostPortPairModel:
+    _, addr = redis_container
+    return addr
+
+
+@pytest.fixture
+async def valkey(
+    valkey_addr: HostPortPairModel, config: ManagerConfigProvider
+) -> AsyncIterator[ScenarioValkey]:
+    """The real server, cleared of what the previous test left.
+
+    The database is copied per test; a server has no such thing, so every key goes.
+    """
+    flush_redis(valkey_addr.host, valkey_addr.port)
+    clients = await ScenarioValkey.create(config)
+    try:
+        yield clients
+    finally:
+        await clients.close()
+
+
 @pytest.fixture
 def recorder() -> ActionRecorder:
     return ActionRecorder()
@@ -86,6 +110,7 @@ def config(
     request: pytest.FixtureRequest,
     template: TemplateDatabase,
     test_db: str,
+    valkey_addr: HostPortPairModel,
 ) -> ManagerConfigProvider:
     """The config this test runs under: the base, plus what a scenario overrides.
 
@@ -96,7 +121,7 @@ def config(
     asked = callspec.params.get("scenario") if callspec is not None else None
     overrides = dict(asked.config()) if isinstance(asked, Configured) else {}
     return ScenarioConfigProvider(
-        make_config(base_config_dict(template.addr, test_db, None), overrides)
+        make_config(base_config_dict(template.addr, test_db, valkey_addr), overrides)
     )
 
 

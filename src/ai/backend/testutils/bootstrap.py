@@ -82,7 +82,7 @@ def _wait_redis_health_check(host: str, port: int, timeout: float = 60.0) -> Non
             continue
 
 
-def _flush_redis(host: str, port: int) -> None:
+def flush_redis(host: str, port: int) -> None:
     with contextlib.closing(socket.socket(socket.AF_INET, socket.SOCK_STREAM)) as s:
         s.connect((host, port))
         s.send(b"*1\r\n$8\r\nFLUSHALL\r\n")
@@ -361,7 +361,7 @@ def redis_container() -> Iterator[tuple[str, HostPortPairModel]]:
             # Extra grace period to avoid intermittent connection failure
             time.sleep(0.5)
         # The previous process in this slot leaves its keys behind.
-        _flush_redis(addr.host, addr.port)
+        flush_redis(addr.host, addr.port)
         yield addr.host, addr
 
 
