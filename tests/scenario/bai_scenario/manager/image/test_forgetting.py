@@ -1,4 +1,4 @@
-"""이미지 소프트 삭제와 복원 — 엔티티 권한을 통과한 뒤에도 소유권 검사가 남는다."""
+"""이미지 소프트 삭제와 복원 — 이미지 권한과 커스텀 이미지 작성자를 검사한다."""
 
 from __future__ import annotations
 
@@ -12,8 +12,8 @@ from bai_scenario.components.image import (
     AnIdThatHoldsNothing,
     AnImageAndACaller,
     AnImageAndSomeone,
-    AnImageNobodyOwns,
     AnImageTheCallerMade,
+    AnUncustomizedImageAndSomeone,
     Target,
     TheImageNode,
     TheLaidImage,
@@ -122,7 +122,7 @@ class TheMakerOfACustomImageMayForgetIt(
     def describe(self) -> str:
         return (
             "자기가 만든 커스텀 이미지에 권한까지 받은 사용자가 그것을 소프트 삭제하면, "
-            "엔티티 권한과 소유권 검사를 모두 통과해 삭제됨 상태가 반환된다"
+            "이미지 권한과 커스텀 이미지 작성자 검사를 모두 통과해 삭제됨 상태가 반환된다"
         )
 
     @override
@@ -201,7 +201,7 @@ class ForgettingWhatIsNotThere(
 
     @override
     def describe(self) -> str:
-        return "어느 이미지도 가리키지 않는 id를 소프트 삭제하려 하면 대상을 찾을 수 없어 거부된다"
+        return "어느 이미지도 가리키지 않는 ID를 소프트 삭제하려 하면 대상을 찾을 수 없어 거부된다"
 
     @override
     def given(self) -> Given[SeedingSession, AnImageAndACaller]:
@@ -224,7 +224,7 @@ class RestoringWhatIsNotThere(Scenario[SeedingSession, AnImageAndACaller, ImageA
 
     @override
     def describe(self) -> str:
-        return "어느 이미지도 가리키지 않는 id를 복원하려 하면 대상을 찾을 수 없어 거부된다"
+        return "어느 이미지도 가리키지 않는 ID를 복원하려 하면 대상을 찾을 수 없어 거부된다"
 
     @override
     def given(self) -> Given[SeedingSession, AnImageAndACaller]:
@@ -253,7 +253,7 @@ class AnUngrantedUserMayNotForget(
 
     @override
     def given(self) -> Given[SeedingSession, AnImageAndACaller]:
-        return AnImageNobodyOwns(granted=False)
+        return AnUncustomizedImageAndSomeone(granted=False)
 
     @override
     def when(self) -> When[AnImageAndACaller, ImageAdapter, ImageNode]:
@@ -278,7 +278,7 @@ class AnUngrantedUserMayNotRestore(
 
     @override
     def given(self) -> Given[SeedingSession, AnImageAndACaller]:
-        return AnImageNobodyOwns(granted=False)
+        return AnUncustomizedImageAndSomeone(granted=False)
 
     @override
     def when(self) -> When[AnImageAndACaller, ImageAdapter, ImageNode]:
@@ -290,21 +290,23 @@ class AnUngrantedUserMayNotRestore(
 
 
 @dataclass(frozen=True)
-class AGrantIsNotOwnership(Scenario[SeedingSession, AnImageAndACaller, ImageAdapter, ImageNode]):
+class AGrantDoesNotSkipTheCreatorCheck(
+    Scenario[SeedingSession, AnImageAndACaller, ImageAdapter, ImageNode]
+):
     @override
     def summary(self) -> str:
-        return "a-granted-user-may-not-forget-an-image-nobody-owns"
+        return "a-granted-user-may-not-forget-an-image-they-did-not-customize"
 
     @override
     def describe(self) -> str:
         return (
-            "커스터마이즈되지 않은 이미지에는 소유자가 없으므로, "
-            "그 이미지에 권한을 받은 사용자라도 엔티티 권한을 통과한 뒤 소유권 검사에서 거부된다"
+            "커스텀 이미지가 아닌 이미지는 권한을 받은 사용자라도 소프트 삭제할 수 없다. "
+            "이미지 권한 검사를 통과한 뒤 커스텀 이미지 작성자 검사에서 거부된다"
         )
 
     @override
     def given(self) -> Given[SeedingSession, AnImageAndACaller]:
-        return AnImageNobodyOwns()
+        return AnUncustomizedImageAndSomeone()
 
     @override
     def when(self) -> When[AnImageAndACaller, ImageAdapter, ImageNode]:
@@ -316,18 +318,18 @@ class AGrantIsNotOwnership(Scenario[SeedingSession, AnImageAndACaller, ImageAdap
 
 
 @dataclass(frozen=True)
-class EnforcementOffDoesNotReachOwnership(
+class EnforcementOffDoesNotSkipTheCreatorCheck(
     Scenario[SeedingSession, AnImageAndACaller, ImageAdapter, ImageNode], Configured
 ):
     @override
     def summary(self) -> str:
-        return "turning-enforcement-off-still-does-not-let-anyone-forget-an-unowned-image"
+        return "turning-enforcement-off-does-not-skip-the-custom-image-creator-check"
 
     @override
     def describe(self) -> str:
         return (
-            "권한 검사를 비활성화해도 소유자가 없는 이미지는 소프트 삭제할 수 없다. "
-            "소유권 검사는 그 설정의 영향을 받지 않기 때문이다"
+            "RBAC 권한 검사를 비활성화해도 커스텀 이미지가 아닌 이미지는 소프트 삭제할 수 없다. "
+            "커스텀 이미지 작성자 검사는 그 설정의 영향을 받지 않는다"
         )
 
     @override
@@ -336,7 +338,7 @@ class EnforcementOffDoesNotReachOwnership(
 
     @override
     def given(self) -> Given[SeedingSession, AnImageAndACaller]:
-        return AnImageNobodyOwns(granted=False)
+        return AnUncustomizedImageAndSomeone(granted=False)
 
     @override
     def when(self) -> When[AnImageAndACaller, ImageAdapter, ImageNode]:
@@ -384,8 +386,8 @@ SCENARIOS: list[Scenario[SeedingSession, AnImageAndACaller, ImageAdapter, ImageN
     RestoringWhatIsNotThere(),
     AnUngrantedUserMayNotForget(),
     AnUngrantedUserMayNotRestore(),
-    AGrantIsNotOwnership(),
-    EnforcementOffDoesNotReachOwnership(),
+    AGrantDoesNotSkipTheCreatorCheck(),
+    EnforcementOffDoesNotSkipTheCreatorCheck(),
     AnImageBeingPurgedIsNotVisible(),
 ]
 

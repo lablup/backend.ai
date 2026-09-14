@@ -26,11 +26,12 @@ from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.v2.image.response import ImageNode
 from ai.backend.common.dto.manager.v2.image.types import (
+    ImageLabelInfo,
     ImageResourceLimitGQLInfo,
     ImageResourceLimitInfo,
 )
 from ai.backend.manager.data.container_registry.types import ContainerRegistryData
-from ai.backend.manager.data.image.types import ImageAliasData, ImageData, ImageStatus
+from ai.backend.manager.data.image.types import ImageAliasData, ImageData, ImageStatus, ImageType
 from ai.backend.manager.data.permission.types import Permission
 from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.defs import INTRINSIC_SLOTS_MIN
@@ -47,7 +48,7 @@ from ai.backend.testutils.scenario_steps import (
 )
 
 NOTHING = uuid.UUID("00000000-0000-0000-0000-0000000000ff")
-"""어느 행도 가리키지 않는 id. 대상이 없을 때 무엇이 반환되는지 확인하려고 지정한다."""
+"""어느 행도 가리키지 않는 ID. 대상이 없을 때 무엇이 반환되는지 확인하려고 지정한다."""
 
 DEFAULT_LIMITS = [
     ImageResourceLimitInfo(key=str(slot), min=str(least), max=None)
@@ -138,6 +139,15 @@ class AnAliasAndACaller:
 
 
 @dataclass(frozen=True)
+class AliasesAndACaller:
+    """이미지 2개에 나뉘어 등록된 별칭과 호출자."""
+
+    image: ImageData
+    aliases: tuple[ImageAliasData, ...]
+    caller: UserData
+
+
+@dataclass(frozen=True)
 class ARegistryWithImages(SeedNest[tuple[ContainerRegistryData, tuple[Laid[ImageData], ...]]]):
     """레지스트리 1개와 그 안의 이미지들. 이미지는 레지스트리에 속해야 만들 수 있다."""
 
@@ -182,19 +192,15 @@ class AnImageAndSomeone(Given[Any, AnImageAndACaller]):
 
 
 @dataclass(frozen=True)
-class AnImageNobodyOwns(Given[Any, AnImageAndACaller]):
-    """커스터마이즈되지 않은 이미지 1개와, 그 이미지에 권한까지 받은 사용자.
-
-    커스터마이즈되지 않은 이미지에는 소유자가 없다. 엔티티 권한을 통과해도 소유권 검사가
-    남는 것을 확인하는 전제이므로, 권한은 주되 소유자는 아닌 상태를 만든다.
-    """
+class AnUncustomizedImageAndSomeone(Given[Any, AnImageAndACaller]):
+    """커스텀 이미지가 아닌 이미지와 일반 사용자."""
 
     granted: bool = True
 
     @override
     def describe(self) -> str:
         holds = "그 이미지에 권한 있음" if self.granted else "아무 권한도 없음"
-        return f"소유자가 없는 이미지 1개, {holds}인 사용자 1명"
+        return f"커스텀 이미지가 아닌 이미지 1개, {holds}인 사용자 1명"
 
     @override
     async def lay(self, seeding: Any) -> AnImageAndACaller:
@@ -211,8 +217,7 @@ class AnImageNobodyOwns(Given[Any, AnImageAndACaller]):
 class AnImageTheCallerMade(Given[Any, AnImageAndACaller]):
     """호출자가 만든 커스텀 이미지 1개와, 그 이미지에 대한 권한.
 
-    소유권 검사를 통과하는 유일한 조합이다. 커스터마이즈된 이미지이면서 만든 사람이
-    호출자여야 한다.
+    커스텀 이미지 작성자 검사를 통과하려면 두 조건이 모두 필요하다.
     """
 
     status: ImageStatus = ImageStatus.ALIVE
@@ -259,6 +264,34 @@ class ManyImagesAndSomeone(Given[Any, ManyImagesAndACaller]):
         return ManyImagesAndACaller(
             laid=tuple(seeding.made(one) for one in images),
             named=seeding.made(images[0]),
+            registry=seeding.made(registry),
+            caller=seeding.made(caller),
+        )
+
+
+@dataclass(frozen=True)
+class ImagesWithTwoStatuses(Given[Any, ManyImagesAndACaller]):
+    """살아 있는 이미지와 삭제된 이미지, 슈퍼관리자."""
+
+    @override
+    def describe(self) -> str:
+        return "살아 있는 이미지 1개와 삭제된 이미지 1개, superadmin 1명"
+
+    @override
+    async def lay(self, seeding: Any) -> ManyImagesAndACaller:
+        domain = await seeding.creating(SeedDomain(name_hint="home"))
+        registry = await seeding.creating(SeedContainerRegistry(name_hint="host"))
+        alive = await seeding.creating_from(
+            SeedImage(name_hint="alive", status=ImageStatus.ALIVE), registry
+        )
+        await seeding.creating_from(
+            SeedImage(name_hint="deleted", status=ImageStatus.DELETED), registry
+        )
+        caller = await seeding.within(SomeoneOf(domain, role=UserRole.SUPERADMIN))
+        made_alive = seeding.made(alive)
+        return ManyImagesAndACaller(
+            laid=(made_alive,),
+            named=made_alive,
             registry=seeding.made(registry),
             caller=seeding.made(caller),
         )
@@ -328,6 +361,31 @@ class AnAliasAndSomeone(Given[Any, AnAliasAndACaller]):
 
 
 @dataclass(frozen=True)
+class AliasesOnTwoImagesAndSomeone(Given[Any, AliasesAndACaller]):
+    """이미지 2개에 별칭 3개가 나뉘어 등록된 상태와 슈퍼관리자."""
+
+    @override
+    def describe(self) -> str:
+        return "이미지 2개, 한쪽에 별칭 2개와 다른 쪽에 1개, superadmin 1명"
+
+    @override
+    async def lay(self, seeding: Any) -> AliasesAndACaller:
+        domain = await seeding.creating(SeedDomain(name_hint="home"))
+        registry = await seeding.creating(SeedContainerRegistry(name_hint="host"))
+        wanted = await seeding.creating_from(SeedImage(name_hint="wanted"), registry)
+        other = await seeding.creating_from(SeedImage(name_hint="other"), registry)
+        first = await seeding.adding(SeedAlias(alias="alpha"), wanted)
+        second = await seeding.adding(SeedAlias(alias="zeta"), wanted)
+        await seeding.adding(SeedAlias(alias="middle"), other)
+        caller = await seeding.within(SomeoneOf(domain, role=UserRole.SUPERADMIN))
+        return AliasesAndACaller(
+            image=seeding.made(wanted),
+            aliases=(seeding.made(first), seeding.made(second)),
+            caller=seeding.made(caller),
+        )
+
+
+@dataclass(frozen=True)
 class SomeoneReachingImages(SeedNest[Laid[None]]):
     """그 레지스트리 안의 이미지를 조회·소프트 삭제·완전 삭제할 수 있는 사용자.
 
@@ -367,7 +425,7 @@ class PaddedDigest(Condition[str | None]):
 
     @override
     def holds(self, got: str | None) -> bool:
-        return got is not None and got.rstrip(" ") == self.planted
+        return got == self.planted.ljust(72)
 
 
 @dataclass(frozen=True)
@@ -390,8 +448,19 @@ class TheImageNode(Then[Any, ImageNode]):
     이미지를 담은 전제면 무엇이든 받는다. `image` 필드로 이미지 1개를 들고 있으면 된다.
     """
 
+    name: str | None = None
+    registry: str | None = None
+    image: str | None = None
     status: ImageStatus | None = None
     tag: str | None = None
+    architecture: str | None = None
+    size_bytes: int | None = None
+    image_type: ImageType | None = None
+    config_digest: str | None = None
+    is_local: bool | None = None
+    labels: dict[str, str] | None = None
+    resource_limits: list[ImageResourceLimitInfo] | None = None
+    resource_limits_gql: list[ImageResourceLimitGQLInfo] | None = None
     accelerators: Accelerators = field(default_factory=NoAccelerator)
 
     @override
@@ -412,42 +481,60 @@ class TheImageNode(Then[Any, ImageNode]):
             ]
         image: ImageData = laid.image
         planted: uuid.UUID = image.id
-        status = self.status or image.status
+        name = self.name if self.name is not None else str(image.name)
+        registry = self.registry if self.registry is not None else image.registry
+        namespace = self.image if self.image is not None else image.image
+        status = self.status if self.status is not None else image.status
+        tag = self.tag if self.tag is not None else image.tag
+        architecture = self.architecture if self.architecture is not None else image.architecture
+        size_bytes = self.size_bytes if self.size_bytes is not None else image.size_bytes
+        image_type = self.image_type if self.image_type is not None else image.type
+        config_digest = (
+            self.config_digest if self.config_digest is not None else image.config_digest
+        )
+        is_local = self.is_local if self.is_local is not None else image.is_local
+        labels = self.labels if self.labels is not None else image.labels.label_data
+        label_nodes = sorted(
+            (ImageLabelInfo(key=key, value=value) for key, value in labels.items()),
+            key=lambda one: one.key,
+        )
+        resource_limits = self.resource_limits or DEFAULT_LIMITS
+        resource_limits_gql = self.resource_limits_gql or DEFAULT_LIMITS_GQL
         written = WrittenByThisRun(datetime.now(UTC))
         return [
-            Held("id", node.id, SameAs(planted, "미리 만들어 둔 이미지의 id")),
-            Same("name", node.name, image.name),
-            Same("image", node.image, image.image),
-            Same("registry", node.registry, image.registry),
+            Held("id", node.id, SameAs(planted, "미리 만들어 둔 이미지의 ID")),
+            Same("name", node.name, name),
+            Same("image", node.image, namespace),
+            Same("registry", node.registry, registry),
             # 두 id는 `EntityIdentifier`의 종류가 서로 다르고, 그 동등성은 종류까지 비교한다.
             Held(
                 "registry_id",
                 node.registry_id.int,
-                SameAs(image.registry_id.int, "미리 만들어 둔 레지스트리의 id"),
+                SameAs(image.registry_id.int, "미리 만들어 둔 레지스트리의 ID"),
             ),
             Same("project", node.project, image.project),
-            Same("tag", node.tag, self.tag or image.tag),
-            Same("architecture", node.architecture, image.architecture),
-            Same("size_bytes", node.size_bytes, image.size_bytes),
-            Same("type", node.type, image.type),
+            Same("tag", node.tag, tag),
+            Same("architecture", node.architecture, architecture),
+            Same("size_bytes", node.size_bytes, size_bytes),
+            Same("type", node.type, image_type),
             Same("status", node.status, status),
-            Same("labels", node.labels, []),
+            Same("labels", sorted(node.labels, key=lambda one: one.key), label_nodes),
             Same("tags", node.tags, []),
             Same(
                 "resource_limits",
                 sorted(node.resource_limits, key=lambda one: one.key),
-                DEFAULT_LIMITS,
+                resource_limits,
             ),
             Same("accelerators", node.accelerators, self.accelerators.named()),
-            Held("config_digest", node.config_digest, PaddedDigest(image.config_digest)),
-            Same("is_local", node.is_local, image.is_local),
+            Held("config_digest", node.config_digest, PaddedDigest(config_digest)),
+            Same("is_local", node.is_local, is_local),
             Held("created_at", node.created_at, written),
             Skipped("last_used_at", "세션이 기록하는 값이라 이 실행에서는 알 수 없다"),
-            Same("identity.canonical_name", identity.canonical_name, image.name),
-            Same("identity.namespace", identity.namespace, image.image),
-            Same("identity.architecture", identity.architecture, image.architecture),
-            Held("metadata.digest", metadata.digest, PaddedDigest(image.config_digest)),
-            Same("metadata.size_bytes", metadata.size_bytes, image.size_bytes),
+            Same("identity.canonical_name", identity.canonical_name, name),
+            Same("identity.namespace", identity.namespace, namespace),
+            Same("identity.architecture", identity.architecture, architecture),
+            Held("metadata.digest", metadata.digest, PaddedDigest(config_digest)),
+            Same("metadata.size_bytes", metadata.size_bytes, size_bytes),
             Held("metadata.created_at", metadata.created_at, written),
             Held(
                 "metadata.last_used_at",
@@ -455,7 +542,11 @@ class TheImageNode(Then[Any, ImageNode]):
                 SameAs(node.last_used_at, "노드의 last_used_at 필드"),
             ),
             Same("metadata.tags", metadata.tags, []),
-            Same("metadata.labels", metadata.labels, []),
+            Same(
+                "metadata.labels",
+                sorted(metadata.labels, key=lambda one: one.key),
+                label_nodes,
+            ),
             Same("metadata.status", metadata.status, status),
             Same(
                 "requirements.supported_accelerators",
@@ -465,7 +556,7 @@ class TheImageNode(Then[Any, ImageNode]):
             Same(
                 "requirements.resource_limits",
                 sorted(requirements.resource_limits, key=lambda one: one.key),
-                DEFAULT_LIMITS_GQL,
+                resource_limits_gql,
             ),
         ]
 
@@ -497,11 +588,11 @@ class TheLaidImage(Target):
 
 @dataclass(frozen=True)
 class AnIdThatHoldsNothing(Target):
-    """어느 이미지도 가리키지 않는 id."""
+    """어느 이미지도 가리키지 않는 ID."""
 
     @override
     def says(self) -> str:
-        return "어느 이미지도 가리키지 않는 id"
+        return "어느 이미지도 가리키지 않는 ID"
 
     @override
     def id_of(self, laid: AnImageAndACaller) -> uuid.UUID:
@@ -525,6 +616,7 @@ class ByOffset(Paging):
     """크기와 오프셋으로 고른다. 생략하면 어댑터가 기본 크기를 채운다."""
 
     limit: int | None = None
+    offset: int | None = None
 
     @override
     def says(self) -> str:
@@ -532,7 +624,7 @@ class ByOffset(Paging):
 
     @override
     def asked(self) -> dict[str, Any]:
-        return {"limit": self.limit}
+        return {"limit": self.limit, "offset": self.offset}
 
 
 @dataclass(frozen=True)

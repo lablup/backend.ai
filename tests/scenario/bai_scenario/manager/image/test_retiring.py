@@ -1,4 +1,4 @@
-"""이미지 완전 삭제 — 행까지 없애고, 별칭도 함께 사라진다."""
+"""이미지 완전 삭제 요청과 응답을 검증한다."""
 
 from __future__ import annotations
 
@@ -13,8 +13,8 @@ from bai_scenario.components.image import (
     AnIdThatHoldsNothing,
     AnImageAndACaller,
     AnImageAndSomeone,
-    AnImageNobodyOwns,
     AnImageTheCallerMade,
+    AnUncustomizedImageAndSomeone,
     Target,
     TheImageNode,
     TheLaidImage,
@@ -40,7 +40,7 @@ from ai.backend.testutils.scenario_steps import (
 
 @dataclass(frozen=True)
 class Retiring(When[AnImageAndACaller, ImageAdapter, ImageNode]):
-    """이미지를 완전 삭제한다. 행이 사라지고 복원할 수 없다."""
+    """이미지를 완전 삭제한다."""
 
     at: Target = field(default_factory=TheLaidImage)
 
@@ -92,7 +92,7 @@ class PurgingAnswersWithTheRemovedImage(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 이미지를 완전 삭제하면 삭제된 이미지가 반환되고 복원할 수 없다"
+        return "슈퍼관리자가 이미지를 완전 삭제하면 삭제된 이미지가 반환된다"
 
     @override
     def given(self) -> Given[SeedingSession, AnImageAndACaller]:
@@ -119,7 +119,7 @@ class TheMakerOfACustomImageMayPurgeIt(
     def describe(self) -> str:
         return (
             "자기가 만든 커스텀 이미지에 권한까지 받은 사용자가 그것을 완전 삭제하면, "
-            "엔티티 권한과 소유권 검사를 모두 통과해 삭제된 이미지가 반환된다"
+            "이미지 권한과 커스텀 이미지 작성자 검사를 모두 통과해 삭제된 이미지가 반환된다"
         )
 
     @override
@@ -136,19 +136,16 @@ class TheMakerOfACustomImageMayPurgeIt(
 
 
 @dataclass(frozen=True)
-class PurgingTakesTheAliasesWithIt(
+class PurgingAnAliasedImageReturnsTheRemovedImage(
     Scenario[SeedingSession, AnAliasAndACaller, ImageAdapter, ImageNode]
 ):
     @override
     def summary(self) -> str:
-        return "purging-an-image-takes-its-aliases-with-it"
+        return "purging-an-aliased-image-answers-with-the-image-it-removed"
 
     @override
     def describe(self) -> str:
-        return (
-            "별칭이 등록된 이미지도 삭제되고 삭제된 이미지가 반환된다. "
-            "별칭이 함께 사라지는 것은 응답에 담기지 않아 이 시나리오로는 확인할 수 없다"
-        )
+        return "별칭이 등록된 이미지를 완전 삭제하면 삭제된 이미지가 반환된다"
 
     @override
     def given(self) -> Given[SeedingSession, AnAliasAndACaller]:
@@ -171,7 +168,7 @@ class RetiringWhatIsNotThere(Scenario[SeedingSession, AnImageAndACaller, ImageAd
 
     @override
     def describe(self) -> str:
-        return "어느 이미지도 가리키지 않는 id를 완전 삭제하려 하면 대상을 찾을 수 없어 거부된다"
+        return "어느 이미지도 가리키지 않는 ID를 완전 삭제하려 하면 대상을 찾을 수 없어 거부된다"
 
     @override
     def given(self) -> Given[SeedingSession, AnImageAndACaller]:
@@ -200,7 +197,7 @@ class AnUngrantedUserMayNotRetire(
 
     @override
     def given(self) -> Given[SeedingSession, AnImageAndACaller]:
-        return AnImageNobodyOwns(granted=False)
+        return AnUncustomizedImageAndSomeone(granted=False)
 
     @override
     def when(self) -> When[AnImageAndACaller, ImageAdapter, ImageNode]:
@@ -212,23 +209,23 @@ class AnUngrantedUserMayNotRetire(
 
 
 @dataclass(frozen=True)
-class AGrantIsNotOwnershipHereEither(
+class AGrantDoesNotSkipTheCreatorCheck(
     Scenario[SeedingSession, AnImageAndACaller, ImageAdapter, ImageNode]
 ):
     @override
     def summary(self) -> str:
-        return "a-granted-user-may-not-purge-an-image-nobody-owns"
+        return "a-granted-user-may-not-purge-an-image-they-did-not-customize"
 
     @override
     def describe(self) -> str:
         return (
-            "소유자가 없는 이미지는 그 이미지에 권한을 받은 사용자라도 완전 삭제할 수 없다. "
-            "엔티티 권한을 통과한 뒤 소유권 검사에서 거부된다"
+            "커스텀 이미지가 아닌 이미지는 권한을 받은 사용자라도 완전 삭제할 수 없다. "
+            "이미지 권한 검사를 통과한 뒤 커스텀 이미지 작성자 검사에서 거부된다"
         )
 
     @override
     def given(self) -> Given[SeedingSession, AnImageAndACaller]:
-        return AnImageNobodyOwns()
+        return AnUncustomizedImageAndSomeone()
 
     @override
     def when(self) -> When[AnImageAndACaller, ImageAdapter, ImageNode]:
@@ -242,10 +239,10 @@ class AGrantIsNotOwnershipHereEither(
 SCENARIOS: list[Any] = [
     PurgingAnswersWithTheRemovedImage(),
     TheMakerOfACustomImageMayPurgeIt(),
-    PurgingTakesTheAliasesWithIt(),
+    PurgingAnAliasedImageReturnsTheRemovedImage(),
     RetiringWhatIsNotThere(),
     AnUngrantedUserMayNotRetire(),
-    AGrantIsNotOwnershipHereEither(),
+    AGrantDoesNotSkipTheCreatorCheck(),
 ]
 
 

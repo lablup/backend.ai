@@ -1,4 +1,4 @@
-"""별칭 등록과 해제 — 이미지에 딸린 값이지만 전역 역할로 보호된다."""
+"""별칭 등록과 해제 — 이미지에 딸린 값이지만 슈퍼관리자 검사로 보호된다."""
 
 from __future__ import annotations
 
@@ -75,7 +75,7 @@ class Aliasing(When[AnImageAndACaller, ImageAdapter, AliasImagePayload]):
 
 @dataclass(frozen=True)
 class AliasingTheTaken(When[AnAliasAndACaller, ImageAdapter, AliasImagePayload]):
-    """이미 다른 이미지가 사용 중인 별칭을 등록한다."""
+    """이미 사용 중인 별칭을 등록한다."""
 
     @override
     def operation(self) -> str:
@@ -135,7 +135,7 @@ class TheAliasAndItsImage(Then[AnImageAndACaller, AliasImagePayload]):
         wanted: UUID = laid.image.id
         return [
             Same("alias", payload.alias, self.alias),
-            Held("image_id", payload.image_id, SameAs(wanted, "미리 만들어 둔 이미지의 id")),
+            Held("image_id", payload.image_id, SameAs(wanted, "미리 만들어 둔 이미지의 ID")),
             Skipped("alias_id", "데이터베이스가 생성한다"),
         ]
 
@@ -156,7 +156,7 @@ class TheRemovedAlias(Then[AnAliasAndACaller, AliasImagePayload]):
         wanted: UUID = laid.image.id
         return [
             Same("alias", payload.alias, laid.alias.alias),
-            Held("image_id", payload.image_id, SameAs(wanted, "미리 만들어 둔 이미지의 id")),
+            Held("image_id", payload.image_id, SameAs(wanted, "미리 만들어 둔 이미지의 ID")),
             Skipped("alias_id", "데이터베이스가 생성한다"),
         ]
 
@@ -242,7 +242,7 @@ class AnAliasAnotherImageHolds(
 ):
     @override
     def summary(self) -> str:
-        return "an-alias-another-image-already-holds-is-refused"
+        return "an-alias-that-is-already-in-use-is-refused"
 
     @override
     def describe(self) -> str:
@@ -298,7 +298,7 @@ class TheOwnerStillMayNotAlias(
     def describe(self) -> str:
         return (
             "자기가 만든 커스텀 이미지라도 별칭은 등록할 수 없다. "
-            "별칭 등록은 그 이미지의 권한이 아니라 전역 역할로 보호되기 때문이다"
+            "별칭 등록은 해당 이미지의 권한이 아니라 슈퍼관리자 검사로 보호되기 때문이다"
         )
 
     @override
@@ -324,7 +324,7 @@ class APlainUserMayNotDealias(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 아닌 사용자가 별칭을 해제하려 하면 역할 부족으로 거부된다"
+        return "슈퍼관리자가 아닌 사용자가 별칭을 해제하려 하면 슈퍼관리자 권한 부족으로 거부된다"
 
     @override
     def given(self) -> Given[SeedingSession, AnAliasAndACaller]:
