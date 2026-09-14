@@ -13,7 +13,7 @@ from ai.backend.common.data.entity.keypair import KeyPairID
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.role import RoleID
 from ai.backend.common.data.entity.user import UserID
-from ai.backend.common.data.filter_specs import StringMatchSpec, UUIDInMatchSpec
+from ai.backend.common.data.filter_specs import StringMatchSpec
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.data.user.types import UserRole as DataUserRole
 from ai.backend.common.dto.manager.pagination import PaginationInfo
@@ -112,7 +112,7 @@ from ai.backend.manager.models.keypair.orders import KeypairOrders
 from ai.backend.manager.models.keypair.row import KeyPairRow
 from ai.backend.manager.models.keypair.scopes import UserKeypairOperationScope
 from ai.backend.manager.models.project.conditions import ProjectConditions
-from ai.backend.manager.models.specs.pagination import NoPagination, OffsetPagination
+from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.models.user.conditions import UserConditions
 from ai.backend.manager.models.user.creators import UserCreator
 from ai.backend.manager.models.user.orders import UserOrders
@@ -121,6 +121,7 @@ from ai.backend.manager.models.user.row import UserRow
 from ai.backend.manager.models.user.searchers import UserSearcher
 from ai.backend.manager.models.user.updaters import UserUpdater
 from ai.backend.manager.services.domain.actions.lookup import LookupDomainAction
+from ai.backend.manager.services.user.actions.bulk_get import BulkGetUsersAction
 from ai.backend.manager.services.user.actions.create_user import (
     BulkCreateUserAction,
     CreateUserAction,
@@ -220,23 +221,19 @@ class UserAdapter(BaseAdapter):
 
     # ------------------------------------------------------------------ batch load (DataLoader)
 
-    async def batch_load_by_ids(self, user_ids: Sequence[UserID]) -> list[UserNode | None]:
-        """Batch load users by UUID for DataLoader use.
-
-        Returns UserNode DTOs in the same order as the input user_ids list.
-        """
+    async def batch_load_by_ids(
+        self, user_ids: Sequence[UserID]
+    ) -> list[UserNode | Exception | None]:
+        """Batch load users by UUID for DataLoader use, checked per user."""
         if not user_ids:
             return []
-        searcher = UserSearcher(
-            pagination=NoPagination(),
-            conditions=[
-                UserConditions.by_uuid_in(UUIDInMatchSpec(values=list(user_ids), negated=False))
-            ],
-        )
-        result = await self._user.global_search.run(GlobalSearchUsersAction(searcher=searcher))
-        nodes = await self._user_nodes(result.items)
-        user_map = {user.uuid: node for user, node in zip(result.items, nodes, strict=True)}
-        return [user_map.get(user_id) for user_id in user_ids]
+        result = await self._user.bulk_get.run(BulkGetUsersAction(ids=list(user_ids)))
+        users = [item.value for item in result.items if item.value is not None]
+        nodes = iter(await self._user_nodes(users))
+        return [
+            next(nodes) if item.value is not None else self.batch_load_failure(item.error)
+            for item in result.items
+        ]
 
     # ------------------------------------------------------------------ GQL search (cursor-based)
 

@@ -223,6 +223,7 @@ from ai.backend.manager.services.object_storage.processors import ObjectStorageP
 from ai.backend.manager.services.permission_contoller.processors import (
     PermissionControllerProcessors,
 )
+from ai.backend.manager.services.project.actions.bulk_get import BulkGetProjectsAction
 from ai.backend.manager.services.project.processors import ProjectProcessors
 from ai.backend.manager.services.project_resource_policy.processors import (
     ProjectResourcePolicyProcessors,
@@ -290,6 +291,7 @@ from ai.backend.manager.services.storage_namespace.processors import (
     StorageNamespaceProcessors,
 )
 from ai.backend.manager.services.template.processors import TemplateProcessors
+from ai.backend.manager.services.user.actions.bulk_get import BulkGetUsersAction
 from ai.backend.manager.services.user.processors import UserProcessors
 from ai.backend.manager.services.user_resource_policy.processors import (
     UserResourcePolicyProcessors,
@@ -786,12 +788,14 @@ def test_field_data_loader_reads_are_partial_permission_reads() -> None:
 
 
 def test_entity_data_loader_reads_are_checked_per_entity_except_domains() -> None:
-    """The resource group, notification and artifact DataLoaders read per named
-    entity; the domain one is public, since a regular user holds no read on domains.
+    """The resource group, notification, artifact, user and project DataLoaders read per
+    named entity; the domain one is public, since a regular user holds no read on domains.
     """
     registry = _ops_registry()
     ResourceGroupProcessors(registry.group(GroupMeta(ResourceGroupEntityType())), MagicMock())
     DomainProcessors(registry.group(GroupMeta(DomainEntityType())), MagicMock())
+    UserProcessors(registry.group(GroupMeta(UserEntityType())), MagicMock())
+    ProjectProcessors(registry.group(GroupMeta(ProjectEntityType())), MagicMock())
     NotificationProcessors(
         registry.group(GroupMeta(NotificationChannelEntityType())),
         registry.group(GroupMeta(NotificationRuleEntityType())),
@@ -857,4 +861,14 @@ def test_entity_data_loader_reads_are_checked_per_entity_except_domains() -> Non
         DomainEntityType(),
         ActionKind.LOOKUP,
         ActionGate.PUBLIC,
+    )
+    assert recorded[BulkGetUsersAction] == (
+        UserEntityType(),
+        ActionKind.BULK,
+        ActionGate.PERMISSION,
+    )
+    assert recorded[BulkGetProjectsAction] == (
+        ProjectEntityType(),
+        ActionKind.BULK,
+        ActionGate.PERMISSION,
     )

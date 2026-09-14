@@ -9,7 +9,6 @@ from ai.backend.common.data.entity.domain import DomainID, DomainName
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.role import RoleID
 from ai.backend.common.data.entity.user import UserID
-from ai.backend.common.data.filter_specs import UUIDInMatchSpec
 from ai.backend.common.dto.manager.query import DateTimeFilter, StringFilter, UUIDFilter
 from ai.backend.common.dto.manager.v2.group.request import (
     AdminSearchProjectsInput,
@@ -70,9 +69,9 @@ from ai.backend.manager.models.project.updaters import (
     ProjectSoftDeleteUpdater,
     ProjectUpdater,
 )
-from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.services.domain.actions.lookup import LookupDomainAction
 from ai.backend.manager.services.domain.processors import DomainProcessors
+from ai.backend.manager.services.project.actions.bulk_get import BulkGetProjectsAction
 from ai.backend.manager.services.project.actions.create_project import CreateProjectAction
 from ai.backend.manager.services.project.actions.delete_project import DeleteProjectAction
 from ai.backend.manager.services.project.actions.purge_project import PurgeProjectAction
@@ -139,24 +138,19 @@ class ProjectAdapter(BaseAdapter):
 
     # ------------------------------------------------------------------ batch load (DataLoader)
 
-    async def batch_load_by_ids(self, group_ids: Sequence[ProjectID]) -> list[ProjectNode | None]:
-        """Batch load projects by UUID for DataLoader use.
-
-        Returns ProjectNode DTOs in the same order as the input group_ids list.
-        """
+    async def batch_load_by_ids(
+        self, group_ids: Sequence[ProjectID]
+    ) -> list[ProjectNode | Exception | None]:
+        """Batch load projects by UUID for DataLoader use, checked per project."""
         if not group_ids:
             return []
-        searcher = ProjectSearcher(
-            pagination=NoPagination(),
-            conditions=[
-                ProjectConditions.by_id_in(UUIDInMatchSpec(values=list(group_ids), negated=False))
-            ],
-        )
-        result = await self._project.global_search.run(
-            GlobalSearchProjectsAction(searcher=searcher)
-        )
-        project_map = {group.id: self._group_data_to_node(group) for group in result.items}
-        return [project_map.get(group_id) for group_id in group_ids]
+        result = await self._project.bulk_get.run(BulkGetProjectsAction(ids=list(group_ids)))
+        return [
+            self._group_data_to_node(item.value)
+            if item.value is not None
+            else self.batch_load_failure(item.error)
+            for item in result.items
+        ]
 
     # ------------------------------------------------------------------ get
 

@@ -765,13 +765,16 @@ class DataLoaders:
     ) -> DataLoader[UserID, UserV2GQL | None]:
         adapter = self._adapters.user
 
-        async def load_fn(ids: list[UserID]) -> list[UserV2GQL | None]:
+        async def load_fn(ids: list[UserID]) -> list[UserV2GQL | Exception | None]:
             from ai.backend.manager.api.gql.user.types.node import (  # pants: no-infer-dep
                 UserV2GQL as U,
             )
 
             dtos = await adapter.batch_load_by_ids(ids)
-            return [U.from_pydantic(dto) if dto is not None else None for dto in dtos]
+            return [
+                dto if dto is None or isinstance(dto, Exception) else U.from_pydantic(dto)
+                for dto in dtos
+            ]
 
         return DataLoader(load_fn=load_fn)
 
@@ -819,13 +822,16 @@ class DataLoaders:
     ) -> DataLoader[ProjectID, ProjectV2GQL | None]:
         adapter = self._adapters.project
 
-        async def load_fn(ids: list[ProjectID]) -> list[ProjectV2GQL | None]:
+        async def load_fn(ids: list[ProjectID]) -> list[ProjectV2GQL | Exception | None]:
             from ai.backend.manager.api.gql.project_v2.types.node import (  # pants: no-infer-dep
                 ProjectV2GQL as PG,
             )
 
             dtos = await adapter.batch_load_by_ids(ids)
-            return [PG.from_pydantic(dto) if dto is not None else None for dto in dtos]
+            return [
+                dto if dto is None or isinstance(dto, Exception) else PG.from_pydantic(dto)
+                for dto in dtos
+            ]
 
         return DataLoader(load_fn=load_fn)
 
