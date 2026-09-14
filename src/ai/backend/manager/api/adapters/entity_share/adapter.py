@@ -60,6 +60,7 @@ from ai.backend.manager.services.entity_share.actions.search import (
     EntityShareTargetScopeItem,
     SearchEntitySharesAction,
 )
+from ai.backend.manager.services.entity_share.processors import EntityShareProcessors
 
 __all__ = ("EntityShareAdapter",)
 
@@ -81,6 +82,11 @@ class EntityShareAdapter(BaseAdapter):
     one is that offer's answer, not the run's.
     """
 
+    _entity_share: EntityShareProcessors
+
+    def __init__(self, entity_share: EntityShareProcessors) -> None:
+        self._entity_share = entity_share
+
     async def create(self, input: CreateEntityShareInput) -> EntitySharePayload:
         me = current_user()
         if me is None:
@@ -92,7 +98,7 @@ class EntityShareAdapter(BaseAdapter):
             recipient = ProjectID(named.project_id)
         elif named.user_id is not None:
             recipient = UserID(named.user_id)
-        result = await self._processors.entity_share.create.run(
+        result = await self._entity_share.create.run(
             CreateEntityShareAction(
                 creator=EntityShareCreator(
                     sharer_user_id=UserID(me.user_id),
@@ -106,16 +112,14 @@ class EntityShareAdapter(BaseAdapter):
         return EntitySharePayload(share=self._to_node(result.data))
 
     async def get(self, share_id: EntityShareID) -> EntitySharePayload:
-        result = await self._processors.entity_share.get.run(
-            GetEntityShareAction(share_id=share_id)
-        )
+        result = await self._entity_share.get.run(GetEntityShareAction(share_id=share_id))
         return EntitySharePayload(share=self._to_node(result.data))
 
     async def accept(self, share_id: EntityShareID) -> EntitySharePayload:
         me = current_user()
         if me is None:
             raise UnreachableError("User context is not available")
-        result = await self._processors.entity_share.accept.run(
+        result = await self._entity_share.accept.run(
             AcceptEntityShareAction(share_id=share_id, answering_scope=UserID(me.user_id))
         )
         return EntitySharePayload(share=self._to_node(result.data))
@@ -124,28 +128,24 @@ class EntityShareAdapter(BaseAdapter):
         me = current_user()
         if me is None:
             raise UnreachableError("User context is not available")
-        result = await self._processors.entity_share.reject.run(
+        result = await self._entity_share.reject.run(
             RejectEntityShareAction(share_id=share_id, answering_scope=UserID(me.user_id))
         )
         return EntitySharePayload(share=self._to_node(result.data))
 
     async def cancel(self, share_id: EntityShareID) -> EntitySharePayload:
-        result = await self._processors.entity_share.cancel.run(
-            CancelEntityShareAction(share_id=share_id)
-        )
+        result = await self._entity_share.cancel.run(CancelEntityShareAction(share_id=share_id))
         return EntitySharePayload(share=self._to_node(result.data))
 
     async def revoke(self, share_id: EntityShareID) -> EntitySharePayload:
-        result = await self._processors.entity_share.revoke.run(
-            RevokeEntityShareAction(share_id=share_id)
-        )
+        result = await self._entity_share.revoke.run(RevokeEntityShareAction(share_id=share_id))
         return EntitySharePayload(share=self._to_node(result.data))
 
     async def leave(self, share_id: EntityShareID) -> EntitySharePayload:
         me = current_user()
         if me is None:
             raise UnreachableError("User context is not available")
-        result = await self._processors.entity_share.leave.run(
+        result = await self._entity_share.leave.run(
             LeaveEntityShareAction(share_id=share_id, answering_scope=UserID(me.user_id))
         )
         return EntitySharePayload(share=self._to_node(result.data))
@@ -223,7 +223,7 @@ class EntityShareAdapter(BaseAdapter):
             limit=limit,
             offset=offset,
         )
-        result = await self._processors.entity_share.search.run(
+        result = await self._entity_share.search.run(
             SearchEntitySharesAction(items=items, searcher=searcher)
         )
         return SearchEntitySharesPayload(

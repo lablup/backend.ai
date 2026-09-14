@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.common.data.entity.service_catalog import SERVICE_CATALOG_ENTITY_TYPE
+from ai.backend.common.data.entity.service_catalog import ServiceCatalogEntityType
 from ai.backend.common.data.entity.types import EntityType
 from ai.backend.manager.actions.v2.ops.base import SearchGlobalOpsAction
 from ai.backend.manager.data.service_catalog.types import ServiceCatalogData
@@ -20,7 +20,7 @@ class SearchServiceCatalogsAction(SearchGlobalOpsAction[ServiceCatalogRow, Servi
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return SERVICE_CATALOG_ENTITY_TYPE
+        return ServiceCatalogEntityType()
 
     @override
     @classmethod

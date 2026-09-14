@@ -1,12 +1,17 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Annotated, Any
 from uuid import UUID
 
 from pydantic import Field
 
-from ai.backend.common.api_handlers import SENTINEL, BaseRequestModel, Sentinel
-from ai.backend.common.config import DEFAULT_SHELL, PresetModelDefinition, PreStartAction
+from ai.backend.common.api_handlers import BaseRequestModel
+from ai.backend.common.config import (
+    DEFAULT_SHELL,
+    PresetModelDefinition,
+    PresetModelDefinitionDraft,
+    PreStartAction,
+)
 from ai.backend.common.data.entity.image import ImageID
 from ai.backend.common.data.entity.runtime_variant import RuntimeVariantID
 from ai.backend.common.dto.manager.query import StringFilter, UUIDFilter
@@ -23,6 +28,7 @@ from ai.backend.common.dto.manager.v2.deployment_revision_preset.types import (
     DeploymentRevisionPresetOrderField,
 )
 from ai.backend.common.dto.manager.v2.resource_slot.types import ResourceOptsEntryDTO
+from ai.backend.common.tristate.unset import UNSET, Unset
 
 
 class PresetModelHealthCheckInput(BaseRequestModel):
@@ -173,26 +179,105 @@ class CreateDeploymentRevisionPresetInput(BaseRequestModel):
     )
 
 
+class UpdatePresetModelHealthCheckInput(BaseRequestModel):
+    """Patch for a preset model's health check. Omit a field to keep its current stored value."""
+
+    enable: bool | None | Unset = Field(default=UNSET)
+    interval: float | None | Unset = Field(default=UNSET)
+    path: str | None | Unset = Field(default=UNSET)
+    max_retries: int | None | Unset = Field(default=UNSET)
+    max_wait_time: float | None | Unset = Field(default=UNSET)
+    expected_status_code: Annotated[int, Field(gt=100)] | None | Unset = Field(default=UNSET)
+    initial_delay: Annotated[float, Field(ge=0)] | None | Unset = Field(default=UNSET)
+
+
+class UpdatePresetModelMetadataInput(BaseRequestModel):
+    """Patch for a preset model's metadata. Omit a field to keep its current stored value."""
+
+    author: str | None | Unset = Field(default=UNSET)
+    title: str | None | Unset = Field(default=UNSET)
+    version: str | None | Unset = Field(default=UNSET)
+    created: str | None | Unset = Field(default=UNSET)
+    description: str | None | Unset = Field(default=UNSET)
+    task: str | None | Unset = Field(default=UNSET)
+    category: str | None | Unset = Field(default=UNSET)
+    architecture: str | None | Unset = Field(default=UNSET)
+    framework: list[str] | None | Unset = Field(default=UNSET)
+    label: list[str] | None | Unset = Field(default=UNSET)
+    license: str | None | Unset = Field(default=UNSET)
+    min_resource: dict[str, Any] | None | Unset = Field(default=UNSET)
+
+
+class UpdatePresetModelServiceConfigInput(BaseRequestModel):
+    """Patch for a preset model's service config. Omit a field to keep its current stored value."""
+
+    pre_start_actions: list[PreStartAction] | None | Unset = Field(default=UNSET)
+    command: str | None | Unset = Field(default=UNSET)
+    start_command: list[str] | None | Unset = Field(default=UNSET)
+    shell: str | None | Unset = Field(default=UNSET)
+    port: Annotated[int, Field(gt=1)] | None | Unset = Field(default=UNSET)
+    health_check: UpdatePresetModelHealthCheckInput | None | Unset = Field(default=UNSET)
+
+
+class UpdatePresetModelConfigInput(BaseRequestModel):
+    """Patch for a single preset model entry. Omit a field to keep its current stored value."""
+
+    name: Annotated[str, Field(min_length=1)] | None | Unset = Field(default=UNSET)
+    model_path: Annotated[str, Field(min_length=1)] | None | Unset = Field(default=UNSET)
+    service: UpdatePresetModelServiceConfigInput | None | Unset = Field(default=UNSET)
+    metadata: UpdatePresetModelMetadataInput | None | Unset = Field(default=UNSET)
+
+
+class UpdatePresetModelDefinitionInput(BaseRequestModel):
+    """Patch for a preset's model definition. Omit `models` to keep the current model entry."""
+
+    models: Annotated[list[UpdatePresetModelConfigInput], Field(max_length=1)] | None | Unset = (
+        Field(default=UNSET)
+    )
+
+    def to_draft(self) -> PresetModelDefinitionDraft:
+        # exclude_unset keeps the resulting draft's model_fields_set aligned with what the
+        # caller actually provided, so merging onto the stored preset doesn't clobber fields
+        # the caller didn't touch.
+        return PresetModelDefinitionDraft.model_validate(self.model_dump(exclude_unset=True))
+
+
 class UpdateDeploymentRevisionPresetInput(BaseRequestModel):
     id: UUID = Field(description="Preset ID.")
-    runtime_variant_id: RuntimeVariantID | None = Field(default=None)
-    name: str | None = Field(default=None, min_length=1, max_length=256)
-    description: str | Sentinel | None = Field(default=SENTINEL)
-    rank: int | None = Field(default=None, ge=0)
-    image_id: ImageID | Sentinel | None = Field(default=SENTINEL)
-    model_definition: PresetModelDefinitionInput | Sentinel | None = Field(default=SENTINEL)
-    resource_slots: list[ResourceSlotEntryInput] | None = Field(default=None)
-    resource_opts: list[ResourceOptsEntryDTO] | None = Field(default=None)
-    cluster_mode: str | None = Field(default=None, max_length=16)
-    cluster_size: int | None = Field(default=None, ge=1)
-    startup_command: str | Sentinel | None = Field(default=SENTINEL)
-    bootstrap_script: str | Sentinel | None = Field(default=SENTINEL)
-    environ: list[EnvironmentVariableEntryInput] | None = Field(default=None)
-    preset_values: list[PresetValueInput] | None = Field(default=None)
-    open_to_public: bool | Sentinel | None = Field(default=SENTINEL)
-    replica_count: int | Sentinel | None = Field(default=SENTINEL, ge=0)
-    revision_history_limit: int | Sentinel | None = Field(default=SENTINEL, ge=0)
-    deployment_strategy: DeploymentStrategyInput | Sentinel | None = Field(default=SENTINEL)
+    runtime_variant_id: RuntimeVariantID | None | Unset = Field(
+        default=UNSET, description="Omit to leave unchanged."
+    )
+    name: str | None | Unset = Field(
+        default=UNSET, min_length=1, max_length=256, description="Omit to leave unchanged."
+    )
+    description: str | None | Unset = Field(default=UNSET)
+    rank: int | None | Unset = Field(default=UNSET, ge=0, description="Omit to leave unchanged.")
+    image_id: ImageID | None | Unset = Field(default=UNSET)
+    model_definition: UpdatePresetModelDefinitionInput | None | Unset = Field(default=UNSET)
+    resource_slots: list[ResourceSlotEntryInput] | None | Unset = Field(
+        default=UNSET, description="Omit to leave unchanged."
+    )
+    resource_opts: list[ResourceOptsEntryDTO] | None | Unset = Field(
+        default=UNSET, description="Omit to leave unchanged."
+    )
+    cluster_mode: str | None | Unset = Field(
+        default=UNSET, max_length=16, description="Omit to leave unchanged."
+    )
+    cluster_size: int | None | Unset = Field(
+        default=UNSET, ge=1, description="Omit to leave unchanged."
+    )
+    startup_command: str | None | Unset = Field(default=UNSET)
+    bootstrap_script: str | None | Unset = Field(default=UNSET)
+    environ: list[EnvironmentVariableEntryInput] | None | Unset = Field(
+        default=UNSET, description="Omit to leave unchanged."
+    )
+    preset_values: list[PresetValueInput] | None | Unset = Field(
+        default=UNSET, description="Omit to leave unchanged."
+    )
+    open_to_public: bool | None | Unset = Field(default=UNSET)
+    replica_count: int | None | Unset = Field(default=UNSET, ge=0)
+    revision_history_limit: int | None | Unset = Field(default=UNSET, ge=0)
+    deployment_strategy: DeploymentStrategyInput | None | Unset = Field(default=UNSET)
 
 
 class DeploymentRevisionPresetFilter(BaseRequestModel):

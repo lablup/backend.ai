@@ -13,6 +13,7 @@ from ai.backend.common.dto.manager.v2.deployment.request import DeploymentStrate
 from ai.backend.common.dto.manager.v2.model_card.types import (
     ModelCardAccessLevel,
     ModelCardOrderField,
+    ModelCardScope,
 )
 
 
@@ -94,6 +95,20 @@ ModelCardFilter.model_rebuild()
 class ModelCardOrder(BaseRequestModel):
     field: ModelCardOrderField
     direction: OrderDirection = OrderDirection.ASC
+
+
+class ScopedSearchModelCardsInput(BaseRequestModel):
+    """Input for searching the model cards the named scopes reach."""
+
+    scope: ModelCardScope = Field(description="Scope (OR across all items).")
+    filter: ModelCardFilter | None = Field(default=None)
+    order: list[ModelCardOrder] | None = Field(default=None)
+    first: int | None = Field(default=None, ge=1)
+    after: str | None = Field(default=None)
+    last: int | None = Field(default=None, ge=1)
+    before: str | None = Field(default=None)
+    limit: int | None = Field(default=None, ge=1)
+    offset: int | None = Field(default=None, ge=0)
 
 
 class SearchModelCardsInput(BaseRequestModel):

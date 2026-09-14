@@ -7,10 +7,7 @@ from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryAr
 from ai.backend.common.resilience.resilience import Resilience
 from ai.backend.manager.data.vfs_storage.types import VFSStorageData, VFSStorageListResult
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.models.vfs_storage import VFSStorageRow
 from ai.backend.manager.repositories.base import BatchQuerier
-from ai.backend.manager.repositories.base.creator import Creator
-from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.vfs_storage.db_source.db_source import VFSStorageDBSource
 
 vfs_storage_repository_resilience = Resilience(
@@ -45,18 +42,6 @@ class VFSStorageRepository:
     @vfs_storage_repository_resilience.apply()
     async def get_by_id(self, storage_id: uuid.UUID) -> VFSStorageData:
         return await self._db_source.get_by_id(storage_id)
-
-    @vfs_storage_repository_resilience.apply()
-    async def create(self, creator: Creator[VFSStorageRow]) -> VFSStorageData:
-        return await self._db_source.create(creator)
-
-    @vfs_storage_repository_resilience.apply()
-    async def update(self, updater: Updater[VFSStorageRow]) -> VFSStorageData:
-        return await self._db_source.update(updater)
-
-    @vfs_storage_repository_resilience.apply()
-    async def delete(self, storage_id: uuid.UUID) -> uuid.UUID:
-        return await self._db_source.delete(storage_id)
 
     @vfs_storage_repository_resilience.apply()
     async def list_vfs_storages(self) -> list[VFSStorageData]:

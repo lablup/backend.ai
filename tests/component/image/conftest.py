@@ -3,17 +3,16 @@ from __future__ import annotations
 import uuid
 from collections.abc import AsyncIterator, Callable
 from typing import Any
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import MagicMock
 
 import pytest
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
 from ai.backend.common.container_registry import ContainerRegistryType
-from ai.backend.common.data.entity.image import IMAGE_ENTITY_TYPE
+from ai.backend.common.data.entity.image import ImageEntityType
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
 from ai.backend.manager.actions.registry.types import GroupMeta
-from ai.backend.manager.actions.validators.rbac.scope import ScopeActionRBACValidator
 from ai.backend.manager.api.adapters.image.adapter import ImageAdapter
 from ai.backend.manager.api.rest.admin.handler import AdminHandler
 from ai.backend.manager.api.rest.admin.registry import register_admin_routes
@@ -51,21 +50,12 @@ def image_processors(
         config_provider,
     )
     service = ImageService(agent_registry, repo, config_provider)
-    mock_scope = MagicMock(spec=ScopeActionRBACValidator)
-    mock_scope.validate = AsyncMock()
-    return ImageProcessors(processor_registry.group(GroupMeta(IMAGE_ENTITY_TYPE)), service)
+    return ImageProcessors(processor_registry.group(GroupMeta(ImageEntityType())), service)
 
 
 @pytest.fixture()
 def image_adapter(image_processors: ImageProcessors) -> ImageAdapter:
-    """Build an ImageAdapter wired only with image processors.
-
-    Other adapter call sites in ImageAdapter use ``self._processors.image`` exclusively,
-    so a MagicMock backing object with ``.image`` set to the real ImageProcessors is sufficient.
-    """
-    processors = MagicMock()
-    processors.image = image_processors
-    return ImageAdapter(processors)
+    return ImageAdapter(image_processors)
 
 
 @pytest.fixture()

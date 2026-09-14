@@ -2,22 +2,14 @@ from __future__ import annotations
 
 import enum
 import uuid
-from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any, override
 
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.types import EntityData
-from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
-from ai.backend.manager.data.permission.id import ScopeId
-from ai.backend.manager.data.permission.types import (
-    EntityType,
-    OperationType,
-    ScopeType,
-)
 from ai.backend.manager.types import OptionalState, PartialModifier, TriState
 
 
@@ -61,22 +53,8 @@ class DomainData(EntityData):
     def entity_id(self) -> DomainID:
         return self.id
 
-    def scope_id(self) -> ScopeId:
-        return ScopeId(
-            scope_type=ScopeType.DOMAIN,
-            scope_id=str(self.id),
-        )
-
     def role_name(self) -> str:
         return f"domain-{self.name}-admin"
-
-    def entity_operations(self) -> Mapping[RBACElementType, Iterable[OperationType]]:
-        operations: dict[RBACElementType, Iterable[OperationType]] = {
-            entity.to_element(): OperationType.admin_operations()
-            for entity in EntityType.admin_accessible_entity_types_in_domain()
-        }
-        operations[RBACElementType.DOMAIN_ADMIN_PAGE] = {OperationType.READ}
-        return operations
 
 
 @dataclass

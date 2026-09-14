@@ -27,23 +27,23 @@ from ai.backend.manager.data.agent.types import (
 )
 from ai.backend.manager.data.image.types import ImageDataWithDetails, ImageIdentifier
 from ai.backend.manager.data.kernel.types import KernelInfo
+from ai.backend.manager.errors.agent import AgentNotFound
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.agent.lookups import AgentNameLookup
 from ai.backend.manager.models.agent.updaters import AgentExitStatusUpdater, AgentStatusUpdater
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.resource_slot import AgentResourceRow
+from ai.backend.manager.models.resource_slot.upserters import AgentResourceUpserter
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.agent.cache_source.cache_source import AgentCacheSource
 from ai.backend.manager.repositories.agent.db_source.db_source import AgentDBSource
 from ai.backend.manager.repositories.agent.stateful_source.stateful_source import (
     AgentStatefulSource,
 )
-from ai.backend.manager.repositories.base import BulkUpserter
 from ai.backend.manager.repositories.base.querier import BatchQuerier
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.resource_preset.utils import suppress_with_log
 from ai.backend.manager.repositories.resource_slot.types import resource_slot_to_quantities
-from ai.backend.manager.repositories.resource_slot.upserters import AgentResourceUpserterSpec
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -79,7 +79,7 @@ class AgentRepository:
         config_provider: ManagerConfigProvider,
         v2_ops_provider: V2DBOpsProvider,
     ) -> None:
-        self._db_source = AgentDBSource(db)
+        self._db_source = AgentDBSource(db, v2_ops_provider)
         self._cache_source = AgentCacheSource(valkey_image, valkey_live, valkey_stat)
         self._stateful_source = AgentStatefulSource(valkey_image, valkey_stat)
         self._config_provider = config_provider
@@ -147,18 +147,21 @@ class AgentRepository:
         # Sync agent capacity to normalized agent_resources table
         quantities = resource_slot_to_quantities(upsert_data.resource_info.available_slots)
         if quantities:
-            bulk_upserter = BulkUpserter(
-                specs=[
-                    AgentResourceUpserterSpec(
+            agent_uuid = await self.lookup_uuid(agent_id)
+            if agent_uuid is None:
+                raise AgentNotFound(f"Agent {agent_id} not found")
+            await self._db_source.sync_agent_resource_capacity(
+                agent_id,
+                agent_uuid,
+                [
+                    AgentResourceUpserter(
                         agent_id=str(agent_id),
                         slot_name=q.slot_name,
                         capacity=q.quantity,
                     )
                     for q in quantities
-                ]
-            )
-            await self._db_source.sync_agent_resource_capacity(
-                agent_id, bulk_upserter, [q.slot_name for q in quantities]
+                ],
+                [q.slot_name for q in quantities],
             )
 
         return upsert_result

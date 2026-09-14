@@ -219,8 +219,8 @@ class TestWebAppLogin:
         ):
             response = await webapp_plugin.login(login_request)
 
-        assert isinstance(response, web.HTTPFound)
-        redirect_url = str(response.location)
+        assert response.status == 302
+        redirect_url = response.headers["Location"]
         assert "idp.example.com/authorize" in redirect_url
         assert "client_id=test-client-id" in redirect_url
 
@@ -275,8 +275,8 @@ class TestWebAppRedirect:
         ):
             response = await webapp_plugin.redirect(redirect_request)
 
-        assert isinstance(response, web.HTTPFound)
-        location = str(response.location)
+        assert response.status == 302
+        location = response.headers["Location"]
         assert "sToken=" in location
         assert "app.example.com/dashboard" in location
 
@@ -300,6 +300,7 @@ class TestWebAppRedirect:
             "ai.backend.manager.plugin.openid.webapp.AsyncOAuth2Client",
             return_value=failing_oauth2_client,
         ):
-            response = await webapp_plugin.redirect(redirect_request)
+            with pytest.raises(web.HTTPUnauthorized) as exc_info:
+                await webapp_plugin.redirect(redirect_request)
 
-        assert response.status == 401
+        assert exc_info.value.status == 401

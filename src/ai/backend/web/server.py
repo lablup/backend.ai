@@ -47,8 +47,9 @@ from ai.backend.client.v2.config import ClientConfig as V2ClientConfig
 from ai.backend.client.v2.registry import BackendAIClientRegistry
 from ai.backend.common import config
 from ai.backend.common.clients.http_client.client_pool import ClientPool
+from ai.backend.common.clients.valkey_client.valkey_rate_limit.client import ValkeyRateLimitClient
 from ai.backend.common.clients.valkey_client.valkey_session.client import ValkeySessionClient
-from ai.backend.common.defs import REDIS_STATISTICS_DB, RedisRole
+from ai.backend.common.defs import REDIS_RATE_LIMIT_DB, REDIS_STATISTICS_DB, RedisRole
 from ai.backend.common.dto.internal.health import (
     ConnectivityCheckResponse,
     HealthResponse,
@@ -92,11 +93,20 @@ from ai.backend.web.clients.manager_pool import (
     ManagerPoolGateHealthChecker,
 )
 from ai.backend.web.config.unified import EventLoopType, ServiceMode, WebServerUnifiedConfig
+from ai.backend.web.ratelimit import manager_proxy_rate_limited
 from ai.backend.web.security import SecurityPolicy, csp_nonce_var, security_policy_middleware
 
 from . import __version__, user_agent
 from .auth import build_forwarding_headers, fill_forwarding_hdrs_to_api_session, get_client_ip
-from .errors import InvalidAPIConfigurationError, UnexpectedAuthResponseError
+from .errors import (
+    AlreadyLoggedInError,
+    InvalidAPIConfigurationError,
+    MissingAuthTokenError,
+    MissingRequestParameterError,
+    ProxyTargetUnreachableError,
+    StaticFileNotFoundError,
+    UnexpectedAuthResponseError,
+)
 from .proxy import (
     apollo_router_handler,
     decrypt_payload,
@@ -153,23 +163,11 @@ async def static_handler(request: web.Request) -> web.StreamResponse:
     file_path = (static_path / request_path).resolve()
     try:
         file_path.relative_to(static_path)
-    except (ValueError, FileNotFoundError):
-        return web.HTTPNotFound(
-            text=json.dumps({
-                "type": "https://api.backend.ai/probs/generic-not-found",
-                "title": "Not Found",
-            }),
-            content_type="application/problem+json",
-        )
+    except (ValueError, FileNotFoundError) as e:
+        raise StaticFileNotFoundError() from e
     if file_path.is_file():
         return apply_cache_headers(web.FileResponse(file_path), request_path)
-    return web.HTTPNotFound(
-        text=json.dumps({
-            "type": "https://api.backend.ai/probs/generic-not-found",
-            "title": "Not Found",
-        }),
-        content_type="application/problem+json",
-    )
+    raise StaticFileNotFoundError()
 
 
 async def config_ini_handler(request: web.Request) -> web.Response:
@@ -248,20 +246,9 @@ async def update_password_no_auth(request: web.Request) -> web.Response:
         log.error("Login: JSON decoding error: {}", e)
         creds = {}
 
-    def _check_params(param_names: list[str]) -> web.Response | None:
-        for param in param_names:
-            if creds.get(param) is None:
-                return web.HTTPBadRequest(
-                    text=json.dumps({
-                        "type": "https://api.backend.ai/probs/invalid-api-params",
-                        "title": f"You must provide the {param} field.",
-                    }),
-                    content_type="application/problem+json",
-                )
-        return None
-
-    if (fail_resp := _check_params(["username", "current_password", "new_password"])) is not None:
-        return fail_resp
+    for param in ("username", "current_password", "new_password"):
+        if creds.get(param) is None:
+            raise MissingRequestParameterError(param)
 
     result: dict[str, Any] = {
         "data": None,
@@ -293,14 +280,7 @@ async def update_password_no_auth(request: web.Request) -> web.Response:
         )
     except BackendClientError as e:
         # This is error, not failed login, so we should not update login history.
-        return web.HTTPBadGateway(
-            text=json.dumps({
-                "type": "https://api.backend.ai/probs/bad-gateway",
-                "title": "The proxy target server is inaccessible.",
-                "details": str(e),
-            }),
-            content_type="application/problem+json",
-        )
+        raise ProxyTargetUnreachableError(str(e)) from e
     except BackendAPIError as e:
         log.info(
             "LOGIN_HANDLER: Authorization failed (email:{}, ip:{}) - {}",
@@ -548,14 +528,7 @@ async def login_handler(request: web.Request) -> web.Response:
                 )
     except BackendClientError as e:
         # This is error, not failed login, so we should not update login history.
-        return web.HTTPBadGateway(
-            text=json.dumps({
-                "type": "https://api.backend.ai/probs/bad-gateway",
-                "title": "The proxy target server is inaccessible.",
-                "details": str(e),
-            }),
-            content_type="application/problem+json",
-        )
+        raise ProxyTargetUnreachableError(str(e)) from e
     except BackendAPIError as e:
         log.info(
             "LOGIN_HANDLER: Authorization failed (email:{}, ip:{}) - {}",
@@ -601,7 +574,7 @@ async def logout_handler(request: web.Request) -> web.Response:
                 "Failed to invalidate login session in Manager DB (token={})", session_token
             )
 
-    return web.HTTPOk()
+    return web.Response()
 
 
 async def extend_login_session(request: web.Request) -> web.Response:
@@ -687,13 +660,7 @@ async def token_login_handler(request: web.Request) -> web.Response:
     # Check browser session exists.
     session = await get_session(request)
     if session.get("authenticated", False):
-        return web.HTTPBadRequest(
-            text=json.dumps({
-                "type": "https://api.backend.ai/probs/generic-bad-request",
-                "title": "You have already logged in.",
-            }),
-            content_type="application/problem+json",
-        )
+        raise AlreadyLoggedInError()
 
     # Check if auth token is delivered via request body or cookie.
     rqst_data: dict[str, Any] = await request.json()
@@ -702,13 +669,7 @@ async def token_login_handler(request: web.Request) -> web.Response:
     if not auth_token:
         auth_token = request.cookies.get(auth_token_name)
     if not auth_token:
-        return web.HTTPBadRequest(
-            text=json.dumps({
-                "type": "https://api.backend.ai/probs/invalid-api-params",
-                "title": "You must provide cookie-based authentication token",
-            }),
-            content_type="application/problem+json",
-        )
+        raise MissingAuthTokenError()
 
     # Login with the token.
     # We do not pose consecutive login failure for this handler since
@@ -781,14 +742,7 @@ async def token_login_handler(request: web.Request) -> web.Response:
         result["authenticated"] = True
         result["data"] = public_return  # store public info from token
     except BackendClientError as e:
-        return web.HTTPBadGateway(
-            text=json.dumps({
-                "type": "https://api.backend.ai/probs/bad-gateway",
-                "title": "The proxy target server is inaccessible.",
-                "details": str(e),
-            }),
-            content_type="application/problem+json",
-        )
+        raise ProxyTargetUnreachableError(str(e)) from e
     except BackendAPIError as e:
         log.info("Authorization failed for token {}: {}", auth_token, e)
         result["authenticated"] = False
@@ -855,6 +809,13 @@ async def redis_ctx(
     # Keep app["redis"] key for compatibility
     app["redis"] = valkey_session_client
 
+    valkey_rate_limit_client = await ValkeyRateLimitClient.create(
+        valkey_target=valkey_profile_target.profile_target(RedisRole.RATE_LIMIT),
+        db_id=REDIS_RATE_LIMIT_DB,
+        human_readable_name="web.ratelimit",
+    )
+    app["valkey_rate_limit"] = valkey_rate_limit_client
+
     if pidx == 0 and config.session.flush_on_startup:
         await valkey_session_client.flush_all_sessions()
         log.info("flushed session storage.")
@@ -870,6 +831,7 @@ async def redis_ctx(
     try:
         yield
     finally:
+        await valkey_rate_limit_client.close()
         await valkey_session_client.close()
 
 
@@ -1041,12 +1003,17 @@ async def webapp_ctx(
 
     manager_pool = cast(HealthyEndpointPool, app["manager_pool"])
 
-    manager_web_handler = partial(web_handler, endpoint_pool=manager_pool)
-    manager_websocket_handler = partial(websocket_handler, endpoint_pool=manager_pool)
+    manager_proxy_handler = partial(web_handler, endpoint_pool=manager_pool)
+    manager_web_handler = manager_proxy_rate_limited(manager_proxy_handler)
+    manager_websocket_handler = manager_proxy_rate_limited(
+        partial(websocket_handler, endpoint_pool=manager_pool)
+    )
     manager_web_plugin_handler = partial(web_plugin_handler, endpoint_pool=manager_pool)
 
-    anon_web_handler = partial(manager_web_handler, is_anonymous=True)
-    anon_web_plugin_handler = partial(manager_web_plugin_handler, is_anonymous=True)
+    anon_web_handler = manager_proxy_rate_limited(partial(manager_proxy_handler, is_anonymous=True))
+    anon_web_plugin_handler = manager_proxy_rate_limited(
+        partial(manager_web_plugin_handler, is_anonymous=True)
+    )
 
     # Pipeline is a separate upstream — no health-aware pool here. A follow-up
     # will introduce one alongside ApolloRouterClientPool.
@@ -1120,9 +1087,11 @@ async def webapp_ctx(
 
     # Feature flag for using Apollo Router(Graphql Federation)
     if config.apollo_router.enabled:
-        supergraph_handler = partial(
-            apollo_router_handler,
-            endpoint_pool=cast(HealthyEndpointPool, app["apollo_router_pool"]),
+        supergraph_handler = manager_proxy_rate_limited(
+            partial(
+                apollo_router_handler,
+                endpoint_pool=cast(HealthyEndpointPool, app["apollo_router_pool"]),
+            )
         )
         cors.add(app.router.add_route("GET", "/func/admin/gql", supergraph_handler))
         cors.add(app.router.add_route("POST", "/func/admin/gql", supergraph_handler))

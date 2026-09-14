@@ -21,10 +21,10 @@ from ai.backend.client.v2.exceptions import (
     PermissionDeniedError,
 )
 from ai.backend.client.v2.registry import BackendAIClientRegistry
-from ai.backend.common.data.entity.project import PROJECT_ENTITY_TYPE
+from ai.backend.common.data.entity.project import ProjectEntityType
 from ai.backend.common.data.entity.resource_group import ResourceGroupID, ResourceGroupName
 from ai.backend.common.data.entity.session import SessionID
-from ai.backend.common.data.entity.user import USER_ENTITY_TYPE
+from ai.backend.common.data.entity.user import UserEntityType
 from ai.backend.common.dto.manager.compute_session import (
     SearchComputeSessionsRequest,
     SearchComputeSessionsResponse,
@@ -90,10 +90,10 @@ def server_module_registries(
         register_session_routes(
             SessionHandler(
                 project=ProjectProcessors(
-                    processor_registry.group(GroupMeta(PROJECT_ENTITY_TYPE)), AsyncMock()
+                    processor_registry.group(GroupMeta(ProjectEntityType())), AsyncMock()
                 ),
                 user=UserProcessors(
-                    processor_registry.group(GroupMeta(USER_ENTITY_TYPE)),
+                    processor_registry.group(GroupMeta(UserEntityType())),
                     AsyncMock(),
                 ),
                 auth=auth_processors,

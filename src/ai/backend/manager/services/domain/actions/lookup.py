@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, override
 
-from ai.backend.common.data.entity.domain import DOMAIN_ENTITY_TYPE, DomainID, DomainName
+from ai.backend.common.data.entity.domain import DomainEntityType, DomainID, DomainName
 from ai.backend.common.data.entity.types import EntityType
 from ai.backend.manager.actions.v2.lookup.base import LookupKey
 from ai.backend.manager.actions.v2.ops.base import LookupEntityOpsAction
@@ -35,7 +35,7 @@ class LookupDomainAction(LookupEntityOpsAction[DomainRow, DomainID]):
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return DOMAIN_ENTITY_TYPE
+        return DomainEntityType()
 
     @override
     @classmethod

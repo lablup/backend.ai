@@ -12,7 +12,7 @@ from ai.backend.common.types import ResourceSlot
 
 
 @dataclass(frozen=True)
-class KernelUsageRecordData:
+class KernelUsageRecordData(FieldData):
     """Kernel usage record data (per-period usage slice)."""
 
     id: uuid.UUID

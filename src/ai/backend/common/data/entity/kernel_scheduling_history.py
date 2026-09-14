@@ -2,11 +2,31 @@
 
 from typing import override
 
-from ai.backend.common.data.entity.types import FieldIdentifier, FieldType
+from ai.backend.common.data.entity.session import SessionEntityType
+from ai.backend.common.data.entity.types import (
+    EntityType,
+    FieldIdentifier,
+    FieldType,
+)
 
-__all__ = ("KERNEL_SCHEDULING_HISTORY_FIELD_TYPE", "KernelSchedulingHistoryID")
+__all__ = ("KernelSchedulingHistoryFieldType", "KernelSchedulingHistoryID")
 
-KERNEL_SCHEDULING_HISTORY_FIELD_TYPE = FieldType("kernel_scheduling_history")
+
+class KernelSchedulingHistoryFieldType(FieldType):
+    @override
+    @classmethod
+    def name(cls) -> str:
+        return "kernel_scheduling_history"
+
+    @override
+    @classmethod
+    def description(cls) -> str:
+        return "One step of a kernel's progress from image pull to termination, with the result."
+
+    @override
+    @classmethod
+    def owner_type(cls) -> type[EntityType]:
+        return SessionEntityType
 
 
 class KernelSchedulingHistoryID(FieldIdentifier):
@@ -15,4 +35,4 @@ class KernelSchedulingHistoryID(FieldIdentifier):
     @override
     @classmethod
     def field_type(cls) -> FieldType:
-        return KERNEL_SCHEDULING_HISTORY_FIELD_TYPE
+        return KernelSchedulingHistoryFieldType()

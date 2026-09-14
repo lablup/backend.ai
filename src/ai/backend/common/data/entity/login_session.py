@@ -2,15 +2,34 @@
 
 from typing import override
 
-from ai.backend.common.data.entity.types import FieldIdentifier, FieldType
+from ai.backend.common.data.entity.types import (
+    EntityType,
+    FieldIdentifier,
+    FieldType,
+)
+from ai.backend.common.data.entity.user import UserEntityType
 
 __all__ = (
-    "LOGIN_SESSION_FIELD_TYPE",
+    "LoginSessionFieldType",
     "LoginSessionID",
 )
 
 
-LOGIN_SESSION_FIELD_TYPE = FieldType("login_session")
+class LoginSessionFieldType(FieldType):
+    @override
+    @classmethod
+    def name(cls) -> str:
+        return "login_session"
+
+    @override
+    @classmethod
+    def description(cls) -> str:
+        return "One login of a user, holding its session token and the client it came from."
+
+    @override
+    @classmethod
+    def owner_type(cls) -> type[EntityType]:
+        return UserEntityType
 
 
 class LoginSessionID(FieldIdentifier):
@@ -23,4 +42,4 @@ class LoginSessionID(FieldIdentifier):
     @override
     @classmethod
     def field_type(cls) -> FieldType:
-        return LOGIN_SESSION_FIELD_TYPE
+        return LoginSessionFieldType()

@@ -41,20 +41,20 @@ from ai.backend.manager.services.image.actions.forget_image import (
     ForgetImageByIdActionResult,
 )
 from ai.backend.manager.services.image.actions.get_all_images import (
-    GetAllImagesAction,
-    GetAllImagesActionResult,
+    PublicGetAllImagesAction,
+    PublicGetAllImagesActionResult,
 )
 from ai.backend.manager.services.image.actions.get_image_installed_agents import (
     GetImageInstalledAgentsAction,
     GetImageInstalledAgentsActionResult,
 )
 from ai.backend.manager.services.image.actions.get_images import (
-    GetImageByIdAction,
-    GetImageByIdActionResult,
-    GetImageByIdentifierAction,
-    GetImageByIdentifierActionResult,
-    GetImagesByCanonicalsAction,
-    GetImagesByCanonicalsActionResult,
+    PublicGetImageByIdAction,
+    PublicGetImageByIdActionResult,
+    PublicGetImageByIdentifierAction,
+    PublicGetImageByIdentifierActionResult,
+    PublicGetImagesByCanonicalsAction,
+    PublicGetImagesByCanonicalsActionResult,
 )
 from ai.backend.manager.services.image.actions.preload_image import (
     PreloadImageAction,
@@ -137,8 +137,8 @@ class ImageService:
             raise ImageAccessForbiddenError()
 
     async def get_images_by_canonicals(
-        self, action: GetImagesByCanonicalsAction
-    ) -> GetImagesByCanonicalsActionResult:
+        self, action: PublicGetImagesByCanonicalsAction
+    ) -> PublicGetImagesByCanonicalsActionResult:
         """
         Deprecated. Use get_images_by_ids instead.
         """
@@ -152,13 +152,13 @@ class ImageService:
             status_filter=action.image_status,
             hide_agents=hide_agents,
         )
-        return GetImagesByCanonicalsActionResult(
+        return PublicGetImagesByCanonicalsActionResult(
             images_with_agent_install_status=images_with_agent_install_status
         )
 
     async def get_image_by_identifier(
-        self, action: GetImageByIdentifierAction
-    ) -> GetImageByIdentifierActionResult:
+        self, action: PublicGetImageByIdentifierAction
+    ) -> PublicGetImageByIdentifierActionResult:
         """
         Deprecated. Use get_image_by_id instead.
         """
@@ -172,7 +172,7 @@ class ImageService:
                 hide_agents=hide_agents,
             )
         )
-        return GetImageByIdentifierActionResult(
+        return PublicGetImageByIdentifierActionResult(
             image_with_agent_install_status=image_with_agent_install_status
         )
 
@@ -183,11 +183,15 @@ class ImageService:
         agent_counts_per_image = await self._image_repository.get_image_installed_agents(image_ids)
         return GetImageInstalledAgentsActionResult(data=agent_counts_per_image)
 
-    async def get_all_images(self, action: GetAllImagesAction) -> GetAllImagesActionResult:
+    async def get_all_images(
+        self, action: PublicGetAllImagesAction
+    ) -> PublicGetAllImagesActionResult:
         images = await self._image_repository.get_all_images(status_filter=action.status_filter)
-        return GetAllImagesActionResult(data=images)
+        return PublicGetAllImagesActionResult(data=images)
 
-    async def get_image_by_id(self, action: GetImageByIdAction) -> GetImageByIdActionResult:
+    async def get_image_by_id(
+        self, action: PublicGetImageByIdAction
+    ) -> PublicGetImageByIdActionResult:
         user = current_user()
         is_superadmin = user is not None and user.role == UserRole.SUPERADMIN
         hide_agents = False if is_superadmin else self._config_provider.config.manager.hide_agents
@@ -199,7 +203,7 @@ class ImageService:
                 hide_agents=hide_agents,
             )
         )
-        return GetImageByIdActionResult(
+        return PublicGetImageByIdActionResult(
             image_with_agent_install_status=image_with_agent_install_status
         )
 

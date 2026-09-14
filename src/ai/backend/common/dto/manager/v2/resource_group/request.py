@@ -17,6 +17,7 @@ from ai.backend.common.dto.manager.v2.deployment_options import DeploymentOption
 from ai.backend.common.dto.manager.v2.resource_group.types import (
     ResourceGroupOrderDirection,
     ResourceGroupOrderField,
+    ResourceGroupScope,
 )
 from ai.backend.common.dto.manager.v2.session_options import DefaultSessionOptionsInput
 from ai.backend.common.types import PreemptionVictimScope
@@ -33,6 +34,7 @@ __all__ = (
     "ResourceGroupFilter",
     "ResourceGroupOrder",
     "ResourceWeightEntryInput",
+    "ScopedSearchResourceGroupsInput",
     "UpdateAllowedDomainsForResourceGroupInput",
     "UpdateAllowedProjectsForResourceGroupInput",
     "UpdateAllowedResourceGroupsForDomainInput",
@@ -180,6 +182,22 @@ class ResourceGroupOrder(BaseRequestModel):
 class AdminSearchResourceGroupsInput(BaseRequestModel):
     """Input for admin search of resource groups with cursor and offset pagination."""
 
+    filter: ResourceGroupFilter | None = Field(default=None, description="Filter conditions.")
+    order: list[ResourceGroupOrder] | None = Field(
+        default=None, description="Order specifications."
+    )
+    first: int | None = Field(default=None, description="Cursor pagination: number of items.")
+    after: str | None = Field(default=None, description="Cursor pagination: after cursor.")
+    last: int | None = Field(default=None, description="Cursor pagination: last N items.")
+    before: str | None = Field(default=None, description="Cursor pagination: before cursor.")
+    limit: int | None = Field(default=None, description="Offset pagination: maximum items.")
+    offset: int | None = Field(default=None, description="Offset pagination: number to skip.")
+
+
+class ScopedSearchResourceGroupsInput(BaseRequestModel):
+    """Input for searching the resource groups the named scopes reach."""
+
+    scope: ResourceGroupScope = Field(description="Scope (OR across all items).")
     filter: ResourceGroupFilter | None = Field(default=None, description="Filter conditions.")
     order: list[ResourceGroupOrder] | None = Field(
         default=None, description="Order specifications."

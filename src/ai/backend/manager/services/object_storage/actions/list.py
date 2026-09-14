@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.common.data.entity.object_storage import OBJECT_STORAGE_ENTITY_TYPE
+from ai.backend.common.data.entity.object_storage import ObjectStorageEntityType
 from ai.backend.common.data.entity.types import EntityType
 from ai.backend.manager.actions.v2.ops.base import SearchGlobalOpsAction
 from ai.backend.manager.data.object_storage.types import ObjectStorageData
@@ -20,7 +20,7 @@ class ListObjectStorageAction(SearchGlobalOpsAction[ObjectStorageRow, ObjectStor
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return OBJECT_STORAGE_ENTITY_TYPE
+        return ObjectStorageEntityType()
 
     @override
     @classmethod

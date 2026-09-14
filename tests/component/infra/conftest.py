@@ -9,14 +9,14 @@ import pytest
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
-from ai.backend.common.data.entity.agent import AGENT_ENTITY_TYPE
-from ai.backend.common.data.entity.container_registry import CONTAINER_REGISTRY_ENTITY_TYPE
-from ai.backend.common.data.entity.domain import DOMAIN_ENTITY_TYPE
-from ai.backend.common.data.entity.etcd_config import ETCD_CONFIG_ENTITY_TYPE
-from ai.backend.common.data.entity.project import PROJECT_ENTITY_TYPE
-from ai.backend.common.data.entity.resource_group import RESOURCE_GROUP_ENTITY_TYPE
-from ai.backend.common.data.entity.resource_preset import RESOURCE_PRESET_ENTITY_TYPE
-from ai.backend.common.data.entity.user import USER_ENTITY_TYPE
+from ai.backend.common.data.entity.agent import AgentEntityType
+from ai.backend.common.data.entity.container_registry import ContainerRegistryEntityType
+from ai.backend.common.data.entity.domain import DomainEntityType
+from ai.backend.common.data.entity.project import ProjectEntityType
+from ai.backend.common.data.entity.resource_group import ResourceGroupEntityType
+from ai.backend.common.data.entity.resource_preset import ResourcePresetEntityType
+from ai.backend.common.data.entity.types import GlobalEntityType
+from ai.backend.common.data.entity.user import UserEntityType
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
@@ -24,8 +24,6 @@ from ai.backend.manager.actions.registry.types import (
     GroupMeta,
 )
 from ai.backend.manager.actions.v2.bulk.validator.rbac import BulkOwnCheck
-from ai.backend.manager.actions.validators import ActionValidators
-from ai.backend.manager.actions.validators.rbac import RBACValidators
 from ai.backend.manager.api.rest.etcd.handler import EtcdHandler
 from ai.backend.manager.api.rest.etcd.registry import register_etcd_routes
 from ai.backend.manager.api.rest.resource.handler import ResourceHandler
@@ -78,14 +76,6 @@ from ai.backend.manager.services.user.processors import UserProcessors
 from ai.backend.manager.services.user.service import UserService
 
 
-def _create_mock_validators() -> MagicMock:
-    mock_rbac = MagicMock(spec=RBACValidators)
-    mock_rbac.scope = AsyncMock()
-    mock_validators = MagicMock(spec=ActionValidators)
-    mock_validators.rbac = mock_rbac
-    return mock_validators
-
-
 @pytest.fixture()
 def container_registry_processors(
     database_engine: ExtendedAsyncSAEngine,
@@ -94,7 +84,7 @@ def container_registry_processors(
     repo = ContainerRegistryRepository(database_engine, RelationOpsProvider(database_engine))
     service = ContainerRegistryService(database_engine, repo)
     return ContainerRegistryProcessors(
-        processor_registry.group(GroupMeta(CONTAINER_REGISTRY_ENTITY_TYPE)), service
+        processor_registry.group(GroupMeta(ContainerRegistryEntityType())), service
     )
 
 
@@ -113,9 +103,7 @@ def etcd_config_processors(
         etcd=async_etcd,
         valkey_stat=valkey_clients.stat,
     )
-    return EtcdConfigProcessors(
-        processor_registry.group(GroupMeta(ETCD_CONFIG_ENTITY_TYPE)), service
-    )
+    return EtcdConfigProcessors(processor_registry.group(GroupMeta(GlobalEntityType())), service)
 
 
 @pytest.fixture()
@@ -125,10 +113,12 @@ def resource_preset_processors(
     valkey_clients: ValkeyClients,
     processor_registry: ProcessorRegistry[Any],
 ) -> ResourcePresetProcessors:
-    repo = ResourcePresetRepository(database_engine, valkey_clients.stat, config_provider)
+    repo = ResourcePresetRepository(
+        database_engine, valkey_clients.stat, config_provider, V2DBOpsProvider(database_engine)
+    )
     service = ResourcePresetService(repo)
     return ResourcePresetProcessors(
-        processor_registry.group(GroupMeta(RESOURCE_PRESET_ENTITY_TYPE)), service
+        processor_registry.group(GroupMeta(ResourcePresetEntityType())), service
     )
 
 
@@ -166,7 +156,7 @@ def agent_processors(
         own_check=BulkOwnCheck(PermissionControllerRepository(database_engine), config_provider),
     )
     return AgentProcessors(
-        processor_registry.group(GroupMeta(AGENT_ENTITY_TYPE)),
+        processor_registry.group(GroupMeta(AgentEntityType())),
         service,
         [],
     )
@@ -189,7 +179,7 @@ def project_processors(
     )
     group_repos = ProjectRepositories(repository=group_repo)
     service = ProjectService(storage_manager, config_provider, valkey_clients.stat, group_repos)
-    return ProjectProcessors(processor_registry.group(GroupMeta(PROJECT_ENTITY_TYPE)), service)
+    return ProjectProcessors(processor_registry.group(GroupMeta(ProjectEntityType())), service)
 
 
 @pytest.fixture()
@@ -207,7 +197,7 @@ def user_processors(
     )
     service = UserService(storage_manager, valkey_clients.stat, AsyncMock(), user_repo, AsyncMock())
     return UserProcessors(
-        processor_registry.group(GroupMeta(USER_ENTITY_TYPE)),
+        processor_registry.group(GroupMeta(UserEntityType())),
         service,
     )
 
@@ -220,7 +210,7 @@ def resource_group_processors(
     repo = ResourceGroupRepository(database_engine, V2DBOpsProvider(database_engine))
     service = ResourceGroupService(repo, appproxy_client_pool=AsyncMock())
     return ResourceGroupProcessors(
-        processor_registry.group(GroupMeta(RESOURCE_GROUP_ENTITY_TYPE)), service
+        processor_registry.group(GroupMeta(ResourceGroupEntityType())), service
     )
 
 
@@ -233,7 +223,7 @@ def domain_processors(
     service = DomainService(
         repository=DomainRepository(database_engine, V2DBOpsProvider(database_engine))
     )
-    return DomainProcessors(processor_registry.group(GroupMeta(DOMAIN_ENTITY_TYPE)), service, [])
+    return DomainProcessors(processor_registry.group(GroupMeta(DomainEntityType())), service, [])
 
 
 @pytest.fixture()

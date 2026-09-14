@@ -15,7 +15,7 @@ from collections.abc import Collection, Mapping, Sequence
 import sqlalchemy as sa
 
 from ai.backend.common.data.entity.types import EntityIdentifier
-from ai.backend.common.data.entity.user import USER_ENTITY_TYPE, UserID
+from ai.backend.common.data.entity.user import UserEntityType, UserID
 from ai.backend.common.data.permission.id import FieldPath
 from ai.backend.common.data.permission.types import Permission
 from ai.backend.manager.data.entity_share.types import EntityShareData, EntityShareStatus
@@ -249,7 +249,7 @@ class V2ShareWriteOps(V2WriteOps, V2CapOps):
         A project takes it itself. A person takes it into the project that is theirs
         alone, which every account has.
         """
-        if answering_scope.entity_type() != USER_ENTITY_TYPE:
+        if answering_scope.entity_type() != UserEntityType():
             return answering_scope
         personal = await self.lookup_entity_id(
             PersonalProjectOfUserLookup(user_id=UserID(answering_scope))

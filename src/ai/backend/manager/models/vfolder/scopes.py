@@ -9,6 +9,10 @@ from uuid import UUID
 
 import sqlalchemy as sa
 
+from ai.backend.common.data.entity.project import ProjectEntityType
+from ai.backend.common.data.entity.user import UserEntityType
+from ai.backend.common.data.entity.vfolder import VFolderEntityType
+from ai.backend.manager.data.project.types import ProjectType
 from ai.backend.manager.errors.resource import ProjectNotFound
 from ai.backend.manager.errors.user import UserNotFound
 from ai.backend.manager.models.clauses import QueryCondition
@@ -16,6 +20,7 @@ from ai.backend.manager.models.project import ProjectRow
 from ai.backend.manager.models.scopes import ExistenceCheck, OperationScope
 from ai.backend.manager.models.user.row import UserRow
 from ai.backend.manager.models.vfolder import VFolderPermissionRow, VFolderRow
+from ai.backend.manager.models.virtual_entity.queries import scope_membership_exists
 
 __all__ = (
     "ProjectVFolderOperationScope",
@@ -38,8 +43,14 @@ class ProjectVFolderOperationScope(OperationScope):
         """Convert scope to a query condition for VFolderRow."""
         project_id = self.project_id
 
+        # TODO(BA-7571): drop the column term once the ownership backfill lands.
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return VFolderRow.group == project_id
+            return sa.or_(
+                VFolderRow.group == project_id,
+                scope_membership_exists(
+                    ProjectEntityType(), project_id, VFolderEntityType(), VFolderRow.id
+                ),
+            )
 
         return inner
 
@@ -68,20 +79,36 @@ class UserVFolderOperationScope(OperationScope):
 
     @override
     def to_condition(self) -> QueryCondition:
-        """Convert scope to a query condition for VFolderRow.
+        """The vfolders the user reaches: their personal project holds it, the user
+        holds it directly, or one of the legacy columns still says so.
 
-        Returns vfolders where the user is the owner (VFolderRow.user)
-        OR has been granted permission (via VFolderPermissionRow).
+        A personal folder belongs to the user's personal project rather than to the
+        user (BEP-1077), so that project is the scope this asks about.
         """
         user_id = self.user_id
 
+        # TODO(BA-7571): drop the column terms once the ownership backfill lands.
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             permitted_vfolder_ids = sa.select(VFolderPermissionRow.vfolder).where(
                 VFolderPermissionRow.user == user_id
             )
+            personal_project_id = (
+                sa.select(ProjectRow.id)
+                .where(
+                    ProjectRow.creator_id == user_id,
+                    ProjectRow.type == ProjectType.PERSONAL,
+                )
+                .scalar_subquery()
+            )
             return sa.or_(
                 VFolderRow.user == user_id,
                 VFolderRow.id.in_(permitted_vfolder_ids),
+                scope_membership_exists(
+                    ProjectEntityType(), personal_project_id, VFolderEntityType(), VFolderRow.id
+                ),
+                scope_membership_exists(
+                    UserEntityType(), user_id, VFolderEntityType(), VFolderRow.id
+                ),
             )
 
         return inner

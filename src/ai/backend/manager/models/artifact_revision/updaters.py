@@ -6,7 +6,6 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, override
-from uuid import UUID
 
 from sqlalchemy.orm import InstrumentedAttribute
 
@@ -44,7 +43,7 @@ class ArtifactRevisionScanUpdater(DataUpdater[ArtifactRevisionRow, ArtifactRevis
         return ArtifactRevisionRow.id
 
     @override
-    def target_id_value(self) -> UUID:
+    def target_id_value(self) -> ArtifactRevisionID:
         return self.revision_id
 
     @property

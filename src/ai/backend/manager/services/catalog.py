@@ -15,7 +15,6 @@ from ai.backend.common.events.hub.hub import EventHub
 from ai.backend.manager.actions.monitors import ActionMonitors
 from ai.backend.manager.actions.registry.types import WiredProcessor
 from ai.backend.manager.actions.v2 import validators as v2_validators
-from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.services.factory import create_processors
 from ai.backend.manager.services.processors import ProcessorArgs, ServiceArgs
 
@@ -44,6 +43,5 @@ async def load_wiring_catalog() -> Sequence[WiredProcessor]:
             validators=v2_validators.ActionValidators(),
         ),
         ActionMonitors(),
-        cast(ActionValidators, unwired),
     )
     return bundle.registry.wired_processors()

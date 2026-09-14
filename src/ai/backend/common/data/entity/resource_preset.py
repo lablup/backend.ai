@@ -4,9 +4,19 @@ from typing import override
 
 from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
 
-__all__ = ("RESOURCE_PRESET_ENTITY_TYPE", "ResourcePresetID")
+__all__ = ("ResourcePresetEntityType", "ResourcePresetID")
 
-RESOURCE_PRESET_ENTITY_TYPE = EntityType("resource_preset")
+
+class ResourcePresetEntityType(EntityType):
+    @override
+    @classmethod
+    def name(cls) -> str:
+        return "resource_preset"
+
+    @override
+    @classmethod
+    def description(cls) -> str:
+        return "A named set of resource amounts a session can request."
 
 
 class ResourcePresetID(EntityIdentifier):
@@ -14,4 +24,4 @@ class ResourcePresetID(EntityIdentifier):
 
     @override
     def entity_type(self) -> EntityType:
-        return RESOURCE_PRESET_ENTITY_TYPE
+        return ResourcePresetEntityType()

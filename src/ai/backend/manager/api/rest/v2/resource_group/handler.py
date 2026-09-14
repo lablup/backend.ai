@@ -13,6 +13,7 @@ from ai.backend.common.dto.manager.v2.resource_group.request import (
     CreateResourceGroupInput,
     ReplaceResourceGroupDefaultDeploymentOptionsInput,
     ReplaceResourceGroupDefaultSessionOptionsInput,
+    ScopedSearchResourceGroupsInput,
     UpdateAllowedDomainsForResourceGroupInput,
     UpdateAllowedProjectsForResourceGroupInput,
     UpdateAllowedResourceGroupsForDomainInput,
@@ -42,6 +43,20 @@ class V2ResourceGroupHandler:
 
     def __init__(self, *, adapter: ResourceGroupAdapter) -> None:
         self._adapter = adapter
+
+    async def scoped_search(
+        self,
+        body: BodyParam[ScopedSearchResourceGroupsInput],
+    ) -> APIResponse:
+        """Search the resource groups the named scopes reach, combined with OR."""
+        result = await self._adapter.scoped_search(body.parsed)
+        payload = AdminSearchResourceGroupsPayload(
+            items=result.items,
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+        )
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=payload)
 
     async def search(
         self,

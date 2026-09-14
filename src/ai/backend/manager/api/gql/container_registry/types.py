@@ -11,6 +11,7 @@ from strawberry import Info
 from strawberry.relay import Connection, Edge, NodeID
 from strawberry.scalars import JSON
 
+from ai.backend.common.data.entity.container_registry import ContainerRegistryID
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_connection_type,
@@ -81,7 +82,7 @@ class ContainerRegistryGQL(PydanticNodeMixin[Any]):
         required: bool = False,
     ) -> Iterable[Self | None]:
         results = await info.context.data_loaders.container_registry_loader.load_many([
-            UUID(nid) for nid in node_ids
+            ContainerRegistryID(UUID(nid)) for nid in node_ids
         ])
         return cast(list[Self | None], results)
 

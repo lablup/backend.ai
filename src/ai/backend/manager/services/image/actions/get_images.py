@@ -12,14 +12,14 @@ from ai.backend.manager.services.image.actions.base import ImageAction
 
 
 @dataclass
-class GetImageByIdAction(ImageAction):
+class PublicGetImageByIdAction(ImageAction):
     image_id: ImageID
     image_status: list[ImageStatus] | None
 
     @override
     @classmethod
     def action_name(cls) -> str:
-        return "get_image_by_id"
+        return "public_get_image_by_id"
 
     @override
     @classmethod
@@ -28,19 +28,19 @@ class GetImageByIdAction(ImageAction):
 
 
 @dataclass
-class GetImageByIdActionResult:
+class PublicGetImageByIdActionResult:
     image_with_agent_install_status: ImageWithAgentInstallStatus
 
 
 @dataclass
-class GetImageByIdentifierAction(ImageAction):
+class PublicGetImageByIdentifierAction(ImageAction):
     image_identifier: ImageIdentifier
     image_status: list[ImageStatus] | None
 
     @override
     @classmethod
     def action_name(cls) -> str:
-        return "get_image_by_identifier"
+        return "public_get_image_by_identifier"
 
     @override
     @classmethod
@@ -49,12 +49,12 @@ class GetImageByIdentifierAction(ImageAction):
 
 
 @dataclass
-class GetImageByIdentifierActionResult:
+class PublicGetImageByIdentifierActionResult:
     image_with_agent_install_status: ImageWithAgentInstallStatus
 
 
 @dataclass
-class GetImagesByCanonicalsAction(ImageAction):
+class PublicGetImagesByCanonicalsAction(ImageAction):
     """
     Deprecated. Use SearchImagesAction instead.
     """
@@ -65,7 +65,7 @@ class GetImagesByCanonicalsAction(ImageAction):
     @override
     @classmethod
     def action_name(cls) -> str:
-        return "get_images_by_canonicals"
+        return "public_get_images_by_canonicals"
 
     @override
     @classmethod
@@ -75,5 +75,5 @@ class GetImagesByCanonicalsAction(ImageAction):
 
 @dataclass
 # TODO: Refactor dataclass with BatchActionResult
-class GetImagesByCanonicalsActionResult:
+class PublicGetImagesByCanonicalsActionResult:
     images_with_agent_install_status: list[ImageWithAgentInstallStatus]

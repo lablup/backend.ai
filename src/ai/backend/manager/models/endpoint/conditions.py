@@ -9,7 +9,7 @@ from datetime import datetime
 import sqlalchemy as sa
 
 from ai.backend.common.data.endpoint.types import EndpointLifecycle, ScalingState
-from ai.backend.common.data.entity.deployment import DEPLOYMENT_ENTITY_TYPE, DeploymentID
+from ai.backend.common.data.entity.deployment import DeploymentEntityType, DeploymentID
 from ai.backend.common.data.filter_specs import (
     StringMatchSpec,
     UUIDEqualMatchSpec,
@@ -33,7 +33,7 @@ class DeploymentConditions:
     """Query conditions for deployments."""
 
     labels = make_entity_label_nested_conditions(
-        EndpointRow, EndpointRow.id, DEPLOYMENT_ENTITY_TYPE
+        EndpointRow, EndpointRow.id, DeploymentEntityType()
     )
     """The `labels` nested filter: some / every / none over the labels on a endpoint."""
 

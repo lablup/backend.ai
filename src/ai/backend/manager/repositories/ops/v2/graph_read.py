@@ -16,7 +16,7 @@ from collections.abc import Sequence
 import sqlalchemy as sa
 
 from ai.backend.common.data.entity.project import ProjectID
-from ai.backend.common.data.entity.types import EntityID, EntityIdentifier, ScopeType
+from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.manager.data.project.types import ProjectType
 from ai.backend.manager.models.project.row import ProjectRow
@@ -29,8 +29,8 @@ class V2GraphReadOpsBase(V2OpsBase):
     """What the graph answers about who holds what."""
 
     async def scopes_owning(
-        self, scope_type: ScopeType, entity: EntityIdentifier
-    ) -> Sequence[EntityID]:
+        self, scope_type: EntityType, entity: EntityIdentifier
+    ) -> Sequence[uuid.UUID]:
         """The scopes of ``scope_type`` that own the entity, uncapped — a share is not
         own. Empty where no such scope holds it."""
         return (await self._sess.scalars(self._scopes_owning_query(scope_type, entity))).all()
@@ -53,7 +53,7 @@ class V2GraphReadOpsBase(V2OpsBase):
         return {row.creator_id: row.id for row in rows}
 
     def _scopes_owning_query(
-        self, scope_type: ScopeType, entity: EntityIdentifier
+        self, scope_type: EntityType, entity: EntityIdentifier
     ) -> sa.Select[tuple[uuid.UUID]]:
         membership = EntityMembershipRow.__table__
         scope = VirtualEntityRow.__table__.alias("owning_scope_node")

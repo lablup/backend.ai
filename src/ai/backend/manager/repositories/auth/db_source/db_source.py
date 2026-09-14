@@ -14,7 +14,7 @@ import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql as pgsql
 
 from ai.backend.common.data.entity.domain import DomainID
-from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE, ProjectID
+from ai.backend.common.data.entity.project import ProjectEntityType, ProjectID
 from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.exception import BackendAIError, UserNotFound
@@ -125,7 +125,7 @@ class AuthDBSource:
     async def fetch_group_membership(self, group_id: UUID, user_id: UUID) -> GroupMembershipData:
         """Fetch group membership from database."""
         async with self._db.begin() as conn:
-            query = sa.select(user_scope_membership_exists(PROJECT_SCOPE_TYPE, group_id, user_id))
+            query = sa.select(user_scope_membership_exists(ProjectEntityType(), group_id, user_id))
             is_member = (await conn.execute(query)).scalar()
             if not is_member:
                 raise GroupMembershipNotFoundError(

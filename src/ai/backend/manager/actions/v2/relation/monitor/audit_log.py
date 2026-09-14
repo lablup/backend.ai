@@ -78,7 +78,7 @@ class RelationActionAuditLogMonitor(RelationActionMonitor):
         await self._repository.atomic_create_dangling_fields_with_nested(
             [creator],
             [
-                AuditLogScopeCreator(scope_type=str(scope.scope_type), scope_id=scope.scope_id)
+                AuditLogScopeCreator(scope_type=str(scope.entity_type()), scope_id=scope)
                 for scope in meta.scope_targets
             ],
         )

@@ -14,7 +14,6 @@ from alembic import op
 from sqlalchemy.engine import Connection
 
 from ai.backend.common.data.permission.types import GLOBAL_SCOPE_ID
-from ai.backend.manager.data.permission.id import ScopeType
 from ai.backend.manager.models.rbac_models.migration.enums import (
     EntityType,
     OperationType,
@@ -105,7 +104,7 @@ def _migrate_new_entity_type(db_conn: Connection) -> None:
 def _associate_entity_to_scopes(db_conn: Connection) -> None:
     """Associate all artifacts to GLOBAL scope."""
     offset = 0
-    scope_type = ScopeType.GLOBAL.value
+    scope_type = GLOBAL_SCOPE_ID
     scope_id = GLOBAL_SCOPE_ID
     entity_type = EntityType.ARTIFACT.value
 

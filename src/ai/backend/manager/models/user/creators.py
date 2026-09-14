@@ -10,7 +10,7 @@ import sqlalchemy as sa
 
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.types import EntityIdentifier
-from ai.backend.common.data.entity.user import USER_SCOPE_TYPE, UserID
+from ai.backend.common.data.entity.user import UserEntityType, UserID
 from ai.backend.manager.data.permission.scope_template import ScopeTemplateValue
 from ai.backend.manager.data.user.types import UserData, UserStatus
 from ai.backend.manager.errors.repository import (
@@ -62,7 +62,7 @@ class UserCreator(RoleManagedEntityCreator[UserRow, UserData]):
 
     @override
     def template_value(self, row: UserRow) -> ScopeTemplateValue:
-        return ScopeTemplateValue(id=row.uuid, name=row.username, type=USER_SCOPE_TYPE)
+        return ScopeTemplateValue(id=row.uuid, name=row.username, type=UserEntityType())
 
     @override
     def integrity_error_checks(self) -> Sequence[IntegrityErrorCheck]:

@@ -22,21 +22,16 @@ from ai.backend.manager.models.mixins.timestamp import CreatedAtMixin
 class PermissionRow(CreatedAtMixin, Base):
     __tablename__ = "permissions"
     __table_args__ = (
-        sa.Index("ix_permissions_role_scope", "role_id", "scope_type", "scope_id"),
         sa.Index(
-            "ix_permissions_scope_entity",
-            "scope_type",
-            "scope_id",
+            "ix_permissions_entity",
             "entity_type",
             postgresql_include=["permission", "role_id"],
         ),
         sa.UniqueConstraint(
             "role_id",
-            "scope_type",
-            "scope_id",
             "entity_type",
             "permission",
-            name="uq_permissions_role_scope_entity_permission",
+            name="uq_permissions_role_entity_permission",
         ),
         sa.CheckConstraint(
             "permission > 0 AND (permission & (permission - 1)) = 0",
@@ -55,10 +50,6 @@ class PermissionRow(CreatedAtMixin, Base):
         sa.ForeignKey("roles.id", ondelete="CASCADE"),
         nullable=False,
     )
-    scope_type: Mapped[EntityType] = mapped_column(
-        "scope_type", sa.String(length=32), nullable=False
-    )
-    scope_id: Mapped[str] = mapped_column("scope_id", sa.String(64), nullable=False)
     entity_type: Mapped[EntityType] = mapped_column(
         "entity_type", sa.String(length=32), nullable=False
     )
@@ -75,8 +66,6 @@ class PermissionRow(CreatedAtMixin, Base):
     def from_input(cls, input: PermissionCreator) -> Self:
         return cls(
             role_id=input.role_id,
-            scope_type=input.scope_type,
-            scope_id=input.scope_id,
             entity_type=input.entity_type,
             permission=single_bit(input.permission),
         )
@@ -85,8 +74,6 @@ class PermissionRow(CreatedAtMixin, Base):
         return PermissionData(
             id=self.id,
             role_id=self.role_id,
-            scope_type=self.scope_type,
-            scope_id=self.scope_id,
             entity_type=self.entity_type,
             permission=self.permission,
             created_at=self.created_at,

@@ -895,7 +895,7 @@ class SessionRepository:
 
     def __init__(
         self,
-        ops_provider: DBOpsProvider,
+        ops_provider: V2DBOpsProvider,
         redis: RedisConnectionInfo,
     ) -> None:
         self._db_source = SessionDBSource(ops_provider)
@@ -1048,7 +1048,7 @@ class TestSessionRepository:
         database_engine: ExtendedAsyncSAEngine,
     ) -> SessionDBSource:
         """Fixture dedicated to this test class"""
-        return SessionDBSource(DBOpsProvider(database_engine))
+        return SessionDBSource(V2DBOpsProvider(database_engine))
 
     @pytest.fixture
     async def session_repository(

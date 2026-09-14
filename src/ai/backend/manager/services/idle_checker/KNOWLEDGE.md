@@ -3,7 +3,7 @@ name: idle-checker-service-shapes
 type: decision-table
 description: idle_checker knowledge - why the definition catalog and the session exclude/include edits share one package, why two groups are wired, why create and update keep a service, why the purge is bulk while the API names one
 scope: src/ai/backend/manager/services/idle_checker
-keywords: [CreateIdleCheckerAction, UpdateIdleCheckerAction, BulkPurgeIdleCheckersAction, AdminSearchIdleCheckersAction, ExcludeSessionIdleChecksAction, IdleCheckerCreator, IdleCheckerUpdater, global_scope, global_partial_bulk_purge_ops, IDLE_CHECKER_ENTITY_TYPE]
+keywords: [CreateIdleCheckerAction, UpdateIdleCheckerAction, BulkPurgeIdleCheckersAction, AdminSearchIdleCheckersAction, ExcludeSessionIdleChecksAction, IdleCheckerCreator, IdleCheckerUpdater, global_scope, global_partial_bulk_purge_ops, IdleCheckerEntityType]
 sources:
   - src/ai/backend/manager/services/idle_checker
   - src/ai/backend/manager/api/adapters/idle_checker
@@ -69,5 +69,5 @@ the entity type, shape, operation, gate and backing.
 
 - An update or purge naming no row raises `EntityNotFoundError`, not
   `IdleCheckerNotFound`.
-- ops knows no domain, so the entity type travels in the message. Both are 404 and
-  only the `error_type` string differs.
+- ops reads the entity type off the identifier, so the code's domain is the same
+  `idle_checker`; both are 404 and only the `error_type` string differs.

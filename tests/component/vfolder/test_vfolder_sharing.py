@@ -9,8 +9,8 @@ import sqlalchemy as sa
 
 from ai.backend.client.exceptions import BackendAPIError
 from ai.backend.client.v2.registry import BackendAIClientRegistry
-from ai.backend.common.data.entity.project import PROJECT_ENTITY_TYPE
-from ai.backend.common.data.entity.vfolder import VFOLDER_ENTITY_TYPE
+from ai.backend.common.data.entity.project import ProjectEntityType
+from ai.backend.common.data.entity.vfolder import VFolderEntityType
 from ai.backend.common.data.permission.types import Permission
 from ai.backend.common.dto.manager.field import VFolderPermissionField
 from ai.backend.common.dto.manager.vfolder import (
@@ -626,8 +626,8 @@ async def _share_caps(db_engine: Any, vfolder_id: uuid.UUID) -> dict[uuid.UUID, 
         )
         .where(
             EntityMembershipRow.capped.is_(True),
-            scope.c.entity_type == PROJECT_ENTITY_TYPE,
-            member.c.entity_type == VFOLDER_ENTITY_TYPE,
+            scope.c.entity_type == ProjectEntityType(),
+            member.c.entity_type == VFolderEntityType(),
             member.c.entity_id == vfolder_id,
             ProjectRow.type == ProjectType.PERSONAL,
         )

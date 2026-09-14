@@ -1,5 +1,5 @@
 from ai.backend.common.data.entity.agent import AgentUUID
-from ai.backend.common.data.entity.agent_resource import AGENT_RESOURCE_FIELD_TYPE
+from ai.backend.common.data.entity.agent_resource import AgentResourceFieldType
 from ai.backend.common.types import AgentId
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.registry.field import LookupFieldGroup
@@ -129,7 +129,7 @@ class AgentProcessors:
             BulkLoadAgentPermissionsAction, service.bulk_load_permissions
         )
         resources: LookupFieldGroup[AgentResourceData] = group.field_group(
-            FieldGroupMeta(AGENT_RESOURCE_FIELD_TYPE),
+            FieldGroupMeta(AgentResourceFieldType()),
             AgentResourceData,
             LookupAgentResourceOwnerAction,
             LookupBulkAgentResourceOwnerAction,
