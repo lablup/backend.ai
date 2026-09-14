@@ -3,15 +3,11 @@
 from __future__ import annotations
 
 import enum
-import functools
 
-from ai.backend.common.data.entity.deployment import DeploymentEntityType
 from ai.backend.common.data.entity.domain import DomainEntityType
 from ai.backend.common.data.entity.project import ProjectEntityType
-from ai.backend.common.data.entity.session import SessionEntityType
 from ai.backend.common.data.entity.types import EntityType
 from ai.backend.common.data.entity.user import UserEntityType
-from ai.backend.common.data.entity.vfolder import VFolderEntityType
 
 
 class PermissionStatus(enum.StrEnum):
@@ -85,18 +81,3 @@ class Permission(enum.IntFlag):
         ``CREATE | UPDATE``), so holding any one of its bits is not enough.
         """
         return (required & ~self) == Permission.NONE
-
-
-_READ_ONLY: Permission = Permission.READ
-_READ_AND_CREATE: Permission = Permission.READ | Permission.CREATE
-
-
-@functools.cache
-def member_permissions(entity_type: EntityType) -> Permission:
-    """The permission a *member* role holds on the given entity type.
-
-    Members of a project may create their own sessions, vfolders and deployments;
-    on everything else a member reads.
-    """
-    creatable = {SessionEntityType(), VFolderEntityType(), DeploymentEntityType()}
-    return _READ_AND_CREATE if entity_type in creatable else _READ_ONLY
