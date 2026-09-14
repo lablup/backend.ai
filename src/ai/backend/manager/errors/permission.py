@@ -19,6 +19,7 @@ from ai.backend.manager.errors.base.field import FieldError, FieldErrorCode
 
 __all__ = (
     "InvalidFieldPermission",
+    "InvalidRoleSeed",
     "InvalidPermissionOperation",
     "NotEnoughPermission",
     "PermissionAlreadyGranted",
@@ -147,4 +148,17 @@ class ReplaceRolePermissionRoleIdMismatch(FieldError, web.HTTPBadRequest):
     def field_error_code(self) -> FieldErrorCode:
         return FieldErrorCode(
             PermissionFieldType(), ActionOperationType.UPDATE, ErrorDetail.MISMATCH
+        )
+
+
+class InvalidRoleSeed(BackendAIError, web.HTTPInternalServerError):
+    error_type = "https://api.backend.ai/probs/invalid-role-seed"
+    error_title = "The seed role declaration is not valid."
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.ROLE,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.INVALID_PARAMETERS,
         )
