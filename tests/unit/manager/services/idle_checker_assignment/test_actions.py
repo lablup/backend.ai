@@ -4,9 +4,8 @@ import uuid
 
 import pytest
 
-from ai.backend.common.data.entity.domain import DOMAIN_SCOPE_TYPE, DomainID
-from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE, ProjectID
-from ai.backend.common.data.entity.types import ScopeRef
+from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.manager.models.idle_checker.scopes import IdleCheckerAssignmentOperationScope
 from ai.backend.manager.models.idle_checker.searchers import IdleCheckerAssignmentSearcher
 from ai.backend.manager.models.specs.pagination import NoPagination
@@ -40,8 +39,8 @@ class TestScopedSearchIdleCheckerAssignmentsAction:
         project_id: ProjectID,
     ) -> None:
         assert action.scope_targets() == [
-            ScopeRef(scope_type=DOMAIN_SCOPE_TYPE, scope_id=domain_id),
-            ScopeRef(scope_type=PROJECT_SCOPE_TYPE, scope_id=project_id),
+            domain_id,
+            project_id,
         ]
 
     def test_operation_scopes_restrict_the_read_to_the_same_scopes(

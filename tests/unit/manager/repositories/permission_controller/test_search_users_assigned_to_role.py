@@ -13,6 +13,7 @@ from datetime import UTC, datetime, timedelta
 import pytest
 
 from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.project import ProjectEntityType
 from ai.backend.common.data.filter_specs import StringMatchSpec
 from ai.backend.manager.models.agent import AgentRow
 
@@ -126,7 +127,12 @@ class TestSearchUsersAssignedToRole:
             db_sess.add(policy)
             await db_sess.flush()
 
-            role = RoleRow(name="test-role", description="Test role")
+            role = RoleRow(
+                scope_type=ProjectEntityType(),
+                scope_id=uuid.uuid4(),
+                name="test-role",
+                description="Test role",
+            )
             db_sess.add(role)
             await db_sess.flush()
 
@@ -202,7 +208,12 @@ class TestSearchUsersAssignedToRole:
     ) -> None:
         """Searching with a different role_id should not return assignments from the test role."""
         async with db_with_tables.begin_session() as db_sess:
-            other_role = RoleRow(name="other-role", description="Other role")
+            other_role = RoleRow(
+                scope_type=ProjectEntityType(),
+                scope_id=uuid.uuid4(),
+                name="other-role",
+                description="Other role",
+            )
             db_sess.add(other_role)
             await db_sess.flush()
             other_role_id = other_role.id

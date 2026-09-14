@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from typing import Any, override
 
 from ai.backend.common.data.entity.domain import DomainName
-from ai.backend.common.data.entity.project import PROJECT_ENTITY_TYPE, ProjectID
+from ai.backend.common.data.entity.project import ProjectEntityType, ProjectID
 from ai.backend.common.data.entity.types import EntityType
 from ai.backend.manager.actions.v2.lookup.base import LookupKey
 from ai.backend.manager.actions.v2.ops.base import LookupEntityOpsAction
@@ -38,7 +38,7 @@ class LookupProjectAction(LookupEntityOpsAction[ProjectRow, ProjectID]):
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return PROJECT_ENTITY_TYPE
+        return ProjectEntityType()
 
     @override
     @classmethod

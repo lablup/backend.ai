@@ -947,11 +947,6 @@ class SessionRow(CreatedAtMixin, Base):
         for kernel_row in self.kernels:
             kernel_row.delegate_ownership(user_uuid, access_key)
 
-    @staticmethod
-    async def delete_by_user_id(user_uuid: UUID, *, db_session: SASession) -> None:
-        await db_session.execute(sa.delete(KernelRow).where(KernelRow.user_uuid == user_uuid))
-        await db_session.execute(sa.delete(SessionRow).where(SessionRow.user_uuid == user_uuid))
-
     @classmethod
     async def set_session_result(
         cls,

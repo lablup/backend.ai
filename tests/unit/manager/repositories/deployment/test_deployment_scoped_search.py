@@ -56,6 +56,8 @@ from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderRow
+from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
+from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
 from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.deployment import DeploymentRepository
 from ai.backend.manager.repositories.ops.v2.reconciler.provider import ReconcileOpsProvider
@@ -125,6 +127,8 @@ class TestDeploymentScopedSearch:
                 ReplicaGroupRow,
                 RoutingRow,
                 ResourcePresetRow,
+                VirtualEntityRow,
+                EntityMembershipRow,
             ],
         ):
             yield database_connection

@@ -13,12 +13,14 @@ from .query import (
     domain_projects_v2,
     project_domain_v2,
     project_v2,
+    scoped_projects_v2,
 )
 
 __all__ = [
     # Queries
     "admin_projects_v2",
     "domain_projects_v2",
+    "scoped_projects_v2",
     "project_domain_v2",
     "project_v2",
     # Mutations

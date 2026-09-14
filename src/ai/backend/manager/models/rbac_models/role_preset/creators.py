@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from typing import override
 
 from ai.backend.common.data.entity.role_preset import RolePresetID
-from ai.backend.manager.data.permission.types import ScopeType
+from ai.backend.common.data.entity.types import EntityType
 from ai.backend.manager.data.role_preset.types import RolePresetData
 from ai.backend.manager.models.rbac_models.role_preset.row import RolePresetRow
 from ai.backend.manager.models.specs.creator import GlobalEntityCreator
@@ -21,7 +21,7 @@ class RolePresetCreator(GlobalEntityCreator[RolePresetRow, RolePresetData]):
     """
 
     name: str
-    scope_type: ScopeType
+    scope_type: EntityType
     auto_assign: bool = False
     role_name_template: str | None = None
 

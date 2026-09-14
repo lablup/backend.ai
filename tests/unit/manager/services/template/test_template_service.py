@@ -15,7 +15,7 @@ import pytest
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.session_template import SessionTemplateID
 from ai.backend.common.data.entity.user import UserID
-from ai.backend.manager.errors.resource import DBOperationFailed, TaskTemplateNotFound
+from ai.backend.manager.errors.resource import DBOperationFailed, SessionTemplateNotFound
 from ai.backend.manager.exceptions import InvalidArgument
 from ai.backend.manager.models.session_template import TemplateType
 from ai.backend.manager.models.user import UserRole
@@ -334,7 +334,7 @@ class TestGetTaskTemplateAction:
         mock_repo.get_task_template = AsyncMock(return_value=None)
 
         action = GetTaskTemplateAction(template_id=_template_id("nonexistent"))
-        with pytest.raises(TaskTemplateNotFound):
+        with pytest.raises(SessionTemplateNotFound):
             await service.get_task_template(action)
 
 
@@ -431,7 +431,7 @@ class TestUpdateTaskTemplateAction:
             **base_action_kwargs,
             items=[TaskTemplateItemInput(template=_make_valid_task_template())],
         )
-        with pytest.raises(TaskTemplateNotFound):
+        with pytest.raises(SessionTemplateNotFound):
             await service.update_task_template(action)
 
     async def test_invalid_template_raises_error(
@@ -504,7 +504,7 @@ class TestDeleteTaskTemplateAction:
         mock_repo.task_template_exists = AsyncMock(return_value=False)
 
         action = DeleteTaskTemplateAction(template_id=_template_id("nonexistent"))
-        with pytest.raises(TaskTemplateNotFound):
+        with pytest.raises(SessionTemplateNotFound):
             await service.delete_task_template(action)
 
     async def test_rowcount_not_one_raises_db_operation_failed(
@@ -648,7 +648,7 @@ class TestGetClusterTemplateAction:
         mock_repo.get_cluster_template = AsyncMock(return_value=None)
 
         action = GetClusterTemplateAction(template_id=_template_id("nonexistent"))
-        with pytest.raises(TaskTemplateNotFound):
+        with pytest.raises(SessionTemplateNotFound):
             await service.get_cluster_template(action)
 
 
@@ -776,7 +776,7 @@ class TestUpdateClusterTemplateAction:
             template_id=_template_id("nonexistent"),
             template_data=_make_valid_cluster_template(),
         )
-        with pytest.raises(TaskTemplateNotFound):
+        with pytest.raises(SessionTemplateNotFound):
             await service.update_cluster_template(action)
 
     async def test_no_master_node_raises_invalid_argument(
@@ -847,7 +847,7 @@ class TestDeleteClusterTemplateAction:
         mock_repo.cluster_template_exists = AsyncMock(return_value=False)
 
         action = DeleteClusterTemplateAction(template_id=_template_id("nonexistent"))
-        with pytest.raises(TaskTemplateNotFound):
+        with pytest.raises(SessionTemplateNotFound):
             await service.delete_cluster_template(action)
 
     async def test_rowcount_not_one_raises_db_operation_failed(

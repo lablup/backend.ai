@@ -11,6 +11,10 @@ import strawberry
 from strawberry import ID, Info
 from strawberry.relay import Connection, Edge, NodeID
 
+from ai.backend.common.data.entity.deployment import DeploymentID
+from ai.backend.common.data.entity.deployment_revision import DeploymentRevisionID
+from ai.backend.common.data.entity.replica import ReplicaID
+from ai.backend.common.data.entity.session import SessionID
 from ai.backend.common.data.model_deployment.types import ActivenessStatus as CommonActivenessStatus
 from ai.backend.common.data.model_deployment.types import LivenessStatus as CommonLivenessStatus
 from ai.backend.common.data.model_deployment.types import ReadinessStatus as CommonReadinessStatus
@@ -283,16 +287,17 @@ class ModelReplica(PydanticNodeMixin[ReplicaNodeDTO]):
     ):
         if self.session_id is None:
             return None
-        from ai.backend.common.types import SessionId
 
         return await info.context.data_loaders.session_loader.load(
-            SessionId(UUID(str(self.session_id)))
+            SessionID(UUID(str(self.session_id)))
         )
 
     @gql_field(description="The revision of this entity.")  # type: ignore[misc]
     async def revision(self, info: Info[StrawberryGQLContext]) -> ModelRevision | None:
         """Resolve revision by ID using DataLoader."""
-        result = await info.context.data_loaders.revision_loader.load(UUID(str(self.revision_id)))
+        result = await info.context.data_loaders.revision_loader.load(
+            DeploymentRevisionID(UUID(str(self.revision_id)))
+        )
         if result is None:
             raise ValueError(f"Revision not found: {self.revision_id}")
         return result
@@ -312,7 +317,9 @@ class ModelReplica(PydanticNodeMixin[ReplicaNodeDTO]):
         ]
         | None
     ):
-        return await info.context.data_loaders.deployment_loader.load(UUID(str(self.deployment_id)))
+        return await info.context.data_loaders.deployment_loader.load(
+            DeploymentID(UUID(str(self.deployment_id)))
+        )
 
     @classmethod
     @override
@@ -324,7 +331,7 @@ class ModelReplica(PydanticNodeMixin[ReplicaNodeDTO]):
         required: bool = False,
     ) -> Iterable[Self | None]:
         results = await info.context.data_loaders.replica_loader.load_many([
-            UUID(nid) for nid in node_ids
+            ReplicaID(UUID(nid)) for nid in node_ids
         ])
         return cast(list[Self | None], results)
 

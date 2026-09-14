@@ -8,6 +8,16 @@ from typing import override
 
 from aiohttp import web
 
+from ai.backend.common.data.entity.deployment_preset import DeploymentPresetEntityType
+from ai.backend.common.data.entity.domain import DomainEntityType
+from ai.backend.common.data.entity.model_card import ModelCardEntityType
+from ai.backend.common.data.entity.project import ProjectEntityType
+from ai.backend.common.data.entity.resource_group import ResourceGroupEntityType
+from ai.backend.common.data.entity.resource_preset import ResourcePresetEntityType
+from ai.backend.common.data.entity.runtime_variant import RuntimeVariantEntityType
+from ai.backend.common.data.entity.runtime_variant_preset import RuntimeVariantPresetEntityType
+from ai.backend.common.data.entity.session_template import SessionTemplateEntityType
+from ai.backend.common.data.entity.vfolder import VFolderEntityType
 from ai.backend.common.exception import (
     BackendAIError,
     ErrorCode,
@@ -15,68 +25,58 @@ from ai.backend.common.exception import (
     ErrorDomain,
     ErrorOperation,
 )
+from ai.backend.manager.actions.types import ActionOperationType
+from ai.backend.manager.errors.base.entity import EntityError, EntityErrorCode
 
 from .common import ObjectNotFound
 
 
-class DomainNotFound(ObjectNotFound):
+class DomainNotFound(EntityError, ObjectNotFound):
     object_name = "domain"
 
     @override
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.DOMAIN,
-            operation=ErrorOperation.READ,
-            error_detail=ErrorDetail.NOT_FOUND,
-        )
+    def entity_error_code(self) -> EntityErrorCode:
+        return EntityErrorCode(DomainEntityType(), ActionOperationType.GET, ErrorDetail.NOT_FOUND)
 
 
-class DomainPurgeInProgress(BackendAIError, web.HTTPConflict):
+class DomainPurgeInProgress(EntityError, web.HTTPConflict):
     """Raised when a write names a domain a purge is working through."""
 
     error_type = "https://api.backend.ai/probs/domain-purge-in-progress"
     error_title = "Domain is being purged."
 
     @override
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.DOMAIN,
-            operation=ErrorOperation.UPDATE,
-            error_detail=ErrorDetail.CONFLICT,
-        )
+    def entity_error_code(self) -> EntityErrorCode:
+        return EntityErrorCode(DomainEntityType(), ActionOperationType.UPDATE, ErrorDetail.CONFLICT)
 
 
-class ProjectPurgeInProgress(BackendAIError, web.HTTPConflict):
+class ProjectPurgeInProgress(EntityError, web.HTTPConflict):
     """Raised when a write names a project a purge is working through."""
 
     error_type = "https://api.backend.ai/probs/project-purge-in-progress"
     error_title = "Project is being purged."
 
     @override
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.GROUP,
-            operation=ErrorOperation.UPDATE,
-            error_detail=ErrorDetail.CONFLICT,
+    def entity_error_code(self) -> EntityErrorCode:
+        return EntityErrorCode(
+            ProjectEntityType(), ActionOperationType.UPDATE, ErrorDetail.CONFLICT
         )
 
 
-class PersonalProjectMemberAdditionError(BackendAIError, web.HTTPConflict):
+class PersonalProjectMemberAdditionError(EntityError, web.HTTPConflict):
     """Raised when a write would add a member to a personal project."""
 
     error_type = "https://api.backend.ai/probs/personal-project-member-addition"
     error_title = "Personal project takes no members beyond its owner."
 
     @override
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.GROUP,
-            operation=ErrorOperation.UPDATE,
-            error_detail=ErrorDetail.CONFLICT,
+    def entity_error_code(self) -> EntityErrorCode:
+        return EntityErrorCode(
+            ProjectEntityType(), ActionOperationType.UPDATE, ErrorDetail.CONFLICT
         )
 
 
-class PersonalProjectDeletionError(BackendAIError, web.HTTPConflict):
+class PersonalProjectDeletionError(EntityError, web.HTTPConflict):
     """Raised when a personal project is deleted or purged on its own, apart from
     the user it belongs to."""
 
@@ -84,62 +84,44 @@ class PersonalProjectDeletionError(BackendAIError, web.HTTPConflict):
     error_title = "Personal project is removed with its user, not on its own."
 
     @override
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.GROUP,
-            operation=ErrorOperation.HARD_DELETE,
-            error_detail=ErrorDetail.CONFLICT,
-        )
+    def entity_error_code(self) -> EntityErrorCode:
+        return EntityErrorCode(ProjectEntityType(), ActionOperationType.PURGE, ErrorDetail.CONFLICT)
 
 
-class ProjectHasActiveKernelsError(BackendAIError, web.HTTPConflict):
+class ProjectHasActiveKernelsError(EntityError, web.HTTPConflict):
     error_type = "https://api.backend.ai/probs/project-has-active-kernels"
     error_title = "Project has active kernels."
 
     @override
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.GROUP,
-            operation=ErrorOperation.HARD_DELETE,
-            error_detail=ErrorDetail.CONFLICT,
-        )
+    def entity_error_code(self) -> EntityErrorCode:
+        return EntityErrorCode(ProjectEntityType(), ActionOperationType.PURGE, ErrorDetail.CONFLICT)
 
 
-class ProjectHasVFoldersMountedError(BackendAIError, web.HTTPConflict):
+class ProjectHasVFoldersMountedError(EntityError, web.HTTPConflict):
     error_type = "https://api.backend.ai/probs/project-has-vfolders-mounted"
     error_title = "Project has vfolders mounted to active kernels."
 
     @override
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.GROUP,
-            operation=ErrorOperation.HARD_DELETE,
-            error_detail=ErrorDetail.CONFLICT,
-        )
+    def entity_error_code(self) -> EntityErrorCode:
+        return EntityErrorCode(ProjectEntityType(), ActionOperationType.PURGE, ErrorDetail.CONFLICT)
 
 
-class ProjectHasActiveEndpointsError(BackendAIError, web.HTTPConflict):
+class ProjectHasActiveEndpointsError(EntityError, web.HTTPConflict):
     error_type = "https://api.backend.ai/probs/project-has-active-endpoints"
     error_title = "Project has active endpoints."
 
     @override
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.GROUP,
-            operation=ErrorOperation.HARD_DELETE,
-            error_detail=ErrorDetail.CONFLICT,
-        )
+    def entity_error_code(self) -> EntityErrorCode:
+        return EntityErrorCode(ProjectEntityType(), ActionOperationType.PURGE, ErrorDetail.CONFLICT)
 
 
-class ResourceGroupNotFound(ObjectNotFound):
-    object_name = "scaling group"
+class ResourceGroupNotFound(EntityError, ObjectNotFound):
+    object_name = "resource group"
 
     @override
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.SCALING_GROUP,
-            operation=ErrorOperation.READ,
-            error_detail=ErrorDetail.NOT_FOUND,
+    def entity_error_code(self) -> EntityErrorCode:
+        return EntityErrorCode(
+            ResourceGroupEntityType(), ActionOperationType.GET, ErrorDetail.NOT_FOUND
         )
 
 
@@ -159,81 +141,35 @@ class UnresolvableResourceGroup(BackendAIError, web.HTTPBadRequest):
         )
 
 
-class DefaultResourceGroupAlreadyExists(BackendAIError, web.HTTPBadRequest):
+class DefaultResourceGroupAlreadyExists(EntityError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/default-scaling-group-already-exists"
     error_title = "Another resource group is already the default."
 
     @override
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.SCALING_GROUP,
-            operation=ErrorOperation.UPDATE,
-            error_detail=ErrorDetail.INVALID_PARAMETERS,
+    def entity_error_code(self) -> EntityErrorCode:
+        return EntityErrorCode(
+            ResourceGroupEntityType(), ActionOperationType.UPDATE, ErrorDetail.INVALID_PARAMETERS
         )
 
 
-class ResourceGroupSessionTypeNotAllowed(BackendAIError, web.HTTPUnprocessableEntity):
-    error_type = "https://api.backend.ai/probs/scaling-group-session-type-not-allowed"
-    error_title = "Scaling group does not allow this session type."
+class ResourceGroupSessionTypeNotAllowed(EntityError, web.HTTPBadRequest):
+    error_type = "https://api.backend.ai/probs/resource-group-session-type-not-allowed"
+    error_title = "Resource group does not allow this session type."
 
     @override
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.SCALING_GROUP,
-            operation=ErrorOperation.READ,
-            error_detail=ErrorDetail.INVALID_PARAMETERS,
+    def entity_error_code(self) -> EntityErrorCode:
+        return EntityErrorCode(
+            ResourceGroupEntityType(), ActionOperationType.GET, ErrorDetail.INVALID_PARAMETERS
         )
 
 
-class ResourceGroupDeletionFailure(BackendAIError, web.HTTPInternalServerError):
-    error_type = "https://api.backend.ai/probs/scaling-group-deletion-failure"
-    error_title = "Failed to delete scaling group."
-
-    @override
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.SCALING_GROUP,
-            operation=ErrorOperation.HARD_DELETE,
-            error_detail=ErrorDetail.INTERNAL_ERROR,
-        )
-
-
-class InstanceNotFound(ObjectNotFound):
-    object_name = "agent instance"
-
-    @override
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.INSTANCE,
-            operation=ErrorOperation.READ,
-            error_detail=ErrorDetail.NOT_FOUND,
-        )
-
-
-class InstanceNotAvailable(BackendAIError, web.HTTPServiceUnavailable):
-    error_type = "https://api.backend.ai/probs/instance-not-available"
-    error_title = "There is no available instance."
-
-    @override
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.INSTANCE,
-            operation=ErrorOperation.ACCESS,
-            error_detail=ErrorDetail.UNAVAILABLE,
-        )
-
-
-class ProjectNotFound(BackendAIError, web.HTTPNotFound):
+class ProjectNotFound(EntityError, web.HTTPNotFound):
     error_type = "https://api.backend.ai/probs/project-not-found"
     error_title = "Project not found."
 
     @override
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.GROUP,
-            operation=ErrorOperation.READ,
-            error_detail=ErrorDetail.NOT_FOUND,
-        )
+    def entity_error_code(self) -> EntityErrorCode:
+        return EntityErrorCode(ProjectEntityType(), ActionOperationType.GET, ErrorDetail.NOT_FOUND)
 
 
 class PersonalProjectNotFound(ProjectNotFound):
@@ -246,19 +182,24 @@ class PersonalProjectNotFound(ProjectNotFound):
     error_title = "Personal project not found."
 
 
-class TaskTemplateNotFound(ObjectNotFound):
-    object_name = "task template"
+class SessionTemplateNotFound(EntityError, ObjectNotFound):
+    object_name = "session template"
 
     @override
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.TEMPLATE,
-            operation=ErrorOperation.READ,
-            error_detail=ErrorDetail.NOT_FOUND,
+    def entity_error_code(self) -> EntityErrorCode:
+        return EntityErrorCode(
+            SessionTemplateEntityType(), ActionOperationType.GET, ErrorDetail.NOT_FOUND
         )
 
 
 class AppNotFound(ObjectNotFound):
+    """Raised when a session's ``service_ports`` names no such app.
+
+    Stays on :class:`BackendAIError`: an entry in that column is a value, not a row.
+    Its ``backendai_read_not-found`` code is load-bearing -- WebUI's app launcher
+    branches on that exact string -- so do not move it.
+    """
+
     object_name = "app service"
 
     @override
@@ -270,300 +211,157 @@ class AppNotFound(ObjectNotFound):
         )
 
 
-class DomainDataProcessingError(BackendAIError, web.HTTPInternalServerError):
-    """
-    Error that occurs when processing domain data fails.
-    This includes failures in converting database rows to domain data objects.
-    """
-
-    error_type = "https://api.backend.ai/probs/domain-data-processing-error"
-    error_title = "Failed to process domain data."
-
-    @override
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.DOMAIN,
-            operation=ErrorOperation.GENERIC,
-            error_detail=ErrorDetail.INTERNAL_ERROR,
-        )
-
-
-class ResourceGroupProxyTargetNotFound(ObjectNotFound):
-    object_name = "scaling group proxy target"
-
-    @override
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.SCALING_GROUP,
-            operation=ErrorOperation.READ,
-            error_detail=ErrorDetail.NOT_FOUND,
-        )
-
-
-class ResourcePresetNotFound(ObjectNotFound):
+class ResourcePresetNotFound(EntityError, ObjectNotFound):
     object_name = "resource preset"
 
     @override
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.RESOURCE_PRESET,
-            operation=ErrorOperation.READ,
-            error_detail=ErrorDetail.NOT_FOUND,
+    def entity_error_code(self) -> EntityErrorCode:
+        return EntityErrorCode(
+            ResourcePresetEntityType(), ActionOperationType.GET, ErrorDetail.NOT_FOUND
         )
 
 
-class RuntimeVariantNotFound(ObjectNotFound):
+class RuntimeVariantNotFound(EntityError, ObjectNotFound):
     object_name = "runtime variant"
 
     @override
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.RUNTIME_VARIANT,
-            operation=ErrorOperation.READ,
-            error_detail=ErrorDetail.NOT_FOUND,
+    def entity_error_code(self) -> EntityErrorCode:
+        return EntityErrorCode(
+            RuntimeVariantEntityType(), ActionOperationType.GET, ErrorDetail.NOT_FOUND
         )
 
 
-class RuntimeVariantConflict(BackendAIError, web.HTTPConflict):
+class RuntimeVariantConflict(EntityError, web.HTTPConflict):
     error_type = "https://api.backend.ai/probs/duplicate-runtime-variant"
     error_title = "Duplicate Runtime Variant"
 
     @override
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.RUNTIME_VARIANT,
-            operation=ErrorOperation.GENERIC,
-            error_detail=ErrorDetail.CONFLICT,
+    def entity_error_code(self) -> EntityErrorCode:
+        return EntityErrorCode(
+            RuntimeVariantEntityType(), ActionOperationType.CREATE, ErrorDetail.CONFLICT
         )
 
 
-class RuntimeVariantPresetNotFound(ObjectNotFound):
+class RuntimeVariantPresetNotFound(EntityError, ObjectNotFound):
     object_name = "runtime variant preset"
 
     @override
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.RUNTIME_VARIANT,
-            operation=ErrorOperation.READ,
-            error_detail=ErrorDetail.NOT_FOUND,
+    def entity_error_code(self) -> EntityErrorCode:
+        return EntityErrorCode(
+            RuntimeVariantPresetEntityType(), ActionOperationType.GET, ErrorDetail.NOT_FOUND
         )
 
 
-class RuntimeVariantPresetConflict(BackendAIError, web.HTTPConflict):
+class RuntimeVariantPresetConflict(EntityError, web.HTTPConflict):
     error_type = "https://api.backend.ai/probs/duplicate-runtime-variant-preset"
     error_title = "Duplicate Runtime Variant Preset"
 
     @override
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.RUNTIME_VARIANT,
-            operation=ErrorOperation.GENERIC,
-            error_detail=ErrorDetail.CONFLICT,
+    def entity_error_code(self) -> EntityErrorCode:
+        return EntityErrorCode(
+            RuntimeVariantPresetEntityType(), ActionOperationType.CREATE, ErrorDetail.CONFLICT
         )
 
 
-class ModelCardNotFound(ObjectNotFound):
+class ModelCardNotFound(EntityError, ObjectNotFound):
     object_name = "model card"
 
     @override
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.MODEL_CARD,
-            operation=ErrorOperation.READ,
-            error_detail=ErrorDetail.NOT_FOUND,
+    def entity_error_code(self) -> EntityErrorCode:
+        return EntityErrorCode(
+            ModelCardEntityType(), ActionOperationType.GET, ErrorDetail.NOT_FOUND
         )
 
 
-class ModelCardConflict(BackendAIError, web.HTTPConflict):
+class ModelCardConflict(EntityError, web.HTTPConflict):
     error_type = "https://api.backend.ai/probs/duplicate-model-card"
     error_title = "Duplicate Model Card"
 
     @override
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.MODEL_CARD,
-            operation=ErrorOperation.GENERIC,
-            error_detail=ErrorDetail.CONFLICT,
+    def entity_error_code(self) -> EntityErrorCode:
+        return EntityErrorCode(
+            ModelCardEntityType(), ActionOperationType.CREATE, ErrorDetail.CONFLICT
         )
 
 
-class InvalidProjectTypeForModelCard(BackendAIError, web.HTTPBadRequest):
+class InvalidProjectTypeForModelCard(EntityError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/invalid-project-type-for-model-card"
     error_title = "Project is not a MODEL_STORE type."
 
     @override
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.MODEL_CARD,
-            operation=ErrorOperation.READ,
-            error_detail=ErrorDetail.BAD_REQUEST,
+    def entity_error_code(self) -> EntityErrorCode:
+        return EntityErrorCode(
+            ProjectEntityType(), ActionOperationType.GET, ErrorDetail.BAD_REQUEST
         )
 
 
-class NotAModelVFolder(BackendAIError, web.HTTPBadRequest):
+class NotAModelVFolder(EntityError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/not-a-model-vfolder"
     error_title = "VFolder usage_mode is not MODEL."
 
     @override
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.MODEL_CARD,
-            operation=ErrorOperation.GENERIC,
-            error_detail=ErrorDetail.BAD_REQUEST,
+    def entity_error_code(self) -> EntityErrorCode:
+        return EntityErrorCode(
+            VFolderEntityType(), ActionOperationType.GET, ErrorDetail.BAD_REQUEST
         )
 
 
-class DeploymentRevisionPresetNotFound(ObjectNotFound):
+class DeploymentRevisionPresetNotFound(EntityError, ObjectNotFound):
     object_name = "deployment revision preset"
 
     @override
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.MODEL_DEPLOYMENT,
-            operation=ErrorOperation.READ,
-            error_detail=ErrorDetail.NOT_FOUND,
+    def entity_error_code(self) -> EntityErrorCode:
+        return EntityErrorCode(
+            DeploymentPresetEntityType(), ActionOperationType.GET, ErrorDetail.NOT_FOUND
         )
 
 
-class DeploymentRevisionPresetConflict(BackendAIError, web.HTTPConflict):
+class DeploymentRevisionPresetConflict(EntityError, web.HTTPConflict):
     error_type = "https://api.backend.ai/probs/duplicate-deployment-revision-preset"
     error_title = "Duplicate Deployment Revision Preset"
 
     @override
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.MODEL_DEPLOYMENT,
-            operation=ErrorOperation.GENERIC,
-            error_detail=ErrorDetail.CONFLICT,
+    def entity_error_code(self) -> EntityErrorCode:
+        return EntityErrorCode(
+            DeploymentPresetEntityType(), ActionOperationType.CREATE, ErrorDetail.CONFLICT
         )
 
 
-class AgentNotFound(ObjectNotFound):
-    object_name = "agent"
-
-    @override
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.AGENT,
-            operation=ErrorOperation.READ,
-            error_detail=ErrorDetail.NOT_FOUND,
-        )
-
-
-class DomainCreationFailed(BackendAIError, web.HTTPInternalServerError):
-    error_type = "https://api.backend.ai/probs/domain-creation-failed"
-    error_title = "Failed to create domain."
-
-    @override
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.DOMAIN,
-            operation=ErrorOperation.CREATE,
-            error_detail=ErrorDetail.INTERNAL_ERROR,
-        )
-
-
-class DomainNodeCreationFailed(BackendAIError, web.HTTPInternalServerError):
-    error_type = "https://api.backend.ai/probs/domain-node-creation-failed"
-    error_title = "Failed to create domain node."
-
-    @override
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.DOMAIN,
-            operation=ErrorOperation.CREATE,
-            error_detail=ErrorDetail.INTERNAL_ERROR,
-        )
-
-
-class DomainHasActiveKernels(BackendAIError, web.HTTPConflict):
+class DomainHasActiveKernels(EntityError, web.HTTPConflict):
     error_type = "https://api.backend.ai/probs/domain-has-active-kernels"
     error_title = "Domain has active kernels."
 
     @override
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.DOMAIN,
-            operation=ErrorOperation.HARD_DELETE,
-            error_detail=ErrorDetail.CONFLICT,
-        )
+    def entity_error_code(self) -> EntityErrorCode:
+        return EntityErrorCode(DomainEntityType(), ActionOperationType.PURGE, ErrorDetail.CONFLICT)
 
 
-class DomainHasUsers(BackendAIError, web.HTTPConflict):
+class DomainHasUsers(EntityError, web.HTTPConflict):
     error_type = "https://api.backend.ai/probs/domain-has-users"
     error_title = "Domain has associated users."
 
     @override
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.DOMAIN,
-            operation=ErrorOperation.HARD_DELETE,
-            error_detail=ErrorDetail.CONFLICT,
-        )
+    def entity_error_code(self) -> EntityErrorCode:
+        return EntityErrorCode(DomainEntityType(), ActionOperationType.PURGE, ErrorDetail.CONFLICT)
 
 
-class DomainHasGroups(BackendAIError, web.HTTPConflict):
+class DomainHasGroups(EntityError, web.HTTPConflict):
     error_type = "https://api.backend.ai/probs/domain-has-groups"
     error_title = "Domain has associated groups."
 
     @override
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.DOMAIN,
-            operation=ErrorOperation.HARD_DELETE,
-            error_detail=ErrorDetail.CONFLICT,
-        )
+    def entity_error_code(self) -> EntityErrorCode:
+        return EntityErrorCode(DomainEntityType(), ActionOperationType.PURGE, ErrorDetail.CONFLICT)
 
 
-class DomainDeletionFailed(BackendAIError, web.HTTPInternalServerError):
+class DomainDeletionFailed(EntityError, web.HTTPInternalServerError):
     error_type = "https://api.backend.ai/probs/domain-deletion-failed"
     error_title = "Failed to delete domain."
 
     @override
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.DOMAIN,
-            operation=ErrorOperation.HARD_DELETE,
-            error_detail=ErrorDetail.INTERNAL_ERROR,
-        )
-
-
-class DomainUpdateNotAllowed(BackendAIError, web.HTTPBadRequest):
-    error_type = "https://api.backend.ai/probs/domain-update-not-allowed"
-    error_title = "Domain update not allowed."
-
-    @override
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.DOMAIN,
-            operation=ErrorOperation.UPDATE,
-            error_detail=ErrorDetail.INVALID_PARAMETERS,
-        )
-
-
-class InvalidDomainConfiguration(BackendAIError, web.HTTPBadRequest):
-    error_type = "https://api.backend.ai/probs/invalid-domain-configuration"
-    error_title = "Invalid domain configuration."
-
-    @override
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.DOMAIN,
-            operation=ErrorOperation.UPDATE,
-            error_detail=ErrorDetail.INVALID_PARAMETERS,
-        )
-
-
-class AllocationFailed(BackendAIError, web.HTTPInternalServerError):
-    error_type = "https://api.backend.ai/probs/allocation-failed"
-    error_title = "Failed to allocate resources."
-
-    @override
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.SESSION,
-            operation=ErrorOperation.CREATE,
-            error_detail=ErrorDetail.INTERNAL_ERROR,
+    def entity_error_code(self) -> EntityErrorCode:
+        return EntityErrorCode(
+            DomainEntityType(), ActionOperationType.PURGE, ErrorDetail.INTERNAL_ERROR
         )
 
 
@@ -593,45 +391,6 @@ class InvalidPresetQuery(BackendAIError, web.HTTPBadRequest):
         )
 
 
-class NoAvailableResourceGroup(BackendAIError, web.HTTPBadRequest):
-    error_type = "https://api.backend.ai/probs/no-available-scaling-group"
-    error_title = "No scaling groups available for this session."
-
-    @override
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.SCALING_GROUP,
-            operation=ErrorOperation.ACCESS,
-            error_detail=ErrorDetail.NOT_FOUND,
-        )
-
-
-class AgentNotAllocated(BackendAIError, web.HTTPInternalServerError):
-    error_type = "https://api.backend.ai/probs/agent-not-allocated"
-    error_title = "Agent ID has not been allocated for the session."
-
-    @override
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.AGENT,
-            operation=ErrorOperation.ACCESS,
-            error_detail=ErrorDetail.INTERNAL_ERROR,
-        )
-
-
-class SessionNotAllocated(BackendAIError, web.HTTPInternalServerError):
-    error_type = "https://api.backend.ai/probs/session-not-allocated"
-    error_title = "Session ID is not available during allocation."
-
-    @override
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.SESSION,
-            operation=ErrorOperation.ACCESS,
-            error_detail=ErrorDetail.INTERNAL_ERROR,
-        )
-
-
 class NoCurrentTaskContext(BackendAIError, web.HTTPInternalServerError):
     error_type = "https://api.backend.ai/probs/no-current-task-context"
     error_title = "No current asyncio task context available."
@@ -654,19 +413,6 @@ class DatabaseConnectionUnavailable(BackendAIError, web.HTTPInternalServerError)
         return ErrorCode(
             domain=ErrorDomain.DATABASE,
             operation=ErrorOperation.ACCESS,
-            error_detail=ErrorDetail.INTERNAL_ERROR,
-        )
-
-
-class InvalidSchedulerState(BackendAIError, web.HTTPInternalServerError):
-    error_type = "https://api.backend.ai/probs/invalid-scheduler-state"
-    error_title = "Scheduler is in an invalid state."
-
-    @override
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.SCALING_GROUP,
-            operation=ErrorOperation.SCHEDULE,
             error_detail=ErrorDetail.INTERNAL_ERROR,
         )
 

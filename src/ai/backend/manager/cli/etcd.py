@@ -309,7 +309,7 @@ def unquote(_cli_ctx: CLIContext, value: str) -> None:
     print(etcd_unquote(value))
 
 
-@cli.command()
+@cli.command("set-storage-sftp-resource-group")
 @click.argument("proxy")
 @click.argument("scaling_groups")
 @click.option(
@@ -345,7 +345,7 @@ def set_storage_sftp_resource_group(
     asyncio.run(_impl())
 
 
-@cli.command()
+@cli.command("remove-storage-sftp-resource-group")
 @click.argument("proxy")
 @click.option(
     "-s",

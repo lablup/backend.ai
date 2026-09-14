@@ -12,6 +12,7 @@ import strawberry
 from strawberry import Info
 from strawberry.relay import Connection, Edge, NodeID
 
+from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.dto.manager.v2.fair_share.request import (
     BulkUpsertProjectFairShareWeightInput as BulkUpsertProjectFairShareWeightInputDTO,
 )
@@ -109,7 +110,9 @@ class ProjectFairShareGQL(PydanticNodeMixin[ProjectFairShareNode]):
         ]
         | None
     ):
-        project_data = await info.context.data_loaders.project_loader.load(self.project_id)
+        project_data = await info.context.data_loaders.project_loader.load(
+            ProjectID(self.project_id)
+        )
         if project_data is None:
             return None
         return project_data

@@ -46,6 +46,12 @@ def register_v2_resource_slot_routes(
     )
     registry.add(
         "POST",
+        "/agent-resources/scoped/search",
+        handler.scoped_search_agent_resources,
+        middlewares=[auth_required],
+    )
+    registry.add(
+        "POST",
         "/agent-resources/search",
         handler.search_agent_resources,
         middlewares=[superadmin_required],

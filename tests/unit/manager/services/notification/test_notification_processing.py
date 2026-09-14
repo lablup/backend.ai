@@ -18,9 +18,9 @@ import pytest
 from ai.backend.common.contexts.user import with_user
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.notification import (
-    NOTIFICATION_CHANNEL_ENTITY_TYPE,
-    NOTIFICATION_RULE_ENTITY_TYPE,
+    NotificationChannelEntityType,
     NotificationChannelID,
+    NotificationRuleEntityType,
     NotificationRuleID,
 )
 from ai.backend.common.data.notification import SessionStartedMessage
@@ -84,8 +84,8 @@ def notification_processors(
     # built but never reached, so the groups may sit on a stand-in engine.
     engine = MagicMock()
     return NotificationProcessors(
-        channel_group=ops_processor_group(engine, GroupMeta(NOTIFICATION_CHANNEL_ENTITY_TYPE)),
-        rule_group=ops_processor_group(engine, GroupMeta(NOTIFICATION_RULE_ENTITY_TYPE)),
+        channel_group=ops_processor_group(engine, GroupMeta(NotificationChannelEntityType())),
+        rule_group=ops_processor_group(engine, GroupMeta(NotificationRuleEntityType())),
         service=service,
     )
 

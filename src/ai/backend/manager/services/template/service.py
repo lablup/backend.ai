@@ -6,7 +6,7 @@ from typing import Any, Final
 
 from ai.backend.common.json import load_json
 from ai.backend.logging.utils import BraceStyleAdapter
-from ai.backend.manager.errors.resource import DBOperationFailed, TaskTemplateNotFound
+from ai.backend.manager.errors.resource import DBOperationFailed, SessionTemplateNotFound
 from ai.backend.manager.models.session_template import (
     TemplateType,
     check_cluster_template,
@@ -119,7 +119,7 @@ class TemplateService:
         """Get a single task template by ID."""
         row = await self._repository.get_task_template(str(action.template_id))
         if row is None:
-            raise TaskTemplateNotFound
+            raise SessionTemplateNotFound
         raw_template = row["template"]
         template: dict[str, Any] = (
             raw_template if isinstance(raw_template, dict) else dict(load_json(raw_template))
@@ -137,7 +137,7 @@ class TemplateService:
         """Validate and update an existing task template."""
         exists = await self._repository.task_template_exists(str(action.template_id))
         if not exists:
-            raise TaskTemplateNotFound
+            raise SessionTemplateNotFound
 
         # Authorize owner against the pre-resolved project
         default_user_uuid, default_group_id = await self._repository.resolve_owner(
@@ -174,7 +174,7 @@ class TemplateService:
         """Soft-delete a task template."""
         exists = await self._repository.task_template_exists(str(action.template_id))
         if not exists:
-            raise TaskTemplateNotFound
+            raise SessionTemplateNotFound
         rowcount = await self._repository.soft_delete_template(
             str(action.template_id), TemplateType.TASK
         )
@@ -232,7 +232,7 @@ class TemplateService:
         """Get a single cluster template by ID."""
         template = await self._repository.get_cluster_template(str(action.template_id))
         if template is None:
-            raise TaskTemplateNotFound
+            raise SessionTemplateNotFound
         return GetClusterTemplateActionResult(template=template)
 
     async def update_cluster_template(
@@ -241,7 +241,7 @@ class TemplateService:
         """Validate and update an existing cluster template."""
         exists = await self._repository.cluster_template_exists(str(action.template_id))
         if not exists:
-            raise TaskTemplateNotFound
+            raise SessionTemplateNotFound
         template_data = check_cluster_template(action.template_data)
         name = template_data["metadata"]["name"]
         rowcount = await self._repository.update_cluster_template(
@@ -257,7 +257,7 @@ class TemplateService:
         """Soft-delete a cluster template."""
         exists = await self._repository.cluster_template_exists(str(action.template_id))
         if not exists:
-            raise TaskTemplateNotFound
+            raise SessionTemplateNotFound
         rowcount = await self._repository.soft_delete_template(
             str(action.template_id), TemplateType.CLUSTER
         )

@@ -13,7 +13,7 @@ import yarl
 from ai.backend.client.v2.auth import HMACAuth
 from ai.backend.client.v2.config import ClientConfig
 from ai.backend.client.v2.v2_registry import V2ClientRegistry
-from ai.backend.common.data.entity.client_ip_masking import CLIENT_IP_MASKING_POLICY_ENTITY_TYPE
+from ai.backend.common.data.entity.client_ip_masking import ClientIPMaskingPolicyEntityType
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
 from ai.backend.manager.actions.registry.types import GroupMeta
 from ai.backend.manager.api.adapters.client_ip_masking.adapter import ClientIPMaskingAdapter
@@ -38,7 +38,7 @@ def client_ip_masking_processors(
     processor_registry: ProcessorRegistry[Any],
 ) -> ClientIPMaskingProcessors:
     return ClientIPMaskingProcessors(
-        processor_registry.group(GroupMeta(CLIENT_IP_MASKING_POLICY_ENTITY_TYPE))
+        processor_registry.group(GroupMeta(ClientIPMaskingPolicyEntityType()))
     )
 
 
@@ -49,7 +49,7 @@ def server_module_registries(
 ) -> list[RouteRegistry]:
     processors = MagicMock(spec=Processors)
     processors.client_ip_masking = client_ip_masking_processors
-    adapter = ClientIPMaskingAdapter(processors)
+    adapter = ClientIPMaskingAdapter(processors.client_ip_masking)
     handler = V2ClientIPMaskingHandler(adapter=adapter)
     v2_reg = RouteRegistry.create("v2", route_deps.cors_options)
     v2_reg.add_subregistry(register_v2_client_ip_masking_routes(handler, route_deps))

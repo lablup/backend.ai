@@ -3,8 +3,8 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Any, override
 
-from ai.backend.common.data.entity.types import ScopeRef
-from ai.backend.common.data.entity.user import USER_SCOPE_TYPE
+from ai.backend.common.data.entity.types import EntityIdentifier
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.types import AccessKey, RuntimeVariant, VFolderMount
 from ai.backend.manager.actions.types import ActionOperationType
@@ -33,8 +33,8 @@ class ValidateModelServiceAction(ModelServiceScopeAction):
     owner_access_key_override: AccessKey | None
 
     @override
-    def scope_targets(self) -> Sequence[ScopeRef]:
-        return (ScopeRef(scope_type=USER_SCOPE_TYPE, scope_id=self.requester_uuid),)
+    def scope_targets(self) -> Sequence[EntityIdentifier]:
+        return (UserID(self.requester_uuid),)
 
     @override
     @classmethod

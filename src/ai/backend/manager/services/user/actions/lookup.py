@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from typing import Any, override
 
 from ai.backend.common.data.entity.types import EntityType
-from ai.backend.common.data.entity.user import USER_ENTITY_TYPE, UserID
+from ai.backend.common.data.entity.user import UserEntityType, UserID
 from ai.backend.manager.actions.v2.lookup.base import LookupKey
 from ai.backend.manager.actions.v2.ops.base import LookupEntityOpsAction
 from ai.backend.manager.models.user.lookups import UserEmailLookup
@@ -35,7 +35,7 @@ class LookupUserAction(LookupEntityOpsAction[UserRow, UserID]):
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return USER_ENTITY_TYPE
+        return UserEntityType()
 
     @override
     @classmethod

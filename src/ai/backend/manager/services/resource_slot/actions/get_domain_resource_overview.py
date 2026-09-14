@@ -4,9 +4,9 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.common.data.entity.domain import DOMAIN_SCOPE_TYPE, DomainID
-from ai.backend.common.data.entity.session import SESSION_ENTITY_TYPE
-from ai.backend.common.data.entity.types import EntityIdentifier, EntityType, ScopeRef
+from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.session import SessionEntityType
+from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.actions.v2.scope.base import BaseScopeAction
 from ai.backend.manager.actions.v2.scope.result import BaseScopeActionResult
@@ -27,11 +27,11 @@ class GetDomainResourceOverviewAction(BaseScopeAction):
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return SESSION_ENTITY_TYPE
+        return SessionEntityType()
 
     @override
-    def scope_targets(self) -> Sequence[ScopeRef]:
-        return (ScopeRef(scope_type=DOMAIN_SCOPE_TYPE, scope_id=self.domain_id),)
+    def scope_targets(self) -> Sequence[EntityIdentifier]:
+        return (self.domain_id,)
 
     @override
     @classmethod

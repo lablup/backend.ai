@@ -154,12 +154,4 @@ def register_v2_rbac_routes(
         middlewares=[superadmin_required],
     )
 
-    # Entities
-    registry.add(
-        "POST",
-        "/entities/search",
-        handler.search_entities,
-        middlewares=[superadmin_required],
-    )
-
     return registry

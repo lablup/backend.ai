@@ -13,7 +13,7 @@ import pytest
 import sqlalchemy as sa
 
 from ai.backend.common.data.entity.domain import (
-    DOMAIN_ENTITY_TYPE,
+    DomainEntityType,
     DomainID,
     DomainName,
 )
@@ -25,12 +25,12 @@ from ai.backend.logging.types import LogFormat
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.bootstrap import (  # noqa: F401
-    etcd_container,
-    postgres_container,
-    redis_container,
-)
 from ai.backend.testutils.fixtures import DomainFactory, DomainFixtureData
+
+pytest_plugins = [
+    "ai.backend.testutils.bootstrap",
+    "ai.backend.testutils.db_fixtures",
+]
 
 
 def create_test_password_info(password: str = "test_password") -> PasswordInfo:
@@ -180,7 +180,7 @@ def domain_factory() -> DomainFactory:
             # sides to be in the graph already.
             await conn.execute(
                 sa.insert(VirtualEntityRow.__table__).values(
-                    entity_type=DOMAIN_ENTITY_TYPE, entity_id=row.id
+                    entity_type=DomainEntityType(), entity_id=row.id
                 )
             )
         return DomainFixtureData(domain_name=DomainName(row.name), domain_id=DomainID(row.id))

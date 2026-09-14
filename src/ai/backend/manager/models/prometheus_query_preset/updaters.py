@@ -3,7 +3,6 @@ from __future__ import annotations
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import Any, override
-from uuid import UUID
 
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql as pgsql
@@ -56,7 +55,7 @@ class PrometheusQueryPresetUpdater(
         return PrometheusQueryPresetRow.id
 
     @override
-    def target_id_value(self) -> UUID:
+    def target_id_value(self) -> PrometheusQueryPresetID:
         return self.preset_id
 
     @property

@@ -1,15 +1,47 @@
-from ai.backend.common.data.entity.types import FieldType
+from typing import override
+
+from ai.backend.common.data.entity.types import DanglingFieldType
 
 __all__ = (
-    "DOMAIN_USAGE_BUCKET_FIELD_TYPE",
-    "PROJECT_USAGE_BUCKET_FIELD_TYPE",
-    "USER_USAGE_BUCKET_FIELD_TYPE",
+    "DomainUsageBucketFieldType",
+    "ProjectUsageBucketFieldType",
+    "UserUsageBucketFieldType",
 )
 
 
-# A bucket is one owner's usage over one window, so the owner's kind is part of what the
-# row is. The legacy RBAC `EntityType` spells the same pair with a `:`; a field type is
-# one name.
-DOMAIN_USAGE_BUCKET_FIELD_TYPE = FieldType("domain_usage_bucket")
-PROJECT_USAGE_BUCKET_FIELD_TYPE = FieldType("project_usage_bucket")
-USER_USAGE_BUCKET_FIELD_TYPE = FieldType("user_usage_bucket")
+# A bucket is one scope's usage in one resource group over one window, so neither side
+# alone owns the row and the wiring fixes no entity type for it.
+class DomainUsageBucketFieldType(DanglingFieldType):
+    @override
+    @classmethod
+    def name(cls) -> str:
+        return "domain_usage_bucket"
+
+    @override
+    @classmethod
+    def description(cls) -> str:
+        return "One period's resource usage of a domain."
+
+
+class ProjectUsageBucketFieldType(DanglingFieldType):
+    @override
+    @classmethod
+    def name(cls) -> str:
+        return "project_usage_bucket"
+
+    @override
+    @classmethod
+    def description(cls) -> str:
+        return "One period's resource usage of a project."
+
+
+class UserUsageBucketFieldType(DanglingFieldType):
+    @override
+    @classmethod
+    def name(cls) -> str:
+        return "user_usage_bucket"
+
+    @override
+    @classmethod
+    def description(cls) -> str:
+        return "One period's resource usage of a user."

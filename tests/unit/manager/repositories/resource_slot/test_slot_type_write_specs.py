@@ -10,6 +10,7 @@ from uuid import uuid4
 import pytest
 import sqlalchemy as sa
 
+from ai.backend.common.data.entity.agent import AgentUUID
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.data.entity.resource_slot import ResourceSlotTypeUUID
@@ -33,9 +34,6 @@ from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.model_card.row import ModelCardRow
 from ai.backend.manager.models.project import ProjectRow
 from ai.backend.manager.models.rbac_models import RoleRow, UserRoleRow
-from ai.backend.manager.models.rbac_models.association_scopes_entities import (
-    AssociationScopesEntitiesRow,
-)
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.replica_group import ReplicaGroupRow
 from ai.backend.manager.models.resource_group import ResourceGroupOpts, ResourceGroupRow
@@ -118,7 +116,6 @@ async def db_with_referencing_tables(
             KernelRow,
             RoutingRow,
             ModelCardRow,
-            AssociationScopesEntitiesRow,
             ResourceSlotTypeRow,
             AgentResourceRow,
             ResourceAllocationRow,
@@ -313,8 +310,10 @@ class TestResourceSlotTypePurger:
                 )
             )
             await db_sess.flush()
+            agent_uuid = AgentUUID(uuid.uuid4())
             db_sess.add(
                 AgentRow(
+                    uuid=agent_uuid,
                     id=agent_id,
                     status=AgentStatus.ALIVE,
                     region="local",
@@ -329,6 +328,7 @@ class TestResourceSlotTypePurger:
             db_sess.add(
                 AgentResourceRow(
                     agent_id=agent_id,
+                    agent_uuid=agent_uuid,
                     slot_name=existing_slot_type.slot_name,
                     capacity=Decimal(2),
                 )

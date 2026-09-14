@@ -17,6 +17,7 @@ import strawberry
 from strawberry import Info
 from strawberry.relay import Connection, Edge, NodeID
 
+from ai.backend.common.data.entity.image_alias import ImageAliasID
 from ai.backend.common.dto.manager.v2.image.request import (
     AdminSearchImageAliasesInput,
     ContainerRegistryScopeInputDTO,
@@ -164,7 +165,7 @@ class ImageV2AliasGQL(PydanticNodeMixin[ImageAliasNode]):
         required: bool = False,
     ) -> Iterable[Self | None]:
         results = await info.context.data_loaders.image_alias_loader.load_many([
-            uuid.UUID(nid) for nid in node_ids
+            ImageAliasID(uuid.UUID(nid)) for nid in node_ids
         ])
         return cast(list[Self | None], results)
 

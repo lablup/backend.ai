@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 from typing import Any
 
-from ai.backend.common.data.entity.types import GLOBAL_ENTITY_TYPE, EntityData, FieldData
+from ai.backend.common.data.entity.types import EntityData, FieldData, GlobalEntityType
 from ai.backend.manager.actions.registry.field import FieldGroup, LookupFieldGroup
 from ai.backend.manager.actions.registry.group import (
     ProcessorGroup,
@@ -61,7 +61,7 @@ class ConcernGroups[TData: EntityData]:
     def dangling_field_group[TFieldData: FieldData](
         self, meta: FieldGroupMeta, data_cls: type[TFieldData]
     ) -> FieldGroup[TFieldData]:
-        return FieldGroup(self._deps, self._records, self._concern, meta, GLOBAL_ENTITY_TYPE)
+        return FieldGroup(self._deps, self._records, self._concern, meta, GlobalEntityType())
 
 
 class ProcessorRegistry[TData: EntityData]:
@@ -89,7 +89,7 @@ class ProcessorRegistry[TData: EntityData]:
         :meth:`ProcessorGroup.field_group`: the owner's type is a value on the row, and
         some rows have no owner at all.
         """
-        return FieldGroup(self._deps, self._records, meta.field_type, meta, GLOBAL_ENTITY_TYPE)
+        return FieldGroup(self._deps, self._records, meta.field_type, meta, GlobalEntityType())
 
     def dangling_lookup_field_group[TFieldData: FieldData](
         self,
@@ -127,7 +127,7 @@ class ProcessorRegistry[TData: EntityData]:
             self._records,
             meta.field_type,
             meta,
-            GLOBAL_ENTITY_TYPE,
+            GlobalEntityType(),
             owner_lookup,
             bulk_owner_lookup,
             partial_bulk_owner_lookup,
@@ -138,7 +138,7 @@ class ProcessorRegistry[TData: EntityData]:
         self._records.append(
             WiredProcessor(
                 concern=meta.field_type,
-                entity_type=GLOBAL_ENTITY_TYPE,
+                entity_type=GlobalEntityType(),
                 field_type=meta.field_type,
                 action_cls=action_cls,
                 kind=ActionKind.LOOKUP,
@@ -154,3 +154,19 @@ class ProcessorRegistry[TData: EntityData]:
     def wired_actions(self) -> Sequence[type[Any]]:
         """Every action class wired through this registry's groups, in wiring order."""
         return tuple(r.action_cls for r in self._records)
+
+    def role_grantable_wirings(self) -> Sequence[WiredProcessor]:
+        """Every wiring a role may permit — the ones asking the caller for a permission
+        on an entity a permission row can name.
+
+        Leaves out the global ones, which a SUPERADMIN gate answers rather than a role,
+        and the relations, which name no entity to hold a permission on.
+        """
+        return tuple(
+            record
+            for record in self._records
+            if record.gate is ActionGate.PERMISSION
+            and record.kind is not ActionKind.GLOBAL
+            and record.entity_type is not None
+            and record.entity_type != GlobalEntityType()
+        )

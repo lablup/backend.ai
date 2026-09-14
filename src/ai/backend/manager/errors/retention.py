@@ -6,16 +6,16 @@ from typing import override
 
 from aiohttp import web
 
+from ai.backend.common.data.entity.retention_policy import RetentionPolicyEntityType
 from ai.backend.common.exception import (
-    BackendAIError,
     ErrorCode,
     ErrorDetail,
     ErrorDomain,
     ErrorOperation,
 )
+from ai.backend.manager.actions.types import ActionOperationType
+from ai.backend.manager.errors.base.entity import EntityError, EntityErrorCode
 from ai.backend.manager.errors.repository import RepositoryError
-
-from .common import ObjectNotFound
 
 
 class RetentionCategoryNotSupportedError(RepositoryError):
@@ -38,26 +38,12 @@ class RetentionCategoryNotSupportedError(RepositoryError):
         )
 
 
-class RetentionPolicyNotFound(ObjectNotFound):
-    object_name = "retention policy"
-
-    @override
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.RETENTION_POLICY,
-            operation=ErrorOperation.READ,
-            error_detail=ErrorDetail.NOT_FOUND,
-        )
-
-
-class RetentionPolicyConflict(BackendAIError, web.HTTPConflict):
+class RetentionPolicyConflict(EntityError, web.HTTPConflict):
     error_type = "https://api.backend.ai/probs/duplicate-retention-policy"
     error_title = "Duplicate Retention Policy"
 
     @override
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.RETENTION_POLICY,
-            operation=ErrorOperation.GENERIC,
-            error_detail=ErrorDetail.CONFLICT,
+    def entity_error_code(self) -> EntityErrorCode:
+        return EntityErrorCode(
+            RetentionPolicyEntityType(), ActionOperationType.CREATE, ErrorDetail.CONFLICT
         )

@@ -3,34 +3,64 @@ from typing import override
 from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
 
 __all__ = (
-    "KEYPAIR_RESOURCE_POLICY_ENTITY_TYPE",
+    "KeyPairResourcePolicyEntityType",
     "KeyPairResourcePolicyUUID",
-    "PROJECT_RESOURCE_POLICY_ENTITY_TYPE",
+    "ProjectResourcePolicyEntityType",
     "ProjectResourcePolicyUUID",
-    "USER_RESOURCE_POLICY_ENTITY_TYPE",
+    "UserResourcePolicyEntityType",
     "UserResourcePolicyUUID",
 )
 
 
-# Raw strings mirroring the RBAC-managed EntityType.*_RESOURCE_POLICY values.
-KEYPAIR_RESOURCE_POLICY_ENTITY_TYPE = EntityType("keypair_resource_policy")
-USER_RESOURCE_POLICY_ENTITY_TYPE = EntityType("user_resource_policy")
-PROJECT_RESOURCE_POLICY_ENTITY_TYPE = EntityType("project_resource_policy")
+class KeyPairResourcePolicyEntityType(EntityType):
+    @override
+    @classmethod
+    def name(cls) -> str:
+        return "keypair_resource_policy"
+
+    @override
+    @classmethod
+    def description(cls) -> str:
+        return "Resource limits applied per keypair."
+
+
+class UserResourcePolicyEntityType(EntityType):
+    @override
+    @classmethod
+    def name(cls) -> str:
+        return "user_resource_policy"
+
+    @override
+    @classmethod
+    def description(cls) -> str:
+        return "Resource limits applied per user."
+
+
+class ProjectResourcePolicyEntityType(EntityType):
+    @override
+    @classmethod
+    def name(cls) -> str:
+        return "project_resource_policy"
+
+    @override
+    @classmethod
+    def description(cls) -> str:
+        return "Resource limits applied per project."
 
 
 class KeyPairResourcePolicyUUID(EntityIdentifier):
     @override
     def entity_type(self) -> EntityType:
-        return KEYPAIR_RESOURCE_POLICY_ENTITY_TYPE
+        return KeyPairResourcePolicyEntityType()
 
 
 class UserResourcePolicyUUID(EntityIdentifier):
     @override
     def entity_type(self) -> EntityType:
-        return USER_RESOURCE_POLICY_ENTITY_TYPE
+        return UserResourcePolicyEntityType()
 
 
 class ProjectResourcePolicyUUID(EntityIdentifier):
     @override
     def entity_type(self) -> EntityType:
-        return PROJECT_RESOURCE_POLICY_ENTITY_TYPE
+        return ProjectResourcePolicyEntityType()

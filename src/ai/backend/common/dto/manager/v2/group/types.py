@@ -6,15 +6,17 @@ from __future__ import annotations
 
 from enum import StrEnum
 
-from pydantic import Field
+from pydantic import Field, model_validator
 
 from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.dto.manager.query import StringFilter, UUIDFilter
 from ai.backend.common.dto.manager.v2.common import OrderDirection
+from ai.backend.common.dto.manager.v2.rbac.types import UUIDScope
 
 __all__ = (
     "DomainProjectScopeDTO",
     "OrderDirection",
+    "ProjectScope",
     "ProjectDomainFilter",
     "ProjectOrderField",
     "ProjectType",
@@ -73,3 +75,29 @@ class DomainProjectScopeDTO(BaseRequestModel):
     """Scope for domain-level project queries."""
 
     domain_name: str = Field(description="Domain name to scope the query.")
+
+
+class ProjectScope(BaseRequestModel):
+    """Scope for the scoped project query.
+
+    Each list is OR'd internally and across lists. Raises an error if every field is
+    empty.
+    """
+
+    domain: list[UUIDScope] | None = Field(
+        default=None, description="Domains whose projects are being read"
+    )
+    user: list[UUIDScope] | None = Field(
+        default=None, description="Users whose project memberships are being read"
+    )
+    resource_group: list[UUIDScope] | None = Field(
+        default=None, description="Resource groups whose projects are being read"
+    )
+
+    @model_validator(mode="after")
+    def _require_non_empty(self) -> ProjectScope:
+        if not self.domain and not self.user and not self.resource_group:
+            raise ValueError(
+                "ProjectScope requires a non-empty value for 'domain', 'user' or 'resource_group'"
+            )
+        return self

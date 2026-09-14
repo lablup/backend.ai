@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import asyncio
 import sys
-from pathlib import Path
 
 import click
 
@@ -88,9 +87,7 @@ def verify(
             async with stack:
                 from ai.backend.storage.dependencies.composer import DependencyInput
 
-                dependency_input = DependencyInput(
-                    config_path=config_path or Path("storage-proxy.toml"),
-                )
+                dependency_input = DependencyInput(config_path=config_path)
                 composer = StorageDependencyComposer()
 
                 # Initialize all dependencies through the composer

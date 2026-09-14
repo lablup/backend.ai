@@ -32,6 +32,7 @@ from ai.backend.common.types import (
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.clients.agent import AgentClientPool
 from ai.backend.manager.config.provider import ManagerConfigProvider
+from ai.backend.manager.data.dotfile.types import normalize_newlines
 from ai.backend.manager.defs import START_SESSION_TIMEOUT_SEC
 from ai.backend.manager.exceptions import convert_to_status_data
 from ai.backend.manager.metrics.scheduler import (
@@ -372,7 +373,11 @@ class SessionLauncher:
                         ],
                         "package_directory": tuple(),
                         "idle_timeout": int(idle_timeout),
-                        "bootstrap_script": k.bootstrap_script,
+                        "bootstrap_script": (
+                            normalize_newlines(k.bootstrap_script)
+                            if k.bootstrap_script is not None
+                            else None
+                        ),
                         "startup_command": k.startup_command,
                         "internal_data": k.internal_data,
                         "auto_pull": kernel_image_config.get("auto_pull", AutoPullBehavior.DIGEST),

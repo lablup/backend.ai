@@ -38,6 +38,7 @@ from ai.backend.common.dto.manager.v2.role_permission_preset.response import (
 from ai.backend.manager.api.gql.base import (
     DateTimeFilter,
     OrderDirection,
+    StringFilter,
     UUIDFilter,
 )
 from ai.backend.manager.api.gql.decorators import (
@@ -55,10 +56,8 @@ from ai.backend.manager.api.gql.pydantic_compat import (
     PydanticOutputMixin,
 )
 from ai.backend.manager.api.gql.rbac.types import (
-    OperationTypeFilterGQL,
-    OperationTypeGQL,
-    RBACElementTypeFilterGQL,
-    RBACElementTypeGQL,
+    PermissionBitFilterGQL,
+    PermissionBitGQL,
 )
 
 # --- Node / Connection types ---
@@ -74,10 +73,8 @@ from ai.backend.manager.api.gql.rbac.types import (
 class RolePermissionPresetGQL(PydanticNodeMixin[RolePermissionPresetNode]):
     id: NodeID[str] = gql_field(description="Permission entry UUID.")
     role_preset_id: UUID = gql_field(description="UUID of the parent role preset.")
-    entity_type: RBACElementTypeGQL = gql_field(
-        description="Entity type the permission applies to."
-    )
-    operation: OperationTypeGQL = gql_field(description="Operation granted by the permission.")
+    entity_type: str = gql_field(description="Entity type the permission applies to.")
+    permission: PermissionBitGQL = gql_field(description="The operation bit the entry grants.")
     created_at: datetime = gql_field(description="Creation timestamp.")
 
 
@@ -118,11 +115,11 @@ class RolePermissionPresetFilterGQL(PydanticInputMixin[RolePermissionPresetFilte
     role_preset_id: UUIDFilter | None = gql_field(
         description="Filter by parent role preset ID.", default=None
     )
-    entity_type: RBACElementTypeFilterGQL | None = gql_field(
+    entity_type: StringFilter | None = gql_field(
         description="Filter by entity type the permission applies to.", default=None
     )
-    operation: OperationTypeFilterGQL | None = gql_field(
-        description="Filter by granted operation.", default=None
+    permission: PermissionBitFilterGQL | None = gql_field(
+        description="Filter by the operation bit granted.", default=None
     )
     created_at: DateTimeFilter | None = gql_field(
         description="Filter by creation timestamp.", default=None
@@ -150,7 +147,7 @@ class RolePermissionPresetFilterGQL(PydanticInputMixin[RolePermissionPresetFilte
 )
 class RolePermissionPresetOrderFieldGQL(StrEnum):
     ENTITY_TYPE = "entity_type"
-    OPERATION = "operation"
+    PERMISSION = "permission"
     CREATED_AT = "created_at"
 
 
@@ -197,11 +194,9 @@ class BulkRolePermissionPresetFailureInfoGQL(
 class BulkAddRolePermissionPresetFailureInfoGQL(
     PydanticOutputMixin[BulkAddRolePermissionPresetFailureInfoDTO]
 ):
-    entity_type: RBACElementTypeGQL = gql_field(
-        description="Entity type of the permission entry that failed."
-    )
-    operation: OperationTypeGQL = gql_field(
-        description="Operation of the permission entry that failed."
+    entity_type: str = gql_field(description="Entity type of the permission entry that failed.")
+    permission: PermissionBitGQL = gql_field(
+        description="The operation bit of the permission entry that failed."
     )
     message: str = gql_field(description="Error message describing the failure.")
 

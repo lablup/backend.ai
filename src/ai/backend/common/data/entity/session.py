@@ -1,20 +1,26 @@
 from typing import override
 
-from ai.backend.common.data.entity.types import EntityIdentifier, EntityType, ScopeType
+from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
 
 __all__ = (
-    "SESSION_ENTITY_TYPE",
-    "SESSION_SCOPE_TYPE",
+    "SessionEntityType",
     "SessionID",
 )
 
 
-# Raw strings mirroring the RBAC-managed RBACElementType.SESSION value.
-SESSION_ENTITY_TYPE = EntityType("session")
-SESSION_SCOPE_TYPE = ScopeType(SESSION_ENTITY_TYPE)
+class SessionEntityType(EntityType):
+    @override
+    @classmethod
+    def name(cls) -> str:
+        return "session"
+
+    @override
+    @classmethod
+    def description(cls) -> str:
+        return "A compute session made of one or more kernels."
 
 
 class SessionID(EntityIdentifier):
     @override
     def entity_type(self) -> EntityType:
-        return SESSION_ENTITY_TYPE
+        return SessionEntityType()
