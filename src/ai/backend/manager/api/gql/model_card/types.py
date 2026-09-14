@@ -630,12 +630,20 @@ class BulkDeleteModelCardsV2PayloadGQL:
 class ModelCardScopeGQL(PydanticInputMixin[ModelCardScope]):
     """The scopes a model card read is answered for."""
 
-    domain: list[UUIDScopeGQL] | None = gql_field(
-        default=None, description="Domains whose model cards are being read."
+    domain: list[UUIDScopeGQL] | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Domains whose model cards are being read.",
+        ),
+        default=None,
     )
     project: list[UUIDScopeGQL] | None = gql_field(
         default=None, description="Projects whose model cards are being read."
     )
-    user: list[UUIDScopeGQL] | None = gql_field(
-        default=None, description="Users whose model cards are being read."
+    user: list[UUIDScopeGQL] | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Users whose model cards are being read.",
+        ),
+        default=None,
     )

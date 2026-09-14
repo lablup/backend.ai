@@ -11137,13 +11137,13 @@ Added in 26.9.0. Scope for the scoped model card query. Each list is OR'd intern
 input ModelCardScope
   @join__type(graph: STRAWBERRY)
 {
-  """Domains whose model cards are being read."""
+  """Added in 26.9.0. Domains whose model cards are being read."""
   domain: [UUIDScope!] = null
 
   """Projects whose model cards are being read."""
   project: [UUIDScope!] = null
 
-  """Users whose model cards are being read."""
+  """Added in 26.9.0. Users whose model cards are being read."""
   user: [UUIDScope!] = null
 }
 

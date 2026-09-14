@@ -191,7 +191,6 @@ class TestImageScopedSearch:
                 "shared_image_id": shared.id,
             }
 
-    @pytest.mark.asyncio
     async def test_project_scope_reads_what_the_project_holds(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
@@ -203,7 +202,6 @@ class TestImageScopedSearch:
         )
         assert [row.ImageRow.id for row in result.rows] == [test_data["owned_image_id"]]
 
-    @pytest.mark.asyncio
     async def test_registry_scope_reads_what_the_registry_holds(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
@@ -219,7 +217,6 @@ class TestImageScopedSearch:
         )
         assert [row.ImageRow.id for row in result.rows] == [test_data["owned_image_id"]]
 
-    @pytest.mark.asyncio
     async def test_global_scope_reads_the_images_of_a_global_registry(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
@@ -229,7 +226,6 @@ class TestImageScopedSearch:
         result = await _search(db_with_cleanup, [GlobalImageOperationScope()])
         assert [row.ImageRow.id for row in result.rows] == [test_data["shared_image_id"]]
 
-    @pytest.mark.asyncio
     async def test_scopes_are_combined_with_or(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
