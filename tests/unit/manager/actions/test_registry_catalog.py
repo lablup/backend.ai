@@ -199,6 +199,9 @@ from ai.backend.manager.services.deployment.actions.scoped_search import (
     ScopedSearchDeploymentsAction,
 )
 from ai.backend.manager.services.deployment.processors import DeploymentProcessors
+from ai.backend.manager.services.deployment_revision_preset.actions.bulk_get import (
+    BulkGetDeploymentPresetsAction,
+)
 from ai.backend.manager.services.deployment_revision_preset.processors import (
     DeploymentPresetProcessors,
 )
@@ -916,6 +919,7 @@ def test_entity_data_loader_reads_are_checked_per_entity_except_domains() -> Non
         ),
         MagicMock(),
     )
+    DeploymentPresetProcessors(registry.group(GroupMeta(DeploymentPresetEntityType())), MagicMock())
     DeploymentProcessors(registry.group(GroupMeta(DeploymentEntityType())), MagicMock())
 
     recorded = {
@@ -924,6 +928,11 @@ def test_entity_data_loader_reads_are_checked_per_entity_except_domains() -> Non
     }
     assert recorded[BulkGetDeploymentsAction] == (
         DeploymentEntityType(),
+        ActionKind.BULK,
+        ActionGate.PERMISSION,
+    )
+    assert recorded[BulkGetDeploymentPresetsAction] == (
+        DeploymentPresetEntityType(),
         ActionKind.BULK,
         ActionGate.PERMISSION,
     )
