@@ -43,7 +43,7 @@ one place per domain.
 ## Reuse by subclassing concrete errors
 
 - `ObjectNotFound` builds its title from `object_name`; a domain not-found error that predates the row bases keeps it as a second base beside `EntityError` or `FieldError` for that title.
-- A raise site that names one row kind raises that kind's own not-found error where one exists, and otherwise `EntityNotFoundError` / `FieldNotFoundError` with the row's type — no new class is defined for a not-found alone. `ObjectNotFound` itself is raised only where the missing thing is no row (the table below lists them).
+- A raise site that names one row kind raises that kind's own not-found error. A kind that has none gets one subclassing `EntityNotFoundError` / `FieldNotFoundError`, binding its type in `__init__` and passing `operation` through. `ObjectNotFound` itself is raised only where the missing thing is no row (the table below lists them).
 - When the meaning fits, extend an existing concrete error rather than deriving fresh from `BackendAIError`.
 
 ## An error stays on `BackendAIError` for want of a row type, or of an action operation

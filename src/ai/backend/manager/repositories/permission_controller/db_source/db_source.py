@@ -37,8 +37,8 @@ from ai.backend.manager.data.permission.virtual_entity import (
     GovernCheckKey,
     OwnCheckKey,
 )
-from ai.backend.manager.errors.base.field import FieldNotFoundError
 from ai.backend.manager.errors.permission import (
+    PermissionNotFound,
     RoleAlreadyAssigned,
     RoleNotAssigned,
     RoleNotFound,
@@ -92,15 +92,13 @@ class PermissionDBSource:
         Delete a permission entry.
 
         Raises:
-            FieldNotFoundError: If permission does not exist
+            PermissionNotFound: If permission does not exist
         """
         async with self._ops.write_ops() as w:
             data = await w.purge_field_entity(purger)
             if data is None:
-                permission_id = purger.target_id_value()
-                raise FieldNotFoundError(
-                    f"Permission with ID {permission_id} does not exist.",
-                    field_type=permission_id.field_type(),
+                raise PermissionNotFound(
+                    f"Permission with ID {purger.target_id_value()} does not exist.",
                     operation=ActionOperationType.PURGE,
                 )
             return data
@@ -113,15 +111,13 @@ class PermissionDBSource:
         Update a permission entry.
 
         Raises:
-            FieldNotFoundError: If permission does not exist
+            PermissionNotFound: If permission does not exist
         """
         async with self._ops.write_ops() as w:
             data = await w.update_data(updater)
             if data is None:
-                permission_id = updater.target_id_value()
-                raise FieldNotFoundError(
-                    f"Permission with ID {permission_id} does not exist.",
-                    field_type=permission_id.field_type(),
+                raise PermissionNotFound(
+                    f"Permission with ID {updater.target_id_value()} does not exist.",
                     operation=ActionOperationType.UPDATE,
                 )
             return data

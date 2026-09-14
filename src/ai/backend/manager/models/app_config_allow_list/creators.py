@@ -6,9 +6,8 @@ from typing import override
 
 from ai.backend.common.data.app_config.types import AppConfigScopeType
 from ai.backend.common.data.entity.app_config_allow_list import AppConfigAllowListID
-from ai.backend.common.data.entity.app_config_definition import AppConfigDefinitionEntityType
 from ai.backend.manager.data.app_config.types import AppConfigAllowListData
-from ai.backend.manager.errors.base.entity import EntityNotFoundError
+from ai.backend.manager.errors.app_config import AppConfigDefinitionNotFound
 from ai.backend.manager.errors.repository import ForeignKeyViolationError
 from ai.backend.manager.models.app_config_allow_list.row import AppConfigAllowListRow
 from ai.backend.manager.models.specs.creator import GlobalEntityCreator
@@ -39,9 +38,8 @@ class AppConfigAllowListCreator(GlobalEntityCreator[AppConfigAllowListRow, AppCo
         return (
             IntegrityErrorCheck(
                 violation_type=ForeignKeyViolationError,
-                error=EntityNotFoundError(
-                    f"App config definition '{self.config_name}' does not exist.",
-                    entity_type=AppConfigDefinitionEntityType(),
+                error=AppConfigDefinitionNotFound(
+                    f"App config definition '{self.config_name}' does not exist."
                 ),
             ),
         )

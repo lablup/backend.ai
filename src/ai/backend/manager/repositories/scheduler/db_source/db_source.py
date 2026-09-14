@@ -25,7 +25,7 @@ from ai.backend.common import msgpack
 from ai.backend.common.data.entity.domain import DomainID, DomainName
 from ai.backend.common.data.entity.image import ImageID
 from ai.backend.common.data.entity.kernel import KernelID
-from ai.backend.common.data.entity.network import NetworkEntityType, NetworkID
+from ai.backend.common.data.entity.network import NetworkID
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.resource_group import (
     ResourceGroupID,
@@ -71,8 +71,8 @@ from ai.backend.manager.data.session.types import (
     SessionStatus,
 )
 from ai.backend.manager.errors.api import InvalidAPIParameters
-from ai.backend.manager.errors.base.entity import EntityNotFoundError
 from ai.backend.manager.errors.image import ImageNotFound
+from ai.backend.manager.errors.network import NetworkNotFound
 from ai.backend.manager.errors.resource import DomainNotFound, ResourceGroupNotFound
 from ai.backend.manager.errors.resource_slot import AgentResourceCapacityExceeded
 from ai.backend.manager.exceptions import ErrorStatusInfo
@@ -3892,9 +3892,7 @@ class ScheduleDBSource:
         async with self._db.begin_readonly_session_read_committed() as db_sess:
             row = await db_sess.scalar(sa.select(NetworkRow).where(NetworkRow.id == network_id))
             if row is None:
-                raise EntityNotFoundError(
-                    f"Network {network_id} not found", entity_type=NetworkEntityType()
-                )
+                raise NetworkNotFound()
             return row.to_data()
 
     async def update_session_network_id(

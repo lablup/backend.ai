@@ -15,6 +15,7 @@ from ai.backend.manager.data.app_config.types import (
     AppConfigAllowListData,
     AppConfigDefinitionData,
 )
+from ai.backend.manager.errors.app_config import AppConfigDefinitionNotFound
 from ai.backend.manager.errors.base.entity import EntityNotFoundError
 from ai.backend.manager.errors.repository import UniqueConstraintViolationError
 from ai.backend.manager.models.app_config_allow_list.conditions import (
@@ -179,8 +180,8 @@ class TestCreateAndGet:
         self, repository: OpsRepository[AppConfigAllowListData]
     ) -> None:
         # No app_config_definitions row for "unregistered": the creator maps the
-        # FK violation onto the definition's not-found.
-        with pytest.raises(EntityNotFoundError):
+        # FK violation onto the domain error.
+        with pytest.raises(AppConfigDefinitionNotFound):
             await _create_entry(repository, "unregistered", AppConfigScopeType.PUBLIC)
 
     async def test_duplicate_config_name_scope_type_rejected(
