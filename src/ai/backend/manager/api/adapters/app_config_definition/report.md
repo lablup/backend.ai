@@ -8,7 +8,7 @@ Not exercised by any scenario: batch_load_fields.
 
 #### [a-definition-holding-an-entry-and-a-fragment-is-still-purged](/tests/scenario/bai_scenario/manager/app_config_definition/test_purging.py) — pass
 
-허용 목록 항목과 설정 조각이 딸린 설정 정의를 슈퍼관리자가 삭제하면, 딸린 것이 막지 않고 삭제한 id를 담은 응답이 반환된다
+허용 목록 항목과 설정 조각이 딸린 설정 정의를 슈퍼관리자가 영구 삭제하면, 종속 행이 삭제를 막지 않고 정의의 ID가 반환된다
 
 Given
 
@@ -25,20 +25,20 @@ Given
 
 When
 
-- AppConfigDefinitionAdapter.admin_purge — user-1이 config-1 삭제
+- AppConfigDefinitionAdapter.admin_purge — user-1이 config-1 영구 삭제
 
 Then
 
-- 삭제한 설정 정의의 id를 응답한다
-  - id: 미리 만들어 둔 설정 정의와 같다
+- 영구 삭제한 설정 정의의 ID를 응답한다
+  - ID: 미리 만들어 둔 설정 정의와 같다
 
 #### [a-user-who-is-not-the-superadmin-may-not-purge-a-definition](/tests/scenario/bai_scenario/manager/app_config_definition/test_purging.py) — pass
 
-같은 설정 정의가 있고 슈퍼관리자가 아닌 사용자가 삭제하면, 권한 부족으로 거부된다
+같은 설정 정의가 있고 권한이 없는 일반 사용자가 영구 삭제하면, 엔티티 영구 삭제 권한이 없어 거부된다
 
 Given
 
-- 설정 정의 하나와, 아무 권한도 없는 사용자 한 명
+- 설정 정의 하나와, 권한이 없는 일반 사용자 한 명
   - 도메인 home-1
   - 설정 정의 config-1: 이 이름의 설정이 등록돼 있다
   - 도메인에 속한 사용자 한 명 준비
@@ -49,7 +49,7 @@ Given
 
 When
 
-- AppConfigDefinitionAdapter.admin_purge — user-1이 config-1 삭제
+- AppConfigDefinitionAdapter.admin_purge — user-1이 config-1 영구 삭제
 
 Then
 
@@ -58,7 +58,7 @@ Then
 
 #### [an-id-nothing-answers-to-is-not-found-for-a-superadmin](/tests/scenario/bai_scenario/manager/app_config_definition/test_purging.py) — pass
 
-슈퍼관리자가 존재하지 않는 id를 삭제하면, 대상을 찾을 수 없다는 이유로 거부된다
+슈퍼관리자가 존재하지 않는 ID를 영구 삭제하면, 대상을 찾을 수 없다는 이유로 거부된다
 
 Given
 
@@ -73,7 +73,7 @@ Given
 
 When
 
-- AppConfigDefinitionAdapter.admin_purge — user-1이 존재하지 않는 id 삭제
+- AppConfigDefinitionAdapter.admin_purge — user-1이 존재하지 않는 ID 영구 삭제
 
 Then
 
@@ -82,7 +82,7 @@ Then
 
 #### [the-superadmin-purges-a-definition](/tests/scenario/bai_scenario/manager/app_config_definition/test_purging.py) — pass
 
-아무것도 딸리지 않은 설정 정의를 슈퍼관리자가 삭제하면, 삭제한 id를 담은 응답이 반환된다
+종속 행이 없는 설정 정의를 슈퍼관리자가 영구 삭제하면, 삭제한 ID가 반환된다
 
 Given
 
@@ -97,22 +97,22 @@ Given
 
 When
 
-- AppConfigDefinitionAdapter.admin_purge — user-1이 config-1 삭제
+- AppConfigDefinitionAdapter.admin_purge — user-1이 config-1 영구 삭제
 
 Then
 
-- 삭제한 설정 정의의 id를 응답한다
-  - id: 미리 만들어 둔 설정 정의와 같다
+- 영구 삭제한 설정 정의의 ID를 응답한다
+  - ID: 미리 만들어 둔 설정 정의와 같다
 
 ### reading
 
 #### [a-user-who-is-not-the-superadmin-may-not-read-a-definition](/tests/scenario/bai_scenario/manager/app_config_definition/test_reading.py) — pass
 
-같은 설정 정의가 있고 슈퍼관리자가 아닌 사용자가 조회하면, 권한 부족으로 거부된다. 설정 정의는 어느 스코프에도 속하지 않아 역할로는 권한을 받을 수 없다
+같은 설정 정의가 있고 권한이 없는 일반 사용자가 조회하면, 엔티티 읽기 권한이 없어 거부된다
 
 Given
 
-- 설정 정의 하나와, 아무 권한도 없는 사용자 한 명
+- 설정 정의 하나와, 권한이 없는 일반 사용자 한 명
   - 도메인 home-1
   - 설정 정의 config-1: 이 이름의 설정이 등록돼 있다
   - 도메인에 속한 사용자 한 명 준비
@@ -132,7 +132,7 @@ Then
 
 #### [an-id-nothing-answers-to-is-not-found-for-a-superadmin](/tests/scenario/bai_scenario/manager/app_config_definition/test_reading.py) — pass
 
-슈퍼관리자가 존재하지 않는 id로 조회하면, 대상을 찾을 수 없다는 이유로 거부된다. 권한 검사를 통과하는 사용자만 이 응답을 본다
+슈퍼관리자가 존재하지 않는 ID로 조회하면, 대상을 찾을 수 없다는 이유로 거부된다. 권한 검사를 통과하는 사용자만 이 응답을 본다
 
 Given
 
@@ -147,7 +147,7 @@ Given
 
 When
 
-- AppConfigDefinitionAdapter.admin_get — user-1이 존재하지 않는 id(으)로 조회
+- AppConfigDefinitionAdapter.admin_get — user-1이 존재하지 않는 ID(으)로 조회
 
 Then
 
@@ -156,7 +156,7 @@ Then
 
 #### [the-superadmin-reads-a-definition-by-id](/tests/scenario/bai_scenario/manager/app_config_definition/test_reading.py) — pass
 
-설정 정의 하나가 있고 슈퍼관리자가 id로 조회하면, 그 정의 전체가 반환된다
+설정 정의 하나가 있고 슈퍼관리자가 ID로 조회하면, 그 정의의 모든 필드가 반환된다
 
 Given
 
@@ -175,19 +175,19 @@ When
 
 Then
 
-- 미리 만들어 둔 설정 정의 전체가 반환된다
-  - id: 미리 만들어 둔 설정 정의와 같다
+- 미리 만들어 둔 설정 정의의 모든 필드가 반환된다
+  - ID: 미리 만들어 둔 설정 정의와 같다
   - config_name = 'config-1'
   - created_at: 이 실행이 쓴 시각
   - updated_at: 이 실행이 쓴 시각
 
 #### [turning-enforcement-off-lets-a-plain-user-read](/tests/scenario/bai_scenario/manager/app_config_definition/test_reading.py) — pass
 
-권한 검사를 끄면 아무 권한도 없는 사용자도 설정 정의를 조회할 수 있다. 조회는 역할이 아니라 권한 그래프로 보호되므로 스위치가 영향을 준다
+RBAC 강제를 끄면 권한이 없는 일반 사용자도 설정 정의를 조회할 수 있다. 개별 조회의 엔티티 권한 검사가 비활성화되기 때문이다
 
 Given
 
-- 설정 정의 하나와, 아무 권한도 없는 사용자 한 명
+- 설정 정의 하나와, 권한이 없는 일반 사용자 한 명
   - 도메인 home-1
   - 설정 정의 config-1: 이 이름의 설정이 등록돼 있다
   - 도메인에 속한 사용자 한 명 준비
@@ -202,8 +202,8 @@ When
 
 Then
 
-- 미리 만들어 둔 설정 정의 전체가 반환된다
-  - id: 미리 만들어 둔 설정 정의와 같다
+- 미리 만들어 둔 설정 정의의 모든 필드가 반환된다
+  - ID: 미리 만들어 둔 설정 정의와 같다
   - config_name = 'config-1'
   - created_at: 이 실행이 쓴 시각
   - updated_at: 이 실행이 쓴 시각
@@ -212,11 +212,11 @@ Then
 
 #### [a-user-who-is-not-the-superadmin-is-refused-per-id](/tests/scenario/bai_scenario/manager/app_config_definition/test_reading_many.py) — pass
 
-슈퍼관리자가 아닌 사용자가 설정 정의 둘과 없는 id 하나를 한 번에 조회하면, 요청 전체가 막히는 것이 아니라 세 항목 모두 그 항목만 권한 부족으로 거부된다
+슈퍼관리자가 아닌 사용자가 설정 정의 둘과 없는 ID 하나를 한 번에 조회하면, 요청 전체가 막히는 것이 아니라 세 항목 모두 그 항목만 권한 부족으로 거부된다
 
 Given
 
-- 설정 정의 둘과, 아무 권한도 없는 사용자 한 명
+- 설정 정의 둘과, 권한이 없는 일반 사용자 한 명
   - 도메인 home-1
   - 설정 정의 first-1: 이 이름의 설정이 등록돼 있다
   - 설정 정의 second-1: 이 이름의 설정이 등록돼 있다
@@ -228,23 +228,23 @@ Given
 
 When
 
-- AppConfigDefinitionAdapter.batch_load_by_ids — user-1이 first-1, second-1, 존재하지 않는 id를 한 번에 조회
+- AppConfigDefinitionAdapter.batch_load_by_ids — user-1이 first-1, second-1, 존재하지 않는 ID를 한 번에 조회
 
 Then
 
-- 있는 둘도 없는 id도 그 항목만 거부된다
+- 있는 둘도 없는 ID도 그 항목만 거부된다
   - items = 3
   - 거부: NotEnoughPermission
   - 거부: NotEnoughPermission
   - 거부: NotEnoughPermission
 
-#### [an-empty-id-list-answers-empty-without-calling-anything](/tests/scenario/bai_scenario/manager/app_config_definition/test_reading_many.py) — pass
+#### [an-empty-id-list-answers-empty](/tests/scenario/bai_scenario/manager/app_config_definition/test_reading_many.py) — pass
 
-빈 id 목록을 주면 빈 응답이 반환된다. 하위 계층을 호출하지 않는다
+빈 ID 목록을 주면 빈 응답이 반환된다
 
 Given
 
-- 설정 정의 둘과, 아무 권한도 없는 사용자 한 명
+- 설정 정의 둘과, 권한이 없는 일반 사용자 한 명
   - 도메인 home-1
   - 설정 정의 first-1: 이 이름의 설정이 등록돼 있다
   - 설정 정의 second-1: 이 이름의 설정이 등록돼 있다
@@ -256,16 +256,16 @@ Given
 
 When
 
-- AppConfigDefinitionAdapter.batch_load_by_ids — user-1이 빈 id 목록으로 조회
+- AppConfigDefinitionAdapter.batch_load_by_ids — user-1이 빈 ID 목록으로 조회
 
 Then
 
 - 빈 응답이 반환된다
   - items = []
 
-#### [the-superadmin-reads-both-and-a-missing-id-comes-back-empty](/tests/scenario/bai_scenario/manager/app_config_definition/test_reading_many.py) — pass
+#### [duplicate-ids-keep-their-input-positions](/tests/scenario/bai_scenario/manager/app_config_definition/test_reading_many.py) — pass
 
-슈퍼관리자가 설정 정의 둘과 없는 id 하나를 한 번에 조회하면, 둘은 노드로 반환되고 없는 id 자리는 비어 있다. 권한 검사를 통과하는 사용자만 빈 항목을 본다
+슈퍼관리자가 같은 설정 정의 ID를 두 번 조회하면, 입력 순서를 보존해 같은 노드가 두 번 반환된다
 
 Given
 
@@ -281,14 +281,41 @@ Given
 
 When
 
-- AppConfigDefinitionAdapter.batch_load_by_ids — user-1이 first-1, second-1, 존재하지 않는 id를 한 번에 조회
+- AppConfigDefinitionAdapter.batch_load_by_ids — user-1이 첫 번째 설정 정의의 ID를 두 번 조회
 
 Then
 
-- 있는 둘은 노드로, 없는 id 자리는 비어서 반환된다
+- 중복 ID의 두 자리에 같은 설정 정의가 반환된다
+  - items = 2
+  - items[0].ID: 미리 만들어 둔 첫 번째 설정 정의와 같다
+  - items[1].ID: 미리 만들어 둔 첫 번째 설정 정의와 같다
+
+#### [the-superadmin-reads-both-and-a-missing-id-comes-back-empty](/tests/scenario/bai_scenario/manager/app_config_definition/test_reading_many.py) — pass
+
+슈퍼관리자가 설정 정의 둘과 없는 ID 하나를 한 번에 조회하면, 둘은 노드로 반환되고 없는 ID 자리는 비어 있다. 권한 검사를 통과하는 사용자만 빈 항목을 본다
+
+Given
+
+- 설정 정의 둘과, 슈퍼관리자 한 명
+  - 도메인 home-1
+  - 설정 정의 first-1: 이 이름의 설정이 등록돼 있다
+  - 설정 정의 second-1: 이 이름의 설정이 등록돼 있다
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+
+When
+
+- AppConfigDefinitionAdapter.batch_load_by_ids — user-1이 first-1, second-1, 존재하지 않는 ID를 한 번에 조회
+
+Then
+
+- 있는 둘은 노드로, 없는 ID 자리는 비어서 반환된다
   - items = 3
-  - items[0].id: 미리 만들어 둔 첫째 설정 정의와 같다
-  - items[1].id: 미리 만들어 둔 둘째 설정 정의와 같다
+  - items[0].ID: 미리 만들어 둔 첫째 설정 정의와 같다
+  - items[1].ID: 미리 만들어 둔 둘째 설정 정의와 같다
   - items[2] = None
 
 ### registering
@@ -319,11 +346,11 @@ Then
 
 #### [a-user-who-is-not-the-superadmin-may-not-register-a-name](/tests/scenario/bai_scenario/manager/app_config_definition/test_registering.py) — pass
 
-슈퍼관리자가 아닌 사용자가 설정 정의를 등록하려 하면, 역할 부족으로 거부된다
+일반 사용자가 설정 정의를 등록하려 하면, 슈퍼관리자 권한이 없어 거부된다
 
 Given
 
-- 설정 정의 하나와, 아무 권한도 없는 사용자 한 명
+- 설정 정의 하나와, 권한이 없는 일반 사용자 한 명
   - 도메인 home-1
   - 설정 정의 config-1: 이 이름의 설정이 등록돼 있다
   - 도메인에 속한 사용자 한 명 준비
@@ -343,7 +370,7 @@ Then
 
 #### [the-superadmin-registers-a-name](/tests/scenario/bai_scenario/manager/app_config_definition/test_registering.py) — pass
 
-슈퍼관리자가 이름만 지정해 설정 정의를 등록하면, 이름은 지정한 그대로이고 id와 시각은 서버가 채운 노드가 반환된다. 등록은 전역 역할로 보호된다
+슈퍼관리자가 이름만 지정해 설정 정의를 등록하면, 이름은 지정한 그대로이고 ID와 시각은 서버가 채운 노드가 반환된다
 
 Given
 
@@ -362,19 +389,19 @@ When
 
 Then
 
-- 등록한 설정 정의 전체가 반환된다
-  - id: 무시함 — 데이터베이스가 만든다
+- 등록한 설정 정의의 모든 필드가 반환된다
+  - ID: 무시함 — 데이터베이스가 만든다
   - config_name = 'fresh-config'
   - created_at: 이 실행이 쓴 시각
   - updated_at: 이 실행이 쓴 시각
 
 #### [turning-enforcement-off-still-does-not-let-a-user-register-a-name](/tests/scenario/bai_scenario/manager/app_config_definition/test_registering.py) — pass
 
-권한 검사를 꺼도 설정 정의 등록은 여전히 거부된다. 등록은 권한 그래프가 아니라 역할로 보호되기 때문이다
+RBAC 강제를 꺼도 일반 사용자의 설정 정의 등록은 거부된다. 등록에는 RBAC 그래프와 별개로 슈퍼관리자 검사가 적용된다
 
 Given
 
-- 설정 정의 하나와, 아무 권한도 없는 사용자 한 명
+- 설정 정의 하나와, 권한이 없는 일반 사용자 한 명
   - 도메인 home-1
   - 설정 정의 config-1: 이 이름의 설정이 등록돼 있다
   - 도메인에 속한 사용자 한 명 준비
@@ -394,13 +421,73 @@ Then
 
 ### searching
 
-#### [a-user-who-is-not-the-superadmin-may-not-search-definitions](/tests/scenario/bai_scenario/manager/app_config_definition/test_searching.py) — pass
+#### [a-forward-cursor-continues-after-the-named-row](/tests/scenario/bai_scenario/manager/app_config_definition/test_searching.py) — pass
 
-슈퍼관리자가 아닌 사용자가 전체를 검색하면, 역할 부족으로 거부된다
+설정 정의 넷이 있고 슈퍼관리자가 최신 정의의 커서 다음 한 건을 조회하면, 그다음 정의와 앞뒤 페이지가 모두 있다고 응답한다
 
 Given
 
-- 설정 정의 3개와, 아무 권한도 없는 사용자 한 명
+- 설정 정의 4개와, 슈퍼관리자 한 명
+  - 도메인 home-1
+  - 설정 정의 wanted-1: 이 이름의 설정이 등록돼 있다
+  - 설정 정의 other-1: 이 이름의 설정이 등록돼 있다
+  - 설정 정의 other-2: 이 이름의 설정이 등록돼 있다
+  - 설정 정의 other-3: 이 이름의 설정이 등록돼 있다
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+
+When
+
+- AppConfigDefinitionAdapter.admin_search — user-1이 wanted-1 다음 정의 한 건 조회
+
+Then
+
+- 커서 다음 정의와 앞뒤 페이지가 모두 있다고 응답한다
+  - items = [AppConfigDefinitionID('01a09f03-29d2-7883-9205-6d284b204389')]
+  - total_count = 4
+  - has_next_page = True
+  - has_previous_page = True
+
+#### [a-middle-offset-page-reports-both-directions](/tests/scenario/bai_scenario/manager/app_config_definition/test_searching.py) — pass
+
+설정 정의 넷을 이름순으로 두 번째 항목부터 두 건 조회하면, 중간 두 항목과 앞뒤 페이지가 모두 있다고 응답한다
+
+Given
+
+- 설정 정의 4개와, 슈퍼관리자 한 명
+  - 도메인 home-1
+  - 설정 정의 wanted-1: 이 이름의 설정이 등록돼 있다
+  - 설정 정의 other-1: 이 이름의 설정이 등록돼 있다
+  - 설정 정의 other-2: 이 이름의 설정이 등록돼 있다
+  - 설정 정의 other-3: 이 이름의 설정이 등록돼 있다
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+
+When
+
+- AppConfigDefinitionAdapter.admin_search — user-1이 이름순 결과의 두 번째 항목부터 두 건 조회
+
+Then
+
+- 중간 두 항목과 앞뒤 페이지가 모두 있다고 응답한다
+  - items = ['other-2', 'other-3']
+  - total_count = 4
+  - has_next_page = True
+  - has_previous_page = True
+
+#### [a-user-who-is-not-the-superadmin-may-not-search-definitions](/tests/scenario/bai_scenario/manager/app_config_definition/test_searching.py) — pass
+
+일반 사용자가 전체를 검색하면, 슈퍼관리자 권한이 없어 거부된다
+
+Given
+
+- 설정 정의 3개와, 권한이 없는 일반 사용자 한 명
   - 도메인 home-1
   - 설정 정의 wanted-1: 이 이름의 설정이 등록돼 있다
   - 설정 정의 other-1: 이 이름의 설정이 등록돼 있다
@@ -419,6 +506,61 @@ Then
 
 - 거부된다
   - 거부: InsufficientPrivilege
+
+#### [an-or-filter-keeps-either-name](/tests/scenario/bai_scenario/manager/app_config_definition/test_searching.py) — pass
+
+설정 정의 셋이 있고 슈퍼관리자가 두 이름을 OR로 묶어 검색하면, 두 이름 중 하나와 일치하는 정의만 반환된다
+
+Given
+
+- 설정 정의 3개와, 슈퍼관리자 한 명
+  - 도메인 home-1
+  - 설정 정의 wanted-1: 이 이름의 설정이 등록돼 있다
+  - 설정 정의 other-1: 이 이름의 설정이 등록돼 있다
+  - 설정 정의 other-2: 이 이름의 설정이 등록돼 있다
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+
+When
+
+- AppConfigDefinitionAdapter.admin_search — user-1이 wanted-1 또는 other-1인 정의 조회
+
+Then
+
+- 두 이름 중 하나와 일치하는 설정 정의만 반환된다
+  - items = ['other-1', 'wanted-1']
+  - total_count = 2
+  - has_next_page = False
+  - has_previous_page = False
+
+#### [cursor-and-offset-pagination-may-not-be-mixed](/tests/scenario/bai_scenario/manager/app_config_definition/test_searching.py) — pass
+
+슈퍼관리자가 커서와 오프셋 페이지네이션을 함께 지정하면, 서로 다른 방식을 섞었다는 이유로 거부된다
+
+Given
+
+- 설정 정의 3개와, 슈퍼관리자 한 명
+  - 도메인 home-1
+  - 설정 정의 wanted-1: 이 이름의 설정이 등록돼 있다
+  - 설정 정의 other-1: 이 이름의 설정이 등록돼 있다
+  - 설정 정의 other-2: 이 이름의 설정이 등록돼 있다
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+
+When
+
+- AppConfigDefinitionAdapter.admin_search — user-1이 커서와 오프셋 페이지네이션을 함께 지정해 조회
+
+Then
+
+- 거부된다
+  - 거부: InvalidGraphQLParameters
 
 #### [filtering-by-name-keeps-only-that-definition](/tests/scenario/bai_scenario/manager/app_config_definition/test_searching.py) — pass
 
@@ -515,7 +657,7 @@ Then
 
 #### [the-superadmin-counts-every-definition](/tests/scenario/bai_scenario/manager/app_config_definition/test_searching.py) — pass
 
-설정 정의 셋이 있고 슈퍼관리자가 필터 없이 전체를 검색하면, 셋 다 집계된다. 검색은 전역 역할로 보호된다
+설정 정의 셋이 있고 슈퍼관리자가 필터 없이 전체를 검색하면, 셋 다 집계된다
 
 Given
 
