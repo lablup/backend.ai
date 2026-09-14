@@ -43,6 +43,7 @@ from ai.backend.common.data.entity.fair_share import (
 from ai.backend.common.data.entity.idle_checker import IdleCheckerEntityType
 from ai.backend.common.data.entity.image import ImageEntityType
 from ai.backend.common.data.entity.image_alias import ImageAliasFieldType
+from ai.backend.common.data.entity.kernel import KernelFieldType
 from ai.backend.common.data.entity.login_client_type import LoginClientTypeEntityType
 from ai.backend.common.data.entity.model_card import ModelCardEntityType
 from ai.backend.common.data.entity.notification import (
@@ -81,6 +82,7 @@ from ai.backend.common.data.entity.vfolder import VFolderEntityType
 from ai.backend.common.data.entity.vfolder_invitation import VFolderInvitationEntityType
 from ai.backend.common.data.entity.vfs_storage import VFSStorageEntityType
 from ai.backend.manager.actions.monitors import ActionMonitors
+from ai.backend.manager.actions.registry.field import LookupFieldGroup
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
 from ai.backend.manager.actions.registry.types import (
     Concern,
@@ -112,6 +114,7 @@ from ai.backend.manager.data.fair_share.types import (
     UserFairShareData,
 )
 from ai.backend.manager.data.image.types import ImageAliasData
+from ai.backend.manager.data.kernel.types import KernelInfo
 from ai.backend.manager.data.secret.types import SecretFieldData
 from ai.backend.manager.repositories.ops.repository import OpsRepository
 from ai.backend.manager.services.agent.actions.bulk_get import BulkGetAgentsAction
@@ -302,8 +305,16 @@ from ai.backend.manager.services.scheduling_history.processors import (
 )
 from ai.backend.manager.services.secret.processors import SecretProcessors
 from ai.backend.manager.services.service_catalog.processors import ServiceCatalogProcessors
+from ai.backend.manager.services.session.actions.bulk_get import BulkGetSessionsAction
+from ai.backend.manager.services.session.actions.bulk_get_kernels import BulkGetKernelsAction
 from ai.backend.manager.services.session.actions.compute_schedule import (
     ComputeScheduleAction,
+)
+from ai.backend.manager.services.session.actions.lookup_bulk_kernel_owner import (
+    LookupBulkKernelOwnerAction,
+)
+from ai.backend.manager.services.session.actions.lookup_kernel_field_owner import (
+    LookupKernelFieldOwnerAction,
 )
 from ai.backend.manager.services.session.processors import SessionProcessors
 from ai.backend.manager.services.session.resource_allocation.processors import (
@@ -368,6 +379,15 @@ def _ops_registry() -> ProcessorRegistry[Any]:
             validators=ActionValidators(),
             repository=OpsRepository(MagicMock()),
         )
+    )
+
+
+def _kernels(registry: ProcessorRegistry[Any]) -> LookupFieldGroup[KernelInfo]:
+    return registry.group(GroupMeta(SessionEntityType())).field_group(
+        FieldGroupMeta(KernelFieldType()),
+        KernelInfo,
+        LookupKernelFieldOwnerAction,
+        LookupBulkKernelOwnerAction,
     )
 
 
@@ -549,6 +569,7 @@ def test_every_defined_v2_action_is_wired() -> None:
     SessionProcessors(
         registry.group(GroupMeta(SessionEntityType())),
         resource_allocation_groups.group(GroupMeta(ResourceGroupEntityType())),
+        _kernels(registry),
         ResourceAllocationProcessors(
             resource_allocation_groups.group(GroupMeta(UserEntityType())),
             resource_allocation_groups.group(GroupMeta(ProjectEntityType())),
@@ -693,6 +714,7 @@ def test_resource_domain_and_agent_reads_keep_their_judged_gates() -> None:
     SessionProcessors(
         registry.group(GroupMeta(SessionEntityType())),
         resource_group_groups.group(GroupMeta(ResourceGroupEntityType())),
+        _kernels(registry),
         ResourceAllocationProcessors(
             resource_group_groups.group(GroupMeta(UserEntityType())),
             resource_group_groups.group(GroupMeta(ProjectEntityType())),
@@ -861,6 +883,35 @@ def test_field_data_loader_reads_are_partial_permission_reads() -> None:
     ):
         assert (owner_lookup, ActionGate.PUBLIC) in lookup_gates
         assert (owner_lookup, ActionGate.PERMISSION) in lookup_gates
+
+
+def test_session_and_kernel_data_loader_reads_are_checked_per_session() -> None:
+    """The session DataLoader reads per named session, the kernel one per owning session."""
+    registry = _ops_registry()
+    SessionProcessors(
+        registry.group(GroupMeta(SessionEntityType())),
+        registry.group(GroupMeta(ResourceGroupEntityType())),
+        _kernels(registry),
+        MagicMock(),
+        MagicMock(),
+    )
+
+    recorded = {
+        record.action_cls: (record.entity_type, record.kind, record.gate)
+        for record in registry.wired_processors()
+        if record.kind == ActionKind.BULK
+    }
+    partial = (SessionEntityType(), ActionKind.BULK, ActionGate.PERMISSION)
+    assert recorded[BulkGetSessionsAction] == partial
+    assert recorded[BulkGetKernelsAction] == partial
+
+    lookup_gates = {
+        (record.action_cls, record.gate)
+        for record in registry.wired_processors()
+        if record.kind == ActionKind.LOOKUP
+    }
+    assert (LookupBulkKernelOwnerAction, ActionGate.PUBLIC) in lookup_gates
+    assert (LookupBulkKernelOwnerAction, ActionGate.PERMISSION) in lookup_gates
 
 
 def test_entity_data_loader_reads_are_checked_per_entity_except_domains() -> None:

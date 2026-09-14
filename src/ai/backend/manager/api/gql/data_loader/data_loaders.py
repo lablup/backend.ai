@@ -696,13 +696,16 @@ class DataLoaders:
     ) -> DataLoader[KernelID, KernelV2GQL | None]:
         adapter = self._adapters.session
 
-        async def load_fn(kernel_ids: list[KernelID]) -> list[KernelV2GQL | None]:
+        async def load_fn(kernel_ids: list[KernelID]) -> list[KernelV2GQL | Exception | None]:
             from ai.backend.manager.api.gql.kernel.types import (  # pants: no-infer-dep
                 KernelV2GQL as KG,
             )
 
             dtos = await adapter.batch_load_kernels_by_ids(kernel_ids)
-            return [KG.from_pydantic(dto) if dto is not None else None for dto in dtos]
+            return [
+                dto if dto is None or isinstance(dto, Exception) else KG.from_pydantic(dto)
+                for dto in dtos
+            ]
 
         return DataLoader(load_fn=load_fn)
 
@@ -712,13 +715,16 @@ class DataLoaders:
     ) -> DataLoader[SessionID, SessionV2GQL | None]:
         adapter = self._adapters.session
 
-        async def load_fn(session_ids: list[SessionID]) -> list[SessionV2GQL | None]:
+        async def load_fn(session_ids: list[SessionID]) -> list[SessionV2GQL | Exception | None]:
             from ai.backend.manager.api.gql.session.types import (  # pants: no-infer-dep
                 SessionV2GQL as SG,
             )
 
             dtos = await adapter.batch_load_by_ids(session_ids)
-            return [SG.from_pydantic(dto) if dto is not None else None for dto in dtos]
+            return [
+                dto if dto is None or isinstance(dto, Exception) else SG.from_pydantic(dto)
+                for dto in dtos
+            ]
 
         return DataLoader(load_fn=load_fn)
 

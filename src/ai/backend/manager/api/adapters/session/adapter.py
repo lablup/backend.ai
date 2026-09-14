@@ -115,6 +115,7 @@ from ai.backend.manager.data.session.types import (
     SessionStatus,
     SessionTerminationStatus,
 )
+from ai.backend.manager.errors.base.not_found import NotFoundError
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.condition_utils import combine_conditions_or, negate_conditions
 from ai.backend.manager.models.kernel.conditions import KernelConditions
@@ -145,9 +146,7 @@ from ai.backend.manager.models.session.orders import (
 )
 from ai.backend.manager.models.session.row import SessionRow
 from ai.backend.manager.models.session.searchers import SessionSearcher
-from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.models.user import UserRole
-from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.idle_checker.types import SessionIdleCheckPair
 from ai.backend.manager.services.idle_checker.actions.exclude_sessions import (
     ExcludeSessionIdleChecksAction,
@@ -162,6 +161,8 @@ from ai.backend.manager.services.session.actions.batch_get_kernel_resource_alloc
 from ai.backend.manager.services.session.actions.batch_get_session_resource_allocation import (
     BatchGetSessionResourceAllocationAction,
 )
+from ai.backend.manager.services.session.actions.bulk_get import BulkGetSessionsAction
+from ai.backend.manager.services.session.actions.bulk_get_kernels import BulkGetKernelsAction
 from ai.backend.manager.services.session.actions.compute_schedule import (
     ComputeScheduleAction,
 )
@@ -486,47 +487,50 @@ class SessionAdapter(BaseAdapter):
     # Batch load (DataLoader)
     # -------------------------------------------------------------------------
 
-    async def batch_load_by_ids(self, session_ids: Sequence[SessionID]) -> list[SessionNode | None]:
-        """Batch load sessions by ID for DataLoader use.
-
-        Returns SessionNode DTOs in the same order as the input session_ids list.
-        """
+    async def batch_load_by_ids(
+        self, session_ids: Sequence[SessionID]
+    ) -> list[SessionNode | Exception | None]:
+        """Batch load sessions by their IDs for DataLoader use, checked per session."""
         if not session_ids:
             return []
-        querier = BatchQuerier(
-            pagination=NoPagination(),
-            conditions=[SessionConditions.by_ids([SessionId(sid) for sid in session_ids])],
+        result = await self._session.bulk_get.run(BulkGetSessionsAction(ids=list(session_ids)))
+        nodes = iter(
+            await self._session_data_to_nodes([
+                item.value.to_session_data() for item in result.items if item.value is not None
+            ])
         )
-        action_result = await self._session.search_sessions.run(
-            SearchSessionsAction(querier=querier, user_id=UserID(self._require_user_id()))
-        )
-        nodes = await self._session_data_to_nodes(action_result.data)
-        session_map: dict[SessionID, SessionNode] = {
-            SessionID(data.id): node for data, node in zip(action_result.data, nodes, strict=True)
-        }
-        return [session_map.get(session_id) for session_id in session_ids]
+        return [
+            next(nodes) if item.value is not None else self.batch_load_failure(item.error)
+            for item in result.items
+        ]
 
     async def batch_load_kernels_by_ids(
         self, kernel_ids: Sequence[KernelID]
-    ) -> list[KernelNode | None]:
-        """Batch load kernels by ID for DataLoader use.
-
-        Returns KernelNode DTOs in the same order as the input kernel_ids list.
-        """
+    ) -> list[KernelNode | Exception | None]:
+        """Batch load kernels for DataLoader use, checked per owning session."""
         if not kernel_ids:
             return []
-        querier = BatchQuerier(
-            pagination=NoPagination(),
-            conditions=[KernelConditions.by_ids([KernelId(kid) for kid in kernel_ids])],
+        ids = list(kernel_ids)
+        try:
+            result = await self._session.bulk_get_kernels.run(BulkGetKernelsAction(ids=ids))
+        except NotFoundError:
+            return [None for _ in ids]
+        readable = [
+            result.successes[kernel_id] for kernel_id in ids if kernel_id in result.successes
+        ]
+        nodes = dict(
+            zip(
+                [KernelID(info.id) for info in readable],
+                await self._kernel_infos_to_nodes(readable),
+                strict=True,
+            )
         )
-        action_result = await self._session.search_kernels.run(
-            SearchKernelsAction(querier=querier, user_id=UserID(self._require_user_id()))
-        )
-        nodes = await self._kernel_infos_to_nodes(action_result.data)
-        kernel_map: dict[KernelID, KernelNode] = {
-            KernelID(info.id): node for info, node in zip(action_result.data, nodes, strict=True)
-        }
-        return [kernel_map.get(kernel_id) for kernel_id in kernel_ids]
+        return [
+            nodes[kernel_id]
+            if kernel_id in nodes
+            else self.batch_load_failure(result.errors.get(kernel_id))
+            for kernel_id in ids
+        ]
 
     @staticmethod
     def _aggregate_to_allocation_dto(
