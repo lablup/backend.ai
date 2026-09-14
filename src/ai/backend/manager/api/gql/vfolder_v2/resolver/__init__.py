@@ -17,13 +17,20 @@ from .mutation import (
     vfolder_mkdir_v2,
     vfolder_move_file_v2,
 )
-from .query import admin_vfolders_v2, my_vfolders, project_vfolders, vfolder_v2
+from .query import (
+    admin_vfolders_v2,
+    my_vfolders,
+    project_vfolders,
+    scoped_vfolders_v2,
+    vfolder_v2,
+)
 
 __all__ = [
     # Queries
     "admin_vfolders_v2",
     "my_vfolders",
     "project_vfolders",
+    "scoped_vfolders_v2",
     "vfolder_v2",
     # Mutations
     "bulk_delete_vfolders_v2",

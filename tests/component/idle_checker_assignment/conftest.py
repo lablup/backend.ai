@@ -83,11 +83,15 @@ from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingR
 from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
 from ai.backend.manager.repositories.idle_checker.repository import IdleCheckerRepository
 from ai.backend.manager.repositories.ops.repository import OpsRepository
+from ai.backend.manager.repositories.ops.v2.permission.provider import PermissionOpsProvider
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.ops.v2.relation.provider import RelationOpsProvider
 from ai.backend.manager.repositories.ops.v2.roster.provider import RosterOpsProvider
 from ai.backend.manager.repositories.permission_controller.repository import (
     PermissionControllerRepository,
+)
+from ai.backend.manager.repositories.rbac.permission_check_repository import (
+    RbacPermissionCheckRepository,
 )
 from ai.backend.manager.repositories.rbac.relation_repository import RbacRelationRepository
 from ai.backend.manager.repositories.rbac.roster_repository import RbacRosterRepository
@@ -155,7 +159,7 @@ def action_registry(
 ) -> ProcessorRegistry[Any]:
     """One registry for every processor these tests wire, with real RBAC validators
     against the real DB."""
-    permission_repo = PermissionControllerRepository(database_engine)
+    permission_repo = RbacPermissionCheckRepository(PermissionOpsProvider(database_engine))
     validators = VirtualEntityRBACValidators(
         scope=VirtualEntityScopeActionRBACValidator(permission_repo, config_provider),
         single_entity=VirtualEntitySingleEntityActionRBACValidator(
@@ -210,7 +214,6 @@ def rbac_processors(
             PermissionControllerRepository(database_engine),
             RbacRosterRepository(RosterOpsProvider(database_engine)),
         ),
-        [],
     )
 
 

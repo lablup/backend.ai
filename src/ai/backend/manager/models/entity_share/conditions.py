@@ -24,6 +24,15 @@ class EntityShareConditions:
         return inner
 
     @staticmethod
+    def by_sharers(user_ids: Collection[uuid.UUID]) -> QueryCondition:
+        """Narrows to the offers those people sent, within a scope already answered for."""
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return EntityShareRow.sharer_user_id.in_(user_ids)
+
+        return inner
+
+    @staticmethod
     def by_status(status: EntityShareStatus) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return EntityShareRow.status == status

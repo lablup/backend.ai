@@ -10,14 +10,10 @@ import sqlalchemy as sa
 
 from ai.backend.common.data.entity.domain import DomainEntityType, DomainID
 from ai.backend.common.data.entity.project import ProjectEntityType, ProjectID
-from ai.backend.common.data.entity.role import RoleID
-from ai.backend.manager.errors.permission import RoleNotFound
 from ai.backend.manager.errors.resource import DomainNotFound, ProjectNotFound
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.project import ProjectRow
-from ai.backend.manager.models.rbac_models.role import RoleRow
-from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
 from ai.backend.manager.models.scopes import ExistenceCheck, OperationScope
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.virtual_entity.queries import user_scope_membership_exists
@@ -25,7 +21,6 @@ from ai.backend.manager.models.virtual_entity.queries import user_scope_membersh
 __all__ = (
     "DomainUserOperationScope",
     "ProjectUserOperationScope",
-    "RoleUserOperationScope",
 )
 
 
@@ -93,38 +88,5 @@ class ProjectUserOperationScope(OperationScope):
                 column=ProjectRow.id,
                 value=self.project_id,
                 error=ProjectNotFound(str(self.project_id)),
-            ),
-        ]
-
-
-@dataclass(frozen=True)
-class RoleUserOperationScope(OperationScope):
-    """Required scope for searching users assigned to a role.
-
-    Requires JOIN with user_roles table.
-    """
-
-    role_id: RoleID
-    """Required. The role to search within."""
-
-    @override
-    def to_condition(self) -> QueryCondition:
-        """Convert scope to a query condition for UserRoleRow."""
-        role_id = self.role_id
-
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return UserRoleRow.role_id == role_id
-
-        return inner
-
-    @property
-    @override
-    def existence_checks(self) -> Sequence[ExistenceCheck[RoleID]]:
-        """Return existence checks for scope validation."""
-        return [
-            ExistenceCheck(
-                column=RoleRow.id,
-                value=self.role_id,
-                error=RoleNotFound(str(self.role_id)),
             ),
         ]

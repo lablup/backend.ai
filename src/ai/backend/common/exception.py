@@ -158,7 +158,6 @@ class ErrorDomain(enum.StrEnum):
     GROUP = "group"
     DOMAIN = "domain"
     IMAGE = "image"
-    IMAGE_ALIAS = "image-alias"
     TEMPLATE = "template"
     CONTAINER_REGISTRY = "container-registry"
     SCALING_GROUP = "scaling-group"

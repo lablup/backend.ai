@@ -12,7 +12,6 @@ from uuid import UUID
 if TYPE_CHECKING:
     from ai.backend.manager.sokovan.deployment.coordinator import DeploymentCoordinator
 
-from ai.backend.common.api_handlers import Sentinel
 from ai.backend.common.config import (
     ModelConfig,
     ModelDefinition,
@@ -23,6 +22,7 @@ from ai.backend.common.data.endpoint.types import EndpointLifecycle
 from ai.backend.common.data.entity.deployment import DeploymentID
 from ai.backend.common.data.entity.deployment_revision import DeploymentRevisionID
 from ai.backend.common.data.entity.deployment_token import DeploymentTokenID
+from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.replica import ReplicaID
 from ai.backend.common.data.entity.runtime_variant_preset import RuntimeVariantPresetID
@@ -63,6 +63,7 @@ from ai.backend.common.dto.manager.v2.deployment.request import (
     RevisionOrder,
     RouteFilter,
     RouteOrder,
+    ScopedSearchDeploymentsInput,
     SearchAccessTokensInput,
     SearchAutoScalingRulesInput,
     SearchDeploymentPoliciesInput,
@@ -116,6 +117,7 @@ from ai.backend.common.dto.manager.v2.deployment.types import (
     DeploymentNetworkAccessInfoDTO,
     DeploymentOrderField,
     DeploymentPolicyInfo,
+    DeploymentScope,
     DeploymentStrategyInfoDTO,
     EnvironmentVariableEntryInfoDTO,
     EnvironmentVariablesInfoDTO,
@@ -152,6 +154,7 @@ from ai.backend.common.dto.manager.v2.resource_slot.types import (
 )
 from ai.backend.common.model_service_start_command_compat import to_legacy_start_command
 from ai.backend.common.schema.deployment import BlueGreenSpec, RollingUpdateSpec
+from ai.backend.common.tristate.unset import Unset
 from ai.backend.manager.api.adapter_options.deployment.options import (
     deployment_options_from_input,
     deployment_options_to_info,
@@ -346,6 +349,8 @@ from ai.backend.manager.services.deployment.actions.route.update_route_traffic_s
     UpdateRouteTrafficStatusAction,
 )
 from ai.backend.manager.services.deployment.actions.scoped_search import (
+    DeploymentScopeItem,
+    DomainDeploymentScopeItem,
     ProjectDeploymentScopeItem,
     ScopedSearchDeploymentsAction,
     UserDeploymentScopeItem,
@@ -360,20 +365,6 @@ from ai.backend.manager.services.deployment.processors import DeploymentProcesso
 from ai.backend.manager.types import OptionalState, TriState
 
 DEFAULT_PAGINATION_LIMIT = 10
-
-
-def _tristate_from_input[T](value: T | Sentinel | None) -> TriState[T]:
-    """Map a DTO-style optional value (Sentinel / None / value) to TriState.
-
-    - ``Sentinel`` → NOP (field was not provided; leave the attribute unchanged)
-    - ``None`` → NULLIFY (field was provided as ``null``; clear the attribute)
-    - otherwise → UPDATE (replace with the given value)
-    """
-    if isinstance(value, Sentinel):
-        return TriState[T].nop()
-    if value is None:
-        return TriState[T].nullify()
-    return TriState[T].update(value)
 
 
 def _model_service_config_to_dto(service: ModelServiceConfig) -> ModelServiceConfigInfoDTO:
@@ -741,6 +732,39 @@ class DeploymentAdapter(BaseAdapter):
             has_previous_page=action_result.has_previous_page,
         )
 
+    def _scope_items(self, scope: DeploymentScope) -> list[DeploymentScopeItem]:
+        """The scope items the request named, in the order the input lists them."""
+        items: list[DeploymentScopeItem] = [
+            DomainDeploymentScopeItem(domain_id=DomainID(entry.value))
+            for entry in scope.domain or ()
+        ]
+        items.extend(
+            ProjectDeploymentScopeItem(project_id=ProjectID(entry.value))
+            for entry in scope.project or ()
+        )
+        items.extend(
+            UserDeploymentScopeItem(user_id=UserID(entry.value)) for entry in scope.user or ()
+        )
+        return items
+
+    async def scoped_search(
+        self,
+        input: ScopedSearchDeploymentsInput,
+    ) -> AdminSearchDeploymentsPayload:
+        """Search the deployments the named scopes reach, combined with OR."""
+        action_result = await self._deployment.scoped_search.run(
+            ScopedSearchDeploymentsAction(
+                items=self._scope_items(input.scope),
+                querier=self._build_scoped_deployment_querier(input),
+            )
+        )
+        return AdminSearchDeploymentsPayload(
+            items=[self._deployment_data_to_dto(item) for item in action_result.data],
+            total_count=action_result.total_count,
+            has_next_page=action_result.has_next_page,
+            has_previous_page=action_result.has_previous_page,
+        )
+
     async def my_search(
         self,
         input: AdminSearchDeploymentsInput,
@@ -801,31 +825,12 @@ class DeploymentAdapter(BaseAdapter):
         deployment_id: DeploymentID,
     ) -> UpdateDeploymentPayload:
         """Update deployment metadata and configuration."""
-        tag_str: str | None = None
-        if not isinstance(input.tags, Sentinel) and input.tags is not None:
-            tag_str = ",".join(input.tags)
         updater = DeploymentUpdater(
             deployment_id=deployment_id,
-            name=(
-                OptionalState.update(input.name)
-                if input.name is not None
-                else OptionalState[str].nop()
-            ),
-            tag=(
-                TriState[str].nop()
-                if isinstance(input.tags, Sentinel)
-                else TriState[str].from_graphql(tag_str)
-            ),
-            replica_count=(
-                OptionalState.update(input.replica_count)
-                if input.replica_count is not None
-                else OptionalState[int].nop()
-            ),
-            open_to_public=(
-                OptionalState.from_graphql(input.open_to_public)
-                if input.open_to_public is not None
-                else OptionalState[bool].nop()
-            ),
+            name=OptionalState.from_unset(input.name),
+            tag=self._convert_tag_state(input.tags),
+            replica_count=OptionalState.from_unset(input.replica_count),
+            open_to_public=OptionalState.from_unset(input.open_to_public),
         )
         action_result = await self._deployment.update_deployment.run(
             UpdateDeploymentAction(deployment_id=deployment_id, updater=updater)
@@ -1058,31 +1063,15 @@ class DeploymentAdapter(BaseAdapter):
     ) -> UpdateAutoScalingRulePayload:
         """Update an auto-scaling rule."""
         modifier = ModelDeploymentAutoScalingRuleModifier(
-            metric_source=(
-                OptionalState.update(input.metric_source)
-                if input.metric_source is not None
-                else OptionalState.nop()
-            ),
-            metric_name=(
-                OptionalState.update(input.metric_name)
-                if input.metric_name is not None
-                else OptionalState.nop()
-            ),
-            min_threshold=_tristate_from_input(input.min_threshold),
-            max_threshold=_tristate_from_input(input.max_threshold),
-            step_size=(
-                OptionalState.update(input.step_size)
-                if input.step_size is not None
-                else OptionalState.nop()
-            ),
-            time_window=(
-                OptionalState.update(input.time_window)
-                if input.time_window is not None
-                else OptionalState.nop()
-            ),
-            min_replicas=_tristate_from_input(input.min_replicas),
-            max_replicas=_tristate_from_input(input.max_replicas),
-            prometheus_query_preset_id=_tristate_from_input(input.prometheus_query_preset_id),
+            metric_source=OptionalState.from_unset(input.metric_source),
+            metric_name=OptionalState.from_unset(input.metric_name),
+            min_threshold=TriState.from_unset(input.min_threshold),
+            max_threshold=TriState.from_unset(input.max_threshold),
+            step_size=OptionalState.from_unset(input.step_size),
+            time_window=OptionalState.from_unset(input.time_window),
+            min_replicas=TriState.from_unset(input.min_replicas),
+            max_replicas=TriState.from_unset(input.max_replicas),
+            prometheus_query_preset_id=TriState.from_unset(input.prometheus_query_preset_id),
         )
         action_result = await self._deployment.update_auto_scaling_rule.run(
             UpdateAutoScalingRuleAction(
@@ -1708,6 +1697,25 @@ class DeploymentAdapter(BaseAdapter):
                     conditions.append(negate_conditions(sub_conditions))
         return conditions
 
+    def _build_scoped_deployment_querier(self, input: ScopedSearchDeploymentsInput) -> BatchQuerier:
+        conditions: list[QueryCondition] = []
+        if input.filter:
+            conditions.extend(self._convert_deployment_filter(input.filter))
+        orders: list[QueryOrder] = (
+            self._convert_deployment_orders(input.order) if input.order else []
+        )
+        return self._build_querier(
+            conditions=conditions,
+            orders=orders,
+            pagination_spec=_get_deployment_pagination_spec(),
+            first=input.first,
+            after=input.after,
+            last=input.last,
+            before=input.before,
+            limit=input.limit,
+            offset=input.offset,
+        )
+
     def _build_deployment_querier(self, input: AdminSearchDeploymentsInput) -> BatchQuerier:
         conditions: list[QueryCondition] = []
         if input.filter:
@@ -2224,6 +2232,14 @@ class DeploymentAdapter(BaseAdapter):
                 if sub_conditions:
                     conditions.append(negate_conditions(sub_conditions))
         return conditions
+
+    @staticmethod
+    def _convert_tag_state(tags: list[str] | None | Unset) -> TriState[str]:
+        if isinstance(tags, Unset):
+            return TriState.nop()
+        if tags is None:
+            return TriState.nullify()
+        return TriState.update(",".join(tags))
 
     # ------------------------------------------------------------------
     # Order converters

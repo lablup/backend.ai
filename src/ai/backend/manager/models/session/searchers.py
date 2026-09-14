@@ -8,8 +8,26 @@ from typing import Any, override
 import sqlalchemy as sa
 
 from ai.backend.common.types import SessionId, VFolderID
+from ai.backend.manager.data.session.types import SessionEntityData
 from ai.backend.manager.models.session.row import DEAD_SESSION_STATUSES, SessionRow
 from ai.backend.manager.models.specs.searcher import Searcher
+
+
+@dataclass
+class SessionSearcher(Searcher[SessionRow, SessionEntityData]):
+    """The session rows a scoped read returns.
+
+    Loads no relationship: what a caller needs from the kernels or the owner is
+    asked for separately.
+    """
+
+    @override
+    def build_select(self) -> sa.sql.Select[Any]:
+        return sa.select(SessionRow)
+
+    @override
+    def to_data(self, row: SessionRow) -> SessionEntityData:
+        return row.to_entity_data()
 
 
 @dataclass

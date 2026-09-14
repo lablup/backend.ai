@@ -7,10 +7,15 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import AsyncGenerator
+from typing import Any
 
 import pytest
+import sqlalchemy as sa
+from sqlalchemy import Row
 
 from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.project import ProjectEntityType
+from ai.backend.common.data.entity.vfolder import VFolderEntityType
 from ai.backend.common.types import BinarySize, ResourceSlot, VFolderUsageMode
 from ai.backend.manager.data.project.types import ProjectType
 from ai.backend.manager.data.vfolder.types import (
@@ -28,18 +33,33 @@ from ai.backend.manager.models.resource_policy import (
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,
 )
+from ai.backend.manager.models.scopes import OperationScope
 from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderRow
 from ai.backend.manager.models.vfolder.scopes import ProjectVFolderOperationScope
 from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
+from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
 from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
 from ai.backend.manager.repositories.base import BatchQuerier
+from ai.backend.manager.repositories.base.querier import (
+    BatchQuerierResult,
+    execute_batch_querier,
+)
 from ai.backend.manager.repositories.ops.v2.share.provider import ShareOpsProvider
 from ai.backend.manager.repositories.vfolder.repository import VfolderRepository
 from ai.backend.manager.secret.types import SecretValue
 from ai.backend.testutils.db import with_tables
+from ai.backend.testutils.virtual_entity import VirtualEntitySeeder
+
+
+async def _search_vfolders(
+    db: ExtendedAsyncSAEngine, querier: BatchQuerier, scope: OperationScope
+) -> BatchQuerierResult[Row[Any]]:
+    """What the read does, without the repository method that used to wrap it."""
+    async with db.begin_readonly_session() as sess:
+        return await execute_batch_querier(sess, sa.select(VFolderRow), querier, scopes=[scope])
 
 
 class TestVfolderSearchInProject:
@@ -65,6 +85,7 @@ class TestVfolderSearchInProject:
                 VFolderRow,
                 VirtualEntityRow,
                 EntityMembershipRow,
+                ScopeBindingRow,
             ],
         ):
             yield database_connection
@@ -214,6 +235,19 @@ class TestVfolderSearchInProject:
                 )
             await db_sess.flush()
 
+            seeder = VirtualEntitySeeder()
+            for vid, group_id, _ in [
+                (vfolder_a1_id, project_a_id, None),
+                (vfolder_a2_id, project_a_id, None),
+                (vfolder_b1_id, project_b_id, None),
+            ]:
+                await seeder.create_in(
+                    db_sess,
+                    VFolderEntityType(),
+                    vid,
+                    [(ProjectEntityType(), group_id)],
+                )
+
         yield {
             "project_a_id": project_a_id,
             "project_b_id": project_b_id,
@@ -224,7 +258,7 @@ class TestVfolderSearchInProject:
 
     async def test_returns_only_vfolders_in_target_project(
         self,
-        vfolder_repository: VfolderRepository,
+        db_with_cleanup: ExtendedAsyncSAEngine,
         test_data: dict[str, uuid.UUID],
     ) -> None:
         """search_in_project returns only vfolders belonging to the specified project."""
@@ -235,16 +269,16 @@ class TestVfolderSearchInProject:
             orders=[],
         )
 
-        result = await vfolder_repository.search_in_project(querier, scope)
+        result = await _search_vfolders(db_with_cleanup, querier, scope)
 
         assert result.total_count == 2
-        assert len(result.items) == 2
-        returned_ids = {item.id for item in result.items}
+        assert len([row.VFolderRow for row in result.rows]) == 2
+        returned_ids = {item.id for item in [row.VFolderRow for row in result.rows]}
         assert returned_ids == {test_data["vfolder_a1_id"], test_data["vfolder_a2_id"]}
 
     async def test_does_not_return_vfolders_from_other_project(
         self,
-        vfolder_repository: VfolderRepository,
+        db_with_cleanup: ExtendedAsyncSAEngine,
         test_data: dict[str, uuid.UUID],
     ) -> None:
         """search_in_project for project_b returns only its vfolder, not project_a's."""
@@ -255,15 +289,15 @@ class TestVfolderSearchInProject:
             orders=[],
         )
 
-        result = await vfolder_repository.search_in_project(querier, scope)
+        result = await _search_vfolders(db_with_cleanup, querier, scope)
 
         assert result.total_count == 1
-        assert len(result.items) == 1
-        assert result.items[0].id == test_data["vfolder_b1_id"]
+        assert len([row.VFolderRow for row in result.rows]) == 1
+        assert [row.VFolderRow for row in result.rows][0].id == test_data["vfolder_b1_id"]
 
     async def test_pagination_fields(
         self,
-        vfolder_repository: VfolderRepository,
+        db_with_cleanup: ExtendedAsyncSAEngine,
         test_data: dict[str, uuid.UUID],
     ) -> None:
         """search_in_project returns correct pagination fields."""
@@ -274,7 +308,7 @@ class TestVfolderSearchInProject:
             orders=[],
         )
 
-        result = await vfolder_repository.search_in_project(querier, scope)
+        result = await _search_vfolders(db_with_cleanup, querier, scope)
 
         assert result.has_next_page is False
         assert result.has_previous_page is False

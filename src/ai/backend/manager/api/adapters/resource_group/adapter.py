@@ -13,7 +13,6 @@ if TYPE_CHECKING:
     from ai.backend.manager.sokovan.deployment.coordinator import DeploymentCoordinator
     from ai.backend.manager.sokovan.scheduler.coordinator import ScheduleCoordinator
 
-from ai.backend.common.api_handlers import SENTINEL
 from ai.backend.common.data.entity.domain import DomainID, DomainName
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID, ResourceGroupName
@@ -67,6 +66,7 @@ from ai.backend.common.dto.manager.v2.resource_group.types import (
     SchedulerTypeDTO,
 )
 from ai.backend.common.exception import DomainNotFound
+from ai.backend.common.tristate.unset import Unset
 from ai.backend.common.types import PreemptionMode, PreemptionOrder, SlotQuantity
 from ai.backend.manager.api.adapter_options.deployment.options import (
     deployment_options_from_input,
@@ -498,21 +498,9 @@ class ResourceGroupAdapter(BaseAdapter):
         """
         updater = ResourceGroupUpdater(
             resource_group_id=await self._resolve_resource_group_id(name),
-            is_active=(
-                OptionalState.update(input.is_active)
-                if input.is_active is not None
-                else OptionalState.nop()
-            ),
-            is_default=OptionalState.from_nullable(input.is_default),
-            description=(
-                TriState.nullify()
-                if input.description is SENTINEL
-                else (
-                    TriState.update(str(input.description))
-                    if input.description is not None
-                    else TriState.nop()
-                )
-            ),
+            is_active=OptionalState.from_unset(input.is_active),
+            is_default=OptionalState.from_unset(input.is_default),
+            description=TriState.from_unset(input.description),
         )
         action_result = await self._resource_group.update_resource_group.run(
             UpdateResourceGroupAction(resource_group_id=updater.resource_group_id, updater=updater)
@@ -617,24 +605,23 @@ class ResourceGroupAdapter(BaseAdapter):
         Returns:
             Payload DTO containing the updated resource group.
         """
-        resource_weights = None
-        if input.resource_weights is not None:
-            resource_weights = [
-                ResourceWeightInput(
-                    resource_type=entry.resource_type,
-                    weight=entry.weight,
-                )
-                for entry in input.resource_weights
+        weight_entries = OptionalState.from_unset(input.resource_weights).optional_value()
+        resource_weights = (
+            [
+                ResourceWeightInput(resource_type=entry.resource_type, weight=entry.weight)
+                for entry in weight_entries
             ]
-
+            if weight_entries is not None
+            else None
+        )
         action_result = await self._resource_group.update_fair_share_spec.run(
             UpdateFairShareSpecAction(
                 resource_group_id=await self._resolve_resource_group_id(input.resource_group_name),
                 resource_group=input.resource_group_name,
-                half_life_days=input.half_life_days,
-                lookback_days=input.lookback_days,
-                decay_unit_days=input.decay_unit_days,
-                default_weight=input.default_weight,
+                half_life_days=OptionalState.from_unset(input.half_life_days).optional_value(),
+                lookback_days=OptionalState.from_unset(input.lookback_days).optional_value(),
+                decay_unit_days=OptionalState.from_unset(input.decay_unit_days).optional_value(),
+                default_weight=OptionalState.from_unset(input.default_weight).optional_value(),
                 resource_weights=resource_weights,
             )
         )
@@ -654,13 +641,12 @@ class ResourceGroupAdapter(BaseAdapter):
         Returns:
             Payload DTO containing the updated resource group.
         """
-        scheduler_value: str | None = None
-        if input.scheduler_type is not None:
-            scheduler_value = SchedulerType(input.scheduler_type).value
-
-        preemption_config_state: OptionalState[DataPreemptionConfig] = OptionalState.nop()
-        if input.preemption is not None:
-            preemption_config_state = OptionalState.update(
+        scheduler: OptionalState[str] = OptionalState.nop()
+        if not isinstance(input.scheduler_type, Unset) and input.scheduler_type is not None:
+            scheduler = OptionalState.update(SchedulerType(input.scheduler_type).value)
+        preemption_config: OptionalState[DataPreemptionConfig] = OptionalState.nop()
+        if not isinstance(input.preemption, Unset) and input.preemption is not None:
+            preemption_config = OptionalState.update(
                 DataPreemptionConfig(
                     enabled=input.preemption.enabled,
                     preemptible_priority=input.preemption.preemptible_priority,
@@ -672,46 +658,17 @@ class ResourceGroupAdapter(BaseAdapter):
                     victim_scope=input.preemption.victim_scope,
                 )
             )
-
         updater = ResourceGroupUpdater(
             resource_group_id=await self._resolve_resource_group_id(input.resource_group_name),
-            is_active=(
-                OptionalState.update(input.is_active)
-                if input.is_active is not None
-                else OptionalState.nop()
-            ),
-            is_public=(
-                OptionalState.update(input.is_public)
-                if input.is_public is not None
-                else OptionalState.nop()
-            ),
-            is_default=OptionalState.from_nullable(input.is_default),
-            description=(
-                TriState.update(input.description)
-                if input.description is not None
-                else TriState.nop()
-            ),
-            wsproxy_addr=(
-                TriState.update(input.app_proxy_addr)
-                if input.app_proxy_addr is not None
-                else TriState.nop()
-            ),
-            wsproxy_api_token=(
-                TriState.update(input.appproxy_api_token)
-                if input.appproxy_api_token is not None
-                else TriState.nop()
-            ),
-            use_host_network=(
-                OptionalState.update(input.use_host_network)
-                if input.use_host_network is not None
-                else OptionalState.nop()
-            ),
-            scheduler=(
-                OptionalState.update(scheduler_value)
-                if scheduler_value is not None
-                else OptionalState.nop()
-            ),
-            preemption_config=preemption_config_state,
+            is_active=OptionalState.from_unset(input.is_active),
+            is_public=OptionalState.from_unset(input.is_public),
+            is_default=OptionalState.from_unset(input.is_default),
+            description=TriState.from_unset(input.description),
+            wsproxy_addr=TriState.from_unset(input.app_proxy_addr),
+            wsproxy_api_token=TriState.from_unset(input.appproxy_api_token),
+            use_host_network=OptionalState.from_unset(input.use_host_network),
+            scheduler=scheduler,
+            preemption_config=preemption_config,
         )
 
         action_result = await self._resource_group.update_resource_group.run(

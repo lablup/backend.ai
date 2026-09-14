@@ -223,10 +223,6 @@ from ai.backend.manager.services.session.actions.search import (
     SearchSessionsAction,
     SearchSessionsActionResult,
 )
-from ai.backend.manager.services.session.actions.search_in_project import (
-    SearchSessionsInProjectAction,
-    SearchSessionsInProjectActionResult,
-)
 from ai.backend.manager.services.session.actions.search_kernel import (
     SearchKernelsAction,
     SearchKernelsActionResult,
@@ -1545,18 +1541,6 @@ class SessionService:
         """Search sessions with querier pattern."""
         result = await self._session_repository.search(action.querier)
         return SearchSessionsActionResult(
-            data=result.items,
-            total_count=result.total_count,
-            has_next_page=result.has_next_page,
-            has_previous_page=result.has_previous_page,
-        )
-
-    async def search_in_project(
-        self, action: SearchSessionsInProjectAction
-    ) -> SearchSessionsInProjectActionResult:
-        """Search sessions scoped to a project."""
-        result = await self._session_repository.search_in_project(action.querier, action.scope)
-        return SearchSessionsInProjectActionResult(
             data=result.items,
             total_count=result.total_count,
             has_next_page=result.has_next_page,

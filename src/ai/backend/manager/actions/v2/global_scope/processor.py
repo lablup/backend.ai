@@ -4,7 +4,6 @@ from collections.abc import Awaitable, Callable, Sequence
 from datetime import UTC, datetime
 
 from ai.backend.logging.utils import BraceStyleAdapter
-from ai.backend.manager.actions.action import BaseActionTriggerMeta
 from ai.backend.manager.actions.run_status import ActionRunStatus
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.actions.v2.global_scope.base import BaseGlobalAction
@@ -18,6 +17,7 @@ from ai.backend.manager.actions.v2.global_scope.validator import (
     GlobalActionValidator,
     SuperAdminActionValidator,
 )
+from ai.backend.manager.actions.v2.trigger import ActionTriggerMeta
 from ai.backend.manager.errors.common import ServerMisconfiguredError
 
 __all__ = (
@@ -50,7 +50,7 @@ class GlobalActionProcessor[TAction: BaseGlobalAction, TResult]:
         self._monitors = monitors or []
         self._validators = [SuperAdminActionValidator(), *(validators or [])]
 
-    async def _prepare_monitors(self, action: TAction, trigger_meta: BaseActionTriggerMeta) -> None:
+    async def _prepare_monitors(self, action: TAction, trigger_meta: ActionTriggerMeta) -> None:
         for monitor in self._monitors:
             try:
                 await monitor.prepare(action, trigger_meta)
@@ -68,7 +68,7 @@ class GlobalActionProcessor[TAction: BaseGlobalAction, TResult]:
     async def run(self, action: TAction) -> TResult:
         started_at = datetime.now(UTC)
         action_id = uuid.uuid4()
-        trigger_meta = BaseActionTriggerMeta(action_id=action_id, started_at=started_at)
+        trigger_meta = ActionTriggerMeta(action_id=action_id, started_at=started_at)
 
         run_status = ActionRunStatus.unknown()
 
@@ -142,7 +142,7 @@ class PublicActionProcessor[TAction: BaseGlobalAction, TResult]:
         self._monitors = monitors or []
         self._validators = [AuthenticatedActionValidator(), *(validators or [])]
 
-    async def _prepare_monitors(self, action: TAction, trigger_meta: BaseActionTriggerMeta) -> None:
+    async def _prepare_monitors(self, action: TAction, trigger_meta: ActionTriggerMeta) -> None:
         for monitor in self._monitors:
             try:
                 await monitor.prepare(action, trigger_meta)
@@ -160,7 +160,7 @@ class PublicActionProcessor[TAction: BaseGlobalAction, TResult]:
     async def run(self, action: TAction) -> TResult:
         started_at = datetime.now(UTC)
         action_id = uuid.uuid4()
-        trigger_meta = BaseActionTriggerMeta(action_id=action_id, started_at=started_at)
+        trigger_meta = ActionTriggerMeta(action_id=action_id, started_at=started_at)
 
         run_status = ActionRunStatus.unknown()
 
@@ -220,7 +220,7 @@ class AnonymousGlobalActionProcessor[TAction: BaseGlobalAction, TResult]:
         self._func = func
         self._monitors = monitors or []
 
-    async def _prepare_monitors(self, action: TAction, trigger_meta: BaseActionTriggerMeta) -> None:
+    async def _prepare_monitors(self, action: TAction, trigger_meta: ActionTriggerMeta) -> None:
         for monitor in self._monitors:
             try:
                 await monitor.prepare(action, trigger_meta)
@@ -238,7 +238,7 @@ class AnonymousGlobalActionProcessor[TAction: BaseGlobalAction, TResult]:
     async def run(self, action: TAction) -> TResult:
         started_at = datetime.now(UTC)
         action_id = uuid.uuid4()
-        trigger_meta = BaseActionTriggerMeta(action_id=action_id, started_at=started_at)
+        trigger_meta = ActionTriggerMeta(action_id=action_id, started_at=started_at)
 
         run_status = ActionRunStatus.unknown()
 

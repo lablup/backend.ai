@@ -16,19 +16,16 @@ from ai.backend.manager.models.scopes import ExistenceCheck, OperationScope
 
 __all__ = (
     "EntityAuditLogOperationScope",
+    "ScopeAuditLogOperationScope",
     "TriggeredByAuditLogOperationScope",
 )
 
 
 @dataclass(frozen=True)
 class EntityAuditLogOperationScope(OperationScope):
-    """Audit log rows about one entity, or run within it as a scope.
+    """The records about one entity: the run named it as what it touched.
 
-    Both, because a scope action is recorded against the entities it touched while the
-    scopes it ran in go to ``audit_log_scopes``. Matching only the first would hide every
-    run that named this entity as its scope.
-
-    ``existence_checks`` is empty — RBAC validation already gates entity reachability.
+    ``existence_checks`` is empty -- RBAC validation already gates entity reachability.
     """
 
     entity_type: EntityType
@@ -40,18 +37,43 @@ class EntityAuditLogOperationScope(OperationScope):
         entity_id = self.entity_id
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return sa.or_(
+            return sa.and_(
+                AuditLogRow.entity_type == entity_type,
+                AuditLogRow.entity_id == entity_id,
+            )
+
+        return inner
+
+    @property
+    @override
+    def existence_checks(self) -> Sequence[ExistenceCheck[Any]]:
+        return ()
+
+
+@dataclass(frozen=True)
+class ScopeAuditLogOperationScope(OperationScope):
+    """The records of the runs that named one entity as the scope they ran in.
+
+    The other half of what an entity's history means, kept apart so a caller asks for
+    one or the other rather than always both: a scope action records the entities it
+    touched on the row and the scopes it ran in on ``audit_log_scopes``.
+    """
+
+    entity_type: EntityType
+    entity_id: str
+
+    @override
+    def to_condition(self) -> QueryCondition:
+        entity_type = self.entity_type
+        entity_id = self.entity_id
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return sa.exists().where(
                 sa.and_(
-                    AuditLogRow.entity_type == entity_type,
-                    AuditLogRow.entity_id == entity_id,
-                ),
-                sa.exists().where(
-                    sa.and_(
-                        AuditLogScopeRow.audit_log_id == AuditLogRow.id,
-                        AuditLogScopeRow.scope_type == entity_type,
-                        AuditLogScopeRow.scope_id == entity_id,
-                    )
-                ),
+                    AuditLogScopeRow.audit_log_id == AuditLogRow.id,
+                    AuditLogScopeRow.scope_type == entity_type,
+                    AuditLogScopeRow.scope_id == entity_id,
+                )
             )
 
         return inner

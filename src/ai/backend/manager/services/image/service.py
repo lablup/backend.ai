@@ -77,6 +77,10 @@ from ai.backend.manager.services.image.actions.scan_image import (
     ScanImageAction,
     ScanImageActionResult,
 )
+from ai.backend.manager.services.image.actions.scoped_search import (
+    ScopedSearchImagesAction,
+    ScopedSearchImagesActionResult,
+)
 from ai.backend.manager.services.image.actions.search_aliases import (
     SearchAliasesAction,
     SearchAliasesActionResult,
@@ -417,6 +421,20 @@ class ImageService:
         """
         result = await self._image_repository.search_images(action.querier)
         return SearchImagesActionResult(
+            data=result.items,
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+        )
+
+    async def scoped_search_images(
+        self, action: ScopedSearchImagesAction
+    ) -> ScopedSearchImagesActionResult:
+        """Search images within the scopes the action names."""
+        result = await self._image_repository.search_images_in_scopes(
+            action.querier, action.operation_scopes()
+        )
+        return ScopedSearchImagesActionResult(
             data=result.items,
             total_count=result.total_count,
             has_next_page=result.has_next_page,

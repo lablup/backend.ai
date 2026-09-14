@@ -158,7 +158,7 @@ def search(
 @click.option("--name", default=None, type=str, help="Updated name.")
 @click.option("--description", default=None, type=str, help="Updated description.")
 @click.option(
-    "--clear-description",
+    "--set-null-description",
     is_flag=True,
     help="Clear the current description.",
 )
@@ -185,37 +185,39 @@ def update(
     idle_checker_id: uuid.UUID,
     name: str | None,
     description: str | None,
-    clear_description: bool,
+    set_null_description: bool,
     target_session_types: tuple[str, ...],
     initial_grace_period_seconds: int | None,
     checker_spec: str | None,
 ) -> None:
     """Update an idle checker."""
-    from ai.backend.common.api_handlers import SENTINEL
     from ai.backend.common.data.entity.idle_checker import IdleCheckerID
     from ai.backend.common.dto.manager.v2.idle_checker.request import (
         IdleCheckerSpecInputDTO,
         UpdateIdleCheckerInput,
     )
+    from ai.backend.common.tristate.unset import UNSET
 
-    if description is not None and clear_description:
-        raise click.UsageError("--description and --clear-description cannot be used together")
+    if description is not None and set_null_description:
+        raise click.UsageError("--description and --set-null-description cannot be used together")
 
     checker_id = IdleCheckerID(idle_checker_id)
     input_ = UpdateIdleCheckerInput(
         id=checker_id,
-        name=name,
+        name=name if name is not None else UNSET,
         description=(
-            None if clear_description else description if description is not None else SENTINEL
+            None if set_null_description else description if description is not None else UNSET
         ),
         target_session_types=(
             [SessionTypes(session_type) for session_type in target_session_types]
             if target_session_types
-            else None
+            else UNSET
         ),
-        initial_grace_period_seconds=initial_grace_period_seconds,
+        initial_grace_period_seconds=(
+            initial_grace_period_seconds if initial_grace_period_seconds is not None else UNSET
+        ),
         checker_spec=(
-            load_model(checker_spec, IdleCheckerSpecInputDTO) if checker_spec is not None else None
+            load_model(checker_spec, IdleCheckerSpecInputDTO) if checker_spec is not None else UNSET
         ),
     )
 

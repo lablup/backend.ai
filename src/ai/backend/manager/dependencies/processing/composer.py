@@ -27,9 +27,6 @@ from ai.backend.common.plugin.hook import HookPluginContext
 from ai.backend.common.plugin.monitor import ErrorPluginContext, StatsPluginContext
 from ai.backend.manager.actions.audit_policy import AuditLogPolicy
 from ai.backend.manager.actions.monitors import ActionMonitors
-from ai.backend.manager.actions.monitors.audit_log import AuditLogMonitor
-from ai.backend.manager.actions.monitors.prometheus import PrometheusMonitor
-from ai.backend.manager.actions.monitors.reporter import ReporterMonitor
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
 from ai.backend.manager.actions.v2.bulk.monitor.audit_log import BulkActionAuditLogMonitor
 from ai.backend.manager.actions.v2.bulk.monitor.prometheus import BulkActionPrometheusMonitor
@@ -259,8 +256,6 @@ class ProcessingComposer(DependencyComposer[ProcessingInput, ProcessingResources
         registered_reporters = _make_registered_reporters(setup_input.config_provider)
         action_reporters = _make_action_reporters(setup_input.config_provider, registered_reporters)
         reporter_hub = ReporterHub(ReporterHubArgs(reporters=action_reporters))
-        reporter_monitor = ReporterMonitor(reporter_hub)
-        prometheus_monitor = PrometheusMonitor()
         audit_log_repository: OpsRepository[AuditLogData] = OpsRepository(
             setup_input.repositories.v2_ops_provider
         )
@@ -268,11 +263,7 @@ class ProcessingComposer(DependencyComposer[ProcessingInput, ProcessingResources
             setup_input.config_provider.config.audit_log.record_read_operations
         )
         client_ip_masking_repository = setup_input.repositories.client_ip_masking.repository
-        audit_log_monitor = AuditLogMonitor(
-            audit_log_repository, audit_log_policy, client_ip_masking_repository
-        )
         action_monitors = ActionMonitors(
-            legacy=[reporter_monitor, prometheus_monitor, audit_log_monitor],
             single_entity=[
                 SingleEntityActionReporterMonitor(reporter_hub),
                 SingleEntityActionPrometheusMonitor(),
@@ -369,7 +360,7 @@ class ProcessingComposer(DependencyComposer[ProcessingInput, ProcessingResources
         )
 
         v2_validators = build_action_validators(
-            setup_input.repositories.permission_controller.repository,
+            setup_input.repositories.rbac.permission_check,
             setup_input.config_provider,
         )
 

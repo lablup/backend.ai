@@ -3,10 +3,10 @@ from __future__ import annotations
 from typing import override
 
 from ai.backend.common.metrics.metric import ActionMetricObserver
-from ai.backend.manager.actions.action import BaseActionTriggerMeta
 from ai.backend.manager.actions.v2.lookup.base import BaseLookupAction
 from ai.backend.manager.actions.v2.lookup.monitor.base import LookupActionMonitor
 from ai.backend.manager.actions.v2.lookup.result import LookupActionProcessResult
+from ai.backend.manager.actions.v2.trigger import ActionTriggerMeta
 
 __all__ = ("LookupActionPrometheusMonitor",)
 
@@ -24,7 +24,7 @@ class LookupActionPrometheusMonitor(LookupActionMonitor):
         self._observer = ActionMetricObserver.instance()
 
     @override
-    async def prepare(self, action: BaseLookupAction, meta: BaseActionTriggerMeta) -> None:
+    async def prepare(self, action: BaseLookupAction, meta: ActionTriggerMeta) -> None:
         return
 
     @override

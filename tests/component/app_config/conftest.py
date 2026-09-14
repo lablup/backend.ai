@@ -15,6 +15,9 @@ from ai.backend.common.data.app_config.types import AppConfigScopeType
 from ai.backend.common.data.entity.app_config import AppConfigEntityType, AppConfigScopeID
 from ai.backend.common.data.entity.app_config_allow_list import AppConfigAllowListEntityType
 from ai.backend.common.data.entity.app_config_definition import AppConfigDefinitionEntityType
+from ai.backend.common.data.entity.app_config_fragment import AppConfigFragmentEntityType
+from ai.backend.common.data.entity.domain import DomainEntityType
+from ai.backend.common.data.entity.user import UserEntityType
 from ai.backend.manager.actions.monitors import ActionMonitors
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
 from ai.backend.manager.actions.registry.types import (
@@ -52,6 +55,7 @@ from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.services.app_config.processors import AppConfigProcessors
 from ai.backend.manager.services.app_config.service import AppConfigService
 from ai.backend.testutils.processors import ops_processor_group
+from ai.backend.testutils.virtual_entity import VirtualEntitySeeder
 
 if TYPE_CHECKING:
     from tests.component.conftest import ServerInfo, UserFixtureData
@@ -168,7 +172,7 @@ async def seed_colliding_fragments(
                 for scope_type in AppConfigScopeType
             ])
             await sess.flush()
-            sess.add_all([
+            rows = [
                 AppConfigFragmentRow(
                     config_name=config_name,
                     scope_type=scope_type,
@@ -177,7 +181,27 @@ async def seed_colliding_fragments(
                 )
                 for scope_type, config in configs.items()
                 if config is not None
-            ])
+            ]
+            sess.add_all(rows)
+            await sess.flush()
+            # A fragment is created in the scope that holds it, which is how a read
+            # reaches it.
+            seeder = VirtualEntitySeeder()
+            owners = {
+                AppConfigScopeType.DOMAIN: (
+                    DomainEntityType(),
+                    domain_fixture.domain_id,
+                ),
+                AppConfigScopeType.USER: (
+                    UserEntityType(),
+                    regular_user_fixture.user_uuid,
+                ),
+            }
+            for row in rows:
+                owner = owners.get(row.scope_type)
+                if owner is None:
+                    continue
+                await seeder.create_in(sess, AppConfigFragmentEntityType(), row.id, [owner])
 
     yield seed
     async with database_engine.begin_session() as sess:

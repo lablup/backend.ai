@@ -11,7 +11,7 @@ sources:
   - src/ai/backend/manager/api/gql/extensions/exception_handler.py
 generated:
   by: claude-code/opus-5
-  at: 2026-09-10
+  at: 2026-09-11
 status: stable
 ---
 
@@ -57,9 +57,11 @@ one place per domain.
 |---|---|
 | `RoleAlreadyAssigned`, `RoleNotAssigned` | the `user_roles` row has no `EntityType` or `FieldType` |
 | `GroupMembershipNotFoundError` | it reads the `entity_memberships` edge, whose id is a plain `NewType` in `data/permission/id.py`, no `EntityType` |
+| `ArtifactAssociationDeletionError`, `ArtifactAssociationNotFoundError` | the `association_artifacts_storages` row has no `FieldType` |
+| `ContainerRegistryGroupsAssociationNotFound` | the `association_container_registries_groups` row has no `FieldType` |
 | `InvalidFieldPermission` | validates a requested field scope for both permission entries and entity shares, so it names no one row kind |
 | `VirtualEntityNotFound` | `data/entity/virtual_entity.py` declares an id alone, no `EntityType` |
-| `NotEnoughPermission`, `InsufficientPrivilege` | an authorization denial about the caller, not about a row |
+| `NotEnoughPermission`, `InsufficientPrivilege`, `ContainerRegistryWebhookAuthorizationFailed`, `ImageAccessForbiddenError` | an authorization denial about the caller, not about a row |
 | `InvalidCredentials`, `InvalidAuthParameters`, `AuthorizationFailed`, `OpenIDAuthenticationFailed` | the credentials are judged before a subject is settled, so no row is named |
 | `InvalidClientIPConfig` | the manager's own client-address configuration, not a row |
 | `PasswordExpired`, `LoginSessionExpiredError`, `LoginBlockedError`, `TooManyConcurrentLoginSessions` | a row is named, but what failed is the authentication — `ErrorOperation.AUTH`, which no `ActionOperationType` maps to |
@@ -91,6 +93,10 @@ one place per domain.
 | `IdlePolicyNotFound` | no idle-policy row type, and it is raised for absent config values rather than a row |
 | `QuotaExceeded` | a resource-policy limit reached, not a condition of one row |
 | `ConflictingSessionRescheduleNotSupported` | an unimplemented cleanup policy, not a condition of an agent row |
+| `InvalidArtifactRegistryTypeError` | three of its four raise sites read a registry type off an event, naming no row |
+| `ArtifactScanLimitExceededError` | bounds a scan request's `limit` before any row is named |
+| `ArtifactImportDelegationError` | reports two returned lists disagreeing in length |
+| `ArtifactDeletionError`, `RemoteReservoirArtifactImportError`, `ReservoirConnectionError`, `RemoteReservoirScanError` | report a storage-proxy or remote reservoir call failing |
 
 ## The legacy neighbor is a different kind
 

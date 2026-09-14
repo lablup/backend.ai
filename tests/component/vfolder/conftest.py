@@ -20,6 +20,7 @@ from ai.backend.common.data.entity.notification import (
     NotificationChannelEntityType,
     NotificationRuleEntityType,
 )
+from ai.backend.common.data.entity.project import ProjectEntityType
 from ai.backend.common.data.entity.session import SessionEntityType
 from ai.backend.common.data.entity.types import EntityType
 from ai.backend.common.data.entity.user import UserEntityType
@@ -368,6 +369,47 @@ async def vfolder_factory(
             await conn.execute(
                 sa.insert(ScopeBindingRow.__table__).values(
                     virtual_entity_id=node_id, scope_entity_id=node_id, permission_cap=None
+                )
+            )
+            # A folder is created in its project, which owns and governs it; that is
+            # what a project-scoped read walks.
+            project_node = await conn.scalar(
+                sa.select(VirtualEntityRow.__table__.c.id).where(
+                    VirtualEntityRow.__table__.c.entity_type == ProjectEntityType(),
+                    VirtualEntityRow.__table__.c.entity_id == uuid.UUID(defaults["group"]),
+                )
+            )
+            if project_node is None:
+                project_node = uuid.uuid4()
+                await conn.execute(
+                    sa.insert(VirtualEntityRow.__table__).values(
+                        id=project_node,
+                        entity_type=ProjectEntityType(),
+                        entity_id=uuid.UUID(defaults["group"]),
+                    )
+                )
+                await conn.execute(
+                    sa.insert(EntityMembershipRow.__table__).values(
+                        virtual_entity_id=project_node,
+                        member_entity_id=project_node,
+                        capped=False,
+                    )
+                )
+                await conn.execute(
+                    sa.insert(ScopeBindingRow.__table__).values(
+                        virtual_entity_id=project_node,
+                        scope_entity_id=project_node,
+                        permission_cap=None,
+                    )
+                )
+            await conn.execute(
+                sa.insert(EntityMembershipRow.__table__).values(
+                    virtual_entity_id=project_node, member_entity_id=node_id, capped=False
+                )
+            )
+            await conn.execute(
+                sa.insert(ScopeBindingRow.__table__).values(
+                    virtual_entity_id=node_id, scope_entity_id=project_node, permission_cap=None
                 )
             )
         created_ids.append(defaults["id"])

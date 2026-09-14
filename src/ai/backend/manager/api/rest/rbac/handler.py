@@ -53,19 +53,19 @@ from ai.backend.manager.services.permission_contoller.actions import (
     CreateRoleAction,
     DeleteRoleAction,
     GetRoleDetailAction,
-    SearchRolesAction,
-    SearchUsersAssignedToRoleAction,
+    GlobalSearchRoleAssignmentsAction,
+    GlobalSearchRolesAction,
     UpdateRoleAction,
 )
 from ai.backend.manager.services.permission_contoller.actions.get_entity_types import (
-    GetEntityTypesAction,
+    GlobalGetEntityTypesAction,
 )
 from ai.backend.manager.services.permission_contoller.actions.get_scope_types import (
-    GetScopeTypesAction,
+    GlobalGetScopeTypesAction,
 )
 from ai.backend.manager.services.permission_contoller.actions.purge_role import PurgeRoleAction
 from ai.backend.manager.services.permission_contoller.actions.search_scopes import (
-    SearchScopesAction,
+    GlobalSearchScopesAction,
 )
 from ai.backend.manager.services.permission_contoller.processors import (
     PermissionControllerProcessors,
@@ -128,8 +128,8 @@ class RBACHandler:
             raise NotEnoughPermission("Only superadmin can search roles.")
 
         querier = self._role_adapter.build_querier(body.parsed)
-        action_result = await self._permission_controller.search_roles.wait_for_complete(
-            SearchRolesAction(querier=querier)
+        action_result = await self._permission_controller.global_search_roles.run(
+            GlobalSearchRolesAction(querier=querier)
         )
         resp = SearchRolesResponse(
             roles=[self._role_adapter.convert_to_dto(role) for role in action_result.result.items],
@@ -150,8 +150,8 @@ class RBACHandler:
         if not ctx.is_superadmin:
             raise NotEnoughPermission("Only superadmin can get role details.")
 
-        action_result = await self._permission_controller.get_role_detail.wait_for_complete(
-            GetRoleDetailAction(role_id=path.parsed.role_id)
+        action_result = await self._permission_controller.get_role_detail.run(
+            GetRoleDetailAction(role_id=RoleID(path.parsed.role_id))
         )
         resp = GetRoleResponse(role=self._role_adapter.convert_to_dto(action_result.role))
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=resp)
@@ -220,9 +220,7 @@ class RBACHandler:
             role_id=body.parsed.role_id,
             granted_by=body.parsed.granted_by or ctx.user_uuid,
         )
-        action_result = await self._rbac.assign_role.wait_for_complete(
-            AssignRoleAction(input=input_data)
-        )
+        action_result = await self._rbac.assign_role.run(AssignRoleAction(input=input_data))
         resp = AssignRoleResponse(
             user_id=action_result.data.user_id,
             role_id=action_result.data.role_id,
@@ -243,9 +241,7 @@ class RBACHandler:
             user_id=body.parsed.user_id,
             role_id=body.parsed.role_id,
         )
-        action_result = await self._rbac.revoke_role.wait_for_complete(
-            RevokeRoleAction(input=input_data)
-        )
+        action_result = await self._rbac.revoke_role.run(RevokeRoleAction(input=input_data))
         resp = RevokeRoleResponse(
             user_id=action_result.data.user_id,
             role_id=action_result.data.role_id,
@@ -263,10 +259,8 @@ class RBACHandler:
             raise NotEnoughPermission("Only superadmin can search assigned users.")
 
         querier = self._assigned_user_adapter.build_querier(path.parsed, body.parsed)
-        action_result = (
-            await self._permission_controller.search_users_assigned_to_role.wait_for_complete(
-                SearchUsersAssignedToRoleAction(querier=querier)
-            )
+        action_result = await self._permission_controller.global_search_role_assignments.run(
+            GlobalSearchRoleAssignmentsAction(querier=querier)
         )
         resp = SearchUsersAssignedToRoleResponse(
             users=[
@@ -291,8 +285,8 @@ class RBACHandler:
         if not ctx.is_superadmin:
             raise NotEnoughPermission("Only superadmin can access scope types.")
 
-        action_result = await self._permission_controller.get_scope_types.wait_for_complete(
-            GetScopeTypesAction()
+        action_result = await self._permission_controller.global_get_scope_types.run(
+            GlobalGetScopeTypesAction()
         )
         resp = GetScopeTypesResponse(items=action_result.entity_types)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=resp)
@@ -309,8 +303,8 @@ class RBACHandler:
 
         scope_type = path.parsed.scope_type
         querier = self._scope_adapter.build_querier(scope_type, body.parsed)
-        action = SearchScopesAction(scope_type=scope_type, querier=querier)
-        action_result = await self._permission_controller.search_scopes.wait_for_complete(action)
+        action = GlobalSearchScopesAction(scope_type=scope_type, querier=querier)
+        action_result = await self._permission_controller.global_search_scopes.run(action)
         resp = SearchScopesResponse(
             items=[self._scope_adapter.convert_to_dto(item) for item in action_result.result.items],
             pagination=PaginationInfo(
@@ -331,8 +325,8 @@ class RBACHandler:
         if not ctx.is_superadmin:
             raise NotEnoughPermission("Only superadmin can access entity types.")
 
-        action_result = await self._permission_controller.get_entity_types.wait_for_complete(
-            GetEntityTypesAction()
+        action_result = await self._permission_controller.global_get_entity_types.run(
+            GlobalGetEntityTypesAction()
         )
         resp = GetEntityTypesResponse(items=action_result.entity_types)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=resp)

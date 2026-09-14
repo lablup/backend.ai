@@ -59,12 +59,14 @@ from ai.backend.manager.models.virtual_entity.entity_membership_cap import (
 from ai.backend.manager.models.virtual_entity.entity_membership_field import (
     EntityMembershipFieldRow,
 )
+from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
 from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
 from ai.backend.manager.repositories.ops.v2.share.provider import ShareOpsProvider
 from ai.backend.manager.repositories.vfolder import repository as vfolder_repo_module
 from ai.backend.manager.repositories.vfolder.repository import VfolderRepository
 from ai.backend.testutils.db import with_tables
 from ai.backend.testutils.fixtures import DomainFixtureData
+from ai.backend.testutils.virtual_entity import VirtualEntitySeeder
 
 REQUESTER_EMAIL = "requester@example.com"
 DOMAIN_NAME_FIXED = "test-domain-share"
@@ -116,6 +118,7 @@ class TestShareVfolderWithUsersMembership:
                 VFolderPermissionRow,
                 VirtualEntityRow,
                 EntityMembershipRow,
+                ScopeBindingRow,
                 EntityMembershipCapRow,
                 EntityMembershipFieldRow,
                 EntityLabelRow,
@@ -221,6 +224,7 @@ class TestShareVfolderWithUsersMembership:
                 )
             )
             await sess.flush()
+            await VirtualEntitySeeder().provision(sess, ProjectEntityType(), project)
         yield ve_id
 
     @pytest.fixture
@@ -284,6 +288,7 @@ class TestShareVfolderWithUsersMembership:
                 )
             )
             await sess.flush()
+            await VirtualEntitySeeder().provision(sess, VFolderEntityType(), vfolder_id)
         yield vfolder_id
 
     @pytest.fixture
@@ -324,6 +329,7 @@ class TestShareVfolderWithUsersMembership:
                 )
             )
             await sess.flush()
+            await VirtualEntitySeeder().provision(sess, UserEntityType(), user_uuid)
             sess.add(
                 EntityMembershipRow(
                     virtual_entity_id=project_scope_id,
@@ -352,6 +358,7 @@ class TestShareVfolderWithUsersMembership:
                 )
             )
             await sess.flush()
+            await VirtualEntitySeeder().provision(sess, ProjectEntityType(), personal_project_id)
         yield email
 
     @pytest.fixture
@@ -420,6 +427,7 @@ class TestShareVfolderWithUsersMembership:
                 )
             )
             await sess.flush()
+            await VirtualEntitySeeder().provision(sess, UserEntityType(), user_uuid)
             sess.add(
                 EntityMembershipRow(
                     virtual_entity_id=project_scope_id,
@@ -472,6 +480,7 @@ class TestShareVfolderWithUsersMembership:
                 )
             )
             await sess.flush()
+            await VirtualEntitySeeder().provision(sess, ProjectEntityType(), other_project)
         yield ve_id
 
     @pytest.fixture
@@ -511,6 +520,7 @@ class TestShareVfolderWithUsersMembership:
                 )
             )
             await sess.flush()
+            await VirtualEntitySeeder().provision(sess, UserEntityType(), user_uuid)
             sess.add(
                 EntityMembershipRow(
                     virtual_entity_id=other_project_scope_id,

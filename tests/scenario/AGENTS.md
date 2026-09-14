@@ -37,9 +37,11 @@
 
 ## 행을 심는 법
 
-- 행은 src의 write spec으로만 만든다. `Seeder`의 입구 다섯 — `creating`, `provisioning`,
-  `adding`, `linking`, `granting` — 외에 데이터베이스를 건드리지 않는다. 앞 행을 읽는 seed는
-  읽는 개수만큼의 입구(`creating_from`, `creating_from_two`, `creating_from_three`)를 쓴다.
+- 행은 src의 write spec으로만 만든다. `Seeder`의 입구 여섯 — `creating`, `provisioning`,
+  `adding`, `adding_with_nested`, `linking`, `granting` — 외에 데이터베이스를 건드리지
+  않는다. `adding_with_nested`는 필드 행과 그것이 소유하는 행(감사 기록과 그 스코프 행처럼)을
+  한 쓰기로 심는다. 앞 행을 읽는 seed는 읽는 개수만큼의 입구(`creating_from`,
+  `creating_from_two`, `creating_from_three`)를 쓴다.
 - seed 하나는 클래스 하나다. `SeedRow` 계열을 구현해 자기가 무엇인지(`kind`), 무엇을
   세워두는지(`detail`), 어떤 이름으로 들어가는지(`name`), 무엇을 쓰는지(`seed`)를 답한다.
 - 이름을 매니저가 못박은 행은 `name`이 그 이름을 답한다. 시더가 붙이는 번호를 받지 않는다.

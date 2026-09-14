@@ -14,6 +14,7 @@ from ai.backend.common.data.entity.deployment_preset import DeploymentPresetID
 from ai.backend.common.dto.manager.query import DateTimeFilter, StringFilter
 from ai.backend.common.dto.manager.v2.deployment.request import DeploymentStrategyInput
 from ai.backend.common.dto.manager.v2.entity_label.request import EntityLabelNestedFilter
+from ai.backend.common.dto.manager.v2.vfolder.types import VFolderScope
 from ai.backend.common.tristate.unset import UNSET, Unset
 from ai.backend.common.typed_validators import VFolderName
 
@@ -395,6 +396,20 @@ class VFolderOrder(BaseRequestModel):
 
     field: VFolderOrderField
     direction: OrderDirection
+
+
+class ScopedSearchVFoldersInput(BaseRequestModel):
+    """Input for searching the vfolders the named scopes reach."""
+
+    scope: VFolderScope = Field(description="Scope (OR across all items).")
+    filter: VFolderFilter | None = Field(default=None, description="Filter conditions.")
+    order: list[VFolderOrder] | None = Field(default=None, description="Order specifications.")
+    first: int | None = Field(default=None, description="Cursor pagination: number of items.")
+    after: str | None = Field(default=None, description="Cursor pagination: after cursor.")
+    last: int | None = Field(default=None, description="Cursor pagination: last N items.")
+    before: str | None = Field(default=None, description="Cursor pagination: before cursor.")
+    limit: int | None = Field(default=None, description="Offset pagination: maximum items.")
+    offset: int | None = Field(default=None, description="Offset pagination: number to skip.")
 
 
 class SearchVFoldersInput(BaseRequestModel):

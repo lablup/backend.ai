@@ -139,7 +139,7 @@ class TestSearchRolesInScope:
             pagination=OffsetPagination(limit=10, offset=0),
         )
 
-        result = await db_source.search_roles_in_scope(querier, scope)
+        result = await db_source.search_roles_in_scope(querier, [scope])
 
         role_ids = [r.id for r in result.items]
         assert scoped_roles.role_in_scope in role_ids
@@ -158,7 +158,7 @@ class TestSearchRolesInScope:
             pagination=OffsetPagination(limit=10, offset=0),
         )
 
-        result = await db_source.search_roles_in_scope(querier, scope)
+        result = await db_source.search_roles_in_scope(querier, [scope])
 
         assert result.total_count == 1
 
@@ -176,7 +176,7 @@ class TestSearchRolesInScope:
             pagination=OffsetPagination(limit=10, offset=0),
         )
 
-        result = await db_source.search_roles_in_scope(querier, scope)
+        result = await db_source.search_roles_in_scope(querier, [scope])
 
         assert result.items == []
         assert result.total_count == 0
@@ -200,10 +200,10 @@ class TestSearchRolesInScope:
 
         # Search with DOMAIN scope using the same scope_id
         domain_scope = ScopedRoleOperationScope(scope=DomainID(scope_id))
-        result = await db_source.search_roles_in_scope(querier, domain_scope)
+        result = await db_source.search_roles_in_scope(querier, [domain_scope])
         assert result.items == []
 
         # Search with PROJECT scope should find it
         project_scope = ScopedRoleOperationScope(scope=ProjectID(scope_id))
-        result = await db_source.search_roles_in_scope(querier, project_scope)
+        result = await db_source.search_roles_in_scope(querier, [project_scope])
         assert len(result.items) == 1

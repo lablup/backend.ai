@@ -27,7 +27,6 @@ from ai.backend.manager.data.user.types import SessionOwnerContext, UserData
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.session import KernelLoadingStrategy, SessionRow
-from ai.backend.manager.models.session.scopes import ProjectSessionOperationScope
 from ai.backend.manager.models.session.updaters import SessionUpdater
 from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -288,23 +287,6 @@ class SessionRepository:
             SessionListResult with items, total count, and pagination info
         """
         return await self._db_source.search(querier)
-
-    @session_repository_resilience.apply()
-    async def search_in_project(
-        self,
-        querier: BatchQuerier,
-        scope: ProjectSessionOperationScope,
-    ) -> SessionListResult:
-        """Search sessions scoped to a project.
-
-        Args:
-            querier: BatchQuerier for filtering, ordering, and pagination
-            scope: ProjectSessionOperationScope that filters by project and validates existence
-
-        Returns:
-            SessionListResult with items, total count, and pagination info
-        """
-        return await self._db_source.search_in_project(querier, scope)
 
     @session_repository_resilience.apply()
     async def search_kernels(

@@ -37,6 +37,7 @@ from ai.backend.manager.repositories.audit_log.options import AuditLogConditions
 from ai.backend.manager.services.audit_log.actions.scoped_search import (
     AuditLogScopeItem,
     EntityAuditLogScopeItem,
+    ScopeAuditLogScopeItem,
     ScopedSearchAuditLogsAction,
     TriggeredByAuditLogScopeItem,
 )
@@ -145,11 +146,11 @@ class AuditLogAdapter(BaseAdapter):
                 raise InvalidAPIParameters(
                     f"Audit log scope id {entity_scope.entity_id!r} is not an entity id"
                 ) from e
-            items.append(
-                EntityAuditLogScopeItem(
-                    owner=RuntimeEntityID(EntityType(entity_scope.entity_type), entity_id),
-                )
-            )
+            owner = RuntimeEntityID(EntityType(entity_scope.entity_type), entity_id)
+            # An entity's history is both halves: what was done to it, and what was done
+            # in it. The request names the entity once and the action ORs the two.
+            items.append(EntityAuditLogScopeItem(owner=owner))
+            items.append(ScopeAuditLogScopeItem(owner=owner))
         for user_scope in input.scope.triggered_user or []:
             items.append(TriggeredByAuditLogScopeItem(user_id=UserID(user_scope.value)))
         return items
@@ -164,6 +165,17 @@ class AuditLogAdapter(BaseAdapter):
                 starts_with_factory=AuditLogConditions.by_entity_type_starts_with,
                 ends_with_factory=AuditLogConditions.by_entity_type_ends_with,
                 in_factory=AuditLogConditions.by_entity_type_in,
+            )
+            if condition is not None:
+                conditions.append(condition)
+        if f.entity_id is not None:
+            condition = self.convert_string_filter(
+                f.entity_id,
+                contains_factory=AuditLogConditions.by_entity_id_contains,
+                equals_factory=AuditLogConditions.by_entity_id_equals,
+                starts_with_factory=AuditLogConditions.by_entity_id_starts_with,
+                ends_with_factory=AuditLogConditions.by_entity_id_ends_with,
+                in_factory=AuditLogConditions.by_entity_id_in,
             )
             if condition is not None:
                 conditions.append(condition)

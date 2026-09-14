@@ -4,14 +4,12 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from datetime import UTC, datetime
-from decimal import Decimal
 from typing import Any, override
 from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
 
 import pytest
 
-from ai.backend.common.api_handlers import SENTINEL
 from ai.backend.common.config import ModelConfig, ModelDefinition, ModelServiceConfig
 from ai.backend.common.contexts.user import with_user
 from ai.backend.common.data.entity.deployment import DeploymentEntityType, DeploymentID
@@ -27,7 +25,6 @@ from ai.backend.common.data.user.types import UserData, UserRole
 from ai.backend.common.dto.manager.v2.deployment.request import AdminSearchDeploymentsInput
 from ai.backend.common.schema.deployment import RollingUpdateSpec
 from ai.backend.common.types import ClusterMode, MountPermission, ResourceSlot
-from ai.backend.manager.actions.action import BaseActionTriggerMeta
 from ai.backend.manager.actions.monitors import ActionMonitors
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
 from ai.backend.manager.actions.registry.types import GroupMeta, ProcessorDependencies
@@ -37,10 +34,10 @@ from ai.backend.manager.actions.v2.global_scope.validator.superadmin import (
 from ai.backend.manager.actions.v2.ops.result import BulkFieldOpsResult, OwnedFieldsOpsResult
 from ai.backend.manager.actions.v2.scope.base import BaseScopeAction
 from ai.backend.manager.actions.v2.scope.validator.base import ScopeActionValidator
+from ai.backend.manager.actions.v2.trigger import ActionTriggerMeta
 from ai.backend.manager.actions.v2.validators import ActionValidators
 from ai.backend.manager.api.adapters.deployment.adapter import (
     DeploymentAdapter,
-    _tristate_from_input,
 )
 from ai.backend.manager.data.deployment.types import (
     ClusterConfigData,
@@ -61,7 +58,6 @@ from ai.backend.manager.services.deployment.actions.scoped_search import (
     ScopedSearchDeploymentsActionResult,
 )
 from ai.backend.manager.services.deployment.processors import DeploymentProcessors
-from ai.backend.manager.types import TriState
 
 DENIED_TOKEN = DeploymentTokenID(uuid4())
 
@@ -125,34 +121,6 @@ class TestRevisionDataToDTO:
         assert service.start_command == ["python", "serve.py"]
 
 
-class TestTriStateFromInput:
-    """Tests for _tristate_from_input(): Sentinel/None/value → NOP/NULLIFY/UPDATE."""
-
-    def test_sentinel_yields_nop(self) -> None:
-        result: TriState[Decimal] = _tristate_from_input(SENTINEL)
-        assert result.is_nop()
-
-    def test_none_yields_nullify(self) -> None:
-        result: TriState[Decimal] = _tristate_from_input(None)
-        assert result.is_nullify()
-
-    def test_decimal_value_yields_update(self) -> None:
-        result = _tristate_from_input(Decimal("0.5"))
-        assert result.is_update()
-        assert result.value() == Decimal("0.5")
-
-    def test_uuid_value_yields_update(self) -> None:
-        preset_id = uuid4()
-        result = _tristate_from_input(preset_id)
-        assert result.is_update()
-        assert result.value() == preset_id
-
-    def test_int_value_yields_update(self) -> None:
-        result = _tristate_from_input(3)
-        assert result.is_update()
-        assert result.value() == 3
-
-
 class _RecordingScopeValidator(ScopeActionValidator):
     """Lets every scoped read through and keeps the scopes it was asked about."""
 
@@ -160,7 +128,7 @@ class _RecordingScopeValidator(ScopeActionValidator):
         self.seen: list[Sequence[EntityIdentifier]] = []
 
     @override
-    async def validate(self, action: BaseScopeAction, meta: BaseActionTriggerMeta) -> None:
+    async def validate(self, action: BaseScopeAction, meta: ActionTriggerMeta) -> None:
         self.seen.append(action.scope_targets())
 
 

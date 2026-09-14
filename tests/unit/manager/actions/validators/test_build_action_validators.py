@@ -19,15 +19,15 @@ from ai.backend.manager.actions.v2.single_entity.validator.rbac import (
 )
 from ai.backend.manager.actions.validators.build import build_action_validators
 from ai.backend.manager.config.provider import ManagerConfigProvider
-from ai.backend.manager.repositories.permission_controller.repository import (
-    PermissionControllerRepository,
+from ai.backend.manager.repositories.rbac.permission_check_repository import (
+    RbacPermissionCheckRepository,
 )
 
 
 class TestBuildActionValidators:
     def test_every_v2_slot_holds_its_validator(self) -> None:
         v2_validators = build_action_validators(
-            MagicMock(spec=PermissionControllerRepository),
+            MagicMock(spec=RbacPermissionCheckRepository),
             MagicMock(spec=ManagerConfigProvider),
         )
 

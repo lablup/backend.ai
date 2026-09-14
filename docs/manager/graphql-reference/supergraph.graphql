@@ -6547,6 +6547,22 @@ input DeploymentScope
 }
 
 """
+Added in 26.9.0. Scope for the scoped deployment query. Each list is OR'd internally and across lists, and every scope named is authorized before the read runs.
+"""
+input DeploymentSearchScope
+  @join__type(graph: STRAWBERRY)
+{
+  """Domains whose deployments are being read."""
+  domain: [UUIDScope!] = null
+
+  """Projects whose deployments are being read."""
+  project: [UUIDScope!] = null
+
+  """Users whose deployments are being read."""
+  user: [UUIDScope!] = null
+}
+
+"""
 Added in 25.19.0. This enum represents the deployment status of a model deployment, indicating its current state.
 """
 enum DeploymentStatus
@@ -9118,6 +9134,28 @@ input ImageRefType
   architecture: String
 }
 
+"""
+Added in 26.9.0. Scope for the scoped image query. Each list is OR'd internally and across lists, and every scope named is authorized before the read runs. `global` names no scope and is authorized against none.
+"""
+input ImageSearchScope
+  @join__type(graph: STRAWBERRY)
+{
+  """Domains whose images are being read."""
+  domain: [UUIDScope!] = null
+
+  """Projects whose images are being read."""
+  project: [UUIDScope!] = null
+
+  """Users whose images are being read."""
+  user: [UUIDScope!] = null
+
+  """Container registries whose images are being read."""
+  containerRegistry: [UUIDScope!] = null
+
+  """Include the images of every registry marked global."""
+  global: Boolean! = false
+}
+
 """Added in 25.4.0."""
 enum ImageStatus
   @join__type(graph: GRAPHENE)
@@ -11099,8 +11137,14 @@ Added in 26.9.0. Scope for the scoped model card query. Each list is OR'd intern
 input ModelCardScope
   @join__type(graph: STRAWBERRY)
 {
+  """Added in 26.9.0. Domains whose model cards are being read."""
+  domain: [UUIDScope!] = null
+
   """Projects whose model cards are being read."""
   project: [UUIDScope!] = null
+
+  """Added in 26.9.0. Users whose model cards are being read."""
+  user: [UUIDScope!] = null
 }
 
 """
@@ -16626,6 +16670,11 @@ type Query
   adminImagesV2(filter: ImageV2Filter = null, orderBy: [ImageV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ImageV2Connection @join__field(graph: STRAWBERRY)
 
   """
+  Added in 26.9.0. Page through the images the named scopes reach, combined with OR. Every scope is authorized before the read runs.
+  """
+  scopedImagesV2(scope: ImageSearchScope!, filter: ImageV2Filter = null, orderBy: [ImageV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ImageV2Connection @join__field(graph: STRAWBERRY)
+
+  """
   Added in 26.2.0. Query kernels with pagination and filtering. (admin only)
   """
   adminKernelsV2(filter: KernelV2Filter = null, orderBy: [KernelV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): KernelV2Connection @join__field(graph: STRAWBERRY)
@@ -16676,12 +16725,22 @@ type Query
   projectSessionsV2(scope: ProjectSessionV2Scope!, filter: SessionV2Filter = null, orderBy: [SessionV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): SessionV2Connection @join__field(graph: STRAWBERRY)
 
   """
+  Added in 26.9.0. Page through the sessions the named scopes reach, combined with OR. Every scope is authorized before the read runs.
+  """
+  scopedSessionsV2(scope: SessionSearchScope!, filter: SessionV2Filter = null, orderBy: [SessionV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): SessionV2Connection @join__field(graph: STRAWBERRY)
+
+  """
   Added in 26.4.3. Query a single session by ID. Returns an error if not found.
   """
   sessionV2(id: UUID!): SessionV2 @join__field(graph: STRAWBERRY)
 
   """Added in 25.19.0. List deployments within a specific project."""
   projectDeployments(scope: ProjectDeploymentScope!, filter: DeploymentFilter = null, orderBy: [DeploymentOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ModelDeploymentConnection @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.9.0. Page through the deployments the named scopes reach, combined with OR. Every scope is authorized before the read runs.
+  """
+  scopedDeployments(scope: DeploymentSearchScope!, filter: DeploymentFilter = null, orderBy: [DeploymentOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ModelDeploymentConnection @join__field(graph: STRAWBERRY)
 
   """Added in 25.19.0. List deployments owned by the current user."""
   myDeployments(filter: DeploymentFilter = null, orderBy: [DeploymentOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ModelDeploymentConnection @join__field(graph: STRAWBERRY)
@@ -16793,9 +16852,12 @@ type Query
   myLoginHistoryV2(filter: LoginHistoryFilter = null, orderBy: [LoginHistoryOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): LoginHistoryV2Connection @join__field(graph: STRAWBERRY)
 
   """
-  Added in 26.3.0. List roles assigned to the current authenticated user.
+  Added in 26.3.0. List the assignment rows joining the current authenticated user to the roles they hold. Deprecated since 26.9.0. Use `myRolesV2`.
   """
-  myRoles(filter: RoleAssignmentFilter = null, orderBy: [RoleAssignmentOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RoleAssignmentConnection @join__field(graph: STRAWBERRY)
+  myRoles(filter: RoleAssignmentFilter = null, orderBy: [RoleAssignmentOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RoleAssignmentConnection @join__field(graph: STRAWBERRY) @deprecated(reason: "Deprecated since 26.9.0. Use `myRolesV2`, which answers with the roles themselves.")
+
+  """Added in 26.9.0. List the roles the current authenticated user holds."""
+  myRolesV2(filter: RoleFilter = null, orderBy: [RoleOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RoleConnection @join__field(graph: STRAWBERRY)
 
   """Added in 26.4.2. List roles registered in a project scope."""
   projectRoles(projectId: UUID!, filter: RoleFilter = null, orderBy: [RoleOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RoleConnection @join__field(graph: STRAWBERRY)
@@ -17176,6 +17238,11 @@ type Query
 
   """Added in 26.4.2. List virtual folders within a specific project."""
   projectVfolders(projectId: UUID!, filter: VFolderFilter = null, orderBy: [VFolderOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): VFolderConnection @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.9.0. Page through the virtual folders the named scopes reach, combined with OR. Every scope is authorized before the read runs.
+  """
+  scopedVFoldersV2(scope: VFolderScope!, filter: VFolderFilter = null, orderBy: [VFolderOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): VFolderConnection @join__field(graph: STRAWBERRY)
 
   """
   Added in 26.4.2. Search virtual folders accessible to the current user with pagination and filtering.
@@ -18858,8 +18925,13 @@ type Role implements Node
   """Added in 26.3.0. Permissions associated with this role."""
   permissions(filter: PermissionFilter = null, orderBy: [PermissionOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): PermissionConnection
 
-  """Added in 26.3.0. Users assigned to this role."""
-  users(filter: RoleAssignmentFilter = null, orderBy: [RoleAssignmentOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RoleAssignmentConnection
+  """
+  Added in 26.3.0. Users assigned to this role, as assignment rows. Deprecated since 26.9.0. Use `usersV2`.
+  """
+  users(filter: RoleAssignmentFilter = null, orderBy: [RoleAssignmentOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RoleAssignmentConnection @deprecated(reason: "Deprecated since 26.9.0. Use `usersV2`, which answers with the users themselves.")
+
+  """Added in 26.9.0. Users holding this role."""
+  usersV2(filter: UserV2Filter = null, orderBy: [UserV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): UserV2Connection
 }
 
 """Added in 26.3.0. RBAC role assignment (user-role association)."""
@@ -20886,6 +20958,22 @@ input SessionScope
   sessionId: UUID!
 }
 
+"""
+Added in 26.9.0. Scope for the scoped session query. Each list is OR'd internally and across lists, and every scope named is authorized before the read runs.
+"""
+input SessionSearchScope
+  @join__type(graph: STRAWBERRY)
+{
+  """Domains whose sessions are being read."""
+  domain: [UUIDScope!] = null
+
+  """Projects whose sessions are being read."""
+  project: [UUIDScope!] = null
+
+  """Users whose sessions are being read."""
+  user: [UUIDScope!] = null
+}
+
 enum SessionTypes
   @join__type(graph: STRAWBERRY)
 {
@@ -22020,16 +22108,16 @@ input UpdateDomainInput
   @join__type(graph: STRAWBERRY)
 {
   """New domain name."""
-  name: String = null
+  name: String
 
   """New description."""
   description: String
 
   """Updated active status."""
-  isActive: Boolean = null
+  isActive: Boolean
 
   """New allowed Docker registry URLs."""
-  allowedDockerRegistries: [String!] = null
+  allowedDockerRegistries: [String!]
 
   """New external integration identifier."""
   integrationName: String
@@ -22170,7 +22258,7 @@ input UpdateLoginClientTypeInput
   @join__type(graph: STRAWBERRY)
 {
   """Updated name."""
-  name: String = null
+  name: String
 
   """Updated description. Pass null to clear, omit to leave unchanged."""
   description: String
@@ -22200,43 +22288,43 @@ input UpdateModelCardV2Input
   id: UUID!
 
   """New name."""
-  name: String = null
+  name: String
 
   """Author."""
-  author: String = null
+  author: String
 
   """Title."""
-  title: String = null
+  title: String
 
   """Version."""
-  modelVersion: String = null
+  modelVersion: String
 
   """Description."""
-  description: String = null
+  description: String
 
   """ML task."""
-  task: String = null
+  task: String
 
   """Category."""
-  category: String = null
+  category: String
 
   """Architecture."""
-  architecture: String = null
+  architecture: String
 
   """Frameworks."""
-  framework: [String!] = null
+  framework: [String!]
 
   """Labels."""
-  label: [String!] = null
+  label: [String!]
 
   """License."""
-  license: String = null
+  license: String
 
   """README content."""
-  readme: String = null
+  readme: String
 
   """Access level (public or internal)."""
-  accessLevel: ModelCardV2AccessLevel = null
+  accessLevel: ModelCardV2AccessLevel
 }
 
 """
@@ -22353,8 +22441,8 @@ input UpdatePermissionInput
   @join__type(graph: STRAWBERRY)
 {
   id: UUID!
-  entityType: String = null
-  permission: PermissionBit = null
+  entityType: String
+  permission: PermissionBit
 }
 
 """
@@ -22585,26 +22673,22 @@ input UpdateResourceGroupFairShareSpecInput
   """Name of the resource group to update."""
   resourceGroupName: String!
 
-  """
-  Half-life for exponential decay in days. Leave null to keep existing value.
-  """
-  halfLifeDays: Int = null
+  """Half-life for exponential decay in days. Omit to leave unchanged."""
+  halfLifeDays: Int
 
-  """Total lookback period in days. Leave null to keep existing value."""
-  lookbackDays: Int = null
+  """Total lookback period in days. Omit to leave unchanged."""
+  lookbackDays: Int
 
-  """
-  Granularity of decay buckets in days. Leave null to keep existing value.
-  """
-  decayUnitDays: Int = null
+  """Granularity of decay buckets in days. Omit to leave unchanged."""
+  decayUnitDays: Int
 
-  """Default weight for entities. Leave null to keep existing value."""
-  defaultWeight: Decimal = null
+  """Default weight for entities. Omit to leave unchanged."""
+  defaultWeight: Decimal
 
   """
-  Resource weights for fair share calculation. Each entry specifies a resource type and its weight multiplier. Only provided resource types are updated (partial update). Set weight to null to remove that resource type (revert to default). Leave the entire list null to keep all existing values.
+  Resource weights for fair share calculation. Each entry specifies a resource type and its weight multiplier. Only provided resource types are updated (partial update). Set weight to null to remove that resource type (revert to default). Omit the entire list to keep all existing values.
   """
-  resourceWeights: [ResourceWeightEntryInput!] = null
+  resourceWeights: [ResourceWeightEntryInput!]
 }
 
 """
@@ -22626,42 +22710,36 @@ input UpdateResourceGroupInput
   """Name of the resource group to update."""
   resourceGroupName: String!
 
-  """
-  Whether the resource group is active. Leave null to keep existing value.
-  """
-  isActive: Boolean = null
+  """Whether the resource group is active. Omit to leave unchanged."""
+  isActive: Boolean
+
+  """Whether the resource group is public. Omit to leave unchanged."""
+  isPublic: Boolean
 
   """
-  Whether the resource group is public. Leave null to keep existing value.
+  Added in 26.9.0. Whether this is the default resource group. At most one resource group may hold the flag, so setting it to true is rejected while another one holds it; clear that one first. Omit to leave unchanged.
   """
-  isPublic: Boolean = null
+  isDefault: Boolean
+
+  """Human-readable description. Omit to leave unchanged; null clears."""
+  description: String
+
+  """App proxy address. Omit to leave unchanged; null clears."""
+  appProxyAddr: String
+
+  """App proxy API token. Omit to leave unchanged; null clears."""
+  appproxyApiToken: String
+
+  """Whether to use host network mode. Omit to leave unchanged."""
+  useHostNetwork: Boolean
+
+  """Scheduler type (FIFO, LIFO, DRF, FAIR_SHARE). Omit to leave unchanged."""
+  schedulerType: SchedulerType
 
   """
-  Added in 26.9.0. Whether this is the default resource group. At most one resource group may hold the flag, so setting it to true is rejected while another one holds it; clear that one first. Leave null to keep existing value.
+  Added in 26.3.0. Preemption configuration. When provided, replaces the entire preemption config. Omit to leave unchanged.
   """
-  isDefault: Boolean = null
-
-  """Human-readable description. Leave null to keep existing value."""
-  description: String = null
-
-  """App proxy address. Leave null to keep existing value."""
-  appProxyAddr: String = null
-
-  """App proxy API token. Leave null to keep existing value."""
-  appproxyApiToken: String = null
-
-  """Whether to use host network mode. Leave null to keep existing value."""
-  useHostNetwork: Boolean = null
-
-  """
-  Scheduler type (FIFO, LIFO, DRF, FAIR_SHARE). Leave null to keep existing value.
-  """
-  schedulerType: SchedulerType = null
-
-  """
-  Added in 26.3.0. Preemption configuration. When provided, replaces the entire preemption config. Leave null to keep existing value.
-  """
-  preemption: PreemptionConfigInput = null
+  preemption: PreemptionConfigInput
 }
 
 """Added in 26.2.0. Payload for resource group update mutation."""
@@ -22837,7 +22915,7 @@ input UpdateRuntimeVariantInput
   id: UUID!
 
   """New name."""
-  name: String = null
+  name: String
 
   """New description. Set to null to clear."""
   description: String
@@ -23759,6 +23837,9 @@ input UserScope
 
   """Projects whose users are being read."""
   project: [UUIDScope!] = null
+
+  """Added in 26.9.0. Roles whose holders are being read."""
+  role: [UUIDScope!] = null
 }
 
 """
@@ -24711,6 +24792,22 @@ type VFolderQuotaInfo
 
   """File-count quota for the folder."""
   maxFiles: Int!
+}
+
+"""
+Added in 26.9.0. Scope for the scoped vfolder query. Each list is OR'd internally and across lists, and every scope named is authorized before the read runs.
+"""
+input VFolderScope
+  @join__type(graph: STRAWBERRY)
+{
+  """Domains whose vfolders are being read."""
+  domain: [UUIDScope!] = null
+
+  """Projects whose vfolders are being read."""
+  project: [UUIDScope!] = null
+
+  """Users whose vfolders are being read."""
+  user: [UUIDScope!] = null
 }
 
 """
