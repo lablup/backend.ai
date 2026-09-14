@@ -193,6 +193,8 @@ from ai.backend.manager.services.entity_label.processors import EntityLabelProce
 from ai.backend.manager.services.entity_share.processors import (
     EntityShareProcessors,
 )
+from ai.backend.manager.services.export.actions.get_report import GetReportAction
+from ai.backend.manager.services.export.actions.public_get_report import PublicGetReportAction
 from ai.backend.manager.services.export.processors import ExportProcessors
 from ai.backend.manager.services.fair_share.processors import FairShareProcessors
 from ai.backend.manager.services.idle_checker.processors import IdleCheckerProcessors
@@ -593,6 +595,30 @@ def test_resource_preset_reads_keep_their_judged_gates() -> None:
             ActionKind.SINGLE_ENTITY,
             ActionGate.PERMISSION,
         ),
+    }
+    recorded = {
+        record.action_cls: (record.entity_type, record.kind, record.gate)
+        for record in registry.wired_processors()
+        if record.action_cls in judged
+    }
+    assert recorded == judged
+
+
+def test_export_report_reads_keep_their_judged_gates() -> None:
+    """The report route stays superadmin-only; exports scoped to a caller read the report publicly."""
+    registry = _ops_registry()
+    ExportProcessors(
+        registry.group(GroupMeta(UserEntityType())),
+        registry.group(GroupMeta(SessionEntityType())),
+        registry.group(GroupMeta(ProjectEntityType())),
+        registry.group(GroupMeta(GlobalEntityType())),
+        registry.dangling_field_group(FieldGroupMeta(AuditLogFieldType()), AuditLogData),
+        MagicMock(),
+    )
+
+    judged = {
+        GetReportAction: (GlobalEntityType(), ActionKind.GLOBAL, ActionGate.PERMISSION),
+        PublicGetReportAction: (GlobalEntityType(), ActionKind.GLOBAL, ActionGate.PUBLIC),
     }
     recorded = {
         record.action_cls: (record.entity_type, record.kind, record.gate)
