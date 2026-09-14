@@ -267,13 +267,16 @@ class DataLoaders:
     ) -> DataLoader[IdleCheckerID, IdleCheckerGQL | None]:
         adapter = self._adapters.idle_checker
 
-        async def load_fn(ids: list[IdleCheckerID]) -> list[IdleCheckerGQL | None]:
+        async def load_fn(ids: list[IdleCheckerID]) -> list[IdleCheckerGQL | Exception | None]:
             from ai.backend.manager.api.gql.idle_checker.types import (  # pants: no-infer-dep
                 IdleCheckerGQL as IC,
             )
 
             dtos = await adapter.batch_load_by_ids(ids)
-            return [IC.from_pydantic(dto) if dto is not None else None for dto in dtos]
+            return [
+                dto if dto is None or isinstance(dto, Exception) else IC.from_pydantic(dto)
+                for dto in dtos
+            ]
 
         return DataLoader(load_fn=load_fn)
 
@@ -283,13 +286,16 @@ class DataLoaders:
     ) -> DataLoader[AuditLogID, AuditLogV2GQL | None]:
         adapter = self._adapters.audit_log
 
-        async def load_fn(ids: list[AuditLogID]) -> list[AuditLogV2GQL | None]:
+        async def load_fn(ids: list[AuditLogID]) -> list[AuditLogV2GQL | Exception | None]:
             from ai.backend.manager.api.gql.audit_log.types.node import (  # pants: no-infer-dep
                 AuditLogV2GQL as AL,
             )
 
             dtos = await adapter.batch_load_by_ids(ids)
-            return [AL.from_pydantic(dto) if dto is not None else None for dto in dtos]
+            return [
+                dto if dto is None or isinstance(dto, Exception) else AL.from_pydantic(dto)
+                for dto in dtos
+            ]
 
         return DataLoader(load_fn=load_fn)
 
@@ -511,13 +517,16 @@ class DataLoaders:
     ) -> DataLoader[VFSStorageID, VFSStorage | None]:
         adapter = self._adapters.vfs_storage
 
-        async def load_fn(ids: list[VFSStorageID]) -> list[VFSStorage | None]:
+        async def load_fn(ids: list[VFSStorageID]) -> list[VFSStorage | Exception | None]:
             from ai.backend.manager.api.gql.vfs_storage import (  # pants: no-infer-dep
                 VFSStorage as VS,
             )
 
             dtos = await adapter.batch_load_by_ids(ids)
-            return [VS.from_pydantic(dto) if dto is not None else None for dto in dtos]
+            return [
+                dto if dto is None or isinstance(dto, Exception) else VS.from_pydantic(dto)
+                for dto in dtos
+            ]
 
         return DataLoader(load_fn=load_fn)
 

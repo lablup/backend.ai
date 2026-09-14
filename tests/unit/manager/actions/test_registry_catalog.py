@@ -153,6 +153,11 @@ from ai.backend.manager.services.artifact_registry.actions.common.get_multi impo
     GetArtifactRegistryMetasAction,
 )
 from ai.backend.manager.services.artifact_registry.processors import ArtifactRegistryProcessors
+from ai.backend.manager.services.audit_log.actions.bulk_get import BulkGetAuditLogsAction
+from ai.backend.manager.services.audit_log.actions.lookup_owner import (
+    LookupAuditLogOwnerAction,
+    LookupBulkAuditLogOwnerAction,
+)
 from ai.backend.manager.services.audit_log.processors import AuditLogProcessors
 from ai.backend.manager.services.auth.processors import AuthProcessors
 from ai.backend.manager.services.container_registry.processors import ContainerRegistryProcessors
@@ -205,6 +210,7 @@ from ai.backend.manager.services.export.actions.get_report import GetReportActio
 from ai.backend.manager.services.export.actions.public_get_report import PublicGetReportAction
 from ai.backend.manager.services.export.processors import ExportProcessors
 from ai.backend.manager.services.fair_share.processors import FairShareProcessors
+from ai.backend.manager.services.idle_checker.actions.bulk_get import BulkGetIdleCheckersAction
 from ai.backend.manager.services.idle_checker.processors import IdleCheckerProcessors
 from ai.backend.manager.services.idle_checker_assignment.processors import (
     IdleCheckerAssignmentProcessors,
@@ -317,6 +323,7 @@ from ai.backend.manager.services.vfolder.processors.invite import VFolderInviteP
 from ai.backend.manager.services.vfolder.processors.sharing import VFolderSharingProcessors
 from ai.backend.manager.services.vfolder.processors.vfolder import VFolderProcessors
 from ai.backend.manager.services.vfolder.processors.vfolder_admin import VFolderAdminProcessors
+from ai.backend.manager.services.vfs_storage.actions.bulk_get import BulkGetVFSStoragesAction
 from ai.backend.manager.services.vfs_storage.processors import VFSStorageProcessors
 
 _V2_ACTION_BASES: tuple[type[Any], ...] = (
@@ -443,7 +450,12 @@ def test_every_defined_v2_action_is_wired() -> None:
         registry.group(GroupMeta(RuntimeVariantPresetEntityType())), MagicMock()
     )
     AuditLogProcessors(
-        registry.dangling_field_group(FieldGroupMeta(AuditLogFieldType()), AuditLogData)
+        registry.dangling_lookup_field_group(
+            FieldGroupMeta(AuditLogFieldType()),
+            AuditLogData,
+            LookupAuditLogOwnerAction,
+            LookupBulkAuditLogOwnerAction,
+        )
     )
     SecretProcessors(
         registry.concern(ConcernMeta(Concern.SYSTEM)).dangling_field_group(
@@ -956,3 +968,102 @@ def test_entity_data_loader_reads_are_checked_per_entity_except_domains() -> Non
         ActionKind.BULK,
         ActionGate.PERMISSION,
     )
+
+
+def test_vfs_storage_loader_read_is_a_partial_permission_read() -> None:
+    """The VFS storage DataLoader reads per named storage, not superadmin-only."""
+    registry = _ops_registry()
+    VFSStorageProcessors(registry.group(GroupMeta(VFSStorageEntityType())), MagicMock())
+
+    recorded = {
+        record.action_cls: (record.entity_type, record.kind, record.gate)
+        for record in registry.wired_processors()
+    }
+    assert recorded[BulkGetVFSStoragesAction] == (
+        VFSStorageEntityType(),
+        ActionKind.BULK,
+        ActionGate.PERMISSION,
+    )
+
+
+def test_idle_checker_loader_read_is_a_partial_permission_read() -> None:
+    """The idle checker DataLoader reads per named checker, not superadmin-only."""
+    registry = _ops_registry()
+    IdleCheckerProcessors(
+        registry.group(GroupMeta(IdleCheckerEntityType())),
+        registry.group(GroupMeta(SessionEntityType())),
+        MagicMock(),
+    )
+
+    recorded = {
+        record.action_cls: (record.entity_type, record.kind, record.gate)
+        for record in registry.wired_processors()
+    }
+    assert recorded[BulkGetIdleCheckersAction] == (
+        IdleCheckerEntityType(),
+        ActionKind.BULK,
+        ActionGate.PERMISSION,
+    )
+
+
+def test_audit_log_loader_read_is_a_partial_field_permission_read() -> None:
+    """The audit log DataLoader reads per named record, checked per entity each is about."""
+    registry = _ops_registry()
+    AuditLogProcessors(
+        registry.dangling_lookup_field_group(
+            FieldGroupMeta(AuditLogFieldType()),
+            AuditLogData,
+            LookupAuditLogOwnerAction,
+            LookupBulkAuditLogOwnerAction,
+        )
+    )
+
+    recorded = {
+        record.action_cls: (record.kind, record.gate) for record in registry.wired_processors()
+    }
+    assert recorded[BulkGetAuditLogsAction] == (ActionKind.BULK, ActionGate.PERMISSION)
+
+
+def test_dangling_lookup_field_group_records_its_owner_lookups_under_its_concern() -> None:
+    """Built from a concern, the lookups name that concern; built from the registry,
+    they name the field type, as the entity label wiring always has."""
+    registry = _ops_registry()
+    AuditLogProcessors(
+        registry.concern(ConcernMeta(Concern.VISIBILITY)).dangling_lookup_field_group(
+            FieldGroupMeta(AuditLogFieldType()),
+            AuditLogData,
+            LookupAuditLogOwnerAction,
+            LookupBulkAuditLogOwnerAction,
+        )
+    )
+    EntityLabelProcessors(
+        registry.dangling_lookup_field_group(
+            FieldGroupMeta(EntityLabelFieldType()),
+            EntityLabelData,
+            LookupEntityLabelOwnerAction,
+            LookupBulkEntityLabelOwnerAction,
+        )
+    )
+
+    recorded: dict[type[Any], set[tuple[object, ActionKind, ActionGate]]] = {}
+    for record in registry.wired_processors():
+        if record.kind == ActionKind.LOOKUP:
+            recorded.setdefault(record.action_cls, set()).add((
+                record.concern,
+                record.kind,
+                record.gate,
+            ))
+    assert recorded[LookupAuditLogOwnerAction] == {
+        (Concern.VISIBILITY, ActionKind.LOOKUP, ActionGate.PERMISSION)
+    }
+    # The partial bulk get records its owner lookup public beside the gated one.
+    assert recorded[LookupBulkAuditLogOwnerAction] == {
+        (Concern.VISIBILITY, ActionKind.LOOKUP, ActionGate.PERMISSION),
+        (Concern.VISIBILITY, ActionKind.LOOKUP, ActionGate.PUBLIC),
+    }
+    assert recorded[LookupEntityLabelOwnerAction] == {
+        (EntityLabelFieldType(), ActionKind.LOOKUP, ActionGate.PERMISSION)
+    }
+    assert recorded[LookupBulkEntityLabelOwnerAction] == {
+        (EntityLabelFieldType(), ActionKind.LOOKUP, ActionGate.PERMISSION)
+    }

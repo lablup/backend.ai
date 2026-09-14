@@ -115,6 +115,10 @@ from ai.backend.manager.services.artifact.revision.service import ArtifactRevisi
 from ai.backend.manager.services.artifact.service import ArtifactService
 from ai.backend.manager.services.artifact_registry.processors import ArtifactRegistryProcessors
 from ai.backend.manager.services.artifact_registry.service import ArtifactRegistryService
+from ai.backend.manager.services.audit_log.actions.lookup_owner import (
+    LookupAuditLogOwnerAction,
+    LookupBulkAuditLogOwnerAction,
+)
 from ai.backend.manager.services.audit_log.processors import AuditLogProcessors
 from ai.backend.manager.services.auth.processors import AuthProcessors
 from ai.backend.manager.services.auth.service import AuthService
@@ -806,8 +810,11 @@ def create_processors(
             artifact_groups.group(GroupMeta(StorageNamespaceEntityType()))
         ),
         audit_log=AuditLogProcessors(
-            visibility_groups.dangling_field_group(
-                FieldGroupMeta(AuditLogFieldType()), AuditLogData
+            visibility_groups.dangling_lookup_field_group(
+                FieldGroupMeta(AuditLogFieldType()),
+                AuditLogData,
+                LookupAuditLogOwnerAction,
+                LookupBulkAuditLogOwnerAction,
             )
         ),
         entity_label=EntityLabelProcessors(

@@ -32,8 +32,8 @@ from ai.backend.manager.models.audit_log import AuditLogRow
 from ai.backend.manager.models.audit_log.searchers import AuditLogSearcher
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.condition_utils import combine_conditions_or, negate_conditions
-from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.repositories.audit_log.options import AuditLogConditions, AuditLogOrders
+from ai.backend.manager.services.audit_log.actions.bulk_get import BulkGetAuditLogsAction
 from ai.backend.manager.services.audit_log.actions.scoped_search import (
     AuditLogScopeItem,
     EntityAuditLogScopeItem,
@@ -61,22 +61,19 @@ class AuditLogAdapter(BaseAdapter):
     def __init__(self, audit_log: AuditLogProcessors) -> None:
         self._audit_log = audit_log
 
-    async def batch_load_by_ids(self, ids: Sequence[AuditLogID]) -> list[AuditLogNode | None]:
-        """Batch load audit logs by their IDs for DataLoader use.
-
-        Returns AuditLogNode DTOs in the same order as the input ids list.
-        """
+    async def batch_load_by_ids(
+        self, ids: Sequence[AuditLogID]
+    ) -> list[AuditLogNode | Exception | None]:
+        """Batch load audit logs for DataLoader use, checked per entity each is about."""
         if not ids:
             return []
-        searcher = AuditLogSearcher(
-            pagination=OffsetPagination(limit=len(ids)),
-            conditions=[AuditLogConditions.by_ids(ids)],
+        audit_log_ids = [AuditLogID(audit_log_id) for audit_log_id in ids]
+        return await self.batch_load_fields(
+            self._audit_log.bulk_get,
+            BulkGetAuditLogsAction(ids=audit_log_ids),
+            audit_log_ids,
+            self._data_to_node,
         )
-        action_result = await self._audit_log.global_search.run(
-            SearchAuditLogsAction(searcher=searcher)
-        )
-        audit_log_map = {item.id: self._data_to_node(item) for item in action_result.items}
-        return [audit_log_map.get(AuditLogID(audit_log_id)) for audit_log_id in ids]
 
     async def admin_search(self, input: AdminSearchAuditLogsInput) -> SearchAuditLogsPayload:
         """Search audit logs with filters, ordering, and pagination."""
