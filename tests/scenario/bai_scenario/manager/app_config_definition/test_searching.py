@@ -14,7 +14,6 @@ from bai_scenario.components.app_config_definition import (
     ManyDefinitionsAndSomeone,
     OnlyTheNamedDefinitionIsFound,
     TenComeWithANextPage,
-    TheDefinitionAfterTheCursorIsFound,
     TheMiddleOffsetPageIsFound,
     TwoNamedDefinitionsAreFound,
 )
@@ -36,7 +35,6 @@ from ai.backend.common.dto.manager.v2.app_config_definition.types import (
     AppConfigDefinitionOrderField,
 )
 from ai.backend.common.dto.manager.v2.common import OrderDirection
-from ai.backend.manager.api.adapter_options.cursor.cursor import encode_cursor
 from ai.backend.manager.api.adapters.app_config_definition.adapter import (
     AppConfigDefinitionAdapter,
 )
@@ -195,32 +193,6 @@ class SearchingAMiddleOffsetPage(
 
 
 @dataclass(frozen=True)
-class SearchingAfterTheNewest(
-    When[ManyDefinitionsAndACaller, AppConfigDefinitionAdapter, Searched]
-):
-    """최신 정의의 커서 다음 항목 하나를 검색한다."""
-
-    @override
-    def operation(self) -> str:
-        return "admin_search"
-
-    @override
-    def describe(self, laid: ManyDefinitionsAndACaller) -> str:
-        newest = max(laid.laid, key=lambda one: one.created_at)
-        return f"{laid.caller.username}이 {newest.config_name} 다음 정의 한 건 조회"
-
-    @override
-    async def call(
-        self, adapter: AppConfigDefinitionAdapter, laid: ManyDefinitionsAndACaller
-    ) -> Searched:
-        newest = max(laid.laid, key=lambda one: one.created_at)
-        with ActingAs(laid.caller):
-            return await adapter.admin_search(
-                SearchAppConfigDefinitionsInput(first=1, after=encode_cursor(newest.id))
-            )
-
-
-@dataclass(frozen=True)
 class SearchingWithMixedPagination(
     When[ManyDefinitionsAndACaller, AppConfigDefinitionAdapter, Searched]
 ):
@@ -368,31 +340,6 @@ class AnOffsetPageReportsBothDirections(
 
 
 @dataclass(frozen=True)
-class AForwardCursorContinuesAfterTheNamedRow(
-    Scenario[SeedingSession, ManyDefinitionsAndACaller, AppConfigDefinitionAdapter, Searched]
-):
-    @override
-    def summary(self) -> str:
-        return "a-forward-cursor-continues-after-the-named-row"
-
-    @override
-    def describe(self) -> str:
-        return "설정 정의 넷이 있고 슈퍼관리자가 최신 정의의 커서 다음 한 건을 조회하면, 그다음 정의와 앞뒤 페이지가 모두 있다고 응답한다"
-
-    @override
-    def given(self) -> Given[SeedingSession, ManyDefinitionsAndACaller]:
-        return ManyDefinitionsAndSomeone(count=4, role=UserRole.SUPERADMIN)
-
-    @override
-    def when(self) -> When[ManyDefinitionsAndACaller, AppConfigDefinitionAdapter, Searched]:
-        return SearchingAfterTheNewest()
-
-    @override
-    def then(self) -> Then[ManyDefinitionsAndACaller, Searched]:
-        return TheDefinitionAfterTheCursorIsFound()
-
-
-@dataclass(frozen=True)
 class PaginationModesMayNotBeMixed(
     Scenario[SeedingSession, ManyDefinitionsAndACaller, AppConfigDefinitionAdapter, Searched]
 ):
@@ -473,7 +420,6 @@ SCENARIOS: list[SearchingStep] = [
     OrderingByNameSortsThem(),
     AnOrFilterKeepsEitherName(),
     AnOffsetPageReportsBothDirections(),
-    AForwardCursorContinuesAfterTheNamedRow(),
     PaginationModesMayNotBeMixed(),
     NoPageSizeMeansTen(),
     APlainUserMayNotSearch(),

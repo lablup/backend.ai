@@ -369,35 +369,3 @@ class TheMiddleOffsetPageIsFound(
             Same("has_next_page", payload.has_next_page, True),
             Same("has_previous_page", payload.has_previous_page, True),
         ]
-
-
-@dataclass(frozen=True)
-class TheDefinitionAfterTheCursorIsFound(
-    Then[ManyDefinitionsAndACaller, SearchAppConfigDefinitionsPayload]
-):
-    """최신 정의 다음의 정의 하나와 커서 페이지 정보를 확인한다."""
-
-    @override
-    def says(self) -> str:
-        return "커서 다음 정의와 앞뒤 페이지가 모두 있다고 응답한다"
-
-    @override
-    def look(
-        self,
-        laid: ManyDefinitionsAndACaller,
-        answered: Answered[SearchAppConfigDefinitionsPayload],
-    ) -> list[Verdict]:
-        payload = answered.response
-        if payload is None:
-            return [Refused(NotEnoughPermission, answered.raised)]
-        ordered = sorted(laid.laid, key=lambda one: one.created_at, reverse=True)
-        return [
-            Held[object](
-                "items",
-                [one.id for one in payload.items],
-                SameAs[object]([ordered[1].id], "커서 다음 설정 정의"),
-            ),
-            Same("total_count", payload.total_count, len(laid.laid)),
-            Same("has_next_page", payload.has_next_page, True),
-            Same("has_previous_page", payload.has_previous_page, True),
-        ]

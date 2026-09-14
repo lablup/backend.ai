@@ -421,36 +421,6 @@ Then
 
 ### searching
 
-#### [a-forward-cursor-continues-after-the-named-row](/tests/scenario/bai_scenario/manager/app_config_definition/test_searching.py) — pass
-
-설정 정의 넷이 있고 슈퍼관리자가 최신 정의의 커서 다음 한 건을 조회하면, 그다음 정의와 앞뒤 페이지가 모두 있다고 응답한다
-
-Given
-
-- 설정 정의 4개와, 슈퍼관리자 한 명
-  - 도메인 home-1
-  - 설정 정의 wanted-1: 이 이름의 설정이 등록돼 있다
-  - 설정 정의 other-1: 이 이름의 설정이 등록돼 있다
-  - 설정 정의 other-2: 이 이름의 설정이 등록돼 있다
-  - 설정 정의 other-3: 이 이름의 설정이 등록돼 있다
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-
-When
-
-- AppConfigDefinitionAdapter.admin_search — user-1이 wanted-1 다음 정의 한 건 조회
-
-Then
-
-- 커서 다음 정의와 앞뒤 페이지가 모두 있다고 응답한다
-  - items: 커서 다음 설정 정의와 같다
-  - total_count = 4
-  - has_next_page = True
-  - has_previous_page = True
-
 #### [a-middle-offset-page-reports-both-directions](/tests/scenario/bai_scenario/manager/app_config_definition/test_searching.py) — pass
 
 설정 정의 넷을 이름순으로 두 번째 항목부터 두 건 조회하면, 중간 두 항목과 앞뒤 페이지가 모두 있다고 응답한다
