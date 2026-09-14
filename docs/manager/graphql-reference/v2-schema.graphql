@@ -11609,9 +11609,12 @@ type Query {
   myLoginHistoryV2(filter: LoginHistoryFilter = null, orderBy: [LoginHistoryOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): LoginHistoryV2Connection
 
   """
-  Added in 26.3.0. List roles assigned to the current authenticated user.
+  Added in 26.3.0. List the assignment rows joining the current authenticated user to the roles they hold. Deprecated since 26.9.0. Use `myRolesV2`.
   """
-  myRoles(filter: RoleAssignmentFilter = null, orderBy: [RoleAssignmentOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RoleAssignmentConnection
+  myRoles(filter: RoleAssignmentFilter = null, orderBy: [RoleAssignmentOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RoleAssignmentConnection @deprecated(reason: "Deprecated since 26.9.0. Use `myRolesV2`, which answers with the roles themselves.")
+
+  """Added in 26.9.0. List the roles the current authenticated user holds."""
+  myRolesV2(filter: RoleFilter = null, orderBy: [RoleOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RoleConnection
 
   """Added in 26.4.2. List roles registered in a project scope."""
   projectRoles(projectId: UUID!, filter: RoleFilter = null, orderBy: [RoleOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RoleConnection
@@ -13372,8 +13375,13 @@ type Role implements Node {
   """Added in 26.3.0. Permissions associated with this role."""
   permissions(filter: PermissionFilter = null, orderBy: [PermissionOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): PermissionConnection
 
-  """Added in 26.3.0. Users assigned to this role."""
-  users(filter: RoleAssignmentFilter = null, orderBy: [RoleAssignmentOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RoleAssignmentConnection
+  """
+  Added in 26.3.0. Users assigned to this role, as assignment rows. Deprecated since 26.9.0. Use `usersV2`.
+  """
+  users(filter: RoleAssignmentFilter = null, orderBy: [RoleAssignmentOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RoleAssignmentConnection @deprecated(reason: "Deprecated since 26.9.0. Use `usersV2`, which answers with the users themselves.")
+
+  """Added in 26.9.0. Users holding this role."""
+  usersV2(filter: UserV2Filter = null, orderBy: [UserV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): UserV2Connection
 }
 
 """Added in 26.3.0. RBAC role assignment (user-role association)."""
@@ -17226,6 +17234,9 @@ input UserScope {
 
   """Projects whose users are being read."""
   project: [UUIDScope!] = null
+
+  """Added in 26.9.0. Roles whose holders are being read."""
+  role: [UUIDScope!] = null
 }
 
 """
