@@ -19582,8 +19582,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Updated role name",
+            "description": "Updated role name. Omit to leave unchanged.",
             "title": "Name"
           },
           "description": {
@@ -19592,14 +19591,10 @@
                 "type": "string"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
-            "description": "Updated role description. Use SENTINEL to clear.",
+            "description": "Updated role description. Omit to leave unchanged; null clears.",
             "title": "Description"
           },
           "status": {
@@ -19611,8 +19606,8 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Updated role status"
+            "description": "Updated role status. Omit to leave unchanged.",
+            "title": "Status"
           },
           "auto_assign": {
             "anyOf": [
@@ -19623,8 +19618,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Updated value for the `auto_assign` flag. When true, the role is automatically granted to a user when the user is added to a scope this role is registered in.",
+            "description": "Updated value for the `auto_assign` flag. When true, the role is automatically granted to a user when the user is added to a scope this role is registered in. Omit to leave unchanged.",
             "title": "Auto Assign"
           }
         },
@@ -19916,8 +19910,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Updated entity type",
+            "description": "Updated entity type. Omit to leave unchanged.",
             "title": "Entity Type"
           },
           "permission": {
@@ -19929,8 +19922,8 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Updated operation bit"
+            "description": "Updated operation bit. Omit to leave unchanged.",
+            "title": "Permission"
           }
         },
         "required": [
@@ -26926,7 +26919,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
+            "description": "Model card name. Omit to leave unchanged.",
             "title": "Name"
           },
           "author": {
@@ -26935,13 +26928,10 @@
                 "type": "string"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
+            "description": "Model card author. Omit to leave unchanged; null clears.",
             "title": "Author"
           },
           "title": {
@@ -26950,13 +26940,10 @@
                 "type": "string"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
+            "description": "Model card title. Omit to leave unchanged; null clears.",
             "title": "Title"
           },
           "model_version": {
@@ -26965,13 +26952,10 @@
                 "type": "string"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
+            "description": "Model version. Omit to leave unchanged; null clears.",
             "title": "Model Version"
           },
           "description": {
@@ -26980,13 +26964,10 @@
                 "type": "string"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
+            "description": "Model card description. Omit to leave unchanged; null clears.",
             "title": "Description"
           },
           "task": {
@@ -26995,13 +26976,10 @@
                 "type": "string"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
+            "description": "Task type. Omit to leave unchanged; null clears.",
             "title": "Task"
           },
           "category": {
@@ -27010,13 +26988,10 @@
                 "type": "string"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
+            "description": "Model category. Omit to leave unchanged; null clears.",
             "title": "Category"
           },
           "architecture": {
@@ -27025,13 +27000,10 @@
                 "type": "string"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
+            "description": "Model architecture. Omit to leave unchanged; null clears.",
             "title": "Architecture"
           },
           "framework": {
@@ -27046,7 +27018,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
+            "description": "Frameworks. Omit to leave unchanged.",
             "title": "Framework"
           },
           "label": {
@@ -27061,7 +27033,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
+            "description": "Labels. Omit to leave unchanged.",
             "title": "Label"
           },
           "license": {
@@ -27070,13 +27042,10 @@
                 "type": "string"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
+            "description": "Model license. Omit to leave unchanged; null clears.",
             "title": "License"
           },
           "min_resource": {
@@ -27088,13 +27057,10 @@
                 "type": "array"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
+            "description": "Minimum resource requirements. Omit to leave unchanged; null clears.",
             "title": "Min Resource"
           },
           "readme": {
@@ -27103,13 +27069,10 @@
                 "type": "string"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
+            "description": "Model readme. Omit to leave unchanged; null clears.",
             "title": "Readme"
           },
           "access_level": {
@@ -27118,13 +27081,10 @@
                 "$ref": "#/components/schemas/ModelCardAccessLevel"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
+            "description": "Access level. Omit to leave unchanged.",
             "title": "Access Level"
           }
         },
@@ -35372,14 +35332,10 @@
                 "type": "string"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
-            "description": "Updated role description",
+            "description": "Updated role description. Omit to leave unchanged; null clears.",
             "title": "Description"
           }
         },
