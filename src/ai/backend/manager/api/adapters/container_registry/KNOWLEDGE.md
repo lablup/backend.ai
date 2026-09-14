@@ -1,9 +1,14 @@
 ---
 name: container-registry-adapter-scenarios
 type: reference
-description: what the container registry adapter guarantees, as scenarios; the superadmin role as the gate on its own calls, the rbac relation gate behind the allowed-project list, the URL check that runs on update but not on create
+description: container registry adapter scenario guarantees; superadmin-gated management calls, RBAC project relations, is_global image visibility, update-only URL validation
 scope: src/ai/backend/manager/api/adapters/container_registry
-keywords: [container registry, scenario, adapter, superadmin, allowed groups, relation]
+keywords: [container registry, scenario, adapter, superadmin, RBAC, allowed groups, relation, is_global, image visibility]
+sources:
+  - src/ai/backend/manager/api/adapters/container_registry/adapter.py
+  - src/ai/backend/manager/services/container_registry/actions/base.py
+  - src/ai/backend/manager/models/image/row.py
+  - tests/scenario/bai_scenario/manager/container_registry
 generated:
   by: codex/gpt-5
   at: 2026-09-14
@@ -16,12 +21,17 @@ status: draft
 
 ## 대부분의 호출은 슈퍼관리자만 실행할 수 있다
 
-- 컨테이너 레지스트리는 특정 스코프에 속하지 않으며, 개별 레지스트리를 RBAC 엔티티로 조회하는
-  구성도 없다.
-- 허용 프로젝트를 변경하는 호출을 제외하면 RBAC 권한이 아니라 슈퍼관리자 여부로 접근을
-  제어한다.
+- 각 레지스트리는 상위 스코프에 소유되지 않는 RBAC 엔티티로 생성된다.
+- 허용 프로젝트 변경을 제외한 관리 호출은 global action으로 처리되며, 엔티티별 RBAC 권한이
+  아니라 슈퍼관리자 여부로 접근을 제어한다.
 - 허용 프로젝트 추가와 제거는 RBAC 관계 작업을 사용하므로 레지스트리와 프로젝트 양쪽의 권한을
   검사하며, 엔티티 권한 검사 설정의 영향을 받는다.
+
+## `is_global`은 이미지의 프로젝트 공개 범위를 정한다
+
+- `is_global`은 레지스트리가 RBAC 계층에서 상위 스코프에 소유되는지와 무관하다.
+- 전역 레지스트리의 이미지는 프로젝트 관계 조건 없이 권한 후보에 포함되지만, 비전역
+  레지스트리의 이미지는 허용 관계가 있는 프로젝트에서만 후보에 포함된다.
 - 레지스트리가 소유한 이미지는 [이미지 어댑터](../image/KNOWLEDGE.md)가 처리한다. 이미지
   리스캔은 REST v1 핸들러가 프로세서를 직접 호출하므로 이 어댑터의 보장 범위에 포함되지 않는다.
 
@@ -138,11 +148,3 @@ ID별로 결과를 나누지 않고 요청 전체를 거부한다.
 
 이 어댑터는 논리 삭제와 복원을 지원하지 않는다. 삭제하면 레지스트리 행이 데이터베이스에서
 제거된다.
-
-## 필드 일괄 조회는 아직 시나리오로 검증하지 않는다
-
-- 어댑터가 직접 정의한 여섯 호출은 모두 위 시나리오에서 다룬다.
-- `batch_load_fields`는 공통 어댑터에서 상속한 필드 일괄 조회 호출이며, 아직 사용하는
-  시나리오가 없다. 레지스트리에서 일괄 조회할 필드가 정해지면 시나리오를 추가한다.
-- 허용 프로젝트 변경 호출은 반환값이 없고 생성·수정·삭제 응답에도 프로젝트 관계가 포함되지
-  않으므로, 해당 시나리오는 어댑터 호출 뒤 연관 테이블을 조회해 최종 상태를 검증한다.
