@@ -5,7 +5,6 @@ import logging
 from collections import defaultdict
 from collections.abc import Callable, Collection, Mapping, Sequence
 from typing import cast
-from uuid import UUID
 
 import sqlalchemy as sa
 from sqlalchemy.exc import DBAPIError
@@ -14,6 +13,7 @@ from sqlalchemy.orm import selectinload
 
 from ai.backend.common.bgtask.reporter import ProgressReporter
 from ai.backend.common.data.entity.image_alias import ImageAliasID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.types import ImageID
 from ai.backend.common.utils import join_non_empty
@@ -290,7 +290,7 @@ class ImageDBSource:
     async def validate_image_ownership(
         self,
         image_id: ImageID,
-        user_id: UUID,
+        user_id: UserID,
         status_filter: list[ImageStatus] | None = None,
     ) -> bool:
         """

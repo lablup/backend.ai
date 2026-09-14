@@ -1,11 +1,11 @@
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
-from uuid import UUID
 
 from ai.backend.common.bgtask.reporter import ProgressReporter
 from ai.backend.common.clients.valkey_client.valkey_image.client import ValkeyImageClient
 from ai.backend.common.container_registry import ContainerRegistryType
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.exception import BackendAIError
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
@@ -234,7 +234,7 @@ class ImageRepository:
     async def validate_image_ownership(
         self,
         image_id: ImageID,
-        user_id: UUID,
+        user_id: UserID,
         status_filter: list[ImageStatus] | None = None,
     ) -> bool:
         """
