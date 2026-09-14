@@ -173,11 +173,17 @@ from ai.backend.manager.services.deployment.actions.access_token.bulk_get_access
 from ai.backend.manager.services.deployment.actions.auto_scaling_rule.bulk_delete_auto_scaling_rules import (
     BulkDeleteAutoScalingRulesAction,
 )
+from ai.backend.manager.services.deployment.actions.auto_scaling_rule.bulk_get_auto_scaling_rules import (
+    BulkGetAutoScalingRulesAction,
+)
+from ai.backend.manager.services.deployment.actions.bulk_get import BulkGetDeploymentsAction
 from ai.backend.manager.services.deployment.actions.deployment_policy.bulk_get_deployment_policies import (
     BulkGetDeploymentPoliciesAction,
 )
 from ai.backend.manager.services.deployment.actions.lookup_owner import (
+    LookupBulkAutoScalingRuleOwnerAction,
     LookupBulkDeploymentAccessTokenOwnerAction,
+    LookupBulkReplicaGroupOwnerAction,
     LookupBulkReplicaOwnerAction,
 )
 from ai.backend.manager.services.deployment.actions.model_revision.bulk_get_revisions import (
@@ -186,6 +192,9 @@ from ai.backend.manager.services.deployment.actions.model_revision.bulk_get_revi
 from ai.backend.manager.services.deployment.actions.replica.bulk_get_replicas import (
     BulkGetReplicasAction,
 )
+from ai.backend.manager.services.deployment.actions.replica_group.bulk_get_replica_groups import (
+    BulkGetReplicaGroupsAction,
+)
 from ai.backend.manager.services.deployment.actions.route.bulk_get_routes import (
     BulkGetRoutesAction,
 )
@@ -193,6 +202,9 @@ from ai.backend.manager.services.deployment.actions.scoped_search import (
     ScopedSearchDeploymentsAction,
 )
 from ai.backend.manager.services.deployment.processors import DeploymentProcessors
+from ai.backend.manager.services.deployment_revision_preset.actions.bulk_get import (
+    BulkGetDeploymentPresetsAction,
+)
 from ai.backend.manager.services.deployment_revision_preset.processors import (
     DeploymentPresetProcessors,
 )
@@ -854,8 +866,10 @@ def test_field_data_loader_reads_are_partial_permission_reads() -> None:
     partial = (DeploymentEntityType(), ActionKind.BULK, ActionGate.PERMISSION)
     assert recorded[BulkGetRevisionsAction] == partial
     assert recorded[BulkGetReplicasAction] == partial
+    assert recorded[BulkGetReplicaGroupsAction] == partial
     assert recorded[BulkGetRoutesAction] == partial
     assert recorded[BulkGetAccessTokensAction] == partial
+    assert recorded[BulkGetAutoScalingRulesAction] == partial
     assert recorded[BulkGetDeploymentPoliciesAction] == partial
     assert recorded[BulkGetDeploymentHistoriesAction] == partial
     assert recorded[BulkGetRouteHistoriesAction] == partial
@@ -878,6 +892,8 @@ def test_field_data_loader_reads_are_partial_permission_reads() -> None:
     for owner_lookup in (
         LookupBulkReplicaOwnerAction,
         LookupBulkDeploymentAccessTokenOwnerAction,
+        LookupBulkAutoScalingRuleOwnerAction,
+        LookupBulkReplicaGroupOwnerAction,
         LookupBulkSessionSchedulingHistoryOwnerAction,
         LookupBulkKernelSchedulingHistoryOwnerAction,
     ):
@@ -954,11 +970,23 @@ def test_entity_data_loader_reads_are_checked_per_entity_except_domains() -> Non
         ),
         MagicMock(),
     )
+    DeploymentPresetProcessors(registry.group(GroupMeta(DeploymentPresetEntityType())), MagicMock())
+    DeploymentProcessors(registry.group(GroupMeta(DeploymentEntityType())), MagicMock())
 
     recorded = {
         record.action_cls: (record.entity_type, record.kind, record.gate)
         for record in registry.wired_processors()
     }
+    assert recorded[BulkGetDeploymentsAction] == (
+        DeploymentEntityType(),
+        ActionKind.BULK,
+        ActionGate.PERMISSION,
+    )
+    assert recorded[BulkGetDeploymentPresetsAction] == (
+        DeploymentPresetEntityType(),
+        ActionKind.BULK,
+        ActionGate.PERMISSION,
+    )
     assert recorded[BulkGetResourceGroupsAction] == (
         ResourceGroupEntityType(),
         ActionKind.BULK,

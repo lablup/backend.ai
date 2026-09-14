@@ -576,13 +576,16 @@ class DataLoaders:
     ) -> DataLoader[DeploymentID, ModelDeployment | None]:
         adapter = self._adapters.deployment
 
-        async def load_fn(ids: list[DeploymentID]) -> list[ModelDeployment | None]:
+        async def load_fn(ids: list[DeploymentID]) -> list[ModelDeployment | Exception | None]:
             from ai.backend.manager.api.gql.deployment.types.deployment import (  # pants: no-infer-dep
                 ModelDeployment as MD,
             )
 
             dtos = await adapter.batch_load_by_ids(ids)
-            return [MD.from_pydantic(dto) if dto is not None else None for dto in dtos]
+            return [
+                dto if dto is None or isinstance(dto, Exception) else MD.from_pydantic(dto)
+                for dto in dtos
+            ]
 
         return DataLoader(load_fn=load_fn)
 
@@ -615,29 +618,16 @@ class DataLoaders:
 
         async def load_fn(
             ids: list[DeploymentPresetID],
-        ) -> list[DeploymentRevisionPresetGQL | None]:
-            from ai.backend.common.dto.manager.query import UUIDFilter
-            from ai.backend.common.dto.manager.v2.deployment_revision_preset.request import (  # pants: no-infer-dep
-                DeploymentRevisionPresetFilter,
-                SearchDeploymentRevisionPresetsInput,
-            )
-            from ai.backend.common.dto.manager.v2.deployment_revision_preset.response import (  # pants: no-infer-dep
-                DeploymentRevisionPresetNode,
-            )
+        ) -> list[DeploymentRevisionPresetGQL | Exception | None]:
             from ai.backend.manager.api.gql.deployment.types.revision_preset import (  # pants: no-infer-dep
                 DeploymentRevisionPresetGQL as DRP,
             )
 
-            payload = await adapter.search(
-                SearchDeploymentRevisionPresetsInput(
-                    filter=DeploymentRevisionPresetFilter(id=UUIDFilter(in_=list(ids))),
-                    limit=len(ids),
-                )
-            )
-            node_map: dict[DeploymentPresetID, DeploymentRevisionPresetNode] = {
-                DeploymentPresetID(item.id): item for item in payload.items
-            }
-            return [DRP.from_pydantic(node) if (node := node_map.get(pid)) else None for pid in ids]
+            dtos = await adapter.batch_load_by_ids(ids)
+            return [
+                dto if dto is None or isinstance(dto, Exception) else DRP.from_pydantic(dto)
+                for dto in dtos
+            ]
 
         return DataLoader(load_fn=load_fn)
 
@@ -900,13 +890,16 @@ class DataLoaders:
     ) -> DataLoader[uuid.UUID, AutoScalingRule | None]:
         adapter = self._adapters.deployment
 
-        async def load_fn(ids: list[uuid.UUID]) -> list[AutoScalingRule | None]:
+        async def load_fn(ids: list[uuid.UUID]) -> list[AutoScalingRule | Exception | None]:
             from ai.backend.manager.api.gql.deployment.types.auto_scaling import (  # pants: no-infer-dep
                 AutoScalingRule as ASR,
             )
 
             dtos = await adapter.batch_load_auto_scaling_rules_by_ids(ids)
-            return [ASR.from_pydantic(dto) if dto is not None else None for dto in dtos]
+            return [
+                dto if dto is None or isinstance(dto, Exception) else ASR.from_pydantic(dto)
+                for dto in dtos
+            ]
 
         return DataLoader(load_fn=load_fn)
 

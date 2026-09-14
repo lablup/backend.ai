@@ -167,30 +167,6 @@ from ai.backend.manager.sokovan.deployment.types import DeploymentLifecycleType
 log = BraceStyleAdapter(logging.getLogger(__name__))
 
 
-def _map_lifecycle_to_status(lifecycle: EndpointLifecycle) -> ModelDeploymentStatus:
-    """Map EndpointLifecycle to ModelDeploymentStatus for the v2 status surface.
-
-    The lifecycle axis is monotonic (PENDING → DEPLOYING → READY → DESTROYING
-    → DESTROYED); v2 exposes replica reconciliation as the orthogonal
-    ``scaling_state`` field on the deployment node. ``SCALING`` is therefore
-    no longer surfaced through ``ModelDeploymentStatus`` — a legacy
-    ``lifecycle=SCALING`` row folds into ``READY`` so clients only have to
-    consult ``scaling_state`` to decide whether a replica reconcile is in
-    flight. Legacy ``CREATED`` (never-deployed) folds into ``PENDING``.
-    """
-    match lifecycle:
-        case EndpointLifecycle.PENDING | EndpointLifecycle.CREATED:
-            return ModelDeploymentStatus.PENDING
-        case EndpointLifecycle.READY | EndpointLifecycle.SCALING:
-            return ModelDeploymentStatus.READY
-        case EndpointLifecycle.DEPLOYING:
-            return ModelDeploymentStatus.DEPLOYING
-        case EndpointLifecycle.DESTROYING:
-            return ModelDeploymentStatus.STOPPING
-        case EndpointLifecycle.DESTROYED:
-            return ModelDeploymentStatus.STOPPED
-
-
 def _deployment_desired_replica_count(info: DeploymentInfo) -> int:
     desired_count = info.replica.desired_replica_count
     if desired_count is None:
@@ -208,7 +184,7 @@ def _convert_deployment_info_to_data(info: DeploymentInfo) -> ModelDeploymentDat
         id=info.id,
         metadata=ModelDeploymentMetadataInfo(
             name=info.metadata.name,
-            status=_map_lifecycle_to_status(info.state.lifecycle),
+            status=ModelDeploymentStatus.from_lifecycle(info.state.lifecycle),
             tags=[info.metadata.tag] if info.metadata.tag else [],
             project_id=info.metadata.project,
             domain_name=info.metadata.domain,
@@ -233,6 +209,7 @@ def _convert_deployment_info_to_data(info: DeploymentInfo) -> ModelDeploymentDat
         scaling_state=info.state.scaling_state,
         policy=info.policy,
         sub_step=info.sub_step,
+        primary_replica_group_id=info.primary_replica_group_id,
     )
 
 
@@ -247,7 +224,7 @@ def _convert_deployment_info_to_legacy_data(info: DeploymentInfo) -> LegacyDeplo
         id=info.id,
         metadata=ModelDeploymentMetadataInfo(
             name=info.metadata.name,
-            status=_map_lifecycle_to_status(info.state.lifecycle),
+            status=ModelDeploymentStatus.from_lifecycle(info.state.lifecycle),
             tags=[info.metadata.tag] if info.metadata.tag else [],
             project_id=info.metadata.project,
             domain_name=info.metadata.domain,
