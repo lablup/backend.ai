@@ -225,7 +225,9 @@ class ImageDBSource:
         Marks a soft-deleted image record as alive again by its ID in the database.
         """
         async with self._db.begin_session() as session:
-            image_row = await self._get_image_by_id(session, image_id)
+            image_row = await self._get_image_by_id(
+                session, image_id, status_filter=list(ImageStatus)
+            )
             await image_row.mark_as_alive(session)
             return image_row.to_dataclass()
 
