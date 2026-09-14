@@ -442,6 +442,23 @@ class TestSyncSeedRoles:
             _PRESET_BY_NAME["project_member"].id
         )
 
+    async def test_the_legacy_role_takes_its_graph_node(
+        self, db: ExtendedAsyncSAEngine, seeded: dict[str, uuid.UUID]
+    ) -> None:
+        async with db.begin_session() as session:
+            session.add(VirtualEntityRow(entity_type="role", entity_id=seeded["legacy_role"]))
+        async with db.begin() as conn:
+            await conn.run_sync(lambda sync_conn: _run(sync_conn))
+        async with db.begin_readonly_session() as session:
+            left = (
+                await session.execute(
+                    sa.select(sa.func.count())
+                    .select_from(VirtualEntityRow)
+                    .where(VirtualEntityRow.entity_id == seeded["legacy_role"])
+                )
+            ).scalar_one()
+        assert left == 0
+
     async def test_the_legacy_system_role_goes_and_the_custom_one_stays(
         self, db: ExtendedAsyncSAEngine, migrated: dict[str, uuid.UUID]
     ) -> None:

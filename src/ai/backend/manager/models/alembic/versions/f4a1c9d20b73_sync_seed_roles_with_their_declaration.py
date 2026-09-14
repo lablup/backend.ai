@@ -856,8 +856,27 @@ def _drop_unlinked_system_roles(conn: sa.engine.Connection) -> None:
     A preset is the only thing that makes a system role, so one without a preset is
     left over from a rule that no longer runs. A role made by hand is never a system
     one, so nothing of anyone's goes here. The role's permissions and assignments go
-    with it, as its foreign keys say."""
-    conn.execute(sa.text("DELETE FROM roles WHERE source = 'system' AND role_preset_id IS NULL"))
+    with it, as its foreign keys say; its graph node does not, and is taken here."""
+    doomed = [
+        row.id
+        for row in conn.execute(
+            sa.text("SELECT id FROM roles WHERE source = 'system' AND role_preset_id IS NULL")
+        )
+    ]
+    if not doomed:
+        return
+    conn.execute(
+        sa.text("DELETE FROM roles WHERE id = ANY(:ids)").bindparams(
+            sa.bindparam("ids", doomed, type_=sa.ARRAY(sa.Uuid))
+        )
+    )
+    # The graph node names its entity by a pair, not a foreign key, so nothing takes it
+    # away with the row. Its edges go with the node, which is a foreign key.
+    conn.execute(
+        sa.text(
+            "DELETE FROM virtual_entities WHERE entity_type = 'role' AND entity_id = ANY(:ids)"
+        ).bindparams(sa.bindparam("ids", doomed, type_=sa.ARRAY(sa.Uuid)))
+    )
 
 
 def _grant_auto_assign_roles(conn: sa.engine.Connection) -> None:
