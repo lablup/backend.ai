@@ -1,3 +1,4 @@
+id: 06057849-3534-546f-b74c-b79d5d3ecf5e
 name: project_member
 scope_type: project
 auto_assign: true
@@ -19,10 +20,10 @@ permissions:
   entity_share:                     []
   global:                           []
   idle_checker:                     []
-  image:                            [create]
+  image:                            [read]
   keypair_resource_policy:          []
   login_client_type:                []
-  model_card:                       []
+  model_card:                       [read]
   network:                          []
   notification_channel:             []
   notification_rule:                []
@@ -42,11 +43,11 @@ permissions:
   scope_admin:                      []
   service_catalog:                  []
   session:                          [create]
-  session_group:                    []
+  session_group:                    [create]
   session_template:                 []
   storage_namespace:                []
   user:                             [read]
   user_resource_policy:             []
-  vfolder:                          [read, update, create, soft_delete]
+  vfolder:                          [read, update, create, soft_delete, hard_delete]
   vfolder_invitation:               []
   vfs_storage:                      []

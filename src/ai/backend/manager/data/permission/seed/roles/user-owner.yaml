@@ -1,3 +1,4 @@
+id: 776c1366-dcf3-5abd-b8de-bc3ad3b759ad
 name: user_owner
 scope_type: user
 auto_assign: false
@@ -15,7 +16,7 @@ permissions:
   container_registry:               [read]
   deployment:                       [read, update, create, soft_delete, hard_delete]
   deployment_preset:                []
-  domain:                           []
+  domain:                           [read]
   entity_share:                     [read, update, create, soft_delete, hard_delete]
   global:                           []
   idle_checker:                     [read, update, create, soft_delete, hard_delete]
@@ -27,15 +28,15 @@ permissions:
   notification_channel:             []
   notification_rule:                []
   object_storage:                   []
-  project:                          [read, update, create, soft_delete, hard_delete]
-  project_resource_policy:          [read, update, create, soft_delete, hard_delete]
+  project:                          []
+  project_resource_policy:          []
   prometheus_query_preset:          []
   prometheus_query_preset_category: []
   resource_group:                   [read]
   resource_preset:                  [read, update, create, soft_delete, hard_delete]
   resource_slot_type:               []
   retention_policy:                 []
-  role:                             []
+  role:                             [read]
   role_preset:                      []
   runtime_variant:                  []
   runtime_variant_preset:           []
@@ -46,7 +47,7 @@ permissions:
   session_template:                 [read, update, create, soft_delete, hard_delete]
   storage_namespace:                []
   user:                             [read, update, soft_delete, hard_delete]
-  user_resource_policy:             [read, update, create, soft_delete, hard_delete]
-  vfolder:                          [read, update, create, soft_delete]
+  user_resource_policy:             [read]
+  vfolder:                          [read, update, create, soft_delete, hard_delete]
   vfolder_invitation:               []
   vfs_storage:                      []

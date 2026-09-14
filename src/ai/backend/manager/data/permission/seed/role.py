@@ -4,6 +4,7 @@ from typing import Any, Self
 
 from pydantic import BaseModel, ConfigDict, field_validator, model_validator
 
+from ai.backend.common.data.entity.role_preset import RolePresetID
 from ai.backend.common.data.entity.types import EntityType
 from ai.backend.common.data.permission.types import Permission, role_scope_types
 
@@ -20,12 +21,14 @@ _OPERATION_NAMES: dict[str, Permission] = {
 class RoleSeed(BaseModel):
     """One seed role, as its file states it.
 
-    The three header fields are the ``role_presets`` row. ``permissions`` lists every
-    entity type, with an empty list where the role is granted nothing.
+    The header fields are the ``role_presets`` row. The id is stated rather than
+    derived, so renaming a role leaves what points at it alone. ``permissions`` lists
+    every entity type, with an empty list where the role is granted nothing.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
+    id: RolePresetID
     name: str
     scope_type: EntityType
     auto_assign: bool

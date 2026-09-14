@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import uuid
 
 import pytest
 from pydantic import ValidationError
@@ -16,6 +17,7 @@ from ai.backend.manager.data.permission.seed.kinds import PermissionKinds
 from ai.backend.manager.data.permission.seed.loader import RoleSeedLoader
 from ai.backend.manager.data.permission.seed.role import RoleSeed
 from ai.backend.manager.errors.permission import InvalidRoleSeed
+from ai.backend.manager.models.base import ensure_all_tables_registered, metadata
 
 
 @pytest.fixture(scope="module")
@@ -44,6 +46,7 @@ def _empty(kinds: PermissionKinds) -> dict[str, list[str]]:
 
 def _seed(name: str, permissions: dict[str, list[str]]) -> RoleSeed:
     return RoleSeed.model_validate({
+        "id": str(uuid.uuid5(uuid.NAMESPACE_DNS, name)),
         "name": name,
         "scope_type": "project",
         "auto_assign": False,
@@ -123,6 +126,7 @@ class TestOperationVocabulary:
     def test_an_unknown_header_field_is_refused(self) -> None:
         with pytest.raises(ValidationError):
             RoleSeed.model_validate({
+                "id": str(uuid.uuid4()),
                 "name": "admin",
                 "scope_type": "project",
                 "auto_assign": False,
@@ -187,3 +191,35 @@ class TestFixture:
         assert {row["role_id"] for row in rendered["permissions"]} <= role_ids
         assert {row["role_id"] for row in rendered["user_roles"]} <= role_ids
         assert not any(preset["deleted"] for preset in rendered["role_presets"])
+
+    def test_every_row_fits_its_table(self, seeds: list[RoleSeed]) -> None:
+        """A generated row names the columns its table has, and misses none it needs."""
+        ensure_all_tables_registered()
+        rendered = RoleFixture(seeds, _REPOSITORY / "fixtures" / "manager").render()
+        for name, rows in rendered.items():
+            if name.startswith("__"):
+                continue
+            table = metadata.tables.get(name)
+            assert table is not None, f"{name} is not a table"
+            columns = {column.name for column in table.columns}
+            needed = {
+                column.name
+                for column in table.columns
+                if not column.nullable and column.default is None and column.server_default is None
+            }
+            for row in rows:
+                assert not set(row) - columns, f"{name}: {sorted(set(row) - columns)}"
+                assert not needed - set(row), f"{name}: {sorted(needed - set(row))}"
+
+    def test_a_preset_carries_the_id_its_file_states(self, seeds: list[RoleSeed]) -> None:
+        rendered = RoleFixture(seeds, _REPOSITORY / "fixtures" / "manager").render()
+        declared = {str(seed.id) for seed in seeds}
+        assert {preset["id"] for preset in rendered["role_presets"]} == declared
+        assert {role["role_preset_id"] for role in rendered["roles"]} <= declared
+
+    def test_a_derived_id_is_a_uuid7(self, seeds: list[RoleSeed]) -> None:
+        """Only the stated preset ids keep the version they were minted with."""
+        rendered = RoleFixture(seeds, _REPOSITORY / "fixtures" / "manager").render()
+        for name in ("roles", "user_roles", "permissions", "virtual_entities"):
+            for row in rendered[name]:
+                assert uuid.UUID(row["id"]).version == 7, f"{name}: {row['id']}"

@@ -1,3 +1,4 @@
+id: 22c4db03-24aa-5ff8-b5a9-64b2a2182413
 name: project_admin
 scope_type: project
 auto_assign: false
@@ -15,20 +16,20 @@ permissions:
   container_registry:               [read]
   deployment:                       [read, update, create, soft_delete, hard_delete]
   deployment_preset:                []
-  domain:                           []
+  domain:                           [read]
   entity_share:                     [read, update, create, soft_delete, hard_delete]
   global:                           []
-  idle_checker:                     []
+  idle_checker:                     [read, update, create, soft_delete, hard_delete]
   image:                            [read, update, create, soft_delete, hard_delete]
   keypair_resource_policy:          []
   login_client_type:                []
-  model_card:                       []
+  model_card:                       [read, update, create, soft_delete, hard_delete]
   network:                          [read, update, create, soft_delete, hard_delete]
   notification_channel:             []
   notification_rule:                []
   object_storage:                   []
-  project:                          []
-  project_resource_policy:          []
+  project:                          [read, update, soft_delete, hard_delete]
+  project_resource_policy:          [read]
   prometheus_query_preset:          []
   prometheus_query_preset_category: []
   resource_group:                   [read]
@@ -47,6 +48,6 @@ permissions:
   storage_namespace:                []
   user:                             [read]
   user_resource_policy:             []
-  vfolder:                          [read, update, create, soft_delete]
+  vfolder:                          [read, update, create, soft_delete, hard_delete]
   vfolder_invitation:               []
   vfs_storage:                      []

@@ -1,3 +1,4 @@
+id: 9ebf4f57-9e67-5631-997a-d2d79cc3815f
 name: domain_admin
 scope_type: domain
 auto_assign: false
@@ -22,7 +23,7 @@ permissions:
   image:                            [read, update, create, soft_delete, hard_delete]
   keypair_resource_policy:          []
   login_client_type:                []
-  model_card:                       []
+  model_card:                       [read, update, create, soft_delete, hard_delete]
   network:                          [read, update, create, soft_delete, hard_delete]
   notification_channel:             []
   notification_rule:                []
@@ -47,6 +48,6 @@ permissions:
   storage_namespace:                []
   user:                             [read, update, create, soft_delete, hard_delete]
   user_resource_policy:             [read, update, create, soft_delete, hard_delete]
-  vfolder:                          [read, update, create, soft_delete]
+  vfolder:                          [read, update, create, soft_delete, hard_delete]
   vfolder_invitation:               []
   vfs_storage:                      []

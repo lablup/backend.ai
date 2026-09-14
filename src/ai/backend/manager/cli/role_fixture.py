@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import uuid
 from collections.abc import Mapping, Sequence
@@ -13,17 +14,18 @@ from ai.backend.common.data.entity.user import UserEntityType
 from ai.backend.common.data.permission.types import Permission
 from ai.backend.manager.data.permission.seed.role import RoleSeed
 
-# Every generated id is a uuid5 under this namespace, so the same declaration writes
-# the same file.
-_NAMESPACE: Final[uuid.UUID] = uuid.UUID("b6b0f7a4-1c1d-5a2f-9e3b-8c7d6a5f4e30")
+# A derived id is a uuid7 whose timestamp is fixed and whose remaining bits come from
+# what it identifies, so the same declaration writes the same file. The timestamp is
+# the moment the seed was first generated.
+_EPOCH_MS: Final[int] = 1757670718265
 _TIMESTAMP: Final[str] = "2025-09-12 09:51:58.265582+00"
-# The operation names the legacy `role_permission_presets.operation` column takes.
-_OPERATION_NAMES: Final[tuple[tuple[Permission, str], ...]] = (
-    (Permission.READ, "read"),
-    (Permission.UPDATE, "update"),
-    (Permission.CREATE, "create"),
-    (Permission.SOFT_DELETE, "soft-delete"),
-    (Permission.HARD_DELETE, "hard-delete"),
+# The bits a grant is written out as, one row per bit.
+_BITS: Final[tuple[Permission, ...]] = (
+    Permission.READ,
+    Permission.UPDATE,
+    Permission.CREATE,
+    Permission.SOFT_DELETE,
+    Permission.HARD_DELETE,
 )
 # Which seed roles a user is assigned, by the role their account carries. A superadmin
 # bypasses the RBAC check entirely, so it holds no scope role; a monitor holds none either.
@@ -36,7 +38,14 @@ _ASSIGNED: Final[Mapping[str, tuple[str, ...]]] = {
 
 
 def _identify(*parts: str) -> str:
-    return str(uuid.uuid5(_NAMESPACE, "|".join(parts)))
+    """The uuid7 identifying these parts, the same on every run."""
+    digest = hashlib.blake2b("|".join(parts).encode("utf-8"), digest_size=10).digest()
+    value = (_EPOCH_MS & 0xFFFFFFFFFFFF) << 80 | int.from_bytes(digest, "big")
+    value &= ~(0xF << 76)
+    value |= 0x7 << 76
+    value &= ~(0x3 << 62)
+    value |= 0x2 << 62
+    return str(uuid.UUID(int=value))
 
 
 class RoleFixture:
@@ -103,6 +112,7 @@ class RoleFixture:
             "source": source,
             "status": "active",
             "auto_assign": self._seeds[preset].auto_assign,
+            "role_preset_id": str(self._seeds[preset].id),
             "created_at": _TIMESTAMP,
             "updated_at": _TIMESTAMP,
             "deleted_at": None,
@@ -186,7 +196,7 @@ class RoleFixture:
         for role in roles:
             granted = self._seeds[role["__preset"]].granted()
             for entity_type in sorted(granted):
-                for bit, _ in _OPERATION_NAMES:
+                for bit in _BITS:
                     if not granted[entity_type] & bit:
                         continue
                     rows.append({
@@ -200,7 +210,7 @@ class RoleFixture:
     def _presets(self) -> list[dict[str, Any]]:
         return [
             {
-                "id": _identify("role_preset", seed.name),
+                "id": str(seed.id),
                 "name": seed.name,
                 "role_name_template": None,
                 "scope_type": str(seed.scope_type),
@@ -215,19 +225,19 @@ class RoleFixture:
     def _permission_presets(self) -> list[dict[str, Any]]:
         rows: list[dict[str, Any]] = []
         for seed in self._seeds.values():
-            preset_id = _identify("role_preset", seed.name)
+            preset_id = str(seed.id)
             granted = seed.granted()
             for entity_type in sorted(granted):
-                for bit, operation in _OPERATION_NAMES:
+                for bit in _BITS:
                     if not granted[entity_type] & bit:
                         continue
                     rows.append({
                         "id": _identify(
-                            "role_permission_preset", preset_id, entity_type, operation
+                            "role_permission_preset", preset_id, entity_type, str(int(bit))
                         ),
                         "role_preset_id": preset_id,
                         "entity_type": entity_type,
-                        "operation": operation,
+                        "permission": int(bit),
                         "created_at": _TIMESTAMP,
                     })
         return rows
