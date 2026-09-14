@@ -286,13 +286,16 @@ class DataLoaders:
     ) -> DataLoader[AuditLogID, AuditLogV2GQL | None]:
         adapter = self._adapters.audit_log
 
-        async def load_fn(ids: list[AuditLogID]) -> list[AuditLogV2GQL | None]:
+        async def load_fn(ids: list[AuditLogID]) -> list[AuditLogV2GQL | Exception | None]:
             from ai.backend.manager.api.gql.audit_log.types.node import (  # pants: no-infer-dep
                 AuditLogV2GQL as AL,
             )
 
             dtos = await adapter.batch_load_by_ids(ids)
-            return [AL.from_pydantic(dto) if dto is not None else None for dto in dtos]
+            return [
+                dto if dto is None or isinstance(dto, Exception) else AL.from_pydantic(dto)
+                for dto in dtos
+            ]
 
         return DataLoader(load_fn=load_fn)
 
