@@ -223,3 +223,31 @@ class TestFixture:
         for name in ("roles", "user_roles", "permissions", "virtual_entities"):
             for row in rendered[name]:
                 assert uuid.UUID(row["id"]).version == 7, f"{name}: {row['id']}"
+
+
+class TestAssignments:
+    """A role is held from within its scope, so everyone holding one is on its roster."""
+
+    def test_every_project_role_is_held_from_inside_the_project(
+        self, seeds: list[RoleSeed]
+    ) -> None:
+        rendered = RoleFixture(seeds, _REPOSITORY / "fixtures" / "manager").render()
+        accounts = json.loads(
+            (_REPOSITORY / "fixtures/manager/example-users.json").read_text(encoding="utf-8")
+        )
+        roster = {(row["group_id"], row["user_id"]) for row in accounts["association_groups_users"]}
+        by_id = {role["id"]: role for role in rendered["roles"]}
+        for row in rendered["user_roles"]:
+            role = by_id[row["role_id"]]
+            if role["scope_type"] != "project":
+                continue
+            assert (role["scope_id"], row["user_id"]) in roster, role["name"]
+
+    def test_a_user_role_is_held_by_that_user(self, seeds: list[RoleSeed]) -> None:
+        rendered = RoleFixture(seeds, _REPOSITORY / "fixtures" / "manager").render()
+        by_id = {role["id"]: role for role in rendered["roles"]}
+        for row in rendered["user_roles"]:
+            role = by_id[row["role_id"]]
+            if role["scope_type"] != "user":
+                continue
+            assert role["scope_id"] == row["user_id"], role["name"]

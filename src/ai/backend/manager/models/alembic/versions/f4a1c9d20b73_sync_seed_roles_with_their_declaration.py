@@ -682,24 +682,38 @@ _RETIRED: Final[dict[str, str | None]] = {
 }
 
 
-# Which preset a seed role was made from, by its scope and the suffix its name ends in.
-# Two naming rules are in the wild -- `role_domain_x_admin` and `domain-x-admin` -- so
-# both separators are read.
-_ADMIN_SUFFIXES: Final[tuple[str, ...]] = ("_admin", "-admin")
-_MEMBER_SUFFIXES: Final[tuple[str, ...]] = ("_member", "-member")
+# The names the earlier data migrations gave the roles they made, which is what says a
+# role is one of theirs. A role made by hand is a custom one and is not read at all, so
+# these are read of system roles only.
+_LEGACY_PREFIX: Final[str] = "role_"
 
 
-def _preset_for(scope_type: str, name: str) -> str | None:
+_AUTO_ASSIGN: Final[dict[str, bool]] = {preset.id: preset.auto_assign for preset in _PRESETS}
+
+
+def _preset_for(scope_type: str, scope_id: str, name: str) -> str | None:
     """The id of the preset this role was made from, or None where nothing says."""
-    by_scope = {preset.scope_type: preset for preset in _PRESETS}
     if scope_type == "user":
-        return by_scope["user"].id
-    if scope_type not in ("domain", "project"):
+        if not name.startswith(f"{_LEGACY_PREFIX}user_"):
+            return None
+        return next((p.id for p in _PRESETS if p.scope_type == "user"), None)
+    if scope_type == "project":
+        stem = f"{_LEGACY_PREFIX}project_{scope_id[:8]}"
+    elif scope_type == "domain":
+        stem = f"{_LEGACY_PREFIX}domain_"
+    else:
         return None
-    if name.endswith(_ADMIN_SUFFIXES):
-        return next((p.id for p in _PRESETS if p.name == f"{scope_type}_admin"), None)
-    if name.endswith(_MEMBER_SUFFIXES):
-        return next((p.id for p in _PRESETS if p.name == f"{scope_type}_member"), None)
+    for suffix, preset_name in (
+        ("_admin", f"{scope_type}_admin"),
+        ("_member", f"{scope_type}_member"),
+    ):
+        if not name.endswith(suffix):
+            continue
+        if scope_type == "project" and name != f"{stem}{suffix}":
+            continue
+        if scope_type == "domain" and not name.startswith(stem):
+            continue
+        return next((p.id for p in _PRESETS if p.name == preset_name), None)
     return None
 
 
@@ -828,7 +842,7 @@ def _sweep_unknown_types(conn: sa.engine.Connection) -> None:
 
 
 def _link_roles(conn: sa.engine.Connection) -> None:
-    """Name the preset each seed role was made from, where nothing named it yet.
+    """Name the preset each system role was made from, where nothing named it yet.
 
     The presets were all soft-deleted when the earlier backfill ran, and it skipped
     deleted ones, so a database carries seed roles that point at nothing. Linking
@@ -838,7 +852,7 @@ def _link_roles(conn: sa.engine.Connection) -> None:
         sa.text("""
             SELECT id, scope_type, scope_id, name
             FROM roles
-            WHERE role_preset_id IS NULL
+            WHERE role_preset_id IS NULL AND source = 'system'
             ORDER BY created_at, id
         """)
     ).all()
@@ -846,17 +860,29 @@ def _link_roles(conn: sa.engine.Connection) -> None:
     # naming rules may have left one behind on the same scope, so the first by age
     # takes the preset and the rest stay unlinked -- and, being system roles no preset
     # accounts for, go in the step after this one.
-    taken: set[tuple[str, str, str]] = set()
+    taken: set[tuple[str, str, str]] = {
+        (str(row.role_preset_id), str(row.scope_type), str(row.scope_id))
+        for row in conn.execute(
+            sa.text(
+                "SELECT role_preset_id, scope_type, scope_id"
+                " FROM roles WHERE role_preset_id IS NOT NULL"
+            )
+        )
+    }
     linked: list[dict[str, Any]] = []
     for row in rows:
-        preset_id = _preset_for(str(row.scope_type), str(row.name))
+        preset_id = _preset_for(str(row.scope_type), str(row.scope_id), str(row.name))
         if preset_id is None:
             continue
         key = (preset_id, str(row.scope_type), str(row.scope_id))
         if key in taken:
             continue
         taken.add(key)
-        linked.append({"b_role_id": row.id, "b_preset_id": preset_id})
+        linked.append({
+            "b_role_id": row.id,
+            "b_preset_id": preset_id,
+            "b_auto_assign": _AUTO_ASSIGN[preset_id],
+        })
     if linked:
         conn.execute(
             sa.text(

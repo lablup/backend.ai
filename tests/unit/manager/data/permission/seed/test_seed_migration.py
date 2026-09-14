@@ -7,6 +7,7 @@ up the same, or the seed says one thing and a running system another.
 from __future__ import annotations
 
 import json
+import uuid
 from pathlib import Path
 from typing import Any
 
@@ -106,24 +107,9 @@ class TestPresetMapping:
     ) -> None:
         for role in fixture["roles"]:
             assert (
-                migration._preset_for(role["scope_type"], role["name"]) == role["role_preset_id"]
+                migration._preset_for(role["scope_type"], role["scope_id"], role["name"])
+                == role["role_preset_id"]
             ), role["name"]
-
-    @pytest.mark.parametrize(
-        ("scope_type", "name", "preset"),
-        [
-            ("domain", "domain-default-admin", "domain_admin"),
-            ("project", "project-2de2b969-admin", "project_admin"),
-            ("project", "project-2de2b969-member", "project_member"),
-            ("user", "user-alice", "user_owner"),
-        ],
-    )
-    def test_the_runtime_naming_rule_maps_too(
-        self, migration: Any, scope_type: str, name: str, preset: str
-    ) -> None:
-        """Two naming rules are in the wild; a role made by either is still seed-owned."""
-        by_id = {p.id: p.name for p in migration._PRESETS}
-        assert by_id[migration._preset_for(scope_type, name)] == preset
 
     @pytest.mark.parametrize(
         ("scope_type", "name"),
@@ -131,10 +117,16 @@ class TestPresetMapping:
             ("domain", "role_superadmin"),
             ("domain", "role_monitor"),
             ("project", "a-role-someone-made"),
+            ("project", "gpu-team-admin"),
+            ("project", "ml_member"),
+            ("domain", "billing-admin"),
+            ("user", "my-custom-role"),
             ("resource_group", "role_resource_group_admin"),
         ],
     )
     def test_what_no_preset_made_maps_to_nothing(
         self, migration: Any, scope_type: str, name: str
     ) -> None:
-        assert migration._preset_for(scope_type, name) is None
+        """A name the earlier migrations never wrote is not one of theirs, whatever it
+        ends in."""
+        assert migration._preset_for(scope_type, str(uuid.uuid4()), name) is None

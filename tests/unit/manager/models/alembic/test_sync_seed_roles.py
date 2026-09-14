@@ -724,7 +724,7 @@ class TestOnePresetPerScope:
         """The same project carrying an admin role under each naming rule."""
         async with db.begin_session() as session:
             twin = RoleRow(
-                name=f"project-{str(seeded['project'])[:8]}-admin",
+                name=f"role_project_{str(seeded['project'])[:8]}_admin",
                 source=RoleSource.SYSTEM,
                 status=RoleStatus.ACTIVE,
                 scope_type=ProjectEntityType(),
@@ -753,3 +753,58 @@ class TestOnePresetPerScope:
         linked = [row for row in rows if row.role_preset_id is not None]
         by_preset = [row.role_preset_id for row in linked]
         assert len(by_preset) == len(set(by_preset)), "one preset took two roles of a scope"
+
+
+class TestCustomRolesAreLeftAlone:
+    """A role made by hand is never read: not linked, not rewritten, not dropped."""
+
+    @pytest.fixture
+    async def handmade(
+        self, db: ExtendedAsyncSAEngine, seeded: dict[str, uuid.UUID]
+    ) -> dict[str, uuid.UUID]:
+        """A custom role named the way a seed role is, on a scope that has one."""
+        async with db.begin_session() as session:
+            role = RoleRow(
+                name=f"role_project_{str(seeded['project'])[:8]}_member",
+                source=RoleSource.CUSTOM,
+                status=RoleStatus.ACTIVE,
+                scope_type=ProjectEntityType(),
+                scope_id=seeded["project"],
+            )
+            session.add(role)
+            await session.flush()
+            session.add(
+                PermissionRow(
+                    role_id=role.id, entity_type="vfolder:data", permission=1, all_fields=True
+                )
+            )
+            seeded["handmade_role"] = role.id
+        return seeded
+
+    async def test_it_is_not_linked_rewritten_or_dropped(
+        self, db: ExtendedAsyncSAEngine, handmade: dict[str, uuid.UUID]
+    ) -> None:
+        async with db.begin() as conn:
+            await conn.run_sync(lambda sync_conn: _run(sync_conn))
+        async with db.begin_readonly_session() as session:
+            role = (
+                await session.execute(
+                    sa.select(RoleRow).where(RoleRow.id == handmade["handmade_role"])
+                )
+            ).scalar_one_or_none()
+            named = set(
+                (
+                    await session.execute(
+                        sa.select(PermissionRow.entity_type).where(
+                            PermissionRow.role_id == handmade["handmade_role"]
+                        )
+                    )
+                )
+                .scalars()
+                .all()
+            )
+        assert role is not None
+        assert role.role_preset_id is None
+        assert role.source is RoleSource.CUSTOM
+        # The type sweep is not about roles: it takes the row wherever it stands.
+        assert named == set()

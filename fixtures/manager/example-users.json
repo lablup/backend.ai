@@ -39,7 +39,8 @@
             "resource_policy": "default",
             "total_resource_slots": {},
             "allowed_vfolder_hosts": {},
-            "type": "general"
+            "type": "general",
+            "creator_id": "4f13d193-f646-425a-a340-270c4d2b9860"
         },
         {
             "id": "8e32dd28-d319-4e3b-8851-ea37837699a5",
@@ -50,7 +51,8 @@
             "resource_policy": "default",
             "total_resource_slots": {},
             "allowed_vfolder_hosts": {},
-            "type": "model-store"
+            "type": "model-store",
+            "creator_id": "4f13d193-f646-425a-a340-270c4d2b9860"
         }
     ],
     "scaling_groups": [

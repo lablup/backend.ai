@@ -27,16 +27,6 @@ _BITS: Final[tuple[Permission, ...]] = (
     Permission.SOFT_DELETE,
     Permission.HARD_DELETE,
 )
-# Which seed roles a user is assigned by the role their account carries. A superadmin
-# bypasses the RBAC check entirely, so it holds no scope role; a monitor holds none
-# either. A role its preset marks auto_assign is not listed here: every member of the
-# scope holds it, which is what `auto_assign` means.
-_ASSIGNED: Final[Mapping[str, tuple[str, ...]]] = {
-    "superadmin": ("user_owner",),
-    "admin": ("user_owner", "domain_admin", "project_admin"),
-    "user": ("user_owner",),
-    "monitor": ("user_owner",),
-}
 
 
 def _identify(*parts: str) -> str:
@@ -54,8 +44,8 @@ class RoleFixture:
     """Writes the seed fixture from the role files and the account fixtures.
 
     The role files give what each role is granted, the account fixtures give the users,
-    projects and domain. Every row is derived from those two, and every id is a uuid5
-    of what it identifies.
+    projects and domain. Every row is derived from those two, and every derived id is
+    a uuid7 of what it identifies.
     """
 
     _seeds: Mapping[str, RoleSeed]
@@ -164,52 +154,52 @@ class RoleFixture:
             )
         return roles
 
-    def _auto_assigned(self, roles: Sequence[dict[str, Any]]) -> list[dict[str, Any]]:
-        """Every member of a scope holds the roles it assigns on its own."""
-        assigned: list[dict[str, Any]] = []
-        for role in roles:
-            if not self._seeds[role["__preset"]].auto_assign:
-                continue
-            for user in self._accounts_in(role["scope_id"]):
-                assigned.append({
-                    "id": _identify("user_role", user["uuid"], role["id"]),
-                    "user_id": user["uuid"],
-                    "role_id": role["id"],
-                    "granted_by": None,
-                    "granted_at": _TIMESTAMP,
-                })
-        return assigned
-
     def _user_roles(self, roles: Sequence[dict[str, Any]]) -> list[dict[str, Any]]:
-        by_scope = {
-            (role["scope_type"], role["scope_id"], role["__preset"]): role for role in roles
+        """Who holds what: a user holds the role of their own scope, whoever made a
+        project holds its admin role, and a member of a scope holds the roles it assigns
+        on its own. A domain names nobody who made it, so its admin role is held by
+        nobody here."""
+        assigned = [
+            self._assignment(user["uuid"], role["id"])
+            for role in roles
+            for user in self._users
+            if role["scope_type"] == "user" and role["scope_id"] == user["uuid"]
+        ]
+        assigned.extend(
+            self._assignment(creator, role["id"])
+            for role in roles
+            for creator in (self._creator_of(role),)
+            if creator is not None
+        )
+        assigned.extend(
+            self._assignment(user["uuid"], role["id"])
+            for role in roles
+            if self._seeds[role["__preset"]].auto_assign
+            for user in self._accounts_in(role["scope_id"])
+        )
+        return list({row["id"]: row for row in assigned}.values())
+
+    def _creator_of(self, role: dict[str, Any]) -> str | None:
+        """Who made the scope this admin role administers, where the scope says and they
+        are still on its roster. A role is held from within its scope, so one granted to
+        someone who left reaches nothing."""
+        if not role["name"].endswith("_admin") or role["scope_type"] != "project":
+            return None
+        made_by = {group["id"]: group.get("creator_id") for group in self._groups}
+        creator = made_by.get(role["scope_id"])
+        if creator is None:
+            return None
+        on_roster = {user["uuid"] for user in self._accounts_in(role["scope_id"])}
+        return creator if creator in on_roster else None
+
+    def _assignment(self, user_id: str, role_id: str) -> dict[str, Any]:
+        return {
+            "id": _identify("user_role", user_id, role_id),
+            "user_id": user_id,
+            "role_id": role_id,
+            "granted_by": None,
+            "granted_at": _TIMESTAMP,
         }
-        assigned: list[dict[str, Any]] = []
-        domain = self._domain()
-        for user in self._users:
-            for preset in _ASSIGNED[user["role"]]:
-                match preset:
-                    case "user_owner":
-                        targets = [by_scope[("user", user["uuid"], preset)]]
-                    case "domain_admin":
-                        targets = [by_scope[("domain", domain["id"], preset)]]
-                    case _:
-                        targets = [
-                            by_scope[("project", group["id"], preset)]
-                            for group in self._groups
-                            if user in self._accounts_in(group["id"])
-                        ]
-                for role in targets:
-                    assigned.append({
-                        "id": _identify("user_role", user["uuid"], role["id"]),
-                        "user_id": user["uuid"],
-                        "role_id": role["id"],
-                        "granted_by": None,
-                        "granted_at": _TIMESTAMP,
-                    })
-        assigned.extend(self._auto_assigned(roles))
-        seen = {row["id"]: row for row in assigned}
-        return list(seen.values())
 
     def _permissions(self, roles: Sequence[dict[str, Any]]) -> list[dict[str, Any]]:
         rows: list[dict[str, Any]] = []
