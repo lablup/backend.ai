@@ -110,8 +110,12 @@ def vxlan_dev(vni: int) -> str:
     return f"{VXLAN_DEV_PREFIX}{vni}"
 
 
+#: Prefix of every overlay bridge this backend creates, the same boundary `VXLAN_DEV_PREFIX` is.
+BRIDGE_DEV_PREFIX: Final = "baibr"
+
+
 def bridge_dev(vni: int) -> str:
-    return f"baibr{vni}"
+    return f"{BRIDGE_DEV_PREFIX}{vni}"
 
 
 def vni_of_dev(dev: str) -> int | None:
@@ -232,6 +236,15 @@ _KEYRING_SIZE: Final = 3
 #: a run of them is a node that cannot say whether anything on it is protected.
 _MAX_UNVERIFIED_PASSES: Final = 3
 _VXLAN_LINE: Final = re.compile(r"^\d+:\s+(?P<name>[^:@\s]+)")
+#: A bridge forward-accept rule as `iptables-save` renders it, keyed by the VNI in the device name.
+_FORWARD_ACCEPT_LINE: Final = re.compile(
+    r"^-A FORWARD -i "
+    + BRIDGE_DEV_PREFIX
+    + r"(?P<in>\d+) -o "
+    + BRIDGE_DEV_PREFIX
+    + r"(?P<out>\d+)"
+    r" -j ACCEPT$"
+)
 #: Stands in `unclosed_devices` for "the fail-close preflight has not run". Not a device name --
 #: the point is that this backend does not yet know what the device names ARE.
 _PREFLIGHT_PENDING: Final = "(the fail-close preflight has not run)"
@@ -787,6 +800,9 @@ class ProtectionSnapshot:
     #: DOWN because a co-located agent restarted and its fail-close preflight downs every
     #: `baivx*` on the host, ours included -- and nothing else ever looks.
     up_devices: frozenset[str]
+    #: Every VXLAN device on the node. A firewall rule naming a bridge whose tunnel does not exist
+    #: belongs to no session anyone can name.
+    devices: frozenset[str]
 
     def table(self, table: str) -> str:
         return self.mangle_rules if table == "mangle" else self.filter_rules
@@ -949,6 +965,39 @@ def _as_port(token: str) -> int | None:
         return int(token, 0)
     except ValueError:
         return None  # a multiport list or a range: not a rule of ours
+
+
+def _device_sets(listing: str) -> dict[str, frozenset[str]]:
+    """Both device sets from one `ip -o link show type vxlan`, as the snapshot's fields."""
+    return {
+        "devices": parse_vxlan_devices(listing),
+        "up_devices": parse_up_vxlan_devices(listing),
+    }
+
+
+def parse_forward_accept_vnis(listing: str) -> frozenset[int]:
+    """The VNIs a filter listing holds a bridge forward-accept rule for.
+
+    The rule as this backend writes it and no other: an operator's own `-i baibrN -o baibrN` rule
+    with a different target, or one on a chain of theirs, is not ours to count and not ours to
+    remove.
+    """
+    found: set[int] = set()
+    for line in listing.splitlines():
+        match = _FORWARD_ACCEPT_LINE.match(line.strip())
+        if match is None or match.group("in") != match.group("out"):
+            continue
+        found.add(int(match.group("in")))
+    return frozenset(found)
+
+
+def parse_vxlan_devices(listing: str) -> frozenset[str]:
+    """Every VXLAN device on the node, up or down, from `ip -o link show type vxlan`."""
+    return frozenset(
+        match.group("name")
+        for match in (_VXLAN_LINE.match(line) for line in listing.splitlines())
+        if match is not None
+    )
 
 
 def parse_up_vxlan_devices(listing: str) -> frozenset[str]:
@@ -1589,6 +1638,9 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
     _pair_active_generations: dict[tuple[str, str], int]
     #: Consecutive protection passes that could not read the node's state at all.
     _unverified_passes: int
+    #: Whether a forward-accept rule could be sitting on this node with no session behind it, so
+    #: an idle node reads its firewall once more instead of every three seconds forever.
+    _forward_sweep_owed: bool
     #: VNI -> the session whose setup is building on it right now. The check and the devices
     #: are separated by several awaits, and a session joins `_sessions` only after they exist.
     _reserved_vnis: dict[int, str]
@@ -1700,6 +1752,9 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
         self._security_states = {}
         self._pair_locks = {}
         self._unverified_passes = 0
+        # True at the start: a process that died mid-teardown -- the privnet restart this backend
+        # is built to survive -- leaves its rules to the one that takes over.
+        self._forward_sweep_owed = True
         # True until something says otherwise: an agent that never runs a preflight is not
         # carrying a node's worth of survivors. `owe_fail_close_preflight` is what the privnet
         # calls at startup to say this node does have one.
@@ -1932,9 +1987,7 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
             policy_pairs=parse_owned_policies(
                 await self._reader(["ip", "xfrm", "policy"]), _XFRM_MARK
             ),
-            up_devices=parse_up_vxlan_devices(
-                await self._reader(["ip", "-o", "link", "show", "type", "vxlan"])
-            ),
+            **_device_sets(await self._reader(["ip", "-o", "link", "show", "type", "vxlan"])),
         )
 
     def _pair_intact(self, snapshot: ProtectionSnapshot, key: tuple[str, str, int]) -> bool:
@@ -1976,7 +2029,7 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
             for session_id, meta in self._sessions.items()
             if meta.encryption_key is None and meta.vni is not None
         ]
-        if not encrypted and not plaintext:
+        if not encrypted and not plaintext and not self._forward_sweep_owed:
             return
         try:
             snapshot = await self._snapshot_protection()
@@ -2051,6 +2104,7 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
                 )
             else:
                 log.info("put session {}'s bridge forward-accept rule back", session_id)
+        await self._reclaim_ownerless_forward_accepts(snapshot)
         for session_id, meta, vni in encrypted:
             try:
                 async with self._session_guard(session_id):
@@ -2064,6 +2118,41 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
                 # `_reassert_session` has already closed the tunnel for anything it could not
                 # restore; one session's failure must not stop the rest of the node's.
                 log.exception("could not re-assert protection for session {}", session_id)
+
+    async def _reclaim_ownerless_forward_accepts(self, snapshot: ProtectionSnapshot) -> None:
+        """Remove a bridge forward-accept rule left on a VNI that has no tunnel on this node.
+
+        The rule is the one object of a session's that nothing reclaimed: setup writes it before
+        the session is registered and teardown removes it before the record goes, so a process
+        that dies between the two -- or an adoption that raised after installing it -- leaves a
+        rule no session can be named for. It then sits in FORWARD until some later session happens
+        to draw the same VNI.
+
+        Bounded by the tunnel, not by our own records: the VXLAN device is node-global, so a rule
+        whose ``baivx`` exists belongs to a live session -- a co-located agent's, if not ours --
+        and is left alone. One with no device can be serving nobody.
+        """
+        removed_all = True
+        for vni in sorted(parse_forward_accept_vnis(snapshot.table("filter"))):
+            if vxlan_dev(vni) in snapshot.devices:
+                continue
+            if any(meta.vni == vni for meta in self._sessions.values()):
+                continue  # ours, and mid-setup: the device is on its way
+            try:
+                await self._remove(forward_accept_del_args(vni))
+            except Exception:
+                removed_all = False
+                log.exception("could not remove the ownerless forward-accept rule for vni {}", vni)
+            else:
+                log.info(
+                    "removed the bridge forward-accept rule for vni {}: this node has no tunnel"
+                    " on it",
+                    vni,
+                )
+        # An idle node that has just been swept clean has nothing left to look for, and the whole
+        # pass is skipped until it serves another session.
+        if removed_all and not self._sessions:
+            self._forward_sweep_owed = False
 
     async def _reassert_session(
         self, session_id: str, meta: SessionNetMeta, vni: int, snapshot: ProtectionSnapshot
@@ -3245,6 +3334,7 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
 
     async def _forget_session(self, session_id: str) -> None:
         """Drop this node's record of the session. Called only after every removal succeeded."""
+        self._forward_sweep_owed = True
         self._sessions.pop(session_id, None)
         self._self_vteps.pop(session_id, None)
         self._encrypted_peers.pop(session_id, None)
