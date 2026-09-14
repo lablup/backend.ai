@@ -125,7 +125,7 @@ class TheAliasAndItsImage(Then[AnImageAndACaller, AliasImagePayload]):
 
     @override
     def says(self) -> str:
-        return "등록한 별칭과 그 이미지의 id가 반환된다"
+        return "등록한 별칭과 그 이미지의 ID가 반환된다"
 
     @override
     def look(self, laid: AnImageAndACaller, answered: Answered[AliasImagePayload]) -> list[Verdict]:
@@ -146,7 +146,7 @@ class TheRemovedAlias(Then[AnAliasAndACaller, AliasImagePayload]):
 
     @override
     def says(self) -> str:
-        return "해제한 별칭과 그 이미지의 id가 반환된다"
+        return "해제한 별칭과 그 이미지의 ID가 반환된다"
 
     @override
     def look(self, laid: AnAliasAndACaller, answered: Answered[AliasImagePayload]) -> list[Verdict]:
@@ -221,7 +221,7 @@ class AliasingWhatIsNotThere(
 
     @override
     def describe(self) -> str:
-        return "어느 이미지도 가리키지 않는 id에 별칭을 등록하려 하면 대상을 찾을 수 없어 거부된다"
+        return "어느 이미지도 가리키지 않는 ID에 별칭을 등록하려 하면 대상을 찾을 수 없어 거부된다"
 
     @override
     def given(self) -> Given[SeedingSession, AnImageAndACaller]:
