@@ -148,25 +148,12 @@ class ImageAdapter(BaseAdapter):
 
     # ------------------------------------------------------------------ search
 
-    async def admin_search(self, input: AdminSearchImagesInput) -> AdminSearchImagesPayload:
-        """Search images with admin scope using offset pagination."""
-        querier = self._build_offset_querier(input)
-
-        action_result = await self._image.search_images.run(SearchImagesAction(querier=querier))
-
-        return AdminSearchImagesPayload(
-            items=[self._data_to_dto(item) for item in action_result.data],
-            total_count=action_result.total_count,
-            has_next_page=action_result.has_next_page,
-            has_previous_page=action_result.has_previous_page,
-        )
-
-    async def admin_search_images_gql(
+    async def admin_search(
         self,
         input: AdminSearchImagesInput,
         base_conditions: Sequence[QueryCondition] | None = None,
     ) -> AdminSearchImagesPayload:
-        """Search images with cursor or offset pagination for GQL resolvers."""
+        """Search images with cursor or offset pagination."""
         conditions = self._convert_filter(input.filter) if input.filter else []
         orders = self._convert_orders(input.order) if input.order else []
         querier = self._build_querier(

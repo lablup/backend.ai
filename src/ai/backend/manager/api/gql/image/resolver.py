@@ -64,7 +64,7 @@ async def admin_images_v2(
     check_admin_only()
     pydantic_filter = filter.to_pydantic() if filter else None
     pydantic_orders = [o.to_pydantic() for o in order_by] if order_by else None
-    payload = await info.context.adapters.image.admin_search_images_gql(
+    payload = await info.context.adapters.image.admin_search(
         AdminSearchImagesInput(
             filter=pydantic_filter,
             order=pydantic_orders,
@@ -126,7 +126,7 @@ async def container_registry_images_v2(
     pydantic_filter = filter.to_pydantic() if filter else None
     pydantic_orders = [o.to_pydantic() for o in order_by] if order_by else None
     base_conditions = [ImageConditions.by_registry_id(scope.registry_id)]
-    payload = await info.context.adapters.image.admin_search_images_gql(
+    payload = await info.context.adapters.image.admin_search(
         AdminSearchImagesInput(
             filter=pydantic_filter,
             order=pydantic_orders,
