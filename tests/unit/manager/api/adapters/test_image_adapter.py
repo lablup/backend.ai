@@ -38,3 +38,4 @@ async def test_admin_search_pages_with_the_cursor_it_is_given(
 
     action = processors.search_images.run.call_args.args[0]
     assert isinstance(action.querier.pagination, CursorForwardPagination)
+    assert action.querier.pagination.cursor_condition is not None
