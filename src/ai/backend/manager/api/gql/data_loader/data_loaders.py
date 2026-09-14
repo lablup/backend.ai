@@ -452,13 +452,16 @@ class DataLoaders:
     ) -> DataLoader[uuid.UUID, HuggingFaceRegistry | None]:
         adapter = self._adapters.huggingface_registry
 
-        async def load_fn(ids: list[uuid.UUID]) -> list[HuggingFaceRegistry | None]:
+        async def load_fn(ids: list[uuid.UUID]) -> list[HuggingFaceRegistry | Exception | None]:
             from ai.backend.manager.api.gql.huggingface_registry import (  # pants: no-infer-dep
                 HuggingFaceRegistry as HF,
             )
 
             dtos = await adapter.batch_load_by_ids(ids)
-            return [HF.from_pydantic(dto) if dto is not None else None for dto in dtos]
+            return [
+                dto if dto is None or isinstance(dto, Exception) else HF.from_pydantic(dto)
+                for dto in dtos
+            ]
 
         return DataLoader(load_fn=load_fn)
 
