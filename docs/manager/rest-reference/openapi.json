@@ -21659,6 +21659,17 @@
         "title": "PreemptionVictimScope",
         "type": "string"
       },
+      "SchedulerTypeDTO": {
+        "description": "Scheduler type for resource group.",
+        "enum": [
+          "fifo",
+          "lifo",
+          "drf",
+          "fair-share"
+        ],
+        "title": "SchedulerTypeDTO",
+        "type": "string"
+      },
       "UpdateResourceGroupConfigInput": {
         "description": "Input for updating resource group configuration via GQL (all fields optional).",
         "properties": {
@@ -21754,7 +21765,7 @@
           "scheduler_type": {
             "anyOf": [
               {
-                "type": "string"
+                "$ref": "#/components/schemas/SchedulerTypeDTO"
               },
               {
                 "type": "null"
