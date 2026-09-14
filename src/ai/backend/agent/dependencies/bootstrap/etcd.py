@@ -49,6 +49,7 @@ class AgentEtcdDependency(DependencyProvider[AgentUnifiedConfig, AsyncEtcd]):
         # Build scope prefix map (same as server.py's etcd_ctx)
         scope_prefix_map = {
             ConfigScopes.GLOBAL: "",
+            ConfigScopes.SGROUP: f"sgroup/{setup_input.agent.legacy_sgroup_name()}",
             ConfigScopes.NODE: f"nodes/agents/{setup_input.agent.id}",
         }
 
