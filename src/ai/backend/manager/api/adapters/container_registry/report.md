@@ -939,7 +939,7 @@ When
 Then
 
 - 커서 이전 레지스트리와 양쪽 페이지 표시가 온다
-  - items = [(ContainerRegistryID('546f4f2d-1577-4bb1-8297-1c98ea25c355'), 'https://other-2.scenario.local', 'other-2', <ContainerRegistryType.HARBOR2: 'harbor2'>, None, None, True, False, None)]
+  - items: 기대한 이전 페이지와 같다
   - total_count = 3
   - has_next_page = True
   - has_previous_page = True
@@ -968,7 +968,7 @@ When
 Then
 
 - 커서 다음 레지스트리와 양쪽 페이지 표시가 온다
-  - items = [(ContainerRegistryID('2f8bb995-e63a-47bb-b4bf-e187ed1c2b12'), 'https://wanted-1.scenario.local', 'wanted-1', <ContainerRegistryType.DOCKER: 'docker'>, None, None, True, True, None)]
+  - items: 기대한 다음 페이지와 같다
   - total_count = 3
   - has_next_page = True
   - has_previous_page = True
@@ -1021,7 +1021,7 @@ When
 Then
 
 - 걸러낸 그 레지스트리 하나만 남는다
-  - items = [(ContainerRegistryID('2b7f179b-d546-405c-af93-a9a59742db1b'), 'https://wanted-1.scenario.local', 'wanted-1', <ContainerRegistryType.DOCKER: 'docker'>, None, None, True, True, None)]
+  - items: 심은 레지스트리와 같다
   - total_count = 1
   - has_next_page = False
   - has_previous_page = False
@@ -1049,7 +1049,7 @@ When
 Then
 
 - 전역이 아닌 레지스트리만 온다
-  - items = [(ContainerRegistryID('5fb5a50c-8204-4a37-b70b-09a26f8752d7'), 'https://other-1.scenario.local', 'other-1', <ContainerRegistryType.HARBOR2: 'harbor2'>, None, None, True, False, None)]
+  - items: 심은 레지스트리와 같다
   - total_count = 1
   - has_next_page = False
   - has_previous_page = False
@@ -1077,7 +1077,7 @@ When
 Then
 
 - 걸러낸 그 레지스트리 하나만 남는다
-  - items = [(ContainerRegistryID('86f5a24e-9493-44e6-ad05-fddb0c9332ac'), 'https://wanted-1.scenario.local', 'wanted-1', <ContainerRegistryType.DOCKER: 'docker'>, None, None, True, True, None)]
+  - items: 심은 레지스트리와 같다
   - total_count = 1
   - has_next_page = False
   - has_previous_page = False
@@ -1105,7 +1105,7 @@ When
 Then
 
 - 걸러낸 그 레지스트리 하나만 남는다
-  - items = [(ContainerRegistryID('703d5f93-6449-4b69-a9c6-6a71bc928a1a'), 'https://wanted-1.scenario.local', 'wanted-1', <ContainerRegistryType.DOCKER: 'docker'>, None, None, True, True, None)]
+  - items: 심은 레지스트리와 같다
   - total_count = 1
   - has_next_page = False
   - has_previous_page = False
@@ -1158,7 +1158,7 @@ When
 Then
 
 - 걸러낸 그 레지스트리 하나만 남는다
-  - items = [(ContainerRegistryID('f3a380c7-2e93-4541-9925-9014fb333b5e'), 'https://wanted-1.scenario.local', 'wanted-1', <ContainerRegistryType.DOCKER: 'docker'>, None, None, True, True, None)]
+  - items: 심은 레지스트리와 같다
   - total_count = 1
   - has_next_page = False
   - has_previous_page = False
@@ -1187,7 +1187,7 @@ When
 Then
 
 - 건너뛴 위치의 한 쪽이 온다
-  - items = [(ContainerRegistryID('59fa625f-328c-4057-b7c4-1650f00e86ba'), 'https://other-2.scenario.local', 'other-2', <ContainerRegistryType.HARBOR2: 'harbor2'>, None, None, True, False, None)]
+  - items: 기대한 오프셋 페이지와 같다
   - total_count = 3
   - has_next_page = True
   - has_previous_page = True
@@ -1216,7 +1216,7 @@ When
 Then
 
 - 건너뛴 위치의 한 쪽이 온다
-  - items = []
+  - items: 기대한 오프셋 페이지와 같다
   - total_count = 3
   - has_next_page = False
   - has_previous_page = True
@@ -1253,7 +1253,7 @@ When
 Then
 
 - 한 쪽만 오고 다음 쪽이 있다고 답한다
-  - items = [(ContainerRegistryID('dd90a01a-2a7e-4c31-86d0-41787e5144b2'), 'https://other-4.scenario.local', 'other-4', <ContainerRegistryType.HARBOR2: 'harbor2'>, None, None, True, False, None), (ContainerRegistryID('cbd3f454-5bdd-44be-bb69-a13df2feea3f'), 'https://other-9.scenario.local', 'other-9', <ContainerRegistryType.HARBOR2: 'harbor2'>, None, None, True, False, None), (ContainerRegistryID('c2740d50-eabb-4df1-8845-c7282b37458f'), 'https://wanted-1.scenario.local', 'wanted-1', <ContainerRegistryType.DOCKER: 'docker'>, None, None, True, True, None), (ContainerRegistryID('94efd8b8-20a3-4b5d-8388-3069a335c318'), 'https://other-10.scenario.local', 'other-10', <ContainerRegistryType.HARBOR2: 'harbor2'>, None, None, True, False, None), (ContainerRegistryID('827792f3-cdc5-48e9-9a0d-12017d39e75f'), 'https://other-6.scenario.local', 'other-6', <ContainerRegistryType.HARBOR2: 'harbor2'>, None, None, True, False, None), (ContainerRegistryID('4da73fa5-3739-4d9c-800d-a28bcdfda04d'), 'https://other-8.scenario.local', 'other-8', <ContainerRegistryType.HARBOR2: 'harbor2'>, None, None, True, False, None), (ContainerRegistryID('4812d017-b4e3-4c07-9990-36f0e31829bb'), 'https://other-3.scenario.local', 'other-3', <ContainerRegistryType.HARBOR2: 'harbor2'>, None, None, True, False, None), (ContainerRegistryID('42334961-9555-40d2-928e-1a8d7bd3a999'), 'https://other-5.scenario.local', 'other-5', <ContainerRegistryType.HARBOR2: 'harbor2'>, None, None, True, False, None), (ContainerRegistryID('355657e6-8171-42a2-b5b9-8a8b6d90f620'), 'https://other-2.scenario.local', 'other-2', <ContainerRegistryType.HARBOR2: 'harbor2'>, None, None, True, False, None), (ContainerRegistryID('16ec59d5-ad22-4fe8-b644-ca6dd83085bb'), 'https://other-1.scenario.local', 'other-1', <ContainerRegistryType.HARBOR2: 'harbor2'>, None, None, True, False, None)]
+  - items: 기대한 기본 페이지와 같다
   - total_count = 11
   - has_next_page = True
   - has_previous_page = False
@@ -1281,7 +1281,7 @@ When
 Then
 
 - 심은 레지스트리가 모두 세어진다
-  - items = [(ContainerRegistryID('111c595f-a255-4624-a113-69207e8712c6'), 'https://other-1.scenario.local', 'other-1', <ContainerRegistryType.HARBOR2: 'harbor2'>, None, None, True, False, None), (ContainerRegistryID('cc5570f7-2cba-41c3-b420-1eababc8b516'), 'https://wanted-1.scenario.local', 'wanted-1', <ContainerRegistryType.DOCKER: 'docker'>, None, None, True, True, None)]
+  - items: 심은 레지스트리와 같다
   - total_count = 2
   - has_next_page = False
   - has_previous_page = False
@@ -1310,7 +1310,7 @@ When
 Then
 
 - 요청한 이름 순서로 온다
-  - items = [(ContainerRegistryID('b73cfd4e-1b7e-4452-8ef4-c89ddf8be9b7'), 'https://other-1.scenario.local', 'other-1', <ContainerRegistryType.HARBOR2: 'harbor2'>, None, None, True, False, None), (ContainerRegistryID('b13442c0-5a9a-45d7-97ad-a0ac3c77aa0a'), 'https://other-2.scenario.local', 'other-2', <ContainerRegistryType.HARBOR2: 'harbor2'>, None, None, True, False, None), (ContainerRegistryID('7e84acd6-0778-4c80-9b28-a3bc712e8787'), 'https://wanted-1.scenario.local', 'wanted-1', <ContainerRegistryType.DOCKER: 'docker'>, None, None, True, True, None)]
+  - items: 심은 레지스트리 순서와 같다
   - total_count = 3
   - has_next_page = False
   - has_previous_page = False
@@ -1338,7 +1338,7 @@ When
 Then
 
 - 심은 레지스트리가 모두 세어진다
-  - items = [(ContainerRegistryID('4237b28f-ca5f-4aa2-bdbe-b8f33b060ed3'), 'https://wanted-1.scenario.local', 'wanted-1', <ContainerRegistryType.DOCKER: 'docker'>, None, None, True, True, None), (ContainerRegistryID('5f92db0e-61f1-44ed-b4c3-d141e303e613'), 'https://other-1.scenario.local', 'other-1', <ContainerRegistryType.HARBOR2: 'harbor2'>, None, None, True, False, None)]
+  - items: 심은 레지스트리와 같다
   - total_count = 2
   - has_next_page = False
   - has_previous_page = False
