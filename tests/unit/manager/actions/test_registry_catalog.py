@@ -309,6 +309,7 @@ from ai.backend.manager.services.vfolder.processors.invite import VFolderInviteP
 from ai.backend.manager.services.vfolder.processors.sharing import VFolderSharingProcessors
 from ai.backend.manager.services.vfolder.processors.vfolder import VFolderProcessors
 from ai.backend.manager.services.vfolder.processors.vfolder_admin import VFolderAdminProcessors
+from ai.backend.manager.services.vfs_storage.actions.bulk_get import BulkGetVFSStoragesAction
 from ai.backend.manager.services.vfs_storage.processors import VFSStorageProcessors
 
 _V2_ACTION_BASES: tuple[type[Any], ...] = (
@@ -906,6 +907,22 @@ def test_entity_data_loader_reads_are_checked_per_entity_except_domains() -> Non
     )
     assert recorded[BulkGetProjectsAction] == (
         ProjectEntityType(),
+        ActionKind.BULK,
+        ActionGate.PERMISSION,
+    )
+
+
+def test_vfs_storage_loader_read_is_a_partial_permission_read() -> None:
+    """The VFS storage DataLoader reads per named storage, not superadmin-only."""
+    registry = _ops_registry()
+    VFSStorageProcessors(registry.group(GroupMeta(VFSStorageEntityType())), MagicMock())
+
+    recorded = {
+        record.action_cls: (record.entity_type, record.kind, record.gate)
+        for record in registry.wired_processors()
+    }
+    assert recorded[BulkGetVFSStoragesAction] == (
+        VFSStorageEntityType(),
         ActionKind.BULK,
         ActionGate.PERMISSION,
     )

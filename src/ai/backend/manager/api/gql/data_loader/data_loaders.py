@@ -511,13 +511,16 @@ class DataLoaders:
     ) -> DataLoader[VFSStorageID, VFSStorage | None]:
         adapter = self._adapters.vfs_storage
 
-        async def load_fn(ids: list[VFSStorageID]) -> list[VFSStorage | None]:
+        async def load_fn(ids: list[VFSStorageID]) -> list[VFSStorage | Exception | None]:
             from ai.backend.manager.api.gql.vfs_storage import (  # pants: no-infer-dep
                 VFSStorage as VS,
             )
 
             dtos = await adapter.batch_load_by_ids(ids)
-            return [VS.from_pydantic(dto) if dto is not None else None for dto in dtos]
+            return [
+                dto if dto is None or isinstance(dto, Exception) else VS.from_pydantic(dto)
+                for dto in dtos
+            ]
 
         return DataLoader(load_fn=load_fn)
 
