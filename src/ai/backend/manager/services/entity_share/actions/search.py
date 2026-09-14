@@ -51,7 +51,6 @@ class EntityShareRecipientScopeItem(EntityShareScopeItem):
 
 
 @dataclass(frozen=True)
-@dataclass(frozen=True)
 class EntityShareRecipientProjectScopeItem(EntityShareScopeItem):
     """The shares addressed to one project."""
 
