@@ -2679,6 +2679,25 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
         self._register_security_state(meta)
         if self_member.vtep_ip is not None:
             self._self_vteps[meta.session_id] = self_member.vtep_ip
+        # The recovery sweep runs before the journal is read -- it cannot tell this session from a
+        # dead one -- and takes FOUR rules off the VNI, while the protection re-assert below puts
+        # back three. The fourth is this bridge's own forward-accept, and on a host whose FORWARD
+        # policy is DROP (br_netfilter plus Docker, or any hardened node) a session adopted
+        # without it carries nothing for as long as it runs. Measured on a rig whose policy is
+        # ACCEPT: the rule was gone after every privnet restart and never came back.
+        #
+        # Warned, not refused, for the reason the MTU check below gives: these devices are already
+        # up and carrying traffic, and an adoption that raised here would take a running session
+        # down over a rule this host may not even need.
+        try:
+            await self._ensure_forward_accept(meta.vni)
+        except Exception as e:
+            log.warning(
+                "adopted session {} without its bridge forward-accept rule ({}); if this host"
+                " filters FORWARD by default, the session's traffic will not pass",
+                meta.session_id,
+                e,
+            )
         if meta.encryption_key is not None:
             await self._close_tunnel(
                 meta,
