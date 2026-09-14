@@ -508,7 +508,7 @@ class ImageRow(CreatedAtMixin, Base):
             registry=self.registry,
             registry_id=self.registry_id,
             architecture=self.architecture,
-            config_digest=self.config_digest,
+            config_digest=self.trimmed_digest,
             size_bytes=self.size_bytes,
             is_local=self.is_local,
             type=self.type,
