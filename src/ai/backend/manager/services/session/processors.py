@@ -16,6 +16,7 @@ from ai.backend.manager.services.session.actions.batch_get_kernel_resource_alloc
 from ai.backend.manager.services.session.actions.batch_get_session_resource_allocation import (
     BatchGetSessionResourceAllocationAction,
 )
+from ai.backend.manager.services.session.actions.bulk_get import BulkGetSessionsAction
 from ai.backend.manager.services.session.actions.commit_session import (
     CommitSessionAction,
     CommitSessionActionResult,
@@ -213,6 +214,8 @@ class SessionProcessors:
         BatchGetKernelResourceAllocationAction, BatchGetKernelResourceAllocationActionResult
     ]
     search_sessions: ScopeActionProcessor[SearchSessionsAction, SearchSessionsActionResult]
+    # What the DataLoader reads: checked per session.
+    bulk_get: PartialBulkActionProcessor[BulkGetSessionsAction, SessionEntityData]
     scoped_search: ScopeActionProcessor[
         ScopedSearchSessionsAction, ScopedBatchOpsResult[SessionEntityData]
     ]
@@ -286,8 +289,6 @@ class SessionProcessors:
         )
         self.match_sessions = group.scope(MatchSessionsAction, service.match_sessions)
         self.search_kernels = group.scope(SearchKernelsAction, service.search_kernels)
-        # Bulk read for GraphQL DataLoaders; ids come from already-authorized
-        # session/kernel nodes, so no per-target RBAC re-validation is applied.
         self.batch_get_session_resource_allocation = group.partial_bulk(
             BatchGetSessionResourceAllocationAction, service.batch_get_session_resource_allocation
         )
@@ -297,6 +298,7 @@ class SessionProcessors:
             service.batch_get_kernel_resource_allocation,
         )
         self.search_sessions = group.scope(SearchSessionsAction, service.search)
+        self.bulk_get = group.partial_bulk_get_ops(BulkGetSessionsAction)
         self.scoped_search = group.scope_search_ops(ScopedSearchSessionsAction)
         self.terminate_sessions = group.partial_bulk(
             TerminateSessionsAction, service.terminate_sessions

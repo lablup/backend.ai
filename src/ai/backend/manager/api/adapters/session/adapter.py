@@ -162,6 +162,7 @@ from ai.backend.manager.services.session.actions.batch_get_kernel_resource_alloc
 from ai.backend.manager.services.session.actions.batch_get_session_resource_allocation import (
     BatchGetSessionResourceAllocationAction,
 )
+from ai.backend.manager.services.session.actions.bulk_get import BulkGetSessionsAction
 from ai.backend.manager.services.session.actions.compute_schedule import (
     ComputeScheduleAction,
 )
@@ -486,25 +487,22 @@ class SessionAdapter(BaseAdapter):
     # Batch load (DataLoader)
     # -------------------------------------------------------------------------
 
-    async def batch_load_by_ids(self, session_ids: Sequence[SessionID]) -> list[SessionNode | None]:
-        """Batch load sessions by ID for DataLoader use.
-
-        Returns SessionNode DTOs in the same order as the input session_ids list.
-        """
+    async def batch_load_by_ids(
+        self, session_ids: Sequence[SessionID]
+    ) -> list[SessionNode | Exception | None]:
+        """Batch load sessions by their IDs for DataLoader use, checked per session."""
         if not session_ids:
             return []
-        querier = BatchQuerier(
-            pagination=NoPagination(),
-            conditions=[SessionConditions.by_ids([SessionId(sid) for sid in session_ids])],
+        result = await self._session.bulk_get.run(BulkGetSessionsAction(ids=list(session_ids)))
+        nodes = iter(
+            await self._session_data_to_nodes([
+                item.value.to_session_data() for item in result.items if item.value is not None
+            ])
         )
-        action_result = await self._session.search_sessions.run(
-            SearchSessionsAction(querier=querier, user_id=UserID(self._require_user_id()))
-        )
-        nodes = await self._session_data_to_nodes(action_result.data)
-        session_map: dict[SessionID, SessionNode] = {
-            SessionID(data.id): node for data, node in zip(action_result.data, nodes, strict=True)
-        }
-        return [session_map.get(session_id) for session_id in session_ids]
+        return [
+            next(nodes) if item.value is not None else self.batch_load_failure(item.error)
+            for item in result.items
+        ]
 
     async def batch_load_kernels_by_ids(
         self, kernel_ids: Sequence[KernelID]

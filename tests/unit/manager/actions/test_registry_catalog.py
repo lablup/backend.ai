@@ -302,6 +302,7 @@ from ai.backend.manager.services.scheduling_history.processors import (
 )
 from ai.backend.manager.services.secret.processors import SecretProcessors
 from ai.backend.manager.services.service_catalog.processors import ServiceCatalogProcessors
+from ai.backend.manager.services.session.actions.bulk_get import BulkGetSessionsAction
 from ai.backend.manager.services.session.actions.compute_schedule import (
     ComputeScheduleAction,
 )
@@ -861,6 +862,28 @@ def test_field_data_loader_reads_are_partial_permission_reads() -> None:
     ):
         assert (owner_lookup, ActionGate.PUBLIC) in lookup_gates
         assert (owner_lookup, ActionGate.PERMISSION) in lookup_gates
+
+
+def test_session_data_loader_read_is_checked_per_session() -> None:
+    """The session DataLoader reads per named session."""
+    registry = _ops_registry()
+    SessionProcessors(
+        registry.group(GroupMeta(SessionEntityType())),
+        registry.group(GroupMeta(ResourceGroupEntityType())),
+        MagicMock(),
+        MagicMock(),
+    )
+
+    recorded = {
+        record.action_cls: (record.entity_type, record.kind, record.gate)
+        for record in registry.wired_processors()
+        if record.kind == ActionKind.BULK
+    }
+    assert recorded[BulkGetSessionsAction] == (
+        SessionEntityType(),
+        ActionKind.BULK,
+        ActionGate.PERMISSION,
+    )
 
 
 def test_entity_data_loader_reads_are_checked_per_entity_except_domains() -> None:

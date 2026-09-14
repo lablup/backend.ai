@@ -36,9 +36,11 @@ from ai.backend.manager.data.resource_slot.types import ResourceAllocationAggreg
 from ai.backend.manager.data.session.options import AgentSelectionPolicy
 from ai.backend.manager.data.session.types import (
     SessionData,
+    SessionEntityData,
     SessionStatus,
     SessionTerminationStatus,
 )
+from ai.backend.manager.errors.common import GenericForbidden
 from ai.backend.manager.services.session.actions.batch_get_session_resource_allocation import (
     BatchGetSessionResourceAllocationAction,
 )
@@ -194,6 +196,82 @@ async def _no_allocations(
             for sid in action.session_ids
         ]
     )
+
+
+class TestBatchLoadSessions:
+    """The session DataLoader path: each session is answered for."""
+
+    @pytest.fixture
+    def readable(self) -> SessionData:
+        return _create_session_data()
+
+    @pytest.fixture
+    def denied_id(self) -> SessionID:
+        return SessionID(uuid4())
+
+    @pytest.fixture
+    def missing_id(self) -> SessionID:
+        return SessionID(uuid4())
+
+    @pytest.fixture
+    def denial(self) -> GenericForbidden:
+        return GenericForbidden("no read on this session")
+
+    @pytest.fixture
+    def processors(
+        self,
+        readable: SessionData,
+        denied_id: SessionID,
+        missing_id: SessionID,
+        denial: GenericForbidden,
+    ) -> MagicMock:
+        entity = MagicMock(spec=SessionEntityData)
+        entity.to_session_data.return_value = readable
+        processors = MagicMock()
+        processors.bulk_get.run = AsyncMock(
+            return_value=PartialBulkResult(
+                items=[
+                    PartialBulkEntityResult[SessionEntityData].succeeded(
+                        SessionID(readable.id), entity
+                    ),
+                    PartialBulkEntityResult[SessionEntityData].denied(denied_id, denial),
+                    PartialBulkEntityResult[SessionEntityData].nothing(missing_id),
+                ]
+            )
+        )
+        processors.batch_get_session_resource_allocation.run = AsyncMock(
+            side_effect=_no_allocations
+        )
+        return processors
+
+    @pytest.fixture
+    def adapter(self, processors: MagicMock) -> SessionAdapter:
+        return SessionAdapter(processors, MagicMock())
+
+    async def test_answers_per_id(
+        self,
+        adapter: SessionAdapter,
+        readable: SessionData,
+        denied_id: SessionID,
+        missing_id: SessionID,
+        denial: GenericForbidden,
+    ) -> None:
+        node, refused, missing = await adapter.batch_load_by_ids([
+            SessionID(readable.id),
+            denied_id,
+            missing_id,
+        ])
+
+        assert node is not None and not isinstance(node, Exception)
+        assert node.id == readable.id
+        assert refused is denial
+        assert missing is None
+
+    async def test_no_ids_read_nothing(
+        self, adapter: SessionAdapter, processors: MagicMock
+    ) -> None:
+        assert await adapter.batch_load_by_ids([]) == []
+        processors.bulk_get.run.assert_not_awaited()
 
 
 class TestEnqueueActionBuilding:
