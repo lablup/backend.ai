@@ -82,7 +82,15 @@ class Searching(When[ManyImagesAndACaller, ImageAdapter, AdminSearchImagesPayloa
 
     @override
     def describe(self, laid: ManyImagesAndACaller) -> str:
-        return f"{laid.caller.username}이 {self.paging.says()} 검색함"
+        conditions: list[str] = []
+        if self.named_only:
+            conditions.append(f"{laid.named.name} 이름으로")
+        if self.status is not None:
+            conditions.append(f"{self.status.value} 상태로")
+        if self.descending:
+            conditions.append("이름 내림차순으로 정렬해")
+        conditions.append(self.paging.says())
+        return f"{laid.caller.username}이 {' '.join(conditions)} 검색함"
 
     @override
     async def call(

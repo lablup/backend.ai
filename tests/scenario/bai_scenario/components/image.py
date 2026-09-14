@@ -443,7 +443,7 @@ class Filled(Condition[Any]):
 
 @dataclass(frozen=True)
 class TheImageNode(Then[Any, ImageNode]):
-    """미리 만들어 둔 이미지 전체가 반환된다. 시나리오가 바꾼 필드만 인자로 받는다.
+    """이미지 노드의 전체 필드를 확인한다. 시나리오가 바꾼 필드만 인자로 받는다.
 
     이미지를 담은 전제면 무엇이든 받는다. `image` 필드로 이미지 1개를 들고 있으면 된다.
     """
@@ -465,7 +465,7 @@ class TheImageNode(Then[Any, ImageNode]):
 
     @override
     def says(self) -> str:
-        return "미리 만들어 둔 이미지 전체가 반환된다"
+        return "이미지 노드의 모든 필드가 예상값과 일치한다"
 
     @override
     def look(self, laid: Any, answered: Answered[ImageNode]) -> list[Verdict]:
@@ -498,8 +498,12 @@ class TheImageNode(Then[Any, ImageNode]):
             (ImageLabelInfo(key=key, value=value) for key, value in labels.items()),
             key=lambda one: one.key,
         )
-        resource_limits = self.resource_limits or DEFAULT_LIMITS
-        resource_limits_gql = self.resource_limits_gql or DEFAULT_LIMITS_GQL
+        resource_limits = (
+            self.resource_limits if self.resource_limits is not None else DEFAULT_LIMITS
+        )
+        resource_limits_gql = (
+            self.resource_limits_gql if self.resource_limits_gql is not None else DEFAULT_LIMITS_GQL
+        )
         written = WrittenByThisRun(datetime.now(UTC))
         return [
             Held("id", node.id, SameAs(planted, "미리 만들어 둔 이미지의 ID")),
@@ -620,7 +624,11 @@ class ByOffset(Paging):
 
     @override
     def says(self) -> str:
-        return "크기를 생략하고" if self.limit is None else "조건 없이"
+        if self.limit is None:
+            return "페이지 크기를 생략하고"
+        if self.offset is not None:
+            return f"앞의 {self.offset}개를 건너뛰고 한 페이지에 {self.limit}개씩"
+        return f"한 페이지에 {self.limit}개씩"
 
     @override
     def asked(self) -> dict[str, Any]:
