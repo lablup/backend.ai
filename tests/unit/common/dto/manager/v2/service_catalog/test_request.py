@@ -233,7 +233,7 @@ class TestUpdateServiceCatalogInput:
         assert inp.labels is UNSET
         assert isinstance(inp.labels, Unset)
 
-    def test_none_labels_clears(self) -> None:
+    def test_none_labels_is_kept_distinct_from_unset(self) -> None:
         inp = UpdateServiceCatalogInput(labels=None)
         assert inp.labels is None
 

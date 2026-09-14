@@ -98,7 +98,7 @@ class UpdateServiceCatalogInput(BaseRequestModel):
         default=UNSET, description="Updated version string. Omit to leave unchanged."
     )
     labels: dict[str, Any] | None | Unset = Field(
-        default=UNSET, description="Updated labels. Omit to leave unchanged; null clears."
+        default=UNSET, description="Updated labels. Omit to leave unchanged."
     )
     status: ServiceCatalogStatus | None | Unset = Field(
         default=UNSET, description="Updated service status. Omit to leave unchanged."
