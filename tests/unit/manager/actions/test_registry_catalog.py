@@ -42,6 +42,7 @@ from ai.backend.common.data.entity.fair_share import (
 )
 from ai.backend.common.data.entity.idle_checker import IdleCheckerEntityType
 from ai.backend.common.data.entity.image import ImageEntityType
+from ai.backend.common.data.entity.image_alias import ImageAliasFieldType
 from ai.backend.common.data.entity.login_client_type import LoginClientTypeEntityType
 from ai.backend.common.data.entity.model_card import ModelCardEntityType
 from ai.backend.common.data.entity.notification import (
@@ -110,6 +111,7 @@ from ai.backend.manager.data.fair_share.types import (
     ProjectFairShareData,
     UserFairShareData,
 )
+from ai.backend.manager.data.image.types import ImageAliasData
 from ai.backend.manager.data.secret.types import SecretFieldData
 from ai.backend.manager.repositories.ops.repository import OpsRepository
 from ai.backend.manager.services.agent.actions.bulk_get import BulkGetAgentsAction
@@ -200,6 +202,11 @@ from ai.backend.manager.services.idle_checker_assignment.processors import (
     IdleCheckerAssignmentProcessors,
 )
 from ai.backend.manager.services.image.actions.bulk_get import BulkGetImagesAction
+from ai.backend.manager.services.image.actions.bulk_get_aliases import BulkGetImageAliasesAction
+from ai.backend.manager.services.image.actions.lookup_alias_owner import (
+    LookupBulkImageAliasOwnerAction,
+    LookupImageAliasOwnerAction,
+)
 from ai.backend.manager.services.image.processors import ImageProcessors
 from ai.backend.manager.services.keypair_resource_policy.processors import (
     KeypairResourcePolicyProcessors,
@@ -492,7 +499,16 @@ def test_every_defined_v2_action_is_wired() -> None:
     ContainerRegistryProcessors(
         registry.group(GroupMeta(ContainerRegistryEntityType())), MagicMock()
     )
-    ImageProcessors(registry.group(GroupMeta(ImageEntityType())), MagicMock())
+    ImageProcessors(
+        registry.group(GroupMeta(ImageEntityType())),
+        registry.group(GroupMeta(ImageEntityType())).field_group(
+            FieldGroupMeta(ImageAliasFieldType()),
+            ImageAliasData,
+            LookupImageAliasOwnerAction,
+            LookupBulkImageAliasOwnerAction,
+        ),
+        MagicMock(),
+    )
     ExportProcessors(
         registry.group(GroupMeta(UserEntityType())),
         registry.group(GroupMeta(SessionEntityType())),
@@ -814,7 +830,16 @@ def test_entity_data_loader_reads_are_checked_per_entity_except_domains() -> Non
         ),
         MagicMock(),
     )
-    ImageProcessors(registry.group(GroupMeta(ImageEntityType())), MagicMock())
+    ImageProcessors(
+        registry.group(GroupMeta(ImageEntityType())),
+        registry.group(GroupMeta(ImageEntityType())).field_group(
+            FieldGroupMeta(ImageAliasFieldType()),
+            ImageAliasData,
+            LookupImageAliasOwnerAction,
+            LookupBulkImageAliasOwnerAction,
+        ),
+        MagicMock(),
+    )
 
     recorded = {
         record.action_cls: (record.entity_type, record.kind, record.gate)
@@ -851,6 +876,11 @@ def test_entity_data_loader_reads_are_checked_per_entity_except_domains() -> Non
         ActionGate.PERMISSION,
     )
     assert recorded[BulkGetImagesAction] == (
+        ImageEntityType(),
+        ActionKind.BULK,
+        ActionGate.PERMISSION,
+    )
+    assert recorded[BulkGetImageAliasesAction] == (
         ImageEntityType(),
         ActionKind.BULK,
         ActionGate.PERMISSION,

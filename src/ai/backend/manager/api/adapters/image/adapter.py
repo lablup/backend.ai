@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import uuid
 from collections.abc import Sequence
 from decimal import Decimal
 from functools import lru_cache
@@ -66,10 +65,11 @@ from ai.backend.manager.models.image.conditions import (
 from ai.backend.manager.models.image.orders import ImageAliasOrders, ImageOrders
 from ai.backend.manager.models.image.row import ImageAliasRow, ImageRow
 from ai.backend.manager.models.image.updaters import ImageUpdate
-from ai.backend.manager.models.specs.pagination import NoPagination, OffsetPagination
+from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.services.image.actions.alias_image import AliasImageByIdAction
 from ai.backend.manager.services.image.actions.bulk_get import BulkGetImagesAction
+from ai.backend.manager.services.image.actions.bulk_get_aliases import BulkGetImageAliasesAction
 from ai.backend.manager.services.image.actions.dealias_image import DealiasImageAction
 from ai.backend.manager.services.image.actions.forget_image import ForgetImageByIdAction
 from ai.backend.manager.services.image.actions.purge_images import PurgeImageByIdAction
@@ -141,22 +141,17 @@ class ImageAdapter(BaseAdapter):
 
     async def batch_load_aliases_by_ids(
         self, alias_ids: Sequence[ImageAliasID]
-    ) -> list[ImageAliasNode | None]:
-        """Batch load image aliases by alias ID for DataLoader use.
-
-        Returns ImageAliasNode DTOs in the same order as the input alias_ids list.
-        """
+    ) -> list[ImageAliasNode | Exception | None]:
+        """Batch load image aliases for DataLoader use, checked per owning image."""
         if not alias_ids:
             return []
-        querier = BatchQuerier(
-            pagination=NoPagination(),
-            conditions=[ImageAliasConditions.by_ids(alias_ids)],
+        ids = [ImageAliasID(alias_id) for alias_id in alias_ids]
+        return await self.batch_load_fields(
+            self._image.bulk_get_aliases,
+            BulkGetImageAliasesAction(ids=ids),
+            ids,
+            self._alias_data_to_dto,
         )
-        action_result = await self._image.search_aliases.run(SearchAliasesAction(querier=querier))
-        alias_map: dict[uuid.UUID, ImageAliasNode] = {
-            item.id: self._alias_data_to_dto(item) for item in action_result.data
-        }
-        return [alias_map.get(alias_id) for alias_id in alias_ids]
 
     # ------------------------------------------------------------------ search
 

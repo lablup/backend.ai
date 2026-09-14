@@ -752,13 +752,16 @@ class DataLoaders:
         """Load a single alias by its own ID (ImageAliasRow.id)."""
         adapter = self._adapters.image
 
-        async def load_fn(ids: list[ImageAliasID]) -> list[ImageV2AliasGQL | None]:
+        async def load_fn(ids: list[ImageAliasID]) -> list[ImageV2AliasGQL | Exception | None]:
             from ai.backend.manager.api.gql.image.types import (  # pants: no-infer-dep
                 ImageV2AliasGQL as IAG,
             )
 
             dtos = await adapter.batch_load_aliases_by_ids(ids)
-            return [IAG.from_pydantic(dto) if dto is not None else None for dto in dtos]
+            return [
+                dto if dto is None or isinstance(dto, Exception) else IAG.from_pydantic(dto)
+                for dto in dtos
+            ]
 
         return DataLoader(load_fn=load_fn)
 
