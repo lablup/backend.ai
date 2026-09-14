@@ -202,6 +202,8 @@ from ai.backend.manager.data.deployment.types import (
     RouteTrafficStatus as ManagerRouteTrafficStatus,
 )
 from ai.backend.manager.data.runtime_variant_preset.types import RuntimeVariantPresetValueData
+from ai.backend.manager.errors.base.field import FieldNotFoundError
+from ai.backend.manager.errors.common import GenericBadRequest
 from ai.backend.manager.errors.deployment import DeploymentRevisionNotFound
 from ai.backend.manager.errors.service import EndpointTokenNotFound
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
@@ -973,11 +975,20 @@ class DeploymentAdapter(BaseAdapter):
         self,
         input: BulkDeleteAccessTokensInput,
     ) -> BulkDeleteAccessTokensPayload:
-        """Bulk delete access tokens."""
-        action_result = await self._deployment.bulk_delete_access_tokens.run(
-            BulkDeleteAccessTokensAction(access_token_ids=input.ids)
+        """Bulk delete access tokens; a token missing or refused is left out of the answer."""
+        if not input.ids:
+            return BulkDeleteAccessTokensPayload(ids=[])
+        try:
+            action_result = await self._deployment.bulk_delete_access_tokens.run(
+                BulkDeleteAccessTokensAction(
+                    access_token_ids=[DeploymentTokenID(token_id) for token_id in input.ids]
+                )
+            )
+        except FieldNotFoundError:
+            return BulkDeleteAccessTokensPayload(ids=[])
+        return BulkDeleteAccessTokensPayload(
+            ids=[token.id for token in action_result.successes.values()]
         )
-        return BulkDeleteAccessTokensPayload(ids=action_result.deleted_ids)
 
     async def search_access_tokens(
         self,
@@ -1097,11 +1108,21 @@ class DeploymentAdapter(BaseAdapter):
     async def bulk_delete_rules(
         self, input: BulkDeleteAutoScalingRulesInput
     ) -> BulkDeleteAutoScalingRulesPayload:
-        """Bulk delete auto-scaling rules."""
+        """Bulk delete auto-scaling rules; a rule missing or refused is left out of the answer."""
+        rule_deployments: dict[UUID, DeploymentID] = {}
+        for rule_id in input.ids:
+            try:
+                rule_deployments[rule_id] = await self._auto_scaling_rule_deployment(rule_id)
+            except GenericBadRequest:
+                continue
+        if not rule_deployments:
+            return BulkDeleteAutoScalingRulesPayload(ids=[])
         action_result = await self._deployment.bulk_delete_auto_scaling_rules.run(
-            BulkDeleteAutoScalingRulesAction(auto_scaling_rule_ids=input.ids)
+            BulkDeleteAutoScalingRulesAction(rule_deployments=rule_deployments)
         )
-        return BulkDeleteAutoScalingRulesPayload(ids=action_result.deleted_ids)
+        return BulkDeleteAutoScalingRulesPayload(
+            ids=[rule_id for rule_ids in action_result.values().values() for rule_id in rule_ids]
+        )
 
     # ------------------------------------------------------------------
     # Deployment policy operations

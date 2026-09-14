@@ -7,7 +7,9 @@ from uuid import UUID
 from ai.backend.common.contexts.user import current_user
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
 from ai.backend.common.data.entity.deployment import DeploymentID
+from ai.backend.common.data.entity.deployment_token import DeploymentTokenID
 from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.types import FieldIdentifier
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.model_deployment.types import (
     DeploymentStrategy,
@@ -17,6 +19,8 @@ from ai.backend.common.dto.appproxy_coordinator.v2.endpoint.request import (
     MintEndpointTokenRequest,
 )
 from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.manager.actions.v2.bulk.result import PartialBulkEntityResult, PartialBulkResult
+from ai.backend.manager.actions.v2.ops.result import BulkFieldOpsResult
 from ai.backend.manager.clients.appproxy.client import AppProxyClientPool
 from ai.backend.manager.data.deployment.creator import (
     ModelRevisionCreator,
@@ -26,6 +30,7 @@ from ai.backend.manager.data.deployment.types import (
     DeploymentInfo,
     ExecutionSpec,
     LegacyDeploymentData,
+    ModelDeploymentAccessTokenData,
     ModelDeploymentData,
     ModelDeploymentMetadataInfo,
     ModelRevisionData,
@@ -35,7 +40,7 @@ from ai.backend.manager.data.deployment.types import (
     RevisionRefreshResult,
 )
 from ai.backend.manager.errors.api import InvalidAPIParameters
-from ai.backend.manager.errors.service import RoutingNotFound
+from ai.backend.manager.errors.service import EndpointTokenNotFound, RoutingNotFound
 from ai.backend.manager.errors.user import UserNotFound
 from ai.backend.manager.models.endpoint.conditions import DeploymentConditions
 from ai.backend.manager.models.endpoint.creators import EndpointTokenCreator
@@ -50,7 +55,6 @@ from ai.backend.manager.repositories.runtime_variant_preset.repository import (
 )
 from ai.backend.manager.services.deployment.actions.access_token.bulk_delete_access_tokens import (
     BulkDeleteAccessTokensAction,
-    BulkDeleteAccessTokensActionResult,
 )
 from ai.backend.manager.services.deployment.actions.access_token.create_access_token import (
     CreateAccessTokenAction,
@@ -62,7 +66,6 @@ from ai.backend.manager.services.deployment.actions.access_token.delete_access_t
 )
 from ai.backend.manager.services.deployment.actions.auto_scaling_rule.bulk_delete_auto_scaling_rules import (
     BulkDeleteAutoScalingRulesAction,
-    BulkDeleteAutoScalingRulesActionResult,
 )
 from ai.backend.manager.services.deployment.actions.auto_scaling_rule.create_auto_scaling_rule import (
     CreateAutoScalingRuleAction,
@@ -838,12 +841,25 @@ class DeploymentService:
 
     async def bulk_delete_auto_scaling_rules(
         self, action: BulkDeleteAutoScalingRulesAction
-    ) -> BulkDeleteAutoScalingRulesActionResult:
-        """Bulk delete auto-scaling rules."""
-        deleted_ids = await self._deployment_repository.bulk_delete_autoscaling_rules(
-            action.auto_scaling_rule_ids
+    ) -> PartialBulkResult[list[UUID]]:
+        """Bulk delete auto-scaling rules, answering with the rules deleted per deployment."""
+        deleted = set(
+            await self._deployment_repository.bulk_delete_autoscaling_rules(
+                list(action.rule_deployments)
+            )
         )
-        return BulkDeleteAutoScalingRulesActionResult(deleted_ids=deleted_ids)
+        by_deployment: dict[DeploymentID, list[UUID]] = {
+            deployment_id: [] for deployment_id in action.rule_deployments.values()
+        }
+        for rule_id, deployment_id in action.rule_deployments.items():
+            if rule_id in deleted:
+                by_deployment[deployment_id].append(rule_id)
+        return PartialBulkResult(
+            items=[
+                PartialBulkEntityResult[list[UUID]].succeeded(deployment_id, rule_ids)
+                for deployment_id, rule_ids in by_deployment.items()
+            ]
+        )
 
     # ========== Access Token ==========
 
@@ -929,12 +945,20 @@ class DeploymentService:
 
     async def bulk_delete_access_tokens(
         self, action: BulkDeleteAccessTokensAction
-    ) -> BulkDeleteAccessTokensActionResult:
+    ) -> BulkFieldOpsResult[ModelDeploymentAccessTokenData]:
         """Bulk delete access tokens."""
-        deleted_ids = await self._deployment_repository.bulk_delete_access_tokens(
-            action.access_token_ids
+        deleted = await self._deployment_repository.bulk_delete_access_tokens(
+            list(action.access_token_ids)
         )
-        return BulkDeleteAccessTokensActionResult(deleted_ids=deleted_ids)
+        successes: dict[FieldIdentifier, ModelDeploymentAccessTokenData] = {
+            DeploymentTokenID(token.id): token for token in deleted
+        }
+        errors: dict[FieldIdentifier, Exception] = {
+            token_id: EndpointTokenNotFound(f"Access token {token_id} not found")
+            for token_id in action.access_token_ids
+            if token_id not in successes
+        }
+        return BulkFieldOpsResult(successes=successes, errors=errors)
 
     # ========== Replica Operations ==========
 

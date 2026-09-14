@@ -154,8 +154,14 @@ from ai.backend.manager.services.artifact_registry.processors import ArtifactReg
 from ai.backend.manager.services.audit_log.processors import AuditLogProcessors
 from ai.backend.manager.services.auth.processors import AuthProcessors
 from ai.backend.manager.services.container_registry.processors import ContainerRegistryProcessors
+from ai.backend.manager.services.deployment.actions.access_token.bulk_delete_access_tokens import (
+    BulkDeleteAccessTokensAction,
+)
 from ai.backend.manager.services.deployment.actions.access_token.bulk_get_access_tokens import (
     BulkGetAccessTokensAction,
+)
+from ai.backend.manager.services.deployment.actions.auto_scaling_rule.bulk_delete_auto_scaling_rules import (
+    BulkDeleteAutoScalingRulesAction,
 )
 from ai.backend.manager.services.deployment.actions.deployment_policy.bulk_get_deployment_policies import (
     BulkGetDeploymentPoliciesAction,
@@ -626,6 +632,21 @@ def test_export_report_reads_keep_their_judged_gates() -> None:
         if record.action_cls in judged
     }
     assert recorded == judged
+
+
+def test_deployment_bulk_deletes_are_checked_per_owning_deployment() -> None:
+    """Rules and access tokens deleted in bulk are judged per deployment, not superadmin-only."""
+    registry = _ops_registry()
+    DeploymentProcessors(registry.group(GroupMeta(DeploymentEntityType())), MagicMock())
+
+    recorded = {
+        record.action_cls: (record.entity_type, record.kind, record.gate)
+        for record in registry.wired_processors()
+        if record.kind == ActionKind.BULK
+    }
+    partial = (DeploymentEntityType(), ActionKind.BULK, ActionGate.PERMISSION)
+    assert recorded[BulkDeleteAutoScalingRulesAction] == partial
+    assert recorded[BulkDeleteAccessTokensAction] == partial
 
 
 def test_resource_domain_and_agent_reads_keep_their_judged_gates() -> None:
