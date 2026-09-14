@@ -11,8 +11,15 @@ The single-file shorthand (`models/{domain}.py`) is legacy — do not add new on
 
 Domains migrated to the v2 specs add them next to `row.py` — `creators.py` / `purgers.py` /
 `upserters.py` / `updaters.py` for writes, `queriers.py` / `searchers.py` / `lookups.py` for
-reads, `scopes.py` for the `OperationScope` subclasses that filter the row. The spec bases
-live in `models/specs/` — read `models/specs/AGENTS.md` before touching them.
+reads, `scopes.py` for the `OperationScope` subclasses that filter the row.
+An `OperationScope` on the domain, project or user axis answers from the ownership graph:
+`scope_membership_exists` (`models/virtual_entity/queries.py`) asks whether the scope's
+virtual entity holds the row, correlating on the column the creator's `entity_id(row)`
+names. A cap bounds what the scope may do with the row, not whether it holds it, so a
+share answers alongside an own edge. Until the ownership backfill puts the existing rows
+in the graph the predicate is OR'd with the column it replaces, marked `TODO(BA-7571)`.
+
+The spec bases live in `models/specs/` — read `models/specs/AGENTS.md` before touching them.
 
 ## Row class rules
 

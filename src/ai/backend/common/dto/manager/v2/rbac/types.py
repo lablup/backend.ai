@@ -7,27 +7,22 @@ from __future__ import annotations
 from enum import StrEnum
 from uuid import UUID
 
-from ai.backend.common.api_handlers import BaseRequestModel, BaseResponseModel
+from ai.backend.common.api_handlers import BaseRequestModel
+from ai.backend.common.data.entity.types import EntityType
 from ai.backend.common.data.permission.types import (
-    EntityType,
-    OperationType,
+    Permission,
     RoleSource,
     RoleStatus,
 )
 from ai.backend.common.dto.manager.v2.common import OrderDirection
 
 __all__ = (
-    "EntityOrderField",
     "EntityType",
     "EntityTypeScope",
-    "OperationType",
-    "OperationTypeDTO",
-    "OperationTypeFilter",
     "OrderDirection",
+    "PermissionBitDTO",
+    "PermissionBitFilter",
     "PermissionOrderField",
-    "PermissionSummary",
-    "RBACElementTypeDTO",
-    "RBACElementTypeFilter",
     "RoleAssignmentOrderField",
     "RoleOrderField",
     "RoleSource",
@@ -56,21 +51,6 @@ class RoleStatusDTO(StrEnum):
     DELETED = "deleted"
 
 
-class OperationTypeDTO(StrEnum):
-    """RBAC operation type enum for DTO layer."""
-
-    CREATE = "create"
-    READ = "read"
-    UPDATE = "update"
-    SOFT_DELETE = "soft-delete"
-    HARD_DELETE = "hard-delete"
-    GRANT_ALL = "grant:all"
-    GRANT_READ = "grant:read"
-    GRANT_UPDATE = "grant:update"
-    GRANT_SOFT_DELETE = "grant:soft-delete"
-    GRANT_HARD_DELETE = "grant:hard-delete"
-
-
 class PermissionBitDTO(StrEnum):
     """One bit of the permission mask.
 
@@ -84,70 +64,17 @@ class PermissionBitDTO(StrEnum):
     SOFT_DELETE = "soft_delete"
     HARD_DELETE = "hard_delete"
 
+    @classmethod
+    def of(cls, permission: Permission) -> PermissionBitDTO:
+        """The name of a single permission bit."""
+        for bit in cls:
+            if permission is Permission[bit.name]:
+                return bit
+        raise ValueError(f"{permission!r} is not a single permission bit")
 
-class RBACElementTypeDTO(StrEnum):
-    """Unified RBAC element type enum for DTO layer (matches GQL schema values)."""
-
-    # Scope hierarchy
-    DOMAIN = "domain"
-    PROJECT = "project"
-    USER = "user"
-
-    # Root-query-enabled entities (scoped)
-    SESSION = "session"
-    VFOLDER = "vfolder"
-    MODEL_DEPLOYMENT = "model_deployment"
-    KEYPAIR = "keypair"
-    NOTIFICATION_CHANNEL = "notification_channel"
-    NETWORK = "network"
-    IDLE_CHECKER_ASSIGNMENT = "idle_checker_assignment"
-    RESOURCE_GROUP = "resource_group"
-    CONTAINER_REGISTRY = "container_registry"
-    STORAGE_HOST = "storage_host"
-    AGENT = "agent"
-    KERNEL = "kernel"
-    ROUTING = "routing"
-    IMAGE = "image"
-    ARTIFACT = "artifact"
-    ARTIFACT_REGISTRY = "artifact_registry"
-    SESSION_TEMPLATE = "session_template"
-    APP_CONFIG = "app_config"
-    APP_CONFIG_DEFINITION = "app_config_definition"
-    APP_CONFIG_ALLOW_LIST = "app_config_allow_list"
-    APP_CONFIG_FRAGMENT = "app_config_fragment"
-    MODEL_CARD = "model_card"
-
-    # Root-query-enabled entities (superadmin-only)
-    RESOURCE_PRESET = "resource_preset"
-    USER_RESOURCE_POLICY = "user_resource_policy"
-    KEYPAIR_RESOURCE_POLICY = "keypair_resource_policy"
-    PROJECT_RESOURCE_POLICY = "project_resource_policy"
-    ROLE = "role"
-    AUDIT_LOG = "audit_log"
-    KERNEL_HISTORY = "kernel:history"
-    EVENT_LOG = "event_log"
-
-    # Admin page access control
-    PROJECT_ADMIN_PAGE = "project_admin_page"
-    DOMAIN_ADMIN_PAGE = "domain_admin_page"
-
-    # Auto-only entities used in permissions
-    NOTIFICATION_RULE = "notification_rule"
-
-    # Auto sub-entities with direct GET APIs
-    DEPLOYMENT_TOKEN = "deployment:token"
-    DEPLOYMENT_POLICY = "deployment:policy"
-    DEPLOYMENT_REVISION = "deployment:revision"
-    IMAGE_ALIAS = "image:alias"
-    ROLE_ASSIGNMENT = "role:assignment"
-
-    # Sub-entity permissions split from parent metadata access
-    VFOLDER_DATA = "vfolder:data"
-    SESSION_APP_SERVICE = "session:app_service"
-    USER_EMAIL = "user:email"
-
-    # Entity-level scopes
-    ARTIFACT_REVISION = "artifact_revision"
+    def to_permission(self) -> Permission:
+        """The bit this names, as a permission row records it."""
+        return Permission[self.name]
 
 
 class RoleOrderField(StrEnum):
@@ -164,13 +91,6 @@ class RoleAssignmentOrderField(StrEnum):
     USERNAME = "username"
     EMAIL = "email"
     GRANTED_AT = "granted_at"
-
-
-class EntityOrderField(StrEnum):
-    """Fields available for ordering entity associations."""
-
-    ENTITY_TYPE = "entity_type"
-    REGISTERED_AT = "registered_at"
 
 
 class PermissionOrderField(StrEnum):
@@ -198,44 +118,26 @@ class RoleStatusFilter(BaseRequestModel):
     not_in: list[str] | None = None
 
 
-class RBACElementTypeFilter(BaseRequestModel):
-    """Filter for RBAC element type (scope_type / entity_type) columns.
+class PermissionBitFilter(BaseRequestModel):
+    """Filter for a permission-bit column over ``PermissionBitDTO``."""
 
-    Mirrors the Strawberry GQL EnumFilter pattern: equals / in / not_equals / not_in.
-    Used for both ``scope_type`` and ``entity_type`` fields, which share the
-    ``RBACElementTypeDTO`` value space at the API surface.
-    """
-
-    equals: RBACElementTypeDTO | None = None
-    in_: list[RBACElementTypeDTO] | None = None
-    not_equals: RBACElementTypeDTO | None = None
-    not_in: list[RBACElementTypeDTO] | None = None
-
-
-class OperationTypeFilter(BaseRequestModel):
-    """Filter for permission operation columns over ``OperationTypeDTO``."""
-
-    equals: OperationTypeDTO | None = None
-    in_: list[OperationTypeDTO] | None = None
-    not_equals: OperationTypeDTO | None = None
-    not_in: list[OperationTypeDTO] | None = None
+    equals: PermissionBitDTO | None = None
+    in_: list[PermissionBitDTO] | None = None
+    not_equals: PermissionBitDTO | None = None
+    not_in: list[PermissionBitDTO] | None = None
 
 
 class ScopeInputDTO(BaseRequestModel):
     """Scope reference for associating an entity with a scope."""
 
-    scope_type: RBACElementTypeDTO
+    scope_type: EntityType
     scope_id: str
 
 
 class EntityTypeScope(BaseRequestModel):
-    """Entity reference parametrized by RBAC element type.
+    """A typed (entity type, id) pair naming one entity."""
 
-    A typed (element_type, id) pair used to reference a specific entity in
-    contexts such as batch RBAC validation or scoped queries.
-    """
-
-    entity_type: RBACElementTypeDTO
+    entity_type: EntityType
     entity_id: str
 
 
@@ -248,10 +150,3 @@ class UUIDScope(BaseRequestModel):
     """
 
     value: UUID
-
-
-class PermissionSummary(BaseResponseModel):
-    """Compact permission view for embedding inside RoleNode."""
-
-    entity_type: EntityType
-    operation: OperationType

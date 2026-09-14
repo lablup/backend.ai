@@ -17,7 +17,9 @@ from unittest.mock import MagicMock
 import pytest
 
 from ai.backend.common.contexts.user import with_user
-from ai.backend.common.data.entity.types import EntityType, ScopeRef, ScopeType
+from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.resource_group import ResourceGroupID
+from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.common.data.permission.types import Permission
 from ai.backend.common.data.user.types import UserData, UserRole
 from ai.backend.common.exception import PermissionDeniedError
@@ -33,19 +35,16 @@ from ai.backend.manager.actions.v2.relation.validator.rbac import (
 )
 from ai.backend.manager.errors.permission import NotEnoughPermission
 
-_RESOURCE_GROUP = ScopeType(EntityType("resource_group"))
-_DOMAIN = ScopeType(EntityType("domain"))
-
-_RG_ID = uuid.uuid5(uuid.NAMESPACE_OID, "rg")
-_DOMAIN_ID = uuid.uuid5(uuid.NAMESPACE_OID, "domain")
+_RG_ID = ResourceGroupID(uuid.uuid5(uuid.NAMESPACE_OID, "rg"))
+_DOMAIN_ID = DomainID(uuid.uuid5(uuid.NAMESPACE_OID, "domain"))
 
 
 @dataclass
 class _LinkAction(BaseRelationAction):
-    scopes: list[ScopeRef]
+    scopes: list[EntityIdentifier]
 
     @override
-    def scope_targets(self) -> Sequence[ScopeRef]:
+    def scope_targets(self) -> Sequence[EntityIdentifier]:
         return self.scopes
 
     @classmethod
@@ -59,16 +58,16 @@ class _LinkAction(BaseRelationAction):
         return "link_resource_group_to_domain"
 
 
-def _action(*scopes: ScopeRef) -> _LinkAction:
+def _action(*scopes: EntityIdentifier) -> _LinkAction:
     return _LinkAction(scopes=list(scopes))
 
 
-def _rg() -> ScopeRef:
-    return ScopeRef(scope_type=_RESOURCE_GROUP, scope_id=_RG_ID)
+def _rg() -> EntityIdentifier:
+    return _RG_ID
 
 
-def _domain() -> ScopeRef:
-    return ScopeRef(scope_type=_DOMAIN, scope_id=_DOMAIN_ID)
+def _domain() -> EntityIdentifier:
+    return _DOMAIN_ID
 
 
 class _RecordingMonitor(RelationActionMonitor):
@@ -107,10 +106,7 @@ class TestRelationActionProcessor:
         )
 
         (meta, result) = monitor.done_calls[0]
-        assert [(s.scope_type, s.scope_id) for s in meta.scope_targets] == [
-            (_RESOURCE_GROUP, _RG_ID),
-            (_DOMAIN, _DOMAIN_ID),
-        ]
+        assert list(meta.scope_targets) == [_RG_ID, _DOMAIN_ID]
         assert result.meta.status is OperationStatus.SUCCESS
 
     async def test_the_action_carries_no_entity_type(self) -> None:

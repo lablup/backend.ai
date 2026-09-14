@@ -11,8 +11,8 @@ Declarative write specs, colocated with the schema: a spec says *what* to write
 Whatever spec type the v2 actions and ops consume is declared in this package — the
 write specs below, plus the read/update declarations (`querier.py`, `lookup.py`,
 `searcher.py`, `updater.py`, `pagination.py`, and the batch purge spec in
-`purger.py`). `repositories/base/` keeps legacy-compatible views for the transition
-only; do not declare a new spec there.
+`purger.py`). `repositories/base/` holds read-side infrastructure only; do not
+declare a spec there.
 
 ## A relation is neither an entity nor a field
 

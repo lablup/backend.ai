@@ -12,6 +12,7 @@ from typing import Any
 from ai.backend.common.data.entity.types import FieldData
 from ai.backend.manager.models.base import Base
 from ai.backend.manager.models.specs.creator import DanglingFieldCreator, NestedFieldCreator
+from ai.backend.manager.models.specs.upserter import DanglingFieldUpserter
 from ai.backend.manager.repositories.ops.v2.write_base import V2WriteOpsBase
 
 
@@ -68,3 +69,38 @@ class V2DanglingFieldWriteOps(V2WriteOpsBase):
                 field_creators[0].integrity_error_checks(),
             )
         return [creator.to_data(row) for creator, row in zip(creators, rows, strict=True)]
+
+    async def upsert_dangling_field[TRow: Base, TData: FieldData](
+        self, upserter: DanglingFieldUpserter[TRow, TData]
+    ) -> TData:
+        """Insert or update on conflict a row that names no owner."""
+        row = await self._upsert_row_returning(
+            upserter.row_class(),
+            upserter.index_elements(),
+            upserter.build_insert_values(),
+            upserter.build_update_values(),
+            upserter.integrity_error_checks(),
+        )
+        return upserter.to_data(row)
+
+    async def atomic_upsert_dangling_fields[TRow: Base, TData: FieldData](
+        self, upserters: Sequence[DanglingFieldUpserter[TRow, TData]]
+    ) -> list[TData]:
+        """Insert-or-update every row atomically.
+
+        One statement per row, as the entity and field bulk upserts run them: each
+        carries its own update values, so they cannot be folded into a single insert.
+        """
+        if not upserters:
+            return []
+        rows = [
+            await self._upsert_row_returning(
+                upserter.row_class(),
+                upserter.index_elements(),
+                upserter.build_insert_values(),
+                upserter.build_update_values(),
+                upserter.integrity_error_checks(),
+            )
+            for upserter in upserters
+        ]
+        return [upserter.to_data(row) for upserter, row in zip(upserters, rows, strict=True)]

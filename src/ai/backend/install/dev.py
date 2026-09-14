@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from .tomltool import toml_set
+from .types import PrerequisiteError
 
 if TYPE_CHECKING:
     from .context import Context
@@ -26,6 +27,19 @@ async def install_git_lfs(ctx: Context) -> None:
         "Darwin": ["git-lfs"],
     })
     await ctx.run_shell("git lfs install", stderr=asyncio.subprocess.DEVNULL)
+
+
+async def pull_git_lfs(ctx: Context) -> None:
+    ctx.log_header("Checking out the Git LFS files")
+    exit_code = await ctx.run_shell("git lfs pull")
+    if exit_code != 0:
+        raise PrerequisiteError(
+            f"Failed to check out the Git LFS files (git lfs pull exit {exit_code}).",
+            instruction=(
+                "Run [bold]git lfs pull[/] in the repository and retry. "
+                "Without it the agent's runner binaries stay as pointer files."
+            ),
+        )
 
 
 async def install_git_hooks(ctx: Context) -> None:

@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from typing import Any, override
 from uuid import UUID
 
-from ai.backend.common.data.entity.deployment import DEPLOYMENT_ENTITY_TYPE, DeploymentID
+from ai.backend.common.data.entity.deployment import DeploymentEntityType, DeploymentID
 from ai.backend.common.data.entity.deployment_policy import DeploymentPolicyID
 from ai.backend.common.data.entity.deployment_revision import DeploymentRevisionID
 from ai.backend.common.data.entity.deployment_token import DeploymentTokenID
@@ -52,7 +52,7 @@ class LookupAutoScalingRuleDeploymentAction(LookupFieldOwnerByKeyOpsAction[Deplo
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return DEPLOYMENT_ENTITY_TYPE
+        return DeploymentEntityType()
 
     @override
     @classmethod
@@ -94,7 +94,7 @@ class LookupDeploymentRevisionOwnerAction(
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return DEPLOYMENT_ENTITY_TYPE
+        return DeploymentEntityType()
 
     @override
     @classmethod
@@ -125,7 +125,7 @@ class LookupBulkDeploymentRevisionOwnerAction(
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return DEPLOYMENT_ENTITY_TYPE
+        return DeploymentEntityType()
 
     @override
     @classmethod
@@ -169,7 +169,7 @@ class LookupReplicaOwnerAction(LookupFieldOwnerOpsAction[ReplicaID, DeploymentID
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return DEPLOYMENT_ENTITY_TYPE
+        return DeploymentEntityType()
 
     @override
     @classmethod
@@ -198,7 +198,7 @@ class LookupBulkReplicaOwnerAction(LookupBulkFieldOwnerOpsAction[ReplicaID, Depl
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return DEPLOYMENT_ENTITY_TYPE
+        return DeploymentEntityType()
 
     @override
     @classmethod
@@ -244,7 +244,7 @@ class LookupDeploymentAccessTokenOwnerAction(
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return DEPLOYMENT_ENTITY_TYPE
+        return DeploymentEntityType()
 
     @override
     @classmethod
@@ -275,7 +275,7 @@ class LookupBulkDeploymentAccessTokenOwnerAction(
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return DEPLOYMENT_ENTITY_TYPE
+        return DeploymentEntityType()
 
     @override
     @classmethod
@@ -321,7 +321,7 @@ class LookupDeploymentPolicyOwnerAction(
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return DEPLOYMENT_ENTITY_TYPE
+        return DeploymentEntityType()
 
     @override
     @classmethod
@@ -352,7 +352,7 @@ class LookupBulkDeploymentPolicyOwnerAction(
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return DEPLOYMENT_ENTITY_TYPE
+        return DeploymentEntityType()
 
     @override
     @classmethod

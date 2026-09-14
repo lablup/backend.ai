@@ -14,6 +14,9 @@ from strawberry import ID, Info
 from strawberry.relay import Connection, Edge, NodeID
 from strawberry.scalars import JSON
 
+from ai.backend.common.data.entity.deployment import DeploymentID
+from ai.backend.common.data.entity.deployment_revision import DeploymentRevisionID
+from ai.backend.common.data.entity.session import SessionID
 from ai.backend.common.dto.manager.v2.deployment.request import (
     RouteFilter as RouteFilterDTO,
 )
@@ -124,7 +127,9 @@ class Route(PydanticNodeMixin[RouteNodeDTO]):
     ) -> Annotated[ModelDeployment, strawberry.lazy(".deployment")] | None:
         """Resolve deployment using dataloader."""
         deployment_id = UUID(str(self.deployment_id))
-        deployment_data = await info.context.data_loaders.deployment_loader.load(deployment_id)
+        deployment_data = await info.context.data_loaders.deployment_loader.load(
+            DeploymentID(deployment_id)
+        )
         if deployment_data is None:
             raise EndpointNotFound(extra_msg=f"id={deployment_id}")
         return deployment_data
@@ -159,10 +164,9 @@ class Route(PydanticNodeMixin[RouteNodeDTO]):
     ):
         if self.session_id is None:
             return None
-        from ai.backend.common.types import SessionId
 
         return await info.context.data_loaders.session_loader.load(
-            SessionId(UUID(str(self.session_id)))
+            SessionID(UUID(str(self.session_id)))
         )
 
     @gql_field(description="The revision associated with the route.")  # type: ignore[misc]
@@ -172,7 +176,9 @@ class Route(PydanticNodeMixin[RouteNodeDTO]):
         """Resolve revision using dataloader."""
         if self.revision_id is None:
             return None
-        return await info.context.data_loaders.revision_loader.load(UUID(str(self.revision_id)))
+        return await info.context.data_loaders.revision_loader.load(
+            DeploymentRevisionID(UUID(str(self.revision_id)))
+        )
 
     @classmethod
     @override

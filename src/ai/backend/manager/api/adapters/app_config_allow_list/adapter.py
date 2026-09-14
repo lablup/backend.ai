@@ -72,6 +72,7 @@ from ai.backend.manager.services.app_config.actions.allow_list.purge import (
 from ai.backend.manager.services.app_config.actions.allow_list.update import (
     UpdateAppConfigAllowListAction,
 )
+from ai.backend.manager.services.app_config.processors import AppConfigProcessors
 from ai.backend.manager.types import OptionalState
 
 
@@ -89,6 +90,11 @@ def _get_app_config_allow_list_pagination_spec() -> PaginationSpec:
 class AppConfigAllowListAdapter(BaseAdapter):
     """Adapter for app config allow-list domain operations (admin-only)."""
 
+    _app_config: AppConfigProcessors
+
+    def __init__(self, app_config: AppConfigProcessors) -> None:
+        self._app_config = app_config
+
     async def admin_create(
         self, input: CreateAppConfigAllowListInput
     ) -> CreateAppConfigAllowListPayload:
@@ -97,7 +103,7 @@ class AppConfigAllowListAdapter(BaseAdapter):
             scope_type=AppConfigScopeType(input.scope_type.value),
             rank=input.rank,
         )
-        action_result = await self._processors.app_config.allow_list_global_create.run(
+        action_result = await self._app_config.allow_list_global_create.run(
             CreateAppConfigAllowListAction(creator=creator)
         )
         return CreateAppConfigAllowListPayload(
@@ -105,7 +111,7 @@ class AppConfigAllowListAdapter(BaseAdapter):
         )
 
     async def admin_get(self, allow_list_id: AppConfigAllowListID) -> AppConfigAllowListNode:
-        action_result = await self._processors.app_config.allow_list_get.run(
+        action_result = await self._app_config.allow_list_get.run(
             GetAppConfigAllowListAction(
                 querier=AppConfigAllowListQuerier(allow_list_id=allow_list_id)
             )
@@ -123,7 +129,7 @@ class AppConfigAllowListAdapter(BaseAdapter):
         if not ids:
             return []
         entity_ids = [AppConfigAllowListID(value) for value in ids]
-        result = await self._processors.app_config.allow_list_bulk_get.run(
+        result = await self._app_config.allow_list_bulk_get.run(
             BulkGetAppConfigAllowListsAction(ids=entity_ids)
         )
         return [
@@ -150,7 +156,7 @@ class AppConfigAllowListAdapter(BaseAdapter):
             limit=input.limit,
             offset=input.offset,
         )
-        action_result = await self._processors.app_config.allow_list_global_search.run(
+        action_result = await self._app_config.allow_list_global_search.run(
             AdminSearchAppConfigAllowListAction(searcher=searcher)
         )
         return SearchAppConfigAllowListPayload(
@@ -169,7 +175,7 @@ class AppConfigAllowListAdapter(BaseAdapter):
                 OptionalState.update(input.rank) if input.rank is not None else OptionalState.nop()
             ),
         )
-        action_result = await self._processors.app_config.allow_list_update.run(
+        action_result = await self._app_config.allow_list_update.run(
             UpdateAppConfigAllowListAction(updater=updater)
         )
         return UpdateAppConfigAllowListPayload(
@@ -180,7 +186,7 @@ class AppConfigAllowListAdapter(BaseAdapter):
         self, input: PurgeAppConfigAllowListInput
     ) -> PurgeAppConfigAllowListPayload:
         purger = AppConfigAllowListPurger(allow_list_id=AppConfigAllowListID(input.id))
-        action_result = await self._processors.app_config.allow_list_purge.run(
+        action_result = await self._app_config.allow_list_purge.run(
             PurgeAppConfigAllowListAction(purger=purger)
         )
         return PurgeAppConfigAllowListPayload(id=action_result.data.id)

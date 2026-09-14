@@ -3,16 +3,24 @@ from typing import override
 from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
 
 __all__ = (
-    "APP_CONFIG_DEFINITION_ENTITY_TYPE",
+    "AppConfigDefinitionEntityType",
     "AppConfigDefinitionID",
 )
 
 
-# Raw string mirroring the RBAC-managed EntityType.APP_CONFIG_DEFINITION value.
-APP_CONFIG_DEFINITION_ENTITY_TYPE = EntityType("app_config_definition")
+class AppConfigDefinitionEntityType(EntityType):
+    @override
+    @classmethod
+    def name(cls) -> str:
+        return "app_config_definition"
+
+    @override
+    @classmethod
+    def description(cls) -> str:
+        return "An app config key registered for use."
 
 
 class AppConfigDefinitionID(EntityIdentifier):
     @override
     def entity_type(self) -> EntityType:
-        return APP_CONFIG_DEFINITION_ENTITY_TYPE
+        return AppConfigDefinitionEntityType()

@@ -3,16 +3,24 @@ from typing import override
 from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
 
 __all__ = (
-    "RETENTION_POLICY_ENTITY_TYPE",
+    "RetentionPolicyEntityType",
     "RetentionPolicyID",
 )
 
 
-# Raw string mirroring the RBAC-managed EntityType.RETENTION_POLICY value.
-RETENTION_POLICY_ENTITY_TYPE = EntityType("retention_policy")
+class RetentionPolicyEntityType(EntityType):
+    @override
+    @classmethod
+    def name(cls) -> str:
+        return "retention_policy"
+
+    @override
+    @classmethod
+    def description(cls) -> str:
+        return "A rule purging records older than a retention period."
 
 
 class RetentionPolicyID(EntityIdentifier):
     @override
     def entity_type(self) -> EntityType:
-        return RETENTION_POLICY_ENTITY_TYPE
+        return RetentionPolicyEntityType()

@@ -9,6 +9,9 @@ from typing import Any, override
 
 from aiohttp import web
 
+from ai.backend.common.data.entity.vfolder import VFolderEntityType
+from ai.backend.common.data.entity.vfolder_invitation import VFolderInvitationEntityType
+from ai.backend.common.data.entity.vfolder_permission import VFolderPermissionFieldType
 from ai.backend.common.exception import (
     BackendAIError,
     ErrorCode,
@@ -16,21 +19,20 @@ from ai.backend.common.exception import (
     ErrorDomain,
     ErrorOperation,
 )
+from ai.backend.manager.actions.types import ActionOperationType
+from ai.backend.manager.errors.base.entity import EntityError, EntityErrorCode
+from ai.backend.manager.errors.base.field import FieldError, FieldErrorCode
 
 from .common import ObjectNotFound
 
 
-class TooManyVFoldersFound(BackendAIError, web.HTTPNotFound):
+class TooManyVFoldersFound(EntityError, web.HTTPConflict):
     error_type = "https://api.backend.ai/probs/too-many-vfolders"
     error_title = "Multiple vfolders found for the operation for a single vfolder."
 
     @override
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.VFOLDER,
-            operation=ErrorOperation.READ,
-            error_detail=ErrorDetail.CONFLICT,
-        )
+    def entity_error_code(self) -> EntityErrorCode:
+        return EntityErrorCode(VFolderEntityType(), ActionOperationType.GET, ErrorDetail.CONFLICT)
 
     def __init__(self, matched_rows: Sequence[Mapping[str, Any]]) -> None:
         serialized_matches = [
@@ -47,7 +49,7 @@ class TooManyVFoldersFound(BackendAIError, web.HTTPNotFound):
         super().__init__(extra_data={"matches": serialized_matches})
 
 
-class VFolderOwnerNotFound(BackendAIError, web.HTTPNotFound):
+class VFolderOwnerNotFound(EntityError, web.HTTPInternalServerError):
     """The scope a vfolder was to be created in does not exist.
 
     A personal folder names its project by its owner, so this states that the owner has
@@ -58,24 +60,18 @@ class VFolderOwnerNotFound(BackendAIError, web.HTTPNotFound):
     error_title = "The vfolder has no owning project."
 
     @override
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.VFOLDER,
-            operation=ErrorOperation.CREATE,
-            error_detail=ErrorDetail.NOT_FOUND,
+    def entity_error_code(self) -> EntityErrorCode:
+        return EntityErrorCode(
+            VFolderEntityType(), ActionOperationType.CREATE, ErrorDetail.NOT_FOUND
         )
 
 
-class VFolderNotFound(ObjectNotFound):
+class VFolderNotFound(EntityError, ObjectNotFound):
     object_name = "virtual folder"
 
     @override
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.VFOLDER,
-            operation=ErrorOperation.READ,
-            error_detail=ErrorDetail.NOT_FOUND,
-        )
+    def entity_error_code(self) -> EntityErrorCode:
+        return EntityErrorCode(VFolderEntityType(), ActionOperationType.GET, ErrorDetail.NOT_FOUND)
 
 
 class QuotaScopeNotFoundError(ObjectNotFound):
@@ -103,30 +99,24 @@ class ModelCardParseError(BackendAIError, web.HTTPBadRequest):
         )
 
 
-class VFolderAlreadyExists(BackendAIError, web.HTTPConflict):
+class VFolderAlreadyExists(EntityError, web.HTTPConflict):
     error_type = "https://api.backend.ai/probs/vfolder-already-exists"
     error_title = "The virtual folder already exists with the same name."
 
     @override
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.VFOLDER,
-            operation=ErrorOperation.CREATE,
-            error_detail=ErrorDetail.ALREADY_EXISTS,
+    def entity_error_code(self) -> EntityErrorCode:
+        return EntityErrorCode(
+            VFolderEntityType(), ActionOperationType.CREATE, ErrorDetail.ALREADY_EXISTS
         )
 
 
-class VFolderGone(BackendAIError, web.HTTPGone):
+class VFolderGone(EntityError, web.HTTPGone):
     error_type = "https://api.backend.ai/probs/vfolder-gone"
     error_title = "The virtual folder is gone."
 
     @override
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.VFOLDER,
-            operation=ErrorOperation.READ,
-            error_detail=ErrorDetail.GONE,
-        )
+    def entity_error_code(self) -> EntityErrorCode:
+        return EntityErrorCode(VFolderEntityType(), ActionOperationType.GET, ErrorDetail.GONE)
 
 
 class VFolderBadRequest(BackendAIError, web.HTTPBadRequest):
@@ -155,16 +145,14 @@ class VFolderOperationFailed(BackendAIError, web.HTTPBadRequest):
         )
 
 
-class VFolderFilterStatusFailed(BackendAIError, web.HTTPBadRequest):
+class VFolderFilterStatusFailed(EntityError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/vfolder-filter-status-failed"
     error_title = "Virtual folder status filtering has failed."
 
     @override
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.VFOLDER,
-            operation=ErrorOperation.READ,
-            error_detail=ErrorDetail.BAD_REQUEST,
+    def entity_error_code(self) -> EntityErrorCode:
+        return EntityErrorCode(
+            VFolderEntityType(), ActionOperationType.GET, ErrorDetail.BAD_REQUEST
         )
 
 
@@ -194,16 +182,14 @@ class VFolderPermissionError(BackendAIError, web.HTTPBadRequest):
         )
 
 
-class VFolderInvitationNotFound(BackendAIError, web.HTTPNotFound):
+class VFolderInvitationNotFound(EntityError, web.HTTPNotFound):
     error_type = "https://api.backend.ai/probs/vfolder-invitation-not-found"
     error_title = "Virtual folder invitation not found."
 
     @override
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.VFOLDER_INVITATION,
-            operation=ErrorOperation.READ,
-            error_detail=ErrorDetail.NOT_FOUND,
+    def entity_error_code(self) -> EntityErrorCode:
+        return EntityErrorCode(
+            VFolderInvitationEntityType(), ActionOperationType.GET, ErrorDetail.NOT_FOUND
         )
 
 
@@ -220,42 +206,36 @@ class VFolderCreationFailure(BackendAIError, web.HTTPBadRequest):
         )
 
 
-class VFolderGrantAlreadyExists(BackendAIError, web.HTTPConflict):
+class VFolderGrantAlreadyExists(FieldError, web.HTTPConflict):
     error_type = "https://api.backend.ai/probs/vfolder-grant-already-exists"
     error_title = "Virtual folder grant already exists."
 
     @override
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.VFOLDER,
-            operation=ErrorOperation.GRANT,
-            error_detail=ErrorDetail.ALREADY_EXISTS,
+    def field_error_code(self) -> FieldErrorCode:
+        return FieldErrorCode(
+            VFolderPermissionFieldType(), ActionOperationType.CREATE, ErrorDetail.ALREADY_EXISTS
         )
 
 
-class VFolderDeletionNotAllowed(BackendAIError, web.HTTPBadRequest):
+class VFolderDeletionNotAllowed(EntityError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/vfolder-deletion-not-allowed"
     error_title = "Virtual folder deletion is not allowed."
 
     @override
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.VFOLDER,
-            operation=ErrorOperation.SOFT_DELETE,
-            error_detail=ErrorDetail.BAD_REQUEST,
+    def entity_error_code(self) -> EntityErrorCode:
+        return EntityErrorCode(
+            VFolderEntityType(), ActionOperationType.DELETE, ErrorDetail.BAD_REQUEST
         )
 
 
-class VFolderHasLinkedModelCard(BackendAIError, web.HTTPBadRequest):
+class VFolderHasLinkedModelCard(EntityError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/vfolder-has-linked-model-card"
     error_title = "Virtual folder has linked model card(s)."
 
     @override
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.VFOLDER,
-            operation=ErrorOperation.HARD_DELETE,
-            error_detail=ErrorDetail.BAD_REQUEST,
+    def entity_error_code(self) -> EntityErrorCode:
+        return EntityErrorCode(
+            VFolderEntityType(), ActionOperationType.PURGE, ErrorDetail.BAD_REQUEST
         )
 
 

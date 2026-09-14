@@ -1,37 +1,38 @@
 """Membership queries over the virtual-entity chain.
 
 The virtual-entity chain (``entity_memberships`` joined to ``virtual_entities`` at both
-ends) is the read model for user-scope membership. ``association_scopes_entities``
-remains as the legacy dual-written association and must not be used for new membership
-reads.
+ends) is the read model for user-scope membership.
 """
 
 from __future__ import annotations
 
 import uuid
-from collections.abc import Sequence
+from typing import Any
 
 import sqlalchemy as sa
 from sqlalchemy.orm import InstrumentedAttribute, aliased
 
-from ai.backend.common.data.entity.types import EntityID, EntityType, ScopeID, ScopeType
-from ai.backend.common.data.entity.user import USER_ENTITY_TYPE
-from ai.backend.manager.models.clauses import QueryCondition
+from ai.backend.common.data.entity.types import EntityType
+from ai.backend.common.data.entity.user import UserEntityType
 from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
 from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
 
 __all__ = (
-    "owning_scope_exists",
+    "scope_membership_exists",
     "user_scope_membership_exists",
     "user_scope_membership_query",
 )
 
-type _UuidExpr = uuid.UUID | sa.ColumnElement[uuid.UUID] | InstrumentedAttribute[uuid.UUID]
+
+# The column element is parameterized loosely: an id newtype makes
+# `ColumnElement[DomainID]`, which is not a `ColumnElement[UUID]` under invariance,
+# and every such newtype is a UUID at the database.
+type _UuidExpr = uuid.UUID | sa.ColumnElement[Any] | InstrumentedAttribute[Any]
 
 
 def user_scope_membership_query(
-    scope_type: ScopeType, user_id: _UuidExpr | None = None
-) -> sa.Select[tuple[EntityID, ScopeID]]:
+    scope_type: EntityType, user_id: _UuidExpr | None = None
+) -> sa.Select[tuple[uuid.UUID, uuid.UUID]]:
     """(``user_id``, ``scope_id``) pairs of the users enrolled in scopes of
     ``scope_type``, narrowed to one user when ``user_id`` is given. The scope side is
     ``VirtualEntityRow``, so callers may filter on its columns; both selected columns
@@ -47,7 +48,7 @@ def user_scope_membership_query(
         .join(member, EntityMembershipRow.member_entity_id == member.id)
         .where(
             VirtualEntityRow.entity_type == scope_type,
-            member.entity_type == USER_ENTITY_TYPE,
+            member.entity_type == UserEntityType(),
         )
     )
     if user_id is not None:
@@ -55,16 +56,19 @@ def user_scope_membership_query(
     return query
 
 
-def user_scope_membership_exists(
-    scope_type: ScopeType,
+def scope_membership_exists(
+    scope_type: EntityType,
     scope_id: _UuidExpr,
-    user_id: _UuidExpr,
+    member_type: EntityType,
+    member_id: _UuidExpr,
 ) -> sa.ColumnElement[bool]:
-    """EXISTS predicate: the user is enrolled in the scope's virtual entity.
+    """EXISTS predicate: the scope's virtual entity holds the named member.
 
-    ``scope_id`` / ``user_id`` accept literal UUIDs or column expressions, so the
-    predicate works both as a direct filter and as a correlated condition inside a
-    larger query.
+    A cap bounds what the scope may do with the member, not whether the scope holds
+    it, so an own edge and a share both answer here.
+
+    Either id accepts a literal UUID or a column expression, so the predicate works
+    both as a direct filter and as a correlated condition inside a larger query.
     """
     member = aliased(VirtualEntityRow, name="member_virtual_entity")
     return sa.exists(
@@ -75,37 +79,16 @@ def user_scope_membership_exists(
         .where(
             VirtualEntityRow.entity_type == scope_type,
             VirtualEntityRow.entity_id == scope_id,
-            member.entity_type == USER_ENTITY_TYPE,
-            member.entity_id == user_id,
-        )
-    )
-
-
-def owning_scope_exists(
-    member_type: EntityType,
-    member_id: _UuidExpr,
-    scope_conditions: Sequence[QueryCondition],
-) -> sa.ColumnElement[bool]:
-    """EXISTS predicate: a scope satisfying every condition owns the named entity.
-
-    The scope side of the edge is the un-aliased :class:`VirtualEntityRow`, so the
-    conditions read its columns; the member side is aliased. The self edge every node
-    carries is excluded, and a capped edge is a share rather than something the scope
-    owns.
-    """
-    member = aliased(VirtualEntityRow, name="member_virtual_entity")
-    query = (
-        sa.select(sa.literal(1))
-        .select_from(EntityMembershipRow)
-        .join(VirtualEntityRow, EntityMembershipRow.virtual_entity_id == VirtualEntityRow.id)
-        .join(member, EntityMembershipRow.member_entity_id == member.id)
-        .where(
-            EntityMembershipRow.virtual_entity_id != EntityMembershipRow.member_entity_id,
-            EntityMembershipRow.capped.is_(False),
             member.entity_type == member_type,
             member.entity_id == member_id,
         )
     )
-    for condition in scope_conditions:
-        query = query.where(condition())
-    return sa.exists(query)
+
+
+def user_scope_membership_exists(
+    scope_type: EntityType,
+    scope_id: _UuidExpr,
+    user_id: _UuidExpr,
+) -> sa.ColumnElement[bool]:
+    """EXISTS predicate: the user is enrolled in the scope's virtual entity."""
+    return scope_membership_exists(scope_type, scope_id, UserEntityType(), user_id)

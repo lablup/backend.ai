@@ -5,11 +5,10 @@ from dataclasses import dataclass
 from typing import override
 
 from ai.backend.common.data.entity.session import (
-    SESSION_ENTITY_TYPE,
-    SESSION_SCOPE_TYPE,
+    SessionEntityType,
     SessionID,
 )
-from ai.backend.common.data.entity.types import EntityIdentifier, EntityType, ScopeRef
+from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
 from ai.backend.common.types import KernelId, SessionId
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.actions.v2.scope.base import BaseScopeAction
@@ -51,8 +50,8 @@ class KernelKernelHistoryTarget(KernelHistoryTarget):
         return KernelKernelHistoryOperationScope(kernel_id=self.kernel_id)
 
     @override
-    def to_scope_ref(self) -> ScopeRef:
-        return ScopeRef(scope_type=SESSION_SCOPE_TYPE, scope_id=SessionID(self.kernel_id))
+    def to_scope_id(self) -> EntityIdentifier:
+        return SessionID(self.kernel_id)
 
 
 @dataclass(frozen=True)
@@ -66,8 +65,8 @@ class SessionKernelHistoryTarget(KernelHistoryTarget):
         return SessionKernelHistoryOperationScope(session_id=self.session_id)
 
     @override
-    def to_scope_ref(self) -> ScopeRef:
-        return ScopeRef(scope_type=SESSION_SCOPE_TYPE, scope_id=SessionID(self.session_id))
+    def to_scope_id(self) -> EntityIdentifier:
+        return SessionID(self.session_id)
 
 
 @dataclass
@@ -81,13 +80,13 @@ class SearchKernelScopedHistoryAction(BaseScopeAction):
     querier: BatchQuerier
 
     @override
-    def scope_targets(self) -> Sequence[ScopeRef]:
-        return (self.target.to_scope_ref(),)
+    def scope_targets(self) -> Sequence[EntityIdentifier]:
+        return (self.target.to_scope_id(),)
 
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return SESSION_ENTITY_TYPE
+        return SessionEntityType()
 
     @override
     @classmethod

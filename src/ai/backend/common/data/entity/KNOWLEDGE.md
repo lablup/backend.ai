@@ -3,7 +3,7 @@ name: entity-type-catalog
 type: reference
 description: entity classification (Entity/Public entity/Global/Field/Virtual), ownership and reference relations, the foreign-key rule for assignments
 scope: src/ai/backend/common/data/entity
-keywords: [EntityType, ENTITY_TYPE, EntityCreator, GlobalEntityCreator, FieldEntityCreator, member_of, virtual entity, ownership, entity relation]
+keywords: [EntityType, FieldType, DanglingFieldType, EntityCreator, GlobalEntityCreator, FieldEntityCreator, member_of, virtual entity, ownership, entity relation]
 sources:
   - src/ai/backend/common/data/entity
   - src/ai/backend/manager/models
@@ -15,13 +15,26 @@ status: draft
 
 # Entity catalog
 
-This package declares one type constant per entity. A constant carries only a name, so
-what the entity is, what it owns and what it is tied to is recorded here. Everything is
-stated at the conceptual level; which table holds it belongs to the `models` documents.
+이 패키지는 종류마다 `EntityType` 또는 `FieldType` 서브클래스를 하나 둔다. 클래스는
+`name()`과 `description()`을 답하고, 필드 종류는 행을 소유하는 엔티티 종류를
+`owner_type()`으로 답한다. 소유자 종류가 고정되지 않는 필드 종류(audit_log,
+audit_log_scope, label, secret, fair share 3종)는 `DanglingFieldType`을 상속해 `None`을
+답한다. 무엇을 소유하고 무엇에 묶이는지는 이 문서에 적는다. 전부 개념 수준이며, 어느 테이블이 담는지는 `models`
+문서가 맡는다.
 
-A tree states ownership; a table states fields and references. A field is authorized
-through the entity that owns it, while a reference is not ownership and therefore never
-becomes an authorization path.
+## 타입 값 규칙
+
+- 값은 사용처에서 `AgentEntityType()`처럼 인자 없이 만든다. 모듈 인스턴스 상수를 두지
+  않는다.
+- 필드 종류는 `owner_type()`으로 행을 소유하는 엔티티 종류를 답한다. 소유자가 행의
+  값이라 고정되지 않으면 `DanglingFieldType`을 상속해 `None`을 답한다.
+- `EntityType(value)`는 base 인스턴스를 만들며 `name()`과 `description()`을 답하지
+  않는다. 문자열을 읽는 경계(행 컬럼, legacy 액션, RBAC 요소)에서만 쓰고 그 밖에서는
+  만들지 않는다.
+- pydantic은 base로 선언한 필드면 문자열을 그대로 받고, 종류로 선언한 필드면 그 이름만
+  받는다. 행에는 `name()` 문자열이 저장된다.
+- secret은 여러 엔티티의 암호화된 컬럼에 저장된 필드이며 소유자 종류가 고정되지 않는다.
+  자체 행 없이 상태 조회와 재암호화를 수행한다.
 
 ## Entity
 
@@ -258,8 +271,8 @@ Ownership relations with no foreign key declared.
 ## Direction: fold identifiers onto the entity axis
 
 Most id types identify an entity or a field, so they are declared in the same file as the
-entity type constant. Adding only one of the two then shows up simply by opening the file,
-and a file with no type constant becomes a signal in itself — either a field, or not yet
+type class. Adding only one of the two then shows up simply by opening the file,
+and a file with no type class becomes a signal in itself — either a field, or not yet
 classified.
 
 - A scope identifier is an alias of an entity identifier, so it belongs on this axis.

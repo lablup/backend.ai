@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.common.data.entity.image import IMAGE_ENTITY_TYPE, ImageID
+from ai.backend.common.data.entity.image import ImageEntityType, ImageID
 from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
 from ai.backend.manager.actions.v2.global_scope.base import BaseGlobalAction
 from ai.backend.manager.actions.v2.single_entity.base import BaseSingleEntityAction
@@ -14,7 +14,7 @@ class ImageAction(BaseGlobalAction):
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return IMAGE_ENTITY_TYPE
+        return ImageEntityType()
 
 
 @dataclass

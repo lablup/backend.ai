@@ -5,12 +5,7 @@ from __future__ import annotations
 import strawberry
 from strawberry import Info
 
-from ai.backend.common.data.permission.scope_entity_combinations import (
-    VALID_SCOPE_ENTITY_COMBINATIONS,
-)
-from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.dto.manager.v2.rbac.request import AdminSearchPermissionsGQLInput
-from ai.backend.manager.actions.action import RBAC_ACTION_REGISTRY, build_operation_description
 from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
@@ -26,13 +21,10 @@ from ai.backend.manager.api.gql.rbac.types import (
     DeletePermissionInput,
     DeletePermissionPayload,
     EntityOperationCombinationGQL,
-    OperationInfoGQL,
-    OperationTypeGQL,
     PermissionConnection,
     PermissionFilter,
     PermissionGQL,
     PermissionOrderBy,
-    RBACElementTypeGQL,
     ReplaceRolePermissionsInputGQL,
     ReplaceRolePermissionsPayloadGQL,
     ScopeEntityCombinationGQL,
@@ -103,16 +95,8 @@ async def admin_permissions(
 async def rbac_scope_entity_combinations(
     info: Info[StrawberryGQLContext],
 ) -> list[ScopeEntityCombinationGQL] | None:
-    return [
-        ScopeEntityCombinationGQL(
-            scope_type=RBACElementTypeGQL(scope.value),
-            valid_entity_types=sorted(
-                [RBACElementTypeGQL(entity.value) for entity in entities],
-                key=lambda e: e.value,  # type: ignore[attr-defined]
-            ),
-        )
-        for scope, entities in VALID_SCOPE_ENTITY_COMBINATIONS.items()
-    ]
+    dto_items = await info.context.adapters.rbac.get_scope_entity_combinations()
+    return [ScopeEntityCombinationGQL.from_pydantic(item) for item in dto_items]
 
 
 @gql_root_field(
@@ -124,25 +108,8 @@ async def rbac_scope_entity_combinations(
 async def rbac_entity_operation_combinations(
     info: Info[StrawberryGQLContext],
 ) -> list[EntityOperationCombinationGQL] | None:
-    entity_ops: dict[RBACElementType, list[OperationInfoGQL]] = {}
-    for action_cls in RBAC_ACTION_REGISTRY:
-        perm = action_cls.required_permission()
-        name = action_cls.action_name()
-        desc = build_operation_description(name, perm.element_type)
-        entity_ops.setdefault(perm.element_type, []).append(
-            OperationInfoGQL(
-                operation=name.value,
-                description=desc,
-                required_permission=OperationTypeGQL(perm.operation.value),
-            )
-        )
-    return [
-        EntityOperationCombinationGQL(
-            entity_type=RBACElementTypeGQL(entity.value),
-            operations=sorted(ops, key=lambda o: o.operation),
-        )
-        for entity, ops in sorted(entity_ops.items(), key=lambda e: e[0].value)
-    ]
+    dto_items = await info.context.adapters.rbac.get_entity_operation_combinations()
+    return [EntityOperationCombinationGQL.from_pydantic(item) for item in dto_items]
 
 
 @gql_root_field(

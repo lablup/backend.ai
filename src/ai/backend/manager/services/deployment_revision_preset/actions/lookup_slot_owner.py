@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from typing import Any, override
 
 from ai.backend.common.data.entity.deployment_preset import (
-    DEPLOYMENT_PRESET_ENTITY_TYPE,
+    DeploymentPresetEntityType,
     DeploymentPresetID,
 )
 from ai.backend.common.data.entity.preset_resource_slot import PresetResourceSlotID
@@ -44,7 +44,7 @@ class LookupPresetResourceSlotOwnerAction(
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return DEPLOYMENT_PRESET_ENTITY_TYPE
+        return DeploymentPresetEntityType()
 
     @override
     @classmethod
@@ -75,7 +75,7 @@ class LookupBulkPresetResourceSlotOwnerAction(
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return DEPLOYMENT_PRESET_ENTITY_TYPE
+        return DeploymentPresetEntityType()
 
     @override
     @classmethod

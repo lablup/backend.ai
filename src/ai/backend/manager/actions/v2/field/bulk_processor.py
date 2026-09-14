@@ -29,7 +29,7 @@ from ai.backend.manager.actions.v2.field.bulk_lookup import (
 )
 from ai.backend.manager.actions.v2.lookup.bulk_processor import BulkLookupActionProcessor
 from ai.backend.manager.actions.v2.ops.result import BulkFieldOpsResult
-from ai.backend.manager.errors.repository import EntityNotFoundError
+from ai.backend.manager.errors.base.field import FieldNotFoundError
 
 __all__ = (
     "AtomicFieldResultJudge",
@@ -168,7 +168,12 @@ class BulkFieldActionProcessor[TAction: BaseBulkFieldAction[Any, Any], TResult]:
         lookup_result = await self._owner_lookup.run(action.to_owner_lookup_action())
         owners = lookup_result.owners
         if not owners:
-            raise EntityNotFoundError("No field row matches the given ids")
+            field_id = action.field_ids()[0]
+            raise FieldNotFoundError(
+                "No field row matches the given ids",
+                field_type=field_id.field_type(),
+                operation=action.operation_type(),
+            )
 
         started_at = datetime.now(UTC)
         action_id = uuid.uuid4()
@@ -281,7 +286,12 @@ class PartialBulkFieldActionProcessor[TAction: BasePartialBulkFieldAction[Any, A
         lookup_result = await self._owner_lookup.run(action.to_owner_lookup_action())
         owners = lookup_result.owners
         if not owners:
-            raise EntityNotFoundError("No field row matches the given ids")
+            field_id = action.field_ids()[0]
+            raise FieldNotFoundError(
+                "No field row matches the given ids",
+                field_type=field_id.field_type(),
+                operation=action.operation_type(),
+            )
 
         started_at = datetime.now(UTC)
         action_id = uuid.uuid4()

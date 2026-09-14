@@ -19,9 +19,9 @@ from ai.backend.manager.actions.v2.lookup.validator import (
 )
 from ai.backend.manager.actions.v2.single_entity.trigger import SingleEntityActionTriggerMeta
 from ai.backend.manager.actions.v2.single_entity.validator import SingleEntityActionValidator
+from ai.backend.manager.errors.base.not_found import NotFoundError
 from ai.backend.manager.errors.common import GenericBadRequest
 from ai.backend.manager.errors.permission import NotEnoughPermission
-from ai.backend.manager.errors.repository import EntityNotFoundError
 
 __all__ = ("LookupActionProcessor",)
 
@@ -122,7 +122,7 @@ class LookupActionProcessor[TAction: BaseLookupAction, TResult: BaseLookupAction
                 raise
             try:
                 result = await self._func(action)
-            except EntityNotFoundError as e:
+            except NotFoundError as e:
                 run_status = ActionRunStatus.of_failure(e, during_validation=False)
                 if not self._post_validators:
                     raise

@@ -6,7 +6,7 @@ from typing import Any, override
 
 from ai.backend.common.data.entity.error_log import ErrorLogID
 from ai.backend.common.data.entity.types import EntityType
-from ai.backend.common.data.entity.user import USER_ENTITY_TYPE, UserID
+from ai.backend.common.data.entity.user import UserEntityType, UserID
 from ai.backend.manager.actions.v2.field.bulk_lookup import LookupBulkFieldOwnerOpsAction
 from ai.backend.manager.actions.v2.field.lookup import LookupFieldOwnerOpsAction
 from ai.backend.manager.actions.v2.lookup.base import LookupKey
@@ -37,7 +37,7 @@ class LookupErrorLogOwnerAction(LookupFieldOwnerOpsAction[ErrorLogID, UserID]):
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return USER_ENTITY_TYPE
+        return UserEntityType()
 
     @override
     @classmethod
@@ -66,7 +66,7 @@ class LookupBulkErrorLogOwnerAction(LookupBulkFieldOwnerOpsAction[ErrorLogID, Us
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return USER_ENTITY_TYPE
+        return UserEntityType()
 
     @override
     @classmethod

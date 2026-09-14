@@ -2,9 +2,12 @@ from __future__ import annotations
 
 import asyncio
 import dataclasses
+import importlib
 import inspect
 import json
+import pkgutil
 import textwrap
+import uuid
 from collections.abc import Sequence
 from itertools import groupby
 from typing import Any, Final
@@ -12,6 +15,14 @@ from typing import Any, Final
 import click
 from tabulate import tabulate
 
+import ai.backend.common.data.entity as entity_package
+from ai.backend.common.data.entity.types import (
+    DanglingFieldType,
+    EntityIdentifier,
+    EntityType,
+    FieldType,
+    RuntimeEntityID,
+)
 from ai.backend.manager.actions.registry.types import Concern, WiredProcessor
 from ai.backend.manager.actions.types import (
     ActionBacking,
@@ -45,6 +56,7 @@ _FIELD_BLOCK_COLUMNS: Final[tuple[str, ...]] = tuple(
     column for column in _ENTITY_BLOCK_COLUMNS if column != "entity_type"
 )
 _ENTITY_COLUMNS: Final[tuple[str, ...]] = ("concern", "entity_type", "field_type", "operations")
+_TYPE_COLUMNS: Final[tuple[str, ...]] = ("classification", "entity_type", "field_type")
 # Stands for a column a wiring leaves unset, so every line has the same shape.
 _ABSENT: Final[str] = "-"
 # An operation targeting no entity at all, which only a relation does. Distinct from
@@ -127,6 +139,63 @@ class EntityFields:
             (self.concern, self.entity_type, field, str(count)) for field, count in self.fields
         )
         return rows
+
+
+@dataclasses.dataclass(frozen=True)
+class TypeCatalog:
+    """Every declared entity and field type, grouped by the ownership they declare.
+
+    Read off the type classes rather than the wiring, so a kind no operation reaches
+    yet is listed too. Rationale: `common/data/entity/KNOWLEDGE.md`.
+    """
+
+    owners: tuple[tuple[str, tuple[str, ...]], ...]
+    dangling: tuple[str, ...]
+    unclassified: tuple[str, ...]
+
+    def rows(self) -> list[tuple[str, ...]]:
+        rows: list[tuple[str, ...]] = []
+        for owner, fields in self.owners:
+            rows.append(("entity", owner, _ABSENT))
+            rows.extend(("field", owner, field) for field in fields)
+        rows.extend(("dangling_field", _ABSENT, field) for field in self.dangling)
+        rows.extend(("unclassified", name, _ABSENT) for name in self.unclassified)
+        return rows
+
+
+def _subclasses[T: type](base: T) -> list[T]:
+    found: list[T] = []
+    for sub in base.__subclasses__():
+        found.append(sub)
+        found.extend(_subclasses(sub))
+    return found
+
+
+def _load_type_catalog() -> TypeCatalog:
+    for module in pkgutil.iter_modules(entity_package.__path__):
+        importlib.import_module(f"{entity_package.__name__}.{module.name}")
+    entity_kinds = {kind.name(): kind for kind in _subclasses(EntityType)}
+    field_kinds = [kind for kind in _subclasses(FieldType) if kind is not DanglingFieldType]
+    # An id is what says a kind has a row of its own, and it answers from the value, so
+    # a nil uuid stands in for the row this catalog never reads. RuntimeEntityID names
+    # no fixed kind, carrying it as a value instead, so it declares nothing here.
+    id_classes: list[Any] = list(_subclasses(EntityIdentifier))
+    named = {
+        type(id_cls(uuid.UUID(int=0)).entity_type()).name()
+        for id_cls in id_classes
+        if id_cls is not RuntimeEntityID and "entity_type" in id_cls.__dict__
+    }
+    owned: dict[str, list[str]] = {name: [] for name in entity_kinds}
+    dangling: list[str] = []
+    for kind in field_kinds:
+        owner = kind.owner_type()
+        if owner is None:
+            dangling.append(kind.name())
+        else:
+            owned[owner.name()].append(kind.name())
+    owners = tuple((name, tuple(sorted(owned[name]))) for name in sorted(owned) if name in named)
+    unclassified = tuple(sorted(name for name in entity_kinds if name not in named))
+    return TypeCatalog(owners, tuple(sorted(dangling)), unclassified)
 
 
 def _type_name(annotation: Any) -> str:
@@ -408,3 +477,62 @@ def describe_operation(entity_type: str, action_name: str) -> None:
             print("input_fields")
             print(textwrap.indent(tabulate(fields, tablefmt="plain"), "  "))
         print()
+
+
+@cli.command(name="types")
+@click.option(
+    "-o",
+    "--output",
+    default="table",
+    type=click.Choice(["table", "json", "tsv"]),
+    help="Set the output style of the command results.",
+)
+def list_types(output: str) -> None:
+    """
+    List every declared entity and field type by the ownership it declares.
+
+    Read off the type classes, not the wiring, so a kind no operation reaches yet is
+    listed too. A field type whose owner is a value on the row is dangling; an entity
+    type no id class names has no row of its own and is left unclassified.
+
+    Examples:
+
+        $ backend.ai mgr ops types
+    """
+    catalog = _load_type_catalog()
+    match output:
+        case "json":
+            print(
+                json.dumps(
+                    [dict(zip(_TYPE_COLUMNS, row, strict=True)) for row in catalog.rows()],
+                    indent=2,
+                )
+            )
+        case "tsv":
+            print("\t".join(_TYPE_COLUMNS))
+            for row in catalog.rows():
+                print("\t".join(row))
+        case _:
+            print(
+                tabulate(
+                    [
+                        (owner, ", ".join(fields) if fields else _ABSENT)
+                        for owner, fields in catalog.owners
+                    ],
+                    headers=("entity type", "field types it owns"),
+                    tablefmt="plain",
+                )
+            )
+            print()
+            print("dangling field types (owner is a value on the row)")
+            print(textwrap.indent("\n".join(catalog.dangling), "  "))
+            print()
+            print("unclassified entity types (no id class names a row)")
+            print(textwrap.indent("\n".join(catalog.unclassified), "  "))
+            print()
+            owned_fields = sum(len(fields) for _, fields in catalog.owners)
+            print(
+                f"{len(catalog.owners)} entity types, "
+                f"{owned_fields + len(catalog.dangling)} field types, "
+                f"{len(catalog.unclassified)} unclassified"
+            )

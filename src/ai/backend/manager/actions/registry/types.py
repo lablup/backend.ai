@@ -119,7 +119,7 @@ class WiredProcessor:
 
     concern: str
     # ``None`` when the operation targets no entity at all, which only a relation does.
-    # Distinct from ``GLOBAL_ENTITY_TYPE``, which names an operation over every entity.
+    # Distinct from ``GlobalEntityType()``, which names an operation over every entity.
     entity_type: EntityType | None
     # Set when the operation is over a field row, whose owner ``entity_type`` names.
     field_type: FieldType | None

@@ -23,7 +23,7 @@ from ai.backend.common.types import (
     VFolderID,
     VFolderUsageMode,
 )
-from ai.backend.manager.data.permission.types import OperationType
+from ai.backend.manager.data.permission.types import Permission
 from ai.backend.manager.errors.resource import DataTransformationFailed
 
 
@@ -73,8 +73,8 @@ class VFolderMountPermission(enum.StrEnum):
                 return cls.OWNER_PERM
         return None
 
-    def to_rbac_operation(self) -> set[OperationType]:
-        """What a mount permission lets its holder do inside a session.
+    def to_permission_cap(self) -> Permission:
+        """The ceiling a mount permission puts on what its holder may do inside a session.
 
         Two answers: reading, and reading with writing. ``wd`` answers as ``rw``
         (BEP-1077 5.7) — it stays a value the legacy read paths gate on, but it buys
@@ -82,13 +82,13 @@ class VFolderMountPermission(enum.StrEnum):
         """
         match self:
             case VFolderMountPermission.READ_ONLY:
-                return {OperationType.READ}
+                return Permission.READ
             case (
                 VFolderMountPermission.READ_WRITE
                 | VFolderMountPermission.RW_DELETE
                 | VFolderMountPermission.OWNER_PERM
             ):
-                return {OperationType.READ, OperationType.UPDATE, OperationType.SOFT_DELETE}
+                return Permission.READ | Permission.UPDATE | Permission.SOFT_DELETE
 
 
 class VFolderInvitationState(enum.StrEnum):

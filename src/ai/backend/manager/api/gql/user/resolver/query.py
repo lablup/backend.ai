@@ -11,6 +11,7 @@ from ai.backend.common.contexts.client_ip import current_client_ip
 from ai.backend.common.contexts.user import current_user
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.dto.manager.v2.user.request import AdminSearchUsersInput
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
@@ -23,6 +24,7 @@ from ai.backend.manager.api.gql.user.types import (
     ProjectUserScopeGQL,
     UserFilterGQL,
     UserOrderByGQL,
+    UserScopeGQL,
     UserV2Connection,
     UserV2Edge,
     UserV2GQL,
@@ -74,6 +76,54 @@ async def admin_users_v2(
             limit=limit,
             offset=offset,
         )
+    )
+    nodes = [UserV2GQL.from_pydantic(item) for item in payload.items]
+    edges = [UserV2Edge(node=node, cursor=encode_cursor(str(node.id))) for node in nodes]
+    return UserV2Connection(
+        edges=edges,
+        page_info=PageInfo(
+            has_next_page=payload.has_next_page,
+            has_previous_page=payload.has_previous_page,
+            start_cursor=edges[0].cursor if edges else None,
+            end_cursor=edges[-1].cursor if edges else None,
+        ),
+        count=payload.total_count,
+    )
+
+
+@gql_root_field(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description=(
+            "Page through the users the named scopes reach, combined with OR. "
+            "Every scope is authorized before the read runs."
+        ),
+    )
+)  # type: ignore[misc]
+async def scoped_users_v2(
+    info: Info[StrawberryGQLContext],
+    scope: UserScopeGQL,
+    filter: UserFilterGQL | None = None,
+    order_by: list[UserOrderByGQL] | None = None,
+    before: str | None = None,
+    after: str | None = None,
+    first: int | None = None,
+    last: int | None = None,
+    limit: int | None = None,
+    offset: int | None = None,
+) -> UserV2Connection | None:
+    payload = await info.context.adapters.user.gql_scoped_search(
+        scope=scope.to_pydantic(),
+        input=AdminSearchUsersInput(
+            filter=filter.to_pydantic() if filter else None,
+            order=[o.to_pydantic() for o in order_by] if order_by else None,
+            first=first,
+            after=after,
+            last=last,
+            before=before,
+            limit=limit,
+            offset=offset,
+        ),
     )
     nodes = [UserV2GQL.from_pydantic(item) for item in payload.items]
     edges = [UserV2Edge(node=node, cursor=encode_cursor(str(node.id))) for node in nodes]

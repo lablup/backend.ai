@@ -14,9 +14,10 @@ from ai.backend.common.data.endpoint.types import EndpointLifecycle
 from ai.backend.common.data.entity.deployment import DeploymentID
 from ai.backend.common.data.entity.deployment_revision import DeploymentRevisionID
 from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.project import ProjectEntityType
 from ai.backend.common.data.entity.replica_group import ReplicaGroupID
 from ai.backend.common.data.entity.session_group import SessionGroupID
-from ai.backend.common.data.permission.types import ScopeType
+from ai.backend.common.data.entity.user import UserEntityType
 from ai.backend.common.schema.deployment import (
     IntOrPercent,
     ReplicaGroupRolloutSpec,
@@ -284,8 +285,8 @@ class TestReplicaGroupRepository:
             await db_sess.flush()
             # A session group joins its project and its owner, which must be in the
             # graph first.
-            db_sess.add(VirtualEntityRow(entity_type=ScopeType.PROJECT.value, entity_id=group_id))
-            db_sess.add(VirtualEntityRow(entity_type=ScopeType.USER.value, entity_id=user_uuid))
+            db_sess.add(VirtualEntityRow(entity_type=ProjectEntityType(), entity_id=group_id))
+            db_sess.add(VirtualEntityRow(entity_type=UserEntityType(), entity_id=user_uuid))
             await db_sess.flush()
             db_sess.add(
                 EndpointRow(
