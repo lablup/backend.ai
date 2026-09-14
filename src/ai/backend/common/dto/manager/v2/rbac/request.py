@@ -168,6 +168,12 @@ class UpdatePermissionInput(BaseRequestModel):
         default=UNSET, description="Updated operation bit. Omit to leave unchanged."
     )
 
+    def permission_bit(self) -> Permission | None | Unset:
+        """The bit this input names; ``None`` and ``UNSET`` pass through untouched."""
+        if isinstance(self.permission, PermissionBitDTO):
+            return self.permission.to_permission()
+        return self.permission
+
 
 class DeletePermissionInput(BaseRequestModel):
     """Input for deleting a scoped permission."""

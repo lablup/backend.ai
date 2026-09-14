@@ -810,11 +810,7 @@ class RBACAdapter(BaseAdapter):
         updater = RolePermissionUpdater(
             permission_id=PermissionID(input.id),
             entity_type=OptionalState.from_unset(input.entity_type),
-            permission=(
-                OptionalState.update(input.permission.to_permission())
-                if isinstance(input.permission, PermissionBitDTO)
-                else OptionalState.nop()
-            ),
+            permission=OptionalState.from_unset(input.permission_bit()),
         )
         action_result = await self._permission_controller.update_permission.wait_for_complete(
             UpdatePermissionAction(updater=updater)
