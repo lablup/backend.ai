@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from typing import Any, override
 
 from ai.backend.common.data.entity.resource_policy import (
-    KEYPAIR_RESOURCE_POLICY_ENTITY_TYPE,
+    KeyPairResourcePolicyEntityType,
     KeyPairResourcePolicyUUID,
 )
 from ai.backend.common.data.entity.types import EntityType
@@ -42,7 +42,7 @@ class LookupKeypairResourcePolicyAction(
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return KEYPAIR_RESOURCE_POLICY_ENTITY_TYPE
+        return KeyPairResourcePolicyEntityType()
 
     @override
     @classmethod

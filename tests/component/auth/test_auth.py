@@ -19,8 +19,8 @@ from ai.backend.client.v2.auth import HMACAuth
 from ai.backend.client.v2.config import ClientConfig
 from ai.backend.client.v2.exceptions import AuthenticationError, InvalidRequestError, NotFoundError
 from ai.backend.client.v2.registry import BackendAIClientRegistry
-from ai.backend.common.data.entity.project import PROJECT_ENTITY_TYPE, ProjectID
-from ai.backend.common.data.entity.user import USER_ENTITY_TYPE
+from ai.backend.common.data.entity.project import ProjectEntityType, ProjectID
+from ai.backend.common.data.entity.user import UserEntityType
 from ai.backend.common.dto.manager.auth.request import (
     AuthorizeRequest,
     GetRoleRequest,
@@ -45,7 +45,6 @@ from ai.backend.common.dto.manager.auth.types import AuthTokenType
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
-from ai.backend.manager.data.permission.types import ScopeType
 from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.models.domain import DomainRow, domains
 from ai.backend.manager.models.hasher.types import PasswordInfo
@@ -150,7 +149,7 @@ async def signup_default_project(
         await conn.execute(
             sa.insert(VirtualEntityRow.__table__).values(
                 id=virtual_entity_id,
-                entity_type=ScopeType.PROJECT,
+                entity_type=ProjectEntityType(),
                 entity_id=data.project_id,
             )
         )
@@ -180,7 +179,7 @@ async def signup_default_project(
             await conn.execute(users.delete().where(users.c.email == email))
         await conn.execute(
             VirtualEntityRow.__table__.delete().where(
-                VirtualEntityRow.__table__.c.entity_type == ScopeType.PROJECT,
+                VirtualEntityRow.__table__.c.entity_type == ProjectEntityType(),
                 VirtualEntityRow.__table__.c.entity_id == data.project_id,
             )
         )
@@ -322,7 +321,7 @@ async def cross_domain_fixture(
         await conn.execute(
             sa.insert(VirtualEntityRow.__table__).values(
                 id=virtual_entity_id,
-                entity_type=ScopeType.PROJECT,
+                entity_type=ProjectEntityType(),
                 entity_id=group_id,
             )
         )
@@ -458,7 +457,7 @@ async def cross_domain_fixture(
         )
         await conn.execute(
             VirtualEntityRow.__table__.delete().where(
-                VirtualEntityRow.__table__.c.entity_type == ScopeType.PROJECT,
+                VirtualEntityRow.__table__.c.entity_type == ProjectEntityType(),
                 VirtualEntityRow.__table__.c.entity_id == group_id,
             )
         )
@@ -1145,9 +1144,9 @@ class TestSignup:
                 .join(scope, scope.id == EntityMembershipRow.virtual_entity_id)
                 .join(member, member.id == EntityMembershipRow.member_entity_id)
                 .where(
-                    scope.entity_type == PROJECT_ENTITY_TYPE,
+                    scope.entity_type == ProjectEntityType(),
                     scope.entity_id == signup_default_project.project_id,
-                    member.entity_type == USER_ENTITY_TYPE,
+                    member.entity_type == UserEntityType(),
                     member.entity_id == user_uuid,
                 ),
             )

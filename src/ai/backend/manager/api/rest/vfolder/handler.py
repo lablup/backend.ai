@@ -14,9 +14,9 @@ from http import HTTPStatus
 from typing import TYPE_CHECKING, Final
 
 from ai.backend.common.api_handlers import APIResponse, BodyParam, QueryParam
-from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE, ProjectID
-from ai.backend.common.data.entity.types import ScopeRef
-from ai.backend.common.data.entity.user import USER_SCOPE_TYPE, UserID
+from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.types import EntityIdentifier
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.data.entity.vfolder_invitation import VFolderInvitationID
 from ai.backend.common.dto.manager.field import (
@@ -352,10 +352,9 @@ class VFolderHandler:
         )
         owner_user_uuid = user_scope.owner_uuid
         group_id = params.group_id
-        if group_id is not None:
-            scope = ScopeRef(scope_type=PROJECT_SCOPE_TYPE, scope_id=group_id)
-        else:
-            scope = ScopeRef(scope_type=USER_SCOPE_TYPE, scope_id=owner_user_uuid)
+        scope: EntityIdentifier = (
+            ProjectID(group_id) if group_id is not None else UserID(owner_user_uuid)
+        )
         result = await self._vfolder.list_vfolder.run(
             ListVFolderAction(
                 user_uuid=owner_user_uuid,

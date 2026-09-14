@@ -16,10 +16,8 @@ from ai.backend.manager.data.app_config.types import (
     AppConfigDefinitionData,
 )
 from ai.backend.manager.errors.app_config import AppConfigDefinitionNotFound
-from ai.backend.manager.errors.repository import (
-    EntityNotFoundError,
-    UniqueConstraintViolationError,
-)
+from ai.backend.manager.errors.base.entity import EntityNotFoundError
+from ai.backend.manager.errors.repository import UniqueConstraintViolationError
 from ai.backend.manager.models.app_config_allow_list.conditions import (
     AppConfigAllowListConditions,
 )

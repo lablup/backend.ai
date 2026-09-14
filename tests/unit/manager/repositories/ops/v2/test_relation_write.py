@@ -22,6 +22,8 @@ import pytest
 import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, mapped_column
 
+from ai.backend.common.data.entity.project import ProjectEntityType
+from ai.backend.common.data.entity.resource_group import ResourceGroupEntityType
 from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
 from ai.backend.common.data.permission.types import Permission
 from ai.backend.manager.errors.common import ObjectNotFound
@@ -51,8 +53,8 @@ from ai.backend.manager.repositories.ops.v2.relation.provider import RelationOps
 from ai.backend.manager.repositories.ops.v2.share.provider import ShareOpsProvider
 from ai.backend.testutils.db import with_tables
 
-_SCOPE_TYPE = EntityType("project")
-_TARGET_TYPE = EntityType("resource_group")
+_SCOPE_TYPE = ProjectEntityType()
+_TARGET_TYPE = ResourceGroupEntityType()
 
 
 class _ScopeID(EntityIdentifier):
@@ -351,6 +353,32 @@ class TestSwitchRelation:
         assert switched == [True]
 
         assert await _off(database) is False
+
+
+class TestPartialSwitchRelations:
+    async def test_answers_each_pair_in_the_order_named(
+        self,
+        database: ExtendedAsyncSAEngine,
+        provider: RelationOpsProvider,
+        pair: tuple[_ScopeID, _TargetID],
+        other_target: _TargetID,
+    ) -> None:
+        """A pair standing in no relation is answered false with no error, beside the
+        one that moved."""
+        scope, target = pair
+        async with provider.write_ops() as ops:
+            await ops.create_relations(_Creator(), [(scope, target)])
+
+        async with provider.write_ops() as ops:
+            result = await ops.partial_switch_relations(
+                _SwitchOff(), [(scope, other_target), (scope, target)]
+            )
+
+        assert [(item.target, item.written, item.error) for item in result.results] == [
+            (other_target, False, None),
+            (target, True, None),
+        ]
+        assert await _off(database) is True
 
 
 class TestPurgeRelation:

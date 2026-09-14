@@ -3,16 +3,24 @@ from typing import override
 from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
 
 __all__ = (
-    "LOGIN_CLIENT_TYPE_ENTITY_TYPE",
+    "LoginClientTypeEntityType",
     "LoginClientTypeID",
 )
 
 
-# Raw string mirroring the RBAC-managed EntityType.LOGIN_CLIENT_TYPE value.
-LOGIN_CLIENT_TYPE_ENTITY_TYPE = EntityType("login_client_type")
+class LoginClientTypeEntityType(EntityType):
+    @override
+    @classmethod
+    def name(cls) -> str:
+        return "login_client_type"
+
+    @override
+    @classmethod
+    def description(cls) -> str:
+        return "A kind of client a login session is opened from."
 
 
 class LoginClientTypeID(EntityIdentifier):
     @override
     def entity_type(self) -> EntityType:
-        return LOGIN_CLIENT_TYPE_ENTITY_TYPE
+        return LoginClientTypeEntityType()

@@ -14,22 +14,6 @@ from ai.backend.manager.actions.v2.single_entity.validator.rbac import (
     VirtualEntitySingleEntityActionRBACValidator,
 )
 from ai.backend.manager.actions.v2.validators import ActionValidators as V2ActionValidators
-from ai.backend.manager.actions.validators.rbac.legacy import (
-    LegacyScopeActionRBACValidator,
-    LegacySingleEntityActionRBACValidator,
-)
-from ai.backend.manager.actions.validators.rbac.scope import ScopeActionRBACValidator
-
-
-@dataclass
-class RBACValidators:
-    scope: ScopeActionRBACValidator
-
-
-@dataclass
-class LegacyRBACValidators:
-    scope: LegacyScopeActionRBACValidator
-    single_entity: LegacySingleEntityActionRBACValidator
 
 
 @dataclass

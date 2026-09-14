@@ -2,11 +2,13 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import click
 import pytest
 from pydantic import BaseModel
 
-from ai.backend.client.cli.v2.helpers import load_model, run_async
+from ai.backend.client.cli.v2.helpers import load_model, nullable_option, run_async
 from ai.backend.client.exceptions import BackendAPIError
+from ai.backend.common.tristate.unset import UNSET
 
 
 class _Entry(BaseModel):
@@ -81,3 +83,18 @@ class TestRunAsync:
 
         assert exc_info.value.code == 1
         assert "No such role_preset." in capsys.readouterr().err
+
+
+class TestNullableOption:
+    def test_omitted_stays_unset(self) -> None:
+        assert nullable_option(None, False, option="description") is UNSET
+
+    def test_value_passes_through(self) -> None:
+        assert nullable_option("x", False, option="description") == "x"
+
+    def test_set_null_clears(self) -> None:
+        assert nullable_option(None, True, option="description") is None
+
+    def test_value_and_set_null_conflict(self) -> None:
+        with pytest.raises(click.UsageError, match="--description and --set-null-description"):
+            nullable_option("x", True, option="description")

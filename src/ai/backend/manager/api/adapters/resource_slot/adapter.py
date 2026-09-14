@@ -4,10 +4,12 @@ from __future__ import annotations
 
 import uuid
 
+from ai.backend.common.data.entity.agent import AgentUUID
 from ai.backend.common.data.entity.domain import DomainName
 from ai.backend.common.data.entity.kernel import KernelID
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.session import SessionID
+from ai.backend.common.dto.manager.defs import DEFAULT_PAGE_LIMIT
 from ai.backend.common.dto.manager.query import StringFilter, UUIDFilter
 from ai.backend.common.dto.manager.v2.fair_share.types import (
     ResourceSlotEntryInfo,
@@ -25,6 +27,7 @@ from ai.backend.common.dto.manager.v2.resource_slot.request import (
     ResourceAllocationOrder,
     ResourceSlotTypeFilter,
     ResourceSlotTypeOrder,
+    ScopedSearchAgentResourcesInput,
     UpdateResourceSlotTypeInput,
 )
 from ai.backend.common.dto.manager.v2.resource_slot.response import (
@@ -69,13 +72,21 @@ from ai.backend.manager.models.resource_slot.orders import (
     resolve_slot_type_order,
 )
 from ai.backend.manager.models.resource_slot.purgers import ResourceSlotTypePurger
-from ai.backend.manager.models.resource_slot.searchers import ResourceSlotTypeSearcher
+from ai.backend.manager.models.resource_slot.searchers import (
+    AgentResourceSearcher,
+    ResourceSlotTypeSearcher,
+)
 from ai.backend.manager.models.resource_slot.types import NumberFormat
 from ai.backend.manager.models.resource_slot.updaters import ResourceSlotTypeUpdater
 from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.services.agent.actions.lookup import LookupAgentAction
+from ai.backend.manager.services.agent.actions.scoped_search_resources import (
+    ScopedSearchAgentResourcesAction,
+)
+from ai.backend.manager.services.agent.processors import AgentProcessors
 from ai.backend.manager.services.domain.actions.lookup import LookupDomainAction
+from ai.backend.manager.services.domain.processors import DomainProcessors
 from ai.backend.manager.services.resource_slot.actions.create import CreateResourceSlotTypeAction
 from ai.backend.manager.services.resource_slot.actions.get import GetResourceSlotTypeAction
 from ai.backend.manager.services.resource_slot.actions.get_agent_resource_by_slot import (
@@ -107,6 +118,7 @@ from ai.backend.manager.services.resource_slot.actions.search_resource_slot_type
     SearchResourceSlotTypesAction,
 )
 from ai.backend.manager.services.resource_slot.actions.update import UpdateResourceSlotTypeAction
+from ai.backend.manager.services.resource_slot.processors import ResourceSlotProcessors
 from ai.backend.manager.types import OptionalState
 
 DEFAULT_PAGINATION_LIMIT = 10
@@ -114,6 +126,20 @@ DEFAULT_PAGINATION_LIMIT = 10
 
 class ResourceSlotAdapter(BaseAdapter):
     """Adapter for resource slot domain operations."""
+
+    _resource_slot: ResourceSlotProcessors
+    _agent: AgentProcessors
+    _domain: DomainProcessors
+
+    def __init__(
+        self,
+        resource_slot: ResourceSlotProcessors,
+        agent: AgentProcessors,
+        domain: DomainProcessors,
+    ) -> None:
+        self._resource_slot = resource_slot
+        self._agent = agent
+        self._domain = domain
 
     # -------------------------------------------------------------------------
     # ResourceSlotType search
@@ -133,7 +159,7 @@ class ResourceSlotAdapter(BaseAdapter):
         """
         searcher = self._build_slot_type_searcher(input)
 
-        action_result = await self._processors.resource_slot.public_search_resource_slot_types.run(
+        action_result = await self._resource_slot.public_search_resource_slot_types.run(
             SearchResourceSlotTypesAction(searcher=searcher)
         )
 
@@ -209,7 +235,7 @@ class ResourceSlotAdapter(BaseAdapter):
             number_format=self._to_number_format(input.number_format),
             rank=input.rank,
         )
-        action_result = await self._processors.resource_slot.global_create_resource_slot_type.run(
+        action_result = await self._resource_slot.global_create_resource_slot_type.run(
             CreateResourceSlotTypeAction(creator=creator)
         )
         return CreateResourceSlotTypePayload(
@@ -220,7 +246,7 @@ class ResourceSlotAdapter(BaseAdapter):
         self, input: UpdateResourceSlotTypeInput
     ) -> UpdateResourceSlotTypePayload:
         """Update the display and scheduling flags of a resource slot type."""
-        target = await self._processors.resource_slot.public_lookup_resource_slot_type.run(
+        target = await self._resource_slot.public_lookup_resource_slot_type.run(
             LookupResourceSlotTypeAction(slot_name=input.slot_name)
         )
         updater = ResourceSlotTypeUpdater(
@@ -238,7 +264,7 @@ class ResourceSlotAdapter(BaseAdapter):
             ),
             rank=OptionalState.from_nullable(input.rank),
         )
-        action_result = await self._processors.resource_slot.global_update_resource_slot_type.run(
+        action_result = await self._resource_slot.global_update_resource_slot_type.run(
             UpdateResourceSlotTypeAction(updater=updater)
         )
         return UpdateResourceSlotTypePayload(
@@ -249,10 +275,10 @@ class ResourceSlotAdapter(BaseAdapter):
         self, input: PurgeResourceSlotTypeInput
     ) -> PurgeResourceSlotTypePayload:
         """Remove a resource slot type, refusing while anything still references it."""
-        target = await self._processors.resource_slot.public_lookup_resource_slot_type.run(
+        target = await self._resource_slot.public_lookup_resource_slot_type.run(
             LookupResourceSlotTypeAction(slot_name=input.slot_name)
         )
-        action_result = await self._processors.resource_slot.purge_resource_slot_type.run(
+        action_result = await self._resource_slot.purge_resource_slot_type.run(
             PurgeResourceSlotTypeAction(
                 purger=ResourceSlotTypePurger(
                     slot_name=input.slot_name, slot_type_id=target.entity_id()
@@ -306,7 +332,7 @@ class ResourceSlotAdapter(BaseAdapter):
         """
         querier = self._build_agent_resource_querier(input)
 
-        action_result = await self._processors.resource_slot.search_agent_resources.run(
+        action_result = await self._resource_slot.search_agent_resources.run(
             GlobalSearchAgentResourcesAction(querier=querier)
         )
 
@@ -315,6 +341,32 @@ class ResourceSlotAdapter(BaseAdapter):
             total_count=action_result.total_count,
             has_next_page=action_result.has_next_page,
             has_previous_page=action_result.has_previous_page,
+        )
+
+    async def scoped_search_agent_resources(
+        self,
+        input: ScopedSearchAgentResourcesInput,
+    ) -> AdminSearchAgentResourcesPayload:
+        """Read the slot rows the named agents carry, combined with OR."""
+        conditions = self._convert_agent_resource_filter(input.filter) if input.filter else []
+        orders = self._convert_agent_resource_orders(input.order) if input.order else []
+        result = await self._agent.scoped_search_resources.run(
+            ScopedSearchAgentResourcesAction(
+                agent_uuids=[AgentUUID(entry.value) for entry in input.scope.agent or ()],
+                searcher=AgentResourceSearcher(
+                    conditions=conditions,
+                    orders=orders,
+                    pagination=OffsetPagination(
+                        limit=input.limit or DEFAULT_PAGE_LIMIT, offset=input.offset or 0
+                    ),
+                ),
+            )
+        )
+        return AdminSearchAgentResourcesPayload(
+            items=[self._agent_resource_data_to_node(item) for item in result.items],
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
         )
 
     def _build_agent_resource_querier(self, input: AdminSearchAgentResourcesInput) -> BatchQuerier:
@@ -405,7 +457,7 @@ class ResourceSlotAdapter(BaseAdapter):
         """
         querier = self._build_resource_allocation_querier(input)
 
-        action_result = await self._processors.resource_slot.search_resource_allocations.run(
+        action_result = await self._resource_slot.search_resource_allocations.run(
             GlobalSearchResourceAllocationsAction(querier=querier)
         )
 
@@ -493,20 +545,18 @@ class ResourceSlotAdapter(BaseAdapter):
 
     async def get_slot_type(self, slot_name: str) -> ResourceSlotTypeNode:
         """Retrieve a single resource slot type by slot name."""
-        resolved = await self._processors.resource_slot.public_lookup_resource_slot_type.run(
+        resolved = await self._resource_slot.public_lookup_resource_slot_type.run(
             LookupResourceSlotTypeAction(slot_name=slot_name)
         )
-        action_result = await self._processors.resource_slot.public_get_resource_slot_type.run(
+        action_result = await self._resource_slot.public_get_resource_slot_type.run(
             GetResourceSlotTypeAction(slot_type_id=resolved.entity_id())
         )
         return self._slot_type_data_to_node(action_result.data)
 
     async def get_agent_resource(self, agent_id: str, slot_name: str) -> AgentResourceNode:
         """Retrieve a single agent resource by agent ID and slot name."""
-        agent = await self._processors.agent.lookup.run(
-            LookupAgentAction(agent_id=AgentId(agent_id))
-        )
-        action_result = await self._processors.resource_slot.get_agent_resource_by_slot.run(
+        agent = await self._agent.lookup.run(LookupAgentAction(agent_id=AgentId(agent_id)))
+        action_result = await self._resource_slot.get_agent_resource_by_slot.run(
             GetAgentResourceBySlotAction(
                 agent_uuid=agent.entity_id(), agent_id=agent_id, slot_name=slot_name
             )
@@ -517,10 +567,10 @@ class ResourceSlotAdapter(BaseAdapter):
         self, kernel_id: uuid.UUID, slot_name: str
     ) -> ResourceAllocationNode:
         """Retrieve a single kernel resource allocation by kernel ID and slot name."""
-        owner = await self._processors.resource_slot.lookup_kernel_owner.run(
+        owner = await self._resource_slot.lookup_kernel_owner.run(
             LookupKernelOwnerAction(kernel_id=KernelID(kernel_id))
         )
-        action_result = await self._processors.resource_slot.get_kernel_allocation_by_slot.run(
+        action_result = await self._resource_slot.get_kernel_allocation_by_slot.run(
             GetKernelAllocationBySlotAction(
                 session_id=SessionID(owner.entity_id()),
                 kernel_id=KernelID(kernel_id),
@@ -535,10 +585,8 @@ class ResourceSlotAdapter(BaseAdapter):
 
     async def get_domain_resource_overview(self, domain_name: str) -> ActiveResourceOverviewInfoDTO:
         """Retrieve active resource occupancy overview for a domain."""
-        domain = await self._processors.domain.lookup.run(
-            LookupDomainAction(name=DomainName(domain_name))
-        )
-        action_result = await self._processors.resource_slot.get_domain_resource_overview.run(
+        domain = await self._domain.lookup.run(LookupDomainAction(name=DomainName(domain_name)))
+        action_result = await self._resource_slot.get_domain_resource_overview.run(
             GetDomainResourceOverviewAction(domain_id=domain.entity_id(), domain_name=domain_name)
         )
         occupancy = action_result.item
@@ -559,7 +607,7 @@ class ResourceSlotAdapter(BaseAdapter):
         self, project_id: uuid.UUID
     ) -> ActiveResourceOverviewInfoDTO:
         """Retrieve active resource occupancy overview for a project."""
-        action_result = await self._processors.resource_slot.get_project_resource_overview.run(
+        action_result = await self._resource_slot.get_project_resource_overview.run(
             GetProjectResourceOverviewAction(project_id=ProjectID(project_id))
         )
         occupancy = action_result.item

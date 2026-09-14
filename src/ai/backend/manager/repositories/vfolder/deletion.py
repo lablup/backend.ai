@@ -52,6 +52,7 @@ async def initiate_vfolder_deletion(
         return 0
 
     async with v2_ops_provider.write_ops() as w:
+        # TODO: scope this purge. A user operation must not use in_global.
         await w.batch_purge_entities_in_global(
             VFolderInvitationBatchPurger(vfolder_ids=vfolder_ids)
         )

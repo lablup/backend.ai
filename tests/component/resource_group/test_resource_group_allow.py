@@ -12,7 +12,7 @@ import sqlalchemy as sa
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
 from ai.backend.client.v2.v2_registry import V2ClientRegistry
-from ai.backend.common.data.entity.resource_group import RESOURCE_GROUP_ENTITY_TYPE
+from ai.backend.common.data.entity.resource_group import ResourceGroupEntityType
 from ai.backend.common.dto.manager.v2.resource_group.request import (
     UpdateAllowedDomainsForResourceGroupInput,
     UpdateAllowedProjectsForResourceGroupInput,
@@ -72,7 +72,7 @@ async def _seed_scaling_group(conn: Any, name: str, description: str) -> None:
     ).scalar_one()
     await conn.execute(
         sa.insert(VirtualEntityRow.__table__).values(
-            entity_type=RESOURCE_GROUP_ENTITY_TYPE,
+            entity_type=ResourceGroupEntityType(),
             entity_id=resource_group_id,
         )
     )

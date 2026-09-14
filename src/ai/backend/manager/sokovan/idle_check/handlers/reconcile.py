@@ -8,11 +8,10 @@ from typing import override
 from ai.backend.common.data.entity.idle_checker import IdleCheckerID
 from ai.backend.common.data.idle_checker.types import CheckerType, IdleCheckPhase
 from ai.backend.common.types import SessionId
-from ai.backend.manager.data.idle_checker.types import IdleCheckSession
+from ai.backend.manager.data.idle_checker.types import IdleCheckSession, IdleJudgmentData
 from ai.backend.manager.repositories.idle_checker.types import (
     IdleCheckBatchData,
     IdleCheckerDefinitionData,
-    IdleJudgmentData,
 )
 from ai.backend.manager.sokovan.idle_check.checkers.base import (
     CheckerAssignment,

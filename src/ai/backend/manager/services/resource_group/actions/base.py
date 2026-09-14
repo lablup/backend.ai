@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from typing import override
 
 from ai.backend.common.data.entity.resource_group import (
-    RESOURCE_GROUP_ENTITY_TYPE,
+    ResourceGroupEntityType,
     ResourceGroupID,
 )
 from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
@@ -28,4 +28,4 @@ class ResourceGroupGlobalAction(BaseGlobalAction):
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return RESOURCE_GROUP_ENTITY_TYPE
+        return ResourceGroupEntityType()

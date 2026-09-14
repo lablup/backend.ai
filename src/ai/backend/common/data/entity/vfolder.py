@@ -4,9 +4,19 @@ from typing import override
 
 from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
 
-__all__ = ("VFOLDER_ENTITY_TYPE", "VFolderUUID")
+__all__ = ("VFolderEntityType", "VFolderUUID")
 
-VFOLDER_ENTITY_TYPE = EntityType("vfolder")
+
+class VFolderEntityType(EntityType):
+    @override
+    @classmethod
+    def name(cls) -> str:
+        return "vfolder"
+
+    @override
+    @classmethod
+    def description(cls) -> str:
+        return "A virtual folder owned by a user or a project."
 
 
 class VFolderUUID(EntityIdentifier):
@@ -18,4 +28,4 @@ class VFolderUUID(EntityIdentifier):
 
     @override
     def entity_type(self) -> EntityType:
-        return VFOLDER_ENTITY_TYPE
+        return VFolderEntityType()

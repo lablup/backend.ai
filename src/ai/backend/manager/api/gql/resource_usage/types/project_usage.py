@@ -9,6 +9,7 @@ import strawberry
 from strawberry import Info
 from strawberry.relay import Connection, Edge, NodeID
 
+from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.filter_specs import UUIDEqualMatchSpec
 from ai.backend.common.dto.manager.v2.resource_usage.request import (
     ProjectUsageBucketFilter as ProjectUsageBucketFilterDTO,
@@ -130,7 +131,7 @@ class ProjectUsageBucketGQL(PydanticNodeMixin[ProjectUsageBucketNode]):
         ]
         | None
     ):
-        return await info.context.data_loaders.project_loader.load(self.project_id)
+        return await info.context.data_loaders.project_loader.load(ProjectID(self.project_id))
 
     @gql_added_field(
         BackendAIGQLMeta(

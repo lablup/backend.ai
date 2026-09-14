@@ -8,7 +8,7 @@ from typing import Self
 
 from pydantic import Field, field_validator
 
-from ai.backend.common.api_handlers import SENTINEL, BaseRequestModel, Sentinel
+from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.dto.manager.query import (
     DateTimeFilter,
     IntFilter,
@@ -21,6 +21,7 @@ from ai.backend.common.dto.manager.v2.common import (
     ResourceSlotEntryInput,
     VFolderHostPermissionEntryInput,
 )
+from ai.backend.common.tristate.unset import UNSET, Unset
 
 from .types import (
     DefaultForUnspecified,
@@ -109,49 +110,51 @@ class CreateKeypairResourcePolicyInput(BaseRequestModel):
 class UpdateKeypairResourcePolicyInput(BaseRequestModel):
     """Input for updating a keypair resource policy. All fields optional for partial update."""
 
-    default_for_unspecified: DefaultForUnspecified | None = Field(
-        default=None,
-        description="Updated default resource allocation. Leave null to keep existing value.",
+    default_for_unspecified: DefaultForUnspecified | None | Unset = Field(
+        default=UNSET,
+        description="Updated default resource allocation. Omit to leave unchanged.",
     )
-    total_resource_slots: list[ResourceSlotEntryInput] | Sentinel | None = Field(
-        default=SENTINEL,
-        description="Updated resource slot limits. Set to null to clear.",
+    total_resource_slots: list[ResourceSlotEntryInput] | None | Unset = Field(
+        default=UNSET,
+        description="Updated resource slot limits. Omit to leave unchanged.",
     )
-    max_session_lifetime: int | None = Field(
-        default=None,
-        description="Updated maximum session lifetime in seconds. Leave null to keep existing.",
+    max_session_lifetime: int | None | Unset = Field(
+        default=UNSET,
+        description="Updated maximum session lifetime in seconds. Omit to leave unchanged.",
     )
-    max_concurrent_sessions: int | None = Field(
-        default=None,
-        description="Updated maximum concurrent sessions. Leave null to keep existing.",
+    max_concurrent_sessions: int | None | Unset = Field(
+        default=UNSET,
+        description="Updated maximum concurrent sessions. Omit to leave unchanged.",
     )
-    max_pending_session_count: int | Sentinel | None = Field(
-        default=SENTINEL,
-        description="Updated max pending sessions. Set to null to clear.",
+    max_pending_session_count: int | None | Unset = Field(
+        default=UNSET,
+        description="Updated max pending sessions. Omit to leave unchanged; null clears.",
     )
-    max_priority: int | Sentinel | None = Field(
-        default=SENTINEL,
-        description="Updated max priority. Set to null to clear.",
+    max_priority: int | None | Unset = Field(
+        default=UNSET,
+        description="Updated max priority. Omit to leave unchanged; null clears.",
     )
-    max_pending_session_resource_slots: list[ResourceSlotEntryInput] | Sentinel | None = Field(
-        default=SENTINEL,
-        description="Updated max pending session resource slots. Set to null to clear.",
+    max_pending_session_resource_slots: list[ResourceSlotEntryInput] | None | Unset = Field(
+        default=UNSET,
+        description=(
+            "Updated max pending session resource slots. Omit to leave unchanged; null clears."
+        ),
     )
-    max_concurrent_sftp_sessions: int | None = Field(
-        default=None,
-        description="Updated max concurrent SFTP sessions. Leave null to keep existing.",
+    max_concurrent_sftp_sessions: int | None | Unset = Field(
+        default=UNSET,
+        description="Updated max concurrent SFTP sessions. Omit to leave unchanged.",
     )
-    max_containers_per_session: int | None = Field(
-        default=None,
-        description="Updated max containers per session. Leave null to keep existing.",
+    max_containers_per_session: int | None | Unset = Field(
+        default=UNSET,
+        description="Updated max containers per session. Omit to leave unchanged.",
     )
-    idle_timeout: int | None = Field(
-        default=None,
-        description="Updated idle timeout in seconds. Leave null to keep existing.",
+    idle_timeout: int | None | Unset = Field(
+        default=UNSET,
+        description="Updated idle timeout in seconds. Omit to leave unchanged.",
     )
-    allowed_vfolder_hosts: list[VFolderHostPermissionEntryInput] | Sentinel | None = Field(
-        default=SENTINEL,
-        description="Updated vfolder host permissions. Set to null to clear.",
+    allowed_vfolder_hosts: list[VFolderHostPermissionEntryInput] | None | Unset = Field(
+        default=UNSET,
+        description="Updated vfolder host permissions. Omit to leave unchanged.",
     )
 
 
@@ -204,30 +207,30 @@ class CreateUserResourcePolicyInput(BaseRequestModel):
 class UpdateUserResourcePolicyInput(BaseRequestModel):
     """Input for updating a user resource policy. All fields optional for partial update."""
 
-    max_vfolder_count: int | Sentinel | None = Field(
-        default=SENTINEL,
-        description="Updated max vfolder count. Use SENTINEL to clear, null to keep existing.",
+    max_vfolder_count: int | None | Unset = Field(
+        default=UNSET,
+        description="Updated max vfolder count. Omit to leave unchanged.",
     )
-    max_concurrent_logins: int | Sentinel | None = Field(
-        default=SENTINEL,
+    max_concurrent_logins: int | None | Unset = Field(
+        default=UNSET,
         ge=1,
         description=(
             "Updated maximum number of concurrent authenticated login sessions per user."
-            " Set to null to clear (unlimited). Must be >= 1 when set."
+            " Omit to leave unchanged; null clears (unlimited). Must be >= 1 when set."
             " Distinct from keypair_resource_policies.max_concurrent_sessions which caps compute sessions."
         ),
     )
-    max_quota_scope_size: BinarySizeInput | Sentinel | None = Field(
-        default=SENTINEL,
-        description="Updated max quota scope size. Use SENTINEL to clear, null to keep existing.",
+    max_quota_scope_size: BinarySizeInput | None | Unset = Field(
+        default=UNSET,
+        description="Updated max quota scope size. Omit to leave unchanged.",
     )
-    max_session_count_per_model_session: int | None = Field(
-        default=None,
-        description="Updated max sessions per model session. Leave null to keep existing.",
+    max_session_count_per_model_session: int | None | Unset = Field(
+        default=UNSET,
+        description="Updated max sessions per model session. Omit to leave unchanged.",
     )
-    max_customized_image_count: int | None = Field(
-        default=None,
-        description="Updated max customized image count. Leave null to keep existing.",
+    max_customized_image_count: int | None | Unset = Field(
+        default=UNSET,
+        description="Updated max customized image count. Omit to leave unchanged.",
     )
 
 
@@ -268,17 +271,17 @@ class CreateProjectResourcePolicyInput(BaseRequestModel):
 class UpdateProjectResourcePolicyInput(BaseRequestModel):
     """Input for updating a project resource policy. All fields optional for partial update."""
 
-    max_vfolder_count: int | Sentinel | None = Field(
-        default=SENTINEL,
-        description="Updated max vfolder count. Use SENTINEL to clear, null to keep existing.",
+    max_vfolder_count: int | None | Unset = Field(
+        default=UNSET,
+        description="Updated max vfolder count. Omit to leave unchanged.",
     )
-    max_quota_scope_size: BinarySizeInput | Sentinel | None = Field(
-        default=SENTINEL,
-        description="Updated max quota scope size. Use SENTINEL to clear, null to keep existing.",
+    max_quota_scope_size: BinarySizeInput | None | Unset = Field(
+        default=UNSET,
+        description="Updated max quota scope size. Omit to leave unchanged.",
     )
-    max_network_count: int | None = Field(
-        default=None,
-        description="Updated max network count. Leave null to keep existing.",
+    max_network_count: int | None | Unset = Field(
+        default=UNSET,
+        description="Updated max network count. Omit to leave unchanged.",
     )
 
 

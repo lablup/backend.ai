@@ -10,14 +10,13 @@ from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
 if TYPE_CHECKING:
-    from ai.backend.manager.services.processors import Processors
     from ai.backend.manager.sokovan.deployment.coordinator import DeploymentCoordinator
     from ai.backend.manager.sokovan.scheduler.coordinator import ScheduleCoordinator
 
-from ai.backend.common.api_handlers import SENTINEL
 from ai.backend.common.data.entity.domain import DomainID, DomainName
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID, ResourceGroupName
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.filter_specs import StringMatchSpec
 from ai.backend.common.dto.manager.v2.fair_share.types import (
     ResourceSlotEntryInfo,
@@ -31,6 +30,7 @@ from ai.backend.common.dto.manager.v2.resource_group.request import (
     ReplaceResourceGroupDefaultSessionOptionsInput,
     ResourceGroupFilter,
     ResourceGroupOrder,
+    ScopedSearchResourceGroupsInput,
     UpdateAllowedDomainsForResourceGroupInput,
     UpdateAllowedProjectsForResourceGroupInput,
     UpdateAllowedResourceGroupsForDomainInput,
@@ -62,9 +62,11 @@ from ai.backend.common.dto.manager.v2.resource_group.types import (
     PreemptionModeDTO,
     ResourceGroupOrderDirection,
     ResourceGroupOrderField,
+    ResourceGroupScope,
     SchedulerTypeDTO,
 )
 from ai.backend.common.exception import DomainNotFound
+from ai.backend.common.tristate.unset import Unset
 from ai.backend.common.types import PreemptionMode, PreemptionOrder, SlotQuantity
 from ai.backend.manager.api.adapter_options.deployment.options import (
     deployment_options_from_input,
@@ -103,9 +105,11 @@ from ai.backend.manager.models.resource_group.updaters import ResourceGroupUpdat
 from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.services.domain.actions.lookup import LookupDomainAction
+from ai.backend.manager.services.domain.processors import DomainProcessors
 from ai.backend.manager.services.rbac.actions.relation.base import RelationPair
 from ai.backend.manager.services.rbac.actions.relation.create import CreateRelationAction
 from ai.backend.manager.services.rbac.actions.relation.purge import PurgeRelationAction
+from ai.backend.manager.services.rbac.processors import RbacProcessors
 from ai.backend.manager.services.resource_group.actions.bulk_get import (
     BulkGetResourceGroupsAction,
 )
@@ -149,12 +153,14 @@ from ai.backend.manager.services.resource_group.actions.scoped_search import (
     ProjectResourceGroupScopeItem,
     ResourceGroupScopeItem,
     ScopedSearchResourceGroupsAction,
+    UserResourceGroupScopeItem,
 )
 from ai.backend.manager.services.resource_group.actions.update import UpdateResourceGroupAction
 from ai.backend.manager.services.resource_group.actions.update_fair_share_spec import (
     ResourceWeightInput,
     UpdateFairShareSpecAction,
 )
+from ai.backend.manager.services.resource_group.processors import ResourceGroupProcessors
 from ai.backend.manager.types import OptionalState, TriState
 
 
@@ -225,13 +231,23 @@ class ResourceGroupAdapter(BaseAdapter):
         exposed ``id`` field carries the resource group UUID.
     """
 
+    _resource_group: ResourceGroupProcessors
+    _rbac: RbacProcessors
+    _domain: DomainProcessors
+    _deployment_coordinator: DeploymentCoordinator
+    _schedule_coordinator: ScheduleCoordinator
+
     def __init__(
         self,
-        processors: Processors,
+        resource_group: ResourceGroupProcessors,
+        rbac: RbacProcessors,
+        domain: DomainProcessors,
         deployment_coordinator: DeploymentCoordinator,
         schedule_coordinator: ScheduleCoordinator,
     ) -> None:
-        super().__init__(processors)
+        self._resource_group = resource_group
+        self._rbac = rbac
+        self._domain = domain
         # ``deployment_coordinator`` is the authoritative source for the
         # live set of registered handler names; we consult it when
         # validating
@@ -256,13 +272,11 @@ class ResourceGroupAdapter(BaseAdapter):
         if not names:
             return []
         keys = [ResourceGroupName(name) for name in names]
-        lookup = await self._processors.resource_group.bulk_lookup.run(
+        lookup = await self._resource_group.bulk_lookup.run(
             BulkLookupResourceGroupsAction(names=keys)
         )
         ids = [lookup.resolved[key] for key in keys if key in lookup.resolved]
-        got = await self._processors.resource_group.bulk_get.run(
-            BulkGetResourceGroupsAction(ids=ids)
-        )
+        got = await self._resource_group.bulk_get.run(BulkGetResourceGroupsAction(ids=ids))
         groups = got.values()
         errors = got.errors()
         nodes: list[ResourceGroupDetailNode | Exception | None] = []
@@ -284,9 +298,7 @@ class ResourceGroupAdapter(BaseAdapter):
         """Batch load resource groups by UUID for DataLoader use, checked per resource group."""
         if not ids:
             return []
-        result = await self._processors.resource_group.bulk_get.run(
-            BulkGetResourceGroupsAction(ids=list(ids))
-        )
+        result = await self._resource_group.bulk_get.run(BulkGetResourceGroupsAction(ids=list(ids)))
         return [
             self._data_to_detail_node(item.value)
             if item.value is not None
@@ -310,7 +322,7 @@ class ResourceGroupAdapter(BaseAdapter):
             limit=input.limit,
             offset=input.offset,
         )
-        action_result = await self._processors.resource_group.search_resource_groups.run(
+        action_result = await self._resource_group.search_resource_groups.run(
             SearchResourceGroupsAction(querier=querier)
         )
         return ResourceGroupSearchPayload(
@@ -318,6 +330,52 @@ class ResourceGroupAdapter(BaseAdapter):
             total_count=action_result.total_count,
             has_next_page=action_result.has_next_page,
             has_previous_page=action_result.has_previous_page,
+        )
+
+    def _scope_items(self, scope: ResourceGroupScope) -> list[ResourceGroupScopeItem]:
+        """The scope items the request named, in the order the input lists them."""
+        items: list[ResourceGroupScopeItem] = [
+            DomainResourceGroupScopeItem(domain_id=DomainID(entry.value))
+            for entry in scope.domain or ()
+        ]
+        items.extend(
+            ProjectResourceGroupScopeItem(project_id=ProjectID(entry.value))
+            for entry in scope.project or ()
+        )
+        items.extend(
+            UserResourceGroupScopeItem(user_id=UserID(entry.value)) for entry in scope.user or ()
+        )
+        return items
+
+    async def scoped_search(
+        self,
+        input: ScopedSearchResourceGroupsInput,
+    ) -> ResourceGroupSearchPayload:
+        """Search the resource groups the named scopes reach, combined with OR."""
+        conditions = self._convert_filter(input.filter) if input.filter else []
+        orders = self._convert_orders(input.order) if input.order else []
+        searcher = self._build_searcher(
+            ResourceGroupSearcher,
+            conditions=conditions,
+            orders=orders,
+            pagination_spec=_resource_group_pagination_spec(),
+            first=input.first,
+            after=input.after,
+            last=input.last,
+            before=input.before,
+            limit=input.limit,
+            offset=input.offset,
+        )
+        result = await self._resource_group.scoped_search_resource_groups.run(
+            ScopedSearchResourceGroupsAction(
+                items=self._scope_items(input.scope), searcher=searcher
+            )
+        )
+        return ResourceGroupSearchPayload(
+            items=[self._data_to_detail_node(data) for data in result.items],
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
         )
 
     def _convert_filter(self, filter_: ResourceGroupFilter) -> list[QueryCondition]:
@@ -416,7 +474,7 @@ class ResourceGroupAdapter(BaseAdapter):
             is_active=True,
             is_default=input.is_default,
         )
-        action_result = await self._processors.resource_group.create_resource_group.run(
+        action_result = await self._resource_group.create_resource_group.run(
             CreateResourceGroupAction(creator=creator)
         )
 
@@ -440,23 +498,11 @@ class ResourceGroupAdapter(BaseAdapter):
         """
         updater = ResourceGroupUpdater(
             resource_group_id=await self._resolve_resource_group_id(name),
-            is_active=(
-                OptionalState.update(input.is_active)
-                if input.is_active is not None
-                else OptionalState.nop()
-            ),
-            is_default=OptionalState.from_nullable(input.is_default),
-            description=(
-                TriState.nullify()
-                if input.description is SENTINEL
-                else (
-                    TriState.update(str(input.description))
-                    if input.description is not None
-                    else TriState.nop()
-                )
-            ),
+            is_active=OptionalState.from_unset(input.is_active),
+            is_default=OptionalState.from_unset(input.is_default),
+            description=TriState.from_unset(input.description),
         )
-        action_result = await self._processors.resource_group.update_resource_group.run(
+        action_result = await self._resource_group.update_resource_group.run(
             UpdateResourceGroupAction(resource_group_id=updater.resource_group_id, updater=updater)
         )
 
@@ -474,7 +520,7 @@ class ResourceGroupAdapter(BaseAdapter):
             ResourceInfoNode DTO with capacity, used, and free resource metrics.
             Quantities are normalized (trailing zeros removed, no scientific notation).
         """
-        action_result = await self._processors.resource_group.get_resource_info.run(
+        action_result = await self._resource_group.get_resource_info.run(
             GetResourceInfoAction(
                 resource_group_id=await self._resolve_resource_group_id(resource_group),
                 resource_group=resource_group,
@@ -510,7 +556,7 @@ class ResourceGroupAdapter(BaseAdapter):
             pagination=NoPagination(),
             conditions=[ResourceGroupConditions.by_name_equals(name_spec)],
         )
-        search_result = await self._processors.resource_group.search_resource_groups.run(
+        search_result = await self._resource_group.search_resource_groups.run(
             SearchResourceGroupsAction(querier=querier)
         )
         if not search_result.resource_groups:
@@ -559,24 +605,23 @@ class ResourceGroupAdapter(BaseAdapter):
         Returns:
             Payload DTO containing the updated resource group.
         """
-        resource_weights = None
-        if input.resource_weights is not None:
-            resource_weights = [
-                ResourceWeightInput(
-                    resource_type=entry.resource_type,
-                    weight=entry.weight,
-                )
-                for entry in input.resource_weights
+        weight_entries = OptionalState.from_unset(input.resource_weights).optional_value()
+        resource_weights = (
+            [
+                ResourceWeightInput(resource_type=entry.resource_type, weight=entry.weight)
+                for entry in weight_entries
             ]
-
-        action_result = await self._processors.resource_group.update_fair_share_spec.run(
+            if weight_entries is not None
+            else None
+        )
+        action_result = await self._resource_group.update_fair_share_spec.run(
             UpdateFairShareSpecAction(
                 resource_group_id=await self._resolve_resource_group_id(input.resource_group_name),
                 resource_group=input.resource_group_name,
-                half_life_days=input.half_life_days,
-                lookback_days=input.lookback_days,
-                decay_unit_days=input.decay_unit_days,
-                default_weight=input.default_weight,
+                half_life_days=OptionalState.from_unset(input.half_life_days).optional_value(),
+                lookback_days=OptionalState.from_unset(input.lookback_days).optional_value(),
+                decay_unit_days=OptionalState.from_unset(input.decay_unit_days).optional_value(),
+                default_weight=OptionalState.from_unset(input.default_weight).optional_value(),
                 resource_weights=resource_weights,
             )
         )
@@ -596,13 +641,12 @@ class ResourceGroupAdapter(BaseAdapter):
         Returns:
             Payload DTO containing the updated resource group.
         """
-        scheduler_value: str | None = None
-        if input.scheduler_type is not None:
-            scheduler_value = SchedulerType(input.scheduler_type).value
-
-        preemption_config_state: OptionalState[DataPreemptionConfig] = OptionalState.nop()
-        if input.preemption is not None:
-            preemption_config_state = OptionalState.update(
+        scheduler: OptionalState[str] = OptionalState.nop()
+        if not isinstance(input.scheduler_type, Unset) and input.scheduler_type is not None:
+            scheduler = OptionalState.update(SchedulerType(input.scheduler_type).value)
+        preemption_config: OptionalState[DataPreemptionConfig] = OptionalState.nop()
+        if not isinstance(input.preemption, Unset) and input.preemption is not None:
+            preemption_config = OptionalState.update(
                 DataPreemptionConfig(
                     enabled=input.preemption.enabled,
                     preemptible_priority=input.preemption.preemptible_priority,
@@ -614,49 +658,20 @@ class ResourceGroupAdapter(BaseAdapter):
                     victim_scope=input.preemption.victim_scope,
                 )
             )
-
         updater = ResourceGroupUpdater(
             resource_group_id=await self._resolve_resource_group_id(input.resource_group_name),
-            is_active=(
-                OptionalState.update(input.is_active)
-                if input.is_active is not None
-                else OptionalState.nop()
-            ),
-            is_public=(
-                OptionalState.update(input.is_public)
-                if input.is_public is not None
-                else OptionalState.nop()
-            ),
-            is_default=OptionalState.from_nullable(input.is_default),
-            description=(
-                TriState.update(input.description)
-                if input.description is not None
-                else TriState.nop()
-            ),
-            wsproxy_addr=(
-                TriState.update(input.app_proxy_addr)
-                if input.app_proxy_addr is not None
-                else TriState.nop()
-            ),
-            wsproxy_api_token=(
-                TriState.update(input.appproxy_api_token)
-                if input.appproxy_api_token is not None
-                else TriState.nop()
-            ),
-            use_host_network=(
-                OptionalState.update(input.use_host_network)
-                if input.use_host_network is not None
-                else OptionalState.nop()
-            ),
-            scheduler=(
-                OptionalState.update(scheduler_value)
-                if scheduler_value is not None
-                else OptionalState.nop()
-            ),
-            preemption_config=preemption_config_state,
+            is_active=OptionalState.from_unset(input.is_active),
+            is_public=OptionalState.from_unset(input.is_public),
+            is_default=OptionalState.from_unset(input.is_default),
+            description=TriState.from_unset(input.description),
+            wsproxy_addr=TriState.from_unset(input.app_proxy_addr),
+            wsproxy_api_token=TriState.from_unset(input.appproxy_api_token),
+            use_host_network=OptionalState.from_unset(input.use_host_network),
+            scheduler=scheduler,
+            preemption_config=preemption_config,
         )
 
-        action_result = await self._processors.resource_group.update_resource_group.run(
+        action_result = await self._resource_group.update_resource_group.run(
             UpdateResourceGroupAction(
                 resource_group_id=updater.resource_group_id,
                 updater=updater,
@@ -678,7 +693,7 @@ class ResourceGroupAdapter(BaseAdapter):
         Returns:
             Pydantic node representing the purged resource group.
         """
-        action_result = await self._processors.resource_group.purge_resource_group.run(
+        action_result = await self._resource_group.purge_resource_group.run(
             PurgeResourceGroupAction(resource_group_id=await self._resolve_resource_group_id(name))
         )
 
@@ -688,14 +703,12 @@ class ResourceGroupAdapter(BaseAdapter):
 
     async def _resolve_domain_id(self, domain_name: str) -> DomainID:
         """Resolve a domain name to its row id at the API boundary."""
-        result = await self._processors.domain.lookup.run(
-            LookupDomainAction(name=DomainName(domain_name))
-        )
+        result = await self._domain.lookup.run(LookupDomainAction(name=DomainName(domain_name)))
         return result.entity_id()
 
     async def _resolve_resource_group_id(self, name: str) -> ResourceGroupID:
         """Resolve a resource group name to its row ID at the API boundary."""
-        result = await self._processors.resource_group.lookup.run(
+        result = await self._resource_group.lookup.run(
             LookupResourceGroupAction(name=ResourceGroupName(name))
         )
         return result.entity_id()
@@ -712,7 +725,7 @@ class ResourceGroupAdapter(BaseAdapter):
         names = [ResourceGroupName(name) for name in {*add, *remove}]
         if not names:
             return [], []
-        result = await self._processors.resource_group.resolve_resource_group_ids_by_names.run(
+        result = await self._resource_group.resolve_resource_group_ids_by_names.run(
             ResolveResourceGroupIDsByNamesAction(names=names)
         )
         ids_by_name = result.ids_by_name
@@ -732,7 +745,7 @@ class ResourceGroupAdapter(BaseAdapter):
         linked is left as it stands: naming one twice is not an error to the caller."""
         if not resource_group_ids:
             return
-        await self._processors.rbac.create_relation.run(
+        await self._rbac.create_relation.run(
             CreateRelationAction(
                 pairs=[
                     RelationPair(scope=domain_id, target=resource_group_id)
@@ -747,7 +760,7 @@ class ResourceGroupAdapter(BaseAdapter):
     ) -> None:
         if not resource_group_ids:
             return
-        await self._processors.rbac.purge_relation.run(
+        await self._rbac.purge_relation.run(
             PurgeRelationAction(
                 pairs=[
                     RelationPair(scope=domain_id, target=resource_group_id)
@@ -764,7 +777,7 @@ class ResourceGroupAdapter(BaseAdapter):
         linked is left as it stands: naming one twice is not an error to the caller."""
         if not resource_group_ids:
             return
-        await self._processors.rbac.create_relation.run(
+        await self._rbac.create_relation.run(
             CreateRelationAction(
                 pairs=[
                     RelationPair(scope=project_id, target=resource_group_id)
@@ -779,7 +792,7 @@ class ResourceGroupAdapter(BaseAdapter):
     ) -> None:
         if not resource_group_ids:
             return
-        await self._processors.rbac.purge_relation.run(
+        await self._rbac.purge_relation.run(
             PurgeRelationAction(
                 pairs=[
                     RelationPair(scope=project_id, target=resource_group_id)
@@ -795,7 +808,7 @@ class ResourceGroupAdapter(BaseAdapter):
         """The same link read from the resource group's side, in one run."""
         if not domain_ids:
             return
-        await self._processors.rbac.create_relation.run(
+        await self._rbac.create_relation.run(
             CreateRelationAction(
                 pairs=[
                     RelationPair(scope=domain_id, target=resource_group_id)
@@ -810,7 +823,7 @@ class ResourceGroupAdapter(BaseAdapter):
     ) -> None:
         if not domain_ids:
             return
-        await self._processors.rbac.purge_relation.run(
+        await self._rbac.purge_relation.run(
             PurgeRelationAction(
                 pairs=[
                     RelationPair(scope=domain_id, target=resource_group_id)
@@ -826,7 +839,7 @@ class ResourceGroupAdapter(BaseAdapter):
         """The same link read from the resource group's side, in one run."""
         if not project_ids:
             return
-        await self._processors.rbac.create_relation.run(
+        await self._rbac.create_relation.run(
             CreateRelationAction(
                 pairs=[
                     RelationPair(scope=project_id, target=resource_group_id)
@@ -841,7 +854,7 @@ class ResourceGroupAdapter(BaseAdapter):
     ) -> None:
         if not project_ids:
             return
-        await self._processors.rbac.purge_relation.run(
+        await self._rbac.purge_relation.run(
             PurgeRelationAction(
                 pairs=[
                     RelationPair(scope=project_id, target=resource_group_id)
@@ -880,7 +893,7 @@ class ResourceGroupAdapter(BaseAdapter):
         domain_id = await self._resolve_domain_id(input.domain_name)
         await self._unlink_resource_groups_from_domain(domain_id, remove_ids)
         await self._link_resource_groups_to_domain(domain_id, add_ids)
-        result = await self._processors.resource_group.get_allowed_rgs_for_domain.run(
+        result = await self._resource_group.get_allowed_rgs_for_domain.run(
             GetAllowedResourceGroupsForDomainAction(domain_id=domain_id)
         )
         return AllowedResourceGroupsPayload(items=result.items)
@@ -896,7 +909,7 @@ class ResourceGroupAdapter(BaseAdapter):
         project_id = ProjectID(input.project_id)
         await self._unlink_resource_groups_from_project(project_id, remove_ids)
         await self._link_resource_groups_to_project(project_id, add_ids)
-        result = await self._processors.resource_group.get_allowed_rgs_for_project.run(
+        result = await self._resource_group.get_allowed_rgs_for_project.run(
             GetAllowedResourceGroupsForProjectAction(project_id=project_id)
         )
         return AllowedResourceGroupsPayload(items=result.items)
@@ -912,7 +925,7 @@ class ResourceGroupAdapter(BaseAdapter):
         )
         await self._unlink_domains_from_resource_group(resource_group_id, remove_ids)
         await self._link_domains_to_resource_group(resource_group_id, add_ids)
-        result = await self._processors.resource_group.get_allowed_domains_for_rg.run(
+        result = await self._resource_group.get_allowed_domains_for_rg.run(
             GetAllowedDomainsForResourceGroupAction(resource_group_id=resource_group_id)
         )
         return AllowedDomainsPayload(items=result.items)
@@ -929,14 +942,14 @@ class ResourceGroupAdapter(BaseAdapter):
         await self._link_projects_to_resource_group(
             resource_group_id, [ProjectID(raw) for raw in input.add or []]
         )
-        result = await self._processors.resource_group.get_allowed_projects_for_rg.run(
+        result = await self._resource_group.get_allowed_projects_for_rg.run(
             GetAllowedProjectsForResourceGroupAction(resource_group_id=resource_group_id)
         )
         return AllowedProjectsPayload(items=result.items)
 
     async def _scoped_resource_group_names(self, item: ResourceGroupScopeItem) -> list[str]:
         """Read the resource groups one scope reaches, by name."""
-        result = await self._processors.resource_group.scoped_search_resource_groups.run(
+        result = await self._resource_group.scoped_search_resource_groups.run(
             ScopedSearchResourceGroupsAction(
                 items=[item],
                 searcher=ResourceGroupSearcher(
@@ -975,7 +988,7 @@ class ResourceGroupAdapter(BaseAdapter):
     ) -> AllowedDomainsPayload:
         """Get allowed domains for a resource group."""
         resource_group_id = await self._resolve_resource_group_id(resource_group_name)
-        result = await self._processors.resource_group.get_allowed_domains_for_rg.run(
+        result = await self._resource_group.get_allowed_domains_for_rg.run(
             GetAllowedDomainsForResourceGroupAction(resource_group_id=resource_group_id)
         )
         return AllowedDomainsPayload(items=result.items)
@@ -986,7 +999,7 @@ class ResourceGroupAdapter(BaseAdapter):
     ) -> AllowedProjectsPayload:
         """Get allowed projects for a resource group."""
         resource_group_id = await self._resolve_resource_group_id(resource_group_name)
-        result = await self._processors.resource_group.get_allowed_projects_for_rg.run(
+        result = await self._resource_group.get_allowed_projects_for_rg.run(
             GetAllowedProjectsForResourceGroupAction(resource_group_id=resource_group_id)
         )
         return AllowedProjectsPayload(items=result.items)
@@ -1046,13 +1059,11 @@ class ResourceGroupAdapter(BaseAdapter):
                 h.name() for h in self._deployment_coordinator.registered_handlers()
             ),
         )
-        action_result = (
-            await self._processors.resource_group.replace_default_deployment_options.run(
-                ReplaceDefaultDeploymentOptionsAction(
-                    resource_group_id=await self._resolve_resource_group_id(name),
-                    resource_group=name,
-                    options=options,
-                )
+        action_result = await self._resource_group.replace_default_deployment_options.run(
+            ReplaceDefaultDeploymentOptionsAction(
+                resource_group_id=await self._resolve_resource_group_id(name),
+                resource_group=name,
+                options=options,
             )
         )
         return ReplaceResourceGroupDefaultDeploymentOptionsPayload(
@@ -1081,7 +1092,7 @@ class ResourceGroupAdapter(BaseAdapter):
                 h.name() for h in self._schedule_coordinator.registered_lifecycle_handlers()
             ),
         )
-        action_result = await self._processors.resource_group.replace_default_session_options.run(
+        action_result = await self._resource_group.replace_default_session_options.run(
             ReplaceDefaultSessionOptionsAction(
                 resource_group_id=await self._resolve_resource_group_id(name),
                 resource_group=name,

@@ -45,6 +45,7 @@ from ai.backend.manager.services.auth.actions.search_login_sessions import (
     SearchLoginSessionsAction,
 )
 from ai.backend.manager.services.auth.actions.unblock_user import GlobalUnblockUserAction
+from ai.backend.manager.services.auth.processors import AuthProcessors
 
 _LOGIN_SESSION_PAGINATION_SPEC = PaginationSpec(
     forward_order=LoginSessionOrders.created_at(ascending=False),
@@ -57,6 +58,11 @@ _LOGIN_SESSION_PAGINATION_SPEC = PaginationSpec(
 
 class LoginSessionAdapter(BaseAdapter):
     """Adapter for login session domain operations."""
+
+    _auth: AuthProcessors
+
+    def __init__(self, auth: AuthProcessors) -> None:
+        self._auth = auth
 
     async def admin_search(
         self, input: AdminSearchLoginSessionsInput
@@ -76,7 +82,7 @@ class LoginSessionAdapter(BaseAdapter):
             limit=input.limit,
             offset=input.offset,
         )
-        action_result = await self._processors.auth.global_search_login_sessions.run(
+        action_result = await self._auth.global_search_login_sessions.run(
             GlobalSearchLoginSessionsAction(searcher=searcher)
         )
         return AdminSearchLoginSessionsPayload(
@@ -108,7 +114,7 @@ class LoginSessionAdapter(BaseAdapter):
             limit=input.limit,
             offset=input.offset,
         )
-        action_result = await self._processors.auth.search_login_sessions.run(
+        action_result = await self._auth.search_login_sessions.run(
             SearchLoginSessionsAction(user_id=UserID(me.user_id), searcher=searcher)
         )
         return MySearchLoginSessionsPayload(
@@ -120,14 +126,14 @@ class LoginSessionAdapter(BaseAdapter):
 
     async def my_revoke(self, input: MyRevokeLoginSessionInput) -> RevokeLoginSessionPayload:
         """Revoke a login session owned by the current user."""
-        action_result = await self._processors.auth.revoke_login_session.run(
+        action_result = await self._auth.revoke_login_session.run(
             RevokeLoginSessionAction(session_id=LoginSessionID(input.session_id))
         )
         return RevokeLoginSessionPayload(success=action_result.success)
 
     async def admin_revoke(self, input: AdminRevokeLoginSessionInput) -> RevokeLoginSessionPayload:
         """Revoke any login session (admin, no ownership check)."""
-        action_result = await self._processors.auth.global_revoke_login_session.run(
+        action_result = await self._auth.global_revoke_login_session.run(
             GlobalRevokeLoginSessionAction(
                 session_id=input.session_id,
             )
@@ -136,7 +142,7 @@ class LoginSessionAdapter(BaseAdapter):
 
     async def admin_unblock_user(self, input: AdminUnblockUserInput) -> UnblockUserPayload:
         """Clear the failed-login rate limit block for a user (admin only)."""
-        action_result = await self._processors.auth.global_unblock_user.run(
+        action_result = await self._auth.global_unblock_user.run(
             GlobalUnblockUserAction(username=input.username)
         )
         return UnblockUserPayload(success=action_result.success)

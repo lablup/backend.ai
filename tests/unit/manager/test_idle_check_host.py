@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import logging
 import uuid
-from collections.abc import AsyncGenerator, AsyncIterator, Mapping
+from collections.abc import AsyncGenerator, Mapping
 from datetime import datetime
 from decimal import Decimal
 from typing import Any, ClassVar, override
@@ -28,7 +28,6 @@ from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
-from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
 from ai.backend.common.types import (
     AccessKey,
     ClusterMode,
@@ -62,9 +61,6 @@ from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.project import ProjectRow
 from ai.backend.manager.models.rbac_models import RoleRow, UserRoleRow
-from ai.backend.manager.models.rbac_models.association_scopes_entities import (
-    AssociationScopesEntitiesRow,
-)
 from ai.backend.manager.models.replica_group import ReplicaGroupRow
 from ai.backend.manager.models.resource_group import ResourceGroupOpts, ResourceGroupRow
 from ai.backend.manager.models.resource_policy import (
@@ -82,7 +78,6 @@ from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderRow
-from ai.backend.manager.repositories.db.engine import create_async_engine
 from ai.backend.manager.secret.types import SecretValue
 from ai.backend.testutils.db import TableOrORM, with_tables
 
@@ -99,7 +94,6 @@ _IDLE_ROWS: list[TableOrORM] = [
     UserRow,
     KeyPairRow,
     ProjectRow,
-    AssociationScopesEntitiesRow,
     ContainerRegistryRow,
     ImageRow,
     VFolderRow,
@@ -172,17 +166,6 @@ class _RecordingChecker(BaseIdleChecker):
     @override
     async def callback_idle_session(self, session_id: SessionId) -> None:
         return None
-
-
-@pytest.fixture
-async def database_connection(
-    postgres_container: tuple[str, HostPortPairModel],
-) -> AsyncIterator[ExtendedAsyncSAEngine]:
-    _, addr = postgres_container
-    url = f"postgresql+asyncpg://postgres:develove@{addr.host}:{addr.port}/testing"
-    engine = create_async_engine(url, pool_size=8, pool_pre_ping=False, max_overflow=64)
-    yield engine
-    await engine.dispose()
 
 
 class TestDoIdleCheck:

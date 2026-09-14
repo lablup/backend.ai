@@ -11,11 +11,6 @@ from ai.backend.manager.models.fair_share.orders import (
     UserFairShareOrders,
 )
 
-from .creators import (
-    DomainFairShareCreatorSpec,
-    ProjectFairShareCreatorSpec,
-    UserFairShareCreatorSpec,
-)
 from .repositories import FairShareRepositories
 from .repository import FairShareRepository
 from .types import (
@@ -23,31 +18,11 @@ from .types import (
     ProjectFairShareEntitySearchResult,
     UserFairShareEntitySearchResult,
 )
-from .upserters import (
-    DomainFairShareBulkWeightUpserterSpec,
-    DomainFairShareUpserterSpec,
-    ProjectFairShareBulkWeightUpserterSpec,
-    ProjectFairShareUpserterSpec,
-    UserFairShareBulkWeightUpserterSpec,
-    UserFairShareUpserterSpec,
-)
 
 __all__ = (
     # Repositories
     "FairShareRepositories",
     "FairShareRepository",
-    # Creator specs
-    "DomainFairShareCreatorSpec",
-    "ProjectFairShareCreatorSpec",
-    "UserFairShareCreatorSpec",
-    # Upserter specs
-    "DomainFairShareUpserterSpec",
-    "ProjectFairShareUpserterSpec",
-    "UserFairShareUpserterSpec",
-    # Bulk weight upserter specs
-    "DomainFairShareBulkWeightUpserterSpec",
-    "ProjectFairShareBulkWeightUpserterSpec",
-    "UserFairShareBulkWeightUpserterSpec",
     # Query conditions
     "DomainFairShareConditions",
     "ProjectFairShareConditions",

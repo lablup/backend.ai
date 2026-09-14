@@ -9,6 +9,7 @@ from strawberry import ID, UNSET, Info
 from strawberry.relay import Connection, Edge, NodeID
 
 from ai.backend.common.data.entity.artifact_revision import ArtifactRevisionID
+from ai.backend.common.data.entity.object_storage import ObjectStorageID
 from ai.backend.common.dto.manager.v2.object_storage.request import (
     AdminSearchObjectStoragesInput,
 )
@@ -91,7 +92,7 @@ class ObjectStorage(PydanticNodeMixin[ObjectStorageNode]):
         required: bool = False,
     ) -> Iterable[Self | None]:
         results = await info.context.data_loaders.object_storage_loader.load_many([
-            UUID(nid) for nid in node_ids
+            ObjectStorageID(UUID(nid)) for nid in node_ids
         ])
         return cast(list[Self | None], results)
 

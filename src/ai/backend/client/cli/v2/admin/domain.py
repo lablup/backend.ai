@@ -115,27 +115,80 @@ def create(body: str) -> None:
 
 @domain.command()
 @click.argument("domain_name")
-@click.argument("body", type=str)
-def update(domain_name: str, body: str) -> None:
-    """Update a domain (superadmin only).
-
-    BODY is a JSON string with fields to update.
-    """
-    import json
-    import sys
-
+@click.option("--name", default=None, help="New domain name.")
+@click.option("--description", default=None, help="Updated description.")
+@click.option(
+    "--set-null-description",
+    is_flag=True,
+    default=False,
+    help="Clear the description. Mutually exclusive with --description.",
+)
+@click.option(
+    "--set-active/--unset-active",
+    "is_active",
+    default=None,
+    help="Whether the domain is active.",
+)
+@click.option(
+    "--allowed-docker-registry",
+    "allowed_docker_registries",
+    multiple=True,
+    help="Allowed Docker registry URL. Repeat to set several; replaces the whole list.",
+)
+@click.option("--integration-name", default=None, help="Updated external integration identifier.")
+@click.option(
+    "--set-null-integration-name",
+    is_flag=True,
+    default=False,
+    help="Clear the integration name. Mutually exclusive with --integration-name.",
+)
+def update(
+    domain_name: str,
+    name: str | None,
+    description: str | None,
+    set_null_description: bool,
+    is_active: bool | None,
+    allowed_docker_registries: tuple[str, ...],
+    integration_name: str | None,
+    set_null_integration_name: bool,
+) -> None:
+    """Update a domain (superadmin only). Omitted options keep their current value."""
     from ai.backend.common.dto.manager.v2.domain.request import UpdateDomainInput
+    from ai.backend.common.tristate.unset import UNSET, Unset
 
-    try:
-        data = json.loads(body)
-    except json.JSONDecodeError as e:
-        click.echo(f"Invalid JSON: {e}", err=True)
-        sys.exit(1)
+    if description is not None and set_null_description:
+        raise click.UsageError("--description and --set-null-description are mutually exclusive.")
+    if integration_name is not None and set_null_integration_name:
+        raise click.UsageError(
+            "--integration-name and --set-null-integration-name are mutually exclusive."
+        )
+
+    # An option the user did not pass stays UNSET so the field is left unchanged.
+    description_value: str | None | Unset = UNSET
+    if set_null_description:
+        description_value = None
+    elif description is not None:
+        description_value = description
+    integration_name_value: str | None | Unset = UNSET
+    if set_null_integration_name:
+        integration_name_value = None
+    elif integration_name is not None:
+        integration_name_value = integration_name
+
+    input_dto = UpdateDomainInput(
+        name=name if name is not None else UNSET,
+        description=description_value,
+        is_active=is_active if is_active is not None else UNSET,
+        allowed_docker_registries=(
+            list(allowed_docker_registries) if allowed_docker_registries else UNSET
+        ),
+        integration_name=integration_name_value,
+    )
 
     async def _run() -> None:
         registry = await create_v2_registry(load_v2_config())
         try:
-            result = await registry.domain.admin_update(domain_name, UpdateDomainInput(**data))
+            result = await registry.domain.admin_update(domain_name, input_dto)
             print_result(result)
         finally:
             await registry.close()

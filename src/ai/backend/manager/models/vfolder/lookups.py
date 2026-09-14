@@ -9,6 +9,7 @@ from uuid import UUID
 
 import sqlalchemy as sa
 
+from ai.backend.common.data.entity.types import FieldType
 from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.data.entity.vfolder_permission import VFolderPermissionID
 from ai.backend.manager.models.specs.lookup import FieldKeyLookup
@@ -27,6 +28,10 @@ class VFolderMountPermissionLookup(FieldKeyLookup[VFolderPermissionID, VFolderUU
 
     vfolder_id: VFolderUUID
     user_id: uuid.UUID
+
+    @override
+    def field_type(self) -> FieldType:
+        return VFolderPermissionID.field_type()
 
     @override
     def build_query(self) -> sa.sql.Select[Any]:

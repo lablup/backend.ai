@@ -8,10 +8,10 @@ import pytest
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
-from ai.backend.common.data.entity.error_log import ERROR_LOG_FIELD_TYPE
-from ai.backend.common.data.entity.manager_admin import MANAGER_ADMIN_ENTITY_TYPE
+from ai.backend.common.data.entity.error_log import ErrorLogFieldType
 from ai.backend.common.data.entity.resource_group import ResourceGroupID, ResourceGroupName
-from ai.backend.common.data.entity.user import USER_ENTITY_TYPE
+from ai.backend.common.data.entity.types import GlobalEntityType
+from ai.backend.common.data.entity.user import UserEntityType
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
 from ai.backend.common.types import HostPortPair
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
@@ -46,8 +46,8 @@ from ai.backend.testutils.processors import ops_processor_group
 @pytest.fixture()
 def error_log_processors(database_engine: ExtendedAsyncSAEngine) -> ErrorLogProcessors:
     return ErrorLogProcessors(
-        ops_processor_group(database_engine, GroupMeta(USER_ENTITY_TYPE)).field_group(
-            FieldGroupMeta(ERROR_LOG_FIELD_TYPE),
+        ops_processor_group(database_engine, GroupMeta(UserEntityType())).field_group(
+            FieldGroupMeta(ErrorLogFieldType()),
             ErrorLogData,
             LookupErrorLogOwnerAction,
             LookupBulkErrorLogOwnerAction,
@@ -88,9 +88,7 @@ def manager_admin_processors(
         db=database_engine,
         valkey_stat=valkey_clients.stat,
     )
-    return ManagerAdminProcessors(
-        processor_registry.group(GroupMeta(MANAGER_ADMIN_ENTITY_TYPE)), service
-    )
+    return ManagerAdminProcessors(processor_registry.group(GroupMeta(GlobalEntityType())), service)
 
 
 @pytest.fixture()

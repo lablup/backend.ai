@@ -62,7 +62,7 @@ _USER_CASES: list[tuple[UserFairShareOrderField, InstrumentedAttribute[Any]]] = 
 
 @pytest.fixture
 def adapter() -> FairShareAdapter:
-    return FairShareAdapter(MagicMock())
+    return FairShareAdapter(MagicMock(), MagicMock())
 
 
 def _assert_sorts_on(

@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from typing import override
 
 from ai.backend.common.data.entity.prometheus_query_preset_category import (
-    PROMETHEUS_QUERY_PRESET_CATEGORY_ENTITY_TYPE,
+    PrometheusQueryPresetCategoryEntityType,
 )
 from ai.backend.common.data.entity.types import EntityType
 from ai.backend.manager.actions.v2.ops.base import CreateGlobalOpsAction
@@ -30,7 +30,7 @@ class CreateCategoryAction(
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return PROMETHEUS_QUERY_PRESET_CATEGORY_ENTITY_TYPE
+        return PrometheusQueryPresetCategoryEntityType()
 
     @override
     @classmethod

@@ -6,7 +6,6 @@ from uuid import UUID
 
 from ai.backend.client.v2.base_domain import BaseDomainClient
 from ai.backend.common.dto.manager.v2.rbac.request import (
-    AdminSearchEntitiesGQLInput,
     AdminSearchPermissionsGQLInput,
     AssignRoleInput,
     BulkAddRolePermissionsInput,
@@ -26,7 +25,6 @@ from ai.backend.common.dto.manager.v2.rbac.request import (
     UpdateRoleInput,
 )
 from ai.backend.common.dto.manager.v2.rbac.response import (
-    AdminSearchAssociationsPayload,
     AdminSearchPermissionsPayload,
     AdminSearchRolesPayload,
     BulkAddRolePermissionsPayload,
@@ -253,17 +251,4 @@ class V2RBACClient(BaseDomainClient):
             f"{_PATH}/assignments/bulk-revoke",
             request=request,
             response_model=BulkRevokeRoleResultPayload,
-        )
-
-    # ------------------------------------------------------------------ Entities
-
-    async def search_entities(
-        self, request: AdminSearchEntitiesGQLInput
-    ) -> AdminSearchAssociationsPayload:
-        """Search entity associations with filters, orders, and pagination."""
-        return await self._client.typed_request(
-            "POST",
-            f"{_PATH}/entities/search",
-            request=request,
-            response_model=AdminSearchAssociationsPayload,
         )

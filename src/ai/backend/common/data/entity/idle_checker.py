@@ -4,20 +4,31 @@ from uuid import UUID
 from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
 
 __all__ = (
-    "IDLE_CHECKER_ENTITY_TYPE",
+    "IdleCheckerEntityType",
     "IdleCheckerAssignmentID",
     "IdleCheckerID",
 )
 
 
-# Raw string mirroring the RBAC-managed EntityType.IDLE_CHECKER value.
-IDLE_CHECKER_ENTITY_TYPE = EntityType("idle_checker")
+class IdleCheckerEntityType(EntityType):
+    @override
+    @classmethod
+    def name(cls) -> str:
+        return "idle_checker"
+
+    @override
+    @classmethod
+    def description(cls) -> str:
+        return (
+            "A rule terminating sessions by lifetime, network silence or utilization,"
+            " assigned to scopes."
+        )
 
 
 class IdleCheckerID(EntityIdentifier):
     @override
     def entity_type(self) -> EntityType:
-        return IDLE_CHECKER_ENTITY_TYPE
+        return IdleCheckerEntityType()
 
 
 IdleCheckerAssignmentID = NewType("IdleCheckerAssignmentID", UUID)

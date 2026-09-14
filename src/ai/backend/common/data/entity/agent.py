@@ -3,12 +3,21 @@ from typing import override
 from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
 
 __all__ = (
-    "AGENT_ENTITY_TYPE",
+    "AgentEntityType",
     "AgentUUID",
 )
 
 
-AGENT_ENTITY_TYPE = EntityType("agent")
+class AgentEntityType(EntityType):
+    @override
+    @classmethod
+    def name(cls) -> str:
+        return "agent"
+
+    @override
+    @classmethod
+    def description(cls) -> str:
+        return "A compute node that runs kernels, in one resource group."
 
 
 class AgentUUID(EntityIdentifier):
@@ -20,4 +29,4 @@ class AgentUUID(EntityIdentifier):
 
     @override
     def entity_type(self) -> EntityType:
-        return AGENT_ENTITY_TYPE
+        return AgentEntityType()

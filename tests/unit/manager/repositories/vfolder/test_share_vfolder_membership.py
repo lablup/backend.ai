@@ -17,16 +17,13 @@ from uuid import UUID, uuid4
 import pytest
 
 from ai.backend.common.data.entity.domain import DomainID, DomainName
+from ai.backend.common.data.entity.project import ProjectEntityType
+from ai.backend.common.data.entity.user import UserEntityType
+from ai.backend.common.data.entity.vfolder import VFolderEntityType
 from ai.backend.common.types import (
     BinarySize,
     ResourceSlot,
     VFolderHostPermissionMap,
-)
-from ai.backend.manager.data.permission.types import (
-    EntityType as PermissionEntityType,
-)
-from ai.backend.manager.data.permission.types import (
-    ScopeType as PermissionScopeType,
 )
 from ai.backend.manager.errors.common import ObjectNotFound
 from ai.backend.manager.models.domain import DomainRow
@@ -35,9 +32,6 @@ from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.project import ProjectRow, ProjectType
 from ai.backend.manager.models.rbac_models import RoleRow, UserRoleRow
-from ai.backend.manager.models.rbac_models.association_scopes_entities import (
-    AssociationScopesEntitiesRow,
-)
 from ai.backend.manager.models.resource_group import ResourceGroupRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
@@ -120,7 +114,6 @@ class TestShareVfolderWithUsersMembership:
                 ProjectRow,
                 VFolderRow,
                 VFolderPermissionRow,
-                AssociationScopesEntitiesRow,
                 VirtualEntityRow,
                 EntityMembershipRow,
                 EntityMembershipCapRow,
@@ -223,7 +216,7 @@ class TestShareVfolderWithUsersMembership:
             sess.add(
                 VirtualEntityRow(
                     id=ve_id,
-                    entity_type=PermissionScopeType.PROJECT.value,
+                    entity_type=ProjectEntityType(),
                     entity_id=project,
                 )
             )
@@ -286,7 +279,7 @@ class TestShareVfolderWithUsersMembership:
             )
             sess.add(
                 VirtualEntityRow(
-                    entity_type=PermissionEntityType.VFOLDER.value,
+                    entity_type=VFolderEntityType(),
                     entity_id=vfolder_id,
                 )
             )
@@ -326,7 +319,7 @@ class TestShareVfolderWithUsersMembership:
             sess.add(
                 VirtualEntityRow(
                     id=user_ve_id,
-                    entity_type=PermissionEntityType.USER.value,
+                    entity_type=UserEntityType(),
                     entity_id=user_uuid,
                 )
             )
@@ -335,14 +328,6 @@ class TestShareVfolderWithUsersMembership:
                 EntityMembershipRow(
                     virtual_entity_id=project_scope_id,
                     member_entity_id=user_ve_id,
-                )
-            )
-            sess.add(
-                AssociationScopesEntitiesRow(
-                    scope_type=PermissionScopeType.PROJECT,
-                    scope_id=str(project),
-                    entity_type=PermissionEntityType.USER,
-                    entity_id=str(user_uuid),
                 )
             )
             personal_project_id = uuid4()
@@ -362,7 +347,7 @@ class TestShareVfolderWithUsersMembership:
             )
             sess.add(
                 VirtualEntityRow(
-                    entity_type=PermissionScopeType.PROJECT.value,
+                    entity_type=ProjectEntityType(),
                     entity_id=personal_project_id,
                 )
             )
@@ -430,7 +415,7 @@ class TestShareVfolderWithUsersMembership:
             sess.add(
                 VirtualEntityRow(
                     id=user_ve_id,
-                    entity_type=PermissionEntityType.USER.value,
+                    entity_type=UserEntityType(),
                     entity_id=user_uuid,
                 )
             )
@@ -439,14 +424,6 @@ class TestShareVfolderWithUsersMembership:
                 EntityMembershipRow(
                     virtual_entity_id=project_scope_id,
                     member_entity_id=user_ve_id,
-                )
-            )
-            sess.add(
-                AssociationScopesEntitiesRow(
-                    scope_type=PermissionScopeType.PROJECT,
-                    scope_id=str(project),
-                    entity_type=PermissionEntityType.USER,
-                    entity_id=str(user_uuid),
                 )
             )
             await sess.flush()
@@ -490,7 +467,7 @@ class TestShareVfolderWithUsersMembership:
             sess.add(
                 VirtualEntityRow(
                     id=ve_id,
-                    entity_type=PermissionScopeType.PROJECT.value,
+                    entity_type=ProjectEntityType(),
                     entity_id=other_project,
                 )
             )
@@ -529,7 +506,7 @@ class TestShareVfolderWithUsersMembership:
             sess.add(
                 VirtualEntityRow(
                     id=user_ve_id,
-                    entity_type=PermissionEntityType.USER.value,
+                    entity_type=UserEntityType(),
                     entity_id=user_uuid,
                 )
             )
@@ -538,14 +515,6 @@ class TestShareVfolderWithUsersMembership:
                 EntityMembershipRow(
                     virtual_entity_id=other_project_scope_id,
                     member_entity_id=user_ve_id,
-                )
-            )
-            sess.add(
-                AssociationScopesEntitiesRow(
-                    scope_type=PermissionScopeType.PROJECT,
-                    scope_id=str(other_project),
-                    entity_type=PermissionEntityType.USER,
-                    entity_id=str(user_uuid),
                 )
             )
             await sess.flush()

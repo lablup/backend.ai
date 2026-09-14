@@ -7,12 +7,11 @@ composed of.
 
 from __future__ import annotations
 
-from typing import Any, cast
+from typing import Any
 
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.manager.data.permission.role import UserRoleRevocationData
-from ai.backend.manager.repositories.permission_controller.creators import UserRoleCreatorSpec
 from ai.backend.manager.repositories.permission_controller.repository import (
     PermissionControllerRepository,
 )
@@ -200,17 +199,16 @@ class RbacRoleService:
         )
 
     async def bulk_assign_role(self, action: BulkAssignRoleAction) -> BulkAssignRoleActionResult:
-        """Assigns a role to multiple users with partial failure support.
+        """Assigns a role to multiple users.
 
         When project_id is provided, also binds each user to the project.
         """
         if action.project_id is not None:
-            for spec in action.bulk_creator.specs:
-                user_role_spec = cast(UserRoleCreatorSpec, spec)
-                await self._roster_repository.join_member(
-                    ProjectID(action.project_id), UserID(user_role_spec.user_id)
-                )
-        data = await self._repository.bulk_assign_role(action.bulk_creator)
+            for user_id in action.user_ids:
+                await self._roster_repository.join_member(ProjectID(action.project_id), user_id)
+        data = await self._repository.bulk_assign_role(
+            action.role_id, action.user_ids, action.granted_by
+        )
         return BulkAssignRoleActionResult(data=data)
 
     async def bulk_revoke_role(self, action: BulkRevokeRoleAction) -> BulkRevokeRoleActionResult:

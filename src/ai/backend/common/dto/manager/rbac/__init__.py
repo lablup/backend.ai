@@ -3,7 +3,6 @@ RBAC DTOs for Manager API.
 """
 
 from .path import (
-    DeleteObjectPermissionPathParam,
     DeletePermissionPathParam,
     GetRolePathParam,
     SearchUsersAssignedToRolePathParam,
@@ -13,7 +12,6 @@ from .request import (
     AssignedUserFilter,
     AssignedUserOrder,
     AssignRoleRequest,
-    CreateObjectPermissionRequest,
     CreatePermissionRequest,
     CreateRoleRequest,
     RevokeRoleRequest,
@@ -27,14 +25,11 @@ from .request import (
 from .response import (
     AssignedUserDTO,
     AssignRoleResponse,
-    CreateObjectPermissionResponse,
     CreatePermissionResponse,
     CreateRoleResponse,
-    DeleteObjectPermissionResponse,
     DeletePermissionResponse,
     DeleteRoleResponse,
     GetRoleResponse,
-    ObjectPermissionDTO,
     PaginationInfo,
     PermissionDTO,
     RevokeRoleResponse,
@@ -57,7 +52,6 @@ __all__ = (
     "UpdateRolePathParam",
     "SearchUsersAssignedToRolePathParam",
     "DeletePermissionPathParam",
-    "DeleteObjectPermissionPathParam",
     # Request DTOs
     "CreateRoleRequest",
     "UpdateRoleRequest",
@@ -66,7 +60,6 @@ __all__ = (
     "SearchRolesRequest",
     "SearchUsersAssignedToRoleRequest",
     "CreatePermissionRequest",
-    "CreateObjectPermissionRequest",
     "RoleFilter",
     "RoleOrder",
     "AssignedUserFilter",
@@ -83,12 +76,9 @@ __all__ = (
     "SearchUsersAssignedToRoleResponse",
     "CreatePermissionResponse",
     "DeletePermissionResponse",
-    "CreateObjectPermissionResponse",
-    "DeleteObjectPermissionResponse",
     "RoleDTO",
     "AssignedUserDTO",
     "PermissionDTO",
-    "ObjectPermissionDTO",
     "PaginationInfo",
     # Types
     "RoleSource",

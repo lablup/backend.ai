@@ -624,7 +624,7 @@ def user_set_weight_cmd(
 # =============================================================================
 
 
-@fair_share.group()
+@fair_share.group("resource-group")
 def resource_group() -> None:
     """Resource group fair share operations."""
 

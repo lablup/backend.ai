@@ -80,7 +80,7 @@ class TestIdleCheckerAdapter:
 
     @pytest.fixture
     def adapter(self, mock_processors: MagicMock) -> IdleCheckerAdapter:
-        return IdleCheckerAdapter(mock_processors)
+        return IdleCheckerAdapter(mock_processors.idle_checker)
 
     def test_builds_session_lifetime_spec(
         self,
