@@ -401,7 +401,9 @@ class DataLoaders:
     ) -> DataLoader[ArtifactRegistryID, ArtifactRegistry | None]:
         adapter = self._adapters.artifact_registry
 
-        async def load_fn(ids: list[ArtifactRegistryID]) -> list[ArtifactRegistry | None]:
+        async def load_fn(
+            ids: list[ArtifactRegistryID],
+        ) -> list[ArtifactRegistry | Exception | None]:
             from strawberry import ID  # pants: no-infer-dep
 
             from ai.backend.manager.api.gql.artifact_registry import (  # pants: no-infer-dep
@@ -410,14 +412,14 @@ class DataLoaders:
 
             dtos = await adapter.batch_load_by_ids(ids)
             return [
-                AR(
+                dto
+                if dto is None or isinstance(dto, Exception)
+                else AR(
                     id=ID(str(dto.id)),
                     registry_id=ID(str(dto.registry_id)),
                     name=dto.name,
                     type=dto.type,
                 )
-                if dto is not None
-                else None
                 for dto in dtos
             ]
 
