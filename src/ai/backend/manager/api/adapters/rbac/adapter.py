@@ -135,7 +135,6 @@ from ai.backend.common.exception import UnreachableError
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.data.common.types import SearchResult
-from ai.backend.manager.data.permission.bit import single_bit
 from ai.backend.manager.data.permission.permission import PermissionData
 from ai.backend.manager.data.permission.role import (
     AssignedUserData,
@@ -799,7 +798,7 @@ class RBACAdapter(BaseAdapter):
         """Create a permission on the role; it holds in the scope the role sits in."""
         creator = RolePermissionCreator(
             entity_type=input.entity_type,
-            permission=single_bit(input.permission_bit()),
+            permission=input.permission_bit(),
         )
         action_result = await self._permission_controller.create_permission.wait_for_complete(
             CreatePermissionAction(role_id=RoleID(input.role_id), creator=creator)
@@ -812,7 +811,7 @@ class RBACAdapter(BaseAdapter):
             permission_id=PermissionID(input.id),
             entity_type=OptionalState.from_unset(input.entity_type),
             permission=(
-                OptionalState.update(single_bit(input.permission.to_permission()))
+                OptionalState.update(input.permission.to_permission())
                 if isinstance(input.permission, PermissionBitDTO)
                 else OptionalState.nop()
             ),
