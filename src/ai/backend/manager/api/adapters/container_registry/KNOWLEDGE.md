@@ -1,14 +1,19 @@
 ---
 name: container-registry-adapter-scenarios
 type: reference
-description: container registry adapter scenario guarantees; superadmin-gated management calls, missing scoped search, RBAC project relations, is_global image visibility, update-only URL validation
+description: container registry adapter scenario guarantees; superadmin-gated management calls, missing scoped search, RBAC project relations, legacy is_global image visibility, update-only URL validation
 scope: src/ai/backend/manager/api/adapters/container_registry
-keywords: [container registry, scenario, adapter, superadmin, scoped_search, RBAC, allowed groups, relation, is_global, image visibility]
+keywords: [container registry, scenario, adapter, superadmin, scoped_search, operation scope, RBAC, allowed groups, is_global, image visibility]
 sources:
   - src/ai/backend/manager/api/adapters/container_registry/adapter.py
   - src/ai/backend/manager/services/container_registry/actions/base.py
   - src/ai/backend/manager/services/container_registry/processors.py
+  - src/ai/backend/manager/models/container_registry/creators.py
+  - src/ai/backend/manager/models/image/creators.py
   - src/ai/backend/manager/models/image/row.py
+  - src/ai/backend/manager/repositories/ops/v2/relation/write.py
+  - src/ai/backend/manager/api/adapters/image/adapter.py
+  - src/ai/backend/manager/api/gql/image/resolver.py
   - tests/scenario/bai_scenario/manager/container_registry
 generated:
   by: codex/gpt-5
@@ -28,22 +33,34 @@ status: draft
 - 허용 프로젝트 추가와 제거는 RBAC 관계 작업을 사용하므로 레지스트리와 프로젝트 양쪽의 권한을
   검사하며, 엔티티 권한 검사 설정의 영향을 받는다.
 
-## 프로젝트 관계는 레지스트리 스코프 검색으로 노출되지 않는다
+## 프로젝트 관계는 권한 그래프에 기록되지만 검색에는 아직 쓰이지 않는다
 
-- 레지스트리 검색은 슈퍼관리자용 `admin_search`만 제공하며, 프로젝트를 입력받는
-  `scoped_search`는 없다.
-- 따라서 프로젝트와 레지스트리 사이의 RBAC 관계를 사용해 접근 가능한 레지스트리 목록을 조회할
-  수는 없다.
-- 이 관계는 레지스트리 자체를 검색하는 대신, 아래의 이미지 권한 후보를 프로젝트별로 제한하는 데
-  사용된다.
+- 허용 프로젝트를 추가하면 프로젝트가 레지스트리를 `READ` 권한으로 관할하며, 이 경로는
+  레지스트리가 소유한 이미지까지 이어진다.
+- 레지스트리 검색은 슈퍼관리자용 `admin_search`만 제공하며, 프로젝트 관계를 조건으로 변환하는
+  operation scope와 `scoped_search`는 아직 없다.
+- 따라서 새 RBAC 그래프에 관계가 있어도 일반 사용자가 접근 가능한 레지스트리나 이미지를 이
+  어댑터의 검색 호출로 열거할 수는 없다.
 
-## `is_global`은 이미지의 프로젝트 공개 범위를 정한다
+## `is_global` 이미지 공개 정책은 레거시 조회에 남아 있다
 
-- `is_global`은 레지스트리가 RBAC 계층에서 상위 스코프에 소유되는지와 무관하다.
-- 전역 레지스트리의 이미지는 프로젝트 관계 조건 없이 권한 후보에 포함되지만, 비전역
-  레지스트리의 이미지는 허용 관계가 있는 프로젝트에서만 후보에 포함된다.
-- 레지스트리가 소유한 이미지는 [이미지 어댑터](../image/KNOWLEDGE.md)가 처리한다. 이미지
-  리스캔은 REST v1 핸들러가 프로세서를 직접 호출하므로 이 어댑터의 보장 범위에 포함되지 않는다.
+- 모든 레지스트리는 상위 소유 스코프 없이 생성되므로 `is_global`은 RBAC 소유 관계를 바꾸지 않으며,
+  값을 수정해도 기존 프로젝트 관계를 유지한다.
+- 레거시 이미지 권한 빌더는 전역 레지스트리의 이미지를 프로젝트 관계 없이 포함하고, 비전역
+  레지스트리의 이미지는 허용 관계가 있는 프로젝트에만 포함한다.
+- 새 관계 그래프는 명시적으로 연결한 프로젝트에서 레지스트리와 그 이미지를 읽는 경로를 제공하지만,
+  `is_global`만으로 모든 프로젝트에 권한 경로를 만들지는 않는다.
+- 이미지 어댑터에는 이 정책을 적용하는 scoped search가 없으므로, 레거시 빌더를 제거하기 전에 전역
+  공개 방식과 목록·단건 조회에 공통으로 적용할 operation scope를 정해야 한다.
+
+## 이미지 scoped search는 레거시 접근 조건을 함께 이전해야 한다
+
+- 프로젝트별 이미지 조건은 전역 레지스트리 또는 프로젝트와 관계가 있는 비전역 레지스트리의
+  이미지를 선택하고, 호출자 도메인의 `allowed_docker_registries`도 적용해야 한다.
+- customized 이미지는 기존 조회와 동일하게 생성자에게만 노출하거나, 새 프로젝트 소유권 정책으로
+  대체한 뒤 목록 조회와 단건 조회가 같은 결과를 내도록 해야 한다.
+- 기존 레지스트리·이미지의 권한 그래프를 backfill하지 않으면 새 scoped search가 이전 데이터의
+  접근 경로를 찾을 수 없다.
 
 ## 생성 시 기본값과 허용 프로젝트 관계를 함께 처리한다
 
