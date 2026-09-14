@@ -37,6 +37,7 @@ from ai.backend.common.data.entity.prometheus_query_preset import PrometheusQuer
 from ai.backend.common.data.entity.replica_group import ReplicaGroupID
 from ai.backend.common.data.entity.runtime_variant import RuntimeVariantID
 from ai.backend.common.data.entity.user import UserID
+from ai.backend.common.data.model_deployment.types import DeploymentStrategy, ModelDeploymentStatus
 from ai.backend.common.types import (
     AccessKey,
     AutoScalingMetricComparator,
@@ -65,8 +66,11 @@ from ai.backend.manager.data.deployment.types import (
     DeploymentState,
     ModelDeploymentAccessTokenData,
     ModelDeploymentAutoScalingRuleData,
+    ModelDeploymentData,
+    ModelDeploymentMetadataInfo,
     ModelRevisionData,
     ReplicaData,
+    ReplicaStateData,
 )
 from ai.backend.manager.data.model_serving.types import (
     EndpointAutoScalingRuleData,
@@ -820,6 +824,48 @@ class EndpointRow(Base):
             deploying_revision_id=None,
             current_revision=None,
             deploying_revision=None,
+        )
+
+    def to_model_deployment_data(self) -> ModelDeploymentData:
+        """The v2 deployment projection read off this row's own columns.
+
+        ``current_revision_id`` and ``policy`` live on other rows and come back ``None``.
+        """
+        created_at = self.created_at
+        return ModelDeploymentData(
+            id=self.id,
+            metadata=ModelDeploymentMetadataInfo(
+                name=self.name,
+                status=ModelDeploymentStatus.from_lifecycle(self.lifecycle_stage),
+                tags=[self.tag] if self.tag else [],
+                project_id=self.project,
+                domain_name=self.domain,
+                resource_group_name=self.resource_group,
+                created_at=created_at,
+                updated_at=created_at,
+            ),
+            network_access=DeploymentNetworkData(
+                open_to_public=self.open_to_public if self.open_to_public is not None else False,
+                access_token_ids=None,
+                url=self.url,
+                preferred_domain_name=None,
+            ),
+            current_revision_id=None,
+            deploying_revision_id=self.deploying_revision_id,
+            revision_history_ids=[],
+            scaling_rule_ids=[],
+            replica_state=ReplicaStateData(
+                desired_replica_count=self.desired_replicas
+                if self.desired_replicas is not None
+                else self.replicas,
+                replica_ids=[],
+            ),
+            default_deployment_strategy=DeploymentStrategy.ROLLING,
+            created_user_id=self.created_user,
+            options=self.options,
+            scaling_state=self.scaling_state,
+            sub_step=self.sub_step,
+            primary_replica_group_id=self.primary_replica_group_id,
         )
 
     def _build_deployment_info(

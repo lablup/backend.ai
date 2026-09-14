@@ -209,6 +209,7 @@ def _convert_deployment_info_to_data(info: DeploymentInfo) -> ModelDeploymentDat
         scaling_state=info.state.scaling_state,
         policy=info.policy,
         sub_step=info.sub_step,
+        primary_replica_group_id=info.primary_replica_group_id,
     )
 
 

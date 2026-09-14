@@ -170,6 +170,7 @@ from ai.backend.manager.services.deployment.actions.access_token.bulk_get_access
 from ai.backend.manager.services.deployment.actions.auto_scaling_rule.bulk_delete_auto_scaling_rules import (
     BulkDeleteAutoScalingRulesAction,
 )
+from ai.backend.manager.services.deployment.actions.bulk_get import BulkGetDeploymentsAction
 from ai.backend.manager.services.deployment.actions.deployment_policy.bulk_get_deployment_policies import (
     BulkGetDeploymentPoliciesAction,
 )
@@ -909,11 +910,17 @@ def test_entity_data_loader_reads_are_checked_per_entity_except_domains() -> Non
         ),
         MagicMock(),
     )
+    DeploymentProcessors(registry.group(GroupMeta(DeploymentEntityType())), MagicMock())
 
     recorded = {
         record.action_cls: (record.entity_type, record.kind, record.gate)
         for record in registry.wired_processors()
     }
+    assert recorded[BulkGetDeploymentsAction] == (
+        DeploymentEntityType(),
+        ActionKind.BULK,
+        ActionGate.PERMISSION,
+    )
     assert recorded[BulkGetResourceGroupsAction] == (
         ResourceGroupEntityType(),
         ActionKind.BULK,

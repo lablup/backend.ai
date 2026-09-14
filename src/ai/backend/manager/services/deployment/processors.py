@@ -84,6 +84,7 @@ from ai.backend.manager.services.deployment.actions.auto_scaling_rule.update_aut
     UpdateAutoScalingRuleAction,
     UpdateAutoScalingRuleActionResult,
 )
+from ai.backend.manager.services.deployment.actions.bulk_get import BulkGetDeploymentsAction
 from ai.backend.manager.services.deployment.actions.create_deployment import (
     CreateDeploymentAction,
     CreateDeploymentActionResult,
@@ -328,6 +329,8 @@ class DeploymentProcessors:
         SearchAccessTokensAction, ScopedFieldsOpsResult[ModelDeploymentAccessTokenData]
     ]
 
+    # What the DataLoader reads: checked per deployment.
+    bulk_get: PartialBulkActionProcessor[BulkGetDeploymentsAction, ModelDeploymentData]
     # What the DataLoaders read: checked per owning deployment.
     bulk_get_replica_groups: PartialBulkFieldActionProcessor[
         BulkGetReplicaGroupsAction, ReplicaGroupData
@@ -385,6 +388,7 @@ class DeploymentProcessors:
             LookupReplicaGroupOwnerAction,
             LookupBulkReplicaGroupOwnerAction,
         )
+        self.bulk_get = group.partial_bulk_get_ops(BulkGetDeploymentsAction)
         self.bulk_get_replica_groups = replica_groups.partial_bulk_get_ops(
             BulkGetReplicaGroupsAction
         )

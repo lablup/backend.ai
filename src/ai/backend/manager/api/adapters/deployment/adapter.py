@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 import uuid
-from collections.abc import Collection, Sequence
+from collections.abc import Collection, Mapping, Sequence
+from dataclasses import replace
 from decimal import Decimal
 from functools import lru_cache
 from typing import TYPE_CHECKING
@@ -25,6 +26,7 @@ from ai.backend.common.data.entity.deployment_token import DeploymentTokenID
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.replica import ReplicaID
+from ai.backend.common.data.entity.replica_group import ReplicaGroupID
 from ai.backend.common.data.entity.runtime_variant_preset import RuntimeVariantPresetID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.model_deployment.types import (
@@ -185,6 +187,7 @@ from ai.backend.manager.data.deployment.types import (
     ModelReplicaData,
     ModelRevisionData,
     MountInfo,
+    ReplicaGroupData,
     ReplicaOperationScope,
     ReplicaSpec,
     ResourceSpec,
@@ -285,6 +288,7 @@ from ai.backend.manager.services.deployment.actions.auto_scaling_rule.search_aut
 from ai.backend.manager.services.deployment.actions.auto_scaling_rule.update_auto_scaling_rule import (
     UpdateAutoScalingRuleAction,
 )
+from ai.backend.manager.services.deployment.actions.bulk_get import BulkGetDeploymentsAction
 from ai.backend.manager.services.deployment.actions.create_deployment import CreateDeploymentAction
 from ai.backend.manager.services.deployment.actions.deployment_policy.bulk_get_deployment_policies import (
     BulkGetDeploymentPoliciesAction,
@@ -339,6 +343,9 @@ from ai.backend.manager.services.deployment.actions.replace_deployment_options i
 )
 from ai.backend.manager.services.deployment.actions.replica.bulk_get_replicas import (
     BulkGetReplicasAction,
+)
+from ai.backend.manager.services.deployment.actions.replica_group.bulk_get_replica_groups import (
+    BulkGetReplicaGroupsAction,
 )
 from ai.backend.manager.services.deployment.actions.revision_operations import (
     ActivateRevisionAction,
@@ -1441,24 +1448,58 @@ class DeploymentAdapter(BaseAdapter):
     async def batch_load_by_ids(
         self,
         deployment_ids: Sequence[DeploymentID],
-    ) -> list[DeploymentNode | None]:
-        """Batch load deployments by ID for DataLoader use.
+    ) -> list[DeploymentNode | Exception | None]:
+        """Batch load deployments by ID for DataLoader use, checked per deployment.
 
-        Returns DeploymentNode DTOs in the same order as the input deployment_ids list.
+        The current revision is read off each readable deployment's primary replica group.
         """
         if not deployment_ids:
             return []
-        querier = BatchQuerier(
-            pagination=OffsetPagination(limit=len(deployment_ids)),
-            conditions=[DeploymentConditions.by_ids(deployment_ids)],
+        result = await self._deployment.bulk_get.run(
+            BulkGetDeploymentsAction(ids=list(deployment_ids))
         )
-        action_result = await self._deployment.global_search.run(
-            GlobalSearchDeploymentsAction(querier=querier)
+        group_ids = list(
+            dict.fromkeys(
+                item.value.primary_replica_group_id
+                for item in result.items
+                if item.value is not None and item.value.primary_replica_group_id is not None
+            )
         )
-        deployment_map = {
-            data.id: self._deployment_data_to_dto(data) for data in action_result.data
-        }
-        return [deployment_map.get(deployment_id) for deployment_id in deployment_ids]
+        current_revisions: dict[ReplicaGroupID, DeploymentRevisionID | Exception | None] = {}
+        if group_ids:
+            loaded = await self.batch_load_fields(
+                self._deployment.bulk_get_replica_groups,
+                BulkGetReplicaGroupsAction(ids=group_ids),
+                group_ids,
+                self._current_revision_of,
+            )
+            current_revisions = dict(zip(group_ids, loaded, strict=True))
+        return [
+            self._deployment_with_current_revision(item.value, current_revisions)
+            if item.value is not None
+            else self.batch_load_failure(item.error)
+            for item in result.items
+        ]
+
+    def _current_revision_of(self, group: ReplicaGroupData) -> DeploymentRevisionID | None:
+        return group.current_revision_id
+
+    def _deployment_with_current_revision(
+        self,
+        data: ModelDeploymentData,
+        current_revisions: Mapping[ReplicaGroupID, DeploymentRevisionID | Exception | None],
+    ) -> DeploymentNode | Exception:
+        group_id = data.primary_replica_group_id
+        current = current_revisions.get(group_id) if group_id is not None else None
+        if isinstance(current, Exception):
+            return current
+        return self._deployment_data_to_dto(
+            replace(
+                data,
+                current_revision_id=current,
+                revision_history_ids=[current] if current is not None else [],
+            )
+        )
 
     async def batch_load_revisions_by_ids(
         self,

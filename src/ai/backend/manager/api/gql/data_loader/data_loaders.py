@@ -576,13 +576,16 @@ class DataLoaders:
     ) -> DataLoader[DeploymentID, ModelDeployment | None]:
         adapter = self._adapters.deployment
 
-        async def load_fn(ids: list[DeploymentID]) -> list[ModelDeployment | None]:
+        async def load_fn(ids: list[DeploymentID]) -> list[ModelDeployment | Exception | None]:
             from ai.backend.manager.api.gql.deployment.types.deployment import (  # pants: no-infer-dep
                 ModelDeployment as MD,
             )
 
             dtos = await adapter.batch_load_by_ids(ids)
-            return [MD.from_pydantic(dto) if dto is not None else None for dto in dtos]
+            return [
+                dto if dto is None or isinstance(dto, Exception) else MD.from_pydantic(dto)
+                for dto in dtos
+            ]
 
         return DataLoader(load_fn=load_fn)
 
