@@ -6547,6 +6547,22 @@ input DeploymentScope
 }
 
 """
+Added in 26.9.0. Scope for the scoped deployment query. Each list is OR'd internally and across lists, and every scope named is authorized before the read runs.
+"""
+input DeploymentSearchScope
+  @join__type(graph: STRAWBERRY)
+{
+  """Domains whose deployments are being read."""
+  domain: [UUIDScope!] = null
+
+  """Projects whose deployments are being read."""
+  project: [UUIDScope!] = null
+
+  """Users whose deployments are being read."""
+  user: [UUIDScope!] = null
+}
+
+"""
 Added in 25.19.0. This enum represents the deployment status of a model deployment, indicating its current state.
 """
 enum DeploymentStatus
@@ -11099,8 +11115,14 @@ Added in 26.9.0. Scope for the scoped model card query. Each list is OR'd intern
 input ModelCardScope
   @join__type(graph: STRAWBERRY)
 {
+  """Domains whose model cards are being read."""
+  domain: [UUIDScope!] = null
+
   """Projects whose model cards are being read."""
   project: [UUIDScope!] = null
+
+  """Users whose model cards are being read."""
+  user: [UUIDScope!] = null
 }
 
 """
@@ -16676,12 +16698,22 @@ type Query
   projectSessionsV2(scope: ProjectSessionV2Scope!, filter: SessionV2Filter = null, orderBy: [SessionV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): SessionV2Connection @join__field(graph: STRAWBERRY)
 
   """
+  Added in 26.9.0. Page through the sessions the named scopes reach, combined with OR. Every scope is authorized before the read runs.
+  """
+  scopedSessionsV2(scope: SessionSearchScope!, filter: SessionV2Filter = null, orderBy: [SessionV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): SessionV2Connection @join__field(graph: STRAWBERRY)
+
+  """
   Added in 26.4.3. Query a single session by ID. Returns an error if not found.
   """
   sessionV2(id: UUID!): SessionV2 @join__field(graph: STRAWBERRY)
 
   """Added in 25.19.0. List deployments within a specific project."""
   projectDeployments(scope: ProjectDeploymentScope!, filter: DeploymentFilter = null, orderBy: [DeploymentOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ModelDeploymentConnection @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.9.0. Page through the deployments the named scopes reach, combined with OR. Every scope is authorized before the read runs.
+  """
+  scopedDeployments(scope: DeploymentSearchScope!, filter: DeploymentFilter = null, orderBy: [DeploymentOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ModelDeploymentConnection @join__field(graph: STRAWBERRY)
 
   """Added in 25.19.0. List deployments owned by the current user."""
   myDeployments(filter: DeploymentFilter = null, orderBy: [DeploymentOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ModelDeploymentConnection @join__field(graph: STRAWBERRY)
@@ -17176,6 +17208,11 @@ type Query
 
   """Added in 26.4.2. List virtual folders within a specific project."""
   projectVfolders(projectId: UUID!, filter: VFolderFilter = null, orderBy: [VFolderOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): VFolderConnection @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.9.0. Page through the virtual folders the named scopes reach, combined with OR. Every scope is authorized before the read runs.
+  """
+  scopedVfoldersV2(scope: VFolderScope!, filter: VFolderFilter = null, orderBy: [VFolderOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): VFolderConnection @join__field(graph: STRAWBERRY)
 
   """
   Added in 26.4.2. Search virtual folders accessible to the current user with pagination and filtering.
@@ -20884,6 +20921,22 @@ input SessionScope
 {
   """Session ID to get history for"""
   sessionId: UUID!
+}
+
+"""
+Added in 26.9.0. Scope for the scoped session query. Each list is OR'd internally and across lists, and every scope named is authorized before the read runs.
+"""
+input SessionSearchScope
+  @join__type(graph: STRAWBERRY)
+{
+  """Domains whose sessions are being read."""
+  domain: [UUIDScope!] = null
+
+  """Projects whose sessions are being read."""
+  project: [UUIDScope!] = null
+
+  """Users whose sessions are being read."""
+  user: [UUIDScope!] = null
 }
 
 enum SessionTypes
@@ -24701,6 +24754,22 @@ type VFolderQuotaInfo
 
   """File-count quota for the folder."""
   maxFiles: Int!
+}
+
+"""
+Added in 26.9.0. Scope for the scoped vfolder query. Each list is OR'd internally and across lists, and every scope named is authorized before the read runs.
+"""
+input VFolderScope
+  @join__type(graph: STRAWBERRY)
+{
+  """Domains whose vfolders are being read."""
+  domain: [UUIDScope!] = null
+
+  """Projects whose vfolders are being read."""
+  project: [UUIDScope!] = null
+
+  """Users whose vfolders are being read."""
+  user: [UUIDScope!] = null
 }
 
 """
