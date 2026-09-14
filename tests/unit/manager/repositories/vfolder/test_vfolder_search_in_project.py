@@ -14,6 +14,8 @@ import sqlalchemy as sa
 from sqlalchemy import Row
 
 from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.project import ProjectEntityType
+from ai.backend.common.data.entity.vfolder import VFolderEntityType
 from ai.backend.common.types import BinarySize, ResourceSlot, VFolderUsageMode
 from ai.backend.manager.data.project.types import ProjectType
 from ai.backend.manager.data.vfolder.types import (
@@ -49,6 +51,7 @@ from ai.backend.manager.repositories.ops.v2.share.provider import ShareOpsProvid
 from ai.backend.manager.repositories.vfolder.repository import VfolderRepository
 from ai.backend.manager.secret.types import SecretValue
 from ai.backend.testutils.db import with_tables
+from ai.backend.testutils.virtual_entity import VirtualEntitySeeder
 
 
 async def _search_vfolders(
@@ -231,6 +234,19 @@ class TestVfolderSearchInProject:
                     )
                 )
             await db_sess.flush()
+
+            seeder = VirtualEntitySeeder()
+            for vid, group_id, _ in [
+                (vfolder_a1_id, project_a_id, None),
+                (vfolder_a2_id, project_a_id, None),
+                (vfolder_b1_id, project_b_id, None),
+            ]:
+                await seeder.create_in(
+                    db_sess,
+                    VFolderEntityType(),
+                    vid,
+                    [(ProjectEntityType(), group_id)],
+                )
 
         yield {
             "project_a_id": project_a_id,

@@ -66,14 +66,9 @@ class DomainModelCardOperationScope(OperationScope):
     def to_condition(self) -> QueryCondition:
         domain_id = self.domain_id
 
-        # TODO(BA-7571): drop the column term once the ownership backfill lands.
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return sa.or_(
-                ModelCardRow.domain
-                == sa.select(DomainRow.name).where(DomainRow.id == domain_id).scalar_subquery(),
-                scope_membership_exists(
-                    DomainEntityType(), domain_id, ModelCardEntityType(), ModelCardRow.id
-                ),
+            return scope_membership_exists(
+                DomainEntityType(), domain_id, ModelCardEntityType(), ModelCardRow.id
             )
 
         return inner
@@ -131,13 +126,9 @@ class ProjectModelCardOperationScope(OperationScope):
     def to_condition(self) -> QueryCondition:
         project_id = self.project_id
 
-        # TODO(BA-7571): drop the column term once the ownership backfill lands.
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return sa.or_(
-                ModelCardRow.project == project_id,
-                scope_membership_exists(
-                    ProjectEntityType(), project_id, ModelCardEntityType(), ModelCardRow.id
-                ),
+            return scope_membership_exists(
+                ProjectEntityType(), project_id, ModelCardEntityType(), ModelCardRow.id
             )
 
         return inner

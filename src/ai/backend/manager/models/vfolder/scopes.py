@@ -21,7 +21,7 @@ from ai.backend.manager.models.project import ProjectRow
 from ai.backend.manager.models.scopes import ExistenceCheck, OperationScope
 from ai.backend.manager.models.user.queries import user_scope_reaches
 from ai.backend.manager.models.user.row import UserRow
-from ai.backend.manager.models.vfolder import VFolderPermissionRow, VFolderRow
+from ai.backend.manager.models.vfolder import VFolderRow
 from ai.backend.manager.models.virtual_entity.queries import scope_membership_exists
 
 __all__ = (
@@ -41,14 +41,9 @@ class DomainVFolderOperationScope(OperationScope):
     def to_condition(self) -> QueryCondition:
         domain_id = self.domain_id
 
-        # TODO(BA-7571): drop the column term once the ownership backfill lands.
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return sa.or_(
-                VFolderRow.domain_name
-                == sa.select(DomainRow.name).where(DomainRow.id == domain_id).scalar_subquery(),
-                scope_membership_exists(
-                    DomainEntityType(), domain_id, VFolderEntityType(), VFolderRow.id
-                ),
+            return scope_membership_exists(
+                DomainEntityType(), domain_id, VFolderEntityType(), VFolderRow.id
             )
 
         return inner
@@ -80,13 +75,9 @@ class ProjectVFolderOperationScope(OperationScope):
         """Convert scope to a query condition for VFolderRow."""
         project_id = self.project_id
 
-        # TODO(BA-7571): drop the column term once the ownership backfill lands.
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return sa.or_(
-                VFolderRow.group == project_id,
-                scope_membership_exists(
-                    ProjectEntityType(), project_id, VFolderEntityType(), VFolderRow.id
-                ),
+            return scope_membership_exists(
+                ProjectEntityType(), project_id, VFolderEntityType(), VFolderRow.id
             )
 
         return inner
@@ -124,16 +115,8 @@ class UserVFolderOperationScope(OperationScope):
         """
         user_id = self.user_id
 
-        # TODO(BA-7571): drop the column terms once the ownership backfill lands.
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            permitted_vfolder_ids = sa.select(VFolderPermissionRow.vfolder).where(
-                VFolderPermissionRow.user == user_id
-            )
-            return sa.or_(
-                VFolderRow.user == user_id,
-                VFolderRow.id.in_(permitted_vfolder_ids),
-                user_scope_reaches(user_id, VFolderEntityType(), VFolderRow.id),
-            )
+            return user_scope_reaches(user_id, VFolderEntityType(), VFolderRow.id)
 
         return inner
 

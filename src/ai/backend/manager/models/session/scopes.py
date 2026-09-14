@@ -41,13 +41,9 @@ class DomainSessionOperationScope(OperationScope):
     def to_condition(self) -> QueryCondition:
         domain_id = self.domain_id
 
-        # TODO(BA-7571): drop the column term once the ownership backfill lands.
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return sa.or_(
-                SessionRow.domain_id == domain_id,
-                scope_membership_exists(
-                    DomainEntityType(), domain_id, SessionEntityType(), SessionRow.id
-                ),
+            return scope_membership_exists(
+                DomainEntityType(), domain_id, SessionEntityType(), SessionRow.id
             )
 
         return inner
@@ -74,12 +70,8 @@ class UserSessionOperationScope(OperationScope):
     def to_condition(self) -> QueryCondition:
         user_id = self.user_id
 
-        # TODO(BA-7571): drop the column term once the ownership backfill lands.
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return sa.or_(
-                SessionRow.user_uuid == user_id,
-                user_scope_reaches(user_id, SessionEntityType(), SessionRow.id),
-            )
+            return user_scope_reaches(user_id, SessionEntityType(), SessionRow.id)
 
         return inner
 
@@ -110,13 +102,9 @@ class ProjectSessionOperationScope(OperationScope):
         """Convert scope to a query condition for SessionRow."""
         project_id = self.project_id
 
-        # TODO(BA-7571): drop the column term once the ownership backfill lands.
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return sa.or_(
-                SessionRow.group_id == project_id,
-                scope_membership_exists(
-                    ProjectEntityType(), project_id, SessionEntityType(), SessionRow.id
-                ),
+            return scope_membership_exists(
+                ProjectEntityType(), project_id, SessionEntityType(), SessionRow.id
             )
 
         return inner

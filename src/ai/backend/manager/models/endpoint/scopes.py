@@ -35,14 +35,9 @@ class DomainDeploymentOperationScope(OperationScope):
     def to_condition(self) -> QueryCondition:
         domain_id = self.domain_id
 
-        # TODO(BA-7571): drop the column term once the ownership backfill lands.
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return sa.or_(
-                EndpointRow.domain
-                == sa.select(DomainRow.name).where(DomainRow.id == domain_id).scalar_subquery(),
-                scope_membership_exists(
-                    DomainEntityType(), domain_id, DeploymentEntityType(), EndpointRow.id
-                ),
+            return scope_membership_exists(
+                DomainEntityType(), domain_id, DeploymentEntityType(), EndpointRow.id
             )
 
         return inner
@@ -72,13 +67,9 @@ class ProjectDeploymentOperationScope(OperationScope):
     def to_condition(self) -> QueryCondition:
         project_id = self.project_id
 
-        # TODO(BA-7571): drop the column term once the ownership backfill lands.
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return sa.or_(
-                EndpointRow.project == project_id,
-                scope_membership_exists(
-                    ProjectEntityType(), project_id, DeploymentEntityType(), EndpointRow.id
-                ),
+            return scope_membership_exists(
+                ProjectEntityType(), project_id, DeploymentEntityType(), EndpointRow.id
             )
 
         return inner
@@ -105,12 +96,8 @@ class UserDeploymentOperationScope(OperationScope):
     def to_condition(self) -> QueryCondition:
         user_id = self.user_id
 
-        # TODO(BA-7571): drop the column term once the ownership backfill lands.
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return sa.or_(
-                EndpointRow.created_user == user_id,
-                user_scope_reaches(user_id, DeploymentEntityType(), EndpointRow.id),
-            )
+            return user_scope_reaches(user_id, DeploymentEntityType(), EndpointRow.id)
 
         return inner
 

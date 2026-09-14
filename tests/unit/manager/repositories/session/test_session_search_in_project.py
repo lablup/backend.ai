@@ -14,7 +14,9 @@ import sqlalchemy as sa
 from dateutil.tz import tzutc
 
 from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.project import ProjectEntityType
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
+from ai.backend.common.data.entity.session import SessionEntityType
 from ai.backend.common.types import (
     AccessKey,
     ClusterMode,
@@ -50,6 +52,7 @@ from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingR
 from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
 from ai.backend.manager.secret.types import SecretValue
 from ai.backend.testutils.db import with_tables
+from ai.backend.testutils.virtual_entity import VirtualEntitySeeder
 
 
 class TestSessionSearchInProject:
@@ -306,6 +309,16 @@ class TestSessionSearchInProject:
                     )
                 )
             await db_sess.flush()
+
+            seeder = VirtualEntitySeeder()
+            for sid, project_id in [
+                (session_a1_id, project_a_id),
+                (session_a2_id, project_a_id),
+                (session_b1_id, project_b_id),
+            ]:
+                await seeder.create_in(
+                    db_sess, SessionEntityType(), sid, [(ProjectEntityType(), project_id)]
+                )
 
         yield {
             "project_a_id": project_a_id,

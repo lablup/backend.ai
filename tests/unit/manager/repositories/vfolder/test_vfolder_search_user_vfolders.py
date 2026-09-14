@@ -15,7 +15,10 @@ import sqlalchemy as sa
 from sqlalchemy import Row
 
 from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.project import ProjectEntityType, ProjectID
 from ai.backend.common.data.entity.user import UserID
+from ai.backend.common.data.entity.vfolder import VFolderEntityType
+from ai.backend.common.data.permission.types import Permission
 from ai.backend.common.types import BinarySize, ResourceSlot, VFolderUsageMode
 from ai.backend.manager.data.project.types import ProjectType
 from ai.backend.manager.data.vfolder.types import (
@@ -39,8 +42,12 @@ from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderPermissionRow, VFolderRow
-from ai.backend.manager.models.vfolder.scopes import UserVFolderOperationScope
+from ai.backend.manager.models.vfolder.scopes import (
+    ProjectVFolderOperationScope,
+    UserVFolderOperationScope,
+)
 from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
+from ai.backend.manager.models.virtual_entity.entity_membership_cap import EntityMembershipCapRow
 from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
 from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
 from ai.backend.manager.repositories.base import BatchQuerier
@@ -52,6 +59,7 @@ from ai.backend.manager.repositories.ops.v2.share.provider import ShareOpsProvid
 from ai.backend.manager.repositories.vfolder.repository import VfolderRepository
 from ai.backend.manager.secret.types import SecretValue
 from ai.backend.testutils.db import with_tables
+from ai.backend.testutils.virtual_entity import VirtualEntitySeeder
 
 
 async def _search_vfolders(
@@ -87,6 +95,7 @@ class TestVfolderSearchUserVfolders:
                 VirtualEntityRow,
                 EntityMembershipRow,
                 ScopeBindingRow,
+                EntityMembershipCapRow,
             ],
         ):
             yield database_connection
@@ -229,6 +238,25 @@ class TestVfolderSearchUserVfolders:
             )
             await db_sess.flush()
 
+            # A folder of one's own lands in the project that is theirs alone
+            # (BEP-1077), which is what a user scope reaches it through.
+            personal_projects = {user_a_id: uuid.uuid4(), user_b_id: uuid.uuid4()}
+            for owner_id, personal_id in personal_projects.items():
+                db_sess.add(
+                    ProjectRow(
+                        id=personal_id,
+                        name=f"personal-{personal_id.hex[:8]}",
+                        domain_name=domain_name,
+                        is_active=True,
+                        total_resource_slots=ResourceSlot(),
+                        allowed_vfolder_hosts={},
+                        resource_policy="default",
+                        type=ProjectType.PERSONAL,
+                        creator_id=owner_id,
+                    )
+                )
+            await db_sess.flush()
+
             for vid, user_id, name in [
                 (vfolder_1_id, user_a_id, "vfolder-1"),
                 (vfolder_2_id, user_a_id, "vfolder-2"),
@@ -240,7 +268,7 @@ class TestVfolderSearchUserVfolders:
                         name=name,
                         host="local:volume1",
                         domain_name=domain_name,
-                        quota_scope_id=f"project:{project_id}",
+                        quota_scope_id=f"user:{user_id}",
                         usage_mode=VFolderUsageMode.GENERAL,
                         permission=VFolderMountPermission.READ_WRITE,
                         max_files=0,
@@ -249,14 +277,27 @@ class TestVfolderSearchUserVfolders:
                         cur_size=0,
                         creator="usera@example.com",
                         unmanaged_path=None,
-                        ownership_type=VFolderOwnershipType.GROUP,
+                        ownership_type=VFolderOwnershipType.USER,
                         user=user_id,
-                        group=project_id,
+                        group=None,
                         cloneable=False,
                         status=VFolderOperationStatus.READY,
                     )
                 )
             await db_sess.flush()
+
+            seeder = VirtualEntitySeeder()
+            for vid, user_id, _ in [
+                (vfolder_1_id, user_a_id, None),
+                (vfolder_2_id, user_a_id, None),
+                (vfolder_3_id, user_b_id, None),
+            ]:
+                await seeder.create_in(
+                    db_sess,
+                    VFolderEntityType(),
+                    vid,
+                    [(ProjectEntityType(), personal_projects[user_id])],
+                )
 
         yield {
             "user_a_id": user_a_id,
@@ -471,19 +512,43 @@ class TestVfolderSearchUserVfolders:
             )
             await db_sess.flush()
 
+            seeder = VirtualEntitySeeder()
+            personal_id = uuid.uuid4()
+            db_sess.add(
+                ProjectRow(
+                    id=personal_id,
+                    name=f"personal-{personal_id.hex[:8]}",
+                    domain_name=domain_name,
+                    is_active=True,
+                    total_resource_slots=ResourceSlot(),
+                    allowed_vfolder_hosts={},
+                    resource_policy="default",
+                    type=ProjectType.PERSONAL,
+                    creator_id=user_id,
+                )
+            )
+            await db_sess.flush()
+            await seeder.create_in(
+                db_sess, VFolderEntityType(), user_vfolder_id, [(ProjectEntityType(), personal_id)]
+            )
+            await seeder.create_in(
+                db_sess, VFolderEntityType(), group_vfolder_id, [(ProjectEntityType(), project_id)]
+            )
+
         yield {
             "user_id": user_id,
+            "project_id": project_id,
             "user_vfolder_id": user_vfolder_id,
             "group_vfolder_id": group_vfolder_id,
         }
 
-    async def test_returns_vfolders_regardless_of_ownership_type(
+    async def test_a_user_reaches_their_own_folder_and_not_the_project_one(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         mixed_ownership_data: dict[str, uuid.UUID],
     ) -> None:
-        """search_user_vfolders returns both USER-owned and GROUP-owned vfolders
-        as long as VFolderRow.user matches, regardless of ownership_type."""
+        """A folder in a team project belongs to that project, so the user scope stops
+        at the one in the project that is theirs alone."""
         scope = UserVFolderOperationScope(user_id=UserID(mixed_ownership_data["user_id"]))
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=10, offset=0),
@@ -493,12 +558,28 @@ class TestVfolderSearchUserVfolders:
 
         result = await _search_vfolders(db_with_cleanup, querier, scope)
 
-        assert result.total_count == 2
         returned_ids = {item.id for item in [row.VFolderRow for row in result.rows]}
-        assert returned_ids == {
-            mixed_ownership_data["user_vfolder_id"],
-            mixed_ownership_data["group_vfolder_id"],
-        }
+        assert returned_ids == {mixed_ownership_data["user_vfolder_id"]}
+
+    async def test_the_project_reaches_the_folder_it_holds(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        mixed_ownership_data: dict[str, uuid.UUID],
+    ) -> None:
+        """The other side of the same pair: the project scope answers for its folder."""
+        scope = ProjectVFolderOperationScope(
+            project_id=ProjectID(mixed_ownership_data["project_id"])
+        )
+        querier = BatchQuerier(
+            pagination=OffsetPagination(limit=10, offset=0),
+            conditions=[],
+            orders=[],
+        )
+
+        result = await _search_vfolders(db_with_cleanup, querier, scope)
+
+        returned_ids = {item.id for item in [row.VFolderRow for row in result.rows]}
+        assert returned_ids == {mixed_ownership_data["group_vfolder_id"]}
 
     async def test_nonexistent_user_raises_error(
         self,
@@ -721,14 +802,40 @@ class TestVfolderSearchUserVfolders:
             await db_sess.flush()
 
             # Grant user_a permission on vfolder_shared
-            db_sess.add(
-                VFolderPermissionRow(
-                    permission=VFolderMountPermission.READ_ONLY,
-                    vfolder=vfolder_shared_id,
-                    user=user_a_id,
-                )
-            )
             await db_sess.flush()
+
+            # Each folder lands in the project that is its owner's alone; the shared one
+            # reaches user A as a capped edge, which is what a share is.
+            seeder = VirtualEntitySeeder()
+            personal_a, personal_b = uuid.uuid4(), uuid.uuid4()
+            for owner_id, personal_id in [(user_a_id, personal_a), (user_b_id, personal_b)]:
+                db_sess.add(
+                    ProjectRow(
+                        id=personal_id,
+                        name=f"personal-{personal_id.hex[:8]}",
+                        domain_name=domain_name,
+                        is_active=True,
+                        total_resource_slots=ResourceSlot(),
+                        allowed_vfolder_hosts={},
+                        resource_policy="default",
+                        type=ProjectType.PERSONAL,
+                        creator_id=owner_id,
+                    )
+                )
+            await db_sess.flush()
+            await seeder.create_in(
+                db_sess, VFolderEntityType(), vfolder_owned_id, [(ProjectEntityType(), personal_a)]
+            )
+            for vid in (vfolder_shared_id, vfolder_no_access_id):
+                await seeder.create_in(
+                    db_sess, VFolderEntityType(), vid, [(ProjectEntityType(), personal_b)]
+                )
+            await seeder.cap_edge(
+                db_sess,
+                await seeder.get_or_create_scope(db_sess, ProjectEntityType(), personal_a),
+                await seeder.get_or_create_node(db_sess, VFolderEntityType(), vfolder_shared_id),
+                Permission.READ,
+            )
 
         yield {
             "user_a_id": user_a_id,

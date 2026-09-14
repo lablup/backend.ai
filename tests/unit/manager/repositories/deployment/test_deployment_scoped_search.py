@@ -12,14 +12,16 @@ import pytest
 from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
 from ai.backend.common.data.entity.container_registry import ContainerRegistryID
-from ai.backend.common.data.entity.deployment import DeploymentID
+from ai.backend.common.data.entity.deployment import DeploymentEntityType, DeploymentID
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.image import ImageID
+from ai.backend.common.data.entity.project import ProjectEntityType
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.deployment.types import DeploymentInfo
 from ai.backend.manager.data.image.types import ImageType
+from ai.backend.manager.data.project.types import ProjectType
 from ai.backend.manager.errors.resource import ProjectNotFound
 from ai.backend.manager.errors.user import UserNotFound
 from ai.backend.manager.models.agent import AgentRow
@@ -64,6 +66,7 @@ from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.deployment import DeploymentRepository
 from ai.backend.manager.repositories.ops.v2.reconciler.provider import ReconcileOpsProvider
 from ai.backend.testutils.db import with_tables
+from ai.backend.testutils.virtual_entity import VirtualEntitySeeder
 
 
 @dataclass
@@ -260,6 +263,39 @@ class TestDeploymentScopedSearch:
                     )
                     ids.append(eid)
             await db_sess.flush()
+
+            # A deployment is created in its project; the user who made it reaches it
+            # through the project that is theirs alone (BEP-1077).
+            seeder = VirtualEntitySeeder()
+            personal_id = uuid.uuid4()
+            db_sess.add(
+                ProjectRow(
+                    id=personal_id,
+                    name=f"personal-{personal_id.hex[:8]}",
+                    domain_name=domain_name,
+                    is_active=True,
+                    total_resource_slots=ResourceSlot(),
+                    allowed_vfolder_hosts={},
+                    resource_policy=project_policy_name,
+                    type=ProjectType.PERSONAL,
+                    creator_id=owner_id,
+                )
+            )
+            await db_sess.flush()
+            for holding_project, ids in (
+                (project_a_id, endpoint_ids_in_a),
+                (project_b_id, endpoint_ids_in_b),
+            ):
+                for deployment_id in ids:
+                    await seeder.create_in(
+                        db_sess,
+                        DeploymentEntityType(),
+                        deployment_id,
+                        [
+                            (ProjectEntityType(), holding_project),
+                            (ProjectEntityType(), personal_id),
+                        ],
+                    )
 
         yield TestData(
             owner_id=owner_id,

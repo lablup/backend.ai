@@ -14,7 +14,10 @@ import sqlalchemy as sa
 from sqlalchemy import Row
 
 from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.project import ProjectEntityType
 from ai.backend.common.data.entity.user import UserID
+from ai.backend.common.data.entity.vfolder import VFolderEntityType
+from ai.backend.common.data.permission.types import Permission
 from ai.backend.common.types import BinarySize, ResourceSlot, VFolderUsageMode
 from ai.backend.manager.data.project.types import ProjectType
 from ai.backend.manager.data.vfolder.types import (
@@ -40,6 +43,7 @@ from ai.backend.manager.models.vfolder import VFolderPermissionRow, VFolderRow
 from ai.backend.manager.models.vfolder.conditions import VFolderConditions
 from ai.backend.manager.models.vfolder.scopes import UserVFolderOperationScope
 from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
+from ai.backend.manager.models.virtual_entity.entity_membership_cap import EntityMembershipCapRow
 from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
 from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
 from ai.backend.manager.repositories.base import BatchQuerier
@@ -51,6 +55,7 @@ from ai.backend.manager.repositories.ops.v2.share.provider import ShareOpsProvid
 from ai.backend.manager.repositories.vfolder.repository import VfolderRepository
 from ai.backend.manager.secret.types import SecretValue
 from ai.backend.testutils.db import with_tables
+from ai.backend.testutils.virtual_entity import VirtualEntitySeeder
 
 
 async def _search_vfolders(
@@ -86,6 +91,7 @@ class TestVfolderSearchFilter:
                 VirtualEntityRow,
                 EntityMembershipRow,
                 ScopeBindingRow,
+                EntityMembershipCapRow,
             ],
         ):
             yield database_connection
@@ -356,15 +362,39 @@ class TestVfolderSearchFilter:
             )
             await db_sess.flush()
 
-            # Grant user_a permission on user_b's cloneable vfolder
-            db_sess.add(
-                VFolderPermissionRow(
-                    permission=VFolderMountPermission.READ_ONLY,
-                    vfolder=vf_shared_clone,
-                    user=user_a_id,
+            # Each folder lands in the project that is its owner's alone (BEP-1077);
+            # user_b's cloneable one reaches user_a as a capped edge, which is a share.
+            seeder = VirtualEntitySeeder()
+            personal_a, personal_b = uuid.uuid4(), uuid.uuid4()
+            for owner_id, personal_id in [(user_a_id, personal_a), (user_b_id, personal_b)]:
+                db_sess.add(
+                    ProjectRow(
+                        id=personal_id,
+                        name=f"personal-{personal_id.hex[:8]}",
+                        domain_name=domain_name,
+                        is_active=True,
+                        total_resource_slots=ResourceSlot(),
+                        allowed_vfolder_hosts={},
+                        resource_policy="default",
+                        type=ProjectType.PERSONAL,
+                        creator_id=owner_id,
+                    )
                 )
-            )
             await db_sess.flush()
+            for vid in (vf_clone_1, vf_clone_2, vf_noclone_1):
+                await seeder.create_in(
+                    db_sess, VFolderEntityType(), vid, [(ProjectEntityType(), personal_a)]
+                )
+            for vid in (vf_shared_clone, vf_noclone_b):
+                await seeder.create_in(
+                    db_sess, VFolderEntityType(), vid, [(ProjectEntityType(), personal_b)]
+                )
+            await seeder.cap_edge(
+                db_sess,
+                await seeder.get_or_create_scope(db_sess, ProjectEntityType(), personal_a),
+                await seeder.get_or_create_node(db_sess, VFolderEntityType(), vf_shared_clone),
+                Permission.READ,
+            )
 
         yield {
             "user_a_id": user_a_id,
