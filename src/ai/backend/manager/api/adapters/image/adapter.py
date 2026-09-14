@@ -60,7 +60,7 @@ from ai.backend.manager.models.image.conditions import (
 from ai.backend.manager.models.image.orders import ImageAliasOrders, ImageOrders
 from ai.backend.manager.models.image.row import ImageAliasRow, ImageRow
 from ai.backend.manager.models.image.updaters import ImageUpdate
-from ai.backend.manager.models.specs.pagination import NoPagination
+from ai.backend.manager.models.specs.pagination import NoPagination, OffsetPagination
 from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.services.image.actions.alias_image import AliasImageByIdAction
 from ai.backend.manager.services.image.actions.dealias_image import DealiasImageAction
@@ -72,6 +72,8 @@ from ai.backend.manager.services.image.actions.search_images import SearchImages
 from ai.backend.manager.services.image.actions.update_image_by_id import UpdateImageByIdAction
 from ai.backend.manager.services.image.processors import ImageProcessors
 from ai.backend.manager.types import OptionalState, TriState
+
+DEFAULT_PAGINATION_LIMIT = 50
 
 
 @lru_cache(maxsize=1)
@@ -146,12 +148,30 @@ class ImageAdapter(BaseAdapter):
 
     # ------------------------------------------------------------------ search
 
-    async def admin_search(
+    async def admin_search(self, input: AdminSearchImagesInput) -> AdminSearchImagesPayload:
+        """Search images with admin scope, by cursor when the request names one."""
+        names_cursor = input.first is not None or input.last is not None
+        names_offset = input.limit is not None or input.offset is not None
+        if names_cursor and not names_offset:
+            querier = self._build_cursor_querier(input)
+        else:
+            querier = self._build_offset_querier(input)
+
+        action_result = await self._image.search_images.run(SearchImagesAction(querier=querier))
+
+        return AdminSearchImagesPayload(
+            items=[self._data_to_dto(item) for item in action_result.data],
+            total_count=action_result.total_count,
+            has_next_page=action_result.has_next_page,
+            has_previous_page=action_result.has_previous_page,
+        )
+
+    async def admin_search_images_gql(
         self,
         input: AdminSearchImagesInput,
         base_conditions: Sequence[QueryCondition] | None = None,
     ) -> AdminSearchImagesPayload:
-        """Search images with cursor or offset pagination."""
+        """Search images with cursor or offset pagination for GQL resolvers."""
         conditions = self._convert_filter(input.filter) if input.filter else []
         orders = self._convert_orders(input.order) if input.order else []
         querier = self._build_querier(
@@ -271,6 +291,30 @@ class ImageAdapter(BaseAdapter):
         return UpdateImagePayload(item=self._data_to_dto(result.image))
 
     # ------------------------------------------------------------------ querier builders
+
+    def _build_offset_querier(self, input: AdminSearchImagesInput) -> BatchQuerier:
+        """Build a BatchQuerier with offset pagination from the search input DTO."""
+        conditions = self._convert_filter(input.filter) if input.filter else []
+        orders = self._convert_orders(input.order) if input.order else []
+        pagination = OffsetPagination(
+            limit=input.limit if input.limit is not None else DEFAULT_PAGINATION_LIMIT,
+            offset=input.offset if input.offset is not None else 0,
+        )
+        return BatchQuerier(conditions=conditions, orders=orders, pagination=pagination)
+
+    def _build_cursor_querier(self, input: AdminSearchImagesInput) -> BatchQuerier:
+        """Build a BatchQuerier with cursor pagination from the search input DTO."""
+        conditions = self._convert_filter(input.filter) if input.filter else []
+        orders = self._convert_orders(input.order) if input.order else []
+        return self._build_querier(
+            conditions=conditions,
+            orders=orders,
+            pagination_spec=_get_image_pagination_spec(),
+            first=input.first,
+            after=input.after,
+            last=input.last,
+            before=input.before,
+        )
 
     def _convert_filter(
         self,
