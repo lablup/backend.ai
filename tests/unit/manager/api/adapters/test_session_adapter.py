@@ -9,6 +9,8 @@ from uuid import UUID, uuid4
 
 import pytest
 
+from ai.backend.common.data.entity.kernel import KernelFieldType, KernelID
+from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.data.entity.session import SessionID
 from ai.backend.common.dto.manager.v2.common import (
     ResourceSlotEntryInfo,
@@ -26,12 +28,28 @@ from ai.backend.common.dto.manager.v2.session.types import (
     CreateSessionTypeEnum,
 )
 from ai.backend.common.dto.manager.v2.session_options.types import AgentSelectionPolicyEnum
-from ai.backend.common.types import ClusterMode, SessionResult, SessionTypes
+from ai.backend.common.types import ClusterMode, KernelId, SessionResult, SessionTypes
+from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.actions.v2.bulk.result import (
     PartialBulkEntityResult,
     PartialBulkResult,
 )
+from ai.backend.manager.actions.v2.ops.result import BulkFieldOpsResult
 from ai.backend.manager.api.adapters.session.adapter import SessionAdapter
+from ai.backend.manager.data.kernel.types import (
+    ClusterConfig,
+    ImageInfo,
+    KernelInfo,
+    KernelStatus,
+    LifecycleStatus,
+    Metadata,
+    Metrics,
+    NetworkConfig,
+    RelatedSessionInfo,
+    ResourceInfo,
+    RuntimeConfig,
+    UserPermission,
+)
 from ai.backend.manager.data.resource_slot.types import ResourceAllocationAggregate
 from ai.backend.manager.data.session.options import AgentSelectionPolicy
 from ai.backend.manager.data.session.types import (
@@ -40,6 +58,7 @@ from ai.backend.manager.data.session.types import (
     SessionStatus,
     SessionTerminationStatus,
 )
+from ai.backend.manager.errors.base.field import FieldNotFoundError
 from ai.backend.manager.errors.common import GenericForbidden
 from ai.backend.manager.services.session.actions.batch_get_session_resource_allocation import (
     BatchGetSessionResourceAllocationAction,
@@ -198,6 +217,79 @@ async def _no_allocations(
     )
 
 
+def _create_kernel_info(kernel_id: KernelId) -> KernelInfo:
+    return KernelInfo(
+        id=kernel_id,
+        session=RelatedSessionInfo(
+            session_id=str(uuid4()),
+            creation_id="test-creation-id",
+            name="test-session",
+            session_type=SessionTypes.INTERACTIVE,
+        ),
+        user_permission=UserPermission(
+            user_uuid=uuid4(),
+            access_key="TESTKEY",
+            domain_name="default",
+            group_id=uuid4(),
+            uid=None,
+            main_gid=None,
+            gids=None,
+        ),
+        image=ImageInfo(image_id=None, identifier=None, registry=None, tag=None, architecture=None),
+        network=NetworkConfig(
+            kernel_host=None,
+            repl_in_port=0,
+            repl_out_port=0,
+            stdin_port=0,
+            stdout_port=0,
+            service_ports=None,
+            preopen_ports=None,
+            use_host_network=False,
+        ),
+        cluster=ClusterConfig(
+            cluster_mode=ClusterMode.SINGLE_NODE,
+            cluster_size=1,
+            cluster_role="main",
+            cluster_idx=0,
+            local_rank=0,
+            cluster_hostname="main",
+        ),
+        resource=ResourceInfo(
+            resource_group="default",
+            resource_group_id=ResourceGroupID(uuid4()),
+            agent="agent-001",
+            agent_addr=None,
+            container_id=None,
+            occupied_shares={},
+            attached_devices={},
+            resource_opts={},
+        ),
+        runtime=RuntimeConfig(
+            environ=None,
+            mounts=None,
+            mount_map=None,
+            vfolder_mounts=None,
+            bootstrap_script=None,
+            startup_command=None,
+        ),
+        lifecycle=LifecycleStatus(
+            status=KernelStatus.RUNNING,
+            result=SessionResult.UNDEFINED,
+            created_at=datetime(2026, 1, 1, tzinfo=UTC),
+            terminated_at=None,
+            starts_at=None,
+            status_changed=None,
+            status_info=None,
+            status_data=None,
+            status_history=None,
+            last_seen=None,
+            last_observed_at=None,
+        ),
+        metrics=Metrics(num_queries=0, last_stat=None, container_log=None),
+        metadata=Metadata(callback_url=None, internal_data=None),
+    )
+
+
 class TestBatchLoadSessions:
     """The session DataLoader path: each session is answered for."""
 
@@ -272,6 +364,89 @@ class TestBatchLoadSessions:
     ) -> None:
         assert await adapter.batch_load_by_ids([]) == []
         processors.bulk_get.run.assert_not_awaited()
+
+
+class TestBatchLoadKernels:
+    """The kernel DataLoader path: each kernel is answered for by its session."""
+
+    @pytest.fixture
+    def readable(self) -> KernelInfo:
+        return _create_kernel_info(KernelId(uuid4()))
+
+    @pytest.fixture
+    def denied_id(self) -> KernelID:
+        return KernelID(uuid4())
+
+    @pytest.fixture
+    def missing_id(self) -> KernelID:
+        return KernelID(uuid4())
+
+    @pytest.fixture
+    def denial(self) -> GenericForbidden:
+        return GenericForbidden("no read on the session this kernel runs under")
+
+    @pytest.fixture
+    def processors(
+        self,
+        readable: KernelInfo,
+        denied_id: KernelID,
+        missing_id: KernelID,
+        denial: GenericForbidden,
+    ) -> MagicMock:
+        processors = MagicMock()
+        processors.bulk_get_kernels.run = AsyncMock(
+            return_value=BulkFieldOpsResult(
+                successes={KernelID(readable.id): readable},
+                errors={
+                    denied_id: denial,
+                    missing_id: FieldNotFoundError(
+                        field_type=KernelFieldType(), operation=ActionOperationType.GET
+                    ),
+                },
+            )
+        )
+        processors.batch_get_kernel_resource_allocation.run = AsyncMock(
+            return_value=MagicMock(data={})
+        )
+        return processors
+
+    @pytest.fixture
+    def adapter(self, processors: MagicMock) -> SessionAdapter:
+        return SessionAdapter(processors, MagicMock())
+
+    async def test_answers_per_id(
+        self,
+        adapter: SessionAdapter,
+        readable: KernelInfo,
+        denied_id: KernelID,
+        missing_id: KernelID,
+        denial: GenericForbidden,
+    ) -> None:
+        node, refused, missing = await adapter.batch_load_kernels_by_ids([
+            KernelID(readable.id),
+            denied_id,
+            missing_id,
+        ])
+
+        assert node is not None and not isinstance(node, Exception)
+        assert node.id == readable.id
+        assert refused is denial
+        assert missing is None
+
+    async def test_no_kernel_found_is_every_id_missing(
+        self, adapter: SessionAdapter, processors: MagicMock, missing_id: KernelID
+    ) -> None:
+        processors.bulk_get_kernels.run.side_effect = FieldNotFoundError(
+            field_type=KernelFieldType(), operation=ActionOperationType.GET
+        )
+
+        assert await adapter.batch_load_kernels_by_ids([missing_id]) == [None]
+
+    async def test_no_ids_read_nothing(
+        self, adapter: SessionAdapter, processors: MagicMock
+    ) -> None:
+        assert await adapter.batch_load_kernels_by_ids([]) == []
+        processors.bulk_get_kernels.run.assert_not_awaited()
 
 
 class TestEnqueueActionBuilding:

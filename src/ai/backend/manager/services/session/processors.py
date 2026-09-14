@@ -1,11 +1,16 @@
 from ai.backend.common.data.entity.session import SessionID
+from ai.backend.manager.actions.registry.field import LookupFieldGroup
 from ai.backend.manager.actions.registry.group import ProcessorGroup
 from ai.backend.manager.actions.v2.bulk.partial_processor import PartialBulkActionProcessor
-from ai.backend.manager.actions.v2.field.bulk_processor import BulkFieldActionProcessor
+from ai.backend.manager.actions.v2.field.bulk_processor import (
+    BulkFieldActionProcessor,
+    PartialBulkFieldActionProcessor,
+)
 from ai.backend.manager.actions.v2.lookup.processor import LookupActionProcessor
 from ai.backend.manager.actions.v2.ops.result import LookupOpsResult, ScopedBatchOpsResult
 from ai.backend.manager.actions.v2.scope.processor import ScopeActionProcessor
 from ai.backend.manager.actions.v2.single_entity.processor import SingleEntityActionProcessor
+from ai.backend.manager.data.kernel.types import KernelInfo
 from ai.backend.manager.data.resource_group.types import ResourceGroupData
 from ai.backend.manager.data.resource_slot.types import ResourceAllocationAggregate
 from ai.backend.manager.data.session.types import SessionEntityData, SessionTerminationStatus
@@ -17,6 +22,7 @@ from ai.backend.manager.services.session.actions.batch_get_session_resource_allo
     BatchGetSessionResourceAllocationAction,
 )
 from ai.backend.manager.services.session.actions.bulk_get import BulkGetSessionsAction
+from ai.backend.manager.services.session.actions.bulk_get_kernels import BulkGetKernelsAction
 from ai.backend.manager.services.session.actions.commit_session import (
     CommitSessionAction,
     CommitSessionActionResult,
@@ -207,6 +213,8 @@ class SessionProcessors:
         ResolveSessionNameAction, ResolveSessionNameActionResult
     ]
     search_kernels: ScopeActionProcessor[SearchKernelsAction, SearchKernelsActionResult]
+    # What the DataLoader reads: checked per owning session.
+    bulk_get_kernels: PartialBulkFieldActionProcessor[BulkGetKernelsAction, KernelInfo]
     batch_get_session_resource_allocation: PartialBulkActionProcessor[
         BatchGetSessionResourceAllocationAction, ResourceAllocationAggregate
     ]
@@ -237,6 +245,7 @@ class SessionProcessors:
         self,
         group: ProcessorGroup[SessionEntityData],
         resource_group: ProcessorGroup[ResourceGroupData],
+        kernels: LookupFieldGroup[KernelInfo],
         resource_allocation: ResourceAllocationProcessors,
         service: SessionService,
     ) -> None:
@@ -289,6 +298,7 @@ class SessionProcessors:
         )
         self.match_sessions = group.scope(MatchSessionsAction, service.match_sessions)
         self.search_kernels = group.scope(SearchKernelsAction, service.search_kernels)
+        self.bulk_get_kernels = kernels.partial_bulk_get_ops(BulkGetKernelsAction)
         self.batch_get_session_resource_allocation = group.partial_bulk(
             BatchGetSessionResourceAllocationAction, service.batch_get_session_resource_allocation
         )

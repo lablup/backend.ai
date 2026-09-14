@@ -16,6 +16,7 @@ from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
 from ai.backend.common.data.entity.agent import AgentEntityType
 from ai.backend.common.data.entity.domain import DomainEntityType
+from ai.backend.common.data.entity.kernel import KernelFieldType
 from ai.backend.common.data.entity.project import ProjectEntityType
 from ai.backend.common.data.entity.resource_group import (
     ResourceGroupEntityType,
@@ -32,6 +33,7 @@ from ai.backend.manager.actions.registry.registry import ProcessorRegistry
 from ai.backend.manager.actions.registry.types import (
     Concern,
     ConcernMeta,
+    FieldGroupMeta,
     GroupMeta,
 )
 
@@ -43,7 +45,7 @@ from ai.backend.manager.api.rest.session.handler import SessionHandler
 from ai.backend.manager.api.rest.session.registry import register_session_routes
 from ai.backend.manager.api.rest.types import RouteDeps
 from ai.backend.manager.config.provider import ManagerConfigProvider
-from ai.backend.manager.data.kernel.types import KernelStatus
+from ai.backend.manager.data.kernel.types import KernelInfo, KernelStatus
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.kernel import kernels
@@ -53,6 +55,12 @@ from ai.backend.manager.repositories.session.repository import SessionRepository
 from ai.backend.manager.services.agent.processors import AgentProcessors
 from ai.backend.manager.services.auth.processors import AuthProcessors
 from ai.backend.manager.services.project.processors import ProjectProcessors
+from ai.backend.manager.services.session.actions.lookup_bulk_kernel_owner import (
+    LookupBulkKernelOwnerAction,
+)
+from ai.backend.manager.services.session.actions.lookup_kernel_field_owner import (
+    LookupKernelFieldOwnerAction,
+)
 from ai.backend.manager.services.session.processors import SessionProcessors
 from ai.backend.manager.services.session.resource_allocation.processors import (
     ResourceAllocationProcessors,
@@ -130,6 +138,12 @@ async def session_processors(
     return SessionProcessors(
         processor_registry.group(GroupMeta(SessionEntityType())),
         groups.group(GroupMeta(ResourceGroupEntityType())),
+        processor_registry.group(GroupMeta(SessionEntityType())).field_group(
+            FieldGroupMeta(KernelFieldType()),
+            KernelInfo,
+            LookupKernelFieldOwnerAction,
+            LookupBulkKernelOwnerAction,
+        ),
         ResourceAllocationProcessors(
             groups.group(GroupMeta(UserEntityType())),
             groups.group(GroupMeta(ProjectEntityType())),
