@@ -10858,7 +10858,7 @@
                 "items": {
                   "$ref": "#/components/schemas/SessionTypes"
                 },
-                "minLength": 1,
+                "minItems": 1,
                 "type": "array"
               },
               {
@@ -10871,7 +10871,7 @@
           "initial_grace_period_seconds": {
             "anyOf": [
               {
-                "ge": 0,
+                "minimum": 0,
                 "type": "integer"
               },
               {
