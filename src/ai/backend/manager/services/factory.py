@@ -24,6 +24,7 @@ from ai.backend.common.data.entity.fair_share import (
 )
 from ai.backend.common.data.entity.idle_checker import IdleCheckerEntityType
 from ai.backend.common.data.entity.image import ImageEntityType
+from ai.backend.common.data.entity.image_alias import ImageAliasFieldType
 from ai.backend.common.data.entity.login_client_type import LoginClientTypeEntityType
 from ai.backend.common.data.entity.model_card import ModelCardEntityType
 from ai.backend.common.data.entity.notification import (
@@ -85,6 +86,7 @@ from ai.backend.manager.data.fair_share.types import (
     ProjectFairShareData,
     UserFairShareData,
 )
+from ai.backend.manager.data.image.types import ImageAliasData
 from ai.backend.manager.data.resource_usage_history.types import (
     DomainUsageBucketData,
     ProjectUsageBucketData,
@@ -151,6 +153,10 @@ from ai.backend.manager.services.idle_checker_assignment.processors import (
     IdleCheckerAssignmentProcessors,
 )
 from ai.backend.manager.services.idle_checker_assignment.service import IdleCheckerAssignmentService
+from ai.backend.manager.services.image.actions.lookup_alias_owner import (
+    LookupBulkImageAliasOwnerAction,
+    LookupImageAliasOwnerAction,
+)
 from ai.backend.manager.services.image.processors import ImageProcessors
 from ai.backend.manager.services.image.service import ImageService
 from ai.backend.manager.services.keypair_resource_policy.processors import (
@@ -615,7 +621,14 @@ def create_processors(
             services.idle_checker,
         ),
         image=ImageProcessors(
-            container_registry_groups.group(GroupMeta(ImageEntityType())), services.image
+            container_registry_groups.group(GroupMeta(ImageEntityType())),
+            container_registry_groups.group(GroupMeta(ImageEntityType())).field_group(
+                FieldGroupMeta(ImageAliasFieldType()),
+                ImageAliasData,
+                LookupImageAliasOwnerAction,
+                LookupBulkImageAliasOwnerAction,
+            ),
+            services.image,
         ),
         container_registry=ContainerRegistryProcessors(
             container_registry_groups.group(GroupMeta(ContainerRegistryEntityType())),

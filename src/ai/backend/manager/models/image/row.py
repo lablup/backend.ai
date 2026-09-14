@@ -870,8 +870,8 @@ async def bulk_get_image_configs(
 
 class ImageAliasRow(Base):
     __tablename__ = "image_aliases"
-    id: Mapped[ImageID] = mapped_column(
-        "id", GUID(ImageID), primary_key=True, server_default=sa.text("uuid_generate_v7()")
+    id: Mapped[ImageAliasID] = mapped_column(
+        "id", GUID(ImageAliasID), primary_key=True, server_default=sa.text("uuid_generate_v7()")
     )
     alias: Mapped[str | None] = mapped_column("alias", sa.String, unique=True, index=True)
     image_id: Mapped[ImageID] = mapped_column(
