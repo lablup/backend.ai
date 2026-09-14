@@ -15,7 +15,6 @@ from ai.backend.common.types import (
     AutoScalingMetricComparator,
     AutoScalingMetricSource,
 )
-from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.data.model_serving.creator import EndpointAutoScalingRuleCreator
 from ai.backend.manager.errors.service import (
     EndpointNotFound,
@@ -47,10 +46,6 @@ class TestCreateEndpointAutoScalingRule:
     def set_user_context(self, user_data: UserData) -> Iterator[None]:
         with with_user(user_data):
             yield
-
-    @pytest.fixture
-    def mock_action_monitor(self) -> MagicMock:
-        return MagicMock(spec=ActionMonitor)
 
     @pytest.fixture
     def mock_repositories(self) -> MagicMock:

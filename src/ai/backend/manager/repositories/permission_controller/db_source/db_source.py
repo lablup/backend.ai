@@ -51,8 +51,8 @@ from ai.backend.manager.models.rbac_models.permission.purgers import RolePermiss
 from ai.backend.manager.models.rbac_models.permission.scopes import PermissionOperationScope
 from ai.backend.manager.models.rbac_models.permission.updaters import RolePermissionUpdater
 from ai.backend.manager.models.rbac_models.role import RoleRow
-from ai.backend.manager.models.rbac_models.role.scopes import ScopedRoleOperationScope
 from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
+from ai.backend.manager.models.scopes import OperationScope
 from ai.backend.manager.models.specs.permission import PermissionEntry
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -261,9 +261,9 @@ class PermissionDBSource:
     async def search_roles_in_scope(
         self,
         querier: BatchQuerier,
-        scope: ScopedRoleOperationScope,
+        scopes: Sequence[OperationScope],
     ) -> RoleListResult:
-        """Search the roles that sit in a given scope."""
+        """Search the roles the named scopes reach, combined with OR."""
         async with self._db.begin_readonly_session() as db_sess:
             query = sa.select(RoleRow)
 
@@ -271,7 +271,7 @@ class PermissionDBSource:
                 db_sess,
                 query,
                 querier,
-                scopes=[scope],
+                scopes=scopes,
             )
 
             items = [row.RoleRow.to_data() for row in result.rows]

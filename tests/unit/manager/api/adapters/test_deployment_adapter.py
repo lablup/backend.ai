@@ -25,7 +25,6 @@ from ai.backend.common.data.user.types import UserData, UserRole
 from ai.backend.common.dto.manager.v2.deployment.request import AdminSearchDeploymentsInput
 from ai.backend.common.schema.deployment import RollingUpdateSpec
 from ai.backend.common.types import ClusterMode, MountPermission, ResourceSlot
-from ai.backend.manager.actions.action import BaseActionTriggerMeta
 from ai.backend.manager.actions.monitors import ActionMonitors
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
 from ai.backend.manager.actions.registry.types import GroupMeta, ProcessorDependencies
@@ -35,6 +34,7 @@ from ai.backend.manager.actions.v2.global_scope.validator.superadmin import (
 from ai.backend.manager.actions.v2.ops.result import BulkFieldOpsResult, OwnedFieldsOpsResult
 from ai.backend.manager.actions.v2.scope.base import BaseScopeAction
 from ai.backend.manager.actions.v2.scope.validator.base import ScopeActionValidator
+from ai.backend.manager.actions.v2.trigger import ActionTriggerMeta
 from ai.backend.manager.actions.v2.validators import ActionValidators
 from ai.backend.manager.api.adapters.deployment.adapter import (
     DeploymentAdapter,
@@ -128,7 +128,7 @@ class _RecordingScopeValidator(ScopeActionValidator):
         self.seen: list[Sequence[EntityIdentifier]] = []
 
     @override
-    async def validate(self, action: BaseScopeAction, meta: BaseActionTriggerMeta) -> None:
+    async def validate(self, action: BaseScopeAction, meta: ActionTriggerMeta) -> None:
         self.seen.append(action.scope_targets())
 
 

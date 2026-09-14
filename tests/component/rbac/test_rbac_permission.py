@@ -5,6 +5,7 @@ from typing import Any
 
 import pytest
 
+from ai.backend.common.contexts.user import with_user
 from ai.backend.common.data.entity.image import ImageEntityType
 from ai.backend.common.data.entity.permission import PermissionID
 from ai.backend.common.data.entity.role import RoleID
@@ -12,19 +13,40 @@ from ai.backend.common.data.entity.session import SessionEntityType
 from ai.backend.common.data.entity.types import EntityType
 from ai.backend.common.data.entity.vfolder import VFolderEntityType
 from ai.backend.common.data.permission.types import Permission
+from ai.backend.common.data.user.types import UserData, UserRole
 from ai.backend.manager.data.permission.permission import PermissionData
-from ai.backend.manager.errors.common import ObjectNotFound
+from ai.backend.manager.errors.base.field import FieldNotFoundError
 from ai.backend.manager.errors.permission import PermissionAlreadyGranted
 from ai.backend.manager.models.rbac_models.permission.creators import RolePermissionCreator
-from ai.backend.manager.models.rbac_models.permission.purgers import RolePermissionPurger
-from ai.backend.manager.services.permission_contoller.actions.permission import (
-    CreatePermissionAction,
+from ai.backend.manager.services.permission_contoller.actions.add_role_permission import (
+    AddRolePermissionAction,
+)
+from ai.backend.manager.services.permission_contoller.actions.delete_permission import (
     DeletePermissionAction,
 )
 from ai.backend.manager.services.permission_contoller.processors import (
     PermissionControllerProcessors,
 )
 from ai.backend.testutils.fixtures import DomainFixtureData
+
+
+@pytest.fixture(autouse=True)
+def superadmin_context(domain_fixture: DomainFixtureData) -> Any:
+    """These call the processors directly, so the acting user the v2 gates read is set here.
+
+    Through the API it comes off the session.
+    """
+    user = UserData(
+        user_id=uuid.uuid4(),
+        is_authorized=True,
+        is_admin=True,
+        is_superadmin=True,
+        role=UserRole.SUPERADMIN,
+        domain_name=domain_fixture.domain_name,
+        domain_id=domain_fixture.domain_id,
+    )
+    with with_user(user):
+        yield
 
 
 class TestPermissionCreate:
@@ -41,8 +63,8 @@ class TestPermissionCreate:
             entity_type=EntityType(SessionEntityType()),
             permission=Permission.READ,
         )
-        result = await permission_controller_processors.create_permission.wait_for_complete(
-            CreatePermissionAction(role_id=RoleID(target_role.role.id), creator=creator)
+        result = await permission_controller_processors.add_role_permission.run(
+            AddRolePermissionAction(role_id=RoleID(target_role.role.id), creator=creator)
         )
 
         assert isinstance(result.data, PermissionData)
@@ -51,8 +73,8 @@ class TestPermissionCreate:
         assert result.data.permission == Permission.READ
 
         # Cleanup
-        await permission_controller_processors.delete_permission.wait_for_complete(
-            DeletePermissionAction(purger=RolePermissionPurger(PermissionID(result.data.id)))
+        await permission_controller_processors.delete_permission.run(
+            DeletePermissionAction(permission_id=PermissionID(result.data.id))
         )
 
     async def test_create_permissions_with_various_combinations(
@@ -70,8 +92,8 @@ class TestPermissionCreate:
         created_ids: list[uuid.UUID] = []
 
         for entity_type, operation in combos:
-            result = await permission_controller_processors.create_permission.wait_for_complete(
-                CreatePermissionAction(
+            result = await permission_controller_processors.add_role_permission.run(
+                AddRolePermissionAction(
                     role_id=RoleID(target_role.role.id),
                     creator=RolePermissionCreator(
                         entity_type=EntityType(entity_type),
@@ -86,8 +108,8 @@ class TestPermissionCreate:
 
         # Cleanup
         for perm_id in created_ids:
-            await permission_controller_processors.delete_permission.wait_for_complete(
-                DeletePermissionAction(purger=RolePermissionPurger(PermissionID(perm_id)))
+            await permission_controller_processors.delete_permission.run(
+                DeletePermissionAction(permission_id=PermissionID(perm_id))
             )
 
     async def test_create_duplicate_permission_raises_unique_constraint(
@@ -102,19 +124,19 @@ class TestPermissionCreate:
             permission=Permission.READ,
         )
 
-        result = await permission_controller_processors.create_permission.wait_for_complete(
-            CreatePermissionAction(role_id=RoleID(target_role.role.id), creator=spec)
+        result = await permission_controller_processors.add_role_permission.run(
+            AddRolePermissionAction(role_id=RoleID(target_role.role.id), creator=spec)
         )
         perm_id = result.data.id
 
         try:
             with pytest.raises(PermissionAlreadyGranted):
-                await permission_controller_processors.create_permission.wait_for_complete(
-                    CreatePermissionAction(role_id=RoleID(target_role.role.id), creator=spec)
+                await permission_controller_processors.add_role_permission.run(
+                    AddRolePermissionAction(role_id=RoleID(target_role.role.id), creator=spec)
                 )
         finally:
-            await permission_controller_processors.delete_permission.wait_for_complete(
-                DeletePermissionAction(purger=RolePermissionPurger(PermissionID(perm_id)))
+            await permission_controller_processors.delete_permission.run(
+                DeletePermissionAction(permission_id=PermissionID(perm_id))
             )
 
 
@@ -128,8 +150,8 @@ class TestPermissionDelete:
         domain_fixture: DomainFixtureData,
     ) -> None:
         """S-DELETE-1: Delete existing permission → deletion response."""
-        create_result = await permission_controller_processors.create_permission.wait_for_complete(
-            CreatePermissionAction(
+        create_result = await permission_controller_processors.add_role_permission.run(
+            AddRolePermissionAction(
                 role_id=RoleID(target_role.role.id),
                 creator=RolePermissionCreator(
                     entity_type=EntityType(SessionEntityType()),
@@ -139,8 +161,8 @@ class TestPermissionDelete:
         )
         perm_id = create_result.data.id
 
-        delete_result = await permission_controller_processors.delete_permission.wait_for_complete(
-            DeletePermissionAction(purger=RolePermissionPurger(PermissionID(perm_id)))
+        delete_result = await permission_controller_processors.delete_permission.run(
+            DeletePermissionAction(permission_id=PermissionID(perm_id))
         )
 
         assert isinstance(delete_result.data, PermissionData)
@@ -153,8 +175,8 @@ class TestPermissionDelete:
         domain_fixture: DomainFixtureData,
     ) -> None:
         """S-DELETE-2: Verify deleted permission no longer exists."""
-        create_result = await permission_controller_processors.create_permission.wait_for_complete(
-            CreatePermissionAction(
+        create_result = await permission_controller_processors.add_role_permission.run(
+            AddRolePermissionAction(
                 role_id=RoleID(target_role.role.id),
                 creator=RolePermissionCreator(
                     entity_type=EntityType(ImageEntityType()),
@@ -164,22 +186,22 @@ class TestPermissionDelete:
         )
         perm_id = create_result.data.id
 
-        await permission_controller_processors.delete_permission.wait_for_complete(
-            DeletePermissionAction(purger=RolePermissionPurger(PermissionID(perm_id)))
+        await permission_controller_processors.delete_permission.run(
+            DeletePermissionAction(permission_id=PermissionID(perm_id))
         )
 
-        # Second delete must raise ObjectNotFound
-        with pytest.raises(ObjectNotFound):
-            await permission_controller_processors.delete_permission.wait_for_complete(
-                DeletePermissionAction(purger=RolePermissionPurger(PermissionID(perm_id)))
+        # The owner lookup answers first, so a second delete stops there
+        with pytest.raises(FieldNotFoundError):
+            await permission_controller_processors.delete_permission.run(
+                DeletePermissionAction(permission_id=PermissionID(perm_id))
             )
 
     async def test_delete_nonexistent_permission_raises_not_found(
         self,
         permission_controller_processors: PermissionControllerProcessors,
     ) -> None:
-        """F-BIZ-2: Delete non-existent permission_id → ObjectNotFound."""
-        with pytest.raises(ObjectNotFound):
-            await permission_controller_processors.delete_permission.wait_for_complete(
-                DeletePermissionAction(purger=RolePermissionPurger(PermissionID(uuid.uuid4())))
+        """F-BIZ-2: Delete non-existent permission_id → FieldNotFoundError."""
+        with pytest.raises(FieldNotFoundError):
+            await permission_controller_processors.delete_permission.run(
+                DeletePermissionAction(permission_id=PermissionID(uuid.uuid4()))
             )

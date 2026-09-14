@@ -12,6 +12,7 @@ from sqlalchemy.orm import (
 from ai.backend.common.data.entity.role import RoleID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.manager.data.permission.role import (
+    AssignedUserData,
     UserRoleAssignmentData,
     UserRoleAssignmentInput,
 )
@@ -53,6 +54,15 @@ class UserRoleRow(Base):
             user_id=self.user_id,
             role_id=self.role_id,
             granted_by=self.granted_by,
+        )
+
+    def to_assigned_user_data(self) -> AssignedUserData:
+        return AssignedUserData(
+            id=self.id,
+            user_id=self.user_id,
+            role_id=self.role_id,
+            granted_by=self.granted_by,
+            granted_at=self.granted_at,
         )
 
     @classmethod

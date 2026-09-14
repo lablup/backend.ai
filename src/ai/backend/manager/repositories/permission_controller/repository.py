@@ -43,7 +43,7 @@ from ai.backend.manager.models.rbac_models.permission.creators import RolePermis
 from ai.backend.manager.models.rbac_models.permission.purgers import RolePermissionPurger
 from ai.backend.manager.models.rbac_models.permission.scopes import PermissionOperationScope
 from ai.backend.manager.models.rbac_models.permission.updaters import RolePermissionUpdater
-from ai.backend.manager.models.rbac_models.role.scopes import ScopedRoleOperationScope
+from ai.backend.manager.models.scopes import OperationScope
 from ai.backend.manager.models.specs.permission import PermissionEntry
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base.querier import BatchQuerier
@@ -169,10 +169,10 @@ class PermissionControllerRepository:
     async def search_roles_in_scope(
         self,
         querier: BatchQuerier,
-        scope: ScopedRoleOperationScope,
+        scopes: Sequence[OperationScope],
     ) -> RoleListResult:
-        """Search roles registered in a project scope."""
-        return await self._db_source.search_roles_in_scope(querier=querier, scope=scope)
+        """Search the roles the named scopes reach, combined with OR."""
+        return await self._db_source.search_roles_in_scope(querier=querier, scopes=scopes)
 
     @permission_controller_repository_resilience.apply()
     async def search_permissions(

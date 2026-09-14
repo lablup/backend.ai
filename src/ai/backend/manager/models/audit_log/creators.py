@@ -35,7 +35,6 @@ __all__ = (
     "EmptyScopeAuditLogCreator",
     "RelationAuditLogCreator",
     "GlobalAuditLogCreator",
-    "LegacyAuditLogCreator",
     "AuditLogScopeCreator",
 )
 
@@ -236,20 +235,6 @@ class GlobalAuditLogCreator(DanglingAuditLogCreator):
     @override
     def action_kind(cls) -> ActionKind:
         return ActionKind.GLOBAL
-
-
-@dataclass
-class LegacyAuditLogCreator(DanglingAuditLogCreator):
-    """An action on the legacy ``BaseAction`` base, which declares no shape.
-
-    ``entity_id`` is whatever the runner resolved, often nothing. Goes away with
-    the legacy base.
-    """
-
-    @classmethod
-    @override
-    def action_kind(cls) -> ActionKind:
-        return ActionKind.UNKNOWN
 
 
 @dataclass

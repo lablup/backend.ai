@@ -123,7 +123,8 @@ if TYPE_CHECKING:
         PermissionNestedFilterGQL,
         PermissionOrderBy,
     )
-    from ai.backend.manager.api.gql.user.types.node import UserV2GQL
+    from ai.backend.manager.api.gql.user.types.filters import UserFilterGQL, UserOrderByGQL
+    from ai.backend.manager.api.gql.user.types.node import UserV2Connection, UserV2GQL
 
 # ==================== Enums ====================
 
@@ -302,7 +303,16 @@ class RoleGQL(PydanticNodeMixin[Any]):
         )
 
     @gql_added_field(
-        BackendAIGQLMeta(added_version="26.3.0", description="Users assigned to this role.")
+        BackendAIGQLMeta(
+            added_version="26.3.0",
+            description="Users assigned to this role, as assignment rows.",
+            deprecated_version=NEXT_RELEASE_VERSION,
+            deprecation_hint="`usersV2`",
+        ),
+        deprecation_reason=(
+            f"Deprecated since {NEXT_RELEASE_VERSION}. Use `usersV2`, which answers with the "
+            "users themselves."
+        ),
     )  # type: ignore[misc]
     async def users(
         self,
@@ -360,6 +370,76 @@ class RoleGQL(PydanticNodeMixin[Any]):
                 end_cursor=edges[-1].cursor if edges else None,
             ),
             count=result.total_count,
+        )
+
+    @gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Users holding this role.",
+        )
+    )  # type: ignore[misc]
+    async def users_v2(
+        self,
+        info: Info[StrawberryGQLContext],
+        filter: Annotated[
+            UserFilterGQL, strawberry.lazy("ai.backend.manager.api.gql.user.types.filters")
+        ]
+        | None = None,
+        order_by: list[
+            Annotated[
+                UserOrderByGQL,
+                strawberry.lazy("ai.backend.manager.api.gql.user.types.filters"),
+            ]
+        ]
+        | None = None,
+        before: str | None = None,
+        after: str | None = None,
+        first: int | None = None,
+        last: int | None = None,
+        limit: int | None = None,
+        offset: int | None = None,
+    ) -> (
+        Annotated[
+            UserV2Connection,
+            strawberry.lazy("ai.backend.manager.api.gql.user.types.node"),
+        ]
+        | None
+    ):
+        from strawberry.relay import PageInfo
+
+        from ai.backend.common.dto.manager.v2.rbac.types import UUIDScope
+        from ai.backend.common.dto.manager.v2.user.request import AdminSearchUsersInput
+        from ai.backend.common.dto.manager.v2.user.types import UserScope
+        from ai.backend.manager.api.gql.user.types.node import (
+            UserV2Connection,
+            UserV2Edge,
+            UserV2GQL,
+        )
+
+        payload = await info.context.adapters.user.gql_scoped_search(
+            UserScope(role=[UUIDScope(value=UUID(self.id))]),
+            AdminSearchUsersInput(
+                filter=filter.to_pydantic() if filter else None,
+                order=[o.to_pydantic() for o in order_by] if order_by else None,
+                first=first,
+                after=after,
+                last=last,
+                before=before,
+                limit=limit,
+                offset=offset,
+            ),
+        )
+        nodes = [UserV2GQL.from_pydantic(item) for item in payload.items]
+        edges = [UserV2Edge(node=node, cursor=encode_cursor(str(node.id))) for node in nodes]
+        return UserV2Connection(
+            edges=edges,
+            page_info=PageInfo(
+                has_next_page=payload.has_next_page,
+                has_previous_page=payload.has_previous_page,
+                start_cursor=edges[0].cursor if edges else None,
+                end_cursor=edges[-1].cursor if edges else None,
+            ),
+            count=payload.total_count,
         )
 
 

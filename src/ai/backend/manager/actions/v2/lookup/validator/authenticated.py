@@ -1,9 +1,9 @@
 from typing import override
 
 from ai.backend.common.contexts.user import current_user
-from ai.backend.manager.actions.action import BaseActionTriggerMeta
 from ai.backend.manager.actions.v2.lookup.base import BaseLookupAction
 from ai.backend.manager.actions.v2.lookup.validator.base import LookupActionValidator
+from ai.backend.manager.actions.v2.trigger import ActionTriggerMeta
 from ai.backend.manager.errors.common import GenericForbidden
 from ai.backend.manager.errors.user import UserNotFound
 
@@ -19,7 +19,7 @@ class AuthenticatedActionValidator(LookupActionValidator):
     """
 
     @override
-    async def validate(self, action: BaseLookupAction, meta: BaseActionTriggerMeta) -> None:
+    async def validate(self, action: BaseLookupAction, meta: ActionTriggerMeta) -> None:
         user = current_user()
         if user is None:
             raise UserNotFound("User not found in context")

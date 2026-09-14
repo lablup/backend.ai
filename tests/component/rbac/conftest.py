@@ -53,8 +53,8 @@ def permission_controller_processors(
     )
     return PermissionControllerProcessors(
         processor_registry.group(GroupMeta(RoleEntityType())),
+        processor_registry.group(GroupMeta(UserEntityType())),
         service=service,
-        action_monitors=[],
     )
 
 
@@ -74,7 +74,6 @@ def rbac_processors(
             PermissionControllerRepository(database_engine),
             RbacRosterRepository(RosterOpsProvider(database_engine)),
         ),
-        [],
     )
 
 

@@ -68,6 +68,5 @@ async def adapter(
     domain = DomainProcessors(
         registry.group(GroupMeta(DomainEntityType())),
         DomainService(DomainRepository(engine, provider)),
-        [],
     )
     return UserAdapter(user, domain, config.config.auth, key_pool)

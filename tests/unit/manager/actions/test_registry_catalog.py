@@ -361,7 +361,7 @@ def test_every_defined_v2_action_is_wired() -> None:
     scheduling_history_groups = registry.concern(ConcernMeta(Concern.SESSION))
     resource_allocation_groups = registry.concern(ConcernMeta(Concern.RESOURCE_GROUP))
     agent_groups = registry.concern(ConcernMeta(Concern.RESOURCE_GROUP))
-    AgentProcessors(agent_groups.group(GroupMeta(AgentEntityType())), MagicMock(), [])
+    AgentProcessors(agent_groups.group(GroupMeta(AgentEntityType())), MagicMock())
     AppConfigProcessors(
         registry.group(GroupMeta(AppConfigEntityType())),
         registry.group(GroupMeta(AppConfigDefinitionEntityType())),
@@ -399,7 +399,6 @@ def test_every_defined_v2_action_is_wired() -> None:
         MagicMock(),
         MagicMock(),
         MagicMock(),
-        [],
     )
     RuntimeVariantProcessors(registry.group(GroupMeta(RuntimeVariantEntityType())))
     ObjectStorageProcessors(
@@ -447,8 +446,12 @@ def test_every_defined_v2_action_is_wired() -> None:
     )
     StorageNamespaceProcessors(registry.group(GroupMeta(StorageNamespaceEntityType())))
     DeploymentPresetProcessors(registry.group(GroupMeta(DeploymentPresetEntityType())), MagicMock())
-    DomainProcessors(registry.group(GroupMeta(DomainEntityType())), MagicMock(), [])
-    PermissionControllerProcessors(registry.group(GroupMeta(RoleEntityType())), MagicMock(), [])
+    DomainProcessors(registry.group(GroupMeta(DomainEntityType())), MagicMock())
+    PermissionControllerProcessors(
+        registry.group(GroupMeta(RoleEntityType())),
+        registry.group(GroupMeta(UserEntityType())),
+        MagicMock(),
+    )
     ProjectProcessors(registry.group(GroupMeta(ProjectEntityType())), MagicMock())
     UserProcessors(
         registry.group(GroupMeta(UserEntityType())),
@@ -607,8 +610,8 @@ def test_resource_domain_and_agent_reads_keep_their_judged_gates() -> None:
     """
     registry = _ops_registry()
     resource_group_groups = registry.concern(ConcernMeta(Concern.RESOURCE_GROUP))
-    AgentProcessors(resource_group_groups.group(GroupMeta(AgentEntityType())), MagicMock(), [])
-    DomainProcessors(registry.group(GroupMeta(DomainEntityType())), MagicMock(), [])
+    AgentProcessors(resource_group_groups.group(GroupMeta(AgentEntityType())), MagicMock())
+    DomainProcessors(registry.group(GroupMeta(DomainEntityType())), MagicMock())
     SessionProcessors(
         registry.group(GroupMeta(SessionEntityType())),
         resource_group_groups.group(GroupMeta(ResourceGroupEntityType())),
@@ -699,7 +702,7 @@ def test_artifact_registry_metas_read_is_a_partial_bulk_permission_read() -> Non
 def test_rg_domain_read_is_a_scoped_permission_read() -> None:
     """The domains a resource group serves are read within the resource-group scope."""
     registry = _ops_registry()
-    DomainProcessors(registry.group(GroupMeta(DomainEntityType())), MagicMock(), [])
+    DomainProcessors(registry.group(GroupMeta(DomainEntityType())), MagicMock())
 
     recorded = {
         record.action_cls: (record.entity_type, record.kind, record.gate)
@@ -788,7 +791,7 @@ def test_entity_data_loader_reads_are_checked_per_entity_except_domains() -> Non
     """
     registry = _ops_registry()
     ResourceGroupProcessors(registry.group(GroupMeta(ResourceGroupEntityType())), MagicMock())
-    DomainProcessors(registry.group(GroupMeta(DomainEntityType())), MagicMock(), [])
+    DomainProcessors(registry.group(GroupMeta(DomainEntityType())), MagicMock())
     NotificationProcessors(
         registry.group(GroupMeta(NotificationChannelEntityType())),
         registry.group(GroupMeta(NotificationRuleEntityType())),
