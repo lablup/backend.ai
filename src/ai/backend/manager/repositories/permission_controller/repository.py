@@ -100,7 +100,7 @@ class PermissionControllerRepository:
         Returns the deleted permission data.
 
         Raises:
-            PermissionNotFound: If permission does not exist.
+            FieldNotFoundError: If permission does not exist.
         """
         return await self._db_source.delete_permission(purger)
 
@@ -115,7 +115,7 @@ class PermissionControllerRepository:
         Returns the updated permission data.
 
         Raises:
-            PermissionNotFound: If permission does not exist.
+            FieldNotFoundError: If permission does not exist.
         """
         return await self._db_source.update_permission(updater)
 

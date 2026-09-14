@@ -9,6 +9,7 @@ from decimal import Decimal
 from typing import Any
 
 from ai.backend.common.contexts.user import current_user
+from ai.backend.common.data.entity.resource_policy import UserResourcePolicyEntityType
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.dto.manager.v2.common import (
     ResourceLimitEntryInfo,
@@ -72,8 +73,8 @@ from ai.backend.manager.data.resource.types import (
     ProjectResourcePolicyData,
     UserResourcePolicyData,
 )
+from ai.backend.manager.errors.base.entity import EntityNotFoundError
 from ai.backend.manager.errors.keypair import KeypairResourcePolicyNotFound
-from ai.backend.manager.errors.user import UserResourcePolicyNotFound
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.condition_utils import combine_conditions_or, negate_conditions
 from ai.backend.manager.models.keypair.conditions import KeypairConditions
@@ -442,7 +443,10 @@ class ResourcePolicyAdapter(BaseAdapter):
             )
         )
         if not result.items:
-            raise UserResourcePolicyNotFound("No user resource policy applies to the caller.")
+            raise EntityNotFoundError(
+                "No user resource policy applies to the caller.",
+                entity_type=UserResourcePolicyEntityType(),
+            )
         return self._user_policy_data_to_node(result.items[0])
 
     # ── Project Resource Policy ──

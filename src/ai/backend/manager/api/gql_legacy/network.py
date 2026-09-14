@@ -14,15 +14,16 @@ from graphene.types.datetime import DateTime as GQLDateTime
 from sqlalchemy.exc import NoResultFound
 from sqlalchemy.orm import selectinload
 
-from ai.backend.common.data.entity.network import NetworkID
+from ai.backend.common.data.entity.network import NetworkEntityType, NetworkID
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.network.types import NetworkData
+from ai.backend.manager.errors.base.entity import EntityNotFoundError
 from ai.backend.manager.errors.common import (
     GenericForbidden,
     ServerMisconfiguredError,
 )
-from ai.backend.manager.errors.network import NetworkNotFound
 from ai.backend.manager.errors.resource import ProjectNotFound
 from ai.backend.manager.models.minilang import FieldSpecItem, OrderSpecItem
 from ai.backend.manager.models.minilang.ordering import QueryOrderParser
@@ -349,14 +350,22 @@ class ModifyNetwork(graphene.Mutation):  # type: ignore[misc]
         try:
             _network_id = uuid.UUID(raw_network_id)
         except ValueError as e:
-            raise NetworkNotFound() from e
+            raise EntityNotFoundError(
+                f"Network {raw_network_id} not found",
+                entity_type=NetworkEntityType(),
+                operation=ActionOperationType.UPDATE,
+            ) from e
 
         graph_ctx: GraphQueryContext = info.context
         async with graph_ctx.db.begin_session(commit_on_end=True) as db_session:
             try:
                 row = await NetworkRow.get(db_session, _network_id, load_project=True)
             except NoResultFound as e:
-                raise NetworkNotFound() from e
+                raise EntityNotFoundError(
+                    f"Network {_network_id} not found",
+                    entity_type=NetworkEntityType(),
+                    operation=ActionOperationType.UPDATE,
+                ) from e
 
             if (
                 graph_ctx.user["role"] != UserRole.SUPERADMIN
@@ -398,13 +407,21 @@ class DeleteNetwork(graphene.Mutation):  # type: ignore[misc]
         try:
             _network_id = uuid.UUID(raw_network_id)
         except ValueError as e:
-            raise NetworkNotFound() from e
+            raise EntityNotFoundError(
+                f"Network {raw_network_id} not found",
+                entity_type=NetworkEntityType(),
+                operation=ActionOperationType.PURGE,
+            ) from e
 
         async with graph_ctx.db.begin_session(commit_on_end=True) as db_session:
             try:
                 row = await NetworkRow.get(db_session, _network_id, load_project=True)
             except NoResultFound as e:
-                raise NetworkNotFound() from e
+                raise EntityNotFoundError(
+                    f"Network {_network_id} not found",
+                    entity_type=NetworkEntityType(),
+                    operation=ActionOperationType.PURGE,
+                ) from e
 
             if (
                 graph_ctx.user["role"] != UserRole.SUPERADMIN
