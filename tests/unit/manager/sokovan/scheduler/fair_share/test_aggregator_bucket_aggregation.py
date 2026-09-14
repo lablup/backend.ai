@@ -22,8 +22,8 @@ from ai.backend.manager.data.fair_share import (
     ProjectUsageBucketKey,
     UserUsageBucketKey,
 )
-from ai.backend.manager.repositories.resource_usage_history import (
-    KernelUsageRecordCreatorSpec,
+from ai.backend.manager.models.resource_usage_history.creators import (
+    KernelUsageRecordCreator,
 )
 from ai.backend.manager.sokovan.scheduler.fair_share.aggregator import (
     FairShareAggregator,
@@ -57,10 +57,9 @@ def make_spec(
     project_id: UUID | None = None,
     domain_name: str = "default",
     resource_group: str = "default",
-) -> KernelUsageRecordCreatorSpec:
-    """Create a KernelUsageRecordCreatorSpec for testing."""
-    return KernelUsageRecordCreatorSpec(
-        kernel_id=uuid4(),
+) -> KernelUsageRecordCreator:
+    """Create a KernelUsageRecordCreator for testing."""
+    return KernelUsageRecordCreator(
         session_id=uuid4(),
         user_uuid=user_uuid or uuid4(),
         project_id=project_id or uuid4(),
@@ -740,7 +739,7 @@ class TestMultiTenantAcrossDays:
     """
 
     @pytest.fixture
-    def multi_tenant_specs(self) -> list[KernelUsageRecordCreatorSpec]:
+    def multi_tenant_specs(self) -> list[KernelUsageRecordCreator]:
         """One 5-minute slice per kernel, spread across two days."""
         workloads = [
             # Day 1: the full mix.
@@ -853,7 +852,7 @@ class TestMultiTenantAcrossDays:
     def test_user_buckets_are_keyed_by_user_project_and_day(
         self,
         aggregator: FairShareAggregator,
-        multi_tenant_specs: list[KernelUsageRecordCreatorSpec],
+        multi_tenant_specs: list[KernelUsageRecordCreator],
         case: _UserBucketExpectation,
     ) -> None:
         result = aggregator.aggregate_kernel_usage_to_buckets(multi_tenant_specs)
@@ -904,7 +903,7 @@ class TestMultiTenantAcrossDays:
     def test_project_buckets_sum_their_users(
         self,
         aggregator: FairShareAggregator,
-        multi_tenant_specs: list[KernelUsageRecordCreatorSpec],
+        multi_tenant_specs: list[KernelUsageRecordCreator],
         case: _ProjectBucketExpectation,
     ) -> None:
         result = aggregator.aggregate_kernel_usage_to_buckets(multi_tenant_specs)
@@ -940,7 +939,7 @@ class TestMultiTenantAcrossDays:
     def test_domain_bucket_sums_every_project(
         self,
         aggregator: FairShareAggregator,
-        multi_tenant_specs: list[KernelUsageRecordCreatorSpec],
+        multi_tenant_specs: list[KernelUsageRecordCreator],
         case: _DomainBucketExpectation,
     ) -> None:
         result = aggregator.aggregate_kernel_usage_to_buckets(multi_tenant_specs)

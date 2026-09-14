@@ -140,3 +140,19 @@ def test_describe_prints_the_addressed_operation() -> None:
 def test_describe_reports_an_unwired_address() -> None:
     result = CliRunner().invoke(cli, ["describe", "vfolder", "no_such_operation"])
     assert result.exit_code != 0
+
+
+def test_secret_is_classified_as_a_dangling_field() -> None:
+    result = CliRunner().invoke(cli, ["types", "--output", "json"])
+    assert result.exit_code == 0, result.output
+    rows = json.loads(result.output)
+    secret_rows = [row for row in rows if "secret" in row.values()]
+    assert secret_rows == [
+        {"classification": "dangling_field", "entity_type": "-", "field_type": "secret"}
+    ]
+
+
+def test_secret_operations_are_listed_as_system_fields() -> None:
+    rows = _list("--concern", "system", "--field", "secret")
+    assert {row["action_name"] for row in rows} == {"get_secret_status", "reencrypt_secrets"}
+    assert all(row["entity_type"] == "global" for row in rows)

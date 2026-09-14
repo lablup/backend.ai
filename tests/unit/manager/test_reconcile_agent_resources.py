@@ -14,11 +14,12 @@ from uuid import uuid4
 import pytest
 import sqlalchemy as sa
 from dateutil.tz import tzutc
+from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
 from ai.backend.common.auth import PublicKey, SecretKey
+from ai.backend.common.data.entity.agent import AgentUUID
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
-from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
 from ai.backend.manager.data.agent.types import AgentStatus
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.session.types import SessionStatus
@@ -42,8 +43,12 @@ from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.registry import AgentRegistry
-from ai.backend.manager.repositories.db.engine import create_async_engine
 from ai.backend.testutils.db import with_tables
+
+
+async def _agent_uuid(db_sess: SASession, agent_id: str) -> AgentUUID:
+    """The agent's entity id, which the slot row records beside its name."""
+    return (await db_sess.scalars(sa.select(AgentRow.uuid).where(AgentRow.id == agent_id))).one()
 
 
 @dataclass(frozen=True)
@@ -60,22 +65,6 @@ class SeededInfra:
 
 class TestReconcileAgentResources:
     """Tests for AgentRegistry._reconcile_agent_resources()."""
-
-    @pytest.fixture
-    async def database_connection(
-        self,
-        postgres_container: tuple[str, HostPortPairModel],
-    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
-        _, addr = postgres_container
-        url = f"postgresql+asyncpg://postgres:develove@{addr.host}:{addr.port}/testing"
-        engine = create_async_engine(
-            url,
-            pool_size=8,
-            pool_pre_ping=False,
-            max_overflow=64,
-        )
-        yield engine
-        await engine.dispose()
 
     @pytest.fixture
     async def db_with_tables(
@@ -216,6 +205,7 @@ class TestReconcileAgentResources:
                 db_sess.add(
                     AgentResourceRow(
                         agent_id=agent_id,
+                        agent_uuid=await _agent_uuid(db_sess, agent_id),
                         slot_name=slot_name,
                         capacity=capacity,
                         used=used,
@@ -456,22 +446,6 @@ class TestOrphanedAllocationCleanup:
     """
 
     @pytest.fixture
-    async def database_connection(
-        self,
-        postgres_container: tuple[str, HostPortPairModel],
-    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
-        _, addr = postgres_container
-        url = f"postgresql+asyncpg://postgres:develove@{addr.host}:{addr.port}/testing"
-        engine = create_async_engine(
-            url,
-            pool_size=8,
-            pool_pre_ping=False,
-            max_overflow=64,
-        )
-        yield engine
-        await engine.dispose()
-
-    @pytest.fixture
     async def db(
         self,
         database_connection: ExtendedAsyncSAEngine,
@@ -657,6 +631,7 @@ class TestOrphanedAllocationCleanup:
             db_sess.add(
                 AgentResourceRow(
                     agent_id=infra.agent_id,
+                    agent_uuid=await _agent_uuid(db_sess, infra.agent_id),
                     slot_name="cpu",
                     capacity=Decimal("8"),
                     used=Decimal("0"),
@@ -871,6 +846,7 @@ class TestOrphanedAllocationCleanup:
             db_sess.add(
                 AgentResourceRow(
                     agent_id=infra.agent_id,
+                    agent_uuid=await _agent_uuid(db_sess, infra.agent_id),
                     slot_name="cpu",
                     capacity=Decimal("8"),
                     used=Decimal("6"),
@@ -914,22 +890,6 @@ class TestTerminalSessionKernelReconciliation:
     of terminal sessions to the session's terminal status and freeing their
     active allocations atomically.
     """
-
-    @pytest.fixture
-    async def database_connection(
-        self,
-        postgres_container: tuple[str, HostPortPairModel],
-    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
-        _, addr = postgres_container
-        url = f"postgresql+asyncpg://postgres:develove@{addr.host}:{addr.port}/testing"
-        engine = create_async_engine(
-            url,
-            pool_size=8,
-            pool_pre_ping=False,
-            max_overflow=64,
-        )
-        yield engine
-        await engine.dispose()
 
     @pytest.fixture
     async def db(
@@ -1121,6 +1081,7 @@ class TestTerminalSessionKernelReconciliation:
             db_sess.add(
                 AgentResourceRow(
                     agent_id=infra.agent_id,
+                    agent_uuid=await _agent_uuid(db_sess, infra.agent_id),
                     slot_name="cpu",
                     capacity=Decimal("8"),
                     used=agent_used,

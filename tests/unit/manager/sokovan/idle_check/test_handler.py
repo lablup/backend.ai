@@ -16,13 +16,12 @@ from ai.backend.common.data.idle_checker.types import (
     SessionLifetimeSpec,
 )
 from ai.backend.common.types import SessionId, SessionTypes
-from ai.backend.manager.data.idle_checker.types import IdleCheckSession
+from ai.backend.manager.data.idle_checker.types import IdleCheckSession, IdleJudgmentData
 from ai.backend.manager.errors.common import InternalServerError
 from ai.backend.manager.repositories.idle_checker.types import (
     IdleCheckAssignmentData,
     IdleCheckBatchData,
     IdleCheckerDefinitionData,
-    IdleJudgmentData,
 )
 from ai.backend.manager.sokovan.idle_check.checkers.base import (
     CheckerAssignment,

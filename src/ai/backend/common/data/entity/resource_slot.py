@@ -3,14 +3,22 @@ from typing import override
 from ai.backend.common.data.entity.types import EntityIdentifier, EntityType, NaturalKey
 
 __all__ = (
-    "RESOURCE_SLOT_TYPE_ENTITY_TYPE",
+    "ResourceSlotTypeEntityType",
     "ResourceSlotName",
     "ResourceSlotTypeUUID",
 )
 
 
-# Raw string mirroring the RBAC-managed EntityType.RESOURCE_SLOT_TYPE value.
-RESOURCE_SLOT_TYPE_ENTITY_TYPE = EntityType("resource_slot_type")
+class ResourceSlotTypeEntityType(EntityType):
+    @override
+    @classmethod
+    def name(cls) -> str:
+        return "resource_slot_type"
+
+    @override
+    @classmethod
+    def description(cls) -> str:
+        return "A kind of resource an agent can offer."
 
 
 class ResourceSlotName(NaturalKey):
@@ -23,4 +31,4 @@ class ResourceSlotName(NaturalKey):
 class ResourceSlotTypeUUID(EntityIdentifier):
     @override
     def entity_type(self) -> EntityType:
-        return RESOURCE_SLOT_TYPE_ENTITY_TYPE
+        return ResourceSlotTypeEntityType()

@@ -6,7 +6,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
-from ai.backend.common.data.entity.deployment import DEPLOYMENT_ENTITY_TYPE
+from ai.backend.common.data.entity.deployment import DeploymentEntityType
 from ai.backend.common.events.hub.hub import EventHub
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
 from ai.backend.manager.actions.registry.types import GroupMeta
@@ -71,7 +71,7 @@ def model_serving_processors(
         route_controller=AsyncMock(),
     )
     return ModelServingProcessors(
-        processor_registry.group(GroupMeta(DEPLOYMENT_ENTITY_TYPE)), service
+        processor_registry.group(GroupMeta(DeploymentEntityType())), service
     )
 
 
@@ -84,7 +84,7 @@ def auto_scaling_processors(
     repo = ModelServingRepository(database_engine, V2DBOpsProvider(database_engine))
     service = AutoScalingService(repository=repo)
     return ModelServingAutoScalingProcessors(
-        processor_registry.group(GroupMeta(DEPLOYMENT_ENTITY_TYPE)), service
+        processor_registry.group(GroupMeta(DeploymentEntityType())), service
     )
 
 
@@ -118,7 +118,7 @@ def deployment_processors(
         appproxy_client_pool=mock_appproxy_client_pool,
     )
     return DeploymentProcessors(
-        processor_registry.group(GroupMeta(DEPLOYMENT_ENTITY_TYPE)), service
+        processor_registry.group(GroupMeta(DeploymentEntityType())), service
     )
 
 

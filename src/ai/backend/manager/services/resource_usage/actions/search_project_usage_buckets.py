@@ -4,8 +4,8 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.common.data.entity.project import PROJECT_ENTITY_TYPE
-from ai.backend.common.data.entity.types import EntityType, ScopeRef
+from ai.backend.common.data.entity.project import ProjectEntityType
+from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
 from ai.backend.manager.actions.v2.ops.base import OperationScopeOpsAction
 from ai.backend.manager.data.resource_usage_history.types import ProjectUsageBucketData
 from ai.backend.manager.models.resource_usage_history.row import ProjectUsageBucketRow
@@ -30,7 +30,7 @@ class SearchProjectUsageBucketsAction(
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return PROJECT_ENTITY_TYPE
+        return ProjectEntityType()
 
     @override
     @classmethod
@@ -38,8 +38,8 @@ class SearchProjectUsageBucketsAction(
         return "search_project_usage_buckets"
 
     @override
-    def scope_targets(self) -> Sequence[ScopeRef]:
-        return [item.scope_ref() for item in self.items]
+    def scope_targets(self) -> Sequence[EntityIdentifier]:
+        return [item.scope_id() for item in self.items]
 
     @override
     def operation_scopes(self) -> Sequence[OperationScope]:

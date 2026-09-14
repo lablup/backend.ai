@@ -2,9 +2,9 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.common.data.entity.domain import DOMAIN_SCOPE_TYPE, DomainID
-from ai.backend.common.data.entity.project import PROJECT_ENTITY_TYPE
-from ai.backend.common.data.entity.types import EntityType, ScopeRef
+from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.project import ProjectEntityType
+from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
 from ai.backend.manager.actions.v2.ops.base import CreateRoleManagedEntityOpsAction
 from ai.backend.manager.data.project.types import ProjectData
 from ai.backend.manager.models.project.creators import ProjectCreator
@@ -21,11 +21,11 @@ class CreateProjectAction(CreateRoleManagedEntityOpsAction[ProjectRow, ProjectDa
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return PROJECT_ENTITY_TYPE
+        return ProjectEntityType()
 
     @override
-    def scope_targets(self) -> Sequence[ScopeRef]:
-        return (ScopeRef(scope_type=DOMAIN_SCOPE_TYPE, scope_id=self.domain_id),)
+    def scope_targets(self) -> Sequence[EntityIdentifier]:
+        return (self.domain_id,)
 
     @override
     @classmethod

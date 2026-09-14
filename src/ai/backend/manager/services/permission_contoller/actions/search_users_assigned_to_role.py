@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.common.data.permission.types import EntityType
+from ai.backend.common.data.entity.types import EntityType
 from ai.backend.manager.actions.action import SearchActionResult
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.permission.role import AssignedUserData
@@ -18,7 +18,7 @@ class SearchUsersAssignedToRoleAction(RoleAction):
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return EntityType.ROLE_USER
+        return EntityType.from_name("role:user")
 
     @override
     def entity_id(self) -> str | None:

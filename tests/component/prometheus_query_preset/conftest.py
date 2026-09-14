@@ -17,7 +17,7 @@ from ai.backend.client.v2.auth import HMACAuth
 from ai.backend.client.v2.config import ClientConfig
 from ai.backend.client.v2.v2_registry import V2ClientRegistry
 from ai.backend.common.data.entity.prometheus_query_preset import (
-    PROMETHEUS_QUERY_PRESET_ENTITY_TYPE,
+    PrometheusQueryPresetEntityType,
 )
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
 from ai.backend.manager.actions.registry.types import GroupMeta
@@ -93,7 +93,7 @@ def prometheus_query_preset_processors(
         ops_repository=OpsRepository(V2DBOpsProvider(database_engine)),
     )
     return PrometheusQueryPresetProcessors(
-        processor_registry.group(GroupMeta(PROMETHEUS_QUERY_PRESET_ENTITY_TYPE)), service
+        processor_registry.group(GroupMeta(PrometheusQueryPresetEntityType())), service
     )
 
 
@@ -104,7 +104,7 @@ def server_module_registries(
 ) -> list[RouteRegistry]:
     processors = MagicMock(spec=Processors)
     processors.prometheus_query_preset = prometheus_query_preset_processors
-    adapter = PrometheusQueryPresetAdapter(processors)
+    adapter = PrometheusQueryPresetAdapter(processors.prometheus_query_preset)
     handler = V2PrometheusQueryPresetHandler(adapter=adapter)
     v2_reg = RouteRegistry.create("v2", route_deps.cors_options)
     v2_reg.add_subregistry(register_v2_prometheus_query_preset_routes(handler, route_deps))

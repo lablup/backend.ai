@@ -2,8 +2,9 @@ import enum
 from dataclasses import dataclass
 from typing import Final
 
-from ai.backend.common.data.entity.types import EntityType, ScopeType
-from ai.backend.common.data.permission.types import OperationType, Permission
+from ai.backend.common.data.entity.types import EntityType
+from ai.backend.common.data.permission.types import Permission
+from ai.backend.common.exception import ErrorOperation
 
 # Placeholder substituted when an id (request_id, entity_id, ...) is absent while
 # materializing action metadata into audit/report records.
@@ -108,31 +109,57 @@ class ActionOperationType(enum.StrEnum):
         """
         return frozenset({cls.GET, cls.SEARCH, cls.LOOKUP})
 
-    def to_permission_operation(self) -> OperationType:
-        """The legacy single :class:`OperationType` this operation maps to.
+    def to_permission_bit(self) -> Permission:
+        """The single bit this operation is listed under.
 
-        ``UPSERT`` narrows to ``CREATE``: this axis carries one value and cannot
-        express the ``CREATE | UPDATE`` mask, so it keeps the stronger of the two.
+        ``UPSERT`` narrows to ``CREATE``: a listing carries one bit and cannot express
+        the ``CREATE | UPDATE`` mask :meth:`to_permission` requires, so it keeps the
+        stronger of the two.
         """
         match self:
             case ActionOperationType.GET:
-                return OperationType.READ
+                return Permission.READ
             case ActionOperationType.SEARCH:
-                return OperationType.READ
+                return Permission.READ
             case ActionOperationType.LOOKUP:
-                return OperationType.READ
+                return Permission.READ
             case ActionOperationType.CREATE:
-                return OperationType.CREATE
+                return Permission.CREATE
             case ActionOperationType.UPDATE:
-                return OperationType.UPDATE
+                return Permission.UPDATE
             case ActionOperationType.UPSERT:
-                return OperationType.CREATE
+                return Permission.CREATE
             case ActionOperationType.DELETE:
-                return OperationType.SOFT_DELETE
+                return Permission.SOFT_DELETE
             case ActionOperationType.PURGE:
-                return OperationType.HARD_DELETE
+                return Permission.HARD_DELETE
             case ActionOperationType.RESTORE:
-                return OperationType.SOFT_DELETE
+                return Permission.SOFT_DELETE
+
+    def to_error_operation(self) -> ErrorOperation:
+        """The ``ErrorCode`` operation an error raised under this operation reports.
+
+        Every operation but ``LOOKUP`` has its own counterpart. ``LOOKUP`` reads the one
+        row a key names, so it reports as a read like ``GET``. ``DELETE`` and ``PURGE``
+        report under the names that say which delete they are.
+        """
+        match self:
+            case ActionOperationType.GET | ActionOperationType.LOOKUP:
+                return ErrorOperation.READ
+            case ActionOperationType.SEARCH:
+                return ErrorOperation.SEARCH
+            case ActionOperationType.CREATE:
+                return ErrorOperation.CREATE
+            case ActionOperationType.UPSERT:
+                return ErrorOperation.UPSERT
+            case ActionOperationType.UPDATE:
+                return ErrorOperation.UPDATE
+            case ActionOperationType.RESTORE:
+                return ErrorOperation.RESTORE
+            case ActionOperationType.DELETE:
+                return ErrorOperation.SOFT_DELETE
+            case ActionOperationType.PURGE:
+                return ErrorOperation.HARD_DELETE
 
     def to_permission(self) -> Permission:
         """The permission an action performing this operation must hold.
@@ -174,5 +201,5 @@ class ActionSpec:
 
 @dataclass(frozen=True)
 class Scope:
-    type: ScopeType
+    type: EntityType
     id: str

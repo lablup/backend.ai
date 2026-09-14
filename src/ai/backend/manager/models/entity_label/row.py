@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+from uuid import UUID
+
 import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, mapped_column
 
 from ai.backend.common.data.entity.entity_label import EntityLabelID, EntityLabelKey
-from ai.backend.common.data.entity.types import EntityID, EntityType, RuntimeEntityID
+from ai.backend.common.data.entity.types import EntityType, RuntimeEntityID
 from ai.backend.manager.data.entity_label.types import EntityLabelData
 from ai.backend.manager.models.base import GUID, Base
 from ai.backend.manager.models.mixins.timestamp import LifecycleTimestampsMixin
@@ -39,7 +41,7 @@ class EntityLabelRow(LifecycleTimestampsMixin, Base):
     entity_type: Mapped[EntityType] = mapped_column(
         "entity_type", sa.String(length=32), nullable=False
     )
-    entity_id: Mapped[EntityID] = mapped_column("entity_id", GUID(), nullable=False)
+    entity_id: Mapped[UUID] = mapped_column("entity_id", GUID(), nullable=False)
     key: Mapped[EntityLabelKey] = mapped_column("key", sa.String(length=255), nullable=False)
     value: Mapped[str] = mapped_column("value", sa.String(length=255), nullable=False)
 

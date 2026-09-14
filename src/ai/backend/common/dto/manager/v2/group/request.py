@@ -9,17 +9,19 @@ from uuid import UUID
 
 from pydantic import Field
 
-from ai.backend.common.api_handlers import SENTINEL, BaseRequestModel, Sentinel
+from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.dto.manager.defs import DEFAULT_PAGE_LIMIT, MAX_PAGE_LIMIT
 from ai.backend.common.dto.manager.query import DateTimeFilter, StringFilter, UUIDFilter
 from ai.backend.common.dto.manager.v2.group.types import (
     OrderDirection,
     ProjectDomainFilter,
     ProjectOrderField,
+    ProjectScope,
     ProjectType,
     ProjectTypeFilter,
     ProjectUserFilter,
 )
+from ai.backend.common.tristate.unset import UNSET, Unset
 
 __all__ = (
     "AdminSearchProjectsInput",
@@ -30,6 +32,7 @@ __all__ = (
     "ProjectOrder",
     "PurgeProjectInput",
     "RestoreProjectInput",
+    "ScopedSearchProjectsInput",
     "SearchProjectsRequest",
     "UnassignUsersFromProjectInput",
     "UpdateProjectInput",
@@ -67,26 +70,26 @@ class CreateProjectInput(BaseRequestModel):
 class UpdateProjectInput(BaseRequestModel):
     """Input for updating group information. All fields optional — only provided fields will be updated."""
 
-    name: str | None = Field(
-        default=None,
-        description="New group name.",
+    name: str | None | Unset = Field(
+        default=UNSET,
+        description="New group name. Omit to leave unchanged.",
         max_length=64,
     )
-    description: str | Sentinel | None = Field(
-        default=SENTINEL,
-        description="New group description. Set to null to clear.",
+    description: str | None | Unset = Field(
+        default=UNSET,
+        description="Updated group description. Omit to leave unchanged; null clears.",
     )
-    is_active: bool | None = Field(
-        default=None,
-        description="Updated active status.",
+    is_active: bool | None | Unset = Field(
+        default=UNSET,
+        description="Updated active status. Omit to leave unchanged.",
     )
-    integration_name: str | Sentinel | None = Field(
-        default=SENTINEL,
-        description="New external integration identifier. Set to null to clear.",
+    integration_name: str | None | Unset = Field(
+        default=UNSET,
+        description="Updated external integration identifier. Omit to leave unchanged; null clears.",
     )
-    resource_policy: str | None = Field(
-        default=None,
-        description="Name of the updated resource policy to apply to this group.",
+    resource_policy: str | None | Unset = Field(
+        default=UNSET,
+        description="Name of the updated resource policy to apply to this group. Omit to leave unchanged.",
     )
 
 
@@ -169,6 +172,20 @@ class SearchProjectsRequest(BaseRequestModel):
 class AdminSearchProjectsInput(BaseRequestModel):
     """Input for admin search of projects with cursor and offset pagination."""
 
+    filter: ProjectFilter | None = Field(default=None, description="Filter conditions.")
+    order: list[ProjectOrder] | None = Field(default=None, description="Order specifications.")
+    first: int | None = Field(default=None, description="Cursor pagination: number of items.")
+    after: str | None = Field(default=None, description="Cursor pagination: after cursor.")
+    last: int | None = Field(default=None, description="Cursor pagination: last N items.")
+    before: str | None = Field(default=None, description="Cursor pagination: before cursor.")
+    limit: int | None = Field(default=None, description="Offset pagination: maximum items.")
+    offset: int | None = Field(default=None, description="Offset pagination: number to skip.")
+
+
+class ScopedSearchProjectsInput(BaseRequestModel):
+    """Input for searching the projects the named scopes reach."""
+
+    scope: ProjectScope = Field(description="Scope (OR across all items).")
     filter: ProjectFilter | None = Field(default=None, description="Filter conditions.")
     order: list[ProjectOrder] | None = Field(default=None, description="Order specifications.")
     first: int | None = Field(default=None, description="Cursor pagination: number of items.")

@@ -19,7 +19,7 @@ from typing import ClassVar
 import sqlalchemy as sa
 
 from ai.backend.common.data.entity.domain import DomainID
-from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE, ProjectID
+from ai.backend.common.data.entity.project import ProjectEntityType, ProjectID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.manager.data.keypair.types import KeyPairData, KeyPairSecrets
 from ai.backend.manager.data.project.types import ProjectData
@@ -227,7 +227,7 @@ class V2UserWriteOps(V2RosterWriteOps):
 
     async def _joined_project_ids(self, user_id: UserID) -> set[ProjectID]:
         """The projects the user is on the roster of, personal ones left out."""
-        stmt = user_scope_membership_query(PROJECT_SCOPE_TYPE, user_id).where(
+        stmt = user_scope_membership_query(ProjectEntityType(), user_id).where(
             VirtualEntityRow.entity_id.not_in(
                 sa.select(ProjectRow.id).where(ProjectRow.type == ProjectType.PERSONAL)
             )

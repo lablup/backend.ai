@@ -30,10 +30,8 @@ from ai.backend.common.dto.manager.infra import (
 )
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.data.resource_preset.types import ResourcePresetData
-from ai.backend.manager.repositories.base.creator import Creator
-from ai.backend.manager.repositories.base.updater import Updater
-from ai.backend.manager.repositories.resource_preset.creators import ResourcePresetCreatorSpec
-from ai.backend.manager.repositories.resource_preset.updaters import ResourcePresetUpdaterSpec
+from ai.backend.manager.models.resource_preset.creators import ResourcePresetCreator
+from ai.backend.manager.models.resource_preset.updaters import ResourcePresetUpdater
 from ai.backend.manager.services.resource_preset.actions.create_preset import (
     CreateResourcePresetAction,
 )
@@ -77,13 +75,11 @@ class TestPresetCRUD:
             resource_slots = ResourceSlot({"cpu": "2", "mem": "2147483648"})
 
         action = CreateResourcePresetAction(
-            creator=Creator(
-                spec=ResourcePresetCreatorSpec(
-                    name=name,
-                    resource_slots=resource_slots,
-                    shared_memory=shared_memory,
-                    resource_group_name=resource_group_name,
-                )
+            creator=ResourcePresetCreator(
+                name=name,
+                resource_slots=resource_slots,
+                shared_memory=shared_memory,
+                resource_group_name=resource_group_name,
             )
         )
         result = await processors.create_preset.run(action)
@@ -206,12 +202,9 @@ class TestPresetCRUD:
         )
 
         modify_action = UpdateResourcePresetAction(
-            preset_id=ResourcePresetID(preset.id),
-            updater=Updater(
-                spec=ResourcePresetUpdaterSpec(
-                    name=OptionalState.update("crud-modify-s5-new"),
-                ),
-                pk_value=preset.id,
+            updater=ResourcePresetUpdater(
+                preset_id=ResourcePresetID(preset.id),
+                name=OptionalState.update("crud-modify-s5-new"),
             ),
         )
         modify_result = await resource_preset_processors.update_preset.run(modify_action)
@@ -238,14 +231,11 @@ class TestPresetCRUD:
         )
 
         modify_action = UpdateResourcePresetAction(
-            preset_id=ResourcePresetID(preset.id),
-            updater=Updater(
-                spec=ResourcePresetUpdaterSpec(
-                    resource_slots=OptionalState.update(
-                        ResourceSlot({"cpu": "16", "mem": "17179869184"})
-                    ),
+            updater=ResourcePresetUpdater(
+                preset_id=ResourcePresetID(preset.id),
+                resource_slots=OptionalState.update(
+                    ResourceSlot({"cpu": "16", "mem": "17179869184"})
                 ),
-                pk_value=preset.id,
             ),
         )
         modify_result = await resource_preset_processors.update_preset.run(modify_action)
@@ -330,13 +320,11 @@ class TestCheckPresets:
             resource_slots = ResourceSlot({"cpu": "2", "mem": "2147483648"})
 
         action = CreateResourcePresetAction(
-            creator=Creator(
-                spec=ResourcePresetCreatorSpec(
-                    name=name,
-                    resource_slots=resource_slots,
-                    shared_memory=None,
-                    resource_group_name=None,
-                )
+            creator=ResourcePresetCreator(
+                name=name,
+                resource_slots=resource_slots,
+                shared_memory=None,
+                resource_group_name=None,
             )
         )
         result = await processors.create_preset.run(action)

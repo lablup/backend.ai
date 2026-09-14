@@ -5,7 +5,6 @@ from __future__ import annotations
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import Any, override
-from uuid import UUID
 
 from sqlalchemy.orm import InstrumentedAttribute
 
@@ -38,7 +37,7 @@ class KeypairDotfilesUpdater(DataUpdater[KeyPairRow, KeyPairData]):
         return KeyPairRow.id
 
     @override
-    def target_id_value(self) -> UUID:
+    def target_id_value(self) -> KeyPairID:
         return self.keypair_id
 
     @override
@@ -72,7 +71,7 @@ class KeypairBootstrapScriptUpdater(DataUpdater[KeyPairRow, KeyPairData]):
         return KeyPairRow.id
 
     @override
-    def target_id_value(self) -> UUID:
+    def target_id_value(self) -> KeyPairID:
         return self.keypair_id
 
     @override
@@ -115,7 +114,7 @@ class KeypairUpdater(GuardedDataUpdater[KeyPairRow, KeyPairData]):
         return KeyPairRow.id
 
     @override
-    def target_id_value(self) -> UUID:
+    def target_id_value(self) -> KeyPairID:
         return self.keypair_id
 
     @override

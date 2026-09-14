@@ -16,8 +16,8 @@ from ai.backend.manager.actions.v2.ops.result import BulkFieldOpsResult
 from ai.backend.manager.api.adapters.scheduling_history.adapter import SchedulingHistoryAdapter
 from ai.backend.manager.data.kernel.types import KernelSchedulingHistoryData
 from ai.backend.manager.data.session.types import SchedulingResult, SessionSchedulingHistoryData
+from ai.backend.manager.errors.base.field import FieldNotFoundError
 from ai.backend.manager.errors.common import GenericForbidden
-from ai.backend.manager.errors.repository import EntityNotFoundError
 
 READABLE = SessionSchedulingHistoryID(uuid.uuid4())
 DENIED = SessionSchedulingHistoryID(uuid.uuid4())
@@ -54,14 +54,16 @@ def processors(readable: SessionSchedulingHistoryData, denial: GenericForbidden)
         return_value=BulkFieldOpsResult(successes={READABLE: readable}, errors={DENIED: denial})
     )
     processors.scheduling_history.bulk_get_kernel_histories.run = AsyncMock(
-        side_effect=EntityNotFoundError("No field row matches the given ids")
+        side_effect=FieldNotFoundError(
+            field_type=KernelSchedulingHistoryID.field_type(),
+        )
     )
     return processors
 
 
 @pytest.fixture
 def adapter(processors: MagicMock) -> SchedulingHistoryAdapter:
-    return SchedulingHistoryAdapter(processors)
+    return SchedulingHistoryAdapter(processors.scheduling_history, processors.resource_slot)
 
 
 async def test_session_histories_answer_per_id(
@@ -122,7 +124,7 @@ async def test_kernel_histories_keep_the_given_order(processors: MagicMock) -> N
     processors.scheduling_history.bulk_get_kernel_histories.run = AsyncMock(
         return_value=BulkFieldOpsResult(successes={second.id: second, first.id: first}, errors={})
     )
-    adapter = SchedulingHistoryAdapter(processors)
+    adapter = SchedulingHistoryAdapter(processors.scheduling_history, processors.resource_slot)
 
     nodes = await adapter.batch_load_kernel_histories_by_ids([first.id, second.id])
 

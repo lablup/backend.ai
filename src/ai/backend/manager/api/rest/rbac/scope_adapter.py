@@ -5,7 +5,10 @@ Handles conversion of request DTOs to BatchQuerier objects.
 
 from __future__ import annotations
 
-from ai.backend.common.data.permission.types import ScopeType
+from ai.backend.common.data.entity.domain import DomainEntityType
+from ai.backend.common.data.entity.project import ProjectEntityType
+from ai.backend.common.data.entity.types import EntityType
+from ai.backend.common.data.entity.user import UserEntityType
 from ai.backend.common.dto.manager.rbac.request import (
     ScopeFilter,
     ScopeOrder,
@@ -35,14 +38,14 @@ __all__ = ("ScopeAdapter",)
 class ScopeAdapter(BaseFilterAdapter):
     """Adapter for converting scope requests to BatchQuerier objects."""
 
-    def build_querier(self, scope_type: ScopeType, request: SearchScopesRequest) -> BatchQuerier:
+    def build_querier(self, scope_type: EntityType, request: SearchScopesRequest) -> BatchQuerier:
         """Build a BatchQuerier based on scope type."""
         match scope_type:
-            case ScopeType.DOMAIN:
+            case DomainEntityType():
                 return self._build_domain_scope_querier(request)
-            case ScopeType.PROJECT:
+            case ProjectEntityType():
                 return self._build_project_scope_querier(request)
-            case ScopeType.USER:
+            case UserEntityType():
                 return self._build_user_scope_querier(request)
             case _:
                 raise NotImplementedError(

@@ -7,9 +7,8 @@ import uuid
 import sqlalchemy as sa
 
 from ai.backend.common.data.filter_specs import StringMatchSpec
-from ai.backend.common.data.permission.types import ScopeType
 from ai.backend.manager.models.clauses import QueryCondition
-from ai.backend.manager.models.condition_utils import make_string_in_factory
+from ai.backend.manager.models.condition_utils import StringConditions, make_string_in_factory
 from ai.backend.manager.models.rbac_models.role_preset.row import RolePresetRow
 
 __all__ = ("RolePresetConditions",)
@@ -70,12 +69,7 @@ class RolePresetConditions:
 
     by_name_in = staticmethod(make_string_in_factory(RolePresetRow.name))
 
-    @staticmethod
-    def by_scope_type(scope_type: ScopeType) -> QueryCondition:
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return RolePresetRow.scope_type == scope_type
-
-        return inner
+    by_scope_type_match = StringConditions(sa.type_coerce(RolePresetRow.scope_type, sa.String()))
 
     @staticmethod
     def by_auto_assign(auto_assign: bool) -> QueryCondition:

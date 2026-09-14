@@ -4,6 +4,7 @@ from typing import override
 
 from aiohttp import web
 
+from ai.backend.common.data.entity.idle_checker import IdleCheckerEntityType
 from ai.backend.common.exception import (
     BackendAIError,
     ErrorCode,
@@ -11,6 +12,8 @@ from ai.backend.common.exception import (
     ErrorDomain,
     ErrorOperation,
 )
+from ai.backend.manager.actions.types import ActionOperationType
+from ai.backend.manager.errors.base.entity import EntityError, EntityErrorCode
 from ai.backend.manager.errors.common import ObjectNotFound
 
 __all__ = (
@@ -21,9 +24,15 @@ __all__ = (
 )
 
 
-class IdleCheckerNotFound(ObjectNotFound):
+class IdleCheckerNotFound(EntityError, ObjectNotFound):
     error_type = "https://api.backend.ai/probs/idle-checker-not-found"
     object_name = "idle checker"
+
+    @override
+    def entity_error_code(self) -> EntityErrorCode:
+        return EntityErrorCode(
+            IdleCheckerEntityType(), ActionOperationType.GET, ErrorDetail.NOT_FOUND
+        )
 
 
 class IdleCheckerAssignmentNotFound(ObjectNotFound):

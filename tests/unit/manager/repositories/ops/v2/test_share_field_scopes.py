@@ -26,6 +26,8 @@ import pytest
 import sqlalchemy as sa
 
 from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
+from ai.backend.common.data.entity.user import UserEntityType
+from ai.backend.common.data.entity.vfolder import VFolderEntityType
 from ai.backend.common.data.permission.id import FieldPath
 from ai.backend.common.data.permission.types import Permission
 from ai.backend.manager.errors.permission import InvalidFieldPermission
@@ -42,8 +44,8 @@ from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntit
 from ai.backend.manager.repositories.ops.v2.share.provider import ShareOpsProvider
 from ai.backend.testutils.db import with_tables
 
-_GRANTEE_TYPE = EntityType("user")
-_ENTITY_TYPE = EntityType("vfolder")
+_GRANTEE_TYPE = UserEntityType()
+_ENTITY_TYPE = VFolderEntityType()
 
 _TOKEN = FieldPath("token")
 _DATA = FieldPath("data")

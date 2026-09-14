@@ -10,12 +10,14 @@ from pydantic import ValidationError
 
 from ai.backend.common.dto.manager.v2.runtime_variant_preset.request import (
     CreateRuntimeVariantPresetInput,
+    RuntimeVariantPresetFilter,
     UpdateRuntimeVariantPresetInput,
 )
 from ai.backend.common.dto.manager.v2.runtime_variant_preset.types import (
     PresetTarget,
     PresetValueType,
 )
+from ai.backend.common.tristate.unset import UNSET, Unset
 
 
 class TestCreateRuntimeVariantPresetInputFlagValidation:
@@ -108,6 +110,15 @@ class TestUpdateRuntimeVariantPresetInputFlagValidation:
             value_type=PresetValueType.FLAG,
         )
         assert result.value_type == PresetValueType.FLAG
+        assert result.preset_target is UNSET
+
+    def test_flag_with_null_preset_target_is_valid(self, preset_id: UUID) -> None:
+        result = UpdateRuntimeVariantPresetInput(
+            id=preset_id,
+            value_type=PresetValueType.FLAG,
+            preset_target=None,
+        )
+        assert result.value_type == PresetValueType.FLAG
         assert result.preset_target is None
 
     def test_flag_with_args_is_valid(self, preset_id: UUID) -> None:
@@ -117,6 +128,62 @@ class TestUpdateRuntimeVariantPresetInputFlagValidation:
             preset_target=PresetTarget.ARGS,
         )
         assert result.value_type == PresetValueType.FLAG
+
+
+class TestUpdateRuntimeVariantPresetInputDefaults:
+    """Omitted fields are UNSET; an explicit null stays None."""
+
+    @pytest.mark.parametrize(
+        "field",
+        [
+            "name",
+            "description",
+            "rank",
+            "preset_target",
+            "value_type",
+            "default_value",
+            "key",
+            "required",
+            "category",
+            "display_name",
+            "ui_option",
+        ],
+    )
+    def test_omitted_field_is_unset(self, field: str) -> None:
+        result = UpdateRuntimeVariantPresetInput(id=uuid4())
+        assert getattr(result, field) is UNSET
+
+    @pytest.mark.parametrize(
+        "field",
+        [
+            "name",
+            "description",
+            "rank",
+            "preset_target",
+            "value_type",
+            "default_value",
+            "key",
+            "required",
+            "category",
+            "display_name",
+            "ui_option",
+        ],
+    )
+    def test_null_field_stays_none(self, field: str) -> None:
+        result = UpdateRuntimeVariantPresetInput(id=uuid4(), **{field: None})
+        assert getattr(result, field) is None
+
+    @pytest.mark.parametrize(
+        ("field", "value"),
+        [
+            pytest.param("name", "", id="name_empty"),
+            pytest.param("key", "", id="key_empty"),
+            pytest.param("rank", -1, id="rank_negative"),
+        ],
+    )
+    def test_constraints_still_apply(self, field: str, value: Any) -> None:
+        with pytest.raises(ValidationError):
+            UpdateRuntimeVariantPresetInput(id=uuid4(), **{field: value})
 
 
 class TestUpdateRuntimeVariantPresetInputDefaultValueValidation:
@@ -149,3 +216,44 @@ class TestUpdateRuntimeVariantPresetInputDefaultValueValidation:
             id=preset_id, value_type=value_type, default_value=default_value
         )
         assert result.id == preset_id
+
+
+class TestVersionFormatValidation:
+    """A bad version must fail at the boundary rather than in the SQL that compares it."""
+
+    @pytest.mark.parametrize(
+        "version",
+        [
+            pytest.param("0.9.0rc1", id="a_segment_that_is_not_a_number"),
+            pytest.param("2147483648.0", id="a_segment_past_the_int_it_is_cast_to"),
+            pytest.param("1.2.3.4", id="a_fourth_segment_the_padding_would_drop"),
+        ],
+    )
+    def test_the_filter_rejects(self, version: str) -> None:
+        with pytest.raises(ValidationError):
+            RuntimeVariantPresetFilter(runtime_version=version)
+
+    def test_create_rejects_a_bad_version(self) -> None:
+        with pytest.raises(ValidationError):
+            CreateRuntimeVariantPresetInput(
+                runtime_variant_id=uuid4(),
+                name="p",
+                preset_target=PresetTarget.ARGS,
+                value_type=PresetValueType.STR,
+                key="--p",
+                added_version="0.9.0rc1",
+            )
+
+    def test_update_rejects_a_bad_version(self) -> None:
+        with pytest.raises(ValidationError):
+            UpdateRuntimeVariantPresetInput(id=uuid4(), deprecated_version="0.9.0rc1")
+
+    def test_the_filter_accepts_a_dotted_numeric_version(self) -> None:
+        result = RuntimeVariantPresetFilter(runtime_version="0.10.0")
+        assert result.runtime_version == "0.10.0"
+
+    def test_an_omitted_version_stays_unset(self) -> None:
+        """UNSET leaves the column alone; a None default would read as 'clear it'."""
+        result = UpdateRuntimeVariantPresetInput(id=uuid4())
+        assert isinstance(result.added_version, Unset)
+        assert isinstance(result.deprecated_version, Unset)

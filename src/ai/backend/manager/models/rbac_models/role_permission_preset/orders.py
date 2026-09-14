@@ -18,10 +18,10 @@ class RolePermissionPresetOrders:
         return RolePermissionPresetRow.entity_type.desc()
 
     @staticmethod
-    def operation(ascending: bool = True) -> QueryOrder:
+    def permission(ascending: bool = True) -> QueryOrder:
         if ascending:
-            return RolePermissionPresetRow.operation.asc()
-        return RolePermissionPresetRow.operation.desc()
+            return RolePermissionPresetRow.permission.asc()
+        return RolePermissionPresetRow.permission.desc()
 
     @staticmethod
     def created_at(ascending: bool = True) -> QueryOrder:

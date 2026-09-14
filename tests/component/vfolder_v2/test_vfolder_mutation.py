@@ -20,7 +20,8 @@ import yarl
 from ai.backend.client.v2.auth import HMACAuth
 from ai.backend.client.v2.config import ClientConfig
 from ai.backend.client.v2.v2_registry import V2ClientRegistry
-from ai.backend.common.data.entity.vfolder import VFOLDER_ENTITY_TYPE
+from ai.backend.common.data.entity.project import ProjectEntityType
+from ai.backend.common.data.entity.vfolder import VFolderEntityType
 from ai.backend.common.dto.manager.field import VFolderPermissionField
 from ai.backend.common.dto.manager.v2.vfolder.request import CreateVFolderInScopeInput
 from ai.backend.common.types import (
@@ -38,11 +39,7 @@ from ai.backend.manager.api.rest.types import RouteDeps
 from ai.backend.manager.api.rest.v2.vfolder.handler import V2VFolderHandler
 from ai.backend.manager.api.rest.v2.vfolder.registry import register_v2_vfolder_routes
 from ai.backend.manager.data.permission.status import RoleStatus
-from ai.backend.manager.data.permission.types import (
-    EntityType,
-    Permission,
-    ScopeType,
-)
+from ai.backend.manager.data.permission.types import Permission
 from ai.backend.manager.data.secret.types import KeyProviderType
 from ai.backend.manager.data.vfolder.types import (
     VFolderMountPermission,
@@ -126,7 +123,7 @@ def vfolder_processors(
         user_repository=user_repository,
         valkey_stat_client=MagicMock(),
     )
-    return VFolderProcessors(processor_registry.group(GroupMeta(VFOLDER_ENTITY_TYPE)), service)
+    return VFolderProcessors(processor_registry.group(GroupMeta(VFolderEntityType())), service)
 
 
 @pytest.fixture()
@@ -137,7 +134,7 @@ def server_module_registries(
     """Register v2 vfolder REST routes with real RBAC."""
     processors = MagicMock(spec=Processors)
     processors.vfolder = vfolder_processors
-    adapter = VFolderAdapter(processors)
+    adapter = VFolderAdapter(processors.vfolder, MagicMock(), MagicMock(), MagicMock())
     handler = V2VFolderHandler(adapter=adapter)
     v2_reg = RouteRegistry.create("v2", route_deps.cors_options)
     v2_reg.add_subregistry(register_v2_vfolder_routes(handler, route_deps))
@@ -222,6 +219,8 @@ async def regular_user_vfolder_create_permission(
                 id=role_id,
                 name=f"test-vfolder-creator-{secrets.token_hex(4)}",
                 status=RoleStatus.ACTIVE,
+                scope_type=ProjectEntityType(),
+                scope_id=group_fixture,
             )
         )
         await conn.execute(
@@ -233,9 +232,7 @@ async def regular_user_vfolder_create_permission(
         await conn.execute(
             sa.insert(PermissionRow.__table__).values(
                 role_id=role_id,
-                scope_type=ScopeType.PROJECT,
-                scope_id=str(group_fixture),
-                entity_type=EntityType.VFOLDER,
+                entity_type=VFolderEntityType(),
                 permission=Permission.CREATE,
             )
         )

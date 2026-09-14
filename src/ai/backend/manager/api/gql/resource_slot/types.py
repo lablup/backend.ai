@@ -201,13 +201,13 @@ class ResourceSlotTypeGQL(PydanticNodeMixin[Any]):
         node_ids: Iterable[str],
         required: bool = False,
     ) -> Iterable[Self | None]:
-        from ai.backend.manager.errors.repository import EntityNotFoundError
+        from ai.backend.manager.errors.base.not_found import NotFoundError
 
         results: list[Self | None] = []
         for slot_name in node_ids:
             try:
                 node = await load_resource_slot_type_node(info, slot_name)
-            except EntityNotFoundError:
+            except NotFoundError:
                 if required:
                     raise
                 results.append(None)

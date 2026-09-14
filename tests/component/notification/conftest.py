@@ -3,8 +3,8 @@ from __future__ import annotations
 import pytest
 
 from ai.backend.common.data.entity.notification import (
-    NOTIFICATION_CHANNEL_ENTITY_TYPE,
-    NOTIFICATION_RULE_ENTITY_TYPE,
+    NotificationChannelEntityType,
+    NotificationRuleEntityType,
 )
 from ai.backend.manager.actions.registry.types import GroupMeta
 from ai.backend.manager.api.rest.notification.handler import NotificationHandler
@@ -29,9 +29,9 @@ def notification_processors(
     # Create properly structured ActionValidators mock with async validators
     return NotificationProcessors(
         channel_group=ops_processor_group(
-            database_engine, GroupMeta(NOTIFICATION_CHANNEL_ENTITY_TYPE)
+            database_engine, GroupMeta(NotificationChannelEntityType())
         ),
-        rule_group=ops_processor_group(database_engine, GroupMeta(NOTIFICATION_RULE_ENTITY_TYPE)),
+        rule_group=ops_processor_group(database_engine, GroupMeta(NotificationRuleEntityType())),
         service=service,
     )
 

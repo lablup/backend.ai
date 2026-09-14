@@ -211,7 +211,7 @@ class Adapters:
         schedule_coordinator: ScheduleCoordinator,
         config_provider: ManagerConfigProvider | None = None,
     ) -> Adapters:
-        """Factory that wires up all adapters from the shared Processors.
+        """Factory that hands each adapter the processors it uses.
 
         ``deployment_coordinator`` / ``schedule_coordinator`` are
         threaded through to adapters that validate or enumerate live
@@ -222,58 +222,91 @@ class Adapters:
         """
         entity_types = WiredEntityTypes(action_registry)
         return cls(
-            agent=AgentAdapter(processors),
-            app_config=AppConfigAdapter(processors),
-            app_config_fragment=AppConfigFragmentAdapter(processors),
-            app_config_allow_list=AppConfigAllowListAdapter(processors),
-            app_config_definition=AppConfigDefinitionAdapter(processors),
-            artifact=ArtifactAdapter(processors),
-            artifact_registry=ArtifactRegistryAdapter(processors),
-            audit_log=AuditLogAdapter(processors),
+            agent=AgentAdapter(processors.agent),
+            app_config=AppConfigAdapter(processors.app_config),
+            app_config_fragment=AppConfigFragmentAdapter(processors.app_config),
+            app_config_allow_list=AppConfigAllowListAdapter(processors.app_config),
+            app_config_definition=AppConfigDefinitionAdapter(processors.app_config),
+            artifact=ArtifactAdapter(processors.artifact),
+            artifact_registry=ArtifactRegistryAdapter(processors.artifact_registry),
+            audit_log=AuditLogAdapter(processors.audit_log),
             entity=EntityAdapter(entity_types),
-            entity_label=EntityLabelAdapter(processors, entity_types),
-            container_registry=ContainerRegistryAdapter(processors),
-            deployment=DeploymentAdapter(processors, deployment_coordinator),
-            domain=DomainAdapter(processors),
-            fair_share=FairShareAdapter(processors),
-            huggingface_registry=HuggingFaceRegistryAdapter(processors),
-            idle_checker=IdleCheckerAdapter(processors),
-            idle_checker_assignment=IdleCheckerAssignmentAdapter(processors),
-            image=ImageAdapter(processors),
-            login_client_type=LoginClientTypeAdapter(processors),
-            client_ip_masking=ClientIPMaskingAdapter(processors),
-            secret=SecretAdapter(processors),
-            login_history=LoginHistoryAdapter(processors),
-            login_session=LoginSessionAdapter(processors),
-            notification=NotificationAdapter(processors),
-            object_storage=ObjectStorageAdapter(processors),
-            project=ProjectAdapter(processors),
-            prometheus_query_preset=PrometheusQueryPresetAdapter(processors),
-            prometheus_query_preset_category=PrometheusQueryPresetCategoryAdapter(processors),
-            rbac=RBACAdapter(processors),
-            reservoir_registry=ReservoirRegistryAdapter(processors),
-            resource_allocation=ResourceAllocationAdapter(processors, config_provider),
-            resource_group=ResourceGroupAdapter(
-                processors, deployment_coordinator, schedule_coordinator
+            entity_label=EntityLabelAdapter(processors.entity_label, entity_types),
+            container_registry=ContainerRegistryAdapter(
+                processors.container_registry, processors.rbac
             ),
-            resource_policy=ResourcePolicyAdapter(processors),
-            resource_preset=ResourcePresetAdapter(processors),
-            resource_slot=ResourceSlotAdapter(processors),
-            entity_share=EntityShareAdapter(processors),
-            retention_policy=RetentionPolicyAdapter(processors),
-            runtime_variant=RuntimeVariantAdapter(processors),
-            runtime_variant_preset=RuntimeVariantPresetAdapter(processors),
-            deployment_revision_preset=DeploymentRevisionPresetAdapter(processors),
-            model_card=ModelCardAdapter(processors),
-            resource_usage=ResourceUsageAdapter(processors),
-            role_preset=RolePresetAdapter(processors),
+            deployment=DeploymentAdapter(processors.deployment, deployment_coordinator),
+            domain=DomainAdapter(processors.domain, processors.resource_group),
+            fair_share=FairShareAdapter(processors.fair_share, processors.resource_group),
+            huggingface_registry=HuggingFaceRegistryAdapter(processors.artifact_registry),
+            idle_checker=IdleCheckerAdapter(processors.idle_checker),
+            idle_checker_assignment=IdleCheckerAssignmentAdapter(
+                processors.idle_checker_assignment, processors.rbac
+            ),
+            image=ImageAdapter(processors.image),
+            login_client_type=LoginClientTypeAdapter(processors.login_client_type),
+            client_ip_masking=ClientIPMaskingAdapter(processors.client_ip_masking),
+            secret=SecretAdapter(processors.secret),
+            login_history=LoginHistoryAdapter(processors.auth),
+            login_session=LoginSessionAdapter(processors.auth),
+            notification=NotificationAdapter(processors.notification),
+            object_storage=ObjectStorageAdapter(processors.object_storage),
+            project=ProjectAdapter(
+                processors.project, processors.rbac, processors.domain, processors.user
+            ),
+            prometheus_query_preset=PrometheusQueryPresetAdapter(
+                processors.prometheus_query_preset
+            ),
+            prometheus_query_preset_category=PrometheusQueryPresetCategoryAdapter(
+                processors.prometheus_query_preset_category
+            ),
+            rbac=RBACAdapter(processors.rbac, processors.permission_controller),
+            reservoir_registry=ReservoirRegistryAdapter(processors.artifact_registry),
+            resource_allocation=ResourceAllocationAdapter(
+                processors.session, processors.domain, processors.user, config_provider
+            ),
+            resource_group=ResourceGroupAdapter(
+                processors.resource_group,
+                processors.rbac,
+                processors.domain,
+                deployment_coordinator,
+                schedule_coordinator,
+            ),
+            resource_policy=ResourcePolicyAdapter(
+                processors.keypair_resource_policy,
+                processors.user_resource_policy,
+                processors.project_resource_policy,
+            ),
+            resource_preset=ResourcePresetAdapter(processors.resource_preset),
+            resource_slot=ResourceSlotAdapter(
+                processors.resource_slot, processors.agent, processors.domain
+            ),
+            entity_share=EntityShareAdapter(processors.entity_share),
+            retention_policy=RetentionPolicyAdapter(processors.retention_policy),
+            runtime_variant=RuntimeVariantAdapter(processors.runtime_variant),
+            runtime_variant_preset=RuntimeVariantPresetAdapter(processors.runtime_variant_preset),
+            deployment_revision_preset=DeploymentRevisionPresetAdapter(
+                processors.deployment_revision_preset
+            ),
+            model_card=ModelCardAdapter(processors.model_card, processors.deployment),
+            resource_usage=ResourceUsageAdapter(
+                processors.resource_usage, processors.resource_group
+            ),
+            role_preset=RolePresetAdapter(processors.role_preset),
             scheduling_handler=SchedulingHandlerAdapter(deployment_coordinator),
-            scheduling_history=SchedulingHistoryAdapter(processors),
-            service_catalog=ServiceCatalogAdapter(processors),
-            session=SessionAdapter(processors),
-            storage_host=StorageHostAdapter(processors),
-            storage_namespace=StorageNamespaceAdapter(processors),
-            user=UserAdapter(processors, auth_config, key_provider_pool),
-            vfolder=VFolderAdapter(processors),
-            vfs_storage=VFSStorageAdapter(processors),
+            scheduling_history=SchedulingHistoryAdapter(
+                processors.scheduling_history, processors.resource_slot
+            ),
+            service_catalog=ServiceCatalogAdapter(processors.service_catalog),
+            session=SessionAdapter(processors.session, processors.idle_checker),
+            storage_host=StorageHostAdapter(processors.vfolder),
+            storage_namespace=StorageNamespaceAdapter(processors.storage_namespace),
+            user=UserAdapter(processors.user, processors.domain, auth_config, key_provider_pool),
+            vfolder=VFolderAdapter(
+                processors.vfolder,
+                processors.vfolder_file,
+                processors.vfolder_admin,
+                processors.deployment,
+            ),
+            vfs_storage=VFSStorageAdapter(processors.vfs_storage),
         )

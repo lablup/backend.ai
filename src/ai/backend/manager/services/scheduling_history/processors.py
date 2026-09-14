@@ -1,12 +1,12 @@
 from __future__ import annotations
 
-from ai.backend.common.data.entity.deployment_history import DEPLOYMENT_HISTORY_FIELD_TYPE
+from ai.backend.common.data.entity.deployment_history import DeploymentHistoryFieldType
 from ai.backend.common.data.entity.kernel_scheduling_history import (
-    KERNEL_SCHEDULING_HISTORY_FIELD_TYPE,
+    KernelSchedulingHistoryFieldType,
 )
-from ai.backend.common.data.entity.route_history import ROUTE_HISTORY_FIELD_TYPE
+from ai.backend.common.data.entity.route_history import RouteHistoryFieldType
 from ai.backend.common.data.entity.session_scheduling_history import (
-    SESSION_SCHEDULING_HISTORY_FIELD_TYPE,
+    SessionSchedulingHistoryFieldType,
 )
 from ai.backend.manager.actions.registry.field import LookupFieldGroup
 from ai.backend.manager.actions.registry.group import ProcessorGroup
@@ -128,25 +128,25 @@ class SchedulingHistoryProcessors:
         service: SchedulingHistoryService,
     ) -> None:
         session_histories: LookupFieldGroup[SessionSchedulingHistoryData] = session.field_group(
-            FieldGroupMeta(SESSION_SCHEDULING_HISTORY_FIELD_TYPE),
+            FieldGroupMeta(SessionSchedulingHistoryFieldType()),
             SessionSchedulingHistoryData,
             LookupSessionSchedulingHistoryOwnerAction,
             LookupBulkSessionSchedulingHistoryOwnerAction,
         )
         kernel_histories: LookupFieldGroup[KernelSchedulingHistoryData] = session.field_group(
-            FieldGroupMeta(KERNEL_SCHEDULING_HISTORY_FIELD_TYPE),
+            FieldGroupMeta(KernelSchedulingHistoryFieldType()),
             KernelSchedulingHistoryData,
             LookupKernelSchedulingHistoryOwnerAction,
             LookupBulkKernelSchedulingHistoryOwnerAction,
         )
         deployment_histories: LookupFieldGroup[DeploymentHistoryData] = deployment.field_group(
-            FieldGroupMeta(DEPLOYMENT_HISTORY_FIELD_TYPE),
+            FieldGroupMeta(DeploymentHistoryFieldType()),
             DeploymentHistoryData,
             LookupDeploymentHistoryOwnerAction,
             LookupBulkDeploymentHistoryOwnerAction,
         )
         route_histories: LookupFieldGroup[RouteHistoryData] = deployment.field_group(
-            FieldGroupMeta(ROUTE_HISTORY_FIELD_TYPE),
+            FieldGroupMeta(RouteHistoryFieldType()),
             RouteHistoryData,
             LookupRouteHistoryOwnerAction,
             LookupBulkRouteHistoryOwnerAction,

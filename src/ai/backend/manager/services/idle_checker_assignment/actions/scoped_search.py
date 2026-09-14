@@ -6,8 +6,8 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.common.data.entity.idle_checker import IDLE_CHECKER_ENTITY_TYPE
-from ai.backend.common.data.entity.types import EntityIdentifier, EntityType, ScopeRef, ScopeType
+from ai.backend.common.data.entity.idle_checker import IdleCheckerEntityType
+from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.actions.v2.scope.base import BaseScopeAction
 from ai.backend.manager.actions.v2.scope.result import BaseScopeActionResult
@@ -31,7 +31,7 @@ class ScopedSearchIdleCheckerAssignmentsAction(BaseScopeAction):
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return IDLE_CHECKER_ENTITY_TYPE
+        return IdleCheckerEntityType()
 
     @override
     @classmethod
@@ -44,11 +44,8 @@ class ScopedSearchIdleCheckerAssignmentsAction(BaseScopeAction):
         return "scoped_search_idle_checker_assignments"
 
     @override
-    def scope_targets(self) -> Sequence[ScopeRef]:
-        return [
-            ScopeRef(scope_type=ScopeType(scope.entity_type()), scope_id=scope)
-            for scope in self.scopes
-        ]
+    def scope_targets(self) -> Sequence[EntityIdentifier]:
+        return [scope for scope in self.scopes]
 
     def operation_scopes(self) -> Sequence[OperationScope]:
         return [IdleCheckerAssignmentOperationScope(scope=scope) for scope in self.scopes]

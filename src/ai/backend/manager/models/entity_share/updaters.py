@@ -11,14 +11,13 @@ from __future__ import annotations
 from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Any, override
-from uuid import UUID
 
 import sqlalchemy as sa
 from sqlalchemy.orm import InstrumentedAttribute
 
 from ai.backend.common.data.entity.entity_share import EntityShareID
 from ai.backend.common.data.entity.types import EntityIdentifier
-from ai.backend.common.data.entity.user import USER_ENTITY_TYPE
+from ai.backend.common.data.entity.user import UserEntityType
 from ai.backend.manager.data.entity_share.types import (
     EntityShareData,
     EntityShareStatus,
@@ -65,7 +64,7 @@ class _RecipientInvitationUpdater(GuardedDataUpdater[EntityShareRow, EntityShare
         return EntityShareRow.id
 
     @override
-    def target_id_value(self) -> UUID:
+    def target_id_value(self) -> EntityShareID:
         return self.share_id
 
     def addressed_to_scope(self) -> QueryCondition:
@@ -81,7 +80,7 @@ class _RecipientInvitationUpdater(GuardedDataUpdater[EntityShareRow, EntityShare
                 EntityShareRow.recipient_entity_type == scope.entity_type(),
                 EntityShareRow.recipient_entity_id == scope,
             )
-            if scope.entity_type() != USER_ENTITY_TYPE:
+            if scope.entity_type() != UserEntityType():
                 return named
             return sa.or_(
                 named,
@@ -214,7 +213,7 @@ class EntityShareRevokeUpdater(GuardedDataUpdater[EntityShareRow, EntityShareDat
         return EntityShareRow.id
 
     @override
-    def target_id_value(self) -> UUID:
+    def target_id_value(self) -> EntityShareID:
         return self.share_id
 
     @override
@@ -263,7 +262,7 @@ class EntityShareCancelUpdater(GuardedDataUpdater[EntityShareRow, EntityShareDat
         return EntityShareRow.id
 
     @override
-    def target_id_value(self) -> UUID:
+    def target_id_value(self) -> EntityShareID:
         return self.share_id
 
     @override

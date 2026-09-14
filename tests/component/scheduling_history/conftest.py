@@ -15,14 +15,14 @@ from ai.backend.client.v2.auth import HMACAuth
 from ai.backend.client.v2.config import ClientConfig
 from ai.backend.client.v2.v2_registry import V2ClientRegistry
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
-from ai.backend.common.data.entity.deployment import DEPLOYMENT_ENTITY_TYPE, DeploymentID
+from ai.backend.common.data.entity.deployment import DeploymentEntityType, DeploymentID
 from ai.backend.common.data.entity.kernel_scheduling_history import KernelSchedulingHistoryID
 from ai.backend.common.data.entity.replica_group import ReplicaGroupID
 from ai.backend.common.data.entity.replica_group_history import (
     ReplicaGroupHistoryID,
 )
 from ai.backend.common.data.entity.resource_group import ResourceGroupID, ResourceGroupName
-from ai.backend.common.data.entity.session import SESSION_ENTITY_TYPE, SessionID
+from ai.backend.common.data.entity.session import SessionEntityType, SessionID
 from ai.backend.common.data.entity.session_group import SessionGroupID
 from ai.backend.common.schema.deployment import IntOrPercent, ReplicaGroupRolloutSpec
 from ai.backend.common.types import KernelId
@@ -85,9 +85,9 @@ def scheduling_history_processors(
     service = SchedulingHistoryService(repo)
     groups = processor_registry.concern(ConcernMeta(Concern.SESSION))
     return SchedulingHistoryProcessors(
-        groups.group(GroupMeta(SESSION_ENTITY_TYPE)),
-        groups.group(GroupMeta(DEPLOYMENT_ENTITY_TYPE)),
-        groups.group(GroupMeta(DEPLOYMENT_ENTITY_TYPE)),
+        groups.group(GroupMeta(SessionEntityType())),
+        groups.group(GroupMeta(DeploymentEntityType())),
+        groups.group(GroupMeta(DeploymentEntityType())),
         service,
     )
 
@@ -106,9 +106,9 @@ def scheduling_history_adapter(
     processors.scheduling_history = scheduling_history_processors
     processors.resource_slot = MagicMock()
     processors.resource_slot.lookup_kernel_owner = processor_registry.group(
-        GroupMeta(SESSION_ENTITY_TYPE)
+        GroupMeta(SessionEntityType())
     ).key_owner_lookup_ops(LookupKernelOwnerAction)
-    return SchedulingHistoryAdapter(processors)
+    return SchedulingHistoryAdapter(processors.scheduling_history, processors.resource_slot)
 
 
 @pytest.fixture()

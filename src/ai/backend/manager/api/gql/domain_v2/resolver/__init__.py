@@ -7,13 +7,14 @@ from .mutation import (
     admin_restore_domain_v2,
     admin_update_domain_v2,
 )
-from .query import admin_domains_v2, domain_v2, rg_domains_v2
+from .query import admin_domains_v2, domain_v2, rg_domains_v2, scoped_domains_v2
 
 __all__ = [
     # Queries
     "domain_v2",
     "admin_domains_v2",
     "rg_domains_v2",
+    "scoped_domains_v2",
     # Mutations
     "admin_create_domain_v2",
     "admin_update_domain_v2",

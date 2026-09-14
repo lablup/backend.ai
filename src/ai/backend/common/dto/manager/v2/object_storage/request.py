@@ -8,12 +8,13 @@ from uuid import UUID
 
 from pydantic import Field, field_validator
 
-from ai.backend.common.api_handlers import SENTINEL, BaseRequestModel, Sentinel
+from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.dto.manager.query import StringFilter
 from ai.backend.common.dto.manager.v2.object_storage.types import (
     ObjectStorageOrderField,
     OrderDirection,
 )
+from ai.backend.common.tristate.unset import UNSET, Unset
 
 __all__ = (
     "AdminSearchObjectStoragesInput",
@@ -50,14 +51,24 @@ class UpdateObjectStorageInput(BaseRequestModel):
     """Input for updating an object storage."""
 
     id: UUID = Field(description="Object storage ID to update")
-    name: str | None = Field(default=None, description="Updated name of the object storage")
-    host: str | None = Field(default=None, description="Updated host address")
-    access_key: str | None = Field(default=None, description="Updated access key")
-    secret_key: str | None = Field(default=None, description="Updated secret key")
-    endpoint: str | None = Field(default=None, description="Updated endpoint URL")
-    region: str | Sentinel | None = Field(
-        default=SENTINEL,
-        description="Updated region. Use SENTINEL (default) for no change, None to clear.",
+    name: str | None | Unset = Field(
+        default=UNSET, description="Updated name of the object storage. Omit to leave unchanged."
+    )
+    host: str | None | Unset = Field(
+        default=UNSET, description="Updated host address. Omit to leave unchanged."
+    )
+    access_key: str | None | Unset = Field(
+        default=UNSET, description="Updated access key. Omit to leave unchanged."
+    )
+    secret_key: str | None | Unset = Field(
+        default=UNSET, description="Updated secret key. Omit to leave unchanged."
+    )
+    endpoint: str | None | Unset = Field(
+        default=UNSET, description="Updated endpoint URL. Omit to leave unchanged."
+    )
+    region: str | None | Unset = Field(
+        default=UNSET,
+        description="Updated region. Omit to leave unchanged; null clears.",
     )
 
 

@@ -46,6 +46,7 @@ from ai.backend.manager.services.retention_policy.actions.search import (
 from ai.backend.manager.services.retention_policy.actions.update import (
     UpdateRetentionPolicyAction,
 )
+from ai.backend.manager.services.retention_policy.processors import RetentionPolicyProcessors
 from ai.backend.manager.types import OptionalState
 
 
@@ -60,6 +61,11 @@ def _retention_policy_pagination_spec() -> PaginationSpec:
 
 
 class RetentionPolicyAdapter(BaseAdapter):
+    _retention_policy: RetentionPolicyProcessors
+
+    def __init__(self, retention_policy: RetentionPolicyProcessors) -> None:
+        self._retention_policy = retention_policy
+
     async def search(
         self,
         input: SearchRetentionPoliciesInput,
@@ -78,7 +84,7 @@ class RetentionPolicyAdapter(BaseAdapter):
             limit=input.limit,
             offset=input.offset,
         )
-        result = await self._processors.retention_policy.global_search.run(
+        result = await self._retention_policy.global_search.run(
             SearchRetentionPoliciesAction(searcher=searcher)
         )
         return SearchRetentionPoliciesPayload(
@@ -89,9 +95,7 @@ class RetentionPolicyAdapter(BaseAdapter):
         )
 
     async def get(self, policy_id: RetentionPolicyID) -> RetentionPolicyNode:
-        result = await self._processors.retention_policy.get.run(
-            GetRetentionPolicyAction(policy_id=policy_id)
-        )
+        result = await self._retention_policy.get.run(GetRetentionPolicyAction(policy_id=policy_id))
         return self._data_to_node(result.data)
 
     async def create(
@@ -103,7 +107,7 @@ class RetentionPolicyAdapter(BaseAdapter):
             retention_period=timedelta(days=input.retention_period_days),
             enabled=input.enabled,
         )
-        result = await self._processors.retention_policy.global_create.run(
+        result = await self._retention_policy.global_create.run(
             CreateRetentionPolicyAction(creator=creator)
         )
         return CreateRetentionPolicyPayload(policy=self._data_to_node(result.data))
@@ -130,22 +134,18 @@ class RetentionPolicyAdapter(BaseAdapter):
                 else OptionalState.nop()
             ),
         )
-        result = await self._processors.retention_policy.update.run(
+        result = await self._retention_policy.update.run(
             UpdateRetentionPolicyAction(updater=updater)
         )
         return UpdateRetentionPolicyPayload(policy=self._data_to_node(result.data))
 
     async def delete(self, policy_id: RetentionPolicyID) -> DeleteRetentionPolicyPayload:
-        result = await self._processors.retention_policy.delete.run(
-            DeleteRetentionPolicyAction(id=policy_id)
-        )
+        result = await self._retention_policy.delete.run(DeleteRetentionPolicyAction(id=policy_id))
         return DeleteRetentionPolicyPayload(id=result.data.id)
 
     async def purge(self, policy_id: RetentionPolicyID) -> PurgeRetentionPolicyPayload:
         purger = RetentionPolicyPurger(policy_id=policy_id)
-        result = await self._processors.retention_policy.purge.run(
-            PurgeRetentionPolicyAction(purger=purger)
-        )
+        result = await self._retention_policy.purge.run(PurgeRetentionPolicyAction(purger=purger))
         return PurgeRetentionPolicyPayload(id=result.data.id)
 
     def _convert_filter(self, filter_: RetentionPolicyFilter) -> list[QueryCondition]:

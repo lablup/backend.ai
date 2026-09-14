@@ -13,6 +13,7 @@ from ai.backend.common.dto.manager.v2.resource_slot.request import (
     AdminSearchResourceSlotTypesInput,
     CreateResourceSlotTypeInput,
     PurgeResourceSlotTypeInput,
+    ScopedSearchAgentResourcesInput,
     UpdateResourceSlotTypeInput,
 )
 from ai.backend.logging import BraceStyleAdapter
@@ -64,6 +65,14 @@ class V2ResourceSlotHandler:
         result = await self._adapter.admin_purge_slot_type(
             PurgeResourceSlotTypeInput(slot_name=path.parsed.slot_name)
         )
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def scoped_search_agent_resources(
+        self,
+        body: BodyParam[ScopedSearchAgentResourcesInput],
+    ) -> APIResponse:
+        """Read the slot rows the named agents carry, combined with OR."""
+        result = await self._adapter.scoped_search_agent_resources(body.parsed)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
     async def search_agent_resources(

@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import uuid
 from collections.abc import Mapping, Sequence
 from typing import TYPE_CHECKING
 from uuid import UUID
@@ -51,6 +50,7 @@ from ai.backend.common.dto.manager.v2.user.request import (
     DeleteUserInput,
     PurgeUserInput,
     RestoreUserInput,
+    ScopedSearchUsersInput,
     SearchUsersRequest,
     UpdateUserInput,
     UserFilter,
@@ -87,6 +87,7 @@ from ai.backend.common.dto.manager.v2.user.types import (
     UserOrderField,
     UserProjectFilter,
     UserRoleFilter,
+    UserScope,
     UserStatusFilter,
 )
 from ai.backend.common.dto.manager.v2.user.types import (
@@ -154,6 +155,7 @@ from ai.backend.manager.services.user.actions.scoped_search import (
     DomainUserScopeItem,
     ProjectUserScopeItem,
     ScopedSearchUsersAction,
+    UserScopeItem,
 )
 from ai.backend.manager.services.user.actions.search_users import GlobalSearchUsersAction
 from ai.backend.manager.services.user.actions.search_users_by_role import (
@@ -167,12 +169,13 @@ from ai.backend.manager.types import OptionalState, TriState
 
 if TYPE_CHECKING:
     from ai.backend.manager.config.unified import AuthConfig
-    from ai.backend.manager.services.processors import Processors
 
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.models.keypair.row import KEYPAIR_SECRET_KEY_CONTEXT
 from ai.backend.manager.secret.pool import KeyProviderPool
+from ai.backend.manager.services.domain.processors import DomainProcessors
+from ai.backend.manager.services.user.processors import UserProcessors
 
 _USER_PAGINATION_SPEC = PaginationSpec(
     forward_order=UserOrders.created_at(ascending=False),
@@ -194,26 +197,31 @@ _KEYPAIR_PAGINATION_SPEC = PaginationSpec(
 class UserAdapter(BaseAdapter):
     """Adapter for user domain operations."""
 
+    _user: UserProcessors
+    _domain: DomainProcessors
+    _auth_config: AuthConfig
+    _key_provider_pool: KeyProviderPool
+
     def __init__(
         self,
-        processors: Processors,
+        user: UserProcessors,
+        domain: DomainProcessors,
         auth_config: AuthConfig,
         key_provider_pool: KeyProviderPool,
     ) -> None:
-        super().__init__(processors)
+        self._user = user
+        self._domain = domain
         self._auth_config = auth_config
         self._key_provider_pool = key_provider_pool
 
     async def resolve_domain_id(self, domain_name: str) -> DomainID:
         """The domain's id, for callers that only hold its name."""
-        result = await self._processors.domain.lookup.run(
-            LookupDomainAction(name=DomainName(domain_name))
-        )
+        result = await self._domain.lookup.run(LookupDomainAction(name=DomainName(domain_name)))
         return result.entity_id()
 
     # ------------------------------------------------------------------ batch load (DataLoader)
 
-    async def batch_load_by_ids(self, user_ids: Sequence[uuid.UUID]) -> list[UserNode | None]:
+    async def batch_load_by_ids(self, user_ids: Sequence[UserID]) -> list[UserNode | None]:
         """Batch load users by UUID for DataLoader use.
 
         Returns UserNode DTOs in the same order as the input user_ids list.
@@ -226,9 +234,7 @@ class UserAdapter(BaseAdapter):
                 UserConditions.by_uuid_in(UUIDInMatchSpec(values=list(user_ids), negated=False))
             ],
         )
-        result = await self._processors.user.global_search.run(
-            GlobalSearchUsersAction(searcher=searcher)
-        )
+        result = await self._user.global_search.run(GlobalSearchUsersAction(searcher=searcher))
         nodes = await self._user_nodes(result.items)
         user_map = {user.uuid: node for user, node in zip(result.items, nodes, strict=True)}
         return [user_map.get(user_id) for user_id in user_ids]
@@ -254,9 +260,7 @@ class UserAdapter(BaseAdapter):
             limit=input.limit,
             offset=input.offset,
         )
-        result = await self._processors.user.global_search.run(
-            GlobalSearchUsersAction(searcher=searcher)
-        )
+        result = await self._user.global_search.run(GlobalSearchUsersAction(searcher=searcher))
         return AdminSearchUsersPayload(
             items=await self._user_nodes(result.items),
             total_count=result.total_count,
@@ -284,7 +288,7 @@ class UserAdapter(BaseAdapter):
             limit=input.limit,
             offset=input.offset,
         )
-        result = await self._processors.user.scoped_search.run(
+        result = await self._user.scoped_search.run(
             ScopedSearchUsersAction(
                 items=[DomainUserScopeItem(domain_id=await self.resolve_domain_id(domain_name))],
                 searcher=searcher,
@@ -317,7 +321,7 @@ class UserAdapter(BaseAdapter):
             limit=input.limit,
             offset=input.offset,
         )
-        result = await self._processors.user.scoped_search.run(
+        result = await self._user.scoped_search.run(
             ScopedSearchUsersAction(
                 items=[ProjectUserScopeItem(project_id=project_id)],
                 searcher=searcher,
@@ -338,8 +342,42 @@ class UserAdapter(BaseAdapter):
     ) -> SearchUsersPayload:
         """Search users with no scope restriction (admin only)."""
         searcher = self._build_search_searcher(input)
-        result = await self._processors.user.global_search.run(
-            GlobalSearchUsersAction(searcher=searcher)
+        result = await self._user.global_search.run(GlobalSearchUsersAction(searcher=searcher))
+        return SearchUsersPayload(
+            items=await self._user_nodes(result.items),
+            pagination=PaginationInfo(
+                total=result.total_count,
+                offset=input.offset,
+                limit=input.limit,
+            ),
+        )
+
+    def _scope_items(self, scope: UserScope) -> list[UserScopeItem]:
+        """The scope items the request named, in the order the input lists them."""
+        items: list[UserScopeItem] = [
+            DomainUserScopeItem(domain_id=DomainID(entry.value)) for entry in scope.domain or ()
+        ]
+        items.extend(
+            ProjectUserScopeItem(project_id=ProjectID(entry.value)) for entry in scope.project or ()
+        )
+        return items
+
+    async def scoped_search(
+        self,
+        input: ScopedSearchUsersInput,
+    ) -> SearchUsersPayload:
+        """Search the users the named scopes reach, combined with OR."""
+        conditions = self._convert_filter(input.filter) if input.filter else []
+        orders = self._convert_orders(input.order) if input.order else []
+        result = await self._user.scoped_search.run(
+            ScopedSearchUsersAction(
+                items=self._scope_items(input.scope),
+                searcher=UserSearcher(
+                    conditions=conditions,
+                    orders=orders,
+                    pagination=OffsetPagination(limit=input.limit, offset=input.offset),
+                ),
+            )
         )
         return SearchUsersPayload(
             items=await self._user_nodes(result.items),
@@ -350,6 +388,36 @@ class UserAdapter(BaseAdapter):
             ),
         )
 
+    async def gql_scoped_search(
+        self,
+        scope: UserScope,
+        input: AdminSearchUsersInput,
+    ) -> AdminSearchUsersPayload:
+        """Search the users the named scopes reach, cursor-based pagination."""
+        conditions = self._convert_gql_filter(input.filter) if input.filter else []
+        orders = self._convert_gql_orders(input.order) if input.order else []
+        searcher = self._build_searcher(
+            UserSearcher,
+            conditions=conditions,
+            orders=orders,
+            pagination_spec=_USER_PAGINATION_SPEC,
+            first=input.first,
+            after=input.after,
+            last=input.last,
+            before=input.before,
+            limit=input.limit,
+            offset=input.offset,
+        )
+        result = await self._user.scoped_search.run(
+            ScopedSearchUsersAction(items=self._scope_items(scope), searcher=searcher)
+        )
+        return AdminSearchUsersPayload(
+            items=await self._user_nodes(result.items),
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+        )
+
     async def domain_search(
         self,
         domain_name: str,
@@ -357,7 +425,7 @@ class UserAdapter(BaseAdapter):
     ) -> SearchUsersPayload:
         """Search users within a domain."""
         searcher = self._build_search_searcher(input)
-        result = await self._processors.user.scoped_search.run(
+        result = await self._user.scoped_search.run(
             ScopedSearchUsersAction(
                 items=[DomainUserScopeItem(domain_id=await self.resolve_domain_id(domain_name))],
                 searcher=searcher,
@@ -379,7 +447,7 @@ class UserAdapter(BaseAdapter):
     ) -> SearchUsersPayload:
         """Search users within a project."""
         searcher = self._build_search_searcher(input)
-        result = await self._processors.user.scoped_search.run(
+        result = await self._user.scoped_search.run(
             ScopedSearchUsersAction(
                 items=[ProjectUserScopeItem(project_id=ProjectID(project_id))],
                 searcher=searcher,
@@ -402,7 +470,7 @@ class UserAdapter(BaseAdapter):
         """Search users assigned to a role."""
         searcher = self._build_search_searcher(input)
         searcher.conditions = [*searcher.conditions, UserConditions.by_role_id(role_id)]
-        result = await self._processors.user.search_users_by_role.run(
+        result = await self._user.search_users_by_role.run(
             SearchUsersByRoleAction(role_id=role_id, searcher=searcher)
         )
         return SearchUsersPayload(
@@ -418,9 +486,7 @@ class UserAdapter(BaseAdapter):
 
     async def get(self, user_id: UUID) -> UserPayload:
         """Get a user by UUID."""
-        action_result = await self._processors.user.get_user.run(
-            GetUserAction(user_id=UserID(user_id))
-        )
+        action_result = await self._user.get_user.run(GetUserAction(user_id=UserID(user_id)))
         return UserPayload(user=await self._user_node(action_result.user))
 
     # ------------------------------------------------------------------ single CRUD
@@ -453,7 +519,7 @@ class UserAdapter(BaseAdapter):
             integration_name=input.integration_name,
         )
         group_ids = [str(gid) for gid in input.group_ids] if input.group_ids else None
-        result = await self._processors.user.create_user.run(
+        result = await self._user.create_user.run(
             CreateUserAction(creator=creator, group_ids=group_ids)
         )
         return CreateUserPayload(
@@ -557,28 +623,26 @@ class UserAdapter(BaseAdapter):
                 else OptionalState.update([str(gid) for gid in input.group_ids])
             ),
         )
-        result = await self._processors.user.update_user.run(UpdateUserAction(updater=updater))
+        result = await self._user.update_user.run(UpdateUserAction(updater=updater))
         if not isinstance(input.main_access_key, Sentinel) and input.main_access_key is not None:
             await self.switch_default_access_key(UserID(user_id), AccessKey(input.main_access_key))
         return UpdateUserPayload(user=await self._user_node(result.data))
 
     async def delete_user_by_id(self, input: DeleteUserInput) -> DeleteUserPayload:
         """Soft-delete a user by UUID."""
-        await self._processors.user.delete_user.run(DeleteUserAction(user_id=UserID(input.user_id)))
+        await self._user.delete_user.run(DeleteUserAction(user_id=UserID(input.user_id)))
         return DeleteUserPayload(success=True)
 
     async def restore_user_by_id(self, input: RestoreUserInput) -> RestoreUserPayload:
         """Restore a soft-deleted user by UUID."""
-        await self._processors.user.restore_user.run(
-            RestoreUserAction(user_id=UserID(input.user_id))
-        )
+        await self._user.restore_user.run(RestoreUserAction(user_id=UserID(input.user_id)))
         return RestoreUserPayload(success=True)
 
     async def purge_user_by_id(
         self, input: PurgeUserInput, admin_user_id: UUID
     ) -> PurgeUserPayload:
         """Permanently purge a user by UUID."""
-        await self._processors.user.purge_user.run(
+        await self._user.purge_user.run(
             PurgeUserAction(
                 user_id=UserID(input.user_id),
                 admin_user_id=admin_user_id,
@@ -604,7 +668,7 @@ class UserAdapter(BaseAdapter):
         Deprecated: the generated keypairs are not returned. Use
         :meth:`bulk_create_users_with_keypair` instead.
         """
-        result = await self._processors.user.bulk_create_users.run(action)
+        result = await self._user.bulk_create_users.run(action)
         created_users = await self._user_nodes([item.user for item in result.data.successes])
         failed = [
             BulkCreateUserV2Error(
@@ -624,7 +688,7 @@ class UserAdapter(BaseAdapter):
 
         The secret key of each keypair is only returned here at creation time.
         """
-        result = await self._processors.user.bulk_create_users.run(action)
+        result = await self._user.bulk_create_users.run(action)
         created_nodes = await self._user_nodes([item.user for item in result.data.successes])
         created = [
             CreateUserPayload(
@@ -654,7 +718,7 @@ class UserAdapter(BaseAdapter):
         A switch runs only for a user whose own update went through, and a switch that
         fails turns that user into a failure instead of aborting the whole batch.
         """
-        result = await self._processors.user.bulk_modify_users.run(action)
+        result = await self._user.bulk_modify_users.run(action)
         failed = [
             BulkUpdateUserV2Error(
                 user_id=action.items[error.index].user_id,
@@ -676,7 +740,7 @@ class UserAdapter(BaseAdapter):
 
     async def bulk_purge_users(self, action: BulkPurgeUserAction) -> BulkPurgeUsersPayload:
         """Bulk-purge users permanently."""
-        result = await self._processors.user.bulk_purge_users.run(action)
+        result = await self._user.bulk_purge_users.run(action)
         failed = [
             BulkPurgeUserV2Error(
                 user_id=error.user_id,
@@ -692,14 +756,14 @@ class UserAdapter(BaseAdapter):
 
     async def update_user(self, action: UpdateUserAction) -> UpdateMyAllowedClientIPPayload:
         """Modify a user. Caller is responsible for building the action."""
-        await self._processors.user.update_user.run(action)
+        await self._user.update_user.run(action)
         return UpdateMyAllowedClientIPPayload(success=True)
 
     # ------------------------------------------------------------------ keypair operations
 
     async def issue_my_keypair(self, user_id: UUID) -> IssueMyKeypairPayload:
         """Issue a new keypair for the current user."""
-        result = await self._processors.user.issue_my_keypair.run(
+        result = await self._user.issue_my_keypair.run(
             IssueMyKeypairAction(user_id=UserID(user_id))
         )
         return IssueMyKeypairPayload(
@@ -714,7 +778,7 @@ class UserAdapter(BaseAdapter):
 
     async def update_my_keypair(self, access_key: str, is_active: bool) -> UpdateMyKeypairPayload:
         """Update a keypair owned by the current user."""
-        result = await self._processors.user.update_keypair.run(
+        result = await self._user.update_keypair.run(
             UpdateKeypairAction(
                 keypair_id=await self._resolve_keypair(access_key),
                 is_active=OptionalState.update(is_active),
@@ -726,7 +790,7 @@ class UserAdapter(BaseAdapter):
         self, user_id: UserID, access_key: AccessKey
     ) -> SwitchMyMainAccessKeyPayload:
         """Move the ``is_default`` marker among the user's keypairs onto ``access_key``."""
-        result = await self._processors.user.switch_default_access_key.run(
+        result = await self._user.switch_default_access_key.run(
             SwitchDefaultAccessKeyAction(user_id=user_id, access_key=access_key)
         )
         return SwitchMyMainAccessKeyPayload(success=result.success)
@@ -758,7 +822,7 @@ class UserAdapter(BaseAdapter):
             limit=input.limit,
             offset=input.offset,
         )
-        action_result = await self._processors.user.search_my_keypairs.run(
+        action_result = await self._user.search_my_keypairs.run(
             SearchMyKeypairsAction(user_id=UserID(scope.user_uuid), querier=querier)
         )
         return SearchResult(
@@ -812,7 +876,7 @@ class UserAdapter(BaseAdapter):
             resource_policy=input.resource_policy,
             rate_limit=input.rate_limit,
         )
-        result = await self._processors.user.admin_create_keypair.run(
+        result = await self._user.admin_create_keypair.run(
             AdminCreateKeypairAction(user_id=UserID(input.user_id), creator=creator)
         )
         return AdminCreateKeypairPayload(
@@ -821,7 +885,7 @@ class UserAdapter(BaseAdapter):
         )
 
     async def _resolve_keypair_owner(self, access_key: str) -> UserID:
-        result = await self._processors.user.lookup_keypair_owner.run(
+        result = await self._user.lookup_keypair_owner.run(
             LookupKeypairOwnerByAccessKeyAction(access_key=AccessKey(access_key))
         )
         return UserID(result.entity_id())
@@ -829,13 +893,13 @@ class UserAdapter(BaseAdapter):
     async def _resolve_keypair(self, access_key: str) -> KeyPairID:
         """The id of the keypair an access key names, which every operation on that row
         is built from."""
-        result = await self._processors.user.lookup_keypair.run(
+        result = await self._user.lookup_keypair.run(
             LookupKeypairByAccessKeyAction(access_key=AccessKey(access_key))
         )
         return KeyPairID(result.field_id)
 
     async def _purge_keypair(self, access_key: str) -> str:
-        result = await self._processors.user.purge_keypair.run(
+        result = await self._user.purge_keypair.run(
             PurgeKeypairAction(keypair_id=await self._resolve_keypair(access_key))
         )
         return str(result.keypair.access_key)
@@ -844,7 +908,7 @@ class UserAdapter(BaseAdapter):
         self, input: AdminUpdateKeypairInput
     ) -> AdminUpdateKeypairPayload:
         """Admin updates any keypair."""
-        result = await self._processors.user.update_keypair.run(
+        result = await self._user.update_keypair.run(
             UpdateKeypairAction(
                 keypair_id=await self._resolve_keypair(input.access_key),
                 is_active=OptionalState.from_nullable(input.is_active),
@@ -861,7 +925,7 @@ class UserAdapter(BaseAdapter):
 
     async def admin_get_keypair(self, access_key: str) -> KeypairNode:
         """Admin retrieves a single keypair by access key."""
-        result = await self._processors.user.get_keypair.run(
+        result = await self._user.get_keypair.run(
             GetKeypairAction(keypair_id=await self._resolve_keypair(access_key))
         )
         return self._keypair_data_to_node(result.keypair)
@@ -870,7 +934,7 @@ class UserAdapter(BaseAdapter):
         self, input: AdminRegisterSSHKeypairInput
     ) -> AdminRegisterSSHKeypairPayload:
         """Admin registers (overwrites) a user's SSH keypair."""
-        result = await self._processors.user.admin_register_ssh_keypair.run(
+        result = await self._user.admin_register_ssh_keypair.run(
             AdminRegisterSSHKeypairAction(
                 user_id=await self._resolve_keypair_owner(input.access_key),
                 access_key=input.access_key,
@@ -882,7 +946,7 @@ class UserAdapter(BaseAdapter):
 
     async def admin_delete_ssh_keypair(self, access_key: str) -> AdminDeleteSSHKeypairPayload:
         """Admin clears a user's SSH keypair."""
-        result = await self._processors.user.admin_delete_ssh_keypair.run(
+        result = await self._user.admin_delete_ssh_keypair.run(
             AdminDeleteSSHKeypairAction(
                 user_id=await self._resolve_keypair_owner(access_key), access_key=access_key
             )
@@ -891,7 +955,7 @@ class UserAdapter(BaseAdapter):
 
     async def admin_get_ssh_keypair(self, access_key: str) -> AdminGetSSHKeypairPayload:
         """Admin retrieves a user's SSH public key (never the private key)."""
-        result = await self._processors.user.admin_get_ssh_keypair.run(
+        result = await self._user.admin_get_ssh_keypair.run(
             AdminGetSSHKeypairAction(
                 user_id=await self._resolve_keypair_owner(access_key), access_key=access_key
             )
@@ -921,7 +985,7 @@ class UserAdapter(BaseAdapter):
             limit=input.limit,
             offset=input.offset,
         )
-        action_result = await self._processors.user.admin_search_keypairs.run(
+        action_result = await self._user.admin_search_keypairs.run(
             AdminSearchKeypairsAction(querier=querier)
         )
         return AdminSearchKeypairsPayload(
@@ -963,7 +1027,7 @@ class UserAdapter(BaseAdapter):
             limit=input.limit,
             offset=input.offset,
         )
-        action_result = await self._processors.user.admin_search_keypairs.run(
+        action_result = await self._user.admin_search_keypairs.run(
             AdminSearchKeypairsAction(querier=querier)
         )
         return SearchResult(
@@ -1575,7 +1639,7 @@ class UserAdapter(BaseAdapter):
         """The key each user authorizes with, read for every one of them in one go."""
         if not users:
             return {}
-        result = await self._processors.user.get_default_keypairs.run(
+        result = await self._user.get_default_keypairs.run(
             GetDefaultKeypairsAction(user_ids=[UserID(user.id) for user in users])
         )
         return {
