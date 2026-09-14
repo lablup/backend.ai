@@ -155,6 +155,12 @@ from ai.backend.manager.services.artifact.revision.processors import ArtifactRev
 from ai.backend.manager.services.artifact_registry.actions.common.get_multi import (
     GetArtifactRegistryMetasAction,
 )
+from ai.backend.manager.services.artifact_registry.actions.huggingface.bulk_get import (
+    BulkGetHuggingFaceRegistriesAction,
+)
+from ai.backend.manager.services.artifact_registry.actions.reservoir.bulk_get import (
+    BulkGetReservoirRegistriesAction,
+)
 from ai.backend.manager.services.artifact_registry.processors import ArtifactRegistryProcessors
 from ai.backend.manager.services.audit_log.actions.bulk_get import BulkGetAuditLogsAction
 from ai.backend.manager.services.audit_log.actions.lookup_owner import (
@@ -163,6 +169,9 @@ from ai.backend.manager.services.audit_log.actions.lookup_owner import (
 )
 from ai.backend.manager.services.audit_log.processors import AuditLogProcessors
 from ai.backend.manager.services.auth.processors import AuthProcessors
+from ai.backend.manager.services.container_registry.actions.bulk_get import (
+    BulkGetContainerRegistriesAction,
+)
 from ai.backend.manager.services.container_registry.processors import ContainerRegistryProcessors
 from ai.backend.manager.services.deployment.actions.access_token.bulk_delete_access_tokens import (
     BulkDeleteAccessTokensAction,
@@ -548,7 +557,12 @@ def test_every_defined_v2_action_is_wired() -> None:
         ),
         MagicMock(),
     )
-    ArtifactRegistryProcessors(registry.group(GroupMeta(ArtifactRegistryEntityType())), MagicMock())
+    ArtifactRegistryProcessors(
+        registry.group(GroupMeta(ArtifactRegistryEntityType())),
+        registry.group(GroupMeta(ArtifactRegistryEntityType())),
+        registry.group(GroupMeta(ArtifactRegistryEntityType())),
+        MagicMock(),
+    )
     ModelCardProcessors(registry.group(GroupMeta(ModelCardEntityType())), MagicMock())
     ContainerRegistryProcessors(
         registry.group(GroupMeta(ContainerRegistryEntityType())), MagicMock()
@@ -796,15 +810,31 @@ def test_resource_domain_and_agent_reads_keep_their_judged_gates() -> None:
 
 
 def test_artifact_registry_metas_read_is_a_partial_bulk_permission_read() -> None:
-    """The named registries are read one permission check per registry, not superadmin-only."""
+    """The named artifact, HuggingFace and Reservoir registries are read one permission check
+    per registry, not superadmin-only."""
     registry = _ops_registry()
-    ArtifactRegistryProcessors(registry.group(GroupMeta(ArtifactRegistryEntityType())), MagicMock())
+    ArtifactRegistryProcessors(
+        registry.group(GroupMeta(ArtifactRegistryEntityType())),
+        registry.group(GroupMeta(ArtifactRegistryEntityType())),
+        registry.group(GroupMeta(ArtifactRegistryEntityType())),
+        MagicMock(),
+    )
 
     recorded = {
         record.action_cls: (record.entity_type, record.kind, record.gate)
         for record in registry.wired_processors()
     }
     assert recorded[GetArtifactRegistryMetasAction] == (
+        ArtifactRegistryEntityType(),
+        ActionKind.BULK,
+        ActionGate.PERMISSION,
+    )
+    assert recorded[BulkGetHuggingFaceRegistriesAction] == (
+        ArtifactRegistryEntityType(),
+        ActionKind.BULK,
+        ActionGate.PERMISSION,
+    )
+    assert recorded[BulkGetReservoirRegistriesAction] == (
         ArtifactRegistryEntityType(),
         ActionKind.BULK,
         ActionGate.PERMISSION,
@@ -1060,6 +1090,24 @@ def test_vfs_storage_loader_read_is_a_partial_permission_read() -> None:
     }
     assert recorded[BulkGetVFSStoragesAction] == (
         VFSStorageEntityType(),
+        ActionKind.BULK,
+        ActionGate.PERMISSION,
+    )
+
+
+def test_container_registry_loader_read_is_a_partial_permission_read() -> None:
+    """The container registry DataLoader reads per named registry, not superadmin-only."""
+    registry = _ops_registry()
+    ContainerRegistryProcessors(
+        registry.group(GroupMeta(ContainerRegistryEntityType())), MagicMock()
+    )
+
+    recorded = {
+        record.action_cls: (record.entity_type, record.kind, record.gate)
+        for record in registry.wired_processors()
+    }
+    assert recorded[BulkGetContainerRegistriesAction] == (
+        ContainerRegistryEntityType(),
         ActionKind.BULK,
         ActionGate.PERMISSION,
     )

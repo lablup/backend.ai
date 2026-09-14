@@ -2,9 +2,12 @@ from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass
+from typing import override
 
 from ai.backend.common.data.artifact.types import ArtifactRegistryType
 from ai.backend.common.data.artifact_registry.types import HuggingFaceRegistryStatefulData
+from ai.backend.common.data.entity.artifact_registry import ArtifactRegistryID
+from ai.backend.common.data.entity.types import EntityData
 
 
 @dataclass
@@ -39,6 +42,19 @@ class HuggingFaceRegistryData:
             url=self.url,
             token=self.token,
         )
+
+
+@dataclass
+class HuggingFaceRegistryConnectionData(EntityData):
+    """A HuggingFace registry's own columns, without the name its artifact registry row holds."""
+
+    id: ArtifactRegistryID
+    url: str
+    token: str | None
+
+    @override
+    def entity_id(self) -> ArtifactRegistryID:
+        return self.id
 
 
 @dataclass

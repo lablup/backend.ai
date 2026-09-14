@@ -401,7 +401,9 @@ class DataLoaders:
     ) -> DataLoader[ArtifactRegistryID, ArtifactRegistry | None]:
         adapter = self._adapters.artifact_registry
 
-        async def load_fn(ids: list[ArtifactRegistryID]) -> list[ArtifactRegistry | None]:
+        async def load_fn(
+            ids: list[ArtifactRegistryID],
+        ) -> list[ArtifactRegistry | Exception | None]:
             from strawberry import ID  # pants: no-infer-dep
 
             from ai.backend.manager.api.gql.artifact_registry import (  # pants: no-infer-dep
@@ -410,14 +412,14 @@ class DataLoaders:
 
             dtos = await adapter.batch_load_by_ids(ids)
             return [
-                AR(
+                dto
+                if dto is None or isinstance(dto, Exception)
+                else AR(
                     id=ID(str(dto.id)),
                     registry_id=ID(str(dto.registry_id)),
                     name=dto.name,
                     type=dto.type,
                 )
-                if dto is not None
-                else None
                 for dto in dtos
             ]
 
@@ -429,13 +431,18 @@ class DataLoaders:
     ) -> DataLoader[ContainerRegistryID, ContainerRegistryGQL | None]:
         adapter = self._adapters.container_registry
 
-        async def load_fn(ids: list[ContainerRegistryID]) -> list[ContainerRegistryGQL | None]:
+        async def load_fn(
+            ids: list[ContainerRegistryID],
+        ) -> list[ContainerRegistryGQL | Exception | None]:
             from ai.backend.manager.api.gql.container_registry.types import (  # pants: no-infer-dep
                 ContainerRegistryGQL as CR,
             )
 
             dtos = await adapter.batch_load_by_ids(ids)
-            return [CR.from_pydantic(dto) if dto is not None else None for dto in dtos]
+            return [
+                dto if dto is None or isinstance(dto, Exception) else CR.from_pydantic(dto)
+                for dto in dtos
+            ]
 
         return DataLoader(load_fn=load_fn)
 
@@ -445,13 +452,16 @@ class DataLoaders:
     ) -> DataLoader[uuid.UUID, HuggingFaceRegistry | None]:
         adapter = self._adapters.huggingface_registry
 
-        async def load_fn(ids: list[uuid.UUID]) -> list[HuggingFaceRegistry | None]:
+        async def load_fn(ids: list[uuid.UUID]) -> list[HuggingFaceRegistry | Exception | None]:
             from ai.backend.manager.api.gql.huggingface_registry import (  # pants: no-infer-dep
                 HuggingFaceRegistry as HF,
             )
 
             dtos = await adapter.batch_load_by_ids(ids)
-            return [HF.from_pydantic(dto) if dto is not None else None for dto in dtos]
+            return [
+                dto if dto is None or isinstance(dto, Exception) else HF.from_pydantic(dto)
+                for dto in dtos
+            ]
 
         return DataLoader(load_fn=load_fn)
 
@@ -461,13 +471,16 @@ class DataLoaders:
     ) -> DataLoader[uuid.UUID, ReservoirRegistry | None]:
         adapter = self._adapters.reservoir_registry
 
-        async def load_fn(ids: list[uuid.UUID]) -> list[ReservoirRegistry | None]:
+        async def load_fn(ids: list[uuid.UUID]) -> list[ReservoirRegistry | Exception | None]:
             from ai.backend.manager.api.gql.reservoir_registry import (  # pants: no-infer-dep
                 ReservoirRegistry as RR,
             )
 
             dtos = await adapter.batch_load_by_ids(ids)
-            return [RR.from_pydantic(dto) if dto is not None else None for dto in dtos]
+            return [
+                dto if dto is None or isinstance(dto, Exception) else RR.from_pydantic(dto)
+                for dto in dtos
+            ]
 
         return DataLoader(load_fn=load_fn)
 
