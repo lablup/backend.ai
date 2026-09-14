@@ -11,6 +11,7 @@ from ai.backend.common.contexts.user import current_user
 from ai.backend.common.data.entity.domain import DomainID, DomainName
 from ai.backend.common.data.entity.keypair import KeyPairID
 from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.role import RoleID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.filter_specs import StringMatchSpec, UUIDInMatchSpec
 from ai.backend.common.data.user.types import UserRole
@@ -154,6 +155,7 @@ from ai.backend.manager.services.user.actions.restore_user import RestoreUserAct
 from ai.backend.manager.services.user.actions.scoped_search import (
     DomainUserScopeItem,
     ProjectUserScopeItem,
+    RoleUserScopeItem,
     ScopedSearchUsersAction,
     UserScopeItem,
 )
@@ -360,6 +362,7 @@ class UserAdapter(BaseAdapter):
         items.extend(
             ProjectUserScopeItem(project_id=ProjectID(entry.value)) for entry in scope.project or ()
         )
+        items.extend(RoleUserScopeItem(role_id=RoleID(entry.value)) for entry in scope.role or ())
         return items
 
     async def scoped_search(
