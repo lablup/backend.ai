@@ -102,6 +102,7 @@ one place per domain.
 | `ObjectNotFound` raised in `clients/container_registry/harbor.py` | a Harbor quota, the registry's own object |
 | `ObjectNotFound` raised in `services/resource_group/service.py` | the AppProxy client pool the manager was started without |
 | `ObjectNotFound` raised in `services/auth/service.py` | "no such project or not a member" is one answer for two cases on purpose, so it names no row |
+| `ObjectNotFound` raised in `api/gql_legacy/base.py` `extract_object_uuid` | takes the row kind as a string argument from its caller, so the helper itself names no row |
 | `URLNotFound`, `MethodNotAllowed`, `ServerFrozen`, `NotImplementedAPI`, `InvalidAPIParameters`, `InvalidGraphQLParameters`, `InvalidCursor` | the request — its path, method, parameters or cursor — refused before a row is reached |
 | `RateLimitExceeded` | how often the caller asks, not a row |
 | `GenericBadRequest` | the request itself — an unsupported API version, an unknown scheduler operation, a parameter left out — or a Harbor quota that already exists |
