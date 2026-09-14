@@ -10,7 +10,7 @@ from ai.backend.manager.actions.v2.global_scope.base import BaseGlobalAction
 
 
 @dataclass(frozen=True)
-class GlobalGetEntityTypesAction(BaseGlobalAction):
+class PublicGetEntityTypesAction(BaseGlobalAction):
     """The entity types a role may permit."""
 
     @override
@@ -26,9 +26,9 @@ class GlobalGetEntityTypesAction(BaseGlobalAction):
     @override
     @classmethod
     def action_name(cls) -> str:
-        return "global_get_entity_types"
+        return "public_get_entity_types"
 
 
 @dataclass(frozen=True)
-class GlobalGetEntityTypesActionResult:
+class PublicGetEntityTypesActionResult:
     entity_types: list[EntityType]

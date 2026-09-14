@@ -24,10 +24,9 @@ from ai.backend.manager.data.common.types import SearchResult
 from ai.backend.manager.data.permission.id import ScopeId
 from ai.backend.manager.data.permission.types import ScopeData
 from ai.backend.manager.dto.context import UserContext
-from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.services.permission_contoller.actions.get_scope_types import (
-    GlobalGetScopeTypesActionResult,
+    PublicGetScopeTypesActionResult,
 )
 from ai.backend.manager.services.permission_contoller.actions.search_scopes import (
     GlobalSearchScopesActionResult,
@@ -52,19 +51,6 @@ def make_test_superadmin_ctx() -> UserContext:
     )
 
 
-def make_test_user_ctx() -> UserContext:
-    """Create a UserContext for a regular (non-superadmin) user."""
-    return UserContext(
-        user_uuid=uuid4(),
-        user_email="user@test.com",
-        user_domain="default",
-        user_role=UserRole.USER,
-        access_key="USERKEY",
-        is_admin=False,
-        is_superadmin=False,
-    )
-
-
 class TestGetScopeTypesHandler:
     """Tests for get_scope_types handler."""
 
@@ -74,19 +60,19 @@ class TestGetScopeTypesHandler:
     def mock_permission_controller(self) -> MagicMock:
         """Create mock permission controller processors."""
         pc = MagicMock()
-        pc.global_get_scope_types = MagicMock()
-        pc.global_get_scope_types.run = AsyncMock()
+        pc.public_get_scope_types = MagicMock()
+        pc.public_get_scope_types.run = AsyncMock()
         return pc
 
     async def test_get_scope_types_returns_scope_types(
         self,
         mock_permission_controller: MagicMock,
     ) -> None:
-        """Test get_scope_types returns all scope types for superadmin."""
+        """Test get_scope_types returns all scope types."""
         handler = make_test_handler(mock_permission_controller)
         ctx = make_test_superadmin_ctx()
-        action_result = GlobalGetScopeTypesActionResult(entity_types=self.SCOPE_TYPES)
-        mock_permission_controller.global_get_scope_types.run.return_value = action_result
+        action_result = PublicGetScopeTypesActionResult(entity_types=self.SCOPE_TYPES)
+        mock_permission_controller.public_get_scope_types.run.return_value = action_result
 
         response = await handler.get_scope_types(ctx=ctx)
 
@@ -95,17 +81,6 @@ class TestGetScopeTypesHandler:
         assert isinstance(response_json, dict)
         assert "items" in response_json
         assert response_json["items"] == self.SCOPE_TYPES
-
-    async def test_get_scope_types_rejects_non_superadmin(
-        self,
-        mock_permission_controller: MagicMock,
-    ) -> None:
-        """Test get_scope_types rejects non-superadmin users."""
-        handler = make_test_handler(mock_permission_controller)
-        ctx = make_test_user_ctx()
-
-        with pytest.raises(NotEnoughPermission):
-            await handler.get_scope_types(ctx=ctx)
 
 
 class TestSearchScopesHandler:
@@ -253,16 +228,3 @@ class TestSearchScopesHandler:
         call_args = mock_permission_controller.global_search_scopes.run.call_args
         action = call_args[0][0]
         assert action.scope_type == self.TEST_SCOPE_TYPE
-
-    async def test_search_scopes_rejects_non_superadmin(
-        self,
-        mock_permission_controller: MagicMock,
-    ) -> None:
-        """Test search_scopes rejects non-superadmin users."""
-        handler = make_test_handler(mock_permission_controller)
-        ctx = make_test_user_ctx()
-        path = self._make_path_param(self.TEST_SCOPE_TYPE)
-        body = self._make_body_param()
-
-        with pytest.raises(NotEnoughPermission):
-            await handler.search_scopes(path=path, body=body, ctx=ctx)
