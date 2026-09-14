@@ -41,16 +41,16 @@ from .actions.bulk_get_permissions import BulkGetPermissionsAction
 from .actions.bulk_get_roles import BulkGetRolesAction
 from .actions.delete_permission import DeletePermissionAction
 from .actions.get_entity_types import (
-    GlobalGetEntityTypesAction,
-    GlobalGetEntityTypesActionResult,
+    PublicGetEntityTypesAction,
+    PublicGetEntityTypesActionResult,
 )
 from .actions.get_permission_matrix import (
     PublicGetPermissionMatrixAction,
     PublicGetPermissionMatrixActionResult,
 )
 from .actions.get_scope_types import (
-    GlobalGetScopeTypesAction,
-    GlobalGetScopeTypesActionResult,
+    PublicGetScopeTypesAction,
+    PublicGetScopeTypesActionResult,
 )
 from .actions.lookup_permission_owner import (
     LookupBulkRolePermissionOwnerAction,
@@ -111,11 +111,11 @@ class PermissionControllerProcessors:
     global_search_scopes: GlobalActionProcessor[
         GlobalSearchScopesAction, GlobalSearchScopesActionResult
     ]
-    global_get_scope_types: GlobalActionProcessor[
-        GlobalGetScopeTypesAction, GlobalGetScopeTypesActionResult
+    public_get_scope_types: PublicActionProcessor[
+        PublicGetScopeTypesAction, PublicGetScopeTypesActionResult
     ]
-    global_get_entity_types: GlobalActionProcessor[
-        GlobalGetEntityTypesAction, GlobalGetEntityTypesActionResult
+    public_get_entity_types: PublicActionProcessor[
+        PublicGetEntityTypesAction, PublicGetEntityTypesActionResult
     ]
     public_get_permission_matrix: PublicActionProcessor[
         PublicGetPermissionMatrixAction, PublicGetPermissionMatrixActionResult
@@ -176,11 +176,11 @@ class PermissionControllerProcessors:
         self.global_search_scopes = role_group.global_scope(
             GlobalSearchScopesAction, service.search_scopes
         )
-        self.global_get_scope_types = role_group.global_scope(
-            GlobalGetScopeTypesAction, service.get_scope_types
+        self.public_get_scope_types = role_group.public(
+            PublicGetScopeTypesAction, service.get_scope_types
         )
-        self.global_get_entity_types = role_group.global_scope(
-            GlobalGetEntityTypesAction, service.get_entity_types
+        self.public_get_entity_types = role_group.public(
+            PublicGetEntityTypesAction, service.get_entity_types
         )
         self.public_get_permission_matrix = role_group.public(
             PublicGetPermissionMatrixAction, service.get_permission_matrix

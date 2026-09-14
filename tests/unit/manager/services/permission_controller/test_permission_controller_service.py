@@ -33,10 +33,11 @@ from ai.backend.manager.data.permission.role import (
     RoleDetailData,
 )
 from ai.backend.manager.data.permission.status import RoleStatus
+from ai.backend.manager.models.rbac_models.user_role.searchers import RoleAssignmentSearcher
 from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.services.permission_contoller.actions.get_entity_types import (
-    GlobalGetEntityTypesAction,
+    PublicGetEntityTypesAction,
 )
 from ai.backend.manager.services.permission_contoller.actions.get_permission_matrix import (
     PublicGetPermissionMatrixAction,
@@ -45,7 +46,7 @@ from ai.backend.manager.services.permission_contoller.actions.get_role_detail im
     GetRoleDetailAction,
 )
 from ai.backend.manager.services.permission_contoller.actions.get_scope_types import (
-    GlobalGetScopeTypesAction,
+    PublicGetScopeTypesAction,
 )
 from ai.backend.manager.services.permission_contoller.actions.search_permissions import (
     GlobalSearchPermissionsAction,
@@ -239,7 +240,7 @@ class TestSearchUsersAssignedToRole:
     @pytest.fixture
     def mock_repository(self) -> MagicMock:
         repository = MagicMock()
-        repository.search_users_assigned_to_role = AsyncMock()
+        repository.search_role_assignments_in_global = AsyncMock()
         return repository
 
     @pytest.fixture
@@ -272,13 +273,13 @@ class TestSearchUsersAssignedToRole:
             has_next_page=False,
             has_previous_page=False,
         )
-        mock_repository.search_users_assigned_to_role.return_value = mock_result
+        mock_repository.search_role_assignments_in_global.return_value = mock_result
 
-        querier = _make_querier()
-        action = GlobalSearchRoleAssignmentsAction(querier=querier)
+        searcher = RoleAssignmentSearcher(pagination=OffsetPagination(limit=10, offset=0))
+        action = GlobalSearchRoleAssignmentsAction(searcher=searcher)
         result = await service.search_users_assigned_to_role(action)
 
-        mock_repository.search_users_assigned_to_role.assert_called_once_with(querier=querier)
+        mock_repository.search_role_assignments_in_global.assert_called_once_with(searcher)
         assert result.result.total_count == 1
         assert result.result.items[0].granted_by == granted_by
 
@@ -293,9 +294,11 @@ class TestSearchUsersAssignedToRole:
             has_next_page=False,
             has_previous_page=False,
         )
-        mock_repository.search_users_assigned_to_role.return_value = mock_result
+        mock_repository.search_role_assignments_in_global.return_value = mock_result
 
-        action = GlobalSearchRoleAssignmentsAction(querier=_make_querier())
+        action = GlobalSearchRoleAssignmentsAction(
+            searcher=RoleAssignmentSearcher(pagination=OffsetPagination(limit=10, offset=0))
+        )
         result = await service.search_users_assigned_to_role(action)
 
         assert result.result.total_count == 0
@@ -392,7 +395,7 @@ class TestPermissionCatalog:
         self,
         service: PermissionControllerService,
     ) -> None:
-        result = await service.get_entity_types(GlobalGetEntityTypesAction())
+        result = await service.get_entity_types(PublicGetEntityTypesAction())
 
         assert RoleEntityType() in result.entity_types
         assert result.entity_types == sorted(set(result.entity_types))
@@ -401,7 +404,7 @@ class TestPermissionCatalog:
         self,
         service: PermissionControllerService,
     ) -> None:
-        result = await service.get_scope_types(GlobalGetScopeTypesAction())
+        result = await service.get_scope_types(PublicGetScopeTypesAction())
 
         assert result.entity_types == [DomainEntityType(), ProjectEntityType(), UserEntityType()]
 
@@ -420,7 +423,7 @@ class TestPermissionCatalog:
         service: PermissionControllerService,
     ) -> None:
         matrix = (await service.get_permission_matrix(PublicGetPermissionMatrixAction())).matrix
-        entity_types = (await service.get_entity_types(GlobalGetEntityTypesAction())).entity_types
+        entity_types = (await service.get_entity_types(PublicGetEntityTypesAction())).entity_types
 
         for entity_map in matrix.values():
             assert sorted(entity_map) == entity_types

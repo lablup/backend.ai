@@ -9,14 +9,14 @@ from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.actions.v2.global_scope.base import BaseGlobalAction
 from ai.backend.manager.data.common.types import SearchResult
 from ai.backend.manager.data.permission.role import AssignedUserData
-from ai.backend.manager.repositories.base import BatchQuerier
+from ai.backend.manager.models.rbac_models.user_role.searchers import RoleAssignmentSearcher
 
 
 @dataclass(frozen=True)
 class GlobalSearchRoleAssignmentsAction(BaseGlobalAction):
     """Page through every role assignment, whichever user or role it joins."""
 
-    querier: BatchQuerier
+    searcher: RoleAssignmentSearcher
 
     @override
     @classmethod

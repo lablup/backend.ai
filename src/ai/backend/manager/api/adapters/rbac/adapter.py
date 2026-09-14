@@ -20,18 +20,6 @@ from ai.backend.common.data.entity.types import (
 )
 from ai.backend.common.data.entity.user import UserEntityType, UserID
 from ai.backend.common.data.permission.types import Permission
-from ai.backend.common.dto.manager.rbac import (
-    OrderDirection,
-    RoleDTO,
-    RoleFilter,
-    RoleOrder,
-    RoleOrderField,
-    RoleSource,
-    RoleStatus,
-    SearchRolesRequest,
-    SearchRolesResponse,
-)
-from ai.backend.common.dto.manager.rbac.response import PaginationInfo
 from ai.backend.common.dto.manager.v2.rbac import (
     BulkAddRolePermissionFailureInfo,
     BulkAddRolePermissionsPayload,
@@ -180,9 +168,9 @@ from ai.backend.manager.models.rbac_models.role.creators import RoleCreator
 from ai.backend.manager.models.rbac_models.role.orders import RoleOrders
 from ai.backend.manager.models.rbac_models.role.updaters import RoleSoftDeleteUpdater, RoleUpdater
 from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
-from ai.backend.manager.models.specs.pagination import NoPagination, OffsetPagination
+from ai.backend.manager.models.rbac_models.user_role.searchers import RoleAssignmentSearcher
+from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.models.specs.permission import PermissionEntry
-from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.services.permission_contoller.actions.add_role_permission import (
     AddRolePermissionAction,
 )
@@ -211,7 +199,9 @@ from ai.backend.manager.services.permission_contoller.actions.replace_role_permi
     ReplaceRolePermissionsAction,
 )
 from ai.backend.manager.services.permission_contoller.actions.search_my_role_assignments import (
+    RoleAssignmentScopeItem,
     ScopedSearchRoleAssignmentsAction,
+    UserRoleAssignmentScopeItem,
 )
 from ai.backend.manager.services.permission_contoller.actions.search_permissions import (
     GlobalSearchPermissionsAction,
@@ -377,12 +367,14 @@ class RBACAdapter(BaseAdapter):
         """
         if not assignment_ids:
             return []
-        querier = BatchQuerier(
+        # Serves the deprecated RoleAssignment node alone, so it stays on the global search
+        # and goes away with that node.
+        searcher = RoleAssignmentSearcher(
             pagination=NoPagination(),
             conditions=[AssignedUserConditions.by_ids(assignment_ids)],
         )
         action_result = await self._permission_controller.global_search_role_assignments.run(
-            GlobalSearchRoleAssignmentsAction(querier=querier)
+            GlobalSearchRoleAssignmentsAction(searcher=searcher)
         )
         assignment_map: dict[UUID, RoleAssignmentNode] = {
             data.id: self._assignment_data_to_node(data) for data in action_result.result.items
@@ -500,24 +492,6 @@ class RBACAdapter(BaseAdapter):
         )
         return CreateRolePayload(role=self._role_data_to_node(result.data))
 
-    # ------------------------------------------------------------------ search
-
-    async def admin_search(self, input: SearchRolesRequest) -> SearchRolesResponse:
-        """Search roles with no scope restriction (admin only)."""
-        querier = self._build_search_querier(input)
-        action_result = await self._permission_controller.global_search_roles.run(
-            GlobalSearchRolesAction(querier=querier)
-        )
-        result = action_result.result
-        return SearchRolesResponse(
-            roles=[self._role_data_to_dto(r) for r in result.items],
-            pagination=PaginationInfo(
-                total=result.total_count,
-                offset=input.offset,
-                limit=input.limit,
-            ),
-        )
-
     # ------------------------------------------------------------------ GQL search
 
     async def admin_search_permissions_gql(
@@ -631,11 +605,19 @@ class RBACAdapter(BaseAdapter):
         me = current_user()
         if me is None:
             raise UnreachableError("User context is not available")
-        querier = self._build_querier(
-            conditions=(
-                [AssignedUserConditions.by_user_id(me.user_id)]
-                + (self._convert_assignment_filter(input.filter) if input.filter else [])
-            ),
+        return await self.search_role_assignments_in_scope(
+            [UserRoleAssignmentScopeItem(user_id=UserID(me.user_id))], input
+        )
+
+    async def search_role_assignments_in_scope(
+        self,
+        items: Sequence[RoleAssignmentScopeItem],
+        input: SearchRoleAssignmentsInput,
+    ) -> SearchResult[RoleAssignmentNode]:
+        """Search the role assignments the named scopes reach."""
+        searcher = self._build_searcher(
+            RoleAssignmentSearcher,
+            conditions=self._convert_assignment_filter(input.filter) if input.filter else [],
             orders=self._convert_assignment_orders(input.order) if input.order else [],
             pagination_spec=_assignment_pagination_spec(),
             first=input.first,
@@ -646,7 +628,7 @@ class RBACAdapter(BaseAdapter):
             offset=input.offset,
         )
         found = await self._permission_controller.scoped_search_role_assignments.run(
-            ScopedSearchRoleAssignmentsAction(user_id=UserID(me.user_id), querier=querier)
+            ScopedSearchRoleAssignmentsAction(items=items, searcher=searcher)
         )
         raw = found.result
         return SearchResult(
@@ -656,25 +638,43 @@ class RBACAdapter(BaseAdapter):
             has_previous_page=raw.has_previous_page,
         )
 
+    async def search_role_permissions(
+        self,
+        role_id: RoleID,
+        input: AdminSearchPermissionsGQLInput,
+    ) -> SearchResult[PermissionNode]:
+        """Search the permission entries one role holds."""
+        searcher = self._build_searcher(
+            RolePermissionSearcher,
+            conditions=self._convert_permission_filter(input.filter) if input.filter else [],
+            orders=self._convert_permission_orders(input.order) if input.order else [],
+            pagination_spec=_permission_pagination_spec(),
+            first=input.first,
+            after=input.after,
+            last=input.last,
+            before=input.before,
+            limit=input.limit,
+            offset=input.offset,
+        )
+        found = await self._permission_controller.search_role_permissions.run(
+            SearchRolePermissionsAction(role_ids=[role_id], searcher=searcher)
+        )
+        return SearchResult(
+            items=[self._permission_data_to_node(item) for item in found.items],
+            total_count=found.total_count,
+            has_next_page=found.has_next_page,
+            has_previous_page=found.has_previous_page,
+        )
+
     async def admin_search_role_assignments(
         self,
         input: SearchRoleAssignmentsInput,
-        base_conditions: Sequence[QueryCondition] | None = None,
     ) -> SearchResult[RoleAssignmentNode]:
         """Search role assignments with cursor/offset pagination (admin)."""
-        return await self._search_role_assignments(input, base_conditions=base_conditions)
-
-    async def _search_role_assignments(
-        self,
-        input: SearchRoleAssignmentsInput,
-        base_conditions: Sequence[QueryCondition] | None = None,
-    ) -> SearchResult[RoleAssignmentNode]:
-        """Internal implementation for searching role assignments."""
-        conditions = self._convert_assignment_filter(input.filter) if input.filter else []
-        orders = self._convert_assignment_orders(input.order) if input.order else []
-        querier = self._build_querier(
-            conditions=conditions,
-            orders=orders,
+        searcher = self._build_searcher(
+            RoleAssignmentSearcher,
+            conditions=self._convert_assignment_filter(input.filter) if input.filter else [],
+            orders=self._convert_assignment_orders(input.order) if input.order else [],
             pagination_spec=_assignment_pagination_spec(),
             first=input.first,
             after=input.after,
@@ -682,10 +682,9 @@ class RBACAdapter(BaseAdapter):
             before=input.before,
             limit=input.limit,
             offset=input.offset,
-            base_conditions=base_conditions,
         )
         action_result = await self._permission_controller.global_search_role_assignments.run(
-            GlobalSearchRoleAssignmentsAction(querier=querier)
+            GlobalSearchRoleAssignmentsAction(searcher=searcher)
         )
         raw = action_result.result
         return SearchResult(
@@ -954,51 +953,6 @@ class RBACAdapter(BaseAdapter):
                 for f in result.failures
             ],
         )
-
-    # ------------------------------------------------------------------ helpers (REST layer)
-
-    def _build_search_querier(self, input: SearchRolesRequest) -> BatchQuerier:
-        conditions = self._convert_filter(input.filter) if input.filter else []
-        orders: list[QueryOrder] = []
-        if input.order is not None:
-            for order in input.order:
-                orders.append(self._convert_order(order))
-        pagination = OffsetPagination(limit=input.limit, offset=input.offset)
-        return BatchQuerier(conditions=conditions, orders=orders, pagination=pagination)
-
-    def _convert_filter(self, filter_req: RoleFilter) -> list[QueryCondition]:
-        conditions: list[QueryCondition] = []
-
-        if filter_req.name is not None:
-            condition = self.convert_string_filter(
-                filter_req.name,
-                contains_factory=RoleConditions.by_name_contains,
-                equals_factory=RoleConditions.by_name_equals,
-                starts_with_factory=RoleConditions.by_name_starts_with,
-                ends_with_factory=RoleConditions.by_name_ends_with,
-                in_factory=RoleConditions.by_name_in,
-            )
-            if condition is not None:
-                conditions.append(condition)
-
-        if filter_req.sources is not None and len(filter_req.sources) > 0:
-            conditions.append(RoleConditions.by_sources(filter_req.sources))
-
-        if filter_req.statuses is not None and len(filter_req.statuses) > 0:
-            conditions.append(RoleConditions.by_statuses(filter_req.statuses))
-
-        return conditions
-
-    @staticmethod
-    def _convert_order(order: RoleOrder) -> QueryOrder:
-        ascending = order.direction == OrderDirection.ASC
-        if order.field == RoleOrderField.NAME:
-            return RoleOrders.name(ascending=ascending)
-        if order.field == RoleOrderField.CREATED_AT:
-            return RoleOrders.created_at(ascending=ascending)
-        if order.field == RoleOrderField.UPDATED_AT:
-            return RoleOrders.updated_at(ascending=ascending)
-        raise ValueError(f"Unknown order field: {order.field}")
 
     # ------------------------------------------------------------------ helpers (GQL layer)
 
@@ -1472,19 +1426,4 @@ class RBACAdapter(BaseAdapter):
             role_id=data.role_id,
             granted_by=data.granted_by,
             granted_at=data.granted_at,
-        )
-
-    @staticmethod
-    def _role_data_to_dto(data: RoleData) -> RoleDTO:
-        return RoleDTO(
-            id=data.id,
-            name=data.name,
-            scope_type=data.scope_type,
-            scope_id=data.scope_id,
-            source=RoleSource(data.source.value),
-            status=RoleStatus(data.status.value),
-            created_at=data.created_at,
-            updated_at=data.updated_at,
-            deleted_at=data.deleted_at,
-            description=data.description,
         )

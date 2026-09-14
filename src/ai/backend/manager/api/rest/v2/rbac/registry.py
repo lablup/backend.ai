@@ -157,7 +157,7 @@ def register_v2_rbac_routes(
         "GET",
         "/permission-matrix",
         handler.get_permission_matrix,
-        middlewares=[superadmin_required],
+        middlewares=[auth_required],
     )
 
     return registry

@@ -13,8 +13,8 @@ from ai.backend.manager.repositories.permission_controller.repository import (
     PermissionControllerRepository,
 )
 from ai.backend.manager.services.permission_contoller.actions.get_entity_types import (
-    GlobalGetEntityTypesAction,
-    GlobalGetEntityTypesActionResult,
+    PublicGetEntityTypesAction,
+    PublicGetEntityTypesActionResult,
 )
 from ai.backend.manager.services.permission_contoller.actions.get_permission_matrix import (
     PublicGetPermissionMatrixAction,
@@ -25,8 +25,8 @@ from ai.backend.manager.services.permission_contoller.actions.get_role_detail im
     GetRoleDetailActionResult,
 )
 from ai.backend.manager.services.permission_contoller.actions.get_scope_types import (
-    GlobalGetScopeTypesAction,
-    GlobalGetScopeTypesActionResult,
+    PublicGetScopeTypesAction,
+    PublicGetScopeTypesActionResult,
 )
 from ai.backend.manager.services.permission_contoller.actions.replace_role_permissions import (
     ReplaceRolePermissionsAction,
@@ -94,8 +94,10 @@ class PermissionControllerService:
     async def scoped_search_role_assignments(
         self, action: ScopedSearchRoleAssignmentsAction
     ) -> ScopedSearchRoleAssignmentsActionResult:
-        """Search the assignment rows inside one user's scope."""
-        result = await self._repository.search_users_assigned_to_role(querier=action.querier)
+        """Search the assignment rows the named scopes reach."""
+        result = await self._repository.search_role_assignments_in_scope(
+            scopes=action.operation_scopes(), searcher=action.searcher
+        )
         return ScopedSearchRoleAssignmentsActionResult(result=result)
 
     async def search_permissions(
@@ -109,9 +111,7 @@ class PermissionControllerService:
         self, action: GlobalSearchRoleAssignmentsAction
     ) -> GlobalSearchRoleAssignmentsActionResult:
         """Search users assigned to a specific role with pagination and filtering."""
-        result = await self._repository.search_users_assigned_to_role(
-            querier=action.querier,
-        )
+        result = await self._repository.search_role_assignments_in_global(action.searcher)
         return GlobalSearchRoleAssignmentsActionResult(result=result)
 
     async def replace_role_permissions(
@@ -132,16 +132,16 @@ class PermissionControllerService:
         return GlobalSearchScopesActionResult(result=result)
 
     async def get_scope_types(
-        self, _action: GlobalGetScopeTypesAction
-    ) -> GlobalGetScopeTypesActionResult:
+        self, _action: PublicGetScopeTypesAction
+    ) -> PublicGetScopeTypesActionResult:
         """The scopes a role is created in."""
-        return GlobalGetScopeTypesActionResult(entity_types=list(role_scope_types()))
+        return PublicGetScopeTypesActionResult(entity_types=list(role_scope_types()))
 
     async def get_entity_types(
-        self, _action: GlobalGetEntityTypesAction
-    ) -> GlobalGetEntityTypesActionResult:
+        self, _action: PublicGetEntityTypesAction
+    ) -> PublicGetEntityTypesActionResult:
         """The entities a role may permit, as the ops wiring declares them."""
-        return GlobalGetEntityTypesActionResult(entity_types=sorted(self._grantable_operations()))
+        return PublicGetEntityTypesActionResult(entity_types=sorted(self._grantable_operations()))
 
     def _grantable_operations(self) -> Mapping[EntityType, Sequence[GrantableOperation]]:
         """Every operation a role may permit, grouped by the entity answering for it.

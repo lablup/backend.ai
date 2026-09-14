@@ -51235,7 +51235,7 @@
           }
         ],
         "parameters": [],
-        "description": "Return the complete RBAC permission matrix.\n\n**Preconditions:**\n* Superadmin privilege required.\n"
+        "description": "Return the complete RBAC permission matrix.\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/v2/reservoir-registries": {
