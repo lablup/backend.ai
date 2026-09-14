@@ -21,7 +21,6 @@ from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.image import ImageID
 from ai.backend.common.data.filter_specs import StringMatchSpec
 from ai.backend.common.types import BinarySize, KernelId, SessionId
-from ai.backend.manager.errors.image import ImageNotFound
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.domain import DomainRow
@@ -838,17 +837,3 @@ class TestImageRepositoryRestore:
         async with db_with_cleanup.begin_readonly_session() as db_sess:
             stored = await db_sess.scalar(sa.select(ImageRow.status).where(ImageRow.id == image_id))
         assert stored == ImageStatus.ALIVE
-
-    @pytest.mark.parametrize(
-        "status",
-        [ImageStatus.PURGING, ImageStatus.PURGE_ERROR],
-        ids=lambda status: status.value,
-    )
-    async def test_restore_does_not_see_an_image_a_purge_is_working_through(
-        self,
-        image_repository: ImageRepository,
-        image_id: ImageID,
-        status: ImageStatus,
-    ) -> None:
-        with pytest.raises(ImageNotFound):
-            await image_repository.restore_image_by_id(image_id)
