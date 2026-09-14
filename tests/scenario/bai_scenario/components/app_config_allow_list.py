@@ -200,7 +200,7 @@ class TheEntryNode(Then[AnEntryAndACaller, AppConfigAllowListNode]):
             return [Refused(NotEnoughPermission, answered.raised)]
         written = WrittenByThisRun(self.started)
         return [
-            Held("id", node.id, SameAs[UUID](laid.entry.id, "미리 만들어 둔 허용 목록 항목")),
+            Held("id", node.id, SameAs[UUID](laid.entry.id, "준비한 ID")),
             Same("config_name", node.config_name, laid.entry.config_name),
             Same("scope_type", node.scope_type, laid.entry.scope_type),
             Same("rank", node.rank, self.rank if self.rank is not None else laid.entry.rank),
@@ -439,7 +439,7 @@ class TheEntryAfterTheCursorIsFound(Then[ManyEntriesAndACaller, SearchAppConfigA
             Held[object](
                 "items[0].id",
                 getattr(payload.items[0], "id", None) if payload.items else None,
-                SameAs[object](ordered[1].id, "커서 다음 허용 목록 항목"),
+                SameAs[object](ordered[1].id, "커서 다음 ID"),
             ),
             Same("items", len(payload.items), 1),
             Same("total_count", payload.total_count, len(laid.laid)),

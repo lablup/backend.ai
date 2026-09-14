@@ -123,12 +123,12 @@ class TwoNodesOneMissing(Then[TwoEntriesAndACaller, Loaded]):
             Held[object](
                 "items[0].id",
                 getattr(items[0], "id", items[0]),
-                SameAs[object](laid.first.id, "미리 만들어 둔 첫째 항목"),
+                SameAs[object](laid.first.id, "준비한 첫 번째 ID"),
             ),
             Held[object](
                 "items[1].id",
                 getattr(items[1], "id", items[1]),
-                SameAs[object](laid.second.id, "미리 만들어 둔 둘째 항목"),
+                SameAs[object](laid.second.id, "준비한 두 번째 ID"),
             ),
             Same("items[2]", items[2], None),
         ]
@@ -171,12 +171,12 @@ class TheDuplicateIdKeepsBothPositions(Then[TwoEntriesAndACaller, Loaded]):
             Held[object](
                 "items[0].id",
                 getattr(items[0], "id", items[0]),
-                SameAs[object](laid.first.id, "준비한 첫 번째 허용 목록 항목"),
+                SameAs[object](laid.first.id, "준비한 첫 번째 ID"),
             ),
             Held[object](
                 "items[1].id",
                 getattr(items[1], "id", items[1]),
-                SameAs[object](laid.first.id, "준비한 첫 번째 허용 목록 항목"),
+                SameAs[object](laid.first.id, "준비한 첫 번째 ID"),
             ),
         ]
 

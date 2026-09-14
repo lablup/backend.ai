@@ -86,9 +86,7 @@ class ThePurgedOneIsNamed(Then[AnEntryAndACaller, Purged]):
         payload = answered.response
         if payload is None or laid.entry is None:
             return [Refused(NotEnoughPermission, answered.raised)]
-        return [
-            Held("id", payload.id, SameAs[UUID](laid.entry.id, "미리 만들어 둔 허용 목록 항목"))
-        ]
+        return [Held("id", payload.id, SameAs[UUID](laid.entry.id, "준비한 ID"))]
 
 
 @dataclass(frozen=True)
