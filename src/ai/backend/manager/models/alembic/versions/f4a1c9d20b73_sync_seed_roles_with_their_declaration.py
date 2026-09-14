@@ -23,7 +23,6 @@ from __future__ import annotations
 
 import hashlib
 import uuid
-from dataclasses import dataclass
 from typing import Any, Final
 
 import sqlalchemy as sa
@@ -53,15 +52,32 @@ def _identify(*parts: str) -> str:
     return str(uuid.UUID(int=value))
 
 
-@dataclass(frozen=True)
 class _Preset:
-    """One declared preset, as this revision froze it."""
+    """One declared preset, as this revision froze it.
+
+    A plain class rather than a dataclass: alembic loads a revision without putting it
+    in `sys.modules`, and `@dataclass` reads the module's namespace to resolve its
+    annotations."""
 
     id: str
     name: str
     scope_type: str
     auto_assign: bool
     grants: tuple[tuple[str, tuple[int, ...]], ...]
+
+    def __init__(
+        self,
+        id: str,
+        name: str,
+        scope_type: str,
+        auto_assign: bool,
+        grants: tuple[tuple[str, tuple[int, ...]], ...],
+    ) -> None:
+        self.id = id
+        self.name = name
+        self.scope_type = scope_type
+        self.auto_assign = auto_assign
+        self.grants = grants
 
 
 _PRESETS: Final[tuple[_Preset, ...]] = (

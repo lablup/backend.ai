@@ -6,13 +6,12 @@ up the same, or the seed says one thing and a running system another.
 
 from __future__ import annotations
 
-import importlib.util
 import json
-import sys
 from pathlib import Path
 from typing import Any
 
 import pytest
+from alembic.util.pyfiles import load_python_file
 
 _REVISION = "f4a1c9d20b73_sync_seed_roles_with_their_declaration"
 _REPOSITORY = Path(__file__).resolve().parents[6]
@@ -22,12 +21,7 @@ _VERSIONS = _REPOSITORY / "src/ai/backend/manager/models/alembic/versions"
 @pytest.fixture(scope="module")
 def migration() -> Any:
     """The revision, imported by path: `versions/` is not a package."""
-    spec = importlib.util.spec_from_file_location(_REVISION, _VERSIONS / f"{_REVISION}.py")
-    assert spec is not None and spec.loader is not None
-    module = importlib.util.module_from_spec(spec)
-    sys.modules[_REVISION] = module
-    spec.loader.exec_module(module)
-    return module
+    return load_python_file(str(_VERSIONS), f"{_REVISION}.py")
 
 
 @pytest.fixture(scope="module")
