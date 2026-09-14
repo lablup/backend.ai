@@ -1,12 +1,13 @@
 ---
 name: container-registry-adapter-scenarios
 type: reference
-description: container registry adapter scenario guarantees; superadmin-gated management calls, RBAC project relations, is_global image visibility, update-only URL validation
+description: container registry adapter scenario guarantees; superadmin-gated management calls, missing scoped search, RBAC project relations, is_global image visibility, update-only URL validation
 scope: src/ai/backend/manager/api/adapters/container_registry
-keywords: [container registry, scenario, adapter, superadmin, RBAC, allowed groups, relation, is_global, image visibility]
+keywords: [container registry, scenario, adapter, superadmin, scoped_search, RBAC, allowed groups, relation, is_global, image visibility]
 sources:
   - src/ai/backend/manager/api/adapters/container_registry/adapter.py
   - src/ai/backend/manager/services/container_registry/actions/base.py
+  - src/ai/backend/manager/services/container_registry/processors.py
   - src/ai/backend/manager/models/image/row.py
   - tests/scenario/bai_scenario/manager/container_registry
 generated:
@@ -26,6 +27,15 @@ status: draft
   아니라 슈퍼관리자 여부로 접근을 제어한다.
 - 허용 프로젝트 추가와 제거는 RBAC 관계 작업을 사용하므로 레지스트리와 프로젝트 양쪽의 권한을
   검사하며, 엔티티 권한 검사 설정의 영향을 받는다.
+
+## 프로젝트 관계는 레지스트리 스코프 검색으로 노출되지 않는다
+
+- 레지스트리 검색은 슈퍼관리자용 `admin_search`만 제공하며, 프로젝트를 입력받는
+  `scoped_search`는 없다.
+- 따라서 프로젝트와 레지스트리 사이의 RBAC 관계를 사용해 접근 가능한 레지스트리 목록을 조회할
+  수는 없다.
+- 이 관계는 레지스트리 자체를 검색하는 대신, 아래의 이미지 권한 후보를 프로젝트별로 제한하는 데
+  사용된다.
 
 ## `is_global`은 이미지의 프로젝트 공개 범위를 정한다
 
