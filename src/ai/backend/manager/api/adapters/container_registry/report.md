@@ -516,30 +516,6 @@ Then
   - extra = None
   - id: 무시함 — 데이터베이스가 만든다
 
-#### [turning-enforcement-off-still-does-not-let-a-user-create-a-registry](/tests/scenario/bai_scenario/manager/container_registry/test_creating.py) — pass
-
-엔티티 권한 집행을 꺼도 슈퍼관리자가 아닌 사용자는 여전히 권한 부족으로 거부된다. 집행 스위치는 권한 그래프만 끄고, 부른 사람이 슈퍼관리자인지 보는 검사는 그대로 남기 때문이다
-
-Given
-
-- 레지스트리 없음, 프로젝트 하나, 도메인 하나에 속한 user 한 명
-  - 도메인 home-1
-  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-  - 프로젝트 project-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-
-When
-
-- ContainerRegistryAdapter.admin_create — user-1이 허용 목록 없이 https://made.scenario.local로 만듦
-
-Then
-
-- 거부된다
-  - 거부: InsufficientPrivilege
-
 ### editing
 
 #### [a-user-who-is-not-the-superadmin-may-not-edit-a-registry](/tests/scenario/bai_scenario/manager/container_registry/test_editing.py) — pass

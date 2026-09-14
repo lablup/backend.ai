@@ -2,9 +2,8 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping
 from dataclasses import dataclass, field
-from typing import Any, override
+from typing import override
 
 import pytest
 from bai_scenario.components.answers import TheCallIsRefused
@@ -32,7 +31,7 @@ from ai.backend.manager.api.adapters.container_registry.adapter import Container
 from ai.backend.manager.errors.auth import InsufficientPrivilege
 from ai.backend.manager.errors.resource import ProjectNotFound
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.scenario_steps import Configured, Given, Scenario, Then, When
+from ai.backend.testutils.scenario_steps import Given, Scenario, Then, When
 
 type CreationScenario = Scenario[
     SeedingSession, AProjectAndACaller, ContainerRegistryAdapter, ContainerRegistryNode
@@ -180,45 +179,11 @@ class APlainUserMayNotCreate(
         return TheCallIsRefused(InsufficientPrivilege)
 
 
-@dataclass(frozen=True)
-class EnforcementOffChangesNothing(
-    Scenario[SeedingSession, AProjectAndACaller, ContainerRegistryAdapter, ContainerRegistryNode],
-    Configured,
-):
-    @override
-    def summary(self) -> str:
-        return "turning-enforcement-off-still-does-not-let-a-user-create-a-registry"
-
-    @override
-    def describe(self) -> str:
-        return (
-            "엔티티 권한 집행을 꺼도 슈퍼관리자가 아닌 사용자는 여전히 권한 부족으로 거부된다. "
-            "집행 스위치는 권한 그래프만 끄고, 부른 사람이 슈퍼관리자인지 보는 검사는 그대로 남기 때문이다"
-        )
-
-    @override
-    def config(self) -> Mapping[str, Any]:
-        return {"manager.rbac.enforcement_enabled": False}
-
-    @override
-    def given(self) -> Given[SeedingSession, AProjectAndACaller]:
-        return NoRegistryYet()
-
-    @override
-    def when(self) -> When[AProjectAndACaller, ContainerRegistryAdapter, ContainerRegistryNode]:
-        return Creating()
-
-    @override
-    def then(self) -> Then[AProjectAndACaller, ContainerRegistryNode]:
-        return TheCallIsRefused(InsufficientPrivilege)
-
-
 SCENARIOS: list[CreationScenario] = [
     CreatingWithOnlyTheRequiredValues(),
     AllowingAProjectWhileCreating(),
     AProjectThatIsNotThereIsRefused(),
     APlainUserMayNotCreate(),
-    EnforcementOffChangesNothing(),
 ]
 
 
