@@ -11,6 +11,7 @@ from uuid import uuid4
 import pytest
 from dateutil.tz import tzutc
 
+from ai.backend.common.data.entity.agent import AgentUUID
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.manager.data.agent.types import AgentStatus
@@ -93,9 +94,11 @@ class TestAgentResources:
                     scheduler_opts=ResourceGroupOpts(),
                 )
             )
+        agent_uuid = AgentUUID(uuid.uuid4())
         async with db.begin_session() as db_sess:
             db_sess.add(
                 AgentRow(
+                    uuid=agent_uuid,
                     id=agent_id,
                     status=AgentStatus.ALIVE,
                     status_changed=datetime.now(tzutc()),
@@ -112,6 +115,7 @@ class TestAgentResources:
             db_sess.add(
                 AgentResourceRow(
                     agent_id=agent_id,
+                    agent_uuid=agent_uuid,
                     slot_name="cpu",
                     capacity=cpu_capacity,
                     used=cpu_used,
@@ -120,6 +124,7 @@ class TestAgentResources:
             db_sess.add(
                 AgentResourceRow(
                     agent_id=agent_id,
+                    agent_uuid=agent_uuid,
                     slot_name="mem",
                     capacity=mem_capacity,
                     used=mem_used,

@@ -8,11 +8,20 @@ from pydantic import Field, model_validator
 
 from ai.backend.common.types import BackendAISchema
 
+VERSION_PREFIX_PATTERN = r"^[0-9]{1,9}(?![0-9])(?:[.][0-9]{1,9}(?![0-9])){0,2}"
+"""The part of a stored version that is compared: '0.9.0rc1' reads as 0.9.0. Ten digits
+match nothing rather than truncating to a different number.
+
+Storage is looser than what the API accepts (`SemVersion`), so lifting that one
+constraint is all it takes to let prerelease versions in."""
+
 
 class RuntimeVariantPresetOrderField(StrEnum):
     NAME = "name"
     RANK = "rank"
     CREATED_AT = "created_at"
+    ADDED_VERSION = "added_version"
+    DEPRECATED_VERSION = "deprecated_version"
 
 
 class PresetTarget(StrEnum):

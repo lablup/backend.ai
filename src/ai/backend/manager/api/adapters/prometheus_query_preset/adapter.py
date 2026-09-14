@@ -73,20 +73,30 @@ from ai.backend.manager.services.prometheus_query_preset.actions import (
     SearchPresetsAction,
     UpdatePresetAction,
 )
+from ai.backend.manager.services.prometheus_query_preset.processors import (
+    PrometheusQueryPresetProcessors,
+)
 from ai.backend.manager.types import OptionalState, TriState
 
 
 class PrometheusQueryPresetAdapter(BaseAdapter):
     """Adapter for prometheus query preset domain operations."""
 
-    async def batch_load_by_ids(self, ids: Sequence[UUID]) -> list[QueryDefinitionNode | None]:
+    _prometheus_query_preset: PrometheusQueryPresetProcessors
+
+    def __init__(self, prometheus_query_preset: PrometheusQueryPresetProcessors) -> None:
+        self._prometheus_query_preset = prometheus_query_preset
+
+    async def batch_load_by_ids(
+        self, ids: Sequence[PrometheusQueryPresetID]
+    ) -> list[QueryDefinitionNode | None]:
         if not ids:
             return []
         searcher = PrometheusQueryPresetSearcher(
             pagination=OffsetPagination(limit=len(ids)),
             conditions=[PrometheusQueryPresetConditions.by_ids(ids)],
         )
-        action_result = await self._processors.prometheus_query_preset.public_search_presets.run(
+        action_result = await self._prometheus_query_preset.public_search_presets.run(
             SearchPresetsAction(searcher=searcher)
         )
         preset_map = {item.id: self._data_to_dto(item) for item in action_result.items}
@@ -110,7 +120,7 @@ class PrometheusQueryPresetAdapter(BaseAdapter):
             group_labels=input.options.group_labels,
         )
 
-        action_result = await self._processors.prometheus_query_preset.global_create_preset.run(
+        action_result = await self._prometheus_query_preset.global_create_preset.run(
             CreatePresetAction(creator=creator)
         )
 
@@ -124,7 +134,7 @@ class PrometheusQueryPresetAdapter(BaseAdapter):
         """
         searcher = self.build_searcher(input)
 
-        action_result = await self._processors.prometheus_query_preset.public_search_presets.run(
+        action_result = await self._prometheus_query_preset.public_search_presets.run(
             SearchPresetsAction(searcher=searcher)
         )
 
@@ -137,7 +147,7 @@ class PrometheusQueryPresetAdapter(BaseAdapter):
 
     async def get(self, preset_id: UUID) -> GetQueryDefinitionPayload:
         """Get a single query definition by ID."""
-        action_result = await self._processors.prometheus_query_preset.public_get_preset.run(
+        action_result = await self._prometheus_query_preset.public_get_preset.run(
             GetPresetAction(preset_id=PrometheusQueryPresetID(preset_id))
         )
 
@@ -147,7 +157,7 @@ class PrometheusQueryPresetAdapter(BaseAdapter):
         self, preset_id: UUID, input: ModifyQueryDefinitionInput
     ) -> ModifyQueryDefinitionPayload:
         """Update an existing query definition."""
-        action_result = await self._processors.prometheus_query_preset.update_preset.run(
+        action_result = await self._prometheus_query_preset.update_preset.run(
             UpdatePresetAction(
                 updater=self._build_updater(PrometheusQueryPresetID(preset_id), input)
             )
@@ -157,7 +167,7 @@ class PrometheusQueryPresetAdapter(BaseAdapter):
 
     async def admin_preview(self, input: PreviewQueryDefinitionInput) -> QueryDefinitionResultInfo:
         """Preview a prometheus query template (admin only)."""
-        action_result = await self._processors.prometheus_query_preset.global_preview_preset.run(
+        action_result = await self._prometheus_query_preset.global_preview_preset.run(
             PreviewPresetAction(query_template=input.query_template)
         )
         return self._prometheus_response_to_result_info(action_result.response)
@@ -185,7 +195,7 @@ class PrometheusQueryPresetAdapter(BaseAdapter):
             if time_range is not None
             else None
         )
-        action_result = await self._processors.prometheus_query_preset.execute_preset.run(
+        action_result = await self._prometheus_query_preset.execute_preset.run(
             ExecutePresetAction(
                 preset_id=PrometheusQueryPresetID(preset_id),
                 options=execute_options,
@@ -217,7 +227,7 @@ class PrometheusQueryPresetAdapter(BaseAdapter):
 
     async def delete(self, input: DeleteQueryDefinitionInput) -> DeleteQueryDefinitionPayload:
         """Delete a query definition by ID."""
-        action_result = await self._processors.prometheus_query_preset.purge_preset.run(
+        action_result = await self._prometheus_query_preset.purge_preset.run(
             PurgePresetAction(preset_id=PrometheusQueryPresetID(input.id))
         )
 

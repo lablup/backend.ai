@@ -8,6 +8,7 @@ import strawberry
 from strawberry import ID, Info
 from strawberry.relay import Connection, Edge, NodeID
 
+from ai.backend.common.data.entity.storage_namespace import StorageNamespaceID
 from ai.backend.common.dto.manager.v2.storage_namespace.request import (
     RegisterStorageNamespaceInput as RegisterStorageNamespaceInputDTO,
 )
@@ -63,7 +64,7 @@ class StorageNamespace(PydanticNodeMixin[Any]):
         required: bool = False,
     ) -> Iterable[Self | None]:
         results = await info.context.data_loaders.storage_namespace_loader.load_many([
-            uuid.UUID(nid) for nid in node_ids
+            StorageNamespaceID(uuid.UUID(nid)) for nid in node_ids
         ])
         return cast(list[Self | None], results)
 

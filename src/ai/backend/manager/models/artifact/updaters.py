@@ -46,7 +46,7 @@ class ArtifactUpdater(GuardedDataUpdater[ArtifactRow, ArtifactData]):
         return ArtifactRow.id
 
     @override
-    def target_id_value(self) -> UUID:
+    def target_id_value(self) -> ArtifactID:
         return self.artifact_id
 
     @property
@@ -97,7 +97,7 @@ class ArtifactScanUpdater(DataUpdater[ArtifactRow, ArtifactData]):
         return ArtifactRow.id
 
     @override
-    def target_id_value(self) -> UUID:
+    def target_id_value(self) -> ArtifactID:
         return self.artifact_id
 
     @property

@@ -22,6 +22,12 @@ def register_v2_model_card_routes(
     registry.add("POST", "/search", handler.admin_search, middlewares=[superadmin_required])
     registry.add(
         "POST",
+        "/scoped/search",
+        handler.scoped_search,
+        middlewares=[auth_required],
+    )
+    registry.add(
+        "POST",
         "/projects/{project_id}/search",
         handler.project_search,
         middlewares=[auth_required],

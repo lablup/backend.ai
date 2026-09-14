@@ -10,7 +10,7 @@ import pytest
 from ai.backend.common.data.entity.app_config_definition import AppConfigDefinitionID
 from ai.backend.common.data.filter_specs import StringMatchSpec
 from ai.backend.manager.data.app_config.types import AppConfigDefinitionData
-from ai.backend.manager.errors.repository import EntityNotFoundError
+from ai.backend.manager.errors.base.entity import EntityNotFoundError
 from ai.backend.manager.models.app_config_definition.conditions import (
     AppConfigDefinitionConditions,
 )

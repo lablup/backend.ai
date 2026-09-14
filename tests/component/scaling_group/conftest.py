@@ -5,9 +5,9 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from ai.backend.common.data.entity.domain import DOMAIN_ENTITY_TYPE
-from ai.backend.common.data.entity.project import PROJECT_ENTITY_TYPE
-from ai.backend.common.data.entity.resource_group import RESOURCE_GROUP_ENTITY_TYPE
+from ai.backend.common.data.entity.domain import DomainEntityType
+from ai.backend.common.data.entity.project import ProjectEntityType
+from ai.backend.common.data.entity.resource_group import ResourceGroupEntityType
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
 from ai.backend.manager.actions.registry.types import GroupMeta
 from ai.backend.manager.api.rest.resource_group.handler import ResourceGroupHandler
@@ -37,7 +37,7 @@ def resource_group_processors(
     repo = ResourceGroupRepository(database_engine, V2DBOpsProvider(database_engine))
     service = ResourceGroupService(repo)
     return ResourceGroupProcessors(
-        processor_registry.group(GroupMeta(RESOURCE_GROUP_ENTITY_TYPE)), service
+        processor_registry.group(GroupMeta(ResourceGroupEntityType())), service
     )
 
 
@@ -49,7 +49,7 @@ def domain_processors(
     service = DomainService(
         repository=DomainRepository(database_engine, V2DBOpsProvider(database_engine))
     )
-    return DomainProcessors(processor_registry.group(GroupMeta(DOMAIN_ENTITY_TYPE)), service, [])
+    return DomainProcessors(processor_registry.group(GroupMeta(DomainEntityType())), service, [])
 
 
 @pytest.fixture()
@@ -71,7 +71,7 @@ def project_processors(
         )
     )
     service = ProjectService(storage_manager, config_provider, valkey_clients.stat, repositories)
-    return ProjectProcessors(processor_registry.group(GroupMeta(PROJECT_ENTITY_TYPE)), service)
+    return ProjectProcessors(processor_registry.group(GroupMeta(ProjectEntityType())), service)
 
 
 @pytest.fixture()

@@ -43,6 +43,7 @@ from .dev import (
     install_git_hooks,
     install_git_lfs,
     pants_export,
+    pull_git_lfs,
 )
 from .docker import (
     check_docker,
@@ -2014,6 +2015,7 @@ class DevContext(Context):
     async def check_prerequisites(self) -> None:
         await super().check_prerequisites()
         await install_git_lfs(self)
+        await pull_git_lfs(self)
         await install_git_hooks(self)
         local_execution_root_dir = await get_preferred_pants_local_exec_root(self)
         await bootstrap_pants(self, local_execution_root_dir)

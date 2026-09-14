@@ -12,7 +12,6 @@ from sqlalchemy.ext.declarative import declarative_base
 
 from ai.backend.manager.models.minilang import ArrayFieldItem, JSONFieldItem
 from ai.backend.manager.models.minilang.queryfilter import QueryFilterParser
-from ai.backend.testutils.bootstrap import postgres_container  # noqa
 
 
 class UserTypes(enum.Enum):
@@ -21,15 +20,9 @@ class UserTypes(enum.Enum):
 
 
 @pytest.fixture
-async def virtual_user_db(postgres_container: Any) -> AsyncGenerator[tuple[Any, Any], None]:  # noqa
-    pgsql_addr = postgres_container[1]
-    host = pgsql_addr.host
-    port = pgsql_addr.port
-
+async def virtual_user_db(test_database_url: str) -> AsyncGenerator[tuple[Any, Any], None]:
     db_id = secrets.token_hex(16)
-    engine = sa.engine.create_engine(
-        f"postgresql+asyncpg://postgres:develove@{host}:{port}/testing", echo=False
-    )
+    engine = sa.engine.create_engine(test_database_url, echo=False)
     async_engine = AsyncEngine(engine)
     base = declarative_base()
     metadata = base.metadata

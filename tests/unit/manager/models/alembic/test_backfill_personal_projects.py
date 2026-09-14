@@ -26,9 +26,6 @@ from ai.backend.manager.models.entity_label.row import EntityLabelRow
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.project import ProjectRow, ProjectType
-from ai.backend.manager.models.rbac_models.association_scopes_entities import (
-    AssociationScopesEntitiesRow,
-)
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
@@ -55,7 +52,6 @@ _TABLES: list[Table | type[HasTable]] = [
     UserRow,
     KeyPairRow,
     ProjectRow,
-    AssociationScopesEntitiesRow,
     VirtualEntityRow,
     ScopeBindingRow,
     EntityLabelRow,

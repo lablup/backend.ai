@@ -8,8 +8,9 @@ from collections.abc import Mapping, Sequence
 from typing import Any
 
 from ai.backend.common.data.entity.types import EntityIdentifier, FieldData, FieldIdentifier
+from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.actions.v2.ops.result import BulkFieldOpsResult
-from ai.backend.manager.errors.repository import EntityNotFoundError
+from ai.backend.manager.errors.base.field import FieldNotFoundError
 from ai.backend.manager.models.base import Base
 from ai.backend.manager.models.specs.creator import (
     FieldCreator,
@@ -140,7 +141,7 @@ class V2FieldWriteOps(V2WriteOpsBase):
         self, purgers: Mapping[FieldIdentifier, GuardedFieldPurger[TRow, TData]]
     ) -> BulkFieldOpsResult[TData]:
         """Delete each named field row independently in its own savepoint; a
-        missing row is answered with :class:`EntityNotFoundError` rather than
+        missing row is answered with :class:`FieldNotFoundError` rather than
         skipped. Authorized through the owner, like the single field purge."""
         successes: dict[FieldIdentifier, TData] = {}
         errors: dict[FieldIdentifier, Exception] = {}
@@ -149,8 +150,10 @@ class V2FieldWriteOps(V2WriteOpsBase):
                 async with self._sess.begin_nested():
                     data = await self.purge_field_entity(purger)
                     if data is None:
-                        raise EntityNotFoundError(
-                            f"{purger.row_class().__name__} {purger.target_id_value()} not found"
+                        raise FieldNotFoundError(
+                            f"{purger.row_class().__name__} {field_id} not found",
+                            field_type=field_id.field_type(),
+                            operation=ActionOperationType.PURGE,
                         )
                     successes[field_id] = data
             except Exception as e:
@@ -170,3 +173,30 @@ class V2FieldWriteOps(V2WriteOpsBase):
             upserter.integrity_error_checks(),
         )
         return upserter.to_data(row)
+
+    async def atomic_upsert_field_entities[
+        TOwnerID: EntityIdentifier,
+        TRow: Base,
+        TData: FieldData,
+    ](
+        self, owner_id: TOwnerID, upserters: Sequence[FieldUpserter[TOwnerID, TRow, TData]]
+    ) -> list[TData]:
+        """Insert-or-update every field row of one owner atomically.
+
+        One statement per row, as :meth:`V2EntityWriteOps.atomic_upsert_entities` runs
+        them: each carries its own update values, so they cannot be folded into a
+        single insert.
+        """
+        if not upserters:
+            return []
+        rows = [
+            await self._upsert_row_returning(
+                upserter.row_class(),
+                upserter.index_elements(),
+                upserter.build_insert_values(owner_id),
+                upserter.build_update_values(),
+                upserter.integrity_error_checks(),
+            )
+            for upserter in upserters
+        ]
+        return [upserter.to_data(row) for upserter, row in zip(upserters, rows, strict=True)]

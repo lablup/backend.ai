@@ -6,13 +6,18 @@ from __future__ import annotations
 
 from enum import StrEnum
 
+from pydantic import Field, model_validator
+
+from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.dto.manager.v2.common import OrderDirection
+from ai.backend.common.dto.manager.v2.rbac.types import UUIDScope
 
 __all__ = (
     "OrderDirection",
     "PreemptionModeDTO",
     "ResourceGroupOrderDirection",
     "ResourceGroupOrderField",
+    "ResourceGroupScope",
     "SchedulerTypeDTO",
 )
 
@@ -46,3 +51,29 @@ class PreemptionModeDTO(StrEnum):
 
     TERMINATE = "terminate"
     RESCHEDULE = "reschedule"
+
+
+class ResourceGroupScope(BaseRequestModel):
+    """Scope for the scoped resource group query.
+
+    Each list is OR'd internally and across lists. Raises an error if every field is
+    empty.
+    """
+
+    domain: list[UUIDScope] | None = Field(
+        default=None, description="Domains whose resource groups are being read"
+    )
+    project: list[UUIDScope] | None = Field(
+        default=None, description="Projects whose resource groups are being read"
+    )
+    user: list[UUIDScope] | None = Field(
+        default=None, description="Users whose resource groups are being read"
+    )
+
+    @model_validator(mode="after")
+    def _require_non_empty(self) -> ResourceGroupScope:
+        if not self.domain and not self.project and not self.user:
+            raise ValueError(
+                "ResourceGroupScope requires a non-empty value for 'domain', 'project' or 'user'"
+            )
+        return self

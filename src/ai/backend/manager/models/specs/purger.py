@@ -11,12 +11,11 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from collections.abc import Sequence
 from typing import Any, final, override
-from uuid import UUID
 
 import sqlalchemy as sa
 from sqlalchemy.orm import InstrumentedAttribute
 
-from ai.backend.common.data.entity.types import EntityIdentifier, FieldData
+from ai.backend.common.data.entity.types import EntityIdentifier, FieldData, FieldIdentifier
 from ai.backend.manager.models.base import Base
 from ai.backend.manager.models.specs.types import ConflictCheck, GuardCheck
 
@@ -96,7 +95,7 @@ class GuardedFieldPurger[TRow: Base, TData: FieldData](ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def target_id_value(self) -> UUID:
+    def target_id_value(self) -> FieldIdentifier:
         """Return the id of the field row to delete."""
         raise NotImplementedError
 

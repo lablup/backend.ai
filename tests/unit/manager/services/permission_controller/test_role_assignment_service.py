@@ -8,6 +8,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.role import RoleID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.manager.data.permission.role import (
     BulkRoleAssignmentResultData,
@@ -17,9 +18,6 @@ from ai.backend.manager.data.permission.role import (
     UserRoleAssignmentInput,
     UserRoleRevocationInput,
 )
-from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
-from ai.backend.manager.repositories.base.creator import BulkCreator
-from ai.backend.manager.repositories.permission_controller.creators import UserRoleCreatorSpec
 from ai.backend.manager.services.rbac.actions.role.assign import AssignRoleAction
 from ai.backend.manager.services.rbac.actions.role.bulk_assign import (
     BulkAssignRoleAction,
@@ -169,9 +167,10 @@ class TestBulkAssignRoleWithProject:
             failures=[],
         )
 
-        specs = [UserRoleCreatorSpec(user_id=uid, role_id=role_id) for uid in user_ids]
         action = BulkAssignRoleAction(
-            bulk_creator=BulkCreator[UserRoleRow](specs=specs), project_id=project_id
+            role_id=RoleID(role_id),
+            user_ids=[UserID(uid) for uid in user_ids],
+            project_id=project_id,
         )
         await service.bulk_assign_role(action)
 
@@ -195,8 +194,9 @@ class TestBulkAssignRoleWithProject:
             failures=[],
         )
 
-        specs = [UserRoleCreatorSpec(user_id=uid, role_id=role_id) for uid in user_ids]
-        action = BulkAssignRoleAction(bulk_creator=BulkCreator[UserRoleRow](specs=specs))
+        action = BulkAssignRoleAction(
+            role_id=RoleID(role_id), user_ids=[UserID(uid) for uid in user_ids]
+        )
         await service.bulk_assign_role(action)
 
         mock_roster_repository.join_member.assert_not_called()

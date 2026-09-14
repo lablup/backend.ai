@@ -9,7 +9,8 @@ from uuid import UUID
 
 import sqlalchemy as sa
 
-from ai.backend.common.data.entity.domain import DomainID, DomainName
+from ai.backend.common.data.entity.domain import DomainEntityType, DomainID, DomainName
+from ai.backend.common.data.entity.types import EntityType
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.specs.lookup import BulkDataLookup, DataLookup
@@ -24,6 +25,10 @@ class DomainNameLookup(DataLookup[DomainRow, DomainID]):
     @override
     def row_class(self) -> type[DomainRow]:
         return DomainRow
+
+    @override
+    def entity_type(self) -> EntityType:
+        return DomainEntityType()
 
     @override
     def conditions(self) -> Sequence[QueryCondition]:

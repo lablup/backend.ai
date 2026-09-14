@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from typing import override
 
 from ai.backend.common.data.entity.domain import DomainID
-from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE, ProjectID
+from ai.backend.common.data.entity.project import ProjectEntityType, ProjectID
 from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.exception import InvalidAPIParameters
@@ -79,7 +79,7 @@ class ProjectCreator(RoleManagedEntityCreator[ProjectRow, ProjectData]):
 
     @override
     def template_value(self, row: ProjectRow) -> ScopeTemplateValue:
-        return ScopeTemplateValue(id=row.id, name=row.name, type=PROJECT_SCOPE_TYPE)
+        return ScopeTemplateValue(id=row.id, name=row.name, type=ProjectEntityType())
 
     @override
     def integrity_error_checks(self) -> Sequence[IntegrityErrorCheck]:

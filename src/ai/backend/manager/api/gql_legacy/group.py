@@ -18,7 +18,7 @@ from graphql import Undefined
 from sqlalchemy.engine.row import Row
 
 from ai.backend.common.data.entity.domain import DomainID, DomainName
-from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE, ProjectID
+from ai.backend.common.data.entity.project import ProjectEntityType, ProjectID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.exception import (
     GroupNotFound,
@@ -225,7 +225,7 @@ class GroupNode(graphene.ObjectType):  # type: ignore[misc]
             last=last,
         )
         # Project membership comes from the virtual-entity chain (PROJECT/USER).
-        membership_filter = user_scope_membership_exists(PROJECT_SCOPE_TYPE, self.id, UserRow.uuid)
+        membership_filter = user_scope_membership_exists(ProjectEntityType(), self.id, UserRow.uuid)
         user_query = query.where(membership_filter)
         cnt_query = sa.select(sa.func.count()).select_from(UserRow).where(membership_filter)
         for cond in conditions:
@@ -506,7 +506,7 @@ class Group(graphene.ObjectType):  # type: ignore[misc]
             _type = [ProjectType.GENERAL]
         else:
             _type = type
-        ms = user_scope_membership_query(PROJECT_SCOPE_TYPE).subquery()
+        ms = user_scope_membership_query(ProjectEntityType()).subquery()
         j = sa.join(groups, ms, groups.c.id == ms.c.scope_id)
         query = (
             sa.select(groups, ms.c.user_id)
@@ -532,7 +532,7 @@ class Group(graphene.ObjectType):  # type: ignore[misc]
         user_id: uuid.UUID,
     ) -> Sequence[Group]:
         query = sa.select(groups).where(
-            user_scope_membership_exists(PROJECT_SCOPE_TYPE, groups.c.id, user_id)
+            user_scope_membership_exists(ProjectEntityType(), groups.c.id, user_id)
         )
         async with graph_ctx.db.begin_readonly() as conn:
             return [

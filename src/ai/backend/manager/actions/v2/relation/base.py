@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from collections.abc import Sequence
 
-from ai.backend.common.data.entity.types import ScopeRef
+from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.manager.actions.types import ActionOperationType
 
 __all__ = ("BaseRelationAction",)
@@ -37,7 +37,7 @@ class BaseRelationAction(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def scope_targets(self) -> Sequence[ScopeRef]:
+    def scope_targets(self) -> Sequence[EntityIdentifier]:
         """Return the scopes this run links or unlinks.
 
         Every one of them has to permit the run: you must be able to touch both to put

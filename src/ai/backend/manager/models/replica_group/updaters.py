@@ -5,7 +5,6 @@ from __future__ import annotations
 from collections.abc import Collection, Sequence
 from dataclasses import dataclass, field
 from typing import Any, override
-from uuid import UUID
 
 import sqlalchemy as sa
 from sqlalchemy.orm import InstrumentedAttribute
@@ -47,7 +46,7 @@ class ReplicaGroupDeployUpdater(DataUpdater[ReplicaGroupRow, ReplicaGroupData]):
         return ReplicaGroupRow.id
 
     @override
-    def target_id_value(self) -> UUID:
+    def target_id_value(self) -> ReplicaGroupID:
         return self.replica_group_id
 
     @property
@@ -90,7 +89,7 @@ class ReplicaGroupScalingUpdater(DataUpdater[ReplicaGroupRow, ReplicaGroupData])
         return ReplicaGroupRow.id
 
     @override
-    def target_id_value(self) -> UUID:
+    def target_id_value(self) -> ReplicaGroupID:
         return self.replica_group_id
 
     @property
@@ -137,7 +136,7 @@ class ReplicaGroupLifecycleUpdater(DataUpdater[ReplicaGroupRow, ReplicaGroupData
         return ReplicaGroupRow.id
 
     @override
-    def target_id_value(self) -> UUID:
+    def target_id_value(self) -> ReplicaGroupID:
         return self.replica_group_id
 
     @property

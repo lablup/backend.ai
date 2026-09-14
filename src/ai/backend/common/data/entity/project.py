@@ -1,20 +1,26 @@
 from typing import override
 
-from ai.backend.common.data.entity.types import EntityIdentifier, EntityType, ScopeType
+from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
 
 __all__ = (
-    "PROJECT_ENTITY_TYPE",
-    "PROJECT_SCOPE_TYPE",
+    "ProjectEntityType",
     "ProjectID",
 )
 
 
-# Raw strings mirroring the RBAC-managed RBACElementType.PROJECT value.
-PROJECT_ENTITY_TYPE = EntityType("project")
-PROJECT_SCOPE_TYPE = ScopeType(PROJECT_ENTITY_TYPE)
+class ProjectEntityType(EntityType):
+    @override
+    @classmethod
+    def name(cls) -> str:
+        return "project"
+
+    @override
+    @classmethod
+    def description(cls) -> str:
+        return "A group of users inside a domain that owns sessions and vfolders."
 
 
 class ProjectID(EntityIdentifier):
     @override
     def entity_type(self) -> EntityType:
-        return PROJECT_ENTITY_TYPE
+        return ProjectEntityType()

@@ -3,16 +3,24 @@ from typing import override
 from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
 
 __all__ = (
-    "ROLE_ENTITY_TYPE",
+    "RoleEntityType",
     "RoleID",
 )
 
 
-# Raw string mirroring the RBAC-managed role element value.
-ROLE_ENTITY_TYPE = EntityType("role")
+class RoleEntityType(EntityType):
+    @override
+    @classmethod
+    def name(cls) -> str:
+        return "role"
+
+    @override
+    @classmethod
+    def description(cls) -> str:
+        return "A named set of permissions granted in a scope."
 
 
 class RoleID(EntityIdentifier):
     @override
     def entity_type(self) -> EntityType:
-        return ROLE_ENTITY_TYPE
+        return RoleEntityType()

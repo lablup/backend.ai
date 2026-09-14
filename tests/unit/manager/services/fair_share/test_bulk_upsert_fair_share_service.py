@@ -9,13 +9,12 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
-from ai.backend.manager.repositories.base import BulkUpserterResult
-from ai.backend.manager.repositories.fair_share import (
-    DomainFairShareBulkWeightUpserterSpec,
-    FairShareRepository,
-    ProjectFairShareBulkWeightUpserterSpec,
-    UserFairShareBulkWeightUpserterSpec,
+from ai.backend.manager.models.fair_share.upserters import (
+    DomainFairShareUpserter,
+    ProjectFairShareUpserter,
+    UserFairShareUpserter,
 )
+from ai.backend.manager.repositories.fair_share import FairShareRepository
 from ai.backend.manager.services.fair_share import FairShareService
 from ai.backend.manager.services.fair_share.actions import (
     BulkUpsertDomainFairShareWeightAction,
@@ -28,6 +27,7 @@ from ai.backend.manager.services.fair_share.actions import (
     ProjectWeightInput,
     UserWeightInput,
 )
+from ai.backend.manager.types import TriState
 
 RESOURCE_GROUP_ID = ResourceGroupID(uuid.uuid4())
 
@@ -54,9 +54,7 @@ class TestBulkUpsertDomainFairShareWeight:
         mock_repository: MagicMock,
     ) -> None:
         """Should call repository with single item bulk upserter."""
-        mock_repository.bulk_upsert_domain_fair_share = AsyncMock(
-            return_value=BulkUpserterResult(upserted_count=1)
-        )
+        mock_repository.bulk_upsert_domain_fair_share = AsyncMock(return_value=[MagicMock()] * 1)
 
         action = BulkUpsertDomainFairShareWeightAction(
             resource_group="default",
@@ -78,9 +76,7 @@ class TestBulkUpsertDomainFairShareWeight:
         mock_repository: MagicMock,
     ) -> None:
         """Should call repository with multiple item bulk upserter."""
-        mock_repository.bulk_upsert_domain_fair_share = AsyncMock(
-            return_value=BulkUpserterResult(upserted_count=3)
-        )
+        mock_repository.bulk_upsert_domain_fair_share = AsyncMock(return_value=[MagicMock()] * 3)
 
         action = BulkUpsertDomainFairShareWeightAction(
             resource_group="default",
@@ -103,9 +99,7 @@ class TestBulkUpsertDomainFairShareWeight:
         mock_repository: MagicMock,
     ) -> None:
         """Should create correct upserter specs for each input."""
-        mock_repository.bulk_upsert_domain_fair_share = AsyncMock(
-            return_value=BulkUpserterResult(upserted_count=2)
-        )
+        mock_repository.bulk_upsert_domain_fair_share = AsyncMock(return_value=[MagicMock()] * 2)
         action = BulkUpsertDomainFairShareWeightAction(
             resource_group="test-rg",
             resource_group_id=RESOURCE_GROUP_ID,
@@ -118,19 +112,16 @@ class TestBulkUpsertDomainFairShareWeight:
         await service.bulk_upsert_domain_fair_share_weight(action)
 
         call_args = mock_repository.bulk_upsert_domain_fair_share.call_args
-        bulk_upserter = call_args[0][0]
-
-        # Verify specs were created correctly
-        specs = bulk_upserter.specs
+        specs = call_args[0][0]
         assert len(specs) == 2
-        assert all(isinstance(s, DomainFairShareBulkWeightUpserterSpec) for s in specs)
+        assert all(isinstance(s, DomainFairShareUpserter) for s in specs)
         assert specs[0].resource_group == "test-rg"
         assert specs[0].resource_group_id == RESOURCE_GROUP_ID
         assert specs[0].domain_name == "domain1"
-        assert specs[0].weight == Decimal("1.5")
+        assert specs[0].weight == TriState[Decimal].update(Decimal("1.5"))
         assert specs[1].resource_group == "test-rg"
         assert specs[1].domain_name == "domain2"
-        assert specs[1].weight is None
+        assert specs[1].weight == TriState[Decimal].nullify()
 
     async def test_bulk_upsert_empty_inputs_returns_zero(
         self,
@@ -163,9 +154,7 @@ class TestBulkUpsertProjectFairShareWeight:
     ) -> None:
         """Should call repository with single item bulk upserter."""
         project_id = uuid.uuid4()
-        mock_repository.bulk_upsert_project_fair_share = AsyncMock(
-            return_value=BulkUpserterResult(upserted_count=1)
-        )
+        mock_repository.bulk_upsert_project_fair_share = AsyncMock(return_value=[MagicMock()] * 1)
 
         action = BulkUpsertProjectFairShareWeightAction(
             resource_group="default",
@@ -192,9 +181,7 @@ class TestBulkUpsertProjectFairShareWeight:
     ) -> None:
         """Should call repository with multiple item bulk upserter."""
         project_ids = [uuid.uuid4() for _ in range(3)]
-        mock_repository.bulk_upsert_project_fair_share = AsyncMock(
-            return_value=BulkUpserterResult(upserted_count=3)
-        )
+        mock_repository.bulk_upsert_project_fair_share = AsyncMock(return_value=[MagicMock()] * 3)
 
         action = BulkUpsertProjectFairShareWeightAction(
             resource_group="default",
@@ -231,9 +218,7 @@ class TestBulkUpsertProjectFairShareWeight:
         """Should create correct upserter specs for each input."""
         project_id1 = uuid.uuid4()
         project_id2 = uuid.uuid4()
-        mock_repository.bulk_upsert_project_fair_share = AsyncMock(
-            return_value=BulkUpserterResult(upserted_count=2)
-        )
+        mock_repository.bulk_upsert_project_fair_share = AsyncMock(return_value=[MagicMock()] * 2)
         action = BulkUpsertProjectFairShareWeightAction(
             resource_group="test-rg",
             resource_group_id=RESOURCE_GROUP_ID,
@@ -254,20 +239,18 @@ class TestBulkUpsertProjectFairShareWeight:
         await service.bulk_upsert_project_fair_share_weight(action)
 
         call_args = mock_repository.bulk_upsert_project_fair_share.call_args
-        bulk_upserter = call_args[0][0]
-
-        specs = bulk_upserter.specs
+        specs = call_args[0][0]
         assert len(specs) == 2
-        assert all(isinstance(s, ProjectFairShareBulkWeightUpserterSpec) for s in specs)
+        assert all(isinstance(s, ProjectFairShareUpserter) for s in specs)
         assert specs[0].resource_group == "test-rg"
         assert specs[0].resource_group_id == RESOURCE_GROUP_ID
         assert specs[0].project_id == project_id1
         assert specs[0].domain_name == "domain1"
-        assert specs[0].weight == Decimal("1.5")
+        assert specs[0].weight == TriState[Decimal].update(Decimal("1.5"))
         assert specs[1].resource_group == "test-rg"
         assert specs[1].project_id == project_id2
         assert specs[1].domain_name == "domain2"
-        assert specs[1].weight is None
+        assert specs[1].weight == TriState[Decimal].nullify()
 
     async def test_bulk_upsert_empty_inputs_returns_zero(
         self,
@@ -301,9 +284,7 @@ class TestBulkUpsertUserFairShareWeight:
         """Should call repository with single item bulk upserter."""
         user_uuid = uuid.uuid4()
         project_id = uuid.uuid4()
-        mock_repository.bulk_upsert_user_fair_share = AsyncMock(
-            return_value=BulkUpserterResult(upserted_count=1)
-        )
+        mock_repository.bulk_upsert_user_fair_share = AsyncMock(return_value=[MagicMock()] * 1)
 
         action = BulkUpsertUserFairShareWeightAction(
             resource_group="default",
@@ -332,9 +313,7 @@ class TestBulkUpsertUserFairShareWeight:
         """Should call repository with multiple item bulk upserter."""
         user_uuids = [uuid.uuid4() for _ in range(3)]
         project_ids = [uuid.uuid4() for _ in range(2)]
-        mock_repository.bulk_upsert_user_fair_share = AsyncMock(
-            return_value=BulkUpserterResult(upserted_count=3)
-        )
+        mock_repository.bulk_upsert_user_fair_share = AsyncMock(return_value=[MagicMock()] * 3)
 
         action = BulkUpsertUserFairShareWeightAction(
             resource_group="default",
@@ -376,9 +355,7 @@ class TestBulkUpsertUserFairShareWeight:
         user_uuid2 = uuid.uuid4()
         project_id1 = uuid.uuid4()
         project_id2 = uuid.uuid4()
-        mock_repository.bulk_upsert_user_fair_share = AsyncMock(
-            return_value=BulkUpserterResult(upserted_count=2)
-        )
+        mock_repository.bulk_upsert_user_fair_share = AsyncMock(return_value=[MagicMock()] * 2)
         action = BulkUpsertUserFairShareWeightAction(
             resource_group="test-rg",
             resource_group_id=RESOURCE_GROUP_ID,
@@ -401,22 +378,20 @@ class TestBulkUpsertUserFairShareWeight:
         await service.bulk_upsert_user_fair_share_weight(action)
 
         call_args = mock_repository.bulk_upsert_user_fair_share.call_args
-        bulk_upserter = call_args[0][0]
-
-        specs = bulk_upserter.specs
+        specs = call_args[0][0]
         assert len(specs) == 2
-        assert all(isinstance(s, UserFairShareBulkWeightUpserterSpec) for s in specs)
+        assert all(isinstance(s, UserFairShareUpserter) for s in specs)
         assert specs[0].resource_group == "test-rg"
         assert specs[0].resource_group_id == RESOURCE_GROUP_ID
         assert specs[0].user_uuid == user_uuid1
         assert specs[0].project_id == project_id1
         assert specs[0].domain_name == "domain1"
-        assert specs[0].weight == Decimal("1.5")
+        assert specs[0].weight == TriState[Decimal].update(Decimal("1.5"))
         assert specs[1].resource_group == "test-rg"
         assert specs[1].user_uuid == user_uuid2
         assert specs[1].project_id == project_id2
         assert specs[1].domain_name == "domain2"
-        assert specs[1].weight is None
+        assert specs[1].weight == TriState[Decimal].nullify()
 
     async def test_bulk_upsert_empty_inputs_returns_zero(
         self,

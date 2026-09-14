@@ -4,7 +4,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.common.data.entity.agent import AGENT_ENTITY_TYPE, AgentUUID
+from ai.backend.common.data.entity.agent import AgentEntityType, AgentUUID
 from ai.backend.common.data.entity.types import EntityType
 from ai.backend.common.types import AgentId
 from ai.backend.manager.actions.v2.ops.base import BulkLookupEntityOpsAction
@@ -25,7 +25,7 @@ class BulkLookupAgentsAction(BulkLookupEntityOpsAction[AgentId, AgentUUID]):
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return AGENT_ENTITY_TYPE
+        return AgentEntityType()
 
     @override
     @classmethod

@@ -11,6 +11,7 @@ import sqlalchemy as sa
 
 from ai.backend.common.data.entity.kernel import KernelID
 from ai.backend.common.data.entity.session import SessionID
+from ai.backend.common.data.entity.types import FieldType
 from ai.backend.manager.models.kernel.row import KernelRow
 from ai.backend.manager.models.specs.lookup import FieldOwnerKeyLookup, FieldOwnerLookup
 
@@ -24,6 +25,10 @@ class KernelSessionLookup(FieldOwnerKeyLookup[SessionID]):
     """
 
     kernel_id: KernelID
+
+    @override
+    def field_type(self) -> FieldType:
+        return KernelID.field_type()
 
     @override
     def build_query(self) -> sa.sql.Select[Any]:

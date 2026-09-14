@@ -9,7 +9,6 @@ from __future__ import annotations
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import Any, override
-from uuid import UUID
 
 import sqlalchemy as sa
 from sqlalchemy.orm import InstrumentedAttribute
@@ -48,7 +47,7 @@ class RoleUpdater(GuardedDataUpdater[RoleRow, RoleData]):
         return RoleRow.id
 
     @override
-    def target_id_value(self) -> UUID:
+    def target_id_value(self) -> RoleID:
         return self.role_id
 
     @override
@@ -97,7 +96,7 @@ class RoleSoftDeleteUpdater(GuardedDataUpdater[RoleRow, RoleData]):
         return RoleRow.id
 
     @override
-    def target_id_value(self) -> UUID:
+    def target_id_value(self) -> RoleID:
         return self.role_id
 
     @override
@@ -139,7 +138,7 @@ class RoleRestoreUpdater(DataUpdater[RoleRow, RoleData]):
         return RoleRow.id
 
     @override
-    def target_id_value(self) -> UUID:
+    def target_id_value(self) -> RoleID:
         return self.role_id
 
     @property

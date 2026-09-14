@@ -6,7 +6,11 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.common.data.entity.artifact_registry import ArtifactRegistryID
+from ai.backend.common.data.entity.artifact_registry import (
+    ArtifactRegistryEntityType,
+    ArtifactRegistryID,
+)
+from ai.backend.common.data.entity.types import EntityType
 from ai.backend.manager.models.artifact_registries.row import ArtifactRegistryRow
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.specs.lookup import DataLookup
@@ -21,6 +25,10 @@ class ArtifactRegistryNameLookup(DataLookup[ArtifactRegistryRow, ArtifactRegistr
     @override
     def row_class(self) -> type[ArtifactRegistryRow]:
         return ArtifactRegistryRow
+
+    @override
+    def entity_type(self) -> EntityType:
+        return ArtifactRegistryEntityType()
 
     @override
     def conditions(self) -> Sequence[QueryCondition]:

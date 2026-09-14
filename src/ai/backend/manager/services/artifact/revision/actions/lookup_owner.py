@@ -4,7 +4,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Any, override
 
-from ai.backend.common.data.entity.artifact import ARTIFACT_ENTITY_TYPE, ArtifactID
+from ai.backend.common.data.entity.artifact import ArtifactEntityType, ArtifactID
 from ai.backend.common.data.entity.artifact_revision import ArtifactRevisionID
 from ai.backend.common.data.entity.types import EntityType
 from ai.backend.manager.actions.v2.field.bulk_lookup import LookupBulkFieldOwnerOpsAction
@@ -37,7 +37,7 @@ class LookupArtifactRevisionOwnerAction(LookupFieldOwnerOpsAction[ArtifactRevisi
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return ARTIFACT_ENTITY_TYPE
+        return ArtifactEntityType()
 
     @override
     @classmethod
@@ -68,7 +68,7 @@ class LookupBulkArtifactRevisionOwnerAction(
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return ARTIFACT_ENTITY_TYPE
+        return ArtifactEntityType()
 
     @override
     @classmethod

@@ -12,7 +12,7 @@ from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
 from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
-from ai.backend.common.data.entity.deployment import DEPLOYMENT_ENTITY_TYPE
+from ai.backend.common.data.entity.deployment import DeploymentEntityType
 from ai.backend.common.data.entity.resource_group import ResourceGroupName
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
 from ai.backend.manager.actions.registry.types import GroupMeta
@@ -79,7 +79,7 @@ def deployment_processors(
         appproxy_client_pool=mock_appproxy_client_pool,
     )
     return DeploymentProcessors(
-        processor_registry.group(GroupMeta(DEPLOYMENT_ENTITY_TYPE)), service
+        processor_registry.group(GroupMeta(DeploymentEntityType())), service
     )
 
 

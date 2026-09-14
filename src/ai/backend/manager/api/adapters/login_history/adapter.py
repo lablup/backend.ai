@@ -34,6 +34,7 @@ from ai.backend.manager.services.auth.actions.search_login_history import (
     GlobalSearchLoginHistoryAction,
     SearchLoginHistoryAction,
 )
+from ai.backend.manager.services.auth.processors import AuthProcessors
 
 _LOGIN_HISTORY_PAGINATION_SPEC = PaginationSpec(
     forward_order=LoginHistoryOrders.created_at(ascending=False),
@@ -46,6 +47,11 @@ _LOGIN_HISTORY_PAGINATION_SPEC = PaginationSpec(
 
 class LoginHistoryAdapter(BaseAdapter):
     """Adapter for login history domain operations."""
+
+    _auth: AuthProcessors
+
+    def __init__(self, auth: AuthProcessors) -> None:
+        self._auth = auth
 
     async def admin_search(
         self, input: AdminSearchLoginHistoryInput
@@ -65,7 +71,7 @@ class LoginHistoryAdapter(BaseAdapter):
             limit=input.limit,
             offset=input.offset,
         )
-        action_result = await self._processors.auth.global_search_login_history.run(
+        action_result = await self._auth.global_search_login_history.run(
             GlobalSearchLoginHistoryAction(searcher=searcher)
         )
         return AdminSearchLoginHistoryPayload(
@@ -97,7 +103,7 @@ class LoginHistoryAdapter(BaseAdapter):
             limit=input.limit,
             offset=input.offset,
         )
-        action_result = await self._processors.auth.search_login_history.run(
+        action_result = await self._auth.search_login_history.run(
             SearchLoginHistoryAction(user_id=UserID(me.user_id), searcher=searcher)
         )
         return MySearchLoginHistoryPayload(

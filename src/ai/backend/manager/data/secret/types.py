@@ -10,6 +10,8 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import NewType
 
+from ai.backend.common.data.entity.types import FieldData
+
 # The id of one key encryption key within a provider. Provider-defined, so it may carry
 # whatever shape that provider names its keys with.
 SecretKeyId = NewType("SecretKeyId", str)
@@ -58,3 +60,8 @@ class SecretReencryptProgress:
     scanned: int
     reencrypted: int
     status: SecretStatus
+
+
+@dataclass(frozen=True)
+class SecretFieldData(FieldData):
+    """Data type for the secret field group, which has no dedicated row."""

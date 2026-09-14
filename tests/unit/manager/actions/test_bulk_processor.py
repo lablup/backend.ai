@@ -12,7 +12,8 @@ from typing import Any, override
 
 import pytest
 
-from ai.backend.common.data.permission.types import EntityType, RBACElementType
+from ai.backend.common.data.entity.session import SessionEntityType
+from ai.backend.common.data.entity.types import EntityType
 from ai.backend.common.exception import PermissionDeniedError
 from ai.backend.manager.actions.action import BaseActionTriggerMeta
 from ai.backend.manager.actions.action.bulk import (
@@ -45,17 +46,17 @@ class _RefTarget(ActionTarget):
 
 @pytest.fixture
 def ref_a() -> RBACElementRef:
-    return RBACElementRef(element_type=RBACElementType.SESSION, element_id="a")
+    return RBACElementRef(element_type=SessionEntityType(), element_id="a")
 
 
 @pytest.fixture
 def ref_b() -> RBACElementRef:
-    return RBACElementRef(element_type=RBACElementType.SESSION, element_id="b")
+    return RBACElementRef(element_type=SessionEntityType(), element_id="b")
 
 
 @pytest.fixture
 def ref_c() -> RBACElementRef:
-    return RBACElementRef(element_type=RBACElementType.SESSION, element_id="c")
+    return RBACElementRef(element_type=SessionEntityType(), element_id="c")
 
 
 @dataclass
@@ -69,7 +70,7 @@ class _MockBulkAction(BaseBulkAction[ActionTarget]):
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return EntityType.SESSION
+        return SessionEntityType()
 
     @override
     @classmethod

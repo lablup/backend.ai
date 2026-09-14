@@ -1,7 +1,7 @@
 from typing import Any
 
-from ai.backend.common.data.entity.login_history import LOGIN_HISTORY_FIELD_TYPE
-from ai.backend.common.data.entity.login_session import LOGIN_SESSION_FIELD_TYPE
+from ai.backend.common.data.entity.login_history import LoginHistoryFieldType
+from ai.backend.common.data.entity.login_session import LoginSessionFieldType
 from ai.backend.manager.actions.registry.field import LookupFieldGroup
 from ai.backend.manager.actions.registry.group import ProcessorGroup
 from ai.backend.manager.actions.registry.types import FieldGroupMeta
@@ -194,13 +194,13 @@ class AuthProcessors:
             UploadSSHKeypairAction, service.upload_ssh_keypair
         )
         self.login_sessions = user_group.field_group(
-            FieldGroupMeta(LOGIN_SESSION_FIELD_TYPE),
+            FieldGroupMeta(LoginSessionFieldType()),
             LoginSessionData,
             LookupLoginSessionOwnerAction,
             LookupBulkLoginSessionOwnerAction,
         )
         self.login_history = user_group.field_group(
-            FieldGroupMeta(LOGIN_HISTORY_FIELD_TYPE),
+            FieldGroupMeta(LoginHistoryFieldType()),
             LoginHistoryData,
             LookupLoginHistoryOwnerAction,
             LookupBulkLoginHistoryOwnerAction,

@@ -8,6 +8,10 @@ from typing import override
 
 from aiohttp import web
 
+from ai.backend.common.data.entity.keypair import KeyPairFieldType
+from ai.backend.common.data.entity.login_client_type import LoginClientTypeEntityType
+from ai.backend.common.data.entity.login_session import LoginSessionFieldType
+from ai.backend.common.data.entity.user import UserEntityType
 from ai.backend.common.exception import (
     BackendAIError,
     ErrorCode,
@@ -15,6 +19,9 @@ from ai.backend.common.exception import (
     ErrorDomain,
     ErrorOperation,
 )
+from ai.backend.manager.actions.types import ActionOperationType
+from ai.backend.manager.errors.base.entity import EntityError, EntityErrorCode
+from ai.backend.manager.errors.base.field import FieldError, FieldErrorCode
 
 from .common import ObjectNotFound
 
@@ -101,54 +108,42 @@ class PasswordExpired(BackendAIError, web.HTTPUnauthorized):
         )
 
 
-class EmailAlreadyExistsError(BackendAIError, web.HTTPBadRequest):
+class EmailAlreadyExistsError(EntityError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/email-already-exists"
     error_title = "Email already exists."
 
     @override
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.USER,
-            operation=ErrorOperation.CREATE,
-            error_detail=ErrorDetail.ALREADY_EXISTS,
+    def entity_error_code(self) -> EntityErrorCode:
+        return EntityErrorCode(
+            UserEntityType(), ActionOperationType.CREATE, ErrorDetail.ALREADY_EXISTS
         )
 
 
-class UserCreationError(BackendAIError, web.HTTPInternalServerError):
+class UserCreationError(EntityError, web.HTTPInternalServerError):
     error_type = "https://api.backend.ai/probs/user-creation-failed"
     error_title = "Failed to create user account."
 
     @override
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.USER,
-            operation=ErrorOperation.CREATE,
-            error_detail=ErrorDetail.INTERNAL_ERROR,
+    def entity_error_code(self) -> EntityErrorCode:
+        return EntityErrorCode(
+            UserEntityType(), ActionOperationType.CREATE, ErrorDetail.INTERNAL_ERROR
         )
 
 
-class UserNotFound(ObjectNotFound):
+class UserNotFound(EntityError, ObjectNotFound):
     object_name = "user"
 
     @override
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.USER,
-            operation=ErrorOperation.READ,
-            error_detail=ErrorDetail.NOT_FOUND,
-        )
+    def entity_error_code(self) -> EntityErrorCode:
+        return EntityErrorCode(UserEntityType(), ActionOperationType.GET, ErrorDetail.NOT_FOUND)
 
 
-class AccessKeyNotFound(ObjectNotFound):
+class AccessKeyNotFound(FieldError, ObjectNotFound):
     object_name = "access key"
 
     @override
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.USER,
-            operation=ErrorOperation.READ,
-            error_detail=ErrorDetail.NOT_FOUND,
-        )
+    def field_error_code(self) -> FieldErrorCode:
+        return FieldErrorCode(KeyPairFieldType(), ActionOperationType.GET, ErrorDetail.NOT_FOUND)
 
 
 class GroupMembershipNotFoundError(BackendAIError, web.HTTPNotFound):
@@ -177,15 +172,13 @@ class InvalidClientIPConfig(BackendAIError, web.HTTPForbidden):
         )
 
 
-class LoginSessionNotFoundError(ObjectNotFound):
+class LoginSessionNotFoundError(FieldError, ObjectNotFound):
     object_name = "login_session"
 
     @override
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.AUTH,
-            operation=ErrorOperation.READ,
-            error_detail=ErrorDetail.NOT_FOUND,
+    def field_error_code(self) -> FieldErrorCode:
+        return FieldErrorCode(
+            LoginSessionFieldType(), ActionOperationType.GET, ErrorDetail.NOT_FOUND
         )
 
 
@@ -215,28 +208,24 @@ class LoginBlockedError(BackendAIError, web.HTTPTooManyRequests):
         )
 
 
-class LoginClientTypeNotFound(ObjectNotFound):
+class LoginClientTypeNotFound(EntityError, ObjectNotFound):
     object_name = "login_client_type"
 
     @override
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.AUTH,
-            operation=ErrorOperation.READ,
-            error_detail=ErrorDetail.NOT_FOUND,
+    def entity_error_code(self) -> EntityErrorCode:
+        return EntityErrorCode(
+            LoginClientTypeEntityType(), ActionOperationType.GET, ErrorDetail.NOT_FOUND
         )
 
 
-class LoginClientTypeConflict(BackendAIError, web.HTTPConflict):
+class LoginClientTypeConflict(EntityError, web.HTTPConflict):
     error_type = "https://api.backend.ai/probs/login-client-type-conflict"
     error_title = "A login client type with the same name already exists."
 
     @override
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.AUTH,
-            operation=ErrorOperation.CREATE,
-            error_detail=ErrorDetail.CONFLICT,
+    def entity_error_code(self) -> EntityErrorCode:
+        return EntityErrorCode(
+            LoginClientTypeEntityType(), ActionOperationType.CREATE, ErrorDetail.CONFLICT
         )
 
 

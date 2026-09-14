@@ -16,7 +16,7 @@ from ai.backend.client.v2.v2_registry import V2ClientRegistry
 if TYPE_CHECKING:
     from tests.component.conftest import ServerInfo, UserFixtureData
 
-from ai.backend.common.data.entity.user import USER_ENTITY_TYPE
+from ai.backend.common.data.entity.user import UserEntityType
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
 from ai.backend.manager.actions.registry.types import (
     GroupMeta,
@@ -58,7 +58,7 @@ def user_processors(
         scheduling_controller=MagicMock(),
     )
     return UserProcessors(
-        processor_registry.group(GroupMeta(USER_ENTITY_TYPE)),
+        processor_registry.group(GroupMeta(UserEntityType())),
         user_service,
     )
 
@@ -73,7 +73,8 @@ def server_module_registries(
     processors.user = user_processors
 
     adapter = UserAdapter(
-        processors,
+        processors.user,
+        MagicMock(),
         auth_config=MagicMock(),
         key_provider_pool=KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
     )
