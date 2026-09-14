@@ -694,3 +694,45 @@ class TestRepeating:
         async with db.begin() as conn:
             await conn.run_sync(lambda sync_conn: _run(sync_conn))
         return seeded_from_fixture
+
+
+class TestOnePresetPerScope:
+    """`uq_roles_preset_scope` holds one role per preset per scope, and the two naming
+    rules can both have left one behind on the same scope."""
+
+    @pytest.fixture
+    async def twins(
+        self, db: ExtendedAsyncSAEngine, seeded: dict[str, uuid.UUID]
+    ) -> dict[str, uuid.UUID]:
+        """The same project carrying an admin role under each naming rule."""
+        async with db.begin_session() as session:
+            twin = RoleRow(
+                name=f"project-{str(seeded['project'])[:8]}-admin",
+                source=RoleSource.SYSTEM,
+                status=RoleStatus.ACTIVE,
+                scope_type=ProjectEntityType(),
+                scope_id=seeded["project"],
+            )
+            session.add(twin)
+            await session.flush()
+            seeded["twin_role"] = twin.id
+        return seeded
+
+    async def test_only_one_of_them_is_linked(
+        self, db: ExtendedAsyncSAEngine, twins: dict[str, uuid.UUID]
+    ) -> None:
+        async with db.begin() as conn:
+            await conn.run_sync(lambda sync_conn: _run(sync_conn))
+        async with db.begin_readonly_session() as session:
+            rows = (
+                (
+                    await session.execute(
+                        sa.select(RoleRow).where(RoleRow.scope_id == twins["project"])
+                    )
+                )
+                .scalars()
+                .all()
+            )
+        linked = [row for row in rows if row.role_preset_id is not None]
+        by_preset = [row.role_preset_id for row in linked]
+        assert len(by_preset) == len(set(by_preset)), "one preset took two roles of a scope"

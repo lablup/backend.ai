@@ -24,7 +24,7 @@ from __future__ import annotations
 import hashlib
 import uuid
 from dataclasses import dataclass
-from typing import Final
+from typing import Any, Final
 
 import sqlalchemy as sa
 from alembic import op
@@ -819,13 +819,28 @@ def _link_roles(conn: sa.engine.Connection) -> None:
     rather than recreating is what keeps the assignments: who holds a role lives only
     in `user_roles`, and a role's own rows go with it."""
     rows = conn.execute(
-        sa.text("SELECT id, scope_type, name FROM roles WHERE role_preset_id IS NULL")
+        sa.text("""
+            SELECT id, scope_type, scope_id, name
+            FROM roles
+            WHERE role_preset_id IS NULL
+            ORDER BY created_at, id
+        """)
     ).all()
-    linked = [
-        {"b_role_id": row.id, "b_preset_id": preset_id}
-        for row in rows
-        if (preset_id := _preset_for(str(row.scope_type), str(row.name))) is not None
-    ]
+    # A scope holds one role per preset, which `uq_roles_preset_scope` states. Both
+    # naming rules may have left one behind on the same scope, so the first by age
+    # takes the preset and the rest stay unlinked -- and, being system roles no preset
+    # accounts for, go in the step after this one.
+    taken: set[tuple[str, str, str]] = set()
+    linked: list[dict[str, Any]] = []
+    for row in rows:
+        preset_id = _preset_for(str(row.scope_type), str(row.name))
+        if preset_id is None:
+            continue
+        key = (preset_id, str(row.scope_type), str(row.scope_id))
+        if key in taken:
+            continue
+        taken.add(key)
+        linked.append({"b_role_id": row.id, "b_preset_id": preset_id})
     if linked:
         conn.execute(
             sa.text(
