@@ -160,6 +160,9 @@ from ai.backend.manager.services.audit_log.actions.lookup_owner import (
 )
 from ai.backend.manager.services.audit_log.processors import AuditLogProcessors
 from ai.backend.manager.services.auth.processors import AuthProcessors
+from ai.backend.manager.services.container_registry.actions.bulk_get import (
+    BulkGetContainerRegistriesAction,
+)
 from ai.backend.manager.services.container_registry.processors import ContainerRegistryProcessors
 from ai.backend.manager.services.deployment.actions.access_token.bulk_delete_access_tokens import (
     BulkDeleteAccessTokensAction,
@@ -981,6 +984,24 @@ def test_vfs_storage_loader_read_is_a_partial_permission_read() -> None:
     }
     assert recorded[BulkGetVFSStoragesAction] == (
         VFSStorageEntityType(),
+        ActionKind.BULK,
+        ActionGate.PERMISSION,
+    )
+
+
+def test_container_registry_loader_read_is_a_partial_permission_read() -> None:
+    """The container registry DataLoader reads per named registry, not superadmin-only."""
+    registry = _ops_registry()
+    ContainerRegistryProcessors(
+        registry.group(GroupMeta(ContainerRegistryEntityType())), MagicMock()
+    )
+
+    recorded = {
+        record.action_cls: (record.entity_type, record.kind, record.gate)
+        for record in registry.wired_processors()
+    }
+    assert recorded[BulkGetContainerRegistriesAction] == (
+        ContainerRegistryEntityType(),
         ActionKind.BULK,
         ActionGate.PERMISSION,
     )
