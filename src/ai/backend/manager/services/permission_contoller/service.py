@@ -94,8 +94,10 @@ class PermissionControllerService:
     async def scoped_search_role_assignments(
         self, action: ScopedSearchRoleAssignmentsAction
     ) -> ScopedSearchRoleAssignmentsActionResult:
-        """Search the assignment rows inside one user's scope."""
-        result = await self._repository.search_users_assigned_to_role(querier=action.querier)
+        """Search the assignment rows the named scopes reach."""
+        result = await self._repository.search_role_assignments_in_scope(
+            scopes=action.operation_scopes(), searcher=action.searcher
+        )
         return ScopedSearchRoleAssignmentsActionResult(result=result)
 
     async def search_permissions(

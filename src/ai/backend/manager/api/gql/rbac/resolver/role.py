@@ -45,7 +45,6 @@ from ai.backend.manager.api.gql.rbac.types import (
 from ai.backend.manager.api.gql.rbac.types.role import RoleAssignmentEdge, RoleEdge
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.utils import check_admin_only
-from ai.backend.manager.models.rbac_models.conditions import AssignedUserConditions
 from ai.backend.manager.services.permission_contoller.actions.search_roles_in_scope import (
     RegisteredRoleScopeItem,
 )
@@ -191,7 +190,7 @@ async def my_roles(
 
         raise InsufficientPrivilege("Authentication required")
 
-    result = await info.context.adapters.rbac.admin_search_role_assignments(
+    result = await info.context.adapters.rbac.my_search_role_assignments(
         SearchRoleAssignmentsInput(
             filter=filter.to_pydantic() if filter is not None else None,
             order=[o.to_pydantic() for o in order_by] if order_by is not None else None,
@@ -202,7 +201,6 @@ async def my_roles(
             limit=limit,
             offset=offset,
         ),
-        base_conditions=[AssignedUserConditions.by_user_id(me.user_id)],
     )
     edges = [
         RoleAssignmentEdge(

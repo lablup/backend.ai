@@ -43,6 +43,7 @@ from ai.backend.manager.models.rbac_models.permission.creators import RolePermis
 from ai.backend.manager.models.rbac_models.permission.purgers import RolePermissionPurger
 from ai.backend.manager.models.rbac_models.permission.scopes import PermissionOperationScope
 from ai.backend.manager.models.rbac_models.permission.updaters import RolePermissionUpdater
+from ai.backend.manager.models.rbac_models.user_role.searchers import RoleAssignmentSearcher
 from ai.backend.manager.models.scopes import OperationScope
 from ai.backend.manager.models.specs.permission import PermissionEntry
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -197,6 +198,17 @@ class PermissionControllerRepository:
         """Searches users assigned to a specific role with pagination and filtering."""
         return await self._db_source.search_users_assigned_to_role(
             querier=querier,
+        )
+
+    @permission_controller_repository_resilience.apply()
+    async def search_role_assignments_in_scope(
+        self,
+        scopes: Sequence[OperationScope],
+        searcher: RoleAssignmentSearcher,
+    ) -> AssignedUserListResult:
+        """Search the assignment rows the named scopes reach, combined with OR."""
+        return await self._db_source.search_role_assignments_in_scope(
+            scopes=scopes, searcher=searcher
         )
 
     @permission_controller_repository_resilience.apply()

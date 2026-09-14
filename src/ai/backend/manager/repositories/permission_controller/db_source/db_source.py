@@ -52,6 +52,7 @@ from ai.backend.manager.models.rbac_models.permission.scopes import PermissionOp
 from ai.backend.manager.models.rbac_models.permission.updaters import RolePermissionUpdater
 from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
+from ai.backend.manager.models.rbac_models.user_role.searchers import RoleAssignmentSearcher
 from ai.backend.manager.models.scopes import OperationScope
 from ai.backend.manager.models.specs.permission import PermissionEntry
 from ai.backend.manager.models.user import UserRow
@@ -354,6 +355,21 @@ class PermissionDBSource:
                 has_next_page=result.has_next_page,
                 has_previous_page=result.has_previous_page,
             )
+
+    async def search_role_assignments_in_scope(
+        self,
+        scopes: Sequence[OperationScope],
+        searcher: RoleAssignmentSearcher,
+    ) -> AssignedUserListResult:
+        """Search the assignment rows the named scopes reach, combined with OR."""
+        async with self._ops.read_ops() as r:
+            result = await r.search_with_scopes(scopes, searcher)
+        return AssignedUserListResult(
+            items=result.items,
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+        )
 
     async def search_domain_scopes(
         self,

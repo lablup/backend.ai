@@ -114,6 +114,9 @@ from ai.backend.manager.api.gql.rbac.types.scope import (
     ScopeInputGQL,
 )
 from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy, StrawberryGQLContext
+from ai.backend.manager.services.permission_contoller.actions.search_my_role_assignments import (
+    RoleRoleAssignmentScopeItem,
+)
 
 if TYPE_CHECKING:
     from ai.backend.manager.api.gql.rbac.types.entity_node import EntityNodeGQL
@@ -254,35 +257,22 @@ class RoleGQL(PydanticNodeMixin[Any]):
         from ai.backend.manager.api.gql.rbac.types.permission import (
             PermissionConnection,
             PermissionEdge,
-            PermissionFilter,
             PermissionGQL,
         )
 
-        # Add role_id filter to scope permissions to this role
-        role_filter = PermissionFilter(role_id=UUIDFilter(equals=UUID(self.id)))
-        if filter is not None:
-            # Merge with user-provided filter
-            combined_filter = PermissionFilter(
-                role_id=role_filter.role_id,
-                entity_type=filter.entity_type,
-            )
-        else:
-            combined_filter = role_filter
-
-        pydantic_filter = combined_filter.to_pydantic() if combined_filter is not None else None
-        pydantic_order = [o.to_pydantic() for o in order_by] if order_by is not None else None
-
-        search_input = AdminSearchPermissionsGQLInput(
-            filter=pydantic_filter,
-            order=pydantic_order,
-            first=first,
-            after=after,
-            last=last,
-            before=before,
-            limit=limit,
-            offset=offset,
+        result = await info.context.adapters.rbac.search_role_permissions(
+            RoleID(UUID(self.id)),
+            AdminSearchPermissionsGQLInput(
+                filter=filter.to_pydantic() if filter is not None else None,
+                order=[o.to_pydantic() for o in order_by] if order_by is not None else None,
+                first=first,
+                after=after,
+                last=last,
+                before=before,
+                limit=limit,
+                offset=offset,
+            ),
         )
-        result = await info.context.adapters.rbac.admin_search_permissions_gql(search_input)
 
         edges = [
             PermissionEdge(
@@ -326,33 +316,18 @@ class RoleGQL(PydanticNodeMixin[Any]):
         limit: int | None = None,
         offset: int | None = None,
     ) -> RoleAssignmentConnection | None:
-        # Add role_id filter to scope assignments to this role
-        role_filter = RoleAssignmentFilter(role_id=UUIDFilter(equals=UUID(self.id)))
-        if filter is not None:
-            # Merge with user-provided filter
-            combined_filter = RoleAssignmentFilter(
-                role_id=role_filter.role_id,
-                role=filter.role,
-                username=filter.username,
-                email=filter.email,
-            )
-        else:
-            combined_filter = role_filter
-
-        pydantic_filter = combined_filter.to_pydantic() if combined_filter is not None else None
-        pydantic_order = [o.to_pydantic() for o in order_by] if order_by is not None else None
-
-        result = await info.context.adapters.rbac.admin_search_role_assignments(
+        result = await info.context.adapters.rbac.search_role_assignments_in_scope(
+            [RoleRoleAssignmentScopeItem(role_id=RoleID(UUID(self.id)))],
             SearchRoleAssignmentsInput(
-                filter=pydantic_filter,
-                order=pydantic_order,
+                filter=filter.to_pydantic() if filter is not None else None,
+                order=[o.to_pydantic() for o in order_by] if order_by is not None else None,
                 first=first,
                 after=after,
                 last=last,
                 before=before,
                 limit=limit,
                 offset=offset,
-            )
+            ),
         )
         edges = [
             RoleAssignmentEdge(
@@ -465,7 +440,7 @@ class RoleAssignmentGQL(PydanticNodeMixin[RoleAssignmentNode]):
         node_ids: Iterable[str],
         required: bool = False,
     ) -> Iterable[Self | None]:
-        # DataLoader already returns RoleAssignmentGQL | None via from_pydantic conversion
+        # Superadmin-only through the global search; removed together with this deprecated node.
         results = await info.context.data_loaders.role_assignment_loader.load_many([
             UUID(nid) for nid in node_ids
         ])
