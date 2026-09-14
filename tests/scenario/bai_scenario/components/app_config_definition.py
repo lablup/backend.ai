@@ -392,7 +392,11 @@ class TheDefinitionAfterTheCursorIsFound(
             return [Refused(NotEnoughPermission, answered.raised)]
         ordered = sorted(laid.laid, key=lambda one: one.created_at, reverse=True)
         return [
-            Same("items", [one.id for one in payload.items], [ordered[1].id]),
+            Held[object](
+                "items",
+                [one.id for one in payload.items],
+                SameAs[object]([ordered[1].id], "커서 다음 설정 정의"),
+            ),
             Same("total_count", payload.total_count, len(laid.laid)),
             Same("has_next_page", payload.has_next_page, True),
             Same("has_previous_page", payload.has_previous_page, True),
