@@ -1328,6 +1328,10 @@ class OverridableAgentConfig(BaseConfigSchema):
             self.id = f"agent-{uuid4()}"
         return self.id
 
+    @property
+    def defaulted_initial_resource_group_name(self) -> str:
+        return self.initial_resource_group_name or "default"
+
 
 class AgentConfig(CommonAgentConfig, OverridableAgentConfig):
     """

@@ -35,6 +35,7 @@ class AgentEtcdClientView(AbstractKVStore):
         the scope prefix mapping is recalculated.
         """
         return {
+            ConfigScopes.SGROUP: f"sgroup/{self._config.agent.defaulted_initial_resource_group_name}",
             ConfigScopes.NODE: f"nodes/agents/{self._config.agent.defaulted_id}",
         }
 

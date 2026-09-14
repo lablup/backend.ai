@@ -1433,6 +1433,7 @@ async def etcd_ctx(local_config: AgentUnifiedConfig) -> AsyncGenerator[AsyncEtcd
         }
     scope_prefix_map = {
         ConfigScopes.GLOBAL: "",
+        ConfigScopes.SGROUP: f"sgroup/{local_config.agent.defaulted_initial_resource_group_name}",
         ConfigScopes.NODE: f"nodes/agents/{local_config.agent.defaulted_id}",
     }
     etcd_config_data = local_config.etcd.to_dataclass()
