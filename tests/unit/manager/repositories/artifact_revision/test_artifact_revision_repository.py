@@ -20,7 +20,7 @@ from ai.backend.manager.data.artifact.types import (
     ArtifactStatus,
     ArtifactType,
 )
-from ai.backend.manager.errors.repository import EntityNotFoundError
+from ai.backend.manager.errors.base.field import FieldNotFoundError
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.artifact import ArtifactRow
 from ai.backend.manager.models.artifact_revision import ArtifactRevisionRow
@@ -393,7 +393,7 @@ class TestArtifactRevisionRepository:
         revision_ops: OpsRepository[ArtifactRevisionData],
     ) -> None:
         """Test retrieving non-existent artifact revision raises error"""
-        with pytest.raises(EntityNotFoundError):
+        with pytest.raises(FieldNotFoundError):
             await revision_ops.get_field(
                 ArtifactRevisionQuerier(revision_id=ArtifactRevisionID(uuid.uuid4()))
             )

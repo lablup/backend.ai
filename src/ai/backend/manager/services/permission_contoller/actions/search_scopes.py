@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.common.data.permission.types import RBACElementType
+from ai.backend.common.data.entity.types import EntityType
 from ai.backend.manager.actions.action import SearchActionResult
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.permission.types import ScopeData
@@ -19,7 +19,7 @@ class SearchScopesAction(RoleAction):
     Permission check is performed at the API handler level.
     """
 
-    element_type: RBACElementType
+    scope_type: EntityType
     querier: BatchQuerier
 
     @override

@@ -10,16 +10,16 @@ import sqlalchemy as sa
 
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.idle_checker import IdleCheckerAssignmentID, IdleCheckerID
-from ai.backend.common.data.entity.project import ProjectID
-from ai.backend.common.data.entity.resource_group import ResourceGroupID
+from ai.backend.common.data.entity.project import ProjectEntityType, ProjectID
+from ai.backend.common.data.entity.resource_group import ResourceGroupEntityType, ResourceGroupID
 from ai.backend.common.data.entity.types import EntityIdentifier
-from ai.backend.common.data.entity.user import UserID
+from ai.backend.common.data.entity.user import UserEntityType, UserID
 from ai.backend.common.data.idle_checker.types import (
     CheckerType,
     IdleCheckerSpec,
     SessionLifetimeSpec,
 )
-from ai.backend.common.data.permission.types import Permission, ScopeType
+from ai.backend.common.data.permission.types import Permission
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.types import ResourceSlot, SessionTypes
 from ai.backend.manager.data.idle_checker.types import IdleCheckerAssignmentData, IdleCheckerData
@@ -66,7 +66,6 @@ from ai.backend.manager.models.virtual_entity.entity_membership_field import (
 from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
 from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
 from ai.backend.manager.repositories.idle_checker.repository import IdleCheckerRepository
-from ai.backend.manager.repositories.ops import DBOpsProvider
 from ai.backend.manager.repositories.ops.repository import OpsRepository
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.ops.v2.relation.provider import RelationOpsProvider
@@ -126,7 +125,11 @@ class TestIdleCheckerAssignmentRepository:
 
     @pytest.fixture
     def repository(self, database: ExtendedAsyncSAEngine) -> IdleCheckerRepository:
-        return IdleCheckerRepository(DBOpsProvider(database), RelationOpsProvider(database))
+        return IdleCheckerRepository(
+            database,
+            RelationOpsProvider(database),
+            V2DBOpsProvider(database),
+        )
 
     @pytest.fixture
     def relations(self, database: ExtendedAsyncSAEngine) -> RbacRelationRepository:
@@ -313,7 +316,7 @@ class TestIdleCheckerAssignmentRepository:
                 )
             )
 
-        assert assignment.scope_type is ScopeType.RESOURCE_GROUP
+        assert assignment.scope_type == ResourceGroupEntityType()
         assert assignment.scope_id == resource_group_id
         assert assignment.enabled is False
         # A relation makes no node of its own.
@@ -394,7 +397,7 @@ class TestIdleCheckerAssignmentRepository:
             relations, repository, IdleCheckerAssignmentCreator(enabled=True), user_id, checker.id
         )
 
-        assert assignment.scope_type is ScopeType.USER
+        assert assignment.scope_type == UserEntityType()
         assert assignment.scope_id == user_id
 
     async def test_create_assignment_on_project_scope(
@@ -412,7 +415,7 @@ class TestIdleCheckerAssignmentRepository:
             checker.id,
         )
 
-        assert assignment.scope_type is ScopeType.PROJECT
+        assert assignment.scope_type == ProjectEntityType()
         assert assignment.scope_id == project_id
 
     async def test_disable_and_enable_switch_the_row_alone(

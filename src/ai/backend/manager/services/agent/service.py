@@ -27,8 +27,7 @@ from ai.backend.manager.actions.v2.bulk.result import PartialBulkEntityResult, P
 from ai.backend.manager.actions.v2.bulk.validator.rbac import BulkOwnCheck
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.permission.permission_defs import AgentPermission
-from ai.backend.manager.errors.agent import ConflictingSessionRescheduleNotSupported
-from ai.backend.manager.errors.resource import AgentNotFound
+from ai.backend.manager.errors.agent import AgentNotFound, ConflictingSessionRescheduleNotSupported
 from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.repositories.agent.repository import AgentRepository
 from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository

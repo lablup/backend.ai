@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.common.data.entity.notification import NOTIFICATION_RULE_ENTITY_TYPE
+from ai.backend.common.data.entity.notification import NotificationRuleEntityType
 from ai.backend.common.data.entity.types import EntityType
 from ai.backend.manager.actions.v2.ops.base import SearchGlobalOpsAction
 from ai.backend.manager.data.notification.types import NotificationRuleData
@@ -20,7 +20,7 @@ class SearchRulesAction(SearchGlobalOpsAction[NotificationRuleRow, NotificationR
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return NOTIFICATION_RULE_ENTITY_TYPE
+        return NotificationRuleEntityType()
 
     @override
     @classmethod

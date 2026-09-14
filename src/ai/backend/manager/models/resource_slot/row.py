@@ -14,6 +14,7 @@ from decimal import Decimal
 import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
+from ai.backend.common.data.entity.agent import AgentUUID
 from ai.backend.common.data.entity.agent_resource import AgentResourceID
 from ai.backend.common.data.entity.deployment_preset import DeploymentPresetID
 from ai.backend.common.data.entity.deployment_revision import DeploymentRevisionID
@@ -157,6 +158,9 @@ class AgentResourceRow(LifecycleTimestampsMixin, Base):
         server_default=sa.text("uuid_generate_v7()"),
     )
     agent_id: Mapped[str] = mapped_column("agent_id", sa.String(length=64), primary_key=True)
+    # The agent this row is written under. ``agent_id`` names the same agent by its
+    # name column, which the key and every existing query still use.
+    agent_uuid: Mapped[AgentUUID] = mapped_column("agent_uuid", GUID(AgentUUID), nullable=False)
     slot_name: Mapped[str] = mapped_column("slot_name", sa.String(length=64), primary_key=True)
     capacity: Mapped[Decimal] = mapped_column(
         "capacity", sa.Numeric(precision=24, scale=6), nullable=False

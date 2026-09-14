@@ -38,45 +38,13 @@ from .services.service import VolumeService
 from .storages.storage_pool import StoragePool
 from .types import VolumeInfo
 from .volumes.abc import AbstractVolume
-from .volumes.cephfs import CephFSVolume
-from .volumes.ddn import EXAScalerFSVolume
-from .volumes.dellemc import DellEMCOneFSVolume
-from .volumes.gpfs import GPFSVolume
-from .volumes.hammerspace.volume.base import BaseHammerspaceVolume
-from .volumes.hammerspace.volume.extended import HammerspaceVolume
-from .volumes.netapp import NetAppVolume
-from .volumes.noop import NoopVolume
 from .volumes.pool import VolumePool
-from .volumes.purestorage import FlashBladeVolume
 from .volumes.stats import VolumeState, VolumeStatsObserver
-from .volumes.vast import VASTVolume
-from .volumes.vfs import BaseVolume
-from .volumes.weka import WekaVolume
-from .volumes.xfs import XfsVolume
 from .watcher import WatcherClient
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 EVENT_DISPATCHER_CONSUMER_GROUP: Final = "storage-proxy"
-
-DEFAULT_BACKENDS: Mapping[str, type[AbstractVolume]] = {
-    FlashBladeVolume.name: FlashBladeVolume,
-    BaseVolume.name: BaseVolume,
-    XfsVolume.name: XfsVolume,
-    NetAppVolume.name: NetAppVolume,
-    # NOTE: Dell EMC has two different storage: PowerStore and PowerScale (OneFS).
-    #       We support the latter only for now.
-    DellEMCOneFSVolume.name: DellEMCOneFSVolume,
-    WekaVolume.name: WekaVolume,
-    GPFSVolume.name: GPFSVolume,  # IBM SpectrumScale or GPFS
-    "spectrumscale": GPFSVolume,  # IBM SpectrumScale or GPFS
-    CephFSVolume.name: CephFSVolume,
-    VASTVolume.name: VASTVolume,
-    EXAScalerFSVolume.name: EXAScalerFSVolume,
-    NoopVolume.name: NoopVolume,
-    HammerspaceVolume.name: HammerspaceVolume,
-    BaseHammerspaceVolume.name: BaseHammerspaceVolume,
-}
 
 
 class ServiceContext:
@@ -159,7 +127,3 @@ class RootContext:
     async def shutdown_volumes(self) -> None:
         for volume in self.volumes.values():
             await volume.shutdown()
-
-    async def shutdown_manager_http_clients(self) -> None:
-        """Close all manager HTTP client sessions."""
-        await self.manager_client_pool.cleanup()

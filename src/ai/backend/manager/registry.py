@@ -134,6 +134,7 @@ from .agent_cache import AgentRPCCache
 from .clients.agent import AgentClientPool
 from .clients.appproxy.client import AppProxyClient
 from .defs import DEFAULT_IMAGE_ARCH, DEFAULT_ROLE
+from .errors.agent import AgentNotAllocated, AgentNotFound
 from .errors.api import InvalidAPIParameters
 from .errors.image import ImageNotFound
 from .errors.kernel import (
@@ -143,9 +144,7 @@ from .errors.kernel import (
     TooManySessionsMatched,
 )
 from .errors.resource import (
-    AgentNotAllocated,
     DatabaseConnectionUnavailable,
-    InstanceNotFound,
     NoCurrentTaskContext,
     ResourceGroupNotFound,
     ResourceGroupSessionTypeNotAllowed,
@@ -184,7 +183,7 @@ from .models.vfolder import (
 from .types import UserScope
 
 type MSetType = Mapping[str | bytes, bytes | float | int | str]
-__all__ = ["AgentRegistry", "InstanceNotFound"]
+__all__ = ["AgentRegistry"]
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -351,7 +350,7 @@ class AgentRegistry:
             result = await db_sess.execute(query)
             row = result.scalar_one_or_none()
             if row is None:
-                raise InstanceNotFound(inst_id)
+                raise AgentNotFound(inst_id)
             return AgentId(row)
 
     async def enumerate_instances(self, check_shadow: bool = True) -> list[AgentId]:
@@ -1638,7 +1637,7 @@ class AgentRegistry:
                 else session.main_kernel
             )
             if kernel.agent is None:
-                raise InstanceNotFound(
+                raise AgentNotFound(
                     "Kernel has not been assigned to an agent.", extra_data={"kernel_id": kernel_id}
                 )
             async with self._agent_client_pool.acquire(AgentId(kernel.agent)) as client:

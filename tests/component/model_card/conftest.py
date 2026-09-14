@@ -16,18 +16,15 @@ from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 from ai.backend.client.v2.auth import HMACAuth
 from ai.backend.client.v2.config import ClientConfig
 from ai.backend.client.v2.v2_registry import V2ClientRegistry
-from ai.backend.common.data.entity.model_card import MODEL_CARD_ENTITY_TYPE
-from ai.backend.common.data.entity.project import PROJECT_ENTITY_TYPE
-from ai.backend.common.data.entity.role import ROLE_ENTITY_TYPE
-from ai.backend.common.data.entity.user import USER_ENTITY_TYPE
+from ai.backend.common.data.entity.model_card import ModelCardEntityType
+from ai.backend.common.data.entity.project import ProjectEntityType
+from ai.backend.common.data.entity.role import RoleEntityType
+from ai.backend.common.data.entity.user import UserEntityType
 from ai.backend.common.data.entity.vfolder import VFolderUUID
-from ai.backend.common.data.permission.types import EntityType, Permission, ScopeType
+from ai.backend.common.data.permission.types import Permission
 from ai.backend.common.types import QuotaScopeID, QuotaScopeType, VFolderUsageMode
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
 from ai.backend.manager.actions.registry.types import Concern, ConcernMeta, GroupMeta
-from ai.backend.manager.actions.validators import ActionValidators
-from ai.backend.manager.actions.validators.rbac import RBACValidators
-from ai.backend.manager.actions.validators.rbac.scope import ScopeActionRBACValidator
 from ai.backend.manager.api.adapters.model_card.adapter import ModelCardAdapter
 from ai.backend.manager.api.adapters.project.adapter import ProjectAdapter
 from ai.backend.manager.api.adapters.rbac.adapter import RBACAdapter
@@ -46,9 +43,6 @@ from ai.backend.manager.data.secret.types import KeyProviderType
 from ai.backend.manager.dependencies.infrastructure.redis import ValkeyClients
 from ai.backend.manager.models.model_card.row import ModelCardRow
 from ai.backend.manager.models.project.row import ProjectRow
-from ai.backend.manager.models.rbac_models.association_scopes_entities import (
-    AssociationScopesEntitiesRow,
-)
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -87,24 +81,10 @@ from ai.backend.manager.services.rbac.service import (
 )
 from ai.backend.manager.services.user.processors import UserProcessors
 from ai.backend.manager.services.user.service import UserService
-from ai.backend.testutils.action_validators import mock_virtual_entity_rbac_validators
 from ai.backend.testutils.fixtures import DomainFixtureData
 
 if TYPE_CHECKING:
     from tests.component.conftest import ServerInfo, UserFixtureData
-
-
-def _build_validators(
-    database_engine: ExtendedAsyncSAEngine,
-    config_provider: ManagerConfigProvider,
-) -> ActionValidators:
-    permission_repo = PermissionControllerRepository(database_engine)
-    return ActionValidators(
-        virtual_entity_rbac=mock_virtual_entity_rbac_validators(),
-        rbac=RBACValidators(
-            scope=ScopeActionRBACValidator(permission_repo, config_provider),
-        ),
-    )
 
 
 @pytest.fixture()
@@ -117,7 +97,7 @@ def model_card_processors(
     """Real ModelCardProcessors with real RBAC enforcement."""
     repo = ModelCardRepository(V2DBOpsProvider(database_engine))
     service = ModelCardService(repo, storage_manager)
-    return ModelCardProcessors(processor_registry.group(GroupMeta(MODEL_CARD_ENTITY_TYPE)), service)
+    return ModelCardProcessors(processor_registry.group(GroupMeta(ModelCardEntityType())), service)
 
 
 @pytest.fixture()
@@ -143,7 +123,7 @@ def group_processors(
         valkey_stat_client=valkey_clients.stat,
         group_repositories=repositories,
     )
-    return ProjectProcessors(processor_registry.group(GroupMeta(PROJECT_ENTITY_TYPE)), service)
+    return ProjectProcessors(processor_registry.group(GroupMeta(ProjectEntityType())), service)
 
 
 @pytest.fixture()
@@ -158,13 +138,12 @@ def permission_controller_processors(
     perm_repo = PermissionControllerRepository(database_engine)
     service = PermissionControllerService(
         perm_repo,
-        rbac_action_registry=[],
+        action_registry=processor_registry,
     )
     return PermissionControllerProcessors(
-        processor_registry.group(GroupMeta(ROLE_ENTITY_TYPE)),
+        processor_registry.group(GroupMeta(RoleEntityType())),
         service=service,
         action_monitors=[],
-        validators=_build_validators(database_engine, config_provider),
     )
 
 
@@ -186,7 +165,7 @@ def user_processors(
         ),
         scheduling_controller=AsyncMock(),
     )
-    return UserProcessors(processor_registry.group(GroupMeta(USER_ENTITY_TYPE)), service)
+    return UserProcessors(processor_registry.group(GroupMeta(UserEntityType())), service)
 
 
 @pytest.fixture()
@@ -198,7 +177,7 @@ def rbac_processors(
     rbac_groups = processor_registry.concern(ConcernMeta(Concern.RBAC))
     return RbacProcessors(
         rbac_groups.relation_group(),
-        rbac_groups.group(GroupMeta(USER_ENTITY_TYPE)),
+        rbac_groups.group(GroupMeta(UserEntityType())),
         RbacRelationService(RbacRelationRepository(RelationOpsProvider(database_engine))),
         RbacRosterService(RbacRosterRepository(RosterOpsProvider(database_engine))),
         RbacRoleService(
@@ -226,9 +205,13 @@ def server_module_registries(
     processors.rbac = rbac_processors
     processors.user = user_processors
 
-    mc_handler = V2ModelCardHandler(adapter=ModelCardAdapter(processors))
-    proj_handler = V2ProjectHandler(adapter=ProjectAdapter(processors))
-    rbac_handler = V2RBACHandler(adapter=RBACAdapter(processors))
+    mc_handler = V2ModelCardHandler(adapter=ModelCardAdapter(processors.model_card, MagicMock()))
+    proj_handler = V2ProjectHandler(
+        adapter=ProjectAdapter(processors.project, processors.rbac, MagicMock(), processors.user)
+    )
+    rbac_handler = V2RBACHandler(
+        adapter=RBACAdapter(processors.rbac, processors.permission_controller)
+    )
 
     v2_reg = RouteRegistry.create("v2", route_deps.cors_options)
     v2_reg.add_subregistry(register_v2_model_card_routes(mc_handler, route_deps))
@@ -266,7 +249,7 @@ async def model_store_project_fixture(
         await conn.execute(
             sa.insert(VirtualEntityRow.__table__).values(
                 id=virtual_entity_id,
-                entity_type=ScopeType.PROJECT,
+                entity_type=ProjectEntityType(),
                 entity_id=project_id,
             )
         )
@@ -291,7 +274,7 @@ async def model_store_project_fixture(
         )
         await conn.execute(
             VirtualEntityRow.__table__.delete().where(
-                VirtualEntityRow.__table__.c.entity_type == ScopeType.PROJECT,
+                VirtualEntityRow.__table__.c.entity_type == ProjectEntityType(),
                 VirtualEntityRow.__table__.c.entity_id == project_id,
             )
         )
@@ -324,7 +307,7 @@ async def second_project_fixture(
         await conn.execute(
             sa.insert(VirtualEntityRow.__table__).values(
                 id=virtual_entity_id,
-                entity_type=ScopeType.PROJECT,
+                entity_type=ProjectEntityType(),
                 entity_id=project_id,
             )
         )
@@ -349,7 +332,7 @@ async def second_project_fixture(
         )
         await conn.execute(
             VirtualEntityRow.__table__.delete().where(
-                VirtualEntityRow.__table__.c.entity_type == ScopeType.PROJECT,
+                VirtualEntityRow.__table__.c.entity_type == ProjectEntityType(),
                 VirtualEntityRow.__table__.c.entity_id == project_id,
             )
         )
@@ -390,6 +373,7 @@ async def vfolder_fixture(
 @pytest.fixture()
 async def role_fixture(
     db_engine: SAEngine,
+    model_store_project_fixture: uuid.UUID,
 ) -> AsyncIterator[uuid.UUID]:
     """Insert a project member role for assign_users SDK calls."""
     role_id = uuid.uuid4()
@@ -399,43 +383,13 @@ async def role_fixture(
                 id=role_id,
                 name=f"test-member-{secrets.token_hex(4)}",
                 status=RoleStatus.ACTIVE,
+                scope_type=ProjectEntityType(),
+                scope_id=model_store_project_fixture,
             )
         )
     yield role_id
     async with db_engine.begin() as conn:
         await conn.execute(RoleRow.__table__.delete().where(RoleRow.__table__.c.id == role_id))
-
-
-@pytest.fixture(autouse=True)
-async def _register_role_in_project(
-    db_engine: SAEngine,
-    role_fixture: uuid.UUID,
-    model_store_project_fixture: uuid.UUID,
-) -> AsyncIterator[None]:
-    """Register the test role in the primary project scope via ASE.
-
-    This ensures revoke_role() can detect the role as project-scoped
-    and properly calls unbind_user_from_project() to clean up agus entries.
-    """
-    async with db_engine.begin() as conn:
-        await conn.execute(
-            sa.insert(AssociationScopesEntitiesRow.__table__).values(
-                scope_type=ScopeType.PROJECT,
-                scope_id=str(model_store_project_fixture),
-                entity_type=EntityType.ROLE,
-                entity_id=str(role_fixture),
-            )
-        )
-    yield
-    async with db_engine.begin() as conn:
-        await conn.execute(
-            AssociationScopesEntitiesRow.__table__.delete().where(
-                sa.and_(
-                    AssociationScopesEntitiesRow.__table__.c.entity_type == EntityType.ROLE,
-                    AssociationScopesEntitiesRow.__table__.c.entity_id == str(role_fixture),
-                )
-            )
-        )
 
 
 @pytest.fixture(autouse=True)
@@ -447,15 +401,13 @@ async def _grant_model_card_read_permission(
     """Grant model_card:read permission to the test role at the project scope.
 
     Required for the regular user to pass RBAC enforcement on
-    search_in_project (ScopeActionRBACValidator checks this permission).
+    scoped_search (the scope RBAC validator checks this permission).
     """
     async with db_engine.begin() as conn:
         await conn.execute(
             sa.insert(PermissionRow.__table__).values(
                 role_id=role_fixture,
-                scope_type=ScopeType.PROJECT,
-                scope_id=str(model_store_project_fixture),
-                entity_type=EntityType.MODEL_CARD,
+                entity_type=ModelCardEntityType(),
                 permission=Permission.READ,
             )
         )

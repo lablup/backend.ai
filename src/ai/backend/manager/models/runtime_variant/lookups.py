@@ -6,7 +6,11 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.common.data.entity.runtime_variant import RuntimeVariantID
+from ai.backend.common.data.entity.runtime_variant import (
+    RuntimeVariantEntityType,
+    RuntimeVariantID,
+)
+from ai.backend.common.data.entity.types import EntityType
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.runtime_variant.row import RuntimeVariantRow
 from ai.backend.manager.models.specs.lookup import DataLookup
@@ -25,6 +29,10 @@ class RuntimeVariantLookup(DataLookup[RuntimeVariantRow, RuntimeVariantID]):
     @override
     def row_class(self) -> type[RuntimeVariantRow]:
         return RuntimeVariantRow
+
+    @override
+    def entity_type(self) -> EntityType:
+        return RuntimeVariantEntityType()
 
     @override
     def conditions(self) -> Sequence[QueryCondition]:

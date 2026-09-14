@@ -10,15 +10,22 @@ import sqlalchemy as sa
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
-from ai.backend.common.data.entity.vfolder import VFOLDER_ENTITY_TYPE
-from ai.backend.common.data.entity.vfolder_invitation import VFOLDER_INVITATION_ENTITY_TYPE
-from ai.backend.common.data.permission.types import (
-    EntityType,
-    Permission,
-    RelationType,
-    RoleStatus,
-    ScopeType,
+from ai.backend.common.data.entity.app_config_fragment import AppConfigFragmentEntityType
+from ai.backend.common.data.entity.artifact import ArtifactEntityType
+from ai.backend.common.data.entity.artifact_registry import ArtifactRegistryEntityType
+from ai.backend.common.data.entity.deployment import DeploymentEntityType
+from ai.backend.common.data.entity.image import ImageEntityType
+from ai.backend.common.data.entity.model_card import ModelCardEntityType
+from ai.backend.common.data.entity.notification import (
+    NotificationChannelEntityType,
+    NotificationRuleEntityType,
 )
+from ai.backend.common.data.entity.session import SessionEntityType
+from ai.backend.common.data.entity.types import EntityType
+from ai.backend.common.data.entity.user import UserEntityType
+from ai.backend.common.data.entity.vfolder import VFolderEntityType
+from ai.backend.common.data.entity.vfolder_invitation import VFolderInvitationEntityType
+from ai.backend.common.data.permission.types import Permission, RoleStatus
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
 from ai.backend.common.types import (
     HostPortPair,
@@ -52,9 +59,6 @@ from ai.backend.manager.data.vfolder.types import (
 from ai.backend.manager.dependencies.infrastructure.redis import ValkeyClients
 from ai.backend.manager.models.domain import domains
 from ai.backend.manager.models.project import ProjectRow, ProjectType
-from ai.backend.manager.models.rbac_models.association_scopes_entities import (
-    AssociationScopesEntitiesRow,
-)
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
@@ -90,6 +94,20 @@ VFolderFixtureData = dict[str, Any]
 VFolderFactory = Callable[..., Coroutine[Any, Any, VFolderFixtureData]]
 InvitationFixtureData = dict[str, Any]
 InvitationFactory = Callable[..., Coroutine[Any, Any, InvitationFixtureData]]
+
+
+_OWNER_ACCESSIBLE_ENTITY_TYPES: tuple[EntityType, ...] = (
+    VFolderEntityType(),
+    ImageEntityType(),
+    SessionEntityType(),
+    ArtifactEntityType(),
+    ArtifactRegistryEntityType(),
+    AppConfigFragmentEntityType(),
+    NotificationChannelEntityType(),
+    NotificationRuleEntityType(),
+    DeploymentEntityType(),
+    ModelCardEntityType(),
+)
 
 
 @pytest.fixture()
@@ -141,7 +159,7 @@ def vfolder_processors(
         user_repository=user_repository,
         valkey_stat_client=valkey_clients.stat,
     )
-    return VFolderProcessors(processor_registry.group(GroupMeta(VFOLDER_ENTITY_TYPE)), service)
+    return VFolderProcessors(processor_registry.group(GroupMeta(VFolderEntityType())), service)
 
 
 @pytest.fixture()
@@ -164,7 +182,7 @@ def vfolder_file_processors(
         vfolder_repository=vfolder_repository,
         user_repository=user_repository,
     )
-    return VFolderFileProcessors(processor_registry.group(GroupMeta(VFOLDER_ENTITY_TYPE)), service)
+    return VFolderFileProcessors(processor_registry.group(GroupMeta(VFolderEntityType())), service)
 
 
 @pytest.fixture()
@@ -186,7 +204,7 @@ def vfolder_invite_processors(
         user_repository=user_repository,
     )
     return VFolderInviteProcessors(
-        processor_registry.group(GroupMeta(VFOLDER_INVITATION_ENTITY_TYPE)), service
+        processor_registry.group(GroupMeta(VFolderInvitationEntityType())), service
     )
 
 
@@ -209,7 +227,7 @@ def vfolder_sharing_processors(
         user_repository=user_repository,
     )
     return VFolderSharingProcessors(
-        processor_registry.group(GroupMeta(VFOLDER_ENTITY_TYPE)), service
+        processor_registry.group(GroupMeta(VFolderEntityType())), service
     )
 
 
@@ -339,7 +357,7 @@ async def vfolder_factory(
             node_id = uuid.uuid4()
             await conn.execute(
                 sa.insert(VirtualEntityRow.__table__).values(
-                    id=node_id, entity_type=VFOLDER_ENTITY_TYPE, entity_id=defaults["id"]
+                    id=node_id, entity_type=VFolderEntityType(), entity_id=defaults["id"]
                 )
             )
             await conn.execute(
@@ -362,7 +380,7 @@ async def vfolder_factory(
         for vid in reversed(created_ids):
             await conn.execute(
                 VirtualEntityRow.__table__.delete().where(
-                    VirtualEntityRow.__table__.c.entity_type == VFOLDER_ENTITY_TYPE,
+                    VirtualEntityRow.__table__.c.entity_type == VFolderEntityType(),
                     VirtualEntityRow.__table__.c.entity_id == vid,
                 )
             )
@@ -454,6 +472,8 @@ async def user_system_role(
                 name=f"user-{str(user_uuid)[:8]}",
                 source=RoleSource.SYSTEM,
                 status=RoleStatus.ACTIVE,
+                scope_type=UserEntityType(),
+                scope_id=user_uuid,
             )
         )
         await conn.execute(
@@ -462,24 +482,13 @@ async def user_system_role(
                 role_id=role_id,
             )
         )
-        await conn.execute(
-            sa.insert(AssociationScopesEntitiesRow.__table__).values(
-                scope_type=ScopeType.USER,
-                scope_id=str(user_uuid),
-                entity_type=EntityType.ROLE,
-                entity_id=str(role_id),
-                relation_type=RelationType.AUTO,
-            )
-        )
-        for entity_type in EntityType.owner_accessible_entity_types_in_user():
+        for entity_type in _OWNER_ACCESSIBLE_ENTITY_TYPES:
             for bit in Permission:
                 if not bit:
                     continue
                 await conn.execute(
                     sa.insert(PermissionRow.__table__).values(
                         role_id=role_id,
-                        scope_type=ScopeType.USER,
-                        scope_id=str(user_uuid),
                         entity_type=entity_type,
                         permission=bit,
                     )
@@ -490,11 +499,6 @@ async def user_system_role(
     async with db_engine.begin() as conn:
         await conn.execute(
             PermissionRow.__table__.delete().where(PermissionRow.__table__.c.role_id == role_id)
-        )
-        await conn.execute(
-            AssociationScopesEntitiesRow.__table__.delete().where(
-                AssociationScopesEntitiesRow.__table__.c.entity_id == str(role_id)
-            )
         )
         await conn.execute(
             UserRoleRow.__table__.delete().where(UserRoleRow.__table__.c.role_id == role_id)

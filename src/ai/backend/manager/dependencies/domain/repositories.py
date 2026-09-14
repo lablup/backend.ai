@@ -5,7 +5,6 @@ from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, override
 
-from ai.backend.manager.repositories.ops import DBOpsProvider
 from ai.backend.manager.repositories.ops.v2.artifact_registry.provider import (
     ArtifactRegistryOpsProvider,
 )
@@ -78,7 +77,6 @@ class RepositoriesDependency(DomainDependency[RepositoriesInput, Repositories]):
         repositories = Repositories.create(
             args=RepositoryArgs(
                 db=setup_input.db,
-                ops_provider=DBOpsProvider(setup_input.db),
                 v2_ops_provider=V2DBOpsProvider(setup_input.db),
                 relation_ops_provider=RelationOpsProvider(setup_input.db),
                 reconcile_ops_provider=ReconcileOpsProvider(setup_input.db),

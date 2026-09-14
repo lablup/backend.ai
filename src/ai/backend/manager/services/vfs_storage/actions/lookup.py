@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from typing import Any, override
 
 from ai.backend.common.data.entity.types import EntityType
-from ai.backend.common.data.entity.vfs_storage import VFS_STORAGE_ENTITY_TYPE, VFSStorageID
+from ai.backend.common.data.entity.vfs_storage import VFSStorageEntityType, VFSStorageID
 from ai.backend.manager.actions.v2.lookup.base import LookupKey
 from ai.backend.manager.actions.v2.ops.base import LookupEntityOpsAction
 from ai.backend.manager.models.vfs_storage.lookups import VFSStorageLookup
@@ -39,7 +39,7 @@ class LookupVFSStorageAction(LookupEntityOpsAction[VFSStorageRow, VFSStorageID])
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return VFS_STORAGE_ENTITY_TYPE
+        return VFSStorageEntityType()
 
     @override
     @classmethod

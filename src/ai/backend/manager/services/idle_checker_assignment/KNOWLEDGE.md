@@ -3,7 +3,7 @@ name: idle-checker-assignment-service-shapes
 type: decision-table
 description: idle_checker_assignment knowledge - why a binding is a relation and not an entity, why its writes are the rbac boundary's and only the reads stay here, why the id the API names is resolved by a lookup first, what a permission on a binding has to name, why enabled is the relation lifecycle
 scope: src/ai/backend/manager/services/idle_checker_assignment
-keywords: [CreateRelationAction, DeleteRelationAction, RestoreRelationAction, PurgeRelationAction, LookupIdleCheckerAssignmentAction, LookupIdleCheckerAssignmentByPairAction, ScopedSearchIdleCheckerAssignmentsAction, IdleCheckerAssignmentCreator, RelationCreator, RelationLifecycleUpdater, relation_group, IDLE_CHECKER_ENTITY_TYPE]
+keywords: [CreateRelationAction, DeleteRelationAction, RestoreRelationAction, PurgeRelationAction, LookupIdleCheckerAssignmentAction, LookupIdleCheckerAssignmentByPairAction, ScopedSearchIdleCheckerAssignmentsAction, IdleCheckerAssignmentCreator, RelationCreator, RelationLifecycleUpdater, relation_group, IdleCheckerEntityType]
 sources:
   - src/ai/backend/manager/services/idle_checker_assignment
   - src/ai/backend/manager/api/adapters/idle_checker_assignment

@@ -33,7 +33,6 @@ from sqlalchemy.sql.expression import SQLColumnExpression
 
 from ai.backend.common import msgpack
 from ai.backend.common.data.entity.project import ProjectID
-from ai.backend.common.data.entity.types import ScopeID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 from ai.backend.logging import BraceStyleAdapter
@@ -111,10 +110,10 @@ container_registry_iv = t.Dict({}) | t.Dict({
 class AssocGroupUserRow(Base):
     """DEPRECATED -- scheduled for sunset.
 
-    Project membership is moving to ``association_scopes_entities`` (ASE) with
-    ``scope_type=PROJECT, entity_type=USER`` as the single source of truth. New
-    code MUST query ASE; do not add new readers or writers against this table.
-    The table itself will be dropped after every reader is migrated.
+    Project membership is moving to the virtual entity graph, where the user is a
+    member of the project's virtual entity. New code MUST read the graph; do not add
+    new readers or writers against this table. The table itself will be dropped after
+    every reader is migrated.
     """
 
     __tablename__ = "association_groups_users"
@@ -139,8 +138,8 @@ class AssocGroupUserRow(Base):
     )
 
 
-# DEPRECATED: scheduled for sunset; project membership lives in
-# `association_scopes_entities`. Do not use in new code.
+# DEPRECATED: scheduled for sunset; project membership lives in the virtual entity
+# graph. Do not use in new code.
 association_groups_users = AssocGroupUserRow.__table__
 
 
@@ -239,7 +238,7 @@ class ProjectRow(LifecycleTimestampsMixin, Base):
     )
 
     @classmethod
-    def scope_id_expr(cls) -> SQLColumnExpression[ScopeID]:
+    def scope_id_expr(cls) -> SQLColumnExpression[ProjectID]:
         return cls.id
 
     @classmethod

@@ -16,7 +16,7 @@ from ai.backend.common.types import (
     VFolderHostPermission,
 )
 from ai.backend.manager.data.resource.types import KeyPairResourcePolicyData
-from ai.backend.manager.errors.repository import EntityNotFoundError
+from ai.backend.manager.errors.base.entity import EntityNotFoundError
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.deployment_auto_scaling_policy import DeploymentAutoScalingPolicyRow

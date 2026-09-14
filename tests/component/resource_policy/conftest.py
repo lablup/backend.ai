@@ -18,9 +18,9 @@ from ai.backend.client.v2.v2_registry import V2ClientRegistry
 if TYPE_CHECKING:
     from tests.component.conftest import ServerInfo, UserFixtureData
 from ai.backend.common.data.entity.resource_policy import (
-    KEYPAIR_RESOURCE_POLICY_ENTITY_TYPE,
-    PROJECT_RESOURCE_POLICY_ENTITY_TYPE,
-    USER_RESOURCE_POLICY_ENTITY_TYPE,
+    KeyPairResourcePolicyEntityType,
+    ProjectResourcePolicyEntityType,
+    UserResourcePolicyEntityType,
 )
 from ai.backend.common.dto.manager.v2.common import BinarySizeInput
 from ai.backend.common.dto.manager.v2.resource_policy.request import (
@@ -77,14 +77,14 @@ def resource_policy_processors(
     ProjectResourcePolicyProcessors,
 ]:
     kp_processors = KeypairResourcePolicyProcessors(
-        group=ops_processor_group(database_engine, GroupMeta(KEYPAIR_RESOURCE_POLICY_ENTITY_TYPE))
+        group=ops_processor_group(database_engine, GroupMeta(KeyPairResourcePolicyEntityType()))
     )
     up_processors = UserResourcePolicyProcessors(
-        group=ops_processor_group(database_engine, GroupMeta(USER_RESOURCE_POLICY_ENTITY_TYPE))
+        group=ops_processor_group(database_engine, GroupMeta(UserResourcePolicyEntityType()))
     )
 
     pp_processors = ProjectResourcePolicyProcessors(
-        group=ops_processor_group(database_engine, GroupMeta(PROJECT_RESOURCE_POLICY_ENTITY_TYPE))
+        group=ops_processor_group(database_engine, GroupMeta(ProjectResourcePolicyEntityType()))
     )
 
     return kp_processors, up_processors, pp_processors
@@ -107,7 +107,11 @@ def server_module_registries(
     processors.user_resource_policy = up_proc
     processors.project_resource_policy = pp_proc
 
-    adapter = ResourcePolicyAdapter(processors)
+    adapter = ResourcePolicyAdapter(
+        processors.keypair_resource_policy,
+        processors.user_resource_policy,
+        processors.project_resource_policy,
+    )
     handler = V2ResourcePolicyHandler(adapter=adapter)
 
     v2_reg = RouteRegistry.create("v2", route_deps.cors_options)

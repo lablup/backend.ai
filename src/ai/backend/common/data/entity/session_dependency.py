@@ -2,11 +2,31 @@
 
 from typing import override
 
-from ai.backend.common.data.entity.types import FieldIdentifier, FieldType
+from ai.backend.common.data.entity.session import SessionEntityType
+from ai.backend.common.data.entity.types import (
+    EntityType,
+    FieldIdentifier,
+    FieldType,
+)
 
-__all__ = ("SESSION_DEPENDENCY_FIELD_TYPE", "SessionDependencyID")
+__all__ = ("SessionDependencyFieldType", "SessionDependencyID")
 
-SESSION_DEPENDENCY_FIELD_TYPE = FieldType("session_dependency")
+
+class SessionDependencyFieldType(FieldType):
+    @override
+    @classmethod
+    def name(cls) -> str:
+        return "session_dependency"
+
+    @override
+    @classmethod
+    def description(cls) -> str:
+        return "One session another session waits on."
+
+    @override
+    @classmethod
+    def owner_type(cls) -> type[EntityType]:
+        return SessionEntityType
 
 
 class SessionDependencyID(FieldIdentifier):
@@ -15,4 +35,4 @@ class SessionDependencyID(FieldIdentifier):
     @override
     @classmethod
     def field_type(cls) -> FieldType:
-        return SESSION_DEPENDENCY_FIELD_TYPE
+        return SessionDependencyFieldType()

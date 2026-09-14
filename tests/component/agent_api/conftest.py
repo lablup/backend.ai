@@ -9,7 +9,7 @@ import pytest
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
-from ai.backend.common.data.entity.agent import AGENT_ENTITY_TYPE
+from ai.backend.common.data.entity.agent import AgentEntityType
 from ai.backend.common.data.entity.resource_group import ResourceGroupID, ResourceGroupName
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
 from ai.backend.common.types import HostPortPair
@@ -94,7 +94,7 @@ def agent_processors(
         own_check=BulkOwnCheck(PermissionControllerRepository(database_engine), config_provider),
     )
     return AgentProcessors(
-        processor_registry.group(GroupMeta(AGENT_ENTITY_TYPE)),
+        processor_registry.group(GroupMeta(AgentEntityType())),
         service,
         [],
     )

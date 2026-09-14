@@ -81,6 +81,7 @@ from ai.backend.manager.data.session.options import (
 )
 from ai.backend.manager.data.session.types import SessionStatus, SessionTerminationStatus
 from ai.backend.manager.defs import DEFAULT_ROLE
+from ai.backend.manager.errors.agent import AgentNotAllocated
 from ai.backend.manager.errors.common import (
     InternalServerError,
     ServiceUnavailable,
@@ -95,10 +96,9 @@ from ai.backend.manager.errors.kernel import (
     TooManySessionsMatched,
 )
 from ai.backend.manager.errors.resource import (
-    AgentNotAllocated,
     AppNotFound,
     NoCurrentTaskContext,
-    TaskTemplateNotFound,
+    SessionTemplateNotFound,
 )
 from ai.backend.manager.errors.storage import VFolderBadRequest
 from ai.backend.manager.idle import IdleCheckerHost
@@ -500,7 +500,7 @@ class SessionService:
         template = await self._session_repository.get_template_by_id(template_id)
         log.debug("task template: {}", template)
         if not template:
-            raise TaskTemplateNotFound
+            raise SessionTemplateNotFound
 
         try:
             user_info = await self._session_repository.query_userinfo(
@@ -657,7 +657,7 @@ class SessionService:
 
         template_info = await self._session_repository.get_template_info_by_id(template_id)
         if not template_info:
-            raise TaskTemplateNotFound
+            raise SessionTemplateNotFound
         template = template_info["template"]
 
         group_name = None

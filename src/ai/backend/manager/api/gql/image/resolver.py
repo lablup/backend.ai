@@ -12,6 +12,7 @@ from uuid import UUID
 import strawberry
 from strawberry import ID, Info
 
+from ai.backend.common.data.entity.image_alias import ImageAliasID
 from ai.backend.common.dto.manager.v2.image.request import (
     AdminSearchImageAliasesInput,
     AdminSearchImagesInput,
@@ -210,7 +211,9 @@ async def admin_image_aliases(
     )
 )  # type: ignore[misc]
 async def image_alias(id: ID, info: Info[StrawberryGQLContext]) -> ImageV2AliasGQL | None:
-    alias_data = await info.context.data_loaders.image_alias_loader.load(uuid.UUID(id))
+    alias_data = await info.context.data_loaders.image_alias_loader.load(
+        ImageAliasID(uuid.UUID(id))
+    )
     if alias_data is None:
         return None
     return alias_data

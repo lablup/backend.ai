@@ -5,7 +5,6 @@ from __future__ import annotations
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import Any, override
-from uuid import UUID
 
 from sqlalchemy.orm import InstrumentedAttribute
 
@@ -56,7 +55,7 @@ class ProjectUpdater(GuardedDataUpdater[ProjectRow, ProjectData]):
         return ProjectRow.id
 
     @override
-    def target_id_value(self) -> UUID:
+    def target_id_value(self) -> ProjectID:
         return self.project_id
 
     @override
@@ -111,7 +110,7 @@ class ProjectDotfilesUpdater(DataUpdater[ProjectRow, ProjectData]):
         return ProjectRow.id
 
     @override
-    def target_id_value(self) -> UUID:
+    def target_id_value(self) -> ProjectID:
         return self.project_id
 
     @override
@@ -145,7 +144,7 @@ class ProjectSoftDeleteUpdater(GuardedDataUpdater[ProjectRow, ProjectData]):
         return ProjectRow.id
 
     @override
-    def target_id_value(self) -> UUID:
+    def target_id_value(self) -> ProjectID:
         return self.project_id
 
     @override
@@ -196,7 +195,7 @@ class ProjectRestoreUpdater(GuardedDataUpdater[ProjectRow, ProjectData]):
         return ProjectRow.id
 
     @override
-    def target_id_value(self) -> UUID:
+    def target_id_value(self) -> ProjectID:
         return self.project_id
 
     @override

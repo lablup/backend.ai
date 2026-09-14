@@ -78,13 +78,13 @@ class CreateProjectInputGQL(PydanticInputMixin[CreateProjectInputDTO]):
 class UpdateProjectInputGQL(PydanticInputMixin[UpdateProjectInputDTO]):
     """Input for updating project information."""
 
-    name: str | None = gql_field(default=None, description="New project name.")
+    name: str | None = gql_field(default=UNSET, description="New project name.")
     description: str | None = gql_field(default=UNSET, description="New description.")
-    is_active: bool | None = gql_field(default=None, description="Updated active status.")
+    is_active: bool | None = gql_field(default=UNSET, description="Updated active status.")
     integration_name: str | None = gql_field(
         default=UNSET, description="New external integration identifier."
     )
-    resource_policy: str | None = gql_field(default=None, description="New resource policy name.")
+    resource_policy: str | None = gql_field(default=UNSET, description="New resource policy name.")
 
 
 # --- Payloads ---

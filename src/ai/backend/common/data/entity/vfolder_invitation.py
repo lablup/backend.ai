@@ -4,9 +4,19 @@ from typing import override
 
 from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
 
-__all__ = ("VFOLDER_INVITATION_ENTITY_TYPE", "VFolderInvitationID")
+__all__ = ("VFolderInvitationEntityType", "VFolderInvitationID")
 
-VFOLDER_INVITATION_ENTITY_TYPE = EntityType("vfolder_invitation")
+
+class VFolderInvitationEntityType(EntityType):
+    @override
+    @classmethod
+    def name(cls) -> str:
+        return "vfolder_invitation"
+
+    @override
+    @classmethod
+    def description(cls) -> str:
+        return "An invitation to share a vfolder with a user."
 
 
 class VFolderInvitationID(EntityIdentifier):
@@ -18,4 +28,4 @@ class VFolderInvitationID(EntityIdentifier):
 
     @override
     def entity_type(self) -> EntityType:
-        return VFOLDER_INVITATION_ENTITY_TYPE
+        return VFolderInvitationEntityType()

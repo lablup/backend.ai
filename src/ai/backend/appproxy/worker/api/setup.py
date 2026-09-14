@@ -1,5 +1,6 @@
 import urllib.parse
 from collections.abc import Iterable
+from http import HTTPStatus
 from uuid import UUID
 
 import aiohttp
@@ -166,7 +167,12 @@ async def setup(
             protocol = "https" if use_tls else "http"
             redirect_path = jwt_body.get("redirect", "")
             proxy_url = generate_proxy_url(port_config, protocol, circuit, redirect_path)
-            response = web.HTTPFound(proxy_url, headers=cors_headers)
+            response = web.Response(
+                status=HTTPStatus.FOUND,
+                headers={**cors_headers, "Location": proxy_url},
+                # Legacy body that aiohttp's HTTP*Redirect filled in.
+                text=f"{HTTPStatus.FOUND.value}: {HTTPStatus.FOUND.phrase}",
+            )
             cookie_domain = None
             if circuit.frontend_mode == FrontendMode.WILDCARD_DOMAIN:
                 wildcard_info = config.wildcard_domain
@@ -192,9 +198,14 @@ async def setup(
                 "gateway": generate_proxy_url(port_config, protocol, circuit, redirect_path=None),
             }
             if jwt_body["redirect"]:
-                return web.HTTPFound(
-                    f"http://localhost:45678/start?{urllib.parse.urlencode(queryparams)}",
-                    headers=cors_headers,
+                return web.Response(
+                    status=HTTPStatus.FOUND,
+                    headers={
+                        **cors_headers,
+                        "Location": f"http://localhost:45678/start?{urllib.parse.urlencode(queryparams)}",
+                    },
+                    # Legacy body that aiohttp's HTTP*Redirect filled in.
+                    text=f"{HTTPStatus.FOUND.value}: {HTTPStatus.FOUND.phrase}",
                 )
             return PydanticResponse(
                 ProxySetupResponseModel(

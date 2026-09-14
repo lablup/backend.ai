@@ -3,14 +3,13 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-
-from ai.backend.common.data.entity.types import ScopeID
+from uuid import UUID
 
 
 @dataclass(frozen=True)
 class ScopeTemplateValue:
     """Scope attributes exposed to templates as ``{{ scope.* }}``."""
 
-    id: ScopeID
+    id: UUID
     name: str
     type: str

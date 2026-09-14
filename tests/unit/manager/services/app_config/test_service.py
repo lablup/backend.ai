@@ -160,7 +160,7 @@ class TestAppConfigService:
         assert scopes == (
             VisibleAppConfigFragmentOperationScope(user_id=_USER_ID, domain_id=_DOMAIN_ID),
         )
-        assert [target.scope_id for target in action.scope_targets()] == [_USER_ID]
+        assert list(action.scope_targets()) == [_USER_ID]
 
     async def test_search_replaces_lists_wholesale(
         self,

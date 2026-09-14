@@ -6,8 +6,7 @@
 
 - `repository.py` (single-entity CRUD), `repositories.py` (multi-entity container / `RepositoryArgs`),
   `types.py` (SearchResult), `options.py` (QueryCondition/QueryOrder),
-  `db_source/db_source.py` (queries). Optional: `updaters.py`, for the legacy
-  `UpdaterSpec` only.
+  `db_source/db_source.py` (queries).
 - Every v2 spec — read as well as write — is declared next to its row under `models/`:
   `queriers.py`, `searchers.py`, `lookups.py`, `updaters.py`, `creators.py`, `purgers.py`,
   `upserters.py`. `scopes.py` (OperationScope) is declared there too. What stays here is
@@ -29,20 +28,15 @@
 - New write specs use the `models/specs/` lineage only:
   - write specs: `GlobalEntity*` / `Entity*` / `RoleManagedEntity*` / `FieldEntity*` (Creator/Purger/Upserter)
   - read/update: `DataQuerier`, `DataLookup`, `Searcher`, `DataUpdater`
-- No new use of the legacy specs — transition-only maintenance of existing code:
-  - `repositories/base/`: `CreatorSpec`, `DataCreator`, `DependentCreatorSpec`, `UpserterSpec`, `PurgerSpec`
-  - `repositories/permission_controller/`: the local creator and purger specs
-  - Judge by import path (`models.specs.*` is v2) — `repositories.base` re-exports some
-    v2 types and bridge classes like `DataBatchPurger` share names, so never judge by
-    the class name alone.
+- `repositories/base/` carries read-side infrastructure only — `BatchQuerier`, export,
+  integrity, filter adapters. It holds no write spec.
 - A v2 ops method that writes several rows names its failure mode: `atomic_*` raises and
   writes nothing on the first failure, `partial_*` isolates each item in a savepoint and
   answers per item. There is no unmarked default, and the two are never selected by an
   argument — the return type differs (`list` vs `BulkResultWithFailures`).
-- The new path for the standard six operations is `OpsRepository` (`V2DBOpsProvider`).
-  The legacy `DBOpsProvider` path (including `create_dependent` and
-  `create_with_next_value`) is for existing code only — when a new domain needs those
-  capabilities, report it as a v2 gap (see the demotion mapping in `services/KNOWLEDGE.md`).
+- The path for the standard six operations is `OpsRepository` (`V2DBOpsProvider`). When
+  a capability is missing there, report it as a v2 gap (see the demotion mapping in
+  `services/KNOWLEDGE.md`).
 - ❌ MUST NOT construct an ops object. `V2WriteOps(session)`, `V2ReadOps(session)` and
   every form of it are forbidden, with no exception. ✅ Take ops from a provider's
   `write_ops()` / `read_ops()`. The transaction boundary has to belong to the provider,

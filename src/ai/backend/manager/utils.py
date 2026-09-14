@@ -5,7 +5,7 @@ import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
-from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE
+from ai.backend.common.data.entity.project import ProjectEntityType
 from ai.backend.common.types import AccessKey
 
 from .data.user.types import SessionOwnerContext
@@ -214,7 +214,7 @@ async def query_userinfo(
             sa.select(groups.c.id)
             .select_from(groups)
             .where(
-                user_scope_membership_exists(PROJECT_SCOPE_TYPE, groups.c.id, owner_uuid)
+                user_scope_membership_exists(ProjectEntityType(), groups.c.id, owner_uuid)
                 & (groups.c.domain_name == owner_domain)
                 & (group_match_query)
                 & (groups.c.is_active),
@@ -368,7 +368,7 @@ async def query_userinfo_from_session(
             sa.select(groups.c.id)
             .select_from(groups)
             .where(
-                user_scope_membership_exists(PROJECT_SCOPE_TYPE, groups.c.id, owner_uuid)
+                user_scope_membership_exists(ProjectEntityType(), groups.c.id, owner_uuid)
                 & (groups.c.domain_name == owner_domain)
                 & (group_match_query)
                 & (groups.c.is_active),
