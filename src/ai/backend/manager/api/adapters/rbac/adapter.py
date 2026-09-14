@@ -181,7 +181,6 @@ from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.rbac_models.role.conditions import RoleConditions
 from ai.backend.manager.models.rbac_models.role.creators import RoleCreator
 from ai.backend.manager.models.rbac_models.role.orders import RoleOrders
-from ai.backend.manager.models.rbac_models.role.scopes import ScopedRoleOperationScope
 from ai.backend.manager.models.rbac_models.role.updaters import RoleSoftDeleteUpdater, RoleUpdater
 from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
 from ai.backend.manager.models.rbac_models.user_role.searchers import UserRoleSearcher
@@ -229,6 +228,8 @@ from ai.backend.manager.services.permission_contoller.actions.search_roles impor
     GlobalSearchRolesActionResult,
 )
 from ai.backend.manager.services.permission_contoller.actions.search_roles_in_scope import (
+    HolderRoleScopeItem,
+    RoleScopeItem,
     SearchRolesInScopeAction,
     SearchRolesInScopeActionResult,
 )
@@ -587,12 +588,21 @@ class RBACAdapter(BaseAdapter):
             has_previous_page=raw.has_previous_page,
         )
 
+    async def my_search_roles(self, input: SearchRolesInput) -> SearchResult[RoleNode]:
+        """The roles the current authenticated user holds."""
+        me = current_user()
+        if me is None:
+            raise UnreachableError("User context is not available")
+        return await self.search_roles_in_scope(
+            [HolderRoleScopeItem(user_id=UserID(me.user_id))], input
+        )
+
     async def search_roles_in_scope(
         self,
-        scope: ScopedRoleOperationScope,
+        items: Sequence[RoleScopeItem],
         input: SearchRolesInput,
     ) -> SearchResult[RoleNode]:
-        """Search roles registered in a given scope."""
+        """Search the roles the named scopes reach."""
         conditions = self._convert_role_filter_gql(input.filter) if input.filter else []
         orders = self._convert_role_orders_gql(input.order) if input.order else []
         querier = self._build_querier(
@@ -608,7 +618,7 @@ class RBACAdapter(BaseAdapter):
         )
         action_result: SearchRolesInScopeActionResult = (
             await self._permission_controller.search_roles_in_scope.run(
-                SearchRolesInScopeAction(scope=scope, querier=querier)
+                SearchRolesInScopeAction(items=items, querier=querier)
             )
         )
         raw = action_result.result
