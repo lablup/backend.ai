@@ -8,7 +8,7 @@ import re
 from datetime import datetime
 from uuid import UUID
 
-from pydantic import Field, field_validator
+from pydantic import Field, NonNegativeInt, field_validator
 
 from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.dto.clients.prometheus.defs import PROMETHEUS_DURATION_PATTERN
@@ -111,8 +111,8 @@ class ModifyQueryDefinitionInput(BaseRequestModel):
         default=UNSET,
         description="Updated description. Omit to leave unchanged; null clears.",
     )
-    rank: int | None | Unset = Field(
-        default=UNSET, ge=0, description="Updated sort rank. Omit to leave unchanged."
+    rank: NonNegativeInt | None | Unset = Field(
+        default=UNSET, description="Updated sort rank. Omit to leave unchanged."
     )
     category_id: UUID | None | Unset = Field(
         default=UNSET,
