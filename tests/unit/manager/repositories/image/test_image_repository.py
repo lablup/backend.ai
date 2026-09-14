@@ -736,7 +736,7 @@ class TestImageRepositoryLastUsedAt:
 
 
 class TestImageRepositoryRestore:
-    """Restore reaches an image in any status, not only a live one."""
+    """Restore reaches a forgotten image as well as a live one."""
 
     @pytest.fixture
     async def db_with_cleanup(
