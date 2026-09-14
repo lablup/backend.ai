@@ -32,8 +32,10 @@ from ai.backend.agent.network.backends.vxlan import (
     XFRM_REPLAY_WINDOW,
     XFRM_REQID,
     VxlanNetworkPlugin,
+    _aead_key,
     _egress_guard_rule,
     _esp_spi,
+    _forward_accept_rule,
     _output_mark_rule,
     _pair_key,
     _plaintext_drop_rule,
@@ -252,6 +254,9 @@ def _protection_reader(plugin: VxlanNetworkPlugin, *, vni: int | None) -> _Listi
     if vni is not None:
         filter_rules += _saved(_plaintext_drop_rule(vni, 4789))
         filter_rules += _saved(_egress_guard_rule(vni, 4789))
+        # Not protection, but the pass restores it too: without it a host that filters FORWARD by
+        # default drops the session's traffic while the session reports itself READY.
+        filter_rules += _saved(_forward_accept_rule(vni))
         mangle_rules += _saved(_output_mark_rule(vni, 4789))
     spis = "".join(
         f"src {src} dst {dst}\n\tproto esp spi {_esp_spi(src, dst, generation):#x}"
@@ -319,25 +324,38 @@ class _FailingAdd(Recorder):
             raise RuntimeError("RTNETLINK answers: File exists")
 
 
-def _sa_listing(src: str, dst: str, spis: Sequence[int]) -> str:
-    """`ip xfrm state` output holding one ESP SA per SPI, all with ``src`` as their source."""
+def _sa_listing(
+    src: str, dst: str, spis: Sequence[int], *, keys: Sequence[str] | None = None
+) -> str:
+    """`ip xfrm state` output holding one ESP SA per SPI, all with ``src`` as their source.
+
+    The key matters to any caller that decides whether an SA may be left alone: the SPI folds in
+    the pair and the generation SLOT only, so a stale generation's SA sits at the same one with a
+    key nobody uses. `keys` writes a chosen key per SPI; the default is the material this pair
+    really derives, which is what the kernel would be showing back.
+    """
+    if keys is None:
+        keys = [_aead_key(_pair_key(_KEY, src, dst, _TEST_GENERATION), spi) for spi in spis]
     return "".join(
         f"src {src} dst {dst}\n"
         f"\tproto esp spi {spi:#x} reqid {XFRM_REQID} mode transport\n"
         "\treplay-window 128 flag esn\n"
-        "\taead rfc4106(gcm(aes)) 0xdeadbeef 128\n"
-        for spi in spis
+        f"\taead rfc4106(gcm(aes)) {key} 128\n"
+        for spi, key in zip(spis, keys, strict=True)
     )
 
 
 def _our_sas(src: str, dst: str) -> str:
     """The SAs this pair derives, as the kernel would print them back to us."""
+    generations = range(_TEST_GENERATION - 1, _TEST_GENERATION + 2)
+    spis = [_esp_spi(src, dst, generation) for generation in generations]
     return _sa_listing(
         src,
         dst,
-        [
-            _esp_spi(src, dst, generation)
-            for generation in range(_TEST_GENERATION - 1, _TEST_GENERATION + 2)
+        spis,
+        keys=[
+            _aead_key(_pair_key(_KEY, src, dst, generation), spi)
+            for generation, spi in zip(generations, spis, strict=True)
         ],
     )
 
@@ -2449,6 +2467,45 @@ class TestXfrmStateVerb:
         verbs = [c[3] for c in rec.calls if c[:3] == _STATE]
         assert "add" not in verbs and "del" not in verbs, verbs
 
+    async def test_a_stale_generations_sa_at_the_same_spi_is_not_adopted(self) -> None:
+        """`_esp_spi` folds in the VTEP pair and the generation SLOT -- three of them -- so an SA
+        two rotations old sits at the very same (dst, spi) carrying a key nobody uses any more.
+        Adopting it on identity alone would leave a retired key protecting live traffic wherever
+        both ends still held one, and black-hole the tunnel wherever only one did. The key material
+        is what tells them apart, so it is compared."""
+        pairs = (("10.0.0.1", "10.0.0.2"), ("10.0.0.2", "10.0.0.1"))
+        stale = ""
+        for src, dst in pairs:
+            spis = [
+                _esp_spi(src, dst, generation)
+                for generation in range(_TEST_GENERATION - 1, _TEST_GENERATION + 2)
+            ]
+            stale += _sa_listing(src, dst, spis, keys=["0x" + "11" * 24] * len(spis))
+        rec = Recorder()
+        reader = _Listing(lambda argv: stale if list(argv[:3]) == _STATE else None)
+        plugin = _plugin(rec, reader=reader, vxlans={vxlan_dev(4097)})
+        await plugin.adopt_session_network(_ENC_META, _SELF)
+        rec.calls.clear()
+        await plugin.add_peer("s1", _PEER)
+        verbs = [c[3] for c in rec.calls if c[:3] == _STATE]
+        assert "add" in verbs, f"a stale key was adopted instead of reprogrammed: {verbs}"
+
+    async def test_an_sa_whose_key_the_listing_hides_is_not_adopted(self) -> None:
+        """A reader without the privilege to see key material, or a format this does not know,
+        says nothing about what the SA protects with. Unknown reprograms; only a match adopts."""
+        keyless = "".join(
+            f"src {src} dst {dst}\n"
+            f"\tproto esp spi {_esp_spi(src, dst, _TEST_GENERATION):#x} reqid {XFRM_REQID} mode transport\n"
+            for src, dst in (("10.0.0.1", "10.0.0.2"), ("10.0.0.2", "10.0.0.1"))
+        )
+        rec = Recorder()
+        reader = _Listing(lambda argv: keyless if list(argv[:3]) == _STATE else None)
+        plugin = _plugin(rec, reader=reader, vxlans={vxlan_dev(4097)})
+        await plugin.adopt_session_network(_ENC_META, _SELF)
+        rec.calls.clear()
+        await plugin.add_peer("s1", _PEER)
+        assert "add" in [c[3] for c in rec.calls if c[:3] == _STATE]
+
     async def test_a_foreign_sa_at_that_spi_is_not_overwritten(self) -> None:
         """The kernel keys an SA on (dst, spi, proto) with no src in it, and this SPI is 32 bits of
         a hash: two peers of the same node can derive the same one. `update` would then replace the
@@ -3253,6 +3310,18 @@ class TestProtectionIsOneNodeWidePass:
             "a steady-state pass changed something; at a hundred sessions this is the process"
             f" storm the pass exists to avoid ({rec.calls[:3]})"
         )
+
+    async def test_a_missing_forward_accept_is_restored(self) -> None:
+        """It is installed once, at setup or adoption, and one insert lost to an xtables lock held
+        at the wrong moment would otherwise hold the session's traffic down for the rest of its
+        life -- on a host that filters FORWARD by default -- while the session reported READY."""
+        rec = _AbsentRuleRecorder()
+        plugin = _plugin(rec)
+        await plugin.setup_session_network(_ENC_META, _SELF)
+        rec.calls.clear()
+        plugin._reader = _protection_reader(plugin, vni=None)  # every rule gone
+        await plugin.reassert_protection()
+        assert forward_accept_add_args(4097) in rec.calls
 
     async def test_a_missing_rule_is_restored(self) -> None:
         rec = _AbsentRuleRecorder()
