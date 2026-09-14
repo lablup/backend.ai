@@ -7,10 +7,14 @@ from dataclasses import dataclass
 from typing import override
 
 from ai.backend.common.data.entity.resource_policy import (
+    KeyPairResourcePolicyEntityType,
     KeyPairResourcePolicyUUID,
+    ProjectResourcePolicyEntityType,
     ProjectResourcePolicyUUID,
+    UserResourcePolicyEntityType,
     UserResourcePolicyUUID,
 )
+from ai.backend.common.data.entity.types import EntityType
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.resource_policy.row import (
     KeyPairResourcePolicyRow,
@@ -31,6 +35,10 @@ class KeypairResourcePolicyNameLookup(
     @override
     def row_class(self) -> type[KeyPairResourcePolicyRow]:
         return KeyPairResourcePolicyRow
+
+    @override
+    def entity_type(self) -> EntityType:
+        return KeyPairResourcePolicyEntityType()
 
     @override
     def conditions(self) -> Sequence[QueryCondition]:
@@ -54,6 +62,10 @@ class ProjectResourcePolicyNameLookup(
         return ProjectResourcePolicyRow
 
     @override
+    def entity_type(self) -> EntityType:
+        return ProjectResourcePolicyEntityType()
+
+    @override
     def conditions(self) -> Sequence[QueryCondition]:
         return [lambda: ProjectResourcePolicyRow.name == self.name]
 
@@ -71,6 +83,10 @@ class UserResourcePolicyNameLookup(DataLookup[UserResourcePolicyRow, UserResourc
     @override
     def row_class(self) -> type[UserResourcePolicyRow]:
         return UserResourcePolicyRow
+
+    @override
+    def entity_type(self) -> EntityType:
+        return UserResourcePolicyEntityType()
 
     @override
     def conditions(self) -> Sequence[QueryCondition]:

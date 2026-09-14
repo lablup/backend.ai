@@ -7,7 +7,8 @@ from dataclasses import dataclass
 from typing import override
 from uuid import UUID
 
-from ai.backend.common.data.entity.session import SessionID
+from ai.backend.common.data.entity.session import SessionEntityType, SessionID
+from ai.backend.common.data.entity.types import EntityType
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.session.row import SessionRow
@@ -29,6 +30,10 @@ class SessionNameOfUserLookup(DataLookup[SessionRow, SessionID]):
     @override
     def row_class(self) -> type[SessionRow]:
         return SessionRow
+
+    @override
+    def entity_type(self) -> EntityType:
+        return SessionEntityType()
 
     @override
     def conditions(self) -> Sequence[QueryCondition]:

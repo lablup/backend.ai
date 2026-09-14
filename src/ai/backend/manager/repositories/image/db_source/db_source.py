@@ -45,6 +45,7 @@ from ai.backend.manager.models.image import (
     ImageRow,
 )
 from ai.backend.manager.models.image.creators import ImageAliasCreator
+from ai.backend.manager.models.image.purgers import ImagePurger
 from ai.backend.manager.models.image.updaters import ImageUpdater
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base import BatchQuerier, execute_batch_querier
@@ -430,12 +431,10 @@ class ImageDBSource:
         Removes an image record and all its aliases from the database.
         """
         try:
-            async with self._db.begin_session() as session:
-                image_row = await self._get_image_by_id(session, image_id, load_aliases=True)
-                data = image_row.to_dataclass()
-                for alias in image_row.aliases:
-                    await session.delete(alias)
-                await session.delete(image_row)
+            async with self._ops_provider.write_ops() as w:
+                data = await w.purge_entity(ImagePurger(image_id=ImageID(image_id)))
+                if data is None:
+                    raise ImageNotFound(f"Image not found (id: {image_id})")
             return data
         except DBAPIError as e:
             raise PurgeImageActionByIdObjectDBError(str(e)) from e

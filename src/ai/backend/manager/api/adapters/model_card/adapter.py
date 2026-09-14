@@ -4,7 +4,6 @@ import secrets
 from collections.abc import Sequence
 from uuid import UUID
 
-from ai.backend.common.api_handlers import SENTINEL
 from ai.backend.common.contexts.user import current_user
 from ai.backend.common.data.entity.model_card import ModelCardID
 from ai.backend.common.data.entity.project import ProjectID
@@ -25,6 +24,7 @@ from ai.backend.common.dto.manager.v2.model_card.request import (
     ModelCardFilter,
     ModelCardOrder,
     ResourceSlotEntryInput,
+    ScopedSearchModelCardsInput,
     SearchModelCardsInput,
     UpdateModelCardInput,
 )
@@ -84,6 +84,7 @@ from ai.backend.manager.models.model_card.searchers import (
 from ai.backend.manager.models.model_card.updaters import ModelCardUpdater
 from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.services.deployment.actions.create_deployment import CreateDeploymentAction
+from ai.backend.manager.services.deployment.processors import DeploymentProcessors
 from ai.backend.manager.services.model_card.actions.available_presets import (
     AvailablePresetsAction,
 )
@@ -94,14 +95,16 @@ from ai.backend.manager.services.model_card.actions.create import CreateModelCar
 from ai.backend.manager.services.model_card.actions.delete import DeleteModelCardAction
 from ai.backend.manager.services.model_card.actions.get import GetModelCardAction
 from ai.backend.manager.services.model_card.actions.scan import ScanProjectModelCardsAction
+from ai.backend.manager.services.model_card.actions.scoped_search import (
+    ModelCardScopeItem,
+    ScopedSearchModelCardsAction,
+)
 from ai.backend.manager.services.model_card.actions.scoped_search_requirements import (
     ScopedSearchModelCardResourceRequirementsAction,
 )
 from ai.backend.manager.services.model_card.actions.search import GlobalSearchModelCardsAction
-from ai.backend.manager.services.model_card.actions.search_in_project import (
-    SearchModelCardsInProjectAction,
-)
 from ai.backend.manager.services.model_card.actions.update import UpdateModelCardAction
+from ai.backend.manager.services.model_card.processors import ModelCardProcessors
 from ai.backend.manager.types import OptionalState, TriState
 
 
@@ -167,6 +170,13 @@ def _requirements_to_entries(
 
 
 class ModelCardAdapter(BaseAdapter):
+    _model_card: ModelCardProcessors
+    _deployment: DeploymentProcessors
+
+    def __init__(self, model_card: ModelCardProcessors, deployment: DeploymentProcessors) -> None:
+        self._model_card = model_card
+        self._deployment = deployment
+
     async def admin_search(
         self,
         input: SearchModelCardsInput,
@@ -185,8 +195,43 @@ class ModelCardAdapter(BaseAdapter):
             limit=input.limit,
             offset=input.offset,
         )
-        result = await self._processors.model_card.global_search.run(
+        result = await self._model_card.global_search.run(
             GlobalSearchModelCardsAction(searcher=searcher)
+        )
+        return SearchModelCardsPayload(
+            items=await self._nodes_with_min_resources(result.items),
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+        )
+
+    async def scoped_search(
+        self,
+        input: ScopedSearchModelCardsInput,
+    ) -> SearchModelCardsPayload:
+        """Search the model cards the named scopes reach, combined with OR."""
+        conditions = self._convert_filter(input.filter) if input.filter else []
+        orders = self._convert_orders(input.order) if input.order else []
+        searcher = self._build_searcher(
+            ModelCardSearcher,
+            conditions=conditions,
+            orders=orders,
+            pagination_spec=_model_card_pagination_spec(),
+            first=input.first,
+            after=input.after,
+            last=input.last,
+            before=input.before,
+            limit=input.limit,
+            offset=input.offset,
+        )
+        result = await self._model_card.scoped_search.run(
+            ScopedSearchModelCardsAction(
+                items=[
+                    ModelCardScopeItem(project_id=ProjectID(entry.value))
+                    for entry in input.scope.project or ()
+                ],
+                searcher=searcher,
+            )
         )
         return SearchModelCardsPayload(
             items=await self._nodes_with_min_resources(result.items),
@@ -214,8 +259,10 @@ class ModelCardAdapter(BaseAdapter):
             limit=input.limit,
             offset=input.offset,
         )
-        result = await self._processors.model_card.search_in_project.run(
-            SearchModelCardsInProjectAction(project_id=ProjectID(project_id), searcher=searcher)
+        result = await self._model_card.scoped_search.run(
+            ScopedSearchModelCardsAction(
+                items=[ModelCardScopeItem(project_id=ProjectID(project_id))], searcher=searcher
+            )
         )
         return SearchModelCardsPayload(
             items=await self._nodes_with_min_resources(result.items),
@@ -251,7 +298,7 @@ class ModelCardAdapter(BaseAdapter):
             limit=input.limit,
             offset=input.offset,
         )
-        result = await self._processors.model_card.global_search.run(
+        result = await self._model_card.global_search.run(
             GlobalSearchModelCardsAction(searcher=searcher)
         )
         return SearchModelCardsPayload(
@@ -262,7 +309,7 @@ class ModelCardAdapter(BaseAdapter):
         )
 
     async def get(self, card_id: UUID) -> ModelCardNode:
-        result = await self._processors.model_card.get.run(
+        result = await self._model_card.get.run(
             GetModelCardAction(model_card_id=ModelCardID(card_id))
         )
         return (await self._nodes_with_min_resources([result.data]))[0]
@@ -294,7 +341,7 @@ class ModelCardAdapter(BaseAdapter):
             readme=input.readme,
             access_level=input.access_level.value,
         )
-        result = await self._processors.model_card.create.run(
+        result = await self._model_card.create.run(
             CreateModelCardAction(creator=creator, min_resource=min_resource)
         )
         return CreateModelCardPayload(
@@ -305,101 +352,24 @@ class ModelCardAdapter(BaseAdapter):
         self,
         input: UpdateModelCardInput,
     ) -> UpdateModelCardPayload:
-        min_resource_state: TriState[list[ResourceRequirementEntry]] = TriState.nop()
-        if input.min_resource is not SENTINEL:
-            if input.min_resource is None:
-                min_resource_state = TriState.nullify()
-            else:
-                min_resource_state = TriState.update(_entries_to_requirements(input.min_resource))
-
         updater = ModelCardUpdater(
             card_id=ModelCardID(input.id),
-            name=(
-                OptionalState.update(input.name) if input.name is not None else OptionalState.nop()
-            ),
-            author=(
-                TriState.nop()
-                if input.author is SENTINEL
-                else TriState.nullify()
-                if input.author is None
-                else TriState.update(input.author)
-            ),
-            title=(
-                TriState.nop()
-                if input.title is SENTINEL
-                else TriState.nullify()
-                if input.title is None
-                else TriState.update(input.title)
-            ),
-            model_version=(
-                TriState.nop()
-                if input.model_version is SENTINEL
-                else TriState.nullify()
-                if input.model_version is None
-                else TriState.update(input.model_version)
-            ),
-            description=(
-                TriState.nop()
-                if input.description is SENTINEL
-                else TriState.nullify()
-                if input.description is None
-                else TriState.update(input.description)
-            ),
-            task=(
-                TriState.nop()
-                if input.task is SENTINEL
-                else TriState.nullify()
-                if input.task is None
-                else TriState.update(input.task)
-            ),
-            category=(
-                TriState.nop()
-                if input.category is SENTINEL
-                else TriState.nullify()
-                if input.category is None
-                else TriState.update(input.category)
-            ),
-            architecture=(
-                TriState.nop()
-                if input.architecture is SENTINEL
-                else TriState.nullify()
-                if input.architecture is None
-                else TriState.update(input.architecture)
-            ),
-            framework=(
-                OptionalState.update(input.framework)
-                if input.framework is not None
-                else OptionalState.nop()
-            ),
-            label=(
-                OptionalState.update(input.label)
-                if input.label is not None
-                else OptionalState.nop()
-            ),
-            license=(
-                TriState.nop()
-                if input.license is SENTINEL
-                else TriState.nullify()
-                if input.license is None
-                else TriState.update(input.license)
-            ),
-            min_resource=min_resource_state,
-            readme=(
-                TriState.nop()
-                if input.readme is SENTINEL
-                else TriState.nullify()
-                if input.readme is None
-                else TriState.update(input.readme)
-            ),
-            access_level=(
-                OptionalState.nop()
-                if input.access_level is SENTINEL
-                else OptionalState.update(input.access_level.value)
-                if input.access_level is not None
-                else OptionalState.nop()
-            ),
+            name=OptionalState.from_unset(input.name),
+            author=TriState.from_unset(input.author),
+            title=TriState.from_unset(input.title),
+            model_version=TriState.from_unset(input.model_version),
+            description=TriState.from_unset(input.description),
+            task=TriState.from_unset(input.task),
+            category=TriState.from_unset(input.category),
+            architecture=TriState.from_unset(input.architecture),
+            framework=OptionalState.from_unset(input.framework),
+            label=OptionalState.from_unset(input.label),
+            license=TriState.from_unset(input.license),
+            min_resource=TriState.from_unset(input.min_resource).map(_entries_to_requirements),
+            readme=TriState.from_unset(input.readme),
+            access_level=OptionalState.from_unset(input.access_level).map(lambda x: x.value),
         )
-        result = await self._processors.model_card.update.run(
+        result = await self._model_card.update.run(
             UpdateModelCardAction(model_card_id=ModelCardID(input.id), updater=updater)
         )
         return UpdateModelCardPayload(
@@ -411,7 +381,7 @@ class ModelCardAdapter(BaseAdapter):
         card_id: UUID,
         options: DeleteModelCardOptions,
     ) -> DeleteModelCardPayload:
-        result = await self._processors.model_card.delete.run(
+        result = await self._model_card.delete.run(
             DeleteModelCardAction(
                 model_card_id=ModelCardID(card_id),
                 purger=ModelCardPurger(card_id=ModelCardID(card_id)),
@@ -426,7 +396,7 @@ class ModelCardAdapter(BaseAdapter):
         options: DeleteModelCardOptions,
     ) -> BulkDeleteModelCardsPayload:
         """Bulk-delete model cards and surface per-card success/failure breakdown."""
-        result = await self._processors.model_card.bulk_delete.run(
+        result = await self._model_card.bulk_delete.run(
             BulkDeleteModelCardAction(
                 ids=[ModelCardID(card_id) for card_id in input.ids],
                 options=options,
@@ -444,7 +414,7 @@ class ModelCardAdapter(BaseAdapter):
         me = current_user()
         if me is None:
             raise UnreachableError("User context is not available")
-        result = await self._processors.model_card.scan.run(
+        result = await self._model_card.scan.run(
             ScanProjectModelCardsAction(
                 project_id=project_id,
                 requester_id=me.user_id,
@@ -527,7 +497,7 @@ class ModelCardAdapter(BaseAdapter):
             policy=policy,
         )
 
-        result = await self._processors.deployment.create_deployment.run(
+        result = await self._deployment.create_deployment.run(
             CreateDeploymentAction(
                 project_id=ProjectID(creator.metadata.project),
                 creator=creator,
@@ -544,7 +514,7 @@ class ModelCardAdapter(BaseAdapter):
         model_card_id: UUID,
         input: SearchDeploymentRevisionPresetsInput,
     ) -> SearchDeploymentRevisionPresetsPayload:
-        action_result = await self._processors.model_card.available_presets.run(
+        action_result = await self._model_card.available_presets.run(
             AvailablePresetsAction(
                 model_card_id=ModelCardID(model_card_id),
                 search_input=input,
@@ -560,7 +530,7 @@ class ModelCardAdapter(BaseAdapter):
 
     async def _get_model_card_data(self, card_id: UUID) -> ModelCardData:
         """Fetch a single model card by ID."""
-        result = await self._processors.model_card.get.run(
+        result = await self._model_card.get.run(
             GetModelCardAction(model_card_id=ModelCardID(card_id))
         )
         return result.data
@@ -653,7 +623,7 @@ class ModelCardAdapter(BaseAdapter):
         """
         if not card_ids:
             return {}
-        result = await self._processors.model_card.scoped_search_requirements.run(
+        result = await self._model_card.scoped_search_requirements.run(
             ScopedSearchModelCardResourceRequirementsAction(
                 card_ids=[ModelCardID(card_id) for card_id in card_ids],
                 searcher=ModelCardResourceRequirementSearcher(pagination=NoPagination()),

@@ -2,12 +2,31 @@
 
 from typing import override
 
-from ai.backend.common.data.entity.types import FieldIdentifier, FieldType
+from ai.backend.common.data.entity.deployment import DeploymentEntityType
+from ai.backend.common.data.entity.types import (
+    EntityType,
+    FieldIdentifier,
+    FieldType,
+)
 
-__all__ = ("DEPLOYMENT_TOKEN_FIELD_TYPE", "DeploymentTokenID")
+__all__ = ("DeploymentTokenFieldType", "DeploymentTokenID")
 
 
-DEPLOYMENT_TOKEN_FIELD_TYPE = FieldType("deployment_token")
+class DeploymentTokenFieldType(FieldType):
+    @override
+    @classmethod
+    def name(cls) -> str:
+        return "deployment_token"
+
+    @override
+    @classmethod
+    def description(cls) -> str:
+        return "A token for calling a deployment, fixing the user it acts as."
+
+    @override
+    @classmethod
+    def owner_type(cls) -> type[EntityType]:
+        return DeploymentEntityType
 
 
 class DeploymentTokenID(FieldIdentifier):
@@ -20,4 +39,4 @@ class DeploymentTokenID(FieldIdentifier):
     @override
     @classmethod
     def field_type(cls) -> FieldType:
-        return DEPLOYMENT_TOKEN_FIELD_TYPE
+        return DeploymentTokenFieldType()

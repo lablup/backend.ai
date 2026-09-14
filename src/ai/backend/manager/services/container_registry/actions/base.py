@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from typing import override
 
 from ai.backend.common.data.entity.container_registry import (
-    CONTAINER_REGISTRY_ENTITY_TYPE,
+    ContainerRegistryEntityType,
     ContainerRegistryID,
 )
 from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
@@ -17,7 +17,7 @@ class ContainerRegistryAction(BaseGlobalAction):
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return CONTAINER_REGISTRY_ENTITY_TYPE
+        return ContainerRegistryEntityType()
 
 
 @dataclass

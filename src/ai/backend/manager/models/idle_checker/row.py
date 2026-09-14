@@ -7,11 +7,15 @@ import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, mapped_column
 
 from ai.backend.common.data.entity.idle_checker import IdleCheckerAssignmentID, IdleCheckerID
+from ai.backend.common.data.entity.types import EntityType
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.idle_checker.types import CheckerType, IdleCheckerSpec, IdleCheckPhase
-from ai.backend.common.data.permission.types import ScopeType
 from ai.backend.common.types import SessionId, SessionTypes
-from ai.backend.manager.data.idle_checker.types import IdleCheckerAssignmentData, IdleCheckerData
+from ai.backend.manager.data.idle_checker.types import (
+    IdleCheckerAssignmentData,
+    IdleCheckerData,
+    SessionIdleCheckData,
+)
 from ai.backend.manager.models.base import GUID, Base, PydanticColumn, StrEnumType
 from ai.backend.manager.models.mixins.timestamp import LifecycleTimestampsMixin, UpdatedAtMixin
 
@@ -98,7 +102,7 @@ class IdleCheckerBindingRow(LifecycleTimestampsMixin, Base):
     def to_data(self) -> IdleCheckerAssignmentData:
         return IdleCheckerAssignmentData(
             id=IdleCheckerAssignmentID(self.id),
-            scope_type=ScopeType(self.scope_type),
+            scope_type=EntityType.from_name(self.scope_type),
             scope_id=self.scope_id,
             idle_checker_id=self.idle_checker_id,
             enabled=self.enabled,
@@ -165,3 +169,14 @@ class SessionIdleCheckRow(UpdatedAtMixin, Base):
     manually_triggered_by: Mapped[UserID | None] = mapped_column(
         "manually_triggered_by", GUID(UserID), nullable=True, default=None
     )
+
+    def to_data(self) -> SessionIdleCheckData:
+        return SessionIdleCheckData(
+            session_id=self.session_id,
+            idle_checker_id=self.idle_checker_id,
+            expire_at=self.expire_at,
+            last_status=self.last_status,
+            last_message=self.last_message,
+            is_manual=self.is_manual,
+            manually_triggered_by=self.manually_triggered_by,
+        )

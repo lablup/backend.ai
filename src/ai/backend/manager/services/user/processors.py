@@ -1,5 +1,5 @@
-from ai.backend.common.data.entity.error_log import ERROR_LOG_FIELD_TYPE
-from ai.backend.common.data.entity.keypair import KEYPAIR_FIELD_TYPE
+from ai.backend.common.data.entity.error_log import ErrorLogFieldType
+from ai.backend.common.data.entity.keypair import KeyPairFieldType
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.manager.actions.registry.field import LookupFieldGroup
 from ai.backend.manager.actions.registry.group import ProcessorGroup
@@ -260,7 +260,7 @@ class UserProcessors:
         )
 
         self.keypair_group = group.field_group(
-            FieldGroupMeta(KEYPAIR_FIELD_TYPE),
+            FieldGroupMeta(KeyPairFieldType()),
             KeyPairData,
             LookupKeypairOwnerAction,
             LookupBulkKeypairOwnerAction,
@@ -278,7 +278,7 @@ class UserProcessors:
         )
         self.error_log = ErrorLogProcessors(
             group.field_group(
-                FieldGroupMeta(ERROR_LOG_FIELD_TYPE),
+                FieldGroupMeta(ErrorLogFieldType()),
                 ErrorLogData,
                 LookupErrorLogOwnerAction,
                 LookupBulkErrorLogOwnerAction,

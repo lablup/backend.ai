@@ -9,28 +9,21 @@ import pytest
 import sqlalchemy as sa
 from sqlalchemy import Table
 
-from ai.backend.common.data.entity.domain import DOMAIN_ENTITY_TYPE, DomainID, DomainName
-from ai.backend.common.data.entity.project import (
-    PROJECT_ENTITY_TYPE,
-    PROJECT_SCOPE_TYPE,
-    ProjectID,
-)
-from ai.backend.common.data.entity.role import ROLE_ENTITY_TYPE, RoleID
-from ai.backend.common.data.entity.user import USER_ENTITY_TYPE, UserID
+from ai.backend.common.data.entity.domain import DomainEntityType, DomainID, DomainName
+from ai.backend.common.data.entity.project import ProjectEntityType, ProjectID
+from ai.backend.common.data.entity.role import RoleEntityType, RoleID
+from ai.backend.common.data.entity.user import UserEntityType, UserID
+from ai.backend.common.data.entity.vfolder import VFolderEntityType
 from ai.backend.common.data.entity.virtual_entity import VirtualEntityID
-from ai.backend.common.data.permission.types import RoleStatus
+from ai.backend.common.data.permission.types import Permission, RoleStatus
 from ai.backend.common.types import AccessKey, ResourceSlot, VFolderHostPermissionMap
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.keypair.types import KeyPairSecrets
-from ai.backend.manager.data.permission.types import EntityType, OperationType, ScopeType
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.entity_label.row import EntityLabelRow
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.project import ProjectRow, ProjectType
-from ai.backend.manager.models.rbac_models.association_scopes_entities import (
-    AssociationScopesEntitiesRow,
-)
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.rbac_models.role_permission_preset.row import (
@@ -74,7 +67,6 @@ _TABLES: list[Table | type[HasTable]] = [
     UserRow,
     KeyPairRow,
     ProjectRow,
-    AssociationScopesEntitiesRow,
     VirtualEntityRow,
     ScopeBindingRow,
     EntityLabelRow,
@@ -229,8 +221,8 @@ async def _project_member_ids(db: ExtendedAsyncSAEngine, project_id: ProjectID) 
                     )
                     .where(
                         EntityMembershipRow.virtual_entity_id
-                        == _node_of(PROJECT_ENTITY_TYPE, project_id),
-                        VirtualEntityRow.entity_type == USER_ENTITY_TYPE,
+                        == _node_of(ProjectEntityType(), project_id),
+                        VirtualEntityRow.entity_type == UserEntityType(),
                     )
                 )
             ).all()
@@ -313,9 +305,9 @@ class TestPersonalProjectProvisioning:
                 .select_from(EntityMembershipRow)
                 .where(
                     EntityMembershipRow.virtual_entity_id
-                    == _node_of(DOMAIN_ENTITY_TYPE, domain.domain_id),
+                    == _node_of(DomainEntityType(), domain.domain_id),
                     EntityMembershipRow.member_entity_id
-                    == _node_of(PROJECT_ENTITY_TYPE, project_id),
+                    == _node_of(ProjectEntityType(), project_id),
                 )
             )
         assert owned == 1
@@ -383,7 +375,7 @@ async def user_role_preset(db: ExtendedAsyncSAEngine) -> uuid.UUID:
             RolePresetRow(
                 id=preset_id,
                 name="preset-user",
-                scope_type=ScopeType.USER,
+                scope_type=UserEntityType(),
                 auto_assign=True,
                 deleted=False,
             )
@@ -392,8 +384,8 @@ async def user_role_preset(db: ExtendedAsyncSAEngine) -> uuid.UUID:
         session.add(
             RolePermissionPresetRow(
                 role_preset_id=preset_id,
-                entity_type=EntityType.VFOLDER,
-                operation=OperationType.READ,
+                entity_type=VFolderEntityType(),
+                permission=Permission.READ,
             )
         )
         await session.commit()
@@ -412,31 +404,10 @@ class TestUserGraphProvisioning:
         """``created_in`` puts the user on the domain's list and under its roles."""
         user_id = await _create_user(provider, domain.domain_id, "alice")
 
-        domain_node = (DOMAIN_ENTITY_TYPE, domain.domain_id)
-        user_node = (USER_ENTITY_TYPE, user_id)
+        domain_node = (DomainEntityType(), domain.domain_id)
+        user_node = (UserEntityType(), user_id)
         assert await _owns(db, domain_node, user_node)
         assert await _governs(db, domain_node, user_node)
-
-    async def test_no_legacy_scope_association_is_written(
-        self,
-        db: ExtendedAsyncSAEngine,
-        provider: UserOpsProvider,
-        domain: DomainFixtureData,
-    ) -> None:
-        """Placement is the graph's answer alone; the legacy association table is
-        left untouched."""
-        user_id = await _create_user(provider, domain.domain_id, "alice")
-
-        async with db.begin_readonly_session() as session:
-            associations = await session.scalar(
-                sa.select(sa.func.count())
-                .select_from(AssociationScopesEntitiesRow)
-                .where(
-                    AssociationScopesEntitiesRow.entity_type == EntityType.USER,
-                    AssociationScopesEntitiesRow.entity_id == str(user_id),
-                )
-            )
-        assert associations == 0
 
     async def test_the_user_holds_the_roles_its_scope_presets_call_for(
         self,
@@ -462,14 +433,12 @@ class TestUserGraphProvisioning:
                     await session.scalars(
                         sa.select(PermissionRow.entity_type).where(
                             PermissionRow.role_id == role.id,
-                            PermissionRow.scope_type == ScopeType.USER,
-                            PermissionRow.scope_id == str(user_id),
                         )
                     )
                 ).all()
             )
         assert role.name == f"preset-user-{str(user_id)[:8]}"
-        assert {str(EntityType.VFOLDER)} == {str(entity_type) for entity_type in entity_types}
+        assert {str(VFolderEntityType())} == {str(entity_type) for entity_type in entity_types}
 
 
 async def _create_project(db: ExtendedAsyncSAEngine, domain_name: DomainName) -> ProjectID:
@@ -495,8 +464,8 @@ async def _create_project(db: ExtendedAsyncSAEngine, domain_name: DomainName) ->
 
 
 async def _enrol_auto_assign_role(db: ExtendedAsyncSAEngine, project_id: ProjectID) -> RoleID:
-    """A role the project hands to whoever joins it, enrolled in the project's virtual
-    entity the way the preset-derived ones are."""
+    """A role the project hands to whoever joins it, on the row and enrolled in the
+    project's virtual entity the way the preset-derived ones are."""
     role_id = RoleID(uuid.uuid4())
     async with db.begin_session() as session:
         session.add(
@@ -505,14 +474,16 @@ async def _enrol_auto_assign_role(db: ExtendedAsyncSAEngine, project_id: Project
                 name=f"role-{role_id.hex[:8]}",
                 status=RoleStatus.ACTIVE,
                 auto_assign=True,
+                scope_type=ProjectEntityType(),
+                scope_id=project_id,
             )
         )
-        role_node = VirtualEntityRow(entity_type=ROLE_ENTITY_TYPE, entity_id=role_id)
+        role_node = VirtualEntityRow(entity_type=RoleEntityType(), entity_id=role_id)
         session.add(role_node)
         await session.flush()
         project_node_id = await session.scalar(
             sa.select(VirtualEntityRow.id).where(
-                VirtualEntityRow.entity_type == PROJECT_SCOPE_TYPE,
+                VirtualEntityRow.entity_type == ProjectEntityType(),
                 VirtualEntityRow.entity_id == project_id,
             )
         )

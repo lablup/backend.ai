@@ -8,7 +8,6 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from ai.backend.common.api_handlers import SENTINEL
 from ai.backend.common.data.entity.role import RoleID
 from ai.backend.common.dto.manager.rbac import (
     OrderDirection,
@@ -40,6 +39,8 @@ class RoleAdapter(BaseFilterAdapter):
         return RoleDTO(
             id=data.id,
             name=data.name,
+            scope_type=data.scope_type,
+            scope_id=data.scope_id,
             source=data.source,
             status=data.status,
             created_at=data.created_at,
@@ -50,18 +51,11 @@ class RoleAdapter(BaseFilterAdapter):
 
     def build_updater(self, request: UpdateRoleRequest, role_id: UUID) -> RoleUpdater:
         """Convert update request to updater."""
-        name = OptionalState[str].nop()
-        description = TriState[str].nop()
-
-        if request.name is not None:
-            name = OptionalState.update(request.name)
-        if request.description is not SENTINEL:
-            if request.description is None:
-                description = TriState.nullify()
-            else:
-                description = TriState.update(request.description)
-
-        return RoleUpdater(role_id=RoleID(role_id), name=name, description=description)
+        return RoleUpdater(
+            role_id=RoleID(role_id),
+            name=OptionalState.from_unset(request.name),
+            description=TriState.from_unset(request.description),
+        )
 
     def build_querier(self, request: SearchRolesRequest) -> BatchQuerier:
         """

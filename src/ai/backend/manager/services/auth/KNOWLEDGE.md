@@ -5,7 +5,7 @@ description: 인증 도메인의 액션이 왜 auth 와 user 두 그룹으로 �
 scope: src/ai/backend/manager/services/auth
 keywords:
   - AuthProcessors
-  - AUTH_ENTITY_TYPE
+  - AuthEntityType
   - anonymous_global
   - PublicActionProcessor
   - RevokeLoginSessionAction

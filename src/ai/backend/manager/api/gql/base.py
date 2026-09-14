@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from datetime import date, datetime
 from enum import StrEnum
 from typing import TYPE_CHECKING, Any, Protocol, TypeVar
+from uuid import UUID
 
 import graphene
 import strawberry
@@ -28,6 +29,7 @@ from ai.backend.common.dto.manager.query import IntFilter as IntFilterDTO
 from ai.backend.common.dto.manager.query import NullableDateTimeFilter as NullableDateTimeFilterDTO
 from ai.backend.common.dto.manager.query import StringFilter as StringFilterDTO
 from ai.backend.common.dto.manager.query import UUIDFilter as UUIDFilterDTO
+from ai.backend.common.dto.manager.v2.rbac.types import UUIDScope
 from ai.backend.manager.api.adapter_options.cursor.cursor import decode_cursor as decode_cursor
 from ai.backend.manager.api.adapter_options.cursor.cursor import encode_cursor as encode_cursor
 from ai.backend.manager.api.gql.decorators import (
@@ -580,4 +582,17 @@ def build_connection[TData, TNode: Node, TConn](
             end_cursor=edges[-1].cursor if edges else None,
         ),
         count=result.total_count,
+    )
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Single-UUID scope item wrapper.",
+        added_version="26.4.4",
+    ),
+    name="UUIDScope",
+)
+class UUIDScopeGQL(PydanticInputMixin[UUIDScope]):
+    value: UUID = gql_field(
+        description="UUID value.",
     )

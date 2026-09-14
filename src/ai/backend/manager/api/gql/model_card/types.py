@@ -6,9 +6,12 @@ from typing import TYPE_CHECKING, Annotated, Self
 from uuid import UUID
 
 import strawberry
-from strawberry import Info
+from strawberry import UNSET, Info
 from strawberry.relay import Connection, Edge, NodeID
 
+from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.user import UserID
+from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.dto.manager.v2.common import OrderDirection
 from ai.backend.common.dto.manager.v2.deployment_revision_preset.request import (
     DeploymentRevisionPresetFilter,
@@ -73,10 +76,15 @@ from ai.backend.common.dto.manager.v2.model_card.types import (
     ModelCardAvailablePresetsScope as AvailablePresetsScopeDTO,
 )
 from ai.backend.common.dto.manager.v2.model_card.types import (
+    ModelCardScope,
+)
+from ai.backend.common.dto.manager.v2.model_card.types import (
     ProjectModelCardScope as ProjectModelCardScopeDTO,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import StringFilter as StringFilterGQL
 from ai.backend.manager.api.gql.base import UUIDFilter as UUIDFilterGQL
+from ai.backend.manager.api.gql.base import UUIDScopeGQL
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     PydanticInputMixin,
@@ -237,7 +245,7 @@ class ModelCardGQL(PydanticNodeMixin[NodeDTO]):
         ]
         | None
     ):
-        return await info.context.data_loaders.vfolder_loader.load(self.vfolder_id)
+        return await info.context.data_loaders.vfolder_loader.load(VFolderUUID(self.vfolder_id))
 
     @gql_added_field(
         BackendAIGQLMeta(
@@ -273,7 +281,7 @@ class ModelCardGQL(PydanticNodeMixin[NodeDTO]):
         ]
         | None
     ):
-        return await info.context.data_loaders.project_loader.load(self.project_id)
+        return await info.context.data_loaders.project_loader.load(ProjectID(self.project_id))
 
     @gql_added_field(
         BackendAIGQLMeta(
@@ -291,7 +299,7 @@ class ModelCardGQL(PydanticNodeMixin[NodeDTO]):
         ]
         | None
     ):
-        return await info.context.data_loaders.user_loader.load(self.creator_id)
+        return await info.context.data_loaders.user_loader.load(UserID(self.creator_id))
 
     @gql_field(  # type: ignore[misc]
         description="Deployment revision presets that satisfy this model card's minimum resource requirements. Equivalent to the root `model_card_available_presets` query but scoped to this card."
@@ -444,20 +452,20 @@ class CreateModelCardInputGQL(PydanticInputMixin[CreateInputDTO]):
 )
 class UpdateModelCardInputGQL(PydanticInputMixin[UpdateInputDTO]):
     id: UUID = gql_field(description="Model card ID.")
-    name: str | None = gql_field(default=None, description="New name.")
-    author: str | None = gql_field(default=None, description="Author.")
-    title: str | None = gql_field(default=None, description="Title.")
-    model_version: str | None = gql_field(default=None, description="Version.")
-    description: str | None = gql_field(default=None, description="Description.")
-    task: str | None = gql_field(default=None, description="ML task.")
-    category: str | None = gql_field(default=None, description="Category.")
-    architecture: str | None = gql_field(default=None, description="Architecture.")
-    framework: list[str] | None = gql_field(default=None, description="Frameworks.")
-    label: list[str] | None = gql_field(default=None, description="Labels.")
-    license: str | None = gql_field(default=None, description="License.")
-    readme: str | None = gql_field(default=None, description="README content.")
+    name: str | None = gql_field(default=UNSET, description="New name.")
+    author: str | None = gql_field(default=UNSET, description="Author.")
+    title: str | None = gql_field(default=UNSET, description="Title.")
+    model_version: str | None = gql_field(default=UNSET, description="Version.")
+    description: str | None = gql_field(default=UNSET, description="Description.")
+    task: str | None = gql_field(default=UNSET, description="ML task.")
+    category: str | None = gql_field(default=UNSET, description="Category.")
+    architecture: str | None = gql_field(default=UNSET, description="Architecture.")
+    framework: list[str] | None = gql_field(default=UNSET, description="Frameworks.")
+    label: list[str] | None = gql_field(default=UNSET, description="Labels.")
+    license: str | None = gql_field(default=UNSET, description="License.")
+    readme: str | None = gql_field(default=UNSET, description="README content.")
     access_level: ModelCardAccessLevelGQL | None = gql_field(
-        default=None, description="Access level (public or internal)."
+        default=UNSET, description="Access level (public or internal)."
     )
 
 
@@ -606,4 +614,22 @@ class BulkDeleteModelCardsV2PayloadGQL:
     )
     failed: list[BulkDeleteModelCardV2ErrorGQL] = gql_field(
         description="List of errors for model cards that failed to delete.",
+    )
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description=(
+            "Scope for the scoped model card query. Each list is OR'd internally, and "
+            "every scope named is authorized before the read runs."
+        ),
+    ),
+    name="ModelCardScope",
+)
+class ModelCardScopeGQL(PydanticInputMixin[ModelCardScope]):
+    """The scopes a model card read is answered for."""
+
+    project: list[UUIDScopeGQL] | None = gql_field(
+        default=None, description="Projects whose model cards are being read."
     )

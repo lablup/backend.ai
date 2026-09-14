@@ -8,11 +8,9 @@ from __future__ import annotations
 from decimal import Decimal
 from typing import Any
 
-from ai.backend.common.api_handlers import Sentinel
 from ai.backend.common.contexts.user import current_user
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.dto.manager.v2.common import (
-    BinarySizeInput,
     ResourceLimitEntryInfo,
     ResourceSlotEntryInfo,
     ResourceSlotEntryInput,
@@ -125,10 +123,14 @@ from ai.backend.manager.services.keypair_resource_policy.actions.purge_keypair_r
     PurgeKeyPairResourcePolicyAction,
 )
 from ai.backend.manager.services.keypair_resource_policy.actions.search_keypair_resource_policies import (
+    KeypairResourcePolicyScopeItem,
     SearchKeypairResourcePoliciesAction,
 )
 from ai.backend.manager.services.keypair_resource_policy.actions.update_keypair_resource_policy import (
     UpdateKeyPairResourcePolicyAction,
+)
+from ai.backend.manager.services.keypair_resource_policy.processors import (
+    KeypairResourcePolicyProcessors,
 )
 from ai.backend.manager.services.project_resource_policy.actions.create_project_resource_policy import (
     CreateProjectResourcePolicyAction,
@@ -148,6 +150,9 @@ from ai.backend.manager.services.project_resource_policy.actions.search_project_
 from ai.backend.manager.services.project_resource_policy.actions.update_project_resource_policy import (
     UpdateProjectResourcePolicyAction,
 )
+from ai.backend.manager.services.project_resource_policy.processors import (
+    ProjectResourcePolicyProcessors,
+)
 from ai.backend.manager.services.user_resource_policy.actions.create_user_resource_policy import (
     CreateUserResourcePolicyAction,
 )
@@ -163,10 +168,12 @@ from ai.backend.manager.services.user_resource_policy.actions.purge_user_resourc
 )
 from ai.backend.manager.services.user_resource_policy.actions.search_user_resource_policies import (
     SearchUserResourcePoliciesAction,
+    UserResourcePolicyScopeItem,
 )
 from ai.backend.manager.services.user_resource_policy.actions.update_user_resource_policy import (
     UpdateUserResourcePolicyAction,
 )
+from ai.backend.manager.services.user_resource_policy.processors import UserResourcePolicyProcessors
 from ai.backend.manager.types import OptionalState, TriState
 
 _KEYPAIR_RP_PAGINATION_SPEC = PaginationSpec(
@@ -197,13 +204,27 @@ _PROJECT_RP_PAGINATION_SPEC = PaginationSpec(
 class ResourcePolicyAdapter(BaseAdapter):
     """Unified adapter for keypair, user, and project resource policy operations."""
 
+    _keypair_resource_policy: KeypairResourcePolicyProcessors
+    _user_resource_policy: UserResourcePolicyProcessors
+    _project_resource_policy: ProjectResourcePolicyProcessors
+
+    def __init__(
+        self,
+        keypair_resource_policy: KeypairResourcePolicyProcessors,
+        user_resource_policy: UserResourcePolicyProcessors,
+        project_resource_policy: ProjectResourcePolicyProcessors,
+    ) -> None:
+        self._keypair_resource_policy = keypair_resource_policy
+        self._user_resource_policy = user_resource_policy
+        self._project_resource_policy = project_resource_policy
+
     # ── Keypair Resource Policy ──
 
     async def admin_get_keypair_resource_policy(self, name: str) -> KeypairResourcePolicyNode:
-        resolved = await self._processors.keypair_resource_policy.lookup.run(
+        resolved = await self._keypair_resource_policy.lookup.run(
             LookupKeypairResourcePolicyAction(name=name)
         )
-        result = await self._processors.keypair_resource_policy.get.run(
+        result = await self._keypair_resource_policy.get.run(
             GetKeyPairResourcePolicyAction(policy_id=resolved.entity_id())
         )
         return self._keypair_policy_data_to_node(result.data)
@@ -226,7 +247,7 @@ class ResourcePolicyAdapter(BaseAdapter):
             limit=input.limit,
             offset=input.offset,
         )
-        result = await self._processors.keypair_resource_policy.global_search.run(
+        result = await self._keypair_resource_policy.global_search.run(
             GlobalSearchKeypairResourcePoliciesAction(searcher=searcher)
         )
         items = [self._keypair_policy_data_to_node(d) for d in result.items]
@@ -253,7 +274,7 @@ class ResourcePolicyAdapter(BaseAdapter):
             idle_timeout=input.idle_timeout,
             allowed_vfolder_hosts=self._entries_to_vfolder_hosts(input.allowed_vfolder_hosts),
         )
-        result = await self._processors.keypair_resource_policy.global_create.run(
+        result = await self._keypair_resource_policy.global_create.run(
             CreateKeyPairResourcePolicyAction(creator=creator)
         )
         return CreateKeypairResourcePolicyPayload(
@@ -263,84 +284,32 @@ class ResourcePolicyAdapter(BaseAdapter):
     async def admin_update_keypair_resource_policy(
         self, name: str, input: UpdateKeypairResourcePolicyInput
     ) -> UpdateKeypairResourcePolicyPayload:
-        target = await self._processors.keypair_resource_policy.lookup.run(
+        target = await self._keypair_resource_policy.lookup.run(
             LookupKeypairResourcePolicyAction(name=name)
         )
         updater = KeyPairResourcePolicyUpdater(
             policy_id=target.entity_id(),
-            default_for_unspecified=(
-                OptionalState.update(input.default_for_unspecified)
-                if input.default_for_unspecified is not None
-                else OptionalState.nop()
+            default_for_unspecified=OptionalState.from_unset(input.default_for_unspecified),
+            total_resource_slots=OptionalState.from_unset(input.total_resource_slots).map(
+                self._entries_to_resource_slot
             ),
-            total_resource_slots=(
-                OptionalState.nop()
-                if isinstance(input.total_resource_slots, Sentinel)
-                else OptionalState.update(
-                    self._entries_to_resource_slot(input.total_resource_slots)
-                )
-                if input.total_resource_slots is not None
-                else OptionalState.nop()
+            max_session_lifetime=OptionalState.from_unset(input.max_session_lifetime),
+            max_concurrent_sessions=OptionalState.from_unset(input.max_concurrent_sessions),
+            max_pending_session_count=TriState.from_unset(input.max_pending_session_count),
+            max_pending_session_resource_slots=TriState.from_unset(
+                input.max_pending_session_resource_slots
+            ).map(self._entries_to_resource_slot),
+            max_priority=TriState.from_unset(input.max_priority),
+            max_concurrent_sftp_sessions=OptionalState.from_unset(
+                input.max_concurrent_sftp_sessions
             ),
-            max_session_lifetime=(
-                OptionalState.update(input.max_session_lifetime)
-                if input.max_session_lifetime is not None
-                else OptionalState.nop()
-            ),
-            max_concurrent_sessions=(
-                OptionalState.update(input.max_concurrent_sessions)
-                if input.max_concurrent_sessions is not None
-                else OptionalState.nop()
-            ),
-            max_pending_session_count=(
-                TriState.nop()
-                if isinstance(input.max_pending_session_count, Sentinel)
-                else TriState.nullify()
-                if input.max_pending_session_count is None
-                else TriState.update(input.max_pending_session_count)
-            ),
-            max_pending_session_resource_slots=(
-                TriState.nop()
-                if isinstance(input.max_pending_session_resource_slots, Sentinel)
-                else TriState.nullify()
-                if input.max_pending_session_resource_slots is None
-                else TriState.update(
-                    self._entries_to_resource_slot(input.max_pending_session_resource_slots)
-                )
-            ),
-            max_priority=(
-                TriState.nop()
-                if isinstance(input.max_priority, Sentinel)
-                else TriState.nullify()
-                if input.max_priority is None
-                else TriState.update(input.max_priority)
-            ),
-            max_concurrent_sftp_sessions=(
-                OptionalState.update(input.max_concurrent_sftp_sessions)
-                if input.max_concurrent_sftp_sessions is not None
-                else OptionalState.nop()
-            ),
-            max_containers_per_session=(
-                OptionalState.update(input.max_containers_per_session)
-                if input.max_containers_per_session is not None
-                else OptionalState.nop()
-            ),
-            idle_timeout=(
-                OptionalState.update(input.idle_timeout)
-                if input.idle_timeout is not None
-                else OptionalState.nop()
-            ),
-            allowed_vfolder_hosts=(
-                OptionalState.nop()
-                if isinstance(input.allowed_vfolder_hosts, Sentinel)
-                else OptionalState.update(
-                    self._entries_to_vfolder_hosts(input.allowed_vfolder_hosts)
-                )
-                if input.allowed_vfolder_hosts is not None
-                else OptionalState.nop()
+            max_containers_per_session=OptionalState.from_unset(input.max_containers_per_session),
+            idle_timeout=OptionalState.from_unset(input.idle_timeout),
+            allowed_vfolder_hosts=OptionalState.from_unset(input.allowed_vfolder_hosts).map(
+                self._entries_to_vfolder_hosts
             ),
         )
-        result = await self._processors.keypair_resource_policy.update.run(
+        result = await self._keypair_resource_policy.update.run(
             UpdateKeyPairResourcePolicyAction(updater=updater)
         )
         return UpdateKeypairResourcePolicyPayload(
@@ -350,10 +319,10 @@ class ResourcePolicyAdapter(BaseAdapter):
     async def admin_delete_keypair_resource_policy(
         self, input: DeleteKeypairResourcePolicyInput
     ) -> DeleteKeypairResourcePolicyPayload:
-        target = await self._processors.keypair_resource_policy.lookup.run(
+        target = await self._keypair_resource_policy.lookup.run(
             LookupKeypairResourcePolicyAction(name=input.name)
         )
-        await self._processors.keypair_resource_policy.purge.run(
+        await self._keypair_resource_policy.purge.run(
             PurgeKeyPairResourcePolicyAction(name=input.name, policy_id=target.entity_id())
         )
         return DeleteKeypairResourcePolicyPayload(name=input.name)
@@ -362,9 +331,9 @@ class ResourcePolicyAdapter(BaseAdapter):
         me = current_user()
         if me is None:
             raise UnreachableError("User context is not available.")
-        result = await self._processors.keypair_resource_policy.search.run(
+        result = await self._keypair_resource_policy.search.run(
             SearchKeypairResourcePoliciesAction(
-                user_id=UserID(me.user_id),
+                items=[KeypairResourcePolicyScopeItem(user_id=UserID(me.user_id))],
                 searcher=KeyPairResourcePolicySearcher(pagination=NoPagination()),
             )
         )
@@ -375,10 +344,10 @@ class ResourcePolicyAdapter(BaseAdapter):
     # ── User Resource Policy ──
 
     async def admin_get_user_resource_policy(self, name: str) -> UserResourcePolicyNode:
-        resolved = await self._processors.user_resource_policy.lookup.run(
+        resolved = await self._user_resource_policy.lookup.run(
             LookupUserResourcePolicyAction(name=name)
         )
-        result = await self._processors.user_resource_policy.get.run(
+        result = await self._user_resource_policy.get.run(
             GetUserResourcePolicyAction(policy_id=resolved.entity_id())
         )
         return self._user_policy_data_to_node(result.data)
@@ -401,7 +370,7 @@ class ResourcePolicyAdapter(BaseAdapter):
             limit=input.limit,
             offset=input.offset,
         )
-        result = await self._processors.user_resource_policy.global_search.run(
+        result = await self._user_resource_policy.global_search.run(
             GlobalSearchUserResourcePoliciesAction(searcher=searcher)
         )
         items = [self._user_policy_data_to_node(d) for d in result.items]
@@ -418,7 +387,7 @@ class ResourcePolicyAdapter(BaseAdapter):
             max_session_count_per_model_session=input.max_session_count_per_model_session,
             max_customized_image_count=input.max_customized_image_count,
         )
-        result = await self._processors.user_resource_policy.global_create.run(
+        result = await self._user_resource_policy.global_create.run(
             CreateUserResourcePolicyAction(creator=creator)
         )
         return CreateUserResourcePolicyPayload(
@@ -428,44 +397,22 @@ class ResourcePolicyAdapter(BaseAdapter):
     async def admin_update_user_resource_policy(
         self, name: str, input: UpdateUserResourcePolicyInput
     ) -> UpdateUserResourcePolicyPayload:
-        target = await self._processors.user_resource_policy.lookup.run(
+        target = await self._user_resource_policy.lookup.run(
             LookupUserResourcePolicyAction(name=name)
         )
         updater = UserResourcePolicyUpdater(
             policy_id=target.entity_id(),
-            max_vfolder_count=(
-                OptionalState.nop()
-                if isinstance(input.max_vfolder_count, Sentinel)
-                else OptionalState.update(input.max_vfolder_count)
-                if input.max_vfolder_count is not None
-                else OptionalState.nop()
+            max_vfolder_count=OptionalState.from_unset(input.max_vfolder_count),
+            max_concurrent_logins=TriState.from_unset(input.max_concurrent_logins),
+            max_quota_scope_size=OptionalState.from_unset(input.max_quota_scope_size).map(
+                lambda x: x.bytes
             ),
-            max_concurrent_logins=(
-                TriState.nop()
-                if isinstance(input.max_concurrent_logins, Sentinel)
-                else TriState.nullify()
-                if input.max_concurrent_logins is None
-                else TriState.update(input.max_concurrent_logins)
+            max_session_count_per_model_session=OptionalState.from_unset(
+                input.max_session_count_per_model_session
             ),
-            max_quota_scope_size=(
-                OptionalState.nop()
-                if isinstance(input.max_quota_scope_size, Sentinel)
-                else OptionalState.update(input.max_quota_scope_size.bytes)
-                if isinstance(input.max_quota_scope_size, BinarySizeInput)
-                else OptionalState.nop()
-            ),
-            max_session_count_per_model_session=(
-                OptionalState.update(input.max_session_count_per_model_session)
-                if input.max_session_count_per_model_session is not None
-                else OptionalState.nop()
-            ),
-            max_customized_image_count=(
-                OptionalState.update(input.max_customized_image_count)
-                if input.max_customized_image_count is not None
-                else OptionalState.nop()
-            ),
+            max_customized_image_count=OptionalState.from_unset(input.max_customized_image_count),
         )
-        result = await self._processors.user_resource_policy.update.run(
+        result = await self._user_resource_policy.update.run(
             UpdateUserResourcePolicyAction(updater=updater)
         )
         return UpdateUserResourcePolicyPayload(
@@ -475,10 +422,10 @@ class ResourcePolicyAdapter(BaseAdapter):
     async def admin_delete_user_resource_policy(
         self, input: DeleteUserResourcePolicyInput
     ) -> DeleteUserResourcePolicyPayload:
-        target = await self._processors.user_resource_policy.lookup.run(
+        target = await self._user_resource_policy.lookup.run(
             LookupUserResourcePolicyAction(name=input.name)
         )
-        await self._processors.user_resource_policy.purge.run(
+        await self._user_resource_policy.purge.run(
             PurgeUserResourcePolicyAction(name=input.name, policy_id=target.entity_id())
         )
         return DeleteUserResourcePolicyPayload(name=input.name)
@@ -487,9 +434,9 @@ class ResourcePolicyAdapter(BaseAdapter):
         me = current_user()
         if me is None:
             raise UnreachableError("User context is not available.")
-        result = await self._processors.user_resource_policy.search.run(
+        result = await self._user_resource_policy.search.run(
             SearchUserResourcePoliciesAction(
-                user_id=UserID(me.user_id),
+                items=[UserResourcePolicyScopeItem(user_id=UserID(me.user_id))],
                 searcher=UserResourcePolicySearcher(pagination=NoPagination()),
             )
         )
@@ -500,10 +447,10 @@ class ResourcePolicyAdapter(BaseAdapter):
     # ── Project Resource Policy ──
 
     async def admin_get_project_resource_policy(self, name: str) -> ProjectResourcePolicyNode:
-        resolved = await self._processors.project_resource_policy.lookup.run(
+        resolved = await self._project_resource_policy.lookup.run(
             LookupProjectResourcePolicyAction(name=name)
         )
-        result = await self._processors.project_resource_policy.get.run(
+        result = await self._project_resource_policy.get.run(
             GetProjectResourcePolicyAction(policy_id=resolved.entity_id())
         )
         return self._project_policy_data_to_node(result.data)
@@ -526,7 +473,7 @@ class ResourcePolicyAdapter(BaseAdapter):
             limit=input.limit,
             offset=input.offset,
         )
-        result = await self._processors.project_resource_policy.global_search.run(
+        result = await self._project_resource_policy.global_search.run(
             SearchProjectResourcePoliciesAction(searcher=searcher)
         )
         items = [self._project_policy_data_to_node(d) for d in result.items]
@@ -541,7 +488,7 @@ class ResourcePolicyAdapter(BaseAdapter):
             max_quota_scope_size=input.max_quota_scope_size.bytes,
             max_network_count=input.max_network_count,
         )
-        result = await self._processors.project_resource_policy.global_create.run(
+        result = await self._project_resource_policy.global_create.run(
             CreateProjectResourcePolicyAction(creator=creator)
         )
         return CreateProjectResourcePolicyPayload(
@@ -551,32 +498,18 @@ class ResourcePolicyAdapter(BaseAdapter):
     async def admin_update_project_resource_policy(
         self, name: str, input: UpdateProjectResourcePolicyInput
     ) -> UpdateProjectResourcePolicyPayload:
-        target = await self._processors.project_resource_policy.lookup.run(
+        target = await self._project_resource_policy.lookup.run(
             LookupProjectResourcePolicyAction(name=name)
         )
         updater = ProjectResourcePolicyUpdater(
             policy_id=target.entity_id(),
-            max_vfolder_count=(
-                OptionalState.nop()
-                if isinstance(input.max_vfolder_count, Sentinel)
-                else OptionalState.update(input.max_vfolder_count)
-                if input.max_vfolder_count is not None
-                else OptionalState.nop()
+            max_vfolder_count=OptionalState.from_unset(input.max_vfolder_count),
+            max_quota_scope_size=OptionalState.from_unset(input.max_quota_scope_size).map(
+                lambda x: x.bytes
             ),
-            max_quota_scope_size=(
-                OptionalState.nop()
-                if isinstance(input.max_quota_scope_size, Sentinel)
-                else OptionalState.update(input.max_quota_scope_size.bytes)
-                if isinstance(input.max_quota_scope_size, BinarySizeInput)
-                else OptionalState.nop()
-            ),
-            max_network_count=(
-                OptionalState.update(input.max_network_count)
-                if input.max_network_count is not None
-                else OptionalState.nop()
-            ),
+            max_network_count=OptionalState.from_unset(input.max_network_count),
         )
-        result = await self._processors.project_resource_policy.update.run(
+        result = await self._project_resource_policy.update.run(
             UpdateProjectResourcePolicyAction(updater=updater)
         )
         return UpdateProjectResourcePolicyPayload(
@@ -586,10 +519,10 @@ class ResourcePolicyAdapter(BaseAdapter):
     async def admin_delete_project_resource_policy(
         self, input: DeleteProjectResourcePolicyInput
     ) -> DeleteProjectResourcePolicyPayload:
-        target = await self._processors.project_resource_policy.lookup.run(
+        target = await self._project_resource_policy.lookup.run(
             LookupProjectResourcePolicyAction(name=input.name)
         )
-        await self._processors.project_resource_policy.purge.run(
+        await self._project_resource_policy.purge.run(
             PurgeProjectResourcePolicyAction(name=input.name, policy_id=target.entity_id())
         )
         return DeleteProjectResourcePolicyPayload(name=input.name)

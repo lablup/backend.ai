@@ -10,7 +10,7 @@ from click.exceptions import Abort, ClickException
 from .types import ExitCode
 
 
-class InterruptAwareCommandMixin(click.BaseCommand):
+class InterruptAwareCommandMixin(click.Command):
     """
     Replace the main() method to support proper exit-codes
     for interruptions on Windows and POSIX platforms.

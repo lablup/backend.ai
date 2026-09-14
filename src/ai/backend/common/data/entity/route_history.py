@@ -2,11 +2,34 @@
 
 from typing import override
 
-from ai.backend.common.data.entity.types import FieldIdentifier, FieldType
+from ai.backend.common.data.entity.deployment import DeploymentEntityType
+from ai.backend.common.data.entity.types import (
+    EntityType,
+    FieldIdentifier,
+    FieldType,
+)
 
-__all__ = ("ROUTE_HISTORY_FIELD_TYPE", "RouteHistoryID")
+__all__ = ("RouteHistoryFieldType", "RouteHistoryID")
 
-ROUTE_HISTORY_FIELD_TYPE = FieldType("route_history")
+
+class RouteHistoryFieldType(FieldType):
+    @override
+    @classmethod
+    def name(cls) -> str:
+        return "route_history"
+
+    @override
+    @classmethod
+    def description(cls) -> str:
+        return (
+            "One run of a route handler over one replica, recording any status change and"
+            " its result."
+        )
+
+    @override
+    @classmethod
+    def owner_type(cls) -> type[EntityType]:
+        return DeploymentEntityType
 
 
 class RouteHistoryID(FieldIdentifier):
@@ -15,4 +38,4 @@ class RouteHistoryID(FieldIdentifier):
     @override
     @classmethod
     def field_type(cls) -> FieldType:
-        return ROUTE_HISTORY_FIELD_TYPE
+        return RouteHistoryFieldType()

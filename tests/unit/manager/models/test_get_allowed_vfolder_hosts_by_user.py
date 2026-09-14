@@ -1,6 +1,6 @@
 """Tests for `get_allowed_vfolder_hosts_by_user` project-membership behavior.
 
-Only the membership filter (powered by `association_scopes_entities`) is verified.
+Only the membership filter, answered by the virtual entity graph, is verified.
 The function's domain-level and resource-policy-level merge behavior is not the
 focus of this test module.
 """
@@ -20,12 +20,6 @@ from ai.backend.common.types import (
     VFolderHostPermission,
     VFolderHostPermissionMap,
 )
-from ai.backend.manager.data.permission.types import (
-    EntityType as PermissionEntityType,
-)
-from ai.backend.manager.data.permission.types import (
-    ScopeType as PermissionScopeType,
-)
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.entity_label.row import EntityLabelRow
@@ -33,9 +27,6 @@ from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.project import ProjectRow, ProjectType
 from ai.backend.manager.models.rbac_models import RoleRow, UserRoleRow
-from ai.backend.manager.models.rbac_models.association_scopes_entities import (
-    AssociationScopesEntitiesRow,
-)
 from ai.backend.manager.models.resource_group import ResourceGroupRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
@@ -90,7 +81,7 @@ class TestGetAllowedVFolderHostsByUserMembership:
     """Project-membership filter for `get_allowed_vfolder_hosts_by_user`.
 
     Each test seeds a domain, two groups in that domain, and a regular user.
-    Membership is granted by inserting the corresponding ASE row.
+    Membership is granted by enrolling the user in the project's virtual entity.
     """
 
     @pytest.fixture
@@ -112,7 +103,6 @@ class TestGetAllowedVFolderHostsByUserMembership:
                 KeyPairRow,
                 ProjectRow,
                 AgentRow,
-                AssociationScopesEntitiesRow,
                 VirtualEntityRow,
                 ScopeBindingRow,
                 EntityLabelRow,
@@ -264,16 +254,8 @@ class TestGetAllowedVFolderHostsByUserMembership:
         regular_user: UUID,
         group_a: UUID,
     ) -> AsyncGenerator[None, None]:
-        """Insert ASE row binding regular_user to group_a."""
+        """Enroll regular_user in group_a."""
         async with db_with_cleanup.begin_session() as sess:
-            sess.add(
-                AssociationScopesEntitiesRow(
-                    scope_type=PermissionScopeType.PROJECT,
-                    scope_id=str(group_a),
-                    entity_type=PermissionEntityType.USER,
-                    entity_id=str(regular_user),
-                )
-            )
             await VirtualEntitySeeder().enroll_user_in_project(sess, group_a, regular_user)
             await sess.flush()
         yield
@@ -285,16 +267,8 @@ class TestGetAllowedVFolderHostsByUserMembership:
         regular_user: UUID,
         group_b: UUID,
     ) -> AsyncGenerator[None, None]:
-        """Insert ASE row binding regular_user to group_b."""
+        """Enroll regular_user in group_b."""
         async with db_with_cleanup.begin_session() as sess:
-            sess.add(
-                AssociationScopesEntitiesRow(
-                    scope_type=PermissionScopeType.PROJECT,
-                    scope_id=str(group_b),
-                    entity_type=PermissionEntityType.USER,
-                    entity_id=str(regular_user),
-                )
-            )
             await VirtualEntitySeeder().enroll_user_in_project(sess, group_b, regular_user)
             await sess.flush()
         yield

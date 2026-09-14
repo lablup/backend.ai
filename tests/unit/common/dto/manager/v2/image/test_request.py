@@ -17,9 +17,11 @@ from ai.backend.common.dto.manager.v2.image.request import (
     PurgeImageInput,
     RescanImagesInput,
     SearchImagesInput,
+    UpdateImageInput,
 )
 from ai.backend.common.dto.manager.v2.image.types import ImageOrderField, OrderDirection
 from ai.backend.common.exception import BackendAISchemaValidationFailed
+from ai.backend.common.tristate.unset import UNSET
 
 
 class TestSearchImagesInput:
@@ -268,3 +270,57 @@ class TestPurgeImageInput:
         json_str = req.model_dump_json()
         restored = PurgeImageInput.model_validate_json(json_str)
         assert restored.image_id == image_id
+
+
+class TestUpdateImageInput:
+    """Tests for UpdateImageInput."""
+
+    def test_omitted_fields_default_to_unset(self) -> None:
+        req = UpdateImageInput(image_id=uuid.uuid4())
+        assert req.name is UNSET
+        assert req.registry is UNSET
+        assert req.image is UNSET
+        assert req.tag is UNSET
+        assert req.architecture is UNSET
+        assert req.is_local is UNSET
+        assert req.size_bytes is UNSET
+        assert req.type is UNSET
+        assert req.config_digest is UNSET
+        assert req.labels is UNSET
+        assert req.supported_accelerators is UNSET
+        assert req.resource_limits is UNSET
+
+    def test_explicit_none_stays_none(self) -> None:
+        req = UpdateImageInput.model_validate({
+            "image_id": str(uuid.uuid4()),
+            "name": None,
+            "labels": None,
+            "supported_accelerators": None,
+        })
+        assert req.name is None
+        assert req.labels is None
+        assert req.supported_accelerators is None
+        assert req.tag is UNSET
+
+    def test_provided_values_kept(self) -> None:
+        req = UpdateImageInput(
+            image_id=uuid.uuid4(),
+            name="cr.example.com/ns/app:1.0",
+            is_local=True,
+            size_bytes=1024,
+            type="compute",
+            labels={"a": "b"},
+            supported_accelerators="cuda",
+            resource_limits={"cpu": {"min": "1"}},
+        )
+        assert req.name == "cr.example.com/ns/app:1.0"
+        assert req.is_local is True
+        assert req.size_bytes == 1024
+        assert req.type == "compute"
+        assert req.labels == {"a": "b"}
+        assert req.supported_accelerators == "cuda"
+        assert req.resource_limits == {"cpu": {"min": "1"}}
+
+    def test_missing_image_id_raises_error(self) -> None:
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
+            UpdateImageInput.model_validate({})

@@ -12,8 +12,7 @@ import aiohttp
 import pytest
 
 from ai.backend.common.data.entity.project import ProjectID
-from ai.backend.common.data.entity.types import ScopeRef
-from ai.backend.common.data.entity.user import USER_SCOPE_TYPE, UserID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.types import (
     QuotaScopeID,
@@ -448,7 +447,7 @@ class TestListVFolderAction:
 
         action = ListVFolderAction(
             user_uuid=user_uuid,
-            scope=ScopeRef(scope_type=USER_SCOPE_TYPE, scope_id=user_uuid),
+            scope=UserID(user_uuid),
         )
 
         result = await vfolder_service.list(action)
@@ -484,7 +483,7 @@ class TestListVFolderAction:
 
         action = ListVFolderAction(
             user_uuid=user_uuid,
-            scope=ScopeRef(scope_type=USER_SCOPE_TYPE, scope_id=user_uuid),
+            scope=UserID(user_uuid),
         )
 
         result = await vfolder_service.list(action)
@@ -508,7 +507,7 @@ class TestListVFolderAction:
 
         action = ListVFolderAction(
             user_uuid=user_uuid,
-            scope=ScopeRef(scope_type=USER_SCOPE_TYPE, scope_id=user_uuid),
+            scope=UserID(user_uuid),
         )
 
         await vfolder_service.list(action)

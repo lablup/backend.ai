@@ -15,7 +15,7 @@ from ai.backend.client.session import Session
 from . import admin
 
 
-@admin.group()
+@admin.group("scaling-group")
 def scaling_group() -> None:
     """
     Scaling group (resource group) administration commands.

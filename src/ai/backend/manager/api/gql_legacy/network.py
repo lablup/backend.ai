@@ -14,6 +14,7 @@ from graphene.types.datetime import DateTime as GQLDateTime
 from sqlalchemy.exc import NoResultFound
 from sqlalchemy.orm import selectinload
 
+from ai.backend.common.data.entity.network import NetworkID
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.network.types import NetworkData
@@ -27,6 +28,7 @@ from ai.backend.manager.models.minilang.ordering import QueryOrderParser
 from ai.backend.manager.models.minilang.queryfilter import QueryFilterParser
 from ai.backend.manager.models.network import NetworkRow
 from ai.backend.manager.models.network.creators import NetworkCreator
+from ai.backend.manager.models.network.purgers import NetworkPurger
 from ai.backend.manager.models.project import AssocGroupUserRow, ProjectRow
 from ai.backend.manager.models.user import UserRole
 
@@ -416,8 +418,9 @@ class DeleteNetwork(graphene.Mutation):  # type: ignore[misc]
             await network_plugin.destroy_network(row.ref_name)
 
             async def _do_mutate() -> DeleteNetwork:
-                update_query = sa.delete(NetworkRow).where(NetworkRow.id == _network_id)
-                await db_session.execute(update_query)
+                await graph_ctx.network_repository.purge_entity(
+                    NetworkPurger(network_id=NetworkID(_network_id))
+                )
                 return DeleteNetwork(ok=True, msg="Network deleted")
 
             return await gql_mutation_wrapper(DeleteNetwork, _do_mutate)

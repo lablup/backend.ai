@@ -5,10 +5,10 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from ai.backend.common.data.entity.deployment import DeploymentID
-from ai.backend.common.data.entity.deployment_policy import DEPLOYMENT_POLICY_FIELD_TYPE
-from ai.backend.common.data.entity.deployment_revision import DEPLOYMENT_REVISION_FIELD_TYPE
-from ai.backend.common.data.entity.deployment_token import DEPLOYMENT_TOKEN_FIELD_TYPE
-from ai.backend.common.data.entity.replica import REPLICA_FIELD_TYPE
+from ai.backend.common.data.entity.deployment_policy import DeploymentPolicyFieldType
+from ai.backend.common.data.entity.deployment_revision import DeploymentRevisionFieldType
+from ai.backend.common.data.entity.deployment_token import DeploymentTokenFieldType
+from ai.backend.common.data.entity.replica import ReplicaFieldType
 from ai.backend.manager.actions.registry.field import LookupFieldGroup
 from ai.backend.manager.actions.registry.group import ProcessorGroup
 from ai.backend.manager.actions.registry.types import FieldGroupMeta
@@ -346,25 +346,25 @@ class DeploymentProcessors:
         self, group: ProcessorGroup[ModelDeploymentData], service: DeploymentService
     ) -> None:
         revisions: LookupFieldGroup[ModelRevisionData] = group.field_group(
-            FieldGroupMeta(DEPLOYMENT_REVISION_FIELD_TYPE),
+            FieldGroupMeta(DeploymentRevisionFieldType()),
             ModelRevisionData,
             LookupDeploymentRevisionOwnerAction,
             LookupBulkDeploymentRevisionOwnerAction,
         )
         replicas: LookupFieldGroup[ModelReplicaData] = group.field_group(
-            FieldGroupMeta(REPLICA_FIELD_TYPE),
+            FieldGroupMeta(ReplicaFieldType()),
             ModelReplicaData,
             LookupReplicaOwnerAction,
             LookupBulkReplicaOwnerAction,
         )
         access_tokens: LookupFieldGroup[ModelDeploymentAccessTokenData] = group.field_group(
-            FieldGroupMeta(DEPLOYMENT_TOKEN_FIELD_TYPE),
+            FieldGroupMeta(DeploymentTokenFieldType()),
             ModelDeploymentAccessTokenData,
             LookupDeploymentAccessTokenOwnerAction,
             LookupBulkDeploymentAccessTokenOwnerAction,
         )
         policies: LookupFieldGroup[DeploymentPolicyData] = group.field_group(
-            FieldGroupMeta(DEPLOYMENT_POLICY_FIELD_TYPE),
+            FieldGroupMeta(DeploymentPolicyFieldType()),
             DeploymentPolicyData,
             LookupDeploymentPolicyOwnerAction,
             LookupBulkDeploymentPolicyOwnerAction,
@@ -372,7 +372,7 @@ class DeploymentProcessors:
         self.bulk_get_revisions = revisions.partial_bulk_get_ops(BulkGetRevisionsAction)
         self.bulk_get_replicas = replicas.partial_bulk_get_ops(BulkGetReplicasAction)
         routes: LookupFieldGroup[RouteInfo] = group.field_group(
-            FieldGroupMeta(REPLICA_FIELD_TYPE),
+            FieldGroupMeta(ReplicaFieldType()),
             RouteInfo,
             LookupReplicaOwnerAction,
             LookupBulkReplicaOwnerAction,

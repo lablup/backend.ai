@@ -55,7 +55,6 @@ from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.project import ProjectRow
 from ai.backend.manager.models.rbac_models import (
-    AssociationScopesEntitiesRow,
     EntityFieldRow,
     RoleRow,
     UserRoleRow,
@@ -93,7 +92,6 @@ _SCHEDULER_ROWS: list[type] = [
     UserRow,
     KeyPairRow,
     ProjectRow,
-    AssociationScopesEntitiesRow,
     EntityFieldRow,
     AgentRow,
     ContainerRegistryRow,
@@ -394,6 +392,9 @@ async def seed_agent_resources(
 ) -> None:
     """Seed agent_resources rows (capacity/used/reserved) for cpu and mem slots."""
     async with db.begin_session() as db_sess:
+        agent_uuid = (
+            await db_sess.scalars(sa.select(AgentRow.uuid).where(AgentRow.id == agent_id))
+        ).one()
         for slot_name, capacity, used, reserved in [
             ("cpu", cpu_capacity, cpu_used, cpu_reserved),
             ("mem", mem_capacity, mem_used, mem_reserved),
@@ -401,6 +402,7 @@ async def seed_agent_resources(
             db_sess.add(
                 AgentResourceRow(
                     agent_id=agent_id,
+                    agent_uuid=agent_uuid,
                     slot_name=slot_name,
                     capacity=capacity,
                     used=used,

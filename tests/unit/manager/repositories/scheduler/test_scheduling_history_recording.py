@@ -70,7 +70,6 @@ from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.project import ProjectRow
 from ai.backend.manager.models.rbac_models import (
-    AssociationScopesEntitiesRow,
     EntityFieldRow,
     RoleRow,
     UserRoleRow,
@@ -127,7 +126,6 @@ class TestEnqueueSessionSchedulingHistory:
                 UserRow,
                 KeyPairRow,
                 ProjectRow,
-                AssociationScopesEntitiesRow,
                 EntityFieldRow,
                 VirtualEntityRow,
                 EntityMembershipRow,

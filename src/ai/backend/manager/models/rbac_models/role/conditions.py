@@ -7,15 +7,18 @@ from collections.abc import Collection
 
 import sqlalchemy as sa
 
-from ai.backend.common.data.entity.role import ROLE_ENTITY_TYPE
-from ai.backend.common.data.filter_specs import StringMatchSpec
+from ai.backend.common.data.entity.types import EntityType
+from ai.backend.common.data.filter_specs import (
+    StringMatchSpec,
+    UUIDEqualMatchSpec,
+    UUIDInMatchSpec,
+)
 from ai.backend.manager.data.permission.status import RoleStatus
 from ai.backend.manager.data.permission.types import RoleSource
 from ai.backend.manager.models.clauses import QueryCondition
-from ai.backend.manager.models.condition_utils import make_string_in_factory
+from ai.backend.manager.models.condition_utils import StringConditions, make_string_in_factory
 from ai.backend.manager.models.rbac_models.role.row import RoleRow
 from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
-from ai.backend.manager.models.virtual_entity.queries import owning_scope_exists
 
 __all__ = ("RoleConditions",)
 
@@ -188,17 +191,63 @@ class RoleConditions:
 
         return inner
 
+    by_scope_type_match = StringConditions(RoleRow.scope_type)
+
+    @staticmethod
+    def by_scope_type_equals(scope_type: EntityType) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return RoleRow.scope_type == scope_type
+
+        return inner
+
+    @staticmethod
+    def by_scope_type_not_equals(scope_type: EntityType) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return RoleRow.scope_type != scope_type
+
+        return inner
+
+    @staticmethod
+    def by_scope_type_in(scope_types: Collection[EntityType]) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return RoleRow.scope_type.in_(list(scope_types))
+
+        return inner
+
+    @staticmethod
+    def by_scope_type_not_in(scope_types: Collection[EntityType]) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return RoleRow.scope_type.not_in(list(scope_types))
+
+        return inner
+
+    @staticmethod
+    def by_scope_id_equals(spec: UUIDEqualMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            condition = RoleRow.scope_id == spec.value
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_scope_id_in(spec: UUIDInMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            condition = RoleRow.scope_id.in_(spec.values)
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
     @staticmethod
     def by_mapped_scope(
         scope_conditions: list[QueryCondition],
     ) -> QueryCondition:
-        """Match roles owned by a scope satisfying ``scope_conditions``.
-
-        Read along ``scope -> virtual entity -> entity``; the conditions read the
-        scope side of the edge, so all of them must hold of the same scope.
-        """
+        """Match roles whose scope satisfies every one of ``scope_conditions``."""
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return owning_scope_exists(ROLE_ENTITY_TYPE, RoleRow.id, scope_conditions)
+            return sa.and_(*[condition() for condition in scope_conditions])
 
         return inner

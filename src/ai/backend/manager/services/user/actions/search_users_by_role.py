@@ -5,7 +5,7 @@ from typing import override
 from uuid import UUID
 
 from ai.backend.common.data.entity.types import EntityType
-from ai.backend.common.data.entity.user import USER_ENTITY_TYPE
+from ai.backend.common.data.entity.user import UserEntityType
 from ai.backend.manager.actions.v2.ops.base import SearchGlobalOpsAction
 from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.models.user.row import UserRow
@@ -28,7 +28,7 @@ class SearchUsersByRoleAction(SearchGlobalOpsAction[UserRow, UserData]):
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return USER_ENTITY_TYPE
+        return UserEntityType()
 
     @override
     @classmethod

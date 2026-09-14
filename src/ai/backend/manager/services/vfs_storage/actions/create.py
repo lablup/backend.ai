@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from typing import override
 
 from ai.backend.common.data.entity.types import EntityType
-from ai.backend.common.data.entity.vfs_storage import VFS_STORAGE_ENTITY_TYPE
+from ai.backend.common.data.entity.vfs_storage import VFSStorageEntityType
 from ai.backend.manager.actions.v2.ops.base import CreateGlobalOpsAction
 from ai.backend.manager.data.vfs_storage.types import VFSStorageData
 from ai.backend.manager.models.vfs_storage.creators import VFSStorageCreator
@@ -20,7 +20,7 @@ class CreateVFSStorageAction(CreateGlobalOpsAction[VFSStorageRow, VFSStorageData
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return VFS_STORAGE_ENTITY_TYPE
+        return VFSStorageEntityType()
 
     @override
     @classmethod

@@ -41,7 +41,8 @@ from ai.backend.manager.data.resource_allocation.types import (
     ScopeUsageData,
 )
 from ai.backend.manager.services.domain.actions.lookup import LookupDomainAction
-from ai.backend.manager.services.processors import Processors
+from ai.backend.manager.services.domain.processors import DomainProcessors
+from ai.backend.manager.services.session.processors import SessionProcessors
 from ai.backend.manager.services.session.resource_allocation.actions.check_preset_availability import (
     CheckPresetAvailabilityAction,
 )
@@ -66,19 +67,27 @@ from ai.backend.manager.services.session.resource_allocation.actions.resolve_key
 from ai.backend.manager.services.user.actions.lookup_keypair_owner import (
     LookupKeypairOwnerByAccessKeyAction,
 )
+from ai.backend.manager.services.user.processors import UserProcessors
 
 
 class ResourceAllocationAdapter(BaseAdapter):
     """Adapter for resource allocation operations."""
 
+    _session: SessionProcessors
+    _domain: DomainProcessors
+    _user: UserProcessors
     _config_provider: ManagerConfigProvider | None
 
     def __init__(
         self,
-        processors: Processors,
+        session: SessionProcessors,
+        domain: DomainProcessors,
+        user: UserProcessors,
         config_provider: ManagerConfigProvider | None,
     ) -> None:
-        super().__init__(processors)
+        self._session = session
+        self._domain = domain
+        self._user = user
         self._config_provider = config_provider
 
     def _visibility_settings(self) -> tuple[bool, bool]:
@@ -101,7 +110,7 @@ class ResourceAllocationAdapter(BaseAdapter):
         Used by GQL resolvers where the request context does not carry
         keypair information directly.
         """
-        result = await self._processors.session.resource_allocation.resolve_keypair_context.run(
+        result = await self._session.resource_allocation.resolve_keypair_context.run(
             ResolveKeypairContextAction(user_id=UserID(user_id))
         )
         return str(result.access_key), result.resource_policy
@@ -175,7 +184,7 @@ class ResourceAllocationAdapter(BaseAdapter):
         )
 
     async def _keypair_owner(self, access_key: AccessKey) -> UserID:
-        result = await self._processors.user.lookup_keypair_owner.run(
+        result = await self._user.lookup_keypair_owner.run(
             LookupKeypairOwnerByAccessKeyAction(access_key=access_key)
         )
         return UserID(result.entity_id())
@@ -186,7 +195,7 @@ class ResourceAllocationAdapter(BaseAdapter):
         resource_policy: Mapping[str, Any],
     ) -> KeypairResourceAllocationPayload:
         """Get keypair resource usage for the current user."""
-        result = await self._processors.session.resource_allocation.get_keypair_usage.run(
+        result = await self._session.resource_allocation.get_keypair_usage.run(
             GetKeypairUsageAction(
                 user_id=await self._keypair_owner(AccessKey(access_key)),
                 access_key=AccessKey(access_key),
@@ -202,7 +211,7 @@ class ResourceAllocationAdapter(BaseAdapter):
         project_id: UUID,
     ) -> ProjectResourceAllocationPayload:
         """Get project resource usage."""
-        result = await self._processors.session.resource_allocation.get_project_usage.run(
+        result = await self._session.resource_allocation.get_project_usage.run(
             GetProjectUsageAction(
                 project_id=ProjectID(project_id),
             )
@@ -216,10 +225,8 @@ class ResourceAllocationAdapter(BaseAdapter):
         domain_name: str,
     ) -> DomainResourceAllocationPayload:
         """Get domain resource usage (admin only)."""
-        domain = await self._processors.domain.lookup.run(
-            LookupDomainAction(name=DomainName(domain_name))
-        )
-        result = await self._processors.session.resource_allocation.get_domain_usage.run(
+        domain = await self._domain.lookup.run(LookupDomainAction(name=DomainName(domain_name)))
+        result = await self._session.resource_allocation.get_domain_usage.run(
             GetDomainUsageAction(domain_id=domain.entity_id(), domain_name=domain_name)
         )
         return DomainResourceAllocationPayload(
@@ -231,7 +238,7 @@ class ResourceAllocationAdapter(BaseAdapter):
         rg_name: str,
     ) -> ResourceGroupResourceAllocationPayload:
         """Get resource group usage."""
-        result = await self._processors.session.resource_allocation.get_resource_group_usage.run(
+        result = await self._session.resource_allocation.get_resource_group_usage.run(
             GetResourceGroupUsageAction(
                 rg_name=rg_name,
             )
@@ -251,7 +258,7 @@ class ResourceAllocationAdapter(BaseAdapter):
         if me is None:
             raise PermissionError("Not authenticated")
         grv, hide = self._visibility_settings()
-        result = await self._processors.session.resource_allocation.get_effective_allocation.run(
+        result = await self._session.resource_allocation.get_effective_allocation.run(
             GetEffectiveAllocationAction(
                 access_key=AccessKey(access_key),
                 user_id=UserID(me.user_id),
@@ -274,7 +281,7 @@ class ResourceAllocationAdapter(BaseAdapter):
     ) -> EffectiveResourceAllocationPayload:
         """Get effective allocation for a specific user (admin only)."""
         grv, hide = self._visibility_settings()
-        result = await self._processors.session.resource_allocation.get_effective_allocation.run(
+        result = await self._session.resource_allocation.get_effective_allocation.run(
             GetEffectiveAllocationAction(
                 access_key=AccessKey(access_key),
                 user_id=UserID(input.user_id),
@@ -300,7 +307,7 @@ class ResourceAllocationAdapter(BaseAdapter):
         if me is None:
             raise PermissionError("Not authenticated")
         grv, hide = self._visibility_settings()
-        result = await self._processors.session.resource_allocation.check_preset_availability.run(
+        result = await self._session.resource_allocation.check_preset_availability.run(
             CheckPresetAvailabilityAction(
                 access_key=AccessKey(access_key),
                 user_id=UserID(me.user_id),

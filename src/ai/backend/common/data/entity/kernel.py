@@ -6,12 +6,31 @@ field identifier: what a kernel belongs to is knowable only through that session
 
 from typing import override
 
-from ai.backend.common.data.entity.types import FieldIdentifier, FieldType
+from ai.backend.common.data.entity.session import SessionEntityType
+from ai.backend.common.data.entity.types import (
+    EntityType,
+    FieldIdentifier,
+    FieldType,
+)
 
 __all__ = ("KernelID",)
 
 
-KERNEL_FIELD_TYPE = FieldType("kernel")
+class KernelFieldType(FieldType):
+    @override
+    @classmethod
+    def name(cls) -> str:
+        return "kernel"
+
+    @override
+    @classmethod
+    def description(cls) -> str:
+        return "One container of a session, placed on one agent."
+
+    @override
+    @classmethod
+    def owner_type(cls) -> type[EntityType]:
+        return SessionEntityType
 
 
 class KernelID(FieldIdentifier):
@@ -20,4 +39,4 @@ class KernelID(FieldIdentifier):
     @override
     @classmethod
     def field_type(cls) -> FieldType:
-        return KERNEL_FIELD_TYPE
+        return KernelFieldType()
