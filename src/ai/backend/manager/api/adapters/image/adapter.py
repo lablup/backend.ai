@@ -7,7 +7,7 @@ from collections.abc import Sequence
 from decimal import Decimal
 from functools import lru_cache
 
-from ai.backend.common.data.entity.artifact_registry import ArtifactRegistryID
+from ai.backend.common.data.entity.container_registry import ContainerRegistryID
 from ai.backend.common.data.entity.image_alias import ImageAliasID
 from ai.backend.common.dto.manager.v2.image.request import (
     AdminSearchImageAliasesInput,
@@ -511,7 +511,7 @@ class ImageAdapter(BaseAdapter):
             name=str(data.name),
             image=data.image,
             registry=data.registry,
-            registry_id=ArtifactRegistryID(data.registry_id),
+            registry_id=ContainerRegistryID(data.registry_id),
             project=data.project,
             tag=data.tag,
             architecture=data.architecture,
