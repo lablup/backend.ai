@@ -60,7 +60,7 @@ from ai.backend.manager.models.image.conditions import (
 from ai.backend.manager.models.image.orders import ImageAliasOrders, ImageOrders
 from ai.backend.manager.models.image.row import ImageAliasRow, ImageRow
 from ai.backend.manager.models.image.updaters import ImageUpdate
-from ai.backend.manager.models.specs.pagination import NoPagination, OffsetPagination
+from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.services.image.actions.alias_image import AliasImageByIdAction
 from ai.backend.manager.services.image.actions.dealias_image import DealiasImageAction
@@ -72,8 +72,6 @@ from ai.backend.manager.services.image.actions.search_images import SearchImages
 from ai.backend.manager.services.image.actions.update_image_by_id import UpdateImageByIdAction
 from ai.backend.manager.services.image.processors import ImageProcessors
 from ai.backend.manager.types import OptionalState, TriState
-
-DEFAULT_PAGINATION_LIMIT = 50
 
 
 @lru_cache(maxsize=1)
@@ -530,12 +528,3 @@ class ImageAdapter(BaseAdapter):
             id=data.id,
             alias=data.alias,
         )
-
-    def _build_pagination(self, input: AdminSearchImagesInput) -> OffsetPagination:
-        return OffsetPagination(
-            limit=input.limit if input.limit is not None else DEFAULT_PAGINATION_LIMIT,
-            offset=input.offset if input.offset is not None else 0,
-        )
-
-    def _convert_orders_legacy(self, orders: list[ImageOrderByInputDTO]) -> list[QueryOrder]:
-        return self._convert_orders(orders)
