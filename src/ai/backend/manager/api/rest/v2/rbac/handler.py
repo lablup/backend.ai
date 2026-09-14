@@ -81,6 +81,20 @@ class V2RBACHandler:
         )
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=payload)
 
+    async def my_search_roles(
+        self,
+        body: BodyParam[SearchRolesInput],
+    ) -> APIResponse:
+        """Search the roles the current authenticated user holds."""
+        result = await self._adapter.my_search_roles(body.parsed)
+        payload = AdminSearchRolesPayload(
+            items=result.items,
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+        )
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=payload)
+
     async def project_search_roles(
         self,
         path: PathParam[ProjectIdPathParam],
