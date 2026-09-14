@@ -3,7 +3,7 @@ from ai.backend.manager.actions.registry.group import ProcessorGroup
 from ai.backend.manager.actions.v2.bulk.partial_processor import PartialBulkActionProcessor
 from ai.backend.manager.actions.v2.field.bulk_processor import BulkFieldActionProcessor
 from ai.backend.manager.actions.v2.lookup.processor import LookupActionProcessor
-from ai.backend.manager.actions.v2.ops.result import LookupOpsResult
+from ai.backend.manager.actions.v2.ops.result import LookupOpsResult, ScopedBatchOpsResult
 from ai.backend.manager.actions.v2.scope.processor import ScopeActionProcessor
 from ai.backend.manager.actions.v2.single_entity.processor import SingleEntityActionProcessor
 from ai.backend.manager.data.resource_group.types import ResourceGroupData
@@ -120,13 +120,12 @@ from ai.backend.manager.services.session.actions.resolve_session_name import (
     ResolveSessionNameAction,
     ResolveSessionNameActionResult,
 )
+from ai.backend.manager.services.session.actions.scoped_search import (
+    ScopedSearchSessionsAction,
+)
 from ai.backend.manager.services.session.actions.search import (
     SearchSessionsAction,
     SearchSessionsActionResult,
-)
-from ai.backend.manager.services.session.actions.search_in_project import (
-    SearchSessionsInProjectAction,
-    SearchSessionsInProjectActionResult,
 )
 from ai.backend.manager.services.session.actions.search_kernel import (
     SearchKernelsAction,
@@ -214,8 +213,8 @@ class SessionProcessors:
         BatchGetKernelResourceAllocationAction, BatchGetKernelResourceAllocationActionResult
     ]
     search_sessions: ScopeActionProcessor[SearchSessionsAction, SearchSessionsActionResult]
-    search_sessions_in_project: ScopeActionProcessor[
-        SearchSessionsInProjectAction, SearchSessionsInProjectActionResult
+    scoped_search: ScopeActionProcessor[
+        ScopedSearchSessionsAction, ScopedBatchOpsResult[SessionEntityData]
     ]
     shutdown_service: SingleEntityActionProcessor[
         ShutdownServiceAction, ShutdownServiceActionResult
@@ -298,9 +297,7 @@ class SessionProcessors:
             service.batch_get_kernel_resource_allocation,
         )
         self.search_sessions = group.scope(SearchSessionsAction, service.search)
-        self.search_sessions_in_project = group.scope(
-            SearchSessionsInProjectAction, service.search_in_project
-        )
+        self.scoped_search = group.scope_search_ops(ScopedSearchSessionsAction)
         self.terminate_sessions = group.partial_bulk(
             TerminateSessionsAction, service.terminate_sessions
         )

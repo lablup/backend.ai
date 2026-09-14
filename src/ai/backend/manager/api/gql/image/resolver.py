@@ -16,7 +16,9 @@ from ai.backend.common.data.entity.image_alias import ImageAliasID
 from ai.backend.common.dto.manager.v2.image.request import (
     AdminSearchImageAliasesInput,
     AdminSearchImagesInput,
+    ScopedSearchImagesInput,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.types import ImageID
 from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.decorators import (
@@ -29,6 +31,7 @@ from ai.backend.manager.models.image.conditions import ImageAliasConditions, Ima
 
 from .types import (
     ContainerRegistryScopeGQL,
+    ImageSearchScopeGQL,
     ImageV2AliasConnectionGQL,
     ImageV2AliasEdgeGQL,
     ImageV2AliasFilterGQL,
@@ -68,6 +71,57 @@ async def admin_images_v2(
         AdminSearchImagesInput(
             filter=pydantic_filter,
             order=pydantic_orders,
+            first=first,
+            after=after,
+            last=last,
+            before=before,
+            limit=limit,
+            offset=offset,
+        ),
+    )
+    edges = [
+        ImageV2EdgeGQL(
+            node=ImageV2GQL.from_pydantic(node),
+            cursor=encode_cursor(node.id),
+        )
+        for node in payload.items
+    ]
+    page_info = strawberry.relay.PageInfo(
+        has_next_page=payload.has_next_page,
+        has_previous_page=payload.has_previous_page,
+        start_cursor=edges[0].cursor if edges else None,
+        end_cursor=edges[-1].cursor if edges else None,
+    )
+    return ImageV2ConnectionGQL(count=payload.total_count, edges=edges, page_info=page_info)
+
+
+@gql_root_field(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description=(
+            "Page through the images the named scopes reach, combined with OR. "
+            "Every scope is authorized before the read runs."
+        ),
+    ),
+    name="scopedImagesV2",
+)  # type: ignore[misc]
+async def scoped_images_v2(
+    info: Info[StrawberryGQLContext],
+    scope: ImageSearchScopeGQL,
+    filter: ImageV2FilterGQL | None = None,
+    order_by: list[ImageV2OrderByGQL] | None = None,
+    before: str | None = None,
+    after: str | None = None,
+    first: int | None = None,
+    last: int | None = None,
+    limit: int | None = None,
+    offset: int | None = None,
+) -> ImageV2ConnectionGQL | None:
+    payload = await info.context.adapters.image.scoped_search(
+        ScopedSearchImagesInput(
+            scope=scope.to_pydantic(),
+            filter=filter.to_pydantic() if filter else None,
+            order=[o.to_pydantic() for o in order_by] if order_by else None,
             first=first,
             after=after,
             last=last,

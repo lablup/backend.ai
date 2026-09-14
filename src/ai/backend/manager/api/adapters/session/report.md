@@ -2,7 +2,7 @@
 
 [무엇을 보장하는가](/src/ai/backend/manager/api/adapters/session/KNOWLEDGE.md) · [어댑터](/src/ai/backend/manager/api/adapters/session/adapter.py)
 
-Not exercised by any scenario: admin_search_kernels, batch_load_by_ids, batch_load_fields, batch_load_kernels_by_ids, batch_resource_allocation_by_kernel, batch_resource_allocation_by_session, compute_schedule, enqueue, exclude_idle_checks, get, get_logs, gql_search_by_project, include_idle_checks, my_search, project_search, search_kernels_by_agent, search_kernels_by_session, search_sessions_by_agent, shutdown_service, start_service, terminate, update.
+Not exercised by any scenario: admin_search_kernels, batch_load_by_ids, batch_load_fields, batch_load_kernels_by_ids, batch_resource_allocation_by_kernel, batch_resource_allocation_by_session, compute_schedule, enqueue, exclude_idle_checks, get, get_logs, gql_search_by_project, include_idle_checks, my_search, project_search, scoped_search, search_kernels_by_agent, search_kernels_by_session, search_sessions_by_agent, shutdown_service, start_service, terminate, update.
 
 ### session
 

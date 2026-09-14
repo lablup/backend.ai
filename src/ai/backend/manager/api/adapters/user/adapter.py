@@ -158,9 +158,6 @@ from ai.backend.manager.services.user.actions.scoped_search import (
     UserScopeItem,
 )
 from ai.backend.manager.services.user.actions.search_users import GlobalSearchUsersAction
-from ai.backend.manager.services.user.actions.search_users_by_role import (
-    SearchUsersByRoleAction,
-)
 from ai.backend.manager.services.user.actions.update_user import (
     BulkUpdateUserAction,
     UpdateUserAction,
@@ -470,9 +467,7 @@ class UserAdapter(BaseAdapter):
         """Search users assigned to a role."""
         searcher = self._build_search_searcher(input)
         searcher.conditions = [*searcher.conditions, UserConditions.by_role_id(role_id)]
-        result = await self._user.search_users_by_role.run(
-            SearchUsersByRoleAction(role_id=role_id, searcher=searcher)
-        )
+        result = await self._user.global_search.run(GlobalSearchUsersAction(searcher=searcher))
         return SearchUsersPayload(
             items=await self._user_nodes(result.items),
             pagination=PaginationInfo(

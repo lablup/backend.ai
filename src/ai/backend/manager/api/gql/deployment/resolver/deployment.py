@@ -13,7 +13,9 @@ from ai.backend.common.data.entity.deployment import DeploymentID
 from ai.backend.common.dto.manager.v2.deployment.request import (
     AdminSearchDeploymentsInput,
     ReplaceDeploymentOptionsInput,
+    ScopedSearchDeploymentsInput,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import encode_cursor, resolve_global_id
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
@@ -42,6 +44,7 @@ from ai.backend.manager.api.gql.deployment.types.deployment import (
     UpdateDeploymentInput,
     UpdateDeploymentPayload,
 )
+from ai.backend.manager.api.gql.deployment.types.scopes import DeploymentScopeGQL
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.utils import check_admin_only
 from ai.backend.manager.errors.user import UserNotFound
@@ -81,6 +84,55 @@ async def admin_deployments(
             limit=limit,
             offset=offset,
         )
+    )
+    nodes = [ModelDeployment.from_pydantic(item) for item in payload.items]
+    edges = [ModelDeploymentEdge(node=node, cursor=encode_cursor(str(node.id))) for node in nodes]
+    return ModelDeploymentConnection(
+        count=payload.total_count,
+        edges=edges,
+        page_info=PageInfo(
+            has_next_page=payload.has_next_page,
+            has_previous_page=payload.has_previous_page,
+            start_cursor=edges[0].cursor if edges else None,
+            end_cursor=edges[-1].cursor if edges else None,
+        ),
+    )
+
+
+@gql_root_field(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description=(
+            "Page through the deployments the named scopes reach, combined with OR. "
+            "Every scope is authorized before the read runs."
+        ),
+    )
+)  # type: ignore[misc]
+async def scoped_deployments(
+    info: Info[StrawberryGQLContext],
+    scope: DeploymentScopeGQL,
+    filter: DeploymentFilter | None = None,
+    order_by: list[DeploymentOrderBy] | None = None,
+    before: str | None = None,
+    after: str | None = None,
+    first: int | None = None,
+    last: int | None = None,
+    limit: int | None = None,
+    offset: int | None = None,
+) -> ModelDeploymentConnection | None:
+    """Page through the deployments the named scopes reach."""
+    payload = await info.context.adapters.deployment.scoped_search(
+        ScopedSearchDeploymentsInput(
+            scope=scope.to_pydantic(),
+            filter=filter.to_pydantic() if filter else None,
+            order=[o.to_pydantic() for o in order_by] if order_by else None,
+            first=first,
+            after=after,
+            last=last,
+            before=before,
+            limit=limit,
+            offset=offset,
+        ),
     )
     nodes = [ModelDeployment.from_pydantic(item) for item in payload.items]
     edges = [ModelDeploymentEdge(node=node, cursor=encode_cursor(str(node.id))) for node in nodes]

@@ -40,14 +40,17 @@ from ai.backend.common.dto.manager.v2.image.response import (
 from ai.backend.common.dto.manager.v2.image.types import (
     ImageLabelInfo,
     ImageResourceLimitGQLInfo,
+    ImageScope,
     ImageTagInfo,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.types import ImageID
 from ai.backend.manager.api.gql.base import (
     DateTimeFilter,
     OrderDirection,
     StringFilter,
     UUIDFilter,
+    UUIDScopeGQL,
     encode_cursor,
 )
 from ai.backend.manager.api.gql.decorators import (
@@ -397,6 +400,39 @@ class ContainerRegistryScopeGQL(PydanticInputMixin[ContainerRegistryScopeInputDT
 )
 class ImageV2ScopeGQL(PydanticInputMixin[ImageScopeInputDTO]):
     image_id: uuid.UUID = gql_field(description="UUID of the image to scope the query to.")
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description=(
+            "Scope for the scoped image query. Each list is OR'd internally and across "
+            "lists, and every scope named is authorized before the read runs. `global` "
+            "names no scope and is authorized against none."
+        ),
+        added_version=NEXT_RELEASE_VERSION,
+    ),
+    name="ImageSearchScope",
+)
+class ImageSearchScopeGQL(PydanticInputMixin[ImageScope]):
+    """The scopes an image read is answered for."""
+
+    domain: list[UUIDScopeGQL] | None = gql_field(
+        default=None, description="Domains whose images are being read."
+    )
+    project: list[UUIDScopeGQL] | None = gql_field(
+        default=None, description="Projects whose images are being read."
+    )
+    user: list[UUIDScopeGQL] | None = gql_field(
+        default=None, description="Users whose images are being read."
+    )
+    container_registry: list[UUIDScopeGQL] | None = gql_field(
+        default=None, description="Container registries whose images are being read."
+    )
+    global_: bool = gql_field(
+        default=False,
+        name="global",
+        description="Include the images of every registry marked global.",
+    )
 
 
 @gql_pydantic_input(

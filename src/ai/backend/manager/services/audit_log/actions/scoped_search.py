@@ -14,6 +14,7 @@ from ai.backend.manager.data.audit_log.types import AuditLogData
 from ai.backend.manager.models.audit_log.row import AuditLogRow
 from ai.backend.manager.models.audit_log.scopes import (
     EntityAuditLogOperationScope,
+    ScopeAuditLogOperationScope,
     TriggeredByAuditLogOperationScope,
 )
 from ai.backend.manager.models.audit_log.searchers import AuditLogSearcher
@@ -52,6 +53,23 @@ class EntityAuditLogScopeItem(AuditLogScopeItem):
     @override
     def operation_scope(self) -> OperationScope:
         return EntityAuditLogOperationScope(
+            entity_type=self.owner.entity_type(), entity_id=str(self.owner)
+        )
+
+
+@dataclass(frozen=True)
+class ScopeAuditLogScopeItem(AuditLogScopeItem):
+    """The records of the runs that named one entity as the scope they ran in."""
+
+    owner: EntityIdentifier
+
+    @override
+    def owner_id(self) -> EntityIdentifier:
+        return self.owner
+
+    @override
+    def operation_scope(self) -> OperationScope:
+        return ScopeAuditLogOperationScope(
             entity_type=self.owner.entity_type(), entity_id=str(self.owner)
         )
 

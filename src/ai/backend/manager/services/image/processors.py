@@ -3,6 +3,7 @@ from ai.backend.manager.actions.v2.global_scope.processor import (
     GlobalActionProcessor,
     PublicActionProcessor,
 )
+from ai.backend.manager.actions.v2.scope.processor import ScopeActionProcessor
 from ai.backend.manager.actions.v2.single_entity.processor import SingleEntityActionProcessor
 from ai.backend.manager.data.image.types import ImageData
 from ai.backend.manager.services.image.actions.alias_image import (
@@ -62,6 +63,10 @@ from ai.backend.manager.services.image.actions.restore_image import (
 from ai.backend.manager.services.image.actions.scan_image import (
     ScanImageAction,
     ScanImageActionResult,
+)
+from ai.backend.manager.services.image.actions.scoped_search import (
+    ScopedSearchImagesAction,
+    ScopedSearchImagesActionResult,
 )
 from ai.backend.manager.services.image.actions.search_aliases import (
     SearchAliasesAction,
@@ -144,6 +149,7 @@ class ImageProcessors:
         PublicGetAllImagesAction, PublicGetAllImagesActionResult
     ]
     search_images: GlobalActionProcessor[SearchImagesAction, SearchImagesActionResult]
+    scoped_search: ScopeActionProcessor[ScopedSearchImagesAction, ScopedSearchImagesActionResult]
     search_aliases: GlobalActionProcessor[SearchAliasesAction, SearchAliasesActionResult]
 
     def __init__(self, group: ProcessorGroup[ImageData], service: ImageService) -> None:
@@ -163,6 +169,7 @@ class ImageProcessors:
         )
         self.forget_image = group.global_scope(ForgetImageAction, service.forget_image)
         self.search_images = group.global_scope(SearchImagesAction, service.search_images)
+        self.scoped_search = group.scope(ScopedSearchImagesAction, service.scoped_search_images)
 
         self.forget_image_by_id = group.single_entity(
             ForgetImageByIdAction, service.forget_image_by_id

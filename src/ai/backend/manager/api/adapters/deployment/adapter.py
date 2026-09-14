@@ -22,6 +22,7 @@ from ai.backend.common.data.endpoint.types import EndpointLifecycle
 from ai.backend.common.data.entity.deployment import DeploymentID
 from ai.backend.common.data.entity.deployment_revision import DeploymentRevisionID
 from ai.backend.common.data.entity.deployment_token import DeploymentTokenID
+from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.replica import ReplicaID
 from ai.backend.common.data.entity.runtime_variant_preset import RuntimeVariantPresetID
@@ -62,6 +63,7 @@ from ai.backend.common.dto.manager.v2.deployment.request import (
     RevisionOrder,
     RouteFilter,
     RouteOrder,
+    ScopedSearchDeploymentsInput,
     SearchAccessTokensInput,
     SearchAutoScalingRulesInput,
     SearchDeploymentPoliciesInput,
@@ -115,6 +117,7 @@ from ai.backend.common.dto.manager.v2.deployment.types import (
     DeploymentNetworkAccessInfoDTO,
     DeploymentOrderField,
     DeploymentPolicyInfo,
+    DeploymentScope,
     DeploymentStrategyInfoDTO,
     EnvironmentVariableEntryInfoDTO,
     EnvironmentVariablesInfoDTO,
@@ -346,6 +349,8 @@ from ai.backend.manager.services.deployment.actions.route.update_route_traffic_s
     UpdateRouteTrafficStatusAction,
 )
 from ai.backend.manager.services.deployment.actions.scoped_search import (
+    DeploymentScopeItem,
+    DomainDeploymentScopeItem,
     ProjectDeploymentScopeItem,
     ScopedSearchDeploymentsAction,
     UserDeploymentScopeItem,
@@ -719,6 +724,39 @@ class DeploymentAdapter(BaseAdapter):
         querier = self._build_deployment_querier(input)
         action_result = await self._deployment.global_search.run(
             GlobalSearchDeploymentsAction(querier=querier)
+        )
+        return AdminSearchDeploymentsPayload(
+            items=[self._deployment_data_to_dto(item) for item in action_result.data],
+            total_count=action_result.total_count,
+            has_next_page=action_result.has_next_page,
+            has_previous_page=action_result.has_previous_page,
+        )
+
+    def _scope_items(self, scope: DeploymentScope) -> list[DeploymentScopeItem]:
+        """The scope items the request named, in the order the input lists them."""
+        items: list[DeploymentScopeItem] = [
+            DomainDeploymentScopeItem(domain_id=DomainID(entry.value))
+            for entry in scope.domain or ()
+        ]
+        items.extend(
+            ProjectDeploymentScopeItem(project_id=ProjectID(entry.value))
+            for entry in scope.project or ()
+        )
+        items.extend(
+            UserDeploymentScopeItem(user_id=UserID(entry.value)) for entry in scope.user or ()
+        )
+        return items
+
+    async def scoped_search(
+        self,
+        input: ScopedSearchDeploymentsInput,
+    ) -> AdminSearchDeploymentsPayload:
+        """Search the deployments the named scopes reach, combined with OR."""
+        action_result = await self._deployment.scoped_search.run(
+            ScopedSearchDeploymentsAction(
+                items=self._scope_items(input.scope),
+                querier=self._build_scoped_deployment_querier(input),
+            )
         )
         return AdminSearchDeploymentsPayload(
             items=[self._deployment_data_to_dto(item) for item in action_result.data],
@@ -1658,6 +1696,25 @@ class DeploymentAdapter(BaseAdapter):
                 if sub_conditions:
                     conditions.append(negate_conditions(sub_conditions))
         return conditions
+
+    def _build_scoped_deployment_querier(self, input: ScopedSearchDeploymentsInput) -> BatchQuerier:
+        conditions: list[QueryCondition] = []
+        if input.filter:
+            conditions.extend(self._convert_deployment_filter(input.filter))
+        orders: list[QueryOrder] = (
+            self._convert_deployment_orders(input.order) if input.order else []
+        )
+        return self._build_querier(
+            conditions=conditions,
+            orders=orders,
+            pagination_spec=_get_deployment_pagination_spec(),
+            first=input.first,
+            after=input.after,
+            last=input.last,
+            before=input.before,
+            limit=input.limit,
+            offset=input.offset,
+        )
 
     def _build_deployment_querier(self, input: AdminSearchDeploymentsInput) -> BatchQuerier:
         conditions: list[QueryCondition] = []
