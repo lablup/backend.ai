@@ -31670,8 +31670,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "New username.",
+            "description": "New username. Omit to leave unchanged.",
             "title": "Username"
           },
           "password": {
@@ -31683,8 +31682,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "New password.",
+            "description": "New password. Omit to leave unchanged.",
             "title": "Password"
           },
           "full_name": {
@@ -31720,8 +31718,8 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "New account status."
+            "description": "New account status. Omit to leave unchanged.",
+            "title": "Status"
           },
           "role": {
             "anyOf": [
@@ -31732,8 +31730,8 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "New user role."
+            "description": "New user role. Omit to leave unchanged.",
+            "title": "Role"
           },
           "domain_name": {
             "anyOf": [
@@ -31744,8 +31742,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "New domain assignment.",
+            "description": "New domain assignment. Omit to leave unchanged.",
             "title": "Domain Name"
           },
           "group_ids": {
@@ -31788,8 +31785,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Set password change requirement.",
+            "description": "Set password change requirement. Omit to leave unchanged.",
             "title": "Need Password Change"
           },
           "resource_policy": {
@@ -31801,8 +31797,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "New user resource policy name.",
+            "description": "New user resource policy name. Omit to leave unchanged.",
             "title": "Resource Policy"
           },
           "sudo_session_enabled": {
@@ -31814,8 +31809,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Enable or disable sudo session capability.",
+            "description": "Enable or disable sudo session capability. Omit to leave unchanged.",
             "title": "Sudo Session Enabled"
           },
           "main_access_key": {
