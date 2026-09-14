@@ -2416,9 +2416,13 @@ class TestXfrmStateVerb:
         verbs = [c[3] for c in rec.calls if c[:3] == ["ip", "xfrm", "state"]]
         assert verbs.count("add") == 6 and verbs.count("update") == 6, verbs
 
-    async def test_an_sa_of_ours_at_that_spi_is_still_updated(self) -> None:
-        # The ordinary EEXIST: our own SA, from before this process. The guard must not turn a
-        # re-assert of our own protection into a refusal.
+    async def test_an_sa_of_ours_at_that_spi_is_left_exactly_as_it_is(self) -> None:
+        """Our own SA, from before this process -- a restart, or a re-assert. Rewriting it is not
+        free: the kernel restarts the new SA's replay state at zero while the peer's inbound window
+        has moved on, and everything we send is dropped as a replay until our sequence climbs past
+        it (measured across a privnet restart: 30 to 70 seconds of a live session's traffic). The
+        re-assert is owed the SA's presence, and it is present, so nothing is written -- and the
+        guard must still not turn that into a refusal."""
         ours = _our_sas("10.0.0.1", "10.0.0.2") + _our_sas("10.0.0.2", "10.0.0.1")
         rec, reader = Recorder(), _Listing(lambda argv: ours if list(argv[:3]) == _STATE else None)
         plugin = _plugin(rec, reader=reader)
@@ -2426,8 +2430,24 @@ class TestXfrmStateVerb:
         await plugin.add_peer("s1", _PEER)
         failing = _FailingAdd()
         plugin._runner = failing
-        await plugin.ensure_session_security("s1", [_PEER])
-        assert [c[3] for c in failing.calls if c[:3] == _STATE].count("update") == 6
+        await plugin.ensure_session_security("s1", [_PEER])  # must not raise
+        verbs = [c[3] for c in failing.calls if c[:3] == _STATE]
+        assert "update" not in verbs and "del" not in verbs, verbs
+
+    async def test_a_restart_adopts_the_sas_the_kernel_already_holds(self) -> None:
+        """Which generation a slot holds lives in this process's memory, so a restart knows
+        nothing and used to delete and re-add SAs the kernel already held correctly. The kernel
+        starts the replacement's replay state at zero while the peer's inbound window has moved
+        on, and everything sent is dropped as a replay until the sequence climbs past it --
+        measured across a privnet restart, 30 to 70 seconds of a live session's traffic."""
+        ours = _our_sas("10.0.0.1", "10.0.0.2") + _our_sas("10.0.0.2", "10.0.0.1")
+        rec, reader = Recorder(), _Listing(lambda argv: ours if list(argv[:3]) == _STATE else None)
+        plugin = _plugin(rec, reader=reader, vxlans={vxlan_dev(4097)})
+        await plugin.adopt_session_network(_ENC_META, _SELF)
+        rec.calls.clear()
+        await plugin.add_peer("s1", _PEER)
+        verbs = [c[3] for c in rec.calls if c[:3] == _STATE]
+        assert "add" not in verbs and "del" not in verbs, verbs
 
     async def test_a_foreign_sa_at_that_spi_is_not_overwritten(self) -> None:
         """The kernel keys an SA on (dst, spi, proto) with no src in it, and this SPI is 32 bits of
@@ -3807,7 +3827,11 @@ class TestSaOwnershipIsPortIndependent:
         await plugin.setup_session_network(self._other_port(), _SELF)
         rec.calls.clear()
         await plugin.add_peer("s2", _PEER)
-        assert not any(c[:3] == ["ip", "xfrm", "state"] for c in rec.calls)
+        # Reading the host's SAs is not programming one: what must not happen is a write.
+        assert not any(
+            c[:4] in (["ip", "xfrm", "state", "add"], ["ip", "xfrm", "state", "del"])
+            for c in rec.calls
+        )
         assert ("10.0.0.1", "10.0.0.2", 4790) in plugin._programmed_policies
 
     async def test_another_agent_on_another_port_still_holds_the_sas(self, tmp_path: Path) -> None:
