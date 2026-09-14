@@ -1160,6 +1160,17 @@ class TestRulesAPartialSetupCouldNotRemove:
         assert link_down_args(vxlan_dev(4097)) in rec.calls
         assert link_up_args(vxlan_dev(4097)) not in rec.calls
 
+    async def test_adopt_puts_the_bridge_forward_accept_back(self) -> None:
+        """The recovery sweep runs before the journal is read, so it takes this VNI's rules while
+        the session is still live -- four of them, against the three the protection re-assert puts
+        back. The fourth is the bridge's own forward-accept, and a node that filters FORWARD by
+        default carries nothing for that session once it is gone. Measured across a privnet
+        restart: the rule was removed every time and never came back."""
+        rec = _AbsentRuleRecorder()
+        plugin = _plugin(rec, vxlans={vxlan_dev(4097)})
+        await plugin.adopt_session_network(_ENC_META, _SELF)
+        assert forward_accept_add_args(4097) in rec.calls
+
     async def test_adopt_holds_the_tunnel_down_when_the_rule_cannot_be_restored(self) -> None:
         """A firewall reload between two agent lives reopens the receive side. Adopting and only
         logging it is the same fail-open the rule exists to close, so the vxlan device goes down:
