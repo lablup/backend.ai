@@ -12,6 +12,7 @@ import pytest
 
 from ai.backend.common.config import ModelConfig, ModelDefinition, ModelServiceConfig
 from ai.backend.common.contexts.user import with_user
+from ai.backend.common.data.entity.auto_scaling_rule import AutoScalingRuleID
 from ai.backend.common.data.entity.deployment import DeploymentEntityType, DeploymentID
 from ai.backend.common.data.entity.deployment_revision import DeploymentRevisionID
 from ai.backend.common.data.entity.deployment_token import DeploymentTokenID
@@ -25,7 +26,12 @@ from ai.backend.common.data.model_deployment.types import DeploymentStrategy, Mo
 from ai.backend.common.data.user.types import UserData, UserRole
 from ai.backend.common.dto.manager.v2.deployment.request import AdminSearchDeploymentsInput
 from ai.backend.common.schema.deployment import RollingUpdateSpec
-from ai.backend.common.types import ClusterMode, MountPermission, ResourceSlot
+from ai.backend.common.types import (
+    AutoScalingMetricSource,
+    ClusterMode,
+    MountPermission,
+    ResourceSlot,
+)
 from ai.backend.manager.actions.monitors import ActionMonitors
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
 from ai.backend.manager.actions.registry.types import GroupMeta, ProcessorDependencies
@@ -48,6 +54,7 @@ from ai.backend.manager.data.deployment.types import (
     DeploymentPolicyData,
     ExecutionData,
     ModelDeploymentAccessTokenData,
+    ModelDeploymentAutoScalingRuleData,
     ModelDeploymentData,
     ModelDeploymentMetadataInfo,
     ModelMountConfigData,
@@ -378,6 +385,52 @@ class TestFieldBatchLoads:
 
         assert await deployment_adapter.batch_load_by_ids([]) == []
         processors.deployment.bulk_get.run.assert_not_awaited()
+
+    async def test_auto_scaling_rules_answer_per_id(self) -> None:
+        rule = ModelDeploymentAutoScalingRuleData(
+            id=uuid4(),
+            model_deployment_id=uuid4(),
+            metric_source=AutoScalingMetricSource.KERNEL,
+            metric_name="cpu_util",
+            min_threshold=None,
+            max_threshold=None,
+            step_size=1,
+            time_window=60,
+            min_replicas=None,
+            max_replicas=None,
+            created_at=datetime(2024, 1, 1, tzinfo=UTC),
+            last_triggered_at=None,
+        )
+        denied = AutoScalingRuleID(uuid4())
+        absent = AutoScalingRuleID(uuid4())
+        denial = GenericForbidden("no read on this deployment")
+        processors = MagicMock()
+        processors.deployment.bulk_get_auto_scaling_rules.run = AsyncMock(
+            return_value=BulkFieldOpsResult(
+                successes={AutoScalingRuleID(rule.id): rule},
+                errors={denied: denial},
+            )
+        )
+        deployment_adapter = DeploymentAdapter(processors.deployment, MagicMock())
+
+        node, refused, missing = await deployment_adapter.batch_load_auto_scaling_rules_by_ids([
+            rule.id,
+            denied,
+            absent,
+        ])
+
+        assert node is not None and not isinstance(node, Exception)
+        assert node.id == rule.id
+        assert refused is denial
+        assert missing is None
+
+    async def test_no_auto_scaling_rule_ids_read_nothing(self) -> None:
+        processors = MagicMock()
+        processors.deployment.bulk_get_auto_scaling_rules.run = AsyncMock()
+        deployment_adapter = DeploymentAdapter(processors.deployment, MagicMock())
+
+        assert await deployment_adapter.batch_load_auto_scaling_rules_by_ids([]) == []
+        processors.deployment.bulk_get_auto_scaling_rules.run.assert_not_awaited()
 
     async def test_policies_answer_per_deployment(self) -> None:
         deployment_id = DeploymentID(uuid4())

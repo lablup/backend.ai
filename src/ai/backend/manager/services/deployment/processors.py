@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 from uuid import UUID
 
+from ai.backend.common.data.entity.auto_scaling_rule import AutoScalingRuleFieldType
 from ai.backend.common.data.entity.deployment import DeploymentID
 from ai.backend.common.data.entity.deployment_policy import DeploymentPolicyFieldType
 from ai.backend.common.data.entity.deployment_revision import DeploymentRevisionFieldType
@@ -32,6 +33,7 @@ from ai.backend.manager.actions.v2.single_entity.processor import SingleEntityAc
 from ai.backend.manager.data.deployment.types import (
     DeploymentPolicyData,
     ModelDeploymentAccessTokenData,
+    ModelDeploymentAutoScalingRuleData,
     ModelDeploymentData,
     ModelReplicaData,
     ModelRevisionData,
@@ -63,6 +65,9 @@ from ai.backend.manager.services.deployment.actions.access_token.search_access_t
 )
 from ai.backend.manager.services.deployment.actions.auto_scaling_rule.bulk_delete_auto_scaling_rules import (
     BulkDeleteAutoScalingRulesAction,
+)
+from ai.backend.manager.services.deployment.actions.auto_scaling_rule.bulk_get_auto_scaling_rules import (
+    BulkGetAutoScalingRulesAction,
 )
 from ai.backend.manager.services.deployment.actions.auto_scaling_rule.create_auto_scaling_rule import (
     CreateAutoScalingRuleAction,
@@ -124,6 +129,8 @@ from ai.backend.manager.services.deployment.actions.global_search_replicas impor
 )
 from ai.backend.manager.services.deployment.actions.lookup_owner import (
     LookupAutoScalingRuleDeploymentAction,
+    LookupAutoScalingRuleOwnerAction,
+    LookupBulkAutoScalingRuleOwnerAction,
     LookupBulkDeploymentAccessTokenOwnerAction,
     LookupBulkDeploymentPolicyOwnerAction,
     LookupBulkDeploymentRevisionOwnerAction,
@@ -341,6 +348,9 @@ class DeploymentProcessors:
     bulk_get_access_tokens: PartialBulkFieldActionProcessor[
         BulkGetAccessTokensAction, ModelDeploymentAccessTokenData
     ]
+    bulk_get_auto_scaling_rules: PartialBulkFieldActionProcessor[
+        BulkGetAutoScalingRulesAction, ModelDeploymentAutoScalingRuleData
+    ]
     bulk_get_deployment_policies: BulkActionProcessor[
         BulkGetDeploymentPoliciesAction, OwnedFieldsOpsResult[DeploymentID, DeploymentPolicyData]
     ]
@@ -402,6 +412,17 @@ class DeploymentProcessors:
         )
         self.bulk_get_routes = routes.partial_bulk_get_ops(BulkGetRoutesAction)
         self.bulk_get_access_tokens = access_tokens.partial_bulk_get_ops(BulkGetAccessTokensAction)
+        auto_scaling_rules: LookupFieldGroup[ModelDeploymentAutoScalingRuleData] = (
+            group.field_group(
+                FieldGroupMeta(AutoScalingRuleFieldType()),
+                ModelDeploymentAutoScalingRuleData,
+                LookupAutoScalingRuleOwnerAction,
+                LookupBulkAutoScalingRuleOwnerAction,
+            )
+        )
+        self.bulk_get_auto_scaling_rules = auto_scaling_rules.partial_bulk_get_ops(
+            BulkGetAutoScalingRulesAction
+        )
         self.bulk_get_deployment_policies = policies.atomic_bulk_get_ops(
             BulkGetDeploymentPoliciesAction
         )

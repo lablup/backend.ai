@@ -170,11 +170,15 @@ from ai.backend.manager.services.deployment.actions.access_token.bulk_get_access
 from ai.backend.manager.services.deployment.actions.auto_scaling_rule.bulk_delete_auto_scaling_rules import (
     BulkDeleteAutoScalingRulesAction,
 )
+from ai.backend.manager.services.deployment.actions.auto_scaling_rule.bulk_get_auto_scaling_rules import (
+    BulkGetAutoScalingRulesAction,
+)
 from ai.backend.manager.services.deployment.actions.bulk_get import BulkGetDeploymentsAction
 from ai.backend.manager.services.deployment.actions.deployment_policy.bulk_get_deployment_policies import (
     BulkGetDeploymentPoliciesAction,
 )
 from ai.backend.manager.services.deployment.actions.lookup_owner import (
+    LookupBulkAutoScalingRuleOwnerAction,
     LookupBulkDeploymentAccessTokenOwnerAction,
     LookupBulkReplicaGroupOwnerAction,
     LookupBulkReplicaOwnerAction,
@@ -840,6 +844,7 @@ def test_field_data_loader_reads_are_partial_permission_reads() -> None:
     assert recorded[BulkGetReplicaGroupsAction] == partial
     assert recorded[BulkGetRoutesAction] == partial
     assert recorded[BulkGetAccessTokensAction] == partial
+    assert recorded[BulkGetAutoScalingRulesAction] == partial
     assert recorded[BulkGetDeploymentPoliciesAction] == partial
     assert recorded[BulkGetDeploymentHistoriesAction] == partial
     assert recorded[BulkGetRouteHistoriesAction] == partial
@@ -862,6 +867,7 @@ def test_field_data_loader_reads_are_partial_permission_reads() -> None:
     for owner_lookup in (
         LookupBulkReplicaOwnerAction,
         LookupBulkDeploymentAccessTokenOwnerAction,
+        LookupBulkAutoScalingRuleOwnerAction,
         LookupBulkReplicaGroupOwnerAction,
         LookupBulkSessionSchedulingHistoryOwnerAction,
         LookupBulkKernelSchedulingHistoryOwnerAction,

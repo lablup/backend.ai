@@ -29,6 +29,7 @@ from sqlalchemy.orm import (
     selectinload,
 )
 
+from ai.backend.common.data.entity.auto_scaling_rule import AutoScalingRuleID
 from ai.backend.common.data.entity.deployment import DeploymentID
 from ai.backend.common.data.entity.deployment_revision import DeploymentRevisionID
 from ai.backend.common.data.entity.deployment_token import DeploymentTokenID
@@ -1060,8 +1061,11 @@ class EndpointTokenRow(Base):
 class EndpointAutoScalingRuleRow(Base):
     __tablename__ = "endpoint_auto_scaling_rules"
 
-    id: Mapped[UUID] = mapped_column(
-        "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v7()")
+    id: Mapped[AutoScalingRuleID] = mapped_column(
+        "id",
+        GUID(AutoScalingRuleID),
+        primary_key=True,
+        server_default=sa.text("uuid_generate_v7()"),
     )
     metric_source: Mapped[AutoScalingMetricSource] = mapped_column(
         "metric_source", StrEnumType(AutoScalingMetricSource, use_name=False), nullable=False

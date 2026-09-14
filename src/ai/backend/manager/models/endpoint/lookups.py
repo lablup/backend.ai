@@ -38,6 +38,22 @@ class AutoScalingRuleDeploymentLookup(FieldOwnerKeyLookup[DeploymentID]):
         return DeploymentID(value)
 
 
+class AutoScalingRuleOwnerLookup(FieldOwnerLookup[AutoScalingRuleID, DeploymentID]):
+    """The deployment an auto-scaling rule belongs to."""
+
+    @override
+    def build_query(
+        self, field_ids: Sequence[AutoScalingRuleID]
+    ) -> sa.sql.Select[tuple[AutoScalingRuleID, DeploymentID]]:
+        return sa.select(EndpointAutoScalingRuleRow.id, EndpointAutoScalingRuleRow.endpoint).where(
+            EndpointAutoScalingRuleRow.id.in_(field_ids)
+        )
+
+    @override
+    def to_entity_id(self, value: UUID) -> DeploymentID:
+        return DeploymentID(value)
+
+
 @dataclass
 class DeploymentAccessTokenOwnerLookup(FieldOwnerLookup[DeploymentTokenID, DeploymentID]):
     """The deployment an access token grants access to."""

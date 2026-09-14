@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from typing import Any, override
 from uuid import UUID
 
+from ai.backend.common.data.entity.auto_scaling_rule import AutoScalingRuleID
 from ai.backend.common.data.entity.deployment import DeploymentEntityType, DeploymentID
 from ai.backend.common.data.entity.deployment_policy import DeploymentPolicyID
 from ai.backend.common.data.entity.deployment_revision import DeploymentRevisionID
@@ -24,6 +25,7 @@ from ai.backend.manager.models.deployment_policy.lookups import DeploymentPolicy
 from ai.backend.manager.models.deployment_revision.lookups import DeploymentRevisionOwnerLookup
 from ai.backend.manager.models.endpoint.lookups import (
     AutoScalingRuleDeploymentLookup,
+    AutoScalingRuleOwnerLookup,
     DeploymentAccessTokenOwnerLookup,
 )
 from ai.backend.manager.models.replica_group.lookups import ReplicaGroupOwnerLookup
@@ -68,6 +70,66 @@ class LookupAutoScalingRuleDeploymentAction(LookupFieldOwnerByKeyOpsAction[Deplo
     @override
     def to_owner_lookup(self) -> AutoScalingRuleDeploymentLookup:
         return AutoScalingRuleDeploymentLookup(rule_id=self.rule_id)
+
+
+@dataclass
+class LookupAutoScalingRuleOwnerAction(LookupFieldOwnerOpsAction[AutoScalingRuleID, DeploymentID]):
+    """The deployment an auto-scaling rule belongs to."""
+
+    rule_id: AutoScalingRuleID
+
+    @override
+    @classmethod
+    def entity_type(cls) -> EntityType:
+        return DeploymentEntityType()
+
+    @override
+    @classmethod
+    def action_name(cls) -> str:
+        return "lookup_auto_scaling_rule_owner"
+
+    @override
+    def lookup_key(self) -> LookupKey:
+        return AutoScalingRuleKey(rule_id=self.rule_id)
+
+    @override
+    def field_id(self) -> AutoScalingRuleID:
+        return self.rule_id
+
+    @override
+    def to_owner_lookup(self) -> AutoScalingRuleOwnerLookup:
+        return AutoScalingRuleOwnerLookup()
+
+
+@dataclass
+class LookupBulkAutoScalingRuleOwnerAction(
+    LookupBulkFieldOwnerOpsAction[AutoScalingRuleID, DeploymentID]
+):
+    """The deployments several auto-scaling rules belong to."""
+
+    rule_ids: Sequence[AutoScalingRuleID]
+
+    @override
+    @classmethod
+    def entity_type(cls) -> EntityType:
+        return DeploymentEntityType()
+
+    @override
+    @classmethod
+    def action_name(cls) -> str:
+        return "lookup_bulk_auto_scaling_rule_owner"
+
+    @override
+    def to_lookup_key(self, field_id: AutoScalingRuleID) -> LookupKey:
+        return AutoScalingRuleKey(rule_id=field_id)
+
+    @override
+    def field_ids(self) -> Sequence[AutoScalingRuleID]:
+        return tuple(self.rule_ids)
+
+    @override
+    def to_owner_lookup(self) -> AutoScalingRuleOwnerLookup:
+        return AutoScalingRuleOwnerLookup()
 
 
 @dataclass(frozen=True)

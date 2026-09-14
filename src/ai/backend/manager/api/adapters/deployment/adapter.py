@@ -20,6 +20,7 @@ from ai.backend.common.config import (
 )
 from ai.backend.common.contexts.user import current_user
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
+from ai.backend.common.data.entity.auto_scaling_rule import AutoScalingRuleID
 from ai.backend.common.data.entity.deployment import DeploymentID
 from ai.backend.common.data.entity.deployment_revision import DeploymentRevisionID
 from ai.backend.common.data.entity.deployment_token import DeploymentTokenID
@@ -250,7 +251,6 @@ from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.models.routing.conditions import RouteConditions
 from ai.backend.manager.models.routing.orders import RouteOrders
 from ai.backend.manager.models.routing.searchers import ModelReplicaSearcher
-from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.services.deployment.actions.access_token.bulk_delete_access_tokens import (
     BulkDeleteAccessTokensAction,
@@ -272,6 +272,9 @@ from ai.backend.manager.services.deployment.actions.access_token.search_access_t
 )
 from ai.backend.manager.services.deployment.actions.auto_scaling_rule.bulk_delete_auto_scaling_rules import (
     BulkDeleteAutoScalingRulesAction,
+)
+from ai.backend.manager.services.deployment.actions.auto_scaling_rule.bulk_get_auto_scaling_rules import (
+    BulkGetAutoScalingRulesAction,
 )
 from ai.backend.manager.services.deployment.actions.auto_scaling_rule.create_auto_scaling_rule import (
     CreateAutoScalingRuleAction,
@@ -1564,24 +1567,17 @@ class DeploymentAdapter(BaseAdapter):
     async def batch_load_auto_scaling_rules_by_ids(
         self,
         rule_ids: Sequence[uuid.UUID],
-    ) -> list[AutoScalingRuleNode | None]:
-        """Batch load auto-scaling rules by ID for DataLoader use.
-
-        Returns AutoScalingRuleNode DTOs in the same order as the input rule_ids list.
-        """
+    ) -> list[AutoScalingRuleNode | Exception | None]:
+        """Batch load auto-scaling rules by ID for DataLoader use, checked per owning deployment."""
         if not rule_ids:
             return []
-        querier = BatchQuerier(
-            pagination=OffsetPagination(limit=len(rule_ids)),
-            conditions=[AutoScalingRuleConditions.by_ids(rule_ids)],
+        ids = [AutoScalingRuleID(rule_id) for rule_id in rule_ids]
+        return await self.batch_load_fields(
+            self._deployment.bulk_get_auto_scaling_rules,
+            BulkGetAutoScalingRulesAction(ids=ids),
+            ids,
+            self._auto_scaling_rule_data_to_dto,
         )
-        action_result = await self._deployment.search_auto_scaling_rules.run(
-            SearchAutoScalingRulesAction(querier=querier)
-        )
-        rule_map = {
-            data.id: self._auto_scaling_rule_data_to_dto(data) for data in action_result.data
-        }
-        return [rule_map.get(rule_id) for rule_id in rule_ids]
 
     async def batch_load_policies_by_endpoint_ids(
         self,

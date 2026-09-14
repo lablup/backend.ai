@@ -971,7 +971,7 @@ class DeploymentInfoWithAutoScalingRules:
 
 
 @dataclass
-class ModelDeploymentAutoScalingRuleData:
+class ModelDeploymentAutoScalingRuleData(FieldData):
     id: UUID
     model_deployment_id: UUID
     metric_source: AutoScalingMetricSource
