@@ -1,8 +1,4 @@
-"""What an app config allow-list scenario table says besides the call.
-
-An entry belongs to no scope, so no role reaches one: every door is passed by the
-superadmin and refused to anyone else. The situations here only choose who calls.
-"""
+"""앱 설정 허용 목록 어댑터의 시나리오 구성 요소."""
 
 from __future__ import annotations
 
@@ -42,12 +38,12 @@ from ai.backend.testutils.scenario_steps import (
 
 
 def _who(role: UserRole) -> str:
-    return "슈퍼관리자 한 명" if role == UserRole.SUPERADMIN else "아무 권한도 없는 사용자 한 명"
+    return "슈퍼관리자 한 명" if role == UserRole.SUPERADMIN else "권한이 없는 일반 사용자 한 명"
 
 
 @dataclass(frozen=True)
 class AnEntryAndACaller:
-    """설정 이름 하나와 그 이름의 허용 목록 항목 하나(없을 수도 있다), 그리고 호출할 사용자."""
+    """설정 이름, 선택적인 허용 목록 항목, 호출자."""
 
     domain: DomainData
     caller: UserData
@@ -57,10 +53,10 @@ class AnEntryAndACaller:
 
 @dataclass(frozen=True)
 class AnEntryAndSomeone(Given[Any, AnEntryAndACaller]):
-    """설정 정의 하나에 허용 목록 항목 하나를 만들어 두고, 슈퍼관리자 또는 아무 권한도 없는 사용자 한 명.
+    """설정 정의와 허용 목록 항목을 만들고 호출자를 준비한다.
 
-    ``opened``를 비우면 정의만 두고, ``defined``를 끄면 정의조차 두지 않는다.
-    ``with_fragment``는 공개 항목 아래 공개 설정 조각을 함께 만들어 둔다.
+    ``opened``가 없으면 정의만 만들고, ``defined``가 거짓이면 정의도 만들지 않는다.
+    ``with_fragment``가 참이면 PUBLIC 항목 아래에 설정 조각도 만든다.
     """
 
     opened: AppConfigScopeType | None = AppConfigScopeType.PUBLIC
@@ -72,13 +68,13 @@ class AnEntryAndSomeone(Given[Any, AnEntryAndACaller]):
     def describe(self) -> str:
         who = _who(self.role)
         if not self.defined:
-            return f"등록되지 않은 설정 이름과, {who}"
+            return f"등록되지 않은 설정 이름과 {who}"
         if self.opened is None:
-            return f"허용 목록 항목이 없는 설정 정의 하나와, {who}"
-        what = f"{SCOPE_NAMES[self.opened]} 스코프에 허용하는 허용 목록 항목 하나"
+            return f"허용 목록 항목이 없는 설정 정의 하나와 {who}"
+        what = f"{SCOPE_NAMES[self.opened]} 스코프 유형의 허용 목록 항목 하나"
         if self.with_fragment:
-            what = f"설정 조각이 딸린 {what}"
-        return f"{what}와, {who}"
+            what = f"설정 조각이 있는 {what}"
+        return f"{what}와 {who}"
 
     @override
     async def lay(self, seeding: Any) -> AnEntryAndACaller:
@@ -106,7 +102,7 @@ class AnEntryAndSomeone(Given[Any, AnEntryAndACaller]):
 
 @dataclass(frozen=True)
 class ManyEntriesAndACaller:
-    """검색 대상 허용 목록 항목 여럿과, 검색을 호출할 사용자. ``named``는 그중 필터로 골라낼 이름이다."""
+    """검색할 허용 목록 항목, 이름 필터의 기준값, 호출자."""
 
     caller: UserData
     laid: tuple[AppConfigAllowListData, ...]
@@ -115,7 +111,7 @@ class ManyEntriesAndACaller:
 
 @dataclass(frozen=True)
 class EntriesLaidAcross(Given[Any, ManyEntriesAndACaller]):
-    """설정 이름 몇 개를 등록하고, 이름마다 지정한 스코프 종류에 허용 목록 항목을 만든다."""
+    """설정 이름마다 지정한 스코프 유형의 허용 목록 항목을 만든다."""
 
     names: int = 1
     kinds: tuple[AppConfigScopeType, ...] = (AppConfigScopeType.PUBLIC,)
@@ -124,7 +120,7 @@ class EntriesLaidAcross(Given[Any, ManyEntriesAndACaller]):
     @override
     def describe(self) -> str:
         kinds = "·".join(SCOPE_NAMES[one] for one in self.kinds)
-        return f"설정 이름 {self.names}개를 각각 {kinds} 스코프에 허용하는 허용 목록 항목들과, {_who(self.role)}"
+        return f"설정 이름 {self.names}개에 각각 {kinds} 스코프 유형의 허용 목록 항목과 {_who(self.role)}"
 
     @override
     async def lay(self, seeding: Any) -> ManyEntriesAndACaller:
@@ -151,7 +147,7 @@ class EntriesLaidAcross(Given[Any, ManyEntriesAndACaller]):
 
 @dataclass(frozen=True)
 class TwoEntriesAndACaller:
-    """id로 함께 조회할 허용 목록 항목 둘과, 조회할 사용자."""
+    """ID로 함께 조회할 허용 목록 항목 둘과 호출자."""
 
     caller: UserData
     first: AppConfigAllowListData
@@ -160,13 +156,13 @@ class TwoEntriesAndACaller:
 
 @dataclass(frozen=True)
 class TwoEntriesAndSomeone(Given[Any, TwoEntriesAndACaller]):
-    """항목 둘과, 슈퍼관리자 또는 아무 권한도 없는 사용자 한 명."""
+    """한 설정 이름에 속한 허용 목록 항목 둘과 호출자를 준비한다."""
 
     role: UserRole = UserRole.USER
 
     @override
     def describe(self) -> str:
-        return f"한 설정 이름을 두 스코프에 허용하는 허용 목록 항목 둘과, {_who(self.role)}"
+        return f"한 설정 이름의 PUBLIC·USER 허용 목록 항목과 {_who(self.role)}"
 
     @override
     async def lay(self, seeding: Any) -> TwoEntriesAndACaller:
@@ -186,14 +182,14 @@ class TwoEntriesAndSomeone(Given[Any, TwoEntriesAndACaller]):
 
 @dataclass(frozen=True)
 class TheEntryNode(Then[AnEntryAndACaller, AppConfigAllowListNode]):
-    """미리 만들어 둔 항목이 통째로 반환된다. 수정 요청이 이 검사를 쓸 때는 순위만 인자로 받는다."""
+    """준비한 항목의 모든 필드가 반환된다."""
 
     started: datetime
     rank: int | None = None
 
     @override
     def says(self) -> str:
-        return "미리 만들어 둔 허용 목록 항목 전체가 반환된다"
+        return "준비한 허용 목록 항목의 모든 필드가 반환된다"
 
     @override
     def look(
@@ -215,7 +211,7 @@ class TheEntryNode(Then[AnEntryAndACaller, AppConfigAllowListNode]):
 
 @dataclass(frozen=True)
 class TheNewEntryNode(Then[AnEntryAndACaller, AppConfigAllowListNode]):
-    """방금 생성한 항목이 통째로 반환된다. 종류와 순위는 시나리오가 정한 값이다."""
+    """생성한 항목의 모든 필드가 반환된다."""
 
     started: datetime
     scope_type: AppConfigScopeType
@@ -223,7 +219,7 @@ class TheNewEntryNode(Then[AnEntryAndACaller, AppConfigAllowListNode]):
 
     @override
     def says(self) -> str:
-        return "생성한 허용 목록 항목 전체가 반환된다"
+        return "생성한 허용 목록 항목의 모든 필드가 반환된다"
 
     @override
     def look(
@@ -245,11 +241,11 @@ class TheNewEntryNode(Then[AnEntryAndACaller, AppConfigAllowListNode]):
 
 @dataclass(frozen=True)
 class EveryLaidEntryIsFound(Then[ManyEntriesAndACaller, SearchAppConfigAllowListPayload]):
-    """미리 만들어 둔 항목이 모두, 그리고 그것만 집계된다."""
+    """준비한 항목만 모두 반환된다."""
 
     @override
     def says(self) -> str:
-        return "미리 만들어 둔 허용 목록 항목이 모두, 그리고 그것만 집계된다"
+        return "준비한 허용 목록 항목만 모두 반환된다"
 
     @override
     def look(
@@ -302,13 +298,13 @@ class OnlyTheNamedNamesEntriesAreFound(
 
 @dataclass(frozen=True)
 class OnlyOneKindsEntriesAreFound(Then[ManyEntriesAndACaller, SearchAppConfigAllowListPayload]):
-    """필터에 맞는 종류의 항목만 반환된다."""
+    """필터에 맞는 스코프 유형의 항목만 반환된다."""
 
     kind: AppConfigScopeType
 
     @override
     def says(self) -> str:
-        return f"{SCOPE_NAMES[self.kind]} 종류의 항목만 반환된다"
+        return f"{SCOPE_NAMES[self.kind]} 스코프 유형의 항목만 반환된다"
 
     @override
     def look(

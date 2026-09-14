@@ -1,7 +1,7 @@
-"""허용 목록 항목 조회 — 슈퍼관리자만 조회할 수 있다.
+"""허용 목록 항목 조회 — 개별 엔티티 권한 검사를 확인한다.
 
-항목은 어느 스코프에도 속하지 않아 역할이 미치지 않는다. 슈퍼관리자는 통과하고 그 밖의
-사용자는 권한 부족으로 거부되며, 존재하지 않는 id는 슈퍼관리자에게만 대상 없음으로 응답한다.
+허용 목록 항목은 도메인·프로젝트·사용자 스코프에 자동 귀속되지 않는다. 따라서 현재 기본
+역할로는 도달할 수 없으며, 슈퍼관리자만 조회할 수 있다.
 """
 
 from __future__ import annotations
@@ -43,7 +43,7 @@ type ReadingStep = Scenario[
 
 @dataclass(frozen=True)
 class ReadingById(When[AnEntryAndACaller, AppConfigAllowListAdapter, AppConfigAllowListNode]):
-    """id로 조회한다. id를 지정하지 않으면 미리 만들어 둔 항목의 id를 쓴다."""
+    """ID로 조회한다. ID를 지정하지 않으면 준비한 항목의 ID를 쓴다."""
 
     other: UUID | None = None
 
@@ -53,7 +53,7 @@ class ReadingById(When[AnEntryAndACaller, AppConfigAllowListAdapter, AppConfigAl
 
     @override
     def describe(self, laid: AnEntryAndACaller) -> str:
-        called = "존재하지 않는 id" if self.other is not None else f"{laid.name}의 항목"
+        called = "존재하지 않는 ID" if self.other is not None else f"{laid.name}의 항목"
         return f"{laid.caller.username}이 {called} 조회"
 
     @override
@@ -82,7 +82,7 @@ class TheSuperadminReadsIt(
 
     @override
     def describe(self) -> str:
-        return "항목 하나가 있고 슈퍼관리자가 id로 조회하면, 그 항목 전체가 반환된다"
+        return "항목 하나가 있고 슈퍼관리자가 ID로 조회하면, 그 항목의 모든 필드가 반환된다"
 
     @override
     def given(self) -> Given[SeedingSession, AnEntryAndACaller]:
@@ -107,10 +107,7 @@ class AUserGrantedNothingMayNotRead(
 
     @override
     def describe(self) -> str:
-        return (
-            "같은 항목이 있고 슈퍼관리자가 아닌 사용자가 조회하면, 권한 부족으로 거부된다. "
-            "항목은 어느 스코프에도 속하지 않아 역할로는 권한을 받을 수 없다"
-        )
+        return "같은 항목을 권한이 없는 일반 사용자가 조회하면, 엔티티 읽기 권한이 없어 거부된다"
 
     @override
     def given(self) -> Given[SeedingSession, AnEntryAndACaller]:
@@ -136,7 +133,7 @@ class AnUnknownIdIsNotFoundForASuperadmin(
     @override
     def describe(self) -> str:
         return (
-            "슈퍼관리자가 존재하지 않는 id로 조회하면, 대상을 찾을 수 없다는 이유로 거부된다. "
+            "슈퍼관리자가 존재하지 않는 ID로 조회하면, 대상을 찾을 수 없다는 이유로 거부된다. "
             "권한 검사를 통과하는 사용자만 이 응답을 본다"
         )
 

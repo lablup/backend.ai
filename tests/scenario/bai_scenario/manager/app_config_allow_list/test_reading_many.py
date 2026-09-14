@@ -1,7 +1,7 @@
-"""여러 id로 허용 목록 항목 조회 — 원소마다 응답한다.
+"""여러 ID로 허용 목록 항목 조회 — 입력 위치마다 응답한다.
 
-슈퍼관리자가 아니면 요청 전체가 막히는 것이 아니라 원소마다 거부된다. 없는 id도 마찬가지로
-거부 원소이고, 빈 항목으로 반환되는 것은 검사를 통과하는 슈퍼관리자에게뿐이다.
+권한이 없는 ID가 있어도 요청 전체가 실패하지 않는다. 각 입력 위치에는 노드, ``None``, 또는
+해당 ID의 권한 오류가 반환된다.
 """
 
 from __future__ import annotations
@@ -48,7 +48,7 @@ type LoadingStep = Scenario[SeedingSession, TwoEntriesAndACaller, AppConfigAllow
 
 @dataclass(frozen=True)
 class LoadingByIds(When[TwoEntriesAndACaller, AppConfigAllowListAdapter, Loaded]):
-    """미리 만들어 둔 둘과 존재하지 않는 id 하나를 한 번에 조회한다. 빈 목록을 줄 수도 있다."""
+    """준비한 ID 둘과 존재하지 않는 ID를 조회한다. 빈 목록도 허용한다."""
 
     nothing: bool = False
 
@@ -59,8 +59,8 @@ class LoadingByIds(When[TwoEntriesAndACaller, AppConfigAllowListAdapter, Loaded]
     @override
     def describe(self, laid: TwoEntriesAndACaller) -> str:
         if self.nothing:
-            return f"{laid.caller.username}이 빈 id 목록으로 조회"
-        return f"{laid.caller.username}이 항목 둘과 존재하지 않는 id를 한 번에 조회"
+            return f"{laid.caller.username}이 빈 ID 목록으로 조회"
+        return f"{laid.caller.username}이 항목 둘과 존재하지 않는 ID를 한 번에 조회"
 
     @override
     async def call(self, adapter: AppConfigAllowListAdapter, laid: TwoEntriesAndACaller) -> Loaded:
@@ -73,11 +73,11 @@ class LoadingByIds(When[TwoEntriesAndACaller, AppConfigAllowListAdapter, Loaded]
 
 @dataclass(frozen=True)
 class EveryIdIsRefused(Then[TwoEntriesAndACaller, Loaded]):
-    """세 항목 모두 그 항목만 거부된다."""
+    """세 입력 위치에 각각 권한 오류가 반환된다."""
 
     @override
     def says(self) -> str:
-        return "있는 둘도 없는 id도 그 항목만 거부된다"
+        return "있는 ID 둘과 없는 ID 모두 각 위치에 권한 오류가 반환된다"
 
     @override
     def look(self, laid: TwoEntriesAndACaller, answered: Answered[Loaded]) -> list[Verdict]:
@@ -98,11 +98,11 @@ class EveryIdIsRefused(Then[TwoEntriesAndACaller, Loaded]):
 
 @dataclass(frozen=True)
 class TwoNodesOneMissing(Then[TwoEntriesAndACaller, Loaded]):
-    """둘은 노드, 셋째는 빈 항목."""
+    """존재하는 ID는 노드, 존재하지 않는 ID는 ``None``으로 반환된다."""
 
     @override
     def says(self) -> str:
-        return "있는 둘은 노드로, 없는 id 자리는 비어서 반환된다"
+        return "있는 ID 둘은 노드로, 없는 ID는 None으로 반환된다"
 
     @override
     def look(self, laid: TwoEntriesAndACaller, answered: Answered[Loaded]) -> list[Verdict]:
@@ -155,8 +155,8 @@ class APlainUserIsRefusedPerId(
     @override
     def describe(self) -> str:
         return (
-            "슈퍼관리자가 아닌 사용자가 항목 둘과 없는 id 하나를 한 번에 조회하면, 요청 전체가 "
-            "막히는 것이 아니라 세 항목 모두 그 항목만 권한 부족으로 거부된다"
+            "권한이 없는 일반 사용자가 항목 둘과 없는 ID 하나를 함께 조회하면, 각 입력 위치에 "
+            "엔티티 읽기 권한 오류가 반환된다"
         )
 
     @override
@@ -183,8 +183,8 @@ class TheSuperadminSeesBoth(
     @override
     def describe(self) -> str:
         return (
-            "슈퍼관리자가 항목 둘과 없는 id 하나를 한 번에 조회하면, 둘은 노드로 반환되고 없는 id "
-            "자리는 비어 있다. 권한 검사를 통과하는 사용자만 빈 항목을 본다"
+            "슈퍼관리자가 항목 둘과 없는 ID 하나를 함께 조회하면, 입력 순서대로 노드 둘과 "
+            "None이 반환된다"
         )
 
     @override
@@ -206,11 +206,11 @@ class AnEmptyListAnswersEmpty(
 ):
     @override
     def summary(self) -> str:
-        return "an-empty-id-list-answers-empty-without-calling-anything"
+        return "an-empty-id-list-answers-empty"
 
     @override
     def describe(self) -> str:
-        return "빈 id 목록을 주면 빈 응답이 반환된다. 하위 계층을 호출하지 않는다"
+        return "빈 ID 목록으로 조회하면 빈 목록이 반환된다"
 
     @override
     def given(self) -> Given[SeedingSession, TwoEntriesAndACaller]:

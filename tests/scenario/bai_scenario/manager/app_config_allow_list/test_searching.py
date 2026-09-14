@@ -1,4 +1,4 @@
-"""허용 목록 항목 검색 — 전역 역할로 보호된다."""
+"""허용 목록 항목 검색 — 슈퍼관리자 검사와 검색 조건을 확인한다."""
 
 from __future__ import annotations
 
@@ -62,7 +62,7 @@ class SearchingEverything(When[ManyEntriesAndACaller, AppConfigAllowListAdapter,
 
     @override
     def describe(self, laid: ManyEntriesAndACaller) -> str:
-        return f"{laid.caller.username}이 필터 없이 전체 조회"
+        return f"{laid.caller.username}이 필터 없이 검색"
 
     @override
     async def call(
@@ -82,7 +82,7 @@ class SearchingByName(When[ManyEntriesAndACaller, AppConfigAllowListAdapter, Sea
 
     @override
     def describe(self, laid: ManyEntriesAndACaller) -> str:
-        return f"{laid.caller.username}이 {laid.named} 이름 필터로 조회"
+        return f"{laid.caller.username}이 설정 이름 {laid.named}(으)로 검색"
 
     @override
     async def call(
@@ -98,7 +98,7 @@ class SearchingByName(When[ManyEntriesAndACaller, AppConfigAllowListAdapter, Sea
 
 @dataclass(frozen=True)
 class SearchingOneKind(When[ManyEntriesAndACaller, AppConfigAllowListAdapter, Searched]):
-    """스코프 종류 하나를 필터로 검색한다."""
+    """스코프 유형 하나를 필터로 검색한다."""
 
     kind: AppConfigScopeType
 
@@ -108,7 +108,7 @@ class SearchingOneKind(When[ManyEntriesAndACaller, AppConfigAllowListAdapter, Se
 
     @override
     def describe(self, laid: ManyEntriesAndACaller) -> str:
-        return f"{laid.caller.username}이 {SCOPE_NAMES[self.kind]} 종류 필터로 조회"
+        return f"{laid.caller.username}이 {SCOPE_NAMES[self.kind]} 스코프 유형으로 검색"
 
     @override
     async def call(
@@ -134,7 +134,7 @@ class SearchingInRankOrder(When[ManyEntriesAndACaller, AppConfigAllowListAdapter
 
     @override
     def describe(self, laid: ManyEntriesAndACaller) -> str:
-        return f"{laid.caller.username}이 순위 오름차순으로 전체 조회"
+        return f"{laid.caller.username}이 순위 오름차순으로 검색"
 
     @override
     async def call(
@@ -162,7 +162,9 @@ class TheSuperadminCountsEveryOne(
 
     @override
     def describe(self) -> str:
-        return "이름 둘에 항목 넷이 있고 슈퍼관리자가 필터 없이 전체를 검색하면, 넷 다 집계된다. 검색은 전역 역할로 보호된다"
+        return (
+            "설정 이름 둘에 항목 넷이 있고 슈퍼관리자가 필터 없이 검색하면, 네 항목이 모두 반환된다"
+        )
 
     @override
     def given(self) -> Given[SeedingSession, ManyEntriesAndACaller]:
@@ -192,7 +194,8 @@ class FilteringByNameKeepsThatNames(
     @override
     def describe(self) -> str:
         return (
-            "이름 둘에 항목 넷이 있고 슈퍼관리자가 이름 필터로 검색하면, 그 이름의 항목만 반환된다"
+            "설정 이름 둘에 항목 넷이 있고 슈퍼관리자가 이름 필터로 검색하면, "
+            "해당 이름의 항목만 반환된다"
         )
 
     @override
@@ -222,7 +225,7 @@ class FilteringByKindKeepsThatKind(
 
     @override
     def describe(self) -> str:
-        return "세 종류에 항목이 하나씩 있고 슈퍼관리자가 사용자 종류 필터로 검색하면, 사용자 항목만 반환된다"
+        return "세 스코프 유형에 항목이 하나씩 있고 슈퍼관리자가 USER 유형으로 검색하면, USER 항목만 반환된다"
 
     @override
     def given(self) -> Given[SeedingSession, ManyEntriesAndACaller]:
@@ -272,7 +275,7 @@ class NoPageSizeMeansTen(
 
     @override
     def describe(self) -> str:
-        return "항목 11개가 있고 슈퍼관리자가 크기 없이 검색하면, 10건까지 반환되고 다음 페이지가 있다고 응답한다"
+        return "항목 11개가 있고 슈퍼관리자가 페이지 크기를 생략하면, 10건과 다음 페이지 표시가 반환된다"
 
     @override
     def given(self) -> Given[SeedingSession, ManyEntriesAndACaller]:
@@ -297,7 +300,7 @@ class APlainUserMayNotSearch(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 아닌 사용자가 전체를 검색하면, 역할 부족으로 거부된다"
+        return "일반 사용자가 허용 목록을 검색하면, 슈퍼관리자 권한이 없어 거부된다"
 
     @override
     def given(self) -> Given[SeedingSession, ManyEntriesAndACaller]:
