@@ -1,4 +1,4 @@
-"""레지스트리 만들기 — 누가 만들 수 있고, 무엇이 만들기를 막는가."""
+"""컨테이너 레지스트리 생성 권한과 거부 조건."""
 
 from __future__ import annotations
 
@@ -9,12 +9,12 @@ from typing import Any, override
 import pytest
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.container_registry import (
-    AllowedGroups,
+    AllowedProjects,
     AProjectAndACaller,
-    AProjectThatIsGone,
+    MissingProject,
     NoProjects,
     NoRegistryYet,
-    TheLaidProject,
+    SeededProject,
     TheNewRegistryNode,
 )
 from bai_scenario.runner.acting import ActingAs
@@ -33,12 +33,16 @@ from ai.backend.manager.errors.resource import ProjectNotFound
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import Configured, Given, Scenario, Then, When
 
+type CreationScenario = Scenario[
+    SeedingSession, AProjectAndACaller, ContainerRegistryAdapter, ContainerRegistryNode
+]
+
 
 @dataclass(frozen=True)
 class Creating(When[AProjectAndACaller, ContainerRegistryAdapter, ContainerRegistryNode]):
     url: str = "https://made.scenario.local"
     registry_name: str = "made-registry"
-    allowed: AllowedGroups = field(default_factory=NoProjects)
+    allowed_projects: AllowedProjects = field(default_factory=NoProjects)
 
     @override
     def operation(self) -> str:
@@ -46,7 +50,7 @@ class Creating(When[AProjectAndACaller, ContainerRegistryAdapter, ContainerRegis
 
     @override
     def describe(self, laid: AProjectAndACaller) -> str:
-        return f"{laid.caller.username}이 {self.allowed.says()} {self.url}로 만듦"
+        return f"{laid.caller.username}이 {self.allowed_projects.says()} {self.url}로 만듦"
 
     @override
     async def call(
@@ -58,7 +62,7 @@ class Creating(When[AProjectAndACaller, ContainerRegistryAdapter, ContainerRegis
                     url=self.url,
                     registry_name=self.registry_name,
                     type=ContainerRegistryType.DOCKER,
-                    allowed_groups=self.allowed.of(laid),
+                    allowed_groups=self.allowed_projects.of(laid),
                 )
             )
         return payload.registry
@@ -114,7 +118,7 @@ class AllowingAProjectWhileCreating(
 
     @override
     def when(self) -> Creating:
-        return Creating(allowed=TheLaidProject())
+        return Creating(allowed_projects=SeededProject())
 
     @override
     def then(self) -> Then[AProjectAndACaller, ContainerRegistryNode]:
@@ -143,7 +147,7 @@ class AProjectThatIsNotThereIsRefused(
 
     @override
     def when(self) -> When[AProjectAndACaller, ContainerRegistryAdapter, ContainerRegistryNode]:
-        return Creating(allowed=AProjectThatIsGone())
+        return Creating(allowed_projects=MissingProject())
 
     @override
     def then(self) -> Then[AProjectAndACaller, ContainerRegistryNode]:
@@ -211,9 +215,7 @@ class EnforcementOffChangesNothing(
         return TheCallIsRefused(InsufficientPrivilege)
 
 
-SCENARIOS: list[
-    Scenario[SeedingSession, AProjectAndACaller, ContainerRegistryAdapter, ContainerRegistryNode]
-] = [
+SCENARIOS: list[CreationScenario] = [
     CreatingWithOnlyTheRequiredValues(),
     AllowingAProjectWhileCreating(),
     AProjectThatIsNotThereIsRefused(),
@@ -224,9 +226,7 @@ SCENARIOS: list[
 
 @pytest.mark.parametrize("scenario", SCENARIOS, ids=lambda s: s.summary())
 async def test_creating(
-    scenario: Scenario[
-        SeedingSession, AProjectAndACaller, ContainerRegistryAdapter, ContainerRegistryNode
-    ],
+    scenario: CreationScenario,
     adapter: ContainerRegistryAdapter,
     engine: ExtendedAsyncSAEngine,
 ) -> None:

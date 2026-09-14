@@ -1,4 +1,4 @@
-"""허용 목록에 프로젝트 넣고 빼기 — 이 어댑터에서 권한 그래프가 지키는 유일한 자리."""
+"""허용 프로젝트 관계의 추가·제거와 권한 검사."""
 
 from __future__ import annotations
 
@@ -9,12 +9,12 @@ from typing import Any, override
 import pytest
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.container_registry import (
-    Adding,
-    AddingWhatIsGone,
+    AddMissingProject,
+    AddProject,
+    AllowedProjectChange,
     ARegistryAndAProjectToAllow,
     ARegistryToAllowAndACaller,
-    GroupChange,
-    Removing,
+    RemoveProject,
 )
 from bai_scenario.runner.acting import ActingAs
 from bai_scenario.runner.planting import SeedingSession
@@ -31,7 +31,6 @@ from ai.backend.testutils.scenario_steps import (
     Answered,
     Configured,
     Given,
-    Refused,
     Same,
     Scenario,
     Then,
@@ -39,10 +38,14 @@ from ai.backend.testutils.scenario_steps import (
     When,
 )
 
+type AllowedProjectScenario = Scenario[
+    SeedingSession, ARegistryToAllowAndACaller, ContainerRegistryAdapter, None
+]
+
 
 @dataclass(frozen=True)
-class AllowingProjects(When[ARegistryToAllowAndACaller, ContainerRegistryAdapter, None]):
-    change: GroupChange = field(default_factory=Adding)
+class ChangingAllowedProjects(When[ARegistryToAllowAndACaller, ContainerRegistryAdapter, None]):
+    change: AllowedProjectChange = field(default_factory=AddProject)
 
     @override
     def operation(self) -> str:
@@ -57,18 +60,14 @@ class AllowingProjects(When[ARegistryToAllowAndACaller, ContainerRegistryAdapter
         self, adapter: ContainerRegistryAdapter, laid: ARegistryToAllowAndACaller
     ) -> None:
         with ActingAs(laid.caller):
-            return await adapter.apply_allowed_groups(
+            await adapter.apply_allowed_groups(
                 ContainerRegistryID(laid.registry.id), self.change.of(laid)
             )
 
 
 @dataclass(frozen=True)
 class TheCallReturnsNothing(Then[ARegistryToAllowAndACaller, None]):
-    """이 호출은 답을 싣지 않는다. 예외 없이 끝나는 것이 성공이다.
-
-    허용 목록이 실제로 바뀌었는지는 이 자리에서 볼 수 없다. 답이 없으므로 확인하려면 그다음 읽기가
-    필요한데, 시나리오 한 줄은 호출 하나를 두고 짝을 세우는 자리다.
-    """
+    """반환값 없이 완료되는 호출의 성공 여부를 검사한다."""
 
     @override
     def says(self) -> str:
@@ -77,12 +76,12 @@ class TheCallReturnsNothing(Then[ARegistryToAllowAndACaller, None]):
     @override
     def look(self, laid: ARegistryToAllowAndACaller, answered: Answered[None]) -> list[Verdict]:
         if answered.raised is not None:
-            return [Refused(type(answered.raised), answered.raised)]
+            return [Same("raised", answered.raised, None)]
         return [Same("response", answered.response, None)]
 
 
 @dataclass(frozen=True)
-class AllowingWithBothScopesGranted(
+class AddingProjectWithBothScopesGranted(
     Scenario[SeedingSession, ARegistryToAllowAndACaller, ContainerRegistryAdapter, None]
 ):
     @override
@@ -102,7 +101,7 @@ class AllowingWithBothScopesGranted(
 
     @override
     def when(self) -> When[ARegistryToAllowAndACaller, ContainerRegistryAdapter, None]:
-        return AllowingProjects()
+        return ChangingAllowedProjects()
 
     @override
     def then(self) -> Then[ARegistryToAllowAndACaller, None]:
@@ -110,7 +109,7 @@ class AllowingWithBothScopesGranted(
 
 
 @dataclass(frozen=True)
-class AllowingTwiceIsNotAnError(
+class AddingExistingProjectIsIdempotent(
     Scenario[SeedingSession, ARegistryToAllowAndACaller, ContainerRegistryAdapter, None]
 ):
     @override
@@ -130,7 +129,7 @@ class AllowingTwiceIsNotAnError(
 
     @override
     def when(self) -> When[ARegistryToAllowAndACaller, ContainerRegistryAdapter, None]:
-        return AllowingProjects()
+        return ChangingAllowedProjects()
 
     @override
     def then(self) -> Then[ARegistryToAllowAndACaller, None]:
@@ -138,7 +137,7 @@ class AllowingTwiceIsNotAnError(
 
 
 @dataclass(frozen=True)
-class RemovingAnAllowedProject(
+class RemovingAllowedProject(
     Scenario[SeedingSession, ARegistryToAllowAndACaller, ContainerRegistryAdapter, None]
 ):
     @override
@@ -155,7 +154,7 @@ class RemovingAnAllowedProject(
 
     @override
     def when(self) -> When[ARegistryToAllowAndACaller, ContainerRegistryAdapter, None]:
-        return AllowingProjects(change=Removing())
+        return ChangingAllowedProjects(change=RemoveProject())
 
     @override
     def then(self) -> Then[ARegistryToAllowAndACaller, None]:
@@ -163,7 +162,7 @@ class RemovingAnAllowedProject(
 
 
 @dataclass(frozen=True)
-class AProjectThatIsNotThereIsRefused(
+class MissingProjectIsRefused(
     Scenario[SeedingSession, ARegistryToAllowAndACaller, ContainerRegistryAdapter, None]
 ):
     @override
@@ -182,7 +181,7 @@ class AProjectThatIsNotThereIsRefused(
 
     @override
     def when(self) -> When[ARegistryToAllowAndACaller, ContainerRegistryAdapter, None]:
-        return AllowingProjects(change=AddingWhatIsGone())
+        return ChangingAllowedProjects(change=AddMissingProject())
 
     @override
     def then(self) -> Then[ARegistryToAllowAndACaller, None]:
@@ -190,7 +189,7 @@ class AProjectThatIsNotThereIsRefused(
 
 
 @dataclass(frozen=True)
-class RemovingWhatIsNotAllowedIsRefused(
+class RemovingUnlinkedProjectIsRefused(
     Scenario[SeedingSession, ARegistryToAllowAndACaller, ContainerRegistryAdapter, None]
 ):
     @override
@@ -207,7 +206,7 @@ class RemovingWhatIsNotAllowedIsRefused(
 
     @override
     def when(self) -> When[ARegistryToAllowAndACaller, ContainerRegistryAdapter, None]:
-        return AllowingProjects(change=Removing())
+        return ChangingAllowedProjects(change=RemoveProject())
 
     @override
     def then(self) -> Then[ARegistryToAllowAndACaller, None]:
@@ -215,7 +214,7 @@ class RemovingWhatIsNotAllowedIsRefused(
 
 
 @dataclass(frozen=True)
-class GrantedOnTheRegistryButNotTheProjectIsRefused(
+class MissingProjectPermissionIsRefused(
     Scenario[SeedingSession, ARegistryToAllowAndACaller, ContainerRegistryAdapter, None]
 ):
     @override
@@ -235,7 +234,7 @@ class GrantedOnTheRegistryButNotTheProjectIsRefused(
 
     @override
     def when(self) -> When[ARegistryToAllowAndACaller, ContainerRegistryAdapter, None]:
-        return AllowingProjects()
+        return ChangingAllowedProjects()
 
     @override
     def then(self) -> Then[ARegistryToAllowAndACaller, None]:
@@ -243,7 +242,7 @@ class GrantedOnTheRegistryButNotTheProjectIsRefused(
 
 
 @dataclass(frozen=True)
-class EnforcementOffOpensThisGate(
+class DisabledEnforcementAllowsProject(
     Scenario[SeedingSession, ARegistryToAllowAndACaller, ContainerRegistryAdapter, None],
     Configured,
 ):
@@ -268,29 +267,27 @@ class EnforcementOffOpensThisGate(
 
     @override
     def when(self) -> When[ARegistryToAllowAndACaller, ContainerRegistryAdapter, None]:
-        return AllowingProjects()
+        return ChangingAllowedProjects()
 
     @override
     def then(self) -> Then[ARegistryToAllowAndACaller, None]:
         return TheCallReturnsNothing()
 
 
-SCENARIOS: list[
-    Scenario[SeedingSession, ARegistryToAllowAndACaller, ContainerRegistryAdapter, None]
-] = [
-    AllowingWithBothScopesGranted(),
-    AllowingTwiceIsNotAnError(),
-    RemovingAnAllowedProject(),
-    AProjectThatIsNotThereIsRefused(),
-    RemovingWhatIsNotAllowedIsRefused(),
-    GrantedOnTheRegistryButNotTheProjectIsRefused(),
-    EnforcementOffOpensThisGate(),
+SCENARIOS: list[AllowedProjectScenario] = [
+    AddingProjectWithBothScopesGranted(),
+    AddingExistingProjectIsIdempotent(),
+    RemovingAllowedProject(),
+    MissingProjectIsRefused(),
+    RemovingUnlinkedProjectIsRefused(),
+    MissingProjectPermissionIsRefused(),
+    DisabledEnforcementAllowsProject(),
 ]
 
 
 @pytest.mark.parametrize("scenario", SCENARIOS, ids=lambda s: s.summary())
 async def test_allowing_projects(
-    scenario: Scenario[SeedingSession, ARegistryToAllowAndACaller, ContainerRegistryAdapter, None],
+    scenario: AllowedProjectScenario,
     adapter: ContainerRegistryAdapter,
     engine: ExtendedAsyncSAEngine,
 ) -> None:

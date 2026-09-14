@@ -1,4 +1,4 @@
-"""id 여럿으로 읽기 — 순서와 빈 자리, 그리고 권한이 없을 때."""
+"""여러 ID 조회의 순서, 누락 값, 권한 검사."""
 
 from __future__ import annotations
 
@@ -6,9 +6,9 @@ from dataclasses import dataclass
 from typing import override
 
 import pytest
-from bai_scenario.components.answers import TheCallIsRefused
+from bai_scenario.components.answers import MissingResponse, TheCallIsRefused
 from bai_scenario.components.container_registry import (
-    NOTHING,
+    MISSING_ENTITY_ID,
     ManyRegistriesAndACaller,
     ManyRegistriesAndSomeone,
 )
@@ -25,7 +25,6 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import (
     Answered,
     Given,
-    Refused,
     Same,
     Scenario,
     Then,
@@ -34,11 +33,14 @@ from ai.backend.testutils.scenario_steps import (
 )
 
 type Loaded = list[ContainerRegistryNode | None]
+type ReadingScenario = Scenario[
+    SeedingSession, ManyRegistriesAndACaller, ContainerRegistryAdapter, Loaded
+]
 
 
 @dataclass(frozen=True)
 class Loading(When[ManyRegistriesAndACaller, ContainerRegistryAdapter, Loaded]):
-    with_no_ids: bool = False
+    empty: bool = False
 
     @override
     def operation(self) -> str:
@@ -47,17 +49,17 @@ class Loading(When[ManyRegistriesAndACaller, ContainerRegistryAdapter, Loaded]):
     @override
     def describe(self, laid: ManyRegistriesAndACaller) -> str:
         who = laid.caller.username
-        if self.with_no_ids:
+        if self.empty:
             return f"{who}이 빈 id 목록으로 읽음"
         return f"{who}이 심은 것 둘과 없는 id 하나를 한 번에 읽음"
 
-    def _ids(self, laid: ManyRegistriesAndACaller) -> list[ContainerRegistryID]:
-        if self.with_no_ids:
+    def registry_ids(self, laid: ManyRegistriesAndACaller) -> list[ContainerRegistryID]:
+        if self.empty:
             return []
         return [
-            ContainerRegistryID(laid.laid[0].id),
-            ContainerRegistryID(NOTHING),
-            ContainerRegistryID(laid.laid[1].id),
+            ContainerRegistryID(laid.registries[0].id),
+            ContainerRegistryID(MISSING_ENTITY_ID),
+            ContainerRegistryID(laid.registries[1].id),
         ]
 
     @override
@@ -65,7 +67,7 @@ class Loading(When[ManyRegistriesAndACaller, ContainerRegistryAdapter, Loaded]):
         self, adapter: ContainerRegistryAdapter, laid: ManyRegistriesAndACaller
     ) -> Loaded:
         with ActingAs(laid.caller):
-            return await adapter.batch_load_by_ids(self._ids(laid))
+            return await adapter.batch_load_by_ids(self.registry_ids(laid))
 
 
 @dataclass(frozen=True)
@@ -78,15 +80,17 @@ class TheOrderIsKeptAndTheHoleIsEmpty(Then[ManyRegistriesAndACaller, Loaded]):
     def look(self, laid: ManyRegistriesAndACaller, answered: Answered[Loaded]) -> list[Verdict]:
         got = answered.response
         if got is None:
-            return [
-                Refused(type(answered.raised) if answered.raised else Exception, answered.raised)
-            ]
+            return [MissingResponse(answered.raised)]
         return [
             Same("length", len(got), 3),
             Same(
                 "names",
                 [one.registry_name if one is not None else None for one in got],
-                [laid.laid[0].registry_name, None, laid.laid[1].registry_name],
+                [
+                    laid.registries[0].registry_name,
+                    None,
+                    laid.registries[1].registry_name,
+                ],
             ),
         ]
 
@@ -101,9 +105,7 @@ class AnEmptyListComesBack(Then[ManyRegistriesAndACaller, Loaded]):
     def look(self, laid: ManyRegistriesAndACaller, answered: Answered[Loaded]) -> list[Verdict]:
         got = answered.response
         if got is None:
-            return [
-                Refused(type(answered.raised) if answered.raised else Exception, answered.raised)
-            ]
+            return [MissingResponse(answered.raised)]
         return [Same("items", got, [])]
 
 
@@ -153,7 +155,7 @@ class AnEmptyListAsksNothing(
 
     @override
     def when(self) -> When[ManyRegistriesAndACaller, ContainerRegistryAdapter, Loaded]:
-        return Loading(with_no_ids=True)
+        return Loading(empty=True)
 
     @override
     def then(self) -> Then[ManyRegistriesAndACaller, Loaded]:
@@ -189,9 +191,7 @@ class APlainUserIsRefusedWholesale(
         return TheCallIsRefused(InsufficientPrivilege)
 
 
-SCENARIOS: list[
-    Scenario[SeedingSession, ManyRegistriesAndACaller, ContainerRegistryAdapter, Loaded]
-] = [
+SCENARIOS: list[ReadingScenario] = [
     LoadingKeepsTheOrderAndLeavesHoles(),
     AnEmptyListAsksNothing(),
     APlainUserIsRefusedWholesale(),
@@ -200,7 +200,7 @@ SCENARIOS: list[
 
 @pytest.mark.parametrize("scenario", SCENARIOS, ids=lambda s: s.summary())
 async def test_reading(
-    scenario: Scenario[SeedingSession, ManyRegistriesAndACaller, ContainerRegistryAdapter, Loaded],
+    scenario: ReadingScenario,
     adapter: ContainerRegistryAdapter,
     engine: ExtendedAsyncSAEngine,
 ) -> None:

@@ -1,9 +1,4 @@
-"""The container registry adapter, assembled for one row.
-
-The only place in these scenarios that knows how the adapter is built. It takes two
-bundles: its own, and the rbac one behind the allowed-project list. The second is not
-decoration — the calls that allow a project on a registry go through it.
-"""
+"""Container registry adapter fixture with registry and RBAC processors."""
 
 from __future__ import annotations
 
@@ -23,6 +18,7 @@ from ai.backend.manager.actions.registry.types import (
 )
 from ai.backend.manager.actions.v2.validators import ActionValidators as V2ActionValidators
 from ai.backend.manager.api.adapters.container_registry.adapter import ContainerRegistryAdapter
+from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.container_registry.repository import (
     ContainerRegistryRepository,
 )
@@ -47,7 +43,7 @@ from ai.backend.manager.services.rbac.service import (
 
 @pytest.fixture
 async def adapter(
-    engine: Any,
+    engine: ExtendedAsyncSAEngine,
     validators: V2ActionValidators,
     monitors: ActionMonitors,
 ) -> ContainerRegistryAdapter:
@@ -61,14 +57,15 @@ async def adapter(
             repository=OpsRepository(provider),
         )
     )
+    rbac_groups = registry.concern(ConcernMeta(Concern.RBAC))
     return ContainerRegistryAdapter(
         ContainerRegistryProcessors(
             registry.group(GroupMeta(ContainerRegistryEntityType())),
             ContainerRegistryService(engine, ContainerRegistryRepository(engine, relations)),
         ),
         RbacProcessors(
-            registry.concern(ConcernMeta(Concern.RBAC)).relation_group(),
-            registry.group(GroupMeta(UserEntityType())),
+            rbac_groups.relation_group(),
+            rbac_groups.group(GroupMeta(UserEntityType())),
             RbacRelationService(RbacRelationRepository(relations)),
             RbacRosterService(RbacRosterRepository(roster)),
             RbacRoleService(PermissionControllerRepository(engine), RbacRosterRepository(roster)),

@@ -1,4 +1,4 @@
-"""레지스트리 지우기 — 되돌릴 수 없고, 허용 목록도 함께 사라진다."""
+"""컨테이너 레지스트리와 허용 프로젝트 관계의 영구 삭제."""
 
 from __future__ import annotations
 
@@ -7,13 +7,13 @@ from typing import override
 from uuid import UUID
 
 import pytest
-from bai_scenario.components.answers import TheCallIsRefused
+from bai_scenario.components.answers import MissingResponse, TheCallIsRefused
 from bai_scenario.components.container_registry import (
-    AnIdThatHoldsNothing,
     ARegistryAndACaller,
     ARegistryAndSomeone,
-    Target,
-    TheLaidRegistry,
+    MissingRegistry,
+    RegistryTarget,
+    SeededRegistry,
 )
 from bai_scenario.runner.acting import ActingAs
 from bai_scenario.runner.planting import SeedingSession
@@ -34,7 +34,6 @@ from ai.backend.testutils.scenario_steps import (
     Answered,
     Given,
     Held,
-    Refused,
     SameAs,
     Scenario,
     Then,
@@ -42,10 +41,17 @@ from ai.backend.testutils.scenario_steps import (
     When,
 )
 
+type DeletionScenario = Scenario[
+    SeedingSession,
+    ARegistryAndACaller,
+    ContainerRegistryAdapter,
+    DeleteContainerRegistryPayload,
+]
+
 
 @dataclass(frozen=True)
-class Retiring(When[ARegistryAndACaller, ContainerRegistryAdapter, DeleteContainerRegistryPayload]):
-    at: Target = field(default_factory=TheLaidRegistry)
+class Deleting(When[ARegistryAndACaller, ContainerRegistryAdapter, DeleteContainerRegistryPayload]):
+    target: RegistryTarget = field(default_factory=SeededRegistry)
 
     @override
     def operation(self) -> str:
@@ -53,15 +59,15 @@ class Retiring(When[ARegistryAndACaller, ContainerRegistryAdapter, DeleteContain
 
     @override
     def describe(self, laid: ARegistryAndACaller) -> str:
-        return f"{laid.caller.username}이 {self.at.says()}를 지움"
+        return f"{laid.caller.username}이 {self.target.says()}를 지움"
 
     @override
     async def call(
         self, adapter: ContainerRegistryAdapter, laid: ARegistryAndACaller
     ) -> DeleteContainerRegistryPayload:
-        target = self.at.id_of(laid)
+        registry_id = self.target.id_of(laid)
         with ActingAs(laid.caller):
-            return await adapter.admin_delete(DeleteContainerRegistryInput(id=target))
+            return await adapter.admin_delete(DeleteContainerRegistryInput(id=registry_id))
 
 
 @dataclass(frozen=True)
@@ -76,9 +82,7 @@ class TheDeletedIdComesBack(Then[ARegistryAndACaller, DeleteContainerRegistryPay
     ) -> list[Verdict]:
         payload = answered.response
         if payload is None:
-            return [
-                Refused(type(answered.raised) if answered.raised else Exception, answered.raised)
-            ]
+            return [MissingResponse(answered.raised)]
         wanted: UUID = laid.registry.id
         return [Held("id", payload.id, SameAs(wanted, "심은 레지스트리의 id"))]
 
@@ -108,7 +112,7 @@ class DeletingAnswersWithTheRemovedId(
     def when(
         self,
     ) -> When[ARegistryAndACaller, ContainerRegistryAdapter, DeleteContainerRegistryPayload]:
-        return Retiring()
+        return Deleting()
 
     @override
     def then(self) -> Then[ARegistryAndACaller, DeleteContainerRegistryPayload]:
@@ -140,7 +144,7 @@ class DeletingTakesTheAllowedProjectWithIt(
     def when(
         self,
     ) -> When[ARegistryAndACaller, ContainerRegistryAdapter, DeleteContainerRegistryPayload]:
-        return Retiring()
+        return Deleting()
 
     @override
     def then(self) -> Then[ARegistryAndACaller, DeleteContainerRegistryPayload]:
@@ -148,7 +152,7 @@ class DeletingTakesTheAllowedProjectWithIt(
 
 
 @dataclass(frozen=True)
-class AnIdThatHoldsNothingIsRefused(
+class MissingRegistryIsRefused(
     Scenario[
         SeedingSession,
         ARegistryAndACaller,
@@ -172,7 +176,7 @@ class AnIdThatHoldsNothingIsRefused(
     def when(
         self,
     ) -> When[ARegistryAndACaller, ContainerRegistryAdapter, DeleteContainerRegistryPayload]:
-        return Retiring(at=AnIdThatHoldsNothing())
+        return Deleting(target=MissingRegistry())
 
     @override
     def then(self) -> Then[ARegistryAndACaller, DeleteContainerRegistryPayload]:
@@ -207,36 +211,24 @@ class APlainUserMayNotDelete(
     def when(
         self,
     ) -> When[ARegistryAndACaller, ContainerRegistryAdapter, DeleteContainerRegistryPayload]:
-        return Retiring()
+        return Deleting()
 
     @override
     def then(self) -> Then[ARegistryAndACaller, DeleteContainerRegistryPayload]:
         return TheCallIsRefused(InsufficientPrivilege)
 
 
-SCENARIOS: list[
-    Scenario[
-        SeedingSession,
-        ARegistryAndACaller,
-        ContainerRegistryAdapter,
-        DeleteContainerRegistryPayload,
-    ]
-] = [
+SCENARIOS: list[DeletionScenario] = [
     DeletingAnswersWithTheRemovedId(),
     DeletingTakesTheAllowedProjectWithIt(),
-    AnIdThatHoldsNothingIsRefused(),
+    MissingRegistryIsRefused(),
     APlainUserMayNotDelete(),
 ]
 
 
 @pytest.mark.parametrize("scenario", SCENARIOS, ids=lambda s: s.summary())
 async def test_retiring(
-    scenario: Scenario[
-        SeedingSession,
-        ARegistryAndACaller,
-        ContainerRegistryAdapter,
-        DeleteContainerRegistryPayload,
-    ],
+    scenario: DeletionScenario,
     adapter: ContainerRegistryAdapter,
     engine: ExtendedAsyncSAEngine,
 ) -> None:
