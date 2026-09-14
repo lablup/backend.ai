@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 from enum import StrEnum
 from typing import override
@@ -45,7 +46,9 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import (
     Answered,
     Given,
+    Held,
     Same,
+    SameAs,
     Scenario,
     Then,
     Verdict,
@@ -96,6 +99,18 @@ def registry_snapshot(
         registry.ssl_verify,
         registry.is_global,
         registry.extra,
+    )
+
+
+def registry_items_match(
+    got: Sequence[ContainerRegistryNode],
+    wanted: Sequence[ContainerRegistryData],
+    came_from: str = "심은 레지스트리",
+) -> Verdict:
+    return Held(
+        "items",
+        [registry_snapshot(one) for one in got],
+        SameAs([registry_snapshot(one) for one in wanted], came_from),
     )
 
 
@@ -225,10 +240,9 @@ class AllSeededRegistriesAreReturned(
         if payload is None:
             return [MissingResponse(answered.raised)]
         return [
-            Same(
-                "items",
-                [registry_snapshot(one) for one in sorted(payload.items, key=lambda r: r.id)],
-                [registry_snapshot(one) for one in sorted(laid.registries, key=lambda r: r.id)],
+            registry_items_match(
+                sorted(payload.items, key=lambda registry: registry.id),
+                sorted(laid.registries, key=lambda registry: registry.id),
             ),
             Same("total_count", payload.total_count, len(laid.registries)),
             Same("has_next_page", payload.has_next_page, False),
@@ -254,11 +268,7 @@ class OnlyTheMatchingRegistryIsReturned(
         if payload is None:
             return [MissingResponse(answered.raised)]
         return [
-            Same(
-                "items",
-                [registry_snapshot(one) for one in payload.items],
-                [registry_snapshot(laid.matching_registry)],
-            ),
+            registry_items_match(payload.items, [laid.matching_registry]),
             Same("total_count", payload.total_count, 1),
             Same("has_next_page", payload.has_next_page, False),
             Same("has_previous_page", payload.has_previous_page, False),
@@ -282,10 +292,10 @@ class DefaultPageIsReturned(Then[ManyRegistriesAndACaller, AdminSearchContainerR
             return [MissingResponse(answered.raised)]
         ordered = sorted(laid.registries, key=lambda registry: registry.id, reverse=True)
         return [
-            Same(
-                "items",
-                [registry_snapshot(one) for one in payload.items],
-                [registry_snapshot(one) for one in ordered[:DEFAULT_PAGINATION_LIMIT]],
+            registry_items_match(
+                payload.items,
+                ordered[:DEFAULT_PAGINATION_LIMIT],
+                "기대한 기본 페이지",
             ),
             Same("total_count", payload.total_count, len(laid.registries)),
             Same("has_next_page", payload.has_next_page, True),
@@ -315,10 +325,9 @@ class OnlyNonGlobalRegistriesAreReturned(
             key=lambda registry: registry.id,
         )
         return [
-            Same(
-                "items",
-                [registry_snapshot(one) for one in sorted(payload.items, key=lambda r: r.id)],
-                [registry_snapshot(one) for one in expected],
+            registry_items_match(
+                sorted(payload.items, key=lambda registry: registry.id),
+                expected,
             ),
             Same("total_count", payload.total_count, len(expected)),
             Same("has_next_page", payload.has_next_page, False),
@@ -351,11 +360,7 @@ class RegistriesAreOrderedByName(
             reverse=self.direction is OrderDirection.DESC,
         )
         return [
-            Same(
-                "items",
-                [registry_snapshot(one) for one in payload.items],
-                [registry_snapshot(one) for one in expected],
-            ),
+            registry_items_match(payload.items, expected, "심은 레지스트리 순서"),
             Same("total_count", payload.total_count, len(laid.registries)),
             Same("has_next_page", payload.has_next_page, False),
             Same("has_previous_page", payload.has_previous_page, False),
@@ -383,11 +388,7 @@ class OffsetPageIsReturned(Then[ManyRegistriesAndACaller, AdminSearchContainerRe
         ordered = sorted(laid.registries, key=lambda registry: registry.registry_name)
         expected = ordered[self.offset : self.offset + self.limit]
         return [
-            Same(
-                "items",
-                [registry_snapshot(one) for one in payload.items],
-                [registry_snapshot(one) for one in expected],
-            ),
+            registry_items_match(payload.items, expected, "기대한 오프셋 페이지"),
             Same("total_count", payload.total_count, len(laid.registries)),
             Same(
                 "has_next_page",
@@ -417,11 +418,7 @@ class ForwardCursorPageIsReturned(
             return [MissingResponse(answered.raised)]
         ordered = sorted(laid.registries, key=lambda registry: registry.id, reverse=True)
         return [
-            Same(
-                "items",
-                [registry_snapshot(one) for one in payload.items],
-                [registry_snapshot(ordered[1])],
-            ),
+            registry_items_match(payload.items, [ordered[1]], "기대한 다음 페이지"),
             Same("total_count", payload.total_count, len(laid.registries)),
             Same("has_next_page", payload.has_next_page, True),
             Same("has_previous_page", payload.has_previous_page, True),
@@ -447,11 +444,7 @@ class BackwardCursorPageIsReturned(
             return [MissingResponse(answered.raised)]
         ordered = sorted(laid.registries, key=lambda registry: registry.id)
         return [
-            Same(
-                "items",
-                [registry_snapshot(one) for one in payload.items],
-                [registry_snapshot(ordered[1])],
-            ),
+            registry_items_match(payload.items, [ordered[1]], "기대한 이전 페이지"),
             Same("total_count", payload.total_count, len(laid.registries)),
             Same("has_next_page", payload.has_next_page, True),
             Same("has_previous_page", payload.has_previous_page, True),
