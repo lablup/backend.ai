@@ -471,13 +471,16 @@ class DataLoaders:
     ) -> DataLoader[uuid.UUID, ReservoirRegistry | None]:
         adapter = self._adapters.reservoir_registry
 
-        async def load_fn(ids: list[uuid.UUID]) -> list[ReservoirRegistry | None]:
+        async def load_fn(ids: list[uuid.UUID]) -> list[ReservoirRegistry | Exception | None]:
             from ai.backend.manager.api.gql.reservoir_registry import (  # pants: no-infer-dep
                 ReservoirRegistry as RR,
             )
 
             dtos = await adapter.batch_load_by_ids(ids)
-            return [RR.from_pydantic(dto) if dto is not None else None for dto in dtos]
+            return [
+                dto if dto is None or isinstance(dto, Exception) else RR.from_pydantic(dto)
+                for dto in dtos
+            ]
 
         return DataLoader(load_fn=load_fn)
 

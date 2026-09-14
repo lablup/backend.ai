@@ -802,6 +802,7 @@ def create_processors(
         artifact_registry=ArtifactRegistryProcessors(
             artifact_groups.group(GroupMeta(ArtifactRegistryEntityType())),
             artifact_groups.group(GroupMeta(ArtifactRegistryEntityType())),
+            artifact_groups.group(GroupMeta(ArtifactRegistryEntityType())),
             services.artifact_registry,
         ),
         deployment=DeploymentProcessors(

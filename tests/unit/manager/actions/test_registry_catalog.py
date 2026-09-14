@@ -155,6 +155,9 @@ from ai.backend.manager.services.artifact_registry.actions.common.get_multi impo
 from ai.backend.manager.services.artifact_registry.actions.huggingface.bulk_get import (
     BulkGetHuggingFaceRegistriesAction,
 )
+from ai.backend.manager.services.artifact_registry.actions.reservoir.bulk_get import (
+    BulkGetReservoirRegistriesAction,
+)
 from ai.backend.manager.services.artifact_registry.processors import ArtifactRegistryProcessors
 from ai.backend.manager.services.audit_log.actions.bulk_get import BulkGetAuditLogsAction
 from ai.backend.manager.services.audit_log.actions.lookup_owner import (
@@ -525,6 +528,7 @@ def test_every_defined_v2_action_is_wired() -> None:
     ArtifactRegistryProcessors(
         registry.group(GroupMeta(ArtifactRegistryEntityType())),
         registry.group(GroupMeta(ArtifactRegistryEntityType())),
+        registry.group(GroupMeta(ArtifactRegistryEntityType())),
         MagicMock(),
     )
     ModelCardProcessors(registry.group(GroupMeta(ModelCardEntityType())), MagicMock())
@@ -772,10 +776,11 @@ def test_resource_domain_and_agent_reads_keep_their_judged_gates() -> None:
 
 
 def test_artifact_registry_metas_read_is_a_partial_bulk_permission_read() -> None:
-    """The named artifact and HuggingFace registries are read one permission check per
-    registry, not superadmin-only."""
+    """The named artifact, HuggingFace and Reservoir registries are read one permission check
+    per registry, not superadmin-only."""
     registry = _ops_registry()
     ArtifactRegistryProcessors(
+        registry.group(GroupMeta(ArtifactRegistryEntityType())),
         registry.group(GroupMeta(ArtifactRegistryEntityType())),
         registry.group(GroupMeta(ArtifactRegistryEntityType())),
         MagicMock(),
@@ -791,6 +796,11 @@ def test_artifact_registry_metas_read_is_a_partial_bulk_permission_read() -> Non
         ActionGate.PERMISSION,
     )
     assert recorded[BulkGetHuggingFaceRegistriesAction] == (
+        ArtifactRegistryEntityType(),
+        ActionKind.BULK,
+        ActionGate.PERMISSION,
+    )
+    assert recorded[BulkGetReservoirRegistriesAction] == (
         ArtifactRegistryEntityType(),
         ActionKind.BULK,
         ActionGate.PERMISSION,
