@@ -719,7 +719,7 @@ def _write_presets(conn: sa.engine.Connection) -> None:
         conn.execute(
             sa.text("""
                 INSERT INTO role_presets (id, name, scope_type, auto_assign, deleted)
-                VALUES (:id, :name, :scope_type, :auto_assign, false)
+                VALUES (CAST(:id AS uuid), :name, :scope_type, :auto_assign, false)
                 ON CONFLICT (id) DO UPDATE SET
                     name = EXCLUDED.name,
                     scope_type = EXCLUDED.scope_type,
@@ -733,9 +733,9 @@ def _write_presets(conn: sa.engine.Connection) -> None:
             )
         )
         conn.execute(
-            sa.text("DELETE FROM role_permission_presets WHERE role_preset_id = :id").bindparams(
-                id=preset.id
-            )
+            sa.text(
+                "DELETE FROM role_permission_presets WHERE role_preset_id = CAST(:id AS uuid)"
+            ).bindparams(id=preset.id)
         )
         rows = [
             {
@@ -752,7 +752,10 @@ def _write_presets(conn: sa.engine.Connection) -> None:
                 sa.text("""
                     INSERT INTO role_permission_presets
                         (id, role_preset_id, entity_type, permission)
-                    VALUES (:id, :role_preset_id, :entity_type, :permission)
+                    VALUES (
+                        CAST(:id AS uuid), CAST(:role_preset_id AS uuid), :entity_type,
+                        :permission
+                    )
                 """),
                 rows,
             )
@@ -763,14 +766,16 @@ def _write_role_permissions(conn: sa.engine.Connection) -> None:
         role_ids = [
             row.id
             for row in conn.execute(
-                sa.text("SELECT id FROM roles WHERE role_preset_id = :id").bindparams(id=preset.id)
+                sa.text("SELECT id FROM roles WHERE role_preset_id = CAST(:id AS uuid)").bindparams(
+                    id=preset.id
+                )
             )
         ]
         if not role_ids:
             continue
         conn.execute(
             sa.text("DELETE FROM permissions WHERE role_id = ANY(:role_ids)").bindparams(
-                role_ids=role_ids
+                sa.bindparam("role_ids", role_ids, type_=sa.ARRAY(sa.Uuid))
             )
         )
         rows = [
@@ -788,7 +793,7 @@ def _write_role_permissions(conn: sa.engine.Connection) -> None:
             conn.execute(
                 sa.text("""
                     INSERT INTO permissions (id, role_id, entity_type, permission)
-                    VALUES (:id, :role_id, :entity_type, :permission)
+                    VALUES (CAST(:id AS uuid), :role_id, :entity_type, :permission)
                 """),
                 rows,
             )
@@ -823,7 +828,9 @@ def _link_roles(conn: sa.engine.Connection) -> None:
     ]
     if linked:
         conn.execute(
-            sa.text("UPDATE roles SET role_preset_id = :b_preset_id WHERE id = :b_role_id"),
+            sa.text(
+                "UPDATE roles SET role_preset_id = CAST(:b_preset_id AS uuid) WHERE id = :b_role_id"
+            ),
             linked,
         )
 
@@ -879,8 +886,8 @@ def _share_membership(conn: sa.engine.Connection, project_id: str, user_id: str)
             INSERT INTO entity_memberships (virtual_entity_id, member_entity_id, capped)
             SELECT scope.id, member.id, TRUE
             FROM virtual_entities scope, virtual_entities member
-            WHERE scope.entity_type = 'project' AND scope.entity_id = :project_id
-              AND member.entity_type = 'user' AND member.entity_id = :user_id
+            WHERE scope.entity_type = 'project' AND scope.entity_id = CAST(:project_id AS uuid)
+              AND member.entity_type = 'user' AND member.entity_id = CAST(:user_id AS uuid)
             ON CONFLICT (virtual_entity_id, member_entity_id) DO NOTHING
             RETURNING id
         """).bindparams(project_id=project_id, user_id=user_id)
