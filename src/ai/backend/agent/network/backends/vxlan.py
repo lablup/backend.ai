@@ -2035,7 +2035,13 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
             ):
                 continue
             try:
-                await self._ensure_forward_accept(meta.vni)
+                async with self._session_guard(session_id):
+                    if self._sessions.get(session_id) is not meta:
+                        # Teardown deletes the rule and drops the record afterwards, so a session
+                        # still listed here can already have had its rule removed on purpose.
+                        # Putting it back would leave the VNI accepting for whoever draws it next.
+                        continue
+                    await self._ensure_forward_accept(meta.vni)
             except Exception as e:
                 log.warning(
                     "session {}'s bridge forward-accept rule is missing and could not be put back"
