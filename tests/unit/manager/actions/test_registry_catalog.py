@@ -197,6 +197,7 @@ from ai.backend.manager.services.entity_share.processors import (
 )
 from ai.backend.manager.services.export.processors import ExportProcessors
 from ai.backend.manager.services.fair_share.processors import FairShareProcessors
+from ai.backend.manager.services.idle_checker.actions.bulk_get import BulkGetIdleCheckersAction
 from ai.backend.manager.services.idle_checker.processors import IdleCheckerProcessors
 from ai.backend.manager.services.idle_checker_assignment.processors import (
     IdleCheckerAssignmentProcessors,
@@ -309,6 +310,7 @@ from ai.backend.manager.services.vfolder.processors.invite import VFolderInviteP
 from ai.backend.manager.services.vfolder.processors.sharing import VFolderSharingProcessors
 from ai.backend.manager.services.vfolder.processors.vfolder import VFolderProcessors
 from ai.backend.manager.services.vfolder.processors.vfolder_admin import VFolderAdminProcessors
+from ai.backend.manager.services.vfs_storage.actions.bulk_get import BulkGetVFSStoragesAction
 from ai.backend.manager.services.vfs_storage.actions.bulk_get import BulkGetVFSStoragesAction
 from ai.backend.manager.services.vfs_storage.processors import VFSStorageProcessors
 
@@ -923,6 +925,42 @@ def test_vfs_storage_loader_read_is_a_partial_permission_read() -> None:
     }
     assert recorded[BulkGetVFSStoragesAction] == (
         VFSStorageEntityType(),
+        ActionKind.BULK,
+        ActionGate.PERMISSION,
+    )
+
+
+def test_vfs_storage_loader_read_is_a_partial_permission_read() -> None:
+    """The VFS storage DataLoader reads per named storage, not superadmin-only."""
+    registry = _ops_registry()
+    VFSStorageProcessors(registry.group(GroupMeta(VFSStorageEntityType())), MagicMock())
+
+    recorded = {
+        record.action_cls: (record.entity_type, record.kind, record.gate)
+        for record in registry.wired_processors()
+    }
+    assert recorded[BulkGetVFSStoragesAction] == (
+        VFSStorageEntityType(),
+        ActionKind.BULK,
+        ActionGate.PERMISSION,
+    )
+
+
+def test_idle_checker_loader_read_is_a_partial_permission_read() -> None:
+    """The idle checker DataLoader reads per named checker, not superadmin-only."""
+    registry = _ops_registry()
+    IdleCheckerProcessors(
+        registry.group(GroupMeta(IdleCheckerEntityType())),
+        registry.group(GroupMeta(SessionEntityType())),
+        MagicMock(),
+    )
+
+    recorded = {
+        record.action_cls: (record.entity_type, record.kind, record.gate)
+        for record in registry.wired_processors()
+    }
+    assert recorded[BulkGetIdleCheckersAction] == (
+        IdleCheckerEntityType(),
         ActionKind.BULK,
         ActionGate.PERMISSION,
     )
