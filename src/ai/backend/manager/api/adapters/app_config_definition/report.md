@@ -446,7 +446,7 @@ When
 Then
 
 - 커서 다음 정의와 앞뒤 페이지가 모두 있다고 응답한다
-  - items = [AppConfigDefinitionID('01a09f03-29d2-7883-9205-6d284b204389')]
+  - items: 커서 다음 설정 정의와 같다
   - total_count = 4
   - has_next_page = True
   - has_previous_page = True
