@@ -69,6 +69,7 @@ from ai.backend.manager.models.image.updaters import ImageUpdate
 from ai.backend.manager.models.specs.pagination import NoPagination, OffsetPagination
 from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.services.image.actions.alias_image import AliasImageByIdAction
+from ai.backend.manager.services.image.actions.bulk_get import BulkGetImagesAction
 from ai.backend.manager.services.image.actions.dealias_image import DealiasImageAction
 from ai.backend.manager.services.image.actions.forget_image import ForgetImageByIdAction
 from ai.backend.manager.services.image.actions.purge_images import PurgeImageByIdAction
@@ -124,22 +125,19 @@ class ImageAdapter(BaseAdapter):
 
     # ------------------------------------------------------------------ batch load (DataLoader)
 
-    async def batch_load_by_ids(self, image_ids: Sequence[ImageID]) -> list[ImageNode | None]:
-        """Batch load images by ID for DataLoader use.
-
-        Returns ImageNode DTOs in the same order as the input image_ids list.
-        """
+    async def batch_load_by_ids(
+        self, image_ids: Sequence[ImageID]
+    ) -> list[ImageNode | Exception | None]:
+        """Batch load images by their IDs for DataLoader use, checked per image."""
         if not image_ids:
             return []
-        querier = BatchQuerier(
-            pagination=NoPagination(),
-            conditions=[ImageConditions.by_ids(image_ids)],
-        )
-        action_result = await self._image.search_images.run(SearchImagesAction(querier=querier))
-        image_map: dict[ImageID, ImageNode] = {
-            ImageID(item.id): self._data_to_dto(item) for item in action_result.data
-        }
-        return [image_map.get(image_id) for image_id in image_ids]
+        result = await self._image.bulk_get.run(BulkGetImagesAction(ids=list(image_ids)))
+        return [
+            self._data_to_dto(item.value)
+            if item.value is not None
+            else self.batch_load_failure(item.error)
+            for item in result.items
+        ]
 
     async def batch_load_aliases_by_ids(
         self, alias_ids: Sequence[ImageAliasID]

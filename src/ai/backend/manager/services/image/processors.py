@@ -1,4 +1,5 @@
 from ai.backend.manager.actions.registry.group import ProcessorGroup
+from ai.backend.manager.actions.v2.bulk.partial_processor import PartialBulkActionProcessor
 from ai.backend.manager.actions.v2.global_scope.processor import (
     GlobalActionProcessor,
     PublicActionProcessor,
@@ -12,6 +13,7 @@ from ai.backend.manager.services.image.actions.alias_image import (
     AliasImageByIdAction,
     AliasImageByIdActionResult,
 )
+from ai.backend.manager.services.image.actions.bulk_get import BulkGetImagesAction
 from ai.backend.manager.services.image.actions.clear_image_custom_resource_limit import (
     ClearImageCustomResourceLimitAction,
     ClearImageCustomResourceLimitActionResult,
@@ -149,6 +151,8 @@ class ImageProcessors:
         PublicGetAllImagesAction, PublicGetAllImagesActionResult
     ]
     search_images: GlobalActionProcessor[SearchImagesAction, SearchImagesActionResult]
+    # What the DataLoader reads: checked per image.
+    bulk_get: PartialBulkActionProcessor[BulkGetImagesAction, ImageData]
     scoped_search: ScopeActionProcessor[ScopedSearchImagesAction, ScopedSearchImagesActionResult]
     search_aliases: GlobalActionProcessor[SearchAliasesAction, SearchAliasesActionResult]
 
@@ -169,6 +173,7 @@ class ImageProcessors:
         )
         self.forget_image = group.global_scope(ForgetImageAction, service.forget_image)
         self.search_images = group.global_scope(SearchImagesAction, service.search_images)
+        self.bulk_get = group.partial_bulk_get_ops(BulkGetImagesAction)
         self.scoped_search = group.scope(ScopedSearchImagesAction, service.scoped_search_images)
 
         self.forget_image_by_id = group.single_entity(

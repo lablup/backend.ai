@@ -199,6 +199,7 @@ from ai.backend.manager.services.idle_checker.processors import IdleCheckerProce
 from ai.backend.manager.services.idle_checker_assignment.processors import (
     IdleCheckerAssignmentProcessors,
 )
+from ai.backend.manager.services.image.actions.bulk_get import BulkGetImagesAction
 from ai.backend.manager.services.image.processors import ImageProcessors
 from ai.backend.manager.services.keypair_resource_policy.processors import (
     KeypairResourcePolicyProcessors,
@@ -813,6 +814,7 @@ def test_entity_data_loader_reads_are_checked_per_entity_except_domains() -> Non
         ),
         MagicMock(),
     )
+    ImageProcessors(registry.group(GroupMeta(ImageEntityType())), MagicMock())
 
     recorded = {
         record.action_cls: (record.entity_type, record.kind, record.gate)
@@ -845,6 +847,11 @@ def test_entity_data_loader_reads_are_checked_per_entity_except_domains() -> Non
     )
     assert recorded[BulkGetArtifactRevisionsAction] == (
         ArtifactEntityType(),
+        ActionKind.BULK,
+        ActionGate.PERMISSION,
+    )
+    assert recorded[BulkGetImagesAction] == (
+        ImageEntityType(),
         ActionKind.BULK,
         ActionGate.PERMISSION,
     )
