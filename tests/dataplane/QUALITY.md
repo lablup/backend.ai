@@ -34,6 +34,12 @@ agent account on every node.
 `network/session/` or `network/ipam/` key in etcd, no `bai*` link on any node -- before and after.
 A run that starts on a dirty rig reports the dirt as its own.
 
+**Let every node finish saying what it can do before starting.** An agent republishes its
+`network/agent/<id>/caps` on a timer, so one started (or restarted over a privnet that was still
+coming up) shortly before the run advertises no backends at the moment the first scenario takes
+its baseline, and fills them in mid-scenario -- reported as a leaked record and a lost one at once.
+Wait until every node's caps names the backend under test.
+
 ## Required environment
 
 | Variable | Contract |
