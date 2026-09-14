@@ -21,6 +21,7 @@ Create Date: 2026-09-14
 
 from __future__ import annotations
 
+import hashlib
 import uuid
 from dataclasses import dataclass
 from typing import Final
@@ -34,6 +35,22 @@ down_revision = "c58b0d3a9e14"
 # Part of: NEXT_RELEASE_VERSION
 branch_labels = None
 depends_on = None
+
+
+# The seed derives an id as a uuid7 whose timestamp is fixed and whose remaining bits
+# come from what it identifies, so a database migrated here and one seeded from the
+# fixture hold the same rows.
+_EPOCH_MS: Final[int] = 1757670718265
+
+
+def _identify(*parts: str) -> str:
+    digest = hashlib.blake2b("|".join(parts).encode("utf-8"), digest_size=10).digest()
+    value = (_EPOCH_MS & 0xFFFFFFFFFFFF) << 80 | int.from_bytes(digest, "big")
+    value &= ~(0xF << 76)
+    value |= 0x7 << 76
+    value &= ~(0x3 << 62)
+    value |= 0x2 << 62
+    return str(uuid.UUID(int=value))
 
 
 @dataclass(frozen=True)
@@ -647,7 +664,7 @@ def _write_presets(conn: sa.engine.Connection) -> None:
         )
         rows = [
             {
-                "id": str(uuid.uuid4()),
+                "id": _identify("role_permission_preset", preset.id, entity_type, str(bit)),
                 "role_preset_id": preset.id,
                 "entity_type": entity_type,
                 "permission": bit,
@@ -683,7 +700,7 @@ def _write_role_permissions(conn: sa.engine.Connection) -> None:
         )
         rows = [
             {
-                "id": str(uuid.uuid4()),
+                "id": _identify("permission", str(role_id), entity_type, str(bit)),
                 "role_id": role_id,
                 "entity_type": entity_type,
                 "permission": bit,
