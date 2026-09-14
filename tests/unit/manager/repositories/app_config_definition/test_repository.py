@@ -4,13 +4,28 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import AsyncGenerator
+from dataclasses import dataclass
 
 import pytest
+import sqlalchemy as sa
 
-from ai.backend.common.data.entity.app_config_definition import AppConfigDefinitionID
+from ai.backend.common.data.app_config.types import AppConfigScopeType
+from ai.backend.common.data.entity.app_config_allow_list import (
+    AppConfigAllowListEntityType,
+    AppConfigAllowListID,
+)
+from ai.backend.common.data.entity.app_config_definition import (
+    AppConfigDefinitionEntityType,
+    AppConfigDefinitionID,
+)
+from ai.backend.common.data.entity.app_config_fragment import (
+    AppConfigFragmentEntityType,
+    AppConfigFragmentID,
+)
 from ai.backend.common.data.filter_specs import StringMatchSpec
 from ai.backend.manager.data.app_config.types import AppConfigDefinitionData
 from ai.backend.manager.errors.base.entity import EntityNotFoundError
+from ai.backend.manager.models.app_config_allow_list.row import AppConfigAllowListRow
 from ai.backend.manager.models.app_config_definition.conditions import (
     AppConfigDefinitionConditions,
 )
@@ -28,6 +43,7 @@ from ai.backend.manager.models.app_config_definition.row import AppConfigDefinit
 from ai.backend.manager.models.app_config_definition.searchers import (
     AppConfigDefinitionSearcher,
 )
+from ai.backend.manager.models.app_config_fragment.row import AppConfigFragmentRow
 from ai.backend.manager.models.entity_label.row import EntityLabelRow
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.rbac_models.role import RoleRow
@@ -42,6 +58,9 @@ from ai.backend.manager.models.virtual_entity.entity_membership_field import (
 )
 from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
 from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
+from ai.backend.manager.repositories.app_config_definition.repository import (
+    AppConfigDefinitionRepository,
+)
 from ai.backend.manager.repositories.ops.repository import OpsRepository
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.testutils.db import with_tables
@@ -63,9 +82,19 @@ async def repository(
             RoleRow,
             PermissionRow,
             AppConfigDefinitionRow,
+            AppConfigAllowListRow,
+            AppConfigFragmentRow,
         ],
     ):
         yield OpsRepository(V2DBOpsProvider(database_connection))
+
+
+@pytest.fixture
+def definition_repository(
+    database_connection: ExtendedAsyncSAEngine,
+    repository: OpsRepository[AppConfigDefinitionData],
+) -> AppConfigDefinitionRepository:
+    return AppConfigDefinitionRepository(V2DBOpsProvider(database_connection))
 
 
 @pytest.fixture
@@ -86,6 +115,58 @@ async def seeded_definitions(
         )
         definitions.append(definition)
     return definitions
+
+
+@dataclass(frozen=True)
+class _DefinitionWithDependents:
+    definition_id: AppConfigDefinitionID
+    allow_list_id: AppConfigAllowListID
+    fragment_id: AppConfigFragmentID
+
+
+@pytest.fixture
+async def definition_with_dependents(
+    database_connection: ExtendedAsyncSAEngine,
+    repository: OpsRepository[AppConfigDefinitionData],
+) -> _DefinitionWithDependents:
+    """A definition, one public allow-list entry and one fragment under it, each with
+    its virtual entity."""
+    laid = _DefinitionWithDependents(
+        definition_id=AppConfigDefinitionID(uuid.uuid4()),
+        allow_list_id=AppConfigAllowListID(uuid.uuid4()),
+        fragment_id=AppConfigFragmentID(uuid.uuid4()),
+    )
+    async with database_connection.begin_session() as db_sess:
+        db_sess.add(AppConfigDefinitionRow(id=laid.definition_id, config_name="theme"))
+        await db_sess.flush()
+        db_sess.add(
+            AppConfigAllowListRow(
+                id=laid.allow_list_id,
+                config_name="theme",
+                scope_type=AppConfigScopeType.PUBLIC,
+                rank=0,
+            )
+        )
+        await db_sess.flush()
+        db_sess.add(
+            AppConfigFragmentRow(
+                id=laid.fragment_id,
+                config_name="theme",
+                scope_type=AppConfigScopeType.PUBLIC,
+                scope_id=None,
+                config={"k": "v"},
+            )
+        )
+        db_sess.add_all([
+            VirtualEntityRow(
+                entity_type=AppConfigDefinitionEntityType(), entity_id=laid.definition_id
+            ),
+            VirtualEntityRow(
+                entity_type=AppConfigAllowListEntityType(), entity_id=laid.allow_list_id
+            ),
+            VirtualEntityRow(entity_type=AppConfigFragmentEntityType(), entity_id=laid.fragment_id),
+        ])
+    return laid
 
 
 def _missing_id() -> AppConfigDefinitionID:
@@ -128,6 +209,44 @@ class TestPurge:
     ) -> None:
         with pytest.raises(EntityNotFoundError):
             await repository.purge_entity(AppConfigDefinitionPurger(definition_id=_missing_id()))
+
+
+class TestPurgeWithDependents:
+    async def test_purge_tears_down_the_cascaded_entries_and_fragments(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+        definition_repository: AppConfigDefinitionRepository,
+        definition_with_dependents: _DefinitionWithDependents,
+    ) -> None:
+        purged = await definition_repository.purge(definition_with_dependents.definition_id)
+        assert purged.id == definition_with_dependents.definition_id
+        async with database_connection.begin_readonly_session() as db_sess:
+            remaining_nodes = await db_sess.scalar(
+                sa.select(sa.func.count())
+                .select_from(VirtualEntityRow)
+                .where(
+                    sa.tuple_(VirtualEntityRow.entity_type, VirtualEntityRow.entity_id).in_([
+                        (AppConfigDefinitionEntityType(), definition_with_dependents.definition_id),
+                        (AppConfigAllowListEntityType(), definition_with_dependents.allow_list_id),
+                        (AppConfigFragmentEntityType(), definition_with_dependents.fragment_id),
+                    ])
+                )
+            )
+            remaining_entries = await db_sess.scalar(
+                sa.select(sa.func.count()).select_from(AppConfigAllowListRow)
+            )
+            remaining_fragments = await db_sess.scalar(
+                sa.select(sa.func.count()).select_from(AppConfigFragmentRow)
+            )
+        assert remaining_nodes == 0
+        assert remaining_entries == 0
+        assert remaining_fragments == 0
+
+    async def test_purge_missing_raises(
+        self, definition_repository: AppConfigDefinitionRepository
+    ) -> None:
+        with pytest.raises(EntityNotFoundError):
+            await definition_repository.purge(_missing_id())
 
 
 class TestAdminSearch:

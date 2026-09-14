@@ -51,6 +51,7 @@ from ai.backend.manager.services.app_config.actions.definition.get import (
 )
 from ai.backend.manager.services.app_config.actions.definition.purge import (
     PurgeAppConfigDefinitionAction,
+    PurgeAppConfigDefinitionActionResult,
 )
 from ai.backend.manager.services.app_config.actions.fragment.admin_search import (
     AdminSearchAppConfigFragmentAction,
@@ -111,7 +112,7 @@ class AppConfigProcessors:
         BulkGetAppConfigDefinitionsAction, AppConfigDefinitionData
     ]
     definition_purge: SingleEntityActionProcessor[
-        PurgeAppConfigDefinitionAction, EntityOpsResult[AppConfigDefinitionData]
+        PurgeAppConfigDefinitionAction, PurgeAppConfigDefinitionActionResult
     ]
     definition_global_search: GlobalActionProcessor[
         AdminSearchAppConfigDefinitionsAction, BatchOpsResult[AppConfigDefinitionData]
@@ -184,7 +185,9 @@ class AppConfigProcessors:
         self.definition_bulk_get = definition_group.partial_bulk_get_ops(
             BulkGetAppConfigDefinitionsAction
         )
-        self.definition_purge = definition_group.entity_purge_ops(PurgeAppConfigDefinitionAction)
+        self.definition_purge = definition_group.single_entity(
+            PurgeAppConfigDefinitionAction, service.purge_definition
+        )
         self.definition_global_search = definition_group.global_search_ops(
             AdminSearchAppConfigDefinitionsAction
         )

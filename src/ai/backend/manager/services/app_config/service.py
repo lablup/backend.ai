@@ -6,7 +6,14 @@ from typing import Any
 from ai.backend.manager.data.app_config.types import AppConfigData, AppConfigFragmentData
 from ai.backend.manager.models.scopes import OperationScope
 from ai.backend.manager.models.specs.searcher import Searcher
+from ai.backend.manager.repositories.app_config_definition.repository import (
+    AppConfigDefinitionRepository,
+)
 from ai.backend.manager.repositories.ops.repository import OpsRepository
+from ai.backend.manager.services.app_config.actions.definition.purge import (
+    PurgeAppConfigDefinitionAction,
+    PurgeAppConfigDefinitionActionResult,
+)
 from ai.backend.manager.services.app_config.actions.search import (
     AnonymousSearchAppConfigsAction,
     SearchAppConfigsAction,
@@ -41,16 +48,30 @@ def _merge_configs(fragments: Sequence[AppConfigFragmentData]) -> dict[str, Any]
 
 
 class AppConfigService:
-    """Read-side service for the merged ``AppConfig`` view.
+    """The merged ``AppConfig`` read and the definition purge.
 
     The fragment read is a plain scoped search, so it runs against ops; what keeps a
-    service here is the merge, which turns many rows into one value per name.
+    service here is the merge, which turns many rows into one value per name. The
+    definition purge is here because it clears three tables in one transaction.
     """
 
     _repository: OpsRepository[AppConfigFragmentData]
+    _definition_repository: AppConfigDefinitionRepository
 
-    def __init__(self, repository: OpsRepository[AppConfigFragmentData]) -> None:
+    def __init__(
+        self,
+        repository: OpsRepository[AppConfigFragmentData],
+        definition_repository: AppConfigDefinitionRepository,
+    ) -> None:
         self._repository = repository
+        self._definition_repository = definition_repository
+
+    async def purge_definition(
+        self, action: PurgeAppConfigDefinitionAction
+    ) -> PurgeAppConfigDefinitionActionResult:
+        return PurgeAppConfigDefinitionActionResult(
+            definition_data=await self._definition_repository.purge(action.definition_id)
+        )
 
     async def search_app_configs(
         self, action: SearchAppConfigsAction

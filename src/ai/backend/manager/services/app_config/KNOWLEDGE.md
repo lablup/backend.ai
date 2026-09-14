@@ -1,17 +1,18 @@
 ---
 name: app-config-service-shapes
 type: decision-table
-description: app config as a value computed from the definition/allow-list/fragment tables with no row of its own, how the allow-list decides which scopes may fill a config_name and which of domain or user overrides the other, why an anonymous read yields public values, why both reads are scope operations
+description: app config as a value computed from the definition/allow-list/fragment tables with no row of its own, how the allow-list decides which scopes may fill a config_name and which of domain or user overrides the other, why an anonymous read yields public values, why both reads are scope operations, why the definition purge is a service method
 scope: src/ai/backend/manager/services/app_config
-keywords: [SearchAppConfigsAction, AnonymousSearchAppConfigsAction, VisibleAppConfigFragmentOperationScope, PublicAppConfigFragmentOperationScope, app_config_definitions, app_config_allow_list, app_config_fragments]
+keywords: [SearchAppConfigsAction, AnonymousSearchAppConfigsAction, PurgeAppConfigDefinitionAction, VisibleAppConfigFragmentOperationScope, PublicAppConfigFragmentOperationScope, app_config_definitions, app_config_allow_list, app_config_fragments]
 sources:
   - src/ai/backend/manager/services/app_config
+  - src/ai/backend/manager/repositories/app_config_definition
   - src/ai/backend/manager/repositories/app_config_fragment
   - src/ai/backend/manager/models/app_config_allow_list
   - src/ai/backend/manager/models/app_config_definition
 generated:
   by: claude-code/opus-5
-  at: 2026-08-18
+  at: 2026-09-14
 status: stable
 ---
 
@@ -65,3 +66,13 @@ Both carry the entity type `app_config`.
 - `public` has no owner and therefore no `scope_id`. It is expressible on the query axis,
   which needs a condition and nothing else, but there is nothing to name where access is
   answered for.
+
+## The definition purge is a service method
+
+- `definition_purge` runs `AppConfigService.purge_definition`, not the generic purge.
+  The database cascades the delete to the allow-list entries and fragments under the
+  name, but the generic path tears down only the purged entity's own virtual entity.
+- `AppConfigDefinitionRepository.purge` deletes the fragments, then the entries, then
+  the definition in one transaction, so each row's virtual entity goes with it.
+- The allow-list purge still runs the generic path; the fragments it cascades to keep
+  their virtual entities.

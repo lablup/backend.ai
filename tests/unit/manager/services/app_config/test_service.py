@@ -20,6 +20,9 @@ from ai.backend.manager.models.app_config_fragment.scopes import (
     VisibleAppConfigFragmentOperationScope,
 )
 from ai.backend.manager.models.specs.searcher import SearcherResult
+from ai.backend.manager.repositories.app_config_definition.repository import (
+    AppConfigDefinitionRepository,
+)
 from ai.backend.manager.repositories.ops.repository import OpsRepository
 from ai.backend.manager.services.app_config.actions.search import (
     AnonymousSearchAppConfigsAction,
@@ -65,7 +68,7 @@ class TestAppConfigService:
 
     @pytest.fixture
     def service(self, mock_repository: MagicMock) -> AppConfigService:
-        return AppConfigService(mock_repository)
+        return AppConfigService(mock_repository, MagicMock(spec=AppConfigDefinitionRepository))
 
     @pytest.fixture
     def found(self, mock_repository: MagicMock) -> Callable[[list[AppConfigFragmentData]], None]:

@@ -50,6 +50,9 @@ from ai.backend.manager.models.app_config_allow_list.row import AppConfigAllowLi
 from ai.backend.manager.models.app_config_definition.row import AppConfigDefinitionRow
 from ai.backend.manager.models.app_config_fragment.row import AppConfigFragmentRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.app_config_definition.repository import (
+    AppConfigDefinitionRepository,
+)
 from ai.backend.manager.repositories.ops.repository import OpsRepository
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.services.app_config.processors import AppConfigProcessors
@@ -78,7 +81,10 @@ def app_config_processors(database_engine: ExtendedAsyncSAEngine) -> AppConfigPr
         ops_processor_group(database_engine, GroupMeta(AppConfigEntityType())),
         registry.group(GroupMeta(AppConfigDefinitionEntityType())),
         registry.group(GroupMeta(AppConfigAllowListEntityType())),
-        AppConfigService(OpsRepository(V2DBOpsProvider(database_engine))),
+        AppConfigService(
+            OpsRepository(V2DBOpsProvider(database_engine)),
+            AppConfigDefinitionRepository(V2DBOpsProvider(database_engine)),
+        ),
     )
 
 

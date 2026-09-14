@@ -146,7 +146,7 @@ class AppConfigDefinitionAdapter(BaseAdapter):
         action_result = await self._app_config.definition_purge.run(
             PurgeAppConfigDefinitionAction(definition_id=AppConfigDefinitionID(input.id))
         )
-        return PurgeAppConfigDefinitionPayload(id=action_result.data.id)
+        return PurgeAppConfigDefinitionPayload(id=action_result.definition_data.id)
 
     @staticmethod
     def _data_to_node(data: AppConfigDefinitionData) -> AppConfigDefinitionNode:

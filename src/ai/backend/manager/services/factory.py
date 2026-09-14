@@ -274,7 +274,10 @@ def create_services(args: ServiceArgs, action_registry: ProcessorRegistry[Any]) 
             args.scheduling_controller,
             BulkOwnCheck(repositories.rbac.permission_check, args.config_provider),
         ),
-        app_config=AppConfigService(OpsRepository(repositories.v2_ops_provider)),
+        app_config=AppConfigService(
+            OpsRepository(repositories.v2_ops_provider),
+            repositories.app_config_definition.repository,
+        ),
         domain=DomainService(repositories.domain.repository),
         etcd_config=EtcdConfigService(
             repository=repositories.etcd_config.repository,
