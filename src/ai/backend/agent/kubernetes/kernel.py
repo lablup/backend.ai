@@ -531,6 +531,8 @@ async def copy_runner_files(scratch_path: Path) -> None:
 
     target_files = [
         "entrypoint.sh",
+        "entrypoint.py",
+        "sha512_crypt.py",
         "*.bin",
         "*.so",
         "DO_NOT_STORE_PERSISTENT_FILES_HERE.md",

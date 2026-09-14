@@ -3,12 +3,14 @@ import logging
 import os
 import site
 import traceback
+from collections.abc import Iterable
 from pathlib import Path
 from typing import Any, Final, override
 
 __all__ = (
     "current_loop",
     "find_executable",
+    "find_posix_shell",
     "safe_close_task",
     "wait_local_port_open",
 )
@@ -20,6 +22,30 @@ else:
     current_loop = asyncio.get_event_loop
 
 CLOCK_TICK: Final = os.sysconf("SC_CLK_TCK")
+
+
+POSIX_SHELL_CANDIDATES: Final = (
+    "/bin/sh",
+    "/usr/bin/sh",
+    "/bin/bash",
+    "/usr/bin/bash",
+    "/bin/ash",
+    "/usr/bin/ash",
+    "/bin/dash",
+    "/usr/bin/dash",
+)
+
+
+def find_posix_shell(candidates: Iterable[str] = POSIX_SHELL_CANDIDATES) -> str:
+    """
+    Return the first POSIX shell the image provides, in the same order as the container
+    entrypoint launcher (runner/entrypoint.py). Falls back to /bin/sh when none is found so the
+    caller still gets a meaningful "not found" error from exec.
+    """
+    for path in candidates:
+        if Path(path).is_file() and os.access(path, os.X_OK):
+            return path
+    return "/bin/sh"
 
 
 def find_executable(*paths: Path | str | bytes) -> Path | None:

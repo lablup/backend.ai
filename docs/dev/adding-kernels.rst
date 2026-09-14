@@ -48,6 +48,9 @@ The only requirement is that it should be compatible with `manylinux2014 <https:
 For musl-based Linux kernel images (e.g., Alpine), you have to install ``libffi`` and ``sqlite-libs`` as the minimum.
 Please also refer `the Dockerfile to build a minimal compatible image <https://github.com/lablup/backend.ai-krunner-alpine/blob/master/compat-test.Dockerfile>`_.
 
+The image must provide one POSIX shell at ``/bin/sh``, ``/usr/bin/sh``, ``/bin/bash``, ``/usr/bin/bash``, ``/bin/ash``, ``/usr/bin/ash``, ``/bin/dash`` or ``/usr/bin/dash``; the first one found in that order runs the agent-injected ``entrypoint.sh``.
+Shadow utilities (``useradd``, ``getent``, ``chpasswd``, ...) and coreutils are optional: when they are absent the entrypoint edits the account files directly and uses the bundled kernel runner Python for file operations.
+
 
 Metadata Labels
 ---------------

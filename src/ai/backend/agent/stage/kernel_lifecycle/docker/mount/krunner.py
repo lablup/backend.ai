@@ -114,6 +114,8 @@ class KernelRunnerMountProvisioner(Provisioner[KernelRunnerMountSpec, KernelRunn
         return [
             self._parse_mount("runner/extract_dotfiles.py", "/opt/kernel/extract_dotfiles.py"),
             self._parse_mount("runner/entrypoint.sh", "/opt/kernel/entrypoint.sh"),
+            self._parse_mount("runner/entrypoint.py", "/opt/kernel/entrypoint.py"),
+            self._parse_mount("runner/sha512_crypt.py", "/opt/kernel/sha512_crypt.py"),
             self._parse_mount("runner/fantompass.py", "/opt/kernel/fantompass.py"),
             self._parse_mount("runner/hash_phrase.py", "/opt/kernel/hash_phrase.py"),
             self._parse_mount("runner/words.json", "/opt/kernel/words.json"),
