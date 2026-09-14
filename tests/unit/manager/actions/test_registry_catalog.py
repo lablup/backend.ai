@@ -175,6 +175,7 @@ from ai.backend.manager.services.deployment.actions.deployment_policy.bulk_get_d
 )
 from ai.backend.manager.services.deployment.actions.lookup_owner import (
     LookupBulkDeploymentAccessTokenOwnerAction,
+    LookupBulkReplicaGroupOwnerAction,
     LookupBulkReplicaOwnerAction,
 )
 from ai.backend.manager.services.deployment.actions.model_revision.bulk_get_revisions import (
@@ -182,6 +183,9 @@ from ai.backend.manager.services.deployment.actions.model_revision.bulk_get_revi
 )
 from ai.backend.manager.services.deployment.actions.replica.bulk_get_replicas import (
     BulkGetReplicasAction,
+)
+from ai.backend.manager.services.deployment.actions.replica_group.bulk_get_replica_groups import (
+    BulkGetReplicaGroupsAction,
 )
 from ai.backend.manager.services.deployment.actions.route.bulk_get_routes import (
     BulkGetRoutesAction,
@@ -832,6 +836,7 @@ def test_field_data_loader_reads_are_partial_permission_reads() -> None:
     partial = (DeploymentEntityType(), ActionKind.BULK, ActionGate.PERMISSION)
     assert recorded[BulkGetRevisionsAction] == partial
     assert recorded[BulkGetReplicasAction] == partial
+    assert recorded[BulkGetReplicaGroupsAction] == partial
     assert recorded[BulkGetRoutesAction] == partial
     assert recorded[BulkGetAccessTokensAction] == partial
     assert recorded[BulkGetDeploymentPoliciesAction] == partial
@@ -856,6 +861,7 @@ def test_field_data_loader_reads_are_partial_permission_reads() -> None:
     for owner_lookup in (
         LookupBulkReplicaOwnerAction,
         LookupBulkDeploymentAccessTokenOwnerAction,
+        LookupBulkReplicaGroupOwnerAction,
         LookupBulkSessionSchedulingHistoryOwnerAction,
         LookupBulkKernelSchedulingHistoryOwnerAction,
     ):

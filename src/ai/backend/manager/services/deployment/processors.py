@@ -10,6 +10,7 @@ from ai.backend.common.data.entity.deployment_policy import DeploymentPolicyFiel
 from ai.backend.common.data.entity.deployment_revision import DeploymentRevisionFieldType
 from ai.backend.common.data.entity.deployment_token import DeploymentTokenFieldType
 from ai.backend.common.data.entity.replica import ReplicaFieldType
+from ai.backend.common.data.entity.replica_group import ReplicaGroupFieldType
 from ai.backend.manager.actions.registry.field import LookupFieldGroup
 from ai.backend.manager.actions.registry.group import ProcessorGroup
 from ai.backend.manager.actions.registry.types import FieldGroupMeta
@@ -34,6 +35,7 @@ from ai.backend.manager.data.deployment.types import (
     ModelDeploymentData,
     ModelReplicaData,
     ModelRevisionData,
+    ReplicaGroupData,
     RouteInfo,
 )
 from ai.backend.manager.services.deployment.actions.access_token.bulk_delete_access_tokens import (
@@ -124,10 +126,12 @@ from ai.backend.manager.services.deployment.actions.lookup_owner import (
     LookupBulkDeploymentAccessTokenOwnerAction,
     LookupBulkDeploymentPolicyOwnerAction,
     LookupBulkDeploymentRevisionOwnerAction,
+    LookupBulkReplicaGroupOwnerAction,
     LookupBulkReplicaOwnerAction,
     LookupDeploymentAccessTokenOwnerAction,
     LookupDeploymentPolicyOwnerAction,
     LookupDeploymentRevisionOwnerAction,
+    LookupReplicaGroupOwnerAction,
     LookupReplicaOwnerAction,
 )
 from ai.backend.manager.services.deployment.actions.model_revision.add_model_revision import (
@@ -160,6 +164,9 @@ from ai.backend.manager.services.deployment.actions.replace_deployment_options i
 )
 from ai.backend.manager.services.deployment.actions.replica.bulk_get_replicas import (
     BulkGetReplicasAction,
+)
+from ai.backend.manager.services.deployment.actions.replica_group.bulk_get_replica_groups import (
+    BulkGetReplicaGroupsAction,
 )
 from ai.backend.manager.services.deployment.actions.revision_operations import (
     ActivateRevisionAction,
@@ -322,6 +329,9 @@ class DeploymentProcessors:
     ]
 
     # What the DataLoaders read: checked per owning deployment.
+    bulk_get_replica_groups: PartialBulkFieldActionProcessor[
+        BulkGetReplicaGroupsAction, ReplicaGroupData
+    ]
     bulk_get_revisions: PartialBulkFieldActionProcessor[BulkGetRevisionsAction, ModelRevisionData]
     bulk_get_replicas: PartialBulkFieldActionProcessor[BulkGetReplicasAction, ModelReplicaData]
     bulk_get_routes: PartialBulkFieldActionProcessor[BulkGetRoutesAction, RouteInfo]
@@ -368,6 +378,15 @@ class DeploymentProcessors:
             DeploymentPolicyData,
             LookupDeploymentPolicyOwnerAction,
             LookupBulkDeploymentPolicyOwnerAction,
+        )
+        replica_groups: LookupFieldGroup[ReplicaGroupData] = group.field_group(
+            FieldGroupMeta(ReplicaGroupFieldType()),
+            ReplicaGroupData,
+            LookupReplicaGroupOwnerAction,
+            LookupBulkReplicaGroupOwnerAction,
+        )
+        self.bulk_get_replica_groups = replica_groups.partial_bulk_get_ops(
+            BulkGetReplicaGroupsAction
         )
         self.bulk_get_revisions = revisions.partial_bulk_get_ops(BulkGetRevisionsAction)
         self.bulk_get_replicas = replicas.partial_bulk_get_ops(BulkGetReplicasAction)
