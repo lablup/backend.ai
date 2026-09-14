@@ -3323,6 +3323,32 @@ class TestProtectionIsOneNodeWidePass:
         await plugin.reassert_protection()
         assert forward_accept_add_args(4097) in rec.calls
 
+    async def test_a_rule_a_teardown_in_flight_removed_is_not_put_back(self) -> None:
+        """Teardown deletes the rule and drops its record afterwards, so in between the session is
+        still listed with its rule already gone on purpose. Re-adding it there leaves the VNI
+        accepting for whoever draws it next."""
+        rec = _AbsentRuleRecorder()
+        plugin = _plugin(rec)
+        # Set up first, so the pass reaches this one before it blocks on the one below.
+        await plugin.setup_session_network(
+            replace(_ENC_META, session_id="s2", subnet="10.128.6.0/24", vni=4098), _SELF
+        )
+        await plugin.setup_session_network(_ENC_META, _SELF)
+        rec.calls.clear()
+        plugin._reader = _protection_reader(plugin, vni=None)  # every rule gone
+        async with plugin._session_guard("s1"):
+            passing = asyncio.create_task(plugin.reassert_protection())
+            for _ in range(1000):
+                if forward_accept_add_args(4098) in rec.calls:
+                    break  # past s2, so now blocked on s1's guard
+                await asyncio.sleep(0)
+            else:
+                passing.cancel()
+                pytest.fail("the pass never reached the forward-accept rules")
+            await plugin._forget_session("s1")
+        await passing
+        assert forward_accept_add_args(4097) not in rec.calls
+
     async def test_a_missing_rule_is_restored(self) -> None:
         rec = _AbsentRuleRecorder()
         plugin = _plugin(rec)
