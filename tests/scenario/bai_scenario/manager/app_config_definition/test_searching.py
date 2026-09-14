@@ -1,4 +1,4 @@
-"""설정 정의 검색 — 전역 역할로 보호된다."""
+"""설정 정의 검색 — 슈퍼관리자 검사와 검색 조건을 확인한다."""
 
 from __future__ import annotations
 
@@ -14,6 +14,9 @@ from bai_scenario.components.app_config_definition import (
     ManyDefinitionsAndSomeone,
     OnlyTheNamedDefinitionIsFound,
     TenComeWithANextPage,
+    TheDefinitionAfterTheCursorIsFound,
+    TheMiddleOffsetPageIsFound,
+    TwoNamedDefinitionsAreFound,
 )
 from bai_scenario.runner.acting import ActingAs
 from bai_scenario.runner.planting import SeedingSession
@@ -33,9 +36,11 @@ from ai.backend.common.dto.manager.v2.app_config_definition.types import (
     AppConfigDefinitionOrderField,
 )
 from ai.backend.common.dto.manager.v2.common import OrderDirection
+from ai.backend.manager.api.adapter_options.cursor.cursor import encode_cursor
 from ai.backend.manager.api.adapters.app_config_definition.adapter import (
     AppConfigDefinitionAdapter,
 )
+from ai.backend.manager.errors.api import InvalidGraphQLParameters
 from ai.backend.manager.errors.auth import InsufficientPrivilege
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import Given, Scenario, Then, When
@@ -122,6 +127,122 @@ class SearchingInNameOrder(When[ManyDefinitionsAndACaller, AppConfigDefinitionAd
 
 
 @dataclass(frozen=True)
+class SearchingByEitherName(When[ManyDefinitionsAndACaller, AppConfigDefinitionAdapter, Searched]):
+    """두 이름 중 하나와 같은 정의를 이름순으로 검색한다."""
+
+    @override
+    def operation(self) -> str:
+        return "admin_search"
+
+    @override
+    def describe(self, laid: ManyDefinitionsAndACaller) -> str:
+        first, second = laid.laid[:2]
+        return f"{laid.caller.username}이 {first.config_name} 또는 {second.config_name}인 정의 조회"
+
+    @override
+    async def call(
+        self, adapter: AppConfigDefinitionAdapter, laid: ManyDefinitionsAndACaller
+    ) -> Searched:
+        filters = [
+            AppConfigDefinitionFilter(config_name=StringFilter(equals=one.config_name))
+            for one in laid.laid[:2]
+        ]
+        with ActingAs(laid.caller):
+            return await adapter.admin_search(
+                SearchAppConfigDefinitionsInput(
+                    filter=AppConfigDefinitionFilter(OR=filters),
+                    order=[
+                        AppConfigDefinitionOrder(
+                            field=AppConfigDefinitionOrderField.CONFIG_NAME,
+                            direction=OrderDirection.ASC,
+                        )
+                    ],
+                )
+            )
+
+
+@dataclass(frozen=True)
+class SearchingAMiddleOffsetPage(
+    When[ManyDefinitionsAndACaller, AppConfigDefinitionAdapter, Searched]
+):
+    """이름순 결과에서 오프셋으로 중간 두 항목을 검색한다."""
+
+    @override
+    def operation(self) -> str:
+        return "admin_search"
+
+    @override
+    def describe(self, laid: ManyDefinitionsAndACaller) -> str:
+        return f"{laid.caller.username}이 이름순 결과의 두 번째 항목부터 두 건 조회"
+
+    @override
+    async def call(
+        self, adapter: AppConfigDefinitionAdapter, laid: ManyDefinitionsAndACaller
+    ) -> Searched:
+        with ActingAs(laid.caller):
+            return await adapter.admin_search(
+                SearchAppConfigDefinitionsInput(
+                    order=[
+                        AppConfigDefinitionOrder(
+                            field=AppConfigDefinitionOrderField.CONFIG_NAME,
+                            direction=OrderDirection.ASC,
+                        )
+                    ],
+                    limit=2,
+                    offset=1,
+                )
+            )
+
+
+@dataclass(frozen=True)
+class SearchingAfterTheNewest(
+    When[ManyDefinitionsAndACaller, AppConfigDefinitionAdapter, Searched]
+):
+    """최신 정의의 커서 다음 항목 하나를 검색한다."""
+
+    @override
+    def operation(self) -> str:
+        return "admin_search"
+
+    @override
+    def describe(self, laid: ManyDefinitionsAndACaller) -> str:
+        newest = max(laid.laid, key=lambda one: one.created_at)
+        return f"{laid.caller.username}이 {newest.config_name} 다음 정의 한 건 조회"
+
+    @override
+    async def call(
+        self, adapter: AppConfigDefinitionAdapter, laid: ManyDefinitionsAndACaller
+    ) -> Searched:
+        newest = max(laid.laid, key=lambda one: one.created_at)
+        with ActingAs(laid.caller):
+            return await adapter.admin_search(
+                SearchAppConfigDefinitionsInput(first=1, after=encode_cursor(newest.id))
+            )
+
+
+@dataclass(frozen=True)
+class SearchingWithMixedPagination(
+    When[ManyDefinitionsAndACaller, AppConfigDefinitionAdapter, Searched]
+):
+    """커서와 오프셋 페이지네이션을 함께 요청한다."""
+
+    @override
+    def operation(self) -> str:
+        return "admin_search"
+
+    @override
+    def describe(self, laid: ManyDefinitionsAndACaller) -> str:
+        return f"{laid.caller.username}이 커서와 오프셋 페이지네이션을 함께 지정해 조회"
+
+    @override
+    async def call(
+        self, adapter: AppConfigDefinitionAdapter, laid: ManyDefinitionsAndACaller
+    ) -> Searched:
+        with ActingAs(laid.caller):
+            return await adapter.admin_search(SearchAppConfigDefinitionsInput(first=1, limit=1))
+
+
+@dataclass(frozen=True)
 class TheSuperadminCountsEveryOne(
     Scenario[SeedingSession, ManyDefinitionsAndACaller, AppConfigDefinitionAdapter, Searched]
 ):
@@ -131,7 +252,7 @@ class TheSuperadminCountsEveryOne(
 
     @override
     def describe(self) -> str:
-        return "설정 정의 셋이 있고 슈퍼관리자가 필터 없이 전체를 검색하면, 셋 다 집계된다. 검색은 전역 역할로 보호된다"
+        return "설정 정의 셋이 있고 슈퍼관리자가 필터 없이 전체를 검색하면, 셋 다 집계된다"
 
     @override
     def given(self) -> Given[SeedingSession, ManyDefinitionsAndACaller]:
@@ -197,6 +318,106 @@ class OrderingByNameSortsThem(
 
 
 @dataclass(frozen=True)
+class AnOrFilterKeepsEitherName(
+    Scenario[SeedingSession, ManyDefinitionsAndACaller, AppConfigDefinitionAdapter, Searched]
+):
+    @override
+    def summary(self) -> str:
+        return "an-or-filter-keeps-either-name"
+
+    @override
+    def describe(self) -> str:
+        return "설정 정의 셋이 있고 슈퍼관리자가 두 이름을 OR로 묶어 검색하면, 두 이름 중 하나와 일치하는 정의만 반환된다"
+
+    @override
+    def given(self) -> Given[SeedingSession, ManyDefinitionsAndACaller]:
+        return ManyDefinitionsAndSomeone(count=3, role=UserRole.SUPERADMIN)
+
+    @override
+    def when(self) -> When[ManyDefinitionsAndACaller, AppConfigDefinitionAdapter, Searched]:
+        return SearchingByEitherName()
+
+    @override
+    def then(self) -> Then[ManyDefinitionsAndACaller, Searched]:
+        return TwoNamedDefinitionsAreFound()
+
+
+@dataclass(frozen=True)
+class AnOffsetPageReportsBothDirections(
+    Scenario[SeedingSession, ManyDefinitionsAndACaller, AppConfigDefinitionAdapter, Searched]
+):
+    @override
+    def summary(self) -> str:
+        return "a-middle-offset-page-reports-both-directions"
+
+    @override
+    def describe(self) -> str:
+        return "설정 정의 넷을 이름순으로 두 번째 항목부터 두 건 조회하면, 중간 두 항목과 앞뒤 페이지가 모두 있다고 응답한다"
+
+    @override
+    def given(self) -> Given[SeedingSession, ManyDefinitionsAndACaller]:
+        return ManyDefinitionsAndSomeone(count=4, role=UserRole.SUPERADMIN)
+
+    @override
+    def when(self) -> When[ManyDefinitionsAndACaller, AppConfigDefinitionAdapter, Searched]:
+        return SearchingAMiddleOffsetPage()
+
+    @override
+    def then(self) -> Then[ManyDefinitionsAndACaller, Searched]:
+        return TheMiddleOffsetPageIsFound()
+
+
+@dataclass(frozen=True)
+class AForwardCursorContinuesAfterTheNamedRow(
+    Scenario[SeedingSession, ManyDefinitionsAndACaller, AppConfigDefinitionAdapter, Searched]
+):
+    @override
+    def summary(self) -> str:
+        return "a-forward-cursor-continues-after-the-named-row"
+
+    @override
+    def describe(self) -> str:
+        return "설정 정의 넷이 있고 슈퍼관리자가 최신 정의의 커서 다음 한 건을 조회하면, 그다음 정의와 앞뒤 페이지가 모두 있다고 응답한다"
+
+    @override
+    def given(self) -> Given[SeedingSession, ManyDefinitionsAndACaller]:
+        return ManyDefinitionsAndSomeone(count=4, role=UserRole.SUPERADMIN)
+
+    @override
+    def when(self) -> When[ManyDefinitionsAndACaller, AppConfigDefinitionAdapter, Searched]:
+        return SearchingAfterTheNewest()
+
+    @override
+    def then(self) -> Then[ManyDefinitionsAndACaller, Searched]:
+        return TheDefinitionAfterTheCursorIsFound()
+
+
+@dataclass(frozen=True)
+class PaginationModesMayNotBeMixed(
+    Scenario[SeedingSession, ManyDefinitionsAndACaller, AppConfigDefinitionAdapter, Searched]
+):
+    @override
+    def summary(self) -> str:
+        return "cursor-and-offset-pagination-may-not-be-mixed"
+
+    @override
+    def describe(self) -> str:
+        return "슈퍼관리자가 커서와 오프셋 페이지네이션을 함께 지정하면, 서로 다른 방식을 섞었다는 이유로 거부된다"
+
+    @override
+    def given(self) -> Given[SeedingSession, ManyDefinitionsAndACaller]:
+        return ManyDefinitionsAndSomeone(count=3, role=UserRole.SUPERADMIN)
+
+    @override
+    def when(self) -> When[ManyDefinitionsAndACaller, AppConfigDefinitionAdapter, Searched]:
+        return SearchingWithMixedPagination()
+
+    @override
+    def then(self) -> Then[ManyDefinitionsAndACaller, Searched]:
+        return TheCallIsRefused(InvalidGraphQLParameters)
+
+
+@dataclass(frozen=True)
 class NoPageSizeMeansTen(
     Scenario[SeedingSession, ManyDefinitionsAndACaller, AppConfigDefinitionAdapter, Searched]
 ):
@@ -231,7 +452,7 @@ class APlainUserMayNotSearch(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 아닌 사용자가 전체를 검색하면, 역할 부족으로 거부된다"
+        return "일반 사용자가 전체를 검색하면, 슈퍼관리자 권한이 없어 거부된다"
 
     @override
     def given(self) -> Given[SeedingSession, ManyDefinitionsAndACaller]:
@@ -250,6 +471,10 @@ SCENARIOS: list[SearchingStep] = [
     TheSuperadminCountsEveryOne(),
     FilteringByNameKeepsOne(),
     OrderingByNameSortsThem(),
+    AnOrFilterKeepsEitherName(),
+    AnOffsetPageReportsBothDirections(),
+    AForwardCursorContinuesAfterTheNamedRow(),
+    PaginationModesMayNotBeMixed(),
     NoPageSizeMeansTen(),
     APlainUserMayNotSearch(),
 ]

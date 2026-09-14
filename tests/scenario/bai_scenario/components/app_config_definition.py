@@ -1,8 +1,4 @@
-"""What an app config definition scenario table says besides the call.
-
-A definition belongs to no scope, so no role reaches one: every door is passed by the
-superadmin and refused to anyone else. The situations here only choose who calls.
-"""
+"""Shared arrangements and expectations for app config definition scenarios."""
 
 from __future__ import annotations
 
@@ -41,7 +37,7 @@ from ai.backend.testutils.scenario_steps import (
 
 
 def _who(role: UserRole) -> str:
-    return "슈퍼관리자 한 명" if role == UserRole.SUPERADMIN else "아무 권한도 없는 사용자 한 명"
+    return "슈퍼관리자 한 명" if role == UserRole.SUPERADMIN else "권한이 없는 일반 사용자 한 명"
 
 
 @dataclass(frozen=True)
@@ -55,7 +51,7 @@ class ADefinitionAndACaller:
 
 @dataclass(frozen=True)
 class ADefinitionAndSomeone(Given[Any, ADefinitionAndACaller]):
-    """설정 정의 하나와, 슈퍼관리자 또는 아무 권한도 없는 사용자 한 명.
+    """설정 정의 하나와 슈퍼관리자 또는 권한이 없는 일반 사용자 한 명.
 
     ``with_fragment``는 그 이름에 공개 허용 목록 항목과 공개 설정 조각을 함께 만들어 둔다.
     """
@@ -100,7 +96,7 @@ class ManyDefinitionsAndACaller:
 
 @dataclass(frozen=True)
 class ManyDefinitionsAndSomeone(Given[Any, ManyDefinitionsAndACaller]):
-    """설정 정의 여럿과, 슈퍼관리자 또는 아무 권한도 없는 사용자 한 명."""
+    """설정 정의 여럿과 슈퍼관리자 또는 권한이 없는 일반 사용자 한 명."""
 
     count: int = 3
     role: UserRole = UserRole.USER
@@ -126,7 +122,7 @@ class ManyDefinitionsAndSomeone(Given[Any, ManyDefinitionsAndACaller]):
 
 @dataclass(frozen=True)
 class TwoDefinitionsAndACaller:
-    """id로 함께 조회할 설정 정의 둘과, 조회할 사용자."""
+    """ID로 함께 조회할 설정 정의 둘과 조회할 사용자."""
 
     caller: UserData
     first: AppConfigDefinitionData
@@ -135,7 +131,7 @@ class TwoDefinitionsAndACaller:
 
 @dataclass(frozen=True)
 class TwoDefinitionsAndSomeone(Given[Any, TwoDefinitionsAndACaller]):
-    """설정 정의 둘과, 슈퍼관리자 또는 아무 권한도 없는 사용자 한 명."""
+    """설정 정의 둘과 슈퍼관리자 또는 권한이 없는 일반 사용자 한 명."""
 
     role: UserRole = UserRole.USER
 
@@ -158,13 +154,13 @@ class TwoDefinitionsAndSomeone(Given[Any, TwoDefinitionsAndACaller]):
 
 @dataclass(frozen=True)
 class TheDefinitionNode(Then[ADefinitionAndACaller, AppConfigDefinitionNode]):
-    """미리 만들어 둔 설정 정의가 통째로 반환된다."""
+    """미리 만들어 둔 설정 정의의 모든 필드가 반환된다."""
 
     started: datetime
 
     @override
     def says(self) -> str:
-        return "미리 만들어 둔 설정 정의 전체가 반환된다"
+        return "미리 만들어 둔 설정 정의의 모든 필드가 반환된다"
 
     @override
     def look(
@@ -175,7 +171,7 @@ class TheDefinitionNode(Then[ADefinitionAndACaller, AppConfigDefinitionNode]):
             return [Refused(NotEnoughPermission, answered.raised)]
         written = WrittenByThisRun(self.started)
         return [
-            Held("id", node.id, SameAs[UUID](laid.definition.id, "미리 만들어 둔 설정 정의")),
+            Held("ID", node.id, SameAs[UUID](laid.definition.id, "미리 만들어 둔 설정 정의")),
             Same("config_name", node.config_name, laid.definition.config_name),
             Held("created_at", node.created_at, written),
             Held("updated_at", node.updated_at, written),
@@ -184,14 +180,14 @@ class TheDefinitionNode(Then[ADefinitionAndACaller, AppConfigDefinitionNode]):
 
 @dataclass(frozen=True)
 class TheNewDefinitionNode(Then[Any, AppConfigDefinitionNode]):
-    """방금 등록한 설정 정의가 통째로 반환된다. 이름은 시나리오가 정한 값이다."""
+    """방금 등록한 설정 정의의 모든 필드가 반환된다."""
 
     started: datetime
     named: str
 
     @override
     def says(self) -> str:
-        return "등록한 설정 정의 전체가 반환된다"
+        return "등록한 설정 정의의 모든 필드가 반환된다"
 
     @override
     def look(self, laid: Any, answered: Answered[AppConfigDefinitionNode]) -> list[Verdict]:
@@ -200,7 +196,7 @@ class TheNewDefinitionNode(Then[Any, AppConfigDefinitionNode]):
             return [Refused(NotEnoughPermission, answered.raised)]
         written = WrittenByThisRun(self.started)
         return [
-            Skipped("id", "데이터베이스가 만든다"),
+            Skipped("ID", "데이터베이스가 만든다"),
             Same("config_name", node.config_name, self.named),
             Held("created_at", node.created_at, written),
             Held("updated_at", node.updated_at, written),
@@ -316,4 +312,88 @@ class TenComeWithANextPage(Then[ManyDefinitionsAndACaller, SearchAppConfigDefini
             Same("total_count", payload.total_count, len(laid.laid)),
             Same("has_next_page", payload.has_next_page, True),
             Same("has_previous_page", payload.has_previous_page, False),
+        ]
+
+
+@dataclass(frozen=True)
+class TwoNamedDefinitionsAreFound(
+    Then[ManyDefinitionsAndACaller, SearchAppConfigDefinitionsPayload]
+):
+    """OR 이름 필터에 맞는 두 정의만 이름순으로 반환된다."""
+
+    @override
+    def says(self) -> str:
+        return "두 이름 중 하나와 일치하는 설정 정의만 반환된다"
+
+    @override
+    def look(
+        self,
+        laid: ManyDefinitionsAndACaller,
+        answered: Answered[SearchAppConfigDefinitionsPayload],
+    ) -> list[Verdict]:
+        payload = answered.response
+        if payload is None:
+            return [Refused(NotEnoughPermission, answered.raised)]
+        wanted = sorted(one.config_name for one in laid.laid[:2])
+        return [
+            Same("items", [one.config_name for one in payload.items], wanted),
+            Same("total_count", payload.total_count, 2),
+            Same("has_next_page", payload.has_next_page, False),
+            Same("has_previous_page", payload.has_previous_page, False),
+        ]
+
+
+@dataclass(frozen=True)
+class TheMiddleOffsetPageIsFound(
+    Then[ManyDefinitionsAndACaller, SearchAppConfigDefinitionsPayload]
+):
+    """이름순 두 번째 페이지와 앞뒤 페이지 표시를 확인한다."""
+
+    @override
+    def says(self) -> str:
+        return "중간 두 항목과 앞뒤 페이지가 모두 있다고 응답한다"
+
+    @override
+    def look(
+        self,
+        laid: ManyDefinitionsAndACaller,
+        answered: Answered[SearchAppConfigDefinitionsPayload],
+    ) -> list[Verdict]:
+        payload = answered.response
+        if payload is None:
+            return [Refused(NotEnoughPermission, answered.raised)]
+        wanted = sorted(one.config_name for one in laid.laid)[1:3]
+        return [
+            Same("items", [one.config_name for one in payload.items], wanted),
+            Same("total_count", payload.total_count, len(laid.laid)),
+            Same("has_next_page", payload.has_next_page, True),
+            Same("has_previous_page", payload.has_previous_page, True),
+        ]
+
+
+@dataclass(frozen=True)
+class TheDefinitionAfterTheCursorIsFound(
+    Then[ManyDefinitionsAndACaller, SearchAppConfigDefinitionsPayload]
+):
+    """최신 정의 다음의 정의 하나와 커서 페이지 정보를 확인한다."""
+
+    @override
+    def says(self) -> str:
+        return "커서 다음 정의와 앞뒤 페이지가 모두 있다고 응답한다"
+
+    @override
+    def look(
+        self,
+        laid: ManyDefinitionsAndACaller,
+        answered: Answered[SearchAppConfigDefinitionsPayload],
+    ) -> list[Verdict]:
+        payload = answered.response
+        if payload is None:
+            return [Refused(NotEnoughPermission, answered.raised)]
+        ordered = sorted(laid.laid, key=lambda one: one.created_at, reverse=True)
+        return [
+            Same("items", [one.id for one in payload.items], [ordered[1].id]),
+            Same("total_count", payload.total_count, len(laid.laid)),
+            Same("has_next_page", payload.has_next_page, True),
+            Same("has_previous_page", payload.has_previous_page, True),
         ]

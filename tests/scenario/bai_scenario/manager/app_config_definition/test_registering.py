@@ -82,8 +82,8 @@ class TheSuperadminRegistersAName(
     @override
     def describe(self) -> str:
         return (
-            "슈퍼관리자가 이름만 지정해 설정 정의를 등록하면, 이름은 지정한 그대로이고 id와 시각은 "
-            "서버가 채운 노드가 반환된다. 등록은 전역 역할로 보호된다"
+            "슈퍼관리자가 이름만 지정해 설정 정의를 등록하면, 이름은 지정한 그대로이고 ID와 시각은 "
+            "서버가 채운 노드가 반환된다"
         )
 
     @override
@@ -145,7 +145,7 @@ class APlainUserMayNotRegister(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 아닌 사용자가 설정 정의를 등록하려 하면, 역할 부족으로 거부된다"
+        return "일반 사용자가 설정 정의를 등록하려 하면, 슈퍼관리자 권한이 없어 거부된다"
 
     @override
     def given(self) -> Given[SeedingSession, ADefinitionAndACaller]:
@@ -176,8 +176,8 @@ class EnforcementOffChangesNothing(
     @override
     def describe(self) -> str:
         return (
-            "권한 검사를 꺼도 설정 정의 등록은 여전히 거부된다. "
-            "등록은 권한 그래프가 아니라 역할로 보호되기 때문이다"
+            "RBAC 강제를 꺼도 일반 사용자의 설정 정의 등록은 거부된다. "
+            "등록에는 RBAC 그래프와 별개로 슈퍼관리자 검사가 적용된다"
         )
 
     @override
