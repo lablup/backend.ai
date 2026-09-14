@@ -6,7 +6,14 @@ from typing import Any
 from ai.backend.manager.data.app_config.types import AppConfigData, AppConfigFragmentData
 from ai.backend.manager.models.scopes import OperationScope
 from ai.backend.manager.models.specs.searcher import Searcher
+from ai.backend.manager.repositories.app_config_allow_list.repository import (
+    AppConfigAllowListRepository,
+)
 from ai.backend.manager.repositories.ops.repository import OpsRepository
+from ai.backend.manager.services.app_config.actions.allow_list.purge import (
+    PurgeAppConfigAllowListAction,
+    PurgeAppConfigAllowListActionResult,
+)
 from ai.backend.manager.services.app_config.actions.search import (
     AnonymousSearchAppConfigsAction,
     SearchAppConfigsAction,
@@ -41,16 +48,30 @@ def _merge_configs(fragments: Sequence[AppConfigFragmentData]) -> dict[str, Any]
 
 
 class AppConfigService:
-    """Read-side service for the merged ``AppConfig`` view.
+    """The merged ``AppConfig`` read and the allow-list purge.
 
     The fragment read is a plain scoped search, so it runs against ops; what keeps a
-    service here is the merge, which turns many rows into one value per name.
+    service here is the merge, which turns many rows into one value per name. The
+    allow-list purge is here because it clears two tables in one transaction.
     """
 
     _repository: OpsRepository[AppConfigFragmentData]
+    _allow_list_repository: AppConfigAllowListRepository
 
-    def __init__(self, repository: OpsRepository[AppConfigFragmentData]) -> None:
+    def __init__(
+        self,
+        repository: OpsRepository[AppConfigFragmentData],
+        allow_list_repository: AppConfigAllowListRepository,
+    ) -> None:
         self._repository = repository
+        self._allow_list_repository = allow_list_repository
+
+    async def purge_allow_list_entry(
+        self, action: PurgeAppConfigAllowListAction
+    ) -> PurgeAppConfigAllowListActionResult:
+        return PurgeAppConfigAllowListActionResult(
+            allow_list_data=await self._allow_list_repository.purge(action.allow_list_id)
+        )
 
     async def search_app_configs(
         self, action: SearchAppConfigsAction

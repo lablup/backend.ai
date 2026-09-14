@@ -33,6 +33,7 @@ from ai.backend.manager.services.app_config.actions.allow_list.get import (
 )
 from ai.backend.manager.services.app_config.actions.allow_list.purge import (
     PurgeAppConfigAllowListAction,
+    PurgeAppConfigAllowListActionResult,
 )
 from ai.backend.manager.services.app_config.actions.allow_list.update import (
     UpdateAppConfigAllowListAction,
@@ -130,7 +131,7 @@ class AppConfigProcessors:
         UpdateAppConfigAllowListAction, EntityOpsResult[AppConfigAllowListData]
     ]
     allow_list_purge: SingleEntityActionProcessor[
-        PurgeAppConfigAllowListAction, EntityOpsResult[AppConfigAllowListData]
+        PurgeAppConfigAllowListAction, PurgeAppConfigAllowListActionResult
     ]
     allow_list_global_search: GlobalActionProcessor[
         AdminSearchAppConfigAllowListAction, BatchOpsResult[AppConfigAllowListData]
@@ -197,7 +198,9 @@ class AppConfigProcessors:
             BulkGetAppConfigAllowListsAction
         )
         self.allow_list_update = allow_list_group.single_update_ops(UpdateAppConfigAllowListAction)
-        self.allow_list_purge = allow_list_group.entity_purge_ops(PurgeAppConfigAllowListAction)
+        self.allow_list_purge = allow_list_group.single_entity(
+            PurgeAppConfigAllowListAction, service.purge_allow_list_entry
+        )
         self.allow_list_global_search = allow_list_group.global_search_ops(
             AdminSearchAppConfigAllowListAction
         )

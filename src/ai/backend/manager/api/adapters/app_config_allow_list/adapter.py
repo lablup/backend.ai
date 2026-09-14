@@ -40,9 +40,6 @@ from ai.backend.manager.models.app_config_allow_list.creators import (
     AppConfigAllowListCreator,
 )
 from ai.backend.manager.models.app_config_allow_list.orders import AppConfigAllowListOrders
-from ai.backend.manager.models.app_config_allow_list.purgers import (
-    AppConfigAllowListPurger,
-)
 from ai.backend.manager.models.app_config_allow_list.queriers import (
     AppConfigAllowListQuerier,
 )
@@ -185,11 +182,10 @@ class AppConfigAllowListAdapter(BaseAdapter):
     async def admin_purge(
         self, input: PurgeAppConfigAllowListInput
     ) -> PurgeAppConfigAllowListPayload:
-        purger = AppConfigAllowListPurger(allow_list_id=AppConfigAllowListID(input.id))
         action_result = await self._app_config.allow_list_purge.run(
-            PurgeAppConfigAllowListAction(purger=purger)
+            PurgeAppConfigAllowListAction(allow_list_id=AppConfigAllowListID(input.id))
         )
-        return PurgeAppConfigAllowListPayload(id=action_result.data.id)
+        return PurgeAppConfigAllowListPayload(id=action_result.allow_list_data.id)
 
     @staticmethod
     def _data_to_node(data: AppConfigAllowListData) -> AppConfigAllowListNode:

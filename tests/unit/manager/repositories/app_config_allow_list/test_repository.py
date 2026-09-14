@@ -4,12 +4,20 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import AsyncGenerator
+from dataclasses import dataclass
 
 import pytest
 import sqlalchemy as sa
 
 from ai.backend.common.data.app_config.types import AppConfigScopeType
-from ai.backend.common.data.entity.app_config_allow_list import AppConfigAllowListID
+from ai.backend.common.data.entity.app_config_allow_list import (
+    AppConfigAllowListEntityType,
+    AppConfigAllowListID,
+)
+from ai.backend.common.data.entity.app_config_fragment import (
+    AppConfigFragmentEntityType,
+    AppConfigFragmentID,
+)
 from ai.backend.common.data.filter_specs import StringMatchSpec
 from ai.backend.manager.data.app_config.types import (
     AppConfigAllowListData,
@@ -64,6 +72,9 @@ from ai.backend.manager.models.virtual_entity.entity_membership_field import (
 )
 from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
 from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
+from ai.backend.manager.repositories.app_config_allow_list.repository import (
+    AppConfigAllowListRepository,
+)
 from ai.backend.manager.repositories.ops.repository import OpsRepository
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.types import OptionalState
@@ -105,6 +116,55 @@ def definition_repository(
     database: ExtendedAsyncSAEngine,
 ) -> OpsRepository[AppConfigDefinitionData]:
     return OpsRepository(V2DBOpsProvider(database))
+
+
+@pytest.fixture
+def allow_list_repository(database: ExtendedAsyncSAEngine) -> AppConfigAllowListRepository:
+    return AppConfigAllowListRepository(V2DBOpsProvider(database))
+
+
+@dataclass(frozen=True)
+class _EntryWithFragment:
+    allow_list_id: AppConfigAllowListID
+    fragment_id: AppConfigFragmentID
+
+
+@pytest.fixture
+async def entry_with_fragment(database: ExtendedAsyncSAEngine) -> _EntryWithFragment:
+    """A public allow-list entry and one fragment under it, each with its virtual
+    entity; the definition the entry hangs off is seeded with them."""
+    laid = _EntryWithFragment(
+        allow_list_id=AppConfigAllowListID(uuid.uuid4()),
+        fragment_id=AppConfigFragmentID(uuid.uuid4()),
+    )
+    async with database.begin_session() as db_sess:
+        db_sess.add(AppConfigDefinitionRow(config_name="theme"))
+        await db_sess.flush()
+        db_sess.add(
+            AppConfigAllowListRow(
+                id=laid.allow_list_id,
+                config_name="theme",
+                scope_type=AppConfigScopeType.PUBLIC,
+                rank=0,
+            )
+        )
+        await db_sess.flush()
+        db_sess.add(
+            AppConfigFragmentRow(
+                id=laid.fragment_id,
+                config_name="theme",
+                scope_type=AppConfigScopeType.PUBLIC,
+                scope_id=None,
+                config={"k": "v"},
+            )
+        )
+        db_sess.add_all([
+            VirtualEntityRow(
+                entity_type=AppConfigAllowListEntityType(), entity_id=laid.allow_list_id
+            ),
+            VirtualEntityRow(entity_type=AppConfigFragmentEntityType(), entity_id=laid.fragment_id),
+        ])
+    return laid
 
 
 async def _register(
@@ -336,6 +396,39 @@ class TestPurge:
             )
         assert remaining_entries == 0
         assert remaining_fragments == 0
+
+
+class TestPurgeWithDependents:
+    async def test_purge_tears_down_the_cascaded_fragments(
+        self,
+        database: ExtendedAsyncSAEngine,
+        allow_list_repository: AppConfigAllowListRepository,
+        entry_with_fragment: _EntryWithFragment,
+    ) -> None:
+        purged = await allow_list_repository.purge(entry_with_fragment.allow_list_id)
+        assert purged.id == entry_with_fragment.allow_list_id
+        async with database.begin_readonly_session() as db_sess:
+            remaining_nodes = await db_sess.scalar(
+                sa.select(sa.func.count())
+                .select_from(VirtualEntityRow)
+                .where(
+                    sa.tuple_(VirtualEntityRow.entity_type, VirtualEntityRow.entity_id).in_([
+                        (AppConfigAllowListEntityType(), entry_with_fragment.allow_list_id),
+                        (AppConfigFragmentEntityType(), entry_with_fragment.fragment_id),
+                    ])
+                )
+            )
+            remaining_fragments = await db_sess.scalar(
+                sa.select(sa.func.count()).select_from(AppConfigFragmentRow)
+            )
+        assert remaining_nodes == 0
+        assert remaining_fragments == 0
+
+    async def test_purge_missing_raises(
+        self, allow_list_repository: AppConfigAllowListRepository
+    ) -> None:
+        with pytest.raises(EntityNotFoundError):
+            await allow_list_repository.purge(_missing_id())
 
 
 class TestAdminSearch:
