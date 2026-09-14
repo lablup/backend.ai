@@ -12,8 +12,6 @@ from __future__ import annotations
 
 from typing import Any, cast
 
-from ai.backend.common.data.entity.types import FieldData
-from ai.backend.testutils.scenario_steps import Told
 from bai_scenario.seeds.ops import SeedOps
 from bai_scenario.seeds.seeder import (
     Laid,
@@ -28,6 +26,9 @@ from bai_scenario.seeds.seeder import (
     SeedRowFromTwo,
     lay,
 )
+
+from ai.backend.common.data.entity.types import FieldData
+from ai.backend.testutils.scenario_steps import Told
 
 
 class SeedingSession:
