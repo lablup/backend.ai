@@ -3390,6 +3390,10 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
             and not force
         ):
             return True  # another session on this node already programmed this pair
+        #: The host's SAs, read at most once per call and only when a slot is about to be
+        #: rewritten. None means the listing could not be read -- see `_kernel_sa_identities`.
+        existing_sas: dict[tuple[str, int], tuple[str, int | None]] | None = None
+        read_sas = False
         try:
             for target_generation in target_generations:
                 slot = target_generation % _KEYRING_SIZE
@@ -3399,10 +3403,33 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
                     meta.encryption_key,
                     generation=target_generation,
                 )
+                if slot_generations.get(slot) == target_generation and not force:
+                    continue  # this process installed it and nothing asked for a re-assert
+
+                # Which generation a slot holds lives in this process's memory, so a restart
+                # arrives here knowing nothing and rewrites a slot the kernel already holds
+                # correctly. Rewriting is not free: the kernel starts the new SA's replay state at
+                # zero while the peer's inbound window has moved on, and everything we send is
+                # then dropped as a replay until our sequence climbs past it. Measured across a
+                # privnet restart on a two-node rig: 30 to 70 seconds of a live session's traffic,
+                # both ends showing identical SPIs, only the SA's creation time moved.
+                #
+                # So ask the kernel rather than this process's memory, and ask before `force` too:
+                # a re-assert is owed the SA's PRESENCE, and an SA of ours at this generation's SPI
+                # is the one the add would have written -- same pair, same generation, same key.
+                # Leaving it alone is what keeps both ends' counters where they are.
+                if not read_sas:
+                    existing_sas = await self._kernel_sa_identities()
+                    read_sas = True
+                if existing_sas is not None and self._already_installed(add_args, existing_sas):
+                    slot_generations[slot] = target_generation
+                    continue
                 if slot_generations.get(slot) == target_generation:
-                    if force:
-                        for args in add_args:
-                            await self._run_xfrm(args)
+                    # A re-assert (`force`) whose SA the kernel does not show, or could not be
+                    # read: install rather than assume. An add that lands on one already there is
+                    # caught by `_run_xfrm`, which refuses a stranger's.
+                    for args in add_args:
+                        await self._run_xfrm(args)
                     continue
 
                 # A Linux XFRM state update does not replace AEAD key material reliably. The
@@ -3722,6 +3749,50 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
                 dst,
             )
         return kept
+
+    async def _kernel_sa_identities(
+        self,
+    ) -> dict[tuple[str, int], tuple[str, int | None]] | None:
+        """``{(dst, spi): (src, reqid)}`` for the SAs on this host, or None if it cannot be read.
+
+        None is not "there are none": a listing that did not run says nothing, and the caller uses
+        this to decide whether an SA may be left alone. Unknown therefore means "reprogram", which
+        is the answer that cannot leave a stale key behind.
+        """
+        try:
+            return parse_sa_identities(await self._rule_inventory(["ip", "xfrm", "state"]))
+        except command.HOST_COMMAND_ERRORS as e:
+            log.debug("could not read this host's ESP SAs before programming a pair: {}", e)
+            return None
+
+    @staticmethod
+    def _already_installed(
+        add_args: Sequence[Sequence[str]],
+        existing: Mapping[tuple[str, int], tuple[str, int | None]],
+    ) -> bool:
+        """Whether the kernel already holds exactly the SAs these `add`s would install.
+
+        Identity is (dst, spi) plus our src and our reqid. The SPI is derived from the directed
+        pair AND the key generation, so an SA of ours sitting at one is this generation's -- the
+        very one the add would write, with the same key material.
+        """
+        for args in add_args:
+            tokens = list(args)
+            if tokens[:4] != ["ip", "xfrm", "state", "add"]:
+                return False
+            src = _value_after(tokens, "src")
+            dst = _value_after(tokens, "dst")
+            raw_spi = _value_after(tokens, "spi")
+            if src is None or dst is None or raw_spi is None:
+                return False
+            try:
+                spi = int(raw_spi, 0)
+            except ValueError:
+                return False
+            holder = existing.get((dst, spi))
+            if holder is None or holder[0] != src or holder[1] != XFRM_REQID:
+                return False
+        return True
 
     async def _refuse_foreign_sa(self, argv: Sequence[str]) -> None:
         """Stop before overwriting an SA at our (dst, spi) that is not ours.
