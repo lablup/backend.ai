@@ -967,6 +967,10 @@ def _as_port(token: str) -> int | None:
         return None  # a multiport list or a range: not a rule of ours
 
 
+#: Reads every VXLAN device on the node, the snapshot's and the sweep's second look alike.
+_VXLAN_LIST_ARGS: Final = ["ip", "-o", "link", "show", "type", "vxlan"]
+
+
 def _device_sets(listing: str) -> dict[str, frozenset[str]]:
     """Both device sets from one `ip -o link show type vxlan`, as the snapshot's fields."""
     return {
@@ -1987,7 +1991,7 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
             policy_pairs=parse_owned_policies(
                 await self._reader(["ip", "xfrm", "policy"]), _XFRM_MARK
             ),
-            **_device_sets(await self._reader(["ip", "-o", "link", "show", "type", "vxlan"])),
+            **_device_sets(await self._reader(_VXLAN_LIST_ARGS)),
         )
 
     def _pair_intact(self, snapshot: ProtectionSnapshot, key: tuple[str, str, int]) -> bool:
@@ -2131,13 +2135,36 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
         Bounded by the tunnel, not by our own records: the VXLAN device is node-global, so a rule
         whose ``baivx`` exists belongs to a live session -- a co-located agent's, if not ours --
         and is left alone. One with no device can be serving nobody.
+
+        Nothing is removed on the snapshot's word alone. The snapshot is read at the top of the
+        pass and this runs several awaits later, and in that window a session can have written
+        exactly this rule: setup builds the device first and registers the session last, so a rule
+        with no device and no record is also what a setup looks like halfway through. The devices
+        are read again, and the VNIs setup is holding are honoured, before anything is taken off.
         """
+        candidates = [
+            vni
+            for vni in sorted(parse_forward_accept_vnis(snapshot.table("filter")))
+            if vxlan_dev(vni) not in snapshot.devices
+        ]
+        if not candidates:
+            self._forget_sweep_if_idle()
+            return
+        try:
+            live = parse_vxlan_devices(await self._reader(_VXLAN_LIST_ARGS))
+        except Exception:
+            # Unread, so unknown, so nothing is taken off: the debt stays owed and the next pass
+            # looks again.
+            log.exception("could not re-read this node's tunnels before removing a rule")
+            return
         removed_all = True
-        for vni in sorted(parse_forward_accept_vnis(snapshot.table("filter"))):
-            if vxlan_dev(vni) in snapshot.devices:
-                continue
+        for vni in candidates:
+            if vxlan_dev(vni) in live:
+                continue  # raised since the snapshot: somebody's session owns it after all
+            if self._reserved_vnis.get(vni) is not None:
+                continue  # a setup of ours is holding this VNI; the rule is its own
             if any(meta.vni == vni for meta in self._sessions.values()):
-                continue  # ours, and mid-setup: the device is on its way
+                continue  # ours, and registered
             try:
                 await self._remove(forward_accept_del_args(vni))
             except Exception:
@@ -2149,9 +2176,13 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
                     " on it",
                     vni,
                 )
-        # An idle node that has just been swept clean has nothing left to look for, and the whole
-        # pass is skipped until it serves another session.
-        if removed_all and not self._sessions:
+        if removed_all:
+            self._forget_sweep_if_idle()
+
+    def _forget_sweep_if_idle(self) -> None:
+        """An idle node that has just been swept clean has nothing left to look for, so the whole
+        pass is skipped until it serves another session."""
+        if not self._sessions:
             self._forward_sweep_owed = False
 
     async def _reassert_session(

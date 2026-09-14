@@ -3416,21 +3416,35 @@ class TestAForwardAcceptNoSessionOwns:
     a process that dies between the two leaves one nothing can be named for. It then sits in
     FORWARD accepting for whichever session draws that VNI next."""
 
-    def _reader(self, *, rules: Sequence[int], devices: Sequence[int]) -> _Listing:
+    def _reader(
+        self,
+        *,
+        rules: Sequence[int],
+        devices: Sequence[int],
+        devices_later: Sequence[int] | None = None,
+    ) -> _Listing:
         filter_rules = f"-A INPUT -j {CHAIN_IN}\n-A OUTPUT -j {CHAIN_GUARD}\n" + "".join(
             f"-A FORWARD -i {bridge_dev(vni)} -o {bridge_dev(vni)} -j ACCEPT\n" for vni in rules
         )
-        links = "".join(
-            f"{index}: {vxlan_dev(vni)}@enp0s1: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1450\n"
-            for index, vni in enumerate(devices, start=7)
-        )
+
+        def _links(vnis: Sequence[int]) -> str:
+            return "".join(
+                f"{index}: {vxlan_dev(vni)}@enp0s1: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1450\n"
+                for index, vni in enumerate(vnis, start=7)
+            )
+
+        #: What the host holds from the second look onwards, for a device raised mid-pass.
+        later = _links(devices if devices_later is None else devices_later)
+        looks = 0
 
         def _listing(argv: Sequence[str]) -> str | None:
+            nonlocal looks
             if argv[0] == "iptables-save":
                 table = argv[argv.index("-t") + 1]
                 return f"-A OUTPUT -j {CHAIN_MARK}\n" if table == "mangle" else filter_rules
             if "link" in argv and "vxlan" in argv:
-                return links
+                looks += 1
+                return _links(devices) if looks == 1 else later
             return None
 
         return _Listing(_listing)
@@ -3459,6 +3473,27 @@ class TestAForwardAcceptNoSessionOwns:
         plugin._reader = self._reader(rules=[4097], devices=[])
         await plugin.reassert_protection()
         assert forward_accept_del_args(4097) not in rec.calls
+
+    async def test_a_setup_in_flight_keeps_the_rule_it_has_just_written(self) -> None:
+        """The rule goes in before the session is registered, so in between the only thing saying
+        the VNI is taken is the reservation setup holds. A pass reading a snapshot from before the
+        rule existed would take it straight back off a session that is coming up."""
+        rec = Recorder()
+        plugin = _plugin(rec)
+        plugin._reader = self._reader(rules=[4097], devices=[])
+        async with plugin._reserve_vni(_META):
+            await plugin.reassert_protection()
+        assert forward_accept_del_args(4097) not in rec.calls
+
+    async def test_a_tunnel_raised_after_the_snapshot_keeps_its_rule(self) -> None:
+        """The snapshot is read at the top of the pass and the removal happens several awaits
+        later. A co-located agent that built the session in that window owns both the rule and the
+        device by the time we would remove it."""
+        rec = Recorder()
+        plugin = _plugin(rec)
+        plugin._reader = self._reader(rules=[4096], devices=[], devices_later=[4096])
+        await plugin.reassert_protection()
+        assert forward_accept_del_args(4096) not in rec.calls
 
     async def test_an_idle_node_reads_its_firewall_once_and_then_stops(self) -> None:
         """Three seconds apart, forever, on every node running no session: the sweep has to cost
