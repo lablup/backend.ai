@@ -156,8 +156,14 @@ from ai.backend.manager.services.artifact_registry.processors import ArtifactReg
 from ai.backend.manager.services.audit_log.processors import AuditLogProcessors
 from ai.backend.manager.services.auth.processors import AuthProcessors
 from ai.backend.manager.services.container_registry.processors import ContainerRegistryProcessors
+from ai.backend.manager.services.deployment.actions.access_token.bulk_delete_access_tokens import (
+    BulkDeleteAccessTokensAction,
+)
 from ai.backend.manager.services.deployment.actions.access_token.bulk_get_access_tokens import (
     BulkGetAccessTokensAction,
+)
+from ai.backend.manager.services.deployment.actions.auto_scaling_rule.bulk_delete_auto_scaling_rules import (
+    BulkDeleteAutoScalingRulesAction,
 )
 from ai.backend.manager.services.deployment.actions.deployment_policy.bulk_get_deployment_policies import (
     BulkGetDeploymentPoliciesAction,
@@ -195,6 +201,8 @@ from ai.backend.manager.services.entity_label.processors import EntityLabelProce
 from ai.backend.manager.services.entity_share.processors import (
     EntityShareProcessors,
 )
+from ai.backend.manager.services.export.actions.get_report import GetReportAction
+from ai.backend.manager.services.export.actions.public_get_report import PublicGetReportAction
 from ai.backend.manager.services.export.processors import ExportProcessors
 from ai.backend.manager.services.fair_share.processors import FairShareProcessors
 from ai.backend.manager.services.idle_checker.processors import IdleCheckerProcessors
@@ -619,6 +627,45 @@ def test_resource_preset_reads_keep_their_judged_gates() -> None:
         if record.action_cls in judged
     }
     assert recorded == judged
+
+
+def test_export_report_reads_keep_their_judged_gates() -> None:
+    """The report route stays superadmin-only; exports scoped to a caller read the report publicly."""
+    registry = _ops_registry()
+    ExportProcessors(
+        registry.group(GroupMeta(UserEntityType())),
+        registry.group(GroupMeta(SessionEntityType())),
+        registry.group(GroupMeta(ProjectEntityType())),
+        registry.group(GroupMeta(GlobalEntityType())),
+        registry.dangling_field_group(FieldGroupMeta(AuditLogFieldType()), AuditLogData),
+        MagicMock(),
+    )
+
+    judged = {
+        GetReportAction: (GlobalEntityType(), ActionKind.GLOBAL, ActionGate.PERMISSION),
+        PublicGetReportAction: (GlobalEntityType(), ActionKind.GLOBAL, ActionGate.PUBLIC),
+    }
+    recorded = {
+        record.action_cls: (record.entity_type, record.kind, record.gate)
+        for record in registry.wired_processors()
+        if record.action_cls in judged
+    }
+    assert recorded == judged
+
+
+def test_deployment_bulk_deletes_are_checked_per_owning_deployment() -> None:
+    """Rules and access tokens deleted in bulk are judged per deployment, not superadmin-only."""
+    registry = _ops_registry()
+    DeploymentProcessors(registry.group(GroupMeta(DeploymentEntityType())), MagicMock())
+
+    recorded = {
+        record.action_cls: (record.entity_type, record.kind, record.gate)
+        for record in registry.wired_processors()
+        if record.kind == ActionKind.BULK
+    }
+    partial = (DeploymentEntityType(), ActionKind.BULK, ActionGate.PERMISSION)
+    assert recorded[BulkDeleteAutoScalingRulesAction] == partial
+    assert recorded[BulkDeleteAccessTokensAction] == partial
 
 
 def test_resource_domain_and_agent_reads_keep_their_judged_gates() -> None:

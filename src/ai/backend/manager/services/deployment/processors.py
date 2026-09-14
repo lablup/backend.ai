@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
+from uuid import UUID
 
 from ai.backend.common.data.entity.deployment import DeploymentID
 from ai.backend.common.data.entity.deployment_policy import DeploymentPolicyFieldType
@@ -12,6 +13,7 @@ from ai.backend.common.data.entity.replica import ReplicaFieldType
 from ai.backend.manager.actions.registry.field import LookupFieldGroup
 from ai.backend.manager.actions.registry.group import ProcessorGroup
 from ai.backend.manager.actions.registry.types import FieldGroupMeta
+from ai.backend.manager.actions.v2.bulk.partial_processor import PartialBulkActionProcessor
 from ai.backend.manager.actions.v2.bulk.processor import BulkActionProcessor
 from ai.backend.manager.actions.v2.field.bulk_processor import PartialBulkFieldActionProcessor
 from ai.backend.manager.actions.v2.field.processor import SingleFieldActionProcessor
@@ -36,7 +38,6 @@ from ai.backend.manager.data.deployment.types import (
 )
 from ai.backend.manager.services.deployment.actions.access_token.bulk_delete_access_tokens import (
     BulkDeleteAccessTokensAction,
-    BulkDeleteAccessTokensActionResult,
 )
 from ai.backend.manager.services.deployment.actions.access_token.bulk_get_access_tokens import (
     BulkGetAccessTokensAction,
@@ -60,7 +61,6 @@ from ai.backend.manager.services.deployment.actions.access_token.search_access_t
 )
 from ai.backend.manager.services.deployment.actions.auto_scaling_rule.bulk_delete_auto_scaling_rules import (
     BulkDeleteAutoScalingRulesAction,
-    BulkDeleteAutoScalingRulesActionResult,
 )
 from ai.backend.manager.services.deployment.actions.auto_scaling_rule.create_auto_scaling_rule import (
     CreateAutoScalingRuleAction,
@@ -297,8 +297,8 @@ class DeploymentProcessors:
     delete_auto_scaling_rule: SingleEntityActionProcessor[
         DeleteAutoScalingRuleAction, DeleteAutoScalingRuleActionResult
     ]
-    bulk_delete_auto_scaling_rules: GlobalActionProcessor[
-        BulkDeleteAutoScalingRulesAction, BulkDeleteAutoScalingRulesActionResult
+    bulk_delete_auto_scaling_rules: PartialBulkActionProcessor[
+        BulkDeleteAutoScalingRulesAction, list[UUID]
     ]
     search_auto_scaling_rules: GlobalActionProcessor[
         SearchAutoScalingRulesAction, SearchAutoScalingRulesActionResult
@@ -314,8 +314,8 @@ class DeploymentProcessors:
     delete_access_token: SingleFieldActionProcessor[
         DeleteAccessTokenAction, DeleteAccessTokenActionResult
     ]
-    bulk_delete_access_tokens: GlobalActionProcessor[
-        BulkDeleteAccessTokensAction, BulkDeleteAccessTokensActionResult
+    bulk_delete_access_tokens: PartialBulkFieldActionProcessor[
+        BulkDeleteAccessTokensAction, ModelDeploymentAccessTokenData
     ]
     search_access_tokens: ScopeActionProcessor[
         SearchAccessTokensAction, ScopedFieldsOpsResult[ModelDeploymentAccessTokenData]
@@ -469,7 +469,7 @@ class DeploymentProcessors:
         self.delete_auto_scaling_rule = group.single_entity(
             DeleteAutoScalingRuleAction, service.delete_auto_scaling_rule
         )
-        self.bulk_delete_auto_scaling_rules = group.global_scope(
+        self.bulk_delete_auto_scaling_rules = group.partial_bulk(
             BulkDeleteAutoScalingRulesAction, service.bulk_delete_auto_scaling_rules
         )
         self.search_auto_scaling_rules = group.global_scope(
@@ -484,7 +484,7 @@ class DeploymentProcessors:
         self.delete_access_token = access_tokens.single_field(
             DeleteAccessTokenAction, service.delete_access_token
         )
-        self.bulk_delete_access_tokens = group.global_scope(
+        self.bulk_delete_access_tokens = access_tokens.partial_bulk_field(
             BulkDeleteAccessTokensAction, service.bulk_delete_access_tokens
         )
         self.search_access_tokens = access_tokens.search_ops(SearchAccessTokensAction)
