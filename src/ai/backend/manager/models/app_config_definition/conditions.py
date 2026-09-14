@@ -84,17 +84,23 @@ class AppConfigDefinitionConditions:
     def by_cursor_forward(cursor_id: str) -> QueryCondition:
         """Cursor condition for forward pagination (after cursor).
 
-        Uses subquery to get created_at of the cursor row and compare.
+        Uses the row ID as a tiebreaker when creation timestamps are equal.
         """
         cursor_uuid = uuid.UUID(cursor_id)
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            subquery = (
+            cursor_created_at = (
                 sa.select(AppConfigDefinitionRow.created_at)
                 .where(AppConfigDefinitionRow.id == cursor_uuid)
                 .scalar_subquery()
             )
-            return AppConfigDefinitionRow.created_at < subquery
+            return sa.or_(
+                AppConfigDefinitionRow.created_at < cursor_created_at,
+                sa.and_(
+                    AppConfigDefinitionRow.created_at == cursor_created_at,
+                    AppConfigDefinitionRow.id > cursor_uuid,
+                ),
+            )
 
         return inner
 
