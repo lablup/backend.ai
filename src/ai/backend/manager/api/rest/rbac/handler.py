@@ -230,9 +230,9 @@ class RBACHandler:
         ctx: UserContext,
     ) -> APIResponse:
         """Search users assigned to a specific role with filters and pagination."""
-        querier = self._assigned_user_adapter.build_querier(path.parsed, body.parsed)
+        searcher = self._assigned_user_adapter.build_searcher(path.parsed, body.parsed)
         action_result = await self._permission_controller.global_search_role_assignments.run(
-            GlobalSearchRoleAssignmentsAction(querier=querier)
+            GlobalSearchRoleAssignmentsAction(searcher=searcher)
         )
         resp = SearchUsersAssignedToRoleResponse(
             users=[

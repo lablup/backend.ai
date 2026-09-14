@@ -191,14 +191,12 @@ class PermissionControllerRepository:
         return result.to_detail_data_without_users()
 
     @permission_controller_repository_resilience.apply()
-    async def search_users_assigned_to_role(
+    async def search_role_assignments_in_global(
         self,
-        querier: BatchQuerier,
+        searcher: RoleAssignmentSearcher,
     ) -> AssignedUserListResult:
-        """Searches users assigned to a specific role with pagination and filtering."""
-        return await self._db_source.search_users_assigned_to_role(
-            querier=querier,
-        )
+        """Search every assignment row, with no scope filter."""
+        return await self._db_source.search_role_assignments_in_global(searcher)
 
     @permission_controller_repository_resilience.apply()
     async def search_role_assignments_in_scope(

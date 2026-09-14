@@ -16,7 +16,6 @@ from ai.backend.manager.data.permission.permission import (
     PermissionListResult,
 )
 from ai.backend.manager.data.permission.role import (
-    AssignedUserData,
     AssignedUserListResult,
     BulkRoleRevocationFailure,
     BulkRoleRevocationResultData,
@@ -319,42 +318,19 @@ class PermissionDBSource:
                 raise RoleNotFound(f"Role with ID {role_id} does not exist.")
             return role_row
 
-    async def search_users_assigned_to_role(
+    async def search_role_assignments_in_global(
         self,
-        querier: BatchQuerier,
+        searcher: RoleAssignmentSearcher,
     ) -> AssignedUserListResult:
-        """Searches users assigned to a specific role with pagination and filtering."""
-        async with self._db.begin_readonly_session() as db_sess:
-            query = sa.select(UserRow, UserRoleRow).select_from(
-                sa.join(
-                    UserRow,
-                    UserRoleRow,
-                    UserRoleRow.user_id == UserRow.uuid,
-                )
-            )
-            result = await execute_batch_querier(
-                db_sess,
-                query,
-                querier,
-            )
-
-            items = [
-                AssignedUserData(
-                    id=row.UserRoleRow.id,
-                    user_id=row.UserRow.uuid,
-                    role_id=row.UserRoleRow.role_id,
-                    granted_by=row.UserRoleRow.granted_by,
-                    granted_at=row.UserRoleRow.granted_at,
-                )
-                for row in result.rows
-            ]
-
-            return AssignedUserListResult(
-                items=items,
-                total_count=result.total_count,
-                has_next_page=result.has_next_page,
-                has_previous_page=result.has_previous_page,
-            )
+        """Search every assignment row, with no scope filter."""
+        async with self._ops.read_ops() as r:
+            result = await r.search_in_global(searcher)
+        return AssignedUserListResult(
+            items=result.items,
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+        )
 
     async def search_role_assignments_in_scope(
         self,

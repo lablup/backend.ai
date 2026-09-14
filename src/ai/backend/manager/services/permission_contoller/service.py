@@ -111,9 +111,7 @@ class PermissionControllerService:
         self, action: GlobalSearchRoleAssignmentsAction
     ) -> GlobalSearchRoleAssignmentsActionResult:
         """Search users assigned to a specific role with pagination and filtering."""
-        result = await self._repository.search_users_assigned_to_role(
-            querier=action.querier,
-        )
+        result = await self._repository.search_role_assignments_in_global(action.searcher)
         return GlobalSearchRoleAssignmentsActionResult(result=result)
 
     async def replace_role_permissions(

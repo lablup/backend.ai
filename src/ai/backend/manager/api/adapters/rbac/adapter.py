@@ -382,12 +382,12 @@ class RBACAdapter(BaseAdapter):
             return []
         # Serves the deprecated RoleAssignment node alone, so it stays on the global search
         # and goes away with that node.
-        querier = BatchQuerier(
+        searcher = RoleAssignmentSearcher(
             pagination=NoPagination(),
             conditions=[AssignedUserConditions.by_ids(assignment_ids)],
         )
         action_result = await self._permission_controller.global_search_role_assignments.run(
-            GlobalSearchRoleAssignmentsAction(querier=querier)
+            GlobalSearchRoleAssignmentsAction(searcher=searcher)
         )
         assignment_map: dict[UUID, RoleAssignmentNode] = {
             data.id: self._assignment_data_to_node(data) for data in action_result.result.items
@@ -700,22 +700,12 @@ class RBACAdapter(BaseAdapter):
     async def admin_search_role_assignments(
         self,
         input: SearchRoleAssignmentsInput,
-        base_conditions: Sequence[QueryCondition] | None = None,
     ) -> SearchResult[RoleAssignmentNode]:
         """Search role assignments with cursor/offset pagination (admin)."""
-        return await self._search_role_assignments(input, base_conditions=base_conditions)
-
-    async def _search_role_assignments(
-        self,
-        input: SearchRoleAssignmentsInput,
-        base_conditions: Sequence[QueryCondition] | None = None,
-    ) -> SearchResult[RoleAssignmentNode]:
-        """Internal implementation for searching role assignments."""
-        conditions = self._convert_assignment_filter(input.filter) if input.filter else []
-        orders = self._convert_assignment_orders(input.order) if input.order else []
-        querier = self._build_querier(
-            conditions=conditions,
-            orders=orders,
+        searcher = self._build_searcher(
+            RoleAssignmentSearcher,
+            conditions=self._convert_assignment_filter(input.filter) if input.filter else [],
+            orders=self._convert_assignment_orders(input.order) if input.order else [],
             pagination_spec=_assignment_pagination_spec(),
             first=input.first,
             after=input.after,
@@ -723,10 +713,9 @@ class RBACAdapter(BaseAdapter):
             before=input.before,
             limit=input.limit,
             offset=input.offset,
-            base_conditions=base_conditions,
         )
         action_result = await self._permission_controller.global_search_role_assignments.run(
-            GlobalSearchRoleAssignmentsAction(querier=querier)
+            GlobalSearchRoleAssignmentsAction(searcher=searcher)
         )
         raw = action_result.result
         return SearchResult(
