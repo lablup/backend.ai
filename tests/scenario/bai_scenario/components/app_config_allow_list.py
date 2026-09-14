@@ -368,3 +368,81 @@ class TenEntriesComeWithANextPage(Then[ManyEntriesAndACaller, SearchAppConfigAll
             Same("has_next_page", payload.has_next_page, True),
             Same("has_previous_page", payload.has_previous_page, False),
         ]
+
+
+@dataclass(frozen=True)
+class TwoNamedEntriesAreFound(Then[ManyEntriesAndACaller, SearchAppConfigAllowListPayload]):
+    """OR 이름 필터에 맞는 두 항목만 이름순으로 반환된다."""
+
+    @override
+    def says(self) -> str:
+        return "두 설정 이름 중 하나와 일치하는 항목만 반환된다"
+
+    @override
+    def look(
+        self, laid: ManyEntriesAndACaller, answered: Answered[SearchAppConfigAllowListPayload]
+    ) -> list[Verdict]:
+        payload = answered.response
+        if payload is None:
+            return [Refused(NotEnoughPermission, answered.raised)]
+        wanted = sorted(one.config_name for one in laid.laid[:2])
+        return [
+            Same("items", [one.config_name for one in payload.items], wanted),
+            Same("total_count", payload.total_count, 2),
+            Same("has_next_page", payload.has_next_page, False),
+            Same("has_previous_page", payload.has_previous_page, False),
+        ]
+
+
+@dataclass(frozen=True)
+class TheMiddleOffsetPageIsFound(Then[ManyEntriesAndACaller, SearchAppConfigAllowListPayload]):
+    """설정 이름순 중간 페이지와 앞뒤 페이지 표시를 확인한다."""
+
+    @override
+    def says(self) -> str:
+        return "중간 두 항목과 앞뒤 페이지가 모두 있다고 응답한다"
+
+    @override
+    def look(
+        self, laid: ManyEntriesAndACaller, answered: Answered[SearchAppConfigAllowListPayload]
+    ) -> list[Verdict]:
+        payload = answered.response
+        if payload is None:
+            return [Refused(NotEnoughPermission, answered.raised)]
+        wanted = sorted(one.config_name for one in laid.laid)[1:3]
+        return [
+            Same("items", [one.config_name for one in payload.items], wanted),
+            Same("total_count", payload.total_count, len(laid.laid)),
+            Same("has_next_page", payload.has_next_page, True),
+            Same("has_previous_page", payload.has_previous_page, True),
+        ]
+
+
+@dataclass(frozen=True)
+class TheEntryAfterTheCursorIsFound(Then[ManyEntriesAndACaller, SearchAppConfigAllowListPayload]):
+    """기본 정렬에서 커서 다음 항목과 페이지 정보를 확인한다."""
+
+    @override
+    def says(self) -> str:
+        return "커서 다음 항목과 앞뒤 페이지가 모두 있다고 응답한다"
+
+    @override
+    def look(
+        self, laid: ManyEntriesAndACaller, answered: Answered[SearchAppConfigAllowListPayload]
+    ) -> list[Verdict]:
+        payload = answered.response
+        if payload is None:
+            return [Refused(NotEnoughPermission, answered.raised)]
+        ordered = sorted(laid.laid, key=lambda one: one.id)
+        ordered.sort(key=lambda one: one.created_at, reverse=True)
+        return [
+            Held[object](
+                "items[0].id",
+                getattr(payload.items[0], "id", None) if payload.items else None,
+                SameAs[object](ordered[1].id, "커서 다음 허용 목록 항목"),
+            ),
+            Same("items", len(payload.items), 1),
+            Same("total_count", payload.total_count, len(laid.laid)),
+            Same("has_next_page", payload.has_next_page, True),
+            Same("has_previous_page", payload.has_previous_page, True),
+        ]

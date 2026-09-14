@@ -15,6 +15,9 @@ from bai_scenario.components.app_config_allow_list import (
     OnlyOneKindsEntriesAreFound,
     OnlyTheNamedNamesEntriesAreFound,
     TenEntriesComeWithANextPage,
+    TheEntryAfterTheCursorIsFound,
+    TheMiddleOffsetPageIsFound,
+    TwoNamedEntriesAreFound,
 )
 from bai_scenario.runner.acting import ActingAs
 from bai_scenario.runner.planting import SeedingSession
@@ -37,9 +40,11 @@ from ai.backend.common.dto.manager.v2.app_config_allow_list.types import (
     AppConfigScopeTypeFilter,
 )
 from ai.backend.common.dto.manager.v2.common import OrderDirection
+from ai.backend.manager.api.adapter_options.cursor.cursor import encode_cursor
 from ai.backend.manager.api.adapters.app_config_allow_list.adapter import (
     AppConfigAllowListAdapter,
 )
+from ai.backend.manager.errors.api import InvalidGraphQLParameters
 from ai.backend.manager.errors.auth import InsufficientPrivilege
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import Given, Scenario, Then, When
@@ -150,6 +155,120 @@ class SearchingInRankOrder(When[ManyEntriesAndACaller, AppConfigAllowListAdapter
                     ]
                 )
             )
+
+
+@dataclass(frozen=True)
+class SearchingByEitherName(When[ManyEntriesAndACaller, AppConfigAllowListAdapter, Searched]):
+    """두 설정 이름 중 하나와 같은 항목을 이름순으로 검색한다."""
+
+    @override
+    def operation(self) -> str:
+        return "admin_search"
+
+    @override
+    def describe(self, laid: ManyEntriesAndACaller) -> str:
+        first, second = laid.laid[:2]
+        return f"{laid.caller.username}이 {first.config_name} 또는 {second.config_name}인 항목 검색"
+
+    @override
+    async def call(
+        self, adapter: AppConfigAllowListAdapter, laid: ManyEntriesAndACaller
+    ) -> Searched:
+        filters = [
+            AppConfigAllowListFilter(config_name=StringFilter(equals=one.config_name))
+            for one in laid.laid[:2]
+        ]
+        with ActingAs(laid.caller):
+            return await adapter.admin_search(
+                SearchAppConfigAllowListInput(
+                    filter=AppConfigAllowListFilter(OR=filters),
+                    order=[
+                        AppConfigAllowListOrder(
+                            field=AppConfigAllowListOrderField.CONFIG_NAME,
+                            direction=OrderDirection.ASC,
+                        )
+                    ],
+                )
+            )
+
+
+@dataclass(frozen=True)
+class SearchingAMiddleOffsetPage(When[ManyEntriesAndACaller, AppConfigAllowListAdapter, Searched]):
+    """설정 이름순 결과에서 오프셋으로 중간 두 항목을 검색한다."""
+
+    @override
+    def operation(self) -> str:
+        return "admin_search"
+
+    @override
+    def describe(self, laid: ManyEntriesAndACaller) -> str:
+        return f"{laid.caller.username}이 설정 이름순 결과의 두 번째 항목부터 두 건 검색"
+
+    @override
+    async def call(
+        self, adapter: AppConfigAllowListAdapter, laid: ManyEntriesAndACaller
+    ) -> Searched:
+        with ActingAs(laid.caller):
+            return await adapter.admin_search(
+                SearchAppConfigAllowListInput(
+                    order=[
+                        AppConfigAllowListOrder(
+                            field=AppConfigAllowListOrderField.CONFIG_NAME,
+                            direction=OrderDirection.ASC,
+                        )
+                    ],
+                    limit=2,
+                    offset=1,
+                )
+            )
+
+
+@dataclass(frozen=True)
+class SearchingAfterTheFirst(When[ManyEntriesAndACaller, AppConfigAllowListAdapter, Searched]):
+    """기본 정렬의 첫 항목 다음 한 항목을 커서로 검색한다."""
+
+    @override
+    def operation(self) -> str:
+        return "admin_search"
+
+    @override
+    def describe(self, laid: ManyEntriesAndACaller) -> str:
+        ordered = sorted(laid.laid, key=lambda one: one.id)
+        ordered.sort(key=lambda one: one.created_at, reverse=True)
+        return f"{laid.caller.username}이 {ordered[0].config_name} 항목의 커서 다음 한 건 검색"
+
+    @override
+    async def call(
+        self, adapter: AppConfigAllowListAdapter, laid: ManyEntriesAndACaller
+    ) -> Searched:
+        ordered = sorted(laid.laid, key=lambda one: one.id)
+        ordered.sort(key=lambda one: one.created_at, reverse=True)
+        with ActingAs(laid.caller):
+            return await adapter.admin_search(
+                SearchAppConfigAllowListInput(first=1, after=encode_cursor(ordered[0].id))
+            )
+
+
+@dataclass(frozen=True)
+class SearchingWithMixedPagination(
+    When[ManyEntriesAndACaller, AppConfigAllowListAdapter, Searched]
+):
+    """커서와 오프셋 페이지네이션을 함께 요청한다."""
+
+    @override
+    def operation(self) -> str:
+        return "admin_search"
+
+    @override
+    def describe(self, laid: ManyEntriesAndACaller) -> str:
+        return f"{laid.caller.username}이 커서와 오프셋 페이지네이션을 함께 지정해 검색"
+
+    @override
+    async def call(
+        self, adapter: AppConfigAllowListAdapter, laid: ManyEntriesAndACaller
+    ) -> Searched:
+        with ActingAs(laid.caller):
+            return await adapter.admin_search(SearchAppConfigAllowListInput(first=1, limit=1))
 
 
 @dataclass(frozen=True)
@@ -266,6 +385,106 @@ class OrderingByRankSortsThem(
 
 
 @dataclass(frozen=True)
+class AnOrFilterKeepsEitherName(
+    Scenario[SeedingSession, ManyEntriesAndACaller, AppConfigAllowListAdapter, Searched]
+):
+    @override
+    def summary(self) -> str:
+        return "an-or-filter-keeps-either-name"
+
+    @override
+    def describe(self) -> str:
+        return "설정 이름 셋이 있고 슈퍼관리자가 두 이름을 OR로 묶어 검색하면, 두 이름 중 하나와 일치하는 항목만 반환된다"
+
+    @override
+    def given(self) -> Given[SeedingSession, ManyEntriesAndACaller]:
+        return EntriesLaidAcross(names=3, role=UserRole.SUPERADMIN)
+
+    @override
+    def when(self) -> When[ManyEntriesAndACaller, AppConfigAllowListAdapter, Searched]:
+        return SearchingByEitherName()
+
+    @override
+    def then(self) -> Then[ManyEntriesAndACaller, Searched]:
+        return TwoNamedEntriesAreFound()
+
+
+@dataclass(frozen=True)
+class AnOffsetPageReportsBothDirections(
+    Scenario[SeedingSession, ManyEntriesAndACaller, AppConfigAllowListAdapter, Searched]
+):
+    @override
+    def summary(self) -> str:
+        return "a-middle-offset-page-reports-both-directions"
+
+    @override
+    def describe(self) -> str:
+        return "항목 넷을 설정 이름순으로 두 번째부터 두 건 검색하면, 중간 두 항목과 앞뒤 페이지가 모두 있다고 응답한다"
+
+    @override
+    def given(self) -> Given[SeedingSession, ManyEntriesAndACaller]:
+        return EntriesLaidAcross(names=4, role=UserRole.SUPERADMIN)
+
+    @override
+    def when(self) -> When[ManyEntriesAndACaller, AppConfigAllowListAdapter, Searched]:
+        return SearchingAMiddleOffsetPage()
+
+    @override
+    def then(self) -> Then[ManyEntriesAndACaller, Searched]:
+        return TheMiddleOffsetPageIsFound()
+
+
+@dataclass(frozen=True)
+class AForwardCursorContinuesAfterTheNamedRow(
+    Scenario[SeedingSession, ManyEntriesAndACaller, AppConfigAllowListAdapter, Searched]
+):
+    @override
+    def summary(self) -> str:
+        return "a-forward-cursor-continues-after-the-named-row"
+
+    @override
+    def describe(self) -> str:
+        return "항목 넷이 있고 슈퍼관리자가 기본 정렬의 첫 항목 다음 한 건을 커서로 검색하면, 다음 항목과 앞뒤 페이지가 모두 있다고 응답한다"
+
+    @override
+    def given(self) -> Given[SeedingSession, ManyEntriesAndACaller]:
+        return EntriesLaidAcross(names=4, role=UserRole.SUPERADMIN)
+
+    @override
+    def when(self) -> When[ManyEntriesAndACaller, AppConfigAllowListAdapter, Searched]:
+        return SearchingAfterTheFirst()
+
+    @override
+    def then(self) -> Then[ManyEntriesAndACaller, Searched]:
+        return TheEntryAfterTheCursorIsFound()
+
+
+@dataclass(frozen=True)
+class PaginationModesMayNotBeMixed(
+    Scenario[SeedingSession, ManyEntriesAndACaller, AppConfigAllowListAdapter, Searched]
+):
+    @override
+    def summary(self) -> str:
+        return "cursor-and-offset-pagination-may-not-be-mixed"
+
+    @override
+    def describe(self) -> str:
+        return "슈퍼관리자가 커서와 오프셋 페이지네이션을 함께 지정하면, 서로 다른 방식을 섞었다는 이유로 거부된다"
+
+    @override
+    def given(self) -> Given[SeedingSession, ManyEntriesAndACaller]:
+        return EntriesLaidAcross(names=3, role=UserRole.SUPERADMIN)
+
+    @override
+    def when(self) -> When[ManyEntriesAndACaller, AppConfigAllowListAdapter, Searched]:
+        return SearchingWithMixedPagination()
+
+    @override
+    def then(self) -> Then[ManyEntriesAndACaller, Searched]:
+        return TheCallIsRefused(InvalidGraphQLParameters)
+
+
+@dataclass(frozen=True)
 class NoPageSizeMeansTen(
     Scenario[SeedingSession, ManyEntriesAndACaller, AppConfigAllowListAdapter, Searched]
 ):
@@ -320,6 +539,10 @@ SCENARIOS: list[SearchingStep] = [
     FilteringByNameKeepsThatNames(),
     FilteringByKindKeepsThatKind(),
     OrderingByRankSortsThem(),
+    AnOrFilterKeepsEitherName(),
+    AnOffsetPageReportsBothDirections(),
+    AForwardCursorContinuesAfterTheNamedRow(),
+    PaginationModesMayNotBeMixed(),
     NoPageSizeMeansTen(),
     APlainUserMayNotSearch(),
 ]

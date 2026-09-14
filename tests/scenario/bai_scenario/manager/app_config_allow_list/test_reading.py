@@ -6,13 +6,15 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from typing import override
+from typing import Any, override
 from uuid import UUID, uuid4
 
 import pytest
 from bai_scenario.components.answers import TheCallIsRefused
+from bai_scenario.components.app_config import ENFORCEMENT
 from bai_scenario.components.app_config_allow_list import (
     AnEntryAndACaller,
     AnEntryAndSomeone,
@@ -34,7 +36,7 @@ from ai.backend.manager.api.adapters.app_config_allow_list.adapter import (
 from ai.backend.manager.errors.base.entity import EntityNotFoundError
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.scenario_steps import Given, Scenario, Then, When
+from ai.backend.testutils.scenario_steps import Configured, Given, Scenario, Then, When
 
 type ReadingStep = Scenario[
     SeedingSession, AnEntryAndACaller, AppConfigAllowListAdapter, AppConfigAllowListNode
@@ -150,10 +152,46 @@ class AnUnknownIdIsNotFoundForASuperadmin(
         return TheCallIsRefused(EntityNotFoundError)
 
 
+@dataclass(frozen=True)
+class EnforcementOffLetsAnyoneRead(
+    Scenario[SeedingSession, AnEntryAndACaller, AppConfigAllowListAdapter, AppConfigAllowListNode],
+    Configured,
+):
+    started: datetime
+
+    @override
+    def summary(self) -> str:
+        return "turning-enforcement-off-lets-a-plain-user-read"
+
+    @override
+    def describe(self) -> str:
+        return (
+            "RBAC 강제를 끄면 권한이 없는 일반 사용자도 허용 목록 항목을 조회할 수 있다. "
+            "개별 조회는 엔티티 권한 검사를 사용한다"
+        )
+
+    @override
+    def config(self) -> Mapping[str, Any]:
+        return {ENFORCEMENT: False}
+
+    @override
+    def given(self) -> Given[SeedingSession, AnEntryAndACaller]:
+        return AnEntryAndSomeone(opened=AppConfigScopeType.USER)
+
+    @override
+    def when(self) -> When[AnEntryAndACaller, AppConfigAllowListAdapter, AppConfigAllowListNode]:
+        return ReadingById()
+
+    @override
+    def then(self) -> Then[AnEntryAndACaller, AppConfigAllowListNode]:
+        return TheEntryNode(started=self.started)
+
+
 SCENARIOS: list[ReadingStep] = [
     TheSuperadminReadsIt(started=datetime.now(UTC)),
     AUserGrantedNothingMayNotRead(),
     AnUnknownIdIsNotFoundForASuperadmin(),
+    EnforcementOffLetsAnyoneRead(started=datetime.now(UTC)),
 ]
 
 

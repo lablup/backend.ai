@@ -51,6 +51,7 @@ class LoadingByIds(When[TwoEntriesAndACaller, AppConfigAllowListAdapter, Loaded]
     """준비한 ID 둘과 존재하지 않는 ID를 조회한다. 빈 목록도 허용한다."""
 
     nothing: bool = False
+    duplicate_first: bool = False
 
     @override
     def operation(self) -> str:
@@ -60,13 +61,18 @@ class LoadingByIds(When[TwoEntriesAndACaller, AppConfigAllowListAdapter, Loaded]
     def describe(self, laid: TwoEntriesAndACaller) -> str:
         if self.nothing:
             return f"{laid.caller.username}이 빈 ID 목록으로 조회"
+        if self.duplicate_first:
+            return f"{laid.caller.username}이 첫 번째 허용 목록 항목의 ID를 두 번 조회"
         return f"{laid.caller.username}이 항목 둘과 존재하지 않는 ID를 한 번에 조회"
 
     @override
     async def call(self, adapter: AppConfigAllowListAdapter, laid: TwoEntriesAndACaller) -> Loaded:
-        asked = (
-            [] if self.nothing else [laid.first.id, laid.second.id, AppConfigAllowListID(uuid4())]
-        )
+        if self.nothing:
+            asked = []
+        elif self.duplicate_first:
+            asked = [laid.first.id, laid.first.id]
+        else:
+            asked = [laid.first.id, laid.second.id, AppConfigAllowListID(uuid4())]
         with ActingAs(laid.caller):
             return await adapter.batch_load_by_ids(asked)
 
@@ -145,6 +151,37 @@ class NothingIsAnswered(Then[TwoEntriesAndACaller, Loaded]):
 
 
 @dataclass(frozen=True)
+class TheDuplicateIdKeepsBothPositions(Then[TwoEntriesAndACaller, Loaded]):
+    """같은 ID를 두 번 요청하면 두 위치에 같은 노드가 반환된다."""
+
+    @override
+    def says(self) -> str:
+        return "중복 ID의 두 위치에 같은 허용 목록 항목이 반환된다"
+
+    @override
+    def look(self, laid: TwoEntriesAndACaller, answered: Answered[Loaded]) -> list[Verdict]:
+        items = answered.response
+        if items is None:
+            return [Refused(NotEnoughPermission, answered.raised)]
+        seen: list[Verdict] = [Same("items", len(items), 2)]
+        if len(items) != 2:
+            return seen
+        return [
+            *seen,
+            Held[object](
+                "items[0].id",
+                getattr(items[0], "id", items[0]),
+                SameAs[object](laid.first.id, "준비한 첫 번째 허용 목록 항목"),
+            ),
+            Held[object](
+                "items[1].id",
+                getattr(items[1], "id", items[1]),
+                SameAs[object](laid.first.id, "준비한 첫 번째 허용 목록 항목"),
+            ),
+        ]
+
+
+@dataclass(frozen=True)
 class APlainUserIsRefusedPerId(
     Scenario[SeedingSession, TwoEntriesAndACaller, AppConfigAllowListAdapter, Loaded]
 ):
@@ -201,6 +238,33 @@ class TheSuperadminSeesBoth(
 
 
 @dataclass(frozen=True)
+class DuplicateIdsKeepTheirPositions(
+    Scenario[SeedingSession, TwoEntriesAndACaller, AppConfigAllowListAdapter, Loaded]
+):
+    @override
+    def summary(self) -> str:
+        return "duplicate-ids-keep-their-input-positions"
+
+    @override
+    def describe(self) -> str:
+        return (
+            "슈퍼관리자가 같은 허용 목록 항목의 ID를 두 번 조회하면, 같은 노드가 두 위치에 반환된다"
+        )
+
+    @override
+    def given(self) -> Given[SeedingSession, TwoEntriesAndACaller]:
+        return TwoEntriesAndSomeone(role=UserRole.SUPERADMIN)
+
+    @override
+    def when(self) -> When[TwoEntriesAndACaller, AppConfigAllowListAdapter, Loaded]:
+        return LoadingByIds(duplicate_first=True)
+
+    @override
+    def then(self) -> Then[TwoEntriesAndACaller, Loaded]:
+        return TheDuplicateIdKeepsBothPositions()
+
+
+@dataclass(frozen=True)
 class AnEmptyListAnswersEmpty(
     Scenario[SeedingSession, TwoEntriesAndACaller, AppConfigAllowListAdapter, Loaded]
 ):
@@ -227,6 +291,7 @@ class AnEmptyListAnswersEmpty(
 
 SCENARIOS: list[LoadingStep] = [
     TheSuperadminSeesBoth(),
+    DuplicateIdsKeepTheirPositions(),
     APlainUserIsRefusedPerId(),
     AnEmptyListAnswersEmpty(),
 ]
