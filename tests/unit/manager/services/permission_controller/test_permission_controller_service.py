@@ -18,7 +18,6 @@ from ai.backend.common.data.entity.project import ProjectEntityType
 from ai.backend.common.data.entity.role import RoleEntityType, RoleID
 from ai.backend.common.data.entity.types import EntityType
 from ai.backend.common.data.entity.user import UserEntityType, UserID
-from ai.backend.common.data.entity.user_role import UserRoleAssignmentID
 from ai.backend.common.data.permission.types import (
     Permission,
     RoleSource,
@@ -261,7 +260,7 @@ class TestSearchUsersAssignedToRole:
     ) -> None:
         granted_by = uuid.uuid4()
         user_data = AssignedUserData(
-            id=UserRoleAssignmentID(uuid.uuid4()),
+            id=uuid.uuid4(),
             user_id=UserID(uuid.uuid4()),
             role_id=RoleID(uuid.uuid4()),
             granted_by=granted_by,

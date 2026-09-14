@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import uuid
 from datetime import datetime
 
 import sqlalchemy as sa
@@ -10,7 +11,6 @@ from sqlalchemy.orm import (
 
 from ai.backend.common.data.entity.role import RoleID
 from ai.backend.common.data.entity.user import UserID
-from ai.backend.common.data.entity.user_role import UserRoleAssignmentID
 from ai.backend.manager.data.permission.role import (
     AssignedUserData,
     UserRoleAssignmentData,
@@ -26,11 +26,8 @@ class UserRoleRow(Base):
     __tablename__ = "user_roles"
     __table_args__ = (sa.UniqueConstraint("user_id", "role_id", name="uq_user_id_role_id"),)
 
-    id: Mapped[UserRoleAssignmentID] = mapped_column(
-        "id",
-        GUID(UserRoleAssignmentID),
-        primary_key=True,
-        server_default=sa.text("uuid_generate_v7()"),
+    id: Mapped[uuid.UUID] = mapped_column(
+        "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v7()")
     )
     user_id: Mapped[UserID] = mapped_column(
         "user_id",

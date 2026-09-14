@@ -32,6 +32,10 @@ from ai.backend.manager.services.permission_contoller.actions.replace_role_permi
     ReplaceRolePermissionsAction,
     ReplaceRolePermissionsActionResult,
 )
+from ai.backend.manager.services.permission_contoller.actions.search_my_role_assignments import (
+    ScopedSearchRoleAssignmentsAction,
+    ScopedSearchRoleAssignmentsActionResult,
+)
 from ai.backend.manager.services.permission_contoller.actions.search_permissions import (
     GlobalSearchPermissionsAction,
     GlobalSearchPermissionsActionResult,
@@ -86,6 +90,13 @@ class PermissionControllerService:
             action.querier, action.operation_scopes()
         )
         return SearchRolesInScopeActionResult(result=result)
+
+    async def scoped_search_role_assignments(
+        self, action: ScopedSearchRoleAssignmentsAction
+    ) -> ScopedSearchRoleAssignmentsActionResult:
+        """Search the assignment rows inside one user's scope."""
+        result = await self._repository.search_users_assigned_to_role(querier=action.querier)
+        return ScopedSearchRoleAssignmentsActionResult(result=result)
 
     async def search_permissions(
         self, action: GlobalSearchPermissionsAction

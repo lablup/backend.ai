@@ -7,14 +7,8 @@ from typing import override
 
 from ai.backend.common.data.entity.role import RoleID
 from ai.backend.common.data.entity.role_preset import RolePresetID
-from ai.backend.common.data.entity.types import (
-    EntityData,
-    EntityIdentifier,
-    EntityType,
-    FieldData,
-)
+from ai.backend.common.data.entity.types import EntityData, EntityIdentifier, EntityType
 from ai.backend.common.data.entity.user import UserID
-from ai.backend.common.data.entity.user_role import UserRoleAssignmentID
 from ai.backend.manager.data.common.types import SearchResult
 
 from .permission import PermissionData
@@ -52,10 +46,10 @@ class RoleData(EntityData):
 
 
 @dataclass(frozen=True)
-class AssignedUserData(FieldData):
-    """One role a user holds, a field row of that user."""
+class AssignedUserData:
+    """One row joining a user to a role they hold."""
 
-    id: UserRoleAssignmentID
+    id: uuid.UUID
     user_id: UserID
     role_id: RoleID
     granted_by: uuid.UUID | None
