@@ -93,7 +93,6 @@ from ai.backend.manager.data.vfolder.types import (
     VFolderOperationStatus,
 )
 from ai.backend.manager.errors.resource import NotAModelVFolder
-from ai.backend.manager.errors.storage import VFolderNotFound
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.condition_utils import combine_conditions_or, negate_conditions
 from ai.backend.manager.models.vfolder.conditions import VFolderConditions
@@ -566,12 +565,10 @@ class VFolderAdapter(BaseAdapter):
         if me is None:
             raise UnreachableError("User context is not available")
 
-        batch_result = await self._vfolder.batch_load_vfolders_by_ids.run(
-            GlobalBatchLoadVFoldersAction(ids=[vfolder_id])
+        get_result = await self._vfolder.get_v2.run(
+            GetVFolderV2Action(vfolder_uuid=VFolderUUID(vfolder_id))
         )
-        if not batch_result.data or batch_result.data[0] is None:
-            raise VFolderNotFound()
-        vfolder = batch_result.data[0]
+        vfolder = get_result.vfolder
         if vfolder.usage_mode != VFolderUsageMode.MODEL:
             raise NotAModelVFolder()
 
