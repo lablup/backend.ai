@@ -96,7 +96,8 @@ async def vfolder_v2(
             "Page through the virtual folders the named scopes reach, combined with OR. "
             "Every scope is authorized before the read runs."
         ),
-    )
+    ),
+    name="scopedVFoldersV2",
 )  # type: ignore[misc]
 async def scoped_vfolders_v2(
     info: Info[StrawberryGQLContext],
