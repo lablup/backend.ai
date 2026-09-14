@@ -274,16 +274,6 @@ class ImageAdapter(BaseAdapter):
 
     # ------------------------------------------------------------------ querier builders
 
-    def _build_offset_querier(self, input: AdminSearchImagesInput) -> BatchQuerier:
-        """Build a BatchQuerier with offset pagination from the search input DTO."""
-        conditions = self._convert_filter(input.filter) if input.filter else []
-        orders = self._convert_orders(input.order) if input.order else []
-        pagination = OffsetPagination(
-            limit=input.limit if input.limit is not None else DEFAULT_PAGINATION_LIMIT,
-            offset=input.offset if input.offset is not None else 0,
-        )
-        return BatchQuerier(conditions=conditions, orders=orders, pagination=pagination)
-
     def _convert_filter(
         self,
         filter: ImageFilterInputDTO,
@@ -540,10 +530,6 @@ class ImageAdapter(BaseAdapter):
             id=data.id,
             alias=data.alias,
         )
-
-    def build_querier(self, input: AdminSearchImagesInput) -> BatchQuerier:
-        """Build a BatchQuerier from the search input DTO (offset pagination)."""
-        return self._build_offset_querier(input)
 
     def _build_pagination(self, input: AdminSearchImagesInput) -> OffsetPagination:
         return OffsetPagination(
