@@ -3411,6 +3411,80 @@ class TestWithdrawingWithoutTearingDown:
         assert rec.calls == [], "the watchdog reprogrammed a session this agent has withdrawn from"
 
 
+class TestAForwardAcceptNoSessionOwns:
+    """The rule is written before the session is registered and removed before the record goes, so
+    a process that dies between the two leaves one nothing can be named for. It then sits in
+    FORWARD accepting for whichever session draws that VNI next."""
+
+    def _reader(self, *, rules: Sequence[int], devices: Sequence[int]) -> _Listing:
+        filter_rules = f"-A INPUT -j {CHAIN_IN}\n-A OUTPUT -j {CHAIN_GUARD}\n" + "".join(
+            f"-A FORWARD -i {bridge_dev(vni)} -o {bridge_dev(vni)} -j ACCEPT\n" for vni in rules
+        )
+        links = "".join(
+            f"{index}: {vxlan_dev(vni)}@enp0s1: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1450\n"
+            for index, vni in enumerate(devices, start=7)
+        )
+
+        def _listing(argv: Sequence[str]) -> str | None:
+            if argv[0] == "iptables-save":
+                table = argv[argv.index("-t") + 1]
+                return f"-A OUTPUT -j {CHAIN_MARK}\n" if table == "mangle" else filter_rules
+            if "link" in argv and "vxlan" in argv:
+                return links
+            return None
+
+        return _Listing(_listing)
+
+    async def test_a_rule_with_no_tunnel_is_taken_back(self) -> None:
+        rec = Recorder()
+        plugin = _plugin(rec)
+        plugin._reader = self._reader(rules=[4096], devices=[])
+        await plugin.reassert_protection()
+        assert forward_accept_del_args(4096) in rec.calls
+
+    async def test_a_rule_whose_tunnel_exists_is_left_alone(self) -> None:
+        """The VXLAN device is node-global: a rule whose `baivx` is up belongs to a live session,
+        a co-located agent's if not ours, and removing it cuts that session's containers off."""
+        rec = Recorder()
+        plugin = _plugin(rec)
+        plugin._reader = self._reader(rules=[4096], devices=[4096])
+        await plugin.reassert_protection()
+        assert forward_accept_del_args(4096) not in rec.calls
+
+    async def test_our_own_sessions_rule_survives_a_device_that_is_not_up_yet(self) -> None:
+        rec = Recorder()
+        plugin = _plugin(rec)
+        await plugin.setup_session_network(_META, _SELF)
+        rec.calls.clear()
+        plugin._reader = self._reader(rules=[4097], devices=[])
+        await plugin.reassert_protection()
+        assert forward_accept_del_args(4097) not in rec.calls
+
+    async def test_an_idle_node_reads_its_firewall_once_and_then_stops(self) -> None:
+        """Three seconds apart, forever, on every node running no session: the sweep has to cost
+        nothing once it has found the node clean."""
+        reader = self._reader(rules=[], devices=[])
+        plugin = _plugin(Recorder())
+        plugin._reader = reader
+        await plugin.reassert_protection()
+        assert reader.calls, "an idle node never looked, so an orphan rule would sit there forever"
+        reader.calls.clear()
+        await plugin.reassert_protection()
+        assert reader.calls == []
+
+    async def test_a_node_that_served_a_session_looks_again(self) -> None:
+        rec = Recorder()
+        plugin = _plugin(rec)
+        reader = self._reader(rules=[], devices=[])
+        plugin._reader = reader
+        await plugin.reassert_protection()  # clean, so the pass goes quiet
+        await plugin.setup_session_network(_META, _SELF)
+        await plugin.teardown_session_network("s1")
+        reader.calls.clear()
+        await plugin.reassert_protection()
+        assert reader.calls, "the node forgot it had ever held a rule"
+
+
 class TestTheWatchdogAndTeardownDoNotRace:
     """The watchdog copies the session list, then awaits four reads. A teardown that finishes in
     that window used to have its rules, XFRM and pair claim reinstalled behind it -- and the next
