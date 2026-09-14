@@ -18,6 +18,7 @@ from ai.backend.common.dto.manager.v2.resource_group.types import (
     ResourceGroupOrderDirection,
     ResourceGroupOrderField,
     ResourceGroupScope,
+    SchedulerTypeDTO,
 )
 from ai.backend.common.dto.manager.v2.session_options import DefaultSessionOptionsInput
 from ai.backend.common.tristate.unset import UNSET, Unset
@@ -311,7 +312,7 @@ class UpdateResourceGroupConfigInput(BaseRequestModel):
         default=UNSET,
         description="Whether to use host network mode. Omit to leave unchanged.",
     )
-    scheduler_type: str | None | Unset = Field(
+    scheduler_type: SchedulerTypeDTO | None | Unset = Field(
         default=UNSET,
         description="Scheduler type value (fifo/lifo/drf/fair-share). Omit to leave unchanged.",
     )
