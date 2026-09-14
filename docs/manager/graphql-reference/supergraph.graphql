@@ -9134,6 +9134,28 @@ input ImageRefType
   architecture: String
 }
 
+"""
+Added in 26.9.0. Scope for the scoped image query. Each list is OR'd internally and across lists, and every scope named is authorized before the read runs. `global` names no scope and is authorized against none.
+"""
+input ImageSearchScope
+  @join__type(graph: STRAWBERRY)
+{
+  """Domains whose images are being read."""
+  domain: [UUIDScope!] = null
+
+  """Projects whose images are being read."""
+  project: [UUIDScope!] = null
+
+  """Users whose images are being read."""
+  user: [UUIDScope!] = null
+
+  """Container registries whose images are being read."""
+  containerRegistry: [UUIDScope!] = null
+
+  """Include the images of every registry marked global."""
+  global: Boolean! = false
+}
+
 """Added in 25.4.0."""
 enum ImageStatus
   @join__type(graph: GRAPHENE)
@@ -16648,6 +16670,11 @@ type Query
   adminImagesV2(filter: ImageV2Filter = null, orderBy: [ImageV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ImageV2Connection @join__field(graph: STRAWBERRY)
 
   """
+  Added in 26.9.0. Page through the images the named scopes reach, combined with OR. Every scope is authorized before the read runs.
+  """
+  scopedImagesV2(scope: ImageSearchScope!, filter: ImageV2Filter = null, orderBy: [ImageV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ImageV2Connection @join__field(graph: STRAWBERRY)
+
+  """
   Added in 26.2.0. Query kernels with pagination and filtering. (admin only)
   """
   adminKernelsV2(filter: KernelV2Filter = null, orderBy: [KernelV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): KernelV2Connection @join__field(graph: STRAWBERRY)
@@ -17212,7 +17239,7 @@ type Query
   """
   Added in 26.9.0. Page through the virtual folders the named scopes reach, combined with OR. Every scope is authorized before the read runs.
   """
-  scopedVfoldersV2(scope: VFolderScope!, filter: VFolderFilter = null, orderBy: [VFolderOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): VFolderConnection @join__field(graph: STRAWBERRY)
+  scopedVFoldersV2(scope: VFolderScope!, filter: VFolderFilter = null, orderBy: [VFolderOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): VFolderConnection @join__field(graph: STRAWBERRY)
 
   """
   Added in 26.4.2. Search virtual folders accessible to the current user with pagination and filtering.

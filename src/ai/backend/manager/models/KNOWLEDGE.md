@@ -149,6 +149,17 @@ something reached through a share is bounded by that edge's cap, so a scope has 
 reason to tell the two apart. Filtering shares out of a scope would instead drop shared
 rows from a read, which is not the scope's judgment to make.
 
+### An axis that asks for no permission
+
+Most axes name a scope the caller is checked against first. An axis reading what is
+shown to everyone has nothing to check against. Such an axis stays out of
+`scope_targets()` and is added to `operation_scopes()` alone -- only `scope_targets()`
+is gated, so an ungated axis is expressible.
+
+`image`'s `global` axis is one. Whether an image is global is answered by the
+`is_global` of the container registry it is attached to, not by the image row. The
+column is nullable, and a registry that leaves it unset is not global.
+
 ### `existence_checks`
 
 Validates that an entity the scope names exists. Every check of every scope is combined

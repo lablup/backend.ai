@@ -12,6 +12,7 @@ from .resolver import (
     image_alias,
     image_scoped_aliases,
     image_v2,
+    scoped_images_v2,
 )
 from .types import (
     ContainerRegistryScopeGQL,
@@ -73,6 +74,7 @@ __all__ = [
     "ImageV2ScopeGQL",
     # Resolver fields
     "admin_images_v2",
+    "scoped_images_v2",
     "image_v2",
     "container_registry_images_v2",
     "image_alias",

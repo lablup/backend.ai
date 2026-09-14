@@ -6303,6 +6303,26 @@ extend type ImageNode implements Node @key(fields: "id") {
 }
 
 """
+Added in 26.9.0. Scope for the scoped image query. Each list is OR'd internally and across lists, and every scope named is authorized before the read runs. `global` names no scope and is authorized against none.
+"""
+input ImageSearchScope {
+  """Domains whose images are being read."""
+  domain: [UUIDScope!] = null
+
+  """Projects whose images are being read."""
+  project: [UUIDScope!] = null
+
+  """Users whose images are being read."""
+  user: [UUIDScope!] = null
+
+  """Container registries whose images are being read."""
+  containerRegistry: [UUIDScope!] = null
+
+  """Include the images of every registry marked global."""
+  global: Boolean! = false
+}
+
+"""
 Added in 26.2.0. Represents a container image in Backend.AI. Images are container specifications that define the runtime environment for compute sessions. Each image has identity information, metadata, resource requirements, and permission settings. This is the V2 implementation using Strawberry GraphQL with Relay-style connections as part of BEP-1010 migration.
 """
 type ImageV2 implements Node {
@@ -11462,6 +11482,11 @@ type Query {
   adminImagesV2(filter: ImageV2Filter = null, orderBy: [ImageV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ImageV2Connection
 
   """
+  Added in 26.9.0. Page through the images the named scopes reach, combined with OR. Every scope is authorized before the read runs.
+  """
+  scopedImagesV2(scope: ImageSearchScope!, filter: ImageV2Filter = null, orderBy: [ImageV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ImageV2Connection
+
+  """
   Added in 26.2.0. Query kernels with pagination and filtering. (admin only)
   """
   adminKernelsV2(filter: KernelV2Filter = null, orderBy: [KernelV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): KernelV2Connection
@@ -12026,7 +12051,7 @@ type Query {
   """
   Added in 26.9.0. Page through the virtual folders the named scopes reach, combined with OR. Every scope is authorized before the read runs.
   """
-  scopedVfoldersV2(scope: VFolderScope!, filter: VFolderFilter = null, orderBy: [VFolderOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): VFolderConnection
+  scopedVFoldersV2(scope: VFolderScope!, filter: VFolderFilter = null, orderBy: [VFolderOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): VFolderConnection
 
   """
   Added in 26.4.2. Search virtual folders accessible to the current user with pagination and filtering.

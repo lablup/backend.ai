@@ -8,7 +8,10 @@ from decimal import Decimal
 from functools import lru_cache
 
 from ai.backend.common.data.entity.container_registry import ContainerRegistryID
+from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.image_alias import ImageAliasID
+from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.dto.manager.v2.image.request import (
     AdminSearchImageAliasesInput,
     AdminSearchImagesInput,
@@ -21,6 +24,7 @@ from ai.backend.common.dto.manager.v2.image.request import (
     ImageOrderByInputDTO,
     PurgeImageInput,
     RestoreImageInput,
+    ScopedSearchImagesInput,
     UpdateImageInput,
 )
 from ai.backend.common.dto.manager.v2.image.response import (
@@ -35,12 +39,14 @@ from ai.backend.common.dto.manager.v2.image.response import (
     ImageRequirementsInfoDTO,
     PurgeImagePayload,
     RestoreImagePayload,
+    ScopedSearchImagesPayload,
     UpdateImagePayload,
 )
 from ai.backend.common.dto.manager.v2.image.types import (
     ImageLabelInfo,
     ImageResourceLimitGQLInfo,
     ImageResourceLimitInfo,
+    ImageScope,
     ImageStatusType,
     ImageTagInfo,
     ImageTypeEnum,
@@ -67,6 +73,14 @@ from ai.backend.manager.services.image.actions.dealias_image import DealiasImage
 from ai.backend.manager.services.image.actions.forget_image import ForgetImageByIdAction
 from ai.backend.manager.services.image.actions.purge_images import PurgeImageByIdAction
 from ai.backend.manager.services.image.actions.restore_image import RestoreImageByIdAction
+from ai.backend.manager.services.image.actions.scoped_search import (
+    ContainerRegistryImageScopeItem,
+    DomainImageScopeItem,
+    ImageScopeItem,
+    ProjectImageScopeItem,
+    ScopedSearchImagesAction,
+    UserImageScopeItem,
+)
 from ai.backend.manager.services.image.actions.search_aliases import SearchAliasesAction
 from ai.backend.manager.services.image.actions.search_images import SearchImagesAction
 from ai.backend.manager.services.image.actions.update_image_by_id import UpdateImageByIdAction
@@ -155,6 +169,51 @@ class ImageAdapter(BaseAdapter):
         action_result = await self._image.search_images.run(SearchImagesAction(querier=querier))
 
         return AdminSearchImagesPayload(
+            items=[self._data_to_dto(item) for item in action_result.data],
+            total_count=action_result.total_count,
+            has_next_page=action_result.has_next_page,
+            has_previous_page=action_result.has_previous_page,
+        )
+
+    def _scope_items(self, scope: ImageScope) -> list[ImageScopeItem]:
+        """The scope items the request named, in the order the input lists them."""
+        items: list[ImageScopeItem] = [
+            DomainImageScopeItem(domain_id=DomainID(entry.value)) for entry in scope.domain or ()
+        ]
+        items.extend(
+            ProjectImageScopeItem(project_id=ProjectID(entry.value))
+            for entry in scope.project or ()
+        )
+        items.extend(UserImageScopeItem(user_id=UserID(entry.value)) for entry in scope.user or ())
+        items.extend(
+            ContainerRegistryImageScopeItem(registry_id=ContainerRegistryID(entry.value))
+            for entry in scope.container_registry or ()
+        )
+        return items
+
+    async def scoped_search(self, input: ScopedSearchImagesInput) -> ScopedSearchImagesPayload:
+        """Search the images the named scopes reach, combined with OR."""
+        conditions = self._convert_filter(input.filter) if input.filter else []
+        orders = self._convert_orders(input.order) if input.order else []
+        querier = self._build_querier(
+            conditions=conditions,
+            orders=orders,
+            pagination_spec=_get_image_pagination_spec(),
+            first=input.first,
+            after=input.after,
+            last=input.last,
+            before=input.before,
+            limit=input.limit,
+            offset=input.offset,
+        )
+        action_result = await self._image.scoped_search.run(
+            ScopedSearchImagesAction(
+                items=self._scope_items(input.scope),
+                include_global=input.scope.global_,
+                querier=querier,
+            )
+        )
+        return ScopedSearchImagesPayload(
             items=[self._data_to_dto(item) for item in action_result.data],
             total_count=action_result.total_count,
             has_next_page=action_result.has_next_page,

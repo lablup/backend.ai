@@ -214,6 +214,7 @@ from .image import (
     image_alias,
     image_scoped_aliases,
     image_v2,
+    scoped_images_v2,
 )
 from .image_federation import Image as _ImageStub
 from .kernel.resolver import admin_kernels_v2, kernel_v2, session_kernels_v2
@@ -638,6 +639,7 @@ class Query:
     admin_project_usage_buckets = admin_project_usage_buckets
     admin_user_usage_buckets = admin_user_usage_buckets
     admin_images_v2 = admin_images_v2
+    scoped_images_v2 = scoped_images_v2
     admin_kernels_v2 = admin_kernels_v2
     admin_audit_logs_v2 = admin_audit_logs_v2
     scoped_audit_logs_v2 = scoped_audit_logs_v2
