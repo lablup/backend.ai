@@ -30,7 +30,7 @@ from ai.backend.manager.models.alembic.versions.dc61fa027fc1_assign_every_user_t
 from ai.backend.manager.models.alembic.versions.f4a1c9d20b73_sync_seed_roles_with_their_declaration import (
     _PRESETS,
     _carry_assignments,
-    _create_seed_roles,
+    _create_preset_roles,
     _drop_unlinked_system_roles,
     _grant_auto_assign_roles,
     _identify,
@@ -273,7 +273,7 @@ def _run(conn: sa.engine.Connection) -> None:
     _retire_names(conn)
     _sweep_unknown_types(conn)
     _write_presets(conn)
-    _create_seed_roles(conn)
+    _create_preset_roles(conn)
     _carry_assignments(conn)
     _drop_unlinked_system_roles(conn)
     _write_role_permissions(conn)
@@ -316,21 +316,15 @@ def _seed_files() -> tuple[dict[str, Any], dict[str, Any]]:
     return accounts, roles
 
 
-@pytest.fixture(params=["seed_ids", "earlier_ids"])
-async def seeded_from_fixture(
-    db: ExtendedAsyncSAEngine, request: pytest.FixtureRequest
-) -> dict[str, Any]:
+@pytest.fixture
+async def seeded_from_fixture(db: ExtendedAsyncSAEngine) -> dict[str, Any]:
     """The seed's own subjects and roles, put back the way a database held them before
     the declaration: no preset link, the permission rows the data migrations left, and
-    none of the assignments a scope hands out on its own. The roles come in under the
-    seed's ids, or under the ids an earlier fixture gave them."""
+    none of the assignments a scope hands out on its own. A role is keyed by its preset
+    and scope, since the migration gives the roles it creates ids of its own."""
     accounts, seed = _seed_files()
     domain = accounts["domains"][0]
     auto_ids = {role["id"] for role in seed["roles"] if role["auto_assign"]}
-    carried_id = {
-        role["id"]: role["id"] if request.param == "seed_ids" else str(uuid.uuid4())
-        for role in seed["roles"]
-    }
     async with db.begin_session() as session:
         session.add(
             DomainRow(
@@ -412,7 +406,7 @@ async def seeded_from_fixture(
         for role in seed["roles"]:
             session.add(
                 RoleRow(
-                    id=uuid.UUID(carried_id[role["id"]]),
+                    id=uuid.UUID(role["id"]),
                     name=role["name"],
                     source=RoleSource(role["source"]),
                     status=RoleStatus.ACTIVE,
@@ -427,7 +421,7 @@ async def seeded_from_fixture(
             for entity_type in ("model_deployment", "keypair", "session:app"):
                 session.add(
                     PermissionRow(
-                        role_id=uuid.UUID(carried_id[role["id"]]),
+                        role_id=uuid.UUID(role["id"]),
                         entity_type=entity_type,
                         permission=1,
                         all_fields=True,
@@ -437,29 +431,20 @@ async def seeded_from_fixture(
             if row["role_id"] in auto_ids:
                 continue
             session.add(
-                UserRoleRow(
-                    user_id=uuid.UUID(row["user_id"]),
-                    role_id=uuid.UUID(carried_id[row["role_id"]]),
-                )
+                UserRoleRow(user_id=uuid.UUID(row["user_id"]), role_id=uuid.UUID(row["role_id"]))
             )
-    by_role_id = {role["id"]: role for role in seed["roles"]}
+    scope_of = {role["id"]: (role["role_preset_id"], role["scope_id"]) for role in seed["roles"]}
     return {
         "expected_permissions": {
-            (by_role_id[row["role_id"]]["name"], row["entity_type"], row["permission"])
+            (*scope_of[row["role_id"]], row["entity_type"], row["permission"])
             for row in seed["permissions"]
         },
         "expected_assignments": {
-            (row["user_id"], by_role_id[row["role_id"]]["name"]) for row in seed["user_roles"]
+            (row["user_id"], *scope_of[row["role_id"]]) for row in seed["user_roles"]
         },
         "expected_roles": {
-            (role["name"], role["scope_type"], role["role_preset_id"], role["source"])
+            (role["role_preset_id"], role["scope_type"], role["scope_id"], role["source"])
             for role in seed["roles"]
-        },
-        "expected_role_ids": {(role["name"], role["id"]) for role in seed["roles"]},
-        "expected_role_nodes": {
-            (row["entity_id"], row["id"])
-            for row in seed["virtual_entities"]
-            if row["entity_type"] == "role"
         },
         "expected_preset_permissions": {
             (row["id"], row["role_preset_id"], row["entity_type"], row["permission"])
@@ -501,15 +486,11 @@ class TestSyncSeedRoles:
             ("user_owner", migrated["member"]),
         }
 
-    async def test_a_created_role_is_named_and_identified_as_the_seed_does(
+    async def test_a_created_role_takes_the_runtime_name(
         self, db: ExtendedAsyncSAEngine, migrated: dict[str, uuid.UUID]
     ) -> None:
         role = await _role_of(db, "project_admin", migrated["project"])
-        name = f"role_project_{str(migrated['project'])[:8]}_admin"
-        assert (role.name, str(role.id)) == (
-            name,
-            _identify("role", "project", str(migrated["project"]), name),
-        )
+        assert role.name == f"project_admin-{str(migrated['project'])[:8]}"
 
     async def test_a_created_role_is_owned_and_governed_by_its_scope(
         self, db: ExtendedAsyncSAEngine, migrated: dict[str, uuid.UUID]
@@ -551,7 +532,6 @@ class TestSyncSeedRoles:
                     )
                 )
             ).scalar_one()
-        assert str(node) == _identify("virtual_entity", "role", str(role.id))
         assert (owned, governed) == (1, 1)
 
     async def test_the_legacy_role_takes_its_graph_node(
@@ -859,7 +839,7 @@ class TestMigratedMatchesTheSeed:
     The seed's own subjects and roles go in without their preset links, carrying the
     permission rows the data migrations left, and the assignments a scope hands out on
     its own taken away. What the migration and the user_owner revision after it then
-    write is held against the fixture, down to the ids the fixture references.
+    write is held against the fixture, each role keyed by its preset and scope.
     """
 
     @pytest.fixture
@@ -877,12 +857,20 @@ class TestMigratedMatchesTheSeed:
         async with db.begin_readonly_session() as session:
             rows = (
                 await session.execute(
-                    sa.select(RoleRow.name, PermissionRow.entity_type, PermissionRow.permission)
+                    sa.select(
+                        RoleRow.role_preset_id,
+                        RoleRow.scope_id,
+                        PermissionRow.entity_type,
+                        PermissionRow.permission,
+                    )
                     .select_from(PermissionRow)
                     .join(RoleRow, RoleRow.id == PermissionRow.role_id)
                 )
             ).all()
-        written = {(row.name, row.entity_type, int(row.permission)) for row in rows}
+        written = {
+            (str(row.role_preset_id), str(row.scope_id), row.entity_type, int(row.permission))
+            for row in rows
+        }
         assert written == carried["expected_permissions"]
 
     async def test_the_assignments_are_the_seed_s(
@@ -891,12 +879,12 @@ class TestMigratedMatchesTheSeed:
         async with db.begin_readonly_session() as session:
             rows = (
                 await session.execute(
-                    sa.select(UserRoleRow.user_id, RoleRow.name)
+                    sa.select(UserRoleRow.user_id, RoleRow.role_preset_id, RoleRow.scope_id)
                     .select_from(UserRoleRow)
                     .join(RoleRow, RoleRow.id == UserRoleRow.role_id)
                 )
             ).all()
-        written = {(str(row.user_id), row.name) for row in rows}
+        written = {(str(row.user_id), str(row.role_preset_id), str(row.scope_id)) for row in rows}
         assert written == carried["expected_assignments"]
 
     async def test_the_roles_are_the_seed_s(
@@ -905,29 +893,10 @@ class TestMigratedMatchesTheSeed:
         async with db.begin_readonly_session() as session:
             rows = (await session.execute(sa.select(RoleRow))).scalars().all()
         written = {
-            (row.name, str(row.scope_type), str(row.role_preset_id), row.source.value)
+            (str(row.role_preset_id), str(row.scope_type), str(row.scope_id), row.source.value)
             for row in rows
         }
         assert written == carried["expected_roles"]
-
-    async def test_the_rows_the_fixture_references_carry_its_ids(
-        self, db: ExtendedAsyncSAEngine, carried: dict[str, Any]
-    ) -> None:
-        """What the fixture's later rows point at is already there under the id they
-        name, so populating it adds nothing and fails nothing."""
-        async with db.begin_readonly_session() as session:
-            roles = (await session.execute(sa.select(RoleRow.name, RoleRow.id))).all()
-            nodes = (
-                await session.execute(
-                    sa.select(VirtualEntityRow.entity_id, VirtualEntityRow.id).where(
-                        VirtualEntityRow.entity_type == "role"
-                    )
-                )
-            ).all()
-        assert {(row.name, str(row.id)) for row in roles} == carried["expected_role_ids"]
-        assert {(str(row.entity_id), str(row.id)) for row in nodes} == carried[
-            "expected_role_nodes"
-        ]
 
     async def test_the_preset_permissions_are_the_seed_s(
         self, db: ExtendedAsyncSAEngine, carried: dict[str, Any]

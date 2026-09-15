@@ -5,8 +5,8 @@ generated from it. A database seeded before that carries what the data migration
 left behind instead, so the two disagree.
 
 Rewrite the presets the declaration states, give every scope the role of each preset
-under the name and id the seed gives it, and pass on to it the holders of the system
-role its name stood for, under either the data migrations' naming or the runtime's.
+as the runtime creates it, and pass on to it the holders of the system role its name
+stood for, under either the data migrations' naming or the runtime's.
 A project's creator still on its roster holds its admin role. The system roles no
 preset made then go, and every preset role holds what its preset states. A custom
 role is left alone: it was made by hand, and nothing here answers for it.
@@ -41,7 +41,7 @@ depends_on = None
 
 # The seed derives an id as a uuid7 whose timestamp is fixed and whose remaining bits
 # come from what it identifies, so a database migrated here and one seeded from the
-# fixture hold the same rows.
+# fixture hold the same preset rows.
 _EPOCH_MS: Final[int] = 1757670718265
 
 
@@ -715,16 +715,10 @@ def _preset_for(scope_type: str, scope_id: str, name: str) -> str | None:
     return None
 
 
-def _seed_role_name(scope_type: str, scope_id: str, label: str, preset_name: str) -> str:
-    """The name the seed gives a preset's role in a scope. `label` is the domain name or
-    the username."""
-    if scope_type == "user":
-        name = f"{_LEGACY_PREFIX}user_{label}"
-    elif scope_type == "domain":
-        name = f"{_LEGACY_PREFIX}domain_{label}_{preset_name.removeprefix('domain_')}"
-    else:
-        name = f"{_LEGACY_PREFIX}project_{scope_id[:8]}_{preset_name.removeprefix('project_')}"
-    return name[:_MAX_ROLE_NAME_LENGTH]
+def _role_name(preset_name: str, scope_id: str) -> str:
+    """The name the runtime gives the role of a preset without a name template."""
+    suffix = f"-{scope_id[:8]}"
+    return f"{preset_name[: _MAX_ROLE_NAME_LENGTH - len(suffix)]}{suffix}"
 
 
 def _retire_names(conn: sa.engine.Connection) -> None:
@@ -851,9 +845,9 @@ def _sweep_unknown_types(conn: sa.engine.Connection) -> None:
     )
 
 
-def _create_seed_roles(conn: sa.engine.Connection) -> None:
-    """Give every scope in the graph the role of each preset it lacks, under the name and
-    id the seed gives it. A system role already under that id takes the preset instead."""
+def _create_preset_roles(conn: sa.engine.Connection) -> None:
+    """Give every scope in the graph the role of each preset it lacks, named as the
+    runtime names it, then put every preset role without a node in the graph."""
     linked = {
         (str(row.role_preset_id), str(row.scope_type), str(row.scope_id))
         for row in conn.execute(
@@ -865,79 +859,74 @@ def _create_seed_roles(conn: sa.engine.Connection) -> None:
     }
     scopes = conn.execute(
         sa.text("""
-            SELECT 'domain' AS scope_type, d.id AS scope_id, CAST(d.name AS text) AS label
+            SELECT 'domain' AS scope_type, d.id AS scope_id
             FROM domains d
             JOIN virtual_entities v ON v.entity_type = 'domain' AND v.entity_id = d.id
             UNION ALL
-            SELECT 'project', g.id, ''
+            SELECT 'project', g.id
             FROM groups g
             JOIN virtual_entities v ON v.entity_type = 'project' AND v.entity_id = g.id
             UNION ALL
-            SELECT 'user', u.uuid, CAST(u.username AS text)
+            SELECT 'user', u.uuid
             FROM users u
             JOIN virtual_entities v ON v.entity_type = 'user' AND v.entity_id = u.uuid
         """)
     ).all()
-    rows: list[dict[str, Any]] = []
-    for scope in scopes:
-        scope_type, scope_id = str(scope.scope_type), str(scope.scope_id)
-        for preset in _PRESETS:
-            if preset.scope_type != scope_type or (preset.id, scope_type, scope_id) in linked:
-                continue
-            name = _seed_role_name(scope_type, scope_id, str(scope.label), preset.name)
-            rows.append({
-                "id": _identify("role", scope_type, scope_id, name),
-                "name": name,
-                "auto_assign": preset.auto_assign,
-                "role_preset_id": preset.id,
-                "scope_type": scope_type,
-                "scope_id": scope_id,
-            })
-    if not rows:
-        return
-    conn.execute(
-        sa.text("""
-            INSERT INTO roles
-                (id, name, source, status, auto_assign, role_preset_id, scope_type, scope_id)
-            VALUES (
-                CAST(:id AS uuid), :name, 'system', 'active', :auto_assign,
-                CAST(:role_preset_id AS uuid), :scope_type, CAST(:scope_id AS uuid)
-            )
-            ON CONFLICT (id) DO UPDATE SET
-                role_preset_id = EXCLUDED.role_preset_id,
-                auto_assign = EXCLUDED.auto_assign
-            WHERE roles.source = 'system' AND roles.role_preset_id IS NULL
-        """),
-        rows,
-    )
-    _put_in_graph(conn, [uuid.UUID(row["id"]) for row in rows])
+    rows = [
+        {
+            "name": _role_name(preset.name, scope_id),
+            "auto_assign": preset.auto_assign,
+            "role_preset_id": preset.id,
+            "scope_type": scope_type,
+            "scope_id": scope_id,
+        }
+        for scope_type, scope_id in (
+            (str(scope.scope_type), str(scope.scope_id)) for scope in scopes
+        )
+        for preset in _PRESETS
+        if preset.scope_type == scope_type and (preset.id, scope_type, scope_id) not in linked
+    ]
+    if rows:
+        conn.execute(
+            sa.text("""
+                INSERT INTO roles
+                    (name, source, status, auto_assign, role_preset_id, scope_type, scope_id)
+                VALUES (
+                    :name, 'system', 'active', :auto_assign,
+                    CAST(:role_preset_id AS uuid), :scope_type, CAST(:scope_id AS uuid)
+                )
+            """),
+            rows,
+        )
+    _put_in_graph(conn)
 
 
-def _put_in_graph(conn: sa.engine.Connection, role_ids: list[uuid.UUID]) -> None:
-    """Put the preset roles among `role_ids` in the graph as the runtime does, their nodes
-    under the seed's ids: each owns and governs itself and is owned and governed by its scope."""
-    kept = [
+def _put_in_graph(conn: sa.engine.Connection) -> None:
+    """Put each preset role without a node in the graph as the runtime does: it owns and
+    governs itself, and its scope owns and governs it."""
+    role_ids = [
         row.id
         for row in conn.execute(
-            sa.text(
-                "SELECT id FROM roles WHERE id = ANY(:ids) AND role_preset_id IS NOT NULL"
-            ).bindparams(sa.bindparam("ids", role_ids, type_=sa.ARRAY(sa.Uuid)))
+            sa.text("""
+                SELECT r.id FROM roles r
+                WHERE r.role_preset_id IS NOT NULL
+                  AND NOT EXISTS (
+                      SELECT 1 FROM virtual_entities v
+                      WHERE v.entity_type = 'role' AND v.entity_id = r.id
+                  )
+            """)
         )
     ]
-    if not kept:
+    if not role_ids:
         return
+    ids = sa.bindparam("role_ids", role_ids, type_=sa.ARRAY(sa.Uuid))
     conn.execute(
         sa.text("""
-            INSERT INTO virtual_entities (id, entity_type, entity_id)
-            VALUES (CAST(:id AS uuid), 'role', CAST(:role_id AS uuid))
+            INSERT INTO virtual_entities (entity_type, entity_id)
+            SELECT 'role', role_id FROM unnest(:role_ids) AS role_id
             ON CONFLICT (entity_type, entity_id) DO NOTHING
-        """),
-        [
-            {"id": _identify("virtual_entity", "role", str(role_id)), "role_id": str(role_id)}
-            for role_id in kept
-        ],
+        """).bindparams(ids)
     )
-    ids = sa.bindparam("role_ids", kept, type_=sa.ARRAY(sa.Uuid))
     conn.execute(
         sa.text("""
             INSERT INTO entity_memberships (virtual_entity_id, member_entity_id, capped)
@@ -1114,7 +1103,7 @@ def upgrade() -> None:
     _retire_names(conn)
     _sweep_unknown_types(conn)
     _write_presets(conn)
-    _create_seed_roles(conn)
+    _create_preset_roles(conn)
     _carry_assignments(conn)
     _drop_unlinked_system_roles(conn)
     _write_role_permissions(conn)
