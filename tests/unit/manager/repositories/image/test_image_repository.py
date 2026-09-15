@@ -700,3 +700,351 @@ class TestImageRepositoryLastUsedAt:
         result = await image_repository.fetch_image_by_id(img.id)
         assert result.last_used_at is not None
         assert abs(result.last_used_at.timestamp() - newer.timestamp()) < 1.0
+<<<<<<< HEAD
+=======
+
+
+class TestImageRepositoryRestore:
+    """Restore reaches an image in any status, not only a live one."""
+
+    @pytest.fixture
+    async def db_with_cleanup(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+        async with with_tables(
+            database_connection,
+            [
+                DomainRow,
+                UserResourcePolicyRow,
+                KeyPairResourcePolicyRow,
+                UserRow,
+                KeyPairRow,
+                ContainerRegistryRow,
+                ImageRow,
+                ImageAliasRow,
+            ],
+        ):
+            yield database_connection
+
+    @pytest.fixture
+    def image_repository(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> ImageRepository:
+        return ImageRepository(
+            db=db_with_cleanup,
+            ops_provider=V2DBOpsProvider(db_with_cleanup),
+            valkey_image=MagicMock(),
+            config_provider=MagicMock(),
+        )
+
+    @pytest.fixture
+    async def test_registry_id(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> UUID:
+        registry_id = uuid4()
+        async with db_with_cleanup.begin_session() as db_sess:
+            db_sess.add(
+                ContainerRegistryRow(
+                    id=ContainerRegistryID(registry_id),
+                    url="https://registry.example.com",
+                    registry_name="registry.example.com",
+                    type=ContainerRegistryType.DOCKER,
+                    project="test_project",
+                    is_global=True,
+                )
+            )
+            await db_sess.flush()
+        return registry_id
+
+    @pytest.fixture
+    async def image_id(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_registry_id: UUID,
+        status: ImageStatus,
+    ) -> ImageID:
+        """An image inserted in the status the case names."""
+        image = ImageRow(
+            name="registry.example.com/test_project/python:3.9",
+            image="python",
+            tag="3.9",
+            registry="registry.example.com",
+            registry_id=test_registry_id,
+            project="test_project",
+            architecture="x86_64",
+            config_digest=f"sha256:{uuid4().hex}",
+            size_bytes=1000000,
+            type=ImageType.COMPUTE,
+            status=status,
+            accelerators=None,
+            labels={},
+            resources={},
+        )
+        async with db_with_cleanup.begin_session() as db_sess:
+            db_sess.add(image)
+            await db_sess.flush()
+            return ImageID(image.id)
+
+    @pytest.mark.parametrize(
+        "status",
+        [ImageStatus.ALIVE, ImageStatus.DELETED],
+        ids=lambda status: status.value,
+    )
+    async def test_restore_marks_the_image_alive(
+        self,
+        image_repository: ImageRepository,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        image_id: ImageID,
+        status: ImageStatus,
+    ) -> None:
+        result = await image_repository.restore_image_by_id(image_id)
+
+        assert result.status == ImageStatus.ALIVE
+        async with db_with_cleanup.begin_readonly_session() as db_sess:
+            stored = await db_sess.scalar(sa.select(ImageRow.status).where(ImageRow.id == image_id))
+        assert stored == ImageStatus.ALIVE
+
+
+class TestImageRepositoryOwnership:
+    """The ownership check reads the statuses it is told to, so restore can run it on a forgotten image."""
+
+    @pytest.fixture
+    async def db_with_cleanup(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+        async with with_tables(
+            database_connection,
+            [
+                DomainRow,
+                UserResourcePolicyRow,
+                KeyPairResourcePolicyRow,
+                UserRow,
+                KeyPairRow,
+                ContainerRegistryRow,
+                ImageRow,
+                ImageAliasRow,
+            ],
+        ):
+            yield database_connection
+
+    @pytest.fixture
+    def image_repository(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> ImageRepository:
+        return ImageRepository(
+            db=db_with_cleanup,
+            ops_provider=V2DBOpsProvider(db_with_cleanup),
+            valkey_image=MagicMock(),
+            config_provider=MagicMock(),
+        )
+
+    @pytest.fixture
+    async def domain(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> DomainRow:
+        domain = DomainRow(id=DomainID(uuid.uuid4()), name=f"test-{uuid4()}")
+        async with db_with_cleanup.begin_session() as db_sess:
+            db_sess.add(domain)
+            await db_sess.flush()
+        return domain
+
+    @pytest.fixture
+    async def user_policy(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> UserResourcePolicyRow:
+        policy = UserResourcePolicyRow(
+            name=f"{uuid4()}",
+            max_vfolder_count=10,
+            max_quota_scope_size=BinarySize.finite_from_str("10GiB"),
+            max_session_count_per_model_session=5,
+            max_customized_image_count=3,
+        )
+        async with db_with_cleanup.begin_session() as db_sess:
+            db_sess.add(policy)
+            await db_sess.flush()
+        return policy
+
+    @pytest.fixture
+    async def user(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        domain: DomainRow,
+        user_policy: UserResourcePolicyRow,
+    ) -> UserRow:
+        user = UserRow(
+            uuid=uuid4(),
+            username=f"testuser-{uuid4().hex[:8]}",
+            email=f"test-{uuid4().hex[:8]}@example.com",
+            domain_name=domain.name,
+            resource_policy=user_policy.name,
+            domain_id=DomainID(domain.id),
+        )
+        async with db_with_cleanup.begin_session() as db_sess:
+            db_sess.add(user)
+            await db_sess.flush()
+        return user
+
+    @pytest.fixture
+    async def test_registry_id(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> UUID:
+        registry_id = uuid4()
+        async with db_with_cleanup.begin_session() as db_sess:
+            db_sess.add(
+                ContainerRegistryRow(
+                    id=ContainerRegistryID(registry_id),
+                    url="https://registry.example.com",
+                    registry_name="registry.example.com",
+                    type=ContainerRegistryType.DOCKER,
+                    project="test_project",
+                    is_global=True,
+                )
+            )
+            await db_sess.flush()
+        return registry_id
+
+    @pytest.fixture
+    async def forgotten_image_id(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_registry_id: UUID,
+        user: UserRow,
+    ) -> ImageID:
+        """A customized image the user committed, then forgot."""
+        image = ImageRow(
+            name="registry.example.com/test_project/python:3.9-customized",
+            image="python",
+            tag="3.9-customized",
+            registry="registry.example.com",
+            registry_id=test_registry_id,
+            project="test_project",
+            architecture="x86_64",
+            config_digest=f"sha256:{uuid4().hex}",
+            size_bytes=1000000,
+            type=ImageType.COMPUTE,
+            status=ImageStatus.DELETED,
+            accelerators=None,
+            labels={},
+            resources={},
+            customized=True,
+            creator_id=user.uuid,
+        )
+        async with db_with_cleanup.begin_session() as db_sess:
+            db_sess.add(image)
+            await db_sess.flush()
+            return ImageID(image.id)
+
+    async def test_ownership_of_a_forgotten_image_is_read_when_asked_to(
+        self,
+        image_repository: ImageRepository,
+        forgotten_image_id: ImageID,
+        user: UserRow,
+    ) -> None:
+        owned = await image_repository.validate_image_ownership(
+            forgotten_image_id, user.uuid, ImageStatus.restorable()
+        )
+
+        assert owned is True
+
+
+class TestImageRepositoryDigest:
+    """The digest an image answers with is the one stored, without the column's padding."""
+
+    DIGEST = "sha256:" + "a" * 64
+
+    @pytest.fixture
+    async def db_with_cleanup(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+        async with with_tables(
+            database_connection,
+            [
+                DomainRow,
+                UserResourcePolicyRow,
+                KeyPairResourcePolicyRow,
+                UserRow,
+                KeyPairRow,
+                ContainerRegistryRow,
+                ImageRow,
+                ImageAliasRow,
+            ],
+        ):
+            yield database_connection
+
+    @pytest.fixture
+    def image_repository(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> ImageRepository:
+        return ImageRepository(
+            db=db_with_cleanup,
+            ops_provider=V2DBOpsProvider(db_with_cleanup),
+            valkey_image=MagicMock(),
+            config_provider=MagicMock(),
+        )
+
+    @pytest.fixture
+    async def test_registry_id(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> UUID:
+        registry_id = uuid4()
+        async with db_with_cleanup.begin_session() as db_sess:
+            db_sess.add(
+                ContainerRegistryRow(
+                    id=ContainerRegistryID(registry_id),
+                    url="https://registry.example.com",
+                    registry_name="registry.example.com",
+                    type=ContainerRegistryType.DOCKER,
+                    project="test_project",
+                    is_global=True,
+                )
+            )
+            await db_sess.flush()
+        return registry_id
+
+    @pytest.fixture
+    async def image_id(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_registry_id: UUID,
+    ) -> ImageID:
+        image = ImageRow(
+            name="registry.example.com/test_project/python:3.9",
+            image="python",
+            tag="3.9",
+            registry="registry.example.com",
+            registry_id=test_registry_id,
+            project="test_project",
+            architecture="x86_64",
+            config_digest=self.DIGEST,
+            size_bytes=1000000,
+            type=ImageType.COMPUTE,
+            status=ImageStatus.ALIVE,
+            accelerators=None,
+            labels={},
+            resources={},
+        )
+        async with db_with_cleanup.begin_session() as db_sess:
+            db_sess.add(image)
+            await db_sess.flush()
+            return ImageID(image.id)
+
+    async def test_fetch_answers_the_digest_as_stored(
+        self,
+        image_repository: ImageRepository,
+        image_id: ImageID,
+    ) -> None:
+        result = await image_repository.fetch_image_by_id(image_id)
+
+        assert result.config_digest == self.DIGEST
+>>>>>>> 97201dca (fix(BA-7876): answer the image digest without the column's padding (#14602))
