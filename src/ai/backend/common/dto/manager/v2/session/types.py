@@ -7,10 +7,11 @@ from __future__ import annotations
 from enum import StrEnum
 from uuid import UUID
 
-from pydantic import Field
+from pydantic import Field, model_validator
 
 from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.dto.manager.v2.common import OrderDirection
+from ai.backend.common.dto.manager.v2.rbac.types import UUIDScope
 
 __all__ = (
     "ClusterModeEnum",
@@ -102,3 +103,29 @@ class ProjectSessionScope(BaseRequestModel):
     """Scope for project-level session operations."""
 
     project_id: UUID = Field(description="Project UUID to scope the operation.")
+
+
+class SessionScope(BaseRequestModel):
+    """Scope for the scoped session query.
+
+    Each list is OR'd internally and across lists. Raises an error if every field is
+    empty.
+    """
+
+    domain: list[UUIDScope] | None = Field(
+        default=None, description="Domains whose sessions are being read"
+    )
+    project: list[UUIDScope] | None = Field(
+        default=None, description="Projects whose sessions are being read"
+    )
+    user: list[UUIDScope] | None = Field(
+        default=None, description="Users whose sessions are being read"
+    )
+
+    @model_validator(mode="after")
+    def _require_non_empty(self) -> SessionScope:
+        if not self.domain and not self.project and not self.user:
+            raise ValueError(
+                "SessionScope requires a non-empty value for 'domain', 'project' or 'user'"
+            )
+        return self

@@ -71,8 +71,8 @@ from ai.backend.manager.data.session.types import (
     SessionStatus,
 )
 from ai.backend.manager.errors.api import InvalidAPIParameters
-from ai.backend.manager.errors.common import ObjectNotFound
 from ai.backend.manager.errors.image import ImageNotFound
+from ai.backend.manager.errors.network import NetworkNotFound
 from ai.backend.manager.errors.resource import DomainNotFound, ResourceGroupNotFound
 from ai.backend.manager.errors.resource_slot import AgentResourceCapacityExceeded
 from ai.backend.manager.exceptions import ErrorStatusInfo
@@ -3892,7 +3892,7 @@ class ScheduleDBSource:
         async with self._db.begin_readonly_session_read_committed() as db_sess:
             row = await db_sess.scalar(sa.select(NetworkRow).where(NetworkRow.id == network_id))
             if row is None:
-                raise ObjectNotFound(object_name="network")
+                raise NetworkNotFound()
             return row.to_data()
 
     async def update_session_network_id(

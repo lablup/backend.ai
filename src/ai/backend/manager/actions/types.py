@@ -30,8 +30,6 @@ class ActionKind(enum.StrEnum):
     RELATION = "relation"
     GLOBAL = "global"
     LOOKUP = "lookup"
-    # Still on the legacy ``BaseAction`` base, which declares no shape.
-    UNKNOWN = "unknown"
 
     def describe(self) -> str:
         """What the operation targets, as the catalog listing explains it."""
@@ -48,8 +46,6 @@ class ActionKind(enum.StrEnum):
                 return "an action operating over everything, divided by no scope"
             case ActionKind.LOOKUP:
                 return "an action reading an entity id from a natural key"
-            case ActionKind.UNKNOWN:
-                return "an action still on the legacy base, to be removed"
 
 
 class ActionGate(enum.StrEnum):

@@ -1,27 +1,37 @@
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.manager.actions.action import SearchActionResult
+from ai.backend.common.data.entity.role import RoleEntityType
+from ai.backend.common.data.entity.types import EntityType
 from ai.backend.manager.actions.types import ActionOperationType
+from ai.backend.manager.actions.v2.global_scope.base import BaseGlobalAction
+from ai.backend.manager.data.common.types import SearchResult
 from ai.backend.manager.data.permission.role import RoleData
 from ai.backend.manager.repositories.base import BatchQuerier
-from ai.backend.manager.services.permission_contoller.actions.base import RoleAction
 
 
-@dataclass
-class SearchRolesAction(RoleAction):
+@dataclass(frozen=True)
+class GlobalSearchRolesAction(BaseGlobalAction):
+    """Page through every role, whichever scope it hangs on."""
+
     querier: BatchQuerier
 
     @override
-    def entity_id(self) -> str | None:
-        return None
+    @classmethod
+    def entity_type(cls) -> EntityType:
+        return RoleEntityType()
 
     @override
     @classmethod
     def operation_type(cls) -> ActionOperationType:
         return ActionOperationType.SEARCH
 
+    @override
+    @classmethod
+    def action_name(cls) -> str:
+        return "global_search_roles"
 
-@dataclass
-class SearchRolesActionResult(SearchActionResult[RoleData]):
-    pass
+
+@dataclass(frozen=True)
+class GlobalSearchRolesActionResult:
+    result: SearchResult[RoleData]

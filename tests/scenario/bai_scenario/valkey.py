@@ -10,6 +10,7 @@ from dataclasses import dataclass
 from typing import Self
 
 from ai.backend.common.clients.valkey_client.valkey_schedule.client import ValkeyScheduleClient
+from ai.backend.common.clients.valkey_client.valkey_session.client import ValkeySessionClient
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.defs import REDIS_LIVE_DB, REDIS_STATISTICS_DB, RedisRole
 from ai.backend.manager.config.provider import ManagerConfigProvider
@@ -21,6 +22,7 @@ class ScenarioValkey:
 
     stat: ValkeyStatClient
     schedule: ValkeyScheduleClient
+    session: ValkeySessionClient
 
     @classmethod
     async def create(cls, config: ManagerConfigProvider) -> Self:
@@ -36,8 +38,14 @@ class ScenarioValkey:
                 db_id=REDIS_LIVE_DB,
                 human_readable_name="scenario-schedule",
             ),
+            session=await ValkeySessionClient.create(
+                target.profile_target(RedisRole.STATISTICS),
+                db_id=REDIS_STATISTICS_DB,
+                human_readable_name="scenario-session",
+            ),
         )
 
     async def close(self) -> None:
         await self.stat.close()
         await self.schedule.close()
+        await self.session.close()

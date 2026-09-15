@@ -68,6 +68,32 @@ class ImageConditions:
         return inner
 
     @staticmethod
+    def by_canonical_and_architecture(canonical: str, architecture: str) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return sa.and_(ImageRow.name == canonical, ImageRow.architecture == architecture)
+
+        return inner
+
+    @staticmethod
+    def by_canonical_and_architecture_or_alias(reference: str, architecture: str) -> QueryCondition:
+        """The reference read as a canonical for the architecture, or as an alias of any
+        architecture."""
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            alias_matches = sa.exists(
+                sa.select(sa.literal(1)).where(
+                    ImageAliasRow.image_id == ImageRow.id,
+                    ImageAliasRow.alias == reference,
+                )
+            )
+            return sa.or_(
+                sa.and_(ImageRow.name == reference, ImageRow.architecture == architecture),
+                alias_matches,
+            )
+
+        return inner
+
+    @staticmethod
     def by_statuses(statuses: Collection[ImageStatus]) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return ImageRow.status.in_(statuses)

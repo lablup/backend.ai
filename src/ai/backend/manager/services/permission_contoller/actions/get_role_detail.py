@@ -1,31 +1,34 @@
 from dataclasses import dataclass
 from typing import override
-from uuid import UUID
 
-from ai.backend.manager.actions.action import BaseActionResult
+from ai.backend.common.data.entity.role import RoleID
+from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.manager.actions.types import ActionOperationType
+from ai.backend.manager.actions.v2.single_entity.base import BaseSingleEntityAction
 from ai.backend.manager.data.permission.role import RoleDetailData
-from ai.backend.manager.services.permission_contoller.actions.base import RoleAction
 
 
-@dataclass
-class GetRoleDetailAction(RoleAction):
-    role_id: UUID
+@dataclass(frozen=True)
+class GetRoleDetailAction(BaseSingleEntityAction):
+    """Read one role with its permissions and the users it is assigned to."""
+
+    role_id: RoleID
 
     @override
-    def entity_id(self) -> str | None:
-        return str(self.role_id)
+    def entity_id(self) -> EntityIdentifier:
+        return self.role_id
 
     @override
     @classmethod
     def operation_type(cls) -> ActionOperationType:
         return ActionOperationType.GET
 
-
-@dataclass
-class GetRoleDetailActionResult(BaseActionResult):
-    role: RoleDetailData
-
     @override
-    def entity_id(self) -> str | None:
-        return str(self.role.id)
+    @classmethod
+    def action_name(cls) -> str:
+        return "get_role_detail"
+
+
+@dataclass(frozen=True)
+class GetRoleDetailActionResult:
+    role: RoleDetailData

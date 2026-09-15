@@ -1,16 +1,22 @@
+from ai.backend.manager.actions.registry.field import LookupFieldGroup
 from ai.backend.manager.actions.registry.group import ProcessorGroup
+from ai.backend.manager.actions.v2.bulk.partial_processor import PartialBulkActionProcessor
+from ai.backend.manager.actions.v2.field.bulk_processor import PartialBulkFieldActionProcessor
 from ai.backend.manager.actions.v2.global_scope.processor import (
     GlobalActionProcessor,
     PublicActionProcessor,
 )
+from ai.backend.manager.actions.v2.scope.processor import ScopeActionProcessor
 from ai.backend.manager.actions.v2.single_entity.processor import SingleEntityActionProcessor
-from ai.backend.manager.data.image.types import ImageData
+from ai.backend.manager.data.image.types import ImageAliasData, ImageData
 from ai.backend.manager.services.image.actions.alias_image import (
     AliasImageAction,
     AliasImageActionResult,
     AliasImageByIdAction,
     AliasImageByIdActionResult,
 )
+from ai.backend.manager.services.image.actions.bulk_get import BulkGetImagesAction
+from ai.backend.manager.services.image.actions.bulk_get_aliases import BulkGetImageAliasesAction
 from ai.backend.manager.services.image.actions.clear_image_custom_resource_limit import (
     ClearImageCustomResourceLimitAction,
     ClearImageCustomResourceLimitActionResult,
@@ -62,6 +68,10 @@ from ai.backend.manager.services.image.actions.restore_image import (
 from ai.backend.manager.services.image.actions.scan_image import (
     ScanImageAction,
     ScanImageActionResult,
+)
+from ai.backend.manager.services.image.actions.scoped_search import (
+    ScopedSearchImagesAction,
+    ScopedSearchImagesActionResult,
 )
 from ai.backend.manager.services.image.actions.search_aliases import (
     SearchAliasesAction,
@@ -144,9 +154,19 @@ class ImageProcessors:
         PublicGetAllImagesAction, PublicGetAllImagesActionResult
     ]
     search_images: GlobalActionProcessor[SearchImagesAction, SearchImagesActionResult]
+    # What the DataLoader reads: checked per image.
+    bulk_get: PartialBulkActionProcessor[BulkGetImagesAction, ImageData]
+    scoped_search: ScopeActionProcessor[ScopedSearchImagesAction, ScopedSearchImagesActionResult]
     search_aliases: GlobalActionProcessor[SearchAliasesAction, SearchAliasesActionResult]
+    # What the DataLoader reads: checked per owning image.
+    bulk_get_aliases: PartialBulkFieldActionProcessor[BulkGetImageAliasesAction, ImageAliasData]
 
-    def __init__(self, group: ProcessorGroup[ImageData], service: ImageService) -> None:
+    def __init__(
+        self,
+        group: ProcessorGroup[ImageData],
+        aliases: LookupFieldGroup[ImageAliasData],
+        service: ImageService,
+    ) -> None:
         self.public_get_all_images = group.public(PublicGetAllImagesAction, service.get_all_images)
         self.public_get_image_by_id = group.public(
             PublicGetImageByIdAction, service.get_image_by_id
@@ -163,6 +183,8 @@ class ImageProcessors:
         )
         self.forget_image = group.global_scope(ForgetImageAction, service.forget_image)
         self.search_images = group.global_scope(SearchImagesAction, service.search_images)
+        self.bulk_get = group.partial_bulk_get_ops(BulkGetImagesAction)
+        self.scoped_search = group.scope(ScopedSearchImagesAction, service.scoped_search_images)
 
         self.forget_image_by_id = group.single_entity(
             ForgetImageByIdAction, service.forget_image_by_id
@@ -200,3 +222,4 @@ class ImageProcessors:
             SetImageResourceLimitByIdAction, service.set_image_resource_limit_by_id
         )
         self.search_aliases = group.global_scope(SearchAliasesAction, service.search_aliases)
+        self.bulk_get_aliases = aliases.partial_bulk_get_ops(BulkGetImageAliasesAction)

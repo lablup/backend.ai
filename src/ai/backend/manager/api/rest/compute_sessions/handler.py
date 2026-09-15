@@ -7,8 +7,6 @@ from http import HTTPStatus
 from typing import Final
 
 from ai.backend.common.api_handlers import APIResponse, BodyParam
-from ai.backend.common.contexts.user import current_user
-from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.dto.manager.compute_session import (
     PaginationInfo,
     SearchComputeSessionsRequest,
@@ -18,12 +16,13 @@ from ai.backend.common.types import SessionId
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.resource_slot.types import ResourceAllocationAggregate
 from ai.backend.manager.dto.context import UserContext
-from ai.backend.manager.errors.user import UserNotFound
 from ai.backend.manager.services.session.actions.batch_get_session_resource_allocation import (
     BatchGetSessionResourceAllocationAction,
 )
-from ai.backend.manager.services.session.actions.search import SearchSessionsAction
-from ai.backend.manager.services.session.actions.search_kernel import SearchKernelsAction
+from ai.backend.manager.services.session.actions.global_search import GlobalSearchSessionsAction
+from ai.backend.manager.services.session.actions.global_search_kernels import (
+    GlobalSearchKernelsAction,
+)
 from ai.backend.manager.services.session.processors import SessionProcessors
 
 from .adapter import ComputeSessionsAdapter
@@ -45,25 +44,22 @@ class ComputeSessionsHandler:
     ) -> APIResponse:
         """Search compute sessions with nested container data."""
 
-        user = current_user()
-        if user is None:
-            raise UserNotFound("User not found in context")
-
         # Step 1: Search sessions
-        session_querier = self._adapter.build_session_querier(body.parsed)
-        session_result = await self._session.search_sessions.run(
-            SearchSessionsAction(querier=session_querier, user_id=UserID(user.user_id))
+        session_result = await self._session.global_search.run(
+            GlobalSearchSessionsAction(searcher=self._adapter.build_session_searcher(body.parsed))
         )
+        sessions = [item.to_session_data() for item in session_result.items]
 
         # Step 2: Fetch kernels for found sessions
-        session_ids = [SessionId(s.id) for s in session_result.data]
+        session_ids = [SessionId(s.id) for s in sessions]
         kernels_by_session = {}
         if session_ids:
-            kernel_querier = self._adapter.build_kernel_querier_for_sessions(session_ids)
-            kernel_result = await self._session.search_kernels.run(
-                SearchKernelsAction(querier=kernel_querier, user_id=UserID(user.user_id))
+            kernel_result = await self._session.global_search_kernels.run(
+                GlobalSearchKernelsAction(
+                    searcher=self._adapter.build_kernel_searcher_for_sessions(session_ids)
+                )
             )
-            kernels_by_session = self._adapter.group_kernels_by_session(kernel_result.data)
+            kernels_by_session = self._adapter.group_kernels_by_session(kernel_result.items)
 
         # Step 3: Aggregate the slot amounts from resource_allocations
         allocations: dict[SessionId, ResourceAllocationAggregate] = {}
@@ -84,7 +80,7 @@ class ComputeSessionsHandler:
                 allocations.get(SessionId(session.id)),
                 kernels_by_session.get(session.id, []),
             )
-            for session in session_result.data
+            for session in sessions
         ]
 
         resp = SearchComputeSessionsResponse(

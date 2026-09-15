@@ -242,8 +242,8 @@ class CreatePermissionInput(PydanticInputMixin[CreatePermissionInputDTO]):
 )
 class UpdatePermissionInput(PydanticInputMixin[UpdatePermissionInputDTO]):
     id: UUID
-    entity_type: str | None = None
-    permission: PermissionBitGQL | None = None
+    entity_type: str | None = strawberry.UNSET
+    permission: PermissionBitGQL | None = strawberry.UNSET
 
 
 @gql_pydantic_input(

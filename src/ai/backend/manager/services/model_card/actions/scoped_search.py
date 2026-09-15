@@ -1,27 +1,56 @@
 from __future__ import annotations
 
+from abc import ABC
 from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import override
 
+from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.model_card import ModelCardEntityType
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.manager.actions.v2.ops.base import OperationScopeOpsAction, ScopeItem
 from ai.backend.manager.data.model_card.types import ModelCardData
 from ai.backend.manager.models.model_card.row import ModelCardRow
-from ai.backend.manager.models.model_card.scopes import ProjectModelCardOperationScope
+from ai.backend.manager.models.model_card.scopes import (
+    DomainModelCardOperationScope,
+    ProjectModelCardOperationScope,
+    UserModelCardOperationScope,
+)
 from ai.backend.manager.models.model_card.searchers import ModelCardSearcher
 from ai.backend.manager.models.scopes import OperationScope
 
 __all__ = (
+    "DomainModelCardScopeItem",
     "ModelCardScopeItem",
+    "ProjectModelCardScopeItem",
     "ScopedSearchModelCardsAction",
+    "UserModelCardScopeItem",
 )
 
 
+class ModelCardScopeItem(ScopeItem, ABC):
+    """One side a model card is reachable from."""
+
+
 @dataclass(frozen=True)
-class ModelCardScopeItem(ScopeItem):
+class DomainModelCardScopeItem(ModelCardScopeItem):
+    """The model cards of one domain."""
+
+    domain_id: DomainID
+
+    @override
+    def scope_id(self) -> EntityIdentifier:
+        return self.domain_id
+
+    @override
+    def operation_scope(self) -> OperationScope:
+        return DomainModelCardOperationScope(domain_id=self.domain_id)
+
+
+@dataclass(frozen=True)
+class ProjectModelCardScopeItem(ModelCardScopeItem):
     """The model cards of one project."""
 
     project_id: ProjectID
@@ -33,6 +62,21 @@ class ModelCardScopeItem(ScopeItem):
     @override
     def operation_scope(self) -> OperationScope:
         return ProjectModelCardOperationScope(project_id=self.project_id)
+
+
+@dataclass(frozen=True)
+class UserModelCardScopeItem(ModelCardScopeItem):
+    """The model cards one user holds."""
+
+    user_id: UserID
+
+    @override
+    def scope_id(self) -> EntityIdentifier:
+        return self.user_id
+
+    @override
+    def operation_scope(self) -> OperationScope:
+        return UserModelCardOperationScope(user_id=self.user_id)
 
 
 @dataclass(frozen=True)

@@ -4,28 +4,60 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import override
+from typing import Any, override
 from uuid import UUID
 
 import sqlalchemy as sa
 
+from ai.backend.common.data.entity.domain import DomainEntityType, DomainID
 from ai.backend.common.data.entity.project import ProjectEntityType
-from ai.backend.common.data.entity.user import UserEntityType
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.entity.vfolder import VFolderEntityType
-from ai.backend.manager.data.project.types import ProjectType
-from ai.backend.manager.errors.resource import ProjectNotFound
+from ai.backend.manager.errors.resource import DomainNotFound, ProjectNotFound
 from ai.backend.manager.errors.user import UserNotFound
 from ai.backend.manager.models.clauses import QueryCondition
+from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.project import ProjectRow
 from ai.backend.manager.models.scopes import ExistenceCheck, OperationScope
+from ai.backend.manager.models.user.queries import user_scope_reaches
 from ai.backend.manager.models.user.row import UserRow
-from ai.backend.manager.models.vfolder import VFolderPermissionRow, VFolderRow
+from ai.backend.manager.models.vfolder import VFolderRow
 from ai.backend.manager.models.virtual_entity.queries import scope_membership_exists
 
 __all__ = (
+    "DomainVFolderOperationScope",
     "ProjectVFolderOperationScope",
     "UserVFolderOperationScope",
 )
+
+
+@dataclass(frozen=True)
+class DomainVFolderOperationScope(OperationScope):
+    """The vfolders of one domain."""
+
+    domain_id: DomainID
+
+    @override
+    def to_condition(self) -> QueryCondition:
+        domain_id = self.domain_id
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return scope_membership_exists(
+                DomainEntityType(), domain_id, VFolderEntityType(), VFolderRow.id
+            )
+
+        return inner
+
+    @property
+    @override
+    def existence_checks(self) -> Sequence[ExistenceCheck[Any]]:
+        return [
+            ExistenceCheck(
+                column=DomainRow.id,
+                value=self.domain_id,
+                error=DomainNotFound(str(self.domain_id)),
+            ),
+        ]
 
 
 @dataclass(frozen=True)
@@ -43,13 +75,9 @@ class ProjectVFolderOperationScope(OperationScope):
         """Convert scope to a query condition for VFolderRow."""
         project_id = self.project_id
 
-        # TODO(BA-7571): drop the column term once the ownership backfill lands.
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return sa.or_(
-                VFolderRow.group == project_id,
-                scope_membership_exists(
-                    ProjectEntityType(), project_id, VFolderEntityType(), VFolderRow.id
-                ),
+            return scope_membership_exists(
+                ProjectEntityType(), project_id, VFolderEntityType(), VFolderRow.id
             )
 
         return inner
@@ -74,7 +102,7 @@ class UserVFolderOperationScope(OperationScope):
     Used for my_vfolders query (current authenticated user).
     """
 
-    user_id: UUID
+    user_id: UserID
     """Required. The user whose vfolders to search."""
 
     @override
@@ -87,29 +115,8 @@ class UserVFolderOperationScope(OperationScope):
         """
         user_id = self.user_id
 
-        # TODO(BA-7571): drop the column terms once the ownership backfill lands.
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            permitted_vfolder_ids = sa.select(VFolderPermissionRow.vfolder).where(
-                VFolderPermissionRow.user == user_id
-            )
-            personal_project_id = (
-                sa.select(ProjectRow.id)
-                .where(
-                    ProjectRow.creator_id == user_id,
-                    ProjectRow.type == ProjectType.PERSONAL,
-                )
-                .scalar_subquery()
-            )
-            return sa.or_(
-                VFolderRow.user == user_id,
-                VFolderRow.id.in_(permitted_vfolder_ids),
-                scope_membership_exists(
-                    ProjectEntityType(), personal_project_id, VFolderEntityType(), VFolderRow.id
-                ),
-                scope_membership_exists(
-                    UserEntityType(), user_id, VFolderEntityType(), VFolderRow.id
-                ),
-            )
+            return user_scope_reaches(user_id, VFolderEntityType(), VFolderRow.id)
 
         return inner
 

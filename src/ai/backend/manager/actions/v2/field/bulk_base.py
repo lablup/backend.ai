@@ -4,7 +4,10 @@ from typing import Self
 
 from ai.backend.common.data.entity.types import EntityIdentifier, FieldIdentifier
 from ai.backend.manager.actions.types import ActionOperationType
-from ai.backend.manager.actions.v2.field.bulk_lookup import LookupBulkFieldOwnerOpsAction
+from ai.backend.manager.actions.v2.field.bulk_lookup import (
+    LookupBulkFieldOwnerOpsAction,
+    LookupBulkRuntimeFieldOwnerOpsAction,
+)
 
 
 class BaseBulkFieldAction[TFieldID: FieldIdentifier, TOwnerID: EntityIdentifier](ABC):
@@ -34,8 +37,14 @@ class BaseBulkFieldAction[TFieldID: FieldIdentifier, TOwnerID: EntityIdentifier]
         raise NotImplementedError
 
     @abstractmethod
-    def to_owner_lookup_action(self) -> LookupBulkFieldOwnerOpsAction[TFieldID, TOwnerID]:
-        """Return the lookup that reads the entity owning each row."""
+    def to_owner_lookup_action(
+        self,
+    ) -> (
+        LookupBulkFieldOwnerOpsAction[TFieldID, TOwnerID]
+        | LookupBulkRuntimeFieldOwnerOpsAction[TFieldID]
+    ):
+        """Return the lookup that reads the entity owning each row, or, where the
+        owner's type is a value on the row, the one that reads that type too."""
         raise NotImplementedError
 
 

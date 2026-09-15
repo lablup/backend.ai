@@ -1,14 +1,14 @@
 import logging
-from uuid import UUID
+from collections.abc import Collection
 
 from ai.backend.common.contexts.user import current_user
-from ai.backend.common.docker import ImageRef
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.dto.manager.rpc_request import PurgeImagesReq
 from ai.backend.common.exception import UnknownImageReference
-from ai.backend.common.types import AgentId, ImageAlias, ImageID
+from ai.backend.common.types import AgentId, ImageID
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
-from ai.backend.manager.data.image.types import ImageWithAgentInstallStatus
+from ai.backend.manager.data.image.types import ImageStatus, ImageWithAgentInstallStatus
 from ai.backend.manager.errors.image import ImageAccessForbiddenError, ImageNotFound
 from ai.backend.manager.models.image import (
     ImageIdentifier,
@@ -77,6 +77,10 @@ from ai.backend.manager.services.image.actions.scan_image import (
     ScanImageAction,
     ScanImageActionResult,
 )
+from ai.backend.manager.services.image.actions.scoped_search import (
+    ScopedSearchImagesAction,
+    ScopedSearchImagesActionResult,
+)
 from ai.backend.manager.services.image.actions.search_aliases import (
     SearchAliasesAction,
     SearchAliasesActionResult,
@@ -125,7 +129,9 @@ class ImageService:
         self._image_repository = image_repository
         self._config_provider = config_provider
 
-    async def _validate_image_ownership(self, image_id: UUID, user_id: UUID) -> None:
+    async def _validate_image_ownership(
+        self, image_id: ImageID, user_id: UserID, statuses: Collection[ImageStatus]
+    ) -> None:
         """
         Validates that user owns the image.
         Raises ImageAccessForbiddenError if user doesn't own the image.
@@ -133,7 +139,7 @@ class ImageService:
         Note: Non-customized images are not owned by anyone,
         so ownership validation fails for them.
         """
-        if not await self._image_repository.validate_image_ownership(image_id, user_id):
+        if not await self._image_repository.validate_image_ownership(image_id, user_id, statuses):
             raise ImageAccessForbiddenError()
 
     async def get_images_by_canonicals(
@@ -211,17 +217,17 @@ class ImageService:
         """
         Deprecated. Use forget_image_by_id instead.
         """
-        identifiers: list[ImageAlias | ImageRef | ImageIdentifier] = [
-            ImageIdentifier(action.reference, action.architecture),
-            ImageAlias(action.reference),
-        ]
         # Regular users need ownership validation
         user = current_user()
         is_superadmin = user is not None and user.role == UserRole.SUPERADMIN
         if not is_superadmin and user is not None:
-            image_data = await self._image_repository.resolve_image(identifiers)
-            await self._validate_image_ownership(image_data.id, user.user_id)
-        data = await self._image_repository.soft_delete_image(identifiers)
+            image_data = await self._image_repository.resolve_image(
+                action.reference, action.architecture
+            )
+            await self._validate_image_ownership(
+                image_data.id, UserID(user.user_id), [ImageStatus.ALIVE]
+            )
+        data = await self._image_repository.soft_delete_image(action.reference, action.architecture)
         return ForgetImageActionResult(image=data)
 
     async def forget_image_by_id(
@@ -231,7 +237,9 @@ class ImageService:
         user = current_user()
         is_superadmin = user is not None and user.role == UserRole.SUPERADMIN
         if not is_superadmin and user is not None:
-            await self._validate_image_ownership(action.image_id, user.user_id)
+            await self._validate_image_ownership(
+                action.image_id, UserID(user.user_id), [ImageStatus.ALIVE]
+            )
         data = await self._image_repository.soft_delete_image_by_id(action.image_id)
         return ForgetImageByIdActionResult(image=data)
 
@@ -242,7 +250,9 @@ class ImageService:
         user = current_user()
         is_superadmin = user is not None and user.role == UserRole.SUPERADMIN
         if not is_superadmin and user is not None:
-            await self._validate_image_ownership(action.image_id, user.user_id)
+            await self._validate_image_ownership(
+                action.image_id, UserID(user.user_id), ImageStatus.restorable()
+            )
         data = await self._image_repository.restore_image_by_id(action.image_id)
         return RestoreImageByIdActionResult(image=data)
 
@@ -272,10 +282,9 @@ class ImageService:
     async def update_image(self, action: UpdateImageAction) -> UpdateImageActionResult:
         try:
             # Resolve image first to get its ID
-            image_data = await self._image_repository.resolve_image([
-                ImageIdentifier(action.target, action.architecture),
-                ImageAlias(action.target),
-            ])
+            image_data = await self._image_repository.resolve_image(
+                action.target, action.architecture
+            )
             updater = ImageUpdater(image_id=image_data.id, update=action.update)
             updated_image_data = await self._image_repository.update_image_properties(updater)
         except UnknownImageReference as e:
@@ -295,7 +304,9 @@ class ImageService:
         user = current_user()
         is_superadmin = user is not None and user.role == UserRole.SUPERADMIN
         if not is_superadmin and user is not None:
-            await self._validate_image_ownership(action.image_id, user.user_id)
+            await self._validate_image_ownership(
+                action.image_id, UserID(user.user_id), [ImageStatus.ALIVE]
+            )
         image_data = await self._image_repository.delete_image_with_aliases(action.image_id)
         return PurgeImageByIdActionResult(image=image_data)
 
@@ -306,7 +317,9 @@ class ImageService:
         user = current_user()
         is_superadmin = user is not None and user.role == UserRole.SUPERADMIN
         if not is_superadmin and user is not None:
-            await self._validate_image_ownership(action.image_id, user.user_id)
+            await self._validate_image_ownership(
+                action.image_id, UserID(user.user_id), [ImageStatus.ALIVE]
+            )
         image_data = await self._image_repository.untag_image_from_registry(action.image_id)
         return UntagImageFromRegistryActionResult(image=image_data)
 
@@ -316,8 +329,7 @@ class ImageService:
         image_canonical = action.image.name
         arch = action.image.architecture
 
-        image_identifier = ImageIdentifier(image_canonical, arch)
-        image_data = await self._image_repository.resolve_image([image_identifier])
+        image_data = await self._image_repository.resolve_image_by_canonical(image_canonical, arch)
 
         results = await self._agent_registry.purge_images(
             AgentId(agent_id),
@@ -357,14 +369,14 @@ class ImageService:
             )
 
             # Collect successful purges for batch resolution
-            successful_identifiers: list[list[ImageIdentifier]] = []
+            successful_identifiers: list[ImageIdentifier] = []
             successful_canonicals = []
 
             for result in results.responses:
                 if not result.error:
                     image_canonical = result.image
                     arch = arch_per_images[image_canonical]
-                    successful_identifiers.append([ImageIdentifier(image_canonical, arch)])
+                    successful_identifiers.append(ImageIdentifier(image_canonical, arch))
                     successful_canonicals.append(image_canonical)
                 else:
                     errors.append(
@@ -417,6 +429,20 @@ class ImageService:
         """
         result = await self._image_repository.search_images(action.querier)
         return SearchImagesActionResult(
+            data=result.items,
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+        )
+
+    async def scoped_search_images(
+        self, action: ScopedSearchImagesAction
+    ) -> ScopedSearchImagesActionResult:
+        """Search images within the scopes the action names."""
+        result = await self._image_repository.search_images_in_scopes(
+            action.querier, action.operation_scopes()
+        )
+        return ScopedSearchImagesActionResult(
             data=result.items,
             total_count=result.total_count,
             has_next_page=result.has_next_page,

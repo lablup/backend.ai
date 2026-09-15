@@ -1571,7 +1571,7 @@ class DeploymentRepository:
     async def bulk_delete_access_tokens(
         self,
         token_ids: list[uuid.UUID],
-    ) -> list[uuid.UUID]:
+    ) -> list[ModelDeploymentAccessTokenData]:
         """Delete multiple access tokens."""
         return await self._db_source.bulk_delete_access_tokens(token_ids)
 

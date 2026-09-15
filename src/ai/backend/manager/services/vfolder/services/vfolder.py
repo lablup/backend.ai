@@ -38,7 +38,7 @@ from ai.backend.manager.data.vfolder.types import (
     VFolderMountPermission,
     VFolderUsageData,
 )
-from ai.backend.manager.errors.common import Forbidden, InternalServerError, ObjectNotFound
+from ai.backend.manager.errors.common import Forbidden, InternalServerError
 from ai.backend.manager.errors.kernel import BackendAgentError
 from ai.backend.manager.errors.resource import ProjectNotFound
 from ai.backend.manager.errors.storage import (
@@ -127,18 +127,10 @@ from ai.backend.manager.services.vfolder.actions.lookup import (
     LookupVFolderAction,
     LookupVFolderActionResult,
 )
-from ai.backend.manager.services.vfolder.actions.search_in_project import (
-    SearchVFoldersInProjectAction,
-    SearchVFoldersInProjectActionResult,
-)
 from ai.backend.manager.services.vfolder.actions.search_storage_host_permissions import (
     SearchStorageHostPermissionsAction,
     SearchStorageHostPermissionsActionResult,
     StorageHostPermissionEntry,
-)
-from ai.backend.manager.services.vfolder.actions.search_user_vfolders import (
-    SearchUserVFoldersAction,
-    SearchUserVFoldersActionResult,
 )
 from ai.backend.manager.services.vfolder.actions.storage_ops import (
     ChangeVFolderOwnershipAction,
@@ -309,7 +301,7 @@ class VFolderService:
         # Get user info using repository
         user_info = await self._vfolder_repository.get_user_info(action.user_uuid)
         if not user_info:
-            raise ObjectNotFound(object_name="User")
+            raise UserNotFound()
         user_role, user_domain_name = user_info
 
         # Get all accessible vfolders to check for name conflicts
@@ -348,7 +340,7 @@ class VFolderService:
         # Get user info using repository
         user_info = await self._vfolder_repository.get_user_info(action.user_uuid)
         if not user_info:
-            raise ObjectNotFound(object_name="User")
+            raise UserNotFound()
         user_role, user_domain_name = user_info
 
         # Use repository to get accessible vfolders
@@ -417,7 +409,7 @@ class VFolderService:
         # Get user info using repository
         user_info = await self._vfolder_repository.get_user_info(action.user_uuid)
         if not user_info:
-            raise ObjectNotFound(object_name="User")
+            raise UserNotFound()
         user_role, user_domain_name = user_info
 
         # Use repository to get accessible vfolders
@@ -458,34 +450,6 @@ class VFolderService:
         return ListVFolderActionResult(
             user_uuid=action.user_uuid,
             vfolders=vfolders,
-        )
-
-    async def search_in_project(
-        self, action: SearchVFoldersInProjectAction
-    ) -> SearchVFoldersInProjectActionResult:
-        """Search vfolders scoped to a project."""
-        result = await self._vfolder_repository.search_in_project(action.querier, action.scope)
-        return SearchVFoldersInProjectActionResult(
-            project_id=action.scope.project_id,
-            data=result.items,
-            total_count=result.total_count,
-            has_next_page=result.has_next_page,
-            has_previous_page=result.has_previous_page,
-        )
-
-    async def search_user_vfolders(
-        self, action: SearchUserVFoldersAction
-    ) -> SearchUserVFoldersActionResult:
-        """Search vfolders owned by a specific user."""
-        result = await self._vfolder_repository.search_user_vfolders(
-            querier=action.querier, scope=action.scope
-        )
-        return SearchUserVFoldersActionResult(
-            user_id=action.scope.user_id,
-            data=result.items,
-            total_count=result.total_count,
-            has_next_page=result.has_next_page,
-            has_previous_page=result.has_previous_page,
         )
 
     async def move_to_trash(

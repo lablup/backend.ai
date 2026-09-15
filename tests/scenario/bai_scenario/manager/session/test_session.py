@@ -22,7 +22,7 @@ from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.v2.session.request import AdminSearchSessionsInput
 from ai.backend.common.dto.manager.v2.session.response import AdminSearchSessionsPayload
 from ai.backend.manager.api.adapters.session.adapter import SessionAdapter
-from ai.backend.manager.errors.permission import NotEnoughPermission
+from ai.backend.manager.errors.auth import InsufficientPrivilege
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import Given, Scenario, Then, When
 
@@ -84,8 +84,8 @@ class AUserGrantedNothingMayNotSearch(
     @override
     def describe(self) -> str:
         return (
-            "세션 조회는 역할이 아니라 스코프 권한이 지키므로, "
-            "아무 권한도 받지 않은 사용자는 권한 부족으로 거부된다"
+            "필터 없는 전체 조회는 슈퍼관리자 역할로만 열리므로, "
+            "아무 권한도 받지 않은 사용자는 역할 부족으로 거부된다"
         )
 
     @override
@@ -98,7 +98,7 @@ class AUserGrantedNothingMayNotSearch(
 
     @override
     def then(self) -> Then[ADomainAndACaller, Searched]:
-        return TheCallIsRefused(NotEnoughPermission)
+        return TheCallIsRefused(InsufficientPrivilege)
 
 
 SCENARIOS: list[SessionStep] = [

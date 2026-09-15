@@ -5,7 +5,6 @@ from datetime import UTC, datetime
 
 from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.logging.utils import BraceStyleAdapter
-from ai.backend.manager.actions.action import BaseActionTriggerMeta
 from ai.backend.manager.actions.run_status import ActionRunStatus
 from ai.backend.manager.actions.v2.lookup.base import BaseLookupAction, BaseLookupActionResult
 from ai.backend.manager.actions.v2.lookup.monitor import LookupActionMonitor
@@ -19,6 +18,7 @@ from ai.backend.manager.actions.v2.lookup.validator import (
 )
 from ai.backend.manager.actions.v2.single_entity.trigger import SingleEntityActionTriggerMeta
 from ai.backend.manager.actions.v2.single_entity.validator import SingleEntityActionValidator
+from ai.backend.manager.actions.v2.trigger import ActionTriggerMeta
 from ai.backend.manager.errors.base.not_found import NotFoundError
 from ai.backend.manager.errors.common import GenericBadRequest
 from ai.backend.manager.errors.permission import NotEnoughPermission
@@ -62,7 +62,7 @@ class LookupActionProcessor[TAction: BaseLookupAction, TResult: BaseLookupAction
         self._validators = [AuthenticatedActionValidator(), *(validators or [])]
         self._post_validators = post_validators or []
 
-    async def _prepare_monitors(self, action: TAction, trigger_meta: BaseActionTriggerMeta) -> None:
+    async def _prepare_monitors(self, action: TAction, trigger_meta: ActionTriggerMeta) -> None:
         for monitor in self._monitors:
             try:
                 await monitor.prepare(action, trigger_meta)
@@ -105,7 +105,7 @@ class LookupActionProcessor[TAction: BaseLookupAction, TResult: BaseLookupAction
     async def run(self, action: TAction) -> TResult:
         started_at = datetime.now(UTC)
         action_id = uuid.uuid4()
-        trigger_meta = BaseActionTriggerMeta(action_id=action_id, started_at=started_at)
+        trigger_meta = ActionTriggerMeta(action_id=action_id, started_at=started_at)
 
         run_status = ActionRunStatus.unknown()
         entity_id: EntityIdentifier | None = None

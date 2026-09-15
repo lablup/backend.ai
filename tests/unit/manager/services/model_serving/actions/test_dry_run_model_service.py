@@ -29,7 +29,6 @@ from ai.backend.common.types import (
     VFolderMount,
     VFolderUsageMode,
 )
-from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.deployment.types import (
@@ -84,10 +83,6 @@ class TestDryRunModelService:
     @pytest.fixture
     def mock_storage_manager(self) -> MagicMock:
         return MagicMock(spec=StorageSessionManager)
-
-    @pytest.fixture
-    def mock_action_monitor(self) -> MagicMock:
-        return MagicMock(spec=ActionMonitor)
 
     @pytest.fixture
     def mock_event_dispatcher(self) -> MagicMock:
@@ -243,21 +238,6 @@ class TestDryRunModelService:
         )
 
     @pytest.fixture
-    def mock_resolve_image_for_endpoint_creation_dry_run(
-        self, mocker: Any, mock_repositories: Any
-    ) -> AsyncMock:
-        mock = cast(
-            AsyncMock,
-            mocker.patch.object(
-                mock_repositories.repository,
-                "resolve_image_for_endpoint_creation",
-                new_callable=AsyncMock,
-            ),
-        )
-        mock.return_value = MagicMock(image_ref="test-image:latest")
-        return mock
-
-    @pytest.fixture
     def mock_background_task_manager_start(
         self, mocker: Any, mock_background_task_manager: Any
     ) -> AsyncMock:
@@ -331,7 +311,6 @@ class TestDryRunModelService:
         user_data: UserData,
         mock_get_vfolder_ownership_type_dry_run: AsyncMock,
         mock_get_user_with_keypair: AsyncMock,
-        mock_resolve_image_for_endpoint_creation_dry_run: MagicMock,
         mock_background_task_manager_start: AsyncMock,
     ) -> None:
         mock_get_user_with_keypair.return_value = MagicMock(
@@ -582,10 +561,6 @@ class TestDryRunWithDeploymentConfigOverrides:
         return MagicMock(spec=StorageSessionManager)
 
     @pytest.fixture
-    def mock_action_monitor(self) -> MagicMock:
-        return MagicMock(spec=ActionMonitor)
-
-    @pytest.fixture
     def mock_event_dispatcher(self) -> MagicMock:
         mock = MagicMock(spec=EventDispatcher)
         mock.dispatch = AsyncMock()
@@ -747,13 +722,6 @@ class TestDryRunWithDeploymentConfigOverrides:
             ),
         )
 
-        mocks["resolve_image_for_endpoint_creation"] = mocker.patch.object(
-            mock_repositories.repository,
-            "resolve_image_for_endpoint_creation",
-            new_callable=AsyncMock,
-            return_value=MagicMock(image_ref="test-image:latest"),
-        )
-
         mocks["background_task_manager_start"] = mocker.patch.object(
             mock_background_task_manager,
             "start",
@@ -762,13 +730,6 @@ class TestDryRunWithDeploymentConfigOverrides:
         )
 
         return mocks
-
-    @pytest.fixture
-    def mock_resolve_image_for_endpoint_creation(
-        self, setup_repository_mocks: dict[str, AsyncMock]
-    ) -> AsyncMock:
-        """Expose resolve_image mock for image override verification."""
-        return setup_repository_mocks["resolve_image_for_endpoint_creation"]
 
     @pytest.fixture
     def action_with_api_request_values(self) -> DryRunModelServiceAction:
@@ -824,7 +785,6 @@ class TestDryRunWithDeploymentConfigOverrides:
         revision_from_deployment_config: ModelRevisionSpec,
         expected_task_id: uuid.UUID,
         mock_scheduling_controller: MagicMock,
-        mock_resolve_image_for_endpoint_creation: AsyncMock,
     ) -> None:
         """Verify dry run applies deployment config overrides from RevisionGenerator."""
         result = await model_serving_service.dry_run(action_with_api_request_values)
@@ -876,10 +836,6 @@ class TestDryRunExtraMountsHandling:
     @pytest.fixture
     def mock_storage_manager(self) -> MagicMock:
         return MagicMock(spec=StorageSessionManager)
-
-    @pytest.fixture
-    def mock_action_monitor(self) -> MagicMock:
-        return MagicMock(spec=ActionMonitor)
 
     @pytest.fixture
     def mock_event_dispatcher(self) -> MagicMock:
@@ -1057,13 +1013,6 @@ class TestDryRunExtraMountsHandling:
                 uuid=uuid.UUID("00000000-0000-0000-0000-000000000001"),
                 role=UserRole.USER,
             ),
-        )
-
-        mocks["resolve_image_for_endpoint_creation"] = mocker.patch.object(
-            mock_repositories.repository,
-            "resolve_image_for_endpoint_creation",
-            new_callable=AsyncMock,
-            return_value=MagicMock(image_ref="test-image:latest"),
         )
 
         mocks["background_task_manager_start"] = mocker.patch.object(

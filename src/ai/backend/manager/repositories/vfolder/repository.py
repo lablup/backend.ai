@@ -42,11 +42,9 @@ from ai.backend.manager.data.vfolder.types import (
     VFolderListResult,
     VFolderMountPermission,
     VFolderPermissionData,
-    VFolderSearchResult,
 )
 from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.auth import AuthorizationFailed
-from ai.backend.manager.errors.common import ObjectNotFound
 from ai.backend.manager.errors.repository import (
     ForeignKeyViolationError,
     RepositoryIntegrityError,
@@ -61,7 +59,7 @@ from ai.backend.manager.errors.storage import (
     VFolderNotFound,
     VFolderOperationFailed,
 )
-from ai.backend.manager.errors.user import UserNotFound
+from ai.backend.manager.errors.user import KeyPairNotFound, UserNotFound
 from ai.backend.manager.models.agent import agents
 from ai.backend.manager.models.kernel import kernels
 from ai.backend.manager.models.keypair import KeyPairRow, keypairs
@@ -120,10 +118,6 @@ from ai.backend.manager.models.vfolder.purgers import (
     VFolderUserPermissionBatchPurger,
 )
 from ai.backend.manager.models.vfolder.queriers import VFolderQuerier
-from ai.backend.manager.models.vfolder.scopes import (
-    ProjectVFolderOperationScope,
-    UserVFolderOperationScope,
-)
 from ai.backend.manager.models.vfolder.updaters import (
     VFolderAttributeUpdater,
     VFolderMountPermissionUpdater,
@@ -132,10 +126,6 @@ from ai.backend.manager.models.vfolder.updaters import (
     VFolderTrashUpdater,
 )
 from ai.backend.manager.models.virtual_entity.queries import user_scope_membership_exists
-from ai.backend.manager.repositories.base import (
-    BatchQuerier,
-    execute_batch_querier,
-)
 from ai.backend.manager.repositories.base.integrity import match_integrity_error
 from ai.backend.manager.repositories.ops.v2.share.provider import ShareOpsProvider
 from ai.backend.manager.repositories.ops.v2.share.write import V2ShareWriteOps
@@ -199,7 +189,7 @@ class VfolderRepository:
             # Check access permissions
             user_row = await session.scalar(sa.select(UserRow).where(UserRow.uuid == user_id))
             if not user_row:
-                raise ObjectNotFound(object_name="User")
+                raise UserNotFound()
 
             # Check if user has access to this vfolder
             allowed_vfolder_types = ["user", "group"]  # TODO: get from config
@@ -305,7 +295,7 @@ class VfolderRepository:
 
             allowed_hosts = await self._fetch_default_keypair_vfolder_hosts(db_session, user_uuid)
             if allowed_hosts is None:
-                raise ObjectNotFound(object_name="User keypair")
+                raise KeyPairNotFound("The user has no default keypair.")
             return allowed_hosts
 
     async def _fetch_default_keypair_vfolder_hosts(
@@ -1835,12 +1825,11 @@ class VfolderRepository:
             users_to_share = [u.uuid for u in user_info]
             emails_to_share = [u.email for u in user_info]
             if len(user_info) < 1:
-                raise ObjectNotFound(object_name="user")
+                raise UserNotFound()
             if len(user_info) < len(emails):
                 users_not_in_group = list(set(emails) - set(emails_to_share))
-                raise ObjectNotFound(
-                    f"Some users do not belong to folder's group: {','.join(users_not_in_group)}",
-                    object_name="user",
+                raise UserNotFound(
+                    f"Some users do not belong to folder's group: {','.join(users_not_in_group)}"
                 )
 
         async with self._v2_ops.write_ops() as w:
@@ -1892,7 +1881,7 @@ class VfolderRepository:
             result = await session.execute(db_query)
             users_to_unshare = [u.uuid for u in result.fetchall()]
             if len(users_to_unshare) < 1:
-                raise ObjectNotFound(object_name="user(s).")
+                raise UserNotFound()
 
         async with self._v2_ops.write_ops() as w:
             for user_id in users_to_unshare:
@@ -2157,7 +2146,7 @@ class VfolderRepository:
                 raise InvalidAPIParameters from e
             user_info = result.first()
             if user_info is None:
-                raise ObjectNotFound(object_name="user")
+                raise UserNotFound()
 
             resource_policy_name = user_info.resource_policy
             result = await conn.execute(
@@ -2272,71 +2261,3 @@ class VfolderRepository:
                 if row.mounts:
                     mounted.update(m[1] for m in row.mounts)
             return mounted
-
-    @vfolder_repository_resilience.apply()
-    async def search_in_project(
-        self,
-        querier: BatchQuerier,
-        scope: ProjectVFolderOperationScope,
-    ) -> VFolderSearchResult:
-        """Search vfolders scoped to a project.
-
-        Args:
-            querier: BatchQuerier for filtering, ordering, and pagination
-            scope: ProjectVFolderOperationScope that filters by project and validates existence
-
-        Returns:
-            VFolderSearchResult with items, total count, and pagination info
-        """
-        async with self._db.begin_readonly_session() as db_sess:
-            query = sa.select(VFolderRow)
-
-            result = await execute_batch_querier(
-                db_sess,
-                query,
-                querier,
-                scopes=[scope],
-            )
-
-            items = [row.VFolderRow.to_data() for row in result.rows]
-
-            return VFolderSearchResult(
-                items=items,
-                total_count=result.total_count,
-                has_next_page=result.has_next_page,
-                has_previous_page=result.has_previous_page,
-            )
-
-    @vfolder_repository_resilience.apply()
-    async def search_user_vfolders(
-        self,
-        querier: BatchQuerier,
-        scope: UserVFolderOperationScope,
-    ) -> VFolderSearchResult:
-        """Search vfolders scoped to a user.
-
-        Args:
-            querier: BatchQuerier for filtering, ordering, and pagination
-            scope: UserVFolderOperationScope that filters by user and validates existence
-
-        Returns:
-            VFolderSearchResult with items, total count, and pagination info
-        """
-        async with self._db.begin_readonly_session() as db_sess:
-            query = sa.select(VFolderRow)
-
-            result = await execute_batch_querier(
-                db_sess,
-                query,
-                querier,
-                scopes=[scope],
-            )
-
-            items = [row.VFolderRow.to_data() for row in result.rows]
-
-            return VFolderSearchResult(
-                items=items,
-                total_count=result.total_count,
-                has_next_page=result.has_next_page,
-                has_previous_page=result.has_previous_page,
-            )
