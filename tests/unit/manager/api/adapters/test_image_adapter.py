@@ -1,4 +1,4 @@
-"""The image DataLoader path: each image is answered for."""
+"""The image adapter: the DataLoader path answers per image, the REST search keeps its cursor."""
 
 from __future__ import annotations
 
@@ -7,8 +7,10 @@ from uuid import uuid4
 
 import pytest
 
+from ai.backend.common.dto.manager.v2.image.request import AdminSearchImagesInput
 from ai.backend.common.types import ImageCanonical, ImageID
 from ai.backend.manager.actions.v2.bulk.result import PartialBulkEntityResult, PartialBulkResult
+from ai.backend.manager.api.adapter_options.cursor.cursor import encode_cursor
 from ai.backend.manager.api.adapters.image.adapter import ImageAdapter
 from ai.backend.manager.data.image.types import (
     ImageData,
@@ -18,6 +20,8 @@ from ai.backend.manager.data.image.types import (
     ImageType,
 )
 from ai.backend.manager.errors.common import GenericForbidden
+from ai.backend.manager.models.specs.pagination import CursorForwardPagination
+from ai.backend.manager.services.image.actions.search_images import SearchImagesActionResult
 
 READABLE = ImageID(uuid4())
 DENIED = ImageID(uuid4())
@@ -68,6 +72,11 @@ def processors(readable: ImageData, denial: GenericForbidden) -> MagicMock:
             ]
         )
     )
+    processors.search_images.run = AsyncMock(
+        return_value=SearchImagesActionResult(
+            data=[], total_count=0, has_next_page=False, has_previous_page=False
+        )
+    )
     return processors
 
 
@@ -91,3 +100,14 @@ async def test_batch_load_answers_per_id(
 async def test_no_ids_read_nothing(adapter: ImageAdapter, processors: MagicMock) -> None:
     assert await adapter.batch_load_by_ids([]) == []
     processors.bulk_get.run.assert_not_awaited()
+
+
+async def test_admin_search_pages_with_the_cursor_it_is_given(
+    adapter: ImageAdapter,
+    processors: MagicMock,
+) -> None:
+    await adapter.admin_search(AdminSearchImagesInput(first=5, after=encode_cursor(uuid4())))
+
+    action = processors.search_images.run.call_args.args[0]
+    assert isinstance(action.querier.pagination, CursorForwardPagination)
+    assert action.querier.pagination.cursor_condition is not None

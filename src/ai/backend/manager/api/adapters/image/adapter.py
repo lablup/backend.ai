@@ -156,8 +156,13 @@ class ImageAdapter(BaseAdapter):
     # ------------------------------------------------------------------ search
 
     async def admin_search(self, input: AdminSearchImagesInput) -> AdminSearchImagesPayload:
-        """Search images with admin scope using offset pagination."""
-        querier = self._build_offset_querier(input)
+        """Search images with admin scope, by cursor when the request names one."""
+        names_cursor = input.first is not None or input.last is not None
+        names_offset = input.limit is not None or input.offset is not None
+        if names_cursor and not names_offset:
+            querier = self._build_cursor_querier(input)
+        else:
+            querier = self._build_offset_querier(input)
 
         action_result = await self._image.search_images.run(SearchImagesAction(querier=querier))
 
@@ -348,6 +353,20 @@ class ImageAdapter(BaseAdapter):
             offset=input.offset if input.offset is not None else 0,
         )
         return BatchQuerier(conditions=conditions, orders=orders, pagination=pagination)
+
+    def _build_cursor_querier(self, input: AdminSearchImagesInput) -> BatchQuerier:
+        """Build a BatchQuerier with cursor pagination from the search input DTO."""
+        conditions = self._convert_filter(input.filter) if input.filter else []
+        orders = self._convert_orders(input.order) if input.order else []
+        return self._build_querier(
+            conditions=conditions,
+            orders=orders,
+            pagination_spec=_get_image_pagination_spec(),
+            first=input.first,
+            after=input.after,
+            last=input.last,
+            before=input.before,
+        )
 
     def _convert_filter(
         self,
@@ -605,16 +624,3 @@ class ImageAdapter(BaseAdapter):
             id=data.id,
             alias=data.alias,
         )
-
-    def build_querier(self, input: AdminSearchImagesInput) -> BatchQuerier:
-        """Build a BatchQuerier from the search input DTO (offset pagination)."""
-        return self._build_offset_querier(input)
-
-    def _build_pagination(self, input: AdminSearchImagesInput) -> OffsetPagination:
-        return OffsetPagination(
-            limit=input.limit if input.limit is not None else DEFAULT_PAGINATION_LIMIT,
-            offset=input.offset if input.offset is not None else 0,
-        )
-
-    def _convert_orders_legacy(self, orders: list[ImageOrderByInputDTO]) -> list[QueryOrder]:
-        return self._convert_orders(orders)
