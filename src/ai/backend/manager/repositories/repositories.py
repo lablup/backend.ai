@@ -67,6 +67,9 @@ from ai.backend.manager.repositories.scheduling_history.repositories import (
     SchedulingHistoryRepositories,
 )
 from ai.backend.manager.repositories.secret.repositories import SecretRepositories
+from ai.backend.manager.repositories.service_catalog.repositories import (
+    ServiceCatalogRepositories,
+)
 from ai.backend.manager.repositories.session.repositories import SessionRepositories
 from ai.backend.manager.repositories.storage_namespace.repositories import (
     StorageNamespaceRepositories,
@@ -134,6 +137,7 @@ class Repositories:
     retention: RetentionRepositories
     role_preset: RolePresetRepositories
     secret: SecretRepositories
+    service_catalog: ServiceCatalogRepositories
 
     @classmethod
     def create(cls, args: RepositoryArgs) -> Self:
@@ -186,6 +190,7 @@ class Repositories:
         retention_repositories = RetentionRepositories.create(args)
         role_preset_repositories = RolePresetRepositories.create(args)
         secret_repositories = SecretRepositories.create(args)
+        service_catalog_repositories = ServiceCatalogRepositories.create(args)
 
         return cls(
             agent=agent_repositories,
@@ -238,4 +243,5 @@ class Repositories:
             retention=retention_repositories,
             role_preset=role_preset_repositories,
             secret=secret_repositories,
+            service_catalog=service_catalog_repositories,
         )
