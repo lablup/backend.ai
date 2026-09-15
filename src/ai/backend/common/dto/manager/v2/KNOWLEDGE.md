@@ -1,14 +1,12 @@
 ---
 name: dto-v2-compat-policy
 type: design-rationale
-description: why the shared v2 DTO schema is additive-only (GQL and REST break together, version-branch schema policy), why update fields separate omitted from null with Unset, why the DTO default never reaches the GraphQL SDL
+description: why the shared v2 DTO schema is additive-only (GQL and REST break together, version-branch schema policy), why update fields separate omitted from null with Unset
 scope: src/ai/backend/common/dto/manager/v2
-keywords: [SSOT, additive-only, Unset, UNSET, nullify, BaseRequestModel, BaseResponseModel, supergraph, schema-inspector, gql_pydantic_input]
+keywords: [SSOT, additive-only, Unset, UNSET, nullify, BaseRequestModel, BaseResponseModel, supergraph, schema-inspector]
 sources:
   - src/ai/backend/common/dto/manager/v2
   - src/ai/backend/common/tristate/unset.py
-  - src/ai/backend/manager/api/gql/decorators.py
-  - scripts/generate-graphql-schema.sh
 generated:
   by: claude-code/fable-5
   at: 2026-08-10
@@ -41,11 +39,3 @@ where a field is defined exactly one, so the surfaces cannot diverge.
 - An omitted field puts nothing on the wire and nothing in the JSON schema.
 - Which of null and unset a column honours is the adapter's decision; the rule table lives in the "Update" section of `../../AGENTS.md`, the sentinel's rationale in [`../../../tristate/KNOWLEDGE.md`](../../../tristate/KNOWLEDGE.md).
 - Fields still declared with the legacy `Sentinel` enum are being migrated one domain at a time; do not add new ones.
-
-## The DTO default never reaches the GraphQL SDL
-
-- A field the client leaves out lands on the GQL input class first, not on the DTO. The class's own `gql_field(default=strawberry.UNSET)` marks it as "not sent".
-- The default the SDL prints is that GQL class default, and `strawberry.UNSET` prints as no default at all.
-- `PydanticInputMixin.to_pydantic()` builds the DTO from the GQL object and leaves the "not sent" fields out of the constructor call.
-- The DTO's `default=UNSET` only fills those left-out fields. It never reaches the SDL.
-- That is why `schema.py` no longer rewrites `Sentinel` defaults to `Undefined`; `tests/unit/manager/api/gql/test_schema_defaults.py` fails if an `Unset` or `Sentinel` value ever appears as an input default.
