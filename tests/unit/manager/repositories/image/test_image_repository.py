@@ -700,3 +700,96 @@ class TestImageRepositoryLastUsedAt:
         result = await image_repository.fetch_image_by_id(img.id)
         assert result.last_used_at is not None
         assert abs(result.last_used_at.timestamp() - newer.timestamp()) < 1.0
+
+
+class TestImageRepositoryDigest:
+    """The digest an image answers with is the one stored, without the column's padding."""
+
+    DIGEST = "sha256:" + "a" * 64
+
+    @pytest.fixture
+    async def db_with_cleanup(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+        async with with_tables(
+            database_connection,
+            [
+                DomainRow,
+                UserResourcePolicyRow,
+                KeyPairResourcePolicyRow,
+                UserRow,
+                KeyPairRow,
+                ContainerRegistryRow,
+                ImageRow,
+                ImageAliasRow,
+            ],
+        ):
+            yield database_connection
+
+    @pytest.fixture
+    def image_repository(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> ImageRepository:
+        return ImageRepository(
+            db=db_with_cleanup,
+            valkey_image=MagicMock(),
+            config_provider=MagicMock(),
+        )
+
+    @pytest.fixture
+    async def test_registry_id(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> UUID:
+        registry_id = uuid4()
+        async with db_with_cleanup.begin_session() as db_sess:
+            db_sess.add(
+                ContainerRegistryRow(
+                    id=registry_id,
+                    url="https://registry.example.com",
+                    registry_name="registry.example.com",
+                    type=ContainerRegistryType.DOCKER,
+                    project="test_project",
+                    is_global=True,
+                )
+            )
+            await db_sess.flush()
+        return registry_id
+
+    @pytest.fixture
+    async def image_id(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_registry_id: UUID,
+    ) -> ImageID:
+        image = ImageRow(
+            name="registry.example.com/test_project/python:3.9",
+            image="python",
+            tag="3.9",
+            registry="registry.example.com",
+            registry_id=test_registry_id,
+            project="test_project",
+            architecture="x86_64",
+            config_digest=self.DIGEST,
+            size_bytes=1000000,
+            type=ImageType.COMPUTE,
+            status=ImageStatus.ALIVE,
+            accelerators=None,
+            labels={},
+            resources={},
+        )
+        async with db_with_cleanup.begin_session() as db_sess:
+            db_sess.add(image)
+            await db_sess.flush()
+            return ImageID(image.id)
+
+    async def test_fetch_answers_the_digest_as_stored(
+        self,
+        image_repository: ImageRepository,
+        image_id: ImageID,
+    ) -> None:
+        result = await image_repository.fetch_image_by_id(image_id)
+
+        assert result.config_digest == self.DIGEST
