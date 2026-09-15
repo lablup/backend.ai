@@ -57,7 +57,7 @@ from ai.backend.manager.types import UserScope
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
-__all__: Sequence[str] = ("HeldPermissions", "prepare_vfolder_mounts")
+__all__: Sequence[str] = ("HeldPermissions", "prepare_vfolder_mounts", "query_reachable_vfolders")
 
 type HeldPermissions = Callable[
     [Sequence[VFolderUUID]], Awaitable[Mapping[EntityIdentifier, Permission]]
@@ -85,7 +85,7 @@ def _normalize_mount_subpath(raw_subpath: str | None) -> str:
     return normed
 
 
-async def _query_reachable_vfolders(
+async def query_reachable_vfolders(
     conn: SAConnection,
     user_scope: UserScope,
     conditions: sa.ColumnElement[bool],
@@ -203,7 +203,7 @@ async def prepare_vfolder_mounts(
             VFolderRow.id.in_(requested_vfolder_ids),
         )
     extra_vf_conds = sa.and_(extra_vf_conds, VFolderRow.status.not_in(DEAD_VFOLDER_STATUSES))
-    accessible_vfolders = await _query_reachable_vfolders(
+    accessible_vfolders = await query_reachable_vfolders(
         conn, user_scope, extra_vf_conds, held_permissions
     )
 

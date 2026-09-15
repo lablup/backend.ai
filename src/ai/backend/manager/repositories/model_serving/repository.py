@@ -82,7 +82,7 @@ from ai.backend.manager.models.session import KernelLoadingStrategy, SessionRow
 from ai.backend.manager.models.user import UserRole, UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine, execute_with_retry
 from ai.backend.manager.models.vfolder import VFolderRow, VFolderUsageMode
-from ai.backend.manager.models.vfolder.row import query_accessible_vfolders, vfolders
+from ai.backend.manager.models.vfolder.row import vfolders
 from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.registry import check_resource_group as registry_check_resource_group
 from ai.backend.manager.repositories.base import (
@@ -94,6 +94,7 @@ from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.rbac.permission_check_repository import (
     RbacPermissionCheckRepository,
 )
+from ai.backend.manager.repositories.vfolder.mount import query_reachable_vfolders
 from ai.backend.manager.types import MountOptionModel, UserScope
 from ai.backend.manager.utils import query_userinfo
 
@@ -960,36 +961,25 @@ class ModelServingRepository:
             )
 
             allowed_vfolder_types = await legacy_etcd_loader.get_vfolder_types()
+            owner_scope = UserScope(
+                domain_name=domain_name,
+                group_id=group_id,
+                user_uuid=owner_uuid,
+                user_role=owner_role,
+            )
+            owner_held = partial(self._permission_check.held_permissions, UserID(owner_uuid))
+            model_condition: sa.ColumnElement[bool]
             try:
-                extra_vf_conds = vfolders.c.id == uuid.UUID(model)
-                matched_vfolders = await query_accessible_vfolders(
-                    conn,
-                    owner_uuid,
-                    user_role=owner_role,
-                    domain_name=domain_name,
-                    allowed_vfolder_types=allowed_vfolder_types,
-                    extra_vf_conds=extra_vf_conds,
+                model_condition = vfolders.c.id == uuid.UUID(model)
+            except ValueError:
+                model_condition = (vfolders.c.name == model) & (
+                    vfolders.c.usage_mode == VFolderUsageMode.MODEL
                 )
-            except Exception as e:
-                if isinstance(e, (ValueError, VFolderNotFound)):
-                    try:
-                        extra_vf_conds = (vfolders.c.name == model) & (
-                            vfolders.c.usage_mode == VFolderUsageMode.MODEL
-                        )
-                        matched_vfolders = await query_accessible_vfolders(
-                            conn,
-                            owner_uuid,
-                            user_role=owner_role,
-                            domain_name=domain_name,
-                            allowed_vfolder_types=allowed_vfolder_types,
-                            extra_vf_conds=extra_vf_conds,
-                        )
-                    except VFolderNotFound as e:
-                        raise VFolderNotFound("Cannot find model folder") from e
-                else:
-                    raise
+            matched_vfolders = await query_reachable_vfolders(
+                conn, owner_scope, model_condition, owner_held
+            )
             if len(matched_vfolders) == 0:
-                raise VFolderNotFound
+                raise VFolderNotFound("Cannot find model folder")
             folder_row = matched_vfolders[0]
             if folder_row["usage_mode"] != VFolderUsageMode.MODEL:
                 raise InvalidAPIParameters("Selected VFolder is not a model folder")
@@ -1003,14 +993,9 @@ class ModelServingRepository:
                 model_id,
                 model_mount_destination,
                 extra_mounts,
-                UserScope(
-                    domain_name=domain_name,
-                    group_id=group_id,
-                    user_uuid=owner_uuid,
-                    user_role=owner_role,
-                ),
+                owner_scope,
                 resource_policy,
-                partial(self._permission_check.held_permissions, UserID(owner_uuid)),
+                owner_held,
             )
 
             reads_vfolder_config_files = await conn.scalar(
