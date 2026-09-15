@@ -21,6 +21,7 @@ __all__ = [
     "ContainerMetricOptionalLabel",
     "ContainerMetricResponseInfo",
     "ContainerMetricResult",
+    "CONTAINER_METRIC_UNIT_HINTS",
     "DIFF_METRICS",
     "KernelLiveStatBatchResult",
     "KernelLiveStatValues",
@@ -31,6 +32,7 @@ __all__ = [
     "RATE_METRICS",
     "MetricType",
     "ValueType",
+    "resolve_container_metric_unit_hint",
 ]
 
 
@@ -76,6 +78,34 @@ class ContainerLiveStatQueries:
 
 DIFF_METRICS: Final[frozenset[str]] = frozenset({"cpu_util"})
 RATE_METRICS: Final[frozenset[str]] = frozenset({"net_rx", "net_tx"})
+
+# Per-metric unit hint emitted by the agent (source of truth:
+# src/ai/backend/agent/docker/intrinsic.py). Not a Prometheus label, so it is
+# mirrored here for query building and the legacy live_stat payload.
+CONTAINER_METRIC_UNIT_HINTS: Final[dict[str, str]] = {
+    "cpu_used": "msec",
+    "cpu_util": "msec",
+    "mem": "bytes",
+    "net_rx": "bps",
+    "net_tx": "bps",
+    "io_read": "bytes",
+    "io_write": "bytes",
+    "io_scratch_size": "bytes",
+}
+
+
+def resolve_container_metric_unit_hint(metric_name: str) -> str:
+    if metric_name in CONTAINER_METRIC_UNIT_HINTS:
+        return CONTAINER_METRIC_UNIT_HINTS[metric_name]
+    if metric_name.endswith("_util"):
+        return "percent"
+    if metric_name == "mem" or metric_name.endswith("_mem"):
+        return "bytes"
+    if metric_name.startswith("io_"):
+        return "bytes"
+    if metric_name.startswith("net_"):
+        return "bps"
+    return metric_name
 
 
 @dataclass

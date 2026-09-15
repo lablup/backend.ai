@@ -13,6 +13,7 @@ from ai.backend.manager.clients.prometheus.metric_types import (
     ContainerLiveStatQueries,
     ContainerMetricOptionalLabel,
     MetricType,
+    resolve_container_metric_unit_hint,
 )
 from ai.backend.manager.clients.prometheus.preset import LabelMatcher, MetricPreset, regex_union
 from ai.backend.manager.clients.prometheus.querier import ContainerMetricQuerier
@@ -141,7 +142,9 @@ class ContainerMetricQueryBuilder:
                 return _DIFF_TEMPLATE
 
     def _get_pct_template(self, metric_name: str) -> str:
-        if metric_name in DIFF_METRICS or metric_name in RATE_METRICS:
+        # A msec series is a cumulative CPU-time counter; rate() turns it into
+        # msec per second, the unit its capacity is reported in.
+        if resolve_container_metric_unit_hint(metric_name) == "msec":
             return _PCT_RATE_TEMPLATE
         return _PCT_TEMPLATE
 
