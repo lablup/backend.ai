@@ -326,7 +326,11 @@ class V2EntityWriteOps(V2GraphWriteOpsBase):
         """Create the roles the active presets matching the scopes' types call for —
         presets are the only source of a scope's roles. Each role carries its scope,
         which owns and governs it as it does every other entity created there."""
-        specs = await self._preset_role_specs(entity_values)
+        await self._write_preset_roles(await self._preset_role_specs(entity_values))
+
+    async def _write_preset_roles(self, specs: Sequence[_PresetRoleSpec]) -> None:
+        """Write each spec's role, its place in the graph under its scope, and its
+        permissions."""
         if not specs:
             return
         role_rows = [

@@ -8,7 +8,7 @@ import sys
 from collections import Counter
 from collections.abc import Sequence
 from pathlib import Path
-from typing import Any, Final
+from typing import TYPE_CHECKING, Any, Final
 
 import click
 from tabulate import tabulate
@@ -22,6 +22,9 @@ from ai.backend.manager.data.permission.seed.kinds import PermissionKinds
 from ai.backend.manager.data.permission.seed.loader import RoleSeedLoader
 from ai.backend.manager.data.permission.seed.role import RoleSeed
 from ai.backend.manager.services.catalog import load_wiring_catalog
+
+if TYPE_CHECKING:
+    from ai.backend.manager.cli.context import CLIContext
 
 # The letters a mask prints as, in the order a cell spells them.
 _LETTERS: Final[tuple[tuple[Permission, str], ...]] = (
@@ -318,17 +321,14 @@ def operations(role: str, verdict: str | None, entity: str | None, output: str) 
             print(f"{len(readings)} operations read against {role}")
 
 
-# The checkout this command reads the account fixtures from and writes the seed to.
+# The checkout this command writes the seed to.
 _REPOSITORY: Final[Path] = Path(__file__).resolve().parents[5]
-# The installer fixtures of the same names are symlinks to these. The presets are
-# populated before the roles that name them.
+# The installer fixture of the same name is a symlink to this one.
 _PRESETS_TARGET: Final[Path] = Path("fixtures/manager/example-role-presets.json")
-_ROLES_TARGET: Final[Path] = Path("fixtures/manager/example-roles.json")
 
 
-def _render(seeds: Sequence[RoleSeed], root: Path) -> dict[Path, dict[str, Any]]:
-    fixture = RoleFixture(seeds, root / "fixtures" / "manager")
-    return {_PRESETS_TARGET: fixture.render_presets(), _ROLES_TARGET: fixture.render_roles()}
+def _render(seeds: Sequence[RoleSeed]) -> dict[Path, dict[str, Any]]:
+    return {_PRESETS_TARGET: RoleFixture(seeds).render_presets()}
 
 
 @cli.command(name="emit")
@@ -336,16 +336,15 @@ def _render(seeds: Sequence[RoleSeed], root: Path) -> dict[Path, dict[str, Any]]
     "--repository",
     default=None,
     type=click.Path(exists=True, file_okay=False, path_type=Path),
-    help="Read the account fixtures from, and write the seed into, this checkout.",
+    help="Write the seed into this checkout.",
 )
 @click.option("--check", is_flag=True, help="Report whether the files are current, write nothing.")
 def emit(repository: Path | None, check: bool) -> None:
     """
-    Write the seed fixtures from the role files and the account fixtures.
+    Write the preset fixture from the role files.
 
-    The written files are generated: edit the role files and run this, never the JSON.
-    Users, projects and the domain come from the account fixtures beside the targets, so
-    they are stated in one place.
+    The written file is generated: edit the role files and run this, never the JSON.
+    The roles the presets call for are created in each scope by `provision`.
 
     Examples:
 
@@ -354,7 +353,7 @@ def emit(repository: Path | None, check: bool) -> None:
       $ backend.ai mgr permissions emit --check
     """
     root = repository if repository is not None else _REPOSITORY
-    rendered = _render(_load(), root)
+    rendered = _render(_load())
     for tables in rendered.values():
         for table, rows in tables.items():
             if not table.startswith("__"):
@@ -375,6 +374,43 @@ def emit(repository: Path | None, check: bool) -> None:
     for target, body in bodies.items():
         (root / target).write_text(body, encoding="utf-8")
         print(f"wrote {target}")
+
+
+# The preset whose role a project's creator holds while still on its roster.
+_CREATOR_PRESET: Final[str] = "project_admin"
+
+
+@cli.command(name="provision")
+@click.pass_obj
+def provision(cli_ctx: CLIContext) -> None:
+    """
+    Instantiate the presets in every domain, project and user that lacks their role.
+
+    Grants what each scope assigns on its own, and the project admin role to a project's
+    creator still on its roster. Running it again changes nothing.
+
+    Examples:
+
+    \b
+      $ backend.ai mgr permissions provision
+    """
+    from ai.backend.manager.models.base import ensure_all_tables_registered
+    from ai.backend.manager.repositories.db.engine import connect_database
+    from ai.backend.manager.repositories.ops.v2.role_preset.provider import RolePresetOpsProvider
+    from ai.backend.manager.repositories.role_preset.repository import RolePresetRepository
+
+    creator_preset_ids = [seed.id for seed in _load() if seed.name == _CREATOR_PRESET]
+
+    async def _provision() -> None:
+        bootstrap_config = await cli_ctx.get_bootstrap_config()
+        # A standalone CLI process has not imported the full model tree.
+        ensure_all_tables_registered()
+        async with connect_database(bootstrap_config.db) as db:
+            repository = RolePresetRepository(RolePresetOpsProvider(db))
+            await repository.provision_roles(creator_preset_ids)
+
+    asyncio.run(_provision())
+    print("Provisioned the preset roles.")
 
 
 if __name__ == "__main__":

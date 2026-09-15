@@ -1,7 +1,7 @@
-"""The migration writes the rows the fixture holds, down to the id.
+"""The migration writes the presets the fixture holds, down to the id.
 
-A database seeded from the fixture and one carried here by the migration have to end
-up the same, or the seed says one thing and a running system another.
+A database seeded from the fixture and one carried here by the migration have to hold
+the same presets, or the seed says one thing and a running system another.
 """
 
 from __future__ import annotations
@@ -33,10 +33,8 @@ def user_owner_migration() -> Any:
 
 @pytest.fixture(scope="module")
 def fixture() -> dict[str, Any]:
-    base = _REPOSITORY / "fixtures/manager"
-    loaded: dict[str, Any] = {}
-    for name in ("example-role-presets.json", "example-roles.json"):
-        loaded.update(json.loads((base / name).read_text(encoding="utf-8")))
+    path = _REPOSITORY / "fixtures/manager/example-role-presets.json"
+    loaded: dict[str, Any] = json.loads(path.read_text(encoding="utf-8"))
     return loaded
 
 
@@ -79,36 +77,11 @@ class TestMigrationMatchesFixture:
         }
         assert written == seeded
 
-    def test_role_permissions(self, migration: Any, fixture: dict[str, Any]) -> None:
-        by_preset = {preset.id: preset for preset in migration._PRESETS}
-        written = {
-            (
-                migration._identify("permission", role["id"], entity_type, str(bit)),
-                role["id"],
-                entity_type,
-                bit,
-            )
-            for role in fixture["roles"]
-            for entity_type, bits in by_preset[role["role_preset_id"]].grants
-            for bit in bits
-        }
-        seeded = {
-            (row["id"], row["role_id"], row["entity_type"], row["permission"])
-            for row in fixture["permissions"]
-        }
-        assert written == seeded
-
-    def test_every_role_names_a_declared_preset(
-        self, migration: Any, fixture: dict[str, Any]
-    ) -> None:
-        declared = {preset.id for preset in migration._PRESETS}
-        assert {role["role_preset_id"] for role in fixture["roles"]} <= declared
-
 
 class TestEntityTypeSweep:
     def test_the_seed_names_only_kept_types(self, migration: Any, fixture: dict[str, Any]) -> None:
-        """What the sweep keeps covers what the seed writes, or it deletes the seed."""
-        named = {row["entity_type"] for row in fixture["permissions"]}
+        """What the sweep keeps covers what the presets grant, or it deletes the grants."""
+        named = {row["entity_type"] for row in fixture["role_permission_presets"]}
         assert named <= migration._ENTITY_TYPES
 
     def test_the_retired_names_are_not_kept(self, migration: Any) -> None:
@@ -119,15 +92,6 @@ class TestEntityTypeSweep:
 
 
 class TestPresetMapping:
-    def test_every_seed_role_maps_to_the_preset_it_carries(
-        self, migration: Any, fixture: dict[str, Any]
-    ) -> None:
-        for role in fixture["roles"]:
-            assert (
-                migration._preset_for(role["scope_type"], role["scope_id"], role["name"])
-                == role["role_preset_id"]
-            ), role["name"]
-
     @pytest.mark.parametrize(
         ("scope_type", "name"),
         [
@@ -146,4 +110,37 @@ class TestPresetMapping:
     ) -> None:
         """A name the earlier migrations never wrote is not one of theirs, whatever it
         ends in."""
+        assert migration._preset_for(scope_type, str(uuid.uuid4()), name) is None
+
+    @pytest.mark.parametrize(
+        ("scope_type", "name", "preset_name"),
+        [
+            ("domain", "domain-default-admin", "domain_admin"),
+            ("project", "project-{short}-admin", "project_admin"),
+            ("project", "project-{short}-member", "project_member"),
+            ("user", "user-{short}", "user_owner"),
+        ],
+    )
+    def test_the_runtime_names_map_to_their_preset(
+        self, migration: Any, scope_type: str, name: str, preset_name: str
+    ) -> None:
+        """The runtime named the roles it made before presets did."""
+        scope_id = str(uuid.uuid4())
+        preset_id = next(p.id for p in migration._PRESETS if p.name == preset_name)
+        assert (
+            migration._preset_for(scope_type, scope_id, name.format(short=scope_id[:8]))
+            == preset_id
+        )
+
+    @pytest.mark.parametrize(
+        ("scope_type", "name"),
+        [
+            ("project", "project-00000000-admin"),
+            ("user", "user-00000000"),
+            ("domain", "domain-default-member"),
+        ],
+    )
+    def test_a_runtime_name_of_another_scope_maps_to_nothing(
+        self, migration: Any, scope_type: str, name: str
+    ) -> None:
         assert migration._preset_for(scope_type, str(uuid.uuid4()), name) is None
