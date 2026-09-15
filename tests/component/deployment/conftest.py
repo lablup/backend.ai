@@ -104,6 +104,10 @@ def deployment_processors(
     processor_registry: ProcessorRegistry[Any],
 ) -> DeploymentProcessors:
     """Real DeploymentProcessors with real DeploymentService and DeploymentRepository."""
+    # The model folders these tests create are not in the graph, so the requester's
+    # permission is not enforced here.
+    rbac_off = MagicMock()
+    rbac_off.config.manager.rbac.enforcement_enabled = False
     repo = DeploymentRepository(
         database_engine,
         ReconcileOpsProvider(database_engine),
@@ -111,6 +115,7 @@ def deployment_processors(
         valkey_clients.stat,
         valkey_clients.live,
         valkey_clients.schedule,
+        RbacPermissionCheckRepository(PermissionOpsProvider(database_engine), rbac_off),
     )
     scheduler_repository = SchedulerRepository(
         database_engine,

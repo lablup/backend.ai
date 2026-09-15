@@ -334,6 +334,7 @@ class TestLegacyExtraMountsHydration:
             valkey_stat=AsyncMock(),
             valkey_live=AsyncMock(),
             valkey_schedule=AsyncMock(),
+            permission_check=AsyncMock(),
         )
 
     async def test_legacy_vfolder_mount_shape_hydrates_to_canonical_fields(

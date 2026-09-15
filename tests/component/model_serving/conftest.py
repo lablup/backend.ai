@@ -61,6 +61,7 @@ def model_serving_processors(
         valkey_clients.stat,
         valkey_clients.live,
         valkey_clients.schedule,
+        RbacPermissionCheckRepository(PermissionOpsProvider(database_engine), config_provider),
     )
     service = ModelServingService(
         agent_registry=AsyncMock(),
@@ -123,6 +124,7 @@ def deployment_processors(
         valkey_clients.stat,
         valkey_clients.live,
         valkey_clients.schedule,
+        MagicMock(),
     )
     deployment_controller = AsyncMock()
     service = DeploymentService(
