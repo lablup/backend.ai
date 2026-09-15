@@ -138,41 +138,25 @@ class KeypairResourcePolicyConditions:
 
     @staticmethod
     def by_cursor_forward(cursor_name: str) -> QueryCondition:
-        """Rows after the cursor row in ``(created_at DESC, name ASC)`` order."""
-
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            cursor_created_at = (
+            subquery = (
                 sa.select(KeyPairResourcePolicyRow.created_at)
                 .where(KeyPairResourcePolicyRow.name == cursor_name)
                 .scalar_subquery()
             )
-            return sa.or_(
-                KeyPairResourcePolicyRow.created_at < cursor_created_at,
-                sa.and_(
-                    KeyPairResourcePolicyRow.created_at == cursor_created_at,
-                    KeyPairResourcePolicyRow.name > cursor_name,
-                ),
-            )
+            return KeyPairResourcePolicyRow.created_at < subquery
 
         return inner
 
     @staticmethod
     def by_cursor_backward(cursor_name: str) -> QueryCondition:
-        """Rows before the cursor row in ``(created_at DESC, name ASC)`` order."""
-
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            cursor_created_at = (
+            subquery = (
                 sa.select(KeyPairResourcePolicyRow.created_at)
                 .where(KeyPairResourcePolicyRow.name == cursor_name)
                 .scalar_subquery()
             )
-            return sa.or_(
-                KeyPairResourcePolicyRow.created_at > cursor_created_at,
-                sa.and_(
-                    KeyPairResourcePolicyRow.created_at == cursor_created_at,
-                    KeyPairResourcePolicyRow.name < cursor_name,
-                ),
-            )
+            return KeyPairResourcePolicyRow.created_at > subquery
 
         return inner
 
@@ -275,41 +259,25 @@ class UserResourcePolicyConditions:
 
     @staticmethod
     def by_cursor_forward(cursor_name: str) -> QueryCondition:
-        """Rows after the cursor row in ``(created_at DESC, name ASC)`` order."""
-
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            cursor_created_at = (
+            subquery = (
                 sa.select(UserResourcePolicyRow.created_at)
                 .where(UserResourcePolicyRow.name == cursor_name)
                 .scalar_subquery()
             )
-            return sa.or_(
-                UserResourcePolicyRow.created_at < cursor_created_at,
-                sa.and_(
-                    UserResourcePolicyRow.created_at == cursor_created_at,
-                    UserResourcePolicyRow.name > cursor_name,
-                ),
-            )
+            return UserResourcePolicyRow.created_at < subquery
 
         return inner
 
     @staticmethod
     def by_cursor_backward(cursor_name: str) -> QueryCondition:
-        """Rows before the cursor row in ``(created_at DESC, name ASC)`` order."""
-
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            cursor_created_at = (
+            subquery = (
                 sa.select(UserResourcePolicyRow.created_at)
                 .where(UserResourcePolicyRow.name == cursor_name)
                 .scalar_subquery()
             )
-            return sa.or_(
-                UserResourcePolicyRow.created_at > cursor_created_at,
-                sa.and_(
-                    UserResourcePolicyRow.created_at == cursor_created_at,
-                    UserResourcePolicyRow.name < cursor_name,
-                ),
-            )
+            return UserResourcePolicyRow.created_at > subquery
 
         return inner
 
@@ -406,40 +374,24 @@ class ProjectResourcePolicyConditions:
 
     @staticmethod
     def by_cursor_forward(cursor_name: str) -> QueryCondition:
-        """Rows after the cursor row in ``(created_at DESC, name ASC)`` order."""
-
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            cursor_created_at = (
+            subquery = (
                 sa.select(ProjectResourcePolicyRow.created_at)
                 .where(ProjectResourcePolicyRow.name == cursor_name)
                 .scalar_subquery()
             )
-            return sa.or_(
-                ProjectResourcePolicyRow.created_at < cursor_created_at,
-                sa.and_(
-                    ProjectResourcePolicyRow.created_at == cursor_created_at,
-                    ProjectResourcePolicyRow.name > cursor_name,
-                ),
-            )
+            return ProjectResourcePolicyRow.created_at < subquery
 
         return inner
 
     @staticmethod
     def by_cursor_backward(cursor_name: str) -> QueryCondition:
-        """Rows before the cursor row in ``(created_at DESC, name ASC)`` order."""
-
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            cursor_created_at = (
+            subquery = (
                 sa.select(ProjectResourcePolicyRow.created_at)
                 .where(ProjectResourcePolicyRow.name == cursor_name)
                 .scalar_subquery()
             )
-            return sa.or_(
-                ProjectResourcePolicyRow.created_at > cursor_created_at,
-                sa.and_(
-                    ProjectResourcePolicyRow.created_at == cursor_created_at,
-                    ProjectResourcePolicyRow.name < cursor_name,
-                ),
-            )
+            return ProjectResourcePolicyRow.created_at > subquery
 
         return inner

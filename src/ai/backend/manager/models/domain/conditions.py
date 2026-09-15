@@ -299,41 +299,35 @@ class DomainConditions:
 
     @staticmethod
     def by_cursor_forward(cursor_name: str) -> QueryCondition:
-        """Rows after the cursor row in ``(created_at DESC, name ASC)`` order."""
+        """Cursor condition for forward pagination (after cursor).
+
+        Uses subquery to get created_at of the cursor row and compare.
+        """
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            cursor_created_at = (
+            subquery = (
                 sa.select(DomainRow.created_at)
                 .where(DomainRow.name == cursor_name)
                 .scalar_subquery()
             )
-            return sa.or_(
-                DomainRow.created_at < cursor_created_at,
-                sa.and_(
-                    DomainRow.created_at == cursor_created_at,
-                    DomainRow.name > cursor_name,
-                ),
-            )
+            return DomainRow.created_at < subquery
 
         return inner
 
     @staticmethod
     def by_cursor_backward(cursor_name: str) -> QueryCondition:
-        """Rows before the cursor row in ``(created_at DESC, name ASC)`` order."""
+        """Cursor condition for backward pagination (before cursor).
+
+        Uses subquery to get created_at of the cursor row and compare.
+        """
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            cursor_created_at = (
+            subquery = (
                 sa.select(DomainRow.created_at)
                 .where(DomainRow.name == cursor_name)
                 .scalar_subquery()
             )
-            return sa.or_(
-                DomainRow.created_at > cursor_created_at,
-                sa.and_(
-                    DomainRow.created_at == cursor_created_at,
-                    DomainRow.name < cursor_name,
-                ),
-            )
+            return DomainRow.created_at > subquery
 
         return inner
 
