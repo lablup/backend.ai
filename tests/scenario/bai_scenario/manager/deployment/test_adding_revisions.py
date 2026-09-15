@@ -393,8 +393,8 @@ class TheSuperadminAddsToAnothers(
     @override
     def describe(self) -> str:
         return (
-            "배포 권한을 받지 않았지만 자기 모델 폴더를 읽을 수 있는 슈퍼관리자가 남의 배포에 "
-            "리비전을 더하면, 리비전이 더해진다. 역할이 배포 권한 검사를 지나간다"
+            "배포에도 자기 모델 폴더에도 권한을 받지 않은 슈퍼관리자가 남의 배포에 리비전을 "
+            "더하면, 리비전이 더해진다. 역할이 배포 권한과 폴더 권한을 함께 지나간다"
         )
 
     @override
@@ -411,23 +411,23 @@ class TheSuperadminAddsToAnothers(
 
 
 @dataclass(frozen=True)
-class TheSuperadminMayNotMountAFolderTheyCannotReach(
+class AFolderTheCallerMayNotReadIsNotFound(
     Scenario[SeedingSession, RevisionsAndACaller, DeploymentAdapter, RevisionNode]
 ):
     @override
     def summary(self) -> str:
-        return "the-superadmin-may-not-mount-a-folder-they-may-not-read"
+        return "a-model-folder-the-caller-may-not-read-is-not-found"
 
     @override
     def describe(self) -> str:
         return (
-            "모델 폴더를 읽을 권한이 없는 슈퍼관리자가 그 폴더로 리비전을 더하면, 폴더를 찾을 "
-            "수 없다는 이유로 거부된다. 폴더 마운트에는 역할이 지나가지 않는다"
+            "배포 생성 권한은 받았지만 모델 폴더를 읽을 권한이 없는 사용자가 그 폴더로 리비전을 "
+            "더하면, 폴더를 찾을 수 없다는 이유로 거부된다"
         )
 
     @override
     def given(self) -> Given[SeedingSession, RevisionsAndACaller]:
-        return AnothersDeploymentToRevise(folder_readable=False)
+        return ADeploymentToRevise(granted=(Permission.CREATE,), folder_readable=False)
 
     @override
     def when(self) -> When[RevisionsAndACaller, DeploymentAdapter, RevisionNode]:
@@ -449,7 +449,7 @@ SCENARIOS: list[AddingStep] = [
     AMissingRequiredSlotIsRefused(),
     AReadGrantDoesNotAdd(),
     TheSuperadminAddsToAnothers(started=datetime.now(UTC)),
-    TheSuperadminMayNotMountAFolderTheyCannotReach(),
+    AFolderTheCallerMayNotReadIsNotFound(),
 ]
 
 

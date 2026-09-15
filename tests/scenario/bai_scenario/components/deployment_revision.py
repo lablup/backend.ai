@@ -4,7 +4,7 @@ A revision is a row a deployment owns, so every table lays a deployment first an
 authorizes through it. A revision also stands on an image, a model folder, a runtime
 variant and the slot types it allocates; those are laid together. The model folder is
 the caller's own, and whether the caller may read it is the row's to say: the mount is
-granted from those bits, and no role passes over them.
+granted from the bits held on it. A superadmin holds every bit on it without a grant.
 """
 
 from __future__ import annotations
@@ -197,12 +197,14 @@ def _revisions_and_a_caller(
 class ADeploymentToRevise(Given[Any, RevisionsAndACaller]):
     """배포 하나와 거기 딸린 리비전들, 그리고 그 프로젝트 안의 사용자 한 명.
 
-    모델 폴더는 부르는 사람의 것이고, 부르는 사람은 그 폴더를 읽을 수만 있다.
+    모델 폴더는 부르는 사람의 것이다. ``folder_readable``이면 부르는 사람은 그 폴더를 읽을
+    수만 있고, 거짓이면 그 폴더에 아무 권한도 없다.
     """
 
     granted: tuple[Permission, ...] = ()
     role: UserRole = UserRole.USER
     revisions: int = 0
+    folder_readable: bool = True
     cpu_required: bool = False
 
     @override
@@ -212,16 +214,19 @@ class ADeploymentToRevise(Given[Any, RevisionsAndACaller]):
             if self.granted
             else "아무 배포 권한도 받지 않은 사용자 한 명"
         )
-        return (
-            f"리비전 {self.revisions}개가 딸린 배포 하나와, 자기 모델 폴더를 읽을 수만 있는 {who}"
-        )
+        folder = "읽을 수만 있는" if self.folder_readable else "읽을 권한이 없는"
+        return f"리비전 {self.revisions}개가 딸린 배포 하나와, 자기 모델 폴더를 {folder} {who}"
 
     @override
     async def lay(self, seeding: Any) -> RevisionsAndACaller:
         place = await lay_a_place(seeding, granted=self.granted, role=self.role)
         deployment = await lay_a_deployment(seeding, place)
         materials = await seeding.within(
-            WhatARevisionStandsOn(place.caller, cpu_required=self.cpu_required)
+            WhatARevisionStandsOn(
+                place.caller,
+                folder_readable=self.folder_readable,
+                cpu_required=self.cpu_required,
+            )
         )
         made = await lay_revisions(seeding, place, deployment, materials, self.revisions)
         return _revisions_and_a_caller(seeding, place, deployment, materials, made)
@@ -229,19 +234,16 @@ class ADeploymentToRevise(Given[Any, RevisionsAndACaller]):
 
 @dataclass(frozen=True)
 class AnothersDeploymentToRevise(Given[Any, RevisionsAndACaller]):
-    """다른 사람이 만든 리비전 없는 배포와, 배포 권한을 받지 않은 슈퍼관리자.
+    """다른 사람이 만든 리비전 없는 배포와, 아무 권한도 받지 않은 슈퍼관리자.
 
-    모델 폴더는 슈퍼관리자 자신의 것이다. ``folder_readable``이 거짓이면 그 폴더를 읽을
-    권한이 없다. 폴더 마운트에는 역할이 지나가지 않는지 보는 자리다.
+    모델 폴더는 슈퍼관리자 자신의 것이지만 그 폴더에도 권한을 심지 않는다. 역할이 배포
+    권한과 폴더 권한을 함께 지나가는지 보는 자리다.
     """
-
-    folder_readable: bool = True
 
     @override
     def describe(self) -> str:
-        folder = "읽을 수 있는" if self.folder_readable else "읽을 권한이 없는"
         return (
-            f"다른 사람이 만든 배포 하나와, 배포 권한은 없고 자기 모델 폴더를 {folder} 슈퍼관리자"
+            "다른 사람이 만든 배포 하나와, 배포에도 자기 모델 폴더에도 권한을 받지 않은 슈퍼관리자"
         )
 
     @override
@@ -255,9 +257,7 @@ class AnothersDeploymentToRevise(Given[Any, RevisionsAndACaller]):
             caller=other,
         )
         deployment = await lay_a_deployment(seeding, theirs, name_hint="theirs")
-        materials = await seeding.within(
-            WhatARevisionStandsOn(place.caller, folder_readable=self.folder_readable)
-        )
+        materials = await seeding.within(WhatARevisionStandsOn(place.caller, folder_readable=False))
         return _revisions_and_a_caller(seeding, place, deployment, materials)
 
 
