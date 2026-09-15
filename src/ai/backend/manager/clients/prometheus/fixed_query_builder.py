@@ -40,8 +40,8 @@ _DIFF_TEMPLATE: Final[str] = (
 )
 _LIVE_STAT_MAX_TEMPLATE: Final[str] = "max_over_time((" + _GAUGE_TEMPLATE + ")[${{window}}:])"
 _LIVE_STAT_AVG_TEMPLATE: Final[str] = "avg_over_time((" + _GAUGE_TEMPLATE + ")[${{window}}:])"
-_LIVE_STAT_RATE_MAX_TEMPLATE: Final[str] = "max_over_time((" + _IRATE_TEMPLATE + ")[${{window}}:])"
-_LIVE_STAT_RATE_AVG_TEMPLATE: Final[str] = "avg_over_time((" + _IRATE_TEMPLATE + ")[${{window}}:])"
+_LIVE_STAT_IRATE_MAX_TEMPLATE: Final[str] = "max_over_time((" + _IRATE_TEMPLATE + ")[${{window}}:])"
+_LIVE_STAT_IRATE_AVG_TEMPLATE: Final[str] = "avg_over_time((" + _IRATE_TEMPLATE + ")[${{window}}:])"
 _INSTANT_GROUP_BY: Final[frozenset[str]] = frozenset({
     "kernel_id",
     "container_metric_name",
@@ -176,7 +176,7 @@ class ContainerLiveStatQueryBuilder:
                 window=self._timewindow,
             ),
             rate_max=MetricPreset(
-                template=_LIVE_STAT_RATE_MAX_TEMPLATE,
+                template=_LIVE_STAT_IRATE_MAX_TEMPLATE,
                 labels=rate_labels,
                 group_by=_AGGREGATED_GROUP_BY,
                 window=self._timewindow,
@@ -188,7 +188,7 @@ class ContainerLiveStatQueryBuilder:
                 window=self._timewindow,
             ),
             rate_avg=MetricPreset(
-                template=_LIVE_STAT_RATE_AVG_TEMPLATE,
+                template=_LIVE_STAT_IRATE_AVG_TEMPLATE,
                 labels=rate_labels,
                 group_by=_AGGREGATED_GROUP_BY,
                 window=self._timewindow,
