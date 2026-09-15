@@ -38,12 +38,16 @@ from ai.backend.manager.models.deployment_revision_preset.searchers import (
     PresetResourceSlotSearcher,
 )
 from ai.backend.manager.models.deployment_revision_preset.updaters import DeploymentPresetUpdater
+from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.entity_label.row import EntityLabelRow
+from ai.backend.manager.models.entity_share.row import EntityShareRow
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.rbac_models.role import RoleRow
+from ai.backend.manager.models.resource_policy import UserResourcePolicyRow
 from ai.backend.manager.models.resource_slot.row import PresetResourceSlotRow, ResourceSlotTypeRow
 from ai.backend.manager.models.runtime_variant.row import RuntimeVariantRow
 from ai.backend.manager.models.specs.pagination import NoPagination
+from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
 from ai.backend.manager.models.virtual_entity.entity_membership_cap import (
@@ -116,6 +120,10 @@ async def database(
             ResourceSlotTypeRow,
             DeploymentRevisionPresetRow,
             PresetResourceSlotRow,
+            DomainRow,
+            UserResourcePolicyRow,
+            UserRow,
+            EntityShareRow,
         ],
     ):
         async with database_connection.begin_session() as session:

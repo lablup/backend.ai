@@ -64,6 +64,7 @@ from ai.backend.manager.models.deployment_revision.row import DeploymentRevision
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.endpoint import EndpointLifecycle, EndpointRow, EndpointTokenRow
 from ai.backend.manager.models.entity_label.row import EntityLabelRow
+from ai.backend.manager.models.entity_share.row import EntityShareRow
 from ai.backend.manager.models.error_log.row import ErrorLogRow
 from ai.backend.manager.models.event_log.row import EventLogRow
 from ai.backend.manager.models.hasher.types import PasswordInfo
@@ -495,7 +496,17 @@ class TestTerminalStateFilter:
     ) -> AsyncIterator[ExtendedAsyncSAEngine]:
         async with with_tables(
             database_connection,
-            [RoleRow, VirtualEntityRow, EntityMembershipRow, ScopeBindingRow, EntityLabelRow],
+            [
+                DomainRow,
+                UserResourcePolicyRow,
+                UserRow,
+                RoleRow,
+                VirtualEntityRow,
+                EntityMembershipRow,
+                ScopeBindingRow,
+                EntityLabelRow,
+                EntityShareRow,
+            ],
         ):
             yield database_connection
 
@@ -632,6 +643,8 @@ class TestSessionsRetention:
                 RetentionPolicyRow,
                 VirtualEntityRow,
                 EntityLabelRow,
+                RoleRow,
+                EntityShareRow,
             ],
         ):
             yield database_connection
@@ -1002,6 +1015,10 @@ class TestDeploymentsRetention:
                 EndpointTokenRow,
                 VirtualEntityRow,
                 EntityLabelRow,
+                UserResourcePolicyRow,
+                UserRow,
+                RoleRow,
+                EntityShareRow,
             ],
         ):
             yield database_connection
@@ -1214,6 +1231,8 @@ class TestDeploymentsTerminalChildCleanup:
                 RoutingRow,
                 VirtualEntityRow,
                 EntityLabelRow,
+                RoleRow,
+                EntityShareRow,
             ],
         ):
             yield database_connection
@@ -1455,6 +1474,8 @@ class TestDeploymentsSessionGroupCleanup:
                 RoutingRow,
                 VirtualEntityRow,
                 EntityLabelRow,
+                RoleRow,
+                EntityShareRow,
             ],
         ):
             yield database_connection
