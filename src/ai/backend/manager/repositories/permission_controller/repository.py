@@ -1,14 +1,13 @@
 from __future__ import annotations
 
 import uuid
-from collections.abc import Collection, Mapping, Sequence
+from collections.abc import Sequence
 
 from ai.backend.common.data.entity.domain import DomainEntityType
 from ai.backend.common.data.entity.project import ProjectEntityType
 from ai.backend.common.data.entity.role import RoleID
 from ai.backend.common.data.entity.types import EntityType
 from ai.backend.common.data.entity.user import UserEntityType, UserID
-from ai.backend.common.data.permission.types import Permission
 from ai.backend.common.exception import BackendAIError
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
@@ -34,10 +33,6 @@ from ai.backend.manager.data.permission.role import (
 )
 from ai.backend.manager.data.permission.types import (
     ScopeListResult,
-)
-from ai.backend.manager.data.permission.virtual_entity import (
-    GovernCheckKey,
-    OwnCheckKey,
 )
 from ai.backend.manager.models.rbac_models.permission.creators import RolePermissionCreator
 from ai.backend.manager.models.rbac_models.permission.purgers import RolePermissionPurger
@@ -235,21 +230,3 @@ class PermissionControllerRepository:
                 raise NotImplementedError(
                     "This function will be deprecated and new repository functions will be implemented for each scope"
                 )
-
-    @permission_controller_repository_resilience.apply()
-    async def owned_permissions(
-        self,
-        keys: Collection[OwnCheckKey],
-    ) -> Mapping[OwnCheckKey, Permission]:
-        """The bits each user holds on each entity through own and govern; a key
-        nothing reaches maps to :attr:`Permission.NONE`."""
-        return await self._db_source.owned_permissions(keys)
-
-    @permission_controller_repository_resilience.apply()
-    async def governed_permissions(
-        self,
-        keys: Collection[GovernCheckKey],
-    ) -> Mapping[GovernCheckKey, Permission]:
-        """The bits each user holds on the key's entity type within the key's scope;
-        a key nothing reaches maps to :attr:`Permission.NONE`."""
-        return await self._db_source.governed_permissions(keys)

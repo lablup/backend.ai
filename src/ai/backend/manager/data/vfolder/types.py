@@ -90,6 +90,18 @@ class VFolderMountPermission(enum.StrEnum):
             ):
                 return Permission.READ | Permission.UPDATE | Permission.SOFT_DELETE
 
+    @classmethod
+    def from_rbac(cls, permission: Permission) -> VFolderMountPermission:
+        """The mount permission the RBAC bits held on a folder answer as.
+
+        Callers pass bits that cover ``READ``; a folder held without it is not mounted.
+        """
+        if permission.covers(Permission.HARD_DELETE):
+            return cls.RW_DELETE
+        if permission.covers(Permission.UPDATE):
+            return cls.READ_WRITE
+        return cls.READ_ONLY
+
 
 class VFolderInvitationState(enum.StrEnum):
     """
@@ -280,27 +292,6 @@ class VFolderCreation:
     vfolder: VFolderData
     max_quota_scope_size: int
     container_uid: int | None
-
-
-@dataclass
-class VFolderAccessInfo:
-    """
-    Information about VFolder access for query results.
-    """
-
-    vfolder_data: VFolderData
-    is_owner: bool
-    effective_permission: VFolderMountPermission | None
-
-
-@dataclass
-class VFolderListResult:
-    """
-    Result of VFolder list operations with pagination support.
-    """
-
-    vfolders: list[VFolderAccessInfo]
-    total_count: int | None = None
 
 
 @dataclass

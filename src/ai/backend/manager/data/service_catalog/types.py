@@ -6,12 +6,12 @@ from typing import Any, override
 from uuid import UUID
 
 from ai.backend.common.data.entity.service_catalog import ServiceCatalogID
-from ai.backend.common.data.entity.types import EntityData, EntityIdentifier
+from ai.backend.common.data.entity.types import EntityData, EntityIdentifier, FieldData
 from ai.backend.common.types import ServiceCatalogStatus
 
 
 @dataclass
-class ServiceCatalogEndpointData:
+class ServiceCatalogEndpointData(FieldData):
     id: ServiceCatalogID
     service_id: UUID
     role: str

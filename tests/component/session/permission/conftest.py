@@ -56,14 +56,16 @@ def processor_registry(
     config_provider: ManagerConfigProvider,
 ) -> ProcessorRegistry[Any]:
     """The registry the session processors are built from, with the real RBAC validators."""
-    permission_repo = RbacPermissionCheckRepository(PermissionOpsProvider(database_engine))
+    permission_repo = RbacPermissionCheckRepository(
+        PermissionOpsProvider(database_engine), config_provider
+    )
     validators = VirtualEntityRBACValidators(
         scope=VirtualEntityScopeActionRBACValidator(permission_repo, config_provider),
         single_entity=VirtualEntitySingleEntityActionRBACValidator(
             permission_repo, config_provider
         ),
-        partial_bulk=VirtualEntityPartialBulkActionRBACValidator(permission_repo, config_provider),
-        atomic_bulk=VirtualEntityAtomicBulkActionRBACValidator(permission_repo, config_provider),
+        partial_bulk=VirtualEntityPartialBulkActionRBACValidator(permission_repo),
+        atomic_bulk=VirtualEntityAtomicBulkActionRBACValidator(permission_repo),
         relation=VirtualEntityRelationActionRBACValidator(permission_repo, config_provider),
     )
     return ProcessorRegistry(

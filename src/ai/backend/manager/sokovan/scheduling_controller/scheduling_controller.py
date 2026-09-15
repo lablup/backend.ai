@@ -10,6 +10,7 @@ from ai.backend.common.contexts.user import current_user
 from ai.backend.common.data.entity.image import ImageID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.data.entity.resource_slot import ResourceSlotName
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.defs import RESERVED_VFOLDER_PATTERNS, RESERVED_VFOLDERS
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.events.event_types.session.broadcast import SchedulingBroadcastEvent
@@ -195,17 +196,17 @@ class SchedulingController:
         resource_group_id = draft.scope.resource_group_id
         if resource_group_id is None:
             return
-        domain_name = str(draft.scope.domain_name) if draft.scope.domain_name else None
+        domain_id = draft.scope.domain_id
         project_id = draft.scope.project_id
-        access_key = draft.resource_spec.identity.access_key
-        if access_key is None or domain_name is None or project_id is None:
+        user_uuid = draft.resource_spec.identity.user_uuid
+        if user_uuid is None or domain_id is None or project_id is None:
             raise InternalServerError(
                 "Unreachable: resource_group_id supplied without identity context",
             )
         accessible_rg_ids = await self._repository.query_accessible_resource_group_ids(
-            domain_name=domain_name,
+            domain_id=domain_id,
             project_id=project_id,
-            access_key=access_key,
+            user_id=UserID(user_uuid),
         )
         if resource_group_id not in accessible_rg_ids:
             rg_label = draft.scope.resource_group_name or resource_group_id

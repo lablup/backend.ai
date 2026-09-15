@@ -8,7 +8,7 @@ import sys
 from collections import Counter
 from collections.abc import Sequence
 from pathlib import Path
-from typing import Final
+from typing import Any, Final
 
 import click
 from tabulate import tabulate
@@ -320,8 +320,15 @@ def operations(role: str, verdict: str | None, entity: str | None, output: str) 
 
 # The checkout this command reads the account fixtures from and writes the seed to.
 _REPOSITORY: Final[Path] = Path(__file__).resolve().parents[5]
-# The installer fixture of the same name is a symlink to this one.
-_TARGETS: Final[tuple[Path, ...]] = (Path("fixtures/manager/example-roles.json"),)
+# The installer fixtures of the same names are symlinks to these. The presets are
+# populated before the roles that name them.
+_PRESETS_TARGET: Final[Path] = Path("fixtures/manager/example-role-presets.json")
+_ROLES_TARGET: Final[Path] = Path("fixtures/manager/example-roles.json")
+
+
+def _render(seeds: Sequence[RoleSeed], root: Path) -> dict[Path, dict[str, Any]]:
+    fixture = RoleFixture(seeds, root / "fixtures" / "manager")
+    return {_PRESETS_TARGET: fixture.render_presets(), _ROLES_TARGET: fixture.render_roles()}
 
 
 @cli.command(name="emit")
@@ -334,10 +341,10 @@ _TARGETS: Final[tuple[Path, ...]] = (Path("fixtures/manager/example-roles.json")
 @click.option("--check", is_flag=True, help="Report whether the files are current, write nothing.")
 def emit(repository: Path | None, check: bool) -> None:
     """
-    Write the seed fixture from the role files and the account fixtures.
+    Write the seed fixtures from the role files and the account fixtures.
 
-    The written file is generated: edit the role files and run this, never the JSON.
-    Users, projects and the domain come from the account fixtures beside the target, so
+    The written files are generated: edit the role files and run this, never the JSON.
+    Users, projects and the domain come from the account fixtures beside the targets, so
     they are stated in one place.
 
     Examples:
@@ -347,20 +354,25 @@ def emit(repository: Path | None, check: bool) -> None:
       $ backend.ai mgr permissions emit --check
     """
     root = repository if repository is not None else _REPOSITORY
-    rendered = RoleFixture(_load(), root / "fixtures" / "manager").render()
-    body = json.dumps(rendered, indent=4) + "\n"
-    stale = [target for target in _TARGETS if (root / target).read_text(encoding="utf-8") != body]
-    for table, rows in rendered.items():
-        if not table.startswith("__"):
-            print(f"{len(rows):5d} {table}")
+    rendered = _render(_load(), root)
+    for tables in rendered.values():
+        for table, rows in tables.items():
+            if not table.startswith("__"):
+                print(f"{len(rows):5d} {table}")
+    bodies = {target: json.dumps(tables, indent=4) + "\n" for target, tables in rendered.items()}
+    stale = [
+        target
+        for target, body in bodies.items()
+        if not (root / target).exists() or (root / target).read_text(encoding="utf-8") != body
+    ]
     if check:
         if stale:
             for target in stale:
                 print(f"stale: {target}")
             raise SystemExit(len(stale))
-        print("The written fixture is what the declaration renders.")
+        print("The written fixtures are what the declaration renders.")
         return
-    for target in _TARGETS:
+    for target, body in bodies.items():
         (root / target).write_text(body, encoding="utf-8")
         print(f"wrote {target}")
 

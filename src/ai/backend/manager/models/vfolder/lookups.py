@@ -1,21 +1,64 @@
-"""Lookup implementations for the vfolder_permissions table, a field of its vfolder."""
+"""Lookup implementations for vfolders and the vfolder_permissions table."""
 
 from __future__ import annotations
 
 import uuid
+from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Any, override
 from uuid import UUID
 
 import sqlalchemy as sa
 
-from ai.backend.common.data.entity.types import FieldType
-from ai.backend.common.data.entity.vfolder import VFolderUUID
+from ai.backend.common.data.entity.types import EntityType, FieldType
+from ai.backend.common.data.entity.vfolder import VFolderEntityType, VFolderUUID
 from ai.backend.common.data.entity.vfolder_permission import VFolderPermissionID
-from ai.backend.manager.models.specs.lookup import FieldKeyLookup
-from ai.backend.manager.models.vfolder.row import VFolderPermissionRow
+from ai.backend.manager.models.clauses import QueryCondition
+from ai.backend.manager.models.scopes import OperationScope
+from ai.backend.manager.models.specs.lookup import DataLookup, FieldKeyLookup
+from ai.backend.manager.models.vfolder.row import (
+    VFolderPermissionRow,
+    VFolderRow,
+    VFolderStatusSet,
+    vfolder_status_map,
+)
 
-__all__ = ("VFolderMountPermissionLookup",)
+__all__ = (
+    "VFolderMountPermissionLookup",
+    "VFolderNameLookup",
+)
+
+
+@dataclass
+class VFolderNameLookup(DataLookup[VFolderRow, VFolderUUID]):
+    """Resolves a folder name within the scopes, combined with OR, into the folder it names.
+
+    Inaccessible folders are left out, so a name freed by a deleted folder resolves to
+    the live one.
+    """
+
+    scopes: Sequence[OperationScope]
+    name: str
+
+    @override
+    def row_class(self) -> type[VFolderRow]:
+        return VFolderRow
+
+    @override
+    def entity_type(self) -> EntityType:
+        return VFolderEntityType()
+
+    @override
+    def conditions(self) -> Sequence[QueryCondition]:
+        return [
+            lambda: VFolderRow.name == self.name,
+            lambda: VFolderRow.status.not_in(vfolder_status_map[VFolderStatusSet.INACCESSIBLE]),
+            lambda: sa.or_(*(scope.to_condition()() for scope in self.scopes)),
+        ]
+
+    @override
+    def to_entity_id(self, row: VFolderRow) -> VFolderUUID:
+        return VFolderUUID(row.id)
 
 
 @dataclass

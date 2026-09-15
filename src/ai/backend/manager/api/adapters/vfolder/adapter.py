@@ -12,8 +12,10 @@ from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
+from ai.backend.common.data.permission.types import Permission
 from ai.backend.common.data.user.types import UserData
 from ai.backend.common.dto.manager.v2.deployment.request import DeploymentStrategyInput
+from ai.backend.common.dto.manager.v2.rbac.types import PermissionBitDTO
 from ai.backend.common.dto.manager.v2.vfolder.request import (
     BulkDeleteVFoldersInput,
     BulkPurgeVFoldersInput,
@@ -124,6 +126,9 @@ from ai.backend.manager.services.vfolder.actions.base import (
 )
 from ai.backend.manager.services.vfolder.actions.batch_load_by_ids import (
     GlobalBatchLoadVFoldersAction,
+)
+from ai.backend.manager.services.vfolder.actions.bulk_load_permissions import (
+    BulkLoadVFolderPermissionsAction,
 )
 from ai.backend.manager.services.vfolder.actions.create import CreateVFolderAction
 from ai.backend.manager.services.vfolder.actions.file_v2 import (
@@ -275,6 +280,30 @@ class VFolderAdapter(BaseAdapter):
             self._vfolder_data_to_node(item) if item is not None else None
             for item in action_result.data
         ]
+
+    async def batch_load_permissions(
+        self, vfolder_ids: Sequence[VFolderUUID]
+    ) -> list[list[PermissionBitDTO] | Exception]:
+        """The permission bits the caller holds on each vfolder, in the given order.
+
+        A folder the caller may not read answers with its denial.
+        """
+        if not vfolder_ids:
+            return []
+        result = await self._vfolder.bulk_load_permissions.run(
+            BulkLoadVFolderPermissionsAction(vfolder_ids=vfolder_ids)
+        )
+        held = result.values()
+        errors = result.errors()
+        answers: list[list[PermissionBitDTO] | Exception] = []
+        for vfolder_id in vfolder_ids:
+            error = self.batch_load_failure(errors.get(vfolder_id))
+            if error is not None:
+                answers.append(error)
+                continue
+            bits = held.get(vfolder_id, Permission.NONE)
+            answers.append([dto for dto in PermissionBitDTO if bits & Permission[dto.name]])
+        return answers
 
     # -------------------------------------------------------------------------
     # Search

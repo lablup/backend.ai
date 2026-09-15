@@ -28,12 +28,8 @@ def build_action_validators(
         single_entity=VirtualEntitySingleEntityActionRBACValidator(
             permission_check_repository, config_provider
         ),
-        partial_bulk=VirtualEntityPartialBulkActionRBACValidator(
-            permission_check_repository, config_provider
-        ),
-        atomic_bulk=VirtualEntityAtomicBulkActionRBACValidator(
-            permission_check_repository, config_provider
-        ),
+        partial_bulk=VirtualEntityPartialBulkActionRBACValidator(permission_check_repository),
+        atomic_bulk=VirtualEntityAtomicBulkActionRBACValidator(permission_check_repository),
         relation=VirtualEntityRelationActionRBACValidator(
             permission_check_repository, config_provider
         ),

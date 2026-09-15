@@ -24,7 +24,9 @@ from ai.backend.manager.data.prometheus_query_preset import (
     PrometheusQueryPresetData,
 )
 from ai.backend.manager.errors.base.entity import EntityNotFoundError
+from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.entity_label.row import EntityLabelRow
+from ai.backend.manager.models.entity_share.row import EntityShareRow
 from ai.backend.manager.models.prometheus_query_preset import PrometheusQueryPresetRow
 from ai.backend.manager.models.prometheus_query_preset.creators import (
     PrometheusQueryPresetCreator,
@@ -44,7 +46,9 @@ from ai.backend.manager.models.prometheus_query_preset_category import (
 )
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.rbac_models.role import RoleRow
+from ai.backend.manager.models.resource_policy import UserResourcePolicyRow
 from ai.backend.manager.models.specs.pagination import OffsetPagination
+from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
 from ai.backend.manager.models.virtual_entity.entity_membership_cap import (
@@ -85,6 +89,10 @@ class TestPrometheusQueryPresetRepository:
                 PermissionRow,
                 PrometheusQueryPresetCategoryRow,
                 PrometheusQueryPresetRow,
+                DomainRow,
+                UserResourcePolicyRow,
+                UserRow,
+                EntityShareRow,
             ],
         ):
             yield database_connection

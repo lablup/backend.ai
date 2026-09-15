@@ -24,6 +24,7 @@ from ai.backend.manager.dependencies.infrastructure.redis import ValkeyClients
 from ai.backend.manager.models.project import ProjectRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
+from ai.backend.manager.repositories.ops.v2.share.provider import ShareOpsProvider
 from ai.backend.manager.repositories.project.repositories import ProjectRepositories
 from ai.backend.manager.repositories.project.repository import ProjectRepository
 from ai.backend.manager.repositories.template.repository import TemplateRepository
@@ -37,7 +38,7 @@ from ai.backend.manager.services.template.service import TemplateService
 def template_processors(
     database_engine: ExtendedAsyncSAEngine, processor_registry: ProcessorRegistry[Any]
 ) -> TemplateProcessors:
-    repo = TemplateRepository(database_engine)
+    repo = TemplateRepository(database_engine, ShareOpsProvider(database_engine))
     service = TemplateService(repository=repo)
     return TemplateProcessors(
         processor_registry.group(GroupMeta(SessionTemplateEntityType())), service

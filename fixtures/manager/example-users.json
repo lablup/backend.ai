@@ -29,32 +29,6 @@
             "max_network_count": 3
         }
     ],
-    "groups": [
-        {
-            "id": "2de2b969-1d04-48a6-af16-0bc8adb3c831",
-            "name": "default",
-            "description": "The default user group",
-            "is_active": true,
-            "domain_name": "default",
-            "resource_policy": "default",
-            "total_resource_slots": {},
-            "allowed_vfolder_hosts": {},
-            "type": "general",
-            "creator_id": "4f13d193-f646-425a-a340-270c4d2b9860"
-        },
-        {
-            "id": "8e32dd28-d319-4e3b-8851-ea37837699a5",
-            "name": "model-store",
-            "description": "model store project",
-            "is_active": true,
-            "domain_name": "default",
-            "resource_policy": "default",
-            "total_resource_slots": {},
-            "allowed_vfolder_hosts": {},
-            "type": "model-store",
-            "creator_id": "4f13d193-f646-425a-a340-270c4d2b9860"
-        }
-    ],
     "scaling_groups": [
         {
             "id": "4d1e9b32-90c7-5b32-8f0e-6f470b8ed24a",
@@ -153,6 +127,32 @@
             "role": "monitor"
         }
     ],
+    "groups": [
+        {
+            "id": "2de2b969-1d04-48a6-af16-0bc8adb3c831",
+            "name": "default",
+            "description": "The default user group",
+            "is_active": true,
+            "domain_name": "default",
+            "resource_policy": "default",
+            "total_resource_slots": {},
+            "allowed_vfolder_hosts": {},
+            "type": "general",
+            "creator_id": "4f13d193-f646-425a-a340-270c4d2b9860"
+        },
+        {
+            "id": "8e32dd28-d319-4e3b-8851-ea37837699a5",
+            "name": "model-store",
+            "description": "model store project",
+            "is_active": true,
+            "domain_name": "default",
+            "resource_policy": "default",
+            "total_resource_slots": {},
+            "allowed_vfolder_hosts": {},
+            "type": "model-store",
+            "creator_id": "4f13d193-f646-425a-a340-270c4d2b9860"
+        }
+    ],
     "association_groups_users": [
         {
             "group_id": "2de2b969-1d04-48a6-af16-0bc8adb3c831",
@@ -235,6 +235,11 @@
             "id": "5c97d84e-1599-54f2-82cc-28e6b24e285f",
             "entity_type": "user",
             "entity_id": "2e10157d-20ca-4bd0-9806-3f909cbcd0e6"
+        },
+        {
+            "id": "7a0f4c2e-3b91-5d6a-9e84-1c5f2b7d9a63",
+            "entity_type": "resource_group",
+            "entity_id": "4d1e9b32-90c7-5b32-8f0e-6f470b8ed24a"
         }
     ],
     "entity_memberships": [
@@ -337,6 +342,10 @@
         {
             "virtual_entity_id": "5843749e-d1be-56bb-a4c9-7327f7ad30c5",
             "member_entity_id": "5c97d84e-1599-54f2-82cc-28e6b24e285f"
+        },
+        {
+            "virtual_entity_id": "7a0f4c2e-3b91-5d6a-9e84-1c5f2b7d9a63",
+            "member_entity_id": "7a0f4c2e-3b91-5d6a-9e84-1c5f2b7d9a63"
         }
     ],
     "scope_bindings": [
@@ -399,6 +408,10 @@
         {
             "virtual_entity_id": "5c97d84e-1599-54f2-82cc-28e6b24e285f",
             "scope_entity_id": "df651a2a-3138-5cbe-b6d4-081ddb8ae04d"
+        },
+        {
+            "virtual_entity_id": "7a0f4c2e-3b91-5d6a-9e84-1c5f2b7d9a63",
+            "scope_entity_id": "7a0f4c2e-3b91-5d6a-9e84-1c5f2b7d9a63"
         }
     ]
 }

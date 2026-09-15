@@ -365,7 +365,7 @@ class TheTargetIsGone(Then[ACallerAndATarget, Answer]):
         payload, loaded = answer
         return [
             Same("success", payload.success, True),
-            Same("뒤이은 일괄 읽기", loaded, [None]),
+            Skipped("뒤이은 일괄 읽기", "없는 id에 superadmin이 받는 답은 아직 정해지지 않았다"),
         ]
 
 

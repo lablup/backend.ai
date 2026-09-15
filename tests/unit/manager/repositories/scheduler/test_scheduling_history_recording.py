@@ -1079,6 +1079,7 @@ class TestMarkTerminatingSchedulingHistory:
             MagicMock(),
             MagicMock(),
             MagicMock(),
+            MagicMock(),
         )
 
     @pytest.fixture

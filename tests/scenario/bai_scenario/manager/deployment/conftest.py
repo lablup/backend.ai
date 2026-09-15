@@ -30,8 +30,12 @@ from ai.backend.manager.clients.appproxy.client import AppProxyClientPool
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.repositories.deployment.repository import DeploymentRepository
 from ai.backend.manager.repositories.ops.repository import OpsRepository
+from ai.backend.manager.repositories.ops.v2.permission.provider import PermissionOpsProvider
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.ops.v2.reconciler.provider import ReconcileOpsProvider
+from ai.backend.manager.repositories.rbac.permission_check_repository import (
+    RbacPermissionCheckRepository,
+)
 from ai.backend.manager.services.deployment.processors import DeploymentProcessors
 from ai.backend.manager.services.deployment.service import DeploymentService
 from ai.backend.manager.sokovan.deployment.deployment_controller import (
@@ -105,6 +109,7 @@ async def adapter(
         unwired(ValkeyStatClient, "only a live deployment reports its usage"),
         unwired(ValkeyLiveClient, "only a live deployment reports its health"),
         unwired(ValkeyScheduleClient, "the controller holds the one that marks work"),
+        RbacPermissionCheckRepository(PermissionOpsProvider(engine), config),
     )
     controller = DeploymentController(
         DeploymentControllerArgs(

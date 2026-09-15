@@ -111,6 +111,7 @@ class TestVFolderServicePurge:
             vfolder_repository=mock_vfolder_repository,
             user_repository=MagicMock(),
             valkey_stat_client=MagicMock(),
+            own_check=MagicMock(),
         )
 
     @pytest.fixture
@@ -340,6 +341,7 @@ class TestVFolderServiceGetFolderUsage:
             vfolder_repository=mock_vfolder_repository,
             user_repository=MagicMock(),
             valkey_stat_client=MagicMock(),
+            own_check=MagicMock(),
         )
 
     @pytest.fixture

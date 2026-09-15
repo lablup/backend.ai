@@ -110,7 +110,7 @@ def agent_processors(
         valkey_clients.live,
         valkey_clients.stat,
         config_provider,
-        V2DBOpsProvider(database_engine),
+        ShareOpsProvider(database_engine),
     )
     scheduler_repo = SchedulerRepository(
         database_engine,
@@ -119,6 +119,7 @@ def agent_processors(
         valkey_clients.schedule,
         config_provider,
         MagicMock(),
+        RbacPermissionCheckRepository(PermissionOpsProvider(database_engine), config_provider),
     )
     service = AgentService(
         etcd=async_etcd,
@@ -128,7 +129,7 @@ def agent_processors(
         scheduler_repository=scheduler_repo,
         scheduling_controller=AsyncMock(),
         own_check=BulkOwnCheck(
-            RbacPermissionCheckRepository(PermissionOpsProvider(database_engine)), config_provider
+            RbacPermissionCheckRepository(PermissionOpsProvider(database_engine), config_provider)
         ),
     )
     return AgentProcessors(

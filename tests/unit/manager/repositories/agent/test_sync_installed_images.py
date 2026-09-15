@@ -46,7 +46,7 @@ from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderRow
 from ai.backend.manager.repositories.agent.repository import AgentRepository
-from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
+from ai.backend.manager.repositories.ops.v2.share.provider import ShareOpsProvider
 from ai.backend.testutils.db import with_tables
 
 
@@ -208,7 +208,7 @@ class TestSyncInstalledImagesIntegration:
             valkey_live=valkey_live_client,
             valkey_stat=valkey_stat_client,
             config_provider=config_provider,
-            v2_ops_provider=V2DBOpsProvider(db_with_cleanup),
+            v2_ops_provider=ShareOpsProvider(db_with_cleanup),
         )
 
     @asynccontextmanager

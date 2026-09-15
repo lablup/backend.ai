@@ -15,6 +15,7 @@ import pytest
 from alembic.util.pyfiles import load_python_file
 
 _REVISION = "f4a1c9d20b73_sync_seed_roles_with_their_declaration"
+_USER_OWNER_REVISION = "dc61fa027fc1_assign_every_user_their_user_owner_role"
 _REPOSITORY = Path(__file__).resolve().parents[6]
 _VERSIONS = _REPOSITORY / "src/ai/backend/manager/models/alembic/versions"
 
@@ -26,16 +27,32 @@ def migration() -> Any:
 
 
 @pytest.fixture(scope="module")
+def user_owner_migration() -> Any:
+    return load_python_file(str(_VERSIONS), f"{_USER_OWNER_REVISION}.py")
+
+
+@pytest.fixture(scope="module")
 def fixture() -> dict[str, Any]:
-    path = _REPOSITORY / "fixtures/manager/example-roles.json"
-    loaded: dict[str, Any] = json.loads(path.read_text(encoding="utf-8"))
+    base = _REPOSITORY / "fixtures/manager"
+    loaded: dict[str, Any] = {}
+    for name in ("example-role-presets.json", "example-roles.json"):
+        loaded.update(json.loads((base / name).read_text(encoding="utf-8")))
     return loaded
 
 
 class TestMigrationMatchesFixture:
-    def test_presets(self, migration: Any, fixture: dict[str, Any]) -> None:
+    def test_presets(
+        self, migration: Any, user_owner_migration: Any, fixture: dict[str, Any]
+    ) -> None:
+        # The user_owner revision turns that preset's auto_assign on afterwards.
         written = {
-            (preset.id, preset.name, preset.scope_type, preset.auto_assign, False)
+            (
+                preset.id,
+                preset.name,
+                preset.scope_type,
+                preset.auto_assign or preset.id == user_owner_migration._USER_OWNER_PRESET_ID,
+                False,
+            )
             for preset in migration._PRESETS
         }
         seeded = {

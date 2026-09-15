@@ -9,9 +9,12 @@ import uuid
 from collections.abc import AsyncGenerator
 
 import pytest
+import sqlalchemy as sa
 
 from ai.backend.common.data.entity.domain import DomainID, DomainName
-from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.project import ProjectEntityType, ProjectID
+from ai.backend.common.data.entity.session_template import SessionTemplateEntityType
+from ai.backend.common.data.entity.user import UserEntityType
 from ai.backend.common.types import DefaultForUnspecified, ResourceSlot, VFolderHostPermissionMap
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.errors.api import InvalidAPIParameters
@@ -33,10 +36,50 @@ from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.session_template import SessionTemplateRow, TemplateType
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
+from ai.backend.manager.models.virtual_entity.entity_membership_cap import EntityMembershipCapRow
+from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
+from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
+from ai.backend.manager.repositories.ops.v2.share.provider import ShareOpsProvider
 from ai.backend.manager.repositories.template.repository import TemplateRepository
 from ai.backend.manager.secret.types import SecretValue
 from ai.backend.testutils.db import with_tables
 from ai.backend.testutils.fixtures import DomainFixtureData
+from ai.backend.testutils.virtual_entity import VirtualEntitySeeder
+
+
+async def _owning_scopes(db: ExtendedAsyncSAEngine, template_id: str) -> set[tuple[str, uuid.UUID]]:
+    """The (entity type, id) of every scope that both owns and governs the template."""
+    template_node = VirtualEntityRow.__table__.alias("template_node")
+    scope_node = VirtualEntityRow.__table__.alias("scope_node")
+    membership = EntityMembershipRow.__table__
+    binding = ScopeBindingRow.__table__
+    async with db.begin_readonly_session() as session:
+        rows = await session.execute(
+            sa.select(scope_node.c.entity_type, scope_node.c.entity_id)
+            .select_from(
+                template_node.join(
+                    membership,
+                    sa.and_(
+                        membership.c.member_entity_id == template_node.c.id,
+                        membership.c.virtual_entity_id != template_node.c.id,
+                    ),
+                )
+                .join(scope_node, scope_node.c.id == membership.c.virtual_entity_id)
+                .join(
+                    binding,
+                    sa.and_(
+                        binding.c.virtual_entity_id == template_node.c.id,
+                        binding.c.scope_entity_id == scope_node.c.id,
+                    ),
+                )
+            )
+            .where(
+                template_node.c.entity_type == SessionTemplateEntityType(),
+                template_node.c.entity_id == uuid.UUID(template_id),
+            )
+        )
+        return {(str(row.entity_type), row.entity_id) for row in rows}
 
 
 class TestTemplateRepository:
@@ -78,6 +121,10 @@ class TestTemplateRepository:
                 SessionRow,
                 KernelRow,
                 SessionTemplateRow,
+                VirtualEntityRow,
+                EntityMembershipRow,
+                EntityMembershipCapRow,
+                ScopeBindingRow,
             ],
         ):
             yield database_connection
@@ -170,6 +217,7 @@ class TestTemplateRepository:
                 domain_id=test_domain.domain_id,
             )
             session.add(user)
+            await VirtualEntitySeeder().provision(session, UserEntityType(), user_uuid)
             await session.commit()
         return user_uuid
 
@@ -199,6 +247,7 @@ class TestTemplateRepository:
                 domain_id=test_domain.domain_id,
             )
             session.add(user)
+            await VirtualEntitySeeder().provision(session, UserEntityType(), user_uuid)
             await session.commit()
         return user_uuid
 
@@ -261,8 +310,36 @@ class TestTemplateRepository:
                 resource_policy=test_project_resource_policy,
             )
             session.add(group)
+            await VirtualEntitySeeder().provision(session, ProjectEntityType(), group_id)
             await session.commit()
         return group_id, group_name
+
+    @pytest.fixture
+    async def other_group(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_domain: DomainFixtureData,
+        test_project_resource_policy: str,
+    ) -> uuid.UUID:
+        group_id = uuid.uuid4()
+        async with db_with_cleanup.begin_session() as session:
+            session.add(
+                ProjectRow(
+                    id=group_id,
+                    name=f"other-group-{group_id.hex[:8]}",
+                    description="Another group",
+                    is_active=True,
+                    domain_name=test_domain.domain_name,
+                    total_resource_slots=ResourceSlot.from_user_input(
+                        {"cpu": "4", "mem": "8g"}, None
+                    ),
+                    allowed_vfolder_hosts=VFolderHostPermissionMap(),
+                    resource_policy=test_project_resource_policy,
+                )
+            )
+            await VirtualEntitySeeder().provision(session, ProjectEntityType(), group_id)
+            await session.commit()
+        return group_id
 
     @pytest.fixture
     async def test_user_in_group(
@@ -285,7 +362,9 @@ class TestTemplateRepository:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> TemplateRepository:
-        return TemplateRepository(db=db_with_cleanup)
+        return TemplateRepository(
+            db=db_with_cleanup, ops_provider=ShareOpsProvider(db_with_cleanup)
+        )
 
     # =========================================================================
     # Task Template CRUD Tests
@@ -340,6 +419,52 @@ class TestTemplateRepository:
         assert len(results) == 3
         for result in results:
             assert result["user"] == str(test_user)
+
+    async def test_create_task_templates_is_created_in_owner_and_project(
+        self,
+        template_repository: TemplateRepository,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_domain: DomainFixtureData,
+        test_user: uuid.UUID,
+        test_group: tuple[uuid.UUID, str],
+    ) -> None:
+        group_id, _ = test_group
+        template_id = uuid.uuid4().hex
+        items = [
+            {
+                "id": template_id,
+                "user_uuid": test_user,
+                "group_id": group_id,
+                "name": "in-graph",
+                "template": {"apiVersion": "v1", "kind": "taskTemplate"},
+            }
+        ]
+
+        await template_repository.create_task_templates(test_domain.domain_name, items)
+
+        assert await _owning_scopes(db_with_cleanup, template_id) == {
+            (UserEntityType().name(), test_user),
+            (ProjectEntityType().name(), group_id),
+        }
+
+    async def test_create_cluster_template_is_created_in_owner_and_project(
+        self,
+        template_repository: TemplateRepository,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_domain: DomainFixtureData,
+        test_user: uuid.UUID,
+        test_group: tuple[uuid.UUID, str],
+    ) -> None:
+        group_id, _ = test_group
+
+        template_id = await template_repository.create_cluster_template(
+            test_domain.domain_name, group_id, test_user, "cluster-in-graph", {"apiVersion": "v1"}
+        )
+
+        assert await _owning_scopes(db_with_cleanup, template_id) == {
+            (UserEntityType().name(), test_user),
+            (ProjectEntityType().name(), group_id),
+        }
 
     async def test_get_task_template_exists(
         self,
@@ -505,6 +630,37 @@ class TestTemplateRepository:
         assert result is not None
         assert result["name"] == "updated-name"
         assert result["template"] == new_template
+
+    async def test_update_task_template_moves_to_new_project(
+        self,
+        template_repository: TemplateRepository,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_domain: DomainFixtureData,
+        test_user: uuid.UUID,
+        test_group: tuple[uuid.UUID, str],
+        other_group: uuid.UUID,
+    ) -> None:
+        group_id, _ = test_group
+        template_id = uuid.uuid4().hex
+        items = [
+            {
+                "id": template_id,
+                "user_uuid": test_user,
+                "group_id": group_id,
+                "name": "movable",
+                "template": {"apiVersion": "v1"},
+            }
+        ]
+        await template_repository.create_task_templates(test_domain.domain_name, items)
+
+        await template_repository.update_task_template(
+            template_id, other_group, test_user, "movable", {"apiVersion": "v1"}
+        )
+
+        assert await _owning_scopes(db_with_cleanup, template_id) == {
+            (UserEntityType().name(), test_user),
+            (ProjectEntityType().name(), other_group),
+        }
 
     async def test_update_task_template_nonexistent(
         self,
