@@ -11,8 +11,10 @@ from uuid import UUID
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
-from ai.backend.common.data.entity.project import ProjectEntityType, ProjectID
+from ai.backend.common.data.entity.domain import DomainName
+from ai.backend.common.data.entity.project import ProjectEntityType
 from ai.backend.common.data.entity.resource_preset import ResourcePresetID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.types import (
     AccessKey,
     DefaultForUnspecified,
@@ -37,9 +39,11 @@ from ai.backend.manager.errors.resource import (
 )
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.domain import domains
+from ai.backend.manager.models.domain.lookups import DomainNameLookup
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.project import groups
-from ai.backend.manager.models.resource_group import query_allowed_sgroups
+from ai.backend.manager.models.project.lookups import ProjectNameInDomainLookup
+from ai.backend.manager.models.resource_group.searchers import AllowedResourceGroupsSearch
 from ai.backend.manager.models.resource_preset import ResourcePresetRow
 from ai.backend.manager.models.resource_preset.creators import ResourcePresetCreator
 from ai.backend.manager.models.resource_preset.purgers import ResourcePresetPurger
@@ -236,10 +240,26 @@ class ResourcePresetDBSource:
         Fetch all data needed for checking presets from database.
         This includes resource limits, occupancy, and preset allocatability.
         """
+        async with self._v2_ops.read_ops() as r:
+            domain_id = await r.lookup_entity_id(DomainNameLookup(name=DomainName(domain_name)))
+            if domain_id is None:
+                raise DomainNotFound(f"Domain not found (name: {domain_name})")
+            project_id = await r.lookup_entity_id(
+                ProjectNameInDomainLookup(
+                    domain_name=DomainName(domain_name), project_name=group_name
+                )
+            )
+            if project_id is None:
+                raise ProjectNotFound(f"Project not found (name: {group_name})")
+            search = AllowedResourceGroupsSearch(
+                domain_id=domain_id, project_ids=[project_id], user_id=UserID(user_id)
+            )
+            allowed = await r.search_with_scopes(search.operation_scopes(), search.searcher())
         async with self._db.begin_readonly_session() as conn:
             # Fetch all database data at once
             return await self._fetch_all_check_presets_data(
                 conn,
+                [rg.name for rg in allowed.items],
                 access_key,
                 user_id,
                 group_name,
@@ -566,6 +586,7 @@ class ResourcePresetDBSource:
     async def _fetch_all_check_presets_data(
         self,
         conn: SASession,
+        allowed_resource_group_names: list[str],
         access_key: AccessKey,
         user_id: UUID,
         group_name: str,
@@ -599,13 +620,7 @@ class ResourcePresetDBSource:
             domain_usage.remaining,
         )
 
-        # Get scaling groups
-        # query_allowed_sgroups expects AsyncConnection, get it from session
-        db_conn = await conn.connection()
-        sgroups = await query_allowed_sgroups(
-            db_conn, domain_name, ProjectID(group_id), str(access_key)
-        )
-        sgroup_names = [sg.name for sg in sgroups]
+        sgroup_names = allowed_resource_group_names
         if resource_group is not None:
             if resource_group not in sgroup_names:
                 raise ResourceGroupNotFound(

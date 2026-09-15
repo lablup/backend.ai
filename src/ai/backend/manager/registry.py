@@ -27,7 +27,6 @@ from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
 from dateutil.parser import isoparse
 from dateutil.tz import tzutc
-from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import noload, selectinload
 from typeguard import check_type
@@ -104,6 +103,7 @@ from ai.backend.manager.data.agent.types import AgentStatus
 from ai.backend.manager.data.image.types import ImageData, ImageStatus
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.model_serving.types import EndpointData
+from ai.backend.manager.data.resource_group.types import ResourceGroupData
 from ai.backend.manager.data.session.draft import (
     KernelExecutionSpecDraft,
     KernelGroupDraft,
@@ -165,7 +165,7 @@ from .models.kernel import (
 )
 from .models.keypair import query_bootstrap_script
 from .models.network import NetworkRow, NetworkType
-from .models.resource_group import query_allowed_sgroups, resource_groups
+from .models.resource_group import resource_groups
 from .models.runtime_variant.row import RuntimeVariantRow
 from .models.session import (
     PRIVATE_SESSION_TYPES,
@@ -1933,33 +1933,24 @@ class AgentRegistry:
         await wsproxy_client.delete_endpoint(endpoint.id)
 
 
-async def check_resource_group(
-    conn: SAConnection,
+def check_resource_group(
+    candidates: Sequence[ResourceGroupData],
     resource_group: str | None,
     session_type: SessionTypes,
-    access_key: AccessKey,
-    domain_name: str,
-    group_id: ProjectID | str,
     public_sgroup_only: bool = False,
 ) -> str:
     # Check scaling group availability if resource_group parameter is given.
     # If resource_group is not provided, it will be selected as the first one among
     # the list of allowed scaling groups.
-    candidates = await query_allowed_sgroups(
-        conn,
-        domain_name,
-        group_id,
-        access_key,
-    )
     if public_sgroup_only:
-        candidates = [sgroup for sgroup in candidates if sgroup.is_public]
+        candidates = [sgroup for sgroup in candidates if sgroup.status.is_public]
     if not candidates:
         raise ResourceGroupNotFound("You have no scaling groups allowed to use.")
 
     stype = session_type.value.lower()
     if resource_group is None:
         for sgroup in candidates:
-            allowed_session_types = sgroup.scheduler_opts.allowed_session_types
+            allowed_session_types = sgroup.scheduler.options.allowed_session_types
             if stype in allowed_session_types:
                 resource_group = sgroup.name
                 break
@@ -1974,7 +1965,7 @@ async def check_resource_group(
                 # resource_group's unique key is 'name' field for now,
                 # but we will change resource_group's unique key to new 'id' field.
                 resource_group_found = True
-                allowed_session_types = sgroup.scheduler_opts.allowed_session_types
+                allowed_session_types = sgroup.scheduler.options.allowed_session_types
                 if stype in allowed_session_types:
                     break
         else:
