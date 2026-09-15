@@ -1,15 +1,15 @@
 ---
 name: image-adapter-scenarios
 type: reference
-description: what the image adapter guarantees, as scenarios; its superadmin and image permission checks, and the separate custom-image creator check
+description: what the image adapter guarantees, as scenarios; its superadmin and image permission checks, the separate custom-image creator check, and single-tag scan
 scope: src/ai/backend/manager/api/adapters/image
-keywords: [image, scenario, adapter, superadmin, permission, customized image, alias]
+keywords: [image, scenario, adapter, superadmin, permission, customized image, alias, scan]
 generated:
   by: claude-code/opus-5
   at: 2026-09-11
 status: draft
 ---
-# image 어댑터 — 시나리오
+# 이미지 어댑터는 이미지 요청과 응답을 변환한다
 
 규칙은 상위 디렉터리의 `AGENTS.md`에 있다. 여기 적힌 내용과 실행 결과가 다르면 문장을 먼저
 의심한다.
@@ -164,3 +164,15 @@ soft delete는 이미지 권한 검사가, 별칭 등록은 슈퍼관리자 검�
 
 생략, 비우기, 값 지정을 구분하는 것은 `supported_accelerators` 필드뿐이다. 나머지 필드는 생략과
 값 지정만 받으므로 비우는 시나리오는 `supported_accelerators` 필드에만 둔다.
+
+## 단일 태그 스캔
+
+| 시나리오 | 상황 | 요청 | 결과 |
+|---|---|---|---|
+| 미등록 이미지도 등록한다 | 레지스트리가 등록되어 있고 태그가 존재한다 | 시스템 관리자가 태그와 아키텍처를 지정해 스캔한다 | 지정한 아키텍처의 이미지 하나를 반환한다 |
+| 일반 사용자는 실행할 수 없다 | 레지스트리가 등록되어 있다 | 일반 사용자가 태그 하나를 스캔한다 | 권한 부족으로 거부한다 |
+| 전체 레지스트리 스캔으로 전환하지 않는다 | 입력에 맞는 레지스트리가 없다 | 시스템 관리자가 스캔한다 | 레지스트리를 찾을 수 없어 거부한다 |
+| 없는 태그는 성공으로 응답하지 않는다 | 레지스트리에 태그가 없다 | 시스템 관리자가 스캔한다 | 이미지를 찾을 수 없어 거부한다 |
+
+태그 스캔은 기존 스캐너대로 모든 아키텍처를 등록·갱신하고, 응답은 요청한 아키텍처로 제한한다.
+요청한 아키텍처가 없으면 이미지를 찾을 수 없어 거부한다.
