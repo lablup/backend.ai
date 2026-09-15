@@ -6,6 +6,7 @@ from .session import (
     exclude_session_idle_checks,
     include_session_idle_checks,
     project_sessions_v2,
+    scoped_sessions_v2,
     session_v2,
     terminate_sessions_v2,
 )
@@ -16,6 +17,7 @@ __all__ = [
     "exclude_session_idle_checks",
     "include_session_idle_checks",
     "project_sessions_v2",
+    "scoped_sessions_v2",
     "session_v2",
     "terminate_sessions_v2",
 ]

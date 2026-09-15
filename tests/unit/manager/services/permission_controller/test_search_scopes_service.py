@@ -18,7 +18,7 @@ from ai.backend.manager.data.permission.types import ScopeData, ScopeListResult
 from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.services.permission_contoller.actions.search_scopes import (
-    SearchScopesAction,
+    GlobalSearchScopesAction,
 )
 from ai.backend.manager.services.permission_contoller.service import (
     PermissionControllerService,
@@ -80,7 +80,7 @@ class TestSearchScopes:
             orders=[],
             pagination=OffsetPagination(limit=limit, offset=offset),
         )
-        action = SearchScopesAction(scope_type=DomainEntityType(), querier=querier)
+        action = GlobalSearchScopesAction(scope_type=DomainEntityType(), querier=querier)
 
         result = await service.search_scopes(action)
 
@@ -94,7 +94,7 @@ class TestSearchScopes:
         service: PermissionControllerService,
         mock_repository: MagicMock,
     ) -> None:
-        """Test search_scopes returns properly formatted SearchScopesActionResult."""
+        """Test search_scopes returns properly formatted GlobalSearchScopesActionResult."""
         project_id_1 = "project-1"
         project_id_2 = "project-2"
         project_name_1 = "project-alpha"
@@ -125,7 +125,7 @@ class TestSearchScopes:
             orders=[],
             pagination=OffsetPagination(limit=limit, offset=offset),
         )
-        action = SearchScopesAction(scope_type=ProjectEntityType(), querier=querier)
+        action = GlobalSearchScopesAction(scope_type=ProjectEntityType(), querier=querier)
 
         result = await service.search_scopes(action)
 

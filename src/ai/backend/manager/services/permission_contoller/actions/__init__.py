@@ -2,7 +2,10 @@ from .add_role_permission import AddRolePermissionAction
 from .bulk_remove_role_permissions import BulkRemoveRolePermissionsAction
 from .create_role import CreateRoleAction
 from .delete_role import DeleteRoleAction
-from .get_permission_matrix import GetPermissionMatrixAction, GetPermissionMatrixActionResult
+from .get_permission_matrix import (
+    PublicGetPermissionMatrixAction,
+    PublicGetPermissionMatrixActionResult,
+)
 from .get_role_detail import GetRoleDetailAction, GetRoleDetailActionResult
 from .purge_role import PurgeRoleAction
 from .replace_role_permissions import (
@@ -10,19 +13,19 @@ from .replace_role_permissions import (
     ReplaceRolePermissionsActionResult,
 )
 from .search_permissions import (
-    SearchPermissionsAction,
-    SearchPermissionsActionResult,
+    GlobalSearchPermissionsAction,
+    GlobalSearchPermissionsActionResult,
 )
-from .search_roles import SearchRolesAction, SearchRolesActionResult
+from .search_roles import GlobalSearchRolesAction, GlobalSearchRolesActionResult
 from .search_roles_in_scope import (
     SearchRolesInScopeAction,
     SearchRolesInScopeActionResult,
 )
 from .search_users_assigned_to_role import (
-    SearchUsersAssignedToRoleAction,
-    SearchUsersAssignedToRoleActionResult,
+    GlobalSearchRoleAssignmentsAction,
+    GlobalSearchRoleAssignmentsActionResult,
 )
-from .update_permission import UpdatePermissionAction, UpdatePermissionActionResult
+from .update_permission import UpdatePermissionAction
 from .update_role import UpdateRoleAction
 
 __all__ = [
@@ -30,22 +33,21 @@ __all__ = [
     "BulkRemoveRolePermissionsAction",
     "CreateRoleAction",
     "DeleteRoleAction",
-    "GetPermissionMatrixAction",
-    "GetPermissionMatrixActionResult",
+    "PublicGetPermissionMatrixAction",
+    "PublicGetPermissionMatrixActionResult",
     "GetRoleDetailAction",
     "GetRoleDetailActionResult",
     "PurgeRoleAction",
     "ReplaceRolePermissionsAction",
     "ReplaceRolePermissionsActionResult",
-    "SearchRolesAction",
-    "SearchRolesActionResult",
+    "GlobalSearchRolesAction",
+    "GlobalSearchRolesActionResult",
     "SearchRolesInScopeAction",
     "SearchRolesInScopeActionResult",
-    "SearchPermissionsAction",
-    "SearchPermissionsActionResult",
-    "SearchUsersAssignedToRoleAction",
-    "SearchUsersAssignedToRoleActionResult",
+    "GlobalSearchPermissionsAction",
+    "GlobalSearchPermissionsActionResult",
+    "GlobalSearchRoleAssignmentsAction",
+    "GlobalSearchRoleAssignmentsActionResult",
     "UpdatePermissionAction",
-    "UpdatePermissionActionResult",
     "UpdateRoleAction",
 ]

@@ -41,11 +41,6 @@ from ai.backend.manager.models.keypair.updaters import KeypairUpdater
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.specs.updater import GuardedDataUpdater
 from ai.backend.manager.models.user.creators import UserCreator
-from ai.backend.manager.models.user.scopes import (
-    DomainUserOperationScope,
-    ProjectUserOperationScope,
-    RoleUserOperationScope,
-)
 from ai.backend.manager.models.user.updaters import UserUpdater
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base.querier import BatchQuerier
@@ -253,43 +248,6 @@ class UserRepository:
             UserSearchResult with matching users and pagination info.
         """
         return await self._db_source.search_users(querier=querier)
-
-    @user_repository_resilience.apply()
-    async def search_users_by_domain(
-        self, scope: DomainUserOperationScope, querier: BatchQuerier
-    ) -> UserSearchResult:
-        """Search users within a domain.
-
-        Args:
-            scope: DomainUserOperationScope defining the domain to search within.
-            querier: BatchQuerier containing conditions, orders, and pagination.
-
-        Returns:
-            UserSearchResult with matching users and pagination info.
-        """
-        return await self._db_source.search_users_by_domain(scope, querier)
-
-    @user_repository_resilience.apply()
-    async def search_users_by_project(
-        self, scope: ProjectUserOperationScope, querier: BatchQuerier
-    ) -> UserSearchResult:
-        """Search users within a project.
-
-        Args:
-            scope: ProjectUserOperationScope defining the project to search within.
-            querier: BatchQuerier containing conditions, orders, and pagination.
-
-        Returns:
-            UserSearchResult with matching users and pagination info.
-        """
-        return await self._db_source.search_users_by_project(scope, querier)
-
-    @user_repository_resilience.apply()
-    async def search_users_by_role(
-        self, scope: RoleUserOperationScope, querier: BatchQuerier
-    ) -> UserSearchResult:
-        """Search users assigned to a role."""
-        return await self._db_source.search_users_by_role(scope, querier)
 
     @user_repository_resilience.apply()
     async def issue_my_keypair(self, user_id: UserID) -> GeneratedKeyPairData:

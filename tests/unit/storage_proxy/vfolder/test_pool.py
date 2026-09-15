@@ -45,29 +45,20 @@ def mock_volume() -> AsyncMock:
 async def test_get_volume(mock_volume: AsyncMock) -> None:
     # Create a VolumePool with mocked volumes
     volume_id = VolumeID(uuid.UUID("550e8400-e29b-41d4-a716-446655440000"))
-    volumes = {volume_id: mock_volume}
-    volumes_by_name = {"test_volume": mock_volume}
-
-    pool = VolumePool(
-        volumes=volumes,
-        volumes_by_name=volumes_by_name,
-    )
+    pool = VolumePool(volumes={str(volume_id): mock_volume, "test_volume": mock_volume})
 
     # Test get_volume with valid volume ID
-    async with pool.get_volume(volume_id) as volume:
-        assert volume is mock_volume
+    assert pool.get_volume(volume_id) is mock_volume
 
-    # Test get_volume_by_name with valid name
-    async with pool.get_volume_by_name("test_volume") as volume:
-        assert volume is mock_volume
+    # Test get_volume_by_name with valid name, including a UUID key
+    assert pool.get_volume_by_name("test_volume") is mock_volume
+    assert pool.get_volume_by_name(str(volume_id).upper()) is mock_volume
 
     # Test get_volume with invalid volume ID
     invalid_id = VolumeID(uuid.UUID("00000000-0000-0000-0000-000000000000"))
     with pytest.raises(InvalidVolumeError):
-        async with pool.get_volume(invalid_id) as volume:
-            pass
+        pool.get_volume(invalid_id)
 
     # Test get_volume_by_name with invalid name
     with pytest.raises(InvalidVolumeError):
-        async with pool.get_volume_by_name("nonexistent") as volume:
-            pass
+        pool.get_volume_by_name("nonexistent")

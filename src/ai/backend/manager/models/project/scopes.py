@@ -10,7 +10,7 @@ import sqlalchemy as sa
 
 from ai.backend.common.data.entity.domain import DomainEntityType, DomainID
 from ai.backend.common.data.entity.project import ProjectEntityType
-from ai.backend.common.data.entity.resource_group import ResourceGroupEntityType, ResourceGroupID
+from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.manager.errors.resource import DomainNotFound
 from ai.backend.manager.models.clauses import QueryCondition
@@ -49,14 +49,9 @@ class DomainProjectOperationScope(OperationScope):
         """
         domain_id = self.domain_id
 
-        # TODO(BA-7571): drop the column term once the ownership backfill lands.
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return sa.or_(
-                ProjectRow.domain_name
-                == sa.select(DomainRow.name).where(DomainRow.id == domain_id).scalar_subquery(),
-                scope_membership_exists(
-                    DomainEntityType(), domain_id, ProjectEntityType(), ProjectRow.id
-                ),
+            return scope_membership_exists(
+                DomainEntityType(), domain_id, ProjectEntityType(), ProjectRow.id
             )
 
         return inner
@@ -116,20 +111,11 @@ class ResourceGroupProjectOperationScope(OperationScope):
     def to_condition(self) -> QueryCondition:
         resource_group_id = self.resource_group_id
 
-        # TODO(BA-7571): drop the association term once the ownership backfill lands.
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return sa.or_(
-                ProjectRow.id.in_(
-                    sa.select(ResourceGroupForProjectRow.group).where(
-                        ResourceGroupForProjectRow.resource_group_id == resource_group_id
-                    )
-                ),
-                scope_membership_exists(
-                    ResourceGroupEntityType(),
-                    resource_group_id,
-                    ProjectEntityType(),
-                    ProjectRow.id,
-                ),
+            return ProjectRow.id.in_(
+                sa.select(ResourceGroupForProjectRow.group).where(
+                    ResourceGroupForProjectRow.resource_group_id == resource_group_id
+                )
             )
 
         return inner

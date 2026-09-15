@@ -15,7 +15,6 @@ from ai.backend.common.contexts.user import current_user
 from ai.backend.common.data.entity.deployment import DeploymentID
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.vfolder import VFolderUUID
-from ai.backend.common.docker import ImageRef
 from ai.backend.common.exception import BackendAIError, VFolderNotFound
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
@@ -47,9 +46,10 @@ from ai.backend.manager.data.model_serving.types import (
 )
 from ai.backend.manager.data.vfolder.types import VFolderOwnershipType
 from ai.backend.manager.errors.api import InvalidAPIParameters
-from ai.backend.manager.errors.common import GenericForbidden, ObjectNotFound, ServiceUnavailable
+from ai.backend.manager.errors.common import GenericForbidden, ServiceUnavailable
+from ai.backend.manager.errors.image import ImageNotFound
 from ai.backend.manager.errors.resource import DatabaseConnectionUnavailable
-from ai.backend.manager.errors.service import EndpointNotFound
+from ai.backend.manager.errors.service import AutoScalingRuleNotFound, EndpointNotFound
 from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
 from ai.backend.manager.models.endpoint import (
     AutoScalingMetricComparator,
@@ -63,7 +63,7 @@ from ai.backend.manager.models.endpoint.updaters import (
     AutoScalingRuleUpdater,
     LegacyEndpointUpdater,
 )
-from ai.backend.manager.models.image import ImageAlias, ImageIdentifier, ImageRow
+from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.project import resolve_group_name_or_id
 from ai.backend.manager.models.resource_group import resource_groups
@@ -601,7 +601,7 @@ class ModelServingRepository:
             try:
                 rule = await EndpointAutoScalingRuleRow.get(session, rule_id, load_endpoint=True)
                 return rule.to_data()
-            except ObjectNotFound:
+            except AutoScalingRuleNotFound:
                 return None
 
     @model_serving_repository_resilience.apply()
@@ -667,7 +667,7 @@ class ModelServingRepository:
             try:
                 # Validate lifecycle stage before update
                 rule = await EndpointAutoScalingRuleRow.get(session, rule_id, load_endpoint=True)
-            except ObjectNotFound:
+            except AutoScalingRuleNotFound:
                 return None
             if rule.endpoint_row.lifecycle_stage in EndpointLifecycle.inactive_states():
                 return None
@@ -689,7 +689,7 @@ class ModelServingRepository:
                 rule = await EndpointAutoScalingRuleRow.get(session, rule_id, load_endpoint=True)
                 await session.delete(rule)
                 return True
-            except ObjectNotFound:
+            except AutoScalingRuleNotFound:
                 return False
 
     @model_serving_repository_resilience.apply()
@@ -721,18 +721,6 @@ class ModelServingRepository:
                 return None
 
     @model_serving_repository_resilience.apply()
-    async def resolve_image_for_endpoint_creation(
-        self, identifiers: list[ImageIdentifier | ImageAlias | ImageRef]
-    ) -> ImageRow:
-        """
-        Resolve image for endpoint creation.
-        This is a special case where we need the actual ImageRow object
-        because EndpointRow constructor requires it.
-        """
-        async with self._db.begin_readonly_session_read_committed() as session:
-            return await ImageRow.resolve(session, identifiers)
-
-    @model_serving_repository_resilience.apply()
     async def get_image_by_id(self, image_id: uuid.UUID) -> ImageData:
         """Look up image data by its UUID.
 
@@ -743,7 +731,7 @@ class ModelServingRepository:
         async with self._db.begin_readonly_session_read_committed() as session:
             image_row = await session.scalar(sa.select(ImageRow).where(ImageRow.id == image_id))
             if image_row is None:
-                raise ObjectNotFound(f"Image {image_id} not found")
+                raise ImageNotFound(f"Image {image_id} not found")
             return image_row.to_dataclass()
 
     @model_serving_repository_resilience.apply()

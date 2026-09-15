@@ -35,7 +35,9 @@ from ai.backend.common.dto.manager.v2.rbac.response import (
 )
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.api.rest.v2.path_params import ProjectIdPathParam, RoleIdPathParam
-from ai.backend.manager.models.rbac_models.role.scopes import ScopedRoleOperationScope
+from ai.backend.manager.services.permission_contoller.actions.search_roles_in_scope import (
+    RegisteredRoleScopeItem,
+)
 
 if TYPE_CHECKING:
     from ai.backend.manager.api.adapters.rbac.adapter import RBACAdapter
@@ -79,6 +81,20 @@ class V2RBACHandler:
         )
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=payload)
 
+    async def my_search_roles(
+        self,
+        body: BodyParam[SearchRolesInput],
+    ) -> APIResponse:
+        """Search the roles the current authenticated user holds."""
+        result = await self._adapter.my_search_roles(body.parsed)
+        payload = AdminSearchRolesPayload(
+            items=result.items,
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+        )
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=payload)
+
     async def project_search_roles(
         self,
         path: PathParam[ProjectIdPathParam],
@@ -86,7 +102,7 @@ class V2RBACHandler:
     ) -> APIResponse:
         """Search roles registered in a project scope."""
         result = await self._adapter.search_roles_in_scope(
-            ScopedRoleOperationScope(scope=ProjectID(path.parsed.project_id)),
+            [RegisteredRoleScopeItem(scope=ProjectID(path.parsed.project_id))],
             body.parsed,
         )
         payload = AdminSearchRolesPayload(

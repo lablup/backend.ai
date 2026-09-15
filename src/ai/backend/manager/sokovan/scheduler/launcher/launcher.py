@@ -296,9 +296,10 @@ class SessionLauncher:
 
             # Convert ImageConfigData to ImageConfig format for agents
             # Build a mapping from image ID to agent-compatible ImageConfig
+            auto_pull = AutoPullBehavior(self._config_provider.config.docker.image.auto_pull.value)
             image_configs_by_id: dict[UUID, ImageConfig] = {}
             for img_id, img_cfg in image_configs.items():
-                image_configs_by_id[img_id] = img_cfg.to_image_config(AutoPullBehavior.DIGEST)
+                image_configs_by_id[img_id] = img_cfg.to_image_config(auto_pull)
 
             # Create kernels on each agent
             async def create_kernels_on_agent(
@@ -380,7 +381,7 @@ class SessionLauncher:
                         ),
                         "startup_command": k.startup_command,
                         "internal_data": k.internal_data,
-                        "auto_pull": kernel_image_config.get("auto_pull", AutoPullBehavior.DIGEST),
+                        "auto_pull": auto_pull,
                         "preopen_ports": k.preopen_ports or [],
                         "allocated_host_ports": [],  # Will be populated by agent
                         "agent_addr": k.agent_addr or "",

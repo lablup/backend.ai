@@ -14,6 +14,7 @@ from ai.backend.manager.data.session.types import SessionData
 from ai.backend.manager.services.idle_checker.actions.admin_search import (
     AdminSearchIdleCheckersAction,
 )
+from ai.backend.manager.services.idle_checker.actions.bulk_get import BulkGetIdleCheckersAction
 from ai.backend.manager.services.idle_checker.actions.create import CreateIdleCheckerAction
 from ai.backend.manager.services.idle_checker.actions.exclude_sessions import (
     ExcludeSessionIdleChecksAction,
@@ -39,6 +40,7 @@ class IdleCheckerProcessors:
     admin_search: GlobalActionProcessor[
         AdminSearchIdleCheckersAction, BatchOpsResult[IdleCheckerData]
     ]
+    bulk_get: PartialBulkActionProcessor[BulkGetIdleCheckersAction, IdleCheckerData]
     create: GlobalActionProcessor[CreateIdleCheckerAction, CreatedEntityOpsResult[IdleCheckerData]]
     update: GlobalActionProcessor[UpdateIdleCheckerAction, EntityOpsResult[IdleCheckerData]]
     bulk_purge: PartialBulkActionProcessor[BulkPurgeIdleCheckersAction, IdleCheckerData]
@@ -58,6 +60,7 @@ class IdleCheckerProcessors:
         service: IdleCheckerService,
     ) -> None:
         self.admin_search = group.global_search_ops(AdminSearchIdleCheckersAction)
+        self.bulk_get = group.partial_bulk_get_ops(BulkGetIdleCheckersAction)
         self.create = group.global_scope(CreateIdleCheckerAction, service.create)
         self.update = group.global_scope(UpdateIdleCheckerAction, service.update)
         self.bulk_purge = group.global_partial_bulk_purge_ops(BulkPurgeIdleCheckersAction)

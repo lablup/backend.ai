@@ -15,7 +15,6 @@ from uuid import UUID, uuid4
 import pytest
 
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
-from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.dto.manager.compute_session import (
     ComputeSessionFilter,
     ComputeSessionOrder,
@@ -50,8 +49,10 @@ from ai.backend.manager.data.kernel.types import (
 from ai.backend.manager.data.resource_slot.types import ResourceAllocationAggregate
 from ai.backend.manager.data.session.types import SessionData, SessionStatus
 from ai.backend.manager.models.specs.pagination import NoPagination, OffsetPagination
-from ai.backend.manager.services.session.actions.search import SearchSessionsAction
-from ai.backend.manager.services.session.actions.search_kernel import SearchKernelsAction
+from ai.backend.manager.services.session.actions.global_search import GlobalSearchSessionsAction
+from ai.backend.manager.services.session.actions.global_search_kernels import (
+    GlobalSearchKernelsAction,
+)
 
 # ========== Test Data Factories ==========
 
@@ -223,37 +224,37 @@ class TestComputeSessionsAdapter:
     def setup_method(self) -> None:
         self.adapter = ComputeSessionsAdapter()
 
-    def test_build_session_querier_defaults(self) -> None:
-        """Build querier with default request should use default pagination."""
+    def test_build_session_searcher_defaults(self) -> None:
+        """Build searcher with default request should use default pagination."""
         request = SearchComputeSessionsRequest()
-        querier = self.adapter.build_session_querier(request)
+        searcher = self.adapter.build_session_searcher(request)
 
-        assert isinstance(querier.pagination, OffsetPagination)
-        assert querier.pagination.limit == 50
-        assert querier.pagination.offset == 0
-        assert querier.conditions == []
-        assert querier.orders == []
+        assert isinstance(searcher.pagination, OffsetPagination)
+        assert searcher.pagination.limit == 50
+        assert searcher.pagination.offset == 0
+        assert searcher.conditions == []
+        assert searcher.orders == []
 
-    def test_build_session_querier_with_pagination(self) -> None:
-        """Build querier with custom pagination."""
+    def test_build_session_searcher_with_pagination(self) -> None:
+        """Build searcher with custom pagination."""
         request = SearchComputeSessionsRequest(limit=100, offset=50)
-        querier = self.adapter.build_session_querier(request)
+        searcher = self.adapter.build_session_searcher(request)
 
-        assert isinstance(querier.pagination, OffsetPagination)
-        assert querier.pagination.limit == 100
-        assert querier.pagination.offset == 50
+        assert isinstance(searcher.pagination, OffsetPagination)
+        assert searcher.pagination.limit == 100
+        assert searcher.pagination.offset == 50
 
-    def test_build_session_querier_with_status_filter(self) -> None:
-        """Build querier with status filter should produce conditions."""
+    def test_build_session_searcher_with_status_filter(self) -> None:
+        """Build searcher with status filter should produce conditions."""
         request = SearchComputeSessionsRequest(
             filter=ComputeSessionFilter(status=["RUNNING", "PENDING"])
         )
-        querier = self.adapter.build_session_querier(request)
+        searcher = self.adapter.build_session_searcher(request)
 
-        assert len(querier.conditions) == 1
+        assert len(searcher.conditions) == 1
 
-    def test_build_session_querier_with_order(self) -> None:
-        """Build querier with order should produce orders."""
+    def test_build_session_searcher_with_order(self) -> None:
+        """Build searcher with order should produce orders."""
         request = SearchComputeSessionsRequest(
             order=[
                 ComputeSessionOrder(
@@ -262,52 +263,52 @@ class TestComputeSessionsAdapter:
                 )
             ]
         )
-        querier = self.adapter.build_session_querier(request)
+        searcher = self.adapter.build_session_searcher(request)
 
-        assert len(querier.orders) == 1
+        assert len(searcher.orders) == 1
 
-    def test_build_session_querier_with_name_filter(self) -> None:
-        """Build querier with name filter should produce a condition."""
+    def test_build_session_searcher_with_name_filter(self) -> None:
+        """Build searcher with name filter should produce a condition."""
         request = SearchComputeSessionsRequest(
             filter=ComputeSessionFilter(name=StringFilter(contains="my-session"))
         )
-        querier = self.adapter.build_session_querier(request)
+        searcher = self.adapter.build_session_searcher(request)
 
-        assert len(querier.conditions) == 1
-        assert callable(querier.conditions[0])
+        assert len(searcher.conditions) == 1
+        assert callable(searcher.conditions[0])
 
-    def test_build_session_querier_with_access_key_filter(self) -> None:
-        """Build querier with access_key filter should produce a condition."""
+    def test_build_session_searcher_with_access_key_filter(self) -> None:
+        """Build searcher with access_key filter should produce a condition."""
         request = SearchComputeSessionsRequest(
             filter=ComputeSessionFilter(access_key=StringFilter(equals="TESTKEY"))
         )
-        querier = self.adapter.build_session_querier(request)
+        searcher = self.adapter.build_session_searcher(request)
 
-        assert len(querier.conditions) == 1
-        assert callable(querier.conditions[0])
+        assert len(searcher.conditions) == 1
+        assert callable(searcher.conditions[0])
 
-    def test_build_session_querier_with_domain_name_filter(self) -> None:
-        """Build querier with domain_name filter should produce a condition."""
+    def test_build_session_searcher_with_domain_name_filter(self) -> None:
+        """Build searcher with domain_name filter should produce a condition."""
         request = SearchComputeSessionsRequest(
             filter=ComputeSessionFilter(domain_name=StringFilter(starts_with="prod"))
         )
-        querier = self.adapter.build_session_querier(request)
+        searcher = self.adapter.build_session_searcher(request)
 
-        assert len(querier.conditions) == 1
-        assert callable(querier.conditions[0])
+        assert len(searcher.conditions) == 1
+        assert callable(searcher.conditions[0])
 
-    def test_build_session_querier_with_scaling_group_filter(self) -> None:
-        """Build querier with scaling_group_name filter should produce a condition."""
+    def test_build_session_searcher_with_scaling_group_filter(self) -> None:
+        """Build searcher with scaling_group_name filter should produce a condition."""
         request = SearchComputeSessionsRequest(
             filter=ComputeSessionFilter(scaling_group_name=StringFilter(equals="default"))
         )
-        querier = self.adapter.build_session_querier(request)
+        searcher = self.adapter.build_session_searcher(request)
 
-        assert len(querier.conditions) == 1
-        assert callable(querier.conditions[0])
+        assert len(searcher.conditions) == 1
+        assert callable(searcher.conditions[0])
 
-    def test_build_session_querier_with_multiple_filters(self) -> None:
-        """Build querier with multiple filter fields should produce multiple conditions."""
+    def test_build_session_searcher_with_multiple_filters(self) -> None:
+        """Build searcher with multiple filter fields should produce multiple conditions."""
         request = SearchComputeSessionsRequest(
             filter=ComputeSessionFilter(
                 status=["RUNNING"],
@@ -316,39 +317,39 @@ class TestComputeSessionsAdapter:
                 domain_name=StringFilter(i_contains="default"),
             )
         )
-        querier = self.adapter.build_session_querier(request)
+        searcher = self.adapter.build_session_searcher(request)
 
         # 1 status + 1 name + 1 access_key + 1 domain_name
-        assert len(querier.conditions) == 4
+        assert len(searcher.conditions) == 4
 
-    def test_build_session_querier_with_case_insensitive_name_filter(self) -> None:
-        """Build querier with case-insensitive name filter should produce a condition."""
+    def test_build_session_searcher_with_case_insensitive_name_filter(self) -> None:
+        """Build searcher with case-insensitive name filter should produce a condition."""
         request = SearchComputeSessionsRequest(
             filter=ComputeSessionFilter(name=StringFilter(i_equals="My-Session"))
         )
-        querier = self.adapter.build_session_querier(request)
+        searcher = self.adapter.build_session_searcher(request)
 
-        assert len(querier.conditions) == 1
-        assert callable(querier.conditions[0])
+        assert len(searcher.conditions) == 1
+        assert callable(searcher.conditions[0])
 
-    def test_build_session_querier_with_negated_filter(self) -> None:
-        """Build querier with negated filter should produce a condition."""
+    def test_build_session_searcher_with_negated_filter(self) -> None:
+        """Build searcher with negated filter should produce a condition."""
         request = SearchComputeSessionsRequest(
             filter=ComputeSessionFilter(name=StringFilter(not_contains="debug"))
         )
-        querier = self.adapter.build_session_querier(request)
+        searcher = self.adapter.build_session_searcher(request)
 
-        assert len(querier.conditions) == 1
-        assert callable(querier.conditions[0])
+        assert len(searcher.conditions) == 1
+        assert callable(searcher.conditions[0])
 
-    def test_build_kernel_querier_for_sessions(self) -> None:
-        """Build kernel querier should use NoPagination and session_id condition."""
+    def test_build_kernel_searcher_for_sessions(self) -> None:
+        """Build kernel searcher should use NoPagination and session_id condition."""
         session_ids = [SessionId(uuid4()), SessionId(uuid4())]
-        querier = self.adapter.build_kernel_querier_for_sessions(session_ids)
+        searcher = self.adapter.build_kernel_searcher_for_sessions(session_ids)
 
-        assert isinstance(querier.pagination, NoPagination)
-        assert len(querier.conditions) == 1
-        assert querier.orders == []
+        assert isinstance(searcher.pagination, NoPagination)
+        assert len(searcher.conditions) == 1
+        assert searcher.orders == []
 
     def test_group_kernels_by_session(self) -> None:
         """Group kernels by session should produce correct mapping."""
@@ -445,7 +446,7 @@ class TestComputeSessionsHandler:
     def mock_session_result_empty(self) -> MagicMock:
         """Mock session search result with no sessions."""
         result = MagicMock()
-        result.data = []
+        result.items = []
         result.total_count = 0
         result.has_next_page = False
         result.has_previous_page = False
@@ -463,7 +464,7 @@ class TestComputeSessionsHandler:
             name="session-2",
         )
         result = MagicMock()
-        result.data = [session_1, session_2]
+        result.items = [session_1, session_2]
         result.total_count = 2
         result.has_next_page = False
         result.has_previous_page = False
@@ -487,7 +488,7 @@ class TestComputeSessionsHandler:
             ),
         ]
         result = MagicMock()
-        result.data = kernels
+        result.items = kernels
         result.total_count = 3
         result.has_next_page = False
         result.has_previous_page = False
@@ -501,10 +502,10 @@ class TestComputeSessionsHandler:
     ) -> MagicMock:
         """Mock processors for session + kernel queries."""
         processors = MagicMock()
-        processors.session.search_sessions.wait_for_complete = AsyncMock(
+        processors.session.global_search.wait_for_complete = AsyncMock(
             return_value=mock_session_result_with_data
         )
-        processors.session.search_kernels.wait_for_complete = AsyncMock(
+        processors.session.global_search_kernels.wait_for_complete = AsyncMock(
             return_value=mock_kernel_result_for_sessions
         )
         return processors
@@ -513,16 +514,16 @@ class TestComputeSessionsHandler:
         self,
         mock_processors: MagicMock,
     ) -> None:
-        """Handler should call both search_sessions and search_kernels."""
-        await mock_processors.session.search_sessions.wait_for_complete(
-            SearchSessionsAction(querier=MagicMock(), user_id=UserID(uuid4()))
+        """Handler should call both global_search and global_search_kernels."""
+        await mock_processors.session.global_search.wait_for_complete(
+            GlobalSearchSessionsAction(searcher=MagicMock())
         )
-        mock_processors.session.search_sessions.wait_for_complete.assert_called_once()
+        mock_processors.session.global_search.wait_for_complete.assert_called_once()
 
-        await mock_processors.session.search_kernels.wait_for_complete(
-            SearchKernelsAction(querier=MagicMock(), user_id=UserID(uuid4()))
+        await mock_processors.session.global_search_kernels.wait_for_complete(
+            GlobalSearchKernelsAction(searcher=MagicMock())
         )
-        mock_processors.session.search_kernels.wait_for_complete.assert_called_once()
+        mock_processors.session.global_search_kernels.wait_for_complete.assert_called_once()
 
     async def test_search_sessions_empty_result(
         self,
@@ -530,40 +531,40 @@ class TestComputeSessionsHandler:
     ) -> None:
         """Handler with empty result should not query kernels."""
         processors = MagicMock()
-        processors.session.search_sessions.wait_for_complete = AsyncMock(
+        processors.session.global_search.wait_for_complete = AsyncMock(
             return_value=mock_session_result_empty
         )
 
-        result = await processors.session.search_sessions.wait_for_complete(
-            SearchSessionsAction(querier=MagicMock(), user_id=UserID(uuid4()))
+        result = await processors.session.global_search.wait_for_complete(
+            GlobalSearchSessionsAction(searcher=MagicMock())
         )
 
-        assert result.data == []
+        assert result.items == []
         assert result.total_count == 0
-        # search_kernels should not be called for empty sessions
-        processors.session.search_kernels.wait_for_complete.assert_not_called()
+        # global_search_kernels should not be called for empty sessions
+        processors.session.global_search_kernels.wait_for_complete.assert_not_called()
 
     async def test_session_result_has_correct_container_grouping(
         self,
         mock_processors: MagicMock,
     ) -> None:
         """Kernels should be correctly grouped by session ID."""
-        session_result = await mock_processors.session.search_sessions.wait_for_complete(
-            SearchSessionsAction(querier=MagicMock(), user_id=UserID(uuid4()))
+        session_result = await mock_processors.session.global_search.wait_for_complete(
+            GlobalSearchSessionsAction(searcher=MagicMock())
         )
-        kernel_result = await mock_processors.session.search_kernels.wait_for_complete(
-            SearchKernelsAction(querier=MagicMock(), user_id=UserID(uuid4()))
+        kernel_result = await mock_processors.session.global_search_kernels.wait_for_complete(
+            GlobalSearchKernelsAction(searcher=MagicMock())
         )
 
         adapter = ComputeSessionsAdapter()
-        kernels_by_session = adapter.group_kernels_by_session(kernel_result.data)
+        kernels_by_session = adapter.group_kernels_by_session(kernel_result.items)
 
         # session-1 should have 2 kernels, session-2 should have 1
         items = [
             adapter.convert_session_to_dto(
                 session, create_allocation(), kernels_by_session.get(session.id, [])
             )
-            for session in session_result.data
+            for session in session_result.items
         ]
 
         assert len(items) == 2
@@ -575,8 +576,8 @@ class TestComputeSessionsHandler:
         mock_processors: MagicMock,
     ) -> None:
         """Pagination info should reflect the session search result."""
-        session_result = await mock_processors.session.search_sessions.wait_for_complete(
-            SearchSessionsAction(querier=MagicMock(), user_id=UserID(uuid4()))
+        session_result = await mock_processors.session.global_search.wait_for_complete(
+            GlobalSearchSessionsAction(searcher=MagicMock())
         )
 
         assert session_result.total_count == 2

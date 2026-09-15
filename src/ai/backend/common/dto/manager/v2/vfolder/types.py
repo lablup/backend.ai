@@ -8,6 +8,8 @@ from datetime import datetime
 from enum import StrEnum
 from uuid import UUID
 
+from pydantic import Field, model_validator
+
 from ai.backend.common.api_handlers import BaseRequestModel, BaseResponseModel
 from ai.backend.common.dto.manager.field import (
     VFolderOperationStatusField,
@@ -15,6 +17,7 @@ from ai.backend.common.dto.manager.field import (
     VFolderPermissionField,
 )
 from ai.backend.common.dto.manager.v2.common import BinarySizeInfo, OrderDirection
+from ai.backend.common.dto.manager.v2.rbac.types import UUIDScope
 from ai.backend.common.types import VFolderUsageMode
 
 __all__ = (
@@ -120,3 +123,29 @@ class VFolderUsageInfo(BaseResponseModel):
 
     num_files: int
     used_bytes: BinarySizeInfo
+
+
+class VFolderScope(BaseRequestModel):
+    """Scope for the scoped vfolder query.
+
+    Each list is OR'd internally and across lists. Raises an error if every field is
+    empty.
+    """
+
+    domain: list[UUIDScope] | None = Field(
+        default=None, description="Domains whose vfolders are being read"
+    )
+    project: list[UUIDScope] | None = Field(
+        default=None, description="Projects whose vfolders are being read"
+    )
+    user: list[UUIDScope] | None = Field(
+        default=None, description="Users whose vfolders are being read"
+    )
+
+    @model_validator(mode="after")
+    def _require_non_empty(self) -> VFolderScope:
+        if not self.domain and not self.project and not self.user:
+            raise ValueError(
+                "VFolderScope requires a non-empty value for 'domain', 'project' or 'user'"
+            )
+        return self

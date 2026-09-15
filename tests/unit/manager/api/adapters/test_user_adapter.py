@@ -1,14 +1,20 @@
-"""Tests for v2 UserAdapter._user_data_to_node conversion."""
+"""Tests for v2 UserAdapter conversion and its DataLoader path."""
 
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from unittest.mock import AsyncMock, MagicMock
 from uuid import UUID, uuid4
 
+import pytest
+
 from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.user.types import UserRole as DataUserRole
+from ai.backend.manager.actions.v2.bulk.result import PartialBulkEntityResult, PartialBulkResult
 from ai.backend.manager.api.adapters.user.adapter import UserAdapter
 from ai.backend.manager.data.user.types import UserData
+from ai.backend.manager.errors.common import GenericForbidden
 
 
 def _create_user_data(
@@ -71,3 +77,54 @@ class TestUserDataToNode:
         data = _create_user_data()
         node = UserAdapter._user_data_to_node(data, None)
         assert not hasattr(node, "groups")
+
+
+class TestBatchLoadByIds:
+    @pytest.fixture
+    def readable(self) -> UserData:
+        return _create_user_data()
+
+    @pytest.fixture
+    def denial(self) -> GenericForbidden:
+        return GenericForbidden("no read on this user")
+
+    @pytest.fixture
+    def processors(self, readable: UserData, denial: GenericForbidden) -> MagicMock:
+        processors = MagicMock()
+        processors.bulk_get.run = AsyncMock(
+            return_value=PartialBulkResult(
+                items=[
+                    PartialBulkEntityResult[UserData].succeeded(UserID(readable.uuid), readable),
+                    PartialBulkEntityResult[UserData].denied(UserID(uuid4()), denial),
+                    PartialBulkEntityResult[UserData].nothing(UserID(uuid4())),
+                ]
+            )
+        )
+        processors.get_default_keypairs.run = AsyncMock(return_value=MagicMock(designated={}))
+        return processors
+
+    @pytest.fixture
+    def adapter(self, processors: MagicMock) -> UserAdapter:
+        return UserAdapter(processors, MagicMock(), MagicMock(), MagicMock())
+
+    async def test_answers_per_id(
+        self,
+        adapter: UserAdapter,
+        processors: MagicMock,
+        readable: UserData,
+        denial: GenericForbidden,
+    ) -> None:
+        ids = [UserID(readable.uuid), UserID(uuid4()), UserID(uuid4())]
+
+        node, refused, missing = await adapter.batch_load_by_ids(ids)
+
+        assert node is not None and not isinstance(node, Exception)
+        assert node.id == readable.uuid
+        assert refused is denial
+        assert missing is None
+        keypair_action = processors.get_default_keypairs.run.await_args.args[0]
+        assert list(keypair_action.user_ids) == [UserID(readable.uuid)]
+
+    async def test_no_ids_read_nothing(self, adapter: UserAdapter, processors: MagicMock) -> None:
+        assert await adapter.batch_load_by_ids([]) == []
+        processors.bulk_get.run.assert_not_awaited()

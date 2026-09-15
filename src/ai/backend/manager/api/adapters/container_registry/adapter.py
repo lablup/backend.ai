@@ -47,8 +47,10 @@ from ai.backend.manager.models.container_registry.purgers import (
     ContainerRegistryPurger,
 )
 from ai.backend.manager.models.container_registry.updaters import ContainerRegistryUpdater
-from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.repositories.base import BatchQuerier
+from ai.backend.manager.services.container_registry.actions.bulk_get import (
+    BulkGetContainerRegistriesAction,
+)
 from ai.backend.manager.services.container_registry.actions.create_container_registry import (
     CreateContainerRegistryAction,
 )
@@ -324,22 +326,19 @@ class ContainerRegistryAdapter(BaseAdapter):
 
     async def batch_load_by_ids(
         self, ids: Sequence[ContainerRegistryID]
-    ) -> list[ContainerRegistryNode | None]:
-        """Batch load container registries by IDs for DataLoader use.
-
-        Returns ContainerRegistryNode DTOs in the same order as the input ids list.
-        """
+    ) -> list[ContainerRegistryNode | Exception | None]:
+        """Batch load container registries by IDs for DataLoader use, checked per registry."""
         if not ids:
             return []
-        querier = BatchQuerier(
-            pagination=OffsetPagination(limit=len(ids)),
-            conditions=[ContainerRegistryConditions.by_ids(ids)],
+        result = await self._container_registry.bulk_get.run(
+            BulkGetContainerRegistriesAction(ids=list(ids))
         )
-        action_result = await self._container_registry.search_container_registries.run(
-            SearchContainerRegistriesAction(querier=querier)
-        )
-        registry_map = {item.id: self._data_to_dto(item) for item in action_result.data}
-        return [registry_map.get(ContainerRegistryID(registry_id)) for registry_id in ids]
+        return [
+            self._data_to_dto(item.value)
+            if item.value is not None
+            else self.batch_load_failure(item.error)
+            for item in result.items
+        ]
 
     @staticmethod
     def _data_to_dto(data: ContainerRegistryData) -> ContainerRegistryNode:

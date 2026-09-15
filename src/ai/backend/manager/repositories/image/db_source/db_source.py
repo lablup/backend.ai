@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import functools
 import logging
-from collections.abc import Callable, Mapping
+from collections import defaultdict
+from collections.abc import Callable, Collection, Mapping, Sequence
 from typing import cast
-from uuid import UUID
 
 import sqlalchemy as sa
 from sqlalchemy.exc import DBAPIError
@@ -13,9 +13,9 @@ from sqlalchemy.orm import selectinload
 
 from ai.backend.common.bgtask.reporter import ProgressReporter
 from ai.backend.common.data.entity.image_alias import ImageAliasID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.docker import ImageRef
-from ai.backend.common.exception import UnknownImageReference
-from ai.backend.common.types import ImageAlias, ImageID
+from ai.backend.common.types import ImageID
 from ai.backend.common.utils import join_non_empty
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.container_registry import get_container_registry_cls
@@ -38,15 +38,24 @@ from ai.backend.manager.errors.image import (
     RegistryNotFoundForImage,
     UpdateImageActionValueError,
 )
+from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.image import (
     ImageAliasRow,
     ImageIdentifier,
     ImageRow,
 )
+from ai.backend.manager.models.image.conditions import ImageAliasConditions, ImageConditions
 from ai.backend.manager.models.image.creators import ImageAliasCreator
+from ai.backend.manager.models.image.lookups import ImageAliasOwnerLookup
+from ai.backend.manager.models.image.orders import ImageOrders
 from ai.backend.manager.models.image.purgers import ImagePurger
+from ai.backend.manager.models.image.queriers import ImageQuerier
+from ai.backend.manager.models.image.searchers import ImageAliasSearcher, ImageSearcher
 from ai.backend.manager.models.image.updaters import ImageUpdater
+from ai.backend.manager.models.scopes import OperationScope
+from ai.backend.manager.models.specs.pagination import NoPagination, OffsetPagination
+from ai.backend.manager.models.specs.searcher import SearcherResult
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base import BatchQuerier, execute_batch_querier
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
@@ -62,60 +71,106 @@ class ImageDBSource:
         self._db = db
         self._ops_provider = ops_provider
 
-    async def fetch_image_by_identifiers(
-        self, identifiers: list[ImageAlias | ImageRef | ImageIdentifier]
-    ) -> ImageData:
-        """
-        Fetches an image from database by its identifiers, which can be a combination of
-        ImageAlias, ImageRef, or ImageIdentifier.
-        Returns an ImageData object.
-        Raises Exception if the image cannot be found.
-        """
-        async with self._db.begin_readonly_session_read_committed() as session:
-            row = await self._resolve_image(session, identifiers)
-            return row.to_dataclass()
+    async def fetch_image_by_reference(self, reference: str, architecture: str) -> ImageData:
+        """The live image the reference names as a canonical for the architecture, or as an
+        alias."""
+        async with self._ops_provider.read_ops() as r:
+            result = await r.search_in_global(
+                self._reference_searcher(reference, architecture, [ImageStatus.ALIVE])
+            )
+        return self._first_image(result)
 
-    async def fetch_images_batch(
-        self, identifier_lists: list[list[ImageIdentifier]]
+    async def fetch_image_by_canonical(self, canonical: str, architecture: str) -> ImageData:
+        async with self._ops_provider.read_ops() as r:
+            result = await r.search_in_global(
+                self._canonical_searcher(canonical, architecture, [ImageStatus.ALIVE])
+            )
+        return self._first_image(result)
+
+    async def fetch_images_by_canonicals(
+        self, identifiers: Sequence[ImageIdentifier]
     ) -> list[ImageData]:
-        """
-        Fetches multiple images from database by their identifiers in a single database session.
-        Returns a list of ImageData objects.
-        More efficient than multiple individual fetch operations.
-        """
-        async with self._db.begin_readonly_session() as session:
-            rows: list[ImageRow] = []
-            for identifiers in identifier_lists:
-                row = await self._resolve_image(
-                    session, cast(list[ImageAlias | ImageRef | ImageIdentifier], identifiers)
+        images: list[ImageData] = []
+        async with self._ops_provider.read_ops() as r:
+            for identifier in identifiers:
+                result = await r.search_in_global(
+                    self._canonical_searcher(
+                        identifier.canonical, identifier.architecture, [ImageStatus.ALIVE]
+                    )
                 )
-                rows.append(row)
-            return [row.to_dataclass() for row in rows]
+                images.append(self._first_image(result))
+        return images
 
-    async def _resolve_image(
-        self,
-        session: SASession,
-        identifiers: list[ImageAlias | ImageRef | ImageIdentifier],
-    ) -> ImageRow:
-        return await ImageRow.resolve(session, identifiers)
-
-    async def _get_image_by_id(
-        self,
-        session: SASession,
-        image_id: UUID,
-        load_aliases: bool = False,
-        status_filter: list[ImageStatus] | None = None,
-    ) -> ImageRow:
-        """
-        Private method to get an image by ID using an existing session.
-        Returns None if image is not found.
-        """
-        row = await ImageRow.get(
-            session, image_id, load_aliases=load_aliases, filter_by_statuses=status_filter
+    def _reference_searcher(
+        self, reference: str, architecture: str, statuses: Collection[ImageStatus]
+    ) -> ImageSearcher:
+        return ImageSearcher(
+            pagination=OffsetPagination(limit=1),
+            conditions=[
+                ImageConditions.by_canonical_and_architecture_or_alias(reference, architecture),
+                *self._status_conditions(statuses),
+            ],
+            orders=ImageOrders.canonical_match_then_alive_then_oldest(reference, architecture),
         )
-        if row is None:
+
+    def _canonical_searcher(
+        self, canonical: str, architecture: str, statuses: Collection[ImageStatus]
+    ) -> ImageSearcher:
+        return ImageSearcher(
+            pagination=OffsetPagination(limit=1),
+            conditions=[
+                ImageConditions.by_canonical_and_architecture(canonical, architecture),
+                *self._status_conditions(statuses),
+            ],
+            orders=ImageOrders.alive_then_oldest(),
+        )
+
+    def _status_conditions(self, statuses: Collection[ImageStatus]) -> list[QueryCondition]:
+        """An empty collection allows every status."""
+        if not statuses:
+            return []
+        return [ImageConditions.by_statuses(statuses)]
+
+    def _first_image(self, result: SearcherResult[ImageData]) -> ImageData:
+        if not result.items:
+            raise ImageNotFound()
+        return result.items[0]
+
+    async def _fetch_image(self, image_id: ImageID, statuses: Collection[ImageStatus]) -> ImageData:
+        async with self._ops_provider.read_ops() as r:
+            image = await r.query_data(ImageQuerier(image_id))
+        if image is None or (statuses and image.status not in statuses):
+            raise ImageNotFound()
+        return image
+
+    async def _get_image_row_for_write(
+        self, session: SASession, image_id: ImageID, statuses: Collection[ImageStatus]
+    ) -> ImageRow:
+        row = await session.get(ImageRow, image_id)
+        if row is None or (statuses and row.status not in statuses):
             raise ImageNotFound()
         return row
+
+    async def _aliases_by_image(
+        self, image_ids: Collection[ImageID]
+    ) -> Mapping[ImageID, list[str]]:
+        if not image_ids:
+            return {}
+        async with self._ops_provider.read_ops() as r:
+            result = await r.search_in_global(
+                ImageAliasSearcher(
+                    pagination=NoPagination(),
+                    conditions=[ImageAliasConditions.by_image_ids(image_ids)],
+                )
+            )
+            owners = await r.lookup_field_owners(
+                ImageAliasOwnerLookup(), [alias.id for alias in result.items]
+            )
+        aliases: defaultdict[ImageID, list[str]] = defaultdict(list)
+        for alias in result.items:
+            if alias.alias:
+                aliases[ImageID(owners[alias.id])].append(alias.alias)
+        return aliases
 
     async def _get_image_alias_by_name(self, session: SASession, alias: str) -> ImageAliasRow:
         """
@@ -157,96 +212,91 @@ class ImageDBSource:
         """
         Deprecated. Use query_image_details_by_id instead.
         """
-        try:
-            async with self._db.begin_readonly_session_read_committed() as session:
-                image_row = await ImageRow.resolve(
-                    session,
-                    [
-                        identifier,
-                        ImageAlias(identifier.canonical),
-                    ],
-                    filter_by_statuses=status_filter,
-                )
-        except UnknownImageReference as e:
-            raise ImageNotFound from e
-        return image_row.to_detailed_dataclass()
+        statuses = [ImageStatus.ALIVE] if status_filter is None else status_filter
+        async with self._ops_provider.read_ops() as r:
+            result = await r.search_in_global(
+                self._reference_searcher(identifier.canonical, identifier.architecture, statuses)
+            )
+        image = self._first_image(result)
+        aliases = await self._aliases_by_image([image.id])
+        return image.to_detailed(aliases.get(image.id, []))
 
     async def query_image_details_by_id(
         self,
-        image_id: UUID,
+        image_id: ImageID,
         load_aliases: bool = False,
         status_filter: list[ImageStatus] | None = None,
     ) -> ImageDataWithDetails:
-        async with self._db.begin_readonly_session_read_committed() as session:
-            try:
-                row: ImageRow = await self._get_image_by_id(
-                    session, image_id, load_aliases, status_filter
-                )
-            except UnknownImageReference as e:
-                raise ImageNotFound() from e
-            return row.to_detailed_dataclass()
+        statuses = [ImageStatus.ALIVE] if status_filter is None else status_filter
+        image = await self._fetch_image(image_id, statuses)
+        if not load_aliases:
+            return image.to_detailed([])
+        aliases = await self._aliases_by_image([image.id])
+        return image.to_detailed(aliases.get(image.id, []))
 
     async def query_all_images(
         self, status_filter: list[ImageStatus] | None = None
     ) -> Mapping[ImageID, ImageDataWithDetails]:
-        async with self._db.begin_readonly_session_read_committed() as session:
-            rows = await ImageRow.list(session, load_aliases=True, filter_by_statuses=status_filter)
-            return {ImageID(row.id): row.to_detailed_dataclass() for row in rows}
+        statuses = [ImageStatus.ALIVE] if status_filter is None else status_filter
+        async with self._ops_provider.read_ops() as r:
+            result = await r.search_in_global(
+                ImageSearcher(
+                    pagination=NoPagination(), conditions=self._status_conditions(statuses)
+                )
+            )
+        aliases = await self._aliases_by_image([image.id for image in result.items])
+        return {image.id: image.to_detailed(aliases.get(image.id, [])) for image in result.items}
 
-    async def mark_image_deleted(
-        self,
-        identifiers: list[ImageAlias | ImageRef | ImageIdentifier],
-    ) -> ImageData:
+    async def mark_image_deleted(self, reference: str, architecture: str) -> ImageData:
         """
         Deprecated. Use mark_image_deleted_by_id instead.
         """
-        async with self._db.begin_session() as session:
-            row = await self._resolve_image(session, identifiers)
-            await row.mark_as_deleted(session)
-            return row.to_dataclass()
+        image = await self.fetch_image_by_reference(reference, architecture)
+        return await self.mark_image_deleted_by_id(image.id)
 
     async def mark_image_deleted_by_id(
         self,
-        image_id: UUID,
+        image_id: ImageID,
     ) -> ImageData:
         """
         Marks an image record as deleted by its ID in the database.
         """
         async with self._db.begin_session() as session:
-            image_row = await self._get_image_by_id(session, image_id)
+            image_row = await self._get_image_row_for_write(session, image_id, [ImageStatus.ALIVE])
             await image_row.mark_as_deleted(session)
             return image_row.to_dataclass()
 
     async def mark_image_alive_by_id(
         self,
-        image_id: UUID,
+        image_id: ImageID,
     ) -> ImageData:
         """
         Marks a soft-deleted image record as alive again by its ID in the database.
         """
         async with self._db.begin_session() as session:
-            image_row = await self._get_image_by_id(session, image_id)
+            image_row = await self._get_image_row_for_write(
+                session, image_id, ImageStatus.restorable()
+            )
             await image_row.mark_as_alive(session)
             return image_row.to_dataclass()
 
-    async def fetch_image_by_id(self, image_id: UUID, load_aliases: bool = False) -> ImageData:
+    async def fetch_image_by_id(self, image_id: ImageID, load_aliases: bool = False) -> ImageData:
         """
         Fetches an image from database by ID.
         Raises ImageNotFound if image doesn't exist.
         """
-        async with self._db.begin_readonly_session_read_committed() as session:
-            image_row = await self._get_image_by_id(session, image_id, load_aliases)
-            return image_row.to_dataclass()
+        return await self._fetch_image(image_id, [ImageStatus.ALIVE])
 
-    async def validate_image_ownership(self, image_id: UUID, user_id: UUID) -> bool:
+    async def validate_image_ownership(
+        self, image_id: ImageID, user_id: UserID, statuses: Collection[ImageStatus]
+    ) -> bool:
         """
         Checks if the image was committed for the user.
         Returns True if it was, False otherwise.
         Raises ImageNotFound if image doesn't exist.
         """
-        async with self._db.begin_readonly_session_read_committed() as session:
-            image_row = await self._get_image_by_id(session, image_id)
-            return image_row.customized and image_row.creator_id == user_id
+        image = await self._fetch_image(image_id, statuses)
+        return image.customized and image.creator_id == user_id
 
     async def insert_image_alias(
         self, alias: str, image_canonical: str, architecture: str
@@ -255,11 +305,8 @@ class ImageDBSource:
         Deprecated. Use insert_image_alias_by_id instead.
         """
         try:
-            async with self._db.begin_readonly_session_read_committed() as session:
-                image_row = await ImageRow.resolve(
-                    session, [ImageIdentifier(image_canonical, architecture)]
-                )
-                image_id = ImageID(image_row.id)
+            image = await self.fetch_image_by_canonical(image_canonical, architecture)
+            image_id = image.id
             async with self._ops_provider.write_ops() as w:
                 alias_data = await w.create_field(image_id, ImageAliasCreator(alias=alias))
             return image_id, alias_data
@@ -273,7 +320,7 @@ class ImageDBSource:
             row = await self._get_image_alias_by_name(session, alias)
             return ImageAliasData(id=ImageAliasID(row.id), alias=row.alias or "")
 
-    async def remove_image_alias(self, alias: str) -> tuple[UUID, ImageAliasData]:
+    async def remove_image_alias(self, alias: str) -> tuple[ImageID, ImageAliasData]:
         async with self._db.begin_session() as session:
             existing_alias = await self._get_image_alias_by_name(session, alias)
             image_id = existing_alias.image_id
@@ -290,41 +337,35 @@ class ImageDBSource:
         Deprecated. Use scan_images_by_ids instead.
         """
 
-        async with self._db.begin_session() as session:
-            # Resolve the image first
-            image_row = await self._resolve_image(
-                session, [ImageIdentifier(image_canonical, architecture)]
-            )
+        image = await self.fetch_image_by_canonical(image_canonical, architecture)
+        registry_parts = []
+        if image.registry:
+            registry_parts.append(image.registry)
+        if image.project:
+            registry_parts.append(image.project)
+        registry_key = "/".join(registry_parts) if registry_parts else ""
 
-            # Get the registry info
-            registry_parts = []
-            if image_row.registry:
-                registry_parts.append(image_row.registry)
-            if image_row.project:
-                registry_parts.append(image_row.project)
-            registry_key = "/".join(registry_parts) if registry_parts else ""
+        async with self._db.begin_readonly_session_read_committed() as session:
+            registry_row = await session.get(ContainerRegistryRow, image.registry_id)
+        if not registry_row:
+            raise RegistryNotFoundForImage(f"Registry not found for image {image_canonical}")
 
-            # Get the registry row
-            registry_row = await session.get(ContainerRegistryRow, image_row.registry_id)
-            if not registry_row:
-                raise RegistryNotFoundForImage(f"Registry not found for image {image_canonical}")
-
-            return await self.scan_single_image(registry_key, registry_row, image_canonical)
+        return await self.scan_single_image(registry_key, registry_row, image_canonical)
 
     async def fetch_image_and_registry(
-        self, image_id: UUID
+        self, image_id: ImageID
     ) -> tuple[ImageData, ImageRef, ContainerRegistryRow]:
         """Read the image (as data + ref) and its container registry row.
 
         Used by the repository to orchestrate a registry untag without holding a
         DB session open across the external registry call.
         """
+        image = await self._fetch_image(image_id, [ImageStatus.ALIVE])
         async with self._db.begin_readonly_session() as session:
-            image_row = await self._get_image_by_id(session, image_id, load_aliases=True)
-            registry_row = await session.get(ContainerRegistryRow, image_row.registry_id)
-            if registry_row is None:
-                raise RegistryNotFoundForImage(f"Registry not found for image {image_id}")
-            return image_row.to_dataclass(), image_row.image_ref, registry_row
+            registry_row = await session.get(ContainerRegistryRow, image.registry_id)
+        if registry_row is None:
+            raise RegistryNotFoundForImage(f"Registry not found for image {image_id}")
+        return image, image.image_ref, registry_row
 
     async def modify_image_properties(self, updater: ImageUpdater) -> ImageData:
         try:
@@ -342,12 +383,8 @@ class ImageDBSource:
         """
         Deprecated. Use clear_image_resource_limits_by_id instead.
         """
-        async with self._db.begin_session() as session:
-            image_row = await ImageRow.resolve(
-                session, [ImageIdentifier(image_canonical, architecture)]
-            )
-            image_row._resources = {}
-            return image_row.to_dataclass()
+        image = await self.fetch_image_by_canonical(image_canonical, architecture)
+        return await self.clear_image_resource_limits_by_id(image.id)
 
     async def insert_image_alias_by_id(
         self, image_id: ImageID, creator: ImageAliasCreator
@@ -356,9 +393,7 @@ class ImageDBSource:
         Creates an alias of the image the id names.
         """
         try:
-            async with self._db.begin_readonly_session_read_committed() as session:
-                # Validate that the image exists
-                await self._get_image_by_id(session, image_id)
+            await self._fetch_image(image_id, [ImageStatus.ALIVE])
             async with self._ops_provider.write_ops() as w:
                 return await w.create_field(image_id, creator)
         except ValueError as e:
@@ -368,7 +403,7 @@ class ImageDBSource:
 
     async def query_images_by_ids(
         self,
-        image_ids: list[UUID],
+        image_ids: list[ImageID],
         status_filter: list[ImageStatus] | None = None,
     ) -> dict[ImageID, ImageDataWithDetails]:
         """
@@ -391,25 +426,25 @@ class ImageDBSource:
             image_rows = list(result.scalars().all())
             return {ImageID(row.id): row.to_detailed_dataclass() for row in image_rows}
 
-    async def clear_image_resource_limits_by_id(self, image_id: UUID) -> ImageData:
+    async def clear_image_resource_limits_by_id(self, image_id: ImageID) -> ImageData:
         """
         Clears image resource limits by image ID.
         """
         async with self._db.begin_session() as session:
-            image_row = await self._get_image_by_id(session, image_id)
+            image_row = await self._get_image_row_for_write(session, image_id, [ImageStatus.ALIVE])
             image_row._resources = {}
             return image_row.to_dataclass()
 
     async def set_image_resource_limit_by_id(
         self,
-        image_id: UUID,
+        image_id: ImageID,
         resource_limit: ResourceLimitInput,
     ) -> ImageData:
         """
         Sets resource limit for an image by its ID.
         """
         async with self._db.begin_session() as session:
-            image_row = await self._get_image_by_id(session, image_id)
+            image_row = await self._get_image_row_for_write(session, image_id, [ImageStatus.ALIVE])
             resources = dict(image_row._resources) if image_row._resources else {}
 
             if resource_limit.slot_name not in resources:
@@ -425,14 +460,14 @@ class ImageDBSource:
 
     async def remove_image_and_aliases(
         self,
-        image_id: UUID,
+        image_id: ImageID,
     ) -> ImageData:
         """
         Removes an image record and all its aliases from the database.
         """
         try:
             async with self._ops_provider.write_ops() as w:
-                data = await w.purge_entity(ImagePurger(image_id=ImageID(image_id)))
+                data = await w.purge_entity(ImagePurger(image_id=image_id))
                 if data is None:
                     raise ImageNotFound(f"Image not found (id: {image_id})")
             return data
@@ -447,6 +482,21 @@ class ImageDBSource:
         async with self._db.begin_readonly_session() as db_sess:
             query = sa.select(ImageRow).options(selectinload(ImageRow.aliases))
             result = await execute_batch_querier(db_sess, query, querier)
+            items = [row.ImageRow.to_dataclass() for row in result.rows]
+            return ImageListResult(
+                items=items,
+                total_count=result.total_count,
+                has_next_page=result.has_next_page,
+                has_previous_page=result.has_previous_page,
+            )
+
+    async def search_images_in_scopes(
+        self, querier: BatchQuerier, scopes: Sequence[OperationScope]
+    ) -> ImageListResult:
+        """The search of :meth:`search_images`, restricted to the scopes (OR)."""
+        async with self._db.begin_readonly_session() as db_sess:
+            query = sa.select(ImageRow).options(selectinload(ImageRow.aliases))
+            result = await execute_batch_querier(db_sess, query, querier, scopes=scopes)
             items = [row.ImageRow.to_dataclass() for row in result.rows]
             return ImageListResult(
                 items=items,
