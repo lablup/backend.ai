@@ -31,8 +31,6 @@ from ai.backend.manager.models.vfolder import (
 )
 from ai.backend.manager.models.vfolder.updaters import VFolderAttributeUpdater
 from ai.backend.manager.services.vfolder.types import (
-    VFolderBaseInfo,
-    VFolderOwnershipInfo,
     VFolderUsageInfo,
 )
 
@@ -155,35 +153,8 @@ class GetVFolderAction(VFolderAction):
 @dataclass
 class GetVFolderActionResult:
     user_uuid: uuid.UUID
-    base_info: VFolderBaseInfo
-    ownership_info: VFolderOwnershipInfo
+    vfolder: VFolderData
     usage_info: VFolderUsageInfo
-
-
-@dataclass
-class ListVFolderAction(VFolderScopeAction):
-    user_uuid: uuid.UUID
-    scope: EntityIdentifier
-
-    @override
-    def scope_targets(self) -> Sequence[EntityIdentifier]:
-        return (self.scope,)
-
-    @override
-    @classmethod
-    def operation_type(cls) -> ActionOperationType:
-        return ActionOperationType.SEARCH
-
-    @override
-    @classmethod
-    def action_name(cls) -> str:
-        return "list_vfolder"
-
-
-@dataclass
-class ListVFolderActionResult(VFolderScopeActionResult):
-    user_uuid: uuid.UUID
-    vfolders: list[tuple[VFolderBaseInfo, VFolderOwnershipInfo]]
 
 
 @dataclass

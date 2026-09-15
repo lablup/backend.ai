@@ -35,11 +35,9 @@ from ai.backend.manager.data.vfolder.dto import UserIdentity
 from ai.backend.manager.data.vfolder.types import (
     UserWithVFolderHostPermissions,
     ValidatedVFolderInfo,
-    VFolderAccessInfo,
     VFolderCreation,
     VFolderData,
     VFolderInvitationData,
-    VFolderListResult,
     VFolderMountPermission,
     VFolderPermissionData,
 )
@@ -97,7 +95,6 @@ from ai.backend.manager.models.vfolder import (
     get_allowed_vfolder_hosts_by_user,
     get_sessions_by_mounted_folder,
     is_unmanaged,
-    query_accessible_vfolders,
     vfolder_status_map,
     vfolders,
 )
@@ -386,46 +383,6 @@ class VfolderRepository:
                 raise UserNotFound(f"User with UUID {user_uuid} not found.")
 
             return user_row.resource_policy_row.max_vfolder_count
-
-    @vfolder_repository_resilience.apply()
-    async def list_accessible_vfolders(
-        self,
-        user_id: uuid.UUID,
-        user_role: UserRole,
-        domain_name: str,
-        allowed_vfolder_types: list[str],
-        extra_conditions: sa.sql.elements.ColumnElement[bool] | None = None,
-    ) -> VFolderListResult:
-        """
-        List all VFolders accessible to a user.
-        Returns VFolderListResult with access information.
-        """
-        async with self._db.begin_readonly_session() as session:
-            conn = await session.connection()
-            vfolder_dicts = await query_accessible_vfolders(
-                conn,
-                user_id,
-                user_role=user_role,
-                domain_name=domain_name,
-                allowed_vfolder_types=allowed_vfolder_types,
-                extra_vf_conds=extra_conditions,
-            )
-
-            vfolder_access_infos = []
-            for vfolder_dict in vfolder_dicts:
-                vfolder_data = self._vfolder_dict_to_data(dict(vfolder_dict))
-                is_owner = vfolder_dict.get("is_owner", False)
-                permission = vfolder_dict.get("permission", VFolderPermission.READ_ONLY)
-
-                vfolder_access_infos.append(
-                    VFolderAccessInfo(
-                        vfolder_data=vfolder_data,
-                        is_owner=is_owner,
-                        effective_permission=permission,
-                    )
-                )
-
-            return VFolderListResult(vfolders=vfolder_access_infos)
 
     @vfolder_repository_resilience.apply()
     async def resolve_vfolder_ids_by_names(self, names: Sequence[str]) -> dict[str, uuid.UUID]:
@@ -1618,35 +1575,6 @@ class VfolderRepository:
             ),
             host=vfolder_data.host,
             unmanaged_path=vfolder_data.unmanaged_path,
-        )
-
-    def _vfolder_dict_to_data(self, vfolder_dict: dict[str, Any]) -> VFolderData:
-        """
-        Convert vfolder dictionary from query_accessible_vfolders to VFolderData.
-        """
-        return VFolderData(
-            id=VFolderUUID(vfolder_dict["id"]),
-            name=vfolder_dict["name"],
-            host=vfolder_dict["host"],
-            domain_name=vfolder_dict["domain_name"],
-            quota_scope_id=vfolder_dict["quota_scope_id"],
-            usage_mode=vfolder_dict["usage_mode"],
-            permission=vfolder_dict.get("permission"),
-            max_files=vfolder_dict["max_files"],
-            max_size=vfolder_dict["max_size"],
-            num_files=vfolder_dict.get("num_files", 0),
-            cur_size=vfolder_dict["cur_size"],
-            created_at=vfolder_dict["created_at"],
-            last_used=vfolder_dict["last_used"],
-            updated_at=vfolder_dict["updated_at"],
-            creator=vfolder_dict["creator"],
-            creator_id=vfolder_dict.get("creator_id"),
-            unmanaged_path=vfolder_dict["unmanaged_path"],
-            ownership_type=vfolder_dict["ownership_type"],
-            user=uuid.UUID(vfolder_dict["user"]) if vfolder_dict["user"] else None,
-            group=uuid.UUID(vfolder_dict["group"]) if vfolder_dict["group"] else None,
-            cloneable=vfolder_dict["cloneable"],
-            status=vfolder_dict["status"],
         )
 
     @vfolder_repository_resilience.apply()

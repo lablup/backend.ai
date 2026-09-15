@@ -295,27 +295,6 @@ class VFolderCreation:
 
 
 @dataclass
-class VFolderAccessInfo:
-    """
-    Information about VFolder access for query results.
-    """
-
-    vfolder_data: VFolderData
-    is_owner: bool
-    effective_permission: VFolderMountPermission | None
-
-
-@dataclass
-class VFolderListResult:
-    """
-    Result of VFolder list operations with pagination support.
-    """
-
-    vfolders: list[VFolderAccessInfo]
-    total_count: int | None = None
-
-
-@dataclass
 class VFolderSearchResult:
     """Search result with total count and pagination info for vfolders."""
 

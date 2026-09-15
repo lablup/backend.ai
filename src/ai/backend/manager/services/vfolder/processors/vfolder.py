@@ -18,8 +18,6 @@ from ai.backend.manager.services.vfolder.actions.base import (
     GetTaskLogsActionResult,
     GetVFolderAction,
     GetVFolderActionResult,
-    ListVFolderAction,
-    ListVFolderActionResult,
     LookupAccessibleVFolderAction,
     LookupAccessibleVFolderActionResult,
     MoveToTrashVFolderAction,
@@ -113,7 +111,6 @@ from ai.backend.manager.services.vfolder.services.vfolder import VFolderService
 class VFolderProcessors:
     create_vfolder: ScopeActionProcessor[CreateVFolderAction, CreateVFolderActionResult]
     get_vfolder: SingleEntityActionProcessor[GetVFolderAction, GetVFolderActionResult]
-    list_vfolder: ScopeActionProcessor[ListVFolderAction, ListVFolderActionResult]
     scoped_search: ScopeActionProcessor[
         ScopedSearchVFoldersAction, ScopedBatchOpsResult[VFolderData]
     ]
@@ -188,7 +185,6 @@ class VFolderProcessors:
     def __init__(self, group: ProcessorGroup[VFolderData], service: VFolderService) -> None:
         # Scope actions with RBAC validation
         self.create_vfolder = group.scope(CreateVFolderAction, service.create)
-        self.list_vfolder = group.scope(ListVFolderAction, service.list)
         self.scoped_search = group.scope_search_ops(ScopedSearchVFoldersAction)
 
         # Single entity actions with RBAC validation
