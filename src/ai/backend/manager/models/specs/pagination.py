@@ -136,7 +136,9 @@ class OffsetPagination(QueryPagination):
     def apply(self, query: sa.sql.Select[Any]) -> sa.sql.Select[Any]:
         """Apply the priority orders, then offset-based pagination."""
 
-        query = query.order_by(*self.priority_orders).limit(self.limit)
+        if self.priority_orders:
+            query = query.order_by(*self.priority_orders)
+        query = query.limit(self.limit)
         if self.offset > 0:
             query = query.offset(self.offset)
         return query
