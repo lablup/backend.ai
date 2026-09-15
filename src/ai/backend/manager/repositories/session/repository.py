@@ -15,11 +15,9 @@ from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryAr
 from ai.backend.common.resilience.resilience import Resilience
 from ai.backend.common.types import AccessKey, KernelId, SessionId
 from ai.backend.manager.data.image.types import ImageData
-from ai.backend.manager.data.kernel.types import KernelListResult
 from ai.backend.manager.data.resource_slot.types import ResourceAllocationAggregate
 from ai.backend.manager.data.session.types import (
     SessionData,
-    SessionListResult,
     SessionRoutingInfo,
 )
 from ai.backend.manager.data.user.types import SessionOwnerContext, UserData
@@ -29,7 +27,6 @@ from ai.backend.manager.models.session import KernelLoadingStrategy, SessionRow
 from ai.backend.manager.models.session.updaters import SessionUpdater
 from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.session.db_source import SessionDBSource
 
@@ -260,36 +257,6 @@ class SessionRepository:
         Pure lookup; session access authorization is the caller's responsibility.
         """
         return await self._db_source.get_session_with_routing_minimal(session_id)
-
-    @session_repository_resilience.apply()
-    async def search(
-        self,
-        querier: BatchQuerier,
-    ) -> SessionListResult:
-        """Search sessions with querier pattern.
-
-        Args:
-            querier: BatchQuerier for filtering, ordering, and pagination
-
-        Returns:
-            SessionListResult with items, total count, and pagination info
-        """
-        return await self._db_source.search(querier)
-
-    @session_repository_resilience.apply()
-    async def search_kernels(
-        self,
-        querier: BatchQuerier,
-    ) -> KernelListResult:
-        """Search kernels with querier pattern.
-
-        Args:
-            querier: BatchQuerier for filtering, ordering, and pagination
-
-        Returns:
-            KernelListResult with items, total count, and pagination info
-        """
-        return await self._db_source.search_kernels(querier)
 
     @session_repository_resilience.apply()
     async def batch_get_resource_allocation_by_session(

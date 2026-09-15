@@ -19,11 +19,9 @@ from ai.backend.common.types import (
     SessionId,
 )
 from ai.backend.manager.data.image.types import ImageData, ImageStatus
-from ai.backend.manager.data.kernel.types import KernelListResult
 from ai.backend.manager.data.resource_slot.types import ResourceAllocationAggregate
 from ai.backend.manager.data.session.types import (
     SessionData,
-    SessionListResult,
     SessionRoutingInfo,
 )
 from ai.backend.manager.data.user.types import SessionOwnerContext, UserData
@@ -624,67 +622,6 @@ class SessionDBSource:
             agent_addr=main_kernel.agent_addr,
             service_ports=main_kernel.service_ports or [],
         )
-
-    async def search(
-        self,
-        querier: BatchQuerier,
-    ) -> SessionListResult:
-        """Search sessions with querier pattern.
-
-        Args:
-            querier: BatchQuerier for filtering, ordering, and pagination
-
-        Returns:
-            SessionListResult with items, total count, and pagination info
-        """
-        async with self._db.begin_readonly_session() as db_sess:
-            query = sa.select(SessionRow).options(selectinload(SessionRow.kernels))
-
-            result = await execute_batch_querier(
-                db_sess,
-                query,
-                querier,
-            )
-
-            session_rows = [row.SessionRow for row in result.rows]
-            items = [row.to_dataclass() for row in session_rows]
-
-            return SessionListResult(
-                items=items,
-                total_count=result.total_count,
-                has_next_page=result.has_next_page,
-                has_previous_page=result.has_previous_page,
-            )
-
-    async def search_kernels(
-        self,
-        querier: BatchQuerier,
-    ) -> KernelListResult:
-        """Search kernels with querier pattern.
-
-        Args:
-            querier: BatchQuerier for filtering, ordering, and pagination
-
-        Returns:
-            KernelListResult with items, total count, and pagination info
-        """
-        async with self._db.begin_readonly_session() as db_sess:
-            query = sa.select(KernelRow)
-
-            result = await execute_batch_querier(
-                db_sess,
-                query,
-                querier,
-            )
-
-            items = [row.KernelRow.to_kernel_info() for row in result.rows]
-
-            return KernelListResult(
-                items=items,
-                total_count=result.total_count,
-                has_next_page=result.has_next_page,
-                has_previous_page=result.has_previous_page,
-            )
 
     @staticmethod
     def _resource_allocation_aggregates() -> tuple[Any, Any, Any]:

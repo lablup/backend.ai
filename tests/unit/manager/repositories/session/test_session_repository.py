@@ -49,10 +49,8 @@ from ai.backend.manager.models.resource_slot import ResourceAllocationRow, Resou
 from ai.backend.manager.models.resource_slot.aggregates import batch_load_session_allocations
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.session_template import SessionTemplateRow, TemplateType
-from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.session.repository import SessionRepository
 from ai.backend.manager.secret.types import SecretValue
@@ -335,96 +333,6 @@ class TestSessionRepository:
             kernel_id=kernel_id,
             access_key=access_key,
         )
-
-    # =========================================================================
-    # Tests - SearchKernels
-    # =========================================================================
-
-    async def test_search_kernels(
-        self,
-        repository: SessionRepository,
-        session_with_kernel: SessionTestData,
-    ) -> None:
-        """Test search_kernels returns kernel info when kernels exist"""
-        querier = BatchQuerier(
-            pagination=OffsetPagination(limit=10, offset=0),
-            conditions=[],
-            orders=[],
-        )
-        result = await repository.search_kernels(querier)
-
-        assert result.total_count == 1
-        assert len(result.items) == 1
-        assert result.has_next_page is False
-        assert result.has_previous_page is False
-
-        kernel_info = result.items[0]
-        assert kernel_info.id == session_with_kernel.kernel_id
-        assert kernel_info.session.session_id == str(session_with_kernel.session_id)
-
-    async def test_search_kernels_empty_result(
-        self,
-        repository: SessionRepository,
-    ) -> None:
-        """Test search_kernels returns empty result when no kernels exist"""
-        querier = BatchQuerier(
-            pagination=OffsetPagination(limit=10, offset=0),
-            conditions=[],
-            orders=[],
-        )
-        result = await repository.search_kernels(querier)
-
-        assert result.total_count == 0
-        assert len(result.items) == 0
-        assert result.has_next_page is False
-        assert result.has_previous_page is False
-
-    # =========================================================================
-    # Tests - SearchSessions
-    # =========================================================================
-
-    async def test_search_sessions(
-        self,
-        repository: SessionRepository,
-        session_with_kernel: SessionTestData,
-    ) -> None:
-        """Test search returns session data when sessions exist"""
-        querier = BatchQuerier(
-            pagination=OffsetPagination(limit=10, offset=0),
-            conditions=[],
-            orders=[],
-        )
-        result = await repository.search(querier=querier)
-
-        assert result.total_count == 1
-        assert len(result.items) == 1
-        assert result.has_next_page is False
-        assert result.has_previous_page is False
-
-        session_data = result.items[0]
-        assert session_data.id == session_with_kernel.session_id
-        assert session_data.name == "test-session"
-        assert session_data.domain_name == session_with_kernel.domain_name
-        assert session_data.group_id == session_with_kernel.group_id
-        assert session_data.user_uuid == session_with_kernel.user_id
-        assert session_data.access_key == session_with_kernel.access_key
-
-    async def test_search_sessions_empty_result(
-        self,
-        repository: SessionRepository,
-    ) -> None:
-        """Test search returns empty result when no sessions exist"""
-        querier = BatchQuerier(
-            pagination=OffsetPagination(limit=10, offset=0),
-            conditions=[],
-            orders=[],
-        )
-        result = await repository.search(querier=querier)
-
-        assert result.total_count == 0
-        assert len(result.items) == 0
-        assert result.has_next_page is False
-        assert result.has_previous_page is False
 
     # =========================================================================
     # Tests - resolve_session_id
