@@ -72,6 +72,10 @@ class StorageComposer(DependencyComposer[StorageComposerInput, StorageResources]
             StoragePoolProvider(),
             StoragePoolInput(local_config=local_config, pidx=setup_input.pidx),
         )
+        watcher = await stack.enter_dependency(
+            WatcherProvider(),
+            WatcherInput(local_config=local_config, pidx=setup_input.pidx),
+        )
         volume_pool = await stack.enter_dependency(
             VolumePoolProvider(),
             VolumePoolInput(
@@ -80,6 +84,7 @@ class StorageComposer(DependencyComposer[StorageComposerInput, StorageResources]
                 event_dispatcher=setup_input.event_dispatcher,
                 event_producer=setup_input.event_producer,
                 backends=setup_input.backends,
+                watcher=watcher,
             ),
         )
         background_task_manager = await stack.enter_dependency(
@@ -90,10 +95,6 @@ class StorageComposer(DependencyComposer[StorageComposerInput, StorageResources]
                 volume_pool=volume_pool,
                 server_id=local_config.storage_proxy.node_id,
             ),
-        )
-        watcher = await stack.enter_dependency(
-            WatcherProvider(),
-            WatcherInput(local_config=local_config, pidx=setup_input.pidx),
         )
         volume_stats = await stack.enter_dependency(
             VolumeStatsProvider(),
