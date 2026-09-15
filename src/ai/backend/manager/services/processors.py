@@ -239,6 +239,7 @@ if TYPE_CHECKING:
     from ai.backend.manager.services.runtime_variant.processors import (
         RuntimeVariantProcessors,
     )
+    from ai.backend.manager.services.runtime_variant.service import RuntimeVariantService
     from ai.backend.manager.services.runtime_variant_preset.processors import (
         RuntimeVariantPresetProcessors,
     )
@@ -380,6 +381,7 @@ class Services:
     rbac_relation: RbacRelationService
     rbac_role: RbacRoleService
     rbac_roster: RbacRosterService
+    runtime_variant: RuntimeVariantService
     runtime_variant_preset: RuntimeVariantPresetService
     deployment_revision_preset: DeploymentPresetService
     model_card: ModelCardService

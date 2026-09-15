@@ -465,7 +465,7 @@ def test_every_defined_v2_action_is_wired() -> None:
         MagicMock(),
         MagicMock(),
     )
-    RuntimeVariantProcessors(registry.group(GroupMeta(RuntimeVariantEntityType())))
+    RuntimeVariantProcessors(registry.group(GroupMeta(RuntimeVariantEntityType())), MagicMock())
     ObjectStorageProcessors(
         registry.group(GroupMeta(ObjectStorageEntityType())),
         artifact_revisions,
