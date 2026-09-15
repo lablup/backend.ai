@@ -67,14 +67,17 @@ class ContainerRegistryValidator:
         self._project = args.project
 
     def _is_valid_url(self, url: str) -> bool:
+        """Whether the address names an http or https host.
+
+        The scheme is part of what is checked. Prepending one to an address that
+        carries another turned `ftp://reg.example` into a host named `ftp:` and let
+        it through, which the error this raises never claimed.
+        """
         try:
-            url = url.strip()
-            if not url.startswith("http://") and not url.startswith("https://"):
-                url = "http://" + url
-            result = urlparse(url)
-            return all([result.scheme, result.netloc])
+            result = urlparse(url.strip())
         except Exception:
             return False
+        return result.scheme in ("http", "https") and bool(result.netloc)
 
     def validate(self) -> None:
         """
