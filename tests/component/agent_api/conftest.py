@@ -27,8 +27,8 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.repositories.agent.repository import AgentRepository
 from ai.backend.manager.repositories.ops.v2.permission.provider import PermissionOpsProvider
-from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.ops.v2.reconciler.provider import ReconcileOpsProvider
+from ai.backend.manager.repositories.ops.v2.share.provider import ShareOpsProvider
 from ai.backend.manager.repositories.rbac.permission_check_repository import (
     RbacPermissionCheckRepository,
 )
@@ -75,7 +75,7 @@ def agent_processors(
         valkey_live=valkey_clients.live,
         valkey_stat=valkey_clients.stat,
         config_provider=config_provider,
-        v2_ops_provider=V2DBOpsProvider(database_engine),
+        v2_ops_provider=ShareOpsProvider(database_engine),
     )
     scheduler_repository = SchedulerRepository(
         database_engine,

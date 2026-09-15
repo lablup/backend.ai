@@ -110,7 +110,7 @@ def agent_processors(
         valkey_clients.live,
         valkey_clients.stat,
         config_provider,
-        V2DBOpsProvider(database_engine),
+        ShareOpsProvider(database_engine),
     )
     scheduler_repo = SchedulerRepository(
         database_engine,
