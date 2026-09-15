@@ -5,7 +5,6 @@ import logging
 from collections import defaultdict
 from collections.abc import Callable, Collection, Mapping, Sequence
 from typing import cast
-from uuid import UUID
 
 import sqlalchemy as sa
 from sqlalchemy.exc import DBAPIError
@@ -14,6 +13,7 @@ from sqlalchemy.orm import selectinload
 
 from ai.backend.common.bgtask.reporter import ProgressReporter
 from ai.backend.common.data.entity.image_alias import ImageAliasID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.types import ImageID
 from ai.backend.common.utils import join_non_empty
@@ -287,13 +287,15 @@ class ImageDBSource:
         """
         return await self._fetch_image(image_id, [ImageStatus.ALIVE])
 
-    async def validate_image_ownership(self, image_id: ImageID, user_id: UUID) -> bool:
+    async def validate_image_ownership(
+        self, image_id: ImageID, user_id: UserID, statuses: Collection[ImageStatus]
+    ) -> bool:
         """
         Checks if the image was committed for the user.
         Returns True if it was, False otherwise.
         Raises ImageNotFound if image doesn't exist.
         """
-        image = await self._fetch_image(image_id, [ImageStatus.ALIVE])
+        image = await self._fetch_image(image_id, statuses)
         return image.customized and image.creator_id == user_id
 
     async def insert_image_alias(

@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-from collections.abc import Mapping, Sequence
-from uuid import UUID
+from collections.abc import Collection, Mapping, Sequence
 
 from ai.backend.common.bgtask.reporter import ProgressReporter
 from ai.backend.common.clients.valkey_client.valkey_image.client import ValkeyImageClient
 from ai.backend.common.container_registry import ContainerRegistryType
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.exception import BackendAIError
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
@@ -231,13 +231,15 @@ class ImageRepository:
         return await self._db_source.fetch_image_by_id(image_id, load_aliases)
 
     @image_repository_resilience.apply()
-    async def validate_image_ownership(self, image_id: ImageID, user_id: UUID) -> bool:
+    async def validate_image_ownership(
+        self, image_id: ImageID, user_id: UserID, statuses: Collection[ImageStatus]
+    ) -> bool:
         """
         Validates that user owns the image.
         Returns True if user owns the image, False otherwise.
         Raises ImageNotFound if image doesn't exist.
         """
-        return await self._db_source.validate_image_ownership(image_id, user_id)
+        return await self._db_source.validate_image_ownership(image_id, user_id, statuses)
 
     @image_repository_resilience.apply()
     async def add_image_alias(
