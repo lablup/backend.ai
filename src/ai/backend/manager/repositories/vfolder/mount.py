@@ -104,7 +104,10 @@ async def query_reachable_vfolders(
         await conn.execute(
             sa.select(vfolders)
             .where(conditions, sa.or_(*(scope.to_condition()() for scope in scopes)))
-            .order_by(VFolderOrders.project_first(ProjectID(user_scope.group_id)))
+            .order_by(
+                VFolderOrders.project_first(ProjectID(user_scope.group_id)),
+                VFolderOrders.shared_last(user_id),
+            )
         )
     ).all()
     held = await held_permissions([VFolderUUID(row.id) for row in rows])
