@@ -51,16 +51,17 @@ from ai.backend.manager.api.rest.vfolder.handler import VFolderHandler
 from ai.backend.manager.api.rest.vfolder.registry import register_vfolder_routes
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.config.provider import ManagerConfigProvider
+from ai.backend.manager.data.entity_share.types import EntityShareStatus
 from ai.backend.manager.data.permission.types import RoleSource
 from ai.backend.manager.data.secret.types import KeyProviderType
 from ai.backend.manager.data.vfolder.types import (
-    VFolderInvitationState,
     VFolderMountPermission,
     VFolderOperationStatus,
     VFolderOwnershipType,
 )
 from ai.backend.manager.dependencies.infrastructure.redis import ValkeyClients
 from ai.backend.manager.models.domain import domains
+from ai.backend.manager.models.entity_share.row import EntityShareRow
 from ai.backend.manager.models.project import ProjectRow, ProjectType
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.rbac_models.role import RoleRow
@@ -493,10 +494,10 @@ async def invitation_factory(
     db_engine: SAEngine,
     admin_user_fixture: Any,
 ) -> AsyncIterator[InvitationFactory]:
-    """Factory that inserts vfolder_invitation rows directly into DB.
+    """Factory that inserts vfolder offers into ``entity_shares`` directly.
 
-    Defaults to a PENDING invitation from the admin user to the given invitee.
-    Cleans up all created invitation rows on teardown.
+    Defaults to a PENDING offer from the admin user to the given invitee.
+    Cleans up all created rows on teardown.
     """
     created_ids: list[uuid.UUID] = []
 
@@ -508,15 +509,16 @@ async def invitation_factory(
         inv_id = uuid.uuid4()
         defaults: dict[str, Any] = {
             "id": inv_id,
-            "permission": VFolderMountPermission.READ_ONLY,
-            "inviter": admin_user_fixture.email,
-            "invitee": invitee_email,
-            "state": VFolderInvitationState.PENDING,
-            "vfolder": vfolder_id,
+            "permission_cap": Permission.READ,
+            "sharer_user_id": admin_user_fixture.user_uuid,
+            "recipient_email": invitee_email,
+            "status": EntityShareStatus.PENDING,
+            "target_entity_type": VFolderEntityType(),
+            "target_entity_id": vfolder_id,
         }
         defaults.update(overrides)
         async with db_engine.begin() as conn:
-            await conn.execute(sa.insert(vfolder_invitations).values(**defaults))
+            await conn.execute(sa.insert(EntityShareRow.__table__).values(**defaults))
         created_ids.append(inv_id)
         return defaults
 
@@ -525,7 +527,7 @@ async def invitation_factory(
     async with db_engine.begin() as conn:
         for inv_id in reversed(created_ids):
             await conn.execute(
-                vfolder_invitations.delete().where(vfolder_invitations.c.id == inv_id)
+                EntityShareRow.__table__.delete().where(EntityShareRow.__table__.c.id == inv_id)
             )
 
 
