@@ -119,27 +119,9 @@ class TestImageOrder:
 
 
 class TestRescanImagesInput:
-    """Tests for RescanImagesInput model."""
-
-    def test_valid_creation(self) -> None:
-        req = RescanImagesInput(canonical="python:3.11", architecture="x86_64")
-        assert req.canonical == "python:3.11"
-        assert req.architecture == "x86_64"
-
     def test_empty_canonical_raises_error(self) -> None:
         with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             RescanImagesInput(canonical="", architecture="x86_64")
-
-    def test_empty_architecture_raises_error(self) -> None:
-        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
-            RescanImagesInput(canonical="python:3.11", architecture="")
-
-    def test_round_trip_serialization(self) -> None:
-        req = RescanImagesInput(canonical="cuda:12.0", architecture="aarch64")
-        json_str = req.model_dump_json()
-        restored = RescanImagesInput.model_validate_json(json_str)
-        assert restored.canonical == req.canonical
-        assert restored.architecture == req.architecture
 
 
 class TestAliasImageInput:

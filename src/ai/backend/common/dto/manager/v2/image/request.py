@@ -157,10 +157,14 @@ class SearchImagesInput(BaseRequestModel):
 
 
 class RescanImagesInput(BaseRequestModel):
-    """Input for rescanning images from a registry."""
+    """Input for rescanning an image tag and selecting its architecture."""
 
-    canonical: str = Field(min_length=1, description="Image canonical name to rescan")
-    architecture: str = Field(min_length=1, description="Image architecture to rescan")
+    canonical: str = Field(
+        min_length=1,
+        description="Image canonical name to rescan. Defaults to latest when the tag is omitted.",
+    )
+
+    architecture: str = Field(min_length=1, description="Image architecture to return")
 
 
 class AliasImageInput(BaseRequestModel):

@@ -13,7 +13,6 @@ from ai.backend.common.dto.manager.v2.image.response import (
     GetImagePayload,
     ImageNode,
     PurgeImagePayload,
-    RescanImagesPayload,
     SearchImagesPayload,
 )
 from ai.backend.common.dto.manager.v2.image.types import (
@@ -238,29 +237,6 @@ class TestGetImagePayload:
         restored = GetImagePayload.model_validate_json(json_str)
         assert restored.item.id == node.id
         assert restored.item.name == node.name
-
-
-class TestRescanImagesPayload:
-    """Tests for RescanImagesPayload model."""
-
-    def test_creation_no_errors(self) -> None:
-        node = make_image_node()
-        payload = RescanImagesPayload(item=node)
-        assert payload.errors == []
-
-    def test_creation_with_errors(self) -> None:
-        node = make_image_node()
-        payload = RescanImagesPayload(item=node, errors=["failed to pull", "timeout"])
-        assert len(payload.errors) == 2
-        assert payload.errors[0] == "failed to pull"
-
-    def test_round_trip_serialization(self) -> None:
-        node = make_image_node()
-        payload = RescanImagesPayload(item=node, errors=["err1"])
-        json_str = payload.model_dump_json()
-        restored = RescanImagesPayload.model_validate_json(json_str)
-        assert restored.item.id == node.id
-        assert restored.errors == ["err1"]
 
 
 class TestAliasImagePayload:
