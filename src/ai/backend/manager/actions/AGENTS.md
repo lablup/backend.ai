@@ -210,7 +210,8 @@ decides the shape. Do not create new subclasses of the legacy `BaseAction` bases
 - A lookup with post-validators answers a key naming nothing and a key the caller may
   not reach with one exception, so no status code says whether the key exists. The
   processor merges them; adapters must not split them apart again. The audit record
-  keeps the two causes apart.
+  keeps the two causes apart. A superadmin passes every check, so the miss reaches
+  them unmerged.
 - The owner lookup a field operation runs first is checked the same way. It is a
   different permission from the write that follows — the lookup asks for read, the
   write for write.

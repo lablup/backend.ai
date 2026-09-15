@@ -151,6 +151,19 @@ def authenticated_user() -> UserData:
 
 
 @pytest.fixture
+def superadmin() -> UserData:
+    return UserData(
+        user_id=uuid.uuid4(),
+        is_authorized=True,
+        is_admin=True,
+        is_superadmin=True,
+        role=UserRole.SUPERADMIN,
+        domain_name="default",
+        domain_id=DomainID(uuid.uuid4()),
+    )
+
+
+@pytest.fixture
 def action() -> _Action:
     return _Action(key=_CanonicalKey(canonical="lablup/python:3.13"))
 
@@ -235,6 +248,16 @@ async def test_an_ungated_lookup_still_reports_the_miss(
     with with_user(authenticated_user):
         with pytest.raises(EntityNotFoundError):
             await _processor(_missing, monitor, []).run(action)
+
+    assert monitor.done_results[0].meta.status is OperationStatus.ERROR
+
+
+async def test_a_superadmin_gets_the_miss_unmerged(action: _Action, superadmin: UserData) -> None:
+    monitor = _RecordingMonitor()
+
+    with with_user(superadmin):
+        with pytest.raises(EntityNotFoundError):
+            await _processor(_missing, monitor, [_PassingValidator()]).run(action)
 
     assert monitor.done_results[0].meta.status is OperationStatus.ERROR
 
