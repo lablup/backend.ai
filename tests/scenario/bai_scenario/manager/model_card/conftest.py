@@ -6,11 +6,6 @@ from collections.abc import Sequence
 from typing import Any
 
 import pytest
-from bai_scenario.fakes.storage_proxy import (
-    FakeStorageProxyManagerFacingClient,
-    FakeStorageSessionManager,
-)
-from bai_scenario.runner.unwired import unwired
 
 from ai.backend.common.data.entity.model_card import ModelCardEntityType
 from ai.backend.manager.actions.monitors import ActionMonitors
@@ -24,6 +19,11 @@ from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.services.deployment.processors import DeploymentProcessors
 from ai.backend.manager.services.model_card.processors import ModelCardProcessors
 from ai.backend.manager.services.model_card.service import ModelCardService
+from bai_scenario.fakes.storage_proxy import (
+    FakeStorageProxyManagerFacingClient,
+    FakeStorageSessionManager,
+)
+from bai_scenario.runner.unwired import unwired
 
 
 @pytest.fixture

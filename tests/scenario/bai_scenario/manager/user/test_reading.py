@@ -8,13 +8,6 @@ from typing import Any, override
 from uuid import uuid4
 
 import pytest
-from bai_scenario.components.answers import TheCallIsRefused
-from bai_scenario.components.domain import WAS_HERE, SomeoneOf
-from bai_scenario.components.user import AGrant, UserNodeLook
-from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
-from bai_scenario.runner.steps import run_scenario
-from bai_scenario.seeds.domain.domain import SeedDomain
 
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.user.types import UserRole
@@ -35,6 +28,13 @@ from ai.backend.testutils.scenario_steps import (
     Verdict,
     When,
 )
+from bai_scenario.components.answers import TheCallIsRefused
+from bai_scenario.components.domain import WAS_HERE, SomeoneOf
+from bai_scenario.components.user import AGrant, UserNodeLook
+from bai_scenario.runner.acting import ActingAs
+from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.steps import run_scenario
+from bai_scenario.seeds.domain.domain import SeedDomain
 
 type Loaded = list[UserNode | Exception | None]
 type Answer = UserNode | Loaded

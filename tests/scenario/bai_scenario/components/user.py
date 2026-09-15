@@ -11,10 +11,6 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, override
 
-from bai_scenario.components.domain import WrittenByThisRun
-from bai_scenario.seeds.rbac.role import SeedPermission, SeedRole
-from bai_scenario.seeds.seeder import Laid, Seeder, SeedNest
-
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.common.data.entity.user import UserEntityType, UserID
@@ -26,6 +22,9 @@ from ai.backend.manager.data.permission.types import Permission
 from ai.backend.manager.data.project.types import ProjectData
 from ai.backend.manager.data.user.types import UserData
 from ai.backend.testutils.scenario_steps import Condition, Held, Same, SameAs, Skipped, Verdict
+from bai_scenario.components.domain import WrittenByThisRun
+from bai_scenario.seeds.rbac.role import SeedPermission, SeedRole
+from bai_scenario.seeds.seeder import Laid, Seeder, SeedNest
 
 
 @dataclass(frozen=True)

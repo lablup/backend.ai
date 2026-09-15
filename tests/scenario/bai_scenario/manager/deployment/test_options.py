@@ -9,11 +9,6 @@ from dataclasses import dataclass, field
 from typing import override
 
 import pytest
-from bai_scenario.components.answers import TheCallIsRefused
-from bai_scenario.components.deployment import ADeploymentAndACaller, ADeploymentInThatPlace
-from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
-from bai_scenario.runner.steps import run_scenario
 
 from ai.backend.common.dto.manager.v2.deployment.request import ReplaceDeploymentOptionsInput
 from ai.backend.common.dto.manager.v2.deployment.response import ReplaceDeploymentOptionsPayload
@@ -44,6 +39,11 @@ from ai.backend.testutils.scenario_steps import (
     Verdict,
     When,
 )
+from bai_scenario.components.answers import TheCallIsRefused
+from bai_scenario.components.deployment import ADeploymentAndACaller, ADeploymentInThatPlace
+from bai_scenario.runner.acting import ActingAs
+from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.steps import run_scenario
 
 REGISTERED = CheckReplicaDeploymentHandler.name()
 UNREGISTERED = "no-such-handler"

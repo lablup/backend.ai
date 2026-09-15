@@ -5,8 +5,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import override
 
-from bai_scenario.seeds.seeder import Naming, SeedRowFromThree, SeedShareAcceptance
-
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.data.permission.types import Permission
@@ -15,6 +13,7 @@ from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.data.vfolder.types import VFolderData
 from ai.backend.manager.models.entity_share.creators import EntityShareCreator
 from ai.backend.manager.models.entity_share.updaters import EntityShareAcceptUpdater
+from bai_scenario.seeds.seeder import Naming, SeedRowFromThree, SeedShareAcceptance
 
 
 @dataclass(frozen=True)

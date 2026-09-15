@@ -10,14 +10,14 @@ They seed through the same `Seeder` the tables use, one row per fixture.
 from __future__ import annotations
 
 import pytest
+
+from ai.backend.common.data.user.types import UserRole
+from ai.backend.manager.data.domain.types import DomainData
 from bai_scenario.components.domain import SomeoneOf
 from bai_scenario.components.vfolder import STORAGE_HOST, SomeoneMakingFolders
 from bai_scenario.runner.planting import SeedingSession
 from bai_scenario.seeds.domain.domain import SeedDomain
 from bai_scenario.seeds.seeder import Laid
-
-from ai.backend.common.data.user.types import UserRole
-from ai.backend.manager.data.domain.types import DomainData
 
 
 @pytest.fixture

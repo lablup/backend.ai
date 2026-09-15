@@ -13,19 +13,6 @@ from collections.abc import AsyncIterator, Iterator, Sequence
 from typing import Any
 
 import pytest
-from bai_scenario.config import ScenarioConfigProvider, base_config_dict, make_config
-from bai_scenario.db import (
-    TemplateDatabase,
-    clone_database,
-    create_template,
-    drop_database,
-    engine_for,
-)
-from bai_scenario.monitors import ActionRecorder
-from bai_scenario.runner.planting import SeedingSession
-from bai_scenario.seeds.ops import SeedOpsProvider
-from bai_scenario.seeds.seeder import Seeder
-from bai_scenario.valkey import ScenarioValkey
 
 from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
 from ai.backend.manager.actions.monitors import ActionMonitors
@@ -39,6 +26,19 @@ from ai.backend.manager.repositories.rbac.permission_check_repository import (
 )
 from ai.backend.testutils.bootstrap import flush_redis
 from ai.backend.testutils.scenario_steps import Configured
+from bai_scenario.config import ScenarioConfigProvider, base_config_dict, make_config
+from bai_scenario.db import (
+    TemplateDatabase,
+    clone_database,
+    create_template,
+    drop_database,
+    engine_for,
+)
+from bai_scenario.monitors import ActionRecorder
+from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.seeds.ops import SeedOpsProvider
+from bai_scenario.seeds.seeder import Seeder
+from bai_scenario.valkey import ScenarioValkey
 
 pytest_plugins = [
     "ai.backend.testutils.bootstrap",

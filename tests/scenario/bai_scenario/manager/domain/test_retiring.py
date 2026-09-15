@@ -6,14 +6,6 @@ from dataclasses import dataclass
 from typing import override
 
 import pytest
-from bai_scenario.components.domain import (
-    ADomainAndACaller,
-    ATargetAndSomeone,
-    TheCallIsRefused,
-)
-from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
-from bai_scenario.runner.steps import run_scenario
 
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.v2.domain.request import (
@@ -40,6 +32,14 @@ from ai.backend.testutils.scenario_steps import (
     Verdict,
     When,
 )
+from bai_scenario.components.domain import (
+    ADomainAndACaller,
+    ATargetAndSomeone,
+    TheCallIsRefused,
+)
+from bai_scenario.runner.acting import ActingAs
+from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.steps import run_scenario
 
 type Retired = DeleteDomainPayload | RestoreDomainPayload | PurgeDomainPayload
 type DomainStep = Scenario[SeedingSession, ADomainAndACaller, DomainAdapter, Retired]

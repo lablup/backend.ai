@@ -9,8 +9,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import override
 
-from bai_scenario.seeds.seeder import Naming, SeedRowFrom, SeedRowFromTwo
-
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.types import QuotaScopeID, QuotaScopeType
@@ -21,6 +19,7 @@ from ai.backend.manager.models.vfolder.creators import (
     PersonalVFolderCreator,
     ProjectVFolderCreator,
 )
+from bai_scenario.seeds.seeder import Naming, SeedRowFrom, SeedRowFromTwo
 
 
 @dataclass(frozen=True)

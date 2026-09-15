@@ -10,8 +10,6 @@ import secrets
 from dataclasses import dataclass
 from typing import override
 
-from bai_scenario.seeds.seeder import SeedField
-
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.types import AccessKey
 from ai.backend.manager.data.auth.login_session_types import (
@@ -27,6 +25,7 @@ from ai.backend.manager.models.login_session.creators import (
     LoginSessionCreator,
 )
 from ai.backend.manager.secret.types import SecretValue
+from bai_scenario.seeds.seeder import SeedField
 
 
 @dataclass(frozen=True)
