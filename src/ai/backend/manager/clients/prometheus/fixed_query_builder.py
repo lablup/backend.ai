@@ -41,7 +41,7 @@ _PCT_CAPACITY_SELECTOR: Final[str] = (
     CONTAINER_UTILIZATION_METRIC_NAME + '{${{labels}},value_type="capacity"}'
 )
 # `current` is a gauge already in the unit of capacity (percent, bytes).
-_PCT_FROM_GAUGE_TEMPLATE: Final[str] = (
+_PCT_TEMPLATE: Final[str] = (
     "label_replace("
     "sum by (${{group_by}})(" + _PCT_CURRENT_SELECTOR + ")"
     " / (sum by (${{group_by}})(" + _PCT_CAPACITY_SELECTOR + ") > 0)"
@@ -49,7 +49,7 @@ _PCT_FROM_GAUGE_TEMPLATE: Final[str] = (
 )
 # `current` is a cumulative counter (CPU msec); rate() makes it per second,
 # the unit capacity is reported in.
-_PCT_FROM_COUNTER_TEMPLATE: Final[str] = (
+_PCT_RATE_TEMPLATE: Final[str] = (
     "label_replace("
     "sum by (${{group_by}})(rate(" + _PCT_CURRENT_SELECTOR + "[${{window}}]))"
     " / (sum by (${{group_by}})(" + _PCT_CAPACITY_SELECTOR + ") > 0)"
@@ -150,8 +150,8 @@ class ContainerMetricQueryBuilder:
 
     def _get_pct_template(self, metric_name: str) -> str:
         if resolve_container_metric_unit_hint(metric_name) in _COUNTER_UNIT_HINTS:
-            return _PCT_FROM_COUNTER_TEMPLATE
-        return _PCT_FROM_GAUGE_TEMPLATE
+            return _PCT_RATE_TEMPLATE
+        return _PCT_TEMPLATE
 
 
 class ContainerLiveStatQueryBuilder:
