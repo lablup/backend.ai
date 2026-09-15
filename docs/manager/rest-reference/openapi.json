@@ -18926,14 +18926,6 @@
         "title": "ModifyQueryDefinitionOptionsInput",
         "type": "object"
       },
-      "Sentinel": {
-        "description": "A sentinel value to represent an unset value.",
-        "enum": [
-          1
-        ],
-        "title": "Sentinel",
-        "type": "integer"
-      },
       "ModifyQueryDefinitionInput": {
         "description": "Input for modifying a prometheus query definition.\n\nEvery field defaults to ``Unset``; only fields the caller sends are updated.",
         "properties": {
