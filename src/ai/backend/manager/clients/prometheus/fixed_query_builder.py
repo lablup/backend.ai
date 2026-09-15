@@ -1,4 +1,4 @@
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Final
 
@@ -32,25 +32,36 @@ _DIFF_TEMPLATE: Final[str] = (
     + CONTAINER_UTILIZATION_METRIC_NAME
     + "{${{labels}}}[${{window}}]))"
 )
-# The `> 0` on capacity drops the series instead of dividing by zero.
+# pct = current / capacity * 100. The `> 0` on capacity drops the series
+# instead of dividing by zero.
 _PCT_CURRENT_SELECTOR: Final[str] = (
     CONTAINER_UTILIZATION_METRIC_NAME + '{${{labels}},value_type="current"}'
 )
 _PCT_CAPACITY_SELECTOR: Final[str] = (
     CONTAINER_UTILIZATION_METRIC_NAME + '{${{labels}},value_type="capacity"}'
 )
-_PCT_TEMPLATE: Final[str] = (
+# `current` is a gauge already in the unit of capacity (percent, bytes).
+_PCT_FROM_GAUGE_TEMPLATE: Final[str] = (
     "label_replace("
     "sum by (${{group_by}})(" + _PCT_CURRENT_SELECTOR + ")"
     " / (sum by (${{group_by}})(" + _PCT_CAPACITY_SELECTOR + ") > 0)"
     ' * 100, "value_type", "pct", "", "")'
 )
-_PCT_RATE_TEMPLATE: Final[str] = (
+# `current` is a cumulative counter (CPU msec); rate() makes it per second,
+# the unit capacity is reported in.
+_PCT_FROM_COUNTER_TEMPLATE: Final[str] = (
     "label_replace("
     "sum by (${{group_by}})(rate(" + _PCT_CURRENT_SELECTOR + "[${{window}}]))"
     " / (sum by (${{group_by}})(" + _PCT_CAPACITY_SELECTOR + ") > 0)"
     ' * 100, "value_type", "pct", "", "")'
 )
+# Unit hints whose `current` series accumulates over time.
+_COUNTER_UNIT_HINTS: Final[frozenset[str]] = frozenset({"msec"})
+_SERIES_TEMPLATES: Final[Mapping[MetricType, str]] = {
+    MetricType.GAUGE: _GAUGE_TEMPLATE,
+    MetricType.RATE: _RATE_TEMPLATE,
+    MetricType.DIFF: _DIFF_TEMPLATE,
+}
 _LIVE_STAT_MAX_TEMPLATE: Final[str] = "max_over_time((" + _GAUGE_TEMPLATE + ")[${{window}}:])"
 _LIVE_STAT_AVG_TEMPLATE: Final[str] = "avg_over_time((" + _GAUGE_TEMPLATE + ")[${{window}}:])"
 _LIVE_STAT_RATE_MAX_TEMPLATE: Final[str] = "max_over_time((" + _RATE_TEMPLATE + ")[${{window}}:])"
@@ -131,22 +142,16 @@ class ContainerMetricQueryBuilder:
         )
 
     def _get_template(self, metric_name: str, label: ContainerMetricOptionalLabel) -> str:
-        if label.value_type == ValueType.PCT:
-            return self._get_pct_template(metric_name)
-        match self.get_container_metric_type(metric_name, label):
-            case MetricType.GAUGE:
-                return _GAUGE_TEMPLATE
-            case MetricType.RATE:
-                return _RATE_TEMPLATE
-            case MetricType.DIFF:
-                return _DIFF_TEMPLATE
+        match label.value_type:
+            case ValueType.CURRENT | ValueType.CAPACITY:
+                return _SERIES_TEMPLATES[self.get_container_metric_type(metric_name, label)]
+            case ValueType.PCT:
+                return self._get_pct_template(metric_name)
 
     def _get_pct_template(self, metric_name: str) -> str:
-        # A msec series is a cumulative CPU-time counter; rate() turns it into
-        # msec per second, the unit its capacity is reported in.
-        if resolve_container_metric_unit_hint(metric_name) == "msec":
-            return _PCT_RATE_TEMPLATE
-        return _PCT_TEMPLATE
+        if resolve_container_metric_unit_hint(metric_name) in _COUNTER_UNIT_HINTS:
+            return _PCT_FROM_COUNTER_TEMPLATE
+        return _PCT_FROM_GAUGE_TEMPLATE
 
 
 class ContainerLiveStatQueryBuilder:
