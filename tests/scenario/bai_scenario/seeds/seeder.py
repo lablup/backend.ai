@@ -25,6 +25,7 @@ from typing import Any, Final, cast
 
 from bai_scenario.seeds.ops import SeedOps
 
+from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.role import RoleID
 from ai.backend.common.data.entity.types import FieldData
 from ai.backend.common.data.entity.user import UserID
@@ -475,6 +476,31 @@ class Seeder:
                 describe=to.describe,
                 states=f"{to.describe}: {role.describe} 보유",
                 sources=(role, to),
+                write=write,
+            )
+        )
+
+    def joining[P, U](
+        self,
+        project: Laid[P],
+        member: Laid[U],
+        *,
+        project_id: Callable[[P], ProjectID],
+        user_id: Callable[[U], UserID],
+    ) -> Laid[None]:
+        """Put the user on the project's roster, the way an operator would."""
+
+        async def write(ops: SeedOps, values: Sequence[Any]) -> None:
+            await ops.join_member(project_id(values[0]), user_id(values[1]))
+
+        return self._remember(
+            Laid(
+                name=member.name,
+                kind=member.kind,
+                nest=tuple(self._nesting),
+                describe=member.describe,
+                states=f"{member.describe}: {project.describe} 명부에 오름",
+                sources=(project, member),
                 write=write,
             )
         )
