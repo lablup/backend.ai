@@ -7,9 +7,10 @@ from __future__ import annotations
 from typing import Any, Self
 from uuid import UUID
 
-from pydantic import Field, field_validator
+from pydantic import Field, field_validator, model_validator
 
 from ai.backend.common.api_handlers import BaseRequestModel
+from ai.backend.common.container_registry import ContainerRegistryValidator
 from ai.backend.common.dto.manager.query import StringFilter
 
 from .types import (
@@ -87,6 +88,11 @@ class CreateContainerRegistryInput(BaseRequestModel):
             raise ValueError("registry_name must not be blank")
         return stripped
 
+    @model_validator(mode="after")
+    def registry_rules(self) -> Self:
+        ContainerRegistryValidator(url=self.url, type=self.type, project=self.project).validate()
+        return self
+
 
 class UpdateContainerRegistryInput(BaseRequestModel):
     """Input for updating an existing container registry. All fields are optional; None means no change."""
@@ -138,6 +144,13 @@ class UpdateContainerRegistryInput(BaseRequestModel):
         if not stripped:
             raise ValueError("registry_name must not be blank")
         return stripped
+
+    @model_validator(mode="after")
+    def registry_rules(self) -> Self:
+        ContainerRegistryValidator(
+            url=self.url, type=self.type, project=self.project
+        ).validate_patch()
+        return self
 
 
 class DeleteContainerRegistryInput(BaseRequestModel):
