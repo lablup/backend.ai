@@ -5,7 +5,7 @@ node. Give each agent one, owned and governed by its resource group, and give a
 resource group without a node one.
 
 Revision ID: e8b1d4a7c2f9
-Revises: f4a1c9d20b73
+Revises: dc61fa027fc1
 Create Date: 2026-09-15
 
 """
@@ -19,7 +19,7 @@ from alembic import op
 
 # revision identifiers, used by Alembic.
 revision = "e8b1d4a7c2f9"  # Part of: NEXT_RELEASE_VERSION
-down_revision = "f4a1c9d20b73"
+down_revision = "dc61fa027fc1"
 branch_labels = None
 depends_on = None
 
