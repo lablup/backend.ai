@@ -1,7 +1,7 @@
 id: 776c1366-dcf3-5abd-b8de-bc3ad3b759ad
 name: user_owner
 scope_type: user
-auto_assign: false
+auto_assign: true
 
 permissions:
   agent:                            [read]
