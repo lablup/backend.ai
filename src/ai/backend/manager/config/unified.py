@@ -2260,10 +2260,11 @@ class MetricConfig(BaseConfigSchema):
         BackendAIConfigMeta(
             description=(
                 "Time window for metric range vector queries in PromQL format. "
-                "This parameter controls the lookback period when querying Prometheus for "
-                "resource usage statistics. For example, '1h' means metrics are averaged over "
-                "the past 1 hour. Shorter windows provide more responsive metrics but may be "
-                "noisier; longer windows smooth out spikes but delay detection of changes."
+                "Statistics queries average counter metrics over this window, so '1h' means "
+                "values are averaged over the past hour: shorter windows are more responsive "
+                "but noisier, longer windows smooth out spikes but delay changes. "
+                "Kernel live_stat only looks back this far for the last two samples, so the "
+                "window must cover at least two scrape intervals."
             ),
             added_version="25.8.0",
             example=ConfigExample(local="1m", prod="1h"),
