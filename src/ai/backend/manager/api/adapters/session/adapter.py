@@ -191,8 +191,6 @@ from ai.backend.manager.services.session.actions.scoped_search import (
 from ai.backend.manager.services.session.actions.scoped_search_kernels import (
     ScopedSearchKernelsAction,
 )
-from ai.backend.manager.services.session.actions.search import SearchSessionsAction
-from ai.backend.manager.services.session.actions.search_kernel import SearchKernelsAction
 from ai.backend.manager.services.session.actions.shutdown_service import ShutdownServiceAction
 from ai.backend.manager.services.session.actions.start_service import StartServiceAction
 from ai.backend.manager.services.session.actions.terminate_sessions import (
@@ -623,26 +621,14 @@ class SessionAdapter(BaseAdapter):
         input: AdminSearchSessionsInput,
     ) -> AdminSearchSessionsPayload:
         """Search sessions (admin, no scope) with filters, orders, and pagination."""
-        conditions = self._convert_session_filter(input.filter) if input.filter else []
-        orders = self._convert_session_orders(input.order) if input.order else []
-        querier = self._build_querier(
-            conditions=conditions,
-            orders=orders,
-            pagination_spec=_SESSION_PAGINATION_SPEC,
-            first=input.first,
-            after=input.after,
-            last=input.last,
-            before=input.before,
-            limit=input.limit,
-            offset=input.offset,
-        )
-
-        action_result = await self._session.search_sessions.run(
-            SearchSessionsAction(querier=querier, user_id=UserID(self._require_user_id()))
+        action_result = await self._session.global_search.run(
+            GlobalSearchSessionsAction(searcher=self._build_session_searcher(input))
         )
 
         return AdminSearchSessionsPayload(
-            items=await self._session_data_to_nodes(action_result.data),
+            items=await self._session_data_to_nodes([
+                item.to_session_data() for item in action_result.items
+            ]),
             total_count=action_result.total_count,
             has_next_page=action_result.has_next_page,
             has_previous_page=action_result.has_previous_page,
@@ -899,26 +885,12 @@ class SessionAdapter(BaseAdapter):
         input: AdminSearchKernelsInput,
     ) -> AdminSearchKernelsPayload:
         """Search kernels (admin, no scope) with filters, orders, and pagination."""
-        conditions = self._convert_kernel_filter(input.filter) if input.filter else []
-        orders = self._convert_kernel_orders(input.order) if input.order else []
-        querier = self._build_querier(
-            conditions=conditions,
-            orders=orders,
-            pagination_spec=_KERNEL_PAGINATION_SPEC,
-            first=input.first,
-            after=input.after,
-            last=input.last,
-            before=input.before,
-            limit=input.limit,
-            offset=input.offset,
-        )
-
-        action_result = await self._session.search_kernels.run(
-            SearchKernelsAction(querier=querier, user_id=UserID(self._require_user_id()))
+        action_result = await self._session.global_search_kernels.run(
+            GlobalSearchKernelsAction(searcher=self._build_kernel_searcher(input))
         )
 
         return AdminSearchKernelsPayload(
-            items=await self._kernel_infos_to_nodes(action_result.data),
+            items=await self._kernel_infos_to_nodes(action_result.items),
             total_count=action_result.total_count,
             has_next_page=action_result.has_next_page,
             has_previous_page=action_result.has_previous_page,

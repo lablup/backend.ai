@@ -144,14 +144,6 @@ from ai.backend.manager.services.session.actions.scoped_search import (
 from ai.backend.manager.services.session.actions.scoped_search_kernels import (
     ScopedSearchKernelsAction,
 )
-from ai.backend.manager.services.session.actions.search import (
-    SearchSessionsAction,
-    SearchSessionsActionResult,
-)
-from ai.backend.manager.services.session.actions.search_kernel import (
-    SearchKernelsAction,
-    SearchKernelsActionResult,
-)
 from ai.backend.manager.services.session.actions.shutdown_service import (
     ShutdownServiceAction,
     ShutdownServiceActionResult,
@@ -226,7 +218,6 @@ class SessionProcessors:
     resolve_session_name: SingleEntityActionProcessor[
         ResolveSessionNameAction, ResolveSessionNameActionResult
     ]
-    search_kernels: ScopeActionProcessor[SearchKernelsAction, SearchKernelsActionResult]
     scoped_search_kernels: BulkActionProcessor[
         ScopedSearchKernelsAction, ScopedFieldsOpsResult[KernelInfo]
     ]
@@ -241,7 +232,6 @@ class SessionProcessors:
     batch_get_kernel_resource_allocation: BulkFieldActionProcessor[
         BatchGetKernelResourceAllocationAction, BatchGetKernelResourceAllocationActionResult
     ]
-    search_sessions: ScopeActionProcessor[SearchSessionsAction, SearchSessionsActionResult]
     global_search: GlobalActionProcessor[
         GlobalSearchSessionsAction, BatchOpsResult[SessionEntityData]
     ]
@@ -320,7 +310,6 @@ class SessionProcessors:
             CreateFromTemplateAction, service.create_from_template
         )
         self.match_sessions = group.scope(MatchSessionsAction, service.match_sessions)
-        self.search_kernels = group.scope(SearchKernelsAction, service.search_kernels)
         self.bulk_get_kernels = kernels.partial_bulk_get_ops(BulkGetKernelsAction)
         self.scoped_search_kernels = kernels.atomic_bulk_scoped_search_ops(
             ScopedSearchKernelsAction
@@ -334,7 +323,6 @@ class SessionProcessors:
             LookupBulkKernelOwnerAction,
             service.batch_get_kernel_resource_allocation,
         )
-        self.search_sessions = group.scope(SearchSessionsAction, service.search)
         self.global_search = group.global_search_ops(GlobalSearchSessionsAction)
         self.bulk_get = group.partial_bulk_get_ops(BulkGetSessionsAction)
         self.scoped_search = group.scope_search_ops(ScopedSearchSessionsAction)
