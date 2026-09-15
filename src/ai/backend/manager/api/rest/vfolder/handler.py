@@ -384,7 +384,9 @@ class VFolderHandler:
     ) -> APIResponse:
         params = query.parsed
         owner_user_uuid = await self._list_owner(params.owner_user_email)
-        scope_items: list[VFolderScopeItem] = [UserVFolderScopeItem(user_id=UserID(owner_user_uuid))]
+        scope_items: list[VFolderScopeItem] = [
+            UserVFolderScopeItem(user_id=UserID(owner_user_uuid))
+        ]
         orders: list[QueryOrder] = []
         if params.group_id is not None:
             project_id = ProjectID(params.group_id)
