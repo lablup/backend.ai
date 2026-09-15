@@ -177,8 +177,8 @@ def permission_controller_processors(
     )
     return PermissionControllerProcessors(
         processor_registry.group(GroupMeta(RoleEntityType())),
+        processor_registry.group(GroupMeta(UserEntityType())),
         service=service,
-        action_monitors=[],
     )
 
 
@@ -191,7 +191,7 @@ def domain_processors(
     service = DomainService(
         repository=DomainRepository(database_engine, V2DBOpsProvider(database_engine))
     )
-    return DomainProcessors(processor_registry.group(GroupMeta(DomainEntityType())), service, [])
+    return DomainProcessors(processor_registry.group(GroupMeta(DomainEntityType())), service)
 
 
 @pytest.fixture()
@@ -210,7 +210,6 @@ def rbac_processors(
             PermissionControllerRepository(database_engine),
             RbacRosterRepository(RosterOpsProvider(database_engine)),
         ),
-        [],
     )
 
 

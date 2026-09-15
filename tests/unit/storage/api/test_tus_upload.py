@@ -82,8 +82,7 @@ class TestTusUploadPartOffsetValidation:
         ctx.local_config.storage_proxy.secret = "test-secret"
         ctx.node_id = "test-node"
         ctx.valkey_tus_client = valkey_tus_client
-        ctx.get_volume.return_value.__aenter__ = AsyncMock(return_value=volume)
-        ctx.get_volume.return_value.__aexit__ = AsyncMock(return_value=None)
+        ctx.volume_pool.get_volume_by_name = MagicMock(return_value=volume)
 
         # Mock request
         request = MagicMock(spec=web.Request)

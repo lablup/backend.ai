@@ -2,12 +2,37 @@
 
 from __future__ import annotations
 
+import sqlalchemy as sa
+
+from ai.backend.manager.data.image.types import ImageStatus
 from ai.backend.manager.models.clauses import QueryOrder
 from ai.backend.manager.models.image import ImageAliasRow, ImageRow
 
 
 class ImageOrders:
     """Query orders for images."""
+
+    @staticmethod
+    def canonical_match_first(canonical: str, architecture: str) -> QueryOrder:
+        matches = sa.and_(ImageRow.name == canonical, ImageRow.architecture == architecture)
+        return sa.case((matches, 0), else_=1).asc()
+
+    @staticmethod
+    def alive_first() -> QueryOrder:
+        return sa.case((ImageRow.status == ImageStatus.ALIVE, 0), else_=1).asc()
+
+    @staticmethod
+    def alive_then_oldest() -> list[QueryOrder]:
+        return [ImageOrders.alive_first(), ImageOrders.created_at()]
+
+    @staticmethod
+    def canonical_match_then_alive_then_oldest(
+        canonical: str, architecture: str
+    ) -> list[QueryOrder]:
+        return [
+            ImageOrders.canonical_match_first(canonical, architecture),
+            *ImageOrders.alive_then_oldest(),
+        ]
 
     @staticmethod
     def name(ascending: bool = True) -> QueryOrder:

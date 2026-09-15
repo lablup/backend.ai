@@ -3,15 +3,13 @@ from __future__ import annotations
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import Any, override
+from uuid import UUID
 
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.orm import InstrumentedAttribute
 
 from ai.backend.common.data.entity.prometheus_query_preset import PrometheusQueryPresetID
-from ai.backend.common.data.entity.prometheus_query_preset_category import (
-    PrometheusQueryPresetCategoryID,
-)
 from ai.backend.manager.data.prometheus_query_preset.types import PrometheusQueryPresetData
 from ai.backend.manager.models.prometheus_query_preset.row import (
     PresetOptions,
@@ -36,9 +34,7 @@ class PrometheusQueryPresetUpdater(
     name: OptionalState[str] = field(default_factory=OptionalState[str].nop)
     description: TriState[str] = field(default_factory=TriState[str].nop)
     rank: OptionalState[int] = field(default_factory=OptionalState[int].nop)
-    category_id: TriState[PrometheusQueryPresetCategoryID] = field(
-        default_factory=TriState[PrometheusQueryPresetCategoryID].nop
-    )
+    category_id: TriState[UUID] = field(default_factory=TriState[UUID].nop)
     metric_name: OptionalState[str] = field(default_factory=OptionalState[str].nop)
     query_template: OptionalState[str] = field(default_factory=OptionalState[str].nop)
     time_window: TriState[str] = field(default_factory=TriState[str].nop)

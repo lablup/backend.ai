@@ -63,11 +63,7 @@ class VFolderInviteService:
         self._user_repository = user_repository
 
     async def invite(self, action: InviteVFolderAction) -> InviteVFolderActionResult:
-        # Get VFolder data
-        user = await self._user_repository.get_user_by_uuid(action.user_uuid)
-        vfolder_data = await self._vfolder_repository.get_by_id_validated(
-            action.vfolder_uuid, action.user_uuid, user.domain_name
-        )
+        vfolder_data = await self._vfolder_repository.get_by_id(action.vfolder_uuid)
 
         if vfolder_data.name.startswith("."):
             raise Forbidden("Cannot share private dot-prefixed vfolders.")
@@ -242,11 +238,7 @@ class VFolderInviteService:
     async def leave_invited_vfolder(
         self, action: LeaveInvitedVFolderAction
     ) -> LeaveInvitedVFolderActionResult:
-        # Get vfolder info
-        user = await self._user_repository.get_user_by_uuid(action.requester_user_uuid)
-        vfolder_data = await self._vfolder_repository.get_by_id_validated(
-            action.vfolder_uuid, user.id, user.domain_name
-        )
+        vfolder_data = await self._vfolder_repository.get_by_id(action.vfolder_uuid)
 
         if vfolder_data.ownership_type == VFolderOwnershipType.GROUP:
             raise VFolderInvalidParameter("Cannot leave a group vfolder.")

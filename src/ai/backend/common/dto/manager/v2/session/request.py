@@ -28,6 +28,7 @@ from ai.backend.common.dto.manager.v2.session.types import (
     CreateSessionTypeEnum,
     OrderDirection,
     SessionOrderField,
+    SessionScope,
     SessionStatusFilter,
 )
 from ai.backend.common.dto.manager.v2.session_options.types import AgentSelectionPolicyEnum
@@ -124,6 +125,20 @@ class SearchSessionsInput(BaseRequestModel):
     order: SessionOrder | None = None
     limit: int = Field(default=DEFAULT_PAGE_LIMIT, ge=1, le=MAX_PAGE_LIMIT)
     offset: int = Field(default=0, ge=0)
+
+
+class ScopedSearchSessionsInput(BaseRequestModel):
+    """Input for searching the sessions the named scopes reach."""
+
+    scope: SessionScope = Field(description="Scope (OR across all items).")
+    filter: SessionFilter | None = Field(default=None, description="Filter criteria")
+    order: list[SessionOrder] | None = Field(default=None, description="Sort order")
+    first: int | None = Field(default=None, ge=1, description="Cursor-forward page size")
+    after: str | None = Field(default=None, description="Cursor-forward start cursor")
+    last: int | None = Field(default=None, ge=1, description="Cursor-backward page size")
+    before: str | None = Field(default=None, description="Cursor-backward end cursor")
+    limit: int | None = Field(default=None, ge=1, description="Max results per page (offset)")
+    offset: int | None = Field(default=None, ge=0, description="Pagination offset")
 
 
 class AdminSearchSessionsInput(BaseRequestModel):

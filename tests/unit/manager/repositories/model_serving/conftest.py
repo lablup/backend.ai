@@ -61,7 +61,9 @@ def mock_db_engine() -> MagicMock:
 def model_serving_repository(mock_db_engine: MagicMock) -> ModelServingRepository:
     """Create a ModelServingRepository instance with mocked database."""
     return ModelServingRepository(
-        db=mock_db_engine, v2_ops_provider=V2DBOpsProvider(mock_db_engine)
+        db=mock_db_engine,
+        v2_ops_provider=V2DBOpsProvider(mock_db_engine),
+        permission_check=MagicMock(),
     )
 
 
@@ -246,12 +248,6 @@ def patch_user_get(mocker: MockerFixture) -> AsyncMock:
 def patch_vfolder_get(mocker: MockerFixture) -> AsyncMock:
     """Patch VFolderRow.get method using mocker."""
     return mocker.patch("ai.backend.manager.models.vfolder.VFolderRow.get", new_callable=AsyncMock)
-
-
-@pytest.fixture
-def patch_image_resolve(mocker: MockerFixture) -> AsyncMock:
-    """Patch ImageRow.resolve method using mocker."""
-    return mocker.patch("ai.backend.manager.models.image.ImageRow.resolve", new_callable=AsyncMock)
 
 
 @pytest.fixture

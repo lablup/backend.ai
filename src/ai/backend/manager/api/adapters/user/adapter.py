@@ -6,13 +6,13 @@ from collections.abc import Mapping, Sequence
 from typing import TYPE_CHECKING
 from uuid import UUID
 
-from ai.backend.common.api_handlers import Sentinel
 from ai.backend.common.contexts.user import current_user
 from ai.backend.common.data.entity.domain import DomainID, DomainName
 from ai.backend.common.data.entity.keypair import KeyPairID
 from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.role import RoleID
 from ai.backend.common.data.entity.user import UserID
-from ai.backend.common.data.filter_specs import StringMatchSpec, UUIDInMatchSpec
+from ai.backend.common.data.filter_specs import StringMatchSpec
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.data.user.types import UserRole as DataUserRole
 from ai.backend.common.dto.manager.pagination import PaginationInfo
@@ -97,6 +97,7 @@ from ai.backend.common.dto.manager.v2.user.types import (
     UserStatus as UserStatusDTO,
 )
 from ai.backend.common.exception import UnreachableError
+from ai.backend.common.tristate.unset import Unset
 from ai.backend.common.types import AccessKey, SecretKey
 from ai.backend.manager.data.common.types import SearchResult
 from ai.backend.manager.data.keypair.types import KeyPairCreator, KeyPairData
@@ -111,7 +112,7 @@ from ai.backend.manager.models.keypair.orders import KeypairOrders
 from ai.backend.manager.models.keypair.row import KeyPairRow
 from ai.backend.manager.models.keypair.scopes import UserKeypairOperationScope
 from ai.backend.manager.models.project.conditions import ProjectConditions
-from ai.backend.manager.models.specs.pagination import NoPagination, OffsetPagination
+from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.models.user.conditions import UserConditions
 from ai.backend.manager.models.user.creators import UserCreator
 from ai.backend.manager.models.user.orders import UserOrders
@@ -120,6 +121,7 @@ from ai.backend.manager.models.user.row import UserRow
 from ai.backend.manager.models.user.searchers import UserSearcher
 from ai.backend.manager.models.user.updaters import UserUpdater
 from ai.backend.manager.services.domain.actions.lookup import LookupDomainAction
+from ai.backend.manager.services.user.actions.bulk_get import BulkGetUsersAction
 from ai.backend.manager.services.user.actions.create_user import (
     BulkCreateUserAction,
     CreateUserAction,
@@ -154,13 +156,11 @@ from ai.backend.manager.services.user.actions.restore_user import RestoreUserAct
 from ai.backend.manager.services.user.actions.scoped_search import (
     DomainUserScopeItem,
     ProjectUserScopeItem,
+    RoleUserScopeItem,
     ScopedSearchUsersAction,
     UserScopeItem,
 )
 from ai.backend.manager.services.user.actions.search_users import GlobalSearchUsersAction
-from ai.backend.manager.services.user.actions.search_users_by_role import (
-    SearchUsersByRoleAction,
-)
 from ai.backend.manager.services.user.actions.update_user import (
     BulkUpdateUserAction,
     UpdateUserAction,
@@ -221,23 +221,19 @@ class UserAdapter(BaseAdapter):
 
     # ------------------------------------------------------------------ batch load (DataLoader)
 
-    async def batch_load_by_ids(self, user_ids: Sequence[UserID]) -> list[UserNode | None]:
-        """Batch load users by UUID for DataLoader use.
-
-        Returns UserNode DTOs in the same order as the input user_ids list.
-        """
+    async def batch_load_by_ids(
+        self, user_ids: Sequence[UserID]
+    ) -> list[UserNode | Exception | None]:
+        """Batch load users by UUID for DataLoader use, checked per user."""
         if not user_ids:
             return []
-        searcher = UserSearcher(
-            pagination=NoPagination(),
-            conditions=[
-                UserConditions.by_uuid_in(UUIDInMatchSpec(values=list(user_ids), negated=False))
-            ],
-        )
-        result = await self._user.global_search.run(GlobalSearchUsersAction(searcher=searcher))
-        nodes = await self._user_nodes(result.items)
-        user_map = {user.uuid: node for user, node in zip(result.items, nodes, strict=True)}
-        return [user_map.get(user_id) for user_id in user_ids]
+        result = await self._user.bulk_get.run(BulkGetUsersAction(ids=list(user_ids)))
+        users = [item.value for item in result.items if item.value is not None]
+        nodes = iter(await self._user_nodes(users))
+        return [
+            next(nodes) if item.value is not None else self.batch_load_failure(item.error)
+            for item in result.items
+        ]
 
     # ------------------------------------------------------------------ GQL search (cursor-based)
 
@@ -360,6 +356,7 @@ class UserAdapter(BaseAdapter):
         items.extend(
             ProjectUserScopeItem(project_id=ProjectID(entry.value)) for entry in scope.project or ()
         )
+        items.extend(RoleUserScopeItem(role_id=RoleID(entry.value)) for entry in scope.role or ())
         return items
 
     async def scoped_search(
@@ -470,9 +467,7 @@ class UserAdapter(BaseAdapter):
         """Search users assigned to a role."""
         searcher = self._build_search_searcher(input)
         searcher.conditions = [*searcher.conditions, UserConditions.by_role_id(role_id)]
-        result = await self._user.search_users_by_role.run(
-            SearchUsersByRoleAction(role_id=role_id, searcher=searcher)
-        )
+        result = await self._user.global_search.run(GlobalSearchUsersAction(searcher=searcher))
         return SearchUsersPayload(
             items=await self._user_nodes(result.items),
             pagination=PaginationInfo(
@@ -531,13 +526,11 @@ class UserAdapter(BaseAdapter):
         """Update a user by UUID."""
         updater = UserUpdater(
             user_id=UserID(user_id),
-            username=(
-                OptionalState.update(input.username)
-                if input.username is not None
-                else OptionalState.nop()
-            ),
+            username=OptionalState.from_unset(input.username),
             password=(
-                OptionalState.update(
+                OptionalState.nop()
+                if isinstance(input.password, Unset) or input.password is None
+                else OptionalState.update(
                     PasswordInfo(
                         password=input.password,
                         algorithm=self._auth_config.password_hash_algorithm,
@@ -545,86 +538,36 @@ class UserAdapter(BaseAdapter):
                         salt_size=self._auth_config.password_hash_salt_size,
                     )
                 )
-                if input.password is not None
-                else OptionalState.nop()
             ),
-            need_password_change=(
-                OptionalState.update(input.need_password_change)
-                if input.need_password_change is not None
-                else OptionalState.nop()
-            ),
-            full_name=(
-                TriState.nop()
-                if isinstance(input.full_name, Sentinel)
-                else TriState.nullify()
-                if input.full_name is None
-                else TriState.update(input.full_name)
-            ),
-            description=(
-                TriState.nop()
-                if isinstance(input.description, Sentinel)
-                else TriState.nullify()
-                if input.description is None
-                else TriState.update(input.description)
-            ),
+            need_password_change=OptionalState.from_unset(input.need_password_change),
+            full_name=TriState.from_unset(input.full_name),
+            description=TriState.from_unset(input.description),
             status=(
-                OptionalState.update(UserStatus(input.status))
-                if input.status is not None
-                else OptionalState.nop()
+                OptionalState.nop()
+                if isinstance(input.status, Unset) or input.status is None
+                else OptionalState.update(UserStatus(input.status))
             ),
-            domain_name=(
-                OptionalState.update(input.domain_name)
-                if input.domain_name is not None
-                else OptionalState.nop()
-            ),
+            domain_name=OptionalState.from_unset(input.domain_name),
             role=(
-                OptionalState.update(UserRoleModel(input.role))
-                if input.role is not None
-                else OptionalState.nop()
+                OptionalState.nop()
+                if isinstance(input.role, Unset) or input.role is None
+                else OptionalState.update(UserRoleModel(input.role))
             ),
-            allowed_client_ip=(
-                TriState.nop()
-                if isinstance(input.allowed_client_ip, Sentinel)
-                else TriState.from_graphql(input.allowed_client_ip)
-            ),
-            resource_policy=(
-                OptionalState.update(input.resource_policy)
-                if input.resource_policy is not None
-                else OptionalState.nop()
-            ),
-            sudo_session_enabled=(
-                OptionalState.update(input.sudo_session_enabled)
-                if input.sudo_session_enabled is not None
-                else OptionalState.nop()
-            ),
-            container_uid=(
-                TriState.nop()
-                if isinstance(input.container_uid, Sentinel)
-                else TriState.from_graphql(input.container_uid)
-            ),
-            container_main_gid=(
-                TriState.nop()
-                if isinstance(input.container_main_gid, Sentinel)
-                else TriState.from_graphql(input.container_main_gid)
-            ),
-            container_gids=(
-                TriState.nop()
-                if isinstance(input.container_gids, Sentinel)
-                else TriState.from_graphql(input.container_gids)
-            ),
-            integration_name=(
-                TriState.nop()
-                if isinstance(input.integration_name, Sentinel)
-                else TriState.from_graphql(input.integration_name)
-            ),
+            allowed_client_ip=TriState.from_unset(input.allowed_client_ip),
+            resource_policy=OptionalState.from_unset(input.resource_policy),
+            sudo_session_enabled=OptionalState.from_unset(input.sudo_session_enabled),
+            container_uid=TriState.from_unset(input.container_uid),
+            container_main_gid=TriState.from_unset(input.container_main_gid),
+            container_gids=TriState.from_unset(input.container_gids),
+            integration_name=TriState.from_unset(input.integration_name),
             group_ids=(
                 OptionalState.nop()
-                if isinstance(input.group_ids, Sentinel) or input.group_ids is None
+                if isinstance(input.group_ids, Unset) or input.group_ids is None
                 else OptionalState.update([str(gid) for gid in input.group_ids])
             ),
         )
         result = await self._user.update_user.run(UpdateUserAction(updater=updater))
-        if not isinstance(input.main_access_key, Sentinel) and input.main_access_key is not None:
+        if not isinstance(input.main_access_key, Unset) and input.main_access_key is not None:
             await self.switch_default_access_key(UserID(user_id), AccessKey(input.main_access_key))
         return UpdateUserPayload(user=await self._user_node(result.data))
 

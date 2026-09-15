@@ -52,9 +52,7 @@ class VFolderSharingService:
         user = await self._user_repository.get_user_by_uuid(requester_id)
         if not user.domain_name:
             raise VFolderNotFound("User has no domain assigned")
-        vfolder_data = await self._vfolder_repository.get_by_id_validated(
-            action.vfolder_uuid, user.id, user.domain_name
-        )
+        vfolder_data = await self._vfolder_repository.get_by_id(action.vfolder_uuid)
         if vfolder_data.ownership_type != VFolderOwnershipType.GROUP:
             raise VFolderNotFound("Only project folders are directly sharable.")
 
@@ -81,9 +79,7 @@ class VFolderSharingService:
         user = await self._user_repository.get_user_by_uuid(requester_id)
         if not user.domain_name:
             raise VFolderNotFound("User has no domain assigned")
-        vfolder_data = await self._vfolder_repository.get_by_id_validated(
-            action.vfolder_uuid, user.id, user.domain_name
-        )
+        vfolder_data = await self._vfolder_repository.get_by_id(action.vfolder_uuid)
         if vfolder_data.ownership_type != VFolderOwnershipType.GROUP:
             raise VFolderNotFound("Only project folders are directly unsharable.")
 

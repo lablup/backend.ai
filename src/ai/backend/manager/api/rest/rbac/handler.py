@@ -46,26 +46,25 @@ from ai.backend.common.dto.manager.rbac.response import (
 )
 from ai.backend.manager.data.permission.role import UserRoleAssignmentInput, UserRoleRevocationInput
 from ai.backend.manager.dto.context import UserContext
-from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.models.rbac_models.role.creators import RoleCreator
 from ai.backend.manager.models.rbac_models.role.updaters import RoleSoftDeleteUpdater
 from ai.backend.manager.services.permission_contoller.actions import (
     CreateRoleAction,
     DeleteRoleAction,
     GetRoleDetailAction,
-    SearchRolesAction,
-    SearchUsersAssignedToRoleAction,
+    GlobalSearchRoleAssignmentsAction,
+    GlobalSearchRolesAction,
     UpdateRoleAction,
 )
 from ai.backend.manager.services.permission_contoller.actions.get_entity_types import (
-    GetEntityTypesAction,
+    PublicGetEntityTypesAction,
 )
 from ai.backend.manager.services.permission_contoller.actions.get_scope_types import (
-    GetScopeTypesAction,
+    PublicGetScopeTypesAction,
 )
 from ai.backend.manager.services.permission_contoller.actions.purge_role import PurgeRoleAction
 from ai.backend.manager.services.permission_contoller.actions.search_scopes import (
-    SearchScopesAction,
+    GlobalSearchScopesAction,
 )
 from ai.backend.manager.services.permission_contoller.processors import (
     PermissionControllerProcessors,
@@ -102,9 +101,6 @@ class RBACHandler:
         ctx: UserContext,
     ) -> APIResponse:
         """Create a new role."""
-        if not ctx.is_superadmin:
-            raise NotEnoughPermission("Only superadmin can create roles.")
-
         result = await self._permission_controller.create_role.run(
             CreateRoleAction(
                 creator=RoleCreator(
@@ -124,12 +120,9 @@ class RBACHandler:
         ctx: UserContext,
     ) -> APIResponse:
         """Search roles with filters, orders, and pagination."""
-        if not ctx.is_superadmin:
-            raise NotEnoughPermission("Only superadmin can search roles.")
-
         querier = self._role_adapter.build_querier(body.parsed)
-        action_result = await self._permission_controller.search_roles.wait_for_complete(
-            SearchRolesAction(querier=querier)
+        action_result = await self._permission_controller.global_search_roles.run(
+            GlobalSearchRolesAction(querier=querier)
         )
         resp = SearchRolesResponse(
             roles=[self._role_adapter.convert_to_dto(role) for role in action_result.result.items],
@@ -147,11 +140,8 @@ class RBACHandler:
         ctx: UserContext,
     ) -> APIResponse:
         """Get a specific role with details."""
-        if not ctx.is_superadmin:
-            raise NotEnoughPermission("Only superadmin can get role details.")
-
-        action_result = await self._permission_controller.get_role_detail.wait_for_complete(
-            GetRoleDetailAction(role_id=path.parsed.role_id)
+        action_result = await self._permission_controller.get_role_detail.run(
+            GetRoleDetailAction(role_id=RoleID(path.parsed.role_id))
         )
         resp = GetRoleResponse(role=self._role_adapter.convert_to_dto(action_result.role))
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=resp)
@@ -163,9 +153,6 @@ class RBACHandler:
         ctx: UserContext,
     ) -> APIResponse:
         """Update an existing role."""
-        if not ctx.is_superadmin:
-            raise NotEnoughPermission("Only superadmin can update roles.")
-
         role_id = path.parsed.role_id
         updater = self._role_adapter.build_updater(body.parsed, role_id)
         result = await self._permission_controller.update_role.run(
@@ -180,9 +167,6 @@ class RBACHandler:
         ctx: UserContext,
     ) -> APIResponse:
         """Delete a role (soft delete)."""
-        if not ctx.is_superadmin:
-            raise NotEnoughPermission("Only superadmin can delete roles.")
-
         await self._permission_controller.delete_role.run(
             DeleteRoleAction(updater=RoleSoftDeleteUpdater(role_id=RoleID(body.parsed.role_id)))
         )
@@ -195,9 +179,6 @@ class RBACHandler:
         ctx: UserContext,
     ) -> APIResponse:
         """Purge a role (hard delete)."""
-        if not ctx.is_superadmin:
-            raise NotEnoughPermission("Only superadmin can purge roles.")
-
         await self._permission_controller.purge_role.run(
             PurgeRoleAction(role_id=RoleID(body.parsed.role_id))
         )
@@ -212,17 +193,12 @@ class RBACHandler:
         ctx: UserContext,
     ) -> APIResponse:
         """Assign a role to a user."""
-        if not ctx.is_superadmin:
-            raise NotEnoughPermission("Only superadmin can assign roles.")
-
         input_data = UserRoleAssignmentInput(
             user_id=body.parsed.user_id,
             role_id=body.parsed.role_id,
             granted_by=body.parsed.granted_by or ctx.user_uuid,
         )
-        action_result = await self._rbac.assign_role.wait_for_complete(
-            AssignRoleAction(input=input_data)
-        )
+        action_result = await self._rbac.assign_role.run(AssignRoleAction(input=input_data))
         resp = AssignRoleResponse(
             user_id=action_result.data.user_id,
             role_id=action_result.data.role_id,
@@ -236,16 +212,11 @@ class RBACHandler:
         ctx: UserContext,
     ) -> APIResponse:
         """Revoke a role from a user."""
-        if not ctx.is_superadmin:
-            raise NotEnoughPermission("Only superadmin can revoke roles.")
-
         input_data = UserRoleRevocationInput(
             user_id=body.parsed.user_id,
             role_id=body.parsed.role_id,
         )
-        action_result = await self._rbac.revoke_role.wait_for_complete(
-            RevokeRoleAction(input=input_data)
-        )
+        action_result = await self._rbac.revoke_role.run(RevokeRoleAction(input=input_data))
         resp = RevokeRoleResponse(
             user_id=action_result.data.user_id,
             role_id=action_result.data.role_id,
@@ -259,14 +230,9 @@ class RBACHandler:
         ctx: UserContext,
     ) -> APIResponse:
         """Search users assigned to a specific role with filters and pagination."""
-        if not ctx.is_superadmin:
-            raise NotEnoughPermission("Only superadmin can search assigned users.")
-
-        querier = self._assigned_user_adapter.build_querier(path.parsed, body.parsed)
-        action_result = (
-            await self._permission_controller.search_users_assigned_to_role.wait_for_complete(
-                SearchUsersAssignedToRoleAction(querier=querier)
-            )
+        searcher = self._assigned_user_adapter.build_searcher(path.parsed, body.parsed)
+        action_result = await self._permission_controller.global_search_role_assignments.run(
+            GlobalSearchRoleAssignmentsAction(searcher=searcher)
         )
         resp = SearchUsersAssignedToRoleResponse(
             users=[
@@ -288,11 +254,8 @@ class RBACHandler:
         ctx: UserContext,
     ) -> APIResponse:
         """Get available scope types for role configuration."""
-        if not ctx.is_superadmin:
-            raise NotEnoughPermission("Only superadmin can access scope types.")
-
-        action_result = await self._permission_controller.get_scope_types.wait_for_complete(
-            GetScopeTypesAction()
+        action_result = await self._permission_controller.public_get_scope_types.run(
+            PublicGetScopeTypesAction()
         )
         resp = GetScopeTypesResponse(items=action_result.entity_types)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=resp)
@@ -304,13 +267,10 @@ class RBACHandler:
         ctx: UserContext,
     ) -> APIResponse:
         """Search scopes for a specific scope type with filters and pagination."""
-        if not ctx.is_superadmin:
-            raise NotEnoughPermission("Only superadmin can search scopes.")
-
         scope_type = path.parsed.scope_type
         querier = self._scope_adapter.build_querier(scope_type, body.parsed)
-        action = SearchScopesAction(scope_type=scope_type, querier=querier)
-        action_result = await self._permission_controller.search_scopes.wait_for_complete(action)
+        action = GlobalSearchScopesAction(scope_type=scope_type, querier=querier)
+        action_result = await self._permission_controller.global_search_scopes.run(action)
         resp = SearchScopesResponse(
             items=[self._scope_adapter.convert_to_dto(item) for item in action_result.result.items],
             pagination=PaginationInfo(
@@ -328,11 +288,8 @@ class RBACHandler:
         ctx: UserContext,
     ) -> APIResponse:
         """Get available entity types for role configuration."""
-        if not ctx.is_superadmin:
-            raise NotEnoughPermission("Only superadmin can access entity types.")
-
-        action_result = await self._permission_controller.get_entity_types.wait_for_complete(
-            GetEntityTypesAction()
+        action_result = await self._permission_controller.public_get_entity_types.run(
+            PublicGetEntityTypesAction()
         )
         resp = GetEntityTypesResponse(items=action_result.entity_types)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=resp)

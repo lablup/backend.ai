@@ -24,9 +24,9 @@ from ai.backend.common.clients.valkey_client.valkey_image.client import ValkeyIm
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.data.agent.types import AgentInfo
-from ai.backend.common.data.entity.agent import AgentUUID
+from ai.backend.common.data.entity.agent import AgentEntityType, AgentUUID
 from ai.backend.common.data.entity.domain import DomainID
-from ai.backend.common.data.entity.resource_group import ResourceGroupID
+from ai.backend.common.data.entity.resource_group import ResourceGroupEntityType, ResourceGroupID
 from ai.backend.common.data.entity.resource_slot import ResourceSlotName
 from ai.backend.common.types import (
     AgentId,
@@ -80,17 +80,60 @@ from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderRow
+from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
+from ai.backend.manager.models.virtual_entity.entity_membership_cap import EntityMembershipCapRow
+from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
+from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
 from ai.backend.manager.repositories.agent.db_source.db_source import AgentDBSource
 from ai.backend.manager.repositories.agent.repository import AgentRepository
 from ai.backend.manager.repositories.base.querier import BatchQuerier
-from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
+from ai.backend.manager.repositories.ops.v2.share.provider import ShareOpsProvider
 from ai.backend.manager.types import OptionalState
 from ai.backend.testutils.db import with_tables
+from ai.backend.testutils.virtual_entity import VirtualEntitySeeder
 
 
 async def _agent_uuid(db_sess: SASession, agent_id: str) -> AgentUUID:
     """The agent's entity id, which the slot row records beside its name."""
     return (await db_sess.scalars(sa.select(AgentRow.uuid).where(AgentRow.id == agent_id))).one()
+
+
+async def _owning_resource_groups(db: ExtendedAsyncSAEngine, agent_id: str) -> set[UUID]:
+    """The resource groups that both own and govern the agent in the graph."""
+    agent_node = VirtualEntityRow.__table__.alias("agent_node")
+    group_node = VirtualEntityRow.__table__.alias("group_node")
+    membership = EntityMembershipRow.__table__
+    binding = ScopeBindingRow.__table__
+    async with db.begin_readonly_session() as db_sess:
+        rows = await db_sess.scalars(
+            sa.select(group_node.c.entity_id)
+            .select_from(
+                AgentRow.__table__.join(
+                    agent_node,
+                    sa.and_(
+                        agent_node.c.entity_type == AgentEntityType(),
+                        agent_node.c.entity_id == AgentRow.uuid,
+                    ),
+                )
+                .join(membership, membership.c.member_entity_id == agent_node.c.id)
+                .join(
+                    group_node,
+                    sa.and_(
+                        group_node.c.id == membership.c.virtual_entity_id,
+                        group_node.c.entity_type == ResourceGroupEntityType(),
+                    ),
+                )
+                .join(
+                    binding,
+                    sa.and_(
+                        binding.c.virtual_entity_id == agent_node.c.id,
+                        binding.c.scope_entity_id == group_node.c.id,
+                    ),
+                )
+            )
+            .where(AgentRow.id == agent_id)
+        )
+        return set(rows.all())
 
 
 @dataclass
@@ -149,6 +192,10 @@ class TestAgentRepositoryDB:
                 ResourcePresetRow,
                 ResourceSlotTypeRow,
                 AgentResourceRow,
+                VirtualEntityRow,
+                EntityMembershipRow,
+                EntityMembershipCapRow,
+                ScopeBindingRow,
             ],
         ):
             # Seed default resource slot types (FK target for agent_resources)
@@ -261,7 +308,7 @@ class TestAgentRepositoryDB:
             valkey_live=mock_valkey_live,
             valkey_stat=mock_valkey_stat,
             config_provider=mock_config_provider,
-            v2_ops_provider=V2DBOpsProvider(db_with_cleanup),
+            v2_ops_provider=ShareOpsProvider(db_with_cleanup),
         )
 
     @pytest.fixture
@@ -286,6 +333,9 @@ class TestAgentRepositoryDB:
                 use_host_network=False,
             )
             db_sess.add(resource_group)
+            await VirtualEntitySeeder().provision(
+                db_sess, ResourceGroupEntityType(), resource_group_id
+            )
         yield ResourceGroupFixtureData(name=name, id=resource_group_id)
 
     @pytest.fixture
@@ -597,7 +647,7 @@ class TestAgentRepositoryDB:
     @pytest.fixture
     def agent_db_source(self, db_with_cleanup: ExtendedAsyncSAEngine) -> AgentDBSource:
         """AgentDBSource backed by the real test database."""
-        return AgentDBSource(db_with_cleanup, V2DBOpsProvider(db_with_cleanup))
+        return AgentDBSource(db_with_cleanup, ShareOpsProvider(db_with_cleanup))
 
     @pytest.fixture
     async def default_scaling_group(
@@ -622,6 +672,9 @@ class TestAgentRepositoryDB:
                     scheduler_opts=ResourceGroupOpts(),
                     use_host_network=False,
                 )
+            )
+            await VirtualEntitySeeder().provision(
+                db_sess, ResourceGroupEntityType(), resource_group_id
             )
         yield ResourceGroupFixtureData(name=name, id=resource_group_id)
 
@@ -655,6 +708,25 @@ class TestAgentRepositoryDB:
         assert row.status == AgentStatus.ALIVE
         assert row.scaling_group == resource_group.name
         assert row.resource_group_id == resource_group.id
+
+    async def test_upsert_new_agent_is_created_in_its_resource_group(
+        self,
+        agent_db_source: AgentDBSource,
+        resource_group: ResourceGroupFixtureData,
+        sample_agent_info: AgentInfo,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> None:
+        """A new agent is put in the graph, owned and governed by the group it joined."""
+        agent_id = AgentId("upsert-new-in-graph")
+        upsert_data = AgentHeartbeatUpsert.from_agent_info(
+            agent_id=agent_id,
+            agent_info=sample_agent_info,
+            heartbeat_received=datetime.now(tzutc()),
+        )
+
+        await agent_db_source.upsert_agent_with_state(upsert_data)
+
+        assert await _owning_resource_groups(db_with_cleanup, agent_id) == {resource_group.id}
 
     async def test_upsert_new_agent_prefers_named_group_over_default(
         self,
@@ -1058,7 +1130,7 @@ class TestAgentRepositoryCache:
             valkey_live=valkey_live_client,
             valkey_stat=valkey_stat_client,
             config_provider=mock_config_provider,
-            v2_ops_provider=V2DBOpsProvider(mock_database_engine),
+            v2_ops_provider=ShareOpsProvider(mock_database_engine),
         )
         yield repo
 
@@ -1135,6 +1207,10 @@ class TestAgentDBSourceKernelFiltering:
                 ResourcePresetRow,
                 ResourceSlotTypeRow,
                 AgentResourceRow,
+                VirtualEntityRow,
+                EntityMembershipRow,
+                EntityMembershipCapRow,
+                ScopeBindingRow,
             ],
         ):
             # Seed default resource slot types
@@ -1399,7 +1475,7 @@ class TestAgentDBSourceKernelFiltering:
         db_with_tables: ExtendedAsyncSAEngine,
     ) -> AsyncGenerator[AgentDBSource, None]:
         """Create AgentDBSource for testing"""
-        db_source = AgentDBSource(db_with_tables, V2DBOpsProvider(db_with_tables))
+        db_source = AgentDBSource(db_with_tables, ShareOpsProvider(db_with_tables))
         yield db_source
 
     @pytest.mark.parametrize(
@@ -1471,9 +1547,11 @@ class TestAgentDBSourceKernelFiltering:
         resource_group_name: str,
         resource_group_id: ResourceGroupID,
     ) -> None:
+        agent_uuid = AgentUUID(uuid4())
         async with db.begin_session() as db_sess:
             db_sess.add(
                 AgentRow(
+                    uuid=agent_uuid,
                     id=agent_id,
                     status=AgentStatus.ALIVE,
                     status_changed=datetime.now(tzutc()),
@@ -1491,6 +1569,12 @@ class TestAgentDBSourceKernelFiltering:
                     schedulable=True,
                     auto_terminate_abusing_kernel=False,
                 )
+            )
+            await VirtualEntitySeeder().create_in(
+                db_sess,
+                AgentEntityType(),
+                agent_uuid,
+                [(ResourceGroupEntityType(), resource_group_id)],
             )
 
     async def _seed_target_group(self, db: ExtendedAsyncSAEngine) -> tuple[str, ResourceGroupID]:
@@ -1511,6 +1595,7 @@ class TestAgentDBSourceKernelFiltering:
                     use_host_network=False,
                 )
             )
+            await VirtualEntitySeeder().provision(db_sess, ResourceGroupEntityType(), group_id)
         return name, group_id
 
     async def _seed_running_kernel(
@@ -1609,6 +1694,8 @@ class TestAgentDBSourceKernelFiltering:
         assert result == []
         # Both the id and the name columns are updated to the target group
         assert await self._agent_group(db_with_tables, agent_id) == (target_name, target_id)
+        # The graph moves with it: only the target group owns and governs the agent
+        assert await _owning_resource_groups(db_with_tables, agent_id) == {target_id}
 
     async def test_update_resource_group_active_kernel_gates_on_force(
         self,

@@ -43,7 +43,6 @@ from ai.backend.manager.data.vfolder.types import (
     VFolderOwnershipType,
 )
 from ai.backend.manager.defs import DEFAULT_ROLE
-from ai.backend.manager.errors.common import ObjectNotFound
 from ai.backend.manager.errors.storage import (
     VFolderAlreadyExists,
     VFolderDeletionNotAllowed,
@@ -52,7 +51,7 @@ from ai.backend.manager.errors.storage import (
     VFolderInvalidParameter,
     VFolderNotFound,
 )
-from ai.backend.manager.errors.user import UserNotFound
+from ai.backend.manager.errors.user import KeyPairNotFound, UserNotFound
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.deployment_auto_scaling_policy import DeploymentAutoScalingPolicyRow
@@ -62,6 +61,7 @@ from ai.backend.manager.models.deployment_revision_preset import DeploymentRevis
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.endpoint import EndpointRow
 from ai.backend.manager.models.entity_label.row import EntityLabelRow
+from ai.backend.manager.models.entity_share.row import EntityShareRow
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow
@@ -185,6 +185,7 @@ class TestVfolderRepository:
                 ScopeBindingRow,
                 EntityLabelRow,
                 PermissionRow,
+                EntityShareRow,
             ],
         ):
             yield database_connection
@@ -879,7 +880,7 @@ class TestVfolderRepositoryAllowedVfolderHosts:
         user_with_active_keypair: uuid.UUID,
     ) -> None:
         """A keypair that is not the default one does not supply the policy."""
-        with pytest.raises(ObjectNotFound):
+        with pytest.raises(KeyPairNotFound):
             await vfolder_repository.get_allowed_vfolder_hosts(
                 user_uuid=user_with_active_keypair,
                 group_uuid=None,
@@ -889,7 +890,7 @@ class TestVfolderRepositoryAllowedVfolderHosts:
         self,
         vfolder_repository: VfolderRepository,
     ) -> None:
-        """Unknown user UUID raises UserNotFound rather than ObjectNotFound."""
+        """Unknown user UUID raises UserNotFound rather than KeyPairNotFound."""
         with pytest.raises(UserNotFound):
             await vfolder_repository.get_allowed_vfolder_hosts(
                 user_uuid=uuid.uuid4(),
@@ -969,6 +970,7 @@ class TestVfolderRepositoryPurge:
                 ModelCardRow,
                 EntityFieldRow,
                 PermissionRow,
+                EntityShareRow,
             ],
         ):
             yield database_connection
@@ -1338,6 +1340,7 @@ class TestVfolderRepositoryDeleteForever:
                 ModelCardRow,
                 ModelCardResourceRequirementRow,
                 EntityFieldRow,
+                EntityShareRow,
             ],
         ):
             yield database_connection

@@ -19,7 +19,9 @@ from ai.backend.common.data.idle_checker.types import (
 from ai.backend.common.types import SessionTypes
 from ai.backend.manager.data.idle_checker.types import IdleCheckerData
 from ai.backend.manager.errors.base.entity import EntityNotFoundError
+from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.entity_label.row import EntityLabelRow
+from ai.backend.manager.models.entity_share.row import EntityShareRow
 from ai.backend.manager.models.idle_checker.conditions import IdleCheckerConditions
 from ai.backend.manager.models.idle_checker.creators import IdleCheckerCreator
 from ai.backend.manager.models.idle_checker.orders import IdleCheckerOrders
@@ -29,7 +31,9 @@ from ai.backend.manager.models.idle_checker.searchers import IdleCheckerSearcher
 from ai.backend.manager.models.idle_checker.updaters import IdleCheckerUpdater
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.rbac_models.role import RoleRow
+from ai.backend.manager.models.resource_policy import UserResourcePolicyRow
 from ai.backend.manager.models.specs.pagination import NoPagination
+from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
 from ai.backend.manager.models.virtual_entity.entity_membership_cap import (
@@ -62,6 +66,10 @@ async def database(
             RoleRow,
             PermissionRow,
             IdleCheckerRow,
+            DomainRow,
+            UserResourcePolicyRow,
+            UserRow,
+            EntityShareRow,
         ],
     ):
         yield database_connection

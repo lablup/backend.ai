@@ -9,6 +9,7 @@ from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.data.resource_group.types import FairShareResourceGroupSpec
 from ai.backend.manager.errors.common import ObjectNotFound
 from ai.backend.manager.errors.fair_share import InvalidResourceWeightError
+from ai.backend.manager.errors.resource import ResourceGroupNotFound
 from ai.backend.manager.models.resource_group.updaters import ResourceGroupUpdater
 from ai.backend.manager.repositories.resource_group import ResourceGroupRepository
 
@@ -96,13 +97,13 @@ class ResourceGroupService:
         if self._appproxy_client_pool is None:
             raise ObjectNotFound(object_name="AppProxy client pool")
         sgroups = await self._repository.list_allowed_sgroups(
-            domain_name=action.domain_name,
-            group=action.group,
-            access_key=action.access_key,
+            domain_id=action.domain_id,
+            project_ids=action.project_ids,
+            user_id=action.user_id,
         )
         sgroup_filtered = [sg for sg in sgroups if sg.name == action.resource_group_name]
         if not sgroup_filtered:
-            raise ObjectNotFound(object_name="scaling group")
+            raise ResourceGroupNotFound()
         sgroup = sgroup_filtered[0]
 
         if not sgroup.network.wsproxy_addr:

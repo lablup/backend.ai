@@ -1,7 +1,6 @@
 from ai.backend.common.data.entity.agent import AgentUUID
 from ai.backend.common.data.entity.agent_resource import AgentResourceFieldType
 from ai.backend.common.types import AgentId
-from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.registry.field import LookupFieldGroup
 from ai.backend.manager.actions.registry.group import ProcessorGroup
 from ai.backend.manager.actions.registry.types import FieldGroupMeta
@@ -117,7 +116,6 @@ class AgentProcessors:
         self,
         group: ProcessorGroup[AgentData],
         service: AgentService,
-        action_monitors: list[ActionMonitor],
     ) -> None:
         self.lookup = group.public_lookup_ops(LookupAgentAction)
         self.bulk_lookup = group.public_bulk_lookup_ops(BulkLookupAgentsAction)

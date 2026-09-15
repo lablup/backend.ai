@@ -20,6 +20,7 @@ from ai.backend.common.dto.manager.v2.vfolder.request import (
     MkdirInput,
     MoveFileInput,
     PurgeVFolderInput,
+    ScopedSearchVFoldersInput,
     SearchVFoldersInput,
 )
 from ai.backend.manager.api.rest.v2.path_params import ProjectIdPathParam, VFolderIdPathParam
@@ -40,6 +41,14 @@ class V2VFolderHandler:
     ) -> APIResponse:
         """Search vfolders owned by the current user."""
         result = await self._adapter.my_search(body.parsed)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def scoped_search(
+        self,
+        body: BodyParam[ScopedSearchVFoldersInput],
+    ) -> APIResponse:
+        """Search the vfolders the named scopes reach, combined with OR."""
+        result = await self._adapter.scoped_search(body.parsed)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
     async def project_search(

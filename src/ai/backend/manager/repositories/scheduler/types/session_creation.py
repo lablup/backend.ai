@@ -4,7 +4,6 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from decimal import Decimal
 
-from ai.backend.common.data.entity.resource_group import ResourceGroupID, ResourceGroupName
 from ai.backend.common.data.entity.resource_slot import ResourceSlotName
 from ai.backend.common.types import (
     AgentSelectionStrategy,
@@ -14,7 +13,6 @@ from ai.backend.common.types import (
 from ai.backend.manager.data.dotfile.types import DotfileBundle
 from ai.backend.manager.data.resource.types import UserEnqueuePolicy
 from ai.backend.manager.data.session.creation import ContainerUserInfo
-from ai.backend.manager.models.resource_group import ResourceGroupOpts
 from ai.backend.manager.views.sokovan.agent import AgentMeta
 from ai.backend.manager.views.sokovan.session_creation import (
     GlobalEnqueueInfo,
@@ -29,16 +27,6 @@ class SessionDependencyData:
 
     session_id: SessionId
     depends_on: SessionId
-
-
-@dataclass
-class AllowedResourceGroup:
-    """Allowed resource group for a user (service/REST contract type)."""
-
-    id: ResourceGroupID
-    name: ResourceGroupName
-    is_private: bool
-    scheduler_opts: ResourceGroupOpts
 
 
 @dataclass(frozen=True)

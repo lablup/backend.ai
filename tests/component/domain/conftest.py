@@ -45,7 +45,7 @@ def domain_processors(
 ) -> DomainProcessors:
     repo = DomainRepository(database_engine, V2DBOpsProvider(database_engine))
     service = DomainService(repo)
-    return DomainProcessors(processor_registry.group(GroupMeta(DomainEntityType())), service, [])
+    return DomainProcessors(processor_registry.group(GroupMeta(DomainEntityType())), service)
 
 
 @pytest.fixture()

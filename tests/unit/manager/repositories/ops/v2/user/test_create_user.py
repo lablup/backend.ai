@@ -19,6 +19,7 @@ from ai.backend.common.data.permission.types import Permission, RoleStatus
 from ai.backend.common.types import AccessKey, ResourceSlot, VFolderHostPermissionMap
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.keypair.types import KeyPairSecrets
+from ai.backend.manager.data.permission.seed.loader import RoleSeedLoader
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.entity_label.row import EntityLabelRow
 from ai.backend.manager.models.hasher.types import PasswordInfo
@@ -439,6 +440,47 @@ class TestUserGraphProvisioning:
             )
         assert role.name == f"preset-user-{str(user_id)[:8]}"
         assert {str(VFolderEntityType())} == {str(entity_type) for entity_type in entity_types}
+
+    async def test_the_user_holds_the_declared_user_owner_role(
+        self,
+        db: ExtendedAsyncSAEngine,
+        provider: UserOpsProvider,
+        domain: DomainFixtureData,
+        declared_user_owner_preset: uuid.UUID,
+    ) -> None:
+        user_id = await _create_user(provider, domain.domain_id, "alice")
+
+        async with db.begin_readonly_session() as session:
+            held = (
+                await session.scalars(
+                    sa.select(RoleRow.role_preset_id)
+                    .join(UserRoleRow, UserRoleRow.role_id == RoleRow.id)
+                    .where(
+                        UserRoleRow.user_id == user_id,
+                        RoleRow.scope_type == UserEntityType(),
+                        RoleRow.scope_id == user_id,
+                    )
+                )
+            ).all()
+        assert list(held) == [declared_user_owner_preset]
+
+
+@pytest.fixture
+async def declared_user_owner_preset(db: ExtendedAsyncSAEngine) -> uuid.UUID:
+    """The user_owner preset as the seed declaration states it."""
+    [seed] = [seed for seed in RoleSeedLoader().load() if seed.name == "user_owner"]
+    async with db.begin_session() as session:
+        session.add(
+            RolePresetRow(
+                id=seed.id,
+                name=seed.name,
+                scope_type=seed.scope_type,
+                auto_assign=seed.auto_assign,
+                deleted=False,
+            )
+        )
+        await session.commit()
+    return seed.id
 
 
 async def _create_project(db: ExtendedAsyncSAEngine, domain_name: DomainName) -> ProjectID:

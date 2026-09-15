@@ -115,6 +115,7 @@ def draft(image_id: ImageID) -> SessionSpecDraft:
                 creation_id="ci-1",
                 session_name="module-test-session",
                 access_key=AccessKey("AKIAIOSFODNN7EXAMPLE"),
+                user_uuid=uuid.uuid4(),
             ),
             classification=SessionClassificationDraft(session_type=SessionTypes.INTERACTIVE),
             network=SessionNetworkDraft(),
@@ -521,7 +522,7 @@ class TestResourceGroupAccessibility:
         repository.fetch_session_spec_context.assert_not_called()
         repository.enqueue_session_from_spec.assert_not_called()
 
-    async def test_access_check_uses_spec_identity_access_key(
+    async def test_access_check_uses_spec_identity_user(
         self,
         draft: SessionSpecDraft,
         image_id: ImageID,
@@ -540,7 +541,6 @@ class TestResourceGroupAccessibility:
             await controller.enqueue_session_from_draft(draft)
 
         repository.query_accessible_resource_group_ids.assert_awaited_once()
-        assert (
-            repository.query_accessible_resource_group_ids.await_args.kwargs["access_key"]
-            == draft.resource_spec.identity.access_key
-        )
+        kwargs = repository.query_accessible_resource_group_ids.await_args.kwargs
+        assert kwargs["user_id"] == draft.resource_spec.identity.user_uuid
+        assert kwargs["domain_id"] == draft.scope.domain_id

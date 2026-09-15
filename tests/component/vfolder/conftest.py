@@ -4,6 +4,7 @@ import secrets
 import uuid
 from collections.abc import AsyncIterator, Callable, Coroutine
 from typing import Any
+from unittest.mock import MagicMock
 
 import pytest
 import sqlalchemy as sa
@@ -20,6 +21,7 @@ from ai.backend.common.data.entity.notification import (
     NotificationChannelEntityType,
     NotificationRuleEntityType,
 )
+from ai.backend.common.data.entity.project import ProjectEntityType
 from ai.backend.common.data.entity.session import SessionEntityType
 from ai.backend.common.data.entity.types import EntityType
 from ai.backend.common.data.entity.user import UserEntityType
@@ -37,6 +39,7 @@ from ai.backend.common.types import (
 )
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
 from ai.backend.manager.actions.registry.types import GroupMeta
+from ai.backend.manager.actions.v2.bulk.validator.rbac import BulkOwnCheck
 
 # Statically imported so that Pants includes these modules in the test PEX.
 # build_root_app() loads them at runtime via importlib.import_module(),
@@ -72,12 +75,18 @@ from ai.backend.manager.models.vfolder import (
 from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
 from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
 from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
+from ai.backend.manager.repositories.ops.v2.permission.provider import PermissionOpsProvider
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.ops.v2.share.provider import ShareOpsProvider
+from ai.backend.manager.repositories.rbac.permission_check_repository import (
+    RbacPermissionCheckRepository,
+)
 from ai.backend.manager.repositories.user.repository import UserRepository
 from ai.backend.manager.repositories.vfolder.repository import VfolderRepository
 from ai.backend.manager.secret.pool import KeyProviderPool
 from ai.backend.manager.services.auth.processors import AuthProcessors
+from ai.backend.manager.services.user.processors import UserProcessors
+from ai.backend.manager.services.user.service import UserService
 from ai.backend.manager.services.vfolder.processors.file import VFolderFileProcessors
 from ai.backend.manager.services.vfolder.processors.invite import VFolderInviteProcessors
 from ai.backend.manager.services.vfolder.processors.sharing import VFolderSharingProcessors
@@ -150,6 +159,9 @@ def vfolder_processors(
         ShareOpsProvider(database_engine),
         KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
     )
+    # The registry here runs no RBAC validator, so the own check answers as enforcement off.
+    rbac_off = MagicMock(spec=ManagerConfigProvider)
+    rbac_off.config.manager.rbac.enforcement_enabled = False
     service = VFolderService(
         config_provider=config_provider,
         etcd=async_etcd,
@@ -158,6 +170,9 @@ def vfolder_processors(
         vfolder_repository=vfolder_repository,
         user_repository=user_repository,
         valkey_stat_client=valkey_clients.stat,
+        own_check=BulkOwnCheck(
+            RbacPermissionCheckRepository(PermissionOpsProvider(database_engine), rbac_off)
+        ),
     )
     return VFolderProcessors(processor_registry.group(GroupMeta(VFolderEntityType())), service)
 
@@ -232,9 +247,31 @@ def vfolder_sharing_processors(
 
 
 @pytest.fixture()
+def user_processors(
+    database_engine: ExtendedAsyncSAEngine,
+    processor_registry: ProcessorRegistry[Any],
+) -> UserProcessors:
+    user_repository = UserRepository(
+        database_engine,
+        V2DBOpsProvider(database_engine),
+        ShareOpsProvider(database_engine),
+        KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
+    )
+    service = UserService(
+        storage_manager=MagicMock(spec=StorageSessionManager),
+        valkey_stat_client=MagicMock(),
+        agent_registry=MagicMock(),
+        user_repository=user_repository,
+        scheduling_controller=MagicMock(),
+    )
+    return UserProcessors(processor_registry.group(GroupMeta(UserEntityType())), service)
+
+
+@pytest.fixture()
 def server_module_registries(
     route_deps: RouteDeps,
     auth_processors: AuthProcessors,
+    user_processors: UserProcessors,
     vfolder_processors: VFolderProcessors,
     vfolder_file_processors: VFolderFileProcessors,
     vfolder_invite_processors: VFolderInviteProcessors,
@@ -245,6 +282,7 @@ def server_module_registries(
         register_vfolder_routes(
             VFolderHandler(
                 auth=auth_processors,
+                user=user_processors,
                 vfolder=vfolder_processors,
                 vfolder_file=vfolder_file_processors,
                 vfolder_invite=vfolder_invite_processors,
@@ -320,7 +358,7 @@ async def vfolder_factory(
     async def _create(**overrides: Any) -> VFolderFixtureData:
         unique = secrets.token_hex(4)
         vfolder_id = uuid.uuid4()
-        user_uuid = admin_user_fixture.user_uuid
+        user_uuid = uuid.UUID(str(overrides.get("user", admin_user_fixture.user_uuid)))
         async with db_engine.begin() as conn:
             personal_project_id = (
                 await conn.execute(
@@ -368,6 +406,47 @@ async def vfolder_factory(
             await conn.execute(
                 sa.insert(ScopeBindingRow.__table__).values(
                     virtual_entity_id=node_id, scope_entity_id=node_id, permission_cap=None
+                )
+            )
+            # A folder is created in its project, which owns and governs it; that is
+            # what a project-scoped read walks.
+            project_node = await conn.scalar(
+                sa.select(VirtualEntityRow.__table__.c.id).where(
+                    VirtualEntityRow.__table__.c.entity_type == ProjectEntityType(),
+                    VirtualEntityRow.__table__.c.entity_id == uuid.UUID(defaults["group"]),
+                )
+            )
+            if project_node is None:
+                project_node = uuid.uuid4()
+                await conn.execute(
+                    sa.insert(VirtualEntityRow.__table__).values(
+                        id=project_node,
+                        entity_type=ProjectEntityType(),
+                        entity_id=uuid.UUID(defaults["group"]),
+                    )
+                )
+                await conn.execute(
+                    sa.insert(EntityMembershipRow.__table__).values(
+                        virtual_entity_id=project_node,
+                        member_entity_id=project_node,
+                        capped=False,
+                    )
+                )
+                await conn.execute(
+                    sa.insert(ScopeBindingRow.__table__).values(
+                        virtual_entity_id=project_node,
+                        scope_entity_id=project_node,
+                        permission_cap=None,
+                    )
+                )
+            await conn.execute(
+                sa.insert(EntityMembershipRow.__table__).values(
+                    virtual_entity_id=project_node, member_entity_id=node_id, capped=False
+                )
+            )
+            await conn.execute(
+                sa.insert(ScopeBindingRow.__table__).values(
+                    virtual_entity_id=node_id, scope_entity_id=project_node, permission_cap=None
                 )
             )
         created_ids.append(defaults["id"])

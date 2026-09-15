@@ -24,10 +24,14 @@ from bai_scenario.seeds.seeder import (
     SeedRowFrom,
     SeedRowFromThree,
     SeedRowFromTwo,
+    SeedShareAcceptance,
     lay,
 )
 
 from ai.backend.common.data.entity.types import FieldData
+from ai.backend.manager.data.entity_share.types import EntityShareData
+from ai.backend.manager.data.project.types import ProjectData
+from ai.backend.manager.data.user.types import UserData
 from ai.backend.testutils.scenario_steps import Told
 
 
@@ -114,6 +118,16 @@ class SeedingSession:
     ) -> Laid[None]:
         return await self._settle(self._seed.linking(one, scope, target))
 
+    async def personal_project_of(self, user: Laid[UserData], /) -> Laid[ProjectData]:
+        row = self._seed.personal_project_of(user)
+        await lay(self._ops, [row], self._made)
+        return row
+
+    async def accepting[A](
+        self, one: SeedShareAcceptance[A], offer: Laid[A], /
+    ) -> Laid[EntityShareData]:
+        return await self._settle(self._seed.accepting(one, offer))
+
     async def granting[R, U](
         self,
         role: Laid[R],
@@ -123,6 +137,18 @@ class SeedingSession:
         user_id: Any,
     ) -> Laid[None]:
         return await self._settle(self._seed.granting(role, to, role_id=role_id, user_id=user_id))
+
+    async def joining[P, U](
+        self,
+        project: Laid[P],
+        member: Laid[U],
+        *,
+        project_id: Any,
+        user_id: Any,
+    ) -> Laid[None]:
+        return await self._settle(
+            self._seed.joining(project, member, project_id=project_id, user_id=user_id)
+        )
 
     async def within[D](self, nest: SeedNest[D]) -> D:
         """Lay what this nest lays, and write all of it."""

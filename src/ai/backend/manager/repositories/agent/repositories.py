@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from typing import Self
 
 from ai.backend.manager.repositories.agent.repository import AgentRepository
+from ai.backend.manager.repositories.ops.v2.share.provider import ShareOpsProvider
 from ai.backend.manager.repositories.types import RepositoryArgs
 
 
@@ -17,7 +18,7 @@ class AgentRepositories:
             args.valkey_live_client,
             args.valkey_stat_client,
             args.config_provider,
-            args.v2_ops_provider,
+            ShareOpsProvider(args.db),
         )
 
         return cls(

@@ -24,7 +24,9 @@ from ai.backend.common.data.entity.replica import ReplicaID
 from ai.backend.common.data.entity.resource_group import ResourceGroupName
 from ai.backend.common.data.entity.runtime_variant import RuntimeVariantID
 from ai.backend.common.data.entity.session_group import SessionGroupID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.entity.vfolder import VFolderUUID
+from ai.backend.common.data.permission.types import Permission
 from ai.backend.common.exception import BackendAIError, InvalidAPIParameters
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
@@ -85,7 +87,9 @@ from ai.backend.manager.data.model_serving.types import AppProxyRouteEntry, Rout
 from ai.backend.manager.data.resource.types import ResourceGroupProxyTarget
 from ai.backend.manager.data.session.creation import DeploymentContext
 from ai.backend.manager.data.session.types import SessionStatus
+from ai.backend.manager.data.vfolder.types import VFolderMountPermission
 from ai.backend.manager.errors.service import EndpointNotFound
+from ai.backend.manager.errors.storage import VFolderNotFound
 from ai.backend.manager.models.deployment_policy.purgers import DeploymentPolicyPurger
 from ai.backend.manager.models.deployment_policy.upserters import DeploymentPolicyUpserter
 from ai.backend.manager.models.deployment_revision.creators import DeploymentRevisionCreator
@@ -111,6 +115,9 @@ from ai.backend.manager.repositories.deployment.types import (
     RouteSessionKernelInfo,
 )
 from ai.backend.manager.repositories.ops.v2.reconciler.provider import ReconcileOpsProvider
+from ai.backend.manager.repositories.rbac.permission_check_repository import (
+    RbacPermissionCheckRepository,
+)
 
 from .db_source import DeploymentDBSource
 from .storage_source import DeploymentStorageSource
@@ -160,6 +167,7 @@ class DeploymentRepository:
     _valkey_stat: ValkeyStatClient
     _valkey_live: ValkeyLiveClient
     _valkey_schedule: ValkeyScheduleClient
+    _permission_check: RbacPermissionCheckRepository
 
     def __init__(
         self,
@@ -169,6 +177,7 @@ class DeploymentRepository:
         valkey_stat: ValkeyStatClient,
         valkey_live: ValkeyLiveClient,
         valkey_schedule: ValkeyScheduleClient,
+        permission_check: RbacPermissionCheckRepository,
     ) -> None:
         self._db_source = DeploymentDBSource(db, reconcile_ops_provider, storage_manager)
         self._reconcile_ops = reconcile_ops_provider
@@ -176,6 +185,7 @@ class DeploymentRepository:
         self._valkey_stat = valkey_stat
         self._valkey_live = valkey_live
         self._valkey_schedule = valkey_schedule
+        self._permission_check = permission_check
 
     # Endpoint operations
 
@@ -550,14 +560,24 @@ class DeploymentRepository:
         user_id: uuid.UUID,
         vfolder_ids: Sequence[VFolderUUID],
     ) -> dict[VFolderUUID, MountPermission]:
-        """Resolve the requester's effective permission on each vfolder.
+        """The mount permission the requester's RBAC bits answer as on each vfolder.
 
-        Used at revision-write time to ground the model vfolder mount
-        permission into the requesting user's own permission (and to reject
-        a request exceeding it) — see
-        ``DeploymentDBSource.resolve_user_vfolder_permissions``.
+        Raises ``VFolderNotFound`` for any vfolder the requester may not read.
         """
-        return await self._db_source.resolve_user_vfolder_permissions(user_id, vfolder_ids)
+        held = await self._permission_check.held_permissions(UserID(user_id), vfolder_ids)
+        permissions: dict[VFolderUUID, MountPermission] = {}
+        unreadable: list[str] = []
+        for vfolder_id in vfolder_ids:
+            bits = held.get(vfolder_id, Permission.NONE)
+            if not bits.covers(Permission.READ):
+                unreadable.append(str(vfolder_id))
+                continue
+            permissions[vfolder_id] = MountPermission(VFolderMountPermission.from_rbac(bits).value)
+        if unreadable:
+            raise VFolderNotFound(
+                f"VFolder not accessible by user {user_id}: {', '.join(unreadable)}"
+            )
+        return permissions
 
     @deployment_repository_resilience.apply()
     async def fetch_deployment_config(
@@ -1571,7 +1591,7 @@ class DeploymentRepository:
     async def bulk_delete_access_tokens(
         self,
         token_ids: list[uuid.UUID],
-    ) -> list[uuid.UUID]:
+    ) -> list[ModelDeploymentAccessTokenData]:
         """Delete multiple access tokens."""
         return await self._db_source.bulk_delete_access_tokens(token_ids)
 

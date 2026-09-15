@@ -85,8 +85,7 @@ class V2BatchWriteOps(V2GraphWriteOpsBase):
         removed = await self._batch_purge_returning(
             scope_condition, purger.build_subquery, purger.conflict_checks(), collect
         )
-        for entity_id in entity_ids:
-            await self._teardown(entity_id)
+        await self._teardown(entity_ids)
         return removed
 
     async def _batch_update_returning[TRow: Base, TData](

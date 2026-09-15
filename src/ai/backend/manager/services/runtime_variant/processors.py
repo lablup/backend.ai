@@ -38,10 +38,11 @@ from ai.backend.manager.services.runtime_variant.actions.search import (
 from ai.backend.manager.services.runtime_variant.actions.update import (
     UpdateRuntimeVariantAction,
 )
+from ai.backend.manager.services.runtime_variant.service import RuntimeVariantService
 
 
 class RuntimeVariantProcessors:
-    """Every operation runs straight against ops, so this domain has no service."""
+    """Every operation but the purge runs straight against ops; the purge clears presets."""
 
     public_get: PublicSingleEntityActionProcessor[
         GetRuntimeVariantAction, EntityOpsResult[RuntimeVariantData]
@@ -65,11 +66,13 @@ class RuntimeVariantProcessors:
         LookupRuntimeVariantAction, LookupOpsResult[RuntimeVariantID]
     ]
 
-    def __init__(self, group: ProcessorGroup[RuntimeVariantData]) -> None:
+    def __init__(
+        self, group: ProcessorGroup[RuntimeVariantData], service: RuntimeVariantService
+    ) -> None:
         self.public_get = group.public_get_ops(GetRuntimeVariantAction)
         self.public_bulk_get = group.public_partial_bulk_get_ops(PublicBulkGetRuntimeVariantsAction)
         self.global_create = group.global_create_ops(CreateRuntimeVariantAction)
         self.update = group.single_update_ops(UpdateRuntimeVariantAction)
-        self.purge = group.entity_purge_ops(PurgeRuntimeVariantAction)
+        self.purge = group.single_entity(PurgeRuntimeVariantAction, service.purge)
         self.public_search = group.public_search_ops(SearchRuntimeVariantsAction)
         self.public_lookup = group.public_lookup_ops(LookupRuntimeVariantAction)

@@ -181,9 +181,7 @@ class TestShareVFolderAction:
     ) -> None:
         emails = ["a@test.com", "b@test.com"]
         mock_user_repo.get_user_by_uuid = AsyncMock(return_value=_make_user_data(user_uuid))
-        mock_vfolder_repo.get_by_id_validated = AsyncMock(
-            return_value=_make_vfolder_data(vfolder_uuid)
-        )
+        mock_vfolder_repo.get_by_id = AsyncMock(return_value=_make_vfolder_data(vfolder_uuid))
         mock_vfolder_repo.share_vfolder_with_users = AsyncMock(return_value=emails)
 
         action = ShareVFolderAction(
@@ -206,7 +204,7 @@ class TestShareVFolderAction:
         vfolder_uuid: uuid.UUID,
     ) -> None:
         mock_user_repo.get_user_by_uuid = AsyncMock(return_value=_make_user_data(user_uuid))
-        mock_vfolder_repo.get_by_id_validated = AsyncMock(
+        mock_vfolder_repo.get_by_id = AsyncMock(
             return_value=_make_vfolder_data(vfolder_uuid, ownership_type=VFolderOwnershipType.USER)
         )
 
@@ -250,7 +248,7 @@ class TestShareVFolderAction:
         vfolder_uuid: uuid.UUID,
     ) -> None:
         mock_user_repo.get_user_by_uuid = AsyncMock(return_value=_make_user_data(user_uuid))
-        mock_vfolder_repo.get_by_id_validated = AsyncMock(side_effect=VFolderNotFound())
+        mock_vfolder_repo.get_by_id = AsyncMock(side_effect=VFolderNotFound())
 
         action = ShareVFolderAction(
             vfolder_uuid=VFolderUUID(vfolder_uuid),
@@ -279,9 +277,7 @@ class TestUnshareVFolderAction:
     ) -> None:
         emails = ["a@test.com", "b@test.com"]
         mock_user_repo.get_user_by_uuid = AsyncMock(return_value=_make_user_data(user_uuid))
-        mock_vfolder_repo.get_by_id_validated = AsyncMock(
-            return_value=_make_vfolder_data(vfolder_uuid)
-        )
+        mock_vfolder_repo.get_by_id = AsyncMock(return_value=_make_vfolder_data(vfolder_uuid))
         mock_vfolder_repo.unshare_vfolder_from_users = AsyncMock(return_value=emails)
 
         action = UnshareVFolderAction(
@@ -302,7 +298,7 @@ class TestUnshareVFolderAction:
         vfolder_uuid: uuid.UUID,
     ) -> None:
         mock_user_repo.get_user_by_uuid = AsyncMock(return_value=_make_user_data(user_uuid))
-        mock_vfolder_repo.get_by_id_validated = AsyncMock(
+        mock_vfolder_repo.get_by_id = AsyncMock(
             return_value=_make_vfolder_data(vfolder_uuid, ownership_type=VFolderOwnershipType.USER)
         )
 
@@ -523,7 +519,7 @@ class TestInviteVFolderAction:
     ) -> None:
         invitation_id = str(uuid.uuid4())
         mock_user_repo.get_user_by_uuid = AsyncMock(return_value=_make_user_data(user_uuid))
-        mock_vfolder_repo.get_by_id_validated = AsyncMock(
+        mock_vfolder_repo.get_by_id = AsyncMock(
             return_value=_make_vfolder_data(vfolder_uuid, name="my-folder")
         )
         mock_vfolder_repo.get_user_email_by_id = AsyncMock(return_value="inviter@test.com")
@@ -555,7 +551,7 @@ class TestInviteVFolderAction:
         vfolder_uuid: uuid.UUID,
     ) -> None:
         mock_user_repo.get_user_by_uuid = AsyncMock(return_value=_make_user_data(user_uuid))
-        mock_vfolder_repo.get_by_id_validated = AsyncMock(
+        mock_vfolder_repo.get_by_id = AsyncMock(
             return_value=_make_vfolder_data(vfolder_uuid, name=".hidden-folder")
         )
 
@@ -579,9 +575,7 @@ class TestInviteVFolderAction:
         vfolder_uuid: uuid.UUID,
     ) -> None:
         mock_user_repo.get_user_by_uuid = AsyncMock(return_value=_make_user_data(user_uuid))
-        mock_vfolder_repo.get_by_id_validated = AsyncMock(
-            return_value=_make_vfolder_data(vfolder_uuid)
-        )
+        mock_vfolder_repo.get_by_id = AsyncMock(return_value=_make_vfolder_data(vfolder_uuid))
         mock_vfolder_repo.get_user_email_by_id = AsyncMock(return_value="inviter@test.com")
         mock_vfolder_repo.get_users_by_emails = AsyncMock(return_value=[])
 
@@ -605,9 +599,7 @@ class TestInviteVFolderAction:
         vfolder_uuid: uuid.UUID,
     ) -> None:
         mock_user_repo.get_user_by_uuid = AsyncMock(return_value=_make_user_data(user_uuid))
-        mock_vfolder_repo.get_by_id_validated = AsyncMock(
-            return_value=_make_vfolder_data(vfolder_uuid)
-        )
+        mock_vfolder_repo.get_by_id = AsyncMock(return_value=_make_vfolder_data(vfolder_uuid))
         mock_vfolder_repo.get_user_email_by_id = AsyncMock(return_value="inviter@test.com")
         mock_vfolder_repo.get_users_by_emails = AsyncMock(
             return_value=[(uuid.uuid4(), "invitee@test.com")]
@@ -634,9 +626,7 @@ class TestInviteVFolderAction:
         vfolder_uuid: uuid.UUID,
     ) -> None:
         mock_user_repo.get_user_by_uuid = AsyncMock(return_value=_make_user_data(user_uuid))
-        mock_vfolder_repo.get_by_id_validated = AsyncMock(
-            return_value=_make_vfolder_data(vfolder_uuid)
-        )
+        mock_vfolder_repo.get_by_id = AsyncMock(return_value=_make_vfolder_data(vfolder_uuid))
         mock_vfolder_repo.get_user_email_by_id = AsyncMock(return_value="inviter@test.com")
         mock_vfolder_repo.get_users_by_emails = AsyncMock(
             return_value=[(uuid.uuid4(), "invitee@test.com")]
@@ -967,7 +957,7 @@ class TestLeaveInvitedVFolderAction:
         vfolder_uuid = uuid.uuid4()
 
         mock_user_repo.get_user_by_uuid = AsyncMock(return_value=_make_user_data(requester_uuid))
-        mock_vfolder_repo.get_by_id_validated = AsyncMock(
+        mock_vfolder_repo.get_by_id = AsyncMock(
             return_value=_make_vfolder_data(vfolder_uuid, ownership_type=VFolderOwnershipType.USER)
         )
         mock_vfolder_repo.get_user_info = AsyncMock(return_value=(UserRole.USER, "default"))
@@ -994,7 +984,7 @@ class TestLeaveInvitedVFolderAction:
         vfolder_uuid = uuid.uuid4()
 
         mock_user_repo.get_user_by_uuid = AsyncMock(return_value=_make_user_data(requester_uuid))
-        mock_vfolder_repo.get_by_id_validated = AsyncMock(
+        mock_vfolder_repo.get_by_id = AsyncMock(
             return_value=_make_vfolder_data(vfolder_uuid, ownership_type=VFolderOwnershipType.GROUP)
         )
 
@@ -1019,7 +1009,7 @@ class TestLeaveInvitedVFolderAction:
         mock_user_repo.get_user_by_uuid = AsyncMock(
             return_value=_make_user_data(admin_uuid, role=UserRole.SUPERADMIN)
         )
-        mock_vfolder_repo.get_by_id_validated = AsyncMock(
+        mock_vfolder_repo.get_by_id = AsyncMock(
             return_value=_make_vfolder_data(vfolder_uuid, ownership_type=VFolderOwnershipType.USER)
         )
         mock_vfolder_repo.get_user_info = AsyncMock(return_value=(UserRole.SUPERADMIN, "default"))
@@ -1048,7 +1038,7 @@ class TestLeaveInvitedVFolderAction:
         vfolder_uuid = uuid.uuid4()
 
         mock_user_repo.get_user_by_uuid = AsyncMock(return_value=_make_user_data(requester_uuid))
-        mock_vfolder_repo.get_by_id_validated = AsyncMock(
+        mock_vfolder_repo.get_by_id = AsyncMock(
             return_value=_make_vfolder_data(vfolder_uuid, ownership_type=VFolderOwnershipType.USER)
         )
         mock_vfolder_repo.get_user_info = AsyncMock(return_value=(UserRole.USER, "default"))
@@ -1176,7 +1166,7 @@ class TestEmptyEmailAccountInvitationScenarios:
         expected_invitation_id: str,
     ) -> InviteVFolderAction:
         mock_user_repo.get_user_by_uuid = AsyncMock(return_value=empty_email_user)
-        mock_vfolder_repo.get_by_id_validated = AsyncMock(
+        mock_vfolder_repo.get_by_id = AsyncMock(
             return_value=_make_vfolder_data(vfolder_uuid, name="folder")
         )
         mock_vfolder_repo.get_user_email_by_id = AsyncMock(return_value="")
@@ -1367,7 +1357,7 @@ class TestEmptyEmailAccountInvitationScenarios:
         vfolder_uuid: uuid.UUID,
     ) -> LeaveInvitedVFolderAction:
         mock_user_repo.get_user_by_uuid = AsyncMock(return_value=empty_email_user)
-        mock_vfolder_repo.get_by_id_validated = AsyncMock(
+        mock_vfolder_repo.get_by_id = AsyncMock(
             return_value=_make_vfolder_data(vfolder_uuid, ownership_type=VFolderOwnershipType.USER)
         )
         mock_vfolder_repo.get_user_info = AsyncMock(return_value=(UserRole.USER, None))

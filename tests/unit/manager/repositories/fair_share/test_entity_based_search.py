@@ -20,7 +20,8 @@ from decimal import Decimal
 import pytest
 import sqlalchemy as sa
 
-from ai.backend.common.data.entity.domain import DomainID, DomainName
+from ai.backend.common.data.entity.domain import DomainEntityType, DomainID, DomainName
+from ai.backend.common.data.entity.project import ProjectEntityType
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.data.filter_specs import StringMatchSpec, UUIDEqualMatchSpec
 from ai.backend.common.types import ResourceSlot
@@ -72,6 +73,7 @@ from ai.backend.manager.models.user import (
 )
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
+from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
 from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
 from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.fair_share import (
@@ -82,6 +84,7 @@ from ai.backend.manager.secret.types import SecretValue
 from ai.backend.manager.types import TriState
 from ai.backend.testutils.db import with_tables
 from ai.backend.testutils.fixtures import DomainFixtureData
+from ai.backend.testutils.virtual_entity import VirtualEntitySeeder
 
 RESOURCE_GROUP_ID = ResourceGroupID(uuid.uuid4())
 EMPTY_RESOURCE_GROUP_ID = ResourceGroupID(uuid.uuid4())
@@ -119,6 +122,7 @@ class TestSearchDomainFairSharesEntityBased:
                 UserFairShareRow,
                 VirtualEntityRow,
                 EntityMembershipRow,
+                ScopeBindingRow,
             ],
         ):
             yield database_connection
@@ -691,6 +695,7 @@ class TestSearchProjectFairSharesEntityBased:
                 UserFairShareRow,
                 VirtualEntityRow,
                 EntityMembershipRow,
+                ScopeBindingRow,
             ],
         ):
             yield database_connection
@@ -784,6 +789,12 @@ class TestSearchProjectFairSharesEntityBased:
                 )
             )
             await db_sess.flush()
+            domain_id = (
+                await db_sess.execute(sa.select(DomainRow.id).where(DomainRow.name == domain_name))
+            ).scalar_one()
+            await VirtualEntitySeeder().create_in(
+                db_sess, ProjectEntityType(), project_id, [(DomainEntityType(), domain_id)]
+            )
 
             db_sess.add(
                 ResourceGroupForProjectRow(resource_group_id=RESOURCE_GROUP_ID, group=project_id)
@@ -833,6 +844,12 @@ class TestSearchProjectFairSharesEntityBased:
                 )
             )
             await db_sess.flush()
+            domain_id = (
+                await db_sess.execute(sa.select(DomainRow.id).where(DomainRow.name == domain_name))
+            ).scalar_one()
+            await VirtualEntitySeeder().create_in(
+                db_sess, ProjectEntityType(), project_id, [(DomainEntityType(), domain_id)]
+            )
 
             db_sess.add(
                 ResourceGroupForProjectRow(resource_group_id=RESOURCE_GROUP_ID, group=project_id)
@@ -1017,6 +1034,13 @@ class TestSearchProjectFairSharesEntityBased:
                     resource_policy=policy_name,
                 )
             )
+            await db_sess.flush()
+            domain_id = (
+                await db_sess.execute(sa.select(DomainRow.id).where(DomainRow.name == domain_name))
+            ).scalar_one()
+            await VirtualEntitySeeder().create_in(
+                db_sess, ProjectEntityType(), project_id, [(DomainEntityType(), domain_id)]
+            )
             await db_sess.commit()
         return project_id
 
@@ -1083,6 +1107,7 @@ class TestSearchUserFairSharesEntityBased:
                 UserFairShareRow,
                 VirtualEntityRow,
                 EntityMembershipRow,
+                ScopeBindingRow,
             ],
         ):
             yield database_connection
@@ -1167,6 +1192,12 @@ class TestSearchUserFairSharesEntityBased:
                 )
             )
             await db_sess.flush()
+            domain_id = (
+                await db_sess.execute(sa.select(DomainRow.id).where(DomainRow.name == domain_name))
+            ).scalar_one()
+            await VirtualEntitySeeder().create_in(
+                db_sess, ProjectEntityType(), project_id, [(DomainEntityType(), domain_id)]
+            )
 
             db_sess.add(
                 ResourceGroupForProjectRow(resource_group_id=RESOURCE_GROUP_ID, group=project_id)

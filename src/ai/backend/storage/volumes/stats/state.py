@@ -74,8 +74,8 @@ class VolumeState:
         """Fetch metric from volume API and store in cache."""
         now = datetime.now(UTC)
 
-        async with self._volume_pool.get_volume_by_name(volume_name) as volume:
-            metric = await volume.get_performance_metric()
+        volume = self._volume_pool.get_volume_by_name(volume_name)
+        metric = await volume.get_performance_metric()
         cached = CachedFSPerfMetricData.from_metric(
             volume_name=volume_name,
             metric=metric,

@@ -37,6 +37,7 @@ class TestAgentRegistryDependency:
             network_plugin_ctx=MagicMock(),
             scheduling_controller=MagicMock(),
             scheduler_repository=MagicMock(),
+            ops_provider=MagicMock(),
             debug=False,
             manager_public_key=MagicMock(),
             manager_secret_key=MagicMock(),
