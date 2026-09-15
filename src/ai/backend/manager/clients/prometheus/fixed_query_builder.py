@@ -55,8 +55,8 @@ _PCT_RATE_TEMPLATE: Final[str] = (
     " / (sum by (${{group_by}})(" + _PCT_CAPACITY_SELECTOR + ") > 0)"
     ' * 100, "value_type", "pct", "", "")'
 )
-# Unit hints whose `current` series accumulates over time.
-_COUNTER_UNIT_HINTS: Final[frozenset[str]] = frozenset({"msec"})
+# Unit hints served as a per-second rate of a cumulative counter (CPU time).
+_COUNTER_UNIT_HINTS: Final[frozenset[str]] = frozenset({"msec/s"})
 _SERIES_TEMPLATES: Final[Mapping[MetricType, str]] = {
     MetricType.GAUGE: _GAUGE_TEMPLATE,
     MetricType.RATE: _RATE_TEMPLATE,
