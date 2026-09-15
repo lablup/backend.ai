@@ -151,22 +151,53 @@ class SessionDBSource:
 
     async def get_session_validated(
         self,
-        session_name_or_id: str | SessionId,
-        owner_access_key: AccessKey,
+        session_id: SessionId,
         kernel_loading_strategy: KernelLoadingStrategy = KernelLoadingStrategy.MAIN_KERNEL_ONLY,
         allow_stale: bool = False,
         eager_loading_op: Sequence[_AbstractLoad] | None = None,
     ) -> SessionRow:
-        """Look up a session by name or ID."""
         async with self._db.begin_readonly_session_read_committed() as db_sess:
-            return await SessionRow.get_session(
+            return await self._session_by_id(
                 db_sess,
-                session_name_or_id,
-                owner_access_key,
+                session_id,
                 kernel_loading_strategy=kernel_loading_strategy,
                 allow_stale=allow_stale,
-                eager_loading_op=list(eager_loading_op) if eager_loading_op else None,
+                eager_loading_op=eager_loading_op or (),
             )
+
+    async def _session_by_id(
+        self,
+        db_sess: AsyncSession,
+        session_id: SessionId,
+        *,
+        kernel_loading_strategy: KernelLoadingStrategy,
+        allow_stale: bool,
+        eager_loading_op: Sequence[_AbstractLoad] = (),
+    ) -> SessionRow:
+        options: list[_AbstractLoad] = [*eager_loading_op]
+        if kernel_loading_strategy != KernelLoadingStrategy.NONE:
+            # MAIN_KERNEL_ONLY loads every kernel as well, the same as SessionRow.get_session.
+            options.extend([
+                noload("*"),
+                selectinload(SessionRow.kernels).options(
+                    noload("*"),
+                    selectinload(KernelRow.agent_row).noload("*"),
+                ),
+            ])
+        options.append(joinedload(SessionRow.user))
+        cond = SessionRow.id == session_id
+        if not allow_stale:
+            cond = cond & ~SessionRow.status.in_(DEAD_SESSION_STATUSES)
+        query = (
+            sa.select(SessionRow)
+            .where(cond)
+            .options(*options)
+            .execution_options(populate_existing=True)
+        )
+        session_row = await db_sess.scalar(query)
+        if session_row is None:
+            raise SessionNotFound(f"Session (id={session_id}) does not exist.")
+        return session_row
 
     async def match_sessions(
         self,
@@ -212,40 +243,34 @@ class SessionDBSource:
 
     async def update_session_name(
         self,
-        session_name_or_id: str | SessionId,
+        session_id: SessionId,
         new_name: str,
-        owner_access_key: AccessKey,
     ) -> SessionRow:
-        async def _update(db_session: AsyncSession) -> SessionRow:
-            # Check if new name already exists for this owner
-            try:
-                await SessionRow.get_session(
-                    db_session,
-                    new_name,
-                    owner_access_key,
-                    kernel_loading_strategy=KernelLoadingStrategy.NONE,
-                )
-                raise SessionAlreadyExists(f"Session with name '{new_name}' already exists")
-            except SessionNotFound:
-                pass  # Session not found, which is good
-
-            # Get the target session
-            session_row = await SessionRow.get_session(
-                db_session,
-                session_name_or_id,
-                owner_access_key,
+        async with self._db.begin_session() as db_sess:
+            session_row = await self._session_by_id(
+                db_sess,
+                session_id,
                 kernel_loading_strategy=KernelLoadingStrategy.ALL_KERNELS,
+                allow_stale=False,
             )
+            if session_row.access_key is not None:
+                # The name is unique among the live sessions of the target session's owner.
+                duplicate = await db_sess.scalar(
+                    sa.select(SessionRow.id)
+                    .where(
+                        (SessionRow.name == new_name)
+                        & (SessionRow.access_key == session_row.access_key)
+                        & (~SessionRow.status.in_(DEAD_SESSION_STATUSES))
+                    )
+                    .limit(1)
+                )
+                if duplicate is not None:
+                    raise SessionAlreadyExists(f"Session with name '{new_name}' already exists")
 
-            # Update session name
             session_row.name = new_name
             for kernel in session_row.kernels:
                 kernel.session_name = new_name
-
             return session_row
-
-        async with self._db.begin_session() as db_sess:
-            return await _update(db_sess)
 
     async def get_container_registry(
         self,
@@ -464,16 +489,14 @@ class SessionDBSource:
     async def _find_dependent_sessions(
         self,
         db_sess: AsyncSession,
-        root_session_name_or_id: str | uuid.UUID,
-        access_key: AccessKey,
+        root_session_id: SessionId,
         allow_stale: bool = False,
     ) -> tuple[uuid.UUID, set[uuid.UUID]]:
         """
         Find the root session and all sessions that depend on it (recursively).
 
         :param db_sess: Database session
-        :param root_session_name_or_id: Root session name or ID
-        :param access_key: Access key of the session owner
+        :param root_session_id: Root session ID
         :param allow_stale: Whether to allow stale sessions
         :return: Tuple of (root_session_id, set of dependent session IDs)
         """
@@ -492,84 +515,69 @@ class SessionDBSource:
             return dependent_sessions
 
         # Get the root session first
-        root_session = await SessionRow.get_session(
+        root_session = await self._session_by_id(
             db_sess,
-            root_session_name_or_id,
-            access_key=access_key,
+            root_session_id,
+            kernel_loading_strategy=KernelLoadingStrategy.NONE,
             allow_stale=allow_stale,
         )
-        root_session_id = cast(uuid.UUID, root_session.id)
-        dependent_ids = await _find_recursive_dependencies(root_session_id)
+        dependent_ids = await _find_recursive_dependencies(root_session.id)
 
-        return root_session_id, dependent_ids
+        return root_session.id, dependent_ids
 
     async def get_target_session_ids(
         self,
-        session_name_or_id: str | uuid.UUID,
-        access_key: AccessKey,
+        session_id: SessionId,
         recursive: bool = False,
     ) -> list[SessionId]:
         """
         Get list of session IDs including dependent sessions if recursive.
 
-        :param session_name_or_id: Name or ID of the primary session
-        :param access_key: Access key of the session owner
+        :param session_id: ID of the primary session
         :param recursive: If True, include dependent sessions
         :return: List of session IDs
         """
         async with self._db.begin_readonly_session() as db_sess:
-            try:
-                if recursive:
-                    # Get root session and dependent sessions
-                    root_id, dependent_ids = await self._find_dependent_sessions(
-                        db_sess,
-                        session_name_or_id,
-                        access_key,
-                        allow_stale=True,
-                    )
-                    # Return dependent sessions first, then root session
-                    session_ids = [cast(SessionId, sid) for sid in dependent_ids]
-                    session_ids.append(cast(SessionId, root_id))
-                else:
-                    # Get only the main session
-                    session = await SessionRow.get_session(
-                        db_sess,
-                        session_name_or_id,
-                        access_key,
-                        kernel_loading_strategy=KernelLoadingStrategy.NONE,
-                        allow_stale=True,
-                    )
-                    session_ids = [session.id]
+            if recursive:
+                # Get root session and dependent sessions
+                root_id, dependent_ids = await self._find_dependent_sessions(
+                    db_sess,
+                    session_id,
+                    allow_stale=True,
+                )
+                # Return dependent sessions first, then root session
+                session_ids = [cast(SessionId, sid) for sid in dependent_ids]
+                session_ids.append(cast(SessionId, root_id))
+            else:
+                # Get only the main session
+                session = await self._session_by_id(
+                    db_sess,
+                    session_id,
+                    kernel_loading_strategy=KernelLoadingStrategy.NONE,
+                    allow_stale=True,
+                )
+                session_ids = [session.id]
 
-                return session_ids
-            except SessionNotFound:
-                raise
+            return session_ids
 
     async def find_dependency_sessions(
         self,
-        session_name_or_id: uuid.UUID | str,
-        access_key: AccessKey,
+        session_id: SessionId,
     ) -> dict[str, list[Any] | str]:
         async with self._db.begin_readonly_session_read_committed() as db_sess:
-            return await find_dependency_sessions(
-                session_name_or_id,
-                db_sess,
-                access_key,
-            )
+            return await find_dependency_sessions(session_id, db_sess)
 
     async def get_session_with_group(
         self,
-        session_name_or_id: str | SessionId,
-        owner_access_key: AccessKey,
+        session_id: SessionId,
         kernel_loading_strategy: KernelLoadingStrategy = KernelLoadingStrategy.MAIN_KERNEL_ONLY,
         allow_stale: bool = False,
     ) -> SessionRow:
         """Get session with group information eagerly loaded"""
         async with self._db.begin_readonly_session_read_committed() as db_sess:
-            return await SessionRow.get_session(
+            return await self._session_by_id(
                 db_sess,
-                session_name_or_id,
-                owner_access_key,
+                session_id,
                 kernel_loading_strategy=kernel_loading_strategy,
                 allow_stale=allow_stale,
                 eager_loading_op=[selectinload(SessionRow.group)],
