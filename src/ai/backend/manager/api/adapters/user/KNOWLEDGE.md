@@ -96,7 +96,7 @@ auth 7, 필드는 error_log 4, keypair 4, login_session 3, login_history 2다. B
 |---|---|---|---|---|---|
 | 전역 역할 | `global_scope`, `global_search_ops` | `InsufficientPrivilege` | 통과. 모니터는 GET/SEARCH/LOOKUP만 통과 | 그대로 막는다 | `actions/v2/global_scope/processor.py:51`, `superadmin.py:22-34`, `actions/types.py:106` |
 | 엔티티 권한 | `single_entity`, field `single_field` | `NotEnoughPermission` | 통과 | 통과 | `actions/v2/single_entity/validator/rbac.py:33-54` |
-| 엔티티 권한, 소유자 조회 단계 | `key_field_lookup_ops`, `key_owner_lookup_ops` | `GenericBadRequest`. 없는 키와 권한 없음이 같은 예외다 | 통과 | 권한은 통과, 없는 키는 여전히 `GenericBadRequest` | `actions/v2/lookup/processor.py:97-103,125-139` |
+| 엔티티 권한, 소유자 조회 단계 | `key_field_lookup_ops`, `key_owner_lookup_ops` | `GenericBadRequest`. 없는 키와 권한 없음이 같은 예외다 | 통과. 없는 키는 `FieldNotFoundError` | 권한은 통과, 없는 키는 여전히 `GenericBadRequest` | `actions/v2/lookup/processor.py:99-110,132-146` |
 | 스코프 권한 | `scope`, `scope_search_ops`, field `search_ops` | `NotEnoughPermission`. 여러 스코프 중 하나라도 막히면 전부 거부 | 통과 | 통과 | `actions/v2/scope/validator/rbac.py:38-66` |
 | 입력 검증 | 없음. 서비스와 리포지토리가 실행 중에 낸다 | 경우마다 다르다 | 해당 없음 | 해당 없음 | 아래 표 |
 

@@ -1123,7 +1123,7 @@ class DeploymentAdapter(BaseAdapter):
         for rule_id in input.ids:
             try:
                 rule_deployments[rule_id] = await self._auto_scaling_rule_deployment(rule_id)
-            except GenericBadRequest:
+            except (GenericBadRequest, FieldNotFoundError):
                 continue
         if not rule_deployments:
             return BulkDeleteAutoScalingRulesPayload(ids=[])

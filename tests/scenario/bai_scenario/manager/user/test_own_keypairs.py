@@ -9,19 +9,6 @@ from itertools import pairwise
 from typing import Any, override
 
 import pytest
-from bai_scenario.components.answers import TheCallIsRefused
-from bai_scenario.components.domain import WAS_HERE, WrittenByThisRun
-from bai_scenario.components.user import AGrant, KeypairNodeLook, UserNodeLook
-from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
-from bai_scenario.runner.steps import run_scenario
-from bai_scenario.seeds.domain.domain import SeedDomain
-from bai_scenario.seeds.resource_policy.keypair import SeedKeypairPolicy
-from bai_scenario.seeds.resource_policy.project import SeedProjectPolicy
-from bai_scenario.seeds.resource_policy.user import SeedUserPolicy
-from bai_scenario.seeds.seeder import Laid, Seeder, SeedNest
-from bai_scenario.seeds.user.fields import SeedKeypairOf
-from bai_scenario.seeds.user.user import SeedUserOf
 
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.dto.manager.v2.keypair import (
@@ -57,6 +44,19 @@ from ai.backend.testutils.scenario_steps import (
     Verdict,
     When,
 )
+from bai_scenario.components.answers import TheCallIsRefused
+from bai_scenario.components.domain import WAS_HERE, WrittenByThisRun
+from bai_scenario.components.user import AGrant, KeypairNodeLook, UserNodeLook
+from bai_scenario.runner.acting import ActingAs
+from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.steps import run_scenario
+from bai_scenario.seeds.domain.domain import SeedDomain
+from bai_scenario.seeds.resource_policy.keypair import SeedKeypairPolicy
+from bai_scenario.seeds.resource_policy.project import SeedProjectPolicy
+from bai_scenario.seeds.resource_policy.user import SeedUserPolicy
+from bai_scenario.seeds.seeder import Laid, Seeder, SeedNest
+from bai_scenario.seeds.user.fields import SeedKeypairOf
+from bai_scenario.seeds.user.user import SeedUserOf
 
 SERVER_RATE_LIMIT = 10000
 """키 행의 요청 한도 기본값. 시드는 한도를 적지 않으므로 컬럼 기본값이 들어간다."""

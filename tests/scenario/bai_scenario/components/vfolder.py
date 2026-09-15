@@ -6,15 +6,6 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any, override
 
-from bai_scenario.components.domain import WAS_HERE, GrantedUser, SomeoneOf
-from bai_scenario.seeds.domain.domain import SeedDomain
-from bai_scenario.seeds.entity_share.share import SeedShareTaken, SeedVFolderShare
-from bai_scenario.seeds.project.project import SeedProject
-from bai_scenario.seeds.rbac.role import SeedPermission, SeedRole
-from bai_scenario.seeds.resource_policy.project import SeedProjectPolicy
-from bai_scenario.seeds.seeder import Laid, Seeder, SeedNest, SeedRow
-from bai_scenario.seeds.vfolder.vfolder import SeedPersonalVFolder, SeedProjectVFolder
-
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.common.data.entity.user import UserID
@@ -24,6 +15,14 @@ from ai.backend.manager.data.domain.types import DomainData
 from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.data.vfolder.types import VFolderData
 from ai.backend.testutils.scenario_steps import Given
+from bai_scenario.components.domain import WAS_HERE, GrantedUser, SomeoneOf
+from bai_scenario.seeds.domain.domain import SeedDomain
+from bai_scenario.seeds.entity_share.share import SeedShareTaken, SeedVFolderShare
+from bai_scenario.seeds.project.project import SeedProject
+from bai_scenario.seeds.rbac.role import SeedPermission, SeedRole
+from bai_scenario.seeds.resource_policy.project import SeedProjectPolicy
+from bai_scenario.seeds.seeder import Laid, Seeder, SeedNest, SeedRow
+from bai_scenario.seeds.vfolder.vfolder import SeedPersonalVFolder, SeedProjectVFolder
 
 STORAGE_HOST = "local:volume1"
 """The one host the faked storage manager answers for."""

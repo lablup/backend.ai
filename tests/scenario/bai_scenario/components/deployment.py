@@ -15,15 +15,6 @@ from datetime import datetime
 from typing import Any, override
 from uuid import UUID
 
-from bai_scenario.components.domain import WAS_HERE, SomeoneOf, WrittenByThisRun
-from bai_scenario.seeds.deployment.deployment import SeedDeployment
-from bai_scenario.seeds.domain.domain import SeedDomain
-from bai_scenario.seeds.project.project import SeedProject
-from bai_scenario.seeds.rbac.role import SeedPermission, SeedRole
-from bai_scenario.seeds.resource_group.resource_group import SeedResourceGroup
-from bai_scenario.seeds.resource_policy.project import SeedProjectPolicy
-from bai_scenario.seeds.seeder import Laid, Seeder, SeedNest
-
 from ai.backend.common.data.endpoint.types import ScalingState
 from ai.backend.common.data.entity.deployment import DeploymentEntityType
 from ai.backend.common.data.entity.project import ProjectID
@@ -59,6 +50,14 @@ from ai.backend.testutils.scenario_steps import (
     Then,
     Verdict,
 )
+from bai_scenario.components.domain import WAS_HERE, SomeoneOf, WrittenByThisRun
+from bai_scenario.seeds.deployment.deployment import SeedDeployment
+from bai_scenario.seeds.domain.domain import SeedDomain
+from bai_scenario.seeds.project.project import SeedProject
+from bai_scenario.seeds.rbac.role import SeedPermission, SeedRole
+from bai_scenario.seeds.resource_group.resource_group import SeedResourceGroup
+from bai_scenario.seeds.resource_policy.project import SeedProjectPolicy
+from bai_scenario.seeds.seeder import Laid, Seeder, SeedNest
 
 
 def _names(granted: Sequence[Permission]) -> str:

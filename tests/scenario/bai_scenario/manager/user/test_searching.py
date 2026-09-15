@@ -9,20 +9,6 @@ from itertools import pairwise
 from typing import Any, override
 
 import pytest
-from bai_scenario.components.answers import TheCallIsRefused
-from bai_scenario.components.domain import WAS_HERE, SomeoneOf
-from bai_scenario.components.user import AGrant
-from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
-from bai_scenario.runner.steps import run_scenario
-from bai_scenario.seeds.domain.domain import SeedDomain
-from bai_scenario.seeds.project.project import SeedProject
-from bai_scenario.seeds.rbac.role import SeedRole
-from bai_scenario.seeds.resource_policy.keypair import SeedKeypairPolicy
-from bai_scenario.seeds.resource_policy.project import SeedProjectPolicy
-from bai_scenario.seeds.resource_policy.user import SeedUserPolicy
-from bai_scenario.seeds.seeder import Laid, Seeder, SeedNest
-from bai_scenario.seeds.user.user import SeedUserOf
 
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.user import UserID
@@ -60,6 +46,20 @@ from ai.backend.testutils.scenario_steps import (
     Verdict,
     When,
 )
+from bai_scenario.components.answers import TheCallIsRefused
+from bai_scenario.components.domain import WAS_HERE, SomeoneOf
+from bai_scenario.components.user import AGrant
+from bai_scenario.runner.acting import ActingAs
+from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.steps import run_scenario
+from bai_scenario.seeds.domain.domain import SeedDomain
+from bai_scenario.seeds.project.project import SeedProject
+from bai_scenario.seeds.rbac.role import SeedRole
+from bai_scenario.seeds.resource_policy.keypair import SeedKeypairPolicy
+from bai_scenario.seeds.resource_policy.project import SeedProjectPolicy
+from bai_scenario.seeds.resource_policy.user import SeedUserPolicy
+from bai_scenario.seeds.seeder import Laid, Seeder, SeedNest
+from bai_scenario.seeds.user.user import SeedUserOf
 
 type Answer = SearchUsersPayload | AdminSearchUsersPayload
 type SearchStep = Scenario[SeedingSession, Any, UserAdapter, Answer]

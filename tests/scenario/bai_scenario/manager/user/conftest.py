@@ -9,8 +9,6 @@ from __future__ import annotations
 from typing import Any
 
 import pytest
-from bai_scenario.runner.unwired import unwired
-from bai_scenario.valkey import ScenarioValkey
 
 from ai.backend.common.data.entity.domain import DomainEntityType
 from ai.backend.common.data.entity.types import GlobalEntityType
@@ -51,6 +49,8 @@ from ai.backend.manager.services.user.service import UserService
 from ai.backend.manager.sokovan.scheduling_controller.scheduling_controller import (
     SchedulingController,
 )
+from bai_scenario.runner.unwired import unwired
+from bai_scenario.valkey import ScenarioValkey
 
 
 def _registry(
