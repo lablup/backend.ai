@@ -155,7 +155,7 @@ def agent_processors(
         scheduler_repository=scheduler_repo,
         scheduling_controller=AsyncMock(),
         own_check=BulkOwnCheck(
-            RbacPermissionCheckRepository(PermissionOpsProvider(database_engine)), config_provider
+            RbacPermissionCheckRepository(PermissionOpsProvider(database_engine), config_provider)
         ),
     )
     return AgentProcessors(

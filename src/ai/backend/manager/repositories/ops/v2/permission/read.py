@@ -16,8 +16,10 @@ import sqlalchemy as sa
 
 from ai.backend.common.data.entity.role import RoleID
 from ai.backend.common.data.entity.types import EntityType
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.permission.id import FieldPath
 from ai.backend.common.data.permission.types import Permission
+from ai.backend.common.data.user.types import UserRole
 from ai.backend.manager.data.permission.status import RoleStatus
 from ai.backend.manager.data.permission.virtual_entity import (
     GovernCheckKey,
@@ -28,6 +30,7 @@ from ai.backend.manager.models.rbac_models.permission.permission_field import Pe
 from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
 from ai.backend.manager.models.specs.permission import PermissionEntry
+from ai.backend.manager.models.user.row import UserRow
 from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
 from ai.backend.manager.models.virtual_entity.entity_membership_cap import (
     EntityMembershipCapRow,
@@ -60,6 +63,13 @@ class PermissionReadOps(V2ReadOps):
             )
         ).scalars()
         return {EntityType(entity_type) for entity_type in rows}
+
+    async def user_role(self, user_id: UserID) -> UserRole | None:
+        """The user's role, or ``None`` when no such user exists."""
+        role: UserRole | None = await self._sess.scalar(
+            sa.select(UserRow.role).where(UserRow.uuid == user_id)
+        )
+        return role
 
     async def permissions(
         self, role_id: RoleID, entity_types: Sequence[EntityType]

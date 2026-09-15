@@ -85,7 +85,7 @@ async def adapter(
         ),
         valkey_stat_client=valkey.stat,
         own_check=BulkOwnCheck(
-            RbacPermissionCheckRepository(PermissionOpsProvider(engine)), config
+            RbacPermissionCheckRepository(PermissionOpsProvider(engine), config)
         ),
     )
     return VFolderAdapter(

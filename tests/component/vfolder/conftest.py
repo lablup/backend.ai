@@ -171,8 +171,7 @@ def vfolder_processors(
         user_repository=user_repository,
         valkey_stat_client=valkey_clients.stat,
         own_check=BulkOwnCheck(
-            RbacPermissionCheckRepository(PermissionOpsProvider(database_engine)),
-            rbac_off,
+            RbacPermissionCheckRepository(PermissionOpsProvider(database_engine), rbac_off)
         ),
     )
     return VFolderProcessors(processor_registry.group(GroupMeta(VFolderEntityType())), service)

@@ -2,9 +2,13 @@
 
 from __future__ import annotations
 
-from collections.abc import Collection, Mapping
+from collections.abc import Collection, Mapping, Sequence
 
+from ai.backend.common.data.entity.types import EntityIdentifier
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.permission.types import Permission
+from ai.backend.common.data.user.types import UserRole
+from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.permission.virtual_entity import GovernCheckKey, OwnCheckKey
 from ai.backend.manager.repositories.ops.v2.permission.provider import PermissionOpsProvider
 
@@ -15,9 +19,15 @@ class RbacPermissionCheckRepository:
     """What the action gates ask before a run: own for an entity, govern for a scope."""
 
     _ops: PermissionOpsProvider
+    _config_provider: ManagerConfigProvider
 
-    def __init__(self, ops_provider: PermissionOpsProvider) -> None:
+    def __init__(
+        self,
+        ops_provider: PermissionOpsProvider,
+        config_provider: ManagerConfigProvider,
+    ) -> None:
         self._ops = ops_provider
+        self._config_provider = config_provider
 
     async def owned_permissions(
         self, keys: Collection[OwnCheckKey]
@@ -30,3 +40,20 @@ class RbacPermissionCheckRepository:
     ) -> Mapping[GovernCheckKey, Permission]:
         async with self._ops.read_ops() as r:
             return await r.governed_permissions(keys)
+
+    async def held_permissions(
+        self, user_id: UserID, entity_ids: Sequence[EntityIdentifier]
+    ) -> Mapping[EntityIdentifier, Permission]:
+        """The bits the user holds on each entity.
+
+        Enforcement off or a superadmin holds everything; anyone else holds what the own
+        check answers, ``NONE`` where nothing reaches.
+        """
+        if not self._config_provider.config.manager.rbac.enforcement_enabled:
+            return dict.fromkeys(entity_ids, Permission.full())
+        async with self._ops.read_ops() as r:
+            if await r.user_role(user_id) == UserRole.SUPERADMIN:
+                return dict.fromkeys(entity_ids, Permission.full())
+            keys = [OwnCheckKey(user_id=user_id, entity=entity_id) for entity_id in entity_ids]
+            owned = await r.owned_permissions(keys)
+        return {key.entity: owned.get(key, Permission.NONE) for key in keys}

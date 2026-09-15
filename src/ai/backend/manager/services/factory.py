@@ -289,7 +289,7 @@ def create_services(args: ServiceArgs, action_registry: ProcessorRegistry[Any]) 
             repositories.agent.repository,
             repositories.scheduler.repository,
             args.scheduling_controller,
-            BulkOwnCheck(repositories.rbac.permission_check, args.config_provider),
+            BulkOwnCheck(repositories.rbac.permission_check),
         ),
         app_config=AppConfigService(OpsRepository(repositories.v2_ops_provider)),
         domain=DomainService(repositories.domain.repository),
@@ -339,7 +339,7 @@ def create_services(args: ServiceArgs, action_registry: ProcessorRegistry[Any]) 
             repositories.vfolder.repository,
             repositories.user.repository,
             args.valkey_stat_client,
-            BulkOwnCheck(repositories.rbac.permission_check, args.config_provider),
+            BulkOwnCheck(repositories.rbac.permission_check),
         ),
         vfolder_admin=VFolderAdminService(
             vfolder_admin_repository=repositories.vfolder.admin_repository,
