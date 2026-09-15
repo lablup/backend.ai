@@ -6,6 +6,7 @@ import logging
 from collections import defaultdict
 from collections.abc import Sequence
 from datetime import datetime
+from functools import partial
 from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
@@ -55,6 +56,9 @@ from ai.backend.manager.models.session.updaters import SessionStatusBatchUpdater
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.ops.v2.reconciler.provider import ReconcileOpsProvider
+from ai.backend.manager.repositories.rbac.permission_check_repository import (
+    RbacPermissionCheckRepository,
+)
 from ai.backend.manager.repositories.scheduler.types.session import SessionHistoryToCreate
 from ai.backend.manager.repositories.vfolder.mount import prepare_vfolder_mounts
 from ai.backend.manager.types import UserScope
@@ -115,6 +119,7 @@ class SchedulerRepository:
     _valkey_schedule: ValkeyScheduleClient
     _config_provider: ManagerConfigProvider
     _storage_manager: StorageSessionManager
+    _permission_check: RbacPermissionCheckRepository
 
     def __init__(
         self,
@@ -124,6 +129,7 @@ class SchedulerRepository:
         valkey_schedule: ValkeyScheduleClient,
         config_provider: ManagerConfigProvider,
         storage_manager: StorageSessionManager,
+        permission_check: RbacPermissionCheckRepository,
     ) -> None:
         self._db = db
         self._db_source = ScheduleDBSource(db, reconcile_ops_provider)
@@ -131,6 +137,7 @@ class SchedulerRepository:
         self._valkey_schedule = valkey_schedule
         self._config_provider = config_provider
         self._storage_manager = storage_manager
+        self._permission_check = permission_check
 
     @scheduler_repository_resilience.apply()
     async def get_scheduling_data(
@@ -431,6 +438,7 @@ class SchedulerRepository:
                         user_scope_for_mounts,
                         resource_policy_dict,
                         per_group_requests,
+                        partial(self._permission_check.held_permissions, UserID(user_uuid)),
                     )
                 )
         return vfolder_mounts_by_role

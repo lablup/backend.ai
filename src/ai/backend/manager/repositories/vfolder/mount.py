@@ -3,13 +3,18 @@ from __future__ import annotations
 import logging
 import os.path
 import uuid
-from collections.abc import Mapping, Sequence
+from collections.abc import Awaitable, Callable, Mapping, Sequence
 from pathlib import PurePosixPath
 from typing import Any, cast
 
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 
+from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.types import EntityIdentifier
+from ai.backend.common.data.entity.user import UserID
+from ai.backend.common.data.entity.vfolder import VFolderUUID
+from ai.backend.common.data.permission.types import Permission
 from ai.backend.common.types import (
     MountPermission,
     VFolderHostPermission,
@@ -33,20 +38,30 @@ from ai.backend.manager.errors.storage import (
     VFolderPermissionError,
 )
 from ai.backend.manager.models.project import groups as groups_table
+from ai.backend.manager.models.scopes import OperationScope
+from ai.backend.manager.models.user.queries import joined_project_ids_query
+from ai.backend.manager.models.vfolder.orders import VFolderOrders
 from ai.backend.manager.models.vfolder.row import (
     DEAD_VFOLDER_STATUSES,
     VFolderRow,
     check_overlapping_mounts,
     ensure_host_permission_allowed,
     is_mount_duplicate,
-    query_accessible_vfolders,
     vfolders,
+)
+from ai.backend.manager.models.vfolder.scopes import (
+    ProjectVFolderOperationScope,
+    UserVFolderOperationScope,
 )
 from ai.backend.manager.types import UserScope
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
-__all__: Sequence[str] = ("prepare_vfolder_mounts",)
+__all__: Sequence[str] = ("HeldPermissions", "prepare_vfolder_mounts")
+
+type HeldPermissions = Callable[
+    [Sequence[VFolderUUID]], Awaitable[Mapping[EntityIdentifier, Permission]]
+]
 
 
 def _normalize_mount_subpath(raw_subpath: str | None) -> str:
@@ -70,6 +85,38 @@ def _normalize_mount_subpath(raw_subpath: str | None) -> str:
     return normed
 
 
+async def _query_reachable_vfolders(
+    conn: SAConnection,
+    user_scope: UserScope,
+    conditions: sa.ColumnElement[bool],
+    held_permissions: HeldPermissions,
+) -> list[dict[str, Any]]:
+    """The vfolders matching ``conditions`` that the user's personal project or a joined
+    project holds and the user may read, the session's project first.
+
+    Each row carries the mount permission the user's bits answer as.
+    """
+    user_id = UserID(user_scope.user_uuid)
+    project_ids = (await conn.scalars(joined_project_ids_query(user_id))).all()
+    scopes: list[OperationScope] = [UserVFolderOperationScope(user_id=user_id)]
+    scopes.extend(ProjectVFolderOperationScope(project_id=pid) for pid in project_ids)
+    rows = (
+        await conn.execute(
+            sa.select(vfolders)
+            .where(conditions, sa.or_(*(scope.to_condition()() for scope in scopes)))
+            .order_by(VFolderOrders.project_first(ProjectID(user_scope.group_id)))
+        )
+    ).all()
+    held = await held_permissions([VFolderUUID(row.id) for row in rows])
+    reachable: list[dict[str, Any]] = []
+    for row in rows:
+        bits = held.get(VFolderUUID(row.id), Permission.NONE)
+        if not bits.covers(Permission.READ):
+            continue
+        reachable.append({**row._mapping, "permission": VFolderPermission.from_rbac(bits)})
+    return reachable
+
+
 async def prepare_vfolder_mounts(
     conn: SAConnection,
     storage_manager: StorageSessionManager,
@@ -77,6 +124,7 @@ async def prepare_vfolder_mounts(
     user_scope: UserScope,
     resource_policy: Mapping[str, Any],
     mount_requests: Sequence[VFolderMountRequest],
+    held_permissions: HeldPermissions,
 ) -> Sequence[VFolderMount]:
     """
     Determine the actual mount information from the requested vfolder lists,
@@ -139,7 +187,7 @@ async def prepare_vfolder_mounts(
         )
     )
     _ms_result = await conn.execute(_ms_query)
-    model_store_project_ids: set[str] = {str(row.id) for row in _ms_result.fetchall()}
+    model_store_project_ids: set[uuid.UUID] = {row.id for row in _ms_result.fetchall()}
 
     # Query the accessible vfolders that satisfy either:
     # - the name matches with the requested vfolder name, or
@@ -155,13 +203,8 @@ async def prepare_vfolder_mounts(
             VFolderRow.id.in_(requested_vfolder_ids),
         )
     extra_vf_conds = sa.and_(extra_vf_conds, VFolderRow.status.not_in(DEAD_VFOLDER_STATUSES))
-    accessible_vfolders = await query_accessible_vfolders(
-        conn,
-        user_scope.user_uuid,
-        user_role=user_scope.user_role,
-        domain_name=user_scope.domain_name,
-        allowed_vfolder_types=allowed_vfolder_types,
-        extra_vf_conds=extra_vf_conds,
+    accessible_vfolders = await _query_reachable_vfolders(
+        conn, user_scope, extra_vf_conds, held_permissions
     )
 
     # Fast-path for empty requested mounts
@@ -211,8 +254,10 @@ async def prepare_vfolder_mounts(
             requested_vfolder_names.setdefault(_vfolder["id"], _vfolder["name"])
             requested_vfolder_subpaths.setdefault(_vfolder["id"], ".")
 
-    # for vfolder in accessible_vfolders:
-    accessible_vfolders_map = {vfolder["name"]: vfolder for vfolder in accessible_vfolders}
+    # The session's project comes first, so its folder wins a name shared with another.
+    accessible_vfolders_map: dict[str, dict[str, Any]] = {}
+    for accessible_vfolder in accessible_vfolders:
+        accessible_vfolders_map.setdefault(accessible_vfolder["name"], accessible_vfolder)
     for requested_key, vfolder_name in requested_vfolder_names.items():
         if not (vfolder := accessible_vfolders_map.get(vfolder_name)):
             raise VFolderNotFound(f"VFolder {vfolder_name} is not found or accessible.")
@@ -263,7 +308,7 @@ async def prepare_vfolder_mounts(
         # A personal folder also carries a project — its owner's personal project — so
         # project ownership is read off the ownership type, never off the column.
         is_project_vfolder = vfolder["ownership_type"] == VFolderOwnershipType.GROUP
-        is_cross_project = is_project_vfolder and vfolder["group"] != str(user_scope.group_id)
+        is_cross_project = is_project_vfolder and vfolder["group"] != user_scope.group_id
         is_model_store_vfolder = is_project_vfolder and vfolder["group"] in model_store_project_ids
         if is_cross_project:
             if is_model_store_vfolder and vfolder["usage_mode"] == VFolderUsageMode.MODEL:

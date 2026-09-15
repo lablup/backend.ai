@@ -119,6 +119,7 @@ def agent_processors(
         valkey_clients.schedule,
         config_provider,
         MagicMock(),
+        RbacPermissionCheckRepository(PermissionOpsProvider(database_engine), config_provider),
     )
     service = AgentService(
         etcd=async_etcd,

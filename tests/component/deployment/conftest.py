@@ -45,7 +45,11 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import vfolders
 from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.repositories.deployment.repository import DeploymentRepository
+from ai.backend.manager.repositories.ops.v2.permission.provider import PermissionOpsProvider
 from ai.backend.manager.repositories.ops.v2.reconciler.provider import ReconcileOpsProvider
+from ai.backend.manager.repositories.rbac.permission_check_repository import (
+    RbacPermissionCheckRepository,
+)
 from ai.backend.manager.repositories.scheduler import SchedulerRepository
 from ai.backend.manager.services.deployment.processors import DeploymentProcessors
 from ai.backend.manager.services.deployment.service import DeploymentService
@@ -115,6 +119,7 @@ def deployment_processors(
         valkey_clients.schedule,
         config_provider,
         storage_manager,
+        RbacPermissionCheckRepository(PermissionOpsProvider(database_engine), config_provider),
     )
     scheduling_controller = SchedulingController(
         SchedulingControllerArgs(

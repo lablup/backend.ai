@@ -75,6 +75,7 @@ from ai.backend.manager.models.user import (
     UserStatus,
     users,
 )
+from ai.backend.manager.models.user.queries import joined_project_ids_query
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine, execute_with_retry
 from ai.backend.manager.models.vfolder import (
     HARD_DELETED_VFOLDER_STATUSES,
@@ -127,9 +128,7 @@ from ai.backend.manager.models.vfolder.updaters import (
 )
 from ai.backend.manager.models.virtual_entity.queries import (
     user_scope_membership_exists,
-    user_scope_membership_query,
 )
-from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
 from ai.backend.manager.repositories.base.integrity import match_integrity_error
 from ai.backend.manager.repositories.ops.v2.share.provider import ShareOpsProvider
 from ai.backend.manager.repositories.ops.v2.share.write import V2ShareWriteOps
@@ -1006,12 +1005,8 @@ class VfolderRepository:
     async def get_joined_project_ids(self, user_id: UserID) -> list[ProjectID]:
         """The projects the user is on the roster of, personal ones left out."""
         async with self._db.begin_readonly_session_read_committed() as session:
-            stmt = user_scope_membership_query(ProjectEntityType(), user_id).where(
-                VirtualEntityRow.entity_id.not_in(
-                    sa.select(ProjectRow.id).where(ProjectRow.type == ProjectType.PERSONAL)
-                )
-            )
-            return [ProjectID(row.scope_id) for row in (await session.execute(stmt)).all()]
+            rows = await session.scalars(joined_project_ids_query(user_id))
+            return [ProjectID(project_id) for project_id in rows.all()]
 
     @vfolder_repository_resilience.apply()
     async def get_user_info(self, user_id: uuid.UUID) -> tuple[UserRole, str] | None:

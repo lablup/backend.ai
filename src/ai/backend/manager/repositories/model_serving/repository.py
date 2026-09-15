@@ -2,6 +2,7 @@ import asyncio
 import uuid
 from collections.abc import Sequence
 from decimal import Decimal
+from functools import partial
 from typing import Any, cast
 
 import sqlalchemy as sa
@@ -90,6 +91,9 @@ from ai.backend.manager.repositories.base import (
 )
 from ai.backend.manager.repositories.model_serving.mount import check_extra_mounts
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
+from ai.backend.manager.repositories.rbac.permission_check_repository import (
+    RbacPermissionCheckRepository,
+)
 from ai.backend.manager.types import MountOptionModel, UserScope
 from ai.backend.manager.utils import query_userinfo
 
@@ -113,10 +117,17 @@ model_serving_repository_resilience = Resilience(
 class ModelServingRepository:
     _db: ExtendedAsyncSAEngine
     _v2_ops: V2DBOpsProvider
+    _permission_check: RbacPermissionCheckRepository
 
-    def __init__(self, db: ExtendedAsyncSAEngine, v2_ops_provider: V2DBOpsProvider) -> None:
+    def __init__(
+        self,
+        db: ExtendedAsyncSAEngine,
+        v2_ops_provider: V2DBOpsProvider,
+        permission_check: RbacPermissionCheckRepository,
+    ) -> None:
         self._db = db
         self._v2_ops = v2_ops_provider
+        self._permission_check = permission_check
 
     def _check_inference_resource_group(
         self,
@@ -999,6 +1010,7 @@ class ModelServingRepository:
                     user_role=owner_role,
                 ),
                 resource_policy,
+                partial(self._permission_check.held_permissions, UserID(owner_uuid)),
             )
 
             reads_vfolder_config_files = await conn.scalar(

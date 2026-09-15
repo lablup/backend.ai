@@ -84,6 +84,9 @@ def agent_processors(
         valkey_schedule=valkey_clients.schedule,
         config_provider=config_provider,
         storage_manager=MagicMock(),
+        permission_check=RbacPermissionCheckRepository(
+            PermissionOpsProvider(database_engine), config_provider
+        ),
     )
     service = AgentService(
         etcd=async_etcd,
