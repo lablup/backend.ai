@@ -4,6 +4,7 @@ import secrets
 import uuid
 from collections.abc import AsyncIterator, Callable, Coroutine
 from typing import Any
+from unittest.mock import MagicMock
 
 import pytest
 import sqlalchemy as sa
@@ -79,6 +80,8 @@ from ai.backend.manager.repositories.user.repository import UserRepository
 from ai.backend.manager.repositories.vfolder.repository import VfolderRepository
 from ai.backend.manager.secret.pool import KeyProviderPool
 from ai.backend.manager.services.auth.processors import AuthProcessors
+from ai.backend.manager.services.user.processors import UserProcessors
+from ai.backend.manager.services.user.service import UserService
 from ai.backend.manager.services.vfolder.processors.file import VFolderFileProcessors
 from ai.backend.manager.services.vfolder.processors.invite import VFolderInviteProcessors
 from ai.backend.manager.services.vfolder.processors.sharing import VFolderSharingProcessors
@@ -233,9 +236,31 @@ def vfolder_sharing_processors(
 
 
 @pytest.fixture()
+def user_processors(
+    database_engine: ExtendedAsyncSAEngine,
+    processor_registry: ProcessorRegistry[Any],
+) -> UserProcessors:
+    user_repository = UserRepository(
+        database_engine,
+        V2DBOpsProvider(database_engine),
+        ShareOpsProvider(database_engine),
+        KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
+    )
+    service = UserService(
+        storage_manager=MagicMock(spec=StorageSessionManager),
+        valkey_stat_client=MagicMock(),
+        agent_registry=MagicMock(),
+        user_repository=user_repository,
+        scheduling_controller=MagicMock(),
+    )
+    return UserProcessors(processor_registry.group(GroupMeta(UserEntityType())), service)
+
+
+@pytest.fixture()
 def server_module_registries(
     route_deps: RouteDeps,
     auth_processors: AuthProcessors,
+    user_processors: UserProcessors,
     vfolder_processors: VFolderProcessors,
     vfolder_file_processors: VFolderFileProcessors,
     vfolder_invite_processors: VFolderInviteProcessors,
@@ -246,6 +271,7 @@ def server_module_registries(
         register_vfolder_routes(
             VFolderHandler(
                 auth=auth_processors,
+                user=user_processors,
                 vfolder=vfolder_processors,
                 vfolder_file=vfolder_file_processors,
                 vfolder_invite=vfolder_invite_processors,

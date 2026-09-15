@@ -52,6 +52,7 @@ from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntit
 from ai.backend.manager.repositories.vfolder.admin_repository import VFolderAdminRepository
 from ai.backend.manager.services.auth.processors import AuthProcessors
 from ai.backend.manager.services.processors import Processors
+from ai.backend.manager.services.user.processors import UserProcessors
 from ai.backend.manager.services.vfolder.processors.file import VFolderFileProcessors
 from ai.backend.manager.services.vfolder.processors.invite import VFolderInviteProcessors
 from ai.backend.manager.services.vfolder.processors.sharing import VFolderSharingProcessors
@@ -85,6 +86,7 @@ def vfolder_admin_processors(
 def server_module_registries(
     route_deps: RouteDeps,
     auth_processors: AuthProcessors,
+    user_processors: UserProcessors,
     vfolder_processors: VFolderProcessors,
     vfolder_admin_processors: VFolderAdminProcessors,
     vfolder_file_processors: VFolderFileProcessors,
@@ -96,6 +98,7 @@ def server_module_registries(
     v1_reg = register_vfolder_routes(
         VFolderHandler(
             auth=auth_processors,
+            user=user_processors,
             vfolder=vfolder_processors,
             vfolder_file=vfolder_file_processors,
             vfolder_invite=vfolder_invite_processors,
