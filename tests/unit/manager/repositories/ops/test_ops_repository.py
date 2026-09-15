@@ -55,7 +55,7 @@ from ai.backend.manager.models.rbac_models.role_preset.updaters import (
 from ai.backend.manager.models.scopes import ExistenceCheck, OperationScope
 from ai.backend.manager.models.specs.creator import GlobalEntityCreator
 from ai.backend.manager.models.specs.lookup import BulkDataLookup, DataLookup
-from ai.backend.manager.models.specs.pagination import OffsetPagination
+from ai.backend.manager.models.specs.pagination import NoPagination, OffsetPagination
 from ai.backend.manager.models.specs.purger import EntityBatchPurger
 from ai.backend.manager.models.specs.querier import (
     BulkEntityQuerier,
@@ -786,6 +786,46 @@ class TestSearch:
         )
 
         assert [item.id for item in result.items] == [preset.id]
+
+    async def test_offset_priority_orders_lead(
+        self,
+        repository: OpsRepository[RolePresetData],
+        view_repository: OpsRepository[_PresetView],
+        preset: RolePresetData,
+    ) -> None:
+        other = await repository.create_global_entity(
+            _PresetCreator(name="other", scope_type=DomainEntityType())
+        )
+
+        result = await view_repository.search_in_global(
+            _PresetSearcher(
+                pagination=OffsetPagination(
+                    limit=20, priority_orders=[(RolePresetRow.name == "other").desc()]
+                ),
+                orders=[RolePresetRow.name.asc()],
+            )
+        )
+
+        assert [item.id for item in result.items] == [other.id, preset.id]
+
+    async def test_unpaginated_priority_orders_lead(
+        self,
+        repository: OpsRepository[RolePresetData],
+        view_repository: OpsRepository[_PresetView],
+        preset: RolePresetData,
+    ) -> None:
+        other = await repository.create_global_entity(
+            _PresetCreator(name="other", scope_type=DomainEntityType())
+        )
+
+        result = await view_repository.search_in_global(
+            _PresetSearcher(
+                pagination=NoPagination(priority_orders=[(RolePresetRow.name == "other").desc()]),
+                orders=[RolePresetRow.name.asc()],
+            )
+        )
+
+        assert [item.id for item in result.items] == [other.id, preset.id]
 
 
 class TestFullStack:
