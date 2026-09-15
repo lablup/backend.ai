@@ -129,7 +129,7 @@ class TestMetric:
         metric = Metric(
             key="cpu_util",
             type=MetricTypes.UTILIZATION,
-            unit_hint="percent",
+            unit_hint="msec",
             stats=MovingStatistics(case.initial_value),
             stats_filter=frozenset({"avg", "max"}),
             current=case.initial_value,
@@ -146,7 +146,7 @@ class TestMetric:
             return Metric(
                 key="cpu_util",
                 type=MetricTypes.UTILIZATION,
-                unit_hint="percent",
+                unit_hint="msec",
                 stats=MovingStatistics(Decimal(1000)),
                 stats_filter=frozenset({"avg", "max"}),
                 current=Decimal(1000),
