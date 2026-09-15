@@ -34,7 +34,6 @@ from ai.backend.manager.errors.storage import (
     VFolderInvitationNotFound,
     VFolderNotFound,
 )
-from ai.backend.manager.errors.user import UserNotFound
 from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.models.vfolder import VFolderInvitationState
 from ai.backend.manager.repositories.user.repository import UserRepository
@@ -444,6 +443,7 @@ class TestUpdateVFolderSharingStatusAction:
         sharing_service: VFolderSharingService,
         mock_vfolder_repo: MagicMock,
         vfolder_uuid: uuid.UUID,
+        user_uuid: uuid.UUID,
     ) -> None:
         user_id = uuid.uuid4()
         mock_vfolder_repo.update_vfolder_sharing_status = AsyncMock()
@@ -456,7 +456,10 @@ class TestUpdateVFolderSharingStatusAction:
         await sharing_service.update_sharing_status(action)
 
         mock_vfolder_repo.update_vfolder_sharing_status.assert_called_once_with(
-            vfolder_uuid, [], [(user_id, VFolderMountPermission.READ_WRITE)]
+            vfolder_uuid,
+            [],
+            [(user_id, VFolderMountPermission.READ_WRITE)],
+            sharer_id=user_uuid,
         )
 
     async def test_delete_multiple_users(
@@ -464,6 +467,7 @@ class TestUpdateVFolderSharingStatusAction:
         sharing_service: VFolderSharingService,
         mock_vfolder_repo: MagicMock,
         vfolder_uuid: uuid.UUID,
+        user_uuid: uuid.UUID,
     ) -> None:
         user_ids = [uuid.uuid4(), uuid.uuid4()]
         mock_vfolder_repo.update_vfolder_sharing_status = AsyncMock()
@@ -476,7 +480,7 @@ class TestUpdateVFolderSharingStatusAction:
         await sharing_service.update_sharing_status(action)
 
         mock_vfolder_repo.update_vfolder_sharing_status.assert_called_once_with(
-            vfolder_uuid, user_ids, []
+            vfolder_uuid, user_ids, [], sharer_id=user_uuid
         )
 
     async def test_simultaneous_update_and_delete(
@@ -484,6 +488,7 @@ class TestUpdateVFolderSharingStatusAction:
         sharing_service: VFolderSharingService,
         mock_vfolder_repo: MagicMock,
         vfolder_uuid: uuid.UUID,
+        user_uuid: uuid.UUID,
     ) -> None:
         update_user = uuid.uuid4()
         delete_user = uuid.uuid4()
@@ -500,6 +505,7 @@ class TestUpdateVFolderSharingStatusAction:
             vfolder_uuid,
             [delete_user],
             [(update_user, VFolderMountPermission.READ_WRITE)],
+            sharer_id=user_uuid,
         )
 
 
@@ -527,7 +533,6 @@ class TestInviteVFolderAction:
             return_value=[(uuid.uuid4(), "invitee@test.com")]
         )
         mock_vfolder_repo.check_user_has_vfolder_permission = AsyncMock(return_value=False)
-        mock_vfolder_repo.check_pending_invitation_exists = AsyncMock(return_value=False)
         mock_vfolder_repo.create_vfolder_invitation = AsyncMock(return_value=invitation_id)
 
         action = InviteVFolderAction(
@@ -617,7 +622,7 @@ class TestInviteVFolderAction:
         with pytest.raises(VFolderGrantAlreadyExists):
             await invite_service.invite(action)
 
-    async def test_invite_duplicate_pending_skipped(
+    async def test_invite_restated_offer_is_not_listed(
         self,
         invite_service: VFolderInviteService,
         mock_vfolder_repo: MagicMock,
@@ -627,12 +632,11 @@ class TestInviteVFolderAction:
     ) -> None:
         mock_user_repo.get_user_by_uuid = AsyncMock(return_value=_make_user_data(user_uuid))
         mock_vfolder_repo.get_by_id = AsyncMock(return_value=_make_vfolder_data(vfolder_uuid))
-        mock_vfolder_repo.get_user_email_by_id = AsyncMock(return_value="inviter@test.com")
         mock_vfolder_repo.get_users_by_emails = AsyncMock(
             return_value=[(uuid.uuid4(), "invitee@test.com")]
         )
         mock_vfolder_repo.check_user_has_vfolder_permission = AsyncMock(return_value=False)
-        mock_vfolder_repo.check_pending_invitation_exists = AsyncMock(return_value=True)
+        mock_vfolder_repo.create_vfolder_invitation = AsyncMock(return_value=None)
 
         action = InviteVFolderAction(
             keypair_resource_policy={},
@@ -644,7 +648,6 @@ class TestInviteVFolderAction:
         result = await invite_service.invite(action)
 
         assert result.invitation_ids == []
-        mock_vfolder_repo.create_vfolder_invitation.assert_not_called()
 
 
 # ============================================================
@@ -675,17 +678,13 @@ class TestAcceptInvitationAction:
         vfolder_data = _make_vfolder_data(vfolder_uuid, name="accepted-folder")
         mock_vfolder_repo.get_by_id = AsyncMock(return_value=vfolder_data)
         mock_vfolder_repo.count_vfolder_with_name_for_user = AsyncMock(return_value=0)
-        mock_vfolder_repo.create_vfolder_permission = AsyncMock()
-        mock_vfolder_repo.update_invitation_state = AsyncMock()
+        mock_vfolder_repo.accept_invitation = AsyncMock()
 
         action = AcceptInvitationAction(invitation_id=VFolderInvitationID(invitation_id))
         result = await invite_service.accept_invitation(action)
 
         assert result.invitation_id == invitation_id
-        mock_vfolder_repo.update_invitation_state.assert_called_once_with(
-            invitation_id, VFolderInvitationState.ACCEPTED
-        )
-        mock_vfolder_repo.create_vfolder_permission.assert_called_once()
+        mock_vfolder_repo.accept_invitation.assert_called_once_with(invitation_id, invitee_uuid)
 
     async def test_accept_nonexistent_invitation_raises_error(
         self,
@@ -747,7 +746,7 @@ class TestRejectInvitationAction:
 
         mock_vfolder_repo.get_invitation_by_id = AsyncMock(return_value=invitation_data)
         mock_vfolder_repo.get_user_email_by_id = AsyncMock(return_value="invitee@test.com")
-        mock_vfolder_repo.update_invitation_state = AsyncMock()
+        mock_vfolder_repo.reject_invitation = AsyncMock()
 
         action = RejectInvitationAction(
             invitation_id=VFolderInvitationID(invitation_id),
@@ -756,9 +755,7 @@ class TestRejectInvitationAction:
         result = await invite_service.reject_invitation(action)
 
         assert result.invitation_id == invitation_id
-        mock_vfolder_repo.update_invitation_state.assert_called_once_with(
-            invitation_id, VFolderInvitationState.REJECTED
-        )
+        mock_vfolder_repo.reject_invitation.assert_called_once_with(invitation_id, invitee_uuid)
 
     async def test_inviter_rejection_sets_canceled(
         self,
@@ -774,7 +771,7 @@ class TestRejectInvitationAction:
 
         mock_vfolder_repo.get_invitation_by_id = AsyncMock(return_value=invitation_data)
         mock_vfolder_repo.get_user_email_by_id = AsyncMock(return_value="inviter@test.com")
-        mock_vfolder_repo.update_invitation_state = AsyncMock()
+        mock_vfolder_repo.cancel_invitation = AsyncMock()
 
         action = RejectInvitationAction(
             invitation_id=VFolderInvitationID(invitation_id),
@@ -783,9 +780,7 @@ class TestRejectInvitationAction:
         result = await invite_service.reject_invitation(action)
 
         assert result.invitation_id == invitation_id
-        mock_vfolder_repo.update_invitation_state.assert_called_once_with(
-            invitation_id, VFolderInvitationState.CANCELED
-        )
+        mock_vfolder_repo.cancel_invitation.assert_called_once_with(invitation_id)
 
     async def test_third_party_rejection_raises_forbidden(
         self,
@@ -837,7 +832,6 @@ class TestUpdateInvitationAction:
         invitation_id = uuid.uuid4()
         inviter_uuid = uuid.uuid4()
 
-        mock_vfolder_repo.get_user_email_by_id = AsyncMock(return_value="inviter@test.com")
         mock_vfolder_repo.update_invitation_permission = AsyncMock()
 
         action = UpdateInvitationAction(
@@ -849,24 +843,8 @@ class TestUpdateInvitationAction:
 
         assert result.invitation_id == invitation_id
         mock_vfolder_repo.update_invitation_permission.assert_called_once_with(
-            invitation_id, "inviter@test.com", VFolderMountPermission.READ_WRITE
+            invitation_id, inviter_uuid, VFolderMountPermission.READ_WRITE
         )
-
-    async def test_update_by_nonexistent_user_raises_error(
-        self,
-        invite_service: VFolderInviteService,
-        mock_vfolder_repo: MagicMock,
-    ) -> None:
-        mock_vfolder_repo.get_user_email_by_id = AsyncMock(return_value=None)
-
-        action = UpdateInvitationAction(
-            invitation_id=VFolderInvitationID(uuid.uuid4()),
-            requester_user_uuid=uuid.uuid4(),
-            mount_permission=VFolderMountPermission.READ_WRITE,
-        )
-
-        with pytest.raises(UserNotFound):
-            await invite_service.update_invitation(action)
 
 
 # ============================================================
@@ -938,7 +916,9 @@ class TestListInvitationAction:
         action = ListInvitationAction(user_uuid=requester_uuid)
         await invite_service.list_invitation(action)
 
-        mock_vfolder_repo.get_pending_invitations_for_user.assert_called_once_with("user@test.com")
+        mock_vfolder_repo.get_pending_invitations_for_user.assert_called_once_with(
+            requester_uuid, "user@test.com"
+        )
 
 
 # ============================================================
@@ -961,7 +941,7 @@ class TestLeaveInvitedVFolderAction:
             return_value=_make_vfolder_data(vfolder_uuid, ownership_type=VFolderOwnershipType.USER)
         )
         mock_vfolder_repo.get_user_info = AsyncMock(return_value=(UserRole.USER, "default"))
-        mock_vfolder_repo.delete_vfolder_permission = AsyncMock()
+        mock_vfolder_repo.leave_shared_vfolder = AsyncMock()
 
         action = LeaveInvitedVFolderAction(
             vfolder_uuid=VFolderUUID(vfolder_uuid),
@@ -970,9 +950,7 @@ class TestLeaveInvitedVFolderAction:
         result = await invite_service.leave_invited_vfolder(action)
 
         assert result.vfolder_uuid == vfolder_uuid
-        mock_vfolder_repo.delete_vfolder_permission.assert_called_once_with(
-            vfolder_uuid, requester_uuid
-        )
+        mock_vfolder_repo.leave_shared_vfolder.assert_called_once_with(vfolder_uuid, requester_uuid)
 
     async def test_leave_group_type_raises_error(
         self,
@@ -1013,7 +991,7 @@ class TestLeaveInvitedVFolderAction:
             return_value=_make_vfolder_data(vfolder_uuid, ownership_type=VFolderOwnershipType.USER)
         )
         mock_vfolder_repo.get_user_info = AsyncMock(return_value=(UserRole.SUPERADMIN, "default"))
-        mock_vfolder_repo.delete_vfolder_permission = AsyncMock()
+        mock_vfolder_repo.leave_shared_vfolder = AsyncMock()
 
         action = LeaveInvitedVFolderAction(
             vfolder_uuid=VFolderUUID(vfolder_uuid),
@@ -1023,7 +1001,7 @@ class TestLeaveInvitedVFolderAction:
         result = await invite_service.leave_invited_vfolder(action)
 
         assert result.vfolder_uuid == vfolder_uuid
-        mock_vfolder_repo.delete_vfolder_permission.assert_called_once_with(
+        mock_vfolder_repo.leave_shared_vfolder.assert_called_once_with(
             vfolder_uuid, shared_user_uuid
         )
 
@@ -1067,7 +1045,7 @@ class TestRevokeInvitedVFolderAction:
         vfolder_uuid = uuid.uuid4()
         shared_user_uuid = uuid.uuid4()
 
-        mock_vfolder_repo.delete_vfolder_permission = AsyncMock()
+        mock_vfolder_repo.revoke_shared_vfolder = AsyncMock()
 
         action = RevokeInvitedVFolderAction(
             vfolder_uuid=VFolderUUID(vfolder_uuid),
@@ -1077,7 +1055,7 @@ class TestRevokeInvitedVFolderAction:
 
         assert result.vfolder_id == vfolder_uuid
         assert result.shared_user_id == shared_user_uuid
-        mock_vfolder_repo.delete_vfolder_permission.assert_called_once_with(
+        mock_vfolder_repo.revoke_shared_vfolder.assert_called_once_with(
             vfolder_uuid, shared_user_uuid
         )
 
@@ -1092,6 +1070,7 @@ class TestUpdateInvitedVFolderMountPermissionAction:
         self,
         invite_service: VFolderInviteService,
         mock_vfolder_repo: MagicMock,
+        user_uuid: uuid.UUID,
     ) -> None:
         vfolder_uuid = uuid.uuid4()
         user_id = uuid.uuid4()
@@ -1109,7 +1088,7 @@ class TestUpdateInvitedVFolderMountPermissionAction:
         assert result.user_id == user_id
         assert result.permission == VFolderMountPermission.RW_DELETE
         mock_vfolder_repo.update_invited_vfolder_mount_permission.assert_called_once_with(
-            vfolder_uuid, user_id, VFolderMountPermission.RW_DELETE
+            vfolder_uuid, user_id, VFolderMountPermission.RW_DELETE, sharer_id=user_uuid
         )
 
 
@@ -1174,7 +1153,6 @@ class TestEmptyEmailAccountInvitationScenarios:
             return_value=[(uuid.uuid4(), "invitee@test.com")]
         )
         mock_vfolder_repo.check_user_has_vfolder_permission = AsyncMock(return_value=False)
-        mock_vfolder_repo.check_pending_invitation_exists = AsyncMock(return_value=False)
         mock_vfolder_repo.create_vfolder_invitation = AsyncMock(return_value=expected_invitation_id)
         return InviteVFolderAction(
             keypair_resource_policy={},
@@ -1188,6 +1166,7 @@ class TestEmptyEmailAccountInvitationScenarios:
         self,
         invite_service: VFolderInviteService,
         mock_vfolder_repo: MagicMock,
+        user_uuid: uuid.UUID,
         vfolder_uuid: uuid.UUID,
         invite_action_with_empty_email_inviter: InviteVFolderAction,
         expected_invitation_id: str,
@@ -1196,7 +1175,7 @@ class TestEmptyEmailAccountInvitationScenarios:
 
         assert result.vfolder_uuid == vfolder_uuid
         assert expected_invitation_id in result.invitation_ids
-        assert mock_vfolder_repo.create_vfolder_invitation.call_args.args[1] == ""
+        assert mock_vfolder_repo.create_vfolder_invitation.call_args.args[1] == user_uuid
 
     # --- accept ---
 
@@ -1215,8 +1194,7 @@ class TestEmptyEmailAccountInvitationScenarios:
             return_value=_make_vfolder_data(vfolder_uuid, name="shared-folder")
         )
         mock_vfolder_repo.count_vfolder_with_name_for_user = AsyncMock(return_value=0)
-        mock_vfolder_repo.create_vfolder_permission = AsyncMock()
-        mock_vfolder_repo.update_invitation_state = AsyncMock()
+        mock_vfolder_repo.accept_invitation = AsyncMock()
         return AcceptInvitationAction(invitation_id=VFolderInvitationID(invitation_uuid))
 
     async def test_invitee_with_empty_email_can_accept_invitation(
@@ -1224,14 +1202,13 @@ class TestEmptyEmailAccountInvitationScenarios:
         invite_service: VFolderInviteService,
         mock_vfolder_repo: MagicMock,
         invitation_uuid: uuid.UUID,
+        invitee_uuid: uuid.UUID,
         accept_action_with_empty_email_invitee: AcceptInvitationAction,
     ) -> None:
         result = await invite_service.accept_invitation(accept_action_with_empty_email_invitee)
 
         assert result.invitation_id == invitation_uuid
-        mock_vfolder_repo.update_invitation_state.assert_called_once_with(
-            invitation_uuid, VFolderInvitationState.ACCEPTED
-        )
+        mock_vfolder_repo.accept_invitation.assert_called_once_with(invitation_uuid, invitee_uuid)
 
     # --- reject ---
 
@@ -1247,7 +1224,7 @@ class TestEmptyEmailAccountInvitationScenarios:
             return_value=invitation_with_empty_invitee_and_normal_inviter
         )
         mock_vfolder_repo.get_user_email_by_id = AsyncMock(return_value="")
-        mock_vfolder_repo.update_invitation_state = AsyncMock()
+        mock_vfolder_repo.reject_invitation = AsyncMock()
         return RejectInvitationAction(
             invitation_id=VFolderInvitationID(invitation_uuid),
             requester_user_uuid=invitee_uuid,
@@ -1258,14 +1235,13 @@ class TestEmptyEmailAccountInvitationScenarios:
         invite_service: VFolderInviteService,
         mock_vfolder_repo: MagicMock,
         invitation_uuid: uuid.UUID,
+        invitee_uuid: uuid.UUID,
         reject_action_with_empty_email_invitee: RejectInvitationAction,
     ) -> None:
         result = await invite_service.reject_invitation(reject_action_with_empty_email_invitee)
 
         assert result.invitation_id == invitation_uuid
-        mock_vfolder_repo.update_invitation_state.assert_called_once_with(
-            invitation_uuid, VFolderInvitationState.REJECTED
-        )
+        mock_vfolder_repo.reject_invitation.assert_called_once_with(invitation_uuid, invitee_uuid)
 
     # --- update ---
 
@@ -1274,12 +1250,12 @@ class TestEmptyEmailAccountInvitationScenarios:
         self,
         mock_vfolder_repo: MagicMock,
         invitation_uuid: uuid.UUID,
+        user_uuid: uuid.UUID,
     ) -> UpdateInvitationAction:
-        mock_vfolder_repo.get_user_email_by_id = AsyncMock(return_value="")
         mock_vfolder_repo.update_invitation_permission = AsyncMock()
         return UpdateInvitationAction(
             invitation_id=VFolderInvitationID(invitation_uuid),
-            requester_user_uuid=uuid.uuid4(),
+            requester_user_uuid=user_uuid,
             mount_permission=VFolderMountPermission.READ_WRITE,
         )
 
@@ -1288,13 +1264,14 @@ class TestEmptyEmailAccountInvitationScenarios:
         invite_service: VFolderInviteService,
         mock_vfolder_repo: MagicMock,
         invitation_uuid: uuid.UUID,
+        user_uuid: uuid.UUID,
         update_action_with_empty_email_inviter: UpdateInvitationAction,
     ) -> None:
         result = await invite_service.update_invitation(update_action_with_empty_email_inviter)
 
         assert result.invitation_id == invitation_uuid
         mock_vfolder_repo.update_invitation_permission.assert_called_once_with(
-            invitation_uuid, "", VFolderMountPermission.READ_WRITE
+            invitation_uuid, user_uuid, VFolderMountPermission.READ_WRITE
         )
 
     # --- list received ---
@@ -1303,15 +1280,17 @@ class TestEmptyEmailAccountInvitationScenarios:
     def list_invitation_action_with_empty_email_requester(
         self,
         mock_vfolder_repo: MagicMock,
+        user_uuid: uuid.UUID,
     ) -> ListInvitationAction:
         mock_vfolder_repo.get_user_email_by_id = AsyncMock(return_value="")
         mock_vfolder_repo.get_pending_invitations_for_user = AsyncMock(return_value=[])
-        return ListInvitationAction(user_uuid=uuid.uuid4())
+        return ListInvitationAction(user_uuid=user_uuid)
 
     async def test_user_with_empty_email_can_list_received_invitations(
         self,
         invite_service: VFolderInviteService,
         mock_vfolder_repo: MagicMock,
+        user_uuid: uuid.UUID,
         list_invitation_action_with_empty_email_requester: ListInvitationAction,
     ) -> None:
         result = await invite_service.list_invitation(
@@ -1319,7 +1298,7 @@ class TestEmptyEmailAccountInvitationScenarios:
         )
 
         assert result.info == []
-        mock_vfolder_repo.get_pending_invitations_for_user.assert_called_once_with("")
+        mock_vfolder_repo.get_pending_invitations_for_user.assert_called_once_with(user_uuid, "")
 
     # --- list sent ---
 
@@ -1327,15 +1306,16 @@ class TestEmptyEmailAccountInvitationScenarios:
     def list_sent_invitations_action_with_empty_email_requester(
         self,
         mock_vfolder_repo: MagicMock,
+        user_uuid: uuid.UUID,
     ) -> ListSentInvitationsAction:
-        mock_vfolder_repo.get_user_email_by_id = AsyncMock(return_value="")
         mock_vfolder_repo.get_sent_invitations_for_user = AsyncMock(return_value=[])
-        return ListSentInvitationsAction(user_uuid=uuid.uuid4())
+        return ListSentInvitationsAction(user_uuid=user_uuid)
 
     async def test_user_with_empty_email_can_list_sent_invitations(
         self,
         invite_service: VFolderInviteService,
         mock_vfolder_repo: MagicMock,
+        user_uuid: uuid.UUID,
         list_sent_invitations_action_with_empty_email_requester: ListSentInvitationsAction,
     ) -> None:
         result = await invite_service.list_sent_invitations(
@@ -1343,7 +1323,7 @@ class TestEmptyEmailAccountInvitationScenarios:
         )
 
         assert result.invitations == []
-        mock_vfolder_repo.get_sent_invitations_for_user.assert_called_once_with("")
+        mock_vfolder_repo.get_sent_invitations_for_user.assert_called_once_with(user_uuid)
 
     # --- leave invited vfolder ---
 
@@ -1361,7 +1341,7 @@ class TestEmptyEmailAccountInvitationScenarios:
             return_value=_make_vfolder_data(vfolder_uuid, ownership_type=VFolderOwnershipType.USER)
         )
         mock_vfolder_repo.get_user_info = AsyncMock(return_value=(UserRole.USER, None))
-        mock_vfolder_repo.delete_vfolder_permission = AsyncMock()
+        mock_vfolder_repo.leave_shared_vfolder = AsyncMock()
         return LeaveInvitedVFolderAction(
             requester_user_uuid=user_uuid,
             vfolder_uuid=VFolderUUID(vfolder_uuid),
@@ -1379,4 +1359,4 @@ class TestEmptyEmailAccountInvitationScenarios:
         result = await invite_service.leave_invited_vfolder(leave_action_with_empty_email_user)
 
         assert result.vfolder_uuid == vfolder_uuid
-        mock_vfolder_repo.delete_vfolder_permission.assert_called_once_with(vfolder_uuid, user_uuid)
+        mock_vfolder_repo.leave_shared_vfolder.assert_called_once_with(vfolder_uuid, user_uuid)

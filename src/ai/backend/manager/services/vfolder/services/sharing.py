@@ -147,5 +147,6 @@ class VFolderSharingService:
             action.vfolder_uuid,
             action.to_delete,
             action.to_update,
+            sharer_id=UserID(self._requester().user_id),
         )
         return UpdateVFolderSharingStatusActionResult()

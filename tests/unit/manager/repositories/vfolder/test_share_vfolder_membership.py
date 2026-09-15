@@ -28,6 +28,7 @@ from ai.backend.common.types import (
 from ai.backend.manager.errors.user import UserNotFound
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.entity_label.row import EntityLabelRow
+from ai.backend.manager.models.entity_share.row import EntityShareRow
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.project import ProjectRow, ProjectType
@@ -122,6 +123,7 @@ class TestShareVfolderWithUsersMembership:
                 EntityMembershipCapRow,
                 EntityMembershipFieldRow,
                 EntityLabelRow,
+                EntityShareRow,
             ],
         ):
             yield database_connection

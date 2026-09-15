@@ -6,15 +6,16 @@ from typing import Any, cast
 import sqlalchemy as sa
 from sqlalchemy import exc as sa_exc
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
-from sqlalchemy.orm import contains_eager, selectinload
+from sqlalchemy.orm import selectinload
 
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
 from ai.backend.common.contexts.user import current_user
+from ai.backend.common.data.entity.entity_share import EntityShareID
 from ai.backend.common.data.entity.model_card import ModelCardID
 from ai.backend.common.data.entity.project import ProjectEntityType, ProjectID
 from ai.backend.common.data.entity.user import UserEntityType, UserID
-from ai.backend.common.data.entity.vfolder import VFolderUUID
-from ai.backend.common.data.entity.vfolder_permission import VFolderPermissionID
+from ai.backend.common.data.entity.vfolder import VFolderEntityType, VFolderUUID
+from ai.backend.common.data.permission.types import Permission
 from ai.backend.common.exception import BackendAIError
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
@@ -28,6 +29,7 @@ from ai.backend.common.types import (
 )
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.data.agent.types import AgentStatus
+from ai.backend.manager.data.entity_share.types import EntityShareStatus
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.permission.id import ScopeId
 from ai.backend.manager.data.project.types import ProjectResourceInfo
@@ -43,6 +45,7 @@ from ai.backend.manager.data.vfolder.types import (
 )
 from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.auth import AuthorizationFailed
+from ai.backend.manager.errors.entity_share import EntityShareNotFound
 from ai.backend.manager.errors.repository import (
     ForeignKeyViolationError,
     RepositoryIntegrityError,
@@ -54,11 +57,24 @@ from ai.backend.manager.errors.storage import (
     VFolderFilterStatusFailed,
     VFolderHasLinkedModelCard,
     VFolderInvalidParameter,
+    VFolderInvitationNotFound,
     VFolderNotFound,
     VFolderOperationFailed,
 )
 from ai.backend.manager.errors.user import KeyPairNotFound, UserNotFound
 from ai.backend.manager.models.agent import agents
+from ai.backend.manager.models.entity_share.creators import EntityShareCreator
+from ai.backend.manager.models.entity_share.lookups import HeldShareLookup
+from ai.backend.manager.models.entity_share.purgers import EntitySharePendingOfferBatchPurger
+from ai.backend.manager.models.entity_share.row import EntityShareRow
+from ai.backend.manager.models.entity_share.updaters import (
+    EntityShareAcceptUpdater,
+    EntityShareCancelUpdater,
+    EntityShareCapUpdater,
+    EntityShareLeaveUpdater,
+    EntityShareRejectUpdater,
+    EntityShareRevokeUpdater,
+)
 from ai.backend.manager.models.kernel import kernels
 from ai.backend.manager.models.keypair import KeyPairRow, keypairs
 from ai.backend.manager.models.model_card.purgers import ModelCardPurger
@@ -81,8 +97,6 @@ from ai.backend.manager.models.vfolder import (
     HARD_DELETED_VFOLDER_STATUSES,
     VFolderCloneInfo,
     VFolderDeletionInfo,
-    VFolderInvitationRow,
-    VFolderInvitationState,
     VFolderOperationStatus,
     VFolderOwnershipType,
     VFolderPermission,
@@ -104,7 +118,6 @@ from ai.backend.manager.models.vfolder.creators import (
     PersonalVFolderCreator,
     ProjectVFolderCreator,
     VFolderBaseCreator,
-    VFolderInvitationCreator,
     VFolderPermissionCreator,
 )
 from ai.backend.manager.models.vfolder.lookups import (
@@ -113,7 +126,6 @@ from ai.backend.manager.models.vfolder.lookups import (
 )
 from ai.backend.manager.models.vfolder.purgers import (
     VFolderInvitationBatchPurger,
-    VFolderInviteeInvitationBatchPurger,
     VFolderPurger,
     VFolderUserPermissionBatchPurger,
 )
@@ -795,27 +807,9 @@ class VfolderRepository:
                 raise VFolderNotFound(extra_data=str(vfolder_id))
             return purged
 
-    @vfolder_repository_resilience.apply()
-    async def get_vfolder_permissions(self, vfolder_id: uuid.UUID) -> list[VFolderPermissionData]:
-        """
-        Get all permissions for a VFolder.
-        """
-        async with self._db.begin_readonly_session_read_committed() as session:
-            query = sa.select(VFolderPermissionRow).where(
-                VFolderPermissionRow.vfolder == vfolder_id
-            )
-            result = await session.execute(query)
-            permission_rows = result.scalars().all()
-
-            return [
-                VFolderPermissionData(
-                    id=VFolderPermissionID(row.id),
-                    vfolder=row.vfolder,
-                    user=row.user,
-                    permission=row.permission or VFolderMountPermission.READ_ONLY,
-                )
-                for row in permission_rows
-            ]
+    def _mount_permission_of(self, cap: Permission | None) -> VFolderMountPermission:
+        """The mount permission an offer's cap answers as; no cap lends every operation."""
+        return VFolderMountPermission.from_rbac(cap if cap is not None else Permission.full())
 
     async def _landing_project(self, w: V2ShareWriteOps, user_id: uuid.UUID) -> ProjectID:
         """Where what a person is given lands (BEP-1077 5.5).
@@ -853,11 +847,12 @@ class VfolderRepository:
         vfolder_id: VFolderUUID,
         user_id: uuid.UUID,
         permission: VFolderMountPermission,
+        sharer_id: UserID,
     ) -> VFolderPermissionData | None:
         """Set what a user already holds on the folder to ``permission``.
 
-        ``None`` when they hold nothing, which leaves the share cap alone: raising
-        what was never lent is the grant path's business.
+        ``None`` when they hold nothing. A share settled from an invitation is restated
+        with the mount row; otherwise the cap alone is.
         """
         found = await w.lookup_field_by_key(
             VFolderMountPermissionLookup(vfolder_id=vfolder_id, user_id=user_id)
@@ -870,74 +865,93 @@ class VfolderRepository:
         )
         if updated is None:
             return None
-        await w.replace_share(
-            await self._landing_project(w, user_id),
-            vfolder_id,
-            permission.to_permission_cap(),
-        )
+        recipient = UserID(user_id)
+        held = await w.lookup_entity_id(HeldShareLookup(recipient=recipient, target=vfolder_id))
+        if held is not None:
+            await w.restate_share(
+                EntityShareCreator(
+                    sharer_user_id=sharer_id,
+                    target=vfolder_id,
+                    recipient=recipient,
+                    permission_cap=permission.to_permission_cap(),
+                )
+            )
+        else:
+            await w.replace_share(
+                await self._landing_project(w, user_id),
+                vfolder_id,
+                permission.to_permission_cap(),
+            )
         return updated
 
     async def _revoke_mount_permission(
         self, w: V2ShareWriteOps, vfolder_id: VFolderUUID, user_id: uuid.UUID
     ) -> None:
-        """Take the folder back from a user: the legacy mount row and the share cap."""
+        """Take the folder back from a user: the legacy mount row, the share settled from
+        an invitation, and the share cap."""
         await w.batch_purge_field_entities(
             vfolder_id, VFolderUserPermissionBatchPurger(user_id=user_id)
         )
+        held = await w.lookup_entity_id(
+            HeldShareLookup(recipient=UserID(user_id), target=vfolder_id)
+        )
+        if held is not None:
+            await w.revoke_share(EntityShareRevokeUpdater(share_id=held))
+            return
         await w.unshare(await self._landing_project(w, user_id), [vfolder_id])
 
     @vfolder_repository_resilience.apply()
-    async def create_vfolder_permission(
-        self,
-        vfolder_id: uuid.UUID,
-        user_id: uuid.UUID,
-        permission: VFolderPermission,
-    ) -> VFolderPermissionData:
-        """
-        Create a VFolder permission entry.
-        """
-        async with self._v2_ops.write_ops() as w:
-            return await self._grant_mount_permission(
-                w, VFolderUUID(vfolder_id), user_id, permission
-            )
-
-    @vfolder_repository_resilience.apply()
-    async def delete_vfolder_permission(self, vfolder_id: uuid.UUID, user_id: uuid.UUID) -> None:
-        """
-        Delete a VFolder permission entry.
-        """
+    async def revoke_shared_vfolder(self, vfolder_id: uuid.UUID, user_id: uuid.UUID) -> None:
+        """Take a shared folder back from a user."""
         async with self._v2_ops.write_ops() as w:
             await self._revoke_mount_permission(w, VFolderUUID(vfolder_id), user_id)
 
     @vfolder_repository_resilience.apply()
-    async def get_vfolder_invitations_by_vfolder(
-        self, vfolder_id: uuid.UUID
-    ) -> list[VFolderInvitationData]:
-        """
-        Get all invitations for a VFolder.
-        """
-        async with self._db.begin_readonly_session_read_committed() as session:
-            query = (
-                sa.select(VFolderInvitationRow, UserRow.username)
-                .outerjoin(UserRow, UserRow.email == VFolderInvitationRow.inviter)
-                .where(VFolderInvitationRow.vfolder == vfolder_id)
+    async def leave_shared_vfolder(self, vfolder_id: uuid.UUID, user_id: uuid.UUID) -> None:
+        """Give back a shared folder the user holds; silent when they hold nothing."""
+        recipient = UserID(user_id)
+        target = VFolderUUID(vfolder_id)
+        async with self._v2_ops.write_ops() as w:
+            await w.batch_purge_field_entities(
+                target, VFolderUserPermissionBatchPurger(user_id=user_id)
             )
-            result = await session.execute(query)
-            rows = result.all()
-
-            return [
-                VFolderInvitationData(
-                    id=row.id,
-                    vfolder=row.vfolder,
-                    inviter=row.inviter or "",
-                    inviter_username=inviter_username,
-                    invitee=row.invitee,
-                    permission=row.permission or VFolderMountPermission.READ_ONLY,
-                    created_at=row.created_at,
-                    modified_at=row.updated_at,
+            held = await w.lookup_entity_id(HeldShareLookup(recipient=recipient, target=target))
+            if held is not None:
+                await w.revoke_share(
+                    EntityShareLeaveUpdater(share_id=held, answering_scope=recipient)
                 )
-                for row, inviter_username in rows
-            ]
+                return
+            await w.unshare(await self._landing_project(w, user_id), [target])
+
+    def _invitation_query(self) -> sa.Select[Any]:
+        """Open vfolder offers with the folder offered and the sharer's email and name."""
+        return (
+            sa.select(EntityShareRow, VFolderRow, UserRow.email, UserRow.username)
+            .select_from(EntityShareRow)
+            .join(VFolderRow, VFolderRow.id == EntityShareRow.target_entity_id)
+            .outerjoin(UserRow, UserRow.uuid == EntityShareRow.sharer_user_id)
+            .where(
+                EntityShareRow.target_entity_type == VFolderEntityType(),
+                EntityShareRow.status == EntityShareStatus.PENDING,
+            )
+        )
+
+    def _invitation_data(
+        self,
+        share_row: EntityShareRow,
+        inviter_email: str | None,
+        inviter_username: str | None,
+    ) -> VFolderInvitationData:
+        return VFolderInvitationData(
+            id=share_row.id,
+            vfolder=share_row.target_entity_id,
+            inviter=inviter_email or "",
+            inviter_username=inviter_username,
+            invitee=share_row.recipient_email or "",
+            permission=self._mount_permission_of(share_row.permission_cap),
+            created_at=share_row.created_at,
+            modified_at=share_row.updated_at,
+        )
 
     @vfolder_repository_resilience.apply()
     async def count_vfolders_by_user(self, user_id: uuid.UUID) -> int:
@@ -1280,49 +1294,28 @@ class VfolderRepository:
             return result or 0
 
     @vfolder_repository_resilience.apply()
-    async def check_pending_invitation_exists(
-        self, vfolder_id: uuid.UUID, inviter_email: str, invitee_email: str
-    ) -> bool:
-        """
-        Check if a pending invitation already exists.
-        Returns True if a pending invitation exists.
-        """
-        async with self._db.begin_readonly_session_read_committed() as session:
-            query = (
-                sa.select(sa.func.count())
-                .select_from(VFolderInvitationRow)
-                .where(
-                    (VFolderInvitationRow.inviter == inviter_email)
-                    & (VFolderInvitationRow.invitee == invitee_email)
-                    & (VFolderInvitationRow.vfolder == vfolder_id)
-                    & (VFolderInvitationRow.state == VFolderInvitationState.PENDING),
-                )
-            )
-            result = await session.scalar(query)
-            return (result or 0) > 0
-
-    @vfolder_repository_resilience.apply()
     async def create_vfolder_invitation(
         self,
         vfolder_id: uuid.UUID,
-        inviter_email: str,
+        inviter_id: UserID,
         invitee_email: str,
         permission: VFolderPermission,
     ) -> str | None:
         """
-        Create a VFolder invitation.
-        Returns the invitee email on success, None on failure.
+        Offer a VFolder to an address, restating an offer already open to it.
+        Returns the invitee email when a new offer was written, None otherwise.
         """
+        creator = EntityShareCreator(
+            sharer_user_id=inviter_id,
+            target=VFolderUUID(vfolder_id),
+            recipient_email=invitee_email,
+            permission_cap=permission.to_permission_cap(),
+        )
         try:
             async with self._v2_ops.write_ops() as w:
-                await w.create_entity(
-                    VFolderInvitationCreator(
-                        vfolder_id=VFolderUUID(vfolder_id),
-                        inviter_email=inviter_email,
-                        invitee_email=invitee_email,
-                        permission=permission,
-                    )
-                )
+                if await w.restate_share(creator) is not None:
+                    return None
+                await w.create_entity(creator)
             return invitee_email
         except sa_exc.DataError:
             return None
@@ -1330,168 +1323,154 @@ class VfolderRepository:
     @vfolder_repository_resilience.apply()
     async def get_invitation_by_id(self, invitation_id: uuid.UUID) -> VFolderInvitationData | None:
         """
-        Get invitation by ID.
+        Get a pending invitation by ID.
         Returns VFolderInvitationData or None if not found.
         """
         async with self._db.begin_readonly_session_read_committed() as session:
-            query = (
-                sa.select(VFolderInvitationRow, UserRow.username)
-                .outerjoin(UserRow, UserRow.email == VFolderInvitationRow.inviter)
-                .where(
-                    (VFolderInvitationRow.id == invitation_id)
-                    & (VFolderInvitationRow.state == VFolderInvitationState.PENDING),
-                )
-            )
+            query = self._invitation_query().where(EntityShareRow.id == invitation_id)
             row = (await session.execute(query)).one_or_none()
-            if not row:
+            if row is None:
                 return None
-            invitation_row, inviter_username = row
+            share_row, _, inviter_email, inviter_username = row
+            return self._invitation_data(share_row, inviter_email, inviter_username)
 
-            return VFolderInvitationData(
-                id=invitation_row.id,
-                vfolder=invitation_row.vfolder,
-                inviter=invitation_row.inviter or "",
-                inviter_username=inviter_username,
-                invitee=invitation_row.invitee,
-                permission=invitation_row.permission or VFolderMountPermission.READ_ONLY,
-                created_at=invitation_row.created_at,
-                modified_at=invitation_row.updated_at,
+    @vfolder_repository_resilience.apply()
+    async def accept_invitation(self, invitation_id: uuid.UUID, invitee_id: UserID) -> None:
+        """
+        Settle the invitation as accepted and share the folder to the invitee, writing
+        the legacy mount row the mount path reads beside it.
+        """
+        async with self._v2_ops.write_ops() as w:
+            try:
+                accepted = await w.accept_share(
+                    EntityShareAcceptUpdater(
+                        share_id=EntityShareID(invitation_id), answering_scope=invitee_id
+                    )
+                )
+            except EntityShareNotFound as e:
+                raise VFolderInvitationNotFound() from e
+            if accepted is None:
+                raise VFolderInvitationNotFound()
+            await w.create_field(
+                VFolderUUID(accepted.target),
+                VFolderPermissionCreator(
+                    user_id=invitee_id,
+                    permission=self._mount_permission_of(accepted.permission_cap),
+                ),
             )
 
     @vfolder_repository_resilience.apply()
-    async def update_invitation_state(
-        self, invitation_id: uuid.UUID, new_state: VFolderInvitationState
-    ) -> None:
+    async def reject_invitation(self, invitation_id: uuid.UUID, invitee_id: UserID) -> None:
         """
-        Update invitation state.
+        Turn down the invitation as its invitee.
         """
-        async with self._db.begin_session() as session:
-            query = (
-                sa.update(VFolderInvitationRow)
-                .where(VFolderInvitationRow.id == invitation_id)
-                .values(state=new_state)
-            )
-            await session.execute(query)
+        async with self._v2_ops.write_ops() as w:
+            try:
+                rejected = await w.update_data(
+                    EntityShareRejectUpdater(
+                        share_id=EntityShareID(invitation_id), answering_scope=invitee_id
+                    )
+                )
+            except EntityShareNotFound as e:
+                raise VFolderInvitationNotFound() from e
+            if rejected is None:
+                raise VFolderInvitationNotFound()
+
+    @vfolder_repository_resilience.apply()
+    async def cancel_invitation(self, invitation_id: uuid.UUID) -> None:
+        """
+        Withdraw the invitation before it was answered.
+        """
+        async with self._v2_ops.write_ops() as w:
+            try:
+                canceled = await w.update_data(
+                    EntityShareCancelUpdater(share_id=EntityShareID(invitation_id))
+                )
+            except EntityShareNotFound as e:
+                raise VFolderInvitationNotFound() from e
+            if canceled is None:
+                raise VFolderInvitationNotFound()
 
     @vfolder_repository_resilience.apply()
     async def update_invitation_permission(
-        self, invitation_id: uuid.UUID, inviter_email: str, permission: VFolderPermission
+        self, invitation_id: uuid.UUID, inviter_id: UserID, permission: VFolderPermission
     ) -> None:
         """
         Update invitation permission (only by inviter).
+        Silent when the invitation is not the inviter's or was already answered.
         """
-        async with self._db.begin_session() as session:
-            query = (
-                sa.update(VFolderInvitationRow)
-                .values(permission=permission)
-                .where(
-                    sa.and_(
-                        VFolderInvitationRow.id == invitation_id,
-                        VFolderInvitationRow.inviter == inviter_email,
-                        VFolderInvitationRow.state == VFolderInvitationState.PENDING,
+        async with self._v2_ops.write_ops() as w:
+            try:
+                await w.update_data(
+                    EntityShareCapUpdater(
+                        share_id=EntityShareID(invitation_id),
+                        sharer_user_id=inviter_id,
+                        permission_cap=permission.to_permission_cap(),
                     )
                 )
-            )
-            await session.execute(query)
+            except EntityShareNotFound:
+                return
 
     @vfolder_repository_resilience.apply()
     async def update_invited_vfolder_mount_permission(
-        self, vfolder_id: uuid.UUID, user_id: uuid.UUID, permission: VFolderPermission
+        self,
+        vfolder_id: uuid.UUID,
+        user_id: uuid.UUID,
+        permission: VFolderPermission,
+        *,
+        sharer_id: UserID,
     ) -> None:
         """
         Update the permission of an invited user for a specific vfolder.
         """
         async with self._v2_ops.write_ops() as w:
-            await self._restate_mount_permission(w, VFolderUUID(vfolder_id), user_id, permission)
+            await self._restate_mount_permission(
+                w, VFolderUUID(vfolder_id), user_id, permission, sharer_id
+            )
 
     @vfolder_repository_resilience.apply()
     async def get_pending_invitations_for_user(
-        self, user_email: str
+        self, user_id: UserID, user_email: str
     ) -> list[tuple[VFolderInvitationData, VFolderData]]:
         """
         Get all pending invitations for a user with VFolder info.
         Returns list of (invitation_data, vfolder_data) tuples.
         """
         async with self._db.begin_readonly_session_read_committed() as session:
-            j = sa.join(
-                VFolderInvitationRow, VFolderRow, VFolderInvitationRow.vfolder == VFolderRow.id
-            ).outerjoin(UserRow, UserRow.email == VFolderInvitationRow.inviter)
-            query = (
-                sa.select(VFolderInvitationRow, UserRow.username)
-                .select_from(j)
-                .where(
-                    sa.and_(
-                        VFolderInvitationRow.invitee == user_email,
-                        VFolderInvitationRow.state == VFolderInvitationState.PENDING,
-                    )
-                )
-                .options(
-                    contains_eager(VFolderInvitationRow.vfolder_row),
-                )
+            addressed = sa.or_(
+                EntityShareRow.recipient_email == user_email,
+                sa.and_(
+                    EntityShareRow.recipient_entity_type == UserEntityType(),
+                    EntityShareRow.recipient_entity_id == user_id,
+                ),
             )
-            result = await session.execute(query)
-            rows = result.all()
-
-            results = []
-            for inv_row, inviter_username in rows:
-                invitation_data = VFolderInvitationData(
-                    id=inv_row.id,
-                    vfolder=inv_row.vfolder,
-                    inviter=inv_row.inviter or "",
-                    inviter_username=inviter_username,
-                    invitee=inv_row.invitee,
-                    permission=inv_row.permission or VFolderMountPermission.READ_ONLY,
-                    created_at=inv_row.created_at,
-                    modified_at=inv_row.updated_at,
+            result = await session.execute(self._invitation_query().where(addressed))
+            return [
+                (
+                    self._invitation_data(share_row, inviter_email, inviter_username),
+                    self._vfolder_row_to_data(vfolder_row),
                 )
-                vfolder_data = self._vfolder_row_to_data(inv_row.vfolder_row)
-                results.append((invitation_data, vfolder_data))
-
-            return results
+                for share_row, vfolder_row, inviter_email, inviter_username in result.all()
+            ]
 
     @vfolder_repository_resilience.apply()
     async def get_sent_invitations_for_user(
-        self, user_email: str
+        self, user_id: UserID
     ) -> list[tuple[VFolderInvitationData, VFolderData]]:
         """
         Get all pending invitations sent by a user (as inviter) with VFolder info.
         """
         async with self._db.begin_readonly_session_read_committed() as session:
-            j = sa.join(
-                VFolderInvitationRow, VFolderRow, VFolderInvitationRow.vfolder == VFolderRow.id
-            ).outerjoin(UserRow, UserRow.email == VFolderInvitationRow.inviter)
-            query = (
-                sa.select(VFolderInvitationRow, UserRow.username)
-                .select_from(j)
-                .where(
-                    sa.and_(
-                        VFolderInvitationRow.inviter == user_email,
-                        VFolderInvitationRow.state == VFolderInvitationState.PENDING,
-                    )
-                )
-                .options(
-                    contains_eager(VFolderInvitationRow.vfolder_row),
-                )
+            result = await session.execute(
+                self._invitation_query().where(EntityShareRow.sharer_user_id == user_id)
             )
-            result = await session.execute(query)
-            rows = result.all()
-
-            results = []
-            for inv_row, inviter_username in rows:
-                invitation_data = VFolderInvitationData(
-                    id=inv_row.id,
-                    vfolder=inv_row.vfolder,
-                    inviter=inv_row.inviter or "",
-                    inviter_username=inviter_username,
-                    invitee=inv_row.invitee,
-                    permission=inv_row.permission or VFolderMountPermission.READ_ONLY,
-                    created_at=inv_row.created_at,
-                    modified_at=inv_row.updated_at,
+            return [
+                (
+                    self._invitation_data(share_row, inviter_email, inviter_username),
+                    self._vfolder_row_to_data(vfolder_row),
                 )
-                vfolder_data = self._vfolder_row_to_data(inv_row.vfolder_row)
-                results.append((invitation_data, vfolder_data))
-
-            return results
+                for share_row, vfolder_row, inviter_email, inviter_username in result.all()
+            ]
 
     @vfolder_repository_resilience.apply()
     async def ensure_host_permission_allowed(
@@ -1715,7 +1694,7 @@ class VfolderRepository:
                 # Whoever already holds the folder has what they hold restated; the
                 # rest are given it. Both write the cap beside the mount row.
                 restated = await self._restate_mount_permission(
-                    w, VFolderUUID(vfolder_id), user_id, permission
+                    w, VFolderUUID(vfolder_id), user_id, permission, UserID(requester_uuid)
                 )
                 if restated is None:
                     await self._grant_mount_permission(
@@ -1819,6 +1798,8 @@ class VfolderRepository:
         vfolder_id: uuid.UUID,
         to_delete: list[uuid.UUID],
         to_update: list[tuple[uuid.UUID, VFolderPermission]],
+        *,
+        sharer_id: UserID,
     ) -> None:
         """
         Batch update and/or delete sharing permissions for a vfolder.
@@ -1827,7 +1808,9 @@ class VfolderRepository:
             for user_id in to_delete:
                 await self._revoke_mount_permission(w, VFolderUUID(vfolder_id), user_id)
             for user_id, perm in to_update:
-                await self._restate_mount_permission(w, VFolderUUID(vfolder_id), user_id, perm)
+                await self._restate_mount_permission(
+                    w, VFolderUUID(vfolder_id), user_id, perm, sharer_id
+                )
 
     @vfolder_repository_resilience.apply()
     async def update_vfolder_max_size(
@@ -2001,10 +1984,19 @@ class VfolderRepository:
             async with self._v2_ops.write_ops() as w:
                 # TODO: scope this purge. A user operation must not use in_global.
                 await w.batch_purge_entities_in_global(
-                    VFolderInviteeInvitationBatchPurger(
-                        vfolder_ids=[vfolder_id], invitee_email=user_email
+                    EntitySharePendingOfferBatchPurger(
+                        entity_type=VFolderEntityType(),
+                        entity_ids=[vfolder_id],
+                        recipient_email=user_email,
                     )
                 )
+                held = await w.lookup_entity_id(
+                    HeldShareLookup(
+                        recipient=UserID(user_info.uuid), target=VFolderUUID(vfolder_id)
+                    )
+                )
+                if held is not None:
+                    await w.revoke_share(EntityShareRevokeUpdater(share_id=held))
                 await w.unshare(new_owner_project, [VFolderUUID(vfolder_id)])
 
         await execute_with_retry(_delete_related_rows)
