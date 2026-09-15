@@ -277,6 +277,7 @@ def _seed_files() -> tuple[dict[str, Any], dict[str, Any]]:
     base = _REPOSITORY / "fixtures" / "manager"
     accounts = json.loads((base / "example-users.json").read_text(encoding="utf-8"))
     roles = json.loads((base / "example-roles.json").read_text(encoding="utf-8"))
+    roles.update(json.loads((base / "example-role-presets.json").read_text(encoding="utf-8")))
     return accounts, roles
 
 

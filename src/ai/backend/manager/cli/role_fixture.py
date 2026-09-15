@@ -41,7 +41,7 @@ def _identify(*parts: str) -> str:
 
 
 class RoleFixture:
-    """Writes the seed fixture from the role files and the account fixtures.
+    """Writes the seed fixtures from the role files and the account fixtures.
 
     The role files give what each role is granted, the account fixtures give the users,
     projects and domain. Every row is derived from those two, and every derived id is
@@ -67,15 +67,22 @@ class RoleFixture:
         }
         self._memberships = accounts["association_groups_users"]
 
-    def render(self) -> dict[str, Any]:
+    def render_presets(self) -> dict[str, Any]:
+        return {
+            "__generated_by": "backend.ai mgr permissions emit",
+            "role_presets": self._presets(),
+            "role_permission_presets": self._permission_presets(),
+        }
+
+    def render_roles(self) -> dict[str, Any]:
+        """The roles instantiated from the presets. Populated after `render_presets`,
+        since a role names its preset."""
         roles = self._roles()
         return {
             "__generated_by": "backend.ai mgr permissions emit",
             "roles": [self._without_notes(role) for role in roles],
             "user_roles": self._user_roles(roles),
             "permissions": self._permissions(roles),
-            "role_presets": self._presets(),
-            "role_permission_presets": self._permission_presets(),
             "virtual_entities": self._virtual_entities(roles),
             "entity_memberships": self._entity_memberships(roles),
             "scope_bindings": self._scope_bindings(roles),
