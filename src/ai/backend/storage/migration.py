@@ -40,6 +40,7 @@ from .context_types import ArtifactVerifierContext
 from .types import VFolderID
 from .volumes.abc import CAP_FAST_SIZE, AbstractVolume
 from .volumes.backends import DEFAULT_BACKENDS
+from .volumes.pool import VolumePool
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -71,23 +72,23 @@ async def check_latest(ctx: RootContext) -> list[VolumeUpgradeInfo]:
     volumes_to_upgrade: list[VolumeUpgradeInfo] = []
     volume_infos = ctx.list_volumes()
     for name, info in volume_infos.items():
-        async with ctx.get_volume(name) as volume:
-            version_path = volume.mount_path / "version.txt"
-            if version_path.exists():
-                version = int(version_path.read_text().strip())
-            else:
-                version = 2
-            match version:
-                case 2:
-                    log.warning(
-                        "{}: Detected an old vfolder structure (v{})",
-                        volume.mount_path,
-                        version,
-                    )
-                    volumes_to_upgrade.append(VolumeUpgradeInfo(2, 3, volume))
-                case 3:
-                    # already the latest version
-                    pass
+        volume = ctx.volume_pool.get_volume_by_name(name)
+        version_path = volume.mount_path / "version.txt"
+        if version_path.exists():
+            version = int(version_path.read_text().strip())
+        else:
+            version = 2
+        match version:
+            case 2:
+                log.warning(
+                    "{}: Detected an old vfolder structure (v{})",
+                    volume.mount_path,
+                    version,
+                )
+                volumes_to_upgrade.append(VolumeUpgradeInfo(2, 3, volume))
+            case 3:
+                # already the latest version
+                pass
     return volumes_to_upgrade
 
 
@@ -264,6 +265,13 @@ async def check_and_upgrade(
         registry_configs={},
         client_config=local_config.reservoir_client,
     )
+    volume_pool = await VolumePool.create(
+        local_config=local_config,
+        etcd=etcd,
+        event_dispatcher=event_dispatcher,
+        event_producer=event_producer,
+        backends=DEFAULT_BACKENDS,
+    )
     ctx = RootContext(
         pid=os.getpid(),
         pidx=0,
@@ -273,7 +281,7 @@ async def check_and_upgrade(
         event_producer=event_producer,
         event_dispatcher=event_dispatcher,
         watcher=None,
-        volume_pool=None,  # type: ignore[arg-type]
+        volume_pool=volume_pool,
         storage_pool=None,  # type: ignore[arg-type]
         background_task_manager=None,  # type: ignore[arg-type]
         artifact_verifier_ctx=ArtifactVerifierContext(),
@@ -283,7 +291,6 @@ async def check_and_upgrade(
         valkey_artifact_client=None,  # type: ignore[arg-type]
         valkey_tus_client=None,  # type: ignore[arg-type]
         backends={**DEFAULT_BACKENDS},
-        volumes={},
         health_probe=health_probe,
         volume_stats_observer=None,  # type: ignore[arg-type]
         volume_stats_state=None,  # type: ignore[arg-type]

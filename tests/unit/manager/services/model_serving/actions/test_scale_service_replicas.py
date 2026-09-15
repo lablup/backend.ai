@@ -11,7 +11,6 @@ from ai.backend.common.contexts.user import with_user
 from ai.backend.common.data.entity.deployment import DeploymentID
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.user.types import UserData, UserRole
-from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.errors.service import (
     ModelServiceNotFound,
 )
@@ -42,10 +41,6 @@ class TestScaleServiceReplicas:
     def set_user_context(self, user_data: UserData) -> Iterator[None]:
         with with_user(user_data):
             yield
-
-    @pytest.fixture
-    def mock_action_monitor(self) -> MagicMock:
-        return MagicMock(spec=ActionMonitor)
 
     @pytest.fixture
     def mock_repositories(self) -> MagicMock:

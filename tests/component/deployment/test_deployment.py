@@ -69,7 +69,6 @@ from ai.backend.manager.data.deployment.types import (
 )
 from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.services.deployment.processors import DeploymentProcessors
-from ai.backend.manager.services.deployment.service import _map_lifecycle_to_status
 from ai.backend.manager.services.processors import Processors
 from ai.backend.testutils.fixtures import DomainFixtureData
 
@@ -807,7 +806,7 @@ class TestStatusMapping:
         }
 
         for lifecycle, expected_status in mapping.items():
-            actual_status = _map_lifecycle_to_status(lifecycle)
+            actual_status = ModelDeploymentStatus.from_lifecycle(lifecycle)
             assert actual_status == expected_status, (
                 f"EndpointLifecycle.{lifecycle.name} should map to "
                 f"ModelDeploymentStatus.{expected_status.name}, got {actual_status.name}"

@@ -18,7 +18,6 @@ from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.resource_slot import ResourceSlotTypeEntityType
 from ai.backend.common.data.entity.types import EntityType
 from ai.backend.common.data.user.types import UserData, UserRole
-from ai.backend.manager.actions.action import BaseActionTriggerMeta
 from ai.backend.manager.actions.types import ActionOperationType, OperationStatus
 from ai.backend.manager.actions.v2.global_scope.base import BaseGlobalAction
 from ai.backend.manager.actions.v2.global_scope.monitor.base import GlobalActionMonitor
@@ -27,6 +26,7 @@ from ai.backend.manager.actions.v2.global_scope.processor import (
     PublicActionProcessor,
 )
 from ai.backend.manager.actions.v2.global_scope.result import GlobalActionProcessResult
+from ai.backend.manager.actions.v2.trigger import ActionTriggerMeta
 from ai.backend.manager.errors.auth import InsufficientPrivilege
 from ai.backend.manager.errors.common import GenericForbidden, ServerMisconfiguredError
 from ai.backend.manager.errors.user import UserNotFound
@@ -90,7 +90,7 @@ class _RecordingMonitor(GlobalActionMonitor):
         self.done_results: list[GlobalActionProcessResult] = []
 
     @override
-    async def prepare(self, action: BaseGlobalAction, meta: BaseActionTriggerMeta) -> None:
+    async def prepare(self, action: BaseGlobalAction, meta: ActionTriggerMeta) -> None:
         return
 
     @override

@@ -54,10 +54,10 @@ from ai.backend.manager.models.idle_checker.creators import IdleCheckerCreator
 from ai.backend.manager.models.idle_checker.orders import IdleCheckerOrders
 from ai.backend.manager.models.idle_checker.searchers import IdleCheckerSearcher
 from ai.backend.manager.models.idle_checker.updaters import IdleCheckerUpdater
-from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.services.idle_checker.actions.admin_search import (
     AdminSearchIdleCheckersAction,
 )
+from ai.backend.manager.services.idle_checker.actions.bulk_get import BulkGetIdleCheckersAction
 from ai.backend.manager.services.idle_checker.actions.create import CreateIdleCheckerAction
 from ai.backend.manager.services.idle_checker.actions.purge import BulkPurgeIdleCheckersAction
 from ai.backend.manager.services.idle_checker.actions.update import UpdateIdleCheckerAction
@@ -105,20 +105,19 @@ class IdleCheckerAdapter(BaseAdapter):
     async def batch_load_by_ids(
         self,
         ids: Sequence[IdleCheckerID],
-    ) -> list[IdleCheckerNode | None]:
-        """Return nodes in input order, with None for missing IDs."""
-
+    ) -> list[IdleCheckerNode | Exception | None]:
+        """One answer per id in the given order: the node, ``None`` for an id matching no
+        row, and the denial for one the caller may not read."""
         if not ids:
             return []
-        searcher = IdleCheckerSearcher(
-            pagination=NoPagination(),
-            conditions=[IdleCheckerConditions.by_ids(ids)],
-        )
-        action_result = await self._idle_checker.admin_search.run(
-            AdminSearchIdleCheckersAction(searcher=searcher)
-        )
-        node_map = {node.id: node for node in map(self._data_to_node, action_result.items)}
-        return [node_map.get(checker_id) for checker_id in ids]
+        entity_ids = [IdleCheckerID(value) for value in ids]
+        result = await self._idle_checker.bulk_get.run(BulkGetIdleCheckersAction(ids=entity_ids))
+        return [
+            self._data_to_node(item.value)
+            if item.value is not None
+            else self.batch_load_failure(item.error)
+            for item in result.items
+        ]
 
     async def admin_search(self, input: SearchIdleCheckersInput) -> SearchIdleCheckerPayload:
         conditions = self._convert_filter(input.filter) if input.filter else []

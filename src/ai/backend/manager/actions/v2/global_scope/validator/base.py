@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 
-from ai.backend.manager.actions.action import BaseActionTriggerMeta
 from ai.backend.manager.actions.v2.global_scope.base import BaseGlobalAction
+from ai.backend.manager.actions.v2.trigger import ActionTriggerMeta
 
 __all__ = ("GlobalActionValidator",)
 
@@ -14,5 +14,5 @@ class GlobalActionValidator(ABC):
     """
 
     @abstractmethod
-    async def validate(self, action: BaseGlobalAction, meta: BaseActionTriggerMeta) -> None:
+    async def validate(self, action: BaseGlobalAction, meta: ActionTriggerMeta) -> None:
         raise NotImplementedError("Subclasses must implement the validate method")

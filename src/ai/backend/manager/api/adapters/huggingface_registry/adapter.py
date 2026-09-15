@@ -22,14 +22,23 @@ from ai.backend.common.dto.manager.v2.huggingface_registry.response import (
 from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.data.artifact_registries.types import (
     ArtifactRegistryCreatorMeta,
+    ArtifactRegistryData,
     ArtifactRegistryModifierMeta,
 )
-from ai.backend.manager.data.huggingface_registry.types import HuggingFaceRegistryData
-from ai.backend.manager.models.huggingface_registry.conditions import HuggingFaceRegistryConditions
+from ai.backend.manager.data.huggingface_registry.types import (
+    HuggingFaceRegistryConnectionData,
+    HuggingFaceRegistryData,
+)
 from ai.backend.manager.models.huggingface_registry.creators import HuggingFaceRegistryCreator
 from ai.backend.manager.models.huggingface_registry.searchers import HuggingFaceRegistrySearcher
 from ai.backend.manager.models.huggingface_registry.updaters import HuggingFaceRegistryUpdater
 from ai.backend.manager.models.specs.pagination import OffsetPagination
+from ai.backend.manager.services.artifact_registry.actions.common.get_multi import (
+    GetArtifactRegistryMetasAction,
+)
+from ai.backend.manager.services.artifact_registry.actions.huggingface.bulk_get import (
+    BulkGetHuggingFaceRegistriesAction,
+)
 from ai.backend.manager.services.artifact_registry.actions.huggingface.create import (
     CreateHuggingFaceRegistryAction,
 )
@@ -140,25 +149,43 @@ class HuggingFaceRegistryAdapter(BaseAdapter):
         )
         return [self._huggingface_registry_data_to_dto(item) for item in action_result.result]
 
-    async def batch_load_by_ids(self, ids: Sequence[UUID]) -> list[HuggingFaceRegistryNode | None]:
-        """Batch load HuggingFace registries by IDs for DataLoader use.
+    async def batch_load_by_ids(
+        self, ids: Sequence[UUID]
+    ) -> list[HuggingFaceRegistryNode | Exception | None]:
+        """Batch load HuggingFace registries by IDs for DataLoader use, checked per registry.
 
-        Returns HuggingFaceRegistryNode DTOs in the same order as the input ids list.
+        The name is read from the artifact registry row, for the registries that were read.
         """
         if not ids:
             return []
-        searcher = HuggingFaceRegistrySearcher(
-            pagination=OffsetPagination(limit=len(ids)),
-            conditions=[HuggingFaceRegistryConditions.by_ids(ids)],
+        result = await self._artifact_registry.bulk_get_huggingface_registries.run(
+            BulkGetHuggingFaceRegistriesAction(
+                ids=[ArtifactRegistryID(registry_id) for registry_id in ids]
+            )
         )
-        action_result = await self._artifact_registry.search_huggingface_registries.run(
-            SearchHuggingFaceRegistriesAction(searcher=searcher)
+        metas = (
+            await self._artifact_registry.get_registry_metas.run(
+                GetArtifactRegistryMetasAction(
+                    registry_ids=[ArtifactRegistryID(entity_id) for entity_id in result.values()]
+                )
+            )
+        ).values()
+        return [
+            self._connection_to_dto(item.value, metas[item.entity_id])
+            if item.value is not None and item.entity_id in metas
+            else self.batch_load_failure(item.error)
+            for item in result.items
+        ]
+
+    def _connection_to_dto(
+        self, connection: HuggingFaceRegistryConnectionData, meta: ArtifactRegistryData
+    ) -> HuggingFaceRegistryNode:
+        return HuggingFaceRegistryNode(
+            id=connection.id,
+            name=meta.name,
+            url=connection.url,
+            token=connection.token,
         )
-        registry_map = {
-            item.id: self._huggingface_registry_data_to_dto(item)
-            for item in action_result.registries
-        }
-        return [registry_map.get(registry_id) for registry_id in ids]
 
     async def delete(
         self, input: DeleteHuggingFaceRegistryInput

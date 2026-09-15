@@ -6,6 +6,7 @@ from ai.backend.common.data.entity.preset_resource_slot import (
 from ai.backend.manager.actions.registry.field import LookupFieldGroup
 from ai.backend.manager.actions.registry.group import ProcessorGroup
 from ai.backend.manager.actions.registry.types import FieldGroupMeta
+from ai.backend.manager.actions.v2.bulk.partial_processor import PartialBulkActionProcessor
 from ai.backend.manager.actions.v2.global_scope.processor import GlobalActionProcessor
 from ai.backend.manager.actions.v2.ops.result import (
     BatchOpsResult,
@@ -19,6 +20,9 @@ from ai.backend.manager.data.deployment_preset.types import PresetResourceSlotDa
 from ai.backend.manager.data.deployment_revision_preset.types import (
     DeploymentRevisionPresetData,
     ResourceSlotEntryData,
+)
+from ai.backend.manager.services.deployment_revision_preset.actions.bulk_get import (
+    BulkGetDeploymentPresetsAction,
 )
 from ai.backend.manager.services.deployment_revision_preset.actions.create import (
     CreateDeploymentPresetAction,
@@ -59,6 +63,10 @@ class DeploymentPresetProcessors:
     global_search: GlobalActionProcessor[
         GlobalSearchDeploymentPresetsAction, BatchOpsResult[DeploymentRevisionPresetData]
     ]
+    # What the DataLoader reads: checked per preset.
+    bulk_get: PartialBulkActionProcessor[
+        BulkGetDeploymentPresetsAction, DeploymentRevisionPresetData
+    ]
     update: SingleEntityActionProcessor[
         UpdateDeploymentPresetAction, EntityOpsResult[DeploymentRevisionPresetData]
     ]
@@ -77,6 +85,7 @@ class DeploymentPresetProcessors:
         self.create = group.global_create_with_fields_ops(CreateDeploymentPresetAction)
         self.get = group.single_get_ops(GetDeploymentPresetAction)
         self.global_search = group.global_search_ops(GlobalSearchDeploymentPresetsAction)
+        self.bulk_get = group.partial_bulk_get_ops(BulkGetDeploymentPresetsAction)
         self.update = group.single_entity(UpdateDeploymentPresetAction, service.update)
         self.purge = group.entity_purge_ops(PurgeDeploymentPresetAction)
 

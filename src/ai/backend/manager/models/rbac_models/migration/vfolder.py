@@ -1,3 +1,9 @@
+"""Frozen vfolder-side inputs for the RBAC data migrations.
+
+Deprecated: read only by `models/alembic/versions/`. These do not track the live
+models; a migration keeps reading what it was written against.
+"""
+
 import enum
 import uuid
 from collections.abc import Mapping

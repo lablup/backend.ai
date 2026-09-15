@@ -12,6 +12,8 @@ import secrets
 from dataclasses import dataclass
 from typing import override
 
+from bai_scenario.seeds.seeder import Naming, SeedUser
+
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.types import AccessKey
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
@@ -21,11 +23,11 @@ from ai.backend.manager.data.resource.types import (
     KeyPairResourcePolicyData,
     UserResourcePolicyData,
 )
+from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.user.creators import UserCreator
 from ai.backend.manager.repositories.ops.v2.user.write import FullUserCreator
 from ai.backend.manager.secret.types import SecretValue
-from bai_scenario.seeds.seeder import Naming, SeedUser
 
 PASSWORD = "scenario-password"
 
@@ -41,6 +43,8 @@ class SeedUserOf(SeedUser[DomainData, UserResourcePolicyData, KeyPairResourcePol
     name_hint: str = "user"
     role: UserRole = UserRole.USER
     is_active: bool = True
+    status: UserStatus | None = None
+    """Written as is when given; otherwise the row derives it from ``is_active``."""
 
     @override
     def kind(self) -> str:
@@ -56,6 +60,8 @@ class SeedUserOf(SeedUser[DomainData, UserResourcePolicyData, KeyPairResourcePol
 
     @override
     def detail(self) -> str:
+        if self.status is not None and self.status != UserStatus.ACTIVE:
+            return f"상태 {self.status.value}, 자기 키와 개인 프로젝트를 갖는다"
         return "자기 키와 개인 프로젝트를 갖는다"
 
     @override
@@ -85,6 +91,7 @@ class SeedUserOf(SeedUser[DomainData, UserResourcePolicyData, KeyPairResourcePol
                 domain_id=domain.id,
                 role=self.role,
                 is_active=self.is_active,
+                status=self.status,
                 resource_policy=policy.name,
             ),
             keypair_secrets=KeyPairSecrets(

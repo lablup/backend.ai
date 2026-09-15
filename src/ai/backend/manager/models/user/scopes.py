@@ -16,8 +16,8 @@ from ai.backend.manager.errors.resource import DomainNotFound, ProjectNotFound
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.project import ProjectRow
-from ai.backend.manager.models.rbac_models.role import RoleRow
-from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
+from ai.backend.manager.models.rbac_models.role.row import RoleRow
+from ai.backend.manager.models.rbac_models.user_role.row import UserRoleRow
 from ai.backend.manager.models.scopes import ExistenceCheck, OperationScope
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.virtual_entity.queries import user_scope_membership_exists
@@ -99,21 +99,23 @@ class ProjectUserOperationScope(OperationScope):
 
 @dataclass(frozen=True)
 class RoleUserOperationScope(OperationScope):
-    """Required scope for searching users assigned to a role.
-
-    Requires JOIN with user_roles table.
-    """
+    """Required scope for searching the users a role is assigned to."""
 
     role_id: RoleID
-    """Required. The role to search within."""
+    """Required. The role whose holders to search."""
 
     @override
     def to_condition(self) -> QueryCondition:
-        """Convert scope to a query condition for UserRoleRow."""
+        """Assignment predicate: the user holds the role."""
         role_id = self.role_id
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return UserRoleRow.role_id == role_id
+            return sa.exists().where(
+                sa.and_(
+                    UserRoleRow.role_id == role_id,
+                    UserRoleRow.user_id == UserRow.uuid,
+                )
+            )
 
         return inner
 

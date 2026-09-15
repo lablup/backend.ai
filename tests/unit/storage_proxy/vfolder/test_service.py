@@ -107,7 +107,7 @@ async def test_create_quota_scope(
     mock_volume = MagicMock()
     mock_volume.quota_model.create_quota_scope = AsyncMock()
 
-    mock_volume_pool.get_volume.return_value.__aenter__.return_value = mock_volume
+    mock_volume_pool.get_volume.return_value = mock_volume
 
     quota_scope_id = QuotaScopeID(scope_type=QuotaScopeType.USER, scope_id=UUID)
     quota_scope_key = QuotaScopeKey(
@@ -132,7 +132,7 @@ async def test_get_quota_scope(
     quota_scope_meta = QuotaScopeMeta(used_bytes=500, limit_bytes=1000)
     mock_volume.quota_model.describe_quota_scope = AsyncMock(return_value=quota_scope_meta)
 
-    mock_volume_pool.get_volume.return_value.__aenter__.return_value = mock_volume
+    mock_volume_pool.get_volume.return_value = mock_volume
 
     quota_scope_id = QuotaScopeID(scope_type=QuotaScopeType.USER, scope_id=UUID)
     quota_scope_key = QuotaScopeKey(volume_id=VOLUME_ID, quota_scope_id=quota_scope_id)
@@ -155,7 +155,7 @@ async def test_update_quota_scope(
     mock_volume.quota_model.describe_quota_scope = AsyncMock(return_value=quota_scope_meta)
     mock_volume.quota_model.update_quota_scope = AsyncMock()
 
-    mock_volume_pool.get_volume.return_value.__aenter__.return_value = mock_volume
+    mock_volume_pool.get_volume.return_value = mock_volume
 
     quota_scope_id = QuotaScopeID(scope_type=QuotaScopeType.USER, scope_id=UUID)
     quota_scope_key = QuotaScopeKey(volume_id=VOLUME_ID, quota_scope_id=quota_scope_id)
@@ -180,7 +180,7 @@ async def test_delete_quota_scope(
     )
     mock_volume.quota_model.unset_quota = AsyncMock()
 
-    mock_volume_pool.get_volume.return_value.__aenter__.return_value = mock_volume
+    mock_volume_pool.get_volume.return_value = mock_volume
 
     quota_scope_id = QuotaScopeID(scope_type=QuotaScopeType.USER, scope_id=UUID)
     quota_scope_key = QuotaScopeKey(volume_id=VOLUME_ID, quota_scope_id=quota_scope_id)
@@ -200,7 +200,7 @@ async def test_create_vfolder(
     mock_volume.create_vfolder = AsyncMock()
     mock_volume.quota_model.create_quota_scope = AsyncMock()
 
-    mock_volume_pool.get_volume.return_value.__aenter__.return_value = mock_volume
+    mock_volume_pool.get_volume.return_value = mock_volume
 
     vfolder_id = VFolderID(
         quota_scope_id=QuotaScopeID(scope_type=QuotaScopeType.USER, scope_id=UUID),
@@ -221,7 +221,7 @@ async def test_clone_vfolder(
     mock_volume = MagicMock()
     mock_volume.clone_vfolder = AsyncMock()
 
-    mock_volume_pool.get_volume.return_value.__aenter__.return_value = mock_volume
+    mock_volume_pool.get_volume.return_value = mock_volume
 
     src_vfolder_id = VFolderID(
         quota_scope_id=QuotaScopeID(scope_type=QuotaScopeType.USER, scope_id=UUID),
@@ -257,7 +257,7 @@ async def test_get_vfolder_info(
     mock_volume.get_usage = AsyncMock(return_value=usage_data)
     mock_volume.get_fs_usage = AsyncMock(return_value=fs_usage_data)
 
-    mock_volume_pool.get_volume.return_value.__aenter__.return_value = mock_volume
+    mock_volume_pool.get_volume.return_value = mock_volume
 
     vfolder_id = VFolderID(
         quota_scope_id=QuotaScopeID(scope_type=QuotaScopeType.USER, scope_id=UUID),
@@ -288,7 +288,7 @@ async def test_delete_vfolder(
     mock_volume = MagicMock()
     mock_volume.get_vfolder_mount = AsyncMock(side_effect=VFolderNotFoundError)
 
-    mock_volume_pool.get_volume.return_value.__aenter__.return_value = mock_volume
+    mock_volume_pool.get_volume.return_value = mock_volume
 
     vfolder_id = VFolderID(
         quota_scope_id=QuotaScopeID(scope_type=QuotaScopeType.USER, scope_id=UUID),

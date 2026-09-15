@@ -220,12 +220,8 @@ class TestEnrollUsersInProject:
                     type=ProjectType.GENERAL,
                 )
             )
-            session.add(
-                VirtualEntityRow(
-                    entity_type=ProjectEntityType(),
-                    entity_id=project_id,
-                )
-            )
+            await session.flush()
+            await VirtualEntitySeeder().provision(session, ProjectEntityType(), project_id)
             await session.commit()
         return project_id
 
@@ -260,12 +256,8 @@ class TestEnrollUsersInProject:
                     type=ProjectType.PERSONAL,
                 )
             )
-            session.add(
-                VirtualEntityRow(
-                    entity_type=ProjectEntityType(),
-                    entity_id=project_id,
-                )
-            )
+            await session.flush()
+            await VirtualEntitySeeder().provision(session, ProjectEntityType(), project_id)
             await session.commit()
         return project_id
 
@@ -729,12 +721,8 @@ class TestWithdrawUsersFromProject:
                     type=ProjectType.GENERAL,
                 )
             )
-            session.add(
-                VirtualEntityRow(
-                    entity_type=ProjectEntityType(),
-                    entity_id=project_id,
-                )
-            )
+            await session.flush()
+            await VirtualEntitySeeder().provision(session, ProjectEntityType(), project_id)
             await session.commit()
         return project_id
 

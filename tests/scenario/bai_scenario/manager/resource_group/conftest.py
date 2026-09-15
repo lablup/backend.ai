@@ -76,12 +76,10 @@ async def adapter(
             RbacRelationService(RbacRelationRepository(RelationOpsProvider(engine))),
             RbacRosterService(roster_repository),
             RbacRoleService(PermissionControllerRepository(engine), roster_repository),
-            [],
         ),
         DomainProcessors(
             registry.group(GroupMeta(DomainEntityType())),
             DomainService(DomainRepository(engine, provider)),
-            [],
         ),
         unwired(DeploymentCoordinator, "only deployment work reaches it"),
         unwired(ScheduleCoordinator, "only scheduling reaches it"),

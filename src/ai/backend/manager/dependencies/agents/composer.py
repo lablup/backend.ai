@@ -20,6 +20,7 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.repositories.deployment.repository import DeploymentRepository
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.runtime_variant.repository import RuntimeVariantRepository
 from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
 from ai.backend.manager.sokovan.deployment.deployment_controller import DeploymentController
@@ -66,6 +67,7 @@ class AgentsInput:
     deployment_revision_preset_repository: DeploymentPresetRepository | None
     runtime_variant_repository: RuntimeVariantRepository
     agent_selector: AgentSelector
+    ops_provider: V2DBOpsProvider
 
 
 @dataclass
@@ -176,6 +178,7 @@ class AgentsComposer(DependencyComposer[AgentsInput, AgentsResources]):
                 network_plugin_ctx=setup_input.network_plugin_ctx,
                 scheduling_controller=scheduling_controller,
                 scheduler_repository=setup_input.scheduler_repository,
+                ops_provider=setup_input.ops_provider,
                 debug=setup_input.config_provider.config.debug.enabled,
                 manager_public_key=setup_input.agent_cache.manager_public_key,
                 manager_secret_key=setup_input.agent_cache.manager_secret_key,
