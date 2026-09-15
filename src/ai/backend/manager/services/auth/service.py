@@ -24,7 +24,6 @@ from ai.backend.common.dto.manager.auth.types import AuthTokenType
 from ai.backend.common.exception import (
     InvalidAPIParameters,
     UnreachableError,
-    UserResourcePolicyNotFound,
 )
 from ai.backend.common.plugin.hook import ALL_COMPLETED, FIRST_COMPLETED, PASSED, HookPluginContext
 from ai.backend.common.types import AccessKey, SecretKey, SSHPrivateKey, SSHPublicKey
@@ -49,7 +48,7 @@ from ai.backend.manager.errors.common import (
     ObjectNotFound,
     RejectedByHook,
 )
-from ai.backend.manager.errors.user import KeyPairNotFound
+from ai.backend.manager.errors.user import KeyPairNotFound, UserResourcePolicyNotFound
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.keypair.row import (
     KEYPAIR_SECRET_KEY_CONTEXT,

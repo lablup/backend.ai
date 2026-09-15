@@ -4,12 +4,13 @@ from typing import TYPE_CHECKING
 
 import sqlalchemy as sa
 
-from ai.backend.common.exception import BackendAIError, UserResourcePolicyNotFound
+from ai.backend.common.exception import BackendAIError
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
 from ai.backend.common.resilience.resilience import Resilience
 from ai.backend.manager.data.resource.types import UserResourcePolicyData
+from ai.backend.manager.errors.user import UserResourcePolicyNotFound
 from ai.backend.manager.models.resource_policy import UserResourcePolicyRow
 
 if TYPE_CHECKING:

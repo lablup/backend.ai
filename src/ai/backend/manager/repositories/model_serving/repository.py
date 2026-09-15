@@ -46,9 +46,10 @@ from ai.backend.manager.data.model_serving.types import (
 )
 from ai.backend.manager.data.vfolder.types import VFolderOwnershipType
 from ai.backend.manager.errors.api import InvalidAPIParameters
-from ai.backend.manager.errors.common import GenericForbidden, ObjectNotFound, ServiceUnavailable
+from ai.backend.manager.errors.common import GenericForbidden, ServiceUnavailable
+from ai.backend.manager.errors.image import ImageNotFound
 from ai.backend.manager.errors.resource import DatabaseConnectionUnavailable
-from ai.backend.manager.errors.service import EndpointNotFound
+from ai.backend.manager.errors.service import AutoScalingRuleNotFound, EndpointNotFound
 from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
 from ai.backend.manager.models.endpoint import (
     AutoScalingMetricComparator,
@@ -600,7 +601,7 @@ class ModelServingRepository:
             try:
                 rule = await EndpointAutoScalingRuleRow.get(session, rule_id, load_endpoint=True)
                 return rule.to_data()
-            except ObjectNotFound:
+            except AutoScalingRuleNotFound:
                 return None
 
     @model_serving_repository_resilience.apply()
@@ -666,7 +667,7 @@ class ModelServingRepository:
             try:
                 # Validate lifecycle stage before update
                 rule = await EndpointAutoScalingRuleRow.get(session, rule_id, load_endpoint=True)
-            except ObjectNotFound:
+            except AutoScalingRuleNotFound:
                 return None
             if rule.endpoint_row.lifecycle_stage in EndpointLifecycle.inactive_states():
                 return None
@@ -688,7 +689,7 @@ class ModelServingRepository:
                 rule = await EndpointAutoScalingRuleRow.get(session, rule_id, load_endpoint=True)
                 await session.delete(rule)
                 return True
-            except ObjectNotFound:
+            except AutoScalingRuleNotFound:
                 return False
 
     @model_serving_repository_resilience.apply()
@@ -730,7 +731,7 @@ class ModelServingRepository:
         async with self._db.begin_readonly_session_read_committed() as session:
             image_row = await session.scalar(sa.select(ImageRow).where(ImageRow.id == image_id))
             if image_row is None:
-                raise ObjectNotFound(f"Image {image_id} not found")
+                raise ImageNotFound(f"Image {image_id} not found")
             return image_row.to_dataclass()
 
     @model_serving_repository_resilience.apply()

@@ -149,7 +149,7 @@ class ResourcePresetRepository:
         """
         Deletes a resource preset.
         Returns the deleted preset data.
-        Raises ObjectNotFound if the preset doesn't exist.
+        Raises ResourcePresetNotFound if the preset doesn't exist.
         """
         preset = await self._db_source.delete_preset(preset_id)
         with suppress_with_log(
