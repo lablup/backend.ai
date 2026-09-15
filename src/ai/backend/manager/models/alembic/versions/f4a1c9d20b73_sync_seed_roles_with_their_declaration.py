@@ -4,9 +4,12 @@ The seed roles are declared under `data/permission/seed/roles/`, and the fixture
 generated from it. A database seeded before that carries what the data migrations
 left behind instead, so the two disagree.
 
-Rewrite the presets the declaration states, then the permissions of every role
-instantiated from one. A role no preset instantiated is left alone: it was made by
-hand, and nothing here answers for it.
+Rewrite the presets the declaration states, give every scope the role of each preset
+under the name and id the seed gives it, and pass on to it the holders of the system
+role its name stood for, under either the data migrations' naming or the runtime's.
+A project's creator still on its roster holds its admin role. The system roles no
+preset made then go, and every preset role holds what its preset states. A custom
+role is left alone: it was made by hand, and nothing here answers for it.
 
 Retire the names that are no longer entity types: `model_deployment` is now
 `deployment`, the two admin pages are now `scope_admin`, and `keypair`,
@@ -682,39 +685,46 @@ _RETIRED: Final[dict[str, str | None]] = {
 }
 
 
-# The names the earlier data migrations gave the roles they made, which is what says a
-# role is one of theirs. A role made by hand is a custom one and is not read at all, so
-# these are read of system roles only.
+# The prefix the earlier data migrations and the seed give a system role's name. The
+# runtime named the roles it made before presets did without it.
 _LEGACY_PREFIX: Final[str] = "role_"
+_MAX_ROLE_NAME_LENGTH: Final[int] = 64
 
 
-_AUTO_ASSIGN: Final[dict[str, bool]] = {preset.id: preset.auto_assign for preset in _PRESETS}
+_PRESET_IDS: Final[dict[str, str]] = {preset.name: preset.id for preset in _PRESETS}
 
 
 def _preset_for(scope_type: str, scope_id: str, name: str) -> str | None:
-    """The id of the preset this role was made from, or None where nothing says."""
+    """The id of the preset a system role's name stands for, under either naming rule,
+    or None where the name says nothing."""
+    short = scope_id[:8]
     if scope_type == "user":
-        if not name.startswith(f"{_LEGACY_PREFIX}user_"):
+        made = name.startswith(f"{_LEGACY_PREFIX}user_") or name == f"user-{short}"
+        return _PRESET_IDS["user_owner"] if made else None
+    for kind in ("admin", "member"):
+        if scope_type == "project":
+            made = name in (f"{_LEGACY_PREFIX}project_{short}_{kind}", f"project-{short}-{kind}")
+        elif scope_type == "domain":
+            made = (name.startswith(f"{_LEGACY_PREFIX}domain_") and name.endswith(f"_{kind}")) or (
+                name.startswith("domain-") and name.endswith(f"-{kind}")
+            )
+        else:
             return None
-        return next((p.id for p in _PRESETS if p.scope_type == "user"), None)
-    if scope_type == "project":
-        stem = f"{_LEGACY_PREFIX}project_{scope_id[:8]}"
-    elif scope_type == "domain":
-        stem = f"{_LEGACY_PREFIX}domain_"
-    else:
-        return None
-    for suffix, preset_name in (
-        ("_admin", f"{scope_type}_admin"),
-        ("_member", f"{scope_type}_member"),
-    ):
-        if not name.endswith(suffix):
-            continue
-        if scope_type == "project" and name != f"{stem}{suffix}":
-            continue
-        if scope_type == "domain" and not name.startswith(stem):
-            continue
-        return next((p.id for p in _PRESETS if p.name == preset_name), None)
+        if made:
+            return _PRESET_IDS.get(f"{scope_type}_{kind}")
     return None
+
+
+def _seed_role_name(scope_type: str, scope_id: str, label: str, preset_name: str) -> str:
+    """The name the seed gives a preset's role in a scope. `label` is the domain name or
+    the username."""
+    if scope_type == "user":
+        name = f"{_LEGACY_PREFIX}user_{label}"
+    elif scope_type == "domain":
+        name = f"{_LEGACY_PREFIX}domain_{label}_{preset_name.removeprefix('domain_')}"
+    else:
+        name = f"{_LEGACY_PREFIX}project_{scope_id[:8]}_{preset_name.removeprefix('project_')}"
+    return name[:_MAX_ROLE_NAME_LENGTH]
 
 
 def _retire_names(conn: sa.engine.Connection) -> None:
@@ -841,26 +851,10 @@ def _sweep_unknown_types(conn: sa.engine.Connection) -> None:
     )
 
 
-def _link_roles(conn: sa.engine.Connection) -> None:
-    """Name the preset each system role was made from, where nothing named it yet.
-
-    The presets were all soft-deleted when the earlier backfill ran, and it skipped
-    deleted ones, so a database carries seed roles that point at nothing. Linking
-    rather than recreating is what keeps the assignments: who holds a role lives only
-    in `user_roles`, and a role's own rows go with it."""
-    rows = conn.execute(
-        sa.text("""
-            SELECT id, scope_type, scope_id, name
-            FROM roles
-            WHERE role_preset_id IS NULL AND source = 'system'
-            ORDER BY created_at, id
-        """)
-    ).all()
-    # A scope holds one role per preset, which `uq_roles_preset_scope` states. Both
-    # naming rules may have left one behind on the same scope, so the first by age
-    # takes the preset and the rest stay unlinked -- and, being system roles no preset
-    # accounts for, go in the step after this one.
-    taken: set[tuple[str, str, str]] = {
+def _create_seed_roles(conn: sa.engine.Connection) -> None:
+    """Give every scope in the graph the role of each preset it lacks, under the name and
+    id the seed gives it. A system role already under that id takes the preset instead."""
+    linked = {
         (str(row.role_preset_id), str(row.scope_type), str(row.scope_id))
         for row in conn.execute(
             sa.text(
@@ -869,27 +863,164 @@ def _link_roles(conn: sa.engine.Connection) -> None:
             )
         )
     }
-    linked: list[dict[str, Any]] = []
-    for row in rows:
+    scopes = conn.execute(
+        sa.text("""
+            SELECT 'domain' AS scope_type, d.id AS scope_id, CAST(d.name AS text) AS label
+            FROM domains d
+            JOIN virtual_entities v ON v.entity_type = 'domain' AND v.entity_id = d.id
+            UNION ALL
+            SELECT 'project', g.id, ''
+            FROM groups g
+            JOIN virtual_entities v ON v.entity_type = 'project' AND v.entity_id = g.id
+            UNION ALL
+            SELECT 'user', u.uuid, CAST(u.username AS text)
+            FROM users u
+            JOIN virtual_entities v ON v.entity_type = 'user' AND v.entity_id = u.uuid
+        """)
+    ).all()
+    rows: list[dict[str, Any]] = []
+    for scope in scopes:
+        scope_type, scope_id = str(scope.scope_type), str(scope.scope_id)
+        for preset in _PRESETS:
+            if preset.scope_type != scope_type or (preset.id, scope_type, scope_id) in linked:
+                continue
+            name = _seed_role_name(scope_type, scope_id, str(scope.label), preset.name)
+            rows.append({
+                "id": _identify("role", scope_type, scope_id, name),
+                "name": name,
+                "auto_assign": preset.auto_assign,
+                "role_preset_id": preset.id,
+                "scope_type": scope_type,
+                "scope_id": scope_id,
+            })
+    if not rows:
+        return
+    conn.execute(
+        sa.text("""
+            INSERT INTO roles
+                (id, name, source, status, auto_assign, role_preset_id, scope_type, scope_id)
+            VALUES (
+                CAST(:id AS uuid), :name, 'system', 'active', :auto_assign,
+                CAST(:role_preset_id AS uuid), :scope_type, CAST(:scope_id AS uuid)
+            )
+            ON CONFLICT (id) DO UPDATE SET
+                role_preset_id = EXCLUDED.role_preset_id,
+                auto_assign = EXCLUDED.auto_assign
+            WHERE roles.source = 'system' AND roles.role_preset_id IS NULL
+        """),
+        rows,
+    )
+    _put_in_graph(conn, [uuid.UUID(row["id"]) for row in rows])
+
+
+def _put_in_graph(conn: sa.engine.Connection, role_ids: list[uuid.UUID]) -> None:
+    """Put the preset roles among `role_ids` in the graph as the runtime does, their nodes
+    under the seed's ids: each owns and governs itself and is owned and governed by its scope."""
+    kept = [
+        row.id
+        for row in conn.execute(
+            sa.text(
+                "SELECT id FROM roles WHERE id = ANY(:ids) AND role_preset_id IS NOT NULL"
+            ).bindparams(sa.bindparam("ids", role_ids, type_=sa.ARRAY(sa.Uuid)))
+        )
+    ]
+    if not kept:
+        return
+    conn.execute(
+        sa.text("""
+            INSERT INTO virtual_entities (id, entity_type, entity_id)
+            VALUES (CAST(:id AS uuid), 'role', CAST(:role_id AS uuid))
+            ON CONFLICT (entity_type, entity_id) DO NOTHING
+        """),
+        [
+            {"id": _identify("virtual_entity", "role", str(role_id)), "role_id": str(role_id)}
+            for role_id in kept
+        ],
+    )
+    ids = sa.bindparam("role_ids", kept, type_=sa.ARRAY(sa.Uuid))
+    conn.execute(
+        sa.text("""
+            INSERT INTO entity_memberships (virtual_entity_id, member_entity_id, capped)
+            SELECT node.id, node.id, FALSE
+            FROM virtual_entities node
+            WHERE node.entity_type = 'role' AND node.entity_id = ANY(:role_ids)
+            UNION ALL
+            SELECT scope.id, node.id, FALSE
+            FROM roles r
+            JOIN virtual_entities node ON node.entity_type = 'role' AND node.entity_id = r.id
+            JOIN virtual_entities scope
+                ON scope.entity_type = r.scope_type AND scope.entity_id = r.scope_id
+            WHERE r.id = ANY(:role_ids)
+            ON CONFLICT (virtual_entity_id, member_entity_id) DO NOTHING
+        """).bindparams(ids)
+    )
+    conn.execute(
+        sa.text("""
+            INSERT INTO scope_bindings (virtual_entity_id, scope_entity_id, permission_cap)
+            SELECT node.id, node.id, CAST(NULL AS smallint)
+            FROM virtual_entities node
+            WHERE node.entity_type = 'role' AND node.entity_id = ANY(:role_ids)
+            UNION ALL
+            SELECT node.id, scope.id, CAST(NULL AS smallint)
+            FROM roles r
+            JOIN virtual_entities node ON node.entity_type = 'role' AND node.entity_id = r.id
+            JOIN virtual_entities scope
+                ON scope.entity_type = r.scope_type AND scope.entity_id = r.scope_id
+            WHERE r.id = ANY(:role_ids)
+            ON CONFLICT DO NOTHING
+        """).bindparams(ids)
+    )
+
+
+def _carry_assignments(conn: sa.engine.Connection) -> None:
+    """Give the holders of a system role no preset made the preset role its name stands
+    for in the same scope, and a project's creator still on its roster its admin role."""
+    targets = {
+        (str(row.role_preset_id), str(row.scope_type), str(row.scope_id)): str(row.id)
+        for row in conn.execute(
+            sa.text(
+                "SELECT id, role_preset_id, scope_type, scope_id"
+                " FROM roles WHERE role_preset_id IS NOT NULL"
+            )
+        )
+    }
+    carried: list[dict[str, Any]] = []
+    for row in conn.execute(
+        sa.text(
+            "SELECT id, scope_type, scope_id, name"
+            " FROM roles WHERE role_preset_id IS NULL AND source = 'system'"
+        )
+    ):
         preset_id = _preset_for(str(row.scope_type), str(row.scope_id), str(row.name))
         if preset_id is None:
             continue
-        key = (preset_id, str(row.scope_type), str(row.scope_id))
-        if key in taken:
-            continue
-        taken.add(key)
-        linked.append({
-            "b_role_id": row.id,
-            "b_preset_id": preset_id,
-            "b_auto_assign": _AUTO_ASSIGN[preset_id],
-        })
-    if linked:
+        target = targets.get((preset_id, str(row.scope_type), str(row.scope_id)))
+        if target is not None:
+            carried.append({"old_role_id": str(row.id), "new_role_id": target})
+    if carried:
         conn.execute(
-            sa.text(
-                "UPDATE roles SET role_preset_id = CAST(:b_preset_id AS uuid) WHERE id = :b_role_id"
-            ),
-            linked,
+            sa.text("""
+                INSERT INTO user_roles (user_id, role_id)
+                SELECT user_id, CAST(:new_role_id AS uuid)
+                FROM user_roles
+                WHERE role_id = CAST(:old_role_id AS uuid)
+                ON CONFLICT (user_id, role_id) DO NOTHING
+            """),
+            carried,
         )
+    conn.execute(
+        sa.text("""
+            INSERT INTO user_roles (user_id, role_id)
+            SELECT g.creator_id, r.id
+            FROM groups g
+            JOIN association_groups_users agu
+                ON agu.group_id = g.id AND agu.user_id = g.creator_id
+            JOIN roles r
+                ON r.scope_type = 'project' AND r.scope_id = g.id
+                AND r.role_preset_id = CAST(:preset_id AS uuid)
+            ON CONFLICT (user_id, role_id) DO NOTHING
+        """).bindparams(preset_id=_PRESET_IDS["project_admin"])
+    )
 
 
 def _drop_unlinked_system_roles(conn: sa.engine.Connection) -> None:
@@ -928,7 +1059,7 @@ def _grant_auto_assign_roles(conn: sa.engine.Connection) -> None:
     Which users a project holds is the only part of a seed role's assignment a database
     still states for itself, so the roles a project hands out without being asked are
     the ones recoverable here. Who administers a project is not stated anywhere but the
-    assignment `_link_roles` kept.
+    assignments `_carry_assignments` passed on.
 
     The roster edge carries the membership: a role held without it reaches nothing."""
     pairs = conn.execute(
@@ -983,7 +1114,8 @@ def upgrade() -> None:
     _retire_names(conn)
     _sweep_unknown_types(conn)
     _write_presets(conn)
-    _link_roles(conn)
+    _create_seed_roles(conn)
+    _carry_assignments(conn)
     _drop_unlinked_system_roles(conn)
     _write_role_permissions(conn)
     _grant_auto_assign_roles(conn)

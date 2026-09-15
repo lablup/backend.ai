@@ -147,3 +147,76 @@ class TestPresetMapping:
         """A name the earlier migrations never wrote is not one of theirs, whatever it
         ends in."""
         assert migration._preset_for(scope_type, str(uuid.uuid4()), name) is None
+
+    @pytest.mark.parametrize(
+        ("scope_type", "name", "preset_name"),
+        [
+            ("domain", "domain-default-admin", "domain_admin"),
+            ("project", "project-{short}-admin", "project_admin"),
+            ("project", "project-{short}-member", "project_member"),
+            ("user", "user-{short}", "user_owner"),
+        ],
+    )
+    def test_the_runtime_names_map_to_their_preset(
+        self, migration: Any, scope_type: str, name: str, preset_name: str
+    ) -> None:
+        """The runtime named the roles it made before presets did."""
+        scope_id = str(uuid.uuid4())
+        preset_id = next(p.id for p in migration._PRESETS if p.name == preset_name)
+        assert (
+            migration._preset_for(scope_type, scope_id, name.format(short=scope_id[:8]))
+            == preset_id
+        )
+
+    @pytest.mark.parametrize(
+        ("scope_type", "name"),
+        [
+            ("project", "project-00000000-admin"),
+            ("user", "user-00000000"),
+            ("domain", "domain-default-member"),
+        ],
+    )
+    def test_a_runtime_name_of_another_scope_maps_to_nothing(
+        self, migration: Any, scope_type: str, name: str
+    ) -> None:
+        assert migration._preset_for(scope_type, str(uuid.uuid4()), name) is None
+
+
+class TestSeedRoleNaming:
+    """A role the migration creates is the fixture's row, so the fixture populates onto a
+    migrated database without skipping one."""
+
+    @pytest.fixture(scope="module")
+    def labels(self) -> dict[str, str]:
+        accounts = json.loads(
+            (_REPOSITORY / "fixtures/manager/example-users.json").read_text(encoding="utf-8")
+        )
+        return {domain["id"]: domain["name"] for domain in accounts["domains"]} | {
+            user["uuid"]: user["username"] for user in accounts["users"]
+        }
+
+    def test_the_names_and_ids_are_the_seed_s(
+        self, migration: Any, fixture: dict[str, Any], labels: dict[str, str]
+    ) -> None:
+        preset_names = {preset.id: preset.name for preset in migration._PRESETS}
+        for role in fixture["roles"]:
+            name = migration._seed_role_name(
+                role["scope_type"],
+                role["scope_id"],
+                labels.get(role["scope_id"], ""),
+                preset_names[role["role_preset_id"]],
+            )
+            identified = migration._identify("role", role["scope_type"], role["scope_id"], name)
+            assert (name, identified) == (role["name"], role["id"])
+
+    def test_the_role_nodes_are_the_seed_s(self, migration: Any, fixture: dict[str, Any]) -> None:
+        seeded = {
+            (row["entity_id"], row["id"])
+            for row in fixture["virtual_entities"]
+            if row["entity_type"] == "role"
+        }
+        written = {
+            (role["id"], migration._identify("virtual_entity", "role", role["id"]))
+            for role in fixture["roles"]
+        }
+        assert written == seeded
