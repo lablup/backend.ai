@@ -74,7 +74,7 @@ result = await metric_service.batch_get_kernel_live_stats(action)
 ### Prometheus Backend
 - The service connects to Prometheus via HTTP API
 - Endpoint configuration: `config.metric.address`
-- Time window for counter metrics: `config.metric.timewindow` (default: 5m) — the averaging window of the statistics queries; kernel live_stat reads counters with `irate()` and uses it only as the lookback for the last two samples
+- Default timewindow for rate calculations: `config.metric.timewindow` (default: 1m)
 
 ### Metric Types and Automatic Detection
 The service automatically determines metric types based on metric names:

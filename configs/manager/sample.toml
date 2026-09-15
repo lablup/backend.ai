@@ -900,12 +900,11 @@
   # agent metrics.
   # Added in 25.8.0
   addr = { host = "prometheus.backend.svc", port = 9090 }
-  # Time window for metric range vector queries in PromQL format. Statistics
-  # queries average counter metrics over this window, so '1h' means values are
-  # averaged over the past hour: shorter windows are more responsive but
-  # noisier, longer windows smooth out spikes but delay changes. Kernel
-  # live_stat only looks back this far for the last two samples, so the window
-  # must cover at least two scrape intervals.
+  # Time window for metric range vector queries in PromQL format. This parameter
+  # controls the lookback period when querying Prometheus for resource usage
+  # statistics. For example, '1h' means metrics are averaged over the past 1
+  # hour. Shorter windows provide more responsive metrics but may be noisier;
+  # longer windows smooth out spikes but delay detection of changes.
   # Added in 25.8.0
   timewindow = "1h"
 
