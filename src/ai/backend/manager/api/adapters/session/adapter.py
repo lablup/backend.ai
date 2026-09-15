@@ -9,8 +9,6 @@ from datetime import datetime, timedelta
 from decimal import Decimal
 from uuid import UUID
 
-import sqlalchemy as sa
-
 from ai.backend.common.contexts.user import current_user
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.kernel import KernelID
@@ -131,6 +129,7 @@ from ai.backend.manager.models.kernel.orders import (
 from ai.backend.manager.models.kernel.orders import (
     resolve_order as resolve_kernel_order,
 )
+from ai.backend.manager.models.kernel.searchers import KernelSearcher
 from ai.backend.manager.models.session.conditions import SessionConditions
 from ai.backend.manager.models.session.orders import (
     DEFAULT_BACKWARD_ORDER as SESSION_DEFAULT_BACKWARD_ORDER,
@@ -144,7 +143,6 @@ from ai.backend.manager.models.session.orders import (
 from ai.backend.manager.models.session.orders import (
     resolve_order as resolve_session_order,
 )
-from ai.backend.manager.models.session.row import SessionRow
 from ai.backend.manager.models.session.searchers import SessionSearcher
 from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.repositories.idle_checker.types import SessionIdleCheckPair
@@ -178,6 +176,10 @@ from ai.backend.manager.services.session.actions.get_container_logs import (
     GetContainerLogsAction,
 )
 from ai.backend.manager.services.session.actions.get_session import GetSessionAction
+from ai.backend.manager.services.session.actions.global_search import GlobalSearchSessionsAction
+from ai.backend.manager.services.session.actions.global_search_kernels import (
+    GlobalSearchKernelsAction,
+)
 from ai.backend.manager.services.session.actions.rename_session import RenameSessionAction
 from ai.backend.manager.services.session.actions.scoped_search import (
     DomainSessionScopeItem,
@@ -185,6 +187,9 @@ from ai.backend.manager.services.session.actions.scoped_search import (
     ScopedSearchSessionsAction,
     SessionScopeItem,
     UserSessionScopeItem,
+)
+from ai.backend.manager.services.session.actions.scoped_search_kernels import (
+    ScopedSearchKernelsAction,
 )
 from ai.backend.manager.services.session.actions.search import SearchSessionsAction
 from ai.backend.manager.services.session.actions.search_kernel import SearchKernelsAction
@@ -648,13 +653,14 @@ class SessionAdapter(BaseAdapter):
         agent_id: AgentId,
         input: AdminSearchSessionsInput,
     ) -> AdminSearchSessionsPayload:
-        """Search sessions scoped to a specific agent."""
-        conditions = self._convert_session_filter(input.filter) if input.filter else []
-        orders = self._convert_session_orders(input.order) if input.order else []
-        scope_condition = SessionConditions.by_agent_id(agent_id)
-        querier = self._build_querier(
-            conditions=conditions,
-            orders=orders,
+        """Search the sessions with a kernel on a specific agent (superadmin)."""
+        searcher = self._build_searcher(
+            SessionSearcher,
+            conditions=[
+                SessionConditions.by_agent_id(agent_id),
+                *(self._convert_session_filter(input.filter) if input.filter else []),
+            ],
+            orders=self._convert_session_orders(input.order) if input.order else [],
             pagination_spec=_SESSION_PAGINATION_SPEC,
             first=input.first,
             after=input.after,
@@ -662,15 +668,15 @@ class SessionAdapter(BaseAdapter):
             before=input.before,
             limit=input.limit,
             offset=input.offset,
-            base_conditions=[scope_condition],
         )
-
-        action_result = await self._session.search_sessions.run(
-            SearchSessionsAction(querier=querier, user_id=UserID(self._require_user_id()))
+        action_result = await self._session.global_search.run(
+            GlobalSearchSessionsAction(searcher=searcher)
         )
 
         return AdminSearchSessionsPayload(
-            items=await self._session_data_to_nodes(action_result.data),
+            items=await self._session_data_to_nodes([
+                item.to_session_data() for item in action_result.items
+            ]),
             total_count=action_result.total_count,
             has_next_page=action_result.has_next_page,
             has_previous_page=action_result.has_previous_page,
@@ -678,33 +684,16 @@ class SessionAdapter(BaseAdapter):
 
     async def my_search(self, input: AdminSearchSessionsInput) -> AdminSearchSessionsPayload:
         """Search sessions owned by the current user."""
-        user = current_user()
-        if user is None:
-            raise RuntimeError("No authenticated user in context")
-
-        conditions = self._convert_session_filter(input.filter) if input.filter else []
-        orders = self._convert_session_orders(input.order) if input.order else []
-
-        def _by_user_uuid() -> sa.sql.expression.ColumnElement[bool]:
-            return SessionRow.user_uuid == user.user_id
-
-        querier = self._build_querier(
-            conditions=conditions,
-            orders=orders,
-            pagination_spec=_SESSION_PAGINATION_SPEC,
-            first=input.first,
-            after=input.after,
-            last=input.last,
-            before=input.before,
-            limit=input.limit,
-            offset=input.offset,
-            base_conditions=[_by_user_uuid],
-        )
-        action_result = await self._session.search_sessions.run(
-            SearchSessionsAction(querier=querier, user_id=UserID(user.user_id))
+        action_result = await self._session.scoped_search.run(
+            ScopedSearchSessionsAction(
+                items=[UserSessionScopeItem(user_id=UserID(self._require_user_id()))],
+                searcher=self._build_session_searcher(input),
+            )
         )
         return AdminSearchSessionsPayload(
-            items=await self._session_data_to_nodes(action_result.data),
+            items=await self._session_data_to_nodes([
+                item.to_session_data() for item in action_result.items
+            ]),
             total_count=action_result.total_count,
             has_next_page=action_result.has_next_page,
             has_previous_page=action_result.has_previous_page,
@@ -797,33 +786,7 @@ class SessionAdapter(BaseAdapter):
         self, project_id: UUID, input: AdminSearchSessionsInput
     ) -> AdminSearchSessionsPayload:
         """Search sessions within a specific project."""
-        conditions = self._convert_session_filter(input.filter) if input.filter else []
-        orders = self._convert_session_orders(input.order) if input.order else []
-
-        def _by_project_id() -> sa.sql.expression.ColumnElement[bool]:
-            return SessionRow.group_id == project_id
-
-        querier = self._build_querier(
-            conditions=conditions,
-            orders=orders,
-            pagination_spec=_SESSION_PAGINATION_SPEC,
-            first=input.first,
-            after=input.after,
-            last=input.last,
-            before=input.before,
-            limit=input.limit,
-            offset=input.offset,
-            base_conditions=[_by_project_id],
-        )
-        action_result = await self._session.search_sessions.run(
-            SearchSessionsAction(querier=querier, user_id=UserID(self._require_user_id()))
-        )
-        return AdminSearchSessionsPayload(
-            items=await self._session_data_to_nodes(action_result.data),
-            total_count=action_result.total_count,
-            has_next_page=action_result.has_next_page,
-            has_previous_page=action_result.has_previous_page,
-        )
+        return await self.gql_search_by_project(ProjectID(project_id), input)
 
     def _convert_session_filter(self, f: SessionFilter) -> list[QueryCondition]:
         conditions: list[QueryCondition] = []
@@ -966,29 +929,17 @@ class SessionAdapter(BaseAdapter):
         agent_id: AgentId,
         input: AdminSearchKernelsInput,
     ) -> AdminSearchKernelsPayload:
-        """Search kernels scoped to a specific agent."""
-        conditions = self._convert_kernel_filter(input.filter) if input.filter else []
-        orders = self._convert_kernel_orders(input.order) if input.order else []
-        scope_condition = KernelConditions.by_agent_id(agent_id)
-        querier = self._build_querier(
-            conditions=conditions,
-            orders=orders,
-            pagination_spec=_KERNEL_PAGINATION_SPEC,
-            first=input.first,
-            after=input.after,
-            last=input.last,
-            before=input.before,
-            limit=input.limit,
-            offset=input.offset,
-            base_conditions=[scope_condition],
-        )
-
-        action_result = await self._session.search_kernels.run(
-            SearchKernelsAction(querier=querier, user_id=UserID(self._require_user_id()))
+        """Search the kernels on a specific agent (superadmin)."""
+        action_result = await self._session.global_search_kernels.run(
+            GlobalSearchKernelsAction(
+                searcher=self._build_kernel_searcher(
+                    input, base_condition=KernelConditions.by_agent_id(agent_id)
+                )
+            )
         )
 
         return AdminSearchKernelsPayload(
-            items=await self._kernel_infos_to_nodes(action_result.data),
+            items=await self._kernel_infos_to_nodes(action_result.items),
             total_count=action_result.total_count,
             has_next_page=action_result.has_next_page,
             has_previous_page=action_result.has_previous_page,
@@ -999,13 +950,33 @@ class SessionAdapter(BaseAdapter):
         session_id: SessionId,
         input: AdminSearchKernelsInput,
     ) -> AdminSearchKernelsPayload:
-        """Search kernels scoped to a specific session."""
-        conditions = self._convert_kernel_filter(input.filter) if input.filter else []
-        orders = self._convert_kernel_orders(input.order) if input.order else []
-        scope_condition = KernelConditions.by_session_ids([session_id])
-        querier = self._build_querier(
+        """Search the kernels of a specific session, authorized on that session."""
+        action_result = await self._session.scoped_search_kernels.run(
+            ScopedSearchKernelsAction(
+                session_ids=[SessionID(session_id)],
+                searcher=self._build_kernel_searcher(input),
+            )
+        )
+
+        return AdminSearchKernelsPayload(
+            items=await self._kernel_infos_to_nodes(action_result.items),
+            total_count=action_result.total_count,
+            has_next_page=action_result.has_next_page,
+            has_previous_page=action_result.has_previous_page,
+        )
+
+    def _build_kernel_searcher(
+        self,
+        input: AdminSearchKernelsInput,
+        base_condition: QueryCondition | None = None,
+    ) -> KernelSearcher:
+        conditions = [base_condition] if base_condition is not None else []
+        if input.filter:
+            conditions.extend(self._convert_kernel_filter(input.filter))
+        return self._build_searcher(
+            KernelSearcher,
             conditions=conditions,
-            orders=orders,
+            orders=self._convert_kernel_orders(input.order) if input.order else [],
             pagination_spec=_KERNEL_PAGINATION_SPEC,
             first=input.first,
             after=input.after,
@@ -1013,18 +984,6 @@ class SessionAdapter(BaseAdapter):
             before=input.before,
             limit=input.limit,
             offset=input.offset,
-            base_conditions=[scope_condition],
-        )
-
-        action_result = await self._session.search_kernels.run(
-            SearchKernelsAction(querier=querier, user_id=UserID(self._require_user_id()))
-        )
-
-        return AdminSearchKernelsPayload(
-            items=await self._kernel_infos_to_nodes(action_result.data),
-            total_count=action_result.total_count,
-            has_next_page=action_result.has_next_page,
-            has_previous_page=action_result.has_previous_page,
         )
 
     def _convert_kernel_filter(self, f: KernelFilter) -> list[QueryCondition]:
