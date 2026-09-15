@@ -143,37 +143,31 @@ class KernelConditions:
 
     @staticmethod
     def by_cursor_forward(cursor_id: str) -> QueryCondition:
-        """Rows after the cursor row in ``(created_at DESC, id ASC)`` order."""
+        """Cursor condition for forward pagination (after cursor).
+
+        Uses subquery to get created_at of the cursor row and compare.
+        """
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            cursor_created_at = (
+            subquery = (
                 sa.select(KernelRow.created_at).where(KernelRow.id == cursor_id).scalar_subquery()
             )
-            return sa.or_(
-                KernelRow.created_at < cursor_created_at,
-                sa.and_(
-                    KernelRow.created_at == cursor_created_at,
-                    KernelRow.id > cursor_id,
-                ),
-            )
+            return KernelRow.created_at < subquery
 
         return inner
 
     @staticmethod
     def by_cursor_backward(cursor_id: str) -> QueryCondition:
-        """Rows before the cursor row in ``(created_at DESC, id ASC)`` order."""
+        """Cursor condition for backward pagination (before cursor).
+
+        Uses subquery to get created_at of the cursor row and compare.
+        """
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            cursor_created_at = (
+            subquery = (
                 sa.select(KernelRow.created_at).where(KernelRow.id == cursor_id).scalar_subquery()
             )
-            return sa.or_(
-                KernelRow.created_at > cursor_created_at,
-                sa.and_(
-                    KernelRow.created_at == cursor_created_at,
-                    KernelRow.id < cursor_id,
-                ),
-            )
+            return KernelRow.created_at > subquery
 
         return inner
 

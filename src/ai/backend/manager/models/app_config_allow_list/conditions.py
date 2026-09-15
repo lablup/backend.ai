@@ -113,43 +113,37 @@ class AppConfigAllowListConditions:
 
     @staticmethod
     def by_cursor_forward(cursor_id: str) -> QueryCondition:
-        """Rows after the cursor row in ``(created_at DESC, id ASC)`` order."""
+        """Cursor condition for forward pagination (after cursor).
+
+        Uses subquery to get created_at of the cursor row and compare.
+        """
         cursor_uuid = uuid.UUID(cursor_id)
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            cursor_created_at = (
+            subquery = (
                 sa.select(AppConfigAllowListRow.created_at)
                 .where(AppConfigAllowListRow.id == cursor_uuid)
                 .scalar_subquery()
             )
-            return sa.or_(
-                AppConfigAllowListRow.created_at < cursor_created_at,
-                sa.and_(
-                    AppConfigAllowListRow.created_at == cursor_created_at,
-                    AppConfigAllowListRow.id > cursor_uuid,
-                ),
-            )
+            return AppConfigAllowListRow.created_at < subquery
 
         return inner
 
     @staticmethod
     def by_cursor_backward(cursor_id: str) -> QueryCondition:
-        """Rows before the cursor row in ``(created_at DESC, id ASC)`` order."""
+        """Cursor condition for backward pagination (before cursor).
+
+        Uses subquery to get created_at of the cursor row and compare.
+        """
         cursor_uuid = uuid.UUID(cursor_id)
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            cursor_created_at = (
+            subquery = (
                 sa.select(AppConfigAllowListRow.created_at)
                 .where(AppConfigAllowListRow.id == cursor_uuid)
                 .scalar_subquery()
             )
-            return sa.or_(
-                AppConfigAllowListRow.created_at > cursor_created_at,
-                sa.and_(
-                    AppConfigAllowListRow.created_at == cursor_created_at,
-                    AppConfigAllowListRow.id < cursor_uuid,
-                ),
-            )
+            return AppConfigAllowListRow.created_at > subquery
 
         return inner
 

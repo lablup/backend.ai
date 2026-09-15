@@ -170,36 +170,30 @@ class AgentConditions:
 
     @staticmethod
     def by_cursor_forward(cursor_id: str) -> QueryCondition:
-        """Rows after the cursor row in ``(first_contact DESC, id ASC)`` order."""
+        """Cursor condition for forward pagination (after cursor).
+
+        Uses subquery to get first_contact of the cursor row and compare.
+        """
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            cursor_first_contact = (
+            subquery = (
                 sa.select(AgentRow.first_contact).where(AgentRow.id == cursor_id).scalar_subquery()
             )
-            return sa.or_(
-                AgentRow.first_contact < cursor_first_contact,
-                sa.and_(
-                    AgentRow.first_contact == cursor_first_contact,
-                    AgentRow.id > cursor_id,
-                ),
-            )
+            return AgentRow.first_contact < subquery
 
         return inner
 
     @staticmethod
     def by_cursor_backward(cursor_id: str) -> QueryCondition:
-        """Rows before the cursor row in ``(first_contact DESC, id ASC)`` order."""
+        """Cursor condition for backward pagination (before cursor).
+
+        Uses subquery to get first_contact of the cursor row and compare.
+        """
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            cursor_first_contact = (
+            subquery = (
                 sa.select(AgentRow.first_contact).where(AgentRow.id == cursor_id).scalar_subquery()
             )
-            return sa.or_(
-                AgentRow.first_contact > cursor_first_contact,
-                sa.and_(
-                    AgentRow.first_contact == cursor_first_contact,
-                    AgentRow.id < cursor_id,
-                ),
-            )
+            return AgentRow.first_contact > subquery
 
         return inner

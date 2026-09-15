@@ -325,43 +325,31 @@ class SessionSchedulingHistoryConditions:
 
     @staticmethod
     def by_cursor_forward(cursor_id: str) -> QueryCondition:
-        """Rows after the cursor row in ``(created_at DESC, id ASC)`` order."""
+        """Cursor condition for forward pagination (after cursor)."""
         cursor_uuid = uuid.UUID(cursor_id)
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            cursor_created_at = (
+            subquery = (
                 sa.select(SessionSchedulingHistoryRow.created_at)
                 .where(SessionSchedulingHistoryRow.id == cursor_uuid)
                 .scalar_subquery()
             )
-            return sa.or_(
-                SessionSchedulingHistoryRow.created_at < cursor_created_at,
-                sa.and_(
-                    SessionSchedulingHistoryRow.created_at == cursor_created_at,
-                    SessionSchedulingHistoryRow.id > cursor_uuid,
-                ),
-            )
+            return SessionSchedulingHistoryRow.created_at < subquery
 
         return inner
 
     @staticmethod
     def by_cursor_backward(cursor_id: str) -> QueryCondition:
-        """Rows before the cursor row in ``(created_at DESC, id ASC)`` order."""
+        """Cursor condition for backward pagination (before cursor)."""
         cursor_uuid = uuid.UUID(cursor_id)
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            cursor_created_at = (
+            subquery = (
                 sa.select(SessionSchedulingHistoryRow.created_at)
                 .where(SessionSchedulingHistoryRow.id == cursor_uuid)
                 .scalar_subquery()
             )
-            return sa.or_(
-                SessionSchedulingHistoryRow.created_at > cursor_created_at,
-                sa.and_(
-                    SessionSchedulingHistoryRow.created_at == cursor_created_at,
-                    SessionSchedulingHistoryRow.id < cursor_uuid,
-                ),
-            )
+            return SessionSchedulingHistoryRow.created_at > subquery
 
         return inner
 
@@ -699,43 +687,31 @@ class KernelSchedulingHistoryConditions:
 
     @staticmethod
     def by_cursor_forward(cursor_id: str) -> QueryCondition:
-        """Rows after the cursor row in ``(created_at DESC, id ASC)`` order."""
+        """Cursor condition for forward pagination (after cursor)."""
         cursor_uuid = uuid.UUID(cursor_id)
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            cursor_created_at = (
+            subquery = (
                 sa.select(KernelSchedulingHistoryRow.created_at)
                 .where(KernelSchedulingHistoryRow.id == cursor_uuid)
                 .scalar_subquery()
             )
-            return sa.or_(
-                KernelSchedulingHistoryRow.created_at < cursor_created_at,
-                sa.and_(
-                    KernelSchedulingHistoryRow.created_at == cursor_created_at,
-                    KernelSchedulingHistoryRow.id > cursor_uuid,
-                ),
-            )
+            return KernelSchedulingHistoryRow.created_at < subquery
 
         return inner
 
     @staticmethod
     def by_cursor_backward(cursor_id: str) -> QueryCondition:
-        """Rows before the cursor row in ``(created_at DESC, id ASC)`` order."""
+        """Cursor condition for backward pagination (before cursor)."""
         cursor_uuid = uuid.UUID(cursor_id)
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            cursor_created_at = (
+            subquery = (
                 sa.select(KernelSchedulingHistoryRow.created_at)
                 .where(KernelSchedulingHistoryRow.id == cursor_uuid)
                 .scalar_subquery()
             )
-            return sa.or_(
-                KernelSchedulingHistoryRow.created_at > cursor_created_at,
-                sa.and_(
-                    KernelSchedulingHistoryRow.created_at == cursor_created_at,
-                    KernelSchedulingHistoryRow.id < cursor_uuid,
-                ),
-            )
+            return KernelSchedulingHistoryRow.created_at > subquery
 
         return inner
 
@@ -1068,43 +1044,31 @@ class DeploymentHistoryConditions:
 
     @staticmethod
     def by_cursor_forward(cursor_id: str) -> QueryCondition:
-        """Rows after the cursor row in ``(created_at DESC, id ASC)`` order."""
+        """Cursor condition for forward pagination (after cursor)."""
         cursor_uuid = uuid.UUID(cursor_id)
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            cursor_created_at = (
+            subquery = (
                 sa.select(DeploymentHistoryRow.created_at)
                 .where(DeploymentHistoryRow.id == cursor_uuid)
                 .scalar_subquery()
             )
-            return sa.or_(
-                DeploymentHistoryRow.created_at < cursor_created_at,
-                sa.and_(
-                    DeploymentHistoryRow.created_at == cursor_created_at,
-                    DeploymentHistoryRow.id > cursor_uuid,
-                ),
-            )
+            return DeploymentHistoryRow.created_at < subquery
 
         return inner
 
     @staticmethod
     def by_cursor_backward(cursor_id: str) -> QueryCondition:
-        """Rows before the cursor row in ``(created_at DESC, id ASC)`` order."""
+        """Cursor condition for backward pagination (before cursor)."""
         cursor_uuid = uuid.UUID(cursor_id)
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            cursor_created_at = (
+            subquery = (
                 sa.select(DeploymentHistoryRow.created_at)
                 .where(DeploymentHistoryRow.id == cursor_uuid)
                 .scalar_subquery()
             )
-            return sa.or_(
-                DeploymentHistoryRow.created_at > cursor_created_at,
-                sa.and_(
-                    DeploymentHistoryRow.created_at == cursor_created_at,
-                    DeploymentHistoryRow.id < cursor_uuid,
-                ),
-            )
+            return DeploymentHistoryRow.created_at > subquery
 
         return inner
 
@@ -1481,43 +1445,31 @@ class RouteHistoryConditions:
 
     @staticmethod
     def by_cursor_forward(cursor_id: str) -> QueryCondition:
-        """Rows after the cursor row in ``(created_at DESC, id ASC)`` order."""
+        """Cursor condition for forward pagination (after cursor)."""
         cursor_uuid = uuid.UUID(cursor_id)
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            cursor_created_at = (
+            subquery = (
                 sa.select(RouteHistoryRow.created_at)
                 .where(RouteHistoryRow.id == cursor_uuid)
                 .scalar_subquery()
             )
-            return sa.or_(
-                RouteHistoryRow.created_at < cursor_created_at,
-                sa.and_(
-                    RouteHistoryRow.created_at == cursor_created_at,
-                    RouteHistoryRow.id > cursor_uuid,
-                ),
-            )
+            return RouteHistoryRow.created_at < subquery
 
         return inner
 
     @staticmethod
     def by_cursor_backward(cursor_id: str) -> QueryCondition:
-        """Rows before the cursor row in ``(created_at DESC, id ASC)`` order."""
+        """Cursor condition for backward pagination (before cursor)."""
         cursor_uuid = uuid.UUID(cursor_id)
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            cursor_created_at = (
+            subquery = (
                 sa.select(RouteHistoryRow.created_at)
                 .where(RouteHistoryRow.id == cursor_uuid)
                 .scalar_subquery()
             )
-            return sa.or_(
-                RouteHistoryRow.created_at > cursor_created_at,
-                sa.and_(
-                    RouteHistoryRow.created_at == cursor_created_at,
-                    RouteHistoryRow.id < cursor_uuid,
-                ),
-            )
+            return RouteHistoryRow.created_at > subquery
 
         return inner
 

@@ -319,41 +319,25 @@ class AuditLogConditions:
 
     @staticmethod
     def by_cursor_forward(cursor_id: str) -> QueryCondition:
-        """Rows after the cursor row in ``(created_at DESC, id ASC)`` order."""
-
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            cursor_created_at = (
+            subquery = (
                 sa.select(AuditLogRow.created_at)
                 .where(AuditLogRow.id == cursor_id)
                 .scalar_subquery()
             )
-            return sa.or_(
-                AuditLogRow.created_at < cursor_created_at,
-                sa.and_(
-                    AuditLogRow.created_at == cursor_created_at,
-                    AuditLogRow.id > cursor_id,
-                ),
-            )
+            return AuditLogRow.created_at < subquery
 
         return inner
 
     @staticmethod
     def by_cursor_backward(cursor_id: str) -> QueryCondition:
-        """Rows before the cursor row in ``(created_at DESC, id ASC)`` order."""
-
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            cursor_created_at = (
+            subquery = (
                 sa.select(AuditLogRow.created_at)
                 .where(AuditLogRow.id == cursor_id)
                 .scalar_subquery()
             )
-            return sa.or_(
-                AuditLogRow.created_at > cursor_created_at,
-                sa.and_(
-                    AuditLogRow.created_at == cursor_created_at,
-                    AuditLogRow.id < cursor_id,
-                ),
-            )
+            return AuditLogRow.created_at > subquery
 
         return inner
 

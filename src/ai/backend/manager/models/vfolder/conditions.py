@@ -260,36 +260,20 @@ class VFolderConditions:
 
     @staticmethod
     def by_cursor_forward(cursor_id: str) -> QueryCondition:
-        """Rows after the cursor row in ``(created_at DESC, id ASC)`` order."""
-
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            cursor_created_at = (
+            subquery = (
                 sa.select(VFolderRow.created_at).where(VFolderRow.id == cursor_id).scalar_subquery()
             )
-            return sa.or_(
-                VFolderRow.created_at < cursor_created_at,
-                sa.and_(
-                    VFolderRow.created_at == cursor_created_at,
-                    VFolderRow.id > cursor_id,
-                ),
-            )
+            return VFolderRow.created_at < subquery
 
         return inner
 
     @staticmethod
     def by_cursor_backward(cursor_id: str) -> QueryCondition:
-        """Rows before the cursor row in ``(created_at DESC, id ASC)`` order."""
-
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            cursor_created_at = (
+            subquery = (
                 sa.select(VFolderRow.created_at).where(VFolderRow.id == cursor_id).scalar_subquery()
             )
-            return sa.or_(
-                VFolderRow.created_at > cursor_created_at,
-                sa.and_(
-                    VFolderRow.created_at == cursor_created_at,
-                    VFolderRow.id < cursor_id,
-                ),
-            )
+            return VFolderRow.created_at > subquery
 
         return inner

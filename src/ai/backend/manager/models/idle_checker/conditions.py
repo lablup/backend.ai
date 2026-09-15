@@ -141,7 +141,6 @@ class IdleCheckerConditions:
 
     @staticmethod
     def by_cursor_forward(cursor_id: str) -> QueryCondition:
-        """Rows after the cursor row in ``(created_at DESC, id ASC)`` order."""
         cursor_uuid = IdleCheckerID(UUID(cursor_id))
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
@@ -150,19 +149,12 @@ class IdleCheckerConditions:
                 .where(IdleCheckerRow.id == cursor_uuid)
                 .scalar_subquery()
             )
-            return sa.or_(
-                IdleCheckerRow.created_at < cursor_created_at,
-                sa.and_(
-                    IdleCheckerRow.created_at == cursor_created_at,
-                    IdleCheckerRow.id > cursor_uuid,
-                ),
-            )
+            return IdleCheckerRow.created_at < cursor_created_at
 
         return inner
 
     @staticmethod
     def by_cursor_backward(cursor_id: str) -> QueryCondition:
-        """Rows before the cursor row in ``(created_at DESC, id ASC)`` order."""
         cursor_uuid = IdleCheckerID(UUID(cursor_id))
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
@@ -171,13 +163,7 @@ class IdleCheckerConditions:
                 .where(IdleCheckerRow.id == cursor_uuid)
                 .scalar_subquery()
             )
-            return sa.or_(
-                IdleCheckerRow.created_at > cursor_created_at,
-                sa.and_(
-                    IdleCheckerRow.created_at == cursor_created_at,
-                    IdleCheckerRow.id < cursor_uuid,
-                ),
-            )
+            return IdleCheckerRow.created_at > cursor_created_at
 
         return inner
 
@@ -302,7 +288,6 @@ class IdleCheckerAssignmentConditions:
 
     @staticmethod
     def by_cursor_forward(cursor_id: str) -> QueryCondition:
-        """Rows after the cursor row in ``(created_at DESC, id ASC)`` order."""
         cursor_uuid = UUID(cursor_id)
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
@@ -311,19 +296,12 @@ class IdleCheckerAssignmentConditions:
                 .where(IdleCheckerBindingRow.id == cursor_uuid)
                 .scalar_subquery()
             )
-            return sa.or_(
-                IdleCheckerBindingRow.created_at < cursor_created_at,
-                sa.and_(
-                    IdleCheckerBindingRow.created_at == cursor_created_at,
-                    IdleCheckerBindingRow.id > cursor_uuid,
-                ),
-            )
+            return IdleCheckerBindingRow.created_at < cursor_created_at
 
         return inner
 
     @staticmethod
     def by_cursor_backward(cursor_id: str) -> QueryCondition:
-        """Rows before the cursor row in ``(created_at DESC, id ASC)`` order."""
         cursor_uuid = UUID(cursor_id)
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
@@ -332,13 +310,7 @@ class IdleCheckerAssignmentConditions:
                 .where(IdleCheckerBindingRow.id == cursor_uuid)
                 .scalar_subquery()
             )
-            return sa.or_(
-                IdleCheckerBindingRow.created_at > cursor_created_at,
-                sa.and_(
-                    IdleCheckerBindingRow.created_at == cursor_created_at,
-                    IdleCheckerBindingRow.id < cursor_uuid,
-                ),
-            )
+            return IdleCheckerBindingRow.created_at > cursor_created_at
 
         return inner
 

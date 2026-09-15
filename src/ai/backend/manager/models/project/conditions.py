@@ -290,37 +290,31 @@ class ProjectConditions:
 
     @staticmethod
     def by_cursor_forward(cursor_id: UUID) -> QueryCondition:
-        """Rows after the cursor row in ``(created_at DESC, id ASC)`` order."""
+        """Cursor condition for forward pagination (after cursor).
+
+        Uses subquery to get created_at of the cursor row and compare.
+        """
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            cursor_created_at = (
+            subquery = (
                 sa.select(ProjectRow.created_at).where(ProjectRow.id == cursor_id).scalar_subquery()
             )
-            return sa.or_(
-                ProjectRow.created_at < cursor_created_at,
-                sa.and_(
-                    ProjectRow.created_at == cursor_created_at,
-                    ProjectRow.id > cursor_id,
-                ),
-            )
+            return ProjectRow.created_at < subquery
 
         return inner
 
     @staticmethod
     def by_cursor_backward(cursor_id: UUID) -> QueryCondition:
-        """Rows before the cursor row in ``(created_at DESC, id ASC)`` order."""
+        """Cursor condition for backward pagination (before cursor).
+
+        Uses subquery to get created_at of the cursor row and compare.
+        """
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            cursor_created_at = (
+            subquery = (
                 sa.select(ProjectRow.created_at).where(ProjectRow.id == cursor_id).scalar_subquery()
             )
-            return sa.or_(
-                ProjectRow.created_at > cursor_created_at,
-                sa.and_(
-                    ProjectRow.created_at == cursor_created_at,
-                    ProjectRow.id < cursor_id,
-                ),
-            )
+            return ProjectRow.created_at > subquery
 
         return inner
 

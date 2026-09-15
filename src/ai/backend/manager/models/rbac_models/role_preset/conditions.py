@@ -87,42 +87,40 @@ class RolePresetConditions:
 
     @staticmethod
     def by_cursor_forward(cursor_id: str) -> QueryCondition:
-        """Rows after the cursor row in ``(created_at DESC, id ASC)`` order."""
+        """Cursor condition for forward pagination (after cursor).
+
+        Reads the cursor row's ``created_at`` and compares against that, because ``created_at`` is what
+        the page is ordered by — comparing ids would draw the page boundary on a column the
+        result is not sorted by.
+        """
         cursor_uuid = uuid.UUID(cursor_id)
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            cursor_created_at = (
+            subquery = (
                 sa.select(RolePresetRow.created_at)
                 .where(RolePresetRow.id == cursor_uuid)
                 .scalar_subquery()
             )
-            return sa.or_(
-                RolePresetRow.created_at < cursor_created_at,
-                sa.and_(
-                    RolePresetRow.created_at == cursor_created_at,
-                    RolePresetRow.id > cursor_uuid,
-                ),
-            )
+            return RolePresetRow.created_at < subquery
 
         return inner
 
     @staticmethod
     def by_cursor_backward(cursor_id: str) -> QueryCondition:
-        """Rows before the cursor row in ``(created_at DESC, id ASC)`` order."""
+        """Cursor condition for backward pagination (before cursor).
+
+        Reads the cursor row's ``created_at`` and compares against that, because ``created_at`` is what
+        the page is ordered by — comparing ids would draw the page boundary on a column the
+        result is not sorted by.
+        """
         cursor_uuid = uuid.UUID(cursor_id)
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            cursor_created_at = (
+            subquery = (
                 sa.select(RolePresetRow.created_at)
                 .where(RolePresetRow.id == cursor_uuid)
                 .scalar_subquery()
             )
-            return sa.or_(
-                RolePresetRow.created_at > cursor_created_at,
-                sa.and_(
-                    RolePresetRow.created_at == cursor_created_at,
-                    RolePresetRow.id < cursor_uuid,
-                ),
-            )
+            return RolePresetRow.created_at > subquery
 
         return inner

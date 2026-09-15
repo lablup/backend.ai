@@ -83,42 +83,28 @@ class PrometheusQueryPresetCategoryConditions:
 
     @staticmethod
     def by_cursor_forward(cursor_id: str) -> QueryCondition:
-        """Rows after the cursor row in ``(created_at DESC, id ASC)`` order."""
         cursor_uuid = uuid.UUID(cursor_id)
 
         def inner() -> sa.ColumnElement[bool]:
-            cursor_created_at = (
+            subquery = (
                 sa.select(PrometheusQueryPresetCategoryRow.created_at)
                 .where(PrometheusQueryPresetCategoryRow.id == cursor_uuid)
                 .scalar_subquery()
             )
-            return sa.or_(
-                PrometheusQueryPresetCategoryRow.created_at < cursor_created_at,
-                sa.and_(
-                    PrometheusQueryPresetCategoryRow.created_at == cursor_created_at,
-                    PrometheusQueryPresetCategoryRow.id > cursor_uuid,
-                ),
-            )
+            return PrometheusQueryPresetCategoryRow.created_at < subquery
 
         return inner
 
     @staticmethod
     def by_cursor_backward(cursor_id: str) -> QueryCondition:
-        """Rows before the cursor row in ``(created_at DESC, id ASC)`` order."""
         cursor_uuid = uuid.UUID(cursor_id)
 
         def inner() -> sa.ColumnElement[bool]:
-            cursor_created_at = (
+            subquery = (
                 sa.select(PrometheusQueryPresetCategoryRow.created_at)
                 .where(PrometheusQueryPresetCategoryRow.id == cursor_uuid)
                 .scalar_subquery()
             )
-            return sa.or_(
-                PrometheusQueryPresetCategoryRow.created_at > cursor_created_at,
-                sa.and_(
-                    PrometheusQueryPresetCategoryRow.created_at == cursor_created_at,
-                    PrometheusQueryPresetCategoryRow.id < cursor_uuid,
-                ),
-            )
+            return PrometheusQueryPresetCategoryRow.created_at > subquery
 
         return inner
