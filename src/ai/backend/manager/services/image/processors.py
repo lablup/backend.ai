@@ -61,6 +61,10 @@ from ai.backend.manager.services.image.actions.purge_images import (
     PurgeImagesAction,
     PurgeImagesActionResult,
 )
+from ai.backend.manager.services.image.actions.rescan_image import (
+    GlobalRescanImageAction,
+    GlobalRescanImageActionResult,
+)
 from ai.backend.manager.services.image.actions.restore_image import (
     RestoreImageByIdAction,
     RestoreImageByIdActionResult,
@@ -106,6 +110,9 @@ from .service import ImageService
 
 
 class ImageProcessors:
+    global_rescan_image: GlobalActionProcessor[
+        GlobalRescanImageAction, GlobalRescanImageActionResult
+    ]
     forget_image: GlobalActionProcessor[ForgetImageAction, ForgetImageActionResult]
     forget_image_by_id: SingleEntityActionProcessor[
         ForgetImageByIdAction, ForgetImageByIdActionResult
@@ -209,6 +216,7 @@ class ImageProcessors:
         self.untag_image_from_registry = group.global_scope(
             UntagImageFromRegistryAction, service.untag_image_from_registry
         )
+        self.global_rescan_image = group.global_scope(GlobalRescanImageAction, service.rescan_image)
         self.scan_image = group.global_scope(ScanImageAction, service.scan_image)
         self.purge_image = group.global_scope(PurgeImageAction, service.purge_image)
         self.purge_images = group.global_scope(PurgeImagesAction, service.purge_images)

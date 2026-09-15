@@ -12973,6 +12973,11 @@ type Mutation
   delete_network(network: String!): DeleteNetwork @join__field(graph: GRAPHENE)
 
   """
+  Added in 26.9.0. Rescan one image tag and return the requested architecture, including images not yet registered (superadmin only).
+  """
+  adminRescanImage(input: RescanImagesInput!): RescanImagesPayload @join__field(graph: STRAWBERRY)
+
+  """
   Added in 26.8.0. Change the resource group of an agent (superadmin only). Sessions still running on the agent under the old resource group are cleaned up per the given policy; without force, the change is rejected with a conflict error when such sessions exist.
   """
   adminUpdateAgentResourceGroup(input: UpdateAgentResourceGroupInput!): UpdateAgentResourceGroupPayload @join__field(graph: STRAWBERRY)
@@ -17871,6 +17876,29 @@ type RescanImages
   ok: Boolean
   msg: String
   task_id: UUID
+}
+
+"""
+Added in 26.9.0. Input for rescanning one image tag and selecting its architecture.
+"""
+input RescanImagesInput
+  @join__type(graph: STRAWBERRY)
+{
+  """
+  Image canonical name to rescan. Defaults to latest when the tag is omitted.
+  """
+  canonical: String!
+
+  """Image architecture to return."""
+  architecture: String!
+}
+
+"""Added in 26.9.0. Rescanned image matching the requested architecture."""
+type RescanImagesPayload
+  @join__type(graph: STRAWBERRY)
+{
+  """Rescanned image matching the requested architecture."""
+  item: ImageV2!
 }
 
 """Added in 25.14.0. Reservoir registry node."""

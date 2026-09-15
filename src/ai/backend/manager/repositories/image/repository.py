@@ -259,6 +259,10 @@ class ImageRepository:
         return await self._db_source.remove_image_alias(alias)
 
     @image_repository_resilience.apply()
+    async def rescan_image(self, canonical: str, architecture: str) -> ImageData:
+        return await self._db_source.rescan_image(canonical, architecture)
+
+    @image_repository_resilience.apply()
     async def scan_image_by_identifier(
         self, image_canonical: str, architecture: str
     ) -> RescanImagesResult:

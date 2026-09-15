@@ -23,8 +23,10 @@ from ai.backend.common.types import ImageID
 from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
+    gql_mutation,
     gql_root_field,
 )
+from ai.backend.manager.api.gql.image.mutations import RescanImagesInputGQL, RescanImagesPayloadGQL
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.utils import check_admin_only
 from ai.backend.manager.models.image.conditions import ImageAliasConditions, ImageConditions
@@ -321,3 +323,17 @@ async def image_scoped_aliases(
         end_cursor=edges[-1].cursor if edges else None,
     )
     return ImageV2AliasConnectionGQL(count=payload.total_count, edges=edges, page_info=page_info)
+
+
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Rescan one image tag and return the requested architecture, including images not yet registered (superadmin only).",
+    )
+)
+async def admin_rescan_image(
+    info: Info[StrawberryGQLContext], input: RescanImagesInputGQL
+) -> RescanImagesPayloadGQL | None:
+    check_admin_only()
+    payload = await info.context.adapters.image.admin_rescan_image(input.to_pydantic())
+    return RescanImagesPayloadGQL.from_pydantic(payload)

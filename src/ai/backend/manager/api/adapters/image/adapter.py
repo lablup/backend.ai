@@ -22,6 +22,7 @@ from ai.backend.common.dto.manager.v2.image.request import (
     ImageFilterInputDTO,
     ImageOrderByInputDTO,
     PurgeImageInput,
+    RescanImagesInput,
     RestoreImageInput,
     ScopedSearchImagesInput,
     UpdateImageInput,
@@ -37,6 +38,7 @@ from ai.backend.common.dto.manager.v2.image.response import (
     ImageNode,
     ImageRequirementsInfoDTO,
     PurgeImagePayload,
+    RescanImagesPayload,
     RestoreImagePayload,
     ScopedSearchImagesPayload,
     UpdateImagePayload,
@@ -73,6 +75,9 @@ from ai.backend.manager.services.image.actions.bulk_get_aliases import BulkGetIm
 from ai.backend.manager.services.image.actions.dealias_image import DealiasImageAction
 from ai.backend.manager.services.image.actions.forget_image import ForgetImageByIdAction
 from ai.backend.manager.services.image.actions.purge_images import PurgeImageByIdAction
+from ai.backend.manager.services.image.actions.rescan_image import (
+    GlobalRescanImageAction,
+)
 from ai.backend.manager.services.image.actions.restore_image import RestoreImageByIdAction
 from ai.backend.manager.services.image.actions.scoped_search import (
     ContainerRegistryImageScopeItem,
@@ -274,6 +279,12 @@ class ImageAdapter(BaseAdapter):
         )
 
     # ------------------------------------------------------------------ mutations
+
+    async def admin_rescan_image(self, input: RescanImagesInput) -> RescanImagesPayload:
+        result = await self._image.global_rescan_image.run(
+            GlobalRescanImageAction(canonical=input.canonical, architecture=input.architecture)
+        )
+        return RescanImagesPayload(item=self._data_to_dto(result.image))
 
     async def admin_forget(self, input: ForgetImageInput) -> ForgetImagePayload:
         """Forget (soft-delete) an image by ID."""
