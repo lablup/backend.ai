@@ -2,10 +2,9 @@ import logging
 from uuid import UUID
 
 from ai.backend.common.contexts.user import current_user
-from ai.backend.common.docker import ImageRef
 from ai.backend.common.dto.manager.rpc_request import PurgeImagesReq
 from ai.backend.common.exception import UnknownImageReference
-from ai.backend.common.types import AgentId, ImageAlias, ImageID
+from ai.backend.common.types import AgentId, ImageID
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.image.types import ImageWithAgentInstallStatus
@@ -215,17 +214,15 @@ class ImageService:
         """
         Deprecated. Use forget_image_by_id instead.
         """
-        identifiers: list[ImageAlias | ImageRef | ImageIdentifier] = [
-            ImageIdentifier(action.reference, action.architecture),
-            ImageAlias(action.reference),
-        ]
         # Regular users need ownership validation
         user = current_user()
         is_superadmin = user is not None and user.role == UserRole.SUPERADMIN
         if not is_superadmin and user is not None:
-            image_data = await self._image_repository.resolve_image(identifiers)
+            image_data = await self._image_repository.resolve_image(
+                action.reference, action.architecture
+            )
             await self._validate_image_ownership(image_data.id, user.user_id)
-        data = await self._image_repository.soft_delete_image(identifiers)
+        data = await self._image_repository.soft_delete_image(action.reference, action.architecture)
         return ForgetImageActionResult(image=data)
 
     async def forget_image_by_id(
@@ -276,10 +273,9 @@ class ImageService:
     async def update_image(self, action: UpdateImageAction) -> UpdateImageActionResult:
         try:
             # Resolve image first to get its ID
-            image_data = await self._image_repository.resolve_image([
-                ImageIdentifier(action.target, action.architecture),
-                ImageAlias(action.target),
-            ])
+            image_data = await self._image_repository.resolve_image(
+                action.target, action.architecture
+            )
             updater = ImageUpdater(image_id=image_data.id, update=action.update)
             updated_image_data = await self._image_repository.update_image_properties(updater)
         except UnknownImageReference as e:
@@ -320,8 +316,7 @@ class ImageService:
         image_canonical = action.image.name
         arch = action.image.architecture
 
-        image_identifier = ImageIdentifier(image_canonical, arch)
-        image_data = await self._image_repository.resolve_image([image_identifier])
+        image_data = await self._image_repository.resolve_image_by_canonical(image_canonical, arch)
 
         results = await self._agent_registry.purge_images(
             AgentId(agent_id),
@@ -361,14 +356,14 @@ class ImageService:
             )
 
             # Collect successful purges for batch resolution
-            successful_identifiers: list[list[ImageIdentifier]] = []
+            successful_identifiers: list[ImageIdentifier] = []
             successful_canonicals = []
 
             for result in results.responses:
                 if not result.error:
                     image_canonical = result.image
                     arch = arch_per_images[image_canonical]
-                    successful_identifiers.append([ImageIdentifier(image_canonical, arch)])
+                    successful_identifiers.append(ImageIdentifier(image_canonical, arch))
                     successful_canonicals.append(image_canonical)
                 else:
                     errors.append(

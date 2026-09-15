@@ -1,16 +1,20 @@
 from __future__ import annotations
 
 import enum
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from datetime import datetime
 from decimal import Decimal
+from functools import cached_property
 from typing import Any, NamedTuple, override
 from uuid import UUID
 
 from ai.backend.common.data.entity.image_alias import ImageAliasID
 from ai.backend.common.data.entity.types import EntityData, FieldData
 from ai.backend.common.data.entity.user import UserID
+from ai.backend.common.docker import ImageRef
 from ai.backend.common.types import CIStrEnum, ImageCanonical, ImageID, SlotName
+from ai.backend.common.utils import join_non_empty
 
 type Resources = dict[SlotName, dict[str, Any]]
 
@@ -109,6 +113,55 @@ class ImageData(EntityData):
     @override
     def entity_id(self) -> ImageID:
         return self.id
+
+    @cached_property
+    def image_ref(self) -> ImageRef:
+        if self.project == self.image:
+            image_name = ""
+            _, tag = ImageRef.parse_image_tag(self.name.split(f"{self.registry}/", maxsplit=1)[1])
+        else:
+            prefix = join_non_empty(self.registry, self.project, sep="/")
+            image_name, tag = ImageRef.parse_image_tag(self.name.removeprefix(f"{prefix}/"))
+        return ImageRef(
+            image_name, self.project, tag, self.registry, self.architecture, self.is_local
+        )
+
+    def to_detailed(self, aliases: Sequence[str]) -> ImageDataWithDetails:
+        version, ptag_set = self.image_ref.tag_set
+        digest = self.config_digest.strip() or None
+        return ImageDataWithDetails(
+            id=self.id,
+            name=ImageCanonical(self.image),
+            namespace=self.image,
+            base_image_name=self.image_ref.name,
+            project=self.project or "",
+            humanized_name=self.image,
+            tag=self.tag,
+            tags=[KVPair(key=k, value=v) for k, v in ptag_set.items()],
+            version=version,
+            registry=self.registry,
+            registry_id=self.registry_id,
+            type=self.type,
+            architecture=self.architecture,
+            is_local=self.is_local,
+            digest=digest,
+            labels=[
+                KVPair(key=k, value=v) for k, v in self.labels.label_data.items() if v is not None
+            ],
+            aliases=list(aliases),
+            size_bytes=self.size_bytes,
+            status=self.status,
+            resource_limits=[
+                ResourceLimit(key=str(k), min=v.get("min", Decimal(0)), max=Decimal("Infinity"))
+                for k, v in self.resources.resources_data.items()
+            ],
+            supported_accelerators=self.accelerators.split(",") if self.accelerators else ["*"],
+            customized=self.customized,
+            creator_id=self.creator_id,
+            created_at=self.created_at,
+            last_used_at=self.last_used_at,
+            hash=digest,
+        )
 
 
 @dataclass

@@ -6,13 +6,12 @@ from uuid import UUID
 from ai.backend.common.bgtask.reporter import ProgressReporter
 from ai.backend.common.clients.valkey_client.valkey_image.client import ValkeyImageClient
 from ai.backend.common.container_registry import ContainerRegistryType
-from ai.backend.common.docker import ImageRef
 from ai.backend.common.exception import BackendAIError
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
 from ai.backend.common.resilience.resilience import Resilience
-from ai.backend.common.types import AgentId, ImageAlias, ImageID
+from ai.backend.common.types import AgentId, ImageID
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.container_registry.harbor import HarborRegistry_v2
 from ai.backend.manager.data.image.types import (
@@ -75,27 +74,18 @@ class ImageRepository:
         self._config_provider = config_provider
 
     @image_repository_resilience.apply()
-    async def resolve_image(
-        self, identifiers: list[ImageAlias | ImageRef | ImageIdentifier]
-    ) -> ImageData:
-        """
-        Resolves an image by its identifiers, which can be a combination of
-        ImageAlias, ImageRef, or ImageIdentifier.
-        Returns an ImageData object.
-        Raises Exception if the image cannot be resolved.
-        """
-        return await self._db_source.fetch_image_by_identifiers(identifiers)
+    async def resolve_image(self, reference: str, architecture: str) -> ImageData:
+        """The image the reference names as a canonical for the architecture, or as an alias."""
+        return await self._db_source.fetch_image_by_reference(reference, architecture)
 
     @image_repository_resilience.apply()
-    async def resolve_images_batch(
-        self, identifier_lists: list[list[ImageIdentifier]]
-    ) -> list[ImageData]:
-        """
-        Resolves multiple images by their identifiers in a single database session.
-        Returns a list of ImageData objects.
-        More efficient than multiple individual resolve_image calls.
-        """
-        return await self._db_source.fetch_images_batch(identifier_lists)
+    async def resolve_image_by_canonical(self, canonical: str, architecture: str) -> ImageData:
+        return await self._db_source.fetch_image_by_canonical(canonical, architecture)
+
+    @image_repository_resilience.apply()
+    async def resolve_images_batch(self, identifiers: Sequence[ImageIdentifier]) -> list[ImageData]:
+        """The images each canonical and architecture pair names, in the given order."""
+        return await self._db_source.fetch_images_by_canonicals(identifiers)
 
     @image_repository_resilience.apply()
     async def get_images_by_canonicals(
@@ -206,14 +196,11 @@ class ImageRepository:
         }
 
     @image_repository_resilience.apply()
-    async def soft_delete_image(
-        self,
-        identifiers: list[ImageAlias | ImageRef | ImageIdentifier],
-    ) -> ImageData:
+    async def soft_delete_image(self, reference: str, architecture: str) -> ImageData:
         """
         Deprecated. Use soft_delete_image_by_id instead.
         """
-        return await self._db_source.mark_image_deleted(identifiers)
+        return await self._db_source.mark_image_deleted(reference, architecture)
 
     @image_repository_resilience.apply()
     async def soft_delete_image_by_id(
