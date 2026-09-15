@@ -9621,14 +9621,6 @@
         "title": "CreateDomainInput",
         "type": "object"
       },
-      "Sentinel": {
-        "description": "A sentinel value to represent an unset value.",
-        "enum": [
-          1
-        ],
-        "title": "Sentinel",
-        "type": "integer"
-      },
       "UpdateDomainInput": {
         "description": "Input for updating domain information. All fields optional — only provided fields will be updated.",
         "properties": {
@@ -18935,6 +18927,14 @@
         },
         "title": "ModifyQueryDefinitionOptionsInput",
         "type": "object"
+      },
+      "Sentinel": {
+        "description": "A sentinel value to represent an unset value.",
+        "enum": [
+          1
+        ],
+        "title": "Sentinel",
+        "type": "integer"
       },
       "ModifyQueryDefinitionInput": {
         "description": "Input for modifying a prometheus query definition.\n\nNullable DB columns (``time_window``, ``description``, ``category_id``) use the\n``Sentinel`` pattern so callers can distinguish \"leave unchanged\" from \"clear to null\".\nNon-nullable fields use ``None`` to mean \"do not update\".",
