@@ -127,7 +127,6 @@ from ai.backend.manager.models.user import (
 from ai.backend.manager.models.vfolder import (
     VFolderOwnershipType,
     VFolderPermission,
-    VFolderPermissionSetAlias,
     VFolderStatusSet,
 )
 from ai.backend.manager.models.vfolder.creators import (
@@ -544,10 +543,6 @@ class VFolderHandler:
         resolved = await self._vfolder.get_accessible_vfolder.run(
             LookupAccessibleVFolderAction(
                 user_uuid=ctx.user_uuid,
-                user_role=req.request["user"]["role"],
-                domain_name=ctx.user_domain,
-                is_admin=req.request["is_admin"],
-                perm=VFolderPermissionSetAlias.READABLE,
                 folder_id_or_name=params.id,
                 required_status=VFolderStatusSet.READABLE,
             )
@@ -584,10 +579,6 @@ class VFolderHandler:
         resolved = await self._vfolder.get_accessible_vfolder.run(
             LookupAccessibleVFolderAction(
                 user_uuid=ctx.user_uuid,
-                user_role=req.request["user"]["role"],
-                domain_name=ctx.user_domain,
-                is_admin=req.request["is_admin"],
-                perm=VFolderPermissionSetAlias.READABLE,
                 folder_id_or_name=params.id,
                 required_status=VFolderStatusSet.READABLE,
             )
@@ -628,10 +619,6 @@ class VFolderHandler:
         resolved = await self._vfolder.get_accessible_vfolder.run(
             LookupAccessibleVFolderAction(
                 user_uuid=ctx.user_uuid,
-                user_role=req.request["user"]["role"],
-                domain_name=ctx.user_domain,
-                is_admin=req.request["is_admin"],
-                perm=VFolderPermissionSetAlias.READABLE,
                 folder_id_or_name=params.id,
                 required_status=VFolderStatusSet.READABLE,
             )
@@ -662,10 +649,6 @@ class VFolderHandler:
         resolved = await self._vfolder.get_accessible_vfolder.run(
             LookupAccessibleVFolderAction(
                 user_uuid=ctx.user_uuid,
-                user_role=req.request["user"]["role"],
-                domain_name=ctx.user_domain,
-                is_admin=req.request["is_admin"],
-                perm=VFolderPermissionSetAlias.READABLE,
                 folder_id_or_name=params.id,
                 required_status=VFolderStatusSet.READABLE,
             )
@@ -1310,12 +1293,7 @@ class VFolderHandler:
         resolved = await self._vfolder.get_accessible_vfolder.run(
             LookupAccessibleVFolderAction(
                 user_uuid=ctx.user_uuid,
-                user_role=req.request["user"]["role"],
-                domain_name=ctx.user_domain,
-                is_admin=req.request["is_admin"],
-                perm=VFolderPermissionSetAlias.READABLE,
                 folder_id_or_name=folder_name,
-                allow_privileged_access=True,
             )
         )
         row = resolved.row
@@ -1353,12 +1331,7 @@ class VFolderHandler:
         resolved = await self._vfolder.get_accessible_vfolder.run(
             LookupAccessibleVFolderAction(
                 user_uuid=ctx.user_uuid,
-                user_role=req.request["user"]["role"],
-                domain_name=ctx.user_domain,
-                is_admin=req.request["is_admin"],
-                perm=VFolderPermissionSetAlias.READABLE,
                 folder_id_or_name=folder_name,
-                allow_privileged_access=True,
             )
         )
         row = resolved.row

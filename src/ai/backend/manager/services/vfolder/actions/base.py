@@ -27,7 +27,6 @@ from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.models.vfolder import (
     VFolderOwnershipType,
     VFolderPermission,
-    VFolderPermissionSetAlias,
     VFolderStatusSet,
 )
 from ai.backend.manager.models.vfolder.updaters import VFolderAttributeUpdater
@@ -400,13 +399,8 @@ class LookupAccessibleVFolderAction(BaseLookupAction):
     """Resolve the folder a legacy caller named, by id or by name."""
 
     user_uuid: uuid.UUID
-    user_role: UserRole
-    domain_name: str
-    is_admin: bool
-    perm: VFolderPermissionSetAlias | VFolderPermission
     folder_id_or_name: str | uuid.UUID
     required_status: VFolderStatusSet | None = None
-    allow_privileged_access: bool = False
 
     @override
     @classmethod

@@ -60,7 +60,7 @@ class TestVFolderSharingFlow:
 
         # Step 1: Share the GROUP vfolder with the regular user
         share_result = await admin_registry.vfolder.share(
-            group_vf["name"],
+            str(group_vf["id"]),
             ShareVFolderReq(
                 permission=VFolderPermissionField.READ_ONLY,
                 emails=[user_email],
@@ -75,7 +75,7 @@ class TestVFolderSharingFlow:
 
         # Step 3: Unshare the vfolder
         unshare_result = await admin_registry.vfolder.unshare(
-            group_vf["name"],
+            str(group_vf["id"]),
             UnshareVFolderReq(emails=[user_email]),
         )
         assert isinstance(unshare_result, UnshareVFolderResponse)
@@ -102,7 +102,7 @@ class TestGroupFolderDirectPermissionSharing:
             group=str(group_fixture),
         )
         result = await admin_registry.vfolder.share(
-            group_vf["name"],
+            str(group_vf["id"]),
             ShareVFolderReq(
                 permission=VFolderPermissionField.READ_ONLY,
                 emails=[regular_user_fixture.email],
@@ -125,7 +125,7 @@ class TestGroupFolderDirectPermissionSharing:
             group=str(group_fixture),
         )
         result = await admin_registry.vfolder.share(
-            group_vf["name"],
+            str(group_vf["id"]),
             ShareVFolderReq(
                 permission=VFolderPermissionField.READ_WRITE,
                 emails=[regular_user_fixture.email],
@@ -148,7 +148,7 @@ class TestGroupFolderDirectPermissionSharing:
             group=str(group_fixture),
         )
         result = await admin_registry.vfolder.share(
-            group_vf["name"],
+            str(group_vf["id"]),
             ShareVFolderReq(
                 permission=VFolderPermissionField.RW_DELETE,
                 emails=[regular_user_fixture.email],
@@ -173,7 +173,7 @@ class TestGroupFolderDirectPermissionSharing:
             group=str(group_fixture),
         )
         await admin_registry.vfolder.share(
-            group_vf["name"],
+            str(group_vf["id"]),
             ShareVFolderReq(
                 permission=VFolderPermissionField.READ_ONLY,
                 emails=[regular_user_fixture.email],
@@ -215,7 +215,7 @@ class TestShareUnshareFlow:
 
         # Share
         share_result = await admin_registry.vfolder.share(
-            group_vf["name"],
+            str(group_vf["id"]),
             ShareVFolderReq(
                 permission=VFolderPermissionField.READ_ONLY,
                 emails=[user_email],
@@ -225,7 +225,7 @@ class TestShareUnshareFlow:
 
         # Unshare
         unshare_result = await admin_registry.vfolder.unshare(
-            group_vf["name"],
+            str(group_vf["id"]),
             UnshareVFolderReq(emails=[user_email]),
         )
         assert isinstance(unshare_result, UnshareVFolderResponse)
@@ -249,14 +249,14 @@ class TestShareUnshareFlow:
         user_email = regular_user_fixture.email
 
         await admin_registry.vfolder.share(
-            group_vf["name"],
+            str(group_vf["id"]),
             ShareVFolderReq(
                 permission=VFolderPermissionField.READ_ONLY,
                 emails=[user_email],
             ),
         )
         await admin_registry.vfolder.unshare(
-            group_vf["name"],
+            str(group_vf["id"]),
             UnshareVFolderReq(emails=[user_email]),
         )
 
@@ -286,7 +286,7 @@ class TestShareUnshareFlow:
             group=str(group_fixture),
         )
         await admin_registry.vfolder.share(
-            group_vf["name"],
+            str(group_vf["id"]),
             ShareVFolderReq(
                 permission=VFolderPermissionField.READ_ONLY,
                 emails=[regular_user_fixture.email],
@@ -312,7 +312,7 @@ class TestShareUnshareFlow:
             group=str(group_fixture),
         )
         await admin_registry.vfolder.share(
-            group_vf["name"],
+            str(group_vf["id"]),
             ShareVFolderReq(
                 permission=VFolderPermissionField.READ_ONLY,
                 emails=[regular_user_fixture.email],
@@ -364,7 +364,7 @@ class TestSharePermissionUpdate:
             group=str(group_fixture),
         )
         await admin_registry.vfolder.share(
-            group_vf["name"],
+            str(group_vf["id"]),
             ShareVFolderReq(
                 permission=VFolderPermissionField.READ_ONLY,
                 emails=[regular_user_fixture.email],
@@ -414,7 +414,7 @@ class TestSharePermissionUpdate:
             group=str(group_fixture),
         )
         await admin_registry.vfolder.share(
-            group_vf["name"],
+            str(group_vf["id"]),
             ShareVFolderReq(
                 permission=VFolderPermissionField.READ_ONLY,
                 emails=[regular_user_fixture.email],
@@ -467,7 +467,7 @@ class TestSharePermissionUpdate:
             group=str(group_fixture),
         )
         await admin_registry.vfolder.share(
-            group_vf["name"],
+            str(group_vf["id"]),
             ShareVFolderReq(
                 permission=VFolderPermissionField.READ_ONLY,
                 emails=[regular_user_fixture.email],
@@ -537,7 +537,7 @@ class TestHostPermissionValidation:
         )
         with pytest.raises(BackendAPIError):
             await user_registry.vfolder.share(
-                group_vf["name"],
+                str(group_vf["id"]),
                 ShareVFolderReq(
                     permission=VFolderPermissionField.READ_ONLY,
                     emails=[admin_user_fixture.email],
@@ -559,7 +559,7 @@ class TestHostPermissionValidation:
         )
         with pytest.raises(BackendAPIError):
             await admin_registry.vfolder.share(
-                group_vf["name"],
+                str(group_vf["id"]),
                 ShareVFolderReq(
                     permission=VFolderPermissionField.READ_ONLY,
                     emails=["nonexistent-user@no-domain.test"],
@@ -581,7 +581,7 @@ class TestHostPermissionValidation:
         )
         with pytest.raises(BackendAPIError):
             await admin_registry.vfolder.unshare(
-                group_vf["name"],
+                str(group_vf["id"]),
                 UnshareVFolderReq(emails=["nonexistent-user@no-domain.test"]),
             )
 
@@ -681,7 +681,7 @@ class TestSharingWritesBothTables:
             group=str(group_fixture),
         )
         await admin_registry.vfolder.share(
-            group_vf["name"],
+            str(group_vf["id"]),
             ShareVFolderReq(
                 permission=VFolderPermissionField.READ_ONLY,
                 emails=[regular_user_fixture.email],
@@ -707,7 +707,7 @@ class TestSharingWritesBothTables:
         )
         vfolder_id = uuid.UUID(str(group_vf["id"]))
         await admin_registry.vfolder.share(
-            group_vf["name"],
+            str(group_vf["id"]),
             ShareVFolderReq(
                 permission=VFolderPermissionField.READ_ONLY,
                 emails=[regular_user_fixture.email],
@@ -716,7 +716,7 @@ class TestSharingWritesBothTables:
         read_only_cap = (await _share_caps(db_engine, vfolder_id))[regular_user_fixture.user_uuid]
 
         await admin_registry.vfolder.share(
-            group_vf["name"],
+            str(group_vf["id"]),
             ShareVFolderReq(
                 permission=VFolderPermissionField.READ_WRITE,
                 emails=[regular_user_fixture.email],
@@ -744,14 +744,14 @@ class TestSharingWritesBothTables:
         )
         vfolder_id = uuid.UUID(str(group_vf["id"]))
         await admin_registry.vfolder.share(
-            group_vf["name"],
+            str(group_vf["id"]),
             ShareVFolderReq(
                 permission=VFolderPermissionField.READ_WRITE,
                 emails=[regular_user_fixture.email],
             ),
         )
         await admin_registry.vfolder.unshare(
-            group_vf["name"],
+            str(group_vf["id"]),
             UnshareVFolderReq(emails=[regular_user_fixture.email]),
         )
         assert await _legacy_mount_permissions(db_engine, vfolder_id) == {}

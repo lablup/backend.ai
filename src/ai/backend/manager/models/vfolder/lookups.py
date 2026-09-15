@@ -31,14 +31,14 @@ __all__ = (
 
 @dataclass
 class VFolderNameLookup(DataLookup[VFolderRow, VFolderUUID]):
-    """Resolves a folder name within one scope into the folder it names.
+    """Resolves a folder name within the scopes, combined with OR, into the folder it names.
 
     Inaccessible folders are left out, so a name freed by a deleted folder resolves to
     the live one.
     """
 
+    scopes: Sequence[OperationScope]
     name: str
-    scope: OperationScope
 
     @override
     def row_class(self) -> type[VFolderRow]:
@@ -53,7 +53,7 @@ class VFolderNameLookup(DataLookup[VFolderRow, VFolderUUID]):
         return [
             lambda: VFolderRow.name == self.name,
             lambda: VFolderRow.status.not_in(vfolder_status_map[VFolderStatusSet.INACCESSIBLE]),
-            self.scope.to_condition(),
+            lambda: sa.or_(*(scope.to_condition()() for scope in self.scopes)),
         ]
 
     @override
