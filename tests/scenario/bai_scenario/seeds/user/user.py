@@ -12,8 +12,6 @@ import secrets
 from dataclasses import dataclass
 from typing import override
 
-from bai_scenario.seeds.seeder import Naming, SeedUser
-
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.types import AccessKey
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
@@ -28,6 +26,7 @@ from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.user.creators import UserCreator
 from ai.backend.manager.repositories.ops.v2.user.write import FullUserCreator
 from ai.backend.manager.secret.types import SecretValue
+from bai_scenario.seeds.seeder import Naming, SeedUser
 
 PASSWORD = "scenario-password"
 

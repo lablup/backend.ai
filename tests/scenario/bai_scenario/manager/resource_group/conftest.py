@@ -9,7 +9,6 @@ from __future__ import annotations
 from typing import Any
 
 import pytest
-from bai_scenario.runner.unwired import unwired
 
 from ai.backend.common.data.entity.domain import DomainEntityType
 from ai.backend.common.data.entity.resource_group import ResourceGroupEntityType
@@ -47,6 +46,7 @@ from ai.backend.manager.services.resource_group.processors import ResourceGroupP
 from ai.backend.manager.services.resource_group.service import ResourceGroupService
 from ai.backend.manager.sokovan.deployment.coordinator import DeploymentCoordinator
 from ai.backend.manager.sokovan.scheduler.coordinator import ScheduleCoordinator
+from bai_scenario.runner.unwired import unwired
 
 
 @pytest.fixture

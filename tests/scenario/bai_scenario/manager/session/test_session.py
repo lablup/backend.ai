@@ -12,11 +12,6 @@ from dataclasses import dataclass
 from typing import override
 
 import pytest
-from bai_scenario.components.answers import NothingIsFound, TheCallIsRefused
-from bai_scenario.components.domain import ADomainAndACaller, ADomainAndSomeone
-from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
-from bai_scenario.runner.steps import run_scenario
 
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.v2.session.request import AdminSearchSessionsInput
@@ -25,6 +20,11 @@ from ai.backend.manager.api.adapters.session.adapter import SessionAdapter
 from ai.backend.manager.errors.auth import InsufficientPrivilege
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import Given, Scenario, Then, When
+from bai_scenario.components.answers import NothingIsFound, TheCallIsRefused
+from bai_scenario.components.domain import ADomainAndACaller, ADomainAndSomeone
+from bai_scenario.runner.acting import ActingAs
+from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.steps import run_scenario
 
 type Searched = AdminSearchSessionsPayload
 type SessionStep = Scenario[SeedingSession, ADomainAndACaller, SessionAdapter, Searched]

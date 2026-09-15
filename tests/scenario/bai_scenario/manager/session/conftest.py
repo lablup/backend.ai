@@ -12,12 +12,6 @@ from typing import Any
 from unittest.mock import MagicMock
 
 import pytest
-from bai_scenario.fakes.storage_proxy import (
-    FakeStorageProxyManagerFacingClient,
-    FakeStorageSessionManager,
-)
-from bai_scenario.runner.unwired import unwired
-from bai_scenario.valkey import ScenarioValkey
 
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
 from ai.backend.common.data.entity.kernel import KernelFieldType
@@ -71,6 +65,12 @@ from ai.backend.manager.sokovan.scheduling_controller.scheduling_controller impo
     SchedulingController,
     SchedulingControllerArgs,
 )
+from bai_scenario.fakes.storage_proxy import (
+    FakeStorageProxyManagerFacingClient,
+    FakeStorageSessionManager,
+)
+from bai_scenario.runner.unwired import unwired
+from bai_scenario.valkey import ScenarioValkey
 
 
 @pytest.fixture
