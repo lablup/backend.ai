@@ -688,7 +688,6 @@ class ResourcePresetDBSource:
         return CheckPresetsDBData(
             known_slot_types=known_slot_types,
             keypair_data=keypair_data,
-            domain_limits=domain_usage.limits,
             per_sgroup_data=per_sgroup,
             presets=presets,
         )
