@@ -121,7 +121,7 @@ async def adapter(
             storage_manager=FakeStorageSessionManager({}),
             event_producer=unwired(EventProducer, "nothing here waits on the event"),
             valkey_schedule=schedule,
-            revision_draft_reader=unwired(RevisionDraftReader, "only a revision reads a draft"),
+            revision_draft_reader=RevisionDraftReader(repository),
             deployment_revision_preset_repository=None,
         )
     )
