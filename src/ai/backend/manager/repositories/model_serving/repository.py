@@ -1,19 +1,21 @@
 import asyncio
 import uuid
+from collections.abc import Sequence
 from decimal import Decimal
 from typing import Any, cast
 
 import sqlalchemy as sa
 from pydantic import HttpUrl
 from sqlalchemy.exc import IntegrityError, NoResultFound, StatementError
-from sqlalchemy.ext.asyncio import AsyncConnection
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import selectinload
 
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
 from ai.backend.common.contexts.user import current_user
 from ai.backend.common.data.entity.deployment import DeploymentID
+from ai.backend.common.data.entity.domain import DomainName
 from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.exception import BackendAIError, VFolderNotFound
 from ai.backend.common.metrics.metric import DomainType, LayerType
@@ -44,13 +46,17 @@ from ai.backend.manager.data.model_serving.types import (
     ServiceSearchResult,
     UserData,
 )
+from ai.backend.manager.data.resource_group.types import (
+    ResourceGroupData as ResourceGroupEntityData,
+)
 from ai.backend.manager.data.vfolder.types import VFolderOwnershipType
 from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.common import GenericForbidden, ServiceUnavailable
 from ai.backend.manager.errors.image import ImageNotFound
-from ai.backend.manager.errors.resource import DatabaseConnectionUnavailable
+from ai.backend.manager.errors.resource import DatabaseConnectionUnavailable, DomainNotFound
 from ai.backend.manager.errors.service import AutoScalingRuleNotFound, EndpointNotFound
 from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
+from ai.backend.manager.models.domain.lookups import DomainNameLookup
 from ai.backend.manager.models.endpoint import (
     AutoScalingMetricComparator,
     AutoScalingMetricSource,
@@ -67,6 +73,7 @@ from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.project import resolve_group_name_or_id
 from ai.backend.manager.models.resource_group import resource_groups
+from ai.backend.manager.models.resource_group.searchers import AllowedResourceGroupsSearch
 from ai.backend.manager.models.resource_policy import keypair_resource_policies
 from ai.backend.manager.models.routing import RouteStatus, RoutingRow
 from ai.backend.manager.models.runtime_variant.row import RuntimeVariantRow
@@ -111,44 +118,23 @@ class ModelServingRepository:
         self._db = db
         self._v2_ops = v2_ops_provider
 
-    async def _check_inference_resource_group(
+    def _check_inference_resource_group(
         self,
-        conn: AsyncConnection,
+        candidates: Sequence[ResourceGroupEntityData],
         resource_group: str,
-        owner_access_key: AccessKey,
-        target_domain: str,
-        target_project: str | ProjectID,
     ) -> str:
         """
-        Wrapper of ``registry.check_scaling_group()`` with additional guards flavored for
+        Wrapper of ``registry.check_resource_group()`` with additional guards flavored for
         model service included.
         """
-        checked_resource_group = await registry_check_resource_group(
-            conn,
-            resource_group,
-            SessionTypes.INFERENCE,
-            owner_access_key,
-            target_domain,
-            target_project,
+        checked_resource_group = registry_check_resource_group(
+            candidates, resource_group, SessionTypes.INFERENCE
         )
-
-        query = (
-            sa.select(resource_groups.c.wsproxy_addr, resource_groups.c.wsproxy_api_token)
-            .select_from(resource_groups)
-            .where(resource_groups.c.name == checked_resource_group)
-        )
-
-        result = await conn.execute(query)
-        sgroup = result.first()
-        if sgroup is None:
-            raise ServiceUnavailable("Scaling group not found")
-        wsproxy_addr = sgroup.wsproxy_addr
-        if not wsproxy_addr:
+        sgroup = next(rg for rg in candidates if rg.name == checked_resource_group)
+        if not sgroup.network.wsproxy_addr:
             raise ServiceUnavailable("No coordinator configured for this resource group")
-
-        if not sgroup.wsproxy_api_token:
+        if not sgroup.network.wsproxy_api_token:
             raise ServiceUnavailable("Scaling group not ready to start model service")
-
         return checked_resource_group
 
     @model_serving_repository_resilience.apply()
@@ -789,27 +775,24 @@ class ModelServingRepository:
                 session_owner = endpoint_row.session_owner_row
                 if session_owner is None:
                     raise InvalidAPIParameters("Session owner not found for endpoint")
-                default_access_key = await db_session.scalar(
-                    sa.select(KeyPairRow.access_key).where(
-                        (KeyPairRow.user == session_owner.uuid) & KeyPairRow.is_default
-                    )
-                )
-                if default_access_key is None:
-                    raise InvalidAPIParameters("Session owner has no access key")
                 if session_owner.role is None:
                     raise InvalidAPIParameters("Session owner has no role")
 
-                conn = await db_session.connection()
-                if conn is None:
-                    raise DatabaseConnectionUnavailable("Database connection is not available")
-
-                await self._check_inference_resource_group(
-                    conn,
-                    endpoint_row.resource_group,
-                    AccessKey(default_access_key),
-                    endpoint_row.domain,
-                    ProjectID(endpoint_row.project),
-                )
+                async with self._v2_ops.read_ops() as r:
+                    domain_id = await r.lookup_entity_id(
+                        DomainNameLookup(name=DomainName(endpoint_row.domain))
+                    )
+                    if domain_id is None:
+                        raise DomainNotFound(f"Domain not found (name: {endpoint_row.domain})")
+                    search = AllowedResourceGroupsSearch(
+                        domain_id=domain_id,
+                        project_ids=[ProjectID(endpoint_row.project)],
+                        user_id=UserID(session_owner.uuid),
+                    )
+                    allowed = await r.search_with_scopes(
+                        search.operation_scopes(), search.searcher()
+                    )
+                self._check_inference_resource_group(allowed.items, endpoint_row.resource_group)
 
                 await db_session.commit()
 
@@ -929,14 +912,6 @@ class ModelServingRepository:
         used by ``SchedulerRepository.prepare_vfolder_mounts``.
         """
         async with self._db.begin_readonly() as conn:
-            checked_resource_group = await self._check_inference_resource_group(
-                conn,
-                resource_group,
-                owner_access_key,
-                domain_name,
-                group_name,
-            )
-
             try:
                 user_info = await query_userinfo(
                     conn,
@@ -955,6 +930,23 @@ class ModelServingRepository:
             group_id = user_info.group_id
             resource_policy = user_info.resource_policy
             owner_role = user_info.owner_role
+
+            target_domain = domain_name or requester_domain
+            async with self._v2_ops.read_ops() as r:
+                domain_id = await r.lookup_entity_id(
+                    DomainNameLookup(name=DomainName(target_domain))
+                )
+                if domain_id is None:
+                    raise DomainNotFound(f"Domain not found (name: {target_domain})")
+                search = AllowedResourceGroupsSearch(
+                    domain_id=domain_id,
+                    project_ids=[ProjectID(group_id)],
+                    user_id=UserID(owner_uuid),
+                )
+                allowed = await r.search_with_scopes(search.operation_scopes(), search.searcher())
+            checked_resource_group = self._check_inference_resource_group(
+                allowed.items, resource_group
+            )
 
             allowed_vfolder_types = await legacy_etcd_loader.get_vfolder_types()
             try:

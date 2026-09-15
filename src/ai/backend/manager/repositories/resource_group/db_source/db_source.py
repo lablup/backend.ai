@@ -30,7 +30,6 @@ from ai.backend.manager.models.resource_group import (
     ResourceGroupForKeypairsRow,
     ResourceGroupForProjectRow,
     ResourceGroupRow,
-    query_allowed_sgroups,
 )
 from ai.backend.manager.models.resource_slot import AgentResourceRow, ResourceSlotTypeRow
 from ai.backend.manager.repositories.base import BatchQuerier, execute_batch_querier
@@ -242,34 +241,6 @@ class ResourceGroupDBSource:
             )
             result = await session.scalar(query)
             return (result or 0) > 0
-
-    async def list_allowed_sgroups(
-        self,
-        *,
-        domain_name: str,
-        group: str,
-        access_key: str,
-    ) -> list[ResourceGroupData]:
-        """List allowed resource groups for a user using the legacy query_allowed_sgroups function.
-
-        Returns ResourceGroupData for each allowed resource group.
-        """
-        async with self._db.begin_readonly() as conn:
-            rows = await query_allowed_sgroups(conn, domain_name, group, access_key)
-            # Convert raw rows to ResourceGroupData via ORM
-            sg_names = [row.name for row in rows]
-
-        if not sg_names:
-            return []
-
-        async with self._db.begin_readonly_session() as db_sess:
-            query = (
-                sa.select(ResourceGroupRow)
-                .where(ResourceGroupRow.name.in_(sg_names))
-                .order_by(ResourceGroupRow.name)
-            )
-            result = await db_sess.execute(query)
-            return [row.to_dataclass() for row in result.scalars()]
 
     async def get_resource_info(
         self,

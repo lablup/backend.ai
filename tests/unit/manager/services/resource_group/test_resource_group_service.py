@@ -6,13 +6,16 @@ Tests the service layer with mocked repository operations.
 import uuid
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
+from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.exception import ResourceGroupConflict
-from ai.backend.common.types import AccessKey, AgentSelectionStrategy, ResourceSlot, SessionTypes
+from ai.backend.common.types import AgentSelectionStrategy, ResourceSlot, SessionTypes
 from ai.backend.manager.data.deployment.types import DeploymentOptions
 from ai.backend.manager.data.resource_group.types import (
     FairShareResourceGroupSpec,
@@ -385,85 +388,49 @@ class TestCheckScalingGroup:
     """Test cases for check_scaling_group function"""
 
     @pytest.fixture
-    def mock_conn(self) -> MagicMock:
-        """Create mocked database connection"""
-        return MagicMock()
+    def interactive_only_sgroup(self) -> MagicMock:
+        """Create a scaling group accepting INTERACTIVE sessions only"""
+        mock_sgroup = MagicMock()
+        mock_sgroup.name = "test-sgroup"
+        mock_sgroup.scheduler.options.allowed_session_types = [SessionTypes.INTERACTIVE]
+        return mock_sgroup
 
-    async def test_check_scaling_group_raises_session_type_not_allowed(
+    def test_check_scaling_group_raises_session_type_not_allowed(
         self,
-        mock_conn: MagicMock,
+        interactive_only_sgroup: MagicMock,
     ) -> None:
         """Test that check_scaling_group raises ResourceGroupSessionTypeNotAllowed (400)
         when requesting BATCH session on INTERACTIVE-only scaling group"""
-        mock_sgroup = MagicMock()
-        mock_sgroup.name = "test-sgroup"
-        mock_sgroup.scheduler_opts = ResourceGroupOpts(
-            allowed_session_types=[SessionTypes.INTERACTIVE],
-        )
+        with pytest.raises(ResourceGroupSessionTypeNotAllowed) as exc_info:
+            check_resource_group(
+                [interactive_only_sgroup],
+                resource_group="test-sgroup",
+                session_type=SessionTypes.BATCH,
+            )
+        assert exc_info.value.status_code == 400
 
-        with patch(
-            "ai.backend.manager.registry.query_allowed_sgroups",
-            new_callable=AsyncMock,
-            return_value=[mock_sgroup],
-        ):
-            with pytest.raises(ResourceGroupSessionTypeNotAllowed) as exc_info:
-                await check_resource_group(
-                    mock_conn,
-                    resource_group="test-sgroup",
-                    session_type=SessionTypes.BATCH,
-                    access_key=AccessKey("test-ak"),
-                    domain_name="test-domain",
-                    group_id="test-group-id",
-                )
-            assert exc_info.value.status_code == 400
-
-    async def test_check_scaling_group_succeeds_with_allowed_session_type(
+    def test_check_scaling_group_succeeds_with_allowed_session_type(
         self,
-        mock_conn: MagicMock,
+        interactive_only_sgroup: MagicMock,
     ) -> None:
         """Test that check_scaling_group succeeds when session type is allowed"""
-        mock_sgroup = MagicMock()
-        mock_sgroup.name = "test-sgroup"
-        mock_sgroup.scheduler_opts = ResourceGroupOpts(
-            allowed_session_types=[SessionTypes.INTERACTIVE],
+        result = check_resource_group(
+            [interactive_only_sgroup],
+            resource_group="test-sgroup",
+            session_type=SessionTypes.INTERACTIVE,
         )
+        assert result == "test-sgroup"
 
-        with patch(
-            "ai.backend.manager.registry.query_allowed_sgroups",
-            new_callable=AsyncMock,
-            return_value=[mock_sgroup],
-        ):
-            result = await check_resource_group(
-                mock_conn,
-                resource_group="test-sgroup",
-                session_type=SessionTypes.INTERACTIVE,
-                access_key=AccessKey("test-ak"),
-                domain_name="test-domain",
-                group_id="test-group-id",
-            )
-            assert result == "test-sgroup"
-
-    async def test_check_scaling_group_raises_not_found(
-        self,
-        mock_conn: MagicMock,
-    ) -> None:
+    def test_check_scaling_group_raises_not_found(self) -> None:
         """Test that check_scaling_group raises ScalingGroupNotFound (404)
         when the scaling group does not exist"""
-        with patch(
-            "ai.backend.manager.registry.query_allowed_sgroups",
-            new_callable=AsyncMock,
-            return_value=[],
-        ):
-            with pytest.raises(ResourceGroupNotFound) as exc_info:
-                await check_resource_group(
-                    mock_conn,
-                    resource_group="nonexistent-sgroup",
-                    session_type=SessionTypes.INTERACTIVE,
-                    access_key=AccessKey("test-ak"),
-                    domain_name="test-domain",
-                    group_id="test-group-id",
-                )
-            assert exc_info.value.status_code == 404
+        with pytest.raises(ResourceGroupNotFound) as exc_info:
+            check_resource_group(
+                [],
+                resource_group="nonexistent-sgroup",
+                session_type=SessionTypes.INTERACTIVE,
+            )
+        assert exc_info.value.status_code == 404
 
 
 class TestGetWsproxyVersion:
@@ -544,9 +511,9 @@ class TestGetWsproxyVersion:
 
         action = GetWsproxyVersionAction(
             resource_group_name="gpu-group",
-            domain_name="default",
-            group="default",
-            access_key="AKTEST123",
+            domain_id=DomainID(uuid.uuid4()),
+            project_ids=[ProjectID(uuid.uuid4())],
+            user_id=UserID(uuid.uuid4()),
         )
 
         result = await resource_group_service.get_wsproxy_version(action)
@@ -566,9 +533,9 @@ class TestGetWsproxyVersion:
 
         action = GetWsproxyVersionAction(
             resource_group_name="nonexistent-group",
-            domain_name="default",
-            group="default",
-            access_key="AKTEST123",
+            domain_id=DomainID(uuid.uuid4()),
+            project_ids=[ProjectID(uuid.uuid4())],
+            user_id=UserID(uuid.uuid4()),
         )
 
         with pytest.raises(ResourceGroupNotFound):
@@ -601,9 +568,9 @@ class TestGetWsproxyVersion:
 
         action = GetWsproxyVersionAction(
             resource_group_name="gpu-group",
-            domain_name="default",
-            group="default",
-            access_key="AKTEST123",
+            domain_id=DomainID(uuid.uuid4()),
+            project_ids=[ProjectID(uuid.uuid4())],
+            user_id=UserID(uuid.uuid4()),
         )
 
         result = await resource_group_service.get_wsproxy_version(action)
@@ -618,9 +585,9 @@ class TestGetWsproxyVersion:
 
         action = GetWsproxyVersionAction(
             resource_group_name="gpu-group",
-            domain_name="default",
-            group="default",
-            access_key="AKTEST123",
+            domain_id=DomainID(uuid.uuid4()),
+            project_ids=[ProjectID(uuid.uuid4())],
+            user_id=UserID(uuid.uuid4()),
         )
 
         with pytest.raises(ObjectNotFound):

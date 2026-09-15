@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import AsyncGenerator
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 import sqlalchemy as sa
@@ -38,7 +38,13 @@ from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.project import ProjectRow
 from ai.backend.manager.models.replica_group import ReplicaGroupRow
-from ai.backend.manager.models.resource_group.row import ResourceGroupOpts, ResourceGroupRow
+from ai.backend.manager.models.resource_group.row import (
+    ResourceGroupForDomainRow,
+    ResourceGroupForKeypairsRow,
+    ResourceGroupForProjectRow,
+    ResourceGroupOpts,
+    ResourceGroupRow,
+)
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
@@ -90,6 +96,9 @@ class TestModifyEndpointModelDefinitionRefresh:
                 UserRow,
                 KeyPairRow,
                 ProjectRow,
+                ResourceGroupForDomainRow,
+                ResourceGroupForProjectRow,
+                ResourceGroupForKeypairsRow,
                 ContainerRegistryRow,
                 ImageRow,
                 VFolderRow,
@@ -402,7 +411,7 @@ class TestModifyEndpointModelDefinitionRefresh:
             patch.object(
                 repository,
                 "_check_inference_resource_group",
-                AsyncMock(),
+                MagicMock(),
             ),
         ):
             result = await repository.modify_endpoint_fields(

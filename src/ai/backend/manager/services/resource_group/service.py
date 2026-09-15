@@ -97,9 +97,9 @@ class ResourceGroupService:
         if self._appproxy_client_pool is None:
             raise ObjectNotFound(object_name="AppProxy client pool")
         sgroups = await self._repository.list_allowed_sgroups(
-            domain_name=action.domain_name,
-            group=action.group,
-            access_key=action.access_key,
+            domain_id=action.domain_id,
+            project_ids=action.project_ids,
+            user_id=action.user_id,
         )
         sgroup_filtered = [sg for sg in sgroups if sg.name == action.resource_group_name]
         if not sgroup_filtered:

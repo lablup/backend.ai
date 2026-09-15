@@ -21,6 +21,7 @@ from ai.backend.common.data.entity.image import ImageID
 from ai.backend.common.data.entity.network import NetworkID
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID, ResourceGroupName
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.events.event_types.kernel.types import KernelCreationInfo
 from ai.backend.common.exception import BackendAIError
 from ai.backend.common.metrics.metric import DomainType, LayerType
@@ -45,6 +46,7 @@ from ai.backend.manager.data.dotfile.types import DotfileBundle
 from ai.backend.manager.data.kernel.types import KernelListResult, KernelStatus
 from ai.backend.manager.data.network.types import NetworkData
 from ai.backend.manager.data.resource.types import UserEnqueuePolicy
+from ai.backend.manager.data.resource_group.types import ResourceGroupData
 from ai.backend.manager.data.session.creation import ContainerUserInfo
 from ai.backend.manager.data.session.types import SessionInfo, SessionStatus
 from ai.backend.manager.exceptions import ErrorStatusInfo
@@ -437,24 +439,24 @@ class SchedulerRepository:
     async def pick_default_resource_group(
         self,
         *,
-        access_key: AccessKey,
-        domain_name: str,
+        domain_id: DomainID,
         project_id: ProjectID,
+        user_id: UserID,
     ) -> ResourceGroupID:
-        """Return the first resource group from the owner's allowlist."""
+        """Return the first resource group, by name, the owner may schedule on."""
         return await self._db_source.pick_default_resource_group(
-            access_key=access_key,
-            domain_name=domain_name,
+            domain_id=domain_id,
             project_id=project_id,
+            user_id=user_id,
         )
 
     @scheduler_repository_resilience.apply()
     async def query_accessible_resource_group_ids(
         self,
         *,
-        domain_name: str,
+        domain_id: DomainID,
         project_id: ProjectID,
-        access_key: AccessKey,
+        user_id: UserID,
     ) -> frozenset[ResourceGroupID]:
         """Return the resource-group ids accessible to the given single-project scope.
 
@@ -463,9 +465,24 @@ class SchedulerRepository:
         performs the accessibility rejection.
         """
         return await self._db_source.query_accessible_resource_group_ids(
-            domain_name=domain_name,
+            domain_id=domain_id,
             project_id=project_id,
-            access_key=access_key,
+            user_id=user_id,
+        )
+
+    @scheduler_repository_resilience.apply()
+    async def query_allowed_resource_groups(
+        self,
+        *,
+        domain_id: DomainID,
+        project_ids: Sequence[ProjectID],
+        user_id: UserID,
+    ) -> list[ResourceGroupData]:
+        """Return the active resource groups the user may schedule on, in name order."""
+        return await self._db_source.query_allowed_resource_groups(
+            domain_id=domain_id,
+            project_ids=project_ids,
+            user_id=user_id,
         )
 
     @scheduler_repository_resilience.apply()

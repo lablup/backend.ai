@@ -9,15 +9,12 @@ from typing import (
     Any,
     Self,
     cast,
-    overload,
     override,
 )
 
 import sqlalchemy as sa
 from pydantic import ConfigDict, Field, field_serializer
 from sqlalchemy.dialects import postgresql as pgsql
-from sqlalchemy.engine.row import Row
-from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import (
     Mapped,
@@ -30,7 +27,6 @@ from sqlalchemy.orm import (
 from sqlalchemy.sql.expression import SQLColumnExpression, false, true
 
 from ai.backend.common.data.entity.domain import DomainID
-from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.schema.resource_group import PreemptionConfig
 from ai.backend.common.types import (
@@ -51,7 +47,6 @@ from ai.backend.manager.models.base import (
     PydanticColumn,
 )
 from ai.backend.manager.models.mixins.timestamp import CreatedAtMixin
-from ai.backend.manager.models.project import resolve_group_name_or_id, resolve_groups
 from ai.backend.manager.models.rbac import (
     AbstractPermissionContext,
     AbstractPermissionContextBuilder,
@@ -78,8 +73,6 @@ __all__: Sequence[str] = (
     "sgroups_for_domains",
     "sgroups_for_groups",
     "sgroups_for_keypairs",
-    # functions
-    "query_allowed_sgroups",
 )
 
 
@@ -448,91 +441,6 @@ class ResourceGroupModel(RBACModel[ResourceGroupPermission]):
             _permissions=frozenset(permissions),
             orm_obj=row,
         )
-
-
-@overload
-async def query_allowed_sgroups(
-    db_conn: SAConnection,
-    domain_name: str,
-    group: ProjectID,
-    access_key: str,
-) -> Sequence[Row[Any]]: ...
-
-
-@overload
-async def query_allowed_sgroups(
-    db_conn: SAConnection,
-    domain_name: str,
-    group: Iterable[ProjectID],
-    access_key: str,
-) -> Sequence[Row[Any]]: ...
-
-
-@overload
-async def query_allowed_sgroups(
-    db_conn: SAConnection,
-    domain_name: str,
-    group: str,
-    access_key: str,
-) -> Sequence[Row[Any]]: ...
-
-
-@overload
-async def query_allowed_sgroups(
-    db_conn: SAConnection,
-    domain_name: str,
-    group: Iterable[str],
-    access_key: str,
-) -> Sequence[Row[Any]]: ...
-
-
-async def query_allowed_sgroups(
-    db_conn: SAConnection,
-    domain_name: str,
-    group: ProjectID | Iterable[ProjectID] | str | Iterable[str],
-    access_key: str,
-) -> Sequence[Row[Any]]:
-    from ai.backend.manager.models.domain import DomainRow
-
-    query = sa.select(sgroups_for_domains).where(
-        sgroups_for_domains.c.domain_id
-        == sa.select(DomainRow.id).where(DomainRow.name == domain_name).scalar_subquery()
-    )
-    result = await db_conn.execute(query)
-    from_domain = {row.resource_group_id for row in result}
-
-    group_ids: Sequence[uuid.UUID] = []
-    match group:
-        case uuid.UUID() | str():
-            if group_id := await resolve_group_name_or_id(db_conn, domain_name, group):
-                group_ids = [group_id]
-            else:
-                group_ids = []
-        case list() | tuple() | set():
-            group_ids = await resolve_groups(db_conn, domain_name, cast(Iterable[Any], group))
-    from_group: set[ResourceGroupID]
-    if not group_ids:
-        from_group = set()  # empty
-    else:
-        group_cond = sgroups_for_groups.c.group.in_(group_ids)
-        query = sa.select(sgroups_for_groups).where(group_cond)
-        result = await db_conn.execute(query)
-        from_group = {row.resource_group_id for row in result}
-
-    query = sa.select(sgroups_for_keypairs).where(sgroups_for_keypairs.c.access_key == access_key)
-    result = await db_conn.execute(query)
-    from_keypair = {row.resource_group_id for row in result}
-
-    sgroup_ids = from_domain | from_group | from_keypair
-    query = (
-        sa.select(resource_groups)
-        .where(
-            (resource_groups.c.id.in_(sgroup_ids)) & (resource_groups.c.is_active),
-        )
-        .order_by(resource_groups.c.name)
-    )
-    result = await db_conn.execute(query)
-    return [row for row in result]
 
 
 ALL_SCALING_GROUP_PERMISSIONS: frozenset[ResourceGroupPermission] = frozenset([
