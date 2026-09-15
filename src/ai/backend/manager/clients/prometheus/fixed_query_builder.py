@@ -31,6 +31,25 @@ _DIFF_TEMPLATE: Final[str] = (
     + CONTAINER_UTILIZATION_METRIC_NAME
     + "{${{labels}}}[${{window}}]))"
 )
+# The `> 0` on capacity drops the series instead of dividing by zero.
+_PCT_CURRENT_SELECTOR: Final[str] = (
+    CONTAINER_UTILIZATION_METRIC_NAME + '{${{labels}},value_type="current"}'
+)
+_PCT_CAPACITY_SELECTOR: Final[str] = (
+    CONTAINER_UTILIZATION_METRIC_NAME + '{${{labels}},value_type="capacity"}'
+)
+_PCT_TEMPLATE: Final[str] = (
+    "label_replace("
+    "sum by (${{group_by}})(" + _PCT_CURRENT_SELECTOR + ")"
+    " / (sum by (${{group_by}})(" + _PCT_CAPACITY_SELECTOR + ") > 0)"
+    ' * 100, "value_type", "pct", "", "")'
+)
+_PCT_RATE_TEMPLATE: Final[str] = (
+    "label_replace("
+    "sum by (${{group_by}})(rate(" + _PCT_CURRENT_SELECTOR + "[${{window}}]))"
+    " / (sum by (${{group_by}})(" + _PCT_CAPACITY_SELECTOR + ") > 0)"
+    ' * 100, "value_type", "pct", "", "")'
+)
 _LIVE_STAT_MAX_TEMPLATE: Final[str] = "max_over_time((" + _GAUGE_TEMPLATE + ")[${{window}}:])"
 _LIVE_STAT_AVG_TEMPLATE: Final[str] = "avg_over_time((" + _GAUGE_TEMPLATE + ")[${{window}}:])"
 _LIVE_STAT_RATE_MAX_TEMPLATE: Final[str] = "max_over_time((" + _RATE_TEMPLATE + ")[${{window}}:])"
@@ -94,7 +113,6 @@ class ContainerMetricQueryBuilder:
         metric_name: str,
         label: ContainerMetricOptionalLabel,
     ) -> MetricPreset:
-        metric_type = self.get_container_metric_type(metric_name, label)
         querier = ContainerMetricQuerier(
             metric_name=metric_name,
             value_type=ValueType(label.value_type.value),
@@ -105,20 +123,27 @@ class ContainerMetricQueryBuilder:
             project_id=label.project_id,
         )
         return MetricPreset(
-            template=self._get_template(metric_type),
+            template=self._get_template(metric_name, label),
             labels=querier.labels(),
             group_by=querier.group_by_labels(),
             window=self._timewindow,
         )
 
-    def _get_template(self, metric_type: MetricType) -> str:
-        match metric_type:
+    def _get_template(self, metric_name: str, label: ContainerMetricOptionalLabel) -> str:
+        if label.value_type == ValueType.PCT:
+            return self._get_pct_template(metric_name)
+        match self.get_container_metric_type(metric_name, label):
             case MetricType.GAUGE:
                 return _GAUGE_TEMPLATE
             case MetricType.RATE:
                 return _RATE_TEMPLATE
             case MetricType.DIFF:
                 return _DIFF_TEMPLATE
+
+    def _get_pct_template(self, metric_name: str) -> str:
+        if metric_name in DIFF_METRICS or metric_name in RATE_METRICS:
+            return _PCT_RATE_TEMPLATE
+        return _PCT_TEMPLATE
 
 
 class ContainerLiveStatQueryBuilder:

@@ -3934,7 +3934,7 @@ type ContainerUtilizationMetric
 {
   metric_name: String
 
-  """One of 'current', 'capacity'."""
+  """One of 'current', 'capacity', 'pct'."""
   value_type: String
   values: [MetricResultValue]
 
@@ -24907,7 +24907,7 @@ type UserUtilizationMetric
 input UserUtilizationMetricQueryInput
   @join__type(graph: GRAPHENE)
 {
-  """One of 'current', 'capacity'. Default value is 'current'."""
+  """One of 'current', 'capacity', 'pct'. Default value is 'current'."""
   value_type: String = "current"
 
   """metric name of container utilization. For example, 'cpu_util', 'mem'."""
