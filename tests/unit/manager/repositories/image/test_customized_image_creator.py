@@ -347,7 +347,7 @@ class TestImageOwnershipGraph:
                 owner_user_id=user_id,
             )
 
-        db_source = SessionDBSource(db_with_cleanup)
+        db_source = SessionDBSource(db_with_cleanup, V2DBOpsProvider(db_with_cleanup))
 
         assert await db_source.get_customized_image_count(user_id) == 2
 
@@ -366,7 +366,7 @@ class TestImageOwnershipGraph:
             owner_user_id=other_id,
         )
 
-        db_source = SessionDBSource(db_with_cleanup)
+        db_source = SessionDBSource(db_with_cleanup, V2DBOpsProvider(db_with_cleanup))
 
         assert await db_source.get_customized_image_count(user_id) == 0
 
@@ -385,7 +385,7 @@ class TestImageOwnershipGraph:
             status=ImageStatus.DELETED,
         )
 
-        db_source = SessionDBSource(db_with_cleanup)
+        db_source = SessionDBSource(db_with_cleanup, V2DBOpsProvider(db_with_cleanup))
 
         assert await db_source.get_customized_image_count(user_id) == 0
 
@@ -398,7 +398,7 @@ class TestImageOwnershipGraph:
         user_id = await self._create_user(db_with_cleanup, domain_id, "owner@test.io")
         await self._create_image(db_with_cleanup, registry_id, "a")
 
-        db_source = SessionDBSource(db_with_cleanup)
+        db_source = SessionDBSource(db_with_cleanup, V2DBOpsProvider(db_with_cleanup))
 
         assert await db_source.get_customized_image_count(user_id) == 0
 

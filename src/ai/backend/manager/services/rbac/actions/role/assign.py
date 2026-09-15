@@ -1,33 +1,39 @@
+from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.manager.actions.action import BaseActionResult
+from ai.backend.common.data.entity.role import RoleID
+from ai.backend.common.data.entity.types import EntityIdentifier
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.manager.actions.types import ActionOperationType
+from ai.backend.manager.actions.v2.relation.base import BaseRelationAction
 from ai.backend.manager.data.permission.role import (
     UserRoleAssignmentData,
     UserRoleAssignmentInput,
 )
-from ai.backend.manager.services.rbac.actions.role.base import RoleAction
 
 
-@dataclass
-class AssignRoleAction(RoleAction):
+@dataclass(frozen=True)
+class AssignRoleAction(BaseRelationAction):
+    """Grant a role to a user, and place them on the project's roster with it."""
+
     input: UserRoleAssignmentInput
-
-    @override
-    def entity_id(self) -> str | None:
-        return str(self.input.user_id)
 
     @override
     @classmethod
     def operation_type(cls) -> ActionOperationType:
         return ActionOperationType.CREATE
 
-
-@dataclass
-class AssignRoleActionResult(BaseActionResult):
-    data: UserRoleAssignmentData
+    @override
+    @classmethod
+    def action_name(cls) -> str:
+        return "assign_role"
 
     @override
-    def entity_id(self) -> str | None:
-        return None
+    def scope_targets(self) -> Sequence[EntityIdentifier]:
+        return [RoleID(self.input.role_id), UserID(self.input.user_id)]
+
+
+@dataclass(frozen=True)
+class AssignRoleActionResult:
+    data: UserRoleAssignmentData

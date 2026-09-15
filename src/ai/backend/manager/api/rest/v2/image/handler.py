@@ -15,6 +15,7 @@ from ai.backend.common.dto.manager.v2.image.request import (
     ForgetImageInput,
     PurgeImageInput,
     RestoreImageInput,
+    ScopedSearchImagesInput,
     UpdateImageInput,
 )
 from ai.backend.logging import BraceStyleAdapter
@@ -37,6 +38,14 @@ class V2ImageHandler:
     ) -> APIResponse:
         """Search images with admin scope."""
         result = await self._adapter.admin_search(body.parsed)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def scoped_search_images(
+        self,
+        body: BodyParam[ScopedSearchImagesInput],
+    ) -> APIResponse:
+        """Search the images the named scopes reach."""
+        result = await self._adapter.scoped_search(body.parsed)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
     async def admin_search_image_aliases(

@@ -117,6 +117,7 @@ from .deployment import (
     # Route
     route,
     routes,
+    scoped_deployments,
     sync_replicas,
     update_auto_scaling_rule,
     update_deployment_policy,
@@ -211,6 +212,7 @@ from .image import (
     image_alias,
     image_scoped_aliases,
     image_v2,
+    scoped_images_v2,
 )
 from .image_federation import Image as _ImageStub
 from .kernel.resolver import admin_kernels_v2, kernel_v2, session_kernels_v2
@@ -354,6 +356,7 @@ from .rbac import (
     admin_update_permission,
     admin_update_role,
     my_roles,
+    my_roles_v2,
     project_roles,
     rbac_entity_operation_combinations,
     rbac_permission_matrix,
@@ -500,6 +503,7 @@ from .session.resolver import (
     exclude_session_idle_checks,
     include_session_idle_checks,
     project_sessions_v2,
+    scoped_sessions_v2,
     session_v2,
     terminate_sessions_v2,
 )
@@ -547,6 +551,7 @@ from .vfolder_v2 import (
     project_vfolders,
     purge_vfolder_v2,
     restore_vfolder_v2,
+    scoped_vfolders_v2,
     vfolder_create_download_session_v2,
     vfolder_create_upload_session_v2,
     vfolder_delete_files_v2,
@@ -633,6 +638,7 @@ class Query:
     admin_project_usage_buckets = admin_project_usage_buckets
     admin_user_usage_buckets = admin_user_usage_buckets
     admin_images_v2 = admin_images_v2
+    scoped_images_v2 = scoped_images_v2
     admin_kernels_v2 = admin_kernels_v2
     admin_audit_logs_v2 = admin_audit_logs_v2
     scoped_audit_logs_v2 = scoped_audit_logs_v2
@@ -645,8 +651,10 @@ class Query:
     admin_login_history_v2 = admin_login_history_v2
     admin_sessions_v2 = admin_sessions_v2
     project_sessions_v2 = project_sessions_v2
+    scoped_sessions_v2 = scoped_sessions_v2
     session_v2 = session_v2
     project_deployments = project_deployments
+    scoped_deployments = scoped_deployments
     my_deployments = my_deployments
     resource_slot_type = resource_slot_type
     resource_slot_types = resource_slot_types
@@ -679,6 +687,7 @@ class Query:
     my_login_history_v2 = my_login_history_v2
     # RBAC User APIs
     my_roles = my_roles
+    my_roles_v2 = my_roles_v2
     # RBAC Scoped APIs
     project_roles = project_roles
     rbac_scope_entity_combinations = rbac_scope_entity_combinations
@@ -799,6 +808,7 @@ class Query:
     admin_vfolders_v2 = admin_vfolders_v2
     vfolder_v2 = vfolder_v2
     project_vfolders = project_vfolders
+    scoped_vfolders_v2 = scoped_vfolders_v2
     my_vfolders = my_vfolders
 
 

@@ -25,6 +25,7 @@ from .role import (
     admin_roles,
     admin_update_role,
     my_roles,
+    my_roles_v2,
     project_roles,
 )
 
@@ -47,6 +48,7 @@ __all__ = [
     "admin_roles",
     "admin_role_assignments",
     "my_roles",
+    "my_roles_v2",
     "project_roles",
     # Role mutations
     "admin_create_role",

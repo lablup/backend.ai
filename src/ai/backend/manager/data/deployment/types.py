@@ -971,7 +971,7 @@ class DeploymentInfoWithAutoScalingRules:
 
 
 @dataclass
-class ModelDeploymentAutoScalingRuleData:
+class ModelDeploymentAutoScalingRuleData(FieldData):
     id: UUID
     model_deployment_id: UUID
     metric_source: AutoScalingMetricSource
@@ -1213,6 +1213,7 @@ class ModelDeploymentData(EntityData):
     policy: DeploymentPolicyData | None = None
     access_token_ids: list[UUID] | None = None
     sub_step: DeploymentLifecycleSubStep | None = None
+    primary_replica_group_id: ReplicaGroupID | None = None
 
     @override
     def entity_id(self) -> EntityIdentifier:

@@ -15,13 +15,15 @@ from ai.backend.common.exception import (
 )
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.errors.base.entity import EntityError, EntityErrorCode
-from ai.backend.manager.errors.base.field import FieldError, FieldErrorCode
+from ai.backend.manager.errors.base.field import FieldError, FieldErrorCode, FieldNotFoundError
 
 __all__ = (
     "InvalidFieldPermission",
+    "InvalidRoleSeed",
     "InvalidPermissionOperation",
     "NotEnoughPermission",
     "PermissionAlreadyGranted",
+    "PermissionNotFound",
     "ReplaceRolePermissionRoleIdMismatch",
     "RoleAlreadyAssigned",
     "RoleNotAssigned",
@@ -63,6 +65,19 @@ class RoleNotAssigned(BackendAIError, web.HTTPBadRequest):
             operation=ErrorOperation.HARD_DELETE,
             error_detail=ErrorDetail.NOT_FOUND,
         )
+
+
+class PermissionNotFound(FieldNotFoundError):
+    error_type = "https://api.backend.ai/probs/permission-not-found"
+    error_title = "The permission entry does not exist."
+
+    def __init__(
+        self,
+        extra_msg: str | None = None,
+        *,
+        operation: ActionOperationType = ActionOperationType.GET,
+    ) -> None:
+        super().__init__(extra_msg, field_type=PermissionFieldType(), operation=operation)
 
 
 class PermissionAlreadyGranted(FieldError, web.HTTPConflict):
@@ -147,4 +162,17 @@ class ReplaceRolePermissionRoleIdMismatch(FieldError, web.HTTPBadRequest):
     def field_error_code(self) -> FieldErrorCode:
         return FieldErrorCode(
             PermissionFieldType(), ActionOperationType.UPDATE, ErrorDetail.MISMATCH
+        )
+
+
+class InvalidRoleSeed(BackendAIError, web.HTTPInternalServerError):
+    error_type = "https://api.backend.ai/probs/invalid-role-seed"
+    error_title = "The seed role declaration is not valid."
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.ROLE,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.INVALID_PARAMETERS,
         )

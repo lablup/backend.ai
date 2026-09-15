@@ -1068,32 +1068,6 @@ class DatabaseError(BackendAIError, web.HTTPServiceUnavailable):
         )
 
 
-class UserResourcePolicyNotFound(BackendAIError, web.HTTPNotFound):
-    error_type = "https://api.backend.ai/probs/user-resource-policy-not-found"
-    error_title = "User Resource Policy Not Found"
-
-    @override
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.USER_RESOURCE_POLICY,
-            operation=ErrorOperation.READ,
-            error_detail=ErrorDetail.NOT_FOUND,
-        )
-
-
-class KeypairResourcePolicyNotFound(BackendAIError, web.HTTPNotFound):
-    error_type = "https://api.backend.ai/probs/keypair-resource-policy-not-found"
-    error_title = "Keypair Resource Policy Not Found"
-
-    @override
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.KEYPAIR_RESOURCE_POLICY,
-            operation=ErrorOperation.READ,
-            error_detail=ErrorDetail.NOT_FOUND,
-        )
-
-
 class BaseNFSMountCheckFailed(BackendAIError):
     pass
 

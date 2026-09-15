@@ -43,7 +43,8 @@ from ai.backend.manager.models.rbac_models.permission.creators import RolePermis
 from ai.backend.manager.models.rbac_models.permission.purgers import RolePermissionPurger
 from ai.backend.manager.models.rbac_models.permission.scopes import PermissionOperationScope
 from ai.backend.manager.models.rbac_models.permission.updaters import RolePermissionUpdater
-from ai.backend.manager.models.rbac_models.role.scopes import ScopedRoleOperationScope
+from ai.backend.manager.models.rbac_models.user_role.searchers import RoleAssignmentSearcher
+from ai.backend.manager.models.scopes import OperationScope
 from ai.backend.manager.models.specs.permission import PermissionEntry
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base.querier import BatchQuerier
@@ -99,7 +100,7 @@ class PermissionControllerRepository:
         Returns the deleted permission data.
 
         Raises:
-            ObjectNotFound: If permission does not exist.
+            PermissionNotFound: If permission does not exist.
         """
         return await self._db_source.delete_permission(purger)
 
@@ -114,7 +115,7 @@ class PermissionControllerRepository:
         Returns the updated permission data.
 
         Raises:
-            ObjectNotFound: If permission does not exist.
+            PermissionNotFound: If permission does not exist.
         """
         return await self._db_source.update_permission(updater)
 
@@ -169,10 +170,10 @@ class PermissionControllerRepository:
     async def search_roles_in_scope(
         self,
         querier: BatchQuerier,
-        scope: ScopedRoleOperationScope,
+        scopes: Sequence[OperationScope],
     ) -> RoleListResult:
-        """Search roles registered in a project scope."""
-        return await self._db_source.search_roles_in_scope(querier=querier, scope=scope)
+        """Search the roles the named scopes reach, combined with OR."""
+        return await self._db_source.search_roles_in_scope(querier=querier, scopes=scopes)
 
     @permission_controller_repository_resilience.apply()
     async def search_permissions(
@@ -190,13 +191,22 @@ class PermissionControllerRepository:
         return result.to_detail_data_without_users()
 
     @permission_controller_repository_resilience.apply()
-    async def search_users_assigned_to_role(
+    async def search_role_assignments_in_global(
         self,
-        querier: BatchQuerier,
+        searcher: RoleAssignmentSearcher,
     ) -> AssignedUserListResult:
-        """Searches users assigned to a specific role with pagination and filtering."""
-        return await self._db_source.search_users_assigned_to_role(
-            querier=querier,
+        """Search every assignment row, with no scope filter."""
+        return await self._db_source.search_role_assignments_in_global(searcher)
+
+    @permission_controller_repository_resilience.apply()
+    async def search_role_assignments_in_scope(
+        self,
+        scopes: Sequence[OperationScope],
+        searcher: RoleAssignmentSearcher,
+    ) -> AssignedUserListResult:
+        """Search the assignment rows the named scopes reach, combined with OR."""
+        return await self._db_source.search_role_assignments_in_scope(
+            scopes=scopes, searcher=searcher
         )
 
     @permission_controller_repository_resilience.apply()

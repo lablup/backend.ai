@@ -1,3 +1,10 @@
+"""Frozen user-side inputs for the RBAC data migrations.
+
+Deprecated: read only by `models/alembic/versions/`. The `grant:*` operations
+listed here are retired -- sharing an entity is `entity_share`, not a permission
+bit.
+"""
+
 import enum
 import uuid
 from dataclasses import dataclass

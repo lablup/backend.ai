@@ -5,6 +5,7 @@ from collections.abc import Sequence
 from uuid import UUID
 
 from ai.backend.common.contexts.user import current_user
+from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.model_card import ModelCardID
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.user import UserID
@@ -44,6 +45,7 @@ from ai.backend.common.dto.manager.v2.model_card.response import (
 from ai.backend.common.dto.manager.v2.model_card.types import (
     ModelCardAccessLevel,
     ModelCardOrderField,
+    ModelCardScope,
 )
 from ai.backend.common.exception import UnreachableError
 from ai.backend.common.schema.deployment import BlueGreenSpec, RollingUpdateSpec
@@ -96,8 +98,11 @@ from ai.backend.manager.services.model_card.actions.delete import DeleteModelCar
 from ai.backend.manager.services.model_card.actions.get import GetModelCardAction
 from ai.backend.manager.services.model_card.actions.scan import ScanProjectModelCardsAction
 from ai.backend.manager.services.model_card.actions.scoped_search import (
+    DomainModelCardScopeItem,
     ModelCardScopeItem,
+    ProjectModelCardScopeItem,
     ScopedSearchModelCardsAction,
+    UserModelCardScopeItem,
 )
 from ai.backend.manager.services.model_card.actions.scoped_search_requirements import (
     ScopedSearchModelCardResourceRequirementsAction,
@@ -205,6 +210,21 @@ class ModelCardAdapter(BaseAdapter):
             has_previous_page=result.has_previous_page,
         )
 
+    def _scope_items(self, scope: ModelCardScope) -> list[ModelCardScopeItem]:
+        """The scope items the request named, in the order the input lists them."""
+        items: list[ModelCardScopeItem] = [
+            DomainModelCardScopeItem(domain_id=DomainID(entry.value))
+            for entry in scope.domain or ()
+        ]
+        items.extend(
+            ProjectModelCardScopeItem(project_id=ProjectID(entry.value))
+            for entry in scope.project or ()
+        )
+        items.extend(
+            UserModelCardScopeItem(user_id=UserID(entry.value)) for entry in scope.user or ()
+        )
+        return items
+
     async def scoped_search(
         self,
         input: ScopedSearchModelCardsInput,
@@ -226,10 +246,7 @@ class ModelCardAdapter(BaseAdapter):
         )
         result = await self._model_card.scoped_search.run(
             ScopedSearchModelCardsAction(
-                items=[
-                    ModelCardScopeItem(project_id=ProjectID(entry.value))
-                    for entry in input.scope.project or ()
-                ],
+                items=self._scope_items(input.scope),
                 searcher=searcher,
             )
         )
@@ -261,7 +278,8 @@ class ModelCardAdapter(BaseAdapter):
         )
         result = await self._model_card.scoped_search.run(
             ScopedSearchModelCardsAction(
-                items=[ModelCardScopeItem(project_id=ProjectID(project_id))], searcher=searcher
+                items=[ProjectModelCardScopeItem(project_id=ProjectID(project_id))],
+                searcher=searcher,
             )
         )
         return SearchModelCardsPayload(

@@ -36,15 +36,24 @@ class ModelCardAvailablePresetsScope(BaseRequestModel):
 class ModelCardScope(BaseRequestModel):
     """Scope for the scoped model card query.
 
-    Each list is OR'd internally. Raises an error if every field is empty.
+    Each list is OR'd internally and across lists. Raises an error if every field is
+    empty.
     """
 
+    domain: list[UUIDScope] | None = Field(
+        default=None, description="Domains whose model cards are being read"
+    )
     project: list[UUIDScope] | None = Field(
         default=None, description="Projects whose model cards are being read"
+    )
+    user: list[UUIDScope] | None = Field(
+        default=None, description="Users whose model cards are being read"
     )
 
     @model_validator(mode="after")
     def _require_non_empty(self) -> ModelCardScope:
-        if not self.project:
-            raise ValueError("ModelCardScope requires a non-empty value for 'project'")
+        if not self.domain and not self.project and not self.user:
+            raise ValueError(
+                "ModelCardScope requires a non-empty value for 'domain', 'project' or 'user'"
+            )
         return self

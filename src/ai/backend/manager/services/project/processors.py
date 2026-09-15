@@ -1,5 +1,6 @@
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.manager.actions.registry.group import ProcessorGroup
+from ai.backend.manager.actions.v2.bulk.partial_processor import PartialBulkActionProcessor
 from ai.backend.manager.actions.v2.global_scope.processor import GlobalActionProcessor
 from ai.backend.manager.actions.v2.lookup.processor import LookupActionProcessor
 from ai.backend.manager.actions.v2.ops.result import (
@@ -12,6 +13,7 @@ from ai.backend.manager.actions.v2.ops.result import (
 from ai.backend.manager.actions.v2.scope.processor import ScopeActionProcessor
 from ai.backend.manager.actions.v2.single_entity.processor import SingleEntityActionProcessor
 from ai.backend.manager.data.project.types import ProjectData
+from ai.backend.manager.services.project.actions.bulk_get import BulkGetProjectsAction
 from ai.backend.manager.services.project.actions.create_project import CreateProjectAction
 from ai.backend.manager.services.project.actions.create_project_dotfile import (
     CreateProjectDotfileAction,
@@ -57,6 +59,7 @@ from ai.backend.manager.services.project.service import ProjectService
 class ProjectProcessors:
     lookup: LookupActionProcessor[LookupProjectAction, LookupOpsResult[ProjectID]]
     get_project: SingleEntityActionProcessor[GetProjectAction, EntityOpsResult[ProjectData]]
+    bulk_get: PartialBulkActionProcessor[BulkGetProjectsAction, ProjectData]
     global_search: GlobalActionProcessor[GlobalSearchProjectsAction, BatchOpsResult[ProjectData]]
     scoped_search: ScopeActionProcessor[
         ScopedSearchProjectsAction, ScopedBatchOpsResult[ProjectData]
@@ -85,6 +88,7 @@ class ProjectProcessors:
     ) -> None:
         self.lookup = group.public_lookup_ops(LookupProjectAction)
         self.get_project = group.single_get_ops(GetProjectAction)
+        self.bulk_get = group.partial_bulk_get_ops(BulkGetProjectsAction)
         self.global_search = group.global_search_ops(GlobalSearchProjectsAction)
         self.scoped_search = group.scope_search_ops(ScopedSearchProjectsAction)
         self.create_project = group.role_managed_create_ops(CreateProjectAction)

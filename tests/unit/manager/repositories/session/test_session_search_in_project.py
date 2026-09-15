@@ -1,5 +1,5 @@
 """
-Tests for SessionRepository.search_in_project() functionality.
+Tests for the project scope over sessions.
 Verifies that project-scoped session search returns only sessions belonging to the target project.
 """
 
@@ -10,10 +10,13 @@ from collections.abc import AsyncGenerator
 from datetime import datetime
 
 import pytest
+import sqlalchemy as sa
 from dateutil.tz import tzutc
 
 from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.project import ProjectEntityType
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
+from ai.backend.common.data.entity.session import SessionEntityType
 from ai.backend.common.types import (
     AccessKey,
     ClusterMode,
@@ -42,19 +45,18 @@ from ai.backend.manager.models.resource_policy import (
 from ai.backend.manager.models.resource_slot import ResourceAllocationRow, ResourceSlotTypeRow
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.session.scopes import ProjectSessionOperationScope
-from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
+from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
 from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
-from ai.backend.manager.repositories.base import BatchQuerier
-from ai.backend.manager.repositories.session.repository import SessionRepository
 from ai.backend.manager.secret.types import SecretValue
 from ai.backend.testutils.db import with_tables
+from ai.backend.testutils.virtual_entity import VirtualEntitySeeder
 
 
 class TestSessionSearchInProject:
-    """Tests for SessionRepository.search_in_project()"""
+    """Tests for ProjectSessionOperationScope."""
 
     @pytest.fixture
     def test_domain_id(self) -> DomainID:
@@ -89,16 +91,10 @@ class TestSessionSearchInProject:
                 ResourceAllocationRow,
                 VirtualEntityRow,
                 EntityMembershipRow,
+                ScopeBindingRow,
             ],
         ):
             yield database_connection
-
-    @pytest.fixture
-    def session_repository(
-        self,
-        db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> SessionRepository:
-        return SessionRepository(db_with_cleanup)
 
     @pytest.fixture
     async def test_data(
@@ -314,6 +310,16 @@ class TestSessionSearchInProject:
                 )
             await db_sess.flush()
 
+            seeder = VirtualEntitySeeder()
+            for sid, project_id in [
+                (session_a1_id, project_a_id),
+                (session_a2_id, project_a_id),
+                (session_b1_id, project_b_id),
+            ]:
+                await seeder.create_in(
+                    db_sess, SessionEntityType(), sid, [(ProjectEntityType(), project_id)]
+                )
+
         yield {
             "project_a_id": project_a_id,
             "project_b_id": project_b_id,
@@ -322,59 +328,29 @@ class TestSessionSearchInProject:
             "session_b1_id": session_b1_id,
         }
 
+    async def _scoped_ids(self, db: ExtendedAsyncSAEngine, project_id: uuid.UUID) -> set[uuid.UUID]:
+        scope = ProjectSessionOperationScope(project_id=project_id)
+        async with db.begin_readonly_session() as sess:
+            rows = await sess.scalars(sa.select(SessionRow.id).where(scope.to_condition()()))
+            return set(rows)
+
     async def test_returns_only_sessions_in_target_project(
         self,
-        session_repository: SessionRepository,
+        db_with_cleanup: ExtendedAsyncSAEngine,
         test_data: dict[str, uuid.UUID],
     ) -> None:
-        """search_in_project returns only sessions belonging to the specified project."""
-        scope = ProjectSessionOperationScope(project_id=test_data["project_a_id"])
-        querier = BatchQuerier(
-            pagination=OffsetPagination(limit=10, offset=0),
-            conditions=[],
-            orders=[],
-        )
-
-        result = await session_repository.search_in_project(querier, scope)
-
-        assert result.total_count == 2
-        assert len(result.items) == 2
-        returned_ids = {item.id for item in result.items}
-        assert returned_ids == {test_data["session_a1_id"], test_data["session_a2_id"]}
+        """The project scope narrows to the sessions that project holds."""
+        assert await self._scoped_ids(db_with_cleanup, test_data["project_a_id"]) == {
+            test_data["session_a1_id"],
+            test_data["session_a2_id"],
+        }
 
     async def test_does_not_return_sessions_from_other_project(
         self,
-        session_repository: SessionRepository,
+        db_with_cleanup: ExtendedAsyncSAEngine,
         test_data: dict[str, uuid.UUID],
     ) -> None:
-        """search_in_project for project_b returns only its session, not project_a's."""
-        scope = ProjectSessionOperationScope(project_id=test_data["project_b_id"])
-        querier = BatchQuerier(
-            pagination=OffsetPagination(limit=10, offset=0),
-            conditions=[],
-            orders=[],
-        )
-
-        result = await session_repository.search_in_project(querier, scope)
-
-        assert result.total_count == 1
-        assert len(result.items) == 1
-        assert result.items[0].id == test_data["session_b1_id"]
-
-    async def test_pagination_fields(
-        self,
-        session_repository: SessionRepository,
-        test_data: dict[str, uuid.UUID],
-    ) -> None:
-        """search_in_project returns correct pagination fields."""
-        scope = ProjectSessionOperationScope(project_id=test_data["project_a_id"])
-        querier = BatchQuerier(
-            pagination=OffsetPagination(limit=10, offset=0),
-            conditions=[],
-            orders=[],
-        )
-
-        result = await session_repository.search_in_project(querier, scope)
-
-        assert result.has_next_page is False
-        assert result.has_previous_page is False
+        """A sibling project reaches its own session and no other."""
+        assert await self._scoped_ids(db_with_cleanup, test_data["project_b_id"]) == {
+            test_data["session_b1_id"]
+        }

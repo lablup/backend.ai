@@ -1,6 +1,7 @@
 from ai.backend.manager.actions.registry.group import ProcessorGroup
 from ai.backend.manager.actions.v2.global_scope.processor import GlobalActionProcessor
 from ai.backend.manager.actions.v2.lookup.processor import LookupActionProcessor
+from ai.backend.manager.actions.v2.ops.result import ScopedBatchOpsResult
 from ai.backend.manager.actions.v2.scope.processor import ScopeActionProcessor
 from ai.backend.manager.actions.v2.single_entity.processor import SingleEntityActionProcessor
 from ai.backend.manager.data.vfolder.types import VFolderData
@@ -56,17 +57,12 @@ from ai.backend.manager.services.vfolder.actions.lookup import (
     LookupVFolderAction,
     LookupVFolderActionResult,
 )
-from ai.backend.manager.services.vfolder.actions.search_in_project import (
-    SearchVFoldersInProjectAction,
-    SearchVFoldersInProjectActionResult,
+from ai.backend.manager.services.vfolder.actions.scoped_search import (
+    ScopedSearchVFoldersAction,
 )
 from ai.backend.manager.services.vfolder.actions.search_storage_host_permissions import (
     SearchStorageHostPermissionsAction,
     SearchStorageHostPermissionsActionResult,
-)
-from ai.backend.manager.services.vfolder.actions.search_user_vfolders import (
-    SearchUserVFoldersAction,
-    SearchUserVFoldersActionResult,
 )
 from ai.backend.manager.services.vfolder.actions.storage_ops import (
     ChangeVFolderOwnershipAction,
@@ -113,11 +109,8 @@ class VFolderProcessors:
     create_vfolder: ScopeActionProcessor[CreateVFolderAction, CreateVFolderActionResult]
     get_vfolder: SingleEntityActionProcessor[GetVFolderAction, GetVFolderActionResult]
     list_vfolder: ScopeActionProcessor[ListVFolderAction, ListVFolderActionResult]
-    search_vfolders_in_project: ScopeActionProcessor[
-        SearchVFoldersInProjectAction, SearchVFoldersInProjectActionResult
-    ]
-    search_user_vfolders: ScopeActionProcessor[
-        SearchUserVFoldersAction, SearchUserVFoldersActionResult
+    scoped_search: ScopeActionProcessor[
+        ScopedSearchVFoldersAction, ScopedBatchOpsResult[VFolderData]
     ]
     update_vfolder_attribute: SingleEntityActionProcessor[
         UpdateVFolderAttributeAction, UpdateVFolderAttributeActionResult
@@ -190,12 +183,7 @@ class VFolderProcessors:
         # Scope actions with RBAC validation
         self.create_vfolder = group.scope(CreateVFolderAction, service.create)
         self.list_vfolder = group.scope(ListVFolderAction, service.list)
-        self.search_vfolders_in_project = group.scope(
-            SearchVFoldersInProjectAction, service.search_in_project
-        )
-        self.search_user_vfolders = group.scope(
-            SearchUserVFoldersAction, service.search_user_vfolders
-        )
+        self.scoped_search = group.scope_search_ops(ScopedSearchVFoldersAction)
 
         # Single entity actions with RBAC validation
         self.get_vfolder = group.single_entity(GetVFolderAction, service.get)

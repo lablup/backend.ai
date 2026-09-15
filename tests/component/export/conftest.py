@@ -57,7 +57,7 @@ def server_module_registries(
             ExportHandler(
                 export=export_processors,
                 domain=DomainProcessors(
-                    processor_registry.group(GroupMeta(DomainEntityType())), AsyncMock(), []
+                    processor_registry.group(GroupMeta(DomainEntityType())), AsyncMock()
                 ),
                 export_config=MagicMock(),
             ),

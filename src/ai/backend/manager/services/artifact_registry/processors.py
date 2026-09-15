@@ -6,6 +6,8 @@ from ai.backend.manager.actions.v2.lookup.processor import LookupActionProcessor
 from ai.backend.manager.actions.v2.ops.result import LookupOpsResult
 from ai.backend.manager.actions.v2.single_entity.processor import SingleEntityActionProcessor
 from ai.backend.manager.data.artifact_registries.types import ArtifactRegistryData
+from ai.backend.manager.data.huggingface_registry.types import HuggingFaceRegistryConnectionData
+from ai.backend.manager.data.reservoir_registry.types import ReservoirRegistryConnectionData
 from ai.backend.manager.services.artifact_registry.actions.common.get_meta import (
     GetArtifactRegistryMetaAction,
     GetArtifactRegistryMetaActionResult,
@@ -16,6 +18,9 @@ from ai.backend.manager.services.artifact_registry.actions.common.get_multi impo
 from ai.backend.manager.services.artifact_registry.actions.common.search import (
     SearchArtifactRegistriesAction,
     SearchArtifactRegistriesActionResult,
+)
+from ai.backend.manager.services.artifact_registry.actions.huggingface.bulk_get import (
+    BulkGetHuggingFaceRegistriesAction,
 )
 from ai.backend.manager.services.artifact_registry.actions.huggingface.create import (
     CreateHuggingFaceRegistryAction,
@@ -47,6 +52,9 @@ from ai.backend.manager.services.artifact_registry.actions.huggingface.update im
 )
 from ai.backend.manager.services.artifact_registry.actions.lookup import (
     LookupArtifactRegistryAction,
+)
+from ai.backend.manager.services.artifact_registry.actions.reservoir.bulk_get import (
+    BulkGetReservoirRegistriesAction,
 )
 from ai.backend.manager.services.artifact_registry.actions.reservoir.create import (
     CreateReservoirActionResult,
@@ -130,12 +138,23 @@ class ArtifactRegistryProcessors:
     get_registry_metas: PartialBulkActionProcessor[
         GetArtifactRegistryMetasAction, ArtifactRegistryData
     ]
+    # What the DataLoaders read: checked per registry.
+    bulk_get_huggingface_registries: PartialBulkActionProcessor[
+        BulkGetHuggingFaceRegistriesAction, HuggingFaceRegistryConnectionData
+    ]
+    bulk_get_reservoir_registries: PartialBulkActionProcessor[
+        BulkGetReservoirRegistriesAction, ReservoirRegistryConnectionData
+    ]
     search_artifact_registries: GlobalActionProcessor[
         SearchArtifactRegistriesAction, SearchArtifactRegistriesActionResult
     ]
 
     def __init__(
-        self, group: ProcessorGroup[ArtifactRegistryData], service: ArtifactRegistryService
+        self,
+        group: ProcessorGroup[ArtifactRegistryData],
+        huggingface_group: ProcessorGroup[HuggingFaceRegistryConnectionData],
+        reservoir_group: ProcessorGroup[ReservoirRegistryConnectionData],
+        service: ArtifactRegistryService,
     ) -> None:
         self.lookup = group.public_lookup_ops(LookupArtifactRegistryAction)
         # Scope actions with RBAC validator
@@ -185,6 +204,12 @@ class ArtifactRegistryProcessors:
             GetArtifactRegistryMetaAction, service.get_registry_meta
         )
         self.get_registry_metas = group.partial_bulk_get_ops(GetArtifactRegistryMetasAction)
+        self.bulk_get_huggingface_registries = huggingface_group.partial_bulk_get_ops(
+            BulkGetHuggingFaceRegistriesAction
+        )
+        self.bulk_get_reservoir_registries = reservoir_group.partial_bulk_get_ops(
+            BulkGetReservoirRegistriesAction
+        )
 
         # Internal/batch actions without RBAC
         self.get_huggingface_registries = group.global_scope(

@@ -59,6 +59,12 @@ def register_v2_rbac_routes(
     )
     registry.add(
         "POST",
+        "/roles/my/search",
+        handler.my_search_roles,
+        middlewares=[auth_required],
+    )
+    registry.add(
+        "POST",
         "/roles/projects/{project_id}/search",
         handler.project_search_roles,
         middlewares=[auth_required],
@@ -151,7 +157,7 @@ def register_v2_rbac_routes(
         "GET",
         "/permission-matrix",
         handler.get_permission_matrix,
-        middlewares=[superadmin_required],
+        middlewares=[auth_required],
     )
 
     return registry

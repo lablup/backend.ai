@@ -1,31 +1,37 @@
+from __future__ import annotations
+
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.actions.types import ActionOperationType
+from ai.backend.common.data.entity.permission import PermissionID
+from ai.backend.common.data.entity.role import RoleID
+from ai.backend.manager.actions.v2.field.ops import UpdateFieldOpsAction
 from ai.backend.manager.data.permission.permission import PermissionData
+from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.rbac_models.permission.updaters import RolePermissionUpdater
-from ai.backend.manager.services.permission_contoller.actions.permission import PermissionAction
+from ai.backend.manager.services.permission_contoller.actions.lookup_permission_owner import (
+    LookupRolePermissionOwnerAction,
+)
 
 
-@dataclass
-class UpdatePermissionAction(PermissionAction):
+@dataclass(frozen=True)
+class UpdatePermissionAction(
+    UpdateFieldOpsAction[PermissionID, RoleID, PermissionRow, PermissionData]
+):
+    """Change one permission entry, answered for by the role holding it."""
+
+    permission_id: PermissionID
     updater: RolePermissionUpdater
 
     @override
-    def entity_id(self) -> str | None:
-        return str(self.updater.target_id_value())
-
-    @override
     @classmethod
-    def operation_type(cls) -> ActionOperationType:
-        return ActionOperationType.UPDATE
-
-
-@dataclass
-class UpdatePermissionActionResult(BaseActionResult):
-    data: PermissionData
+    def action_name(cls) -> str:
+        return "update_permission"
 
     @override
-    def entity_id(self) -> str | None:
-        return str(self.data.id)
+    def to_owner_lookup_action(self) -> LookupRolePermissionOwnerAction:
+        return LookupRolePermissionOwnerAction(permission_id=self.permission_id)
+
+    @override
+    def to_updater(self) -> RolePermissionUpdater:
+        return self.updater

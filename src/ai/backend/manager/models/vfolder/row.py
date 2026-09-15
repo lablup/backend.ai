@@ -55,9 +55,9 @@ from ai.backend.manager.data.vfolder.types import (
 from ai.backend.manager.data.vfolder.types import VFolderMountPermission as VFolderPermission
 from ai.backend.manager.defs import is_noop_host
 from ai.backend.manager.errors.api import InvalidAPIParameters
-from ai.backend.manager.errors.common import ObjectNotFound
 from ai.backend.manager.errors.storage import (
     InsufficientStoragePermission,
+    VFolderNotFound,
 )
 from ai.backend.manager.models.base import (
     GUID,
@@ -423,7 +423,7 @@ class VFolderRow(LifecycleTimestampsMixin, Base):
 
         result = await session.scalar(query)
         if not result:
-            raise ObjectNotFound(object_name="VFolder")
+            raise VFolderNotFound()
         return result
 
     def __contains__(self, key: str) -> bool:

@@ -13,7 +13,7 @@ from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.dto.manager.query import DateTimeFilter, StringFilter, UUIDFilter
 from ai.backend.common.tristate.unset import UNSET, Unset
 
-from .types import ImageOrderField, ImageStatusType, OrderDirection
+from .types import ImageOrderField, ImageScope, ImageStatusType, OrderDirection
 
 __all__ = (
     "AdminSearchImageAliasesInput",
@@ -34,6 +34,7 @@ __all__ = (
     "ImageStatusFilterInputDTO",
     "PurgeImageInput",
     "RescanImagesInput",
+    "ScopedSearchImagesInput",
     "SearchImagesInput",
     "UpdateImageInput",
     "UUIDFilter",
@@ -204,6 +205,22 @@ class PurgeImageInput(BaseRequestModel):
 class AdminSearchImagesInput(BaseRequestModel):
     """Input for admin search of images with cursor and offset pagination."""
 
+    filter: ImageFilterInputDTO | None = Field(default=None, description="Filter conditions.")
+    order: list[ImageOrderByInputDTO] | None = Field(
+        default=None, description="Order specifications."
+    )
+    first: int | None = Field(default=None, description="Cursor pagination: number of items.")
+    after: str | None = Field(default=None, description="Cursor pagination: after cursor.")
+    last: int | None = Field(default=None, description="Cursor pagination: last N items.")
+    before: str | None = Field(default=None, description="Cursor pagination: before cursor.")
+    limit: int | None = Field(default=None, description="Offset pagination: maximum items.")
+    offset: int | None = Field(default=None, description="Offset pagination: number to skip.")
+
+
+class ScopedSearchImagesInput(BaseRequestModel):
+    """Input for searching the images the named scopes reach."""
+
+    scope: ImageScope = Field(description="Scope (OR across all items).")
     filter: ImageFilterInputDTO | None = Field(default=None, description="Filter conditions.")
     order: list[ImageOrderByInputDTO] | None = Field(
         default=None, description="Order specifications."

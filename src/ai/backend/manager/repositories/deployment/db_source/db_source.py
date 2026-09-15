@@ -88,7 +88,7 @@ from ai.backend.manager.data.deployment.types import (
     RouteStatus,
 )
 from ai.backend.manager.data.deployment_revision_preset.types import ResourceSlotEntryData
-from ai.backend.manager.data.image.types import ImageIdentifier
+from ai.backend.manager.data.image.types import ImageIdentifier, ImageStatus
 from ai.backend.manager.data.model_serving.types import AppProxyRouteEntry, RoutingData
 from ai.backend.manager.data.resource.types import ResourceGroupProxyTarget
 from ai.backend.manager.data.session.creation import (
@@ -106,6 +106,7 @@ from ai.backend.manager.errors.deployment import (
     NoActiveKeypairForDeployment,
     UserNotFoundInDeployment,
 )
+from ai.backend.manager.errors.image import ImageNotFound
 from ai.backend.manager.errors.repository import UniqueConstraintViolationError
 from ai.backend.manager.errors.resource import (
     DomainNotFound,
@@ -145,7 +146,9 @@ from ai.backend.manager.models.endpoint.updaters import (
     EndpointLifecycleBatchUpdater,
     EndpointReplicaGroupUpdater,
 )
-from ai.backend.manager.models.image import ImageRow
+from ai.backend.manager.models.image.conditions import ImageConditions
+from ai.backend.manager.models.image.orders import ImageOrders
+from ai.backend.manager.models.image.searchers import ImageSearcher
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import keypairs
 from ai.backend.manager.models.project import ProjectRow, groups
@@ -175,6 +178,7 @@ from ai.backend.manager.models.scopes import OperationScope
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.session_group.creators import SessionGroupCreator
 from ai.backend.manager.models.specs.creator import FieldToCreate
+from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderRow, query_accessible_vfolders
@@ -395,17 +399,28 @@ class DeploymentDBSource:
             raise ProjectNotFound(f"Project {group_id} not found in domain {domain_name}")
 
     async def get_image_id(self, image: ImageIdentifier) -> ImageID:
-        """Get image ID from ImageIdentifier.
-
-        Args:
-            image: ImageIdentifier containing canonical and architecture
-
-        Returns:
-            ImageID of the image
-        """
-        async with self._begin_readonly_session_read_committed() as db_sess:
-            image_row = await ImageRow.lookup(db_sess, image)
-            return ImageID(image_row.id)
+        """The live image the canonical names for the architecture, or that carries it as an
+        alias."""
+        async with self._reconcile_ops.read_ops() as r:
+            result = await r.search_in_global(
+                ImageSearcher(
+                    pagination=OffsetPagination(limit=1),
+                    conditions=[
+                        ImageConditions.by_canonical_and_architecture_or_alias(
+                            image.canonical, image.architecture
+                        ),
+                        ImageConditions.by_statuses([ImageStatus.ALIVE]),
+                    ],
+                    orders=ImageOrders.canonical_match_then_alive_then_oldest(
+                        image.canonical, image.architecture
+                    ),
+                )
+            )
+        if not result.items:
+            raise ImageNotFound(
+                f"Unknown image reference: {image.canonical} ({image.architecture})"
+            )
+        return result.items[0].id
 
     async def get_endpoint(
         self,
@@ -2115,11 +2130,7 @@ class DeploymentDBSource:
                 raise DeploymentHasNoTargetRevision(
                     f"Revision {revision_id} not found or has no image"
                 )
-            image_identifier = ImageIdentifier(
-                canonical=revision_row.image_row.name,
-                architecture=revision_row.image_row.architecture,
-            )
-            image_row = await ImageRow.resolve(db_sess, [image_identifier])
+            image_row = revision_row.image_row
 
             # Resolve runtime variant preset values from revision
             resolved_presets: ResolvedPresetValues | None = None
@@ -3117,18 +3128,18 @@ class DeploymentDBSource:
     async def bulk_delete_access_tokens(
         self,
         token_ids: list[uuid.UUID],
-    ) -> list[uuid.UUID]:
-        """Delete multiple access tokens and return the IDs that were actually deleted."""
+    ) -> list[ModelDeploymentAccessTokenData]:
+        """Delete multiple access tokens and return the ones that were actually deleted."""
         if not token_ids:
             return []
         async with self._begin_session_read_committed() as db_sess:
             query = (
                 sa.delete(EndpointTokenRow)
                 .where(EndpointTokenRow.id.in_(token_ids))
-                .returning(EndpointTokenRow.id)
+                .returning(EndpointTokenRow)
             )
             result = await db_sess.execute(query)
-            return [row[0] for row in result.fetchall()]
+            return [row.to_access_token_data() for row in result.scalars().all()]
 
     async def search_access_tokens(
         self,

@@ -1,4 +1,4 @@
-"""FieldQuerier implementations for endpoint tokens."""
+"""Querier implementations for deployments, endpoint tokens and auto-scaling rules."""
 
 from __future__ import annotations
 
@@ -8,9 +8,21 @@ from typing import Any, override
 from sqlalchemy.orm import InstrumentedAttribute
 
 from ai.backend.common.data.entity.deployment_token import DeploymentTokenID
-from ai.backend.manager.data.deployment.types import ModelDeploymentAccessTokenData
-from ai.backend.manager.models.endpoint.row import EndpointTokenRow
-from ai.backend.manager.models.specs.querier import BulkFieldQuerier, FieldQuerier
+from ai.backend.manager.data.deployment.types import (
+    ModelDeploymentAccessTokenData,
+    ModelDeploymentAutoScalingRuleData,
+    ModelDeploymentData,
+)
+from ai.backend.manager.models.endpoint.row import (
+    EndpointAutoScalingRuleRow,
+    EndpointRow,
+    EndpointTokenRow,
+)
+from ai.backend.manager.models.specs.querier import (
+    BulkEntityQuerier,
+    BulkFieldQuerier,
+    FieldQuerier,
+)
 
 
 @dataclass
@@ -32,6 +44,40 @@ class DeploymentAccessTokenQuerier(FieldQuerier[EndpointTokenRow, ModelDeploymen
     @override
     def to_data(self, row: EndpointTokenRow) -> ModelDeploymentAccessTokenData:
         return row.to_access_token_data()
+
+
+class BulkDeploymentQuerier(BulkEntityQuerier[EndpointRow, ModelDeploymentData]):
+    """The deployments the caller named."""
+
+    @override
+    def row_class(self) -> type[EndpointRow]:
+        return EndpointRow
+
+    @override
+    def entity_id_column(self) -> InstrumentedAttribute[Any]:
+        return EndpointRow.id
+
+    @override
+    def to_data(self, row: EndpointRow) -> ModelDeploymentData:
+        return row.to_model_deployment_data()
+
+
+class BulkAutoScalingRuleQuerier(
+    BulkFieldQuerier[EndpointAutoScalingRuleRow, ModelDeploymentAutoScalingRuleData]
+):
+    """The auto-scaling rules the caller named."""
+
+    @override
+    def row_class(self) -> type[EndpointAutoScalingRuleRow]:
+        return EndpointAutoScalingRuleRow
+
+    @override
+    def target_id_column(self) -> InstrumentedAttribute[Any]:
+        return EndpointAutoScalingRuleRow.id
+
+    @override
+    def to_data(self, row: EndpointAutoScalingRuleRow) -> ModelDeploymentAutoScalingRuleData:
+        return row.to_model_deployment_data()
 
 
 class BulkDeploymentAccessTokenQuerier(
