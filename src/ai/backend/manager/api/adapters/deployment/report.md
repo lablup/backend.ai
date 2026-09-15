@@ -2,7 +2,530 @@
 
 [무엇을 보장하는가](/src/ai/backend/manager/api/adapters/deployment/KNOWLEDGE.md) · [어댑터](/src/ai/backend/manager/api/adapters/deployment/adapter.py)
 
-Not exercised by any scenario: activate_revision, add_revision, admin_refresh_deployment_revisions, admin_search_replicas, admin_search_revisions, batch_load_access_tokens_by_ids, batch_load_auto_scaling_rules_by_ids, batch_load_by_ids, batch_load_fields, batch_load_policies_by_endpoint_ids, batch_load_replicas_by_ids, batch_load_revisions_by_ids, batch_load_routes_by_ids, bulk_delete_access_tokens, bulk_delete_rules, create_access_token, create_rule, delete_access_token, delete_rule, get_access_token, get_policy, get_replica, get_revision, get_rule, scoped_search, search_access_tokens, search_policies, search_replicas, search_revision_resource_slots, search_revisions, search_routes, search_rules, update_route_traffic, update_rule, upsert_policy.
+Not exercised by any scenario: activate_revision, admin_refresh_deployment_revisions, admin_search_replicas, batch_load_access_tokens_by_ids, batch_load_auto_scaling_rules_by_ids, batch_load_by_ids, batch_load_fields, batch_load_policies_by_endpoint_ids, batch_load_replicas_by_ids, batch_load_routes_by_ids, bulk_delete_access_tokens, bulk_delete_rules, create_access_token, create_rule, delete_access_token, delete_rule, get_access_token, get_policy, get_replica, get_rule, scoped_search, search_access_tokens, search_policies, search_replicas, search_routes, search_rules, update_route_traffic, update_rule, upsert_policy.
+
+### adding_revisions
+
+#### [a-model-folder-the-caller-may-not-read-is-not-found](/tests/scenario/bai_scenario/manager/deployment/test_adding_revisions.py) — pass
+
+배포 생성 권한은 받았지만 모델 폴더를 읽을 권한이 없는 사용자가 그 폴더로 리비전을 더하면, 폴더를 찾을 수 없다는 이유로 거부된다
+
+Given
+
+- 리비전 0개가 딸린 배포 하나와, 자기 모델 폴더를 읽을 권한이 없는 배포에 CREATE 권한을 받은 사용자 한 명
+  - 도메인 home-1
+  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+  - 프로젝트 team-1
+  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
+  - 배포에 CREATE 권한을 받은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 역할 deployment-user-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 deployment-user-1: deployment 전체에 CREATE 허용
+    - 일반 사용자 user-1: 역할 deployment-user-1 보유
+  - 배포 deployment-1: 복제를 1개 두려 한다, 아직 리비전이 없다
+  - 리비전이 딛는 이미지, 모델 폴더, 런타임 변형, 자원 슬롯 타입 준비
+    - 컨테이너 레지스트리 registry-1: 이미지를 가져오는 곳
+    - 이미지 image-1: x86_64 이미지
+    - 개인 폴더 folder-1: 그 사람의 개인 프로젝트에 놓이고, 쓸 수 있는 상태다
+    - 런타임 변형 runtime-1: 기본 모델 정의가 비어 있고, 모델 폴더의 설정 파일을 읽지 않는다
+    - 자원 슬롯 타입 cpu: 리비전이 채우지 않아도 된다
+    - 자원 슬롯 타입 mem: 리비전이 채우지 않아도 된다
+
+When
+
+- DeploymentAdapter.add_revision — user-1이 deployment-1에 리비전을 더함
+
+Then
+
+- 거부된다
+  - 거부: VFolderNotFound
+
+#### [a-mount-beyond-what-the-caller-holds-on-the-folder-is-refused](/tests/scenario/bai_scenario/manager/deployment/test_adding_revisions.py) — pass
+
+모델 폴더를 읽을 수만 있는 사용자가 읽고 쓰기로 마운트하는 리비전을 더하면, 폴더 권한을 넘는다는 이유로 거부된다
+
+Given
+
+- 리비전 0개가 딸린 배포 하나와, 자기 모델 폴더를 읽을 수만 있는 배포에 CREATE 권한을 받은 사용자 한 명
+  - 도메인 home-1
+  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+  - 프로젝트 team-1
+  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
+  - 배포에 CREATE 권한을 받은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 역할 deployment-user-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 deployment-user-1: deployment 전체에 CREATE 허용
+    - 일반 사용자 user-1: 역할 deployment-user-1 보유
+  - 배포 deployment-1: 복제를 1개 두려 한다, 아직 리비전이 없다
+  - 리비전이 딛는 이미지, 모델 폴더, 런타임 변형, 자원 슬롯 타입 준비
+    - 컨테이너 레지스트리 registry-1: 이미지를 가져오는 곳
+    - 이미지 image-1: x86_64 이미지
+    - 개인 폴더 folder-1: 그 사람의 개인 프로젝트에 놓이고, 쓸 수 있는 상태다
+    - 폴더 읽기 권한 부여
+      - 역할 folder-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
+      - 역할 folder-reader-1: vfolder 전체에 READ 허용
+      - 일반 사용자 user-1: 역할 folder-reader-1 보유
+    - 런타임 변형 runtime-1: 기본 모델 정의가 비어 있고, 모델 폴더의 설정 파일을 읽지 않는다
+    - 자원 슬롯 타입 cpu: 리비전이 채우지 않아도 된다
+    - 자원 슬롯 타입 mem: 리비전이 채우지 않아도 된다
+
+When
+
+- DeploymentAdapter.add_revision — user-1이 deployment-1에 리비전을 더함
+
+Then
+
+- 거부된다
+  - 거부: VFolderPermissionError
+
+#### [a-revision-added-without-resources-runs-on-one-node-with-no-slot](/tests/scenario/bai_scenario/manager/deployment/test_adding_revisions.py) — pass
+
+프리셋도 필수 슬롯도 없이 자원과 클러스터를 빼고 리비전을 더하면, 노드 하나에 크기 1이고 자원 슬롯이 빈 리비전이 온다
+
+Given
+
+- 리비전 0개가 딸린 배포 하나와, 자기 모델 폴더를 읽을 수만 있는 배포에 CREATE 권한을 받은 사용자 한 명
+  - 도메인 home-1
+  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+  - 프로젝트 team-1
+  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
+  - 배포에 CREATE 권한을 받은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 역할 deployment-user-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 deployment-user-1: deployment 전체에 CREATE 허용
+    - 일반 사용자 user-1: 역할 deployment-user-1 보유
+  - 배포 deployment-1: 복제를 1개 두려 한다, 아직 리비전이 없다
+  - 리비전이 딛는 이미지, 모델 폴더, 런타임 변형, 자원 슬롯 타입 준비
+    - 컨테이너 레지스트리 registry-1: 이미지를 가져오는 곳
+    - 이미지 image-1: x86_64 이미지
+    - 개인 폴더 folder-1: 그 사람의 개인 프로젝트에 놓이고, 쓸 수 있는 상태다
+    - 폴더 읽기 권한 부여
+      - 역할 folder-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
+      - 역할 folder-reader-1: vfolder 전체에 READ 허용
+      - 일반 사용자 user-1: 역할 folder-reader-1 보유
+    - 런타임 변형 runtime-1: 기본 모델 정의가 비어 있고, 모델 폴더의 설정 파일을 읽지 않는다
+    - 자원 슬롯 타입 cpu: 리비전이 채우지 않아도 된다
+    - 자원 슬롯 타입 mem: 리비전이 채우지 않아도 된다
+
+When
+
+- DeploymentAdapter.add_revision — user-1이 deployment-1에 리비전을 더함 (자원과 클러스터 없이)
+
+Then
+
+- 리비전 전체가 온다
+  - id: 무시함 — 데이터베이스가 만든다
+  - deployment_id: 심은 배포와 같다
+  - revision_number = 1
+  - image_id: 심은 이미지와 같다
+  - cluster_config = ClusterConfigInfoDTO(mode='SINGLE_NODE', size=1)
+  - resource_config.resource_group_name = 'resource-group-1'
+  - resource_config.resource_slots = []
+  - resource_config.resource_opts = None
+  - model_runtime_config.runtime_variant_id: 심은 런타임 변형와 같다
+  - model_runtime_config.inference_runtime_config = None
+  - model_runtime_config.environ = None
+  - model_runtime_config.runtime_variant_preset_values = []
+  - model_mount_config.vfolder_id: 심은 모델 폴더와 같다
+  - model_mount_config.mount_destination = '/models'
+  - model_mount_config.definition_path = ''
+  - model_mount_config.subpath = None
+  - model_definition = ModelDefinitionInfoDTO(models=[ModelConfigInfoDTO(name='served', model_path='/models', service=None, metadata=None)])
+  - created_at: 이 실행이 쓴 시각
+  - extra_mounts = []
+  - revision_preset_id = None
+
+#### [a-revision-missing-a-required-slot-is-refused](/tests/scenario/bai_scenario/manager/deployment/test_adding_revisions.py) — pass
+
+모든 리비전이 채워야 하는 슬롯이 정해져 있고 그 슬롯을 빼고 리비전을 더하면, 입력이 틀렸다는 이유로 거부된다
+
+Given
+
+- 리비전 0개가 딸린 배포 하나와, 자기 모델 폴더를 읽을 수만 있는 배포에 CREATE 권한을 받은 사용자 한 명
+  - 도메인 home-1
+  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+  - 프로젝트 team-1
+  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
+  - 배포에 CREATE 권한을 받은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 역할 deployment-user-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 deployment-user-1: deployment 전체에 CREATE 허용
+    - 일반 사용자 user-1: 역할 deployment-user-1 보유
+  - 배포 deployment-1: 복제를 1개 두려 한다, 아직 리비전이 없다
+  - 리비전이 딛는 이미지, 모델 폴더, 런타임 변형, 자원 슬롯 타입 준비
+    - 컨테이너 레지스트리 registry-1: 이미지를 가져오는 곳
+    - 이미지 image-1: x86_64 이미지
+    - 개인 폴더 folder-1: 그 사람의 개인 프로젝트에 놓이고, 쓸 수 있는 상태다
+    - 폴더 읽기 권한 부여
+      - 역할 folder-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
+      - 역할 folder-reader-1: vfolder 전체에 READ 허용
+      - 일반 사용자 user-1: 역할 folder-reader-1 보유
+    - 런타임 변형 runtime-1: 기본 모델 정의가 비어 있고, 모델 폴더의 설정 파일을 읽지 않는다
+    - 자원 슬롯 타입 cpu: 모든 리비전이 반드시 채워야 한다
+    - 자원 슬롯 타입 mem: 리비전이 채우지 않아도 된다
+
+When
+
+- DeploymentAdapter.add_revision — user-1이 deployment-1에 리비전을 더함
+
+Then
+
+- 거부된다
+  - 거부: InvalidAPIParameters
+
+#### [a-revision-with-no-image-from-any-layer-is-refused](/tests/scenario/bai_scenario/manager/deployment/test_adding_revisions.py) — pass
+
+프리셋 없이 이미지를 빼고 리비전을 더하면, 입력이 틀렸다는 이유로 거부된다
+
+Given
+
+- 리비전 0개가 딸린 배포 하나와, 자기 모델 폴더를 읽을 수만 있는 배포에 CREATE 권한을 받은 사용자 한 명
+  - 도메인 home-1
+  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+  - 프로젝트 team-1
+  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
+  - 배포에 CREATE 권한을 받은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 역할 deployment-user-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 deployment-user-1: deployment 전체에 CREATE 허용
+    - 일반 사용자 user-1: 역할 deployment-user-1 보유
+  - 배포 deployment-1: 복제를 1개 두려 한다, 아직 리비전이 없다
+  - 리비전이 딛는 이미지, 모델 폴더, 런타임 변형, 자원 슬롯 타입 준비
+    - 컨테이너 레지스트리 registry-1: 이미지를 가져오는 곳
+    - 이미지 image-1: x86_64 이미지
+    - 개인 폴더 folder-1: 그 사람의 개인 프로젝트에 놓이고, 쓸 수 있는 상태다
+    - 폴더 읽기 권한 부여
+      - 역할 folder-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
+      - 역할 folder-reader-1: vfolder 전체에 READ 허용
+      - 일반 사용자 user-1: 역할 folder-reader-1 보유
+    - 런타임 변형 runtime-1: 기본 모델 정의가 비어 있고, 모델 폴더의 설정 파일을 읽지 않는다
+    - 자원 슬롯 타입 cpu: 리비전이 채우지 않아도 된다
+    - 자원 슬롯 타입 mem: 리비전이 채우지 않아도 된다
+
+When
+
+- DeploymentAdapter.add_revision — user-1이 deployment-1에 리비전을 더함 (이미지 없이)
+
+Then
+
+- 거부된다
+  - 거부: InvalidAPIParameters
+
+#### [a-revision-with-no-model-definition-from-any-layer-is-refused](/tests/scenario/bai_scenario/manager/deployment/test_adding_revisions.py) — pass
+
+폴더 파일을 읽지 않는 런타임 변형으로 프리셋 없이 모델 정의를 빼고 리비전을 더하면, 이름 없는 모델이 모델 정의 검증에서 거부된다
+
+Given
+
+- 리비전 0개가 딸린 배포 하나와, 자기 모델 폴더를 읽을 수만 있는 배포에 CREATE 권한을 받은 사용자 한 명
+  - 도메인 home-1
+  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+  - 프로젝트 team-1
+  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
+  - 배포에 CREATE 권한을 받은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 역할 deployment-user-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 deployment-user-1: deployment 전체에 CREATE 허용
+    - 일반 사용자 user-1: 역할 deployment-user-1 보유
+  - 배포 deployment-1: 복제를 1개 두려 한다, 아직 리비전이 없다
+  - 리비전이 딛는 이미지, 모델 폴더, 런타임 변형, 자원 슬롯 타입 준비
+    - 컨테이너 레지스트리 registry-1: 이미지를 가져오는 곳
+    - 이미지 image-1: x86_64 이미지
+    - 개인 폴더 folder-1: 그 사람의 개인 프로젝트에 놓이고, 쓸 수 있는 상태다
+    - 폴더 읽기 권한 부여
+      - 역할 folder-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
+      - 역할 folder-reader-1: vfolder 전체에 READ 허용
+      - 일반 사용자 user-1: 역할 folder-reader-1 보유
+    - 런타임 변형 runtime-1: 기본 모델 정의가 비어 있고, 모델 폴더의 설정 파일을 읽지 않는다
+    - 자원 슬롯 타입 cpu: 리비전이 채우지 않아도 된다
+    - 자원 슬롯 타입 mem: 리비전이 채우지 않아도 된다
+
+When
+
+- DeploymentAdapter.add_revision — user-1이 deployment-1에 리비전을 더함 (모델 정의 없이)
+
+Then
+
+- 거부된다
+  - 거부: BackendAISchemaValidationFailed
+
+#### [a-revision-with-no-runtime-variant-from-any-layer-is-refused](/tests/scenario/bai_scenario/manager/deployment/test_adding_revisions.py) — pass
+
+프리셋 없이 런타임 변형을 빼고 리비전을 더하면, 입력이 틀렸다는 이유로 거부된다
+
+Given
+
+- 리비전 0개가 딸린 배포 하나와, 자기 모델 폴더를 읽을 수만 있는 배포에 CREATE 권한을 받은 사용자 한 명
+  - 도메인 home-1
+  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+  - 프로젝트 team-1
+  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
+  - 배포에 CREATE 권한을 받은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 역할 deployment-user-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 deployment-user-1: deployment 전체에 CREATE 허용
+    - 일반 사용자 user-1: 역할 deployment-user-1 보유
+  - 배포 deployment-1: 복제를 1개 두려 한다, 아직 리비전이 없다
+  - 리비전이 딛는 이미지, 모델 폴더, 런타임 변형, 자원 슬롯 타입 준비
+    - 컨테이너 레지스트리 registry-1: 이미지를 가져오는 곳
+    - 이미지 image-1: x86_64 이미지
+    - 개인 폴더 folder-1: 그 사람의 개인 프로젝트에 놓이고, 쓸 수 있는 상태다
+    - 폴더 읽기 권한 부여
+      - 역할 folder-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
+      - 역할 folder-reader-1: vfolder 전체에 READ 허용
+      - 일반 사용자 user-1: 역할 folder-reader-1 보유
+    - 런타임 변형 runtime-1: 기본 모델 정의가 비어 있고, 모델 폴더의 설정 파일을 읽지 않는다
+    - 자원 슬롯 타입 cpu: 리비전이 채우지 않아도 된다
+    - 자원 슬롯 타입 mem: 리비전이 채우지 않아도 된다
+
+When
+
+- DeploymentAdapter.add_revision — user-1이 deployment-1에 리비전을 더함 (런타임 변형 없이)
+
+Then
+
+- 거부된다
+  - 거부: InvalidAPIParameters
+
+#### [a-user-granted-create-adds-the-first-revision](/tests/scenario/bai_scenario/manager/deployment/test_adding_revisions.py) — pass
+
+리비전 없는 배포에 생성 권한을 받은 사용자가 모든 설정을 주고 리비전을 더하면, 번호 1을 단 리비전이 준 설정 그대로 온다
+
+Given
+
+- 리비전 0개가 딸린 배포 하나와, 자기 모델 폴더를 읽을 수만 있는 배포에 CREATE 권한을 받은 사용자 한 명
+  - 도메인 home-1
+  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+  - 프로젝트 team-1
+  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
+  - 배포에 CREATE 권한을 받은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 역할 deployment-user-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 deployment-user-1: deployment 전체에 CREATE 허용
+    - 일반 사용자 user-1: 역할 deployment-user-1 보유
+  - 배포 deployment-1: 복제를 1개 두려 한다, 아직 리비전이 없다
+  - 리비전이 딛는 이미지, 모델 폴더, 런타임 변형, 자원 슬롯 타입 준비
+    - 컨테이너 레지스트리 registry-1: 이미지를 가져오는 곳
+    - 이미지 image-1: x86_64 이미지
+    - 개인 폴더 folder-1: 그 사람의 개인 프로젝트에 놓이고, 쓸 수 있는 상태다
+    - 폴더 읽기 권한 부여
+      - 역할 folder-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
+      - 역할 folder-reader-1: vfolder 전체에 READ 허용
+      - 일반 사용자 user-1: 역할 folder-reader-1 보유
+    - 런타임 변형 runtime-1: 기본 모델 정의가 비어 있고, 모델 폴더의 설정 파일을 읽지 않는다
+    - 자원 슬롯 타입 cpu: 리비전이 채우지 않아도 된다
+    - 자원 슬롯 타입 mem: 리비전이 채우지 않아도 된다
+
+When
+
+- DeploymentAdapter.add_revision — user-1이 deployment-1에 리비전을 더함
+
+Then
+
+- 리비전 전체가 온다
+  - id: 무시함 — 데이터베이스가 만든다
+  - deployment_id: 심은 배포와 같다
+  - revision_number = 1
+  - image_id: 심은 이미지와 같다
+  - cluster_config = ClusterConfigInfoDTO(mode='SINGLE_NODE', size=1)
+  - resource_config.resource_group_name = 'resource-group-1'
+  - resource_config.resource_slots = [('cpu', Decimal('1')), ('mem', Decimal('1073741824'))]
+  - resource_config.resource_opts = None
+  - model_runtime_config.runtime_variant_id: 심은 런타임 변형와 같다
+  - model_runtime_config.inference_runtime_config = None
+  - model_runtime_config.environ = None
+  - model_runtime_config.runtime_variant_preset_values = []
+  - model_mount_config.vfolder_id: 심은 모델 폴더와 같다
+  - model_mount_config.mount_destination = '/models'
+  - model_mount_config.definition_path = ''
+  - model_mount_config.subpath = None
+  - model_definition = ModelDefinitionInfoDTO(models=[ModelConfigInfoDTO(name='served', model_path='/models', service=None, metadata=None)])
+  - created_at: 이 실행이 쓴 시각
+  - extra_mounts = []
+  - revision_preset_id = None
+
+#### [a-user-granted-only-read-may-not-add-a-revision](/tests/scenario/bai_scenario/manager/deployment/test_adding_revisions.py) — pass
+
+배포 읽기 권한만 받은 사용자가 리비전을 더하면, 권한 부족으로 거부된다
+
+Given
+
+- 리비전 0개가 딸린 배포 하나와, 자기 모델 폴더를 읽을 수만 있는 배포에 READ 권한을 받은 사용자 한 명
+  - 도메인 home-1
+  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+  - 프로젝트 team-1
+  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
+  - 배포에 READ 권한을 받은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 역할 deployment-user-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 deployment-user-1: deployment 전체에 READ 허용
+    - 일반 사용자 user-1: 역할 deployment-user-1 보유
+  - 배포 deployment-1: 복제를 1개 두려 한다, 아직 리비전이 없다
+  - 리비전이 딛는 이미지, 모델 폴더, 런타임 변형, 자원 슬롯 타입 준비
+    - 컨테이너 레지스트리 registry-1: 이미지를 가져오는 곳
+    - 이미지 image-1: x86_64 이미지
+    - 개인 폴더 folder-1: 그 사람의 개인 프로젝트에 놓이고, 쓸 수 있는 상태다
+    - 폴더 읽기 권한 부여
+      - 역할 folder-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
+      - 역할 folder-reader-1: vfolder 전체에 READ 허용
+      - 일반 사용자 user-1: 역할 folder-reader-1 보유
+    - 런타임 변형 runtime-1: 기본 모델 정의가 비어 있고, 모델 폴더의 설정 파일을 읽지 않는다
+    - 자원 슬롯 타입 cpu: 리비전이 채우지 않아도 된다
+    - 자원 슬롯 타입 mem: 리비전이 채우지 않아도 된다
+
+When
+
+- DeploymentAdapter.add_revision — user-1이 deployment-1에 리비전을 더함
+
+Then
+
+- 거부된다
+  - 거부: NotEnoughPermission
+
+#### [the-next-revision-is-numbered-one-past-the-last](/tests/scenario/bai_scenario/manager/deployment/test_adding_revisions.py) — pass
+
+리비전 하나가 딸린 배포에 리비전을 더하면, 번호 2를 단 리비전이 온다
+
+Given
+
+- 리비전 1개가 딸린 배포 하나와, 자기 모델 폴더를 읽을 수만 있는 배포에 CREATE 권한을 받은 사용자 한 명
+  - 도메인 home-1
+  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+  - 프로젝트 team-1
+  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
+  - 배포에 CREATE 권한을 받은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 역할 deployment-user-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 deployment-user-1: deployment 전체에 CREATE 허용
+    - 일반 사용자 user-1: 역할 deployment-user-1 보유
+  - 배포 deployment-1: 복제를 1개 두려 한다, 아직 리비전이 없다
+  - 리비전이 딛는 이미지, 모델 폴더, 런타임 변형, 자원 슬롯 타입 준비
+    - 컨테이너 레지스트리 registry-1: 이미지를 가져오는 곳
+    - 이미지 image-1: x86_64 이미지
+    - 개인 폴더 folder-1: 그 사람의 개인 프로젝트에 놓이고, 쓸 수 있는 상태다
+    - 폴더 읽기 권한 부여
+      - 역할 folder-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
+      - 역할 folder-reader-1: vfolder 전체에 READ 허용
+      - 일반 사용자 user-1: 역할 folder-reader-1 보유
+    - 런타임 변형 runtime-1: 기본 모델 정의가 비어 있고, 모델 폴더의 설정 파일을 읽지 않는다
+    - 자원 슬롯 타입 cpu: 리비전이 채우지 않아도 된다
+    - 자원 슬롯 타입 mem: 리비전이 채우지 않아도 된다
+  - 배포 deployment-1: 리비전 하나를 갖는다
+
+When
+
+- DeploymentAdapter.add_revision — user-1이 deployment-1에 리비전을 더함
+
+Then
+
+- 리비전 전체가 온다
+  - id: 무시함 — 데이터베이스가 만든다
+  - deployment_id: 심은 배포와 같다
+  - revision_number = 2
+  - image_id: 심은 이미지와 같다
+  - cluster_config = ClusterConfigInfoDTO(mode='SINGLE_NODE', size=1)
+  - resource_config.resource_group_name = 'resource-group-1'
+  - resource_config.resource_slots = [('cpu', Decimal('1')), ('mem', Decimal('1073741824'))]
+  - resource_config.resource_opts = None
+  - model_runtime_config.runtime_variant_id: 심은 런타임 변형와 같다
+  - model_runtime_config.inference_runtime_config = None
+  - model_runtime_config.environ = None
+  - model_runtime_config.runtime_variant_preset_values = []
+  - model_mount_config.vfolder_id: 심은 모델 폴더와 같다
+  - model_mount_config.mount_destination = '/models'
+  - model_mount_config.definition_path = ''
+  - model_mount_config.subpath = None
+  - model_definition = ModelDefinitionInfoDTO(models=[ModelConfigInfoDTO(name='served', model_path='/models', service=None, metadata=None)])
+  - created_at: 이 실행이 쓴 시각
+  - extra_mounts = []
+  - revision_preset_id = None
+
+#### [the-superadmin-adds-a-revision-to-anothers-deployment-without-a-grant](/tests/scenario/bai_scenario/manager/deployment/test_adding_revisions.py) — pass
+
+배포에도 자기 모델 폴더에도 권한을 받지 않은 슈퍼관리자가 남의 배포에 리비전을 더하면, 리비전이 더해진다. 역할이 배포 권한과 폴더 권한을 함께 지나간다
+
+Given
+
+- 다른 사람이 만든 배포 하나와, 배포에도 자기 모델 폴더에도 권한을 받지 않은 슈퍼관리자
+  - 도메인 home-1
+  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+  - 프로젝트 team-1
+  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
+  - 배포 권한을 하나도 받지 않은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+  - 도메인에 속한 사용자 한 명 준비
+    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+    - 일반 사용자 user-2: 자기 키와 개인 프로젝트를 갖는다
+  - 배포 theirs-1: 복제를 1개 두려 한다, 아직 리비전이 없다
+  - 리비전이 딛는 이미지, 모델 폴더, 런타임 변형, 자원 슬롯 타입 준비
+    - 컨테이너 레지스트리 registry-1: 이미지를 가져오는 곳
+    - 이미지 image-1: x86_64 이미지
+    - 개인 폴더 folder-1: 그 사람의 개인 프로젝트에 놓이고, 쓸 수 있는 상태다
+    - 런타임 변형 runtime-1: 기본 모델 정의가 비어 있고, 모델 폴더의 설정 파일을 읽지 않는다
+    - 자원 슬롯 타입 cpu: 리비전이 채우지 않아도 된다
+    - 자원 슬롯 타입 mem: 리비전이 채우지 않아도 된다
+
+When
+
+- DeploymentAdapter.add_revision — user-1이 theirs-1에 리비전을 더함
+
+Then
+
+- 리비전 전체가 온다
+  - id: 무시함 — 데이터베이스가 만든다
+  - deployment_id: 심은 배포와 같다
+  - revision_number = 1
+  - image_id: 심은 이미지와 같다
+  - cluster_config = ClusterConfigInfoDTO(mode='SINGLE_NODE', size=1)
+  - resource_config.resource_group_name = 'resource-group-1'
+  - resource_config.resource_slots = [('cpu', Decimal('1')), ('mem', Decimal('1073741824'))]
+  - resource_config.resource_opts = None
+  - model_runtime_config.runtime_variant_id: 심은 런타임 변형와 같다
+  - model_runtime_config.inference_runtime_config = None
+  - model_runtime_config.environ = None
+  - model_runtime_config.runtime_variant_preset_values = []
+  - model_mount_config.vfolder_id: 심은 모델 폴더와 같다
+  - model_mount_config.mount_destination = '/models'
+  - model_mount_config.definition_path = ''
+  - model_mount_config.subpath = None
+  - model_definition = ModelDefinitionInfoDTO(models=[ModelConfigInfoDTO(name='served', model_path='/models', service=None, metadata=None)])
+  - created_at: 이 실행이 쓴 시각
+  - extra_mounts = []
+  - revision_preset_id = None
 
 ### creating
 
@@ -891,6 +1414,256 @@ Then
   - deploying_revision_id = None
   - policy = None
 
+### reading_revisions
+
+#### [a-revision-id-nothing-answers-to-is-not-found-for-a-superadmin](/tests/scenario/bai_scenario/manager/deployment/test_reading_revisions.py) — pass
+
+슈퍼관리자가 아무것도 갖지 않은 id로 리비전을 조회하면, 대상이 없다는 것으로 거부된다. 모든 검사를 지나가는 사람에게는 감출 것이 없다
+
+Given
+
+- 리비전 1개가 딸린 배포 하나와, 자기 모델 폴더를 읽을 수만 있는 아무 배포 권한도 받지 않은 사용자 한 명
+  - 도메인 home-1
+  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+  - 프로젝트 team-1
+  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
+  - 배포 권한을 하나도 받지 않은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+  - 배포 deployment-1: 복제를 1개 두려 한다, 아직 리비전이 없다
+  - 리비전이 딛는 이미지, 모델 폴더, 런타임 변형, 자원 슬롯 타입 준비
+    - 컨테이너 레지스트리 registry-1: 이미지를 가져오는 곳
+    - 이미지 image-1: x86_64 이미지
+    - 개인 폴더 folder-1: 그 사람의 개인 프로젝트에 놓이고, 쓸 수 있는 상태다
+    - 폴더 읽기 권한 부여
+      - 역할 folder-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
+      - 역할 folder-reader-1: vfolder 전체에 READ 허용
+      - 슈퍼관리자 user-1: 역할 folder-reader-1 보유
+    - 런타임 변형 runtime-1: 기본 모델 정의가 비어 있고, 모델 폴더의 설정 파일을 읽지 않는다
+    - 자원 슬롯 타입 cpu: 리비전이 채우지 않아도 된다
+    - 자원 슬롯 타입 mem: 리비전이 채우지 않아도 된다
+  - 배포 deployment-1: 리비전 하나를 갖는다
+
+When
+
+- DeploymentAdapter.get_revision — user-1이 아무것도 갖지 않은 id로 리비전을 조회
+
+Then
+
+- 거부된다
+  - 거부: FieldNotFoundError
+
+#### [a-revision-id-nothing-answers-to-is-refused-as-unresolvable](/tests/scenario/bai_scenario/manager/deployment/test_reading_revisions.py) — pass
+
+배포 읽기 권한을 받은 사용자가 아무것도 갖지 않은 id로 리비전을 조회하면, 볼 수 없는 id와 같은 이유로 거부된다
+
+Given
+
+- 리비전 1개가 딸린 배포 하나와, 자기 모델 폴더를 읽을 수만 있는 배포에 READ 권한을 받은 사용자 한 명
+  - 도메인 home-1
+  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+  - 프로젝트 team-1
+  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
+  - 배포에 READ 권한을 받은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 역할 deployment-user-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 deployment-user-1: deployment 전체에 READ 허용
+    - 일반 사용자 user-1: 역할 deployment-user-1 보유
+  - 배포 deployment-1: 복제를 1개 두려 한다, 아직 리비전이 없다
+  - 리비전이 딛는 이미지, 모델 폴더, 런타임 변형, 자원 슬롯 타입 준비
+    - 컨테이너 레지스트리 registry-1: 이미지를 가져오는 곳
+    - 이미지 image-1: x86_64 이미지
+    - 개인 폴더 folder-1: 그 사람의 개인 프로젝트에 놓이고, 쓸 수 있는 상태다
+    - 폴더 읽기 권한 부여
+      - 역할 folder-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
+      - 역할 folder-reader-1: vfolder 전체에 READ 허용
+      - 일반 사용자 user-1: 역할 folder-reader-1 보유
+    - 런타임 변형 runtime-1: 기본 모델 정의가 비어 있고, 모델 폴더의 설정 파일을 읽지 않는다
+    - 자원 슬롯 타입 cpu: 리비전이 채우지 않아도 된다
+    - 자원 슬롯 타입 mem: 리비전이 채우지 않아도 된다
+  - 배포 deployment-1: 리비전 하나를 갖는다
+
+When
+
+- DeploymentAdapter.get_revision — user-1이 아무것도 갖지 않은 id로 리비전을 조회
+
+Then
+
+- 거부된다
+  - 거부: GenericBadRequest
+
+#### [a-user-granted-nothing-may-not-read-a-revision](/tests/scenario/bai_scenario/manager/deployment/test_reading_revisions.py) — pass
+
+아무 배포 권한도 받지 않은 사용자가 리비전을 id로 조회하면, 키를 풀 수 없다는 이유로 거부된다
+
+Given
+
+- 리비전 1개가 딸린 배포 하나와, 자기 모델 폴더를 읽을 수만 있는 아무 배포 권한도 받지 않은 사용자 한 명
+  - 도메인 home-1
+  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+  - 프로젝트 team-1
+  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
+  - 배포 권한을 하나도 받지 않은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+  - 배포 deployment-1: 복제를 1개 두려 한다, 아직 리비전이 없다
+  - 리비전이 딛는 이미지, 모델 폴더, 런타임 변형, 자원 슬롯 타입 준비
+    - 컨테이너 레지스트리 registry-1: 이미지를 가져오는 곳
+    - 이미지 image-1: x86_64 이미지
+    - 개인 폴더 folder-1: 그 사람의 개인 프로젝트에 놓이고, 쓸 수 있는 상태다
+    - 폴더 읽기 권한 부여
+      - 역할 folder-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
+      - 역할 folder-reader-1: vfolder 전체에 READ 허용
+      - 일반 사용자 user-1: 역할 folder-reader-1 보유
+    - 런타임 변형 runtime-1: 기본 모델 정의가 비어 있고, 모델 폴더의 설정 파일을 읽지 않는다
+    - 자원 슬롯 타입 cpu: 리비전이 채우지 않아도 된다
+    - 자원 슬롯 타입 mem: 리비전이 채우지 않아도 된다
+  - 배포 deployment-1: 리비전 하나를 갖는다
+
+When
+
+- DeploymentAdapter.get_revision — user-1이 deployment-1의 첫 리비전 id로 리비전을 조회
+
+Then
+
+- 거부된다
+  - 거부: GenericBadRequest
+
+#### [a-user-granted-read-reads-a-revision-by-id](/tests/scenario/bai_scenario/manager/deployment/test_reading_revisions.py) — pass
+
+배포 읽기 권한을 받은 사용자가 그 배포의 리비전을 id로 조회하면, 그 리비전이 온다
+
+Given
+
+- 리비전 1개가 딸린 배포 하나와, 자기 모델 폴더를 읽을 수만 있는 배포에 READ 권한을 받은 사용자 한 명
+  - 도메인 home-1
+  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+  - 프로젝트 team-1
+  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
+  - 배포에 READ 권한을 받은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 역할 deployment-user-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 deployment-user-1: deployment 전체에 READ 허용
+    - 일반 사용자 user-1: 역할 deployment-user-1 보유
+  - 배포 deployment-1: 복제를 1개 두려 한다, 아직 리비전이 없다
+  - 리비전이 딛는 이미지, 모델 폴더, 런타임 변형, 자원 슬롯 타입 준비
+    - 컨테이너 레지스트리 registry-1: 이미지를 가져오는 곳
+    - 이미지 image-1: x86_64 이미지
+    - 개인 폴더 folder-1: 그 사람의 개인 프로젝트에 놓이고, 쓸 수 있는 상태다
+    - 폴더 읽기 권한 부여
+      - 역할 folder-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
+      - 역할 folder-reader-1: vfolder 전체에 READ 허용
+      - 일반 사용자 user-1: 역할 folder-reader-1 보유
+    - 런타임 변형 runtime-1: 기본 모델 정의가 비어 있고, 모델 폴더의 설정 파일을 읽지 않는다
+    - 자원 슬롯 타입 cpu: 리비전이 채우지 않아도 된다
+    - 자원 슬롯 타입 mem: 리비전이 채우지 않아도 된다
+  - 배포 deployment-1: 리비전 하나를 갖는다
+
+When
+
+- DeploymentAdapter.get_revision — user-1이 deployment-1의 첫 리비전 id로 리비전을 조회
+
+Then
+
+- 리비전 전체가 온다
+  - id: 심은 리비전와 같다
+  - deployment_id: 심은 배포와 같다
+  - revision_number = 1
+  - image_id: 심은 이미지와 같다
+  - cluster_config = ClusterConfigInfoDTO(mode='SINGLE_NODE', size=1)
+  - resource_config.resource_group_name = 'resource-group-1'
+  - resource_config.resource_slots = [('cpu', Decimal('1')), ('mem', Decimal('1073741824'))]
+  - resource_config.resource_opts = None
+  - model_runtime_config.runtime_variant_id: 심은 런타임 변형와 같다
+  - model_runtime_config.inference_runtime_config = None
+  - model_runtime_config.environ = None
+  - model_runtime_config.runtime_variant_preset_values = []
+  - model_mount_config.vfolder_id: 심은 모델 폴더와 같다
+  - model_mount_config.mount_destination = '/models'
+  - model_mount_config.definition_path = ''
+  - model_mount_config.subpath = None
+  - model_definition = ModelDefinitionInfoDTO(models=[ModelConfigInfoDTO(name='served', model_path='/models', service=None, metadata=None)])
+  - created_at: 이 실행이 쓴 시각
+  - extra_mounts = []
+  - revision_preset_id = None
+
+#### [loading-revisions-by-id-answers-each-id-on-its-own](/tests/scenario/bai_scenario/manager/deployment/test_reading_revisions.py) — pass
+
+한 프로젝트에서만 배포 읽기 권한을 받은 사용자가 읽을 수 있는 리비전, 다른 프로젝트의 리비전, 아무것도 갖지 않은 id를 한 번에 집으면, 이름 댄 순서대로 리비전, 거부, 빈 자리가 온다
+
+Given
+
+- 두 프로젝트의 배포에 리비전 1개와 1개가 나뉘어 있고, 한쪽 프로젝트에서만 배포에 READ 권한을 받은 사용자 한 명
+  - 도메인 home-1
+  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+  - 프로젝트 team-1
+  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
+  - 배포에 READ 권한을 받은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 역할 deployment-user-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 deployment-user-1: deployment 전체에 READ 허용
+    - 일반 사용자 user-1: 역할 deployment-user-1 보유
+  - 프로젝트 other-1
+  - 배포 wanted-1: 복제를 1개 두려 한다, 아직 리비전이 없다
+  - 배포 elsewhere-1: 복제를 1개 두려 한다, 아직 리비전이 없다
+  - 리비전이 딛는 이미지, 모델 폴더, 런타임 변형, 자원 슬롯 타입 준비
+    - 컨테이너 레지스트리 registry-1: 이미지를 가져오는 곳
+    - 이미지 image-1: x86_64 이미지
+    - 개인 폴더 folder-1: 그 사람의 개인 프로젝트에 놓이고, 쓸 수 있는 상태다
+    - 폴더 읽기 권한 부여
+      - 역할 folder-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
+      - 역할 folder-reader-1: vfolder 전체에 READ 허용
+      - 일반 사용자 user-1: 역할 folder-reader-1 보유
+    - 런타임 변형 runtime-1: 기본 모델 정의가 비어 있고, 모델 폴더의 설정 파일을 읽지 않는다
+    - 자원 슬롯 타입 cpu: 리비전이 채우지 않아도 된다
+    - 자원 슬롯 타입 mem: 리비전이 채우지 않아도 된다
+  - 배포 wanted-1: 리비전 하나를 갖는다
+  - 배포 elsewhere-1: 리비전 하나를 갖는다
+
+When
+
+- DeploymentAdapter.batch_load_revisions_by_ids — user-1이 wanted-1의 리비전, 다른 프로젝트 배포의 리비전, 아무것도 갖지 않은 id를 차례로 집음
+
+Then
+
+- 이름 댄 순서대로 리비전, 거부, 빈 자리가 온다
+  - len = 3
+  - [0].id: 심은 리비전와 같다
+  - [0].deployment_id: 심은 배포와 같다
+  - [0].revision_number = 1
+  - [0].image_id: 심은 이미지와 같다
+  - [0].cluster_config = ClusterConfigInfoDTO(mode='SINGLE_NODE', size=1)
+  - [0].resource_config.resource_group_name = 'resource-group-1'
+  - [0].resource_config.resource_slots = [('cpu', Decimal('1')), ('mem', Decimal('1073741824'))]
+  - [0].resource_config.resource_opts = None
+  - [0].model_runtime_config.runtime_variant_id: 심은 런타임 변형와 같다
+  - [0].model_runtime_config.inference_runtime_config = None
+  - [0].model_runtime_config.environ = None
+  - [0].model_runtime_config.runtime_variant_preset_values = []
+  - [0].model_mount_config.vfolder_id: 심은 모델 폴더와 같다
+  - [0].model_mount_config.mount_destination = '/models'
+  - [0].model_mount_config.definition_path = ''
+  - [0].model_mount_config.subpath = None
+  - [0].model_definition = ModelDefinitionInfoDTO(models=[ModelConfigInfoDTO(name='served', model_path='/models', service=None, metadata=None)])
+  - [0].created_at: 이 실행이 쓴 시각
+  - [0].extra_mounts = []
+  - [0].revision_preset_id = None
+  - [1] = 'NotEnoughPermission'
+  - [2] = None
+
 ### retiring
 
 #### [a-user-granted-only-update-may-not-retire-a-deployment](/tests/scenario/bai_scenario/manager/deployment/test_retiring.py) — pass
@@ -1207,6 +1980,366 @@ Then
 - 심은 배포가 모두, 그리고 그것만 세어진다
   - items = ['other-1', 'other-2', 'wanted-1']
   - total_count = 3
+  - has_next_page = False
+  - has_previous_page = False
+
+### searching_revisions
+
+#### [a-user-granted-nothing-may-not-search-a-deployments-revisions](/tests/scenario/bai_scenario/manager/deployment/test_searching_revisions.py) — pass
+
+아무 배포 권한도 받지 않은 사용자가 배포의 리비전을 훑으면, 권한 부족으로 거부된다
+
+Given
+
+- 리비전 1개가 딸린 배포 하나와, 자기 모델 폴더를 읽을 수만 있는 아무 배포 권한도 받지 않은 사용자 한 명
+  - 도메인 home-1
+  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+  - 프로젝트 team-1
+  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
+  - 배포 권한을 하나도 받지 않은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+  - 배포 deployment-1: 복제를 1개 두려 한다, 아직 리비전이 없다
+  - 리비전이 딛는 이미지, 모델 폴더, 런타임 변형, 자원 슬롯 타입 준비
+    - 컨테이너 레지스트리 registry-1: 이미지를 가져오는 곳
+    - 이미지 image-1: x86_64 이미지
+    - 개인 폴더 folder-1: 그 사람의 개인 프로젝트에 놓이고, 쓸 수 있는 상태다
+    - 폴더 읽기 권한 부여
+      - 역할 folder-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
+      - 역할 folder-reader-1: vfolder 전체에 READ 허용
+      - 일반 사용자 user-1: 역할 folder-reader-1 보유
+    - 런타임 변형 runtime-1: 기본 모델 정의가 비어 있고, 모델 폴더의 설정 파일을 읽지 않는다
+    - 자원 슬롯 타입 cpu: 리비전이 채우지 않아도 된다
+    - 자원 슬롯 타입 mem: 리비전이 채우지 않아도 된다
+  - 배포 deployment-1: 리비전 하나를 갖는다
+
+When
+
+- DeploymentAdapter.search_revisions — user-1이 deployment-1의 리비전을 조회
+
+Then
+
+- 거부된다
+  - 거부: NotEnoughPermission
+
+#### [a-user-granted-read-counts-every-revision-of-a-deployment](/tests/scenario/bai_scenario/manager/deployment/test_searching_revisions.py) — pass
+
+리비전 셋이 딸린 배포에 읽기 권한을 받은 사용자가 그 배포의 리비전을 훑으면, 셋을 모두 센다
+
+Given
+
+- 리비전 3개가 딸린 배포 하나와, 자기 모델 폴더를 읽을 수만 있는 배포에 READ 권한을 받은 사용자 한 명
+  - 도메인 home-1
+  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+  - 프로젝트 team-1
+  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
+  - 배포에 READ 권한을 받은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 역할 deployment-user-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 deployment-user-1: deployment 전체에 READ 허용
+    - 일반 사용자 user-1: 역할 deployment-user-1 보유
+  - 배포 deployment-1: 복제를 1개 두려 한다, 아직 리비전이 없다
+  - 리비전이 딛는 이미지, 모델 폴더, 런타임 변형, 자원 슬롯 타입 준비
+    - 컨테이너 레지스트리 registry-1: 이미지를 가져오는 곳
+    - 이미지 image-1: x86_64 이미지
+    - 개인 폴더 folder-1: 그 사람의 개인 프로젝트에 놓이고, 쓸 수 있는 상태다
+    - 폴더 읽기 권한 부여
+      - 역할 folder-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
+      - 역할 folder-reader-1: vfolder 전체에 READ 허용
+      - 일반 사용자 user-1: 역할 folder-reader-1 보유
+    - 런타임 변형 runtime-1: 기본 모델 정의가 비어 있고, 모델 폴더의 설정 파일을 읽지 않는다
+    - 자원 슬롯 타입 cpu: 리비전이 채우지 않아도 된다
+    - 자원 슬롯 타입 mem: 리비전이 채우지 않아도 된다
+  - 배포 deployment-1: 리비전 하나를 갖는다
+  - 배포 deployment-1: 리비전 하나를 갖는다
+  - 배포 deployment-1: 리비전 하나를 갖는다
+
+When
+
+- DeploymentAdapter.search_revisions — user-1이 deployment-1의 리비전을 조회
+
+Then
+
+- 심은 리비전이 모두, 그리고 그것만 세어진다
+  - items.id: 센 리비전들와 같다
+  - items.revision_number = [1, 2, 3]
+  - total_count = 3
+  - has_next_page = False
+  - has_previous_page = False
+
+#### [a-user-granted-read-may-not-search-a-revisions-slots](/tests/scenario/bai_scenario/manager/deployment/test_searching_revisions.py) — pass
+
+배포 읽기 권한을 받았지만 슈퍼관리자가 아닌 사용자가 그 리비전의 슬롯을 훑으면, 역할로 거부된다. 리비전은 읽어도 슬롯은 못 본다
+
+Given
+
+- 리비전 1개가 딸린 배포 하나와, 자기 모델 폴더를 읽을 수만 있는 배포에 READ 권한을 받은 사용자 한 명
+  - 도메인 home-1
+  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+  - 프로젝트 team-1
+  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
+  - 배포에 READ 권한을 받은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 역할 deployment-user-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 deployment-user-1: deployment 전체에 READ 허용
+    - 일반 사용자 user-1: 역할 deployment-user-1 보유
+  - 배포 deployment-1: 복제를 1개 두려 한다, 아직 리비전이 없다
+  - 리비전이 딛는 이미지, 모델 폴더, 런타임 변형, 자원 슬롯 타입 준비
+    - 컨테이너 레지스트리 registry-1: 이미지를 가져오는 곳
+    - 이미지 image-1: x86_64 이미지
+    - 개인 폴더 folder-1: 그 사람의 개인 프로젝트에 놓이고, 쓸 수 있는 상태다
+    - 폴더 읽기 권한 부여
+      - 역할 folder-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
+      - 역할 folder-reader-1: vfolder 전체에 READ 허용
+      - 일반 사용자 user-1: 역할 folder-reader-1 보유
+    - 런타임 변형 runtime-1: 기본 모델 정의가 비어 있고, 모델 폴더의 설정 파일을 읽지 않는다
+    - 자원 슬롯 타입 cpu: 리비전이 채우지 않아도 된다
+    - 자원 슬롯 타입 mem: 리비전이 채우지 않아도 된다
+  - 배포 deployment-1: 리비전 하나를 갖는다
+
+When
+
+- DeploymentAdapter.search_revision_resource_slots — user-1이 deployment-1의 첫 리비전의 슬롯을 조회
+
+Then
+
+- 거부된다
+  - 거부: InsufficientPrivilege
+
+#### [a-user-granted-read-may-not-search-every-revision](/tests/scenario/bai_scenario/manager/deployment/test_searching_revisions.py) — pass
+
+모든 배포에 읽기 권한을 받았지만 슈퍼관리자가 아닌 사용자가 전체 리비전을 훑으면, 역할로 거부된다
+
+Given
+
+- 리비전 1개가 딸린 배포 하나와, 자기 모델 폴더를 읽을 수만 있는 배포에 READ 권한을 받은 사용자 한 명
+  - 도메인 home-1
+  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+  - 프로젝트 team-1
+  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
+  - 배포에 READ 권한을 받은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 역할 deployment-user-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 deployment-user-1: deployment 전체에 READ 허용
+    - 일반 사용자 user-1: 역할 deployment-user-1 보유
+  - 배포 deployment-1: 복제를 1개 두려 한다, 아직 리비전이 없다
+  - 리비전이 딛는 이미지, 모델 폴더, 런타임 변형, 자원 슬롯 타입 준비
+    - 컨테이너 레지스트리 registry-1: 이미지를 가져오는 곳
+    - 이미지 image-1: x86_64 이미지
+    - 개인 폴더 folder-1: 그 사람의 개인 프로젝트에 놓이고, 쓸 수 있는 상태다
+    - 폴더 읽기 권한 부여
+      - 역할 folder-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
+      - 역할 folder-reader-1: vfolder 전체에 READ 허용
+      - 일반 사용자 user-1: 역할 folder-reader-1 보유
+    - 런타임 변형 runtime-1: 기본 모델 정의가 비어 있고, 모델 폴더의 설정 파일을 읽지 않는다
+    - 자원 슬롯 타입 cpu: 리비전이 채우지 않아도 된다
+    - 자원 슬롯 타입 mem: 리비전이 채우지 않아도 된다
+  - 배포 deployment-1: 리비전 하나를 갖는다
+
+When
+
+- DeploymentAdapter.admin_search_revisions — user-1이 필터 없이 모든 리비전을 조회
+
+Then
+
+- 거부된다
+  - 거부: InsufficientPrivilege
+
+#### [another-deployments-revisions-stay-out-of-a-deployment-search](/tests/scenario/bai_scenario/manager/deployment/test_searching_revisions.py) — pass
+
+두 프로젝트의 배포에 리비전이 나뉘어 있고 한쪽에만 읽기 권한을 받은 사용자가 그쪽 배포의 리비전을 훑으면, 그쪽 것만 나온다
+
+Given
+
+- 두 프로젝트의 배포에 리비전 2개와 1개가 나뉘어 있고, 한쪽 프로젝트에서만 배포에 READ 권한을 받은 사용자 한 명
+  - 도메인 home-1
+  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+  - 프로젝트 team-1
+  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
+  - 배포에 READ 권한을 받은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 역할 deployment-user-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 deployment-user-1: deployment 전체에 READ 허용
+    - 일반 사용자 user-1: 역할 deployment-user-1 보유
+  - 프로젝트 other-1
+  - 배포 wanted-1: 복제를 1개 두려 한다, 아직 리비전이 없다
+  - 배포 elsewhere-1: 복제를 1개 두려 한다, 아직 리비전이 없다
+  - 리비전이 딛는 이미지, 모델 폴더, 런타임 변형, 자원 슬롯 타입 준비
+    - 컨테이너 레지스트리 registry-1: 이미지를 가져오는 곳
+    - 이미지 image-1: x86_64 이미지
+    - 개인 폴더 folder-1: 그 사람의 개인 프로젝트에 놓이고, 쓸 수 있는 상태다
+    - 폴더 읽기 권한 부여
+      - 역할 folder-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
+      - 역할 folder-reader-1: vfolder 전체에 READ 허용
+      - 일반 사용자 user-1: 역할 folder-reader-1 보유
+    - 런타임 변형 runtime-1: 기본 모델 정의가 비어 있고, 모델 폴더의 설정 파일을 읽지 않는다
+    - 자원 슬롯 타입 cpu: 리비전이 채우지 않아도 된다
+    - 자원 슬롯 타입 mem: 리비전이 채우지 않아도 된다
+  - 배포 wanted-1: 리비전 하나를 갖는다
+  - 배포 wanted-1: 리비전 하나를 갖는다
+  - 배포 elsewhere-1: 리비전 하나를 갖는다
+
+When
+
+- DeploymentAdapter.search_revisions — user-1이 wanted-1의 리비전을 조회
+
+Then
+
+- 심은 리비전이 모두, 그리고 그것만 세어진다
+  - items.id: 센 리비전들와 같다
+  - items.revision_number = [1, 2]
+  - total_count = 2
+  - has_next_page = False
+  - has_previous_page = False
+
+#### [filtering-revisions-by-number-leaves-only-that-one](/tests/scenario/bai_scenario/manager/deployment/test_searching_revisions.py) — pass
+
+리비전 셋이 딸린 배포의 리비전을 번호로 걸러 훑으면, 그 번호의 것만 남는다
+
+Given
+
+- 리비전 3개가 딸린 배포 하나와, 자기 모델 폴더를 읽을 수만 있는 배포에 READ 권한을 받은 사용자 한 명
+  - 도메인 home-1
+  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+  - 프로젝트 team-1
+  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
+  - 배포에 READ 권한을 받은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 역할 deployment-user-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 deployment-user-1: deployment 전체에 READ 허용
+    - 일반 사용자 user-1: 역할 deployment-user-1 보유
+  - 배포 deployment-1: 복제를 1개 두려 한다, 아직 리비전이 없다
+  - 리비전이 딛는 이미지, 모델 폴더, 런타임 변형, 자원 슬롯 타입 준비
+    - 컨테이너 레지스트리 registry-1: 이미지를 가져오는 곳
+    - 이미지 image-1: x86_64 이미지
+    - 개인 폴더 folder-1: 그 사람의 개인 프로젝트에 놓이고, 쓸 수 있는 상태다
+    - 폴더 읽기 권한 부여
+      - 역할 folder-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
+      - 역할 folder-reader-1: vfolder 전체에 READ 허용
+      - 일반 사용자 user-1: 역할 folder-reader-1 보유
+    - 런타임 변형 runtime-1: 기본 모델 정의가 비어 있고, 모델 폴더의 설정 파일을 읽지 않는다
+    - 자원 슬롯 타입 cpu: 리비전이 채우지 않아도 된다
+    - 자원 슬롯 타입 mem: 리비전이 채우지 않아도 된다
+  - 배포 deployment-1: 리비전 하나를 갖는다
+  - 배포 deployment-1: 리비전 하나를 갖는다
+  - 배포 deployment-1: 리비전 하나를 갖는다
+
+When
+
+- DeploymentAdapter.search_revisions — user-1이 deployment-1의 리비전을 번호 2로 걸러 조회
+
+Then
+
+- 심은 리비전이 모두, 그리고 그것만 세어진다
+  - items.id: 센 리비전들와 같다
+  - items.revision_number = [2]
+  - total_count = 1
+  - has_next_page = False
+  - has_previous_page = False
+
+#### [the-superadmin-counts-every-revision](/tests/scenario/bai_scenario/manager/deployment/test_searching_revisions.py) — pass
+
+두 프로젝트의 배포에 리비전이 나뉘어 있고 슈퍼관리자가 필터 없이 전체를 훑으면, 둘의 것을 모두 센다. 이 문은 역할이 지킨다
+
+Given
+
+- 두 프로젝트의 배포에 리비전 2개와 1개가 나뉘어 있고, 아무 배포 권한도 받지 않은 사용자 한 명
+  - 도메인 home-1
+  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+  - 프로젝트 team-1
+  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
+  - 배포 권한을 하나도 받지 않은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+  - 프로젝트 other-1
+  - 배포 wanted-1: 복제를 1개 두려 한다, 아직 리비전이 없다
+  - 배포 elsewhere-1: 복제를 1개 두려 한다, 아직 리비전이 없다
+  - 리비전이 딛는 이미지, 모델 폴더, 런타임 변형, 자원 슬롯 타입 준비
+    - 컨테이너 레지스트리 registry-1: 이미지를 가져오는 곳
+    - 이미지 image-1: x86_64 이미지
+    - 개인 폴더 folder-1: 그 사람의 개인 프로젝트에 놓이고, 쓸 수 있는 상태다
+    - 폴더 읽기 권한 부여
+      - 역할 folder-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
+      - 역할 folder-reader-1: vfolder 전체에 READ 허용
+      - 슈퍼관리자 user-1: 역할 folder-reader-1 보유
+    - 런타임 변형 runtime-1: 기본 모델 정의가 비어 있고, 모델 폴더의 설정 파일을 읽지 않는다
+    - 자원 슬롯 타입 cpu: 리비전이 채우지 않아도 된다
+    - 자원 슬롯 타입 mem: 리비전이 채우지 않아도 된다
+  - 배포 wanted-1: 리비전 하나를 갖는다
+  - 배포 wanted-1: 리비전 하나를 갖는다
+  - 배포 elsewhere-1: 리비전 하나를 갖는다
+
+When
+
+- DeploymentAdapter.admin_search_revisions — user-1이 필터 없이 모든 리비전을 조회
+
+Then
+
+- 심은 리비전이 모두, 그리고 그것만 세어진다
+  - items.id: 센 리비전들와 같다
+  - items.revision_number = [1, 1, 2]
+  - total_count = 3
+  - has_next_page = False
+  - has_previous_page = False
+
+#### [the-superadmin-counts-every-slot-a-revision-allocates](/tests/scenario/bai_scenario/manager/deployment/test_searching_revisions.py) — pass
+
+슬롯 둘을 잡은 리비전의 슬롯을 슈퍼관리자가 훑으면, 둘을 모두 센다. 이 문은 역할이 지킨다
+
+Given
+
+- 리비전 1개가 딸린 배포 하나와, 자기 모델 폴더를 읽을 수만 있는 아무 배포 권한도 받지 않은 사용자 한 명
+  - 도메인 home-1
+  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+  - 프로젝트 team-1
+  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
+  - 배포 권한을 하나도 받지 않은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+  - 배포 deployment-1: 복제를 1개 두려 한다, 아직 리비전이 없다
+  - 리비전이 딛는 이미지, 모델 폴더, 런타임 변형, 자원 슬롯 타입 준비
+    - 컨테이너 레지스트리 registry-1: 이미지를 가져오는 곳
+    - 이미지 image-1: x86_64 이미지
+    - 개인 폴더 folder-1: 그 사람의 개인 프로젝트에 놓이고, 쓸 수 있는 상태다
+    - 폴더 읽기 권한 부여
+      - 역할 folder-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
+      - 역할 folder-reader-1: vfolder 전체에 READ 허용
+      - 슈퍼관리자 user-1: 역할 folder-reader-1 보유
+    - 런타임 변형 runtime-1: 기본 모델 정의가 비어 있고, 모델 폴더의 설정 파일을 읽지 않는다
+    - 자원 슬롯 타입 cpu: 리비전이 채우지 않아도 된다
+    - 자원 슬롯 타입 mem: 리비전이 채우지 않아도 된다
+  - 배포 deployment-1: 리비전 하나를 갖는다
+
+When
+
+- DeploymentAdapter.search_revision_resource_slots — user-1이 deployment-1의 첫 리비전의 슬롯을 조회
+
+Then
+
+- 리비전이 잡은 슬롯이 모두 세어진다
+  - items = [('cpu', Decimal('1')), ('mem', Decimal('1073741824'))]
+  - total_count = 2
   - has_next_page = False
   - has_previous_page = False
 
