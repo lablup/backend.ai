@@ -84,7 +84,7 @@ RATE_METRICS: Final[frozenset[str]] = frozenset({"net_rx", "net_tx"})
 # mirrored here for query building and the legacy live_stat payload.
 CONTAINER_METRIC_UNIT_HINTS: Final[dict[str, str]] = {
     "cpu_used": "msec",
-    "cpu_util": "msec/s",
+    "cpu_util": "millicores",
     "mem": "bytes",
     "net_rx": "bps",
     "net_tx": "bps",

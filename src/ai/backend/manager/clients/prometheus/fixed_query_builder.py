@@ -56,7 +56,7 @@ _PCT_RATE_TEMPLATE: Final[str] = (
     ' * 100, "value_type", "pct", "", "")'
 )
 # Unit hints served as a per-second rate of a cumulative counter (CPU time).
-_COUNTER_UNIT_HINTS: Final[frozenset[str]] = frozenset({"msec/s"})
+_COUNTER_UNIT_HINTS: Final[frozenset[str]] = frozenset({"millicores"})
 _SERIES_TEMPLATES: Final[Mapping[MetricType, str]] = {
     MetricType.GAUGE: _GAUGE_TEMPLATE,
     MetricType.RATE: _RATE_TEMPLATE,
