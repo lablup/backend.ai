@@ -7,7 +7,6 @@ from uuid import UUID
 
 from strawberry import Info
 
-from ai.backend.common.api_handlers import Sentinel
 from ai.backend.common.contexts.client_ip import current_client_ip
 from ai.backend.common.contexts.user import current_user
 from ai.backend.common.data.entity.domain import DomainID
@@ -19,6 +18,7 @@ from ai.backend.common.dto.manager.v2.user.request import (
 )
 from ai.backend.common.exception import InvalidIpAddressValue, UnreachableError
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
+from ai.backend.common.tristate.unset import Unset
 from ai.backend.common.types import AccessKey, ReadableCIDR
 from ai.backend.manager.api.adapters.user.adapter import UserAdapter
 from ai.backend.manager.api.gql.decorators import (
@@ -273,13 +273,11 @@ async def admin_bulk_update_users_v2(
 
         updater = UserUpdater(
             user_id=UserID(user_item.user_id),
-            username=(
-                OptionalState.update(dto.username)
-                if dto.username is not None
-                else OptionalState.nop()
-            ),
+            username=OptionalState.from_unset(dto.username),
             password=(
-                OptionalState.update(
+                OptionalState.nop()
+                if isinstance(dto.password, Unset) or dto.password is None
+                else OptionalState.update(
                     PasswordInfo(
                         password=dto.password,
                         algorithm=auth_config.password_hash_algorithm,
@@ -287,81 +285,35 @@ async def admin_bulk_update_users_v2(
                         salt_size=auth_config.password_hash_salt_size,
                     )
                 )
-                if dto.password is not None
-                else OptionalState.nop()
             ),
-            need_password_change=(
-                OptionalState.update(dto.need_password_change)
-                if dto.need_password_change is not None
-                else OptionalState.nop()
-            ),
-            full_name=(
-                TriState.nop()
-                if isinstance(dto.full_name, Sentinel)
-                else TriState.nullify()
-                if dto.full_name is None
-                else TriState.update(dto.full_name)
-            ),
-            description=(
-                TriState.nop()
-                if isinstance(dto.description, Sentinel)
-                else TriState.nullify()
-                if dto.description is None
-                else TriState.update(dto.description)
-            ),
+            need_password_change=OptionalState.from_unset(dto.need_password_change),
+            full_name=TriState.from_unset(dto.full_name),
+            description=TriState.from_unset(dto.description),
             status=(
-                OptionalState.update(UserStatus(dto.status))
-                if dto.status is not None
-                else OptionalState.nop()
+                OptionalState.nop()
+                if isinstance(dto.status, Unset) or dto.status is None
+                else OptionalState.update(UserStatus(dto.status))
             ),
-            domain_name=(
-                OptionalState.update(dto.domain_name)
-                if dto.domain_name is not None
-                else OptionalState.nop()
-            ),
+            domain_name=OptionalState.from_unset(dto.domain_name),
             role=(
-                OptionalState.update(UserRole(dto.role))
-                if dto.role is not None
-                else OptionalState.nop()
+                OptionalState.nop()
+                if isinstance(dto.role, Unset) or dto.role is None
+                else OptionalState.update(UserRole(dto.role))
             ),
-            allowed_client_ip=(
-                TriState.nop()
-                if isinstance(dto.allowed_client_ip, Sentinel)
-                else TriState.from_graphql(dto.allowed_client_ip)
-            ),
-            resource_policy=(
-                OptionalState.update(dto.resource_policy)
-                if dto.resource_policy is not None
-                else OptionalState.nop()
-            ),
-            sudo_session_enabled=(
-                OptionalState.update(dto.sudo_session_enabled)
-                if dto.sudo_session_enabled is not None
-                else OptionalState.nop()
-            ),
-            container_uid=(
-                TriState.nop()
-                if isinstance(dto.container_uid, Sentinel)
-                else TriState.from_graphql(dto.container_uid)
-            ),
-            container_main_gid=(
-                TriState.nop()
-                if isinstance(dto.container_main_gid, Sentinel)
-                else TriState.from_graphql(dto.container_main_gid)
-            ),
-            container_gids=(
-                TriState.nop()
-                if isinstance(dto.container_gids, Sentinel)
-                else TriState.from_graphql(dto.container_gids)
-            ),
+            allowed_client_ip=TriState.from_unset(dto.allowed_client_ip),
+            resource_policy=OptionalState.from_unset(dto.resource_policy),
+            sudo_session_enabled=OptionalState.from_unset(dto.sudo_session_enabled),
+            container_uid=TriState.from_unset(dto.container_uid),
+            container_main_gid=TriState.from_unset(dto.container_main_gid),
+            container_gids=TriState.from_unset(dto.container_gids),
             group_ids=(
                 OptionalState.nop()
-                if isinstance(dto.group_ids, Sentinel) or dto.group_ids is None
+                if isinstance(dto.group_ids, Unset) or dto.group_ids is None
                 else OptionalState.update([str(gid) for gid in dto.group_ids])
             ),
         )
 
-        if not isinstance(dto.main_access_key, Sentinel) and dto.main_access_key is not None:
+        if not isinstance(dto.main_access_key, Unset) and dto.main_access_key is not None:
             default_key_switches[UserID(user_item.user_id)] = AccessKey(dto.main_access_key)
         items.append(updater)
 
