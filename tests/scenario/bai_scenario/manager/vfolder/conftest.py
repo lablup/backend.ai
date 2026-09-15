@@ -28,6 +28,7 @@ from ai.backend.manager.repositories.ops.repository import OpsRepository
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.ops.v2.share.provider import ShareOpsProvider
 from ai.backend.manager.repositories.user.repository import UserRepository
+from ai.backend.manager.repositories.vfolder.admin_repository import VFolderAdminRepository
 from ai.backend.manager.repositories.vfolder.repository import VfolderRepository
 from ai.backend.manager.secret.pool import KeyProviderPool
 from ai.backend.manager.services.deployment.processors import DeploymentProcessors
@@ -35,6 +36,7 @@ from ai.backend.manager.services.vfolder.processors.file import VFolderFileProce
 from ai.backend.manager.services.vfolder.processors.vfolder import VFolderProcessors
 from ai.backend.manager.services.vfolder.processors.vfolder_admin import VFolderAdminProcessors
 from ai.backend.manager.services.vfolder.services.vfolder import VFolderService
+from ai.backend.manager.services.vfolder.services.vfolder_admin import VFolderAdminService
 
 
 @pytest.fixture
@@ -83,6 +85,9 @@ async def adapter(
     return VFolderAdapter(
         VFolderProcessors(registry.group(GroupMeta(VFolderEntityType())), service),
         unwired(VFolderFileProcessors, "no file operation is exercised here"),
-        unwired(VFolderAdminProcessors, "no admin operation is exercised here"),
+        VFolderAdminProcessors(
+            registry.group(GroupMeta(VFolderEntityType())),
+            VFolderAdminService(VFolderAdminRepository(engine)),
+        ),
         unwired(DeploymentProcessors, "only deploy() reaches it"),
     )

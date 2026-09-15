@@ -11,11 +11,15 @@ from __future__ import annotations
 
 import pytest
 from bai_scenario.components.domain import SomeoneOf
-from bai_scenario.components.vfolder import STORAGE_HOST, SomeoneMakingFolders
+from bai_scenario.components.vfolder.stage import MAKING, STORAGE_HOST
 from bai_scenario.runner.planting import SeedingSession
 from bai_scenario.seeds.domain.domain import SeedDomain
+from bai_scenario.seeds.rbac.role import SeedPermission, SeedRole
 from bai_scenario.seeds.seeder import Laid
 
+from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.user import UserID
+from ai.backend.common.data.entity.vfolder import VFolderEntityType
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.manager.data.domain.types import DomainData
 
@@ -59,8 +63,16 @@ async def test_a_granted_user_and_a_plain_one_can_stand_side_by_side(
 ) -> None:
     """A permission row and its ungranted twin are laid in the same situation, which is
     how every permission row of the tables is written."""
-    granted = await seeding.within(SomeoneMakingFolders(home))
+    granted = await seeding.within(SomeoneOf(home, vfolder_hosts=[STORAGE_HOST]))
+    role = await seeding.creating_from(
+        SeedRole(lambda d: DomainID(d.id), name_hint="folder-role"), home
+    )
+    for one in MAKING:
+        await seeding.adding(SeedPermission(entity_type=VFolderEntityType(), permission=one), role)
+    grant = await seeding.granting(
+        role, granted, role_id=lambda r: r.id, user_id=lambda u: UserID(u.id)
+    )
     plain = await seeding.within(SomeoneOf(home))
 
-    assert seeding.made(granted.user).id != seeding.made(plain).id
-    assert seeding.made(granted.grant) is None
+    assert seeding.made(granted).id != seeding.made(plain).id
+    assert seeding.made(grant) is None
