@@ -16,6 +16,7 @@ from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.contexts.user import current_user
 from ai.backend.common.data.entity.vfolder import VFolderUUID
+from ai.backend.common.data.permission.types import Permission
 from ai.backend.common.defs import VFOLDER_GROUP_PERMISSION_MODE
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.exception import UnreachableError
@@ -28,6 +29,8 @@ from ai.backend.common.types import (
     VFolderUsageMode,
 )
 from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.manager.actions.v2.bulk.result import PartialBulkEntityResult, PartialBulkResult
+from ai.backend.manager.actions.v2.bulk.validator.rbac import BulkOwnCheck
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.project.types import ProjectResourceInfo
@@ -102,6 +105,9 @@ from ai.backend.manager.services.vfolder.actions.base import (
 from ai.backend.manager.services.vfolder.actions.batch_load_by_ids import (
     GlobalBatchLoadVFoldersAction,
     GlobalBatchLoadVFoldersActionResult,
+)
+from ai.backend.manager.services.vfolder.actions.bulk_load_permissions import (
+    BulkLoadVFolderPermissionsAction,
 )
 from ai.backend.manager.services.vfolder.actions.create import (
     CreateVFolderAction,
@@ -203,6 +209,7 @@ class VFolderService:
     _vfolder_repository: VfolderRepository
     _user_repository: UserRepository
     _valkey_stat_client: ValkeyStatClient
+    _own_check: BulkOwnCheck
 
     def __init__(
         self,
@@ -213,6 +220,7 @@ class VFolderService:
         vfolder_repository: VfolderRepository,
         user_repository: UserRepository,
         valkey_stat_client: ValkeyStatClient,
+        own_check: BulkOwnCheck,
     ) -> None:
         self._config_provider = config_provider
         self._etcd = etcd
@@ -221,6 +229,7 @@ class VFolderService:
         self._user_repository = user_repository
         self._background_task_manager = background_task_manager
         self._valkey_stat_client = valkey_stat_client
+        self._own_check = own_check
 
     async def batch_load_by_ids(
         self, action: GlobalBatchLoadVFoldersAction
@@ -231,6 +240,19 @@ class VFolderService:
         """
         data = await self._vfolder_repository.batch_load_by_ids(action.ids)
         return GlobalBatchLoadVFoldersActionResult(data=data)
+
+    async def bulk_load_permissions(
+        self, action: BulkLoadVFolderPermissionsAction
+    ) -> PartialBulkResult[Permission]:
+        held = await self._own_check.held(action.vfolder_ids)
+        return PartialBulkResult(
+            items=[
+                PartialBulkEntityResult[Permission].succeeded(
+                    vid, held.get(vid, Permission.NONE), description="resolved"
+                )
+                for vid in action.vfolder_ids
+            ]
+        )
 
     async def lookup_vfolder(self, action: LookupVFolderAction) -> LookupVFolderActionResult:
         """Resolve one vfolder name into its id.

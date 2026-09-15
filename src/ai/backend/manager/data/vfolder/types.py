@@ -90,6 +90,18 @@ class VFolderMountPermission(enum.StrEnum):
             ):
                 return Permission.READ | Permission.UPDATE | Permission.SOFT_DELETE
 
+    @classmethod
+    def from_rbac(cls, permission: Permission) -> VFolderMountPermission:
+        """The mount permission the RBAC bits held on a folder answer as.
+
+        Callers pass bits that cover ``READ``; a folder held without it is not mounted.
+        """
+        if permission.covers(Permission.HARD_DELETE):
+            return cls.RW_DELETE
+        if permission.covers(Permission.UPDATE):
+            return cls.READ_WRITE
+        return cls.READ_ONLY
+
 
 class VFolderInvitationState(enum.StrEnum):
     """

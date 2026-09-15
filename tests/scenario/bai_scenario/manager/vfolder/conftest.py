@@ -20,13 +20,18 @@ from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.manager.actions.monitors import ActionMonitors
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
 from ai.backend.manager.actions.registry.types import GroupMeta, ProcessorDependencies
+from ai.backend.manager.actions.v2.bulk.validator.rbac import BulkOwnCheck
 from ai.backend.manager.actions.v2.validators import ActionValidators as V2ActionValidators
 from ai.backend.manager.api.adapters.vfolder.adapter import VFolderAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.secret.types import KeyProviderType
 from ai.backend.manager.repositories.ops.repository import OpsRepository
+from ai.backend.manager.repositories.ops.v2.permission.provider import PermissionOpsProvider
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.ops.v2.share.provider import ShareOpsProvider
+from ai.backend.manager.repositories.rbac.permission_check_repository import (
+    RbacPermissionCheckRepository,
+)
 from ai.backend.manager.repositories.user.repository import UserRepository
 from ai.backend.manager.repositories.vfolder.repository import VfolderRepository
 from ai.backend.manager.secret.pool import KeyProviderPool
@@ -79,6 +84,9 @@ async def adapter(
             KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
         ),
         valkey_stat_client=valkey.stat,
+        own_check=BulkOwnCheck(
+            RbacPermissionCheckRepository(PermissionOpsProvider(engine)), config
+        ),
     )
     return VFolderAdapter(
         VFolderProcessors(registry.group(GroupMeta(VFolderEntityType())), service),
