@@ -5,15 +5,16 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import override
 
+from bai_scenario.components.domain import GrantedUser, SomeoneOf
+from bai_scenario.seeds.rbac.role import SeedPermission, SeedRole
+from bai_scenario.seeds.seeder import Laid, Seeder, SeedNest
+
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.session import SessionEntityType
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.manager.data.domain.types import DomainData
 from ai.backend.manager.data.permission.types import Permission
 from ai.backend.manager.data.project.types import ProjectData
-from bai_scenario.components.domain import GrantedUser, SomeoneOf
-from bai_scenario.seeds.rbac.role import SeedPermission, SeedRole
-from bai_scenario.seeds.seeder import Laid, Seeder, SeedNest
 
 
 @dataclass(frozen=True)
