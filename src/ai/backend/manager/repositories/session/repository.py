@@ -84,15 +84,13 @@ class SessionRepository:
     @session_repository_resilience.apply()
     async def get_session_validated(
         self,
-        session_name_or_id: str | SessionId,
-        owner_access_key: AccessKey,
+        session_id: SessionId,
         kernel_loading_strategy: KernelLoadingStrategy = KernelLoadingStrategy.MAIN_KERNEL_ONLY,
         allow_stale: bool = False,
         eager_loading_op: Sequence[_AbstractLoad] | None = None,
     ) -> SessionRow:
         return await self._db_source.get_session_validated(
-            session_name_or_id,
-            owner_access_key,
+            session_id,
             kernel_loading_strategy,
             allow_stale,
             eager_loading_op,
@@ -123,13 +121,10 @@ class SessionRepository:
     @session_repository_resilience.apply()
     async def update_session_name(
         self,
-        session_name_or_id: str | SessionId,
+        session_id: SessionId,
         new_name: str,
-        owner_access_key: AccessKey,
     ) -> SessionRow:
-        return await self._db_source.update_session_name(
-            session_name_or_id, new_name, owner_access_key
-        )
+        return await self._db_source.update_session_name(session_id, new_name)
 
     @session_repository_resilience.apply()
     async def get_container_registry(
@@ -224,41 +219,35 @@ class SessionRepository:
     @session_repository_resilience.apply()
     async def get_target_session_ids(
         self,
-        session_name_or_id: str | uuid.UUID,
-        access_key: AccessKey,
+        session_id: SessionId,
         recursive: bool = False,
     ) -> list[SessionId]:
         """
         Get list of session IDs including dependent sessions if recursive.
 
-        :param session_name_or_id: Name or ID of the primary session
-        :param access_key: Access key of the session owner
+        :param session_id: ID of the primary session
         :param recursive: If True, include dependent sessions
         :return: List of session IDs
         """
-        return await self._db_source.get_target_session_ids(
-            session_name_or_id, access_key, recursive
-        )
+        return await self._db_source.get_target_session_ids(session_id, recursive)
 
     @session_repository_resilience.apply()
     async def find_dependency_sessions(
         self,
-        session_name_or_id: uuid.UUID | str,
-        access_key: AccessKey,
+        session_id: SessionId,
     ) -> dict[str, list[Any] | str]:
-        return await self._db_source.find_dependency_sessions(session_name_or_id, access_key)
+        return await self._db_source.find_dependency_sessions(session_id)
 
     @session_repository_resilience.apply()
     async def get_session_with_group(
         self,
-        session_name_or_id: str | SessionId,
-        owner_access_key: AccessKey,
+        session_id: SessionId,
         kernel_loading_strategy: KernelLoadingStrategy = KernelLoadingStrategy.MAIN_KERNEL_ONLY,
         allow_stale: bool = False,
     ) -> SessionRow:
         """Get session with group information eagerly loaded"""
         return await self._db_source.get_session_with_group(
-            session_name_or_id, owner_access_key, kernel_loading_strategy, allow_stale
+            session_id, kernel_loading_strategy, allow_stale
         )
 
     @session_repository_resilience.apply()

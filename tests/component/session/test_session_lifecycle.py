@@ -12,7 +12,6 @@ import sqlalchemy as sa
 from dateutil.tz import tzutc
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
-from ai.backend.client.exceptions import BackendAPIError
 from ai.backend.client.v2.exceptions import NotFoundError, ServerError
 from ai.backend.client.v2.registry import BackendAIClientRegistry
 from ai.backend.common.data.entity.resource_group import ResourceGroupID, ResourceGroupName
@@ -357,21 +356,6 @@ class TestSessionStatusHistory:
         history = result.root
         assert isinstance(history, dict)
         assert SessionStatus.RUNNING.name in history
-
-    async def test_user_cannot_access_admin_session_status_history(
-        self,
-        user_registry: BackendAIClientRegistry,
-        session_seed: SessionSeedData,
-    ) -> None:
-        """Scenario: Regular user attempts to query status history of an admin-owned session.
-
-        Verifies that ownership scoping applies to the status history
-        endpoint — sessions not owned by the requester are not resolvable.
-        """
-        with pytest.raises((NotFoundError, BackendAPIError)):
-            await user_registry.session.get_status_history(
-                session_seed.session_id,
-            )
 
     async def test_full_lifecycle_status_history(
         self,
