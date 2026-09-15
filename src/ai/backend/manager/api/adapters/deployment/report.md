@@ -2,7 +2,7 @@
 
 [무엇을 보장하는가](/src/ai/backend/manager/api/adapters/deployment/KNOWLEDGE.md) · [어댑터](/src/ai/backend/manager/api/adapters/deployment/adapter.py)
 
-Not exercised by any scenario: activate_revision, add_revision, admin_refresh_deployment_revisions, admin_search_replicas, admin_search_revisions, batch_load_access_tokens_by_ids, batch_load_auto_scaling_rules_by_ids, batch_load_by_ids, batch_load_fields, batch_load_policies_by_endpoint_ids, batch_load_replicas_by_ids, batch_load_revisions_by_ids, batch_load_routes_by_ids, bulk_delete_access_tokens, bulk_delete_rules, create_access_token, create_rule, delete_access_token, delete_rule, get_access_token, get_policy, get_replica, get_revision, get_rule, search_access_tokens, search_policies, search_replicas, search_revision_resource_slots, search_revisions, search_routes, search_rules, update_route_traffic, update_rule, upsert_policy.
+Not exercised by any scenario: activate_revision, add_revision, admin_refresh_deployment_revisions, admin_search_replicas, admin_search_revisions, batch_load_access_tokens_by_ids, batch_load_auto_scaling_rules_by_ids, batch_load_by_ids, batch_load_fields, batch_load_policies_by_endpoint_ids, batch_load_replicas_by_ids, batch_load_revisions_by_ids, batch_load_routes_by_ids, bulk_delete_access_tokens, bulk_delete_rules, create_access_token, create_rule, delete_access_token, delete_rule, get_access_token, get_policy, get_replica, get_revision, get_rule, scoped_search, search_access_tokens, search_policies, search_replicas, search_revision_resource_slots, search_revisions, search_routes, search_rules, update_route_traffic, update_rule, upsert_policy.
 
 ### creating
 
