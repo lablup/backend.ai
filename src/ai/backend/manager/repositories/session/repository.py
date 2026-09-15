@@ -8,14 +8,13 @@ from typing import Any
 from sqlalchemy.orm.strategy_options import _AbstractLoad
 
 from ai.backend.common.data.entity.session import SessionID
-from ai.backend.common.docker import ImageRef
 from ai.backend.common.exception import BackendAIError
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
 from ai.backend.common.resilience.resilience import Resilience
-from ai.backend.common.types import AccessKey, ImageAlias, KernelId, SessionId
-from ai.backend.manager.data.image.types import ImageIdentifier
+from ai.backend.common.types import AccessKey, KernelId, SessionId
+from ai.backend.manager.data.image.types import ImageData
 from ai.backend.manager.data.kernel.types import KernelListResult
 from ai.backend.manager.data.resource_slot.types import ResourceAllocationAggregate
 from ai.backend.manager.data.session.types import (
@@ -31,6 +30,7 @@ from ai.backend.manager.models.session.updaters import SessionUpdater
 from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base import BatchQuerier
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.session.db_source import SessionDBSource
 
 session_repository_resilience = Resilience(
@@ -51,8 +51,8 @@ session_repository_resilience = Resilience(
 class SessionRepository:
     _db_source: SessionDBSource
 
-    def __init__(self, db: ExtendedAsyncSAEngine) -> None:
-        self._db_source = SessionDBSource(db)
+    def __init__(self, db: ExtendedAsyncSAEngine, ops_provider: V2DBOpsProvider) -> None:
+        self._db_source = SessionDBSource(db, ops_provider)
 
     @session_repository_resilience.apply()
     async def get_session_name(self, session_id: SessionId) -> str:
@@ -140,19 +140,18 @@ class SessionRepository:
         return await self._db_source.get_container_registry(registry_hostname, registry_project)
 
     @session_repository_resilience.apply()
-    async def resolve_image(
-        self,
-        image_identifiers: list[ImageAlias | ImageRef | ImageIdentifier],
-        alive_only: bool = True,
-    ) -> ImageRow:
-        """Resolve an image from the given identifiers.
+    async def resolve_image(self, reference: str, architecture: str) -> ImageData:
+        """The live image the reference names as a canonical for the architecture, or as an
+        alias."""
+        return await self._db_source.resolve_image(reference, architecture)
 
-        When ``alive_only`` is True (default), only images with the ALIVE status
-        are considered.  Set it to False to also include DELETED images, which is
-        useful when the caller needs to reference images that are no longer active
-        (e.g., committing a session whose base image has been deleted).
-        """
-        return await self._db_source.resolve_image(image_identifiers, alive_only)
+    @session_repository_resilience.apply()
+    async def resolve_image_by_canonical(
+        self, canonical: str, architecture: str, alive_only: bool = True
+    ) -> ImageData:
+        """``alive_only=False`` also considers DELETED images, for a session whose base
+        image was deleted while it ran."""
+        return await self._db_source.resolve_image_by_canonical(canonical, architecture, alive_only)
 
     @session_repository_resilience.apply()
     async def get_customized_image_count(self, user_id: uuid.UUID) -> int:

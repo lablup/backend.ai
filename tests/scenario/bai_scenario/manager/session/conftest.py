@@ -95,7 +95,7 @@ async def adapter(
     )
     service = SessionService(
         SessionServiceArgs(
-            session_repository=SessionRepository(engine),
+            session_repository=SessionRepository(engine, provider),
             scheduler_repository=scheduler_repository,
             user_repository=unwired(UserRepository, "only writes resolve the owner"),
             agent_registry=unwired(AgentRegistry, "only session writes reach the agents"),

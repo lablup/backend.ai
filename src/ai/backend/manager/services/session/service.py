@@ -43,7 +43,6 @@ from ai.backend.common.types import (
     AgentId,
     BinarySize,
     ContainerId,
-    ImageAlias,
     KernelId,
     ResourceSlot,
     ResourceSlotEntry,
@@ -59,7 +58,6 @@ from ai.backend.manager.bgtask.tasks.commit_session import CommitSessionManifest
 from ai.backend.manager.bgtask.types import ManagerBgtaskName
 from ai.backend.manager.clients.appproxy.client import AppProxyClientPool
 from ai.backend.manager.data.common.sentinel import undefined
-from ai.backend.manager.data.image.types import ImageIdentifier
 from ai.backend.manager.data.resource_slot.types import ResourceAllocationAggregate
 from ai.backend.manager.data.session.draft import (
     KernelExecutionSpecDraft,
@@ -451,9 +449,8 @@ class SessionService:
 
         # Validate image exists
         if session.main_kernel.image and session.main_kernel.architecture:
-            await self._session_repository.resolve_image(
-                [ImageIdentifier(session.main_kernel.image, session.main_kernel.architecture)],
-                alive_only=False,
+            await self._session_repository.resolve_image_by_canonical(
+                session.main_kernel.image, session.main_kernel.architecture, alive_only=False
             )
 
         # Create manifest for background task
@@ -588,17 +585,11 @@ class SessionService:
         )
 
         try:
-            image_row = await self._session_repository.resolve_image([
-                ImageIdentifier(
-                    image,
-                    architecture,
-                ),
-                ImageAlias(image),
-            ])
+            image_data = await self._session_repository.resolve_image(image, architecture)
 
             resp = await self._agent_registry.create_session(
                 session_name,
-                image_row.image_ref,
+                image_data.image_ref,
                 UserScope(
                     domain_name=domain_name,
                     group_id=user_info.group_id,
@@ -627,7 +618,7 @@ class SessionService:
                 sudo_session_enabled=sudo_session_enabled,
             )
             await self._session_repository.update_image_last_used_at(
-                image_row.id, datetime.now(tzutc())
+                image_data.id, datetime.now(tzutc())
             )
             return CreateFromParamsActionResult(
                 session_id=uuid.UUID(resp["sessionId"]), result=resp
@@ -794,17 +785,11 @@ class SessionService:
         )
 
         try:
-            image_row = await self._session_repository.resolve_image([
-                ImageIdentifier(
-                    image,
-                    architecture,
-                ),
-                ImageAlias(image),
-            ])
+            image_data = await self._session_repository.resolve_image(image, architecture)
 
             resp = await self._agent_registry.create_session(
                 session_name,
-                image_row.image_ref,
+                image_data.image_ref,
                 UserScope(
                     domain_name=domain_name,
                     group_id=user_info.group_id,

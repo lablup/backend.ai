@@ -494,7 +494,7 @@ class TestImageRepositoryLastUsedAt:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> SessionRepository:
-        return SessionRepository(db=db_with_cleanup)
+        return SessionRepository(db=db_with_cleanup, ops_provider=V2DBOpsProvider(db_with_cleanup))
 
     @pytest.fixture
     async def domain(
