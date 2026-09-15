@@ -219,7 +219,7 @@ def format_stats(stats: dict[str, Any]) -> str:
                     val = naturalsize(val, binary=True)
                     val, unit = val.rsplit(" ", maxsplit=1)
                     val = f"{Decimal(val):,}"
-                case "msec" | "usec" | "sec" | "msec/s":
+                case "msec" | "usec" | "sec" | "millicores":
                     val = "{:,}".format(Decimal(metric["current"]))
                 case "percent" | "pct" | "%":
                     val = metric["pct"]
