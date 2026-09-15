@@ -10,16 +10,48 @@ from uuid import UUID
 import sqlalchemy as sa
 
 from ai.backend.common.data.entity.deployment import DeploymentEntityType, DeploymentID
+from ai.backend.common.data.entity.domain import DomainEntityType, DomainID
 from ai.backend.common.data.entity.project import ProjectEntityType
-from ai.backend.common.data.entity.user import UserEntityType
-from ai.backend.manager.errors.resource import ProjectNotFound
+from ai.backend.common.data.entity.user import UserID
+from ai.backend.manager.errors.resource import DomainNotFound, ProjectNotFound
 from ai.backend.manager.errors.user import UserNotFound
 from ai.backend.manager.models.clauses import QueryCondition
+from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.endpoint.row import EndpointRow, EndpointTokenRow
 from ai.backend.manager.models.project.row import ProjectRow
 from ai.backend.manager.models.scopes import ExistenceCheck, OperationScope
+from ai.backend.manager.models.user.queries import user_scope_reaches
 from ai.backend.manager.models.user.row import UserRow
 from ai.backend.manager.models.virtual_entity.queries import scope_membership_exists
+
+
+@dataclass(frozen=True)
+class DomainDeploymentOperationScope(OperationScope):
+    """The deployments of one domain."""
+
+    domain_id: DomainID
+
+    @override
+    def to_condition(self) -> QueryCondition:
+        domain_id = self.domain_id
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return scope_membership_exists(
+                DomainEntityType(), domain_id, DeploymentEntityType(), EndpointRow.id
+            )
+
+        return inner
+
+    @property
+    @override
+    def existence_checks(self) -> Sequence[ExistenceCheck[Any]]:
+        return [
+            ExistenceCheck(
+                column=DomainRow.id,
+                value=self.domain_id,
+                error=DomainNotFound(str(self.domain_id)),
+            ),
+        ]
 
 
 @dataclass(frozen=True)
@@ -35,13 +67,9 @@ class ProjectDeploymentOperationScope(OperationScope):
     def to_condition(self) -> QueryCondition:
         project_id = self.project_id
 
-        # TODO(BA-7571): drop the column term once the ownership backfill lands.
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return sa.or_(
-                EndpointRow.project == project_id,
-                scope_membership_exists(
-                    ProjectEntityType(), project_id, DeploymentEntityType(), EndpointRow.id
-                ),
+            return scope_membership_exists(
+                ProjectEntityType(), project_id, DeploymentEntityType(), EndpointRow.id
             )
 
         return inner
@@ -62,20 +90,14 @@ class ProjectDeploymentOperationScope(OperationScope):
 class UserDeploymentOperationScope(OperationScope):
     """The deployments one user created."""
 
-    user_id: UUID
+    user_id: UserID
 
     @override
     def to_condition(self) -> QueryCondition:
         user_id = self.user_id
 
-        # TODO(BA-7571): drop the column term once the ownership backfill lands.
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return sa.or_(
-                EndpointRow.created_user == user_id,
-                scope_membership_exists(
-                    UserEntityType(), user_id, DeploymentEntityType(), EndpointRow.id
-                ),
-            )
+            return user_scope_reaches(user_id, DeploymentEntityType(), EndpointRow.id)
 
         return inner
 

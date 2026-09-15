@@ -3117,18 +3117,18 @@ class DeploymentDBSource:
     async def bulk_delete_access_tokens(
         self,
         token_ids: list[uuid.UUID],
-    ) -> list[uuid.UUID]:
-        """Delete multiple access tokens and return the IDs that were actually deleted."""
+    ) -> list[ModelDeploymentAccessTokenData]:
+        """Delete multiple access tokens and return the ones that were actually deleted."""
         if not token_ids:
             return []
         async with self._begin_session_read_committed() as db_sess:
             query = (
                 sa.delete(EndpointTokenRow)
                 .where(EndpointTokenRow.id.in_(token_ids))
-                .returning(EndpointTokenRow.id)
+                .returning(EndpointTokenRow)
             )
             result = await db_sess.execute(query)
-            return [row[0] for row in result.fetchall()]
+            return [row.to_access_token_data() for row in result.scalars().all()]
 
     async def search_access_tokens(
         self,

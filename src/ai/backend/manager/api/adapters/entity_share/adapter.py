@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import uuid
 from collections.abc import Sequence
 
 from ai.backend.common.contexts.user import current_user
@@ -53,11 +54,10 @@ from ai.backend.manager.services.entity_share.actions.create import (
 )
 from ai.backend.manager.services.entity_share.actions.get import GetEntityShareAction
 from ai.backend.manager.services.entity_share.actions.search import (
+    EntityShareOwningScopeItem,
     EntityShareRecipientProjectScopeItem,
     EntityShareRecipientScopeItem,
     EntityShareScopeItem,
-    EntityShareSharerScopeItem,
-    EntityShareTargetScopeItem,
     SearchEntitySharesAction,
 )
 from ai.backend.manager.services.entity_share.processors import EntityShareProcessors
@@ -160,14 +160,17 @@ class EntityShareAdapter(BaseAdapter):
         if me is None:
             raise UnreachableError("User context is not available")
         items: list[EntityShareScopeItem] = []
+        sharers: list[uuid.UUID] = []
         for side in input.sides:
             match side:
                 case EntityShareSideDTO.RECIPIENT:
                     items.append(EntityShareRecipientScopeItem(user_id=UserID(me.user_id)))
                 case EntityShareSideDTO.SHARER:
-                    items.append(EntityShareSharerScopeItem(user_id=UserID(me.user_id)))
+                    items.append(EntityShareOwningScopeItem(target=UserID(me.user_id)))
+                    sharers.append(me.user_id)
         return await self._search(
             items,
+            extra_conditions=([EntityShareConditions.by_sharers(sharers)] if sharers else []),
             filter=input.filter,
             order=input.order,
             first=input.first,
@@ -202,6 +205,7 @@ class EntityShareAdapter(BaseAdapter):
         self,
         items: list[EntityShareScopeItem],
         *,
+        extra_conditions: Sequence[QueryCondition] = (),
         filter: EntityShareFilter | None,
         order: list[EntityShareOrderBy] | None,
         first: int | None,
@@ -213,7 +217,10 @@ class EntityShareAdapter(BaseAdapter):
     ) -> SearchEntitySharesPayload:
         searcher = self._build_searcher(
             EntityShareSearcher,
-            conditions=self._convert_filter(filter) if filter else [],
+            conditions=[
+                *(self._convert_filter(filter) if filter else []),
+                *extra_conditions,
+            ],
             orders=self._convert_orders(order) if order else [],
             pagination_spec=_entity_share_pagination_spec(),
             first=first,
@@ -240,10 +247,10 @@ class EntityShareAdapter(BaseAdapter):
         for project in scope.recipient_project or ():
             items.append(EntityShareRecipientProjectScopeItem(project_id=ProjectID(project.value)))
         for sharer in scope.sharer or ():
-            items.append(EntityShareSharerScopeItem(user_id=UserID(sharer.value)))
+            items.append(EntityShareOwningScopeItem(target=UserID(sharer.value)))
         for target in scope.target or ():
             items.append(
-                EntityShareTargetScopeItem(
+                EntityShareOwningScopeItem(
                     target=RuntimeEntityID(target.entity_type, target.entity_id)
                 )
             )

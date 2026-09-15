@@ -29,6 +29,7 @@ from ai.backend.common.dto.manager.v2.deployment.request import (
     DeleteAccessTokenInput,
     DeleteDeploymentInput,
     ReplaceDeploymentOptionsInput,
+    ScopedSearchDeploymentsInput,
     SearchAccessTokensInput,
     SearchAutoScalingRulesInput,
     SearchDeploymentPoliciesInput,
@@ -94,6 +95,14 @@ class V2DeploymentHandler:
     ) -> APIResponse:
         """Search deployments with admin scope."""
         result = await self._adapter.admin_search(body.parsed)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def scoped_search(
+        self,
+        body: BodyParam[ScopedSearchDeploymentsInput],
+    ) -> APIResponse:
+        """Search the deployments the named scopes reach, combined with OR."""
+        result = await self._adapter.scoped_search(body.parsed)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
     async def project_search(

@@ -1,3 +1,10 @@
+"""Frozen copies of the RBAC enums as the data migrations found them.
+
+Deprecated: nothing outside `models/alembic/versions/` may read these. They are kept
+so a migration keeps reading the values it was written against, and they do not track
+the live enums.
+"""
+
 from __future__ import annotations
 
 import enum
@@ -33,6 +40,12 @@ class RoleStatus(enum.StrEnum):
 
 
 class OperationType(enum.StrEnum):
+    """Deprecated: the live axis is `Permission`, a bitmask.
+
+    The `grant:*` values are retired, not pending: handing an entity to someone else is
+    `entity_share`, not a permission bit. Do not read them as a grant axis to build on.
+    """
+
     CREATE = "create"
     READ = "read"
     UPDATE = "update"

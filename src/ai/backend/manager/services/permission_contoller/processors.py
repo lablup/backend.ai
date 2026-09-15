@@ -1,19 +1,26 @@
 from ai.backend.common.data.entity.permission import PermissionFieldType
-from ai.backend.manager.actions.monitors.monitor import ActionMonitor
-from ai.backend.manager.actions.processor import ActionProcessor
 from ai.backend.manager.actions.registry.field import LookupFieldGroup
 from ai.backend.manager.actions.registry.group import ProcessorGroup
 from ai.backend.manager.actions.registry.types import FieldGroupMeta
+from ai.backend.manager.actions.v2.bulk.partial_processor import PartialBulkActionProcessor
+from ai.backend.manager.actions.v2.bulk.processor import BulkActionProcessor
 from ai.backend.manager.actions.v2.field.bulk_processor import PartialBulkFieldActionProcessor
+from ai.backend.manager.actions.v2.field.processor import SingleFieldActionProcessor
+from ai.backend.manager.actions.v2.global_scope.processor import (
+    GlobalActionProcessor,
+    PublicActionProcessor,
+)
 from ai.backend.manager.actions.v2.ops.result import (
     CreatedEntityOpsResult,
     CreatedFieldOpsResult,
     EntityOpsResult,
+    ScopedFieldsOpsResult,
 )
 from ai.backend.manager.actions.v2.scope.processor import ScopeActionProcessor
 from ai.backend.manager.actions.v2.single_entity.processor import SingleEntityActionProcessor
 from ai.backend.manager.data.permission.permission import PermissionData
 from ai.backend.manager.data.permission.role import RoleData
+from ai.backend.manager.data.user.types import UserData
 
 from .actions import (
     AddRolePermissionAction,
@@ -22,51 +29,52 @@ from .actions import (
     DeleteRoleAction,
     GetRoleDetailAction,
     GetRoleDetailActionResult,
+    GlobalSearchRolesAction,
+    GlobalSearchRolesActionResult,
     ReplaceRolePermissionsAction,
     ReplaceRolePermissionsActionResult,
-    SearchRolesAction,
-    SearchRolesActionResult,
     SearchRolesInScopeAction,
     SearchRolesInScopeActionResult,
-    SearchUsersAssignedToRoleAction,
-    SearchUsersAssignedToRoleActionResult,
     UpdateRoleAction,
 )
+from .actions.bulk_get_permissions import BulkGetPermissionsAction
+from .actions.bulk_get_roles import BulkGetRolesAction
+from .actions.delete_permission import DeletePermissionAction
 from .actions.get_entity_types import (
-    GetEntityTypesAction,
-    GetEntityTypesActionResult,
+    PublicGetEntityTypesAction,
+    PublicGetEntityTypesActionResult,
 )
 from .actions.get_permission_matrix import (
-    GetPermissionMatrixAction,
-    GetPermissionMatrixActionResult,
+    PublicGetPermissionMatrixAction,
+    PublicGetPermissionMatrixActionResult,
 )
 from .actions.get_scope_types import (
-    GetScopeTypesAction,
-    GetScopeTypesActionResult,
+    PublicGetScopeTypesAction,
+    PublicGetScopeTypesActionResult,
 )
 from .actions.lookup_permission_owner import (
     LookupBulkRolePermissionOwnerAction,
     LookupRolePermissionOwnerAction,
 )
-from .actions.permission import (
-    CreatePermissionAction,
-    CreatePermissionActionResult,
-    DeletePermissionAction,
-    DeletePermissionActionResult,
-)
 from .actions.purge_role import PurgeRoleAction
+from .actions.search_my_role_assignments import (
+    ScopedSearchRoleAssignmentsAction,
+    ScopedSearchRoleAssignmentsActionResult,
+)
 from .actions.search_permissions import (
-    SearchPermissionsAction,
-    SearchPermissionsActionResult,
+    GlobalSearchPermissionsAction,
+    GlobalSearchPermissionsActionResult,
 )
+from .actions.search_role_permissions import SearchRolePermissionsAction
 from .actions.search_scopes import (
-    SearchScopesAction,
-    SearchScopesActionResult,
+    GlobalSearchScopesAction,
+    GlobalSearchScopesActionResult,
 )
-from .actions.update_permission import (
-    UpdatePermissionAction,
-    UpdatePermissionActionResult,
+from .actions.search_users_assigned_to_role import (
+    GlobalSearchRoleAssignmentsAction,
+    GlobalSearchRoleAssignmentsActionResult,
 )
+from .actions.update_permission import UpdatePermissionAction
 from .service import PermissionControllerService
 
 
@@ -77,13 +85,19 @@ class PermissionControllerProcessors:
     update_role: SingleEntityActionProcessor[UpdateRoleAction, EntityOpsResult[RoleData]]
     delete_role: SingleEntityActionProcessor[DeleteRoleAction, EntityOpsResult[RoleData]]
     purge_role: SingleEntityActionProcessor[PurgeRoleAction, EntityOpsResult[RoleData]]
-    get_role_detail: ActionProcessor[GetRoleDetailAction, GetRoleDetailActionResult]
-    search_roles: ActionProcessor[SearchRolesAction, SearchRolesActionResult]
+    get_role_detail: SingleEntityActionProcessor[GetRoleDetailAction, GetRoleDetailActionResult]
+    bulk_get_roles: PartialBulkActionProcessor[BulkGetRolesAction, RoleData]
+    global_search_roles: GlobalActionProcessor[
+        GlobalSearchRolesAction, GlobalSearchRolesActionResult
+    ]
     search_roles_in_scope: ScopeActionProcessor[
         SearchRolesInScopeAction, SearchRolesInScopeActionResult
     ]
-    search_users_assigned_to_role: ActionProcessor[
-        SearchUsersAssignedToRoleAction, SearchUsersAssignedToRoleActionResult
+    scoped_search_role_assignments: ScopeActionProcessor[
+        ScopedSearchRoleAssignmentsAction, ScopedSearchRoleAssignmentsActionResult
+    ]
+    global_search_role_assignments: GlobalActionProcessor[
+        GlobalSearchRoleAssignmentsAction, GlobalSearchRoleAssignmentsActionResult
     ]
     add_role_permission: SingleEntityActionProcessor[
         AddRolePermissionAction, CreatedFieldOpsResult[PermissionData]
@@ -91,37 +105,60 @@ class PermissionControllerProcessors:
     bulk_remove_role_permissions: PartialBulkFieldActionProcessor[
         BulkRemoveRolePermissionsAction, PermissionData
     ]
-    replace_role_permissions: ActionProcessor[
+    replace_role_permissions: SingleEntityActionProcessor[
         ReplaceRolePermissionsAction, ReplaceRolePermissionsActionResult
     ]
-    search_scopes: ActionProcessor[SearchScopesAction, SearchScopesActionResult]
-    get_scope_types: ActionProcessor[GetScopeTypesAction, GetScopeTypesActionResult]
-    get_entity_types: ActionProcessor[GetEntityTypesAction, GetEntityTypesActionResult]
-    get_permission_matrix: ActionProcessor[
-        GetPermissionMatrixAction, GetPermissionMatrixActionResult
+    global_search_scopes: GlobalActionProcessor[
+        GlobalSearchScopesAction, GlobalSearchScopesActionResult
     ]
-    search_permissions: ActionProcessor[SearchPermissionsAction, SearchPermissionsActionResult]
-    create_permission: ActionProcessor[CreatePermissionAction, CreatePermissionActionResult]
-    update_permission: ActionProcessor[UpdatePermissionAction, UpdatePermissionActionResult]
-    delete_permission: ActionProcessor[DeletePermissionAction, DeletePermissionActionResult]
+    public_get_scope_types: PublicActionProcessor[
+        PublicGetScopeTypesAction, PublicGetScopeTypesActionResult
+    ]
+    public_get_entity_types: PublicActionProcessor[
+        PublicGetEntityTypesAction, PublicGetEntityTypesActionResult
+    ]
+    public_get_permission_matrix: PublicActionProcessor[
+        PublicGetPermissionMatrixAction, PublicGetPermissionMatrixActionResult
+    ]
+    bulk_get_permissions: PartialBulkFieldActionProcessor[BulkGetPermissionsAction, PermissionData]
+    search_role_permissions: BulkActionProcessor[
+        SearchRolePermissionsAction, ScopedFieldsOpsResult[PermissionData]
+    ]
+    global_search_permissions: GlobalActionProcessor[
+        GlobalSearchPermissionsAction, GlobalSearchPermissionsActionResult
+    ]
+    update_permission: SingleFieldActionProcessor[
+        UpdatePermissionAction, EntityOpsResult[PermissionData]
+    ]
+    delete_permission: SingleFieldActionProcessor[
+        DeletePermissionAction, EntityOpsResult[PermissionData]
+    ]
 
     def __init__(
         self,
         role_group: ProcessorGroup[RoleData],
+        user_group: ProcessorGroup[UserData],
         service: PermissionControllerService,
-        action_monitors: list[ActionMonitor],
     ) -> None:
         self.create_role = role_group.entity_create_ops(CreateRoleAction)
         self.update_role = role_group.single_update_ops(UpdateRoleAction)
         self.delete_role = role_group.single_delete_ops(DeleteRoleAction)
         self.purge_role = role_group.entity_purge_ops(PurgeRoleAction)
-        self.get_role_detail = ActionProcessor(service.get_role_detail, action_monitors)
-        self.search_roles = ActionProcessor(service.search_roles, action_monitors)
+        self.get_role_detail = role_group.single_entity(
+            GetRoleDetailAction, service.get_role_detail
+        )
+        self.bulk_get_roles = role_group.partial_bulk_get_ops(BulkGetRolesAction)
+        self.global_search_roles = role_group.global_scope(
+            GlobalSearchRolesAction, service.search_roles
+        )
         self.search_roles_in_scope = role_group.scope(
             SearchRolesInScopeAction, service.search_roles_in_scope
         )
-        self.search_users_assigned_to_role = ActionProcessor(
-            service.search_users_assigned_to_role, action_monitors
+        self.scoped_search_role_assignments = user_group.scope(
+            ScopedSearchRoleAssignmentsAction, service.scoped_search_role_assignments
+        )
+        self.global_search_role_assignments = role_group.global_scope(
+            GlobalSearchRoleAssignmentsAction, service.search_users_assigned_to_role
         )
         permissions: LookupFieldGroup[PermissionData] = role_group.field_group(
             FieldGroupMeta(PermissionFieldType()),
@@ -133,14 +170,27 @@ class PermissionControllerProcessors:
         self.bulk_remove_role_permissions = permissions.partial_bulk_purge_ops(
             BulkRemoveRolePermissionsAction
         )
-        self.replace_role_permissions = ActionProcessor(
-            service.replace_role_permissions, action_monitors
+        self.replace_role_permissions = role_group.single_entity(
+            ReplaceRolePermissionsAction, service.replace_role_permissions
         )
-        self.search_scopes = ActionProcessor(service.search_scopes, action_monitors)
-        self.get_scope_types = ActionProcessor(service.get_scope_types, action_monitors)
-        self.get_entity_types = ActionProcessor(service.get_entity_types, action_monitors)
-        self.get_permission_matrix = ActionProcessor(service.get_permission_matrix, action_monitors)
-        self.search_permissions = ActionProcessor(service.search_permissions, action_monitors)
-        self.create_permission = ActionProcessor(service.create_permission, action_monitors)
-        self.update_permission = ActionProcessor(service.update_permission, action_monitors)
-        self.delete_permission = ActionProcessor(service.delete_permission, action_monitors)
+        self.global_search_scopes = role_group.global_scope(
+            GlobalSearchScopesAction, service.search_scopes
+        )
+        self.public_get_scope_types = role_group.public(
+            PublicGetScopeTypesAction, service.get_scope_types
+        )
+        self.public_get_entity_types = role_group.public(
+            PublicGetEntityTypesAction, service.get_entity_types
+        )
+        self.public_get_permission_matrix = role_group.public(
+            PublicGetPermissionMatrixAction, service.get_permission_matrix
+        )
+        self.bulk_get_permissions = permissions.partial_bulk_get_ops(BulkGetPermissionsAction)
+        self.search_role_permissions = permissions.atomic_bulk_scoped_search_ops(
+            SearchRolePermissionsAction
+        )
+        self.global_search_permissions = role_group.global_scope(
+            GlobalSearchPermissionsAction, service.search_permissions
+        )
+        self.update_permission = permissions.update_ops(UpdatePermissionAction)
+        self.delete_permission = permissions.purge_ops(DeletePermissionAction)

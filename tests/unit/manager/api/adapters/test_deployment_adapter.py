@@ -12,44 +12,59 @@ import pytest
 
 from ai.backend.common.config import ModelConfig, ModelDefinition, ModelServiceConfig
 from ai.backend.common.contexts.user import with_user
+from ai.backend.common.data.entity.auto_scaling_rule import AutoScalingRuleID
 from ai.backend.common.data.entity.deployment import DeploymentEntityType, DeploymentID
 from ai.backend.common.data.entity.deployment_revision import DeploymentRevisionID
 from ai.backend.common.data.entity.deployment_token import DeploymentTokenID
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.image import ImageID
+from ai.backend.common.data.entity.replica_group import ReplicaGroupID
 from ai.backend.common.data.entity.runtime_variant import RuntimeVariantID
 from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.common.data.entity.vfolder import VFolderUUID
-from ai.backend.common.data.model_deployment.types import DeploymentStrategy
+from ai.backend.common.data.model_deployment.types import DeploymentStrategy, ModelDeploymentStatus
 from ai.backend.common.data.user.types import UserData, UserRole
 from ai.backend.common.dto.manager.v2.deployment.request import AdminSearchDeploymentsInput
 from ai.backend.common.schema.deployment import RollingUpdateSpec
-from ai.backend.common.types import ClusterMode, MountPermission, ResourceSlot
-from ai.backend.manager.actions.action import BaseActionTriggerMeta
+from ai.backend.common.types import (
+    AutoScalingMetricSource,
+    ClusterMode,
+    MountPermission,
+    ResourceSlot,
+)
 from ai.backend.manager.actions.monitors import ActionMonitors
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
 from ai.backend.manager.actions.registry.types import GroupMeta, ProcessorDependencies
+from ai.backend.manager.actions.v2.bulk.result import PartialBulkEntityResult, PartialBulkResult
 from ai.backend.manager.actions.v2.global_scope.validator.superadmin import (
     SuperAdminActionValidator,
 )
 from ai.backend.manager.actions.v2.ops.result import BulkFieldOpsResult, OwnedFieldsOpsResult
 from ai.backend.manager.actions.v2.scope.base import BaseScopeAction
 from ai.backend.manager.actions.v2.scope.validator.base import ScopeActionValidator
+from ai.backend.manager.actions.v2.trigger import ActionTriggerMeta
 from ai.backend.manager.actions.v2.validators import ActionValidators
 from ai.backend.manager.api.adapters.deployment.adapter import (
     DeploymentAdapter,
 )
 from ai.backend.manager.data.deployment.types import (
     ClusterConfigData,
+    DeploymentNetworkData,
+    DeploymentOptions,
     DeploymentPolicyData,
     ExecutionData,
     ModelDeploymentAccessTokenData,
+    ModelDeploymentAutoScalingRuleData,
+    ModelDeploymentData,
+    ModelDeploymentMetadataInfo,
     ModelMountConfigData,
     ModelRevisionData,
     ModelRuntimeConfigData,
     PresetAttributionData,
+    ReplicaStateData,
     ResourceConfigData,
 )
+from ai.backend.manager.data.model_serving.types import ScalingState
 from ai.backend.manager.errors.auth import InsufficientPrivilege
 from ai.backend.manager.errors.base.field import FieldNotFoundError
 from ai.backend.manager.errors.common import GenericForbidden
@@ -128,7 +143,7 @@ class _RecordingScopeValidator(ScopeActionValidator):
         self.seen: list[Sequence[EntityIdentifier]] = []
 
     @override
-    async def validate(self, action: BaseScopeAction, meta: BaseActionTriggerMeta) -> None:
+    async def validate(self, action: BaseScopeAction, meta: ActionTriggerMeta) -> None:
         self.seen.append(action.scope_targets())
 
 
@@ -295,6 +310,127 @@ class TestFieldBatchLoads:
         deployment_adapter, processors = adapter
         assert await deployment_adapter.batch_load_access_tokens_by_ids([]) == []
         processors.deployment.bulk_get_access_tokens.run.assert_not_awaited()
+
+    def _deployment(
+        self, deployment_id: DeploymentID, group_id: ReplicaGroupID
+    ) -> ModelDeploymentData:
+        return ModelDeploymentData(
+            id=deployment_id,
+            metadata=ModelDeploymentMetadataInfo(
+                name="deployment",
+                status=ModelDeploymentStatus.READY,
+                tags=[],
+                project_id=uuid4(),
+                domain_name="default",
+                resource_group_name="default",
+                created_at=datetime(2024, 1, 1, tzinfo=UTC),
+                updated_at=datetime(2024, 1, 1, tzinfo=UTC),
+            ),
+            network_access=DeploymentNetworkData(
+                open_to_public=False, access_token_ids=None, url=None, preferred_domain_name=None
+            ),
+            current_revision_id=None,
+            deploying_revision_id=None,
+            revision_history_ids=[],
+            scaling_rule_ids=[],
+            replica_state=ReplicaStateData(desired_replica_count=1, replica_ids=[]),
+            default_deployment_strategy=DeploymentStrategy.ROLLING,
+            created_user_id=uuid4(),
+            options=DeploymentOptions(),
+            scaling_state=ScalingState.STABLE,
+            primary_replica_group_id=group_id,
+        )
+
+    async def test_deployments_answer_per_id_with_their_current_revision(self) -> None:
+        readable = DeploymentID(uuid4())
+        denied = DeploymentID(uuid4())
+        absent = DeploymentID(uuid4())
+        group_id = ReplicaGroupID(uuid4())
+        current = DeploymentRevisionID(uuid4())
+        denial = GenericForbidden("no read on this deployment")
+        group = MagicMock(current_revision_id=current)
+        processors = MagicMock()
+        processors.deployment.bulk_get.run = AsyncMock(
+            return_value=PartialBulkResult(
+                items=[
+                    PartialBulkEntityResult[ModelDeploymentData].succeeded(
+                        readable, self._deployment(readable, group_id)
+                    ),
+                    PartialBulkEntityResult[ModelDeploymentData].denied(denied, denial),
+                    PartialBulkEntityResult[ModelDeploymentData].nothing(absent),
+                ]
+            )
+        )
+        processors.deployment.bulk_get_replica_groups.run = AsyncMock(
+            return_value=BulkFieldOpsResult(successes={group_id: group}, errors={})
+        )
+        deployment_adapter = DeploymentAdapter(processors.deployment, MagicMock())
+
+        node, refused, missing = await deployment_adapter.batch_load_by_ids([
+            readable,
+            denied,
+            absent,
+        ])
+
+        assert node is not None and not isinstance(node, Exception)
+        assert node.id == readable
+        assert node.current_revision_id == current
+        assert refused is denial
+        assert missing is None
+
+    async def test_no_deployment_ids_read_nothing(self) -> None:
+        processors = MagicMock()
+        processors.deployment.bulk_get.run = AsyncMock()
+        deployment_adapter = DeploymentAdapter(processors.deployment, MagicMock())
+
+        assert await deployment_adapter.batch_load_by_ids([]) == []
+        processors.deployment.bulk_get.run.assert_not_awaited()
+
+    async def test_auto_scaling_rules_answer_per_id(self) -> None:
+        rule = ModelDeploymentAutoScalingRuleData(
+            id=uuid4(),
+            model_deployment_id=uuid4(),
+            metric_source=AutoScalingMetricSource.KERNEL,
+            metric_name="cpu_util",
+            min_threshold=None,
+            max_threshold=None,
+            step_size=1,
+            time_window=60,
+            min_replicas=None,
+            max_replicas=None,
+            created_at=datetime(2024, 1, 1, tzinfo=UTC),
+            last_triggered_at=None,
+        )
+        denied = AutoScalingRuleID(uuid4())
+        absent = AutoScalingRuleID(uuid4())
+        denial = GenericForbidden("no read on this deployment")
+        processors = MagicMock()
+        processors.deployment.bulk_get_auto_scaling_rules.run = AsyncMock(
+            return_value=BulkFieldOpsResult(
+                successes={AutoScalingRuleID(rule.id): rule},
+                errors={denied: denial},
+            )
+        )
+        deployment_adapter = DeploymentAdapter(processors.deployment, MagicMock())
+
+        node, refused, missing = await deployment_adapter.batch_load_auto_scaling_rules_by_ids([
+            rule.id,
+            denied,
+            absent,
+        ])
+
+        assert node is not None and not isinstance(node, Exception)
+        assert node.id == rule.id
+        assert refused is denial
+        assert missing is None
+
+    async def test_no_auto_scaling_rule_ids_read_nothing(self) -> None:
+        processors = MagicMock()
+        processors.deployment.bulk_get_auto_scaling_rules.run = AsyncMock()
+        deployment_adapter = DeploymentAdapter(processors.deployment, MagicMock())
+
+        assert await deployment_adapter.batch_load_auto_scaling_rules_by_ids([]) == []
+        processors.deployment.bulk_get_auto_scaling_rules.run.assert_not_awaited()
 
     async def test_policies_answer_per_deployment(self) -> None:
         deployment_id = DeploymentID(uuid4())

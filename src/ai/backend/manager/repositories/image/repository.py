@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from uuid import UUID
 
 from ai.backend.common.bgtask.reporter import ProgressReporter
@@ -32,6 +32,7 @@ from ai.backend.manager.models.image import (
 )
 from ai.backend.manager.models.image.creators import ImageAliasCreator
 from ai.backend.manager.models.image.updaters import ImageUpdater
+from ai.backend.manager.models.scopes import OperationScope
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.image.db_source.db_source import ImageDBSource
@@ -342,6 +343,13 @@ class ImageRepository:
         Returns ImageListResult with items and pagination info.
         """
         return await self._db_source.search_images(querier)
+
+    @image_repository_resilience.apply()
+    async def search_images_in_scopes(
+        self, querier: BatchQuerier, scopes: Sequence[OperationScope]
+    ) -> ImageListResult:
+        """The search of :meth:`search_images`, restricted to the scopes (OR)."""
+        return await self._db_source.search_images_in_scopes(querier, scopes)
 
     @image_repository_resilience.apply()
     async def search_aliases(self, querier: BatchQuerier) -> ImageAliasListResult:

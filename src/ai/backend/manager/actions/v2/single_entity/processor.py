@@ -32,7 +32,7 @@ class SingleEntityActionProcessor[TAction: BaseSingleEntityAction, TResult]:
     Each registered validator runs first. The action function then executes within a
     monitor lifecycle: every monitor's ``prepare`` is called before, and ``done`` after
     (on success or failure), with status / timing / error captured into a
-    :class:`ProcessResult`. This path depends only on the pure-ABC
+    :class:`SingleEntityActionProcessResult`. This path depends only on the pure-ABC
     :class:`BaseSingleEntityAction`, never on the legacy ``BaseAction`` framework.
     """
 

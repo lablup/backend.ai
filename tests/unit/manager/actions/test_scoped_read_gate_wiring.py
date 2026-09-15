@@ -19,12 +19,12 @@ from ai.backend.common.data.entity.resource_group import (
     ResourceGroupID,
 )
 from ai.backend.common.data.user.types import UserData, UserRole
-from ai.backend.manager.actions.action import BaseActionTriggerMeta
 from ai.backend.manager.actions.monitors import ActionMonitors
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
 from ai.backend.manager.actions.registry.types import GroupMeta, ProcessorDependencies
 from ai.backend.manager.actions.v2.scope.base import BaseScopeAction
 from ai.backend.manager.actions.v2.scope.validator.base import ScopeActionValidator
+from ai.backend.manager.actions.v2.trigger import ActionTriggerMeta
 from ai.backend.manager.actions.v2.validators import ActionValidators
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.models.domain.searchers import DomainSearcher
@@ -42,7 +42,7 @@ class _DenyingScopeValidator(ScopeActionValidator):
         self.seen: list[BaseScopeAction] = []
 
     @override
-    async def validate(self, action: BaseScopeAction, meta: BaseActionTriggerMeta) -> None:
+    async def validate(self, action: BaseScopeAction, meta: ActionTriggerMeta) -> None:
         self.seen.append(action)
         raise NotEnoughPermission(f"denied at scopes {action.scope_targets()}")
 
@@ -81,7 +81,7 @@ async def test_rg_domain_search_is_answered_for_the_resource_group(
     denying_scope: _DenyingScopeValidator,
     regular_user: UserData,
 ) -> None:
-    processors = DomainProcessors(registry.group(GroupMeta(DomainEntityType())), MagicMock(), [])
+    processors = DomainProcessors(registry.group(GroupMeta(DomainEntityType())), MagicMock())
     resource_group_id = ResourceGroupID(uuid.uuid4())
     action = ScopedSearchDomainsAction(
         items=[ResourceGroupDomainScopeItem(resource_group_id=resource_group_id)],

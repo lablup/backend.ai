@@ -27,6 +27,7 @@ __all__ = (
     "AliasImagePayload",
     "ForgetImagePayload",
     "RestoreImagePayload",
+    "ScopedSearchImagesPayload",
     "GetImagePayload",
     "ImageAliasNode",
     "ImageIdentityInfoDTO",
@@ -135,6 +136,15 @@ class UpdateImagePayload(BaseResponseModel):
 
 class AdminSearchImagesPayload(BaseResponseModel):
     """Payload for admin-scoped paginated image search results."""
+
+    items: list[ImageNode] = Field(description="List of image nodes.")
+    total_count: int = Field(description="Total number of images matching the filter.")
+    has_next_page: bool = Field(description="Whether there is a next page.")
+    has_previous_page: bool = Field(description="Whether there is a previous page.")
+
+
+class ScopedSearchImagesPayload(BaseResponseModel):
+    """Payload for a scoped paginated image search."""
 
     items: list[ImageNode] = Field(description="List of image nodes.")
     total_count: int = Field(description="Total number of images matching the filter.")

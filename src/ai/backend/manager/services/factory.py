@@ -24,6 +24,8 @@ from ai.backend.common.data.entity.fair_share import (
 )
 from ai.backend.common.data.entity.idle_checker import IdleCheckerEntityType
 from ai.backend.common.data.entity.image import ImageEntityType
+from ai.backend.common.data.entity.image_alias import ImageAliasFieldType
+from ai.backend.common.data.entity.kernel import KernelFieldType
 from ai.backend.common.data.entity.login_client_type import LoginClientTypeEntityType
 from ai.backend.common.data.entity.model_card import ModelCardEntityType
 from ai.backend.common.data.entity.notification import (
@@ -85,6 +87,8 @@ from ai.backend.manager.data.fair_share.types import (
     ProjectFairShareData,
     UserFairShareData,
 )
+from ai.backend.manager.data.image.types import ImageAliasData
+from ai.backend.manager.data.kernel.types import KernelInfo
 from ai.backend.manager.data.resource_usage_history.types import (
     DomainUsageBucketData,
     ProjectUsageBucketData,
@@ -113,6 +117,10 @@ from ai.backend.manager.services.artifact.revision.service import ArtifactRevisi
 from ai.backend.manager.services.artifact.service import ArtifactService
 from ai.backend.manager.services.artifact_registry.processors import ArtifactRegistryProcessors
 from ai.backend.manager.services.artifact_registry.service import ArtifactRegistryService
+from ai.backend.manager.services.audit_log.actions.lookup_owner import (
+    LookupAuditLogOwnerAction,
+    LookupBulkAuditLogOwnerAction,
+)
 from ai.backend.manager.services.audit_log.processors import AuditLogProcessors
 from ai.backend.manager.services.auth.processors import AuthProcessors
 from ai.backend.manager.services.auth.service import AuthService
@@ -151,6 +159,10 @@ from ai.backend.manager.services.idle_checker_assignment.processors import (
     IdleCheckerAssignmentProcessors,
 )
 from ai.backend.manager.services.idle_checker_assignment.service import IdleCheckerAssignmentService
+from ai.backend.manager.services.image.actions.lookup_alias_owner import (
+    LookupBulkImageAliasOwnerAction,
+    LookupImageAliasOwnerAction,
+)
 from ai.backend.manager.services.image.processors import ImageProcessors
 from ai.backend.manager.services.image.service import ImageService
 from ai.backend.manager.services.keypair_resource_policy.processors import (
@@ -230,6 +242,12 @@ from ai.backend.manager.services.scheduling_history.service import SchedulingHis
 from ai.backend.manager.services.secret.processors import SecretProcessors
 from ai.backend.manager.services.secret.service import SecretService
 from ai.backend.manager.services.service_catalog.processors import ServiceCatalogProcessors
+from ai.backend.manager.services.session.actions.lookup_bulk_kernel_owner import (
+    LookupBulkKernelOwnerAction,
+)
+from ai.backend.manager.services.session.actions.lookup_kernel_field_owner import (
+    LookupKernelFieldOwnerAction,
+)
 from ai.backend.manager.services.session.processors import SessionProcessors
 from ai.backend.manager.services.session.resource_allocation.processors import (
     ResourceAllocationProcessors,
@@ -272,7 +290,7 @@ def create_services(args: ServiceArgs, action_registry: ProcessorRegistry[Any]) 
             repositories.agent.repository,
             repositories.scheduler.repository,
             args.scheduling_controller,
-            BulkOwnCheck(repositories.permission_controller.repository, args.config_provider),
+            BulkOwnCheck(repositories.rbac.permission_check, args.config_provider),
         ),
         app_config=AppConfigService(OpsRepository(repositories.v2_ops_provider)),
         domain=DomainService(repositories.domain.repository),
@@ -525,9 +543,6 @@ def create_processors(
     monitors: ActionMonitors,
 ) -> ProcessorsBundle:
     repositories = args.service_args.repositories
-    # Legacy BaseAction-era packages consume the flat monitor list; packages migrated
-    # to the pure-ABC frameworks pick the per-type monitors from `monitors` instead.
-    action_monitors = monitors.legacy
     # One registry shared by every v2-wired package: each package wires through its
     # own group, and the registry's wired_specs() is the catalog of every
     # registered action. Built before the services because the permission controller
@@ -568,7 +583,6 @@ def create_processors(
         agent=AgentProcessors(
             resource_group_groups.group(GroupMeta(AgentEntityType())),
             services.agent,
-            action_monitors,
         ),
         app_config=AppConfigProcessors(
             app_config_groups.group(GroupMeta(AppConfigEntityType())),
@@ -580,7 +594,6 @@ def create_processors(
         domain=DomainProcessors(
             organization_groups.group(GroupMeta(DomainEntityType())),
             services.domain,
-            action_monitors,
         ),
         etcd_config=EtcdConfigProcessors(
             system_groups.group(GroupMeta(GlobalEntityType())), services.etcd_config
@@ -620,7 +633,14 @@ def create_processors(
             services.idle_checker,
         ),
         image=ImageProcessors(
-            container_registry_groups.group(GroupMeta(ImageEntityType())), services.image
+            container_registry_groups.group(GroupMeta(ImageEntityType())),
+            container_registry_groups.group(GroupMeta(ImageEntityType())).field_group(
+                FieldGroupMeta(ImageAliasFieldType()),
+                ImageAliasData,
+                LookupImageAliasOwnerAction,
+                LookupBulkImageAliasOwnerAction,
+            ),
+            services.image,
         ),
         container_registry=ContainerRegistryProcessors(
             container_registry_groups.group(GroupMeta(ContainerRegistryEntityType())),
@@ -645,6 +665,12 @@ def create_processors(
         session=SessionProcessors(
             session_groups.group(GroupMeta(SessionEntityType())),
             resource_group_groups.group(GroupMeta(ResourceGroupEntityType())),
+            session_groups.group(GroupMeta(SessionEntityType())).field_group(
+                FieldGroupMeta(KernelFieldType()),
+                KernelInfo,
+                LookupKernelFieldOwnerAction,
+                LookupBulkKernelOwnerAction,
+            ),
             ResourceAllocationProcessors(
                 resource_group_groups.group(GroupMeta(UserEntityType())),
                 resource_group_groups.group(GroupMeta(ProjectEntityType())),
@@ -707,7 +733,6 @@ def create_processors(
             services.rbac_relation,
             services.rbac_roster,
             services.rbac_role,
-            action_monitors,
         ),
         entity_share=EntityShareProcessors(
             rbac_groups.group(GroupMeta(EntityShareEntityType())),
@@ -772,8 +797,8 @@ def create_processors(
         ),
         permission_controller=PermissionControllerProcessors(
             rbac_groups.group(GroupMeta(RoleEntityType())),
+            rbac_groups.group(GroupMeta(UserEntityType())),
             services.permission_controller,
-            action_monitors,
         ),
         vfs_storage=VFSStorageProcessors(
             artifact_groups.group(GroupMeta(VFSStorageEntityType())), services.vfs_storage
@@ -790,6 +815,8 @@ def create_processors(
         ),
         artifact_registry=ArtifactRegistryProcessors(
             artifact_groups.group(GroupMeta(ArtifactRegistryEntityType())),
+            artifact_groups.group(GroupMeta(ArtifactRegistryEntityType())),
+            artifact_groups.group(GroupMeta(ArtifactRegistryEntityType())),
             services.artifact_registry,
         ),
         deployment=DeploymentProcessors(
@@ -799,8 +826,11 @@ def create_processors(
             artifact_groups.group(GroupMeta(StorageNamespaceEntityType()))
         ),
         audit_log=AuditLogProcessors(
-            visibility_groups.dangling_field_group(
-                FieldGroupMeta(AuditLogFieldType()), AuditLogData
+            visibility_groups.dangling_lookup_field_group(
+                FieldGroupMeta(AuditLogFieldType()),
+                AuditLogData,
+                LookupAuditLogOwnerAction,
+                LookupBulkAuditLogOwnerAction,
             )
         ),
         entity_label=EntityLabelProcessors(

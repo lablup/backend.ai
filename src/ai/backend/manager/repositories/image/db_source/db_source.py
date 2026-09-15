@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import functools
 import logging
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Mapping, Sequence
 from typing import cast
 from uuid import UUID
 
@@ -47,6 +47,7 @@ from ai.backend.manager.models.image import (
 from ai.backend.manager.models.image.creators import ImageAliasCreator
 from ai.backend.manager.models.image.purgers import ImagePurger
 from ai.backend.manager.models.image.updaters import ImageUpdater
+from ai.backend.manager.models.scopes import OperationScope
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base import BatchQuerier, execute_batch_querier
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
@@ -225,7 +226,9 @@ class ImageDBSource:
         Marks a soft-deleted image record as alive again by its ID in the database.
         """
         async with self._db.begin_session() as session:
-            image_row = await self._get_image_by_id(session, image_id)
+            image_row = await self._get_image_by_id(
+                session, image_id, status_filter=list(ImageStatus.restorable())
+            )
             await image_row.mark_as_alive(session)
             return image_row.to_dataclass()
 
@@ -447,6 +450,21 @@ class ImageDBSource:
         async with self._db.begin_readonly_session() as db_sess:
             query = sa.select(ImageRow).options(selectinload(ImageRow.aliases))
             result = await execute_batch_querier(db_sess, query, querier)
+            items = [row.ImageRow.to_dataclass() for row in result.rows]
+            return ImageListResult(
+                items=items,
+                total_count=result.total_count,
+                has_next_page=result.has_next_page,
+                has_previous_page=result.has_previous_page,
+            )
+
+    async def search_images_in_scopes(
+        self, querier: BatchQuerier, scopes: Sequence[OperationScope]
+    ) -> ImageListResult:
+        """The search of :meth:`search_images`, restricted to the scopes (OR)."""
+        async with self._db.begin_readonly_session() as db_sess:
+            query = sa.select(ImageRow).options(selectinload(ImageRow.aliases))
+            result = await execute_batch_querier(db_sess, query, querier, scopes=scopes)
             items = [row.ImageRow.to_dataclass() for row in result.rows]
             return ImageListResult(
                 items=items,

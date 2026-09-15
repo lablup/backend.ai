@@ -23,6 +23,7 @@ from .deployment import (
     my_deployments,
     project_deployments,
     replace_deployment_options,
+    scoped_deployments,
     sync_replicas,
     update_model_deployment,
 )
@@ -68,6 +69,7 @@ __all__ = [
     "admin_refresh_deployment_revisions",
     "my_deployments",
     "project_deployments",
+    "scoped_deployments",
     "deployment",
     "create_model_deployment",
     "update_model_deployment",

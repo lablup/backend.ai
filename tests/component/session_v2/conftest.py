@@ -28,6 +28,7 @@ from ai.backend.common.data.entity.artifact_registry import ArtifactRegistryEnti
 from ai.backend.common.data.entity.deployment import DeploymentEntityType
 from ai.backend.common.data.entity.domain import DomainEntityType, DomainID
 from ai.backend.common.data.entity.image import ImageEntityType, ImageID
+from ai.backend.common.data.entity.kernel import KernelFieldType
 from ai.backend.common.data.entity.model_card import ModelCardEntityType
 from ai.backend.common.data.entity.notification import (
     NotificationChannelEntityType,
@@ -49,7 +50,7 @@ from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.plugin.monitor import ErrorPluginContext
 from ai.backend.common.types import SessionTypes
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
-from ai.backend.manager.actions.registry.types import GroupMeta
+from ai.backend.manager.actions.registry.types import FieldGroupMeta, GroupMeta
 from ai.backend.manager.api.adapters.session.adapter import SessionAdapter
 from ai.backend.manager.api.rest.routing import RouteRegistry
 from ai.backend.manager.api.rest.types import RouteDeps
@@ -59,7 +60,7 @@ from ai.backend.manager.clients.storage_proxy.session_manager import StorageSess
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.agent.types import AgentStatus
 from ai.backend.manager.data.image.types import ImageStatus, ImageType
-from ai.backend.manager.data.kernel.types import KernelStatus
+from ai.backend.manager.data.kernel.types import KernelInfo, KernelStatus
 from ai.backend.manager.data.secret.types import KeyProviderType
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.dependencies.infrastructure.redis import ValkeyClients
@@ -85,6 +86,12 @@ from ai.backend.manager.repositories.session.repository import SessionRepository
 from ai.backend.manager.repositories.user.repository import UserRepository
 from ai.backend.manager.secret.pool import KeyProviderPool
 from ai.backend.manager.services.processors import Processors
+from ai.backend.manager.services.session.actions.lookup_bulk_kernel_owner import (
+    LookupBulkKernelOwnerAction,
+)
+from ai.backend.manager.services.session.actions.lookup_kernel_field_owner import (
+    LookupKernelFieldOwnerAction,
+)
 from ai.backend.manager.services.session.processors import SessionProcessors
 from ai.backend.manager.services.session.resource_allocation.processors import (
     ResourceAllocationProcessors,
@@ -185,6 +192,12 @@ async def session_processors(
     return SessionProcessors(
         processor_registry.group(GroupMeta(SessionEntityType())),
         processor_registry.group(GroupMeta(ResourceGroupEntityType())),
+        processor_registry.group(GroupMeta(SessionEntityType())).field_group(
+            FieldGroupMeta(KernelFieldType()),
+            KernelInfo,
+            LookupKernelFieldOwnerAction,
+            LookupBulkKernelOwnerAction,
+        ),
         ResourceAllocationProcessors(
             processor_registry.group(GroupMeta(UserEntityType())),
             processor_registry.group(GroupMeta(ProjectEntityType())),
@@ -696,6 +709,12 @@ async def compute_session_processors(
     return SessionProcessors(
         processor_registry.group(GroupMeta(SessionEntityType())),
         processor_registry.group(GroupMeta(ResourceGroupEntityType())),
+        processor_registry.group(GroupMeta(SessionEntityType())).field_group(
+            FieldGroupMeta(KernelFieldType()),
+            KernelInfo,
+            LookupKernelFieldOwnerAction,
+            LookupBulkKernelOwnerAction,
+        ),
         ResourceAllocationProcessors(
             processor_registry.group(GroupMeta(UserEntityType())),
             processor_registry.group(GroupMeta(ProjectEntityType())),

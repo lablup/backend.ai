@@ -12,6 +12,7 @@ from uuid import UUID
 import sqlalchemy as sa
 
 from ai.backend.common.contexts.user import current_user
+from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.kernel import KernelID
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.resource_slot import ResourceSlotName
@@ -58,6 +59,7 @@ from ai.backend.common.dto.manager.v2.session.request import (
     EnqueueSessionInput,
     ExcludeSessionIdleChecksInput,
     IncludeSessionIdleChecksInput,
+    ScopedSearchSessionsInput,
     SessionFilter,
     SessionOrder,
     ShutdownSessionServiceInput,
@@ -84,7 +86,11 @@ from ai.backend.common.dto.manager.v2.session.response import (
     TerminateSessionsPayload,
     UpdateSessionPayload,
 )
-from ai.backend.common.dto.manager.v2.session.types import ClusterModeEnum, SessionStatusFilter
+from ai.backend.common.dto.manager.v2.session.types import (
+    ClusterModeEnum,
+    SessionScope,
+    SessionStatusFilter,
+)
 from ai.backend.common.types import (
     AccessKey,
     AgentId,
@@ -109,6 +115,7 @@ from ai.backend.manager.data.session.types import (
     SessionStatus,
     SessionTerminationStatus,
 )
+from ai.backend.manager.errors.base.not_found import NotFoundError
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.condition_utils import combine_conditions_or, negate_conditions
 from ai.backend.manager.models.kernel.conditions import KernelConditions
@@ -138,10 +145,8 @@ from ai.backend.manager.models.session.orders import (
     resolve_order as resolve_session_order,
 )
 from ai.backend.manager.models.session.row import SessionRow
-from ai.backend.manager.models.session.scopes import ProjectSessionOperationScope
-from ai.backend.manager.models.specs.pagination import NoPagination
+from ai.backend.manager.models.session.searchers import SessionSearcher
 from ai.backend.manager.models.user import UserRole
-from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.idle_checker.types import SessionIdleCheckPair
 from ai.backend.manager.services.idle_checker.actions.exclude_sessions import (
     ExcludeSessionIdleChecksAction,
@@ -156,6 +161,8 @@ from ai.backend.manager.services.session.actions.batch_get_kernel_resource_alloc
 from ai.backend.manager.services.session.actions.batch_get_session_resource_allocation import (
     BatchGetSessionResourceAllocationAction,
 )
+from ai.backend.manager.services.session.actions.bulk_get import BulkGetSessionsAction
+from ai.backend.manager.services.session.actions.bulk_get_kernels import BulkGetKernelsAction
 from ai.backend.manager.services.session.actions.compute_schedule import (
     ComputeScheduleAction,
 )
@@ -172,10 +179,14 @@ from ai.backend.manager.services.session.actions.get_container_logs import (
 )
 from ai.backend.manager.services.session.actions.get_session import GetSessionAction
 from ai.backend.manager.services.session.actions.rename_session import RenameSessionAction
-from ai.backend.manager.services.session.actions.search import SearchSessionsAction
-from ai.backend.manager.services.session.actions.search_in_project import (
-    SearchSessionsInProjectAction,
+from ai.backend.manager.services.session.actions.scoped_search import (
+    DomainSessionScopeItem,
+    ProjectSessionScopeItem,
+    ScopedSearchSessionsAction,
+    SessionScopeItem,
+    UserSessionScopeItem,
 )
+from ai.backend.manager.services.session.actions.search import SearchSessionsAction
 from ai.backend.manager.services.session.actions.search_kernel import SearchKernelsAction
 from ai.backend.manager.services.session.actions.shutdown_service import ShutdownServiceAction
 from ai.backend.manager.services.session.actions.start_service import StartServiceAction
@@ -476,47 +487,50 @@ class SessionAdapter(BaseAdapter):
     # Batch load (DataLoader)
     # -------------------------------------------------------------------------
 
-    async def batch_load_by_ids(self, session_ids: Sequence[SessionID]) -> list[SessionNode | None]:
-        """Batch load sessions by ID for DataLoader use.
-
-        Returns SessionNode DTOs in the same order as the input session_ids list.
-        """
+    async def batch_load_by_ids(
+        self, session_ids: Sequence[SessionID]
+    ) -> list[SessionNode | Exception | None]:
+        """Batch load sessions by their IDs for DataLoader use, checked per session."""
         if not session_ids:
             return []
-        querier = BatchQuerier(
-            pagination=NoPagination(),
-            conditions=[SessionConditions.by_ids([SessionId(sid) for sid in session_ids])],
+        result = await self._session.bulk_get.run(BulkGetSessionsAction(ids=list(session_ids)))
+        nodes = iter(
+            await self._session_data_to_nodes([
+                item.value.to_session_data() for item in result.items if item.value is not None
+            ])
         )
-        action_result = await self._session.search_sessions.run(
-            SearchSessionsAction(querier=querier, user_id=UserID(self._require_user_id()))
-        )
-        nodes = await self._session_data_to_nodes(action_result.data)
-        session_map: dict[SessionID, SessionNode] = {
-            SessionID(data.id): node for data, node in zip(action_result.data, nodes, strict=True)
-        }
-        return [session_map.get(session_id) for session_id in session_ids]
+        return [
+            next(nodes) if item.value is not None else self.batch_load_failure(item.error)
+            for item in result.items
+        ]
 
     async def batch_load_kernels_by_ids(
         self, kernel_ids: Sequence[KernelID]
-    ) -> list[KernelNode | None]:
-        """Batch load kernels by ID for DataLoader use.
-
-        Returns KernelNode DTOs in the same order as the input kernel_ids list.
-        """
+    ) -> list[KernelNode | Exception | None]:
+        """Batch load kernels for DataLoader use, checked per owning session."""
         if not kernel_ids:
             return []
-        querier = BatchQuerier(
-            pagination=NoPagination(),
-            conditions=[KernelConditions.by_ids([KernelId(kid) for kid in kernel_ids])],
+        ids = list(kernel_ids)
+        try:
+            result = await self._session.bulk_get_kernels.run(BulkGetKernelsAction(ids=ids))
+        except NotFoundError:
+            return [None for _ in ids]
+        readable = [
+            result.successes[kernel_id] for kernel_id in ids if kernel_id in result.successes
+        ]
+        nodes = dict(
+            zip(
+                [KernelID(info.id) for info in readable],
+                await self._kernel_infos_to_nodes(readable),
+                strict=True,
+            )
         )
-        action_result = await self._session.search_kernels.run(
-            SearchKernelsAction(querier=querier, user_id=UserID(self._require_user_id()))
-        )
-        nodes = await self._kernel_infos_to_nodes(action_result.data)
-        kernel_map: dict[KernelID, KernelNode] = {
-            KernelID(info.id): node for info, node in zip(action_result.data, nodes, strict=True)
-        }
-        return [kernel_map.get(kernel_id) for kernel_id in kernel_ids]
+        return [
+            nodes[kernel_id]
+            if kernel_id in nodes
+            else self.batch_load_failure(result.errors.get(kernel_id))
+            for kernel_id in ids
+        ]
 
     @staticmethod
     def _aggregate_to_allocation_dto(
@@ -698,15 +712,64 @@ class SessionAdapter(BaseAdapter):
 
     async def gql_search_by_project(
         self,
-        scope: ProjectSessionOperationScope,
+        project_id: ProjectID,
         input: AdminSearchSessionsInput,
     ) -> AdminSearchSessionsPayload:
         """Search sessions within a project, cursor-based pagination."""
-        conditions = self._convert_session_filter(input.filter) if input.filter else []
-        orders = self._convert_session_orders(input.order) if input.order else []
-        querier = self._build_querier(
-            conditions=conditions,
-            orders=orders,
+        action_result = await self._session.scoped_search.run(
+            ScopedSearchSessionsAction(
+                items=[ProjectSessionScopeItem(project_id=project_id)],
+                searcher=self._build_session_searcher(input),
+            )
+        )
+        return AdminSearchSessionsPayload(
+            items=await self._session_data_to_nodes([
+                item.to_session_data() for item in action_result.items
+            ]),
+            total_count=action_result.total_count,
+            has_next_page=action_result.has_next_page,
+            has_previous_page=action_result.has_previous_page,
+        )
+
+    def _scope_items(self, scope: SessionScope) -> list[SessionScopeItem]:
+        """The scope items the request named, in the order the input lists them."""
+        items: list[SessionScopeItem] = [
+            DomainSessionScopeItem(domain_id=DomainID(entry.value)) for entry in scope.domain or ()
+        ]
+        items.extend(
+            ProjectSessionScopeItem(project_id=ProjectID(entry.value))
+            for entry in scope.project or ()
+        )
+        items.extend(
+            UserSessionScopeItem(user_id=UserID(entry.value)) for entry in scope.user or ()
+        )
+        return items
+
+    async def scoped_search(
+        self,
+        input: ScopedSearchSessionsInput,
+    ) -> AdminSearchSessionsPayload:
+        """Search the sessions the named scopes reach, combined with OR."""
+        action_result = await self._session.scoped_search.run(
+            ScopedSearchSessionsAction(
+                items=self._scope_items(input.scope),
+                searcher=self._build_scoped_session_searcher(input),
+            )
+        )
+        return AdminSearchSessionsPayload(
+            items=await self._session_data_to_nodes([
+                item.to_session_data() for item in action_result.items
+            ]),
+            total_count=action_result.total_count,
+            has_next_page=action_result.has_next_page,
+            has_previous_page=action_result.has_previous_page,
+        )
+
+    def _build_scoped_session_searcher(self, input: ScopedSearchSessionsInput) -> SessionSearcher:
+        return self._build_searcher(
+            SessionSearcher,
+            conditions=self._convert_session_filter(input.filter) if input.filter else [],
+            orders=self._convert_session_orders(input.order) if input.order else [],
             pagination_spec=_SESSION_PAGINATION_SPEC,
             first=input.first,
             after=input.after,
@@ -715,14 +778,19 @@ class SessionAdapter(BaseAdapter):
             limit=input.limit,
             offset=input.offset,
         )
-        action_result = await self._session.search_sessions_in_project.run(
-            SearchSessionsInProjectAction(scope=scope, querier=querier)
-        )
-        return AdminSearchSessionsPayload(
-            items=await self._session_data_to_nodes(action_result.data),
-            total_count=action_result.total_count,
-            has_next_page=action_result.has_next_page,
-            has_previous_page=action_result.has_previous_page,
+
+    def _build_session_searcher(self, input: AdminSearchSessionsInput) -> SessionSearcher:
+        return self._build_searcher(
+            SessionSearcher,
+            conditions=self._convert_session_filter(input.filter) if input.filter else [],
+            orders=self._convert_session_orders(input.order) if input.order else [],
+            pagination_spec=_SESSION_PAGINATION_SPEC,
+            first=input.first,
+            after=input.after,
+            last=input.last,
+            before=input.before,
+            limit=input.limit,
+            offset=input.offset,
         )
 
     async def project_search(

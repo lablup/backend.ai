@@ -38,12 +38,8 @@ class ProjectConditions:
             domain_id = (
                 sa.select(DomainRow.id).where(DomainRow.name == domain_name).scalar_subquery()
             )
-            # TODO(BA-7571): drop the column term once the ownership backfill lands.
-            return sa.or_(
-                ProjectRow.domain_name == domain_name,
-                scope_membership_exists(
-                    DomainEntityType(), domain_id, ProjectEntityType(), ProjectRow.id
-                ),
+            return scope_membership_exists(
+                DomainEntityType(), domain_id, ProjectEntityType(), ProjectRow.id
             )
 
         return inner

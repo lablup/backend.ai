@@ -44,6 +44,7 @@ from ai.backend.manager.repositories.permission_controller.repository import (
 from ai.backend.manager.services.export.actions.export_my_keypairs_csv import (
     ExportMyKeypairsCSVAction,
 )
+from ai.backend.manager.services.export.actions.public_get_report import PublicGetReportAction
 from ai.backend.manager.services.export.processors import ExportProcessors
 from ai.backend.manager.services.export.service import ExportService
 
@@ -124,6 +125,22 @@ def processors(registry: ProcessorRegistry[Any], export_repository: MagicMock) -
         groups.dangling_field_group(FieldGroupMeta(AuditLogFieldType()), AuditLogData),
         ExportService(export_repository),
     )
+
+
+class TestReportRead:
+    async def test_public_report_read_is_open_to_a_regular_user(
+        self,
+        processors: ExportProcessors,
+        actor: UserData,
+        export_repository: MagicMock,
+    ) -> None:
+        report = MagicMock()
+        export_repository.get_report.return_value = report
+        with with_user(actor):
+            result = await processors.public_get_report.run(
+                PublicGetReportAction(report_key="sessions")
+            )
+        assert result.report is report
 
 
 class TestScopedExportPermissions:

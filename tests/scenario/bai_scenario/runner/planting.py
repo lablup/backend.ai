@@ -124,6 +124,18 @@ class SeedingSession:
     ) -> Laid[None]:
         return await self._settle(self._seed.granting(role, to, role_id=role_id, user_id=user_id))
 
+    async def joining[P, U](
+        self,
+        project: Laid[P],
+        member: Laid[U],
+        *,
+        project_id: Any,
+        user_id: Any,
+    ) -> Laid[None]:
+        return await self._settle(
+            self._seed.joining(project, member, project_id=project_id, user_id=user_id)
+        )
+
     async def within[D](self, nest: SeedNest[D]) -> D:
         """Lay what this nest lays, and write all of it."""
         answered = self._seed.within(nest)

@@ -37,6 +37,12 @@ def register_v2_deployment_routes(
     )
     registry.add(
         "POST",
+        "/scoped/search",
+        handler.scoped_search,
+        middlewares=[auth_required],
+    )
+    registry.add(
+        "POST",
         "/projects/{project_id}/search",
         handler.project_search,
         middlewares=[auth_required],
