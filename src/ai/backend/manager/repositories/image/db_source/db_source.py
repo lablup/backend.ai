@@ -136,15 +136,15 @@ class ImageDBSource:
             raise ImageNotFound()
         return result.items[0]
 
-    async def _fetch_image(self, image_id: UUID, statuses: Collection[ImageStatus]) -> ImageData:
+    async def _fetch_image(self, image_id: ImageID, statuses: Collection[ImageStatus]) -> ImageData:
         async with self._ops_provider.read_ops() as r:
-            image = await r.query_data(ImageQuerier(ImageID(image_id)))
+            image = await r.query_data(ImageQuerier(image_id))
         if image is None or (statuses and image.status not in statuses):
             raise ImageNotFound()
         return image
 
     async def _get_image_row_for_write(
-        self, session: SASession, image_id: UUID, statuses: Collection[ImageStatus]
+        self, session: SASession, image_id: ImageID, statuses: Collection[ImageStatus]
     ) -> ImageRow:
         row = await session.get(ImageRow, image_id)
         if row is None or (statuses and row.status not in statuses):
@@ -223,7 +223,7 @@ class ImageDBSource:
 
     async def query_image_details_by_id(
         self,
-        image_id: UUID,
+        image_id: ImageID,
         load_aliases: bool = False,
         status_filter: list[ImageStatus] | None = None,
     ) -> ImageDataWithDetails:
@@ -256,7 +256,7 @@ class ImageDBSource:
 
     async def mark_image_deleted_by_id(
         self,
-        image_id: UUID,
+        image_id: ImageID,
     ) -> ImageData:
         """
         Marks an image record as deleted by its ID in the database.
@@ -268,7 +268,7 @@ class ImageDBSource:
 
     async def mark_image_alive_by_id(
         self,
-        image_id: UUID,
+        image_id: ImageID,
     ) -> ImageData:
         """
         Marks a soft-deleted image record as alive again by its ID in the database.
@@ -280,14 +280,14 @@ class ImageDBSource:
             await image_row.mark_as_alive(session)
             return image_row.to_dataclass()
 
-    async def fetch_image_by_id(self, image_id: UUID, load_aliases: bool = False) -> ImageData:
+    async def fetch_image_by_id(self, image_id: ImageID, load_aliases: bool = False) -> ImageData:
         """
         Fetches an image from database by ID.
         Raises ImageNotFound if image doesn't exist.
         """
         return await self._fetch_image(image_id, [ImageStatus.ALIVE])
 
-    async def validate_image_ownership(self, image_id: UUID, user_id: UUID) -> bool:
+    async def validate_image_ownership(self, image_id: ImageID, user_id: UUID) -> bool:
         """
         Checks if the image was committed for the user.
         Returns True if it was, False otherwise.
@@ -318,7 +318,7 @@ class ImageDBSource:
             row = await self._get_image_alias_by_name(session, alias)
             return ImageAliasData(id=ImageAliasID(row.id), alias=row.alias or "")
 
-    async def remove_image_alias(self, alias: str) -> tuple[UUID, ImageAliasData]:
+    async def remove_image_alias(self, alias: str) -> tuple[ImageID, ImageAliasData]:
         async with self._db.begin_session() as session:
             existing_alias = await self._get_image_alias_by_name(session, alias)
             image_id = existing_alias.image_id
@@ -351,7 +351,7 @@ class ImageDBSource:
         return await self.scan_single_image(registry_key, registry_row, image_canonical)
 
     async def fetch_image_and_registry(
-        self, image_id: UUID
+        self, image_id: ImageID
     ) -> tuple[ImageData, ImageRef, ContainerRegistryRow]:
         """Read the image (as data + ref) and its container registry row.
 
@@ -401,7 +401,7 @@ class ImageDBSource:
 
     async def query_images_by_ids(
         self,
-        image_ids: list[UUID],
+        image_ids: list[ImageID],
         status_filter: list[ImageStatus] | None = None,
     ) -> dict[ImageID, ImageDataWithDetails]:
         """
@@ -424,7 +424,7 @@ class ImageDBSource:
             image_rows = list(result.scalars().all())
             return {ImageID(row.id): row.to_detailed_dataclass() for row in image_rows}
 
-    async def clear_image_resource_limits_by_id(self, image_id: UUID) -> ImageData:
+    async def clear_image_resource_limits_by_id(self, image_id: ImageID) -> ImageData:
         """
         Clears image resource limits by image ID.
         """
@@ -435,7 +435,7 @@ class ImageDBSource:
 
     async def set_image_resource_limit_by_id(
         self,
-        image_id: UUID,
+        image_id: ImageID,
         resource_limit: ResourceLimitInput,
     ) -> ImageData:
         """
@@ -458,14 +458,14 @@ class ImageDBSource:
 
     async def remove_image_and_aliases(
         self,
-        image_id: UUID,
+        image_id: ImageID,
     ) -> ImageData:
         """
         Removes an image record and all its aliases from the database.
         """
         try:
             async with self._ops_provider.write_ops() as w:
-                data = await w.purge_entity(ImagePurger(image_id=ImageID(image_id)))
+                data = await w.purge_entity(ImagePurger(image_id=image_id))
                 if data is None:
                     raise ImageNotFound(f"Image not found (id: {image_id})")
             return data

@@ -144,7 +144,7 @@ class ImageRepository:
     @image_repository_resilience.apply()
     async def get_image_by_id(
         self,
-        image_id: UUID,
+        image_id: ImageID,
         load_aliases: bool = False,
         status_filter: list[ImageStatus] | None = None,
         hide_agents: bool = False,
@@ -205,7 +205,7 @@ class ImageRepository:
     @image_repository_resilience.apply()
     async def soft_delete_image_by_id(
         self,
-        image_id: UUID,
+        image_id: ImageID,
     ) -> ImageData:
         """
         Marks an image as deleted by its ID.
@@ -215,7 +215,7 @@ class ImageRepository:
     @image_repository_resilience.apply()
     async def restore_image_by_id(
         self,
-        image_id: UUID,
+        image_id: ImageID,
     ) -> ImageData:
         """
         Marks a soft-deleted image as alive again by its ID.
@@ -223,7 +223,7 @@ class ImageRepository:
         return await self._db_source.mark_image_alive_by_id(image_id)
 
     @image_repository_resilience.apply()
-    async def fetch_image_by_id(self, image_id: UUID, load_aliases: bool = False) -> ImageData:
+    async def fetch_image_by_id(self, image_id: ImageID, load_aliases: bool = False) -> ImageData:
         """
         Fetches an image from database by ID.
         Raises ImageNotFound if image doesn't exist.
@@ -231,7 +231,7 @@ class ImageRepository:
         return await self._db_source.fetch_image_by_id(image_id, load_aliases)
 
     @image_repository_resilience.apply()
-    async def validate_image_ownership(self, image_id: UUID, user_id: UUID) -> bool:
+    async def validate_image_ownership(self, image_id: ImageID, user_id: UUID) -> bool:
         """
         Validates that user owns the image.
         Returns True if user owns the image, False otherwise.
@@ -253,7 +253,7 @@ class ImageRepository:
         return await self._db_source.query_image_alias(alias)
 
     @image_repository_resilience.apply()
-    async def delete_image_alias(self, alias: str) -> tuple[UUID, ImageAliasData]:
+    async def delete_image_alias(self, alias: str) -> tuple[ImageID, ImageAliasData]:
         return await self._db_source.remove_image_alias(alias)
 
     @image_repository_resilience.apply()
@@ -266,7 +266,7 @@ class ImageRepository:
         return await self._db_source.scan_and_upsert_image(image_canonical, architecture)
 
     @image_repository_resilience.apply()
-    async def untag_image_from_registry(self, image_id: UUID) -> ImageData:
+    async def untag_image_from_registry(self, image_id: ImageID) -> ImageData:
         image_data, image_ref, registry_row = await self._db_source.fetch_image_and_registry(
             image_id
         )
@@ -299,7 +299,7 @@ class ImageRepository:
         return await self._db_source.insert_image_alias_by_id(image_id, creator)
 
     @image_repository_resilience.apply()
-    async def clear_image_resource_limits_by_id(self, image_id: UUID) -> ImageData:
+    async def clear_image_resource_limits_by_id(self, image_id: ImageID) -> ImageData:
         """
         Clears image resource limits by image ID.
         """
@@ -308,7 +308,7 @@ class ImageRepository:
     @image_repository_resilience.apply()
     async def set_image_resource_limit_by_id(
         self,
-        image_id: UUID,
+        image_id: ImageID,
         resource_limit: ResourceLimitInput,
     ) -> ImageData:
         """
@@ -317,7 +317,7 @@ class ImageRepository:
         return await self._db_source.set_image_resource_limit_by_id(image_id, resource_limit)
 
     @image_repository_resilience.apply()
-    async def delete_image_with_aliases(self, image_id: UUID) -> ImageData:
+    async def delete_image_with_aliases(self, image_id: ImageID) -> ImageData:
         """
         Deletes an image and all its aliases.
         """

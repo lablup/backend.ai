@@ -128,7 +128,7 @@ class ImageService:
         self._image_repository = image_repository
         self._config_provider = config_provider
 
-    async def _validate_image_ownership(self, image_id: UUID, user_id: UUID) -> None:
+    async def _validate_image_ownership(self, image_id: ImageID, user_id: UUID) -> None:
         """
         Validates that user owns the image.
         Raises ImageAccessForbiddenError if user doesn't own the image.
