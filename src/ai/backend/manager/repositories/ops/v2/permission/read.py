@@ -15,7 +15,7 @@ from dataclasses import dataclass
 import sqlalchemy as sa
 
 from ai.backend.common.data.entity.role import RoleID
-from ai.backend.common.data.entity.types import EntityType
+from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.permission.id import FieldPath
 from ai.backend.common.data.permission.types import Permission
@@ -63,13 +63,6 @@ class PermissionReadOps(V2ReadOps):
             )
         ).scalars()
         return {EntityType(entity_type) for entity_type in rows}
-
-    async def user_role(self, user_id: UserID) -> UserRole | None:
-        """The user's role, or ``None`` when no such user exists."""
-        role: UserRole | None = await self._sess.scalar(
-            sa.select(UserRow.role).where(UserRow.uuid == user_id)
-        )
-        return role
 
     async def permissions(
         self, role_id: RoleID, entity_types: Sequence[EntityType]
@@ -126,11 +119,20 @@ class PermissionReadOps(V2ReadOps):
         entity's own type and only through the ve's own govern. Every-field rows only:
         path-scoped bits wait for the field check. Keys sharing ``(user, entity type)``
         share one round-trip; a key nothing reaches maps to :attr:`Permission.NONE`.
+        A superadmin holds every bit on an entity that has a node, and none on one that has not.
         """
         if not keys:
             return {}
+        superadmins = await self._superadmin_ids({key.user_id for key in keys})
+        result: dict[OwnCheckKey, Permission] = {}
+        admin_keys = [key for key in keys if key.user_id in superadmins]
+        provisioned = await self._provisioned([key.entity for key in admin_keys])
+        for key in admin_keys:
+            result[key] = self._full_if_provisioned(key.entity, provisioned)
         groups: defaultdict[_GroupKey, list[OwnCheckKey]] = defaultdict(list)
         for key in keys:
+            if key.user_id in superadmins:
+                continue
             groups[
                 _GroupKey(
                     user_id=key.user_id,
@@ -139,7 +141,6 @@ class PermissionReadOps(V2ReadOps):
                 )
             ].append(key)
 
-        result: dict[OwnCheckKey, Permission] = {}
         for group_key, members in groups.items():
             granted = await self._resolve_group(group_key, [k.entity for k in members])
             for key in members:
@@ -151,11 +152,19 @@ class PermissionReadOps(V2ReadOps):
         keys: Collection[GovernCheckKey],
     ) -> Mapping[GovernCheckKey, Permission]:
         """The bits each user holds on ``entity_type`` within each scope through the
-        scopes governing it."""
+        scopes governing it. A superadmin holds every bit within a scope that has a node."""
         if not keys:
             return {}
+        superadmins = await self._superadmin_ids({key.user_id for key in keys})
+        result: dict[GovernCheckKey, Permission] = {}
+        admin_keys = [key for key in keys if key.user_id in superadmins]
+        provisioned = await self._provisioned([key.scope for key in admin_keys])
+        for key in admin_keys:
+            result[key] = self._full_if_provisioned(key.scope, provisioned)
         groups: defaultdict[_GroupKey, list[GovernCheckKey]] = defaultdict(list)
         for key in keys:
+            if key.user_id in superadmins:
+                continue
             groups[
                 _GroupKey(
                     user_id=key.user_id,
@@ -164,12 +173,40 @@ class PermissionReadOps(V2ReadOps):
                 )
             ].append(key)
 
-        result: dict[GovernCheckKey, Permission] = {}
         for group_key, members in groups.items():
             granted = await self._resolve_group(group_key, [k.scope for k in members])
             for key in members:
                 result[key] = granted.get(key.scope, Permission.NONE)
         return result
+
+    async def _superadmin_ids(self, user_ids: Collection[UserID]) -> set[uuid.UUID]:
+        rows = await self._sess.scalars(
+            sa.select(UserRow.uuid).where(
+                UserRow.uuid.in_(list(user_ids)), UserRow.role == UserRole.SUPERADMIN
+            )
+        )
+        return {uuid.UUID(int=user_id.int) for user_id in rows.all()}
+
+    async def _provisioned(
+        self, entities: Sequence[EntityIdentifier]
+    ) -> set[tuple[str, uuid.UUID]]:
+        """The ``(entity type, id)`` pairs among ``entities`` that have a node."""
+        if not entities:
+            return set()
+        rows = await self._sess.execute(
+            sa.select(VirtualEntityRow.entity_type, VirtualEntityRow.entity_id).where(
+                sa.tuple_(VirtualEntityRow.entity_type, VirtualEntityRow.entity_id).in_([
+                    (entity.entity_type(), entity) for entity in entities
+                ])
+            )
+        )
+        return {(str(row.entity_type), uuid.UUID(int=row.entity_id.int)) for row in rows}
+
+    def _full_if_provisioned(
+        self, entity: EntityIdentifier, provisioned: set[tuple[str, uuid.UUID]]
+    ) -> Permission:
+        key = (str(entity.entity_type()), uuid.UUID(int=entity.int))
+        return Permission.full() if key in provisioned else Permission.NONE
 
     async def _resolve_group(
         self, group_key: _GroupKey, entity_ids: Sequence[uuid.UUID]

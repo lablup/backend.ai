@@ -921,12 +921,16 @@ class TestUpsertRequiresBothCreateAndUpdate:
 class TestVirtualEntityAtomicBulkActionRBACValidator:
     async def test_superadmin_bypasses_check(
         self,
+        db_with_rbac_tables: ExtendedAsyncSAEngine,
         bulk_validator: VirtualEntityAtomicBulkActionRBACValidator,
         bulk_vfolder_action: _BulkVfolderUpdateAction,
         trigger_meta: ActionTriggerMeta,
         seeded_superadmin_user: UserData,
     ) -> None:
-        # No permission rows seeded; the stored role answers.
+        # No permission rows seeded; the stored role answers for every existing entity.
+        async with db_with_rbac_tables.begin_session() as db_sess:
+            for entity_id in bulk_vfolder_action.entity_ids():
+                await VirtualEntitySeeder().provision(db_sess, VFolderEntityType(), entity_id)
         with with_user(seeded_superadmin_user):
             await bulk_validator.validate(
                 BulkActionTriggerMeta(
@@ -937,6 +941,17 @@ class TestVirtualEntityAtomicBulkActionRBACValidator:
                     action_name=bulk_vfolder_action.action_name(),
                 )
             )
+
+    async def test_superadmin_is_refused_an_entity_without_a_node(
+        self,
+        bulk_validator: VirtualEntityAtomicBulkActionRBACValidator,
+        bulk_vfolder_action: _BulkVfolderUpdateAction,
+        trigger_meta: ActionTriggerMeta,
+        seeded_superadmin_user: UserData,
+    ) -> None:
+        with with_user(seeded_superadmin_user):
+            with pytest.raises(NotEnoughPermission):
+                await bulk_validator.validate(_bulk_meta(bulk_vfolder_action, trigger_meta))
 
     async def test_all_targets_granted_passes(
         self,
@@ -1001,16 +1016,23 @@ class TestVirtualEntityAtomicBulkActionRBACValidator:
 
 
 class TestHeldPermissions:
-    async def test_superadmin_holds_everything(
+    async def test_superadmin_holds_everything_on_an_existing_entity(
         self,
+        db_with_rbac_tables: ExtendedAsyncSAEngine,
         repository: RbacPermissionCheckRepository,
         seeded_superadmin_user: UserData,
     ) -> None:
-        entities = [VFolderUUID(_BULK_VF_GRANTED), VFolderUUID(_BULK_VF_DENIED)]
+        existing = VFolderUUID(_BULK_VF_GRANTED)
+        missing = VFolderUUID(_BULK_VF_DENIED)
+        async with db_with_rbac_tables.begin_session() as db_sess:
+            await VirtualEntitySeeder().provision(db_sess, VFolderEntityType(), existing)
 
-        held = await repository.held_permissions(UserID(seeded_superadmin_user.user_id), entities)
+        held = await repository.held_permissions(
+            UserID(seeded_superadmin_user.user_id), [existing, missing]
+        )
 
-        assert held == dict.fromkeys(entities, Permission.full())
+        # An entity without a node is no entity to hold anything on.
+        assert held == {existing: Permission.full(), missing: Permission.NONE}
 
     async def test_enforcement_off_holds_everything(
         self,
