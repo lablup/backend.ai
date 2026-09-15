@@ -39,6 +39,7 @@ from ai.backend.common.types import (
 )
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
 from ai.backend.manager.actions.registry.types import GroupMeta
+from ai.backend.manager.actions.v2.bulk.validator.rbac import BulkOwnCheck
 
 # Statically imported so that Pants includes these modules in the test PEX.
 # build_root_app() loads them at runtime via importlib.import_module(),
@@ -74,8 +75,12 @@ from ai.backend.manager.models.vfolder import (
 from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
 from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
 from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
+from ai.backend.manager.repositories.ops.v2.permission.provider import PermissionOpsProvider
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.ops.v2.share.provider import ShareOpsProvider
+from ai.backend.manager.repositories.rbac.permission_check_repository import (
+    RbacPermissionCheckRepository,
+)
 from ai.backend.manager.repositories.user.repository import UserRepository
 from ai.backend.manager.repositories.vfolder.repository import VfolderRepository
 from ai.backend.manager.secret.pool import KeyProviderPool
@@ -154,6 +159,9 @@ def vfolder_processors(
         ShareOpsProvider(database_engine),
         KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
     )
+    # The registry here runs no RBAC validator, so the own check answers as enforcement off.
+    rbac_off = MagicMock(spec=ManagerConfigProvider)
+    rbac_off.config.manager.rbac.enforcement_enabled = False
     service = VFolderService(
         config_provider=config_provider,
         etcd=async_etcd,
@@ -162,6 +170,9 @@ def vfolder_processors(
         vfolder_repository=vfolder_repository,
         user_repository=user_repository,
         valkey_stat_client=valkey_clients.stat,
+        own_check=BulkOwnCheck(
+            RbacPermissionCheckRepository(PermissionOpsProvider(database_engine), rbac_off)
+        ),
     )
     return VFolderProcessors(processor_registry.group(GroupMeta(VFolderEntityType())), service)
 
@@ -347,7 +358,7 @@ async def vfolder_factory(
     async def _create(**overrides: Any) -> VFolderFixtureData:
         unique = secrets.token_hex(4)
         vfolder_id = uuid.uuid4()
-        user_uuid = admin_user_fixture.user_uuid
+        user_uuid = uuid.UUID(str(overrides.get("user", admin_user_fixture.user_uuid)))
         async with db_engine.begin() as conn:
             personal_project_id = (
                 await conn.execute(

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import uuid
-from collections.abc import AsyncGenerator
+from collections.abc import AsyncGenerator, Mapping, Sequence
 from pathlib import PurePosixPath
 from typing import TYPE_CHECKING
 from unittest.mock import AsyncMock, MagicMock
@@ -12,6 +12,10 @@ from uuid import UUID, uuid4
 import pytest
 
 from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.project import ProjectEntityType
+from ai.backend.common.data.entity.types import EntityIdentifier
+from ai.backend.common.data.entity.vfolder import VFolderEntityType, VFolderUUID
+from ai.backend.common.data.permission.types import Permission
 from ai.backend.common.types import (
     BinarySize,
     QuotaScopeID,
@@ -20,6 +24,7 @@ from ai.backend.common.types import (
     VFolderMountRequest,
 )
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
+from ai.backend.manager.data.project.types import ProjectType
 from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.storage import VFolderNotFound
 from ai.backend.manager.models.agent import AgentRow
@@ -52,12 +57,23 @@ from ai.backend.manager.models.vfolder import (
     VFolderPermissionRow,
     VFolderRow,
 )
+from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
+from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
+from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
 from ai.backend.manager.repositories.vfolder.mount import prepare_vfolder_mounts
 from ai.backend.manager.types import UserScope
 from ai.backend.testutils.db import with_tables
+from ai.backend.testutils.virtual_entity import VirtualEntitySeeder
 
 if TYPE_CHECKING:
     from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+
+
+async def _held_in_full(
+    vfolder_ids: Sequence[VFolderUUID],
+) -> Mapping[EntityIdentifier, Permission]:
+    """Every bit on every folder: what is resolved is under test, not the permission."""
+    return dict.fromkeys(vfolder_ids, Permission.full())
 
 
 def _password_info() -> PasswordInfo:
@@ -104,6 +120,7 @@ class TestPrepareVFolderMountsSubpathValidation:
                         options=VFolderMountOptions(subpath=bad_subpath),
                     ),
                 ],
+                held_permissions=AsyncMock(),
             )
 
 
@@ -146,6 +163,9 @@ class TestPrepareVFolderMountsSubpathFlow:
                 KernelRow,
                 ReplicaGroupRow,
                 RoutingRow,
+                VirtualEntityRow,
+                EntityMembershipRow,
+                ScopeBindingRow,
             ],
         ):
             yield database_connection
@@ -167,6 +187,7 @@ class TestPrepareVFolderMountsSubpathFlow:
         project_policy_name = f"test-proj-pol-{uuid4().hex[:8]}"
         user_uuid = uuid4()
         group_id = uuid4()
+        personal_project_id = uuid4()
         vfolder_id = uuid4()
         async with db_with_cleanup.begin_session() as db_sess:
             db_sess.add(
@@ -240,7 +261,27 @@ class TestPrepareVFolderMountsSubpathFlow:
                     user=user_uuid,
                 )
             )
+            db_sess.add(
+                ProjectRow(
+                    id=personal_project_id,
+                    name=f"personal-{personal_project_id.hex[:6]}",
+                    description="",
+                    is_active=True,
+                    domain_name=domain_name,
+                    resource_policy=project_policy_name,
+                    total_resource_slots=ResourceSlot(),
+                    allowed_vfolder_hosts={},
+                    type=ProjectType.PERSONAL,
+                    creator_id=user_uuid,
+                )
+            )
             await db_sess.flush()
+            await VirtualEntitySeeder().create_in(
+                db_sess,
+                VFolderEntityType(),
+                vfolder_id,
+                [(ProjectEntityType(), personal_project_id)],
+            )
 
         yield user_uuid, domain_name, group_id, vfolder_id
 
@@ -279,6 +320,7 @@ class TestPrepareVFolderMountsSubpathFlow:
                 resource_policy={
                     "allowed_vfolder_hosts": {"proxy:noop": ["mount-in-session"]},
                 },
+                held_permissions=_held_in_full,
                 mount_requests=[
                     VFolderMountRequest(
                         ref=vfolder_id,
@@ -321,6 +363,7 @@ class TestPrepareVFolderMountsSubpathFlow:
                 resource_policy={
                     "allowed_vfolder_hosts": {"proxy:noop": ["mount-in-session"]},
                 },
+                held_permissions=_held_in_full,
                 mount_requests=[
                     VFolderMountRequest(
                         ref=vfolder_id,
@@ -357,6 +400,7 @@ class TestPrepareVFolderMountsSubpathFlow:
                 resource_policy={
                     "allowed_vfolder_hosts": {"proxy:noop": ["mount-in-session"]},
                 },
+                held_permissions=_held_in_full,
                 mount_requests=[
                     VFolderMountRequest(
                         ref=vfolder_id,
@@ -405,6 +449,7 @@ class TestPrepareVFolderMountsSubpathFlow:
                 resource_policy={
                     "allowed_vfolder_hosts": {"proxy:noop": ["mount-in-session"]},
                 },
+                held_permissions=_held_in_full,
                 mount_requests=[
                     VFolderMountRequest(
                         ref=vfolder_id,
@@ -449,6 +494,7 @@ class TestPrepareVFolderMountsSubpathFlow:
                     resource_policy={
                         "allowed_vfolder_hosts": {"proxy:noop": ["mount-in-session"]},
                     },
+                    held_permissions=_held_in_full,
                     mount_requests=[
                         VFolderMountRequest(
                             ref=vfolder_id,

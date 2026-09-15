@@ -320,7 +320,7 @@ class TestVFolderClonePolicyCheck:
 
         with pytest.raises(BackendAPIError) as exc_info:
             await admin_registry.vfolder.clone(
-                cloneable_project_vfolder["name"],
+                str(cloneable_project_vfolder["id"]),
                 CloneVFolderReq(target_name="cloned-should-fail"),
             )
         assert exc_info.value.status == 400
@@ -352,7 +352,7 @@ class TestVFolderClonePolicyCheck:
         await vfolder_factory(name="user-vf-2-clone-ok")
 
         result = await admin_registry.vfolder.clone(
-            cloneable_project_vfolder["name"],
+            str(cloneable_project_vfolder["id"]),
             CloneVFolderReq(target_name="cloned-should-succeed"),
         )
         assert result.root.name == "cloned-should-succeed"
@@ -383,7 +383,7 @@ class TestVFolderCloneResponseFormat:
         """
         _configure_clone_storage_mock(storage_manager)
 
-        source_name = cloneable_project_vfolder["name"]
+        source_name = str(cloneable_project_vfolder["id"])
         raw = await admin_registry._client._request(
             "POST",
             f"/folders/{source_name}/clone",

@@ -129,7 +129,7 @@ def config(
 @pytest.fixture
 def validators(engine: Any, config: ManagerConfigProvider) -> V2ActionValidators:
     return build_action_validators(
-        RbacPermissionCheckRepository(PermissionOpsProvider(engine)), config
+        RbacPermissionCheckRepository(PermissionOpsProvider(engine), config), config
     )
 
 

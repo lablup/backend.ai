@@ -8,15 +8,19 @@ from typing import TYPE_CHECKING, Any
 import sqlalchemy as sa
 
 from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.session_template import SessionTemplateID
+from ai.backend.common.data.entity.types import EntityIdentifier
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.common import GenericForbidden
-from ai.backend.manager.errors.resource import DBOperationFailed
 from ai.backend.manager.models.domain import domains
 from ai.backend.manager.models.keypair import keypairs
 from ai.backend.manager.models.project import association_groups_users as agus
 from ai.backend.manager.models.project import groups
-from ai.backend.manager.models.session_template import SessionTemplateRow, TemplateType
+from ai.backend.manager.models.session_template.creators import SessionTemplateCreator
+from ai.backend.manager.models.session_template.row import SessionTemplateRow, TemplateType
 from ai.backend.manager.models.user import UserRole, users
+from ai.backend.manager.repositories.ops.v2.share.provider import ShareOpsProvider
 from ai.backend.manager.utils import check_if_requester_is_eligible_to_act_as_target_user
 
 if TYPE_CHECKING:
@@ -27,9 +31,11 @@ class TemplateDBSource:
     """Database source for session/cluster template operations."""
 
     _db: ExtendedAsyncSAEngine
+    _ops: ShareOpsProvider
 
-    def __init__(self, db: ExtendedAsyncSAEngine) -> None:
+    def __init__(self, db: ExtendedAsyncSAEngine, ops_provider: ShareOpsProvider) -> None:
         self._db = db
+        self._ops = ops_provider
 
     # --- Owner resolution ---
 
@@ -111,25 +117,35 @@ class TemplateDBSource:
         domain_name: str,
         items: list[dict[str, Any]],
     ) -> list[dict[str, str]]:
-        """Insert one or more task templates. Each item must have: id, user_uuid, group_id, name, template."""
-        results: list[dict[str, str]] = []
-        async with self._db.begin() as conn:
-            for item in items:
-                query = sa.insert(SessionTemplateRow).values({
-                    "id": item["id"],
-                    "created_at": datetime.now(UTC),
-                    "domain_name": domain_name,
-                    "group_id": item["group_id"],
-                    "user_uuid": item["user_uuid"],
-                    "name": item["name"],
-                    "template": item["template"],
-                    "type": TemplateType.TASK,
-                })
-                result = await conn.execute(query)
-                if result.rowcount != 1:
-                    raise DBOperationFailed(f"Failed to create session template: {item['id']}")
-                results.append({"id": item["id"], "user": str(item["user_uuid"])})
-        return results
+        """Create one or more task templates. Each item must have: id, user_uuid, group_id, name, template."""
+        creators = [
+            SessionTemplateCreator(
+                template_id=SessionTemplateID(uuid.UUID(item["id"])),
+                template_type=TemplateType.TASK,
+                domain_name=domain_name,
+                user_uuid=UserID(item["user_uuid"]),
+                group_id=self._project_id(item["group_id"]),
+                name=item["name"],
+                template=item["template"],
+                created_at=datetime.now(UTC),
+            )
+            for item in items
+        ]
+        async with self._ops.write_ops() as w:
+            await w.atomic_create_entities(creators)
+        return [{"id": item["id"], "user": str(item["user_uuid"])} for item in items]
+
+    def _project_id(self, group_id: uuid.UUID | None) -> ProjectID | None:
+        return ProjectID(group_id) if group_id is not None else None
+
+    def _owning_scopes(
+        self, user_uuid: uuid.UUID, group_id: uuid.UUID | None
+    ) -> list[EntityIdentifier]:
+        """The scopes a template with this owner and project is created in."""
+        scopes: list[EntityIdentifier] = [UserID(user_uuid)]
+        if group_id is not None:
+            scopes.append(ProjectID(group_id))
+        return scopes
 
     async def list_task_templates(self, user_uuid: uuid.UUID) -> list[dict[str, Any]]:
         """List all active task templates with user/group info."""
@@ -226,8 +242,15 @@ class TemplateDBSource:
         name: str,
         template_data: Mapping[str, Any],
     ) -> int:
-        """Update a task template. Returns rowcount."""
+        """Update a task template; a changed owner or project moves it there. Returns rowcount."""
         async with self._db.begin() as conn:
+            previous = (
+                await conn.execute(
+                    sa.select(SessionTemplateRow.user_uuid, SessionTemplateRow.group_id).where(
+                        SessionTemplateRow.id == template_id
+                    )
+                )
+            ).first()
             q = (
                 sa.update(SessionTemplateRow)
                 .values({
@@ -239,7 +262,15 @@ class TemplateDBSource:
                 .where(SessionTemplateRow.id == template_id)
             )
             result = await conn.execute(q)
-            return result.rowcount
+            rowcount = result.rowcount
+        if previous is None:
+            return rowcount
+        from_scopes = self._owning_scopes(previous.user_uuid, previous.group_id)
+        to_scopes = self._owning_scopes(user_uuid, group_id)
+        if set(from_scopes) != set(to_scopes):
+            async with self._ops.write_ops() as w:
+                await w.transfer(from_scopes, to_scopes, SessionTemplateID(uuid.UUID(template_id)))
+        return rowcount
 
     # --- Cluster template operations ---
 
@@ -251,22 +282,22 @@ class TemplateDBSource:
         name: str,
         template_data: Mapping[str, Any],
     ) -> str:
-        """Insert a cluster template. Returns template ID."""
-        template_id = uuid.uuid4().hex
-        async with self._db.begin() as conn:
-            q = sa.insert(SessionTemplateRow).values({
-                "id": template_id,
-                "domain_name": domain_name,
-                "group_id": group_id,
-                "user_uuid": user_uuid,
-                "name": name,
-                "template": template_data,
-                "type": TemplateType.CLUSTER,
-            })
-            result = await conn.execute(q)
-            if result.rowcount != 1:
-                raise DBOperationFailed(f"Failed to create cluster template: {template_id}")
-        return template_id
+        """Create a cluster template. Returns template ID."""
+        template_id = uuid.uuid4()
+        async with self._ops.write_ops() as w:
+            await w.create_entity(
+                SessionTemplateCreator(
+                    template_id=SessionTemplateID(template_id),
+                    template_type=TemplateType.CLUSTER,
+                    domain_name=domain_name,
+                    user_uuid=UserID(user_uuid),
+                    group_id=self._project_id(group_id),
+                    name=name,
+                    template=template_data,
+                    created_at=datetime.now(UTC),
+                )
+            )
+        return template_id.hex
 
     async def list_cluster_templates_all(self, user_uuid: uuid.UUID) -> list[dict[str, Any]]:
         """List all active cluster templates (superadmin + all mode)."""

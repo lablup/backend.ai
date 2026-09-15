@@ -35,11 +35,9 @@ from ai.backend.manager.data.vfolder.dto import UserIdentity
 from ai.backend.manager.data.vfolder.types import (
     UserWithVFolderHostPermissions,
     ValidatedVFolderInfo,
-    VFolderAccessInfo,
     VFolderCreation,
     VFolderData,
     VFolderInvitationData,
-    VFolderListResult,
     VFolderMountPermission,
     VFolderPermissionData,
 )
@@ -68,6 +66,7 @@ from ai.backend.manager.models.model_card.row import ModelCardRow
 from ai.backend.manager.models.project import ProjectRow, ProjectType
 from ai.backend.manager.models.project.lookups import PersonalProjectOfUserLookup
 from ai.backend.manager.models.resource_policy import keypair_resource_policies
+from ai.backend.manager.models.scopes import OperationScope
 from ai.backend.manager.models.specs.types import ConflictCheck, IntegrityErrorCheck
 from ai.backend.manager.models.user import (
     ACTIVE_USER_STATUSES,
@@ -76,6 +75,7 @@ from ai.backend.manager.models.user import (
     UserStatus,
     users,
 )
+from ai.backend.manager.models.user.queries import joined_project_ids_query
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine, execute_with_retry
 from ai.backend.manager.models.vfolder import (
     HARD_DELETED_VFOLDER_STATUSES,
@@ -87,7 +87,6 @@ from ai.backend.manager.models.vfolder import (
     VFolderOwnershipType,
     VFolderPermission,
     VFolderPermissionRow,
-    VFolderPermissionSetAlias,
     VFolderRow,
     VFolderStatusSet,
     delete_vfolder_relation_rows,
@@ -97,8 +96,6 @@ from ai.backend.manager.models.vfolder import (
     get_allowed_vfolder_hosts_by_user,
     get_sessions_by_mounted_folder,
     is_unmanaged,
-    query_accessible_vfolders,
-    vfolder_permissions,
     vfolder_status_map,
     vfolders,
 )
@@ -110,7 +107,10 @@ from ai.backend.manager.models.vfolder.creators import (
     VFolderInvitationCreator,
     VFolderPermissionCreator,
 )
-from ai.backend.manager.models.vfolder.lookups import VFolderMountPermissionLookup
+from ai.backend.manager.models.vfolder.lookups import (
+    VFolderMountPermissionLookup,
+    VFolderNameLookup,
+)
 from ai.backend.manager.models.vfolder.purgers import (
     VFolderInvitationBatchPurger,
     VFolderInviteeInvitationBatchPurger,
@@ -118,6 +118,7 @@ from ai.backend.manager.models.vfolder.purgers import (
     VFolderUserPermissionBatchPurger,
 )
 from ai.backend.manager.models.vfolder.queriers import VFolderQuerier
+from ai.backend.manager.models.vfolder.scopes import UserVFolderOperationScope
 from ai.backend.manager.models.vfolder.updaters import (
     VFolderAttributeUpdater,
     VFolderMountPermissionUpdater,
@@ -125,7 +126,9 @@ from ai.backend.manager.models.vfolder.updaters import (
     VFolderSoftDeleteUpdater,
     VFolderTrashUpdater,
 )
-from ai.backend.manager.models.virtual_entity.queries import user_scope_membership_exists
+from ai.backend.manager.models.virtual_entity.queries import (
+    user_scope_membership_exists,
+)
 from ai.backend.manager.repositories.base.integrity import match_integrity_error
 from ai.backend.manager.repositories.ops.v2.share.provider import ShareOpsProvider
 from ai.backend.manager.repositories.ops.v2.share.write import V2ShareWriteOps
@@ -168,46 +171,6 @@ class VfolderRepository:
     def __init__(self, db: ExtendedAsyncSAEngine, v2_ops_provider: ShareOpsProvider) -> None:
         self._db = db
         self._v2_ops = v2_ops_provider
-
-    @vfolder_repository_resilience.apply()
-    async def get_by_id_validated(
-        self, vfolder_id: uuid.UUID, user_id: uuid.UUID, domain_name: str | None
-    ) -> VFolderData:
-        """
-        Get a VFolder by ID with ownership/permission validation.
-        Returns VFolderData if user has access.
-        Raises VFolderNotFound if vfolder doesn't exist or user has no access.
-        """
-        async with self._db.begin_readonly_session() as session:
-            vfolder_row = await self._get_vfolder_by_id(session, vfolder_id)
-            if not vfolder_row:
-                raise VFolderNotFound()
-
-            if vfolder_row.user == user_id:
-                return self._vfolder_row_to_data(vfolder_row)
-
-            # Check access permissions
-            user_row = await session.scalar(sa.select(UserRow).where(UserRow.uuid == user_id))
-            if not user_row:
-                raise UserNotFound()
-
-            # Check if user has access to this vfolder
-            allowed_vfolder_types = ["user", "group"]  # TODO: get from config
-            conn = await session.connection()
-            vfolder_dicts = await query_accessible_vfolders(
-                conn,
-                user_id,
-                allow_privileged_access=True,
-                user_role=user_row.role,
-                domain_name=domain_name,
-                allowed_vfolder_types=allowed_vfolder_types,
-                extra_vf_conds=(VFolderRow.id == vfolder_id),
-            )
-
-            if not vfolder_dicts:
-                raise VFolderNotFound()
-
-            return self._vfolder_row_to_data(vfolder_row)
 
     @vfolder_repository_resilience.apply()
     async def get_by_id(self, vfolder_id: uuid.UUID) -> VFolderData:
@@ -419,46 +382,6 @@ class VfolderRepository:
                 raise UserNotFound(f"User with UUID {user_uuid} not found.")
 
             return user_row.resource_policy_row.max_vfolder_count
-
-    @vfolder_repository_resilience.apply()
-    async def list_accessible_vfolders(
-        self,
-        user_id: uuid.UUID,
-        user_role: UserRole,
-        domain_name: str,
-        allowed_vfolder_types: list[str],
-        extra_conditions: sa.sql.elements.ColumnElement[bool] | None = None,
-    ) -> VFolderListResult:
-        """
-        List all VFolders accessible to a user.
-        Returns VFolderListResult with access information.
-        """
-        async with self._db.begin_readonly_session() as session:
-            conn = await session.connection()
-            vfolder_dicts = await query_accessible_vfolders(
-                conn,
-                user_id,
-                user_role=user_role,
-                domain_name=domain_name,
-                allowed_vfolder_types=allowed_vfolder_types,
-                extra_vf_conds=extra_conditions,
-            )
-
-            vfolder_access_infos = []
-            for vfolder_dict in vfolder_dicts:
-                vfolder_data = self._vfolder_dict_to_data(dict(vfolder_dict))
-                is_owner = vfolder_dict.get("is_owner", False)
-                permission = vfolder_dict.get("permission", VFolderPermission.READ_ONLY)
-
-                vfolder_access_infos.append(
-                    VFolderAccessInfo(
-                        vfolder_data=vfolder_data,
-                        is_owner=is_owner,
-                        effective_permission=permission,
-                    )
-                )
-
-            return VFolderListResult(vfolders=vfolder_access_infos)
 
     @vfolder_repository_resilience.apply()
     async def resolve_vfolder_ids_by_names(self, names: Sequence[str]) -> dict[str, uuid.UUID]:
@@ -1053,36 +976,37 @@ class VfolderRepository:
             return result or 0
 
     @vfolder_repository_resilience.apply()
-    async def check_vfolder_name_exists(
-        self,
-        name: str,
-        user_id: uuid.UUID,
-        user_role: UserRole,
-        domain_name: str,
-        allowed_vfolder_types: list[str],
-    ) -> bool:
-        """
-        Check if a VFolder with the given name already exists for the user.
-        """
-
-        async with self._db.begin_readonly_session() as session:
-            # Use query_accessible_vfolders to check accessible folders
-            extra_vf_conds = sa.and_(
-                (VFolderRow.name == name),
-                (VFolderRow.status.not_in(HARD_DELETED_VFOLDER_STATUSES)),
+    async def check_vfolder_name_exists(self, scope: OperationScope, name: str) -> bool:
+        """Whether a vfolder the scope reaches, not hard-deleted, already carries the name."""
+        async with self._db.begin_readonly_session_read_committed() as session:
+            query = sa.select(
+                sa.select(VFolderRow.id)
+                .where(
+                    VFolderRow.name == name,
+                    VFolderRow.status.not_in(HARD_DELETED_VFOLDER_STATUSES),
+                    scope.to_condition()(),
+                )
+                .exists()
             )
+            return bool(await session.scalar(query))
 
-            conn = await session.connection()
-            vfolder_dicts = await query_accessible_vfolders(
-                conn,
-                user_id,
-                user_role=user_role,
-                domain_name=domain_name,
-                allowed_vfolder_types=allowed_vfolder_types,
-                extra_vf_conds=extra_vf_conds,
-            )
+    @vfolder_repository_resilience.apply()
+    async def resolve_vfolder_id_by_name(
+        self, scopes: Sequence[OperationScope], name: str
+    ) -> VFolderUUID:
+        """The vfolder the name resolves to within the scopes."""
+        async with self._v2_ops.read_ops() as r:
+            vfolder_id = await r.lookup_entity_id(VFolderNameLookup(scopes=scopes, name=name))
+        if vfolder_id is None:
+            raise VFolderNotFound(extra_data=name)
+        return vfolder_id
 
-            return len(vfolder_dicts) > 0
+    @vfolder_repository_resilience.apply()
+    async def get_joined_project_ids(self, user_id: UserID) -> list[ProjectID]:
+        """The projects the user is on the roster of, personal ones left out."""
+        async with self._db.begin_readonly_session_read_committed() as session:
+            rows = await session.scalars(joined_project_ids_query(user_id))
+            return [ProjectID(project_id) for project_id in rows.all()]
 
     @vfolder_repository_resilience.apply()
     async def get_user_info(self, user_id: uuid.UUID) -> tuple[UserRole, str] | None:
@@ -1630,7 +1554,7 @@ class VfolderRepository:
         user = current_user()
         if user is None:
             raise AuthorizationFailed("User context is not available")
-        vfolder_data = await self.get_by_id_validated(vfolder_uuid, user.user_id, user.domain_name)
+        vfolder_data = await self.get_by_id(vfolder_uuid)
         await self.ensure_host_permission_allowed(
             vfolder_data.host,
             permission=permission,
@@ -1646,35 +1570,6 @@ class VfolderRepository:
             ),
             host=vfolder_data.host,
             unmanaged_path=vfolder_data.unmanaged_path,
-        )
-
-    def _vfolder_dict_to_data(self, vfolder_dict: dict[str, Any]) -> VFolderData:
-        """
-        Convert vfolder dictionary from query_accessible_vfolders to VFolderData.
-        """
-        return VFolderData(
-            id=VFolderUUID(vfolder_dict["id"]),
-            name=vfolder_dict["name"],
-            host=vfolder_dict["host"],
-            domain_name=vfolder_dict["domain_name"],
-            quota_scope_id=vfolder_dict["quota_scope_id"],
-            usage_mode=vfolder_dict["usage_mode"],
-            permission=vfolder_dict.get("permission"),
-            max_files=vfolder_dict["max_files"],
-            max_size=vfolder_dict["max_size"],
-            num_files=vfolder_dict.get("num_files", 0),
-            cur_size=vfolder_dict["cur_size"],
-            created_at=vfolder_dict["created_at"],
-            last_used=vfolder_dict["last_used"],
-            updated_at=vfolder_dict["updated_at"],
-            creator=vfolder_dict["creator"],
-            creator_id=vfolder_dict.get("creator_id"),
-            unmanaged_path=vfolder_dict["unmanaged_path"],
-            ownership_type=vfolder_dict["ownership_type"],
-            user=uuid.UUID(vfolder_dict["user"]) if vfolder_dict["user"] else None,
-            group=uuid.UUID(vfolder_dict["group"]) if vfolder_dict["group"] else None,
-            cloneable=vfolder_dict["cloneable"],
-            status=vfolder_dict["status"],
         )
 
     @vfolder_repository_resilience.apply()
@@ -1750,32 +1645,15 @@ class VfolderRepository:
         return clone_response.bgtask_id, target.id
 
     @vfolder_repository_resilience.apply()
-    async def get_logs_vfolder(
-        self,
-        user_id: uuid.UUID,
-        user_role: UserRole,
-        domain_name: str,
-    ) -> VFolderData | None:
-        """
-        Get the accessible .logs vfolder for a user.
-        Returns VFolderData if found, None otherwise.
-        """
-        async with self._db.begin_readonly() as conn:
-            vfolder_dicts = await query_accessible_vfolders(
-                conn,
-                user_id,
-                user_role=user_role,
-                domain_name=domain_name,
-                allowed_vfolder_types=["user"],
-                extra_vf_conds=(vfolders.c.name == ".logs"),
+    async def get_logs_vfolder(self, user_id: UserID) -> VFolderData | None:
+        """The ``.logs`` vfolder the user reaches, or ``None`` when there is none."""
+        async with self._v2_ops.read_ops() as r:
+            vfolder_id = await r.lookup_entity_id(
+                VFolderNameLookup(scopes=[UserVFolderOperationScope(user_id=user_id)], name=".logs")
             )
-
-            if not vfolder_dicts:
-                return None
-
-            # Return the first (and should be only) matching .logs vfolder
-            vfolder_dict = vfolder_dicts[0]
-            return self._vfolder_dict_to_data(dict(vfolder_dict))
+        if vfolder_id is None:
+            return None
+        return await self.get_by_id(vfolder_id)
 
     @vfolder_repository_resilience.apply()
     async def share_vfolder_with_users(
@@ -1950,91 +1828,6 @@ class VfolderRepository:
                 await self._revoke_mount_permission(w, VFolderUUID(vfolder_id), user_id)
             for user_id, perm in to_update:
                 await self._restate_mount_permission(w, VFolderUUID(vfolder_id), user_id, perm)
-
-    @vfolder_repository_resilience.apply()
-    async def check_vfolder_accessible(
-        self,
-        vfolder_id: uuid.UUID,
-        user_uuid: uuid.UUID,
-        user_role: UserRole,
-        domain_name: str,
-        allowed_vfolder_types: Sequence[str],
-    ) -> bool:
-        """
-        Check if a vfolder is accessible by the user.
-        Returns True if accessible, raises VFolderNotFound if not.
-        """
-        async with self._db.begin_readonly_session() as session:
-            conn = await session.connection()
-            extra_vf_conds = [vfolders.c.id == vfolder_id]
-            entries = await query_accessible_vfolders(
-                conn,
-                user_uuid,
-                user_role=user_role,
-                domain_name=domain_name,
-                allowed_vfolder_types=allowed_vfolder_types,
-                extra_vf_conds=(sa.and_(*extra_vf_conds)),
-            )
-        if len(entries) == 0:
-            raise VFolderNotFound(extra_data=vfolder_id)
-        return True
-
-    @vfolder_repository_resilience.apply()
-    async def get_accessible_rows(
-        self,
-        user_uuid: uuid.UUID,
-        user_role: UserRole,
-        domain_name: str,
-        is_admin: bool,
-        allowed_vfolder_types: Sequence[str],
-        perm: VFolderPermissionSetAlias | VFolderPermission,
-        folder_id_or_name: str | uuid.UUID,
-        *,
-        allowed_status_set: VFolderStatusSet | None = None,
-        allow_privileged_access: bool = False,
-    ) -> Sequence[Mapping[str, Any]]:
-        """
-        Build permission conditions and query accessible vfolders.
-
-        This is the repository-layer replacement for the legacy
-        ``resolve_vfolder_rows()`` that previously lived in the API layer.
-        """
-        vf_user_cond = None
-        vf_group_cond: sa.ColumnElement[bool] | None = None
-        invited_perm_cond: sa.ColumnElement[bool]
-
-        match perm:
-            case VFolderPermissionSetAlias():
-                invited_perm_cond = vfolder_permissions.c.permission.in_(list(perm.value))
-                if not is_admin:
-                    vf_group_cond = vfolders.c.permission.in_(list(perm.value))
-            case _:
-                invited_perm_cond = vfolder_permissions.c.permission == perm
-                if not is_admin:
-                    vf_group_cond = vfolders.c.permission == perm
-
-        match folder_id_or_name:
-            case str():
-                extra_vf_conds = vfolders.c.name == folder_id_or_name
-            case uuid.UUID():
-                extra_vf_conds = vfolders.c.id == folder_id_or_name
-            case _:
-                raise RuntimeError(f"Unsupported VFolder index type {type(folder_id_or_name)}")
-
-        async with self._db.begin_readonly() as conn:
-            return await query_accessible_vfolders(
-                conn,
-                user_uuid,
-                allow_privileged_access=allow_privileged_access,
-                user_role=user_role,
-                domain_name=domain_name,
-                allowed_vfolder_types=allowed_vfolder_types,
-                extra_vf_conds=extra_vf_conds,
-                extra_invited_vf_conds=invited_perm_cond,
-                extra_vf_user_conds=vf_user_cond,
-                extra_vf_group_conds=vf_group_cond,
-                allowed_status_set=allowed_status_set,
-            )
 
     @vfolder_repository_resilience.apply()
     async def update_vfolder_max_size(

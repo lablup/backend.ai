@@ -232,6 +232,7 @@ from ai.backend.manager.services.retention_policy.processors import RetentionPol
 from ai.backend.manager.services.role_preset.processors import RolePresetProcessors
 from ai.backend.manager.services.role_preset.service import RolePresetService
 from ai.backend.manager.services.runtime_variant.processors import RuntimeVariantProcessors
+from ai.backend.manager.services.runtime_variant.service import RuntimeVariantService
 from ai.backend.manager.services.runtime_variant_preset.processors import (
     RuntimeVariantPresetProcessors,
 )
@@ -289,9 +290,11 @@ def create_services(args: ServiceArgs, action_registry: ProcessorRegistry[Any]) 
             repositories.agent.repository,
             repositories.scheduler.repository,
             args.scheduling_controller,
-            BulkOwnCheck(repositories.rbac.permission_check, args.config_provider),
+            BulkOwnCheck(repositories.rbac.permission_check),
         ),
-        app_config=AppConfigService(OpsRepository(repositories.v2_ops_provider)),
+        app_config=AppConfigService(
+            OpsRepository(repositories.v2_ops_provider), repositories.app_config.repository
+        ),
         domain=DomainService(repositories.domain.repository),
         etcd_config=EtcdConfigService(
             repository=repositories.etcd_config.repository,
@@ -339,6 +342,7 @@ def create_services(args: ServiceArgs, action_registry: ProcessorRegistry[Any]) 
             repositories.vfolder.repository,
             repositories.user.repository,
             args.valkey_stat_client,
+            BulkOwnCheck(repositories.rbac.permission_check),
         ),
         vfolder_admin=VFolderAdminService(
             vfolder_admin_repository=repositories.vfolder.admin_repository,
@@ -409,6 +413,7 @@ def create_services(args: ServiceArgs, action_registry: ProcessorRegistry[Any]) 
         entity_share=EntityShareService(
             repositories.entity_share.repository,
         ),
+        runtime_variant=RuntimeVariantService(repositories.runtime_variant.repository),
         runtime_variant_preset=RuntimeVariantPresetService(
             repositories.runtime_variant_preset.repository,
             OpsRepository(repositories.v2_ops_provider),
@@ -721,7 +726,7 @@ def create_processors(
             rbac_groups.group(GroupMeta(RolePresetEntityType())), services.role_preset
         ),
         runtime_variant=RuntimeVariantProcessors(
-            system_groups.group(GroupMeta(RuntimeVariantEntityType()))
+            system_groups.group(GroupMeta(RuntimeVariantEntityType())), services.runtime_variant
         ),
         client_ip_masking=ClientIPMaskingProcessors(
             system_groups.group(GroupMeta(ClientIPMaskingPolicyEntityType()))

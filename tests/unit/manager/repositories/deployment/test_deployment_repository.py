@@ -785,6 +785,7 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
             valkey_stat=valkey_stat,
             valkey_live=valkey_live,
             valkey_schedule=valkey_schedule,
+            permission_check=MagicMock(),
         )
 
     async def test_fetch_single_route_with_inference_port(
@@ -1153,6 +1154,7 @@ class TestGetDefaultArchitectureFromScalingGroup:
             valkey_stat=valkey_stat,
             valkey_live=valkey_live,
             valkey_schedule=valkey_schedule,
+            permission_check=MagicMock(),
         )
 
     async def _create_agent(
@@ -1734,6 +1736,7 @@ class TestDeploymentRevisionOperations:
             valkey_stat=valkey_stat,
             valkey_live=valkey_live,
             valkey_schedule=valkey_schedule,
+            permission_check=MagicMock(),
         )
 
     @pytest.fixture
@@ -2379,6 +2382,7 @@ class TestDeploymentPolicyOperations:
             valkey_stat=valkey_stat,
             valkey_live=valkey_live,
             valkey_schedule=valkey_schedule,
+            permission_check=MagicMock(),
         )
 
     @pytest.fixture
@@ -2733,6 +2737,7 @@ class TestSearchDeploymentPolicies:
             valkey_stat=valkey_stat,
             valkey_live=valkey_live,
             valkey_schedule=valkey_schedule,
+            permission_check=MagicMock(),
         )
 
     # =========================================================================
@@ -3100,6 +3105,7 @@ class TestRouteOperations:
             valkey_stat=valkey_stat,
             valkey_live=valkey_live,
             valkey_schedule=valkey_schedule,
+            permission_check=MagicMock(),
         )
 
     @pytest.fixture
@@ -3513,6 +3519,7 @@ class TestDeploymentRepositoryDuplicateName:
             valkey_stat=mock_valkey_stat,
             valkey_live=mock_valkey_live,
             valkey_schedule=mock_valkey_schedule,
+            permission_check=MagicMock(),
         )
 
     def _create_endpoint_creator(

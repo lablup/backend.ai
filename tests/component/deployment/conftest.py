@@ -45,7 +45,11 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import vfolders
 from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.repositories.deployment.repository import DeploymentRepository
+from ai.backend.manager.repositories.ops.v2.permission.provider import PermissionOpsProvider
 from ai.backend.manager.repositories.ops.v2.reconciler.provider import ReconcileOpsProvider
+from ai.backend.manager.repositories.rbac.permission_check_repository import (
+    RbacPermissionCheckRepository,
+)
 from ai.backend.manager.repositories.scheduler import SchedulerRepository
 from ai.backend.manager.services.deployment.processors import DeploymentProcessors
 from ai.backend.manager.services.deployment.service import DeploymentService
@@ -100,6 +104,10 @@ def deployment_processors(
     processor_registry: ProcessorRegistry[Any],
 ) -> DeploymentProcessors:
     """Real DeploymentProcessors with real DeploymentService and DeploymentRepository."""
+    # The model folders these tests create are not in the graph, so the requester's
+    # permission is not enforced here.
+    rbac_off = MagicMock()
+    rbac_off.config.manager.rbac.enforcement_enabled = False
     repo = DeploymentRepository(
         database_engine,
         ReconcileOpsProvider(database_engine),
@@ -107,6 +115,7 @@ def deployment_processors(
         valkey_clients.stat,
         valkey_clients.live,
         valkey_clients.schedule,
+        RbacPermissionCheckRepository(PermissionOpsProvider(database_engine), rbac_off),
     )
     scheduler_repository = SchedulerRepository(
         database_engine,
@@ -115,6 +124,7 @@ def deployment_processors(
         valkey_clients.schedule,
         config_provider,
         storage_manager,
+        RbacPermissionCheckRepository(PermissionOpsProvider(database_engine), config_provider),
     )
     scheduling_controller = SchedulingController(
         SchedulingControllerArgs(

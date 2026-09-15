@@ -370,7 +370,9 @@ class TestModifyEndpointModelDefinitionRefresh:
     @pytest.fixture()
     def repository(self, db_with_cleanup: ExtendedAsyncSAEngine) -> ModelServingRepository:
         return ModelServingRepository(
-            db=db_with_cleanup, v2_ops_provider=V2DBOpsProvider(db_with_cleanup)
+            db=db_with_cleanup,
+            v2_ops_provider=V2DBOpsProvider(db_with_cleanup),
+            permission_check=MagicMock(),
         )
 
     @pytest.fixture()

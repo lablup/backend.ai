@@ -35,10 +35,12 @@ import pytest
 from ai.backend.common.clients.valkey_client.valkey_schedule.client import ValkeyScheduleClient
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.data.entity.domain import DomainID, DomainName
-from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.project import ProjectEntityType, ProjectID
+from ai.backend.common.data.entity.vfolder import VFolderEntityType
 from ai.backend.common.types import BinarySize, QuotaScopeID, ResourceSlot
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
+from ai.backend.manager.data.project.types import ProjectType
 from ai.backend.manager.data.session.draft import (
     KernelGroupDraft,
     ResourceSpecDraft,
@@ -76,10 +78,18 @@ from ai.backend.manager.models.runtime_variant import RuntimeVariantRow
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.vfolder import VFolderPermissionRow, VFolderRow
+from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
+from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
+from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
+from ai.backend.manager.repositories.ops.v2.permission.provider import PermissionOpsProvider
 from ai.backend.manager.repositories.ops.v2.reconciler.provider import ReconcileOpsProvider
+from ai.backend.manager.repositories.rbac.permission_check_repository import (
+    RbacPermissionCheckRepository,
+)
 from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
 from ai.backend.testutils.db import with_tables
 from ai.backend.testutils.fixtures import DomainFixtureData
+from ai.backend.testutils.virtual_entity import VirtualEntitySeeder
 
 if TYPE_CHECKING:
     from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -140,6 +150,9 @@ class TestAutoMountVFolderResolution:
                 KernelRow,
                 ReplicaGroupRow,
                 RoutingRow,
+                VirtualEntityRow,
+                EntityMembershipRow,
+                ScopeBindingRow,
             ],
         ):
             yield database_connection
@@ -261,13 +274,42 @@ class TestAutoMountVFolderResolution:
         return group_id
 
     @pytest.fixture
+    async def test_personal_project(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_domain: DomainFixtureData,
+        test_project_resource_policy_name: str,
+        test_user: UUID,
+    ) -> UUID:
+        """Create the personal project ``test_user``'s own folders are created in."""
+        project_id = uuid4()
+        async with db_with_cleanup.begin_session() as db_sess:
+            db_sess.add(
+                ProjectRow(
+                    id=project_id,
+                    name=f"personal-{project_id.hex[:6]}",
+                    description="",
+                    is_active=True,
+                    domain_name=test_domain.domain_name,
+                    resource_policy=test_project_resource_policy_name,
+                    total_resource_slots=ResourceSlot(),
+                    allowed_vfolder_hosts={},
+                    type=ProjectType.PERSONAL,
+                    creator_id=test_user,
+                )
+            )
+            await db_sess.flush()
+        return project_id
+
+    @pytest.fixture
     async def automount_vfolder_id(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_domain: DomainFixtureData,
         test_user: UUID,
+        test_personal_project: UUID,
     ) -> UUID:
-        """Create a dot-prefixed (auto-mount) vfolder owned by ``test_user``."""
+        """Create a dot-prefixed (auto-mount) vfolder in ``test_user``'s personal project."""
         vfolder_id = uuid4()
         async with db_with_cleanup.begin_session() as db_sess:
             db_sess.add(
@@ -282,6 +324,12 @@ class TestAutoMountVFolderResolution:
                 )
             )
             await db_sess.flush()
+            await VirtualEntitySeeder().create_in(
+                db_sess,
+                VFolderEntityType(),
+                vfolder_id,
+                [(ProjectEntityType(), test_personal_project)],
+            )
         return vfolder_id
 
     @pytest.fixture
@@ -304,6 +352,8 @@ class TestAutoMountVFolderResolution:
         config_provider.legacy_etcd_config_loader.get_vfolder_types = AsyncMock(
             return_value=["user"]
         )
+        # What is resolved is under test, not the owner's permission on it.
+        config_provider.config.manager.rbac.enforcement_enabled = False
         return config_provider
 
     @pytest.fixture
@@ -323,6 +373,9 @@ class TestAutoMountVFolderResolution:
             AsyncMock(spec=ValkeyScheduleClient),
             mock_config_provider,
             mock_storage_manager,
+            RbacPermissionCheckRepository(
+                PermissionOpsProvider(db_with_cleanup), mock_config_provider
+            ),
         )
 
     async def test_automount_resolved_without_explicit_mount_requests(
