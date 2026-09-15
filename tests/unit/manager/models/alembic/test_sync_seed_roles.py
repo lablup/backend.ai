@@ -24,6 +24,9 @@ from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.permission.status import RoleStatus
 from ai.backend.manager.data.permission.types import RoleSource
+from ai.backend.manager.models.alembic.versions.dc61fa027fc1_assign_every_user_their_user_owner_role import (
+    backfill as assign_user_owner_roles,
+)
 from ai.backend.manager.models.alembic.versions.f4a1c9d20b73_sync_seed_roles_with_their_declaration import (
     _PRESETS,
     _drop_unlinked_system_roles,
@@ -61,6 +64,7 @@ from ai.backend.manager.models.virtual_entity.entity_membership import EntityMem
 from ai.backend.manager.models.virtual_entity.entity_membership_cap import (
     EntityMembershipCapRow,
 )
+from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
 from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
 from ai.backend.testutils.db import HasTable, with_tables
 
@@ -80,6 +84,7 @@ _TABLES: list[Table | type[HasTable]] = [
     VirtualEntityRow,
     EntityMembershipRow,
     EntityMembershipCapRow,
+    ScopeBindingRow,
 ]
 
 _PRESET_BY_NAME = {preset.name: preset for preset in _PRESETS}
@@ -591,9 +596,9 @@ class TestMigratedMatchesTheSeed:
 
     The seed's own subjects and roles go in without their preset links, carrying the
     permission rows the data migrations left, and the assignments a scope hands out on
-    its own taken away. What the migration then writes is held against the fixture,
-    keyed by role name: a linked role keeps the id it came in with, so the rows are the
-    same rows under different role ids.
+    its own taken away. What the migration and the user_owner revision after it then
+    write is held against the fixture, keyed by role name: a linked role keeps the id it
+    came in with, so the rows are the same rows under different role ids.
     """
 
     @pytest.fixture
@@ -602,6 +607,7 @@ class TestMigratedMatchesTheSeed:
     ) -> dict[str, Any]:
         async with db.begin() as conn:
             await conn.run_sync(lambda sync_conn: _run(sync_conn))
+            await conn.run_sync(assign_user_owner_roles)
         return seeded_from_fixture
 
     async def test_the_permissions_are_the_seed_s(
