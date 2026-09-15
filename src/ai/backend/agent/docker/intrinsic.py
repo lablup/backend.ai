@@ -355,7 +355,7 @@ class CPUPlugin(AbstractComputePlugin):
             ContainerMeasurement(
                 MetricKey("cpu_util"),
                 MetricTypes.UTILIZATION,
-                unit_hint="percent",
+                unit_hint="msec",
                 current_hook=lambda metric: metric.stats.rate,
                 stats_filter=frozenset({"avg", "max"}),
                 per_container=per_container_cpu_util,
@@ -421,7 +421,7 @@ class CPUPlugin(AbstractComputePlugin):
             ProcessMeasurement(
                 MetricKey("cpu_util"),
                 MetricTypes.UTILIZATION,
-                unit_hint="percent",
+                unit_hint="msec",
                 current_hook=lambda metric: metric.stats.rate,
                 stats_filter=frozenset({"avg", "max"}),
                 per_process=per_process_cpu_util,

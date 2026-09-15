@@ -18,7 +18,7 @@ _DIFF_STAT_METRICS: Final[frozenset[str]] = frozenset({"cpu_util"})
 # src/ai/backend/agent/docker/intrinsic.py).
 _METRIC_UNIT_HINTS: Final[dict[str, str]] = {
     "cpu_used": "msec",
-    "cpu_util": "percent",
+    "cpu_util": "msec",
     "mem": "bytes",
     "net_rx": "bps",
     "net_tx": "bps",
