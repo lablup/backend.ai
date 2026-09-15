@@ -16,13 +16,14 @@ The uuids are pinned to the ones ``fixtures/manager/example-resource-slot-types.
 assigns, following ``8f21c46a0b73``, so an upgraded deployment ends up with the
 same slot identity a fresh install gets instead of a random one per database.
 
+``downgrade`` deliberately leaves both rows in place; see the comment there.
+
 Create Date: 2026-09-12
 
 """
 
 from __future__ import annotations
 
-import sqlalchemy as sa
 from alembic import op
 
 # revision identifiers, used by Alembic.
@@ -31,22 +32,6 @@ down_revision = "c58b0d3a9e14"
 # Part of: NEXT_RELEASE_VERSION
 branch_labels = None
 depends_on = None
-
-_added_slot_names = (
-    "tt-n300.device",
-    "neuron.core",
-)
-
-# Every table that carries an FK onto `resource_slot_types.slot_name` as of this
-# revision.  A slot still referenced from any of them cannot be deleted, so the
-# downgrade has to skip it rather than abort the whole migration.
-_referencing_tables = (
-    "agent_resources",
-    "resource_allocations",
-    "model_card_resource_requirements",
-    "preset_resource_slots",
-    "deployment_revision_resource_slots",
-)
 
 
 def upgrade() -> None:
@@ -77,21 +62,7 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    # Only remove rows that nothing references.  Five tables carry an FK on
-    # slot_name, so an unconditional delete would abort the downgrade on any
-    # deployment that still has a live Neuron/Tenstorrent agent, a historical
-    # allocation, or a model card / preset / deployment revision naming the slot.
-    guards = "\n".join(
-        f"              AND NOT EXISTS ("
-        f"SELECT 1 FROM {table} r WHERE r.slot_name = resource_slot_types.slot_name)"
-        for table in _referencing_tables
-    )
-    conn = op.get_bind()
-    conn.execute(
-        sa.text(f"""
-            DELETE FROM resource_slot_types
-            WHERE slot_name = ANY(:names)
-{guards}
-        """),
-        {"names": list(_added_slot_names)},
-    )
+    # Intentionally a no-op: five tables carry an FK onto `resource_slot_types.slot_name`,
+    # so deleting a seeded row is destructive rather than reversible.  An older manager
+    # simply never looks the rows up.  Removing them is an operator decision.
+    pass

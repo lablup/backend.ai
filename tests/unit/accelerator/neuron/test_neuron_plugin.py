@@ -26,6 +26,8 @@ from ai.backend.accelerator.neuron.neuron_api import (
     NeuronToolError,
 )
 from ai.backend.accelerator.neuron.plugin import NeuronPlugin
+from ai.backend.agent.errors.resources import ResourceError
+from ai.backend.agent.resources import AllocationStrategy
 from ai.backend.common.types import DeviceId, MetricKey, SlotName
 
 # Captured from `neuron-ls --json-output` on trn1.2xlarge.
@@ -262,6 +264,13 @@ class TestDiscovery:
             for info in alloc_map.device_slots.values()
         )
 
+    async def test_alloc_map_fills_one_device_before_the_next(
+        self, monkeypatch: pytest.MonkeyPatch, stub_sysfs: None
+    ) -> None:
+        plugin = await _make_plugin(monkeypatch, TWO_DEVICE_NEURON_LS_JSON)
+        alloc_map = await plugin.create_alloc_map()
+        assert alloc_map.allocation_strategy == AllocationStrategy.FILL
+
     async def test_device_mask_hides_cores(
         self, monkeypatch: pytest.MonkeyPatch, stub_sysfs: None
     ) -> None:
@@ -438,7 +447,7 @@ class TestContainerPlumbing:
         plugin = await _make_plugin(monkeypatch, TRN1_2XLARGE_NEURON_LS_JSON)
         assert await plugin.generate_docker_args(NO_DOCKER, self._alloc()) == {}
 
-    async def test_missing_device_node_is_skipped_not_fatal(
+    async def test_missing_device_node_fails_container_creation(
         self, monkeypatch: pytest.MonkeyPatch, stub_sysfs: None
     ) -> None:
         plugin = await _make_plugin(monkeypatch, TRN1_2XLARGE_NEURON_LS_JSON)
@@ -447,8 +456,9 @@ class TestContainerPlumbing:
             "ai.backend.accelerator.neuron.plugin._device_node_exists",
             lambda path: False,
         )
-        args = await plugin.generate_docker_args(NO_DOCKER, self._alloc("0"))
-        assert args["HostConfig"]["Devices"] == []
+        with pytest.raises(ResourceError) as excinfo:
+            await plugin.generate_docker_args(NO_DOCKER, self._alloc("0"))
+        assert "/dev/neuron0" in (excinfo.value.extra_msg or "")
 
     async def test_resource_data_maps_local_to_global_core_ids(
         self, monkeypatch: pytest.MonkeyPatch, stub_sysfs: None

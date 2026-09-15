@@ -10,18 +10,12 @@ from aiodocker import Docker
 from aiodocker.exceptions import DockerError
 
 from ai.backend.accelerator.neuron import __version__
-
-from .neuron_api import NeuronAPI, NeuronDeviceInfo, NeuronToolError, resolve_neuron_ls_path
-from .types import NeuronCoreDevice, make_core_device_id
-
-try:
-    from ai.backend.agent.resources import get_resource_spec_from_container  # type: ignore
-except ImportError:
-    from ai.backend.agent.docker.resources import get_resource_spec_from_container
-
+from ai.backend.agent.docker.resources import get_resource_spec_from_container
+from ai.backend.agent.errors.resources import ResourceError
 from ai.backend.agent.resources import (
     AbstractAllocMap,
     AbstractComputePlugin,
+    AllocationStrategy,
     DeviceAllocation,
     DeviceSlotInfo,
     DiscretePropertyAllocMap,
@@ -48,10 +42,13 @@ from ai.backend.common.types import (
 )
 from ai.backend.logging import BraceStyleAdapter
 
+from .neuron_api import NeuronAPI, NeuronDeviceInfo, NeuronToolError, resolve_neuron_ls_path
+from .types import NeuronCoreDevice, make_core_device_id
+
 PREFIX = "neuron"
 SLOT_NAME = SlotName("neuron.core")
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore
+log = BraceStyleAdapter(logging.getLogger(__name__))
 
 
 def _device_node_exists(path: Path) -> bool:
@@ -79,6 +76,7 @@ class NeuronPlugin(AbstractComputePlugin):
 
     device_mask: Sequence[DeviceId] = []
     enabled: bool = True
+    config_watch_enabled = False
 
     _neuron_ls_path: str
     _all_devices: list[NeuronCoreDevice] | None
@@ -339,6 +337,10 @@ class NeuronPlugin(AbstractComputePlugin):
                 for dev in devices
             },
             exclusive_slot_types=self.exclusive_slot_types,
+            # Fill one device before using the next, rather than the default
+            # EVENLY spread: a device split between two sessions is a device node
+            # both can see.  See "Isolation" in README.md.
+            allocation_strategy=AllocationStrategy.FILL,
         )
 
     async def get_hooks(self, distro: str, arch: str) -> Sequence[Path]:
@@ -387,10 +389,13 @@ class NeuronPlugin(AbstractComputePlugin):
         for host_index, alloc_idx in container_index_of.items():
             host_path = Path(f"/dev/neuron{host_index}")
             if not _device_node_exists(host_path):
-                # Just skip mounting without raising an error, matching the
-                # other NPU plugins' behaviour for hot-removed devices.
-                log.warning("device node {} is missing; not mounting it", host_path)
-                continue
+                # Skipping is not safe here: `container_index_of` has already
+                # numbered this device, so the NEURON_RT_VISIBLE_CORES indices below
+                # assume it is mounted.  Fail container creation instead.
+                raise ResourceError(
+                    f"Neuron device node {host_path} allocated to this container is missing; "
+                    "refusing to create the container with an incomplete device set."
+                )
             assigned_devices[host_path.as_posix()] = f"/dev/neuron{alloc_idx}"
 
         # Container-local NeuronCore indices.  The runtime numbers cores by the
@@ -542,4 +547,7 @@ class NeuronPlugin(AbstractComputePlugin):
         pass
 
     async def update_plugin_config(self, new_plugin_config: Mapping[str, Any]) -> None:
+        # Never called: `config_watch_enabled` is False.  `device_mask` and
+        # `neuron_ls_path` are read only in `init()`; changing them needs an agent
+        # restart, the same contract as the ROCm and CUDA plugins.
         pass

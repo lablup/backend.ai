@@ -92,17 +92,33 @@ reported in this version.
 
 * `HostConfig.Devices` mapping each allocated `/dev/neuron{N}` to
   `/dev/neuron{alloc_idx}`, with `CgroupPermissions: "rwm"`, renumbered so the
-  container always sees `0..k-1`. Missing device nodes are skipped rather than
-  failing container creation.
+  container always sees `0..k-1`. A missing device node fails container creation,
+  because the renumbering above already accounts for it.
 * `CapAdd: ["IPC_LOCK"]`, `IpcMode: "host"` and an unlimited `memlock` ulimit,
   which the Neuron runtime needs for its large pinned-memory registration.
 * `Env: ["NEURON_RT_VISIBLE_CORES=..."]`, holding the **container-local** core
   indices of the allocated cores.
 
-A device node carries *all* of that device's cores, so allocating a subset of
-the cores of a device still mounts the whole device node — the container can see
-sibling cores it was not allocated. `NEURON_RT_VISIBLE_CORES` is what confines
-the runtime to the allocated cores.
+## Isolation
+
+A device node carries *all* of that device's cores, and the node is the smallest
+unit Docker can hand to a container. Allocating a subset of a device's cores
+therefore mounts the whole node, and `NEURON_RT_VISIBLE_CORES` — a process
+environment variable the workload can overwrite — is the only thing confining the
+runtime to the allocated cores.
+
+Two consequences, both accepted for this release:
+
+| | |
+| --- | --- |
+| Enforcement | Core isolation is cooperative, not enforced. Two sessions holding cores of the same device can reach each other's cores. This is the same trust model as `cuda.shares`, which shares `/dev/nvidia{N}` across sessions. |
+| Accounting | `gather_container_measures` attributes device memory per *node*, so two sessions splitting one device are each reported the device total — as in the Tenstorrent and Rebellions plugins. |
+
+The allocator mitigates both by filling one device before using the next
+(`AllocationStrategy.FILL`), so a device is split only when no wholly free device
+is left. Enforced per-core isolation needs either whole-device slots
+(`neuron.device`) or manager-side support for allocating a whole device while
+charging the requested core count; neither is in this PR.
 
 ## Configuration
 
