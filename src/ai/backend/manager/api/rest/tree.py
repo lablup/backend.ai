@@ -233,6 +233,7 @@ def build_api_routes(
     )
     vfolder_handler = VFolderHandler(
         auth=processors.auth,
+        user=processors.user,
         vfolder=processors.vfolder,
         vfolder_file=processors.vfolder_file,
         vfolder_invite=processors.vfolder_invite,

@@ -14,6 +14,7 @@ from http import HTTPStatus
 from typing import TYPE_CHECKING, Final
 
 from ai.backend.common.api_handlers import APIResponse, BodyParam, QueryParam
+from ai.backend.common.contexts.user import current_user
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.common.data.entity.user import UserID
@@ -102,6 +103,8 @@ from ai.backend.common.dto.manager.vfolder.response import (
     VFolderSharedInfoDTO,
     VolumeInfoDTO,
 )
+from ai.backend.common.exception import InvalidAPIParameters as InvalidUserScope
+from ai.backend.common.exception import UnreachableError
 from ai.backend.common.types import QuotaScopeID, QuotaScopeType, VFolderID
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.dto.context import (
@@ -111,6 +114,7 @@ from ai.backend.manager.dto.context import (
 )
 from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.auth import InsufficientPrivilege
+from ai.backend.manager.errors.base.not_found import NotFoundError
 from ai.backend.manager.errors.common import Forbidden, InternalServerError
 from ai.backend.manager.errors.storage import (
     TooManyVFoldersFound,
@@ -134,9 +138,7 @@ from ai.backend.manager.models.vfolder.creators import (
     VFolderBaseCreator,
 )
 from ai.backend.manager.models.vfolder.updaters import VFolderAttributeUpdater
-from ai.backend.manager.services.auth.actions.resolve_user_scope import (
-    PublicResolveUserScopeAction,
-)
+from ai.backend.manager.services.user.actions.lookup import LookupUserAction
 from ai.backend.manager.services.vfolder.actions.base import (
     CloneVFolderAction,
     DeleteForeverVFolderAction,
@@ -199,6 +201,7 @@ from ai.backend.manager.types import OptionalState
 
 if TYPE_CHECKING:
     from ai.backend.manager.services.auth.processors import AuthProcessors
+    from ai.backend.manager.services.user.processors import UserProcessors
     from ai.backend.manager.services.vfolder.processors.file import VFolderFileProcessors
     from ai.backend.manager.services.vfolder.processors.invite import VFolderInviteProcessors
     from ai.backend.manager.services.vfolder.processors.sharing import VFolderSharingProcessors
@@ -214,12 +217,14 @@ class VFolderHandler:
         self,
         *,
         auth: AuthProcessors,
+        user: UserProcessors,
         vfolder: VFolderProcessors,
         vfolder_file: VFolderFileProcessors,
         vfolder_invite: VFolderInviteProcessors,
         vfolder_sharing: VFolderSharingProcessors,
     ) -> None:
         self._auth = auth
+        self._user = user
         self._vfolder = vfolder
         self._vfolder_file = vfolder_file
         self._vfolder_invite = vfolder_invite
@@ -340,6 +345,21 @@ class VFolderHandler:
     # 2. list_folders (GET /)
     # ------------------------------------------------------------------
 
+    async def _list_owner(self, owner_user_email: str | None) -> uuid.UUID:
+        """The user whose folders to list: the caller, or the user a superadmin names."""
+        user = current_user()
+        if user is None:
+            raise UnreachableError("authenticated user missing from request context")
+        if owner_user_email is None:
+            return user.user_id
+        if not user.is_superadmin:
+            raise InvalidUserScope("Only superadmins may have user scopes.")
+        try:
+            result = await self._user.lookup.run(LookupUserAction(email=owner_user_email))
+        except NotFoundError as e:
+            raise InvalidUserScope(str(e)) from e
+        return result.entity_id()
+
     async def list_folders(
         self,
         query: QueryParam[ListVFoldersQuery],
@@ -347,10 +367,7 @@ class VFolderHandler:
         req: RequestCtx,
     ) -> APIResponse:
         params = query.parsed
-        user_scope = await self._auth.public_resolve_user_scope.run(
-            PublicResolveUserScopeAction(owner_user_email=params.owner_user_email)
-        )
-        owner_user_uuid = user_scope.owner_uuid
+        owner_user_uuid = await self._list_owner(params.owner_user_email)
         group_id = params.group_id
         scope: EntityIdentifier = (
             ProjectID(group_id) if group_id is not None else UserID(owner_user_uuid)

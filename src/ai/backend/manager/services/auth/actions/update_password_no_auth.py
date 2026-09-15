@@ -5,17 +5,23 @@ from typing import override
 
 from aiohttp import web
 
+from ai.backend.common.data.entity.types import EntityType, GlobalEntityType
 from ai.backend.manager.actions.types import ActionOperationType
-from ai.backend.manager.services.auth.actions.base import AuthGlobalAction
+from ai.backend.manager.actions.v2.global_scope.base import BaseGlobalAction
 
 
 @dataclass(frozen=True)
-class UpdatePasswordNoAuthAction(AuthGlobalAction):
+class UpdatePasswordNoAuthAction(BaseGlobalAction):
     request: web.Request
     domain_name: str
     email: str
     current_password: str
     new_password: str
+
+    @override
+    @classmethod
+    def entity_type(cls) -> EntityType:
+        return GlobalEntityType()
 
     @override
     @classmethod
