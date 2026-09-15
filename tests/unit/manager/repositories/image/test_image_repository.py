@@ -980,7 +980,7 @@ class TestImageRepositoryOwnership:
         user: UserRow,
     ) -> None:
         owned = await image_repository.validate_image_ownership(
-            forgotten_image_id, user.uuid, status_filter=list(ImageStatus.restorable())
+            forgotten_image_id, user.uuid, ImageStatus.restorable()
         )
 
         assert owned is True

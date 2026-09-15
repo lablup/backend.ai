@@ -1,4 +1,5 @@
 import logging
+from collections.abc import Collection
 
 from ai.backend.common.contexts.user import current_user
 from ai.backend.common.data.entity.user import UserID
@@ -129,10 +130,7 @@ class ImageService:
         self._config_provider = config_provider
 
     async def _validate_image_ownership(
-        self,
-        image_id: ImageID,
-        user_id: UserID,
-        status_filter: list[ImageStatus] | None = None,
+        self, image_id: ImageID, user_id: UserID, statuses: Collection[ImageStatus]
     ) -> None:
         """
         Validates that user owns the image.
@@ -141,9 +139,7 @@ class ImageService:
         Note: Non-customized images are not owned by anyone,
         so ownership validation fails for them.
         """
-        if not await self._image_repository.validate_image_ownership(
-            image_id, user_id, status_filter
-        ):
+        if not await self._image_repository.validate_image_ownership(image_id, user_id, statuses):
             raise ImageAccessForbiddenError()
 
     async def get_images_by_canonicals(
@@ -228,7 +224,9 @@ class ImageService:
             image_data = await self._image_repository.resolve_image(
                 action.reference, action.architecture
             )
-            await self._validate_image_ownership(image_data.id, UserID(user.user_id))
+            await self._validate_image_ownership(
+                image_data.id, UserID(user.user_id), [ImageStatus.ALIVE]
+            )
         data = await self._image_repository.soft_delete_image(action.reference, action.architecture)
         return ForgetImageActionResult(image=data)
 
@@ -239,7 +237,9 @@ class ImageService:
         user = current_user()
         is_superadmin = user is not None and user.role == UserRole.SUPERADMIN
         if not is_superadmin and user is not None:
-            await self._validate_image_ownership(action.image_id, UserID(user.user_id))
+            await self._validate_image_ownership(
+                action.image_id, UserID(user.user_id), [ImageStatus.ALIVE]
+            )
         data = await self._image_repository.soft_delete_image_by_id(action.image_id)
         return ForgetImageByIdActionResult(image=data)
 
@@ -251,7 +251,7 @@ class ImageService:
         is_superadmin = user is not None and user.role == UserRole.SUPERADMIN
         if not is_superadmin and user is not None:
             await self._validate_image_ownership(
-                action.image_id, UserID(user.user_id), status_filter=list(ImageStatus.restorable())
+                action.image_id, UserID(user.user_id), ImageStatus.restorable()
             )
         data = await self._image_repository.restore_image_by_id(action.image_id)
         return RestoreImageByIdActionResult(image=data)
@@ -304,7 +304,9 @@ class ImageService:
         user = current_user()
         is_superadmin = user is not None and user.role == UserRole.SUPERADMIN
         if not is_superadmin and user is not None:
-            await self._validate_image_ownership(action.image_id, UserID(user.user_id))
+            await self._validate_image_ownership(
+                action.image_id, UserID(user.user_id), [ImageStatus.ALIVE]
+            )
         image_data = await self._image_repository.delete_image_with_aliases(action.image_id)
         return PurgeImageByIdActionResult(image=image_data)
 
@@ -315,7 +317,9 @@ class ImageService:
         user = current_user()
         is_superadmin = user is not None and user.role == UserRole.SUPERADMIN
         if not is_superadmin and user is not None:
-            await self._validate_image_ownership(action.image_id, UserID(user.user_id))
+            await self._validate_image_ownership(
+                action.image_id, UserID(user.user_id), [ImageStatus.ALIVE]
+            )
         image_data = await self._image_repository.untag_image_from_registry(action.image_id)
         return UntagImageFromRegistryActionResult(image=image_data)
 

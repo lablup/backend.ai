@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import Mapping, Sequence
+from collections.abc import Collection, Mapping, Sequence
 
 from ai.backend.common.bgtask.reporter import ProgressReporter
 from ai.backend.common.clients.valkey_client.valkey_image.client import ValkeyImageClient
@@ -232,17 +232,14 @@ class ImageRepository:
 
     @image_repository_resilience.apply()
     async def validate_image_ownership(
-        self,
-        image_id: ImageID,
-        user_id: UserID,
-        status_filter: list[ImageStatus] | None = None,
+        self, image_id: ImageID, user_id: UserID, statuses: Collection[ImageStatus]
     ) -> bool:
         """
         Validates that user owns the image.
         Returns True if user owns the image, False otherwise.
         Raises ImageNotFound if image doesn't exist.
         """
-        return await self._db_source.validate_image_ownership(image_id, user_id, status_filter)
+        return await self._db_source.validate_image_ownership(image_id, user_id, statuses)
 
     @image_repository_resilience.apply()
     async def add_image_alias(
