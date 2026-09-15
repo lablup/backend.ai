@@ -15,6 +15,7 @@ import click
 from ai.backend.client.cli.v2.helpers import (
     create_v2_registry,
     load_v2_config,
+    nullable_option,
     print_result,
 )
 
@@ -92,23 +93,49 @@ def create(
 @click.option("--metric-name", default=None, type=str, help="Updated Prometheus metric name.")
 @click.option("--query-template", default=None, type=str, help="Updated PromQL template.")
 @click.option("--time-window", default=None, type=str, help="Updated time window.")
+@click.option(
+    "--set-null-time-window",
+    is_flag=True,
+    default=False,
+    help="Clear the time window. Mutually exclusive with --time-window.",
+)
 @click.option("--description", default=None, type=str, help="Updated description.")
+@click.option(
+    "--set-null-description",
+    is_flag=True,
+    default=False,
+    help="Clear the description. Mutually exclusive with --description.",
+)
 @click.option("--rank", default=None, type=int, help="Updated sort rank.")
 @click.option("--category-id", default=None, type=click.UUID, help="Updated category UUID.")
+@click.option(
+    "--set-null-category-id",
+    is_flag=True,
+    default=False,
+    help="Detach the category. Mutually exclusive with --category-id.",
+)
 def update(
     preset_id: UUID,
     name: str | None,
     metric_name: str | None,
     query_template: str | None,
     time_window: str | None,
+    set_null_time_window: bool,
     description: str | None,
+    set_null_description: bool,
     rank: int | None,
     category_id: UUID | None,
+    set_null_category_id: bool,
 ) -> None:
     """Update a prometheus query definition (superadmin only)."""
     from ai.backend.common.dto.manager.v2.prometheus_query_preset.request import (
         ModifyQueryDefinitionInput,
     )
+    from ai.backend.common.tristate.unset import UNSET
+
+    time_window_value = nullable_option(time_window, set_null_time_window, option="time-window")
+    description_value = nullable_option(description, set_null_description, option="description")
+    category_id_value = nullable_option(category_id, set_null_category_id, option="category-id")
 
     async def _run() -> None:
         registry = await create_v2_registry(load_v2_config())
@@ -116,13 +143,13 @@ def update(
             result = await registry.prometheus_query_preset.update(
                 preset_id,
                 ModifyQueryDefinitionInput(
-                    name=name,
-                    metric_name=metric_name,
-                    query_template=query_template,
-                    time_window=time_window,
-                    description=description,
-                    rank=rank,
-                    category_id=category_id,
+                    name=name if name is not None else UNSET,
+                    metric_name=metric_name if metric_name is not None else UNSET,
+                    query_template=query_template if query_template is not None else UNSET,
+                    time_window=time_window_value,
+                    description=description_value,
+                    rank=rank if rank is not None else UNSET,
+                    category_id=category_id_value,
                 ),
             )
             print_result(result)
