@@ -11,16 +11,14 @@ from sqlalchemy.orm import joinedload, load_only, noload, selectinload
 from sqlalchemy.orm.strategy_options import _AbstractLoad
 
 from ai.backend.common.data.entity.session import SessionID
-from ai.backend.common.docker import ImageRef
 from ai.backend.common.types import (
     AccessKey,
     AgentId,
-    ImageAlias,
     KernelId,
     ResourceSlot,
     SessionId,
 )
-from ai.backend.manager.data.image.types import ImageIdentifier, ImageStatus
+from ai.backend.manager.data.image.types import ImageData, ImageStatus
 from ai.backend.manager.data.kernel.types import KernelListResult
 from ai.backend.manager.data.resource_slot.types import ResourceAllocationAggregate
 from ai.backend.manager.data.session.types import (
@@ -39,6 +37,9 @@ from ai.backend.manager.errors.kernel import (
 )
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.image import ImageRow
+from ai.backend.manager.models.image.conditions import ImageConditions
+from ai.backend.manager.models.image.orders import ImageOrders
+from ai.backend.manager.models.image.searchers import ImageSearcher
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.project import groups
@@ -54,13 +55,14 @@ from ai.backend.manager.models.session import (
 )
 from ai.backend.manager.models.session.updaters import SessionUpdater
 from ai.backend.manager.models.session_template import SessionTemplateRow
-from ai.backend.manager.models.specs.pagination import NoPagination
+from ai.backend.manager.models.specs.pagination import NoPagination, OffsetPagination
 from ai.backend.manager.models.user import UserRole, UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
     execute_batch_querier,
 )
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.ops.v2.write import V2WriteOps
 from ai.backend.manager.repositories.session.dependency_graph import find_dependency_sessions
 from ai.backend.manager.utils import query_userinfo
@@ -68,9 +70,11 @@ from ai.backend.manager.utils import query_userinfo
 
 class SessionDBSource:
     _db: ExtendedAsyncSAEngine
+    _ops_provider: V2DBOpsProvider
 
-    def __init__(self, db: ExtendedAsyncSAEngine) -> None:
+    def __init__(self, db: ExtendedAsyncSAEngine, ops_provider: V2DBOpsProvider) -> None:
         self._db = db
+        self._ops_provider = ops_provider
 
     async def resolve_session_id(
         self,
@@ -266,29 +270,44 @@ class SessionDBSource:
             )
             return cast(ContainerRegistryRow | None, await db_session.scalar(query))
 
-    async def resolve_image(
-        self,
-        image_identifiers: list[ImageAlias | ImageRef | ImageIdentifier],
-        alive_only: bool = True,
-    ) -> ImageRow:
-        """Resolve an image from the given identifiers.
-
-        When ``alive_only`` is True (default), only images with the ALIVE status
-        are considered.  Set it to False to also include DELETED images, which is
-        useful when the caller needs to reference images that are no longer active
-        (e.g., committing a session whose base image has been deleted).
-        """
-        async with self._db.begin_readonly_session_read_committed() as db_sess:
-            if alive_only:
-                return await ImageRow.resolve(db_sess, image_identifiers)
-            return await ImageRow.resolve(
-                db_sess,
-                image_identifiers,
-                filter_by_statuses=[
-                    ImageStatus.ALIVE,
-                    ImageStatus.DELETED,
-                ],
+    async def resolve_image(self, reference: str, architecture: str) -> ImageData:
+        async with self._ops_provider.read_ops() as r:
+            result = await r.search_in_global(
+                ImageSearcher(
+                    pagination=OffsetPagination(limit=1),
+                    conditions=[
+                        ImageConditions.by_canonical_and_architecture_or_alias(
+                            reference, architecture
+                        ),
+                        ImageConditions.by_statuses([ImageStatus.ALIVE]),
+                    ],
+                    orders=ImageOrders.canonical_match_then_alive_then_oldest(
+                        reference, architecture
+                    ),
+                )
             )
+        if not result.items:
+            raise ImageNotFound(f"Unknown image reference: {reference} ({architecture})")
+        return result.items[0]
+
+    async def resolve_image_by_canonical(
+        self, canonical: str, architecture: str, alive_only: bool = True
+    ) -> ImageData:
+        statuses = [ImageStatus.ALIVE] if alive_only else [ImageStatus.ALIVE, ImageStatus.DELETED]
+        async with self._ops_provider.read_ops() as r:
+            result = await r.search_in_global(
+                ImageSearcher(
+                    pagination=OffsetPagination(limit=1),
+                    conditions=[
+                        ImageConditions.by_canonical_and_architecture(canonical, architecture),
+                        ImageConditions.by_statuses(statuses),
+                    ],
+                    orders=ImageOrders.alive_then_oldest(),
+                )
+            )
+        if not result.items:
+            raise ImageNotFound(f"Unknown image: {canonical} ({architecture})")
+        return result.items[0]
 
     async def get_customized_image_count(self, user_id: uuid.UUID) -> int:
         """How many live customized images were committed for the user."""

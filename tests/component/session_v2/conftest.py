@@ -151,7 +151,7 @@ def rbac_permission_repo(
 def session_repository(
     database_engine: ExtendedAsyncSAEngine,
 ) -> SessionRepository:
-    return SessionRepository(database_engine)
+    return SessionRepository(database_engine, V2DBOpsProvider(database_engine))
 
 
 @pytest.fixture()
@@ -694,7 +694,7 @@ async def compute_session_processors(
         event_hub=AsyncMock(),
         error_monitor=error_monitor,
         idle_checker_host=AsyncMock(),
-        session_repository=SessionRepository(database_engine),
+        session_repository=SessionRepository(database_engine, V2DBOpsProvider(database_engine)),
         scheduler_repository=scheduler_repository,
         scheduling_controller=scheduling_controller,
         appproxy_client_pool=AsyncMock(),

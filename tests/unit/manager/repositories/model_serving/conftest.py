@@ -249,12 +249,6 @@ def patch_vfolder_get(mocker: MockerFixture) -> AsyncMock:
 
 
 @pytest.fixture
-def patch_image_resolve(mocker: MockerFixture) -> AsyncMock:
-    """Patch ImageRow.resolve method using mocker."""
-    return mocker.patch("ai.backend.manager.models.image.ImageRow.resolve", new_callable=AsyncMock)
-
-
-@pytest.fixture
 def patch_session_get(mocker: MockerFixture) -> AsyncMock:
     """Patch SessionRow.get_session method using mocker."""
     return mocker.patch(
