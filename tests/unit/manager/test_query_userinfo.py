@@ -55,6 +55,7 @@ from ai.backend.manager.models.virtual_entity.entity_membership_cap import (
 from ai.backend.manager.models.virtual_entity.entity_membership_field import (
     EntityMembershipFieldRow,
 )
+from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
 from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
 from ai.backend.manager.secret.types import SecretValue
 from ai.backend.manager.utils import query_userinfo, query_userinfo_from_session
@@ -75,6 +76,7 @@ ALL_ROWS: list[TableOrORM] = [
     EntityMembershipRow,
     EntityMembershipCapRow,
     EntityMembershipFieldRow,
+    ScopeBindingRow,
     EntityLabelRow,
     ContainerRegistryRow,
     ImageRow,
@@ -229,12 +231,16 @@ class TestQueryUserinfo:
                 ),
             ])
             await sess.flush()
-            sess.add(
+            sess.add_all([
                 EntityMembershipRow(
                     virtual_entity_id=project_ve_id,
                     member_entity_id=user_ve_id,
-                )
-            )
+                ),
+                ScopeBindingRow(
+                    virtual_entity_id=project_ve_id,
+                    scope_entity_id=project_ve_id,
+                ),
+            ])
             await sess.commit()
 
         yield SeedData(
@@ -624,12 +630,16 @@ class TestQueryUserinfoFromSession:
                 ),
             ])
             await sess.flush()
-            sess.add(
+            sess.add_all([
                 EntityMembershipRow(
                     virtual_entity_id=project_ve_id,
                     member_entity_id=user_ve_id,
-                )
-            )
+                ),
+                ScopeBindingRow(
+                    virtual_entity_id=project_ve_id,
+                    scope_entity_id=project_ve_id,
+                ),
+            ])
             await sess.commit()
 
         yield SeedData(
