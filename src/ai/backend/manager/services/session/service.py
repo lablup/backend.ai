@@ -1583,6 +1583,7 @@ class SessionService:
         dependencies = tuple(SessionID(dep_id) for dep_id in (action.scheduling.dependencies or ()))
         callback_url = yarl.URL(action.callback_url) if action.callback_url else None
 
+        domain_id = await self._scheduler_repository.get_domain_id_by_name(DomainName(domain_name))
         if action.resource.resource_group_id is not None:
             resource_group_id = action.resource.resource_group_id
             resource_group_name = await self._scheduler_repository.get_resource_group_name_by_id(
@@ -1595,14 +1596,13 @@ class SessionService:
             )
         else:
             resource_group_id = await self._scheduler_repository.pick_default_resource_group(
-                access_key=access_key,
-                domain_name=domain_name,
+                domain_id=domain_id,
                 project_id=ProjectID(action.group_id),
+                user_id=UserID(user_id),
             )
             resource_group_name = await self._scheduler_repository.get_resource_group_name_by_id(
                 resource_group_id
             )
-        domain_id = await self._scheduler_repository.get_domain_id_by_name(DomainName(domain_name))
         kernel_groups = await self._resolve_kernel_groups(
             cluster_size=action.resource.cluster_size,
             preopen_ports=preopen_ports,

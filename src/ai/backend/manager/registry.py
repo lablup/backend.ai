@@ -50,6 +50,7 @@ from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.resource_group import ResourceGroupName
 from ai.backend.common.data.entity.resource_slot import ResourceSlotName
 from ai.backend.common.data.entity.session import SessionID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.defs.session import JOB_PRIORITY_DEFAULT, SESSION_PRIORITY_DEFAULT
 from ai.backend.common.docker import ImageRef, LabelName
@@ -1159,9 +1160,9 @@ class AgentRegistry:
             )
         else:
             resource_group_id = await self._scheduler_repository.pick_default_resource_group(
-                access_key=access_key,
-                domain_name=user_scope.domain_name,
+                domain_id=domain_id,
                 project_id=ProjectID(user_scope.group_id),
+                user_id=UserID(user_scope.user_uuid),
             )
             resource_group_name = await self._scheduler_repository.get_resource_group_name_by_id(
                 resource_group_id
