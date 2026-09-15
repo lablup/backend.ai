@@ -93,7 +93,7 @@ class PrometheusClient:
         )
 
         # max/rate_max and avg/rate_avg are split: gauge metrics can be aggregated
-        # directly, but cumulative counters (cpu_util/net_rx/net_tx) need rate() first.
+        # directly, but cumulative counters (cpu_util/net_rx/net_tx) need irate() first.
         instant_res = await self._query_instant(queries.instant)
         rate_current_res = await self._query_instant(queries.rate_current)
         max_res = await self._query_instant(queries.max)

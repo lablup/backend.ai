@@ -144,16 +144,28 @@ class TestGetContainerLiveStatQueries:
         assert "rate(" not in renderer.render(result.max)
         assert "rate(" not in renderer.render(result.avg)
 
+    def test_rate_current_reads_instant_rate(self, renderer: PromQLTemplateRenderer) -> None:
+        builder = ContainerLiveStatQueryBuilder("1m")
+        kid = KernelId(UUID("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"))
+
+        result = builder.get_container_live_stat_queries([kid])
+
+        assert renderer.render(result.rate_current) == (
+            "sum by (container_metric_name,kernel_id)(irate(backendai_container_utilization"
+            '{kernel_id=~"aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",'
+            'container_metric_name=~"cpu_util|net_rx|net_tx",value_type="current"}[1m]))'
+        )
+
     def test_rate_window_queries_read_rate_series(self, renderer: PromQLTemplateRenderer) -> None:
         builder = ContainerLiveStatQueryBuilder("1m")
         kid = KernelId(UUID("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"))
 
         result = builder.get_container_live_stat_queries([kid])
 
-        assert "max_over_time((sum by (container_metric_name,kernel_id)(rate(" in renderer.render(
+        assert "max_over_time((sum by (container_metric_name,kernel_id)(irate(" in renderer.render(
             result.rate_max
         )
-        assert "avg_over_time((sum by (container_metric_name,kernel_id)(rate(" in renderer.render(
+        assert "avg_over_time((sum by (container_metric_name,kernel_id)(irate(" in renderer.render(
             result.rate_avg
         )
         assert 'container_metric_name=~"cpu_util|net_rx|net_tx"' in renderer.render(result.rate_max)

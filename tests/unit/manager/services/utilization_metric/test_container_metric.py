@@ -884,7 +884,7 @@ class TestContainerLiveStatQueries:
         assert "label_replace" not in rendered
         assert "max_over_time" in rendered
         assert "sum by (container_metric_name,kernel_id)" in rendered
-        assert "rate(" in rendered
+        assert "irate(" in rendered
         assert 'container_metric_name=~"cpu_util|net_rx|net_tx"' in rendered
         assert 'value_type="current"' in rendered
 
@@ -908,7 +908,7 @@ class TestContainerLiveStatQueries:
         assert "label_replace" not in rendered
         assert "avg_over_time" in rendered
         assert "sum by (container_metric_name,kernel_id)" in rendered
-        assert "rate(" in rendered
+        assert "irate(" in rendered
         assert 'container_metric_name=~"cpu_util|net_rx|net_tx"' in rendered
         assert 'value_type="current"' in rendered
 

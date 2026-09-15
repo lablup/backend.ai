@@ -26,6 +26,13 @@ _RATE_TEMPLATE: Final[str] = (
     + CONTAINER_UTILIZATION_METRIC_NAME
     + "{${{labels}}}[${{window}}]))"
 )
+# Live stats want the latest value, so counters take the rate of the last two
+# samples in the window rather than the average over it.
+_IRATE_TEMPLATE: Final[str] = (
+    "sum by (${{group_by}})(irate("
+    + CONTAINER_UTILIZATION_METRIC_NAME
+    + "{${{labels}}}[${{window}}]))"
+)
 _DIFF_TEMPLATE: Final[str] = (
     "sum by (${{group_by}})(rate("
     + CONTAINER_UTILIZATION_METRIC_NAME
@@ -33,8 +40,8 @@ _DIFF_TEMPLATE: Final[str] = (
 )
 _LIVE_STAT_MAX_TEMPLATE: Final[str] = "max_over_time((" + _GAUGE_TEMPLATE + ")[${{window}}:])"
 _LIVE_STAT_AVG_TEMPLATE: Final[str] = "avg_over_time((" + _GAUGE_TEMPLATE + ")[${{window}}:])"
-_LIVE_STAT_RATE_MAX_TEMPLATE: Final[str] = "max_over_time((" + _RATE_TEMPLATE + ")[${{window}}:])"
-_LIVE_STAT_RATE_AVG_TEMPLATE: Final[str] = "avg_over_time((" + _RATE_TEMPLATE + ")[${{window}}:])"
+_LIVE_STAT_RATE_MAX_TEMPLATE: Final[str] = "max_over_time((" + _IRATE_TEMPLATE + ")[${{window}}:])"
+_LIVE_STAT_RATE_AVG_TEMPLATE: Final[str] = "avg_over_time((" + _IRATE_TEMPLATE + ")[${{window}}:])"
 _INSTANT_GROUP_BY: Final[frozenset[str]] = frozenset({
     "kernel_id",
     "container_metric_name",
@@ -157,7 +164,7 @@ class ContainerLiveStatQueryBuilder:
                 group_by=_INSTANT_GROUP_BY,
             ),
             rate_current=MetricPreset(
-                template=_RATE_TEMPLATE,
+                template=_IRATE_TEMPLATE,
                 labels=rate_labels,
                 group_by=_AGGREGATED_GROUP_BY,
                 window=self._timewindow,
