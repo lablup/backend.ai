@@ -21,7 +21,6 @@ from ai.backend.manager.models.resource_group import (
     ResourceGroupForProjectRow,
     ResourceGroupOpts,
     ResourceGroupRow,
-    query_allowed_sgroups,
 )
 from ai.backend.manager.models.resource_group.searchers import AllowedResourceGroupsSearch
 from ai.backend.manager.models.resource_policy import (
@@ -180,7 +179,9 @@ class TestAllowedResourceGroupsSearch:
             sess.add(row)
         return row
 
-    async def test_matches_the_legacy_query(self, db: ExtendedAsyncSAEngine, owner: _Owner) -> None:
+    async def test_active_groups_of_every_scope_in_name_order(
+        self, db: ExtendedAsyncSAEngine, owner: _Owner
+    ) -> None:
         by_domain = await self._add_resource_group(db, "rg-c-domain")
         by_project = await self._add_resource_group(db, "rg-a-project")
         by_keypair = await self._add_resource_group(db, "rg-b-keypair")
@@ -198,10 +199,6 @@ class TestAllowedResourceGroupsSearch:
                 ),
             ])
 
-        async with db.begin_readonly() as conn:
-            legacy = await query_allowed_sgroups(
-                conn, owner.domain_name, owner.project_id, owner.access_key
-            )
         search = AllowedResourceGroupsSearch(
             domain_id=owner.domain_id, project_ids=[owner.project_id], user_id=owner.user_id
         )
@@ -209,4 +206,3 @@ class TestAllowedResourceGroupsSearch:
             result = await r.search_with_scopes(search.operation_scopes(), search.searcher())
 
         assert [rg.name for rg in result.items] == ["rg-a-project", "rg-b-keypair", "rg-c-domain"]
-        assert [rg.name for rg in result.items] == [row.name for row in legacy]

@@ -58,6 +58,7 @@ from ai.backend.manager.data.image.types import ImageIdentifier
 from ai.backend.manager.data.kernel.types import KernelListResult, KernelStatus
 from ai.backend.manager.data.network.types import NetworkData
 from ai.backend.manager.data.resource.types import SlotTypeInfo, UserEnqueuePolicy
+from ai.backend.manager.data.resource_group.types import ResourceGroupData
 from ai.backend.manager.data.session.creation import (
     ContainerUserInfo,
     ImageInfo,
@@ -2260,6 +2261,21 @@ class ScheduleDBSource:
         async with self._reconcile_ops.read_ops() as r:
             result = await r.search_with_scopes(search.operation_scopes(), search.searcher())
         return frozenset(rg.id for rg in result.items)
+
+    async def query_allowed_resource_groups(
+        self,
+        *,
+        domain_id: DomainID,
+        project_ids: Sequence[ProjectID],
+        user_id: UserID,
+    ) -> list[ResourceGroupData]:
+        """Return the active resource groups the user may schedule on, in name order."""
+        search = AllowedResourceGroupsSearch(
+            domain_id=domain_id, project_ids=project_ids, user_id=user_id
+        )
+        async with self._reconcile_ops.read_ops() as r:
+            result = await r.search_with_scopes(search.operation_scopes(), search.searcher())
+        return result.items
 
     async def get_resource_group_id_by_name(self, name: ResourceGroupName) -> ResourceGroupID:
         async with self._db.begin_readonly_session_read_committed() as db_sess:

@@ -23,7 +23,9 @@ from ai.backend.common.clients.valkey_client.valkey_image.client import ValkeyIm
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
 from ai.backend.common.clients.valkey_client.valkey_schedule.client import ValkeyScheduleClient
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
+from ai.backend.common.data.entity.domain import DomainName
 from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.exception import (
     BackendAIError,
     ErrorCode,
@@ -38,6 +40,9 @@ from ai.backend.manager.services.keypair_resource_policy.actions.lookup import (
     LookupKeypairResourcePolicyAction,
 )
 from ai.backend.manager.services.processors import Processors
+from ai.backend.manager.services.user.actions.lookup_keypair_owner import (
+    LookupKeypairOwnerByAccessKeyAction,
+)
 from ai.backend.manager.services.user_resource_policy.actions.lookup import (
     LookupUserResourcePolicyAction,
 )
@@ -137,7 +142,6 @@ from ai.backend.manager.models.rbac import ProjectScope, ScopeType, SystemScope
 from ai.backend.manager.models.resource_group.row import (
     ResourceGroupRow,
     and_names,
-    query_allowed_sgroups,
 )
 from ai.backend.manager.models.vfolder import ensure_quota_scope_accessible_by_user
 from ai.backend.manager.repositories.ops.repository import OpsRepository
@@ -2303,11 +2307,16 @@ class Query(graphene.ObjectType):  # type: ignore[misc]
     ) -> Sequence[ScalingGroup]:
         ctx: GraphQueryContext = info.context
         domain_name = domain_name or ctx.user["domain_name"]
-        async with ctx.db.begin() as db_conn:
-            sgroup_rows = await query_allowed_sgroups(
-                db_conn, domain_name, ProjectID(project_id), access_key
-            )
-        conditions = [and_names([sgroup.name for sgroup in sgroup_rows])]
+        owner = await ctx.processors.user.lookup_keypair_owner.run(
+            LookupKeypairOwnerByAccessKeyAction(access_key=access_key)
+        )
+        domain_id = await ctx.scheduler_repository.get_domain_id_by_name(DomainName(domain_name))
+        allowed = await ctx.scheduler_repository.query_allowed_resource_groups(
+            domain_id=domain_id,
+            project_ids=[ProjectID(project_id)],
+            user_id=UserID(owner.owner_entity_id),
+        )
+        conditions = [and_names([rg.name for rg in allowed])]
         sgroup_orm_rows = await ResourceGroupRow.list_by_condition(conditions, db=ctx.db)
         return [ScalingGroup.from_orm_row(row).masked for row in sgroup_orm_rows]
 
