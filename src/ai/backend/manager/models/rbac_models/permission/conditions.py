@@ -37,37 +37,43 @@ class ScopedPermissionConditions:
 
     @staticmethod
     def by_cursor_forward(cursor_id: str) -> QueryCondition:
-        """Cursor condition for forward pagination (after cursor).
-
-        Uses subquery to look up created_at of the cursor row (default order: created_at DESC).
-        """
+        """Rows after the cursor row in ``(created_at DESC, id ASC)`` order."""
         cursor_uuid = uuid.UUID(cursor_id)
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            subquery = (
+            cursor_created_at = (
                 sa.select(PermissionRow.created_at)
                 .where(PermissionRow.id == cursor_uuid)
                 .scalar_subquery()
             )
-            return PermissionRow.created_at < subquery
+            return sa.or_(
+                PermissionRow.created_at < cursor_created_at,
+                sa.and_(
+                    PermissionRow.created_at == cursor_created_at,
+                    PermissionRow.id > cursor_uuid,
+                ),
+            )
 
         return inner
 
     @staticmethod
     def by_cursor_backward(cursor_id: str) -> QueryCondition:
-        """Cursor condition for backward pagination (before cursor).
-
-        Uses subquery to look up created_at of the cursor row (default order: created_at DESC).
-        """
+        """Rows before the cursor row in ``(created_at DESC, id ASC)`` order."""
         cursor_uuid = uuid.UUID(cursor_id)
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            subquery = (
+            cursor_created_at = (
                 sa.select(PermissionRow.created_at)
                 .where(PermissionRow.id == cursor_uuid)
                 .scalar_subquery()
             )
-            return PermissionRow.created_at > subquery
+            return sa.or_(
+                PermissionRow.created_at > cursor_created_at,
+                sa.and_(
+                    PermissionRow.created_at == cursor_created_at,
+                    PermissionRow.id < cursor_uuid,
+                ),
+            )
 
         return inner
 

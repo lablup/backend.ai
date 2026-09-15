@@ -82,34 +82,42 @@ class EntityShareConditions:
 
     @staticmethod
     def by_cursor_forward(cursor_id: str) -> QueryCondition:
-        """Cursor condition for forward pagination (after cursor).
-
-        Compares against the cursor row's ``created_at``, which is what the page is
-        ordered by.
-        """
+        """Rows after the cursor row in ``(created_at ASC, id ASC)`` order."""
         cursor_uuid = uuid.UUID(cursor_id)
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            subquery = (
+            cursor_created_at = (
                 sa.select(EntityShareRow.created_at)
                 .where(EntityShareRow.id == cursor_uuid)
                 .scalar_subquery()
             )
-            return EntityShareRow.created_at > subquery
+            return sa.or_(
+                EntityShareRow.created_at > cursor_created_at,
+                sa.and_(
+                    EntityShareRow.created_at == cursor_created_at,
+                    EntityShareRow.id > cursor_uuid,
+                ),
+            )
 
         return inner
 
     @staticmethod
     def by_cursor_backward(cursor_id: str) -> QueryCondition:
-        """Cursor condition for backward pagination (before cursor)."""
+        """Rows before the cursor row in ``(created_at ASC, id ASC)`` order."""
         cursor_uuid = uuid.UUID(cursor_id)
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            subquery = (
+            cursor_created_at = (
                 sa.select(EntityShareRow.created_at)
                 .where(EntityShareRow.id == cursor_uuid)
                 .scalar_subquery()
             )
-            return EntityShareRow.created_at < subquery
+            return sa.or_(
+                EntityShareRow.created_at < cursor_created_at,
+                sa.and_(
+                    EntityShareRow.created_at == cursor_created_at,
+                    EntityShareRow.id < cursor_uuid,
+                ),
+            )
 
         return inner

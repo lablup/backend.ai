@@ -149,36 +149,42 @@ class RouteConditions:
 
     @staticmethod
     def by_cursor_forward(cursor_id: str) -> QueryCondition:
-        """Cursor condition for forward pagination (after cursor).
-
-        Uses subquery to get created_at of the cursor row and compare.
-        """
+        """Rows after the cursor row in ``(created_at DESC, id ASC)`` order."""
         cursor_uuid = uuid.UUID(cursor_id)
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            subquery = (
+            cursor_created_at = (
                 sa.select(RoutingRow.created_at)
                 .where(RoutingRow.id == cursor_uuid)
                 .scalar_subquery()
             )
-            return RoutingRow.created_at < subquery
+            return sa.or_(
+                RoutingRow.created_at < cursor_created_at,
+                sa.and_(
+                    RoutingRow.created_at == cursor_created_at,
+                    RoutingRow.id > cursor_uuid,
+                ),
+            )
 
         return inner
 
     @staticmethod
     def by_cursor_backward(cursor_id: str) -> QueryCondition:
-        """Cursor condition for backward pagination (before cursor).
-
-        Uses subquery to get created_at of the cursor row and compare.
-        """
+        """Rows before the cursor row in ``(created_at DESC, id ASC)`` order."""
         cursor_uuid = uuid.UUID(cursor_id)
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            subquery = (
+            cursor_created_at = (
                 sa.select(RoutingRow.created_at)
                 .where(RoutingRow.id == cursor_uuid)
                 .scalar_subquery()
             )
-            return RoutingRow.created_at > subquery
+            return sa.or_(
+                RoutingRow.created_at > cursor_created_at,
+                sa.and_(
+                    RoutingRow.created_at == cursor_created_at,
+                    RoutingRow.id < cursor_uuid,
+                ),
+            )
 
         return inner

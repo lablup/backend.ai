@@ -117,37 +117,43 @@ class NotificationChannelConditions:
 
     @staticmethod
     def by_cursor_forward(cursor_id: str) -> QueryCondition:
-        """Cursor condition for forward pagination (after cursor).
-
-        Uses subquery to get created_at of the cursor row and compare.
-        """
+        """Rows after the cursor row in ``(created_at DESC, id ASC)`` order."""
         cursor_uuid = uuid.UUID(cursor_id)
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            subquery = (
+            cursor_created_at = (
                 sa.select(NotificationChannelRow.created_at)
                 .where(NotificationChannelRow.id == cursor_uuid)
                 .scalar_subquery()
             )
-            return NotificationChannelRow.created_at < subquery
+            return sa.or_(
+                NotificationChannelRow.created_at < cursor_created_at,
+                sa.and_(
+                    NotificationChannelRow.created_at == cursor_created_at,
+                    NotificationChannelRow.id > cursor_uuid,
+                ),
+            )
 
         return inner
 
     @staticmethod
     def by_cursor_backward(cursor_id: str) -> QueryCondition:
-        """Cursor condition for backward pagination (before cursor).
-
-        Uses subquery to get created_at of the cursor row and compare.
-        """
+        """Rows before the cursor row in ``(created_at DESC, id ASC)`` order."""
         cursor_uuid = uuid.UUID(cursor_id)
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            subquery = (
+            cursor_created_at = (
                 sa.select(NotificationChannelRow.created_at)
                 .where(NotificationChannelRow.id == cursor_uuid)
                 .scalar_subquery()
             )
-            return NotificationChannelRow.created_at > subquery
+            return sa.or_(
+                NotificationChannelRow.created_at > cursor_created_at,
+                sa.and_(
+                    NotificationChannelRow.created_at == cursor_created_at,
+                    NotificationChannelRow.id < cursor_uuid,
+                ),
+            )
 
         return inner
 
@@ -255,36 +261,42 @@ class NotificationRuleConditions:
 
     @staticmethod
     def by_cursor_forward(cursor_id: str) -> QueryCondition:
-        """Cursor condition for forward pagination (after cursor).
-
-        Uses subquery to get created_at of the cursor row and compare.
-        """
+        """Rows after the cursor row in ``(created_at DESC, id ASC)`` order."""
         cursor_uuid = uuid.UUID(cursor_id)
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            subquery = (
+            cursor_created_at = (
                 sa.select(NotificationRuleRow.created_at)
                 .where(NotificationRuleRow.id == cursor_uuid)
                 .scalar_subquery()
             )
-            return NotificationRuleRow.created_at < subquery
+            return sa.or_(
+                NotificationRuleRow.created_at < cursor_created_at,
+                sa.and_(
+                    NotificationRuleRow.created_at == cursor_created_at,
+                    NotificationRuleRow.id > cursor_uuid,
+                ),
+            )
 
         return inner
 
     @staticmethod
     def by_cursor_backward(cursor_id: str) -> QueryCondition:
-        """Cursor condition for backward pagination (before cursor).
-
-        Uses subquery to get created_at of the cursor row and compare.
-        """
+        """Rows before the cursor row in ``(created_at DESC, id ASC)`` order."""
         cursor_uuid = uuid.UUID(cursor_id)
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            subquery = (
+            cursor_created_at = (
                 sa.select(NotificationRuleRow.created_at)
                 .where(NotificationRuleRow.id == cursor_uuid)
                 .scalar_subquery()
             )
-            return NotificationRuleRow.created_at > subquery
+            return sa.or_(
+                NotificationRuleRow.created_at > cursor_created_at,
+                sa.and_(
+                    NotificationRuleRow.created_at == cursor_created_at,
+                    NotificationRuleRow.id < cursor_uuid,
+                ),
+            )
 
         return inner

@@ -675,25 +675,37 @@ class UserConditions:
 
     @staticmethod
     def by_cursor_forward(cursor_id: str) -> QueryCondition:
-        """Cursor condition for forward pagination (after cursor)."""
+        """Rows after the cursor row in ``(created_at DESC, uuid ASC)`` order."""
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            subquery = (
+            cursor_created_at = (
                 sa.select(UserRow.created_at).where(UserRow.uuid == cursor_id).scalar_subquery()
             )
-            return UserRow.created_at < subquery
+            return sa.or_(
+                UserRow.created_at < cursor_created_at,
+                sa.and_(
+                    UserRow.created_at == cursor_created_at,
+                    UserRow.uuid > cursor_id,
+                ),
+            )
 
         return inner
 
     @staticmethod
     def by_cursor_backward(cursor_id: str) -> QueryCondition:
-        """Cursor condition for backward pagination (before cursor)."""
+        """Rows before the cursor row in ``(created_at DESC, uuid ASC)`` order."""
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            subquery = (
+            cursor_created_at = (
                 sa.select(UserRow.created_at).where(UserRow.uuid == cursor_id).scalar_subquery()
             )
-            return UserRow.created_at > subquery
+            return sa.or_(
+                UserRow.created_at > cursor_created_at,
+                sa.and_(
+                    UserRow.created_at == cursor_created_at,
+                    UserRow.uuid < cursor_id,
+                ),
+            )
 
         return inner
 

@@ -184,25 +184,41 @@ class LoginSessionConditions:
 
     @staticmethod
     def by_cursor_forward(cursor_id: str) -> QueryCondition:
+        """Rows after the cursor row in ``(created_at DESC, id ASC)`` order."""
+
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            subquery = (
+            cursor_created_at = (
                 sa.select(LoginSessionRow.created_at)
                 .where(LoginSessionRow.id == cursor_id)
                 .scalar_subquery()
             )
-            return LoginSessionRow.created_at < subquery
+            return sa.or_(
+                LoginSessionRow.created_at < cursor_created_at,
+                sa.and_(
+                    LoginSessionRow.created_at == cursor_created_at,
+                    LoginSessionRow.id > cursor_id,
+                ),
+            )
 
         return inner
 
     @staticmethod
     def by_cursor_backward(cursor_id: str) -> QueryCondition:
+        """Rows before the cursor row in ``(created_at DESC, id ASC)`` order."""
+
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            subquery = (
+            cursor_created_at = (
                 sa.select(LoginSessionRow.created_at)
                 .where(LoginSessionRow.id == cursor_id)
                 .scalar_subquery()
             )
-            return LoginSessionRow.created_at > subquery
+            return sa.or_(
+                LoginSessionRow.created_at > cursor_created_at,
+                sa.and_(
+                    LoginSessionRow.created_at == cursor_created_at,
+                    LoginSessionRow.id < cursor_id,
+                ),
+            )
 
         return inner
 
@@ -345,25 +361,41 @@ class LoginHistoryConditions:
 
     @staticmethod
     def by_cursor_forward(cursor_id: str) -> QueryCondition:
+        """Rows after the cursor row in ``(created_at DESC, id ASC)`` order."""
+
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            subquery = (
+            cursor_created_at = (
                 sa.select(LoginHistoryRow.created_at)
                 .where(LoginHistoryRow.id == cursor_id)
                 .scalar_subquery()
             )
-            return LoginHistoryRow.created_at < subquery
+            return sa.or_(
+                LoginHistoryRow.created_at < cursor_created_at,
+                sa.and_(
+                    LoginHistoryRow.created_at == cursor_created_at,
+                    LoginHistoryRow.id > cursor_id,
+                ),
+            )
 
         return inner
 
     @staticmethod
     def by_cursor_backward(cursor_id: str) -> QueryCondition:
+        """Rows before the cursor row in ``(created_at DESC, id ASC)`` order."""
+
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            subquery = (
+            cursor_created_at = (
                 sa.select(LoginHistoryRow.created_at)
                 .where(LoginHistoryRow.id == cursor_id)
                 .scalar_subquery()
             )
-            return LoginHistoryRow.created_at > subquery
+            return sa.or_(
+                LoginHistoryRow.created_at > cursor_created_at,
+                sa.and_(
+                    LoginHistoryRow.created_at == cursor_created_at,
+                    LoginHistoryRow.id < cursor_id,
+                ),
+            )
 
         return inner
 

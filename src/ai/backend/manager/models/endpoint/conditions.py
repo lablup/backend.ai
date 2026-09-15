@@ -482,37 +482,43 @@ class DeploymentConditions:
 
     @staticmethod
     def by_cursor_forward(cursor_id: str) -> QueryCondition:
-        """Cursor condition for forward pagination (after cursor).
-
-        Uses subquery to get created_at of the cursor row and compare.
-        """
+        """Rows after the cursor row in ``(created_at DESC, id ASC)`` order."""
         cursor_uuid = uuid.UUID(cursor_id)
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            subquery = (
+            cursor_created_at = (
                 sa.select(EndpointRow.created_at)
                 .where(EndpointRow.id == cursor_uuid)
                 .scalar_subquery()
             )
-            return EndpointRow.created_at < subquery
+            return sa.or_(
+                EndpointRow.created_at < cursor_created_at,
+                sa.and_(
+                    EndpointRow.created_at == cursor_created_at,
+                    EndpointRow.id > cursor_uuid,
+                ),
+            )
 
         return inner
 
     @staticmethod
     def by_cursor_backward(cursor_id: str) -> QueryCondition:
-        """Cursor condition for backward pagination (before cursor).
-
-        Uses subquery to get created_at of the cursor row and compare.
-        """
+        """Rows before the cursor row in ``(created_at DESC, id ASC)`` order."""
         cursor_uuid = uuid.UUID(cursor_id)
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            subquery = (
+            cursor_created_at = (
                 sa.select(EndpointRow.created_at)
                 .where(EndpointRow.id == cursor_uuid)
                 .scalar_subquery()
             )
-            return EndpointRow.created_at > subquery
+            return sa.or_(
+                EndpointRow.created_at > cursor_created_at,
+                sa.and_(
+                    EndpointRow.created_at == cursor_created_at,
+                    EndpointRow.id < cursor_uuid,
+                ),
+            )
 
         return inner
 
@@ -635,37 +641,43 @@ class AccessTokenConditions:
 
     @staticmethod
     def by_cursor_forward(cursor_id: str) -> QueryCondition:
-        """Cursor condition for forward pagination (after cursor).
-
-        Uses subquery to get created_at of the cursor row and compare.
-        """
+        """Rows after the cursor row in ``(created_at DESC, id ASC)`` order."""
         cursor_uuid = uuid.UUID(cursor_id)
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            subquery = (
+            cursor_created_at = (
                 sa.select(EndpointTokenRow.created_at)
                 .where(EndpointTokenRow.id == cursor_uuid)
                 .scalar_subquery()
             )
-            return EndpointTokenRow.created_at < subquery
+            return sa.or_(
+                EndpointTokenRow.created_at < cursor_created_at,
+                sa.and_(
+                    EndpointTokenRow.created_at == cursor_created_at,
+                    EndpointTokenRow.id > cursor_uuid,
+                ),
+            )
 
         return inner
 
     @staticmethod
     def by_cursor_backward(cursor_id: str) -> QueryCondition:
-        """Cursor condition for backward pagination (before cursor).
-
-        Uses subquery to get created_at of the cursor row and compare.
-        """
+        """Rows before the cursor row in ``(created_at DESC, id ASC)`` order."""
         cursor_uuid = uuid.UUID(cursor_id)
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            subquery = (
+            cursor_created_at = (
                 sa.select(EndpointTokenRow.created_at)
                 .where(EndpointTokenRow.id == cursor_uuid)
                 .scalar_subquery()
             )
-            return EndpointTokenRow.created_at > subquery
+            return sa.or_(
+                EndpointTokenRow.created_at > cursor_created_at,
+                sa.and_(
+                    EndpointTokenRow.created_at == cursor_created_at,
+                    EndpointTokenRow.id < cursor_uuid,
+                ),
+            )
 
         return inner
 
@@ -754,36 +766,42 @@ class AutoScalingRuleConditions:
 
     @staticmethod
     def by_cursor_forward(cursor_id: str) -> QueryCondition:
-        """Cursor condition for forward pagination (after cursor).
-
-        Uses subquery to get created_at of the cursor row and compare.
-        """
+        """Rows after the cursor row in ``(created_at DESC, id ASC)`` order."""
         cursor_uuid = uuid.UUID(cursor_id)
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            subquery = (
+            cursor_created_at = (
                 sa.select(EndpointAutoScalingRuleRow.created_at)
                 .where(EndpointAutoScalingRuleRow.id == cursor_uuid)
                 .scalar_subquery()
             )
-            return EndpointAutoScalingRuleRow.created_at < subquery
+            return sa.or_(
+                EndpointAutoScalingRuleRow.created_at < cursor_created_at,
+                sa.and_(
+                    EndpointAutoScalingRuleRow.created_at == cursor_created_at,
+                    EndpointAutoScalingRuleRow.id > cursor_uuid,
+                ),
+            )
 
         return inner
 
     @staticmethod
     def by_cursor_backward(cursor_id: str) -> QueryCondition:
-        """Cursor condition for backward pagination (before cursor).
-
-        Uses subquery to get created_at of the cursor row and compare.
-        """
+        """Rows before the cursor row in ``(created_at DESC, id ASC)`` order."""
         cursor_uuid = uuid.UUID(cursor_id)
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            subquery = (
+            cursor_created_at = (
                 sa.select(EndpointAutoScalingRuleRow.created_at)
                 .where(EndpointAutoScalingRuleRow.id == cursor_uuid)
                 .scalar_subquery()
             )
-            return EndpointAutoScalingRuleRow.created_at > subquery
+            return sa.or_(
+                EndpointAutoScalingRuleRow.created_at > cursor_created_at,
+                sa.and_(
+                    EndpointAutoScalingRuleRow.created_at == cursor_created_at,
+                    EndpointAutoScalingRuleRow.id < cursor_uuid,
+                ),
+            )
 
         return inner

@@ -81,38 +81,52 @@ class RuntimeVariantConditions:
 
     @staticmethod
     def by_cursor_forward(cursor_id: str) -> QueryCondition:
-        """Cursor condition for forward pagination (after cursor).
-
-        Reads the cursor row's ``created_at`` and compares against that, because that is what
-        the page is ordered by.
-        """
+        """Rows after the cursor row in ``(created_at DESC, name ASC)`` order."""
         cursor_uuid = uuid.UUID(cursor_id)
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            subquery = (
+            cursor_created_at = (
                 sa.select(RuntimeVariantRow.created_at)
                 .where(RuntimeVariantRow.id == cursor_uuid)
                 .scalar_subquery()
             )
-            return RuntimeVariantRow.created_at < subquery
+            cursor_name = (
+                sa.select(RuntimeVariantRow.name)
+                .where(RuntimeVariantRow.id == cursor_uuid)
+                .scalar_subquery()
+            )
+            return sa.or_(
+                RuntimeVariantRow.created_at < cursor_created_at,
+                sa.and_(
+                    RuntimeVariantRow.created_at == cursor_created_at,
+                    RuntimeVariantRow.name > cursor_name,
+                ),
+            )
 
         return inner
 
     @staticmethod
     def by_cursor_backward(cursor_id: str) -> QueryCondition:
-        """Cursor condition for backward pagination (before cursor).
-
-        Reads the cursor row's ``created_at`` and compares against that, because that is what
-        the page is ordered by.
-        """
+        """Rows before the cursor row in ``(created_at DESC, name ASC)`` order."""
         cursor_uuid = uuid.UUID(cursor_id)
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            subquery = (
+            cursor_created_at = (
                 sa.select(RuntimeVariantRow.created_at)
                 .where(RuntimeVariantRow.id == cursor_uuid)
                 .scalar_subquery()
             )
-            return RuntimeVariantRow.created_at > subquery
+            cursor_name = (
+                sa.select(RuntimeVariantRow.name)
+                .where(RuntimeVariantRow.id == cursor_uuid)
+                .scalar_subquery()
+            )
+            return sa.or_(
+                RuntimeVariantRow.created_at > cursor_created_at,
+                sa.and_(
+                    RuntimeVariantRow.created_at == cursor_created_at,
+                    RuntimeVariantRow.name < cursor_name,
+                ),
+            )
 
         return inner
