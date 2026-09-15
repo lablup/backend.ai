@@ -8,7 +8,7 @@ import sys
 from collections import Counter
 from collections.abc import Sequence
 from pathlib import Path
-from typing import Any, Final
+from typing import TYPE_CHECKING, Any, Final
 
 import click
 from tabulate import tabulate
@@ -22,6 +22,9 @@ from ai.backend.manager.data.permission.seed.kinds import PermissionKinds
 from ai.backend.manager.data.permission.seed.loader import RoleSeedLoader
 from ai.backend.manager.data.permission.seed.role import RoleSeed
 from ai.backend.manager.services.catalog import load_wiring_catalog
+
+if TYPE_CHECKING:
+    from ai.backend.manager.cli.context import CLIContext
 
 # The letters a mask prints as, in the order a cell spells them.
 _LETTERS: Final[tuple[tuple[Permission, str], ...]] = (
@@ -375,6 +378,43 @@ def emit(repository: Path | None, check: bool) -> None:
     for target, body in bodies.items():
         (root / target).write_text(body, encoding="utf-8")
         print(f"wrote {target}")
+
+
+# The preset whose role a project's creator holds while still on its roster.
+_CREATOR_PRESET: Final[str] = "project_admin"
+
+
+@cli.command(name="provision")
+@click.pass_obj
+def provision(cli_ctx: CLIContext) -> None:
+    """
+    Instantiate the presets in every domain, project and user that lacks their role.
+
+    Grants what each scope assigns on its own, and the project admin role to a project's
+    creator still on its roster. Running it again changes nothing.
+
+    Examples:
+
+    \b
+      $ backend.ai mgr permissions provision
+    """
+    from ai.backend.manager.models.base import ensure_all_tables_registered
+    from ai.backend.manager.repositories.db.engine import connect_database
+    from ai.backend.manager.repositories.ops.v2.role_preset.provider import RolePresetOpsProvider
+    from ai.backend.manager.repositories.role_preset.repository import RolePresetRepository
+
+    creator_preset_ids = [seed.id for seed in _load() if seed.name == _CREATOR_PRESET]
+
+    async def _provision() -> None:
+        bootstrap_config = await cli_ctx.get_bootstrap_config()
+        # A standalone CLI process has not imported the full model tree.
+        ensure_all_tables_registered()
+        async with connect_database(bootstrap_config.db) as db:
+            repository = RolePresetRepository(RolePresetOpsProvider(db))
+            await repository.provision_roles(creator_preset_ids)
+
+    asyncio.run(_provision())
+    print("Provisioned the preset roles.")
 
 
 if __name__ == "__main__":
