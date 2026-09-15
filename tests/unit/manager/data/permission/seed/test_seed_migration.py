@@ -33,8 +33,10 @@ def user_owner_migration() -> Any:
 
 @pytest.fixture(scope="module")
 def fixture() -> dict[str, Any]:
-    path = _REPOSITORY / "fixtures/manager/example-roles.json"
-    loaded: dict[str, Any] = json.loads(path.read_text(encoding="utf-8"))
+    base = _REPOSITORY / "fixtures/manager"
+    loaded: dict[str, Any] = {}
+    for name in ("example-role-presets.json", "example-roles.json"):
+        loaded.update(json.loads((base / name).read_text(encoding="utf-8")))
     return loaded
 
 
