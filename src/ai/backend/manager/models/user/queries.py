@@ -6,7 +6,7 @@ import uuid
 
 import sqlalchemy as sa
 
-from ai.backend.common.data.entity.project import ProjectEntityType
+from ai.backend.common.data.entity.project import ProjectEntityType, ProjectID
 from ai.backend.common.data.entity.types import EntityType
 from ai.backend.common.data.entity.user import UserEntityType, UserID
 from ai.backend.manager.data.project.types import ProjectType
@@ -14,6 +14,7 @@ from ai.backend.manager.models.project.row import ProjectRow
 from ai.backend.manager.models.virtual_entity.queries import (
     UuidExpr,
     scope_membership_exists,
+    scope_share_exists,
     user_scope_membership_query,
 )
 from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
@@ -21,6 +22,7 @@ from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntit
 __all__ = (
     "joined_project_ids_query",
     "user_scope_reaches",
+    "user_scope_shares",
 )
 
 
@@ -49,15 +51,34 @@ def user_scope_reaches(
     is created in it rather than in them. Naming the user therefore has to stand for
     the project too, so that a caller never has to name both.
     """
-    personal_project = (
+    return sa.or_(
+        scope_membership_exists(UserEntityType(), user_id, member_type, member_id),
+        scope_membership_exists(
+            ProjectEntityType(), _personal_project_id(user_id), member_type, member_id
+        ),
+    )
+
+
+def user_scope_shares(
+    user_id: UserID,
+    member_type: EntityType,
+    member_id: UuidExpr,
+) -> sa.ColumnElement[bool]:
+    """EXISTS predicate: the member was shared to this user or their personal project."""
+    return sa.or_(
+        scope_share_exists(UserEntityType(), user_id, member_type, member_id),
+        scope_share_exists(
+            ProjectEntityType(), _personal_project_id(user_id), member_type, member_id
+        ),
+    )
+
+
+def _personal_project_id(user_id: UserID) -> sa.ScalarSelect[ProjectID]:
+    return (
         sa.select(ProjectRow.id)
         .where(
             ProjectRow.creator_id == user_id,
             ProjectRow.type == ProjectType.PERSONAL,
         )
         .scalar_subquery()
-    )
-    return sa.or_(
-        scope_membership_exists(UserEntityType(), user_id, member_type, member_id),
-        scope_membership_exists(ProjectEntityType(), personal_project, member_type, member_id),
     )

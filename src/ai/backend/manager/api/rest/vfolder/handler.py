@@ -385,16 +385,18 @@ class VFolderHandler:
         params = query.parsed
         owner_user_uuid = await self._list_owner(params.owner_user_email)
         scope_items: list[VFolderScopeItem] = [UserVFolderScopeItem(user_id=UserID(owner_user_uuid))]
-        priority_orders: list[QueryOrder] = []
+        orders: list[QueryOrder] = []
         if params.group_id is not None:
             project_id = ProjectID(params.group_id)
             scope_items.insert(0, ProjectVFolderScopeItem(project_id=project_id))
-            priority_orders.append(VFolderOrders.project_first(project_id))
+            orders.append(VFolderOrders.project_first(project_id))
+        orders.append(VFolderOrders.shared_last(UserID(owner_user_uuid)))
         result = await self._vfolder.scoped_search.run(
             ScopedSearchVFoldersAction(
                 items=scope_items,
                 searcher=VFolderSearcher(
-                    pagination=NoPagination(priority_orders=priority_orders),
+                    pagination=NoPagination(),
+                    orders=orders,
                     conditions=[
                         VFolderConditions.by_status_not_in(
                             vfolder_status_map[VFolderStatusSet.INACCESSIBLE]
