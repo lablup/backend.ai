@@ -2,7 +2,7 @@
 
 Static analysis does not reach the migration's SQL, so what it writes is checked here:
 a database shaped like one seeded before the declaration goes in, the migration runs,
-and what comes out is held against the fixture the declaration renders.
+and what comes out is held against the rows the presets call for.
 """
 
 from __future__ import annotations
@@ -311,20 +311,43 @@ _REPOSITORY = pathlib.Path(__file__).resolve().parents[5]
 def _seed_files() -> tuple[dict[str, Any], dict[str, Any]]:
     base = _REPOSITORY / "fixtures" / "manager"
     accounts = json.loads((base / "example-users.json").read_text(encoding="utf-8"))
-    roles = json.loads((base / "example-roles.json").read_text(encoding="utf-8"))
-    roles.update(json.loads((base / "example-role-presets.json").read_text(encoding="utf-8")))
-    return accounts, roles
+    presets = json.loads((base / "example-role-presets.json").read_text(encoding="utf-8"))
+    return accounts, presets
 
 
 @pytest.fixture
 async def seeded_from_fixture(db: ExtendedAsyncSAEngine) -> dict[str, Any]:
-    """The seed's own subjects and roles, put back the way a database held them before
-    the declaration: no preset link, the permission rows the data migrations left, and
-    none of the assignments a scope hands out on its own. A role is keyed by its preset
-    and scope, since the migration gives the roles it creates ids of its own."""
-    accounts, seed = _seed_files()
+    """The seed's accounts carrying the roles the data migrations made for them: no
+    preset link, the permission rows those migrations left, and none of the assignments a
+    scope hands out on its own. Expected rows are keyed by preset and scope."""
+    accounts, presets = _seed_files()
     domain = accounts["domains"][0]
-    auto_ids = {role["id"] for role in seed["roles"] if role["auto_assign"]}
+    roster = {(row["group_id"], row["user_id"]) for row in accounts["association_groups_users"]}
+    creators = {
+        group["id"]: group["creator_id"]
+        for group in accounts["groups"]
+        if (group["id"], group.get("creator_id")) in roster
+    }
+    # (scope type, scope id, name, auto_assign) of each role the data migrations made.
+    legacy = [
+        ("domain", domain["id"], f"role_domain_{domain['name']}_admin", False),
+        *(
+            ("project", group["id"], f"role_project_{group['id'][:8]}_{kind}", kind == "member")
+            for group in accounts["groups"]
+            for kind in ("admin", "member")
+        ),
+        *(
+            ("user", user["uuid"], f"role_user_{user['username']}", False)
+            for user in accounts["users"]
+        ),
+    ]
+    held = [
+        *((user["uuid"], f"role_user_{user['username']}") for user in accounts["users"]),
+        *(
+            (creator, f"role_project_{group_id[:8]}_admin")
+            for group_id, creator in creators.items()
+        ),
+    ]
     async with db.begin_session() as session:
         session.add(
             DomainRow(
@@ -393,7 +416,7 @@ async def seeded_from_fixture(db: ExtendedAsyncSAEngine) -> dict[str, Any]:
                     entity_id=uuid.UUID(entity["entity_id"]),
                 )
             )
-        for preset in seed["role_presets"]:
+        for preset in presets["role_presets"]:
             session.add(
                 RolePresetRow(
                     id=uuid.UUID(preset["id"]),
@@ -403,52 +426,62 @@ async def seeded_from_fixture(db: ExtendedAsyncSAEngine) -> dict[str, Any]:
                     deleted=True,
                 )
             )
-        for role in seed["roles"]:
-            session.add(
-                RoleRow(
-                    id=uuid.UUID(role["id"]),
-                    name=role["name"],
-                    source=RoleSource(role["source"]),
-                    status=RoleStatus.ACTIVE,
-                    auto_assign=role["auto_assign"],
-                    scope_type=role["scope_type"],
-                    scope_id=uuid.UUID(role["scope_id"]),
-                )
+        roles = {
+            name: RoleRow(
+                name=name,
+                source=RoleSource.SYSTEM,
+                status=RoleStatus.ACTIVE,
+                auto_assign=auto_assign,
+                scope_type=scope_type,
+                scope_id=uuid.UUID(scope_id),
             )
+            for scope_type, scope_id, name, auto_assign in legacy
+        }
+        session.add_all(roles.values())
         await session.flush()
         # What the data migrations left behind, on a role of each kind.
-        for role in seed["roles"][:2]:
+        for role in list(roles.values())[:2]:
             for entity_type in ("model_deployment", "keypair", "session:app"):
                 session.add(
                     PermissionRow(
-                        role_id=uuid.UUID(role["id"]),
-                        entity_type=entity_type,
-                        permission=1,
-                        all_fields=True,
+                        role_id=role.id, entity_type=entity_type, permission=1, all_fields=True
                     )
                 )
-        for row in seed["user_roles"]:
-            if row["role_id"] in auto_ids:
-                continue
-            session.add(
-                UserRoleRow(user_id=uuid.UUID(row["user_id"]), role_id=uuid.UUID(row["role_id"]))
-            )
-    scope_of = {role["id"]: (role["role_preset_id"], role["scope_id"]) for role in seed["roles"]}
+        for user_id, name in held:
+            session.add(UserRoleRow(user_id=uuid.UUID(user_id), role_id=roles[name].id))
+    instantiated = [
+        (preset, entity["entity_id"])
+        for entity in accounts["virtual_entities"]
+        for preset in _PRESETS
+        if preset.scope_type == entity["entity_type"]
+    ]
     return {
+        "expected_roles": {
+            (preset.id, preset.scope_type, scope_id, "system") for preset, scope_id in instantiated
+        },
         "expected_permissions": {
-            (*scope_of[row["role_id"]], row["entity_type"], row["permission"])
-            for row in seed["permissions"]
+            (preset.id, scope_id, entity_type, bit)
+            for preset, scope_id in instantiated
+            for entity_type, bits in preset.grants
+            for bit in bits
         },
         "expected_assignments": {
-            (row["user_id"], *scope_of[row["role_id"]]) for row in seed["user_roles"]
-        },
-        "expected_roles": {
-            (role["role_preset_id"], role["scope_type"], role["scope_id"], role["source"])
-            for role in seed["roles"]
+            *(
+                (user["uuid"], _PRESET_BY_NAME["user_owner"].id, user["uuid"])
+                for user in accounts["users"]
+            ),
+            *(
+                (user_id, _PRESET_BY_NAME["project_member"].id, group_id)
+                for group_id, user_id in roster
+            ),
+            *(
+                (creator, _PRESET_BY_NAME["project_admin"].id, group_id)
+                for group_id, creator in creators.items()
+            ),
         },
         "expected_preset_permissions": {
             (row["id"], row["role_preset_id"], row["entity_type"], row["permission"])
-            for row in seed["role_permission_presets"]
+            for row in presets["role_permission_presets"]
         },
     }
 

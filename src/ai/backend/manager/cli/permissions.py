@@ -321,17 +321,14 @@ def operations(role: str, verdict: str | None, entity: str | None, output: str) 
             print(f"{len(readings)} operations read against {role}")
 
 
-# The checkout this command reads the account fixtures from and writes the seed to.
+# The checkout this command writes the seed to.
 _REPOSITORY: Final[Path] = Path(__file__).resolve().parents[5]
-# The installer fixtures of the same names are symlinks to these. The presets are
-# populated before the roles that name them.
+# The installer fixture of the same name is a symlink to this one.
 _PRESETS_TARGET: Final[Path] = Path("fixtures/manager/example-role-presets.json")
-_ROLES_TARGET: Final[Path] = Path("fixtures/manager/example-roles.json")
 
 
-def _render(seeds: Sequence[RoleSeed], root: Path) -> dict[Path, dict[str, Any]]:
-    fixture = RoleFixture(seeds, root / "fixtures" / "manager")
-    return {_PRESETS_TARGET: fixture.render_presets(), _ROLES_TARGET: fixture.render_roles()}
+def _render(seeds: Sequence[RoleSeed]) -> dict[Path, dict[str, Any]]:
+    return {_PRESETS_TARGET: RoleFixture(seeds).render_presets()}
 
 
 @cli.command(name="emit")
@@ -339,16 +336,15 @@ def _render(seeds: Sequence[RoleSeed], root: Path) -> dict[Path, dict[str, Any]]
     "--repository",
     default=None,
     type=click.Path(exists=True, file_okay=False, path_type=Path),
-    help="Read the account fixtures from, and write the seed into, this checkout.",
+    help="Write the seed into this checkout.",
 )
 @click.option("--check", is_flag=True, help="Report whether the files are current, write nothing.")
 def emit(repository: Path | None, check: bool) -> None:
     """
-    Write the seed fixtures from the role files and the account fixtures.
+    Write the preset fixture from the role files.
 
-    The written files are generated: edit the role files and run this, never the JSON.
-    Users, projects and the domain come from the account fixtures beside the targets, so
-    they are stated in one place.
+    The written file is generated: edit the role files and run this, never the JSON.
+    The roles the presets call for are created in each scope by `provision`.
 
     Examples:
 
@@ -357,7 +353,7 @@ def emit(repository: Path | None, check: bool) -> None:
       $ backend.ai mgr permissions emit --check
     """
     root = repository if repository is not None else _REPOSITORY
-    rendered = _render(_load(), root)
+    rendered = _render(_load())
     for tables in rendered.values():
         for table, rows in tables.items():
             if not table.startswith("__"):
