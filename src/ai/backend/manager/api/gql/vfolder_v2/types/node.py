@@ -36,6 +36,7 @@ from ai.backend.manager.api.gql.model_card.types import (
     ModelCardV2Edge,
 )
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
+from ai.backend.manager.api.gql.rbac.types.scope import PermissionBitGQL
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.vfolder_v2.types.enum import VFolderOperationStatusGQL
 from ai.backend.manager.models.model_card.scopes import VFolderModelCardOperationScope
@@ -195,6 +196,20 @@ class VFolderGQL(PydanticNodeMixin[VFolderNode]):
             last=last,
             limit=limit,
             offset=offset,
+        )
+
+    @gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="The permission bits the current user holds on this vfolder.",
+        )
+    )  # type: ignore[misc]
+    async def permissions(
+        self,
+        info: Info[StrawberryGQLContext],
+    ) -> list[PermissionBitGQL]:
+        return await info.context.data_loaders.vfolder_permission_loader.load(
+            VFolderUUID(UUID(self.id))
         )
 
     @classmethod

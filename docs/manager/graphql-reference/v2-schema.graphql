@@ -17854,6 +17854,11 @@ type VFolder implements Node {
 
   """Added in 26.9.0. The labels on this vfolder."""
   entityLabels(filter: EntityLabelFilter = null, orderBy: [EntityLabelOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): EntityLabelConnection
+
+  """
+  Added in 26.9.0. The permission bits the current user holds on this vfolder.
+  """
+  permissions: [PermissionBit!]!
 }
 
 """
