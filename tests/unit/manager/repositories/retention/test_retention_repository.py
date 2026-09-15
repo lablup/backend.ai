@@ -37,6 +37,7 @@ from ai.backend.common.data.entity.deployment_token import DeploymentTokenID
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.project import ProjectEntityType, ProjectID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
+from ai.backend.common.data.entity.role import RoleEntityType
 from ai.backend.common.data.entity.session_group import SessionGroupID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
@@ -62,6 +63,7 @@ from ai.backend.manager.models.deployment_policy.row import DeploymentPolicyRow
 from ai.backend.manager.models.deployment_revision.row import DeploymentRevisionRow
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.endpoint import EndpointLifecycle, EndpointRow, EndpointTokenRow
+from ai.backend.manager.models.entity_label.row import EntityLabelRow
 from ai.backend.manager.models.error_log.row import ErrorLogRow
 from ai.backend.manager.models.event_log.row import EventLogRow
 from ai.backend.manager.models.hasher.types import PasswordInfo
@@ -103,10 +105,14 @@ from ai.backend.manager.models.session_group.row import SessionGroupRow
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder.row import VFolderRow
+from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
+from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
+from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
 from ai.backend.manager.repositories.ops.v2.retention.provider import RetentionOpsProvider
 from ai.backend.manager.repositories.ops.v2.retention.write import RetentionDrain
 from ai.backend.manager.repositories.retention.db_source.db_source import RetentionDBSource
 from ai.backend.testutils.db import with_tables
+from ai.backend.testutils.virtual_entity import VirtualEntitySeeder
 
 _NOW = datetime.now(UTC)
 _THRESHOLD = _NOW - timedelta(days=30)
@@ -487,13 +493,16 @@ class TestTerminalStateFilter:
     async def db(
         self, database_connection: ExtendedAsyncSAEngine
     ) -> AsyncIterator[ExtendedAsyncSAEngine]:
-        async with with_tables(database_connection, [RoleRow]):
+        async with with_tables(
+            database_connection,
+            [RoleRow, VirtualEntityRow, EntityMembershipRow, ScopeBindingRow, EntityLabelRow],
+        ):
             yield database_connection
 
     async def test_only_deleted_rows_past_boundary_are_purged(
         self, db: ExtendedAsyncSAEngine
     ) -> None:
-        await _insert(
+        await self._insert_roles(
             db,
             [
                 RoleRow(
@@ -533,6 +542,58 @@ class TestTerminalStateFilter:
         remaining = {name for (name,) in await self._role_names(db)}
         assert remaining == {"deleted-new", "active"}
 
+    async def test_drained_entity_takes_its_node(self, db: ExtendedAsyncSAEngine) -> None:
+        drained = RoleRow(
+            id=uuid.uuid4(),
+            scope_type=ProjectEntityType(),
+            scope_id=uuid.uuid4(),
+            name="drained",
+            status=RoleStatus.DELETED,
+            deleted_at=_OLD,
+        )
+        kept = RoleRow(
+            id=uuid.uuid4(),
+            scope_type=ProjectEntityType(),
+            scope_id=uuid.uuid4(),
+            name="kept",
+            status=RoleStatus.DELETED,
+            deleted_at=_NEW,
+        )
+        await self._insert_roles(db, [drained, kept])
+        async with db.begin_session() as sess:
+            for role in (drained, kept):
+                await VirtualEntitySeeder().provision(sess, RoleEntityType(), role.id)
+        spec = RetentionDrain(
+            RoleRow,
+            RoleRow.deleted_at,
+            _THRESHOLD,
+            conditions=(RoleRow.status == RoleStatus.DELETED,),
+            entity=RoleEntityType(),
+        )
+
+        async with RetentionOpsProvider(db).write_ops() as w:
+            deleted_count = await w.drain(spec, batch_size=100)
+
+        assert deleted_count == 1
+        async with db.begin_readonly_session() as sess:
+            nodes = set(
+                (
+                    await sess.scalars(
+                        sa.select(VirtualEntityRow.entity_id).where(
+                            VirtualEntityRow.entity_type == RoleEntityType()
+                        )
+                    )
+                ).all()
+            )
+        assert nodes == {kept.id}
+
+    async def _insert_roles(self, engine: ExtendedAsyncSAEngine, roles: list[RoleRow]) -> None:
+        """Insert roles after putting each one's scope in the graph, as the role FK requires."""
+        async with engine.begin_session() as sess:
+            for role in roles:
+                await VirtualEntitySeeder().provision(sess, role.scope_type, role.scope_id)
+            sess.add_all(roles)
+
     async def _role_names(self, engine: ExtendedAsyncSAEngine) -> list[tuple[str]]:
         async with engine.begin_readonly_session() as sess:
             result = await sess.execute(sa.select(RoleRow.name))
@@ -569,6 +630,8 @@ class TestSessionsRetention:
                 RoutingRow,
                 SessionDependencyRow,
                 RetentionPolicyRow,
+                VirtualEntityRow,
+                EntityLabelRow,
             ],
         ):
             yield database_connection
@@ -937,6 +1000,8 @@ class TestDeploymentsRetention:
                 EndpointRow,
                 DeploymentPolicyRow,
                 EndpointTokenRow,
+                VirtualEntityRow,
+                EntityLabelRow,
             ],
         ):
             yield database_connection
@@ -1147,6 +1212,8 @@ class TestDeploymentsTerminalChildCleanup:
                 EndpointRow,
                 ReplicaGroupRow,
                 RoutingRow,
+                VirtualEntityRow,
+                EntityLabelRow,
             ],
         ):
             yield database_connection
@@ -1386,6 +1453,8 @@ class TestDeploymentsSessionGroupCleanup:
                 EndpointRow,
                 ReplicaGroupRow,
                 RoutingRow,
+                VirtualEntityRow,
+                EntityLabelRow,
             ],
         ):
             yield database_connection

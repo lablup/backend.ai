@@ -73,22 +73,23 @@ class V2GraphWriteOpsBase(V2WriteOpsBase):
             .on_conflict_do_nothing()
         )
 
-    async def _teardown(self, entity: EntityIdentifier) -> None:
-        """Remove what the entity left: its virtual entity (every relation naming it
+    async def _teardown(self, entities: Sequence[EntityIdentifier]) -> None:
+        """Remove what each entity left: its virtual entity (every relation naming it
         goes with it by FK), and the labels put on it.
 
         The permissions granted in the entity's scope belong to roles the scope holds,
         and those roles go with the virtual entity by FK, taking their permissions."""
+        if not entities:
+            return
+        keys = [self._node_key(entity) for entity in entities]
         await self._sess.execute(
             sa.delete(VirtualEntityRow).where(
-                VirtualEntityRow.entity_type == entity.entity_type(),
-                VirtualEntityRow.entity_id == entity,
+                sa.tuple_(VirtualEntityRow.entity_type, VirtualEntityRow.entity_id).in_(keys)
             )
         )
         await self._sess.execute(
             sa.delete(EntityLabelRow).where(
-                EntityLabelRow.entity_type == entity.entity_type(),
-                EntityLabelRow.entity_id == entity,
+                sa.tuple_(EntityLabelRow.entity_type, EntityLabelRow.entity_id).in_(keys)
             )
         )
 

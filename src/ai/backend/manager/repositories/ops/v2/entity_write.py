@@ -197,7 +197,7 @@ class V2EntityWriteOps(V2GraphWriteOpsBase):
         )
         if row is None:
             return None
-        await self._teardown(purger.entity_id())
+        await self._teardown([purger.entity_id()])
         return purger.to_data(row)
 
     async def partial_bulk_purge_entities[TRow: Base, TData](
