@@ -11,6 +11,14 @@ from dataclasses import dataclass
 from typing import Any, override
 
 import pytest
+
+from ai.backend.common.data.user.types import UserRole
+from ai.backend.common.dto.manager.v2.secret.response import AdminReencryptSecretsPayload
+from ai.backend.manager.api.adapters.secret.adapter import SecretAdapter
+from ai.backend.manager.data.secret.types import KeyProviderType
+from ai.backend.manager.errors.auth import InsufficientPrivilege
+from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.testutils.scenario_steps import Configured, Given, Scenario, Then, When
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.secret import (
     CONFIG_KEYS,
@@ -23,14 +31,6 @@ from bai_scenario.components.secret import (
 from bai_scenario.runner.acting import ActingAs
 from bai_scenario.runner.planting import SeedingSession
 from bai_scenario.runner.steps import run_scenario
-
-from ai.backend.common.data.user.types import UserRole
-from ai.backend.common.dto.manager.v2.secret.response import AdminReencryptSecretsPayload
-from ai.backend.manager.api.adapters.secret.adapter import SecretAdapter
-from ai.backend.manager.data.secret.types import KeyProviderType
-from ai.backend.manager.errors.auth import InsufficientPrivilege
-from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.scenario_steps import Configured, Given, Scenario, Then, When
 
 type Reencrypted = AdminReencryptSecretsPayload
 type ReencryptingStep = Scenario[SeedingSession, AKeyringAndACaller, SecretAdapter, Reencrypted]

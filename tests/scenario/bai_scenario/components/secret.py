@@ -11,15 +11,6 @@ import base64
 from dataclasses import dataclass
 from typing import Any, override
 
-from bai_scenario.components.domain import WAS_HERE, SomeoneOf
-from bai_scenario.components.system import role_named
-from bai_scenario.seeds.domain.domain import SeedDomain
-from bai_scenario.seeds.resource_policy.keypair import SeedKeypairPolicy
-from bai_scenario.seeds.resource_policy.project import SeedProjectPolicy
-from bai_scenario.seeds.resource_policy.user import SeedUserPolicy
-from bai_scenario.seeds.seeder import Laid, Seeder, SeedNest
-from bai_scenario.seeds.user.user import SeedUserOf
-
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.v2.secret.response import (
     AdminReencryptSecretsPayload,
@@ -34,6 +25,14 @@ from ai.backend.manager.secret.keys import KeyEncryptionKey
 from ai.backend.manager.secret.pool import KeyProviderPool
 from ai.backend.manager.secret.types import SecretValue
 from ai.backend.testutils.scenario_steps import Answered, Given, Refused, Same, Then, Verdict
+from bai_scenario.components.domain import WAS_HERE, SomeoneOf
+from bai_scenario.components.system import role_named
+from bai_scenario.seeds.domain.domain import SeedDomain
+from bai_scenario.seeds.resource_policy.keypair import SeedKeypairPolicy
+from bai_scenario.seeds.resource_policy.project import SeedProjectPolicy
+from bai_scenario.seeds.resource_policy.user import SeedUserPolicy
+from bai_scenario.seeds.seeder import Laid, Seeder, SeedNest
+from bai_scenario.seeds.user.user import SeedUserOf
 
 KEY_ID = SecretKeyId("k1")
 KEY_MATERIAL = SecretKeyMaterial(base64.b64encode(b"0123456789abcdef0123456789abcdef").decode())
