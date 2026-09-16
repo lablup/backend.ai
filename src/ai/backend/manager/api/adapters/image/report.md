@@ -963,7 +963,7 @@ Then
 
 #### [turning-enforcement-off-does-not-skip-the-custom-image-creator-check](/tests/scenario/bai_scenario/manager/image/test_forgetting.py) — pass
 
-RBAC 권한 검사를 비활성화해도 커스텀 이미지가 아닌 이미지는 소프트 삭제할 수 없다. 커스텀 이미지 작성자 검사는 그 설정의 영향을 받지 않는다
+RBAC 권한 검사를 비활성화해도 커스텀 이미지가 아닌 이미지는 소프트 삭제할 수 없다
 
 Given
 
