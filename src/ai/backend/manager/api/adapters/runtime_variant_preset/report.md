@@ -13,7 +13,7 @@ Not exercised by any scenario: batch_load_fields.
 Given
 
 - 런타임 변형 하나와, 슈퍼관리자 한 명
-  - 런타임 변형 variant-1
+  - 런타임 변형 runtime-1: 기본 모델 정의가 비어 있고, 모델 폴더의 설정 파일을 읽지 않는다
   - 도메인 home-1
   - 도메인에 속한 사용자 한 명 준비
     - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
@@ -23,7 +23,7 @@ Given
 
 When
 
-- RuntimeVariantPresetAdapter.create — user-1이 변형 variant-1에 preset max-tokens 생성
+- RuntimeVariantPresetAdapter.create — user-1이 변형 runtime-1에 preset max-tokens 생성
 
 Then
 
@@ -51,7 +51,7 @@ Then
 Given
 
 - 런타임 변형 하나와, 슈퍼관리자 한 명
-  - 런타임 변형 variant-1
+  - 런타임 변형 runtime-1: 기본 모델 정의가 비어 있고, 모델 폴더의 설정 파일을 읽지 않는다
   - 도메인 home-1
   - 도메인에 속한 사용자 한 명 준비
     - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
@@ -61,7 +61,7 @@ Given
 
 When
 
-- RuntimeVariantPresetAdapter.create — user-1이 변형 variant-1에 preset max-tokens 생성
+- RuntimeVariantPresetAdapter.create — user-1이 변형 runtime-1에 preset max-tokens 생성
 
 Then
 
@@ -89,7 +89,7 @@ Then
 Given
 
 - 런타임 변형 하나와, 슈퍼관리자 한 명
-  - 런타임 변형 variant-1
+  - 런타임 변형 runtime-1: 기본 모델 정의가 비어 있고, 모델 폴더의 설정 파일을 읽지 않는다
   - 도메인 home-1
   - 도메인에 속한 사용자 한 명 준비
     - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
@@ -99,7 +99,7 @@ Given
 
 When
 
-- RuntimeVariantPresetAdapter.create — user-1이 변형 variant-1에 preset max-tokens 생성
+- RuntimeVariantPresetAdapter.create — user-1이 변형 runtime-1에 preset max-tokens 생성
 
 Then
 
@@ -127,7 +127,7 @@ Then
 Given
 
 - 런타임 변형 하나와, 슈퍼관리자 한 명
-  - 런타임 변형 variant-1
+  - 런타임 변형 runtime-1: 기본 모델 정의가 비어 있고, 모델 폴더의 설정 파일을 읽지 않는다
   - 도메인 home-1
   - 도메인에 속한 사용자 한 명 준비
     - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
@@ -137,7 +137,7 @@ Given
 
 When
 
-- RuntimeVariantPresetAdapter.create — user-1이 변형 variant-1에 preset max-tokens 생성
+- RuntimeVariantPresetAdapter.create — user-1이 변형 runtime-1에 preset max-tokens 생성
 
 Then
 
@@ -165,7 +165,7 @@ Then
 Given
 
 - 변형 하나와 그 변형의 preset 하나, 그리고 슈퍼관리자 한 명
-  - 런타임 변형 variant-1
+  - 런타임 변형 runtime-1: 기본 모델 정의가 비어 있고, 모델 폴더의 설정 파일을 읽지 않는다
   - 런타임 변형 preset preset-1: env 대상, 값 종류 str
   - 도메인 home-1
   - 도메인에 속한 사용자 한 명 준비
@@ -176,7 +176,7 @@ Given
 
 When
 
-- RuntimeVariantPresetAdapter.create — user-1이 변형 variant-1에 preset preset-1 하나 더 생성
+- RuntimeVariantPresetAdapter.create — user-1이 변형 runtime-1에 preset preset-1 하나 더 생성
 
 Then
 
@@ -190,7 +190,7 @@ preset이 하나 있는 변형에 슈퍼관리자가 하나 더 생성하면 순
 Given
 
 - 변형 하나와 그 변형의 preset 하나, 그리고 슈퍼관리자 한 명
-  - 런타임 변형 variant-1
+  - 런타임 변형 runtime-1: 기본 모델 정의가 비어 있고, 모델 폴더의 설정 파일을 읽지 않는다
   - 런타임 변형 preset preset-1: env 대상, 값 종류 str
   - 도메인 home-1
   - 도메인에 속한 사용자 한 명 준비
@@ -201,7 +201,7 @@ Given
 
 When
 
-- RuntimeVariantPresetAdapter.create — user-1이 변형 variant-1에 preset max-tokens 하나 더 생성
+- RuntimeVariantPresetAdapter.create — user-1이 변형 runtime-1에 preset max-tokens 하나 더 생성
 
 Then
 
@@ -229,7 +229,7 @@ Then
 Given
 
 - 런타임 변형 하나와, 슈퍼관리자 한 명
-  - 런타임 변형 variant-1
+  - 런타임 변형 runtime-1: 기본 모델 정의가 비어 있고, 모델 폴더의 설정 파일을 읽지 않는다
   - 도메인 home-1
   - 도메인에 속한 사용자 한 명 준비
     - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
@@ -239,7 +239,7 @@ Given
 
 When
 
-- RuntimeVariantPresetAdapter.create — user-1이 변형 variant-1에 preset max-tokens 생성
+- RuntimeVariantPresetAdapter.create — user-1이 변형 runtime-1에 preset max-tokens 생성
 
 Then
 
@@ -267,7 +267,7 @@ Then
 Given
 
 - 런타임 변형 하나와, 슈퍼관리자 한 명
-  - 런타임 변형 variant-1
+  - 런타임 변형 runtime-1: 기본 모델 정의가 비어 있고, 모델 폴더의 설정 파일을 읽지 않는다
   - 도메인 home-1
   - 도메인에 속한 사용자 한 명 준비
     - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
@@ -277,7 +277,7 @@ Given
 
 When
 
-- RuntimeVariantPresetAdapter.create — user-1이 변형 variant-1에 preset max-tokens 생성
+- RuntimeVariantPresetAdapter.create — user-1이 변형 runtime-1에 preset max-tokens 생성
 
 Then
 
@@ -305,7 +305,7 @@ Then
 Given
 
 - 런타임 변형 하나와, 일반 사용자 한 명
-  - 런타임 변형 variant-1
+  - 런타임 변형 runtime-1: 기본 모델 정의가 비어 있고, 모델 폴더의 설정 파일을 읽지 않는다
   - 도메인 home-1
   - 도메인에 속한 사용자 한 명 준비
     - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
@@ -315,7 +315,7 @@ Given
 
 When
 
-- RuntimeVariantPresetAdapter.create — user-1이 변형 variant-1에 preset max-tokens 생성
+- RuntimeVariantPresetAdapter.create — user-1이 변형 runtime-1에 preset max-tokens 생성
 
 Then
 
@@ -329,7 +329,7 @@ Then
 Given
 
 - 런타임 변형 하나와, 슈퍼관리자 한 명
-  - 런타임 변형 variant-1
+  - 런타임 변형 runtime-1: 기본 모델 정의가 비어 있고, 모델 폴더의 설정 파일을 읽지 않는다
   - 도메인 home-1
   - 도메인에 속한 사용자 한 명 준비
     - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
@@ -339,7 +339,7 @@ Given
 
 When
 
-- RuntimeVariantPresetAdapter.create — user-1이 변형 variant-1에 preset max-tokens 생성
+- RuntimeVariantPresetAdapter.create — user-1이 변형 runtime-1에 preset max-tokens 생성
 
 Then
 
@@ -367,7 +367,7 @@ preset이 없는 변형에 슈퍼관리자가 필수 항목만 지정해 생성�
 Given
 
 - 런타임 변형 하나와, 슈퍼관리자 한 명
-  - 런타임 변형 variant-1
+  - 런타임 변형 runtime-1: 기본 모델 정의가 비어 있고, 모델 폴더의 설정 파일을 읽지 않는다
   - 도메인 home-1
   - 도메인에 속한 사용자 한 명 준비
     - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
@@ -377,7 +377,7 @@ Given
 
 When
 
-- RuntimeVariantPresetAdapter.create — user-1이 변형 variant-1에 preset max-tokens 생성
+- RuntimeVariantPresetAdapter.create — user-1이 변형 runtime-1에 preset max-tokens 생성
 
 Then
 
@@ -405,8 +405,8 @@ Then
 Given
 
 - 변형 둘, 한쪽에만 있는 preset 하나, 그리고 슈퍼관리자 한 명
-  - 런타임 변형 taken-1
-  - 런타임 변형 free-1
+  - 런타임 변형 taken-1: 기본 모델 정의가 비어 있고, 모델 폴더의 설정 파일을 읽지 않는다
+  - 런타임 변형 free-1: 기본 모델 정의가 비어 있고, 모델 폴더의 설정 파일을 읽지 않는다
   - 런타임 변형 preset preset-1: env 대상, 값 종류 str
   - 도메인 home-1
   - 도메인에 속한 사용자 한 명 준비
@@ -445,7 +445,7 @@ Then
 Given
 
 - 런타임 변형 하나와, 일반 사용자 한 명
-  - 런타임 변형 variant-1
+  - 런타임 변형 runtime-1: 기본 모델 정의가 비어 있고, 모델 폴더의 설정 파일을 읽지 않는다
   - 도메인 home-1
   - 도메인에 속한 사용자 한 명 준비
     - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
@@ -455,7 +455,7 @@ Given
 
 When
 
-- RuntimeVariantPresetAdapter.create — user-1이 변형 variant-1에 preset max-tokens 생성
+- RuntimeVariantPresetAdapter.create — user-1이 변형 runtime-1에 preset max-tokens 생성
 
 Then
 
@@ -471,7 +471,7 @@ Then
 Given
 
 - 변형 하나와 그 변형의 preset 하나, 그리고 슈퍼관리자 한 명
-  - 런타임 변형 variant-1
+  - 런타임 변형 runtime-1: 기본 모델 정의가 비어 있고, 모델 폴더의 설정 파일을 읽지 않는다
   - 런타임 변형 preset preset-1: env 대상, 값 종류 str
   - 도메인 home-1
   - 도메인에 속한 사용자 한 명 준비
@@ -510,7 +510,7 @@ Then
 Given
 
 - 변형 하나와 그 변형의 preset 하나, 그리고 일반 사용자 한 명
-  - 런타임 변형 variant-1
+  - 런타임 변형 runtime-1: 기본 모델 정의가 비어 있고, 모델 폴더의 설정 파일을 읽지 않는다
   - 런타임 변형 preset preset-1: env 대상, 값 종류 str
   - 도메인 home-1
   - 도메인에 속한 사용자 한 명 준비
@@ -535,7 +535,7 @@ Then
 Given
 
 - 변형 하나와 그 변형의 preset 하나, 그리고 슈퍼관리자 한 명
-  - 런타임 변형 variant-1
+  - 런타임 변형 runtime-1: 기본 모델 정의가 비어 있고, 모델 폴더의 설정 파일을 읽지 않는다
   - 런타임 변형 preset preset-1: env 대상, 값 종류 int, 기본값 4
   - 도메인 home-1
   - 도메인에 속한 사용자 한 명 준비
@@ -560,7 +560,7 @@ Then
 Given
 
 - 변형 하나와 그 변형의 preset 하나, 그리고 슈퍼관리자 한 명
-  - 런타임 변형 variant-1
+  - 런타임 변형 runtime-1: 기본 모델 정의가 비어 있고, 모델 폴더의 설정 파일을 읽지 않는다
   - 런타임 변형 preset preset-1: env 대상, 값 종류 str
   - 도메인 home-1
   - 도메인에 속한 사용자 한 명 준비
@@ -585,7 +585,7 @@ Then
 Given
 
 - 변형 하나와 그 변형의 preset 하나, 그리고 슈퍼관리자 한 명
-  - 런타임 변형 variant-1
+  - 런타임 변형 runtime-1: 기본 모델 정의가 비어 있고, 모델 폴더의 설정 파일을 읽지 않는다
   - 런타임 변형 preset preset-1: env 대상, 값 종류 str
   - 도메인 home-1
   - 도메인에 속한 사용자 한 명 준비
@@ -624,7 +624,7 @@ Then
 Given
 
 - 변형 하나와 그 변형의 preset 하나, 그리고 슈퍼관리자 한 명
-  - 런타임 변형 variant-1
+  - 런타임 변형 runtime-1: 기본 모델 정의가 비어 있고, 모델 폴더의 설정 파일을 읽지 않는다
   - 런타임 변형 preset preset-1: env 대상, 값 종류 str
   - 도메인 home-1
   - 도메인에 속한 사용자 한 명 준비
@@ -663,7 +663,7 @@ Then
 Given
 
 - 변형 하나와 그 변형의 preset 하나, 그리고 슈퍼관리자 한 명
-  - 런타임 변형 variant-1
+  - 런타임 변형 runtime-1: 기본 모델 정의가 비어 있고, 모델 폴더의 설정 파일을 읽지 않는다
   - 런타임 변형 preset preset-1: env 대상, 값 종류 str
   - 도메인 home-1
   - 도메인에 속한 사용자 한 명 준비
@@ -702,7 +702,7 @@ Then
 Given
 
 - 변형 하나와 그 변형의 preset 하나, 그리고 슈퍼관리자 한 명
-  - 런타임 변형 variant-1
+  - 런타임 변형 runtime-1: 기본 모델 정의가 비어 있고, 모델 폴더의 설정 파일을 읽지 않는다
   - 런타임 변형 preset preset-1: env 대상, 값 종류 str
   - 도메인 home-1
   - 도메인에 속한 사용자 한 명 준비
@@ -727,7 +727,7 @@ Then
 Given
 
 - 변형 하나와 그 변형의 preset 하나, 그리고 일반 사용자 한 명
-  - 런타임 변형 variant-1
+  - 런타임 변형 runtime-1: 기본 모델 정의가 비어 있고, 모델 폴더의 설정 파일을 읽지 않는다
   - 런타임 변형 preset preset-1: env 대상, 값 종류 str
   - 도메인 home-1
   - 도메인에 속한 사용자 한 명 준비
@@ -768,7 +768,7 @@ Then
 Given
 
 - 변형 하나와 그 변형의 preset 하나, 그리고 일반 사용자 한 명
-  - 런타임 변형 variant-1
+  - 런타임 변형 runtime-1: 기본 모델 정의가 비어 있고, 모델 폴더의 설정 파일을 읽지 않는다
   - 런타임 변형 preset preset-1: env 대상, 값 종류 str
   - 도메인 home-1
   - 도메인에 속한 사용자 한 명 준비
@@ -807,7 +807,7 @@ Then
 Given
 
 - 변형 하나와 그 변형의 preset 하나, 그리고 일반 사용자 한 명
-  - 런타임 변형 variant-1
+  - 런타임 변형 runtime-1: 기본 모델 정의가 비어 있고, 모델 폴더의 설정 파일을 읽지 않는다
   - 런타임 변형 preset preset-1: env 대상, 값 종류 str
   - 도메인 home-1
   - 도메인에 속한 사용자 한 명 준비
@@ -832,7 +832,7 @@ Then
 Given
 
 - 한 변형의 preset 2개와, 일반 사용자 한 명
-  - 런타임 변형 variant-1
+  - 런타임 변형 runtime-1: 기본 모델 정의가 비어 있고, 모델 폴더의 설정 파일을 읽지 않는다
   - 런타임 변형 preset preset-1: env 대상, 값 종류 str
   - 런타임 변형 preset preset-2: env 대상, 값 종류 str
   - 도메인 home-1
@@ -889,7 +889,7 @@ Then
 Given
 
 - 변형 하나와 그 변형의 preset 하나, 그리고 일반 사용자 한 명
-  - 런타임 변형 variant-1
+  - 런타임 변형 runtime-1: 기본 모델 정의가 비어 있고, 모델 폴더의 설정 파일을 읽지 않는다
   - 런타임 변형 preset preset-1: env 대상, 값 종류 str
   - 도메인 home-1
   - 도메인에 속한 사용자 한 명 준비
@@ -916,7 +916,7 @@ Then
 Given
 
 - 변형 하나와 그 변형의 preset 하나, 그리고 일반 사용자 한 명
-  - 런타임 변형 variant-1
+  - 런타임 변형 runtime-1: 기본 모델 정의가 비어 있고, 모델 폴더의 설정 파일을 읽지 않는다
   - 런타임 변형 preset preset-1: env 대상, 값 종류 str
   - 도메인 home-1
   - 도메인에 속한 사용자 한 명 준비
@@ -941,7 +941,7 @@ Then
 Given
 
 - 변형 하나와 그 변형의 preset 하나, 그리고 슈퍼관리자 한 명
-  - 런타임 변형 variant-1
+  - 런타임 변형 runtime-1: 기본 모델 정의가 비어 있고, 모델 폴더의 설정 파일을 읽지 않는다
   - 런타임 변형 preset preset-1: env 대상, 값 종류 str
   - 도메인 home-1
   - 도메인에 속한 사용자 한 명 준비
@@ -966,7 +966,7 @@ Then
 Given
 
 - 변형 하나와 그 변형의 preset 하나, 그리고 슈퍼관리자 한 명
-  - 런타임 변형 variant-1
+  - 런타임 변형 runtime-1: 기본 모델 정의가 비어 있고, 모델 폴더의 설정 파일을 읽지 않는다
   - 런타임 변형 preset preset-1: env 대상, 값 종류 str
   - 도메인 home-1
   - 도메인에 속한 사용자 한 명 준비
@@ -991,7 +991,7 @@ Then
 Given
 
 - 변형 하나와 그 변형의 preset 하나, 그리고 일반 사용자 한 명
-  - 런타임 변형 variant-1
+  - 런타임 변형 runtime-1: 기본 모델 정의가 비어 있고, 모델 폴더의 설정 파일을 읽지 않는다
   - 런타임 변형 preset preset-1: env 대상, 값 종류 str
   - 도메인 home-1
   - 도메인에 속한 사용자 한 명 준비
@@ -1018,7 +1018,7 @@ preset 둘이 있을 때 아무 권한도 없는 사용자가 필터 없이 조�
 Given
 
 - 한 변형의 preset 2개와, 일반 사용자 한 명
-  - 런타임 변형 variant-1
+  - 런타임 변형 runtime-1: 기본 모델 정의가 비어 있고, 모델 폴더의 설정 파일을 읽지 않는다
   - 런타임 변형 preset preset-1: env 대상, 값 종류 str
   - 런타임 변형 preset preset-2: env 대상, 값 종류 str
   - 도메인 home-1
@@ -1047,8 +1047,8 @@ Then
 Given
 
 - 두 변형에 나뉜 preset 셋과, 일반 사용자 한 명
-  - 런타임 변형 wanted-1
-  - 런타임 변형 other-1
+  - 런타임 변형 wanted-1: 기본 모델 정의가 비어 있고, 모델 폴더의 설정 파일을 읽지 않는다
+  - 런타임 변형 other-1: 기본 모델 정의가 비어 있고, 모델 폴더의 설정 파일을 읽지 않는다
   - 런타임 변형 preset mine-1: env 대상, 값 종류 str
   - 런타임 변형 preset mine-2: env 대상, 값 종류 str
   - 런타임 변형 preset elsewhere-1: env 대상, 값 종류 str
@@ -1078,7 +1078,7 @@ Then
 Given
 
 - 추가 버전과 폐기 버전이 다른 preset 다섯과, 일반 사용자 한 명
-  - 런타임 변형 variant-1
+  - 런타임 변형 runtime-1: 기본 모델 정의가 비어 있고, 모델 폴더의 설정 파일을 읽지 않는다
   - 런타임 변형 preset open-1: env 대상, 값 종류 str, 버전 1.0.0부터 끝까지
   - 런타임 변형 preset unbounded-1: env 대상, 값 종류 str
   - 런타임 변형 preset closed-1: env 대상, 값 종류 str, 버전 1.0.0부터 2.0.0까지
@@ -1110,7 +1110,7 @@ preset 11개가 있을 때 크기 없이 조회하면 10건까지 반환되고 �
 Given
 
 - 한 변형의 preset 11개와, 일반 사용자 한 명
-  - 런타임 변형 variant-1
+  - 런타임 변형 runtime-1: 기본 모델 정의가 비어 있고, 모델 폴더의 설정 파일을 읽지 않는다
   - 런타임 변형 preset preset-1: env 대상, 값 종류 str
   - 런타임 변형 preset preset-2: env 대상, 값 종류 str
   - 런타임 변형 preset preset-3: env 대상, 값 종류 str

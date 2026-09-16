@@ -13,18 +13,6 @@ from typing import Any, override
 from uuid import uuid4
 
 import pytest
-from bai_scenario.components.answers import TheCallIsRefused
-from bai_scenario.components.runtime_variant_preset import (
-    APresetAndACaller,
-    APresetAndSomeone,
-    ManyPresetsAndACaller,
-    ManyPresetsAndSomeone,
-    ThePresetNode,
-    ThePresetsInTheOrderAsked,
-)
-from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
-from bai_scenario.runner.steps import run_scenario
 
 from ai.backend.common.data.entity.runtime_variant_preset import RuntimeVariantPresetID
 from ai.backend.common.dto.manager.v2.runtime_variant_preset.response import (
@@ -45,6 +33,18 @@ from ai.backend.testutils.scenario_steps import (
     Verdict,
     When,
 )
+from bai_scenario.components.answers import TheCallIsRefused
+from bai_scenario.components.runtime_variant_preset import (
+    APresetAndACaller,
+    APresetAndSomeone,
+    ManyPresetsAndACaller,
+    ManyPresetsAndSomeone,
+    ThePresetNode,
+    ThePresetsInTheOrderAsked,
+)
+from bai_scenario.runner.acting import ActingAs
+from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.steps import run_scenario
 
 type Loaded = list[RuntimeVariantPresetNode | None]
 type ReadingStep = Scenario[SeedingSession, Any, RuntimeVariantPresetAdapter, Any]

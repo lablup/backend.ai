@@ -6,18 +6,6 @@ from dataclasses import dataclass
 from typing import override
 
 import pytest
-from bai_scenario.components.runtime_variant_preset import (
-    VALID_AT,
-    ManyPresetsAndACaller,
-    ManyPresetsAndSomeone,
-    PresetsAcrossVersions,
-    PresetsInTwoVariants,
-    TheFirstPageOfPresets,
-    TheLaidPresetsAreLeft,
-)
-from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
-from bai_scenario.runner.steps import run_scenario
 
 from ai.backend.common.dto.manager.query import UUIDFilter
 from ai.backend.common.dto.manager.v2.runtime_variant_preset.request import (
@@ -32,6 +20,18 @@ from ai.backend.manager.api.adapters.runtime_variant_preset.adapter import (
 )
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import Given, Scenario, Then, When
+from bai_scenario.components.runtime_variant_preset import (
+    VALID_AT,
+    ManyPresetsAndACaller,
+    ManyPresetsAndSomeone,
+    PresetsAcrossVersions,
+    PresetsInTwoVariants,
+    TheFirstPageOfPresets,
+    TheLaidPresetsAreLeft,
+)
+from bai_scenario.runner.acting import ActingAs
+from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.steps import run_scenario
 
 DEFAULT_PAGE = 10
 

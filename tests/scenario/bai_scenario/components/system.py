@@ -11,14 +11,13 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, override
 
+from ai.backend.common.data.user.types import UserRole
+from ai.backend.manager.data.user.types import UserData
+from ai.backend.testutils.scenario_steps import Given
 from bai_scenario.components.domain import WAS_HERE, SomeoneOf
 from bai_scenario.seeds.domain.domain import SeedDomain
 from bai_scenario.seeds.seeder import Laid
 from bai_scenario.seeds.user.user import SeedUserOf
-
-from ai.backend.common.data.user.types import UserRole
-from ai.backend.manager.data.user.types import UserData
-from ai.backend.testutils.scenario_steps import Given
 
 ENFORCEMENT = "manager.rbac.enforcement_enabled"
 """The switch the entity gate reads. A row that turns it off passes it as its config."""

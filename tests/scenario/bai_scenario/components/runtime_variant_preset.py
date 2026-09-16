@@ -11,12 +11,6 @@ from datetime import datetime
 from typing import Any, override
 from uuid import UUID
 
-from bai_scenario.components.domain import WrittenByThisRun
-from bai_scenario.components.runtime_variant import AVariantAndACaller
-from bai_scenario.components.system import KEPT, Kept, lay_a_caller, role_named
-from bai_scenario.seeds.runtime_variant.preset import SeedRuntimeVariantPreset
-from bai_scenario.seeds.runtime_variant.runtime_variant import SeedRuntimeVariant
-
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.v2.runtime_variant_preset.response import (
     DeleteRuntimeVariantPresetPayload,
@@ -44,6 +38,11 @@ from ai.backend.testutils.scenario_steps import (
     Then,
     Verdict,
 )
+from bai_scenario.components.domain import WrittenByThisRun
+from bai_scenario.components.runtime_variant import AVariantAndACaller
+from bai_scenario.components.system import KEPT, Kept, lay_a_caller, role_named
+from bai_scenario.seeds.runtime_variant.preset import SeedRuntimeVariantPreset
+from bai_scenario.seeds.runtime_variant.runtime_variant import SeedRuntimeVariant
 
 DESCRIBED = "미리 만들어 둔 preset"
 """시드가 미리 만들어 두는 preset의 설명. 시나리오가 기대값으로 다시 쓰므로 한 곳에 둔다."""

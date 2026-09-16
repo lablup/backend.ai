@@ -9,16 +9,6 @@ from typing import Any, override
 from uuid import uuid4
 
 import pytest
-from bai_scenario.components.answers import TheCallIsRefused
-from bai_scenario.components.runtime_variant_preset import (
-    APresetAndACaller,
-    APresetAndSomeone,
-    ThePresetNode,
-)
-from bai_scenario.components.system import ENFORCEMENT
-from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
-from bai_scenario.runner.steps import run_scenario
 
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.v2.runtime_variant_preset.request import (
@@ -36,6 +26,16 @@ from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.errors.resource import RuntimeVariantPresetNotFound
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import Configured, Given, Scenario, Then, When
+from bai_scenario.components.answers import TheCallIsRefused
+from bai_scenario.components.runtime_variant_preset import (
+    APresetAndACaller,
+    APresetAndSomeone,
+    ThePresetNode,
+)
+from bai_scenario.components.system import ENFORCEMENT
+from bai_scenario.runner.acting import ActingAs
+from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.steps import run_scenario
 
 RENAMED = "renamed"
 RERANKED = 7

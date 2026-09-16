@@ -12,23 +12,6 @@ from datetime import UTC, datetime
 from typing import Any, override
 
 import pytest
-from bai_scenario.components.answers import TheCallIsRefused
-from bai_scenario.components.domain import WrittenByThisRun
-from bai_scenario.components.runtime_variant import AVariantAndACaller, AVariantAndSomeone
-from bai_scenario.components.runtime_variant_preset import (
-    RANK_GAP,
-    APresetAndACaller,
-    APresetAndSomeone,
-    TheNewPresetNode,
-    TheSameNameUnderTheOtherVariant,
-    TwoVariantsAndAPreset,
-    TwoVariantsOneWithAPreset,
-    preset_verdicts,
-)
-from bai_scenario.components.system import ENFORCEMENT
-from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
-from bai_scenario.runner.steps import run_scenario
 
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.v2.runtime_variant_preset.request import (
@@ -62,6 +45,23 @@ from ai.backend.testutils.scenario_steps import (
     Verdict,
     When,
 )
+from bai_scenario.components.answers import TheCallIsRefused
+from bai_scenario.components.domain import WrittenByThisRun
+from bai_scenario.components.runtime_variant import AVariantAndACaller, AVariantAndSomeone
+from bai_scenario.components.runtime_variant_preset import (
+    RANK_GAP,
+    APresetAndACaller,
+    APresetAndSomeone,
+    TheNewPresetNode,
+    TheSameNameUnderTheOtherVariant,
+    TwoVariantsAndAPreset,
+    TwoVariantsOneWithAPreset,
+    preset_verdicts,
+)
+from bai_scenario.components.system import ENFORCEMENT
+from bai_scenario.runner.acting import ActingAs
+from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.steps import run_scenario
 
 MADE = "max-tokens"
 KEY = "MAX_TOKENS"
