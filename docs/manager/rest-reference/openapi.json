@@ -3254,8 +3254,8 @@
         "title": "AdminSearchContainerRegistriesInput",
         "type": "object"
       },
-      "AllowedProjectsInput": {
-        "description": "Input for specifying allowed project membership changes.",
+      "AllowedGroupsInput": {
+        "description": "Input for specifying allowed group membership changes.",
         "properties": {
           "add": {
             "description": "List of group IDs or names to add to the allowed groups.",
@@ -3274,7 +3274,7 @@
             "type": "array"
           }
         },
-        "title": "AllowedProjectsInput",
+        "title": "AllowedGroupsInput",
         "type": "object"
       },
       "CreateContainerRegistryInput": {
@@ -3376,7 +3376,7 @@
           "allowed_groups": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/AllowedProjectsInput"
+                "$ref": "#/components/schemas/AllowedGroupsInput"
               },
               {
                 "type": "null"
@@ -3523,7 +3523,7 @@
           "allowed_groups": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/AllowedProjectsInput"
+                "$ref": "#/components/schemas/AllowedGroupsInput"
               },
               {
                 "type": "null"
