@@ -202,7 +202,8 @@ class ANameAlreadyTakenIsRefused(
     def describe(self) -> str:
         return (
             "같은 이름의 슬롯 종류가 있을 때 그 이름으로 다시 생성하면, 이름 중복으로 거부된다. "
-            "이 행은 다섯 테이블의 참조 대상이라 덮어쓰지 않는다"
+            "이 행은 에이전트 자원·커널 할당·모델 카드 자원 요구·배포 preset 자원 슬롯·배포 리비전 자원 슬롯 "
+            "테이블이 참조하므로 덮어쓰지 않는다"
         )
 
     @override

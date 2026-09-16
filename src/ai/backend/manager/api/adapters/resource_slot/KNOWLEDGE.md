@@ -1,7 +1,7 @@
 ---
 name: resource-slot-adapter-scenarios
 type: reference
-description: what the resource slot adapter guarantees for slot types, as scenarios; the name-keyed surface that resolves a name before every call, the superadmin role on create and update against the entity gate on purge, the five referrers that refuse a purge; the agent resource reads are not yet written
+description: what the resource slot adapter guarantees for slot types, as scenarios; the name-keyed surface that resolves a name before every call, the superadmin role on create and update against the entity gate on purge, the agent resource, kernel allocation, model card requirement, deployment preset slot and deployment revision slot rows that refuse a purge; the agent resource reads are not yet written
 scope: src/ai/backend/manager/api/adapters/resource_slot
 keywords: [resource slot type, scenario, adapter, superadmin, lookup, purge, in use, public read]
 generated:
@@ -14,8 +14,8 @@ status: draft
 규칙은 상위 디렉터리의 `AGENTS.md`에 있다. 여기 적힌 내용과 실행 결과가 어긋나면 문장 쪽을 먼저
 의심한다.
 
-이 어댑터는 두 가지를 다룬다. 슬롯 종류의 카탈로그와, 에이전트가 보고하고 커널이 할당받은
-자원의 조회다. 이 문서는 앞의 것만 적는다. 뒤의 것은 자원 그룹 관심사의 몫이라 "아직 적지
+이 어댑터는 슬롯 종류의 카탈로그와, 에이전트가 보고하고 커널이 할당받은 자원의 조회를 다룬다.
+이 문서는 슬롯 종류의 카탈로그만 적는다. 자원의 조회는 자원 그룹 관심사의 몫이라 "아직 적지
 않은 것"에 남긴다.
 
 슬롯 종류는 어느 스코프에도 속하지 않게 만들어진다. 생성과 수정은 전역 역할이 있어야 하고,
@@ -32,13 +32,14 @@ id로 풀어낸 뒤 본 호출을 실행한다. 쓰기는 부르는 사람이 �
 |---|---|---|---|
 | 슈퍼관리자가 이름과 종류만 지정해 생성한다 | 슬롯 종류 없음, 전역 역할 있음 | 이름과 종류로 생성 | 표시용 문자열은 모두 비고, 필수 여부는 거짓, 사용 여부는 참, 순위는 0, 숫자 서식은 십진에 반올림 없음인 노드 |
 | 표시 항목을 모두 지정해 생성한다 | 슬롯 종류 없음, 전역 역할 있음 | 표시 이름·설명·단위·아이콘·서식·순위까지 지정해 생성 | 지정한 값이 그대로 담긴 노드 |
-| 네 종류 각각으로 생성한다 | 슬롯 종류 없음, 전역 역할 있음 | 개수·바이트·고유·통합 종류로 각각 생성 | 생성된다 |
+| 개수·바이트·고유·통합 종류 각각으로 생성한다 | 슬롯 종류 없음, 전역 역할 있음 | 그 종류로 생성 | 그 종류가 담긴 노드 |
 | 이미 사용 중인 이름으로 생성한다 | 그 이름의 슬롯 종류가 있음, 전역 역할 있음 | 생성 | 이름 중복으로 거부 |
 | 슈퍼관리자가 아닌 사용자가 생성한다 | 전역 역할 없음 | 생성 | 역할 부족으로 거부 |
 | 권한 검사를 꺼도 슈퍼관리자가 아니면 생성할 수 없다 | 권한 검사 비활성화, 전역 역할 없음 | 생성 | 역할 부족으로 거부 |
 
-이미 사용 중인 이름을 덮어쓰지 않고 거부하는 것은 이 행이 다섯 테이블의 참조 대상이기
-때문이다. 조용히 바꾸면 그 이름으로 기록된 할당량이 모두 다른 뜻이 된다.
+이미 사용 중인 이름을 덮어쓰지 않고 거부하는 것은 이 행을 에이전트 자원·커널 할당·모델 카드
+자원 요구·배포 preset 자원 슬롯·배포 리비전 자원 슬롯 테이블이 참조하기 때문이다. 조용히 바꾸면
+그 이름으로 기록된 할당량이 모두 다른 뜻이 된다.
 
 노드의 id는 uuid가 아니라 슬롯 이름이다. 다른 엔티티에서 id를 무시하는 검사를 여기 그대로
 가져오면 이름 검사를 잃으므로, 이 엔티티에서는 id를 검사하고 uuid를 무시한다.
@@ -84,9 +85,9 @@ id로 풀어낸 뒤 본 호출을 실행한다. 쓰기는 부르는 사람이 �
 
 이름과 종류는 수정할 수 없다. 요청 타입이 그 둘을 받지 않으므로 시나리오로 두지 않는다.
 
-여섯 번째 시나리오가 이 절에서 눈여겨볼 곳이다. 역할이 없는 사용자는 이름이 있을 때와 같은
-이유로 거부된다. 이름을 풀어내는 단계가 역할 검사보다 먼저 돌면 "대상 없음"이 새어 나오는데, 그
-순서가 아니라는 것을 이 행이 못박는다. 삭제 절의 같은 시나리오와 나란히 둔다.
+슈퍼관리자가 아닌 사용자가 없는 이름을 수정하는 시나리오가 이 절에서 눈여겨볼 곳이다. 역할이
+없는 사용자는 이름이 있을 때와 같은 이유로 거부된다. 이름을 풀어내는 단계가 역할 검사보다 먼저
+돌면 "대상 없음"이 새어 나오는데, 그 순서가 아니라는 것을 이 행이 못박는다. 삭제 절의 같은 시나리오와 나란히 둔다.
 
 ## 삭제
 
@@ -103,8 +104,9 @@ id로 풀어낸 뒤 본 호출을 실행한다. 쓰기는 부르는 사람이 �
 | 아무 권한도 없는 사용자가 없는 이름을 삭제한다 | 다른 슬롯 종류만 있음, 아무 권한도 없음 | 삭제 | 권한 부족으로 거부 |
 | 권한 검사를 끄면 권한 없이도 삭제된다 | 권한 검사 비활성화, 아무 권한도 없음 | 삭제 | 삭제한 이름을 담은 응답 |
 
-참조하는 곳마다 시나리오를 하나씩 둔다. 다섯 검사가 각각 따로 실행되고, 어느 하나가 빠지면 그
-경우는 거부가 아니라 제약 위반으로 실패한다. 한 시나리오로 뭉치면 넷이 빠져도 통과한다.
+참조하는 테이블마다 시나리오를 하나씩 둔다. 에이전트 자원·커널 할당·모델 카드 자원 요구·배포
+preset 자원 슬롯·배포 리비전 자원 슬롯 검사가 각각 따로 실행되고, 어느 하나가 빠지면 그 경우는
+거부가 아니라 제약 위반으로 실패한다. 한 시나리오로 뭉치면 그중 하나만 남아도 통과한다.
 
 수정과 삭제가 같은 슬롯 종류에 대해 서로 다른 이유로 거부한다. 수정은 역할 부족, 삭제는 권한
 부족이다.
@@ -116,8 +118,8 @@ id로 풀어낸 뒤 본 호출을 실행한다. 쓰기는 부르는 사람이 �
 어느 시나리오도 호출하지 않는 어댑터 호출이다. 실행 결과가 이 목록을 함께 출력한다.
 
 에이전트가 보고한 자원과 커널의 할당을 조회하는 일곱 호출은 자원 그룹 관심사에서 적는다. 슬롯
-종류의 시나리오는 이 어댑터의 의존성 셋 중 슬롯 종류 처리기만 사용하고, 에이전트와 도메인
-처리기에는 접근하지 않는다.
+종류의 시나리오는 이 어댑터가 의존하는 슬롯 종류·에이전트·도메인 처리기 중 슬롯 종류 처리기만
+사용한다.
 
 - 에이전트 자원: `search_agent_resources`, `scoped_search_agent_resources`, `get_agent_resource`
 - 할당: `search_allocations`, `get_kernel_allocation`
