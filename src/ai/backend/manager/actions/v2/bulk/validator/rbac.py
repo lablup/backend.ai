@@ -75,7 +75,8 @@ class VirtualEntityPartialBulkActionRBACValidator(PartialBulkActionValidator):
     """The check answered per entity, so the run keeps going without the denied ones.
 
     A denied entity becomes one failed item of the result, told apart from an id that
-    matched no row by the error it carries.
+    matched no row by the error it carries. A superadmin is denied nothing, so an id
+    that matched no row reaches the operation and comes back as the miss it is.
     """
 
     _check: BulkOwnCheck
@@ -85,6 +86,11 @@ class VirtualEntityPartialBulkActionRBACValidator(PartialBulkActionValidator):
 
     @override
     async def validate(self, meta: BulkActionTriggerMeta) -> Mapping[EntityIdentifier, Exception]:
+        user = current_user()
+        if user is None:
+            raise UnreachableError("User context is not available")
+        if user.is_superadmin:
+            return {}
         owned = await self._check.check(meta)
         return {
             entity_id: NotEnoughPermission(
