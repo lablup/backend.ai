@@ -302,44 +302,6 @@ Then
   - app_configs[0].config_name: 요청한 이름와 같다
   - app_configs[0].config = {'theme': 'dark', 'menu': {'docs': False, 'billing': True}}
 
-#### [another-users-fragment-does-not-merge-into-mine](/tests/scenario/bai_scenario/manager/app_config/test_reading_mine.py) — pass
-
-같은 도메인의 다른 사용자가 같은 이름에 조각을 두었어도, 자기 설정을 조회하면 자기 조각의 값만 반환된다
-
-Given
-
-- 사용자 스코프에 허용된 설정 이름 하나와, 자기 스코프에서 설정 읽기 권한을 받은 사용자 한 명
-  - 도메인 home-1
-  - 자기 스코프에서 설정에 대한 READ 권한을 받은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 own-scope-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 own-scope-1: app_config 전체에 READ 허용
-    - 일반 사용자 user-1: 역할 own-scope-1 보유
-  - 사용자 스코프에 허용된 설정 이름 준비
-    - 설정 정의 config-1: 이 이름의 설정이 등록돼 있다
-    - 허용 목록 항목 entry-1: 사용자 스코프에서 이 이름의 설정을 지정할 수 있다, 순위는 그 스코프 종류의 기본값
-  - 설정 조각 own-fragment-1: 값 {'theme': 'solar', 'menu': {'home': False}}
-  - 도메인에 속한 사용자 한 명 준비
-    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
-    - 일반 사용자 user-2: 자기 키와 개인 프로젝트를 갖는다
-  - 설정 조각 anothers-fragment-1: 값 {'theme': 'theirs', 'secret': 1}
-
-When
-
-- AppConfigAdapter.my_app_configs — user-1이 config-1의 자기 설정을 조회
-
-Then
-
-- 요청한 이름마다 병합된 설정이 반환된다
-  - app_configs = 1
-  - app_configs[0].config_name: 요청한 이름와 같다
-  - app_configs[0].config = {'theme': 'solar', 'menu': {'home': False}}
-
 #### [my-own-fragment-overrides-the-domains](/tests/scenario/bai_scenario/manager/app_config/test_reading_mine.py) — pass
 
 같은 이름에 도메인 조각과 자기 조각이 모두 있고 허용 목록 항목이 기본 순위이면, 겹치는 키는 자기 값이 남고 겹치지 않는 키는 양쪽 모두 남는다

@@ -5,10 +5,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import override
 
-from bai_scenario.seeds.seeder import Naming, SeedRow
-
 from ai.backend.manager.data.app_config.types import AppConfigDefinitionData
 from ai.backend.manager.models.app_config_definition.creators import AppConfigDefinitionCreator
+from bai_scenario.seeds.seeder import Naming, SeedRow
 
 
 @dataclass(frozen=True)

@@ -13,14 +13,6 @@ from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Any, override
 
-from bai_scenario.components.domain import WAS_HERE, SomeoneOf
-from bai_scenario.seeds.app_config.allow_list import SCOPE_NAMES, SeedAllowListEntry
-from bai_scenario.seeds.app_config.definition import SeedDefinition
-from bai_scenario.seeds.app_config.fragment import SeedFragmentOf, SeedPublicFragment
-from bai_scenario.seeds.domain.domain import SeedDomain
-from bai_scenario.seeds.rbac.role import SeedPermission, SeedRole
-from bai_scenario.seeds.seeder import Laid, Seeder, SeedNest
-
 from ai.backend.common.data.app_config.types import AppConfigScopeType
 from ai.backend.common.data.entity.app_config import AppConfigEntityType
 from ai.backend.common.data.entity.app_config_allow_list import AppConfigAllowListEntityType
@@ -48,6 +40,13 @@ from ai.backend.testutils.scenario_steps import (
     Then,
     Verdict,
 )
+from bai_scenario.components.domain import WAS_HERE, SomeoneOf
+from bai_scenario.seeds.app_config.allow_list import SCOPE_NAMES, SeedAllowListEntry
+from bai_scenario.seeds.app_config.definition import SeedDefinition
+from bai_scenario.seeds.app_config.fragment import SeedFragmentOf, SeedPublicFragment
+from bai_scenario.seeds.domain.domain import SeedDomain
+from bai_scenario.seeds.rbac.role import SeedPermission, SeedRole
+from bai_scenario.seeds.seeder import Laid, Seeder, SeedNest
 
 ENFORCEMENT = "manager.rbac.enforcement_enabled"
 

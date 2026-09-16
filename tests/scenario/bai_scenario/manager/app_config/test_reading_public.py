@@ -11,6 +11,12 @@ from dataclasses import dataclass
 from typing import Any, override
 
 import pytest
+
+from ai.backend.common.dto.manager.v2.app_config.request import PublicGetAppConfigsInput
+from ai.backend.common.dto.manager.v2.app_config.response import GetAppConfigsPayload
+from ai.backend.manager.api.adapters.app_config.adapter import AppConfigAdapter
+from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.testutils.scenario_steps import Given, Scenario, Then, When
 from bai_scenario.components.app_config import (
     AConfigLaidAcross,
     AMergeAndACaller,
@@ -20,12 +26,6 @@ from bai_scenario.components.app_config import (
 from bai_scenario.runner.acting import ActingAs
 from bai_scenario.runner.planting import SeedingSession
 from bai_scenario.runner.steps import run_scenario
-
-from ai.backend.common.dto.manager.v2.app_config.request import PublicGetAppConfigsInput
-from ai.backend.common.dto.manager.v2.app_config.response import GetAppConfigsPayload
-from ai.backend.manager.api.adapters.app_config.adapter import AppConfigAdapter
-from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.scenario_steps import Given, Scenario, Then, When
 
 type ReadingStep = Scenario[
     SeedingSession, AMergeAndACaller, AppConfigAdapter, GetAppConfigsPayload
