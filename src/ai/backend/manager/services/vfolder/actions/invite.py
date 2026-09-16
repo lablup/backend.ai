@@ -6,12 +6,10 @@ from typing import (
     override,
 )
 
+from ai.backend.common.data.entity.entity_share import EntityShareEntityType
 from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
 from ai.backend.common.data.entity.user import UserID
-from ai.backend.common.data.entity.vfolder_invitation import (
-    VFolderInvitationEntityType,
-    VFolderInvitationID,
-)
+from ai.backend.common.data.entity.vfolder_invitation import VFolderInvitationID
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.actions.v2.scope.base import BaseScopeAction
 from ai.backend.manager.actions.v2.single_entity.base import BaseSingleEntityAction
@@ -40,14 +38,17 @@ class VFolderInvitationAction(BaseSingleEntityAction):
 
 @dataclass
 class VFolderInvitationScopeAction(BaseScopeAction):
-    """Base for reading the invitations a user sent or received."""
+    """Base for reading the invitations a user sent or received.
+
+    The rows read are ``entity_share``, so permission is asked on that type.
+    """
 
     user_uuid: uuid.UUID
 
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return VFolderInvitationEntityType()
+        return EntityShareEntityType()
 
     @override
     def scope_targets(self) -> Sequence[EntityIdentifier]:
