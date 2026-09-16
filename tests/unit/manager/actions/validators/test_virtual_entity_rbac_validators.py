@@ -1,0 +1,1117 @@
+"""Tests for the virtual-entity-chain RBAC action validators (BA-6876 scope).
+
+These tests drive the validators against a real ``RbacPermissionCheckRepository``
+backed by a real Postgres connection. Permissions are seeded through the
+virtual-entity chain (``virtual_entities`` / ``scope_bindings`` /
+``entity_memberships``) with a self scope_binding on the owner scope, so the
+non-superadmin path exercises the virtual-entity-chain permission resolution —
+not the recursive scope-walk.
+"""
+
+from __future__ import annotations
+
+import uuid
+from collections.abc import AsyncIterator, Awaitable, Sequence
+from dataclasses import dataclass, field
+from datetime import UTC, datetime
+from typing import override
+from unittest.mock import MagicMock
+
+import pytest
+import sqlalchemy as sa
+from sqlalchemy.ext.asyncio import AsyncSession as SASession
+
+from ai.backend.common.contexts.user import with_user
+from ai.backend.common.data.entity.domain import DomainEntityType, DomainID
+from ai.backend.common.data.entity.project import ProjectEntityType
+from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
+from ai.backend.common.data.entity.user import UserID
+from ai.backend.common.data.entity.vfolder import VFolderEntityType, VFolderUUID
+from ai.backend.common.data.entity.virtual_entity import VirtualEntityID
+from ai.backend.common.data.permission.types import Permission
+from ai.backend.common.data.user.types import UserData, UserRole
+from ai.backend.common.exception import UnreachableError
+from ai.backend.common.types import ResourceSlot
+from ai.backend.manager.actions.types import ActionOperationType
+from ai.backend.manager.actions.v2.bulk.base import BaseBulkAction
+from ai.backend.manager.actions.v2.bulk.trigger import BulkActionTriggerMeta
+from ai.backend.manager.actions.v2.bulk.validator.rbac import (
+    VirtualEntityAtomicBulkActionRBACValidator,
+    VirtualEntityPartialBulkActionRBACValidator,
+)
+from ai.backend.manager.actions.v2.scope.base import BaseScopeAction
+from ai.backend.manager.actions.v2.scope.validator.rbac import (
+    VirtualEntityScopeActionRBACValidator,
+)
+from ai.backend.manager.actions.v2.single_entity.base import BaseSingleEntityAction
+from ai.backend.manager.actions.v2.single_entity.trigger import (
+    SingleEntityActionTriggerMeta,
+)
+from ai.backend.manager.actions.v2.single_entity.validator.rbac import (
+    VirtualEntitySingleEntityActionRBACValidator,
+)
+from ai.backend.manager.actions.v2.trigger import ActionTriggerMeta
+from ai.backend.manager.data.user.types import UserStatus
+from ai.backend.manager.errors.permission import NotEnoughPermission
+from ai.backend.manager.models.agent import AgentRow
+
+# ORM cluster registration: configure_mappers() (triggered when this isolated
+# test registers a domain-cluster row) resolves string relationships against the
+# registry. These rows are reachable via relationships but are not otherwise
+# imported/registered by this test; _ORM_CLUSTER keeps them live.
+from ai.backend.manager.models.domain import DomainRow
+from ai.backend.manager.models.entity_label.row import EntityLabelRow
+from ai.backend.manager.models.image import ImageRow
+from ai.backend.manager.models.keypair import KeyPairRow
+from ai.backend.manager.models.rbac_models import UserRoleRow
+from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
+from ai.backend.manager.models.rbac_models.role import RoleRow
+from ai.backend.manager.models.resource_group import ResourceGroupForDomainRow
+from ai.backend.manager.models.resource_policy import (
+    KeyPairResourcePolicyRow,
+    UserResourcePolicyRow,
+)
+from ai.backend.manager.models.user import UserRow
+from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
+from ai.backend.manager.models.virtual_entity.entity_membership_cap import (
+    EntityMembershipCapRow,
+)
+from ai.backend.manager.models.virtual_entity.entity_membership_field import (
+    EntityMembershipFieldRow,
+)
+from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
+from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
+from ai.backend.manager.repositories.ops.v2.permission.provider import PermissionOpsProvider
+from ai.backend.manager.repositories.rbac.permission_check_repository import (
+    RbacPermissionCheckRepository,
+)
+from ai.backend.testutils.db import with_tables
+from ai.backend.testutils.virtual_entity import VirtualEntitySeeder
+
+_ORM_CLUSTER = (
+    AgentRow,
+    ImageRow,
+    ResourceGroupForDomainRow,
+)
+
+_DOMAIN_ID: uuid.UUID = uuid.uuid4()
+_OTHER_DOMAIN_ID: uuid.UUID = uuid.uuid4()
+_PROJECT_ID: uuid.UUID = uuid.uuid4()
+_VFOLDER_ID: uuid.UUID = uuid.uuid4()
+_BULK_VF_GRANTED: uuid.UUID = uuid.uuid4()
+_BULK_VF_DENIED: uuid.UUID = uuid.uuid4()
+
+
+class _StubEntityID(EntityIdentifier):
+    @override
+    @classmethod
+    def entity_type(cls) -> EntityType:
+        return VFolderEntityType()
+
+
+class _ProjectCreateScopeAction(BaseScopeAction):
+    """PROJECT:CREATE at domain scopes — subject type differs from the scope type."""
+
+    _scopes: Sequence[EntityIdentifier]
+
+    def __init__(self, scopes: Sequence[EntityIdentifier]) -> None:
+        self._scopes = scopes
+
+    @classmethod
+    @override
+    def entity_type(cls) -> EntityType:
+        return ProjectEntityType()
+
+    @override
+    def scope_targets(self) -> Sequence[EntityIdentifier]:
+        return self._scopes
+
+    @classmethod
+    @override
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.CREATE
+
+    @classmethod
+    @override
+    def action_name(cls) -> str:
+        return "create_project"
+
+
+@dataclass
+class _VfolderUpdateAction(BaseSingleEntityAction):
+    """VFOLDER:UPDATE on a single vfolder — exercises the single-entity path."""
+
+    vfolder_id: uuid.UUID = field(default_factory=lambda: _VFOLDER_ID)
+
+    @classmethod
+    @override
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.UPDATE
+
+    @classmethod
+    @override
+    def action_name(cls) -> str:
+        return "update_vfolder"
+
+    @override
+    def entity_id(self) -> EntityIdentifier:
+        return _StubEntityID(self.vfolder_id)
+
+
+@dataclass
+class _VfolderUpsertAction(BaseSingleEntityAction):
+    """VFOLDER:UPSERT on a single vfolder — requires the ``CREATE | UPDATE`` mask."""
+
+    vfolder_id: uuid.UUID = field(default_factory=lambda: _VFOLDER_ID)
+
+    @classmethod
+    @override
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.UPSERT
+
+    @classmethod
+    @override
+    def action_name(cls) -> str:
+        return "upsert_vfolder"
+
+    @override
+    def entity_id(self) -> EntityIdentifier:
+        return _StubEntityID(self.vfolder_id)
+
+
+@dataclass
+class _BulkVfolderUpdateAction(BaseBulkAction):
+    """VFOLDER:UPDATE on multiple vfolders — exercises the bulk validator path."""
+
+    ids: list[uuid.UUID]
+
+    @classmethod
+    @override
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.UPDATE
+
+    @classmethod
+    @override
+    def action_name(cls) -> str:
+        return "update_vfolders"
+
+    @override
+    def entity_ids(self) -> Sequence[EntityIdentifier]:
+        return tuple(_VfolderID(i) for i in self.ids)
+
+
+def _bulk_meta(
+    action: _BulkVfolderUpdateAction, trigger_meta: ActionTriggerMeta
+) -> BulkActionTriggerMeta:
+    return BulkActionTriggerMeta(
+        action_id=trigger_meta.action_id,
+        started_at=trigger_meta.started_at,
+        entity_ids=action.entity_ids(),
+        operation_type=action.operation_type(),
+        action_name=action.action_name(),
+    )
+
+
+class _VfolderID(EntityIdentifier):
+    @override
+    @classmethod
+    def entity_type(cls) -> EntityType:
+        return VFolderEntityType()
+
+
+def _domain_scope(scope_id: uuid.UUID) -> EntityIdentifier:
+    return DomainID(scope_id)
+
+
+def _make_user_data(user_id: uuid.UUID, *, is_superadmin: bool) -> UserData:
+    return UserData(
+        user_id=user_id,
+        is_authorized=True,
+        is_admin=is_superadmin,
+        is_superadmin=is_superadmin,
+        role=UserRole.SUPERADMIN if is_superadmin else UserRole.USER,
+        domain_name="default",
+        domain_id=DomainID(uuid.uuid4()),
+    )
+
+
+def _make_config_provider(*, enforcement_enabled: bool = True) -> MagicMock:
+    config_provider = MagicMock()
+    config_provider.config.manager.rbac.enforcement_enabled = enforcement_enabled
+    return config_provider
+
+
+async def _seed_user_with_role(
+    db: ExtendedAsyncSAEngine,
+    *,
+    user_id: uuid.UUID,
+    role_id: uuid.UUID,
+) -> None:
+    suffix = user_id.hex[:8]
+    policy_name = f"policy-{suffix}"
+    async with db.begin_session() as db_sess:
+        domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
+        domain_id = DomainID(uuid.uuid4())
+        db_sess.add(DomainRow(id=domain_id, name=domain_name, total_resource_slots=ResourceSlot()))
+        db_sess.add(
+            UserResourcePolicyRow(
+                name=policy_name,
+                max_vfolder_count=0,
+                max_quota_scope_size=-1,
+                max_session_count_per_model_session=0,
+                max_customized_image_count=0,
+            )
+        )
+        db_sess.add(
+            UserRow(
+                uuid=user_id,
+                username=f"user-{suffix}",
+                email=f"user-{suffix}@test.com",
+                resource_policy=policy_name,
+                status=UserStatus.ACTIVE,
+                need_password_change=False,
+                sudo_session_enabled=False,
+                domain_name=domain_name,
+                domain_id=domain_id,
+            )
+        )
+        await db_sess.flush()
+        db_sess.add(VirtualEntityRow(entity_type=EntityType("domain"), entity_id=domain_id))
+        db_sess.add(
+            RoleRow(
+                id=role_id,
+                name=f"role-{suffix}",
+                description="virtual-entity validator test role",
+                scope_type=EntityType("domain"),
+                scope_id=domain_id,
+            )
+        )
+        await db_sess.flush()
+        db_sess.add(UserRoleRow(user_id=user_id, role_id=role_id))
+        await db_sess.flush()
+
+
+def _single_bit_rows(
+    *,
+    role_id: uuid.UUID,
+    entity_type: object,
+    permission: Permission,
+) -> list[PermissionRow]:
+    """One permissions row per bit of ``permission`` — the row is keyed by its bit."""
+    return [
+        PermissionRow(
+            role_id=role_id,
+            entity_type=entity_type,
+            permission=bit,
+        )
+        for bit in Permission
+        if bit and permission & bit
+    ]
+
+
+async def _grant_permission(
+    db: ExtendedAsyncSAEngine,
+    *,
+    role_id: uuid.UUID,
+    scope_type: EntityType,
+    scope_id: uuid.UUID,
+    entity_type: EntityType,
+    operation: Permission,
+    permission: Permission | None = None,
+) -> None:
+    """Grant *operation* on *entity_type* at the scope.
+
+    ``permission`` overrides the granted bitmask, which the resolution actually
+    reads; pass it to grant a multi-bit mask the single ``operation`` column
+    cannot express.
+    """
+    async with db.begin_session() as db_sess:
+        domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
+        domain_id = DomainID(uuid.uuid4())
+        db_sess.add(DomainRow(id=domain_id, name=domain_name, total_resource_slots=ResourceSlot()))
+        await db_sess.execute(
+            sa.update(RoleRow)
+            .where(RoleRow.id == role_id)
+            .values(scope_type=EntityType(str(scope_type)), scope_id=scope_id)
+        )
+        db_sess.add_all(
+            _single_bit_rows(
+                role_id=role_id,
+                entity_type=entity_type,
+                permission=permission if permission is not None else operation,
+            )
+        )
+        await db_sess.flush()
+
+
+async def _seed_vs_chain(
+    db: ExtendedAsyncSAEngine,
+    *,
+    owner_scope_type: str,
+    owner_scope_id: uuid.UUID,
+    entity_type: str,
+    entity_ids: Sequence[uuid.UUID],
+    scope_cap: Permission | None = None,
+    entity_cap: Permission | None = None,
+) -> None:
+    """Materialize the owner's virtual entity with a self scope_binding and one
+    entity membership per id: ``owner scope -> VS(owner) -> entities``. Each member
+    entity gets its own node, which the membership names."""
+    async with db.begin_session() as db_sess:
+        domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
+        domain_id = DomainID(uuid.uuid4())
+        db_sess.add(DomainRow(id=domain_id, name=domain_name, total_resource_slots=ResourceSlot()))
+        ve_id = await _node_id(db_sess, EntityType(owner_scope_type), owner_scope_id)
+        member_node_ids = [
+            await _node_id(db_sess, EntityType(entity_type), entity_id) for entity_id in entity_ids
+        ]
+        db_sess.add(
+            ScopeBindingRow(
+                virtual_entity_id=ve_id,
+                scope_entity_id=ve_id,
+                permission_cap=scope_cap,
+            )
+        )
+        for node_id in member_node_ids:
+            await VirtualEntitySeeder().cap_edge(db_sess, ve_id, node_id, entity_cap)
+        await db_sess.flush()
+
+
+async def _node_id(
+    db_sess: SASession, entity_type: EntityType, entity_id: uuid.UUID
+) -> VirtualEntityID:
+    """The entity's virtual entity node id, created if it has none."""
+    existing = await db_sess.scalar(
+        sa.select(VirtualEntityRow.id).where(
+            VirtualEntityRow.entity_type == entity_type,
+            VirtualEntityRow.entity_id == entity_id,
+        )
+    )
+    if existing is not None:
+        return VirtualEntityID(existing)
+    node = VirtualEntityRow(entity_type=entity_type, entity_id=entity_id)
+    db_sess.add(node)
+    await db_sess.flush()
+    return VirtualEntityID(node.id)
+
+
+async def _seed_granted_user(
+    db: ExtendedAsyncSAEngine,
+    *,
+    owner_scope_type: str,
+    owner_scope_id: uuid.UUID,
+    entity_type: str,
+    entity_ids: Sequence[uuid.UUID],
+    perm_scope_type: EntityType,
+    perm_entity_type: EntityType,
+    operation: Permission,
+    permission: Permission | None = None,
+    scope_cap: Permission | None = None,
+    entity_cap: Permission | None = None,
+) -> UserData:
+    """Seed a non-superadmin user whose role grants *operation* on
+    *perm_entity_type* at the owner scope, reachable via the virtual-entity chain."""
+    user_id = uuid.uuid4()
+    role_id = uuid.uuid4()
+    await _seed_user_with_role(db, user_id=user_id, role_id=role_id)
+    await _seed_vs_chain(
+        db,
+        owner_scope_type=owner_scope_type,
+        owner_scope_id=owner_scope_id,
+        entity_type=entity_type,
+        entity_ids=entity_ids,
+        scope_cap=scope_cap,
+        entity_cap=entity_cap,
+    )
+    await _grant_permission(
+        db,
+        role_id=role_id,
+        scope_type=perm_scope_type,
+        scope_id=owner_scope_id,
+        entity_type=perm_entity_type,
+        operation=operation,
+        permission=permission,
+    )
+    return _make_user_data(user_id, is_superadmin=False)
+
+
+@pytest.fixture
+def trigger_meta() -> ActionTriggerMeta:
+    return ActionTriggerMeta(action_id=uuid.uuid4(), started_at=datetime.now(UTC))
+
+
+@pytest.fixture
+def scope_action() -> _ProjectCreateScopeAction:
+    return _ProjectCreateScopeAction(scopes=[_domain_scope(_DOMAIN_ID)])
+
+
+@pytest.fixture
+def partially_authorized_scope_action() -> _ProjectCreateScopeAction:
+    """Targets the granted domain plus one the user has no chain to."""
+    return _ProjectCreateScopeAction(
+        scopes=[_domain_scope(_DOMAIN_ID), _domain_scope(_OTHER_DOMAIN_ID)],
+    )
+
+
+@pytest.fixture
+def single_entity_action() -> _VfolderUpdateAction:
+    return _VfolderUpdateAction()
+
+
+@pytest.fixture
+def bulk_vfolder_action() -> _BulkVfolderUpdateAction:
+    return _BulkVfolderUpdateAction(ids=[_BULK_VF_GRANTED, _BULK_VF_DENIED])
+
+
+@pytest.fixture
+async def db_with_rbac_tables(
+    database_connection: ExtendedAsyncSAEngine,
+) -> AsyncIterator[ExtendedAsyncSAEngine]:
+    async with with_tables(
+        database_connection,
+        [
+            DomainRow,
+            UserResourcePolicyRow,
+            KeyPairResourcePolicyRow,
+            RoleRow,
+            UserRoleRow,
+            UserRow,
+            KeyPairRow,
+            PermissionRow,
+            VirtualEntityRow,
+            ScopeBindingRow,
+            EntityLabelRow,
+            EntityMembershipRow,
+            EntityMembershipCapRow,
+            EntityMembershipFieldRow,
+        ],
+    ):
+        yield database_connection
+
+
+@pytest.fixture
+def repository(
+    db_with_rbac_tables: ExtendedAsyncSAEngine,
+) -> RbacPermissionCheckRepository:
+    return RbacPermissionCheckRepository(
+        PermissionOpsProvider(db_with_rbac_tables), _make_config_provider()
+    )
+
+
+@pytest.fixture
+def scope_validator(
+    repository: RbacPermissionCheckRepository,
+) -> VirtualEntityScopeActionRBACValidator:
+    return VirtualEntityScopeActionRBACValidator(repository, _make_config_provider())
+
+
+@pytest.fixture
+def single_entity_validator(
+    repository: RbacPermissionCheckRepository,
+) -> VirtualEntitySingleEntityActionRBACValidator:
+    return VirtualEntitySingleEntityActionRBACValidator(repository, _make_config_provider())
+
+
+@pytest.fixture
+def bulk_validator(
+    repository: RbacPermissionCheckRepository,
+) -> VirtualEntityAtomicBulkActionRBACValidator:
+    return VirtualEntityAtomicBulkActionRBACValidator(repository)
+
+
+@pytest.fixture
+def partial_bulk_validator(
+    repository: RbacPermissionCheckRepository,
+) -> VirtualEntityPartialBulkActionRBACValidator:
+    return VirtualEntityPartialBulkActionRBACValidator(repository)
+
+
+@pytest.fixture
+def superadmin_user() -> UserData:
+    # Bypass path: validator returns before any DB lookup, so no rows are seeded.
+    return _make_user_data(uuid.uuid4(), is_superadmin=True)
+
+
+@pytest.fixture
+async def seeded_superadmin_user(
+    db_with_rbac_tables: ExtendedAsyncSAEngine,
+) -> UserData:
+    """A superadmin stored as one, for the checks that read the role from the user row."""
+    user_id = uuid.uuid4()
+    await _seed_user_with_role(db_with_rbac_tables, user_id=user_id, role_id=uuid.uuid4())
+    async with db_with_rbac_tables.begin_session() as db_sess:
+        await db_sess.execute(
+            sa.update(UserRow).where(UserRow.uuid == user_id).values(role=UserRole.SUPERADMIN)
+        )
+    return _make_user_data(user_id, is_superadmin=True)
+
+
+@pytest.fixture
+async def regular_user_without_permission(
+    db_with_rbac_tables: ExtendedAsyncSAEngine,
+) -> UserData:
+    user_id = uuid.uuid4()
+    await _seed_user_with_role(db_with_rbac_tables, user_id=user_id, role_id=uuid.uuid4())
+    return _make_user_data(user_id, is_superadmin=False)
+
+
+@pytest.fixture
+async def user_with_project_create_at_domain(
+    db_with_rbac_tables: ExtendedAsyncSAEngine,
+) -> UserData:
+    """PROJECT:CREATE granted at the domain scope, chain uncapped."""
+    return await _seed_granted_user(
+        db_with_rbac_tables,
+        owner_scope_type="domain",
+        owner_scope_id=_DOMAIN_ID,
+        entity_type="domain",
+        entity_ids=[_DOMAIN_ID],
+        perm_scope_type=DomainEntityType(),
+        perm_entity_type=ProjectEntityType(),
+        operation=Permission.CREATE,
+    )
+
+
+@pytest.fixture
+async def user_with_read_capped_domain_scope(
+    db_with_rbac_tables: ExtendedAsyncSAEngine,
+) -> UserData:
+    """PROJECT:CREATE granted, but the scope_binding cap clips it to READ."""
+    return await _seed_granted_user(
+        db_with_rbac_tables,
+        owner_scope_type="domain",
+        owner_scope_id=_DOMAIN_ID,
+        entity_type="domain",
+        entity_ids=[_DOMAIN_ID],
+        perm_scope_type=DomainEntityType(),
+        perm_entity_type=ProjectEntityType(),
+        operation=Permission.CREATE,
+        scope_cap=Permission.READ,
+    )
+
+
+@pytest.fixture
+async def user_with_vfolder_update_at_project(
+    db_with_rbac_tables: ExtendedAsyncSAEngine,
+) -> UserData:
+    """VFOLDER:UPDATE granted at the project scope, chain uncapped."""
+    return await _seed_granted_user(
+        db_with_rbac_tables,
+        owner_scope_type="project",
+        owner_scope_id=_PROJECT_ID,
+        entity_type="vfolder",
+        entity_ids=[_VFOLDER_ID],
+        perm_scope_type=ProjectEntityType(),
+        perm_entity_type=VFolderEntityType(),
+        operation=Permission.UPDATE,
+    )
+
+
+@pytest.fixture
+async def user_with_read_capped_vfolder(
+    db_with_rbac_tables: ExtendedAsyncSAEngine,
+) -> UserData:
+    """VFOLDER:UPDATE granted, but the entity_membership cap clips it to READ."""
+    return await _seed_granted_user(
+        db_with_rbac_tables,
+        owner_scope_type="project",
+        owner_scope_id=_PROJECT_ID,
+        entity_type="vfolder",
+        entity_ids=[_VFOLDER_ID],
+        perm_scope_type=ProjectEntityType(),
+        perm_entity_type=VFolderEntityType(),
+        operation=Permission.UPDATE,
+        entity_cap=Permission.READ,
+    )
+
+
+def _vfolder_user_with(
+    db: ExtendedAsyncSAEngine,
+    permission: Permission,
+) -> Awaitable[UserData]:
+    """A user whose effective VFOLDER permission at the project scope is *permission*."""
+    return _seed_granted_user(
+        db,
+        owner_scope_type="project",
+        owner_scope_id=_PROJECT_ID,
+        entity_type="vfolder",
+        entity_ids=[_VFOLDER_ID],
+        perm_scope_type=ProjectEntityType(),
+        perm_entity_type=VFolderEntityType(),
+        operation=Permission.CREATE,
+        permission=permission,
+    )
+
+
+@pytest.fixture
+async def user_with_vfolder_create_only(
+    db_with_rbac_tables: ExtendedAsyncSAEngine,
+) -> UserData:
+    return await _vfolder_user_with(db_with_rbac_tables, Permission.CREATE)
+
+
+@pytest.fixture
+async def user_with_vfolder_update_only(
+    db_with_rbac_tables: ExtendedAsyncSAEngine,
+) -> UserData:
+    return await _vfolder_user_with(db_with_rbac_tables, Permission.UPDATE)
+
+
+@pytest.fixture
+async def user_with_vfolder_create_and_update(
+    db_with_rbac_tables: ExtendedAsyncSAEngine,
+) -> UserData:
+    return await _vfolder_user_with(db_with_rbac_tables, Permission.CREATE | Permission.UPDATE)
+
+
+@pytest.fixture
+async def user_with_all_bulk_vfolders_granted(
+    db_with_rbac_tables: ExtendedAsyncSAEngine,
+) -> UserData:
+    """VFOLDER:UPDATE granted with both bulk target vfolders in the chain."""
+    return await _seed_granted_user(
+        db_with_rbac_tables,
+        owner_scope_type="project",
+        owner_scope_id=_PROJECT_ID,
+        entity_type="vfolder",
+        entity_ids=[_BULK_VF_GRANTED, _BULK_VF_DENIED],
+        perm_scope_type=ProjectEntityType(),
+        perm_entity_type=VFolderEntityType(),
+        operation=Permission.UPDATE,
+    )
+
+
+@pytest.fixture
+async def user_with_partial_bulk_membership(
+    db_with_rbac_tables: ExtendedAsyncSAEngine,
+) -> UserData:
+    """VFOLDER:UPDATE granted, but only _BULK_VF_GRANTED is in the chain."""
+    return await _seed_granted_user(
+        db_with_rbac_tables,
+        owner_scope_type="project",
+        owner_scope_id=_PROJECT_ID,
+        entity_type="vfolder",
+        entity_ids=[_BULK_VF_GRANTED],
+        perm_scope_type=ProjectEntityType(),
+        perm_entity_type=VFolderEntityType(),
+        operation=Permission.UPDATE,
+    )
+
+
+@pytest.fixture
+async def user_with_read_capped_bulk_vfolder(
+    db_with_rbac_tables: ExtendedAsyncSAEngine,
+) -> UserData:
+    """VFOLDER:UPDATE granted, but the entity_membership cap clips it to READ."""
+    return await _seed_granted_user(
+        db_with_rbac_tables,
+        owner_scope_type="project",
+        owner_scope_id=_PROJECT_ID,
+        entity_type="vfolder",
+        entity_ids=[_BULK_VF_GRANTED],
+        perm_scope_type=ProjectEntityType(),
+        perm_entity_type=VFolderEntityType(),
+        operation=Permission.UPDATE,
+        entity_cap=Permission.READ,
+    )
+
+
+class TestVirtualEntityScopeActionRBACValidator:
+    async def test_superadmin_bypasses_check(
+        self,
+        scope_validator: VirtualEntityScopeActionRBACValidator,
+        scope_action: _ProjectCreateScopeAction,
+        trigger_meta: ActionTriggerMeta,
+        superadmin_user: UserData,
+    ) -> None:
+        # No permission rows seeded; bypass must succeed regardless.
+        with with_user(superadmin_user):
+            await scope_validator.validate(scope_action, trigger_meta)
+
+    async def test_enforcement_disabled_skips_check(
+        self,
+        repository: RbacPermissionCheckRepository,
+        scope_action: _ProjectCreateScopeAction,
+        trigger_meta: ActionTriggerMeta,
+    ) -> None:
+        # Short-circuits before the user-context lookup, so no user is set.
+        validator = VirtualEntityScopeActionRBACValidator(
+            repository, _make_config_provider(enforcement_enabled=False)
+        )
+        await validator.validate(scope_action, trigger_meta)
+
+    async def test_missing_user_raises(
+        self,
+        scope_validator: VirtualEntityScopeActionRBACValidator,
+        scope_action: _ProjectCreateScopeAction,
+        trigger_meta: ActionTriggerMeta,
+    ) -> None:
+        with pytest.raises(UnreachableError):
+            await scope_validator.validate(scope_action, trigger_meta)
+
+    async def test_permission_on_subject_type_at_scope_passes(
+        self,
+        scope_validator: VirtualEntityScopeActionRBACValidator,
+        scope_action: _ProjectCreateScopeAction,
+        trigger_meta: ActionTriggerMeta,
+        user_with_project_create_at_domain: UserData,
+    ) -> None:
+        with with_user(user_with_project_create_at_domain):
+            await scope_validator.validate(scope_action, trigger_meta)
+
+    async def test_unauthorized_scope_among_targets_raises(
+        self,
+        scope_validator: VirtualEntityScopeActionRBACValidator,
+        partially_authorized_scope_action: _ProjectCreateScopeAction,
+        trigger_meta: ActionTriggerMeta,
+        user_with_project_create_at_domain: UserData,
+    ) -> None:
+        # One target scope is unauthorized, so the whole action must be rejected.
+        with with_user(user_with_project_create_at_domain):
+            with pytest.raises(NotEnoughPermission):
+                await scope_validator.validate(partially_authorized_scope_action, trigger_meta)
+
+    async def test_scope_cap_clips_granted_permission(
+        self,
+        scope_validator: VirtualEntityScopeActionRBACValidator,
+        scope_action: _ProjectCreateScopeAction,
+        trigger_meta: ActionTriggerMeta,
+        user_with_read_capped_domain_scope: UserData,
+    ) -> None:
+        with with_user(user_with_read_capped_domain_scope):
+            with pytest.raises(NotEnoughPermission):
+                await scope_validator.validate(scope_action, trigger_meta)
+
+
+class TestVirtualEntitySingleEntityActionRBACValidator:
+    async def test_permission_via_chain_passes(
+        self,
+        single_entity_validator: VirtualEntitySingleEntityActionRBACValidator,
+        single_entity_action: _VfolderUpdateAction,
+        trigger_meta: ActionTriggerMeta,
+        user_with_vfolder_update_at_project: UserData,
+    ) -> None:
+        with with_user(user_with_vfolder_update_at_project):
+            await single_entity_validator.validate(
+                SingleEntityActionTriggerMeta(
+                    action_id=trigger_meta.action_id,
+                    started_at=trigger_meta.started_at,
+                    entity=single_entity_action.entity_id(),
+                    operation_type=single_entity_action.operation_type(),
+                    action_name=single_entity_action.action_name(),
+                )
+            )
+
+    async def test_without_permission_raises(
+        self,
+        single_entity_validator: VirtualEntitySingleEntityActionRBACValidator,
+        single_entity_action: _VfolderUpdateAction,
+        trigger_meta: ActionTriggerMeta,
+        regular_user_without_permission: UserData,
+    ) -> None:
+        with with_user(regular_user_without_permission):
+            with pytest.raises(NotEnoughPermission):
+                await single_entity_validator.validate(
+                    SingleEntityActionTriggerMeta(
+                        action_id=trigger_meta.action_id,
+                        started_at=trigger_meta.started_at,
+                        entity=single_entity_action.entity_id(),
+                        operation_type=single_entity_action.operation_type(),
+                        action_name=single_entity_action.action_name(),
+                    )
+                )
+
+    async def test_entity_cap_clips_granted_permission(
+        self,
+        single_entity_validator: VirtualEntitySingleEntityActionRBACValidator,
+        single_entity_action: _VfolderUpdateAction,
+        trigger_meta: ActionTriggerMeta,
+        user_with_read_capped_vfolder: UserData,
+    ) -> None:
+        with with_user(user_with_read_capped_vfolder):
+            with pytest.raises(NotEnoughPermission):
+                await single_entity_validator.validate(
+                    SingleEntityActionTriggerMeta(
+                        action_id=trigger_meta.action_id,
+                        started_at=trigger_meta.started_at,
+                        entity=single_entity_action.entity_id(),
+                        operation_type=single_entity_action.operation_type(),
+                        action_name=single_entity_action.action_name(),
+                    )
+                )
+
+
+class TestUpsertRequiresBothCreateAndUpdate:
+    """An UPSERT action demands the ``CREATE | UPDATE`` mask, and the check is a
+    subset test — holding just one of the two bits must be rejected."""
+
+    @pytest.fixture
+    def upsert_action(self) -> _VfolderUpsertAction:
+        return _VfolderUpsertAction()
+
+    async def test_create_only_is_rejected(
+        self,
+        single_entity_validator: VirtualEntitySingleEntityActionRBACValidator,
+        upsert_action: _VfolderUpsertAction,
+        trigger_meta: ActionTriggerMeta,
+        user_with_vfolder_create_only: UserData,
+    ) -> None:
+        with with_user(user_with_vfolder_create_only):
+            with pytest.raises(NotEnoughPermission):
+                await single_entity_validator.validate(
+                    SingleEntityActionTriggerMeta(
+                        action_id=trigger_meta.action_id,
+                        started_at=trigger_meta.started_at,
+                        entity=upsert_action.entity_id(),
+                        operation_type=upsert_action.operation_type(),
+                        action_name=upsert_action.action_name(),
+                    )
+                )
+
+    async def test_update_only_is_rejected(
+        self,
+        single_entity_validator: VirtualEntitySingleEntityActionRBACValidator,
+        upsert_action: _VfolderUpsertAction,
+        trigger_meta: ActionTriggerMeta,
+        user_with_vfolder_update_only: UserData,
+    ) -> None:
+        with with_user(user_with_vfolder_update_only):
+            with pytest.raises(NotEnoughPermission):
+                await single_entity_validator.validate(
+                    SingleEntityActionTriggerMeta(
+                        action_id=trigger_meta.action_id,
+                        started_at=trigger_meta.started_at,
+                        entity=upsert_action.entity_id(),
+                        operation_type=upsert_action.operation_type(),
+                        action_name=upsert_action.action_name(),
+                    )
+                )
+
+    async def test_both_bits_pass(
+        self,
+        single_entity_validator: VirtualEntitySingleEntityActionRBACValidator,
+        upsert_action: _VfolderUpsertAction,
+        trigger_meta: ActionTriggerMeta,
+        user_with_vfolder_create_and_update: UserData,
+    ) -> None:
+        with with_user(user_with_vfolder_create_and_update):
+            await single_entity_validator.validate(
+                SingleEntityActionTriggerMeta(
+                    action_id=trigger_meta.action_id,
+                    started_at=trigger_meta.started_at,
+                    entity=upsert_action.entity_id(),
+                    operation_type=upsert_action.operation_type(),
+                    action_name=upsert_action.action_name(),
+                )
+            )
+
+    async def test_single_bit_operation_still_passes_with_one_bit(
+        self,
+        single_entity_validator: VirtualEntitySingleEntityActionRBACValidator,
+        single_entity_action: _VfolderUpdateAction,
+        trigger_meta: ActionTriggerMeta,
+        user_with_vfolder_update_only: UserData,
+    ) -> None:
+        # Regression: the subset semantics must not tighten single-bit operations.
+        with with_user(user_with_vfolder_update_only):
+            await single_entity_validator.validate(
+                SingleEntityActionTriggerMeta(
+                    action_id=trigger_meta.action_id,
+                    started_at=trigger_meta.started_at,
+                    entity=single_entity_action.entity_id(),
+                    operation_type=single_entity_action.operation_type(),
+                    action_name=single_entity_action.action_name(),
+                )
+            )
+
+
+class TestVirtualEntityAtomicBulkActionRBACValidator:
+    async def test_superadmin_bypasses_check(
+        self,
+        db_with_rbac_tables: ExtendedAsyncSAEngine,
+        bulk_validator: VirtualEntityAtomicBulkActionRBACValidator,
+        bulk_vfolder_action: _BulkVfolderUpdateAction,
+        trigger_meta: ActionTriggerMeta,
+        seeded_superadmin_user: UserData,
+    ) -> None:
+        # No permission rows seeded; the stored role answers for every existing entity.
+        async with db_with_rbac_tables.begin_session() as db_sess:
+            for entity_id in bulk_vfolder_action.entity_ids():
+                await VirtualEntitySeeder().provision(db_sess, VFolderEntityType(), entity_id)
+        with with_user(seeded_superadmin_user):
+            await bulk_validator.validate(
+                BulkActionTriggerMeta(
+                    action_id=trigger_meta.action_id,
+                    started_at=trigger_meta.started_at,
+                    entity_ids=bulk_vfolder_action.entity_ids(),
+                    operation_type=bulk_vfolder_action.operation_type(),
+                    action_name=bulk_vfolder_action.action_name(),
+                )
+            )
+
+    async def test_superadmin_is_refused_an_entity_without_a_node(
+        self,
+        bulk_validator: VirtualEntityAtomicBulkActionRBACValidator,
+        bulk_vfolder_action: _BulkVfolderUpdateAction,
+        trigger_meta: ActionTriggerMeta,
+        seeded_superadmin_user: UserData,
+    ) -> None:
+        with with_user(seeded_superadmin_user):
+            with pytest.raises(NotEnoughPermission):
+                await bulk_validator.validate(_bulk_meta(bulk_vfolder_action, trigger_meta))
+
+    async def test_all_targets_granted_passes(
+        self,
+        bulk_validator: VirtualEntityAtomicBulkActionRBACValidator,
+        bulk_vfolder_action: _BulkVfolderUpdateAction,
+        trigger_meta: ActionTriggerMeta,
+        user_with_all_bulk_vfolders_granted: UserData,
+    ) -> None:
+        with with_user(user_with_all_bulk_vfolders_granted):
+            await bulk_validator.validate(
+                BulkActionTriggerMeta(
+                    action_id=trigger_meta.action_id,
+                    started_at=trigger_meta.started_at,
+                    entity_ids=bulk_vfolder_action.entity_ids(),
+                    operation_type=bulk_vfolder_action.operation_type(),
+                    action_name=bulk_vfolder_action.action_name(),
+                )
+            )
+
+    async def test_any_denied_target_rejects_whole_action(
+        self,
+        bulk_validator: VirtualEntityAtomicBulkActionRBACValidator,
+        bulk_vfolder_action: _BulkVfolderUpdateAction,
+        trigger_meta: ActionTriggerMeta,
+        user_with_partial_bulk_membership: UserData,
+    ) -> None:
+        # _BULK_VF_DENIED has no membership, so the whole bulk action must be rejected.
+        with with_user(user_with_partial_bulk_membership):
+            with pytest.raises(NotEnoughPermission):
+                await bulk_validator.validate(
+                    BulkActionTriggerMeta(
+                        action_id=trigger_meta.action_id,
+                        started_at=trigger_meta.started_at,
+                        entity_ids=bulk_vfolder_action.entity_ids(),
+                        operation_type=bulk_vfolder_action.operation_type(),
+                        action_name=bulk_vfolder_action.action_name(),
+                    )
+                )
+
+    async def test_entity_cap_clips_granted_permission(
+        self,
+        bulk_validator: VirtualEntityAtomicBulkActionRBACValidator,
+        trigger_meta: ActionTriggerMeta,
+        user_with_read_capped_bulk_vfolder: UserData,
+    ) -> None:
+        with with_user(user_with_read_capped_bulk_vfolder):
+            with pytest.raises(NotEnoughPermission):
+                await bulk_validator.validate(
+                    _bulk_meta(_BulkVfolderUpdateAction(ids=[_BULK_VF_GRANTED]), trigger_meta)
+                )
+
+    async def test_empty_targets_passes(
+        self,
+        bulk_validator: VirtualEntityAtomicBulkActionRBACValidator,
+        trigger_meta: ActionTriggerMeta,
+        regular_user_without_permission: UserData,
+    ) -> None:
+        with with_user(regular_user_without_permission):
+            await bulk_validator.validate(
+                _bulk_meta(_BulkVfolderUpdateAction(ids=[]), trigger_meta)
+            )
+
+
+class TestVirtualEntityPartialBulkActionRBACValidator:
+    async def test_superadmin_is_denied_nothing_for_an_entity_without_a_node(
+        self,
+        partial_bulk_validator: VirtualEntityPartialBulkActionRBACValidator,
+        bulk_vfolder_action: _BulkVfolderUpdateAction,
+        trigger_meta: ActionTriggerMeta,
+        seeded_superadmin_user: UserData,
+    ) -> None:
+        with with_user(seeded_superadmin_user):
+            denied = await partial_bulk_validator.validate(
+                _bulk_meta(bulk_vfolder_action, trigger_meta)
+            )
+
+        assert denied == {}
+
+    async def test_missing_user_raises(
+        self,
+        partial_bulk_validator: VirtualEntityPartialBulkActionRBACValidator,
+        bulk_vfolder_action: _BulkVfolderUpdateAction,
+        trigger_meta: ActionTriggerMeta,
+    ) -> None:
+        with pytest.raises(UnreachableError):
+            await partial_bulk_validator.validate(_bulk_meta(bulk_vfolder_action, trigger_meta))
+
+    async def test_denied_target_is_one_failed_item(
+        self,
+        partial_bulk_validator: VirtualEntityPartialBulkActionRBACValidator,
+        bulk_vfolder_action: _BulkVfolderUpdateAction,
+        trigger_meta: ActionTriggerMeta,
+        user_with_partial_bulk_membership: UserData,
+    ) -> None:
+        with with_user(user_with_partial_bulk_membership):
+            denied = await partial_bulk_validator.validate(
+                _bulk_meta(bulk_vfolder_action, trigger_meta)
+            )
+
+        assert set(denied) == {_VfolderID(_BULK_VF_DENIED)}
+        assert isinstance(denied[_VfolderID(_BULK_VF_DENIED)], NotEnoughPermission)
+
+
+class TestHeldPermissions:
+    async def test_superadmin_holds_everything_on_an_existing_entity(
+        self,
+        db_with_rbac_tables: ExtendedAsyncSAEngine,
+        repository: RbacPermissionCheckRepository,
+        seeded_superadmin_user: UserData,
+    ) -> None:
+        existing = VFolderUUID(_BULK_VF_GRANTED)
+        missing = VFolderUUID(_BULK_VF_DENIED)
+        async with db_with_rbac_tables.begin_session() as db_sess:
+            await VirtualEntitySeeder().provision(db_sess, VFolderEntityType(), existing)
+
+        held = await repository.held_permissions(
+            UserID(seeded_superadmin_user.user_id), [existing, missing]
+        )
+
+        # An entity without a node is no entity to hold anything on.
+        assert held == {existing: Permission.full(), missing: Permission.NONE}
+
+    async def test_enforcement_off_holds_everything(
+        self,
+        db_with_rbac_tables: ExtendedAsyncSAEngine,
+        regular_user_without_permission: UserData,
+    ) -> None:
+        repository = RbacPermissionCheckRepository(
+            PermissionOpsProvider(db_with_rbac_tables),
+            _make_config_provider(enforcement_enabled=False),
+        )
+
+        entity = VFolderUUID(_BULK_VF_GRANTED)
+
+        held = await repository.held_permissions(
+            UserID(regular_user_without_permission.user_id), [entity]
+        )
+
+        assert held == {entity: Permission.full()}
+
+    async def test_user_holds_what_the_own_check_answers(
+        self,
+        repository: RbacPermissionCheckRepository,
+        user_with_partial_bulk_membership: UserData,
+    ) -> None:
+        granted = VFolderUUID(_BULK_VF_GRANTED)
+        denied = VFolderUUID(_BULK_VF_DENIED)
+
+        held = await repository.held_permissions(
+            UserID(user_with_partial_bulk_membership.user_id), [granted, denied]
+        )
+
+        assert held[granted].covers(Permission.UPDATE)
+        # An entity nothing reaches holds NONE rather than being absent.
+        assert held[denied] == Permission.NONE
