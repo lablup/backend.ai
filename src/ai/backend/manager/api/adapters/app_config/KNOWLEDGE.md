@@ -96,5 +96,6 @@ app config는 자체 행이 없다. 조회할 때마다 `app_config_definitions`
 
 ## 아직 적지 않은 것
 
-어댑터가 제공하는 `my_app_configs`와 `public_app_configs`가 모두 위에 있다. 실행 결과에 남는 `batch_load_fields`는 어댑터 공통
-기반 클래스가 물려주는 필드 읽기이고, 이 엔티티는 필드를 갖지 않아 호출할 일이 없다.
+어댑터가 제공하는 `my_app_configs`와 `public_app_configs`가 모두 위에 있다. 실행 결과에 남는
+`batch_load_fields`는 어댑터 공통 기반 클래스가 물려주는 필드 읽기이고, 이 엔티티는 필드를 갖지
+않아 호출할 일이 없다.
