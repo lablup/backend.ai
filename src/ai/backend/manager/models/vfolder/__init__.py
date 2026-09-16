@@ -12,7 +12,6 @@ from .row import (
     SOFT_DELETED_VFOLDER_STATUSES,
     VFolderCloneInfo,
     VFolderDeletionInfo,
-    VFolderInvitationRow,
     VFolderPermissionSetAlias,
     VFolderPermissionValidator,
     VFolderRow,
@@ -28,7 +27,6 @@ from .row import (
     is_unmanaged,
     update_vfolder_status,
     verify_vfolder_name,
-    vfolder_invitations,
     vfolder_status_map,
     vfolders,
 )
@@ -45,7 +43,6 @@ __all__ = (
     "VFolderCloneInfo",
     "VFolderDeletionInfo",
     "VFolderID",
-    "VFolderInvitationRow",
     "VFolderInvitationState",
     "VFolderOperationStatus",
     "VFolderOwnershipType",
@@ -66,7 +63,6 @@ __all__ = (
     "is_unmanaged",
     "update_vfolder_status",
     "verify_vfolder_name",
-    "vfolder_invitations",
     "vfolder_status_map",
     "vfolders",
 )

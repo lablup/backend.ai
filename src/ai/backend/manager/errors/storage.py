@@ -9,8 +9,8 @@ from typing import Any, override
 
 from aiohttp import web
 
+from ai.backend.common.data.entity.entity_share import EntityShareEntityType
 from ai.backend.common.data.entity.vfolder import VFolderEntityType
-from ai.backend.common.data.entity.vfolder_invitation import VFolderInvitationEntityType
 from ai.backend.common.data.entity.vfolder_mount_policy import VFolderMountPolicyFieldType
 from ai.backend.common.exception import (
     BackendAIError,
@@ -189,7 +189,7 @@ class VFolderInvitationNotFound(EntityError, web.HTTPNotFound):
     @override
     def entity_error_code(self) -> EntityErrorCode:
         return EntityErrorCode(
-            VFolderInvitationEntityType(), ActionOperationType.GET, ErrorDetail.NOT_FOUND
+            EntityShareEntityType(), ActionOperationType.GET, ErrorDetail.NOT_FOUND
         )
 
 

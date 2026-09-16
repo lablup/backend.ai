@@ -123,7 +123,6 @@ from ai.backend.manager.models.vfolder.lookups import (
     VFolderNameLookup,
 )
 from ai.backend.manager.models.vfolder.purgers import (
-    VFolderInvitationBatchPurger,
     VFolderPurger,
     VFolderUserMountPolicyBatchPurger,
 )
@@ -749,14 +748,6 @@ class VfolderRepository:
                         await db_session.refresh(row, attribute_names=["updated_at"])
 
                 succeeded_data = [self._vfolder_row_to_data(row) for row in succeeded_rows]
-
-            if succeeded_ids:
-                # Delete relation rows for succeeded vfolders only.
-                async with self._v2_ops.write_ops() as w:
-                    # TODO: scope this purge. A user operation must not use in_global.
-                    await w.batch_purge_entities_in_global(
-                        VFolderInvitationBatchPurger(vfolder_ids=succeeded_ids)
-                    )
 
             result.succeeded = succeeded_data
             return result

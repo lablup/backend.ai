@@ -10,7 +10,6 @@ from collections.abc import AsyncGenerator
 from typing import TYPE_CHECKING
 
 import pytest
-import sqlalchemy as sa
 
 from ai.backend.common.types import (
     QuotaScopeID,
@@ -19,7 +18,7 @@ from ai.backend.common.types import (
     VFolderUsageMode,
 )
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
-from ai.backend.manager.data.vfolder.types import VFolderMountPermission, VFolderOwnershipType
+from ai.backend.manager.data.vfolder.types import VFolderOwnershipType
 from ai.backend.manager.models.agent import AgentRow  # noqa: F401
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.entity_label.row import EntityLabelRow
@@ -35,11 +34,7 @@ from ai.backend.manager.models.resource_policy import (
     UserResourcePolicyRow,
 )
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
-from ai.backend.manager.models.vfolder.purgers import (
-    VFolderInvitationBatchPurger,
-)
 from ai.backend.manager.models.vfolder.row import (
-    VFolderInvitationRow,
     VFolderRow,
     VFolderUserMountPolicyRow,
 )
@@ -52,7 +47,6 @@ from ai.backend.manager.models.virtual_entity.entity_membership_field import (
 )
 from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
 from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
-from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.testutils.db import with_tables
 from ai.backend.testutils.fixtures import DomainFactory, DomainFixtureData
 
@@ -78,7 +72,6 @@ class TestVFolderPurgersIntegration:
                 UserRow,
                 KeyPairRow,
                 VFolderRow,
-                VFolderInvitationRow,
                 VFolderUserMountPolicyRow,
                 # An entity batch purge tears the graph down with each row.
                 VirtualEntityRow,
@@ -179,53 +172,3 @@ class TestVFolderPurgersIntegration:
             await session.flush()
             await session.refresh(vfolder)
             return vfolder
-
-    @pytest.fixture
-    async def sample_invitations(
-        self,
-        db_with_cleanup: ExtendedAsyncSAEngine,
-        sample_vfolder: VFolderRow,
-        sample_domain: DomainFixtureData,
-        sample_user: UserRow,
-    ) -> list[VFolderInvitationRow]:
-        """Create test vfolder invitations."""
-        invitations: list[VFolderInvitationRow] = []
-        async with db_with_cleanup.begin_session() as session:
-            for i in range(3):
-                invitation = VFolderInvitationRow(
-                    vfolder=sample_vfolder.id,
-                    inviter=sample_user.email,
-                    invitee=f"invitee-{i}@example.com",
-                    permission=VFolderMountPermission.READ_ONLY,
-                )
-                session.add(invitation)
-                invitations.append(invitation)
-            await session.flush()
-            for inv in invitations:
-                await session.refresh(inv)
-        return invitations
-
-    async def test_purge_vfolder_invitations(
-        self,
-        db_with_cleanup: ExtendedAsyncSAEngine,
-        sample_vfolder: VFolderRow,
-        sample_invitations: list[VFolderInvitationRow],
-    ) -> None:
-        """Test purging vfolder invitations."""
-        vfolder_ids = [sample_vfolder.id]
-
-        # Purge invitations
-        async with V2DBOpsProvider(db_with_cleanup).write_ops() as w:
-            removed = await w.batch_purge_entities_in_global(
-                VFolderInvitationBatchPurger(vfolder_ids=vfolder_ids)
-            )
-            assert len(removed) == len(sample_invitations)
-
-        # Verify invitations are deleted
-        async with db_with_cleanup.begin_session() as session:
-            count = await session.scalar(
-                sa.select(sa.func.count())
-                .select_from(VFolderInvitationRow)
-                .where(VFolderInvitationRow.vfolder.in_(vfolder_ids))
-            )
-            assert count == 0

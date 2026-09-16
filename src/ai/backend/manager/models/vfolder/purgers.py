@@ -11,49 +11,17 @@ import sqlalchemy as sa
 from sqlalchemy.orm import InstrumentedAttribute
 
 from ai.backend.common.data.entity.vfolder import VFolderUUID
-from ai.backend.common.data.entity.vfolder_invitation import VFolderInvitationID
 from ai.backend.common.data.entity.vfolder_mount_policy import VFolderMountPolicyID
 from ai.backend.manager.data.vfolder.types import VFolderData
 from ai.backend.manager.models.specs.purger import (
-    EntityBatchPurger,
     EntityPurger,
     FieldBatchPurger,
 )
 from ai.backend.manager.models.specs.types import ConflictCheck
 from ai.backend.manager.models.vfolder.row import (
-    VFolderInvitationRow,
     VFolderRow,
     VFolderUserMountPolicyRow,
 )
-
-
-@dataclass
-class VFolderInvitationBatchPurger(EntityBatchPurger[VFolderInvitationRow, VFolderInvitationID]):
-    """Clears the invitations of the vfolders going away, each with its graph.
-
-    An invitation is an entity of its own — the invitee acts on it while holding no
-    permission on the folder — so what it left in the graph goes with it.
-    """
-
-    vfolder_ids: Sequence[UUID]
-
-    @override
-    def entity_id(self, row: VFolderInvitationRow) -> VFolderInvitationID:
-        return VFolderInvitationID(row.id)
-
-    @override
-    def build_subquery(self) -> sa.sql.Select[tuple[VFolderInvitationRow]]:
-        return sa.select(VFolderInvitationRow).where(
-            VFolderInvitationRow.vfolder.in_(self.vfolder_ids)
-        )
-
-    @override
-    def conflict_checks(self) -> Sequence[ConflictCheck]:
-        return ()
-
-    @override
-    def to_data(self, row: VFolderInvitationRow) -> VFolderInvitationID:
-        return VFolderInvitationID(row.id)
 
 
 @dataclass
@@ -87,39 +55,6 @@ class VFolderPurger(EntityPurger[VFolderRow, VFolderData]):
     @override
     def to_data(self, row: VFolderRow) -> VFolderData:
         return row.to_data()
-
-
-@dataclass
-class VFolderInviteeInvitationBatchPurger(
-    EntityBatchPurger[VFolderInvitationRow, VFolderInvitationID]
-):
-    """Clears one invitee's invitations to the named vfolders, each with its graph.
-
-    What :class:`VFolderInvitationBatchPurger` does for a whole folder, narrowed to
-    the invitee whose standing on those folders is being replaced.
-    """
-
-    vfolder_ids: Sequence[UUID]
-    invitee_email: str
-
-    @override
-    def entity_id(self, row: VFolderInvitationRow) -> VFolderInvitationID:
-        return VFolderInvitationID(row.id)
-
-    @override
-    def build_subquery(self) -> sa.sql.Select[tuple[VFolderInvitationRow]]:
-        return sa.select(VFolderInvitationRow).where(
-            VFolderInvitationRow.vfolder.in_(self.vfolder_ids),
-            VFolderInvitationRow.invitee == self.invitee_email,
-        )
-
-    @override
-    def conflict_checks(self) -> Sequence[ConflictCheck]:
-        return ()
-
-    @override
-    def to_data(self, row: VFolderInvitationRow) -> VFolderInvitationID:
-        return VFolderInvitationID(row.id)
 
 
 @dataclass

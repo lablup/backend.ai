@@ -16,11 +16,11 @@ from typing import TYPE_CHECKING, Final
 
 from ai.backend.common.api_handlers import APIResponse, BodyParam, QueryParam
 from ai.backend.common.contexts.user import current_user
+from ai.backend.common.data.entity.entity_share import EntityShareID
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.entity.vfolder import VFolderUUID
-from ai.backend.common.data.entity.vfolder_invitation import VFolderInvitationID
 from ai.backend.common.data.permission.types import Permission
 from ai.backend.common.dto.manager.field import (
     VFolderItemField,
@@ -1135,7 +1135,7 @@ class VFolderHandler:
         inv_id = req.request.match_info["inv_id"]
         await self._vfolder_invite.update_invitation.run(
             UpdateInvitationAction(
-                invitation_id=VFolderInvitationID(uuid.UUID(inv_id)),
+                invitation_id=EntityShareID(uuid.UUID(inv_id)),
                 requester_user_uuid=ctx.user_uuid,
                 mount_permission=VFolderMountPolicy(params.permission.value),
             )
@@ -1223,7 +1223,8 @@ class VFolderHandler:
         inv_id = params.inv_id
         await self._vfolder_invite.accept_invitation.run(
             AcceptInvitationAction(
-                invitation_id=VFolderInvitationID(uuid.UUID(inv_id)),
+                invitation_id=EntityShareID(uuid.UUID(inv_id)),
+                requester_user_uuid=ctx.user_uuid,
             )
         )
         resp = MessageResponse(msg="")
@@ -1243,7 +1244,7 @@ class VFolderHandler:
         inv_id = params.inv_id
         await self._vfolder_invite.reject_invitation.run(
             RejectInvitationAction(
-                invitation_id=VFolderInvitationID(uuid.UUID(inv_id)),
+                invitation_id=EntityShareID(uuid.UUID(inv_id)),
                 requester_user_uuid=ctx.user_uuid,
             )
         )

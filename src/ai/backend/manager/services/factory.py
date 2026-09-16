@@ -65,7 +65,6 @@ from ai.backend.common.data.entity.usage_bucket import (
 )
 from ai.backend.common.data.entity.user import UserEntityType
 from ai.backend.common.data.entity.vfolder import VFolderEntityType
-from ai.backend.common.data.entity.vfolder_invitation import VFolderInvitationEntityType
 from ai.backend.common.data.entity.vfs_storage import VFSStorageEntityType
 from ai.backend.manager.actions.monitors import ActionMonitors
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
@@ -667,7 +666,7 @@ def create_processors(
             vfolder_groups.group(GroupMeta(VFolderEntityType())), services.vfolder_file
         ),
         vfolder_invite=VFolderInviteProcessors(
-            vfolder_groups.group(GroupMeta(VFolderInvitationEntityType())),
+            vfolder_groups.group(GroupMeta(VFolderEntityType())),
             services.vfolder_invite,
         ),
         vfolder_sharing=VFolderSharingProcessors(

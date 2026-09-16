@@ -13,8 +13,8 @@ import pytest
 
 from ai.backend.common.contexts.user import with_user
 from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.entity_share import EntityShareID
 from ai.backend.common.data.entity.vfolder import VFolderUUID
-from ai.backend.common.data.entity.vfolder_invitation import VFolderInvitationID
 from ai.backend.common.data.user.types import UserData as ContextUserData
 from ai.backend.common.data.user.types import UserRole as ContextUserRole
 from ai.backend.common.types import VFolderMountPolicy
@@ -680,7 +680,9 @@ class TestAcceptInvitationAction:
         mock_vfolder_repo.count_vfolder_with_name_for_user = AsyncMock(return_value=0)
         mock_vfolder_repo.accept_invitation = AsyncMock()
 
-        action = AcceptInvitationAction(invitation_id=VFolderInvitationID(invitation_id))
+        action = AcceptInvitationAction(
+            invitation_id=EntityShareID(invitation_id), requester_user_uuid=invitee_uuid
+        )
         result = await invite_service.accept_invitation(action)
 
         assert result.invitation_id == invitation_id
@@ -693,7 +695,9 @@ class TestAcceptInvitationAction:
     ) -> None:
         mock_vfolder_repo.get_invitation_by_id = AsyncMock(return_value=None)
 
-        action = AcceptInvitationAction(invitation_id=VFolderInvitationID(uuid.uuid4()))
+        action = AcceptInvitationAction(
+            invitation_id=EntityShareID(uuid.uuid4()), requester_user_uuid=uuid.uuid4()
+        )
 
         with pytest.raises(VFolderInvitationNotFound):
             await invite_service.accept_invitation(action)
@@ -720,7 +724,9 @@ class TestAcceptInvitationAction:
         )
         mock_vfolder_repo.count_vfolder_with_name_for_user = AsyncMock(return_value=1)
 
-        action = AcceptInvitationAction(invitation_id=VFolderInvitationID(invitation_id))
+        action = AcceptInvitationAction(
+            invitation_id=EntityShareID(invitation_id), requester_user_uuid=invitee_uuid
+        )
 
         with pytest.raises(VFolderAlreadyExists):
             await invite_service.accept_invitation(action)
@@ -749,7 +755,7 @@ class TestRejectInvitationAction:
         mock_vfolder_repo.reject_invitation = AsyncMock()
 
         action = RejectInvitationAction(
-            invitation_id=VFolderInvitationID(invitation_id),
+            invitation_id=EntityShareID(invitation_id),
             requester_user_uuid=invitee_uuid,
         )
         result = await invite_service.reject_invitation(action)
@@ -774,7 +780,7 @@ class TestRejectInvitationAction:
         mock_vfolder_repo.cancel_invitation = AsyncMock()
 
         action = RejectInvitationAction(
-            invitation_id=VFolderInvitationID(invitation_id),
+            invitation_id=EntityShareID(invitation_id),
             requester_user_uuid=inviter_uuid,
         )
         result = await invite_service.reject_invitation(action)
@@ -795,7 +801,7 @@ class TestRejectInvitationAction:
         mock_vfolder_repo.get_user_email_by_id = AsyncMock(return_value="thirdparty@test.com")
 
         action = RejectInvitationAction(
-            invitation_id=VFolderInvitationID(uuid.uuid4()),
+            invitation_id=EntityShareID(uuid.uuid4()),
             requester_user_uuid=uuid.uuid4(),
         )
 
@@ -810,7 +816,7 @@ class TestRejectInvitationAction:
         mock_vfolder_repo.get_invitation_by_id = AsyncMock(return_value=None)
 
         action = RejectInvitationAction(
-            invitation_id=VFolderInvitationID(uuid.uuid4()),
+            invitation_id=EntityShareID(uuid.uuid4()),
             requester_user_uuid=uuid.uuid4(),
         )
 
@@ -835,7 +841,7 @@ class TestUpdateInvitationAction:
         mock_vfolder_repo.update_invitation_permission = AsyncMock()
 
         action = UpdateInvitationAction(
-            invitation_id=VFolderInvitationID(invitation_id),
+            invitation_id=EntityShareID(invitation_id),
             requester_user_uuid=inviter_uuid,
             mount_permission=VFolderMountPolicy.READ_WRITE,
         )
@@ -1195,7 +1201,9 @@ class TestEmptyEmailAccountInvitationScenarios:
         )
         mock_vfolder_repo.count_vfolder_with_name_for_user = AsyncMock(return_value=0)
         mock_vfolder_repo.accept_invitation = AsyncMock()
-        return AcceptInvitationAction(invitation_id=VFolderInvitationID(invitation_uuid))
+        return AcceptInvitationAction(
+            invitation_id=EntityShareID(invitation_uuid), requester_user_uuid=invitee_uuid
+        )
 
     async def test_invitee_with_empty_email_can_accept_invitation(
         self,
@@ -1226,7 +1234,7 @@ class TestEmptyEmailAccountInvitationScenarios:
         mock_vfolder_repo.get_user_email_by_id = AsyncMock(return_value="")
         mock_vfolder_repo.reject_invitation = AsyncMock()
         return RejectInvitationAction(
-            invitation_id=VFolderInvitationID(invitation_uuid),
+            invitation_id=EntityShareID(invitation_uuid),
             requester_user_uuid=invitee_uuid,
         )
 
@@ -1254,7 +1262,7 @@ class TestEmptyEmailAccountInvitationScenarios:
     ) -> UpdateInvitationAction:
         mock_vfolder_repo.update_invitation_permission = AsyncMock()
         return UpdateInvitationAction(
-            invitation_id=VFolderInvitationID(invitation_uuid),
+            invitation_id=EntityShareID(invitation_uuid),
             requester_user_uuid=user_uuid,
             mount_permission=VFolderMountPolicy.READ_WRITE,
         )

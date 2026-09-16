@@ -528,7 +528,6 @@ class UserDBSource:
         storage_ptask_group = aiotools.PersistentTaskGroup()
         await initiate_vfolder_deletion(
             self._db,
-            self._v2_ops,
             target_vfs,
             storage_manager,
             storage_ptask_group,

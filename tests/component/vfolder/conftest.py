@@ -26,7 +26,6 @@ from ai.backend.common.data.entity.session import SessionEntityType
 from ai.backend.common.data.entity.types import EntityType
 from ai.backend.common.data.entity.user import UserEntityType
 from ai.backend.common.data.entity.vfolder import VFolderEntityType
-from ai.backend.common.data.entity.vfolder_invitation import VFolderInvitationEntityType
 from ai.backend.common.data.permission.types import Permission, RoleStatus
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
 from ai.backend.common.types import (
@@ -68,10 +67,7 @@ from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
 from ai.backend.manager.models.resource_policy import keypair_resource_policies
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.models.vfolder import (
-    vfolder_invitations,
-    vfolders,
-)
+from ai.backend.manager.models.vfolder import vfolders
 from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
 from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
 from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
@@ -219,7 +215,7 @@ def vfolder_invite_processors(
         user_repository=user_repository,
     )
     return VFolderInviteProcessors(
-        processor_registry.group(GroupMeta(VFolderInvitationEntityType())), service
+        processor_registry.group(GroupMeta(VFolderEntityType())), service
     )
 
 
@@ -462,9 +458,6 @@ async def vfolder_factory(
                     VirtualEntityRow.__table__.c.entity_type == VFolderEntityType(),
                     VirtualEntityRow.__table__.c.entity_id == vid,
                 )
-            )
-            await conn.execute(
-                vfolder_invitations.delete().where(vfolder_invitations.c.vfolder == vid)
             )
             await conn.execute(vfolders.delete().where(vfolders.c.id == vid))
 

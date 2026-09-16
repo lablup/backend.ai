@@ -124,7 +124,6 @@ __all__: Sequence[str] = (
     "get_allowed_vfolder_hosts_by_user",
     "update_vfolder_status",
     "verify_vfolder_name",
-    "vfolder_invitations",
     "vfolder_status_map",
     "vfolders",
 )
@@ -491,36 +490,6 @@ vfolder_attachment = sa.Table(
     ),
     sa.PrimaryKeyConstraint("vfolder", "kernel"),
 )
-
-
-class VFolderInvitationRow(LifecycleTimestampsMixin, Base):
-    __tablename__ = "vfolder_invitations"
-
-    id: Mapped[VFolderUUID] = mapped_column(
-        "id", GUID(VFolderUUID), primary_key=True, server_default=sa.text("uuid_generate_v7()")
-    )
-    permission: Mapped[VFolderPermission | None] = mapped_column(
-        "permission", EnumValueType(VFolderPermission), default=VFolderPermission.READ_WRITE
-    )
-    inviter: Mapped[str | None] = mapped_column("inviter", sa.String(length=256))  # email
-    invitee: Mapped[str] = mapped_column("invitee", sa.String(length=256), nullable=False)  # email
-    state: Mapped[VFolderInvitationState | None] = mapped_column(
-        "state", EnumValueType(VFolderInvitationState), default=VFolderInvitationState.PENDING
-    )
-    vfolder: Mapped[VFolderUUID] = mapped_column(
-        "vfolder",
-        GUID(VFolderUUID),
-        sa.ForeignKey("vfolders.id", onupdate="CASCADE", ondelete="CASCADE"),
-        nullable=False,
-    )
-
-    # Relationships
-    vfolder_row: Mapped[VFolderRow] = relationship("VFolderRow")
-
-
-# NOTE: Deprecated legacy table reference for backward compatibility.
-# Use VFolderInvitationRow class directly for new code.
-vfolder_invitations = VFolderInvitationRow.__table__
 
 
 class VFolderUserMountPolicyRow(LifecycleTimestampsMixin, Base):

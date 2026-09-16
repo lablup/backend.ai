@@ -48,5 +48,4 @@ permissions:
   user:                             []
   user_resource_policy:             []
   vfolder:                          []
-  vfolder_invitation:               []
   vfs_storage:                      []

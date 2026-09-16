@@ -17,22 +17,17 @@ from ai.backend.manager.data.vfolder.types import VFolderOperationStatus
 from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.storage import VFolderGone, VFolderOperationFailed
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.models.vfolder.purgers import (
-    VFolderInvitationBatchPurger,
-)
 from ai.backend.manager.models.vfolder.row import (
     VFolderDeletionInfo,
     is_unmanaged,
     update_vfolder_status,
 )
-from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 async def initiate_vfolder_deletion(
     db_engine: ExtendedAsyncSAEngine,
-    v2_ops_provider: V2DBOpsProvider,
     requested_vfolders: Sequence[VFolderDeletionInfo],
     storage_manager: StorageSessionManager,
     _storage_ptask_group: aiotools.PersistentTaskGroup | None = None,
@@ -49,11 +44,6 @@ async def initiate_vfolder_deletion(
     if vfolder_info_len == 0:
         return 0
 
-    async with v2_ops_provider.write_ops() as w:
-        # TODO: scope this purge. A user operation must not use in_global.
-        await w.batch_purge_entities_in_global(
-            VFolderInvitationBatchPurger(vfolder_ids=vfolder_ids)
-        )
     await update_vfolder_status(
         db_engine,
         vfolder_ids,
