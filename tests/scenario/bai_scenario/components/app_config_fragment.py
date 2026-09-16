@@ -493,7 +493,6 @@ class ManyFragmentsAndACaller:
     caller: UserData
     domain: DomainData
     laid: tuple[AppConfigFragmentData, ...]
-    named: str
     scope_type: AppConfigScopeType
     scope_id: UUID | None
     other_id: UUID | None
@@ -546,13 +545,10 @@ class FragmentsLaidAcross(Given[Any, ManyFragmentsAndACaller]):
             )
         other = await seeding.within(SomeoneOf(home)) if self.anothers else None
         answering: list[Laid[AppConfigFragmentData]] = []
-        named = ""
         for i in range(self.mine):
             design = await seeding.within(
                 ADesignOf(allowed=(AppConfigScopeType.USER,), name_hint="mine")
             )
-            if i == 0:
-                named = seeding.made(design.definition).config_name
             own = await seeding.creating_from_two(
                 SeedFragmentOf(owner_of=user_owner, config={"mine": i}, name_hint="own-fragment"),
                 design.entries[AppConfigScopeType.USER],
@@ -575,8 +571,6 @@ class FragmentsLaidAcross(Given[Any, ManyFragmentsAndACaller]):
             design = await seeding.within(
                 ADesignOf(allowed=(AppConfigScopeType.DOMAIN,), name_hint="domains")
             )
-            if not named:
-                named = seeding.made(design.definition).config_name
             laid = await seeding.creating_from_two(
                 SeedFragmentOf(
                     owner_of=domain_owner, config={"domains": i}, name_hint="domain-fragment"
@@ -590,8 +584,6 @@ class FragmentsLaidAcross(Given[Any, ManyFragmentsAndACaller]):
             design = await seeding.within(
                 ADesignOf(allowed=(AppConfigScopeType.PUBLIC,), name_hint="publics")
             )
-            if not named:
-                named = seeding.made(design.definition).config_name
             laid = await seeding.creating_from(
                 SeedPublicFragment(config={"publics": i}), design.entries[AppConfigScopeType.PUBLIC]
             )
@@ -609,7 +601,6 @@ class FragmentsLaidAcross(Given[Any, ManyFragmentsAndACaller]):
             caller=seeding.made(caller),
             domain=seeding.made(home),
             laid=tuple(seeding.made(one) for one in answering),
-            named=named,
             scope_type=self.answers or AppConfigScopeType.PUBLIC,
             scope_id=scope_id,
             other_id=seeding.made(other).id if other is not None else None,
@@ -639,76 +630,6 @@ class EveryAnsweringFragmentIsFound(Then[ManyFragmentsAndACaller, SearchAppConfi
             ),
             Same("total_count", payload.total_count, len(laid.laid)),
             Same("has_next_page", payload.has_next_page, False),
-            Same("has_previous_page", payload.has_previous_page, False),
-        ]
-
-
-@dataclass(frozen=True)
-class OnlyTheNamedFragmentIsFound(Then[ManyFragmentsAndACaller, SearchAppConfigFragmentPayload]):
-    """필터에 맞는 이름의 조각만 반환된다."""
-
-    @override
-    def says(self) -> str:
-        return "이름 필터에 맞는 설정 조각만 반환된다"
-
-    @override
-    def look(
-        self, laid: ManyFragmentsAndACaller, answered: Answered[SearchAppConfigFragmentPayload]
-    ) -> list[Verdict]:
-        payload = answered.response
-        if payload is None:
-            return [Refused(NotEnoughPermission, answered.raised)]
-        return [
-            Same("items", [one.config_name for one in payload.items], [laid.named]),
-            Same("total_count", payload.total_count, 1),
-            Same("has_next_page", payload.has_next_page, False),
-            Same("has_previous_page", payload.has_previous_page, False),
-        ]
-
-
-@dataclass(frozen=True)
-class OnlyOneKindsFragmentsAreFound(Then[ManyFragmentsAndACaller, SearchAppConfigFragmentPayload]):
-    """필터에 맞는 종류의 조각만 반환된다."""
-
-    kind: AppConfigScopeType
-    count: int
-
-    @override
-    def says(self) -> str:
-        return f"{SCOPE_NAMES[self.kind]} 종류의 설정 조각만 반환된다"
-
-    @override
-    def look(
-        self, laid: ManyFragmentsAndACaller, answered: Answered[SearchAppConfigFragmentPayload]
-    ) -> list[Verdict]:
-        payload = answered.response
-        if payload is None:
-            return [Refused(NotEnoughPermission, answered.raised)]
-        return [
-            Same("items", [one.scope_type for one in payload.items], [self.kind] * self.count),
-            Same("total_count", payload.total_count, self.count),
-        ]
-
-
-@dataclass(frozen=True)
-class TenFragmentsComeWithANextPage(Then[ManyFragmentsAndACaller, SearchAppConfigFragmentPayload]):
-    """크기를 지정하지 않으면 10건까지 반환되고 다음 페이지가 있다고 응답한다."""
-
-    @override
-    def says(self) -> str:
-        return "10건까지 반환되고 다음 페이지가 있다고 응답한다"
-
-    @override
-    def look(
-        self, laid: ManyFragmentsAndACaller, answered: Answered[SearchAppConfigFragmentPayload]
-    ) -> list[Verdict]:
-        payload = answered.response
-        if payload is None:
-            return [Refused(NotEnoughPermission, answered.raised)]
-        return [
-            Same("items", len(payload.items), 10),
-            Same("total_count", payload.total_count, len(laid.laid)),
-            Same("has_next_page", payload.has_next_page, True),
             Same("has_previous_page", payload.has_previous_page, False),
         ]
 

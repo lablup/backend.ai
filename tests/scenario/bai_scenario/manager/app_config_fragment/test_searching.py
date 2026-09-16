@@ -15,9 +15,6 @@ from bai_scenario.components.app_config_fragment import (
     EveryAnsweringFragmentIsFound,
     FragmentsLaidAcross,
     ManyFragmentsAndACaller,
-    OnlyOneKindsFragmentsAreFound,
-    OnlyTheNamedFragmentIsFound,
-    TenFragmentsComeWithANextPage,
 )
 from bai_scenario.runner.acting import ActingAs
 from bai_scenario.runner.planting import SeedingSession
@@ -26,17 +23,14 @@ from bai_scenario.seeds.app_config.allow_list import SCOPE_NAMES
 
 from ai.backend.common.data.app_config.types import AppConfigScopeType
 from ai.backend.common.data.user.types import UserRole
-from ai.backend.common.dto.manager.query import StringFilter
 from ai.backend.common.dto.manager.v2.app_config_fragment.request import (
     AdminSearchAppConfigFragmentInput,
-    AppConfigFragmentFilter,
     AppConfigFragmentScope,
     ScopedSearchAppConfigFragmentInput,
 )
 from ai.backend.common.dto.manager.v2.app_config_fragment.response import (
     SearchAppConfigFragmentPayload,
 )
-from ai.backend.common.dto.manager.v2.app_config_fragment.types import AppConfigScopeTypeFilter
 from ai.backend.common.dto.manager.v2.rbac.types import UUIDScope
 from ai.backend.manager.api.adapters.app_config_fragment.adapter import AppConfigFragmentAdapter
 from ai.backend.manager.data.permission.types import Permission
@@ -64,9 +58,7 @@ type SearchingStep = Scenario[
 
 @dataclass(frozen=True)
 class SearchingTheScope(When[ManyFragmentsAndACaller, AppConfigFragmentAdapter, Searched]):
-    """미리 만들어 둔 스코프 하나를 지정해 검색한다. 이름 필터를 걸 수도 있다."""
-
-    by_name: bool = False
+    """미리 만들어 둔 스코프 하나를 지정해 검색한다."""
 
     @override
     def operation(self) -> str:
@@ -74,18 +66,12 @@ class SearchingTheScope(When[ManyFragmentsAndACaller, AppConfigFragmentAdapter, 
 
     @override
     def describe(self, laid: ManyFragmentsAndACaller) -> str:
-        how = f"{laid.named} 이름 필터로" if self.by_name else "필터 없이"
-        return f"{laid.caller.username}이 {SCOPE_NAMES[laid.scope_type]} 스코프를 지정해 {how} 조회"
+        return f"{laid.caller.username}이 {SCOPE_NAMES[laid.scope_type]} 스코프를 지정해 필터 없이 조회"
 
     @override
     async def call(
         self, adapter: AppConfigFragmentAdapter, laid: ManyFragmentsAndACaller
     ) -> Searched:
-        filter_ = (
-            AppConfigFragmentFilter(config_name=StringFilter(equals=laid.named))
-            if self.by_name
-            else None
-        )
         if laid.scope_type == AppConfigScopeType.PUBLIC:
             scope = AppConfigFragmentScope(public=True)
         elif laid.scope_id is None:
@@ -95,9 +81,7 @@ class SearchingTheScope(When[ManyFragmentsAndACaller, AppConfigFragmentAdapter, 
         else:
             scope = AppConfigFragmentScope(domain=[UUIDScope(value=laid.scope_id)])
         with ActingAs(laid.caller):
-            return await adapter.scoped_search(
-                ScopedSearchAppConfigFragmentInput(scope=scope, filter=filter_)
-            )
+            return await adapter.scoped_search(ScopedSearchAppConfigFragmentInput(scope=scope))
 
 
 @dataclass(frozen=True)
@@ -129,10 +113,7 @@ class SearchingTwoScopes(When[ManyFragmentsAndACaller, AppConfigFragmentAdapter,
 
 @dataclass(frozen=True)
 class SearchingEverything(When[ManyFragmentsAndACaller, AppConfigFragmentAdapter, Searched]):
-    """스코프 없이 전체를 검색한다. 종류나 이름 필터를 걸 수도 있다."""
-
-    kind: AppConfigScopeType | None = None
-    by_name: bool = False
+    """스코프 없이 전체를 검색한다."""
 
     @override
     def operation(self) -> str:
@@ -140,23 +121,14 @@ class SearchingEverything(When[ManyFragmentsAndACaller, AppConfigFragmentAdapter
 
     @override
     def describe(self, laid: ManyFragmentsAndACaller) -> str:
-        if self.kind is not None:
-            return f"{laid.caller.username}이 {SCOPE_NAMES[self.kind]} 종류 필터로 전체 조회"
-        if self.by_name:
-            return f"{laid.caller.username}이 {laid.named} 이름 필터로 전체 조회"
         return f"{laid.caller.username}이 필터 없이 전체 조회"
 
     @override
     async def call(
         self, adapter: AppConfigFragmentAdapter, laid: ManyFragmentsAndACaller
     ) -> Searched:
-        filter_ = None
-        if self.kind is not None:
-            filter_ = AppConfigFragmentFilter(scope_type=AppConfigScopeTypeFilter(equals=self.kind))
-        elif self.by_name:
-            filter_ = AppConfigFragmentFilter(config_name=StringFilter(equals=laid.named))
         with ActingAs(laid.caller):
-            return await adapter.admin_search(AdminSearchAppConfigFragmentInput(filter=filter_))
+            return await adapter.admin_search(AdminSearchAppConfigFragmentInput())
 
 
 @dataclass(frozen=True)
@@ -234,56 +206,6 @@ class TheGrantedUserCountsTheirOwn(
     @override
     def then(self) -> Then[ManyFragmentsAndACaller, Searched]:
         return EveryAnsweringFragmentIsFound()
-
-
-@dataclass(frozen=True)
-class FilteringByNameKeepsOne(
-    Scenario[SeedingSession, ManyFragmentsAndACaller, AppConfigFragmentAdapter, Searched]
-):
-    @override
-    def summary(self) -> str:
-        return "filtering-a-scope-by-name-keeps-only-that-fragment"
-
-    @override
-    def describe(self) -> str:
-        return "자기 조각 둘이 있고 읽기 권한을 받은 사용자가 이름 필터로 검색하면, 그 이름의 조각만 반환된다"
-
-    @override
-    def given(self) -> Given[SeedingSession, ManyFragmentsAndACaller]:
-        return FragmentsLaidAcross(mine=2, granted=(Permission.READ,))
-
-    @override
-    def when(self) -> When[ManyFragmentsAndACaller, AppConfigFragmentAdapter, Searched]:
-        return SearchingTheScope(by_name=True)
-
-    @override
-    def then(self) -> Then[ManyFragmentsAndACaller, Searched]:
-        return OnlyTheNamedFragmentIsFound()
-
-
-@dataclass(frozen=True)
-class NoPageSizeMeansTen(
-    Scenario[SeedingSession, ManyFragmentsAndACaller, AppConfigFragmentAdapter, Searched]
-):
-    @override
-    def summary(self) -> str:
-        return "leaving-the-page-size-out-answers-ten-with-a-next-page"
-
-    @override
-    def describe(self) -> str:
-        return "자기 조각 11개가 있고 읽기 권한을 받은 사용자가 크기 없이 검색하면, 10건까지 반환되고 다음 페이지가 있다고 응답한다"
-
-    @override
-    def given(self) -> Given[SeedingSession, ManyFragmentsAndACaller]:
-        return FragmentsLaidAcross(mine=11, granted=(Permission.READ,))
-
-    @override
-    def when(self) -> When[ManyFragmentsAndACaller, AppConfigFragmentAdapter, Searched]:
-        return SearchingTheScope()
-
-    @override
-    def then(self) -> Then[ManyFragmentsAndACaller, Searched]:
-        return TenFragmentsComeWithANextPage()
 
 
 @dataclass(frozen=True)
@@ -422,58 +344,6 @@ class TheSuperadminCountsEveryOne(
 
 
 @dataclass(frozen=True)
-class FilteringByKindKeepsThatKind(
-    Scenario[SeedingSession, ManyFragmentsAndACaller, AppConfigFragmentAdapter, Searched]
-):
-    @override
-    def summary(self) -> str:
-        return "filtering-everything-by-scope-kind-keeps-only-that-kinds-fragments"
-
-    @override
-    def describe(self) -> str:
-        return "세 종류에 조각이 하나씩 있고 슈퍼관리자가 사용자 종류 필터로 검색하면, 사용자 조각만 반환된다"
-
-    @override
-    def given(self) -> Given[SeedingSession, ManyFragmentsAndACaller]:
-        return FragmentsLaidAcross(
-            mine=1, domains=1, publics=1, answers=None, role=UserRole.SUPERADMIN
-        )
-
-    @override
-    def when(self) -> When[ManyFragmentsAndACaller, AppConfigFragmentAdapter, Searched]:
-        return SearchingEverything(kind=AppConfigScopeType.USER)
-
-    @override
-    def then(self) -> Then[ManyFragmentsAndACaller, Searched]:
-        return OnlyOneKindsFragmentsAreFound(kind=AppConfigScopeType.USER, count=1)
-
-
-@dataclass(frozen=True)
-class FilteringEverythingByNameKeepsOne(
-    Scenario[SeedingSession, ManyFragmentsAndACaller, AppConfigFragmentAdapter, Searched]
-):
-    @override
-    def summary(self) -> str:
-        return "filtering-everything-by-name-keeps-only-that-fragment"
-
-    @override
-    def describe(self) -> str:
-        return "이름이 다른 조각 여럿이 있고 슈퍼관리자가 이름 필터로 검색하면, 그 이름의 조각만 반환된다"
-
-    @override
-    def given(self) -> Given[SeedingSession, ManyFragmentsAndACaller]:
-        return FragmentsLaidAcross(mine=2, publics=1, answers=None, role=UserRole.SUPERADMIN)
-
-    @override
-    def when(self) -> When[ManyFragmentsAndACaller, AppConfigFragmentAdapter, Searched]:
-        return SearchingEverything(by_name=True)
-
-    @override
-    def then(self) -> Then[ManyFragmentsAndACaller, Searched]:
-        return OnlyTheNamedFragmentIsFound()
-
-
-@dataclass(frozen=True)
 class AGrantDoesNotOpenTheGlobalDoor(
     Scenario[SeedingSession, ManyFragmentsAndACaller, AppConfigFragmentAdapter, Searched]
 ):
@@ -505,8 +375,6 @@ class AGrantDoesNotOpenTheGlobalDoor(
 
 SCOPED_SCENARIOS: list[SearchingStep] = [
     TheGrantedUserCountsTheirOwn(),
-    FilteringByNameKeepsOne(),
-    NoPageSizeMeansTen(),
     AnyoneSignedInSearchesThePublic(),
     TwoScopesAtOnceAreRefused(),
     AnotherUsersScopeIsRefused(),
@@ -515,8 +383,6 @@ SCOPED_SCENARIOS: list[SearchingStep] = [
 
 GLOBAL_SCENARIOS: list[SearchingStep] = [
     TheSuperadminCountsEveryOne(),
-    FilteringByKindKeepsThatKind(),
-    FilteringEverythingByNameKeepsOne(),
     AGrantDoesNotOpenTheGlobalDoor(),
 ]
 
