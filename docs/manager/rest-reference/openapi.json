@@ -33127,6 +33127,7 @@
       },
       "VFolderPermissionField": {
         "enum": [
+          "none",
           "ro",
           "rw",
           "wd",
@@ -33256,6 +33257,27 @@
           }
         },
         "title": "PurgeVFolderInput",
+        "type": "object"
+      },
+      "SetVFolderMountPolicyInput": {
+        "description": "Input for setting the mount level one user gets on a virtual folder.",
+        "properties": {
+          "user_id": {
+            "description": "User the mount level is set for",
+            "format": "uuid",
+            "title": "User Id",
+            "type": "string"
+          },
+          "permission": {
+            "$ref": "#/components/schemas/VFolderPermissionField",
+            "description": "Mount level: none, ro or rw. wd is stored as rw."
+          }
+        },
+        "required": [
+          "user_id",
+          "permission"
+        ],
+        "title": "SetVFolderMountPolicyInput",
         "type": "object"
       },
       "DeployVFolderInput": {
@@ -55674,6 +55696,108 @@
           }
         ],
         "description": "Permanently delete a vfolder, optionally cascading linked model cards.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2/vfolders/{vfolder_id}/mount-policies": {
+      "put": {
+        "operationId": "v2/vfolders.set_mount_policy",
+        "tags": [
+          "v2/vfolders"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetVFolderMountPolicyInput"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "vfolder_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Set the mount level one user gets on the vfolder.\n\n**Preconditions:**\n* User privilege required.\n"
+      },
+      "get": {
+        "operationId": "v2/vfolders.list_mount_policies",
+        "tags": [
+          "v2/vfolders"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "vfolder_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "The mount levels set on the vfolder, one row per user.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2/vfolders/{vfolder_id}/mount-policies/{user_id}": {
+      "delete": {
+        "operationId": "v2/vfolders.unset_mount_policy",
+        "tags": [
+          "v2/vfolders"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "vfolder_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "user_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Take back the mount level one user was given on the vfolder.\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/v2/vfolders/{vfolder_id}/restore": {
