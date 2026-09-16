@@ -1,0 +1,25 @@
+# Example per-host config for the `dax` agent accelerator plugin.
+# Copy to `dax-accelerator.toml` in the agent's working directory,
+# `~/.config/backend.ai/`, or `/etc/backend.ai/`. Unknown keys are rejected.
+
+# How many kernels may hold one dax device at the same time.
+# > 1 hands the bytes to an external resource manager, not to Backend.AI.
+max_holders = 1
+
+# Restrict admission to these sysfs names or `dax-<serial>` ids.
+# Omitted (the default) admits every device that passes discovery.
+# allowlist = ["dax0.0", "dax1.0"]
+
+# Admit devices whose CXL serial cannot be resolved through sysfs.
+allow_non_cxl = false
+
+# Sysfs and devtmpfs roots read by discovery.
+sysfs_root = "/sys"
+dev_root = "/dev"
+
+# Testing only: skip the real device checks.
+mock = false
+
+# Testing only: map a dax device id to the host path bind-mounted into kernels.
+# [path_on_host]
+# "dax0.0" = "/dev/null"
