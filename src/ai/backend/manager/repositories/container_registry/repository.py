@@ -115,16 +115,15 @@ class ContainerRegistryRepository:
             await w.create_relations(
                 ContainerRegistryProjectCreator(), [(scope, target) for scope in links.add]
             )
-        if not links.remove:
-            return
-        unlinked = await w.purge_relations(
-            ContainerRegistryProjectPurger(), [(scope, target) for scope in links.remove]
-        )
-        if not any(unlinked):
-            raise ContainerRegistryGroupsAssociationNotFound(
-                f"Tried to remove non-existing associations for registry_id: {target}, "
-                f"group_ids: {list(links.remove)}"
+        if links.remove:
+            unlinked = await w.purge_relations(
+                ContainerRegistryProjectPurger(), [(scope, target) for scope in links.remove]
             )
+            if not any(unlinked):
+                raise ContainerRegistryGroupsAssociationNotFound(
+                    f"Tried to remove non-existing associations for registry_id: {target}, "
+                    f"group_ids: {list(links.remove)}"
+                )
 
     async def delete_registry(self, purger: ContainerRegistryPurger) -> ContainerRegistryData:
         """Delete a container registry with the graph it left; its project relations go
