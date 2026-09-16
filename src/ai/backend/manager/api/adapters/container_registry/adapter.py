@@ -191,7 +191,10 @@ class ContainerRegistryAdapter(BaseAdapter):
         )
         result = await self._container_registry.update_container_registry.run(
             UpdateContainerRegistryAction(
-                updater=updater, links=self._input_to_allowed_projects_change(input.allowed_groups)
+                updater=updater,
+                allowed_projects_change=self._input_to_allowed_projects_change(
+                    input.allowed_groups
+                ),
             )
         )
         return UpdateContainerRegistryPayload(registry=self._data_to_dto(result.data))

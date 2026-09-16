@@ -13,7 +13,7 @@ from ai.backend.manager.services.container_registry.actions.base import Containe
 @dataclass
 class UpdateContainerRegistryAction(ContainerRegistryAction):
     updater: ContainerRegistryUpdater
-    links: AllowedProjectsChange | None = None
+    allowed_projects_change: AllowedProjectsChange | None = None
 
     @override
     @classmethod

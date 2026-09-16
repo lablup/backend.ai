@@ -82,7 +82,7 @@ class ContainerRegistryRepository:
     async def modify_registry(
         self,
         updater: ContainerRegistryUpdater,
-        links: AllowedProjectsChange | None = None,
+        allowed_projects_change: AllowedProjectsChange | None = None,
     ) -> ContainerRegistryData:
         """Update the registry and the projects allowed on it in one transaction, so a
         refusal of either leaves both as they were."""
@@ -99,30 +99,32 @@ class ContainerRegistryRepository:
                         url=data.url,
                     )
                 ).validate()
-            if links is not None:
-                await self._apply_links(w, ContainerRegistryID(data.id), links)
+            if allowed_projects_change is not None:
+                await self._apply_allowed_projects_change(
+                    w, ContainerRegistryID(data.id), allowed_projects_change
+                )
             return data
 
     @staticmethod
-    async def _apply_links(
+    async def _apply_allowed_projects_change(
         w: V2RelationWriteOps,
         target: ContainerRegistryID,
-        links: AllowedProjectsChange,
+        change: AllowedProjectsChange,
     ) -> None:
-        """A pair already linked is left as it stands; unlinking is refused only when
-        none of the named pairs was linked."""
-        if links.add:
+        """A project already allowed is left as it stands; removing is refused only when
+        none of the named projects was allowed."""
+        if change.add:
             await w.create_relations(
-                ContainerRegistryProjectCreator(), [(scope, target) for scope in links.add]
+                ContainerRegistryProjectCreator(), [(scope, target) for scope in change.add]
             )
-        if links.remove:
-            unlinked = await w.purge_relations(
-                ContainerRegistryProjectPurger(), [(scope, target) for scope in links.remove]
+        if change.remove:
+            removed = await w.purge_relations(
+                ContainerRegistryProjectPurger(), [(scope, target) for scope in change.remove]
             )
-            if not any(unlinked):
+            if not any(removed):
                 raise ContainerRegistryGroupsAssociationNotFound(
                     f"Tried to remove non-existing associations for registry_id: {target}, "
-                    f"group_ids: {list(links.remove)}"
+                    f"group_ids: {list(change.remove)}"
                 )
 
     async def delete_registry(self, purger: ContainerRegistryPurger) -> ContainerRegistryData:

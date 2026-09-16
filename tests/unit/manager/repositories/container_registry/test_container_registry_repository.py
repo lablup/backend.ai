@@ -135,10 +135,11 @@ class _RegistryWithGroups:
 
 @dataclass(frozen=True)
 class _RefusedEdit:
-    """An update refused by its row or by its links; ``unlink`` indexes ``all_group_ids``."""
+    """An update refused by its row or by its allowed projects; ``remove`` indexes
+    ``all_group_ids``."""
 
     url: OptionalState[str]
-    unlink: Sequence[int]
+    remove: Sequence[int]
     refusal: type[BackendAIError]
 
 
@@ -1229,7 +1230,7 @@ class TestContainerRegistryRepository:
             ).all()
             assert set(linked) == set(registry_with_associated_groups.group_ids)
 
-    async def test_modify_registry_writes_the_links_with_the_row(
+    async def test_modify_registry_writes_the_allowed_projects_change_with_the_row(
         self,
         repository: ContainerRegistryRepository,
         db_with_cleanup: ExtendedAsyncSAEngine,
@@ -1246,39 +1247,40 @@ class TestContainerRegistryRepository:
 
         assert result.username == "edited"
         async with db_with_cleanup.begin_readonly_session() as session:
-            linked = (
+            allowed = (
                 await session.scalars(
                     sa.select(AssociationContainerRegistriesGroupsRow.group_id).where(
                         AssociationContainerRegistriesGroupsRow.registry_id == registry_id
                     )
                 )
             ).all()
-        assert set(linked) == {group_ids[1], group_ids[2]}
+        assert set(allowed) == {group_ids[1], group_ids[2]}
 
     @pytest.mark.parametrize(
         "case",
         [
             _RefusedEdit(
                 url=OptionalState.update("http://"),
-                unlink=[0],
+                remove=[0],
                 refusal=InvalidContainerRegistryURL,
             ),
             _RefusedEdit(
                 url=OptionalState.nop(),
-                unlink=[3],
+                remove=[3],
                 refusal=ContainerRegistryGroupsAssociationNotFound,
             ),
         ],
         ids=lambda case: case.refusal.__name__,
     )
-    async def test_modify_registry_refused_leaves_the_row_and_the_links_alone(
+    async def test_modify_registry_refused_leaves_the_row_and_the_allowed_projects_alone(
         self,
         repository: ContainerRegistryRepository,
         db_with_cleanup: ExtendedAsyncSAEngine,
         registry_with_partial_groups: _RegistryWithPartialGroups,
         case: _RefusedEdit,
     ) -> None:
-        """A refusal, whether of the row or of the links, rolls back the whole update."""
+        """A refusal, whether of the row or of the allowed projects, rolls back the whole
+        update."""
         registry = registry_with_partial_groups.registry
         group_ids = registry_with_partial_groups.all_group_ids
         registry_id = ContainerRegistryID(registry.id)
@@ -1289,13 +1291,13 @@ class TestContainerRegistryRepository:
                     registry_id=registry_id, url=case.url, username=TriState.update("edited")
                 ),
                 AllowedProjectsChange(
-                    add=[group_ids[2]], remove=[group_ids[i] for i in case.unlink]
+                    add=[group_ids[2]], remove=[group_ids[i] for i in case.remove]
                 ),
             )
 
         async with db_with_cleanup.begin_readonly_session() as session:
             row = await session.get_one(ContainerRegistryRow, registry_id)
-            linked = (
+            allowed = (
                 await session.scalars(
                     sa.select(AssociationContainerRegistriesGroupsRow.group_id).where(
                         AssociationContainerRegistriesGroupsRow.registry_id == registry_id
@@ -1304,7 +1306,7 @@ class TestContainerRegistryRepository:
             ).all()
             assert row.url == registry.url
             assert row.username == registry.username
-        assert set(linked) == set(registry_with_partial_groups.initially_associated_group_ids)
+        assert set(allowed) == set(registry_with_partial_groups.initially_associated_group_ids)
 
     async def test_allowed_project_reads_the_registry_and_is_read_by_it(
         self,

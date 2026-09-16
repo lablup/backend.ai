@@ -108,7 +108,7 @@ class ContainerRegistryService:
         self, action: UpdateContainerRegistryAction
     ) -> UpdateContainerRegistryActionResult:
         data = await self._container_registry_repository.modify_registry(
-            action.updater, action.links
+            action.updater, action.allowed_projects_change
         )
         return UpdateContainerRegistryActionResult(data=data)
 
