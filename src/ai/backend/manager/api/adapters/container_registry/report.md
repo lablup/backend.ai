@@ -34,7 +34,7 @@ Given
 
 When
 
-- ContainerRegistryAdapter.apply_allowed_groups — user-1이 없는 프로젝트를 허용 목록에 넣음
+- ContainerRegistryAdapter.apply_allowed_groups — user-1이 존재하지 않는 프로젝트를 허용 목록에 넣음
 
 Then
 
@@ -43,7 +43,7 @@ Then
 
 #### [a-superadmin-removing-a-project-that-was-never-allowed-is-refused](/tests/scenario/bai_scenario/manager/container_registry/test_allowing_projects.py) — pass
 
-지목한 프로젝트 중 실제로 허용된 것이 하나도 없으면, 뺄 것이 없다는 이유로 거부된다
+지정한 프로젝트 중 실제로 허용된 것이 하나도 없으면, 제거할 관계가 없다는 이유로 거부된다
 
 Given
 
@@ -108,12 +108,12 @@ When
 
 Then
 
-- 답이 없고 예외도 없다
+- 반환값이 없고 예외도 발생하지 않는다
   - response = None
 
 #### [a-user-granted-on-the-project-but-not-the-registry-is-refused](/tests/scenario/bai_scenario/manager/container_registry/test_allowing_projects.py) — pass
 
-프로젝트에만 권한을 받고 레지스트리에는 받지 못한 사용자가 프로젝트를 허용하려 하면, 관계 동작은 지목한 스코프를 모두 보므로 권한 부족으로 막힌다
+프로젝트에만 권한을 받고 레지스트리에는 받지 못한 사용자가 프로젝트를 허용하려 하면, 관계 연산은 지정한 스코프 모두의 권한을 검사하므로 권한 부족으로 거부된다
 
 Given
 
@@ -143,7 +143,7 @@ Then
 
 #### [a-user-granted-on-the-registry-but-not-the-project-is-refused](/tests/scenario/bai_scenario/manager/container_registry/test_allowing_projects.py) — pass
 
-레지스트리에만 권한을 받고 프로젝트에는 받지 못한 사용자가 프로젝트를 허용하려 하면, 관계 동작은 지목한 스코프를 모두 보므로 권한 부족으로 막힌다
+레지스트리에만 권한을 받고 프로젝트에는 받지 못한 사용자가 프로젝트를 허용하려 하면, 관계 연산은 지정한 스코프 모두의 권한을 검사하므로 권한 부족으로 거부된다
 
 Given
 
@@ -182,7 +182,7 @@ Given
   - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
   - 프로젝트 project-1
   - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
-  - 프로젝트 project-1 이 허용된 컨테이너 레지스트리 host-1
+  - 프로젝트 project-1 을 허용한 컨테이너 레지스트리 host-1
   - 도메인에 속한 사용자 한 명 준비
     - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
     - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
@@ -204,7 +204,7 @@ When
 
 Then
 
-- 답이 없고 예외도 없다
+- 반환값이 없고 예외도 발생하지 않는다
   - response = None
 
 #### [an-allowed-project-is-removed-from-the-allowed-list](/tests/scenario/bai_scenario/manager/container_registry/test_allowing_projects.py) — pass
@@ -218,7 +218,7 @@ Given
   - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
   - 프로젝트 project-1
   - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
-  - 프로젝트 project-1 이 허용된 컨테이너 레지스트리 host-1
+  - 프로젝트 project-1 을 허용한 컨테이너 레지스트리 host-1
   - 도메인에 속한 사용자 한 명 준비
     - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
     - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
@@ -240,7 +240,7 @@ When
 
 Then
 
-- 답이 없고 예외도 없다
+- 반환값이 없고 예외도 발생하지 않는다
   - response = None
 
 #### [create-permission-does-not-allow-removing-a-project](/tests/scenario/bai_scenario/manager/container_registry/test_allowing_projects.py) — pass
@@ -254,7 +254,7 @@ Given
   - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
   - 프로젝트 project-1
   - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
-  - 프로젝트 project-1 이 허용된 컨테이너 레지스트리 host-1
+  - 프로젝트 project-1 을 허용한 컨테이너 레지스트리 host-1
   - 도메인에 속한 사용자 한 명 준비
     - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
     - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
@@ -307,7 +307,7 @@ When
 
 Then
 
-- 답이 없고 예외도 없다
+- 반환값이 없고 예외도 발생하지 않는다
   - response = None
 
 #### [soft-delete-permission-does-not-allow-adding-a-project](/tests/scenario/bai_scenario/manager/container_registry/test_allowing_projects.py) — pass
@@ -354,7 +354,7 @@ Given
   - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
   - 프로젝트 project-1
   - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
-  - 프로젝트 project-1 이 허용된 컨테이너 레지스트리 host-1
+  - 프로젝트 project-1 을 허용한 컨테이너 레지스트리 host-1
   - 도메인에 속한 사용자 한 명 준비
     - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
     - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
@@ -374,12 +374,12 @@ When
 
 Then
 
-- 답이 없고 예외도 없다
+- 반환값이 없고 예외도 발생하지 않는다
   - response = None
 
 #### [turning-enforcement-off-lets-an-ungranted-user-allow-a-project](/tests/scenario/bai_scenario/manager/container_registry/test_allowing_projects.py) — pass
 
-엔티티 권한 집행을 끄면 아무 권한도 받지 않은 사용자도 프로젝트를 허용할 수 있다
+권한 검사를 끄면 아무 권한도 받지 않은 사용자도 프로젝트를 허용할 수 있다
 
 Given
 
@@ -399,14 +399,14 @@ When
 
 Then
 
-- 답이 없고 예외도 없다
+- 반환값이 없고 예외도 발생하지 않는다
   - response = None
 
 ### creating
 
 #### [a-project-named-while-creating-is-allowed-on-the-new-registry](/tests/scenario/bai_scenario/manager/container_registry/test_creating.py) — pass
 
-슈퍼관리자가 허용 프로젝트를 함께 주고 레지스트리를 만들면 그 관계도 생성된다
+슈퍼관리자가 허용 프로젝트를 함께 지정해 레지스트리를 생성하면 그 관계도 생성된다
 
 Given
 
@@ -421,11 +421,11 @@ Given
 
 When
 
-- ContainerRegistryAdapter.admin_create — user-1이 심은 프로젝트를 허용 목록에 넣고 https://made.scenario.local로 만듦
+- ContainerRegistryAdapter.admin_create — user-1이 미리 만들어 둔 프로젝트를 허용 목록에 넣고 https://made.scenario.local로 생성
 
 Then
 
-- 만든 레지스트리 전체가 온다
+- 생성한 레지스트리 전체가 반환된다
   - url = 'https://made.scenario.local'
   - registry_name = 'made-registry'
   - type = <ContainerRegistryType.DOCKER: 'docker'>
@@ -438,7 +438,7 @@ Then
 
 #### [a-project-that-does-not-exist-is-refused-while-creating](/tests/scenario/bai_scenario/manager/container_registry/test_creating.py) — pass
 
-허용 목록에 없는 프로젝트를 넣고 레지스트리를 만들려 하면, 그 프로젝트가 없다는 이유로 거부된다
+존재하지 않는 프로젝트를 허용 목록에 넣고 레지스트리를 생성하려 하면, 그 프로젝트를 찾을 수 없어 거부된다
 
 Given
 
@@ -453,7 +453,7 @@ Given
 
 When
 
-- ContainerRegistryAdapter.admin_create — user-1이 없는 프로젝트를 허용 목록에 넣고 https://made.scenario.local로 만듦
+- ContainerRegistryAdapter.admin_create — user-1이 존재하지 않는 프로젝트를 허용 목록에 넣고 https://made.scenario.local로 생성
 
 Then
 
@@ -462,7 +462,7 @@ Then
 
 #### [a-user-who-is-not-the-superadmin-may-not-create-a-registry](/tests/scenario/bai_scenario/manager/container_registry/test_creating.py) — pass
 
-슈퍼관리자가 아닌 사용자가 레지스트리를 만들려 하면 권한 부족으로 거부된다. 이 호출은 부른 사람이 슈퍼관리자인지만 보고, 어떤 권한을 받았는지는 보지 않는다
+슈퍼관리자가 아닌 사용자가 레지스트리를 생성하려 하면 권한 부족으로 거부된다. 이 호출은 호출자가 슈퍼관리자인지만 검사하고, 부여된 권한은 보지 않는다
 
 Given
 
@@ -477,7 +477,7 @@ Given
 
 When
 
-- ContainerRegistryAdapter.admin_create — user-1이 허용 목록 없이 https://made.scenario.local로 만듦
+- ContainerRegistryAdapter.admin_create — user-1이 허용 목록 없이 https://made.scenario.local로 생성
 
 Then
 
@@ -486,7 +486,7 @@ Then
 
 #### [creating-a-registry-with-only-the-required-values-leaves-the-rest-empty](/tests/scenario/bai_scenario/manager/container_registry/test_creating.py) — pass
 
-슈퍼관리자가 주소와 이름과 종류만 주고 레지스트리를 만들면, 나머지 자리가 모두 비어 있는 노드가 답으로 온다
+슈퍼관리자가 주소·이름·종류만 지정해 레지스트리를 생성하면, 나머지 필드가 모두 비어 있는 노드가 반환된다
 
 Given
 
@@ -501,11 +501,11 @@ Given
 
 When
 
-- ContainerRegistryAdapter.admin_create — user-1이 허용 목록 없이 https://made.scenario.local로 만듦
+- ContainerRegistryAdapter.admin_create — user-1이 허용 목록 없이 https://made.scenario.local로 생성
 
 Then
 
-- 만든 레지스트리 전체가 온다
+- 생성한 레지스트리 전체가 반환된다
   - url = 'https://made.scenario.local'
   - registry_name = 'made-registry'
   - type = <ContainerRegistryType.DOCKER: 'docker'>
@@ -520,7 +520,7 @@ Then
 
 #### [a-user-who-is-not-the-superadmin-may-not-edit-a-registry](/tests/scenario/bai_scenario/manager/container_registry/test_editing.py) — pass
 
-슈퍼관리자가 아닌 사용자가 레지스트리를 고치려 하면 권한 부족으로 거부된다. 이 호출은 부른 사람이 슈퍼관리자인지만 보고, 어떤 권한을 받았는지는 보지 않는다
+슈퍼관리자가 아닌 사용자가 레지스트리를 수정하려 하면 권한 부족으로 거부된다. 이 호출은 호출자가 슈퍼관리자인지만 검사하고, 부여된 권한은 보지 않는다
 
 Given
 
@@ -535,7 +535,7 @@ Given
 
 When
 
-- ContainerRegistryAdapter.admin_update — user-1이 주소를 https://moved.scenario.local로 고침
+- ContainerRegistryAdapter.admin_update — user-1이 주소를 https://moved.scenario.local로 수정
 
 Then
 
@@ -544,7 +544,7 @@ Then
 
 #### [an-address-whose-host-is-empty-is-refused-on-update](/tests/scenario/bai_scenario/manager/container_registry/test_editing.py) — pass
 
-슈퍼관리자가 호스트 자리가 비는 주소로 고치려 하면, 고친 뒤의 행을 보는 검사가 주소 형식으로 막는다
+슈퍼관리자가 호스트가 없는 주소로 수정하려 하면, 수정 후의 행을 검사하는 단계에서 주소 형식 오류로 거부된다
 
 Given
 
@@ -559,7 +559,7 @@ Given
 
 When
 
-- ContainerRegistryAdapter.admin_update — user-1이 주소를 http://로 고침
+- ContainerRegistryAdapter.admin_update — user-1이 주소를 http://로 수정
 
 Then
 
@@ -568,7 +568,7 @@ Then
 
 #### [an-edit-that-names-no-value-changes-nothing](/tests/scenario/bai_scenario/manager/container_registry/test_editing.py) — pass
 
-슈퍼관리자가 값을 하나도 주지 않고 고치면 아무것도 바뀌지 않은 노드가 온다
+슈퍼관리자가 값을 하나도 지정하지 않고 수정하면 아무것도 바뀌지 않은 노드가 반환된다
 
 Given
 
@@ -583,11 +583,11 @@ Given
 
 When
 
-- ContainerRegistryAdapter.admin_update — user-1이 아무 값도 주지 않고 고침
+- ContainerRegistryAdapter.admin_update — user-1이 아무 값도 지정하지 않고 수정
 
 Then
 
-- 심은 레지스트리 전체가 온다
+- 미리 만들어 둔 레지스트리 전체가 반환된다
   - url = 'https://host-1.scenario.local'
   - registry_name = 'host-1'
   - type = <ContainerRegistryType.DOCKER: 'docker'>
@@ -600,7 +600,7 @@ Then
 
 #### [changing-only-the-address-leaves-every-other-field-alone](/tests/scenario/bai_scenario/manager/container_registry/test_editing.py) — pass
 
-슈퍼관리자가 주소만 고치면 주소만 새 값이 되고 나머지 자리는 그대로다
+슈퍼관리자가 주소만 수정하면 주소만 새 값이 되고 나머지 필드는 그대로다
 
 Given
 
@@ -615,11 +615,11 @@ Given
 
 When
 
-- ContainerRegistryAdapter.admin_update — user-1이 주소를 https://moved.scenario.local로 고침
+- ContainerRegistryAdapter.admin_update — user-1이 주소를 https://moved.scenario.local로 수정
 
 Then
 
-- 심은 레지스트리 전체가 온다
+- 미리 만들어 둔 레지스트리 전체가 반환된다
   - url = 'https://moved.scenario.local'
   - registry_name = 'host-1'
   - type = <ContainerRegistryType.DOCKER: 'docker'>
@@ -632,7 +632,7 @@ Then
 
 #### [editing-a-registry-can-add-an-allowed-project](/tests/scenario/bai_scenario/manager/container_registry/test_editing.py) — pass
 
-슈퍼관리자가 레지스트리를 고치며 프로젝트를 허용하면 그 관계가 생성된다
+슈퍼관리자가 레지스트리를 수정하며 프로젝트를 허용하면 그 관계가 생성된다
 
 Given
 
@@ -648,11 +648,11 @@ Given
 
 When
 
-- ContainerRegistryAdapter.admin_update — user-1이 심은 프로젝트를 허용 목록에 넣으며 고침
+- ContainerRegistryAdapter.admin_update — user-1이 미리 만들어 둔 프로젝트를 허용 목록에 넣으며 수정
 
 Then
 
-- 심은 레지스트리 전체가 온다
+- 미리 만들어 둔 레지스트리 전체가 반환된다
   - url = 'https://host-1.scenario.local'
   - registry_name = 'host-1'
   - type = <ContainerRegistryType.DOCKER: 'docker'>
@@ -665,7 +665,7 @@ Then
 
 #### [editing-an-id-that-holds-no-registry-is-refused](/tests/scenario/bai_scenario/manager/container_registry/test_editing.py) — pass
 
-아무 레지스트리도 갖지 않은 id를 고치려 하면 대상이 없다는 이유로 거부된다
+존재하지 않는 id를 수정하려 하면 대상을 찾을 수 없어 거부된다
 
 Given
 
@@ -680,7 +680,7 @@ Given
 
 When
 
-- ContainerRegistryAdapter.admin_update — user-1이 아무것도 갖지 않은 id를 고침
+- ContainerRegistryAdapter.admin_update — user-1이 존재하지 않는 id를 수정
 
 Then
 
@@ -689,7 +689,7 @@ Then
 
 #### [turning-a-registry-into-harbor-without-a-project-is-refused](/tests/scenario/bai_scenario/manager/container_registry/test_editing.py) — pass
 
-프로젝트가 비어 있는 레지스트리를 harbor 종류로 고치려 하면, harbor는 프로젝트를 요구하므로 그 값으로 막힌다
+프로젝트가 비어 있는 레지스트리를 harbor 종류로 수정하려 하면, harbor는 프로젝트를 요구하므로 거부된다
 
 Given
 
@@ -704,7 +704,7 @@ Given
 
 When
 
-- ContainerRegistryAdapter.admin_update — user-1이 종류를 harbor2로 고침
+- ContainerRegistryAdapter.admin_update — user-1이 종류를 harbor2로 수정
 
 Then
 
@@ -715,7 +715,7 @@ Then
 
 #### [a-plain-user-loading-many-ids-is-refused-on-every-id](/tests/scenario/bai_scenario/manager/container_registry/test_reading.py) — pass
 
-권한을 받지 않은 사용자가 id 여럿을 한 번에 읽으면, 요청이 통째로 거부되는 대신 자리마다 권한 부족이 담겨 온다. 없는 id도 같은 거부로 와서 있는지 없는지가 드러나지 않는다
+권한을 받지 않은 사용자가 id 여럿을 한 번에 조회하면, 요청 전체가 거부되는 대신 항목마다 권한 부족 거부가 담겨 반환된다. 존재하지 않는 id도 같은 거부로 반환되어 있는지 없는지가 드러나지 않는다
 
 Given
 
@@ -731,11 +731,11 @@ Given
 
 When
 
-- ContainerRegistryAdapter.batch_load_by_ids — user-1이 심은 것 둘과 없는 id 하나를 한 번에 읽음
+- ContainerRegistryAdapter.batch_load_by_ids — user-1이 미리 만들어 둔 레지스트리 둘과 존재하지 않는 id 하나를 한 번에 조회
 
 Then
 
-- 자리마다 권한 부족이 담겨 온다
+- 항목마다 권한 부족 거부가 담겨 반환된다
   - length = 3
   - 거부: NotEnoughPermission
   - 거부: NotEnoughPermission
@@ -743,7 +743,7 @@ Then
 
 #### [an-empty-id-list-answers-empty-without-calling-the-wiring](/tests/scenario/bai_scenario/manager/container_registry/test_reading.py) — pass
 
-빈 id 목록으로 읽으면 배선을 부르지 않고 빈 답이 온다
+빈 id 목록으로 조회하면 하위 계층을 호출하지 않고 빈 응답이 반환된다
 
 Given
 
@@ -759,16 +759,16 @@ Given
 
 When
 
-- ContainerRegistryAdapter.batch_load_by_ids — user-1이 빈 id 목록으로 읽음
+- ContainerRegistryAdapter.batch_load_by_ids — user-1이 빈 id 목록으로 조회
 
 Then
 
-- 빈 답이 온다
+- 빈 응답이 반환된다
   - items = []
 
 #### [loading-many-ids-keeps-the-order](/tests/scenario/bai_scenario/manager/container_registry/test_reading.py) — pass
 
-슈퍼관리자가 심은 레지스트리 둘과 아무것도 갖지 않은 id 하나를 한 번에 읽으면, 심은 것은 준 순서 그대로 온다. 없는 id 자리에 무엇이 오는지는 아직 정해지지 않았다
+슈퍼관리자가 미리 만들어 둔 레지스트리 둘과 존재하지 않는 id 하나를 한 번에 조회하면, 미리 만들어 둔 레지스트리는 요청한 순서대로 반환된다. 존재하지 않는 id의 항목에 무엇이 반환되는지는 아직 정해지지 않았다
 
 Given
 
@@ -784,21 +784,21 @@ Given
 
 When
 
-- ContainerRegistryAdapter.batch_load_by_ids — user-1이 심은 것 둘과 없는 id 하나를 한 번에 읽음
+- ContainerRegistryAdapter.batch_load_by_ids — user-1이 미리 만들어 둔 레지스트리 둘과 존재하지 않는 id 하나를 한 번에 조회
 
 Then
 
-- 심은 것은 준 순서 그대로 오고, 없는 id 자리는 보지 않는다
+- 미리 만들어 둔 레지스트리는 요청한 순서대로 반환되고, 존재하지 않는 id의 항목은 검사하지 않는다
   - length = 3
   - [0].registry_name = 'wanted-1'
-  - [1]: 무시함 — 없는 id에 superadmin이 받는 답은 아직 정해지지 않았다
+  - [1]: 무시함 — 존재하지 않는 id에 슈퍼관리자가 받는 응답은 아직 정해지지 않았다
   - [2].registry_name = 'other-1'
 
 ### retiring
 
 #### [a-user-who-is-not-the-superadmin-may-not-delete-a-registry](/tests/scenario/bai_scenario/manager/container_registry/test_retiring.py) — pass
 
-슈퍼관리자가 아닌 사용자가 레지스트리를 지우려 하면 권한 부족으로 거부된다. 이 호출은 부른 사람이 슈퍼관리자인지만 보고, 어떤 권한을 받았는지는 보지 않는다
+슈퍼관리자가 아닌 사용자가 레지스트리를 삭제하려 하면 권한 부족으로 거부된다. 이 호출은 호출자가 슈퍼관리자인지만 검사하고, 부여된 권한은 보지 않는다
 
 Given
 
@@ -813,7 +813,7 @@ Given
 
 When
 
-- ContainerRegistryAdapter.admin_delete — user-1이 심은 레지스트리를 지움
+- ContainerRegistryAdapter.admin_delete — user-1이 미리 만들어 둔 레지스트리를 삭제
 
 Then
 
@@ -822,7 +822,7 @@ Then
 
 #### [deleting-a-registry-answers-with-the-id-it-removed](/tests/scenario/bai_scenario/manager/container_registry/test_retiring.py) — pass
 
-슈퍼관리자가 레지스트리를 지우면 지운 id가 답으로 온다
+슈퍼관리자가 레지스트리를 삭제하면 삭제한 id를 담은 응답이 반환된다
 
 Given
 
@@ -837,16 +837,16 @@ Given
 
 When
 
-- ContainerRegistryAdapter.admin_delete — user-1이 심은 레지스트리를 지움
+- ContainerRegistryAdapter.admin_delete — user-1이 미리 만들어 둔 레지스트리를 삭제
 
 Then
 
-- 지운 id가 답으로 온다
-  - id: 심은 레지스트리의 id와 같다
+- 삭제한 id가 반환된다
+  - id: 미리 만들어 둔 레지스트리의 id와 같다
 
 #### [deleting-a-registry-takes-its-allowed-projects-with-it](/tests/scenario/bai_scenario/manager/container_registry/test_retiring.py) — pass
 
-허용 프로젝트가 딸린 레지스트리를 지우면, 외래 키를 통해 그 허용 목록까지 함께 사라진다
+허용 프로젝트가 있는 레지스트리를 삭제하면, 외래 키를 통해 그 허용 목록까지 함께 삭제된다
 
 Given
 
@@ -855,7 +855,7 @@ Given
   - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
   - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
   - 프로젝트 project-1
-  - 프로젝트 project-1 이 허용된 컨테이너 레지스트리 host-1
+  - 프로젝트 project-1 을 허용한 컨테이너 레지스트리 host-1
   - 도메인에 속한 사용자 한 명 준비
     - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
     - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
@@ -863,16 +863,16 @@ Given
 
 When
 
-- ContainerRegistryAdapter.admin_delete — user-1이 심은 레지스트리를 지움
+- ContainerRegistryAdapter.admin_delete — user-1이 미리 만들어 둔 레지스트리를 삭제
 
 Then
 
-- 지운 id가 답으로 온다
-  - id: 심은 레지스트리의 id와 같다
+- 삭제한 id가 반환된다
+  - id: 미리 만들어 둔 레지스트리의 id와 같다
 
 #### [deleting-an-id-that-holds-no-registry-is-refused](/tests/scenario/bai_scenario/manager/container_registry/test_retiring.py) — pass
 
-아무 레지스트리도 갖지 않은 id를 지우려 하면 대상이 없다는 이유로 거부된다
+존재하지 않는 id를 삭제하려 하면 대상을 찾을 수 없어 거부된다
 
 Given
 
@@ -887,7 +887,7 @@ Given
 
 When
 
-- ContainerRegistryAdapter.admin_delete — user-1이 아무것도 갖지 않은 id를 지움
+- ContainerRegistryAdapter.admin_delete — user-1이 존재하지 않는 id를 삭제
 
 Then
 
@@ -898,7 +898,7 @@ Then
 
 #### [a-user-who-is-not-the-superadmin-may-not-search-registries](/tests/scenario/bai_scenario/manager/container_registry/test_searching.py) — pass
 
-슈퍼관리자가 아닌 사용자가 레지스트리를 검색하려 하면 권한 부족으로 거부된다. 이 호출은 부른 사람이 슈퍼관리자인지만 보고, 어떤 권한을 받았는지는 보지 않는다
+슈퍼관리자가 아닌 사용자가 레지스트리를 검색하려 하면 권한 부족으로 거부된다. 이 호출은 호출자가 슈퍼관리자인지만 검사하고, 부여된 권한은 보지 않는다
 
 Given
 
@@ -914,7 +914,7 @@ Given
 
 When
 
-- ContainerRegistryAdapter.admin_search — user-1이 조건 없이 검색함
+- ContainerRegistryAdapter.admin_search — user-1이 조건 없이 검색
 
 Then
 
@@ -923,7 +923,7 @@ Then
 
 #### [filtering-by-global-visibility-leaves-only-non-global-registries](/tests/scenario/bai_scenario/manager/container_registry/test_searching.py) — pass
 
-슈퍼관리자가 전역 여부로 걸러 검색하면 전역이 아닌 레지스트리만 남는다
+슈퍼관리자가 전역 여부 필터로 검색하면 전역이 아닌 레지스트리만 남는다
 
 Given
 
@@ -939,19 +939,19 @@ Given
 
 When
 
-- ContainerRegistryAdapter.admin_search — user-1이 non-global 조건으로 걸러 검색함
+- ContainerRegistryAdapter.admin_search — user-1이 non-global 필터로 검색
 
 Then
 
-- 전역이 아닌 레지스트리만 온다
-  - items: 심은 레지스트리와 같다
+- 전역이 아닌 레지스트리만 반환된다
+  - items: 미리 만들어 둔 레지스트리와 같다
   - total_count = 1
   - has_next_page = False
   - has_previous_page = False
 
 #### [filtering-by-type-leaves-only-matching-registries](/tests/scenario/bai_scenario/manager/container_registry/test_searching.py) — pass
 
-슈퍼관리자가 종류로 걸러 검색하면 그 종류를 가진 레지스트리만 남는다
+슈퍼관리자가 종류 필터로 검색하면 그 종류의 레지스트리만 남는다
 
 Given
 
@@ -967,19 +967,19 @@ Given
 
 When
 
-- ContainerRegistryAdapter.admin_search — user-1이 type 조건으로 걸러 검색함
+- ContainerRegistryAdapter.admin_search — user-1이 type 필터로 검색
 
 Then
 
-- 걸러낸 그 레지스트리 하나만 남는다
-  - items: 심은 레지스트리와 같다
+- 필터와 일치하는 레지스트리 하나만 남는다
+  - items: 미리 만들어 둔 레지스트리와 같다
   - total_count = 1
   - has_next_page = False
   - has_previous_page = False
 
 #### [searching-without-a-filter-counts-every-registry](/tests/scenario/bai_scenario/manager/container_registry/test_searching.py) — pass
 
-슈퍼관리자가 조건 없이 검색하면 심어둔 레지스트리가 모두 답으로 온다
+슈퍼관리자가 조건 없이 검색하면 미리 만들어 둔 레지스트리가 모두 반환된다
 
 Given
 
@@ -995,12 +995,12 @@ Given
 
 When
 
-- ContainerRegistryAdapter.admin_search — user-1이 조건 없이 검색함
+- ContainerRegistryAdapter.admin_search — user-1이 조건 없이 검색
 
 Then
 
-- 심은 레지스트리가 모두 세어진다
-  - items: 심은 레지스트리와 같다
+- 미리 만들어 둔 레지스트리가 모두 집계된다
+  - items: 미리 만들어 둔 레지스트리와 같다
   - total_count = 2
   - has_next_page = False
   - has_previous_page = False

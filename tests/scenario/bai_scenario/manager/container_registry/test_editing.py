@@ -58,14 +58,14 @@ class Editing(When[ARegistryAndACaller, ContainerRegistryAdapter, ContainerRegis
     def describe(self, laid: ARegistryAndACaller) -> str:
         who = laid.caller.username
         if isinstance(self.target, MissingRegistry):
-            return f"{who}이 {self.target.says()}를 고침"
+            return f"{who}이 {self.target.says()}를 수정"
         if self.url is not None:
-            return f"{who}이 주소를 {self.url}로 고침"
+            return f"{who}이 주소를 {self.url}로 수정"
         if self.registry_type is not None:
-            return f"{who}이 종류를 {self.registry_type.value}로 고침"
+            return f"{who}이 종류를 {self.registry_type.value}로 수정"
         if self.allow_project:
-            return f"{who}이 심은 프로젝트를 허용 목록에 넣으며 고침"
-        return f"{who}이 아무 값도 주지 않고 고침"
+            return f"{who}이 미리 만들어 둔 프로젝트를 허용 목록에 넣으며 수정"
+        return f"{who}이 아무 값도 지정하지 않고 수정"
 
     @override
     async def call(
@@ -99,7 +99,7 @@ class ChangingOnlyTheAddress(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 주소만 고치면 주소만 새 값이 되고 나머지 자리는 그대로다"
+        return "슈퍼관리자가 주소만 수정하면 주소만 새 값이 되고 나머지 필드는 그대로다"
 
     @override
     def given(self) -> Given[SeedingSession, ARegistryAndACaller]:
@@ -124,7 +124,9 @@ class AnEmptyEditChangesNothing(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 값을 하나도 주지 않고 고치면 아무것도 바뀌지 않은 노드가 온다"
+        return (
+            "슈퍼관리자가 값을 하나도 지정하지 않고 수정하면 아무것도 바뀌지 않은 노드가 반환된다"
+        )
 
     @override
     def given(self) -> Given[SeedingSession, ARegistryAndACaller]:
@@ -149,7 +151,7 @@ class AddingAllowedProjectWhileEditing(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 레지스트리를 고치며 프로젝트를 허용하면 그 관계가 생성된다"
+        return "슈퍼관리자가 레지스트리를 수정하며 프로젝트를 허용하면 그 관계가 생성된다"
 
     @override
     def given(self) -> Given[SeedingSession, ARegistryAndACaller]:
@@ -175,8 +177,8 @@ class AnAddressWithoutAHostIsRefused(
     @override
     def describe(self) -> str:
         return (
-            "슈퍼관리자가 호스트 자리가 비는 주소로 고치려 하면, "
-            "고친 뒤의 행을 보는 검사가 주소 형식으로 막는다"
+            "슈퍼관리자가 호스트가 없는 주소로 수정하려 하면, "
+            "수정 후의 행을 검사하는 단계에서 주소 형식 오류로 거부된다"
         )
 
     @override
@@ -203,8 +205,8 @@ class HarborWithoutAProjectIsRefused(
     @override
     def describe(self) -> str:
         return (
-            "프로젝트가 비어 있는 레지스트리를 harbor 종류로 고치려 하면, "
-            "harbor는 프로젝트를 요구하므로 그 값으로 막힌다"
+            "프로젝트가 비어 있는 레지스트리를 harbor 종류로 수정하려 하면, "
+            "harbor는 프로젝트를 요구하므로 거부된다"
         )
 
     @override
@@ -230,7 +232,7 @@ class MissingRegistryIsRefused(
 
     @override
     def describe(self) -> str:
-        return "아무 레지스트리도 갖지 않은 id를 고치려 하면 대상이 없다는 이유로 거부된다"
+        return "존재하지 않는 id를 수정하려 하면 대상을 찾을 수 없어 거부된다"
 
     @override
     def given(self) -> Given[SeedingSession, ARegistryAndACaller]:
@@ -256,8 +258,8 @@ class APlainUserMayNotEdit(
     @override
     def describe(self) -> str:
         return (
-            "슈퍼관리자가 아닌 사용자가 레지스트리를 고치려 하면 권한 부족으로 거부된다. "
-            "이 호출은 부른 사람이 슈퍼관리자인지만 보고, 어떤 권한을 받았는지는 보지 않는다"
+            "슈퍼관리자가 아닌 사용자가 레지스트리를 수정하려 하면 권한 부족으로 거부된다. "
+            "이 호출은 호출자가 슈퍼관리자인지만 검사하고, 부여된 권한은 보지 않는다"
         )
 
     @override

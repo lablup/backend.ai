@@ -50,7 +50,7 @@ class Creating(When[AProjectAndACaller, ContainerRegistryAdapter, ContainerRegis
 
     @override
     def describe(self, laid: AProjectAndACaller) -> str:
-        return f"{laid.caller.username}이 {self.allowed_projects.says()} {self.url}로 만듦"
+        return f"{laid.caller.username}이 {self.allowed_projects.says()} {self.url}로 생성"
 
     @override
     async def call(
@@ -79,8 +79,8 @@ class CreatingWithOnlyTheRequiredValues(
     @override
     def describe(self) -> str:
         return (
-            "슈퍼관리자가 주소와 이름과 종류만 주고 레지스트리를 만들면, "
-            "나머지 자리가 모두 비어 있는 노드가 답으로 온다"
+            "슈퍼관리자가 주소·이름·종류만 지정해 레지스트리를 생성하면, "
+            "나머지 필드가 모두 비어 있는 노드가 반환된다"
         )
 
     @override
@@ -107,7 +107,7 @@ class AllowingAProjectWhileCreating(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 허용 프로젝트를 함께 주고 레지스트리를 만들면 그 관계도 생성된다"
+        return "슈퍼관리자가 허용 프로젝트를 함께 지정해 레지스트리를 생성하면 그 관계도 생성된다"
 
     @override
     def given(self) -> Given[SeedingSession, AProjectAndACaller]:
@@ -134,8 +134,8 @@ class AProjectThatIsNotThereIsRefused(
     @override
     def describe(self) -> str:
         return (
-            "허용 목록에 없는 프로젝트를 넣고 레지스트리를 만들려 하면, "
-            "그 프로젝트가 없다는 이유로 거부된다"
+            "존재하지 않는 프로젝트를 허용 목록에 넣고 레지스트리를 생성하려 하면, "
+            "그 프로젝트를 찾을 수 없어 거부된다"
         )
 
     @override
@@ -162,8 +162,8 @@ class APlainUserMayNotCreate(
     @override
     def describe(self) -> str:
         return (
-            "슈퍼관리자가 아닌 사용자가 레지스트리를 만들려 하면 권한 부족으로 거부된다. "
-            "이 호출은 부른 사람이 슈퍼관리자인지만 보고, 어떤 권한을 받았는지는 보지 않는다"
+            "슈퍼관리자가 아닌 사용자가 레지스트리를 생성하려 하면 권한 부족으로 거부된다. "
+            "이 호출은 호출자가 슈퍼관리자인지만 검사하고, 부여된 권한은 보지 않는다"
         )
 
     @override

@@ -161,7 +161,7 @@ ALLOWING = (Permission.CREATE, Permission.SOFT_DELETE)
 
 @dataclass(frozen=True)
 class ARegistryAndAProjectToAllow(Given[SeedingSession, ARegistryToAllowAndACaller]):
-    """관계 동작은 지목한 스코프가 모두 허용해야 실행된다. 그래서 한쪽만 주는 자리가 필요하다."""
+    """관계 연산은 지정한 스코프 모두에 권한이 있어야 실행된다. 그래서 한쪽에만 권한을 주는 상황이 필요하다."""
 
     role: UserRole = UserRole.USER
     on_registry: bool = True
@@ -262,7 +262,7 @@ class TheNewRegistryNode(Then[AProjectAndACaller, ContainerRegistryNode]):
 
     @override
     def says(self) -> str:
-        return "만든 레지스트리 전체가 온다"
+        return "생성한 레지스트리 전체가 반환된다"
 
     @override
     def look(
@@ -290,7 +290,7 @@ class TheUpdatedRegistryNode(Then[ARegistryAndACaller, ContainerRegistryNode]):
 
     @override
     def says(self) -> str:
-        return "심은 레지스트리 전체가 온다"
+        return "미리 만들어 둔 레지스트리 전체가 반환된다"
 
     @override
     def look(
@@ -315,7 +315,7 @@ class TheUpdatedRegistryNode(Then[ARegistryAndACaller, ContainerRegistryNode]):
 
 
 class RegistryTarget(ABC):
-    """요청이 지목하는 레지스트리."""
+    """요청이 지정하는 레지스트리."""
 
     @abstractmethod
     def says(self) -> str:
@@ -330,7 +330,7 @@ class RegistryTarget(ABC):
 class SeededRegistry(RegistryTarget):
     @override
     def says(self) -> str:
-        return "심은 레지스트리"
+        return "미리 만들어 둔 레지스트리"
 
     @override
     def id_of(self, laid: ARegistryAndACaller) -> uuid.UUID:
@@ -341,7 +341,7 @@ class SeededRegistry(RegistryTarget):
 class MissingRegistry(RegistryTarget):
     @override
     def says(self) -> str:
-        return "아무것도 갖지 않은 id"
+        return "존재하지 않는 id"
 
     @override
     def id_of(self, laid: ARegistryAndACaller) -> uuid.UUID:
@@ -349,7 +349,7 @@ class MissingRegistry(RegistryTarget):
 
 
 class AllowedProjects(ABC):
-    """만들기 요청이 허용 목록 자리에 담는 것."""
+    """생성 요청의 허용 목록 필드에 담는 값."""
 
     @abstractmethod
     def says(self) -> str:
@@ -375,7 +375,7 @@ class NoProjects(AllowedProjects):
 class SeededProject(AllowedProjects):
     @override
     def says(self) -> str:
-        return "심은 프로젝트를 허용 목록에 넣고"
+        return "미리 만들어 둔 프로젝트를 허용 목록에 넣고"
 
     @override
     def of(self, laid: AProjectAndACaller) -> AllowedGroupsInput:
@@ -386,7 +386,7 @@ class SeededProject(AllowedProjects):
 class MissingProject(AllowedProjects):
     @override
     def says(self) -> str:
-        return "없는 프로젝트를 허용 목록에 넣고"
+        return "존재하지 않는 프로젝트를 허용 목록에 넣고"
 
     @override
     def of(self, laid: AProjectAndACaller) -> AllowedGroupsInput:
@@ -394,7 +394,7 @@ class MissingProject(AllowedProjects):
 
 
 class AllowedProjectChange(ABC):
-    """허용 목록을 고치는 요청이 한 방향으로 담는 것."""
+    """허용 목록 수정 요청에 담는 값. 추가와 제거 중 한쪽만 담는다."""
 
     @abstractmethod
     def says(self) -> str:
@@ -431,7 +431,7 @@ class RemoveProject(AllowedProjectChange):
 class AddMissingProject(AllowedProjectChange):
     @override
     def says(self) -> str:
-        return "없는 프로젝트를 허용 목록에 넣음"
+        return "존재하지 않는 프로젝트를 허용 목록에 넣음"
 
     @override
     def of(self, laid: ARegistryToAllowAndACaller) -> AllowedGroupsModel:

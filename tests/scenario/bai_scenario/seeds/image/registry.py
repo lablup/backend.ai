@@ -51,7 +51,7 @@ class SeedContainerRegistry(SeedRow[ContainerRegistryData]):
 class AllowProject(SeedLink[ProjectData, ContainerRegistryData]):
     @override
     def kind(self) -> str:
-        return "이 허용된"
+        return "을 허용한"
 
     @override
     def scope_id(self, scope: ProjectData) -> ProjectID:

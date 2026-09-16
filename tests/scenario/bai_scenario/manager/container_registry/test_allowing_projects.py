@@ -73,7 +73,7 @@ class TheCallReturnsNothing(Then[ARegistryToAllowAndACaller, None]):
 
     @override
     def says(self) -> str:
-        return "답이 없고 예외도 없다"
+        return "반환값이 없고 예외도 발생하지 않는다"
 
     @override
     def look(self, laid: ARegistryToAllowAndACaller, answered: Answered[None]) -> list[Verdict]:
@@ -306,7 +306,7 @@ class RemovingUnlinkedProjectIsRefused(
 
     @override
     def describe(self) -> str:
-        return "지목한 프로젝트 중 실제로 허용된 것이 하나도 없으면, 뺄 것이 없다는 이유로 거부된다"
+        return "지정한 프로젝트 중 실제로 허용된 것이 하나도 없으면, 제거할 관계가 없다는 이유로 거부된다"
 
     @override
     def given(self) -> Given[SeedingSession, ARegistryToAllowAndACaller]:
@@ -333,7 +333,7 @@ class MissingProjectPermissionIsRefused(
     def describe(self) -> str:
         return (
             "레지스트리에만 권한을 받고 프로젝트에는 받지 못한 사용자가 프로젝트를 허용하려 하면, "
-            "관계 동작은 지목한 스코프를 모두 보므로 권한 부족으로 막힌다"
+            "관계 연산은 지정한 스코프 모두의 권한을 검사하므로 권한 부족으로 거부된다"
         )
 
     @override
@@ -361,7 +361,7 @@ class MissingRegistryPermissionIsRefused(
     def describe(self) -> str:
         return (
             "프로젝트에만 권한을 받고 레지스트리에는 받지 못한 사용자가 프로젝트를 허용하려 하면, "
-            "관계 동작은 지목한 스코프를 모두 보므로 권한 부족으로 막힌다"
+            "관계 연산은 지정한 스코프 모두의 권한을 검사하므로 권한 부족으로 거부된다"
         )
 
     @override
@@ -388,7 +388,7 @@ class DisabledEnforcementAllowsProject(
 
     @override
     def describe(self) -> str:
-        return "엔티티 권한 집행을 끄면 아무 권한도 받지 않은 사용자도 프로젝트를 허용할 수 있다"
+        return "권한 검사를 끄면 아무 권한도 받지 않은 사용자도 프로젝트를 허용할 수 있다"
 
     @override
     def config(self) -> Mapping[str, Any]:

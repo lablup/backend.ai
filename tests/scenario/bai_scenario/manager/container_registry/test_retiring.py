@@ -60,7 +60,7 @@ class Deleting(When[ARegistryAndACaller, ContainerRegistryAdapter, DeleteContain
 
     @override
     def describe(self, laid: ARegistryAndACaller) -> str:
-        return f"{laid.caller.username}이 {self.target.says()}를 지움"
+        return f"{laid.caller.username}이 {self.target.says()}를 삭제"
 
     @override
     async def call(
@@ -75,7 +75,7 @@ class Deleting(When[ARegistryAndACaller, ContainerRegistryAdapter, DeleteContain
 class TheDeletedIdComesBack(Then[ARegistryAndACaller, DeleteContainerRegistryPayload]):
     @override
     def says(self) -> str:
-        return "지운 id가 답으로 온다"
+        return "삭제한 id가 반환된다"
 
     @override
     def look(
@@ -85,7 +85,7 @@ class TheDeletedIdComesBack(Then[ARegistryAndACaller, DeleteContainerRegistryPay
         if payload is None:
             return [MissingResponse(answered.raised)]
         wanted: UUID = laid.registry.id
-        return [Held("id", payload.id, SameAs(wanted, "심은 레지스트리의 id"))]
+        return [Held("id", payload.id, SameAs(wanted, "미리 만들어 둔 레지스트리의 id"))]
 
 
 @dataclass(frozen=True)
@@ -103,7 +103,7 @@ class DeletingAnswersWithTheRemovedId(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 레지스트리를 지우면 지운 id가 답으로 온다"
+        return "슈퍼관리자가 레지스트리를 삭제하면 삭제한 id를 담은 응답이 반환된다"
 
     @override
     def given(self) -> Given[SeedingSession, ARegistryAndACaller]:
@@ -135,7 +135,7 @@ class DeletingTakesTheAllowedProjectWithIt(
 
     @override
     def describe(self) -> str:
-        return "허용 프로젝트가 딸린 레지스트리를 지우면, 외래 키를 통해 그 허용 목록까지 함께 사라진다"
+        return "허용 프로젝트가 있는 레지스트리를 삭제하면, 외래 키를 통해 그 허용 목록까지 함께 삭제된다"
 
     @override
     def given(self) -> Given[SeedingSession, ARegistryAndACaller]:
@@ -167,7 +167,7 @@ class MissingRegistryIsRefused(
 
     @override
     def describe(self) -> str:
-        return "아무 레지스트리도 갖지 않은 id를 지우려 하면 대상이 없다는 이유로 거부된다"
+        return "존재하지 않는 id를 삭제하려 하면 대상을 찾을 수 없어 거부된다"
 
     @override
     def given(self) -> Given[SeedingSession, ARegistryAndACaller]:
@@ -200,8 +200,8 @@ class APlainUserMayNotDelete(
     @override
     def describe(self) -> str:
         return (
-            "슈퍼관리자가 아닌 사용자가 레지스트리를 지우려 하면 권한 부족으로 거부된다. "
-            "이 호출은 부른 사람이 슈퍼관리자인지만 보고, 어떤 권한을 받았는지는 보지 않는다"
+            "슈퍼관리자가 아닌 사용자가 레지스트리를 삭제하려 하면 권한 부족으로 거부된다. "
+            "이 호출은 호출자가 슈퍼관리자인지만 검사하고, 부여된 권한은 보지 않는다"
         )
 
     @override

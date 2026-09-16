@@ -52,8 +52,8 @@ class Loading(When[ManyRegistriesAndACaller, ContainerRegistryAdapter, Loaded]):
     def describe(self, laid: ManyRegistriesAndACaller) -> str:
         who = laid.caller.username
         if self.empty:
-            return f"{who}이 빈 id 목록으로 읽음"
-        return f"{who}이 심은 것 둘과 없는 id 하나를 한 번에 읽음"
+            return f"{who}이 빈 id 목록으로 조회"
+        return f"{who}이 미리 만들어 둔 레지스트리 둘과 존재하지 않는 id 하나를 한 번에 조회"
 
     def registry_ids(self, laid: ManyRegistriesAndACaller) -> list[ContainerRegistryID]:
         if self.empty:
@@ -82,7 +82,7 @@ def registry_name_of(one: ContainerRegistryNode | Exception | None) -> str | Non
 class TheOrderIsKept(Then[ManyRegistriesAndACaller, Loaded]):
     @override
     def says(self) -> str:
-        return "심은 것은 준 순서 그대로 오고, 없는 id 자리는 보지 않는다"
+        return "미리 만들어 둔 레지스트리는 요청한 순서대로 반환되고, 존재하지 않는 id의 항목은 검사하지 않는다"
 
     @override
     def look(self, laid: ManyRegistriesAndACaller, answered: Answered[Loaded]) -> list[Verdict]:
@@ -94,7 +94,7 @@ class TheOrderIsKept(Then[ManyRegistriesAndACaller, Loaded]):
         return [
             Same("length", len(got), 3),
             Same("[0].registry_name", registry_name_of(got[0]), laid.registries[0].registry_name),
-            Skipped("[1]", "없는 id에 superadmin이 받는 답은 아직 정해지지 않았다"),
+            Skipped("[1]", "존재하지 않는 id에 슈퍼관리자가 받는 응답은 아직 정해지지 않았다"),
             Same("[2].registry_name", registry_name_of(got[2]), laid.registries[1].registry_name),
         ]
 
@@ -103,7 +103,7 @@ class TheOrderIsKept(Then[ManyRegistriesAndACaller, Loaded]):
 class EveryIdIsRefused(Then[ManyRegistriesAndACaller, Loaded]):
     @override
     def says(self) -> str:
-        return "자리마다 권한 부족이 담겨 온다"
+        return "항목마다 권한 부족 거부가 담겨 반환된다"
 
     @override
     def look(self, laid: ManyRegistriesAndACaller, answered: Answered[Loaded]) -> list[Verdict]:
@@ -123,7 +123,7 @@ class EveryIdIsRefused(Then[ManyRegistriesAndACaller, Loaded]):
 class AnEmptyListComesBack(Then[ManyRegistriesAndACaller, Loaded]):
     @override
     def says(self) -> str:
-        return "빈 답이 온다"
+        return "빈 응답이 반환된다"
 
     @override
     def look(self, laid: ManyRegistriesAndACaller, answered: Answered[Loaded]) -> list[Verdict]:
@@ -144,8 +144,9 @@ class LoadingKeepsTheOrder(
     @override
     def describe(self) -> str:
         return (
-            "슈퍼관리자가 심은 레지스트리 둘과 아무것도 갖지 않은 id 하나를 한 번에 읽으면, "
-            "심은 것은 준 순서 그대로 온다. 없는 id 자리에 무엇이 오는지는 아직 정해지지 않았다"
+            "슈퍼관리자가 미리 만들어 둔 레지스트리 둘과 존재하지 않는 id 하나를 한 번에 조회하면, "
+            "미리 만들어 둔 레지스트리는 요청한 순서대로 반환된다. "
+            "존재하지 않는 id의 항목에 무엇이 반환되는지는 아직 정해지지 않았다"
         )
 
     @override
@@ -171,7 +172,7 @@ class AnEmptyListAsksNothing(
 
     @override
     def describe(self) -> str:
-        return "빈 id 목록으로 읽으면 배선을 부르지 않고 빈 답이 온다"
+        return "빈 id 목록으로 조회하면 하위 계층을 호출하지 않고 빈 응답이 반환된다"
 
     @override
     def given(self) -> Given[SeedingSession, ManyRegistriesAndACaller]:
@@ -197,8 +198,9 @@ class APlainUserIsRefusedOnEveryId(
     @override
     def describe(self) -> str:
         return (
-            "권한을 받지 않은 사용자가 id 여럿을 한 번에 읽으면, 요청이 통째로 거부되는 대신 "
-            "자리마다 권한 부족이 담겨 온다. 없는 id도 같은 거부로 와서 있는지 없는지가 드러나지 않는다"
+            "권한을 받지 않은 사용자가 id 여럿을 한 번에 조회하면, 요청 전체가 거부되는 대신 "
+            "항목마다 권한 부족 거부가 담겨 반환된다. "
+            "존재하지 않는 id도 같은 거부로 반환되어 있는지 없는지가 드러나지 않는다"
         )
 
     @override
