@@ -11,10 +11,6 @@ from datetime import datetime
 from typing import Any, override
 from uuid import UUID
 
-from bai_scenario.components.domain import WrittenByThisRun
-from bai_scenario.components.system import KEPT, Kept, lay_a_caller, role_named
-from bai_scenario.seeds.retention_policy.retention_policy import SeedRetentionPolicy
-
 from ai.backend.common.data.retention.types import RetentionCategory
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.v2.retention_policy.response import (
@@ -35,6 +31,9 @@ from ai.backend.testutils.scenario_steps import (
     Then,
     Verdict,
 )
+from bai_scenario.components.domain import WrittenByThisRun
+from bai_scenario.components.system import KEPT, Kept, lay_a_caller, role_named
+from bai_scenario.seeds.retention_policy.retention_policy import SeedRetentionPolicy
 
 KEPT_DAYS = 30
 """시드가 미리 만들어 두는 정책의 보존 일수."""

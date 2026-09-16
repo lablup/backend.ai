@@ -6,11 +6,10 @@ from dataclasses import dataclass
 from datetime import timedelta
 from typing import override
 
-from bai_scenario.seeds.seeder import Naming, SeedRow
-
 from ai.backend.common.data.retention.types import RetentionCategory
 from ai.backend.manager.data.retention.types import RetentionPolicyData
 from ai.backend.manager.models.retention.creators import RetentionPolicyCreator
+from bai_scenario.seeds.seeder import Naming, SeedRow
 
 
 @dataclass(frozen=True)
