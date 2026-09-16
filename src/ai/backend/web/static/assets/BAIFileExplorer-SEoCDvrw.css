@@ -1,0 +1,32 @@
+/**
+ @license
+ Copyright (c) 2015-2026 Lablup Inc. All rights reserved.
+
+ Co-located styles for <DragAndDrop>, imported by the component itself (P17).
+
+ Astryx paints a dropzone's drag-over fill with `--color-accent-muted`. That is
+ a hint on the 350px field its templates show; this dropzone is stretched over
+ the whole explorer, where the same 20% accent reads as an orange wash on the
+ file list. Only the area fill is scale-dependent, so it goes neutral and the
+ accent dashed border stays as the drop cue (FR-3575).
+*/.bai-file-explorer-dropzone{--color-accent-muted: var(--color-background-muted)}/**
+ @license
+ Copyright (c) 2015-2026 Lablup Inc. All rights reserved.
+
+ Co-located styles for <EditableFileName>, imported by the component itself
+ (P17). No theme token is involved.
+
+ to-astryx W2-D: the hover-reveal rules were keyed on `ant-typography-edit`,
+ the anchor antd injected for `Typography.Text editable`. That element no
+ longer exists (the affordance is an Astryx `IconButton` now), so the selector
+ is re-pointed at the button's own class rather than left silently matching
+ nothing (P6).
+
+ Ticket 35 re-pointed the margin rule the same way. The rename field sits in
+ the self-hosted form engine now, so its item root is `[data-bai-form-item]`
+ and the old `ant-form-item*` selectors had stopped matching anything —
+ which would have left this field with the shell's default 24px bottom margin
+ inside a single-line inline editor. `!important` still wins over the shell's
+ inline `marginBottom` (author `!important` beats a non-important inline
+ style), so the collapse-to-zero behaviour is unchanged.
+*/.bai-editable-file-name-hover-edit .bai-editable-file-name-edit-button{opacity:0;transition:opacity .2s}.bai-editable-file-name-hover-edit:hover .bai-editable-file-name-edit-button,.bai-editable-file-name-hover-edit:focus-within .bai-editable-file-name-edit-button{opacity:1}.bai-editable-file-name-form [data-bai-form-item]{margin-bottom:0!important}.bai-editable-file-name-form{flex:1;min-width:0}

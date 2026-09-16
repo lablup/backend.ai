@@ -1,9 +1,21 @@
-/* Operator stylesheet — add custom WebUI style overrides here. Examples: */
+/* Operator stylesheet — add custom WebUI style overrides here.
 
-/* .ant-tabs {
-  background-color: #2A2C30;
+   Prefer the theme bridge over element selectors. `--token-*` custom
+   properties are written to :root by the app on every theme change, so
+   overriding them recolours the UI consistently instead of patching one
+   component's markup — and, unlike a class selector, they are a supported
+   contract that survives component-library changes.
+
+   The examples below are commented out. */
+
+/* :root {
+  --token-colorPrimary: #27824f;
+  --token-colorBgBase: #f7f7f6;
 } */
 
-/* .ant-card-head > .ant-tabs {
-  background-color: #ffffff;
+/* Element-level overrides are still possible, but target the app's own
+   stable `bai-*` markers rather than component-library internals: */
+
+/* .bai-name-action-cell-actions {
+  opacity: 1;
 } */
