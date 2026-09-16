@@ -13,6 +13,19 @@ from datetime import UTC, datetime
 from typing import Any, override
 
 import pytest
+
+from ai.backend.common.data.user.types import UserRole
+from ai.backend.manager.api.adapters.resource_policy.adapter import ResourcePolicyAdapter
+from ai.backend.manager.errors.base.entity import EntityNotFoundError
+from ai.backend.manager.errors.common import GenericBadRequest
+from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.testutils.scenario_steps import (
+    Configured,
+    Given,
+    Scenario,
+    Then,
+    When,
+)
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.resource_policy import (
     FAMILIES,
@@ -24,18 +37,6 @@ from bai_scenario.components.resource_policy import (
 from bai_scenario.runner.acting import ActingAs
 from bai_scenario.runner.planting import SeedingSession
 from bai_scenario.runner.steps import run_scenario
-
-from ai.backend.common.data.user.types import UserRole
-from ai.backend.manager.api.adapters.resource_policy.adapter import ResourcePolicyAdapter
-from ai.backend.manager.errors.common import GenericBadRequest
-from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.scenario_steps import (
-    Configured,
-    Given,
-    Scenario,
-    Then,
-    When,
-)
 
 NOBODY = "nobody"
 ENFORCEMENT = "manager.rbac.enforcement_enabled"
@@ -126,23 +127,20 @@ class AUserGrantedNothingMayNotRead(
 
 
 @dataclass(frozen=True)
-class ANameNothingAnswersToIsUnresolvable(
+class ANameNothingAnswersToIsNotFound(
     Scenario[SeedingSession, APolicyAndACaller[Any], ResourcePolicyAdapter, Any]
 ):
     family: Family[Any, Any]
 
     @override
     def summary(self) -> str:
-        return (
-            f"a-{self.family.label}-name-nothing-answers-to-is-unresolvable-even-for-the-superadmin"
-        )
+        return f"reading-a-{self.family.label}-name-nothing-answers-to-is-not-found"
 
     @override
     def describe(self) -> str:
         return (
-            f"슈퍼관리자가 어느 {self.family.kind}에도 없는 이름으로 조회하면, 권한 없음과 "
-            "구분되지 않는 '정책을 찾을 수 없음'으로 거부된다. 거부 응답은 그 이름이 "
-            "존재하는지 알려 주지 않는다"
+            f"슈퍼관리자가 어느 {self.family.kind}에도 없는 이름으로 조회하면, "
+            "권한 문제가 아니라 대상이 없다는 것으로 거부된다"
         )
 
     @override
@@ -155,7 +153,7 @@ class ANameNothingAnswersToIsUnresolvable(
 
     @override
     def then(self) -> Then[APolicyAndACaller[Any], Any]:
-        return TheCallIsRefused(GenericBadRequest)
+        return TheCallIsRefused(EntityNotFoundError)
 
 
 @dataclass(frozen=True)
@@ -193,7 +191,7 @@ class EnforcementOffOpensTheRead(
 SCENARIOS: list[ReadingStep] = [
     *(TheSuperadminReadsItByName(family, started=datetime.now(UTC)) for family in FAMILIES),
     *(AUserGrantedNothingMayNotRead(family) for family in FAMILIES),
-    *(ANameNothingAnswersToIsUnresolvable(family) for family in FAMILIES),
+    *(ANameNothingAnswersToIsNotFound(family) for family in FAMILIES),
     *(EnforcementOffOpensTheRead(family, started=datetime.now(UTC)) for family in FAMILIES),
 ]
 

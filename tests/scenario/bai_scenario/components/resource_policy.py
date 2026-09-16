@@ -16,16 +16,6 @@ from decimal import Decimal
 from typing import Any, override
 from uuid import UUID
 
-from bai_scenario.components.domain import WAS_HERE, WrittenByThisRun
-from bai_scenario.seeds.domain.domain import SeedDomain
-from bai_scenario.seeds.keypair.keypair import SeedKeypair
-from bai_scenario.seeds.rbac.role import SeedPermission, SeedRole
-from bai_scenario.seeds.resource_policy.keypair import SeedKeypairPolicy
-from bai_scenario.seeds.resource_policy.project import SeedProjectPolicy
-from bai_scenario.seeds.resource_policy.user import SeedUserPolicy
-from bai_scenario.seeds.seeder import Laid, Seeder, SeedNest, SeedRow
-from bai_scenario.seeds.user.user import SeedUserOf
-
 from ai.backend.common.data.entity.resource_policy import (
     KeyPairResourcePolicyEntityType,
 )
@@ -74,6 +64,15 @@ from ai.backend.testutils.scenario_steps import (
     Then,
     Verdict,
 )
+from bai_scenario.components.domain import WAS_HERE, WrittenByThisRun
+from bai_scenario.seeds.domain.domain import SeedDomain
+from bai_scenario.seeds.keypair.keypair import SeedKeypair
+from bai_scenario.seeds.rbac.role import SeedPermission, SeedRole
+from bai_scenario.seeds.resource_policy.keypair import SeedKeypairPolicy
+from bai_scenario.seeds.resource_policy.project import SeedProjectPolicy
+from bai_scenario.seeds.resource_policy.user import SeedUserPolicy
+from bai_scenario.seeds.seeder import Laid, Seeder, SeedNest, SeedRow
+from bai_scenario.seeds.user.user import SeedUserOf
 
 type Searched = SearchKeypairResourcePoliciesPayload
 

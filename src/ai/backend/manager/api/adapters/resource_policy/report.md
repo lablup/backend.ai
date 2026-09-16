@@ -337,9 +337,9 @@ Then
   - idle_timeout = 3600
   - allowed_vfolder_hosts = []
 
-#### [editing-a-keypair-policy-name-nothing-answers-to-is-unresolvable](/tests/scenario/bai_scenario/manager/resource_policy/test_editing.py) — pass
+#### [editing-a-keypair-policy-name-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/resource_policy/test_editing.py) — pass
 
-슈퍼관리자가 어느 키페어 정책에도 없는 이름을 수정하려 하면, 정책을 찾을 수 없다는 이유로 거부된다
+슈퍼관리자가 어느 키페어 정책에도 없는 이름을 수정하려 하면, 권한 문제가 아니라 대상이 없다는 것으로 거부된다
 
 Given
 
@@ -359,7 +359,7 @@ When
 Then
 
 - 거부된다
-  - 거부: GenericBadRequest
+  - 거부: EntityNotFoundError
 
 #### [giving-no-value-changes-nothing-of-a-keypair-policy](/tests/scenario/bai_scenario/manager/resource_policy/test_editing.py) — pass
 
@@ -461,30 +461,6 @@ Then
 
 ### reading
 
-#### [a-keypair-policy-name-nothing-answers-to-is-unresolvable-even-for-the-superadmin](/tests/scenario/bai_scenario/manager/resource_policy/test_reading.py) — pass
-
-슈퍼관리자가 어느 키페어 정책에도 없는 이름으로 조회하면, 권한 없음과 구분되지 않는 '정책을 찾을 수 없음'으로 거부된다. 거부 응답은 그 이름이 존재하는지 알려 주지 않는다
-
-Given
-
-- 아무도 사용하지 않는 키페어 정책 하나와, superadmin 한 명
-  - 도메인 home-1
-  - 정책이 할당된 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
-
-When
-
-- ResourcePolicyAdapter.admin_get_keypair_resource_policy — user-1이 nobody 이름으로 조회
-
-Then
-
-- 거부된다
-  - 거부: GenericBadRequest
-
 #### [a-user-granted-nothing-cannot-resolve-a-keypair-policy-name](/tests/scenario/bai_scenario/manager/resource_policy/test_reading.py) — pass
 
 같은 키페어 정책이 있고 아무 권한도 없는 사용자가 이름으로 조회하면, 정책을 찾을 수 없다는 이유로 거부된다
@@ -508,6 +484,30 @@ Then
 
 - 거부된다
   - 거부: GenericBadRequest
+
+#### [reading-a-keypair-policy-name-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/resource_policy/test_reading.py) — pass
+
+슈퍼관리자가 어느 키페어 정책에도 없는 이름으로 조회하면, 권한 문제가 아니라 대상이 없다는 것으로 거부된다
+
+Given
+
+- 아무도 사용하지 않는 키페어 정책 하나와, superadmin 한 명
+  - 도메인 home-1
+  - 정책이 할당된 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+  - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+
+When
+
+- ResourcePolicyAdapter.admin_get_keypair_resource_policy — user-1이 nobody 이름으로 조회
+
+Then
+
+- 거부된다
+  - 거부: EntityNotFoundError
 
 #### [the-superadmin-reads-a-keypair-policy-by-name](/tests/scenario/bai_scenario/manager/resource_policy/test_reading.py) — pass
 
@@ -673,7 +673,7 @@ When
 Then
 
 - 거부된다
-  - 거부: ObjectNotFound
+  - 거부: KeypairResourcePolicyNotFound
 
 #### [among-several-keys-the-default-one-names-the-keypair-policy](/tests/scenario/bai_scenario/manager/resource_policy/test_reading_own.py) — pass
 
@@ -821,9 +821,9 @@ Then
 - 거부된다
   - 거부: GenericBadRequest
 
-#### [purging-a-keypair-policy-name-nothing-answers-to-is-unresolvable](/tests/scenario/bai_scenario/manager/resource_policy/test_retiring.py) — pass
+#### [purging-a-keypair-policy-name-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/resource_policy/test_retiring.py) — pass
 
-슈퍼관리자가 어느 키페어 정책에도 없는 이름을 삭제하려 하면, 정책을 찾을 수 없다는 이유로 거부된다
+슈퍼관리자가 어느 키페어 정책에도 없는 이름을 삭제하려 하면, 권한 문제가 아니라 대상이 없다는 것으로 거부된다
 
 Given
 
@@ -843,7 +843,7 @@ When
 Then
 
 - 거부된다
-  - 거부: GenericBadRequest
+  - 거부: EntityNotFoundError
 
 #### [purging-a-keypair-policy-still-held-is-refused](/tests/scenario/bai_scenario/manager/resource_policy/test_retiring.py) — pass
 

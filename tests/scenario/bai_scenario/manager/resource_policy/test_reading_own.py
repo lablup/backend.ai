@@ -12,6 +12,18 @@ from datetime import UTC, datetime
 from typing import Any, override
 
 import pytest
+
+from ai.backend.manager.api.adapters.resource_policy.adapter import ResourcePolicyAdapter
+from ai.backend.manager.errors.keypair import KeypairResourcePolicyNotFound
+from ai.backend.manager.errors.permission import NotEnoughPermission
+from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.testutils.scenario_steps import (
+    Configured,
+    Given,
+    Scenario,
+    Then,
+    When,
+)
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.resource_policy import (
     KEYPAIR,
@@ -26,18 +38,6 @@ from bai_scenario.components.resource_policy import (
 from bai_scenario.runner.acting import ActingAs
 from bai_scenario.runner.planting import SeedingSession
 from bai_scenario.runner.steps import run_scenario
-
-from ai.backend.manager.api.adapters.resource_policy.adapter import ResourcePolicyAdapter
-from ai.backend.manager.errors.common import ObjectNotFound
-from ai.backend.manager.errors.permission import NotEnoughPermission
-from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.scenario_steps import (
-    Configured,
-    Given,
-    Scenario,
-    Then,
-    When,
-)
 
 ENFORCEMENT = "manager.rbac.enforcement_enabled"
 
@@ -180,7 +180,7 @@ class NoActiveKeyFindsNoPolicy(
 
     @override
     def then(self) -> Then[APolicyAndACaller[Any], Any]:
-        return TheCallIsRefused(ObjectNotFound)
+        return TheCallIsRefused(KeypairResourcePolicyNotFound)
 
 
 @dataclass(frozen=True)
