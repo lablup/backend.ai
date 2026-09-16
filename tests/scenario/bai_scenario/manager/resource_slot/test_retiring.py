@@ -1,7 +1,7 @@
-"""슬롯 종류 삭제 — 이름으로 지정해 누가 삭제할 수 있는가.
+"""슬롯 종류 삭제 — 이름으로 지정해 누가 삭제할 수 있고, 무엇이 아직 참조하면 거부되는가.
 
-아직 참조하는 곳이 있어 거부되는 다섯 시나리오는 여기 없다. 에이전트 자원, 커널 할당, 모델 카드,
-배포 preset, 배포 리비전을 미리 만들어 두는 seed가 아직 없다.
+에이전트 자원, 모델 카드, 배포 preset이 아직 참조해서 거부되는 시나리오는 여기 없다. 그 셋을
+미리 만들어 두는 seed가 아직 없다.
 """
 
 from __future__ import annotations
@@ -18,9 +18,14 @@ from ai.backend.common.dto.manager.v2.resource_slot.response import PurgeResourc
 from ai.backend.manager.api.adapters.resource_slot.adapter import ResourceSlotAdapter
 from ai.backend.manager.errors.base.entity import EntityNotFoundError
 from ai.backend.manager.errors.permission import NotEnoughPermission
+from ai.backend.manager.errors.resource_slot import ResourceSlotTypeInUse
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import Configured, Given, Scenario, Then, When
 from bai_scenario.components.answers import TheCallIsRefused
+from bai_scenario.components.resource_allocation import (
+    ASlotTypeAKernelAsksForAndSomeone,
+    ASlotTypeARevisionUsesAndSomeone,
+)
 from bai_scenario.components.resource_slot import (
     ASlotTypeAndACaller,
     ASlotTypeAndSomeone,
@@ -85,6 +90,56 @@ class TheSuperadminPurgesASlotType(
     @override
     def then(self) -> Then[ASlotTypeAndACaller, Purged]:
         return TheDeletedSlotName()
+
+
+@dataclass(frozen=True)
+class ASlotAKernelStillAsksForMayNotBePurged(
+    Scenario[SeedingSession, ASlotTypeAndACaller, ResourceSlotAdapter, Purged]
+):
+    @override
+    def summary(self) -> str:
+        return "a-slot-type-a-kernel-still-asks-for-may-not-be-purged"
+
+    @override
+    def describe(self) -> str:
+        return "커널이 아직 할당받은 슬롯 종류를 슈퍼관리자가 삭제하면 아직 사용 중이라는 이유로 거부된다"
+
+    @override
+    def given(self) -> Given[SeedingSession, ASlotTypeAndACaller]:
+        return ASlotTypeAKernelAsksForAndSomeone(role=UserRole.SUPERADMIN)
+
+    @override
+    def when(self) -> When[ASlotTypeAndACaller, ResourceSlotAdapter, Purged]:
+        return Purging()
+
+    @override
+    def then(self) -> Then[ASlotTypeAndACaller, Purged]:
+        return TheCallIsRefused(ResourceSlotTypeInUse)
+
+
+@dataclass(frozen=True)
+class ASlotARevisionStillUsesMayNotBePurged(
+    Scenario[SeedingSession, ASlotTypeAndACaller, ResourceSlotAdapter, Purged]
+):
+    @override
+    def summary(self) -> str:
+        return "a-slot-type-a-deployment-revision-still-uses-may-not-be-purged"
+
+    @override
+    def describe(self) -> str:
+        return "배포 리비전이 아직 사용하는 슬롯 종류를 슈퍼관리자가 삭제하면 아직 사용 중이라는 이유로 거부된다"
+
+    @override
+    def given(self) -> Given[SeedingSession, ASlotTypeAndACaller]:
+        return ASlotTypeARevisionUsesAndSomeone(role=UserRole.SUPERADMIN)
+
+    @override
+    def when(self) -> When[ASlotTypeAndACaller, ResourceSlotAdapter, Purged]:
+        return Purging()
+
+    @override
+    def then(self) -> Then[ASlotTypeAndACaller, Purged]:
+        return TheCallIsRefused(ResourceSlotTypeInUse)
 
 
 @dataclass(frozen=True)
@@ -199,6 +254,8 @@ class EnforcementOffLetsAnyonePurge(
 
 SCENARIOS: list[RetiringStep] = [
     TheSuperadminPurgesASlotType(),
+    ASlotAKernelStillAsksForMayNotBePurged(),
+    ASlotARevisionStillUsesMayNotBePurged(),
     ANameNothingAnswersToIsNotFound(),
     AUserGrantedNothingMayNotPurge(),
     # TODO(BA-7929): the name is resolved before the permission gate, so this row fails
