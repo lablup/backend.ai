@@ -16,6 +16,7 @@ from alembic.util.pyfiles import load_python_file
 
 _REVISION = "f4a1c9d20b73_sync_seed_roles_with_their_declaration"
 _USER_OWNER_REVISION = "dc61fa027fc1_assign_every_user_their_user_owner_role"
+_DOMAIN_MEMBER_REVISION = "e7d2a9c41b60_assign_every_user_their_domain_member_role"
 _REPOSITORY = Path(__file__).resolve().parents[6]
 _VERSIONS = _REPOSITORY / "src/ai/backend/manager/models/alembic/versions"
 
@@ -32,6 +33,11 @@ def user_owner_migration() -> Any:
 
 
 @pytest.fixture(scope="module")
+def domain_member_migration() -> Any:
+    return load_python_file(str(_VERSIONS), f"{_DOMAIN_MEMBER_REVISION}.py")
+
+
+@pytest.fixture(scope="module")
 def fixture() -> dict[str, Any]:
     path = _REPOSITORY / "fixtures/manager/example-role-presets.json"
     loaded: dict[str, Any] = json.loads(path.read_text(encoding="utf-8"))
@@ -40,7 +46,11 @@ def fixture() -> dict[str, Any]:
 
 class TestMigrationMatchesFixture:
     def test_presets(
-        self, migration: Any, user_owner_migration: Any, fixture: dict[str, Any]
+        self,
+        migration: Any,
+        user_owner_migration: Any,
+        domain_member_migration: Any,
+        fixture: dict[str, Any],
     ) -> None:
         # The user_owner revision turns that preset's auto_assign on afterwards.
         written = {
@@ -53,13 +63,23 @@ class TestMigrationMatchesFixture:
             )
             for preset in migration._PRESETS
         }
+        # The domain_member revision writes its preset afterwards.
+        written.add((
+            domain_member_migration._PRESET_ID,
+            domain_member_migration._PRESET_NAME,
+            domain_member_migration._SCOPE_TYPE,
+            True,
+            False,
+        ))
         seeded = {
             (row["id"], row["name"], row["scope_type"], row["auto_assign"], row["deleted"])
             for row in fixture["role_presets"]
         }
         assert written == seeded
 
-    def test_preset_permissions(self, migration: Any, fixture: dict[str, Any]) -> None:
+    def test_preset_permissions(
+        self, migration: Any, domain_member_migration: Any, fixture: dict[str, Any]
+    ) -> None:
         written = {
             (
                 migration._identify("role_permission_preset", preset.id, entity_type, str(bit)),
@@ -69,6 +89,21 @@ class TestMigrationMatchesFixture:
             )
             for preset in migration._PRESETS
             for entity_type, bits in preset.grants
+            for bit in bits
+        }
+        written |= {
+            (
+                domain_member_migration._identify(
+                    "role_permission_preset",
+                    domain_member_migration._PRESET_ID,
+                    entity_type,
+                    str(bit),
+                ),
+                domain_member_migration._PRESET_ID,
+                entity_type,
+                bit,
+            )
+            for entity_type, bits in domain_member_migration._GRANTS
             for bit in bits
         }
         seeded = {
