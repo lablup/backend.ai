@@ -481,10 +481,7 @@ class EnforcementOffStillNeedsTheSuperadmin(
 
     @override
     def describe(self) -> str:
-        return (
-            "권한 검사를 꺼도 슈퍼관리자가 아니면 프리셋을 생성할 수 없다. "
-            "생성은 권한 그래프가 아니라 역할로 보호되므로 이 설정의 영향을 받지 않는다"
-        )
+        return "권한 검사를 꺼도 슈퍼관리자가 아니면 프리셋을 생성할 수 없다"
 
     @override
     def config(self) -> Mapping[str, Any]:

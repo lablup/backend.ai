@@ -440,7 +440,7 @@ Then
 
 #### [turning-enforcement-off-does-not-let-a-user-create-a-preset](/tests/scenario/bai_scenario/manager/runtime_variant_preset/test_creating.py) — pass
 
-권한 검사를 꺼도 슈퍼관리자가 아니면 프리셋을 생성할 수 없다. 생성은 권한 그래프가 아니라 역할로 보호되므로 이 설정의 영향을 받지 않는다
+권한 검사를 꺼도 슈퍼관리자가 아니면 프리셋을 생성할 수 없다
 
 Given
 
@@ -722,7 +722,7 @@ Then
 
 #### [turning-enforcement-off-lets-a-user-edit-a-preset](/tests/scenario/bai_scenario/manager/runtime_variant_preset/test_editing.py) — pass
 
-권한 검사를 끄면 아무 권한도 없는 사용자도 프리셋을 수정할 수 있다. 수정은 역할이 아니라 권한 그래프로 보호되기 때문이다
+권한 검사를 끄면 아무 권한도 없는 사용자도 프리셋을 수정할 수 있다
 
 Given
 
@@ -986,7 +986,7 @@ Then
 
 #### [turning-enforcement-off-lets-a-user-delete-a-preset](/tests/scenario/bai_scenario/manager/runtime_variant_preset/test_retiring.py) — pass
 
-권한 검사를 끄면 아무 권한도 없는 사용자도 프리셋을 삭제할 수 있다. 삭제는 역할이 아니라 권한 그래프로 보호되기 때문이다
+권한 검사를 끄면 아무 권한도 없는 사용자도 프리셋을 삭제할 수 있다
 
 Given
 
