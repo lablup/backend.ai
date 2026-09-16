@@ -436,7 +436,11 @@ class TestVFolderOwnershipTransferRBACCleanup:
     ) -> None:
         """Invite ``invitee`` to the folder and accept the invitation as them."""
         await repo.create_vfolder_invitation(
-            vfolder_id, UserID(inviter.user_id), UserID(invitee.user_id), invitee.email, permission
+            vfolder_id,
+            UserID(inviter.user_id),
+            invitee.email,
+            permission,
+            invitee_id=UserID(invitee.user_id),
         )
         pending = await repo.get_pending_invitations_for_user(
             UserID(invitee.user_id), invitee.email

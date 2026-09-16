@@ -70,17 +70,14 @@ class VFolderInviteService:
         if vfolder_data.name.startswith("."):
             raise Forbidden("Cannot share private dot-prefixed vfolders.")
 
-        # Resolve invitee emails to user info
+        # An address with an account gets a mount level with the offer; one without
+        # gets the offer alone and mounts at the folder's default once it has one.
         invitee_users = await self._vfolder_repository.get_users_by_emails(action.invitee_emails)
-        if not invitee_users:
-            raise VFolderNotFound("No users found with the provided emails.")
-        invitee_user_uuids = [user_id for user_id, _ in invitee_users]
+        account_of = {email: UserID(user_id) for user_id, email in invitee_users}
 
-        # Check if users already have permission
-        has_permission = await self._vfolder_repository.check_user_has_vfolder_permission(
-            action.vfolder_uuid, invitee_user_uuids
-        )
-        if has_permission:
+        if account_of and await self._vfolder_repository.check_user_has_vfolder_permission(
+            action.vfolder_uuid, list(account_of.values())
+        ):
             raise VFolderGrantAlreadyExists(
                 "Invitation to this VFolder already sent out to target user"
             )
@@ -88,13 +85,13 @@ class VFolderInviteService:
         # Create invitations; an offer already open to an address is restated instead
         invited_ids: list[str] = []
 
-        for user_id, user_email in invitee_users:
+        for email in action.invitee_emails:
             result = await self._vfolder_repository.create_vfolder_invitation(
                 action.vfolder_uuid,
                 UserID(action.user_uuid),
-                UserID(user_id),
-                user_email,
+                email,
                 action.mount_permission,
+                invitee_id=account_of.get(email),
             )
             if result:
                 invited_ids.append(result)

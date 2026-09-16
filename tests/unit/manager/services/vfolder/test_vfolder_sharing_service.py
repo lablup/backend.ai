@@ -571,7 +571,7 @@ class TestInviteVFolderAction:
         with pytest.raises(Forbidden, match="dot-prefixed"):
             await invite_service.invite(action)
 
-    async def test_invite_nonexistent_email_raises_error(
+    async def test_invite_address_without_account_gets_the_offer_alone(
         self,
         invite_service: VFolderInviteService,
         mock_vfolder_repo: MagicMock,
@@ -583,6 +583,8 @@ class TestInviteVFolderAction:
         mock_vfolder_repo.get_by_id = AsyncMock(return_value=_make_vfolder_data(vfolder_uuid))
         mock_vfolder_repo.get_user_email_by_id = AsyncMock(return_value="inviter@test.com")
         mock_vfolder_repo.get_users_by_emails = AsyncMock(return_value=[])
+        mock_vfolder_repo.check_user_has_vfolder_permission = AsyncMock(return_value=False)
+        mock_vfolder_repo.create_vfolder_invitation = AsyncMock(return_value="nobody@test.com")
 
         action = InviteVFolderAction(
             keypair_resource_policy={},
@@ -591,9 +593,11 @@ class TestInviteVFolderAction:
             mount_permission=VFolderMountPolicy.READ_ONLY,
             invitee_emails=["nobody@test.com"],
         )
+        result = await invite_service.invite(action)
 
-        with pytest.raises(VFolderNotFound):
-            await invite_service.invite(action)
+        assert result.invitation_ids == ["nobody@test.com"]
+        mock_vfolder_repo.check_user_has_vfolder_permission.assert_not_called()
+        assert mock_vfolder_repo.create_vfolder_invitation.call_args.kwargs["invitee_id"] is None
 
     async def test_invite_existing_permission_raises_error(
         self,

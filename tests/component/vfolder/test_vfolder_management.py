@@ -29,7 +29,7 @@ from ai.backend.manager.data.entity_share.types import EntityShareStatus
 from ai.backend.manager.data.vfolder.types import VFolderOperationStatus
 from ai.backend.manager.models.entity_share.row import EntityShareRow
 from ai.backend.manager.models.project import ProjectRow, ProjectType
-from ai.backend.manager.models.vfolder import vfolders
+from ai.backend.manager.models.vfolder import VFolderUserMountPolicyRow, vfolders
 
 VFolderFixtureData = dict[str, Any]
 VFolderFactory = Callable[..., Coroutine[Any, Any, VFolderFixtureData]]
@@ -301,20 +301,40 @@ class TestVFolderInviteCreate:
             assert row.status == EntityShareStatus.PENDING
             assert row.recipient_email == regular_user_fixture.email
 
-    async def test_invite_nonexistent_email_raises_error(
+    async def test_invite_address_without_account_gets_the_offer_alone(
         self,
         admin_registry: BackendAIClientRegistry,
         target_vfolder: VFolderFixtureData,
+        db_engine: SAEngine,
     ) -> None:
-        """F-INVITE-2: Inviting a non-existent email raises an error."""
-        with pytest.raises(BackendAPIError):
-            await admin_registry.vfolder.invite(
-                target_vfolder["name"],
-                InviteVFolderReq(
-                    permission=VFolderPermissionField.READ_ONLY,
-                    emails=["nonexistent-xyz-99999@example.invalid"],
-                ),
-            )
+        """F-INVITE-2: An address with no account is offered the folder and set no mount level."""
+        email = "nonexistent-xyz-99999@example.invalid"
+        result = await admin_registry.vfolder.invite(
+            target_vfolder["name"],
+            InviteVFolderReq(permission=VFolderPermissionField.READ_ONLY, emails=[email]),
+        )
+        assert result.invited_ids == [email]
+
+        async with db_engine.begin() as conn:
+            row = (
+                await conn.execute(
+                    sa.select(EntityShareRow.status, EntityShareRow.recipient_entity_id).where(
+                        EntityShareRow.target_entity_id == target_vfolder["id"],
+                        EntityShareRow.recipient_email == email,
+                    )
+                )
+            ).first()
+            assert row is not None
+            assert row.status == EntityShareStatus.PENDING
+            assert row.recipient_entity_id is None
+            policies = (
+                await conn.execute(
+                    sa.select(VFolderUserMountPolicyRow.user_id).where(
+                        VFolderUserMountPolicyRow.vfolder_id == target_vfolder["id"]
+                    )
+                )
+            ).fetchall()
+            assert policies == []
 
     async def test_duplicate_invite_is_skipped(
         self,

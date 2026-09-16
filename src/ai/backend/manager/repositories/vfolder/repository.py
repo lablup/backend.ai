@@ -1306,13 +1306,15 @@ class VfolderRepository:
         self,
         vfolder_id: uuid.UUID,
         inviter_id: UserID,
-        invitee_id: UserID,
         invitee_email: str,
         permission: VFolderMountPolicy,
+        *,
+        invitee_id: UserID | None,
     ) -> str | None:
         """
-        Set the invitee's mount level and offer them the folder, restating an offer
-        already open to the address. Returns the invitee email when a new offer was
+        Offer the folder to the address, restating an offer already open to it, and
+        set the mount level of the account the address belongs to. An address with no
+        account gets the offer alone. Returns the invitee email when a new offer was
         written, None otherwise.
         """
         creator = EntityShareCreator(
@@ -1323,10 +1325,11 @@ class VfolderRepository:
         )
         try:
             async with self._v2_ops.write_ops() as w:
-                await w.upsert_field_entity(
-                    VFolderUUID(vfolder_id),
-                    VFolderUserMountPolicyUpserter(user_id=invitee_id, permission=permission),
-                )
+                if invitee_id is not None:
+                    await w.upsert_field_entity(
+                        VFolderUUID(vfolder_id),
+                        VFolderUserMountPolicyUpserter(user_id=invitee_id, permission=permission),
+                    )
                 if await w.restate_share(creator) is not None:
                     return None
                 await w.create_entity(creator)
