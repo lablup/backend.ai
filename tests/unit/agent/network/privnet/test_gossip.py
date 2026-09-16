@@ -71,8 +71,28 @@ class TestTheWire:
         sent = Announcement("s1", _VTEP, (_endpoint(1),), sent_at=1000.0)
         assert decode(sent.encode(_KEY), _KEY, now=990.0) is not None
 
-    def test_an_unknown_version_is_refused_rather_than_guessed(self) -> None:
-        body = json.dumps({"v": PROTOCOL_VERSION + 1, "s": "s1", "t": _VTEP, "e": [], "at": 1000.0})
+    def test_a_newer_sender_is_understood_by_what_it_says_not_by_its_number(self) -> None:
+        """A node upgraded ahead of this one announces with a field this one does not know and a
+        version it has never seen. Both are ignored: the fields this receiver needs are there. A
+        receiver that dropped the whole datagram over the number would black-hole every kernel on
+        the newer node for as long as the rollout takes."""
+        good = _endpoint(1)
+        body = json.dumps({
+            "v": PROTOCOL_VERSION + 1,
+            "s": "s1",
+            "t": _VTEP,
+            "e": [good.to_wire()],
+            "at": 1000.0,
+            "future-field": {"nested": True},
+        })
+        got = decode(_sign(body.encode(), _KEY) + b"." + body.encode(), _KEY, now=1000.0)
+        assert got is not None and got.endpoints == (good,)
+
+    def test_a_datagram_missing_a_field_this_receiver_needs_is_refused(self) -> None:
+        """What a breaking change looks like from the old side: a required key it cannot find.
+        Refused as such -- not guessed at, and not mistaken for a version it was told to
+        distrust."""
+        body = json.dumps({"v": PROTOCOL_VERSION, "s": "s1", "e": [], "at": 1000.0})  # no "t"
         raw = _sign(body.encode(), _KEY) + b"." + body.encode()
         assert decode(raw, _KEY, now=1000.0) is None
 

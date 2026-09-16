@@ -49,7 +49,11 @@ from ai.backend.logging import BraceStyleAdapter
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
-#: Wire version. A receiver refuses what it does not know rather than guessing at the fields.
+#: Wire version, carried for the reader of a capture and deciding nothing. A receiver takes
+#: what it can understand: the fields it needs are checked by name and type below, and one it does
+#: not know is ignored. That is what lets a field be added and rolled out one node at a time. A
+#: change an old receiver cannot work without is made under a NEW key, required -- refused there
+#: as a field it cannot find, explicitly, not as a number it was told not to trust.
 PROTOCOL_VERSION: Final = 1
 
 #: How stale an announcement may be and still be applied. It bounds replay: a datagram captured
@@ -168,7 +172,7 @@ def decode(
         raw = json.loads(body)
     except ValueError:
         return None
-    if not isinstance(raw, dict) or raw.get("v") != PROTOCOL_VERSION:
+    if not isinstance(raw, dict):
         return None
     session_id, vtep, sent_at = raw.get("s"), raw.get("t"), raw.get("at")
     generation = raw.get("g")
