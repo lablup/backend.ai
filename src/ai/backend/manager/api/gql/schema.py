@@ -554,11 +554,14 @@ from .vfolder_v2 import (
     purge_vfolder_v2,
     restore_vfolder_v2,
     scoped_vfolders_v2,
+    set_vfolder_mount_policy,
+    unset_vfolder_mount_policy,
     vfolder_create_download_session_v2,
     vfolder_create_upload_session_v2,
     vfolder_delete_files_v2,
     vfolder_list_files_v2,
     vfolder_mkdir_v2,
+    vfolder_mount_policies,
     vfolder_move_file_v2,
     vfolder_v2,
 )
@@ -813,6 +816,7 @@ class Query:
     vfolder_v2 = vfolder_v2
     project_vfolders = project_vfolders
     scoped_vfolders_v2 = scoped_vfolders_v2
+    vfolder_mount_policies = vfolder_mount_policies
     my_vfolders = my_vfolders
 
 
@@ -1068,6 +1072,8 @@ class Mutation:
     delete_vfolder_v2 = delete_vfolder_v2
     purge_vfolder_v2 = purge_vfolder_v2
     restore_vfolder_v2 = restore_vfolder_v2
+    set_vfolder_mount_policy = set_vfolder_mount_policy
+    unset_vfolder_mount_policy = unset_vfolder_mount_policy
     deploy_vfolder_v2 = deploy_vfolder_v2
     bulk_delete_vfolders_v2 = bulk_delete_vfolders_v2
     bulk_purge_vfolders_v2 = bulk_purge_vfolders_v2

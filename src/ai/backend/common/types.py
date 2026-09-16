@@ -1654,6 +1654,19 @@ class VFolderMountPolicy(CIStrEnum):
     READ_ONLY = "ro"
     READ_WRITE = "rw"
 
+    def exceeds(self, other: VFolderMountPolicy) -> bool:
+        """Whether this level mounts more than ``other``: none < ro < rw."""
+        return self._rank() > other._rank()
+
+    def _rank(self) -> int:
+        match self:
+            case VFolderMountPolicy.NONE:
+                return 0
+            case VFolderMountPolicy.READ_ONLY:
+                return 1
+            case VFolderMountPolicy.READ_WRITE:
+                return 2
+
     @override
     @classmethod
     def _missing_(cls, value: Any) -> VFolderMountPolicy | None:

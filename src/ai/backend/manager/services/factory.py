@@ -267,12 +267,14 @@ from ai.backend.manager.services.user_resource_policy.processors import UserReso
 from ai.backend.manager.services.vfolder.processors import (
     VFolderFileProcessors,
     VFolderInviteProcessors,
+    VFolderMountPolicyProcessors,
     VFolderProcessors,
     VFolderSharingProcessors,
 )
 from ai.backend.manager.services.vfolder.processors.vfolder_admin import VFolderAdminProcessors
 from ai.backend.manager.services.vfolder.services.file import VFolderFileService
 from ai.backend.manager.services.vfolder.services.invite import VFolderInviteService
+from ai.backend.manager.services.vfolder.services.mount_policy import VFolderMountPolicyService
 from ai.backend.manager.services.vfolder.services.sharing import VFolderSharingService
 from ai.backend.manager.services.vfolder.services.vfolder import VFolderService
 from ai.backend.manager.services.vfolder.services.vfolder_admin import VFolderAdminService
@@ -362,6 +364,10 @@ def create_services(args: ServiceArgs, action_registry: ProcessorRegistry[Any]) 
             args.config_provider,
             repositories.vfolder.repository,
             repositories.user.repository,
+        ),
+        vfolder_mount_policy=VFolderMountPolicyService(
+            repositories.vfolder.repository,
+            repositories.rbac.permission_check,
         ),
         session=SessionService(
             SessionServiceArgs(
@@ -666,6 +672,9 @@ def create_processors(
         ),
         vfolder_sharing=VFolderSharingProcessors(
             vfolder_groups.group(GroupMeta(VFolderEntityType())), services.vfolder_sharing
+        ),
+        vfolder_mount_policy=VFolderMountPolicyProcessors(
+            vfolder_groups.group(GroupMeta(VFolderEntityType())), services.vfolder_mount_policy
         ),
         session=SessionProcessors(
             session_groups.group(GroupMeta(SessionEntityType())),

@@ -351,6 +351,9 @@ from ai.backend.manager.services.user_resource_policy.processors import (
 )
 from ai.backend.manager.services.vfolder.processors.file import VFolderFileProcessors
 from ai.backend.manager.services.vfolder.processors.invite import VFolderInviteProcessors
+from ai.backend.manager.services.vfolder.processors.mount_policy import (
+    VFolderMountPolicyProcessors,
+)
 from ai.backend.manager.services.vfolder.processors.sharing import VFolderSharingProcessors
 from ai.backend.manager.services.vfolder.processors.vfolder import VFolderProcessors
 from ai.backend.manager.services.vfolder.processors.vfolder_admin import VFolderAdminProcessors
@@ -612,6 +615,7 @@ def test_every_defined_v2_action_is_wired() -> None:
     VFolderFileProcessors(registry.group(GroupMeta(VFolderEntityType())), MagicMock())
     VFolderInviteProcessors(registry.group(GroupMeta(VFolderInvitationEntityType())), MagicMock())
     VFolderSharingProcessors(registry.group(GroupMeta(VFolderEntityType())), MagicMock())
+    VFolderMountPolicyProcessors(registry.group(GroupMeta(VFolderEntityType())), MagicMock())
     ModelServingProcessors(registry.group(GroupMeta(DeploymentEntityType())), MagicMock())
     ModelServingAutoScalingProcessors(
         registry.group(GroupMeta(DeploymentEntityType())), MagicMock()

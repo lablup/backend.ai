@@ -11,6 +11,7 @@ from aiohttp import web
 
 from ai.backend.common.data.entity.vfolder import VFolderEntityType
 from ai.backend.common.data.entity.vfolder_invitation import VFolderInvitationEntityType
+from ai.backend.common.data.entity.vfolder_mount_policy import VFolderMountPolicyFieldType
 from ai.backend.common.data.entity.vfolder_permission import VFolderPermissionFieldType
 from ai.backend.common.exception import (
     BackendAIError,
@@ -214,6 +215,30 @@ class VFolderGrantAlreadyExists(FieldError, web.HTTPConflict):
     def field_error_code(self) -> FieldErrorCode:
         return FieldErrorCode(
             VFolderPermissionFieldType(), ActionOperationType.CREATE, ErrorDetail.ALREADY_EXISTS
+        )
+
+
+class VFolderMountPolicyTooWide(FieldError, web.HTTPForbidden):
+    error_type = "https://api.backend.ai/probs/vfolder-mount-policy-too-wide"
+    error_title = "The mount level exceeds what the requester mounts the folder at."
+
+    @override
+    def field_error_code(self) -> FieldErrorCode:
+        return FieldErrorCode(
+            VFolderMountPolicyFieldType(), ActionOperationType.UPDATE, ErrorDetail.FORBIDDEN
+        )
+
+
+class VFolderMountPolicyNotApplicable(FieldError, web.HTTPBadRequest):
+    error_type = "https://api.backend.ai/probs/vfolder-mount-policy-not-applicable"
+    error_title = "The user takes no mount policy row on this folder."
+
+    @override
+    def field_error_code(self) -> FieldErrorCode:
+        return FieldErrorCode(
+            VFolderMountPolicyFieldType(),
+            ActionOperationType.UPDATE,
+            ErrorDetail.INVALID_PARAMETERS,
         )
 
 

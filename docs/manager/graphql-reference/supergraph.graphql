@@ -13903,6 +13903,16 @@ type Mutation
   """
   restoreVFolder(vfolderId: UUID!): RestoreVFolderPayload @join__field(graph: STRAWBERRY)
 
+  """
+  Added in 26.9.0. Set the mount level one user gets on a virtual folder. Requires UPDATE on the folder; a requester who reaches the folder through a share may not hand out more than they mount at.
+  """
+  setVFolderMountPolicy(vfolderId: UUID!, input: SetVFolderMountPolicyInput!): SetVFolderMountPolicyPayload @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.9.0. Take back the mount level one user was given on a virtual folder.
+  """
+  unsetVFolderMountPolicy(vfolderId: UUID!, input: UnsetVFolderMountPolicyInput!): UnsetVFolderMountPolicyPayload @join__field(graph: STRAWBERRY)
+
   """Added in 26.4.2. Deploy a deployment directly from a model VFolder."""
   deployVfolderV2(vfolderId: UUID!, input: DeployVFolderV2Input!): DeployVFolderV2Payload @join__field(graph: STRAWBERRY)
 
@@ -17403,6 +17413,11 @@ type Query
   Added in 26.9.0. Page through the virtual folders the named scopes reach, combined with OR. Every scope is authorized before the read runs.
   """
   scopedVFoldersV2(scope: VFolderScope!, filter: VFolderFilter = null, orderBy: [VFolderOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): VFolderConnection @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.9.0. The mount levels set on a virtual folder, one row per user.
+  """
+  vfolderMountPolicies(vfolderId: UUID!): VFolderMountPoliciesPayload @join__field(graph: STRAWBERRY)
 
   """
   Added in 26.4.2. Search virtual folders accessible to the current user with pagination and filtering.
@@ -21475,6 +21490,29 @@ type SetQuotaScope
   quota_scope: QuotaScope
 }
 
+"""
+Added in 26.9.0. Input for setting the mount level one user gets on a virtual folder.
+"""
+input SetVFolderMountPolicyInput
+  @join__type(graph: STRAWBERRY)
+{
+  """User the mount level is set for."""
+  userId: UUID!
+
+  """
+  Mount level: NONE, READ_ONLY or READ_WRITE. RW_DELETE is stored as READ_WRITE.
+  """
+  permission: VFolderMountPermission!
+}
+
+"""Added in 26.9.0. Payload returned after setting a mount policy."""
+type SetVFolderMountPolicyPayload
+  @join__type(graph: STRAWBERRY)
+{
+  """The mount level now set."""
+  policy: VFolderMountPolicy!
+}
+
 """Added in 26.4.2. Slider UI config."""
 type SliderOption
   @join__type(graph: STRAWBERRY)
@@ -21908,6 +21946,30 @@ type UnsetQuotaScope
   @join__type(graph: GRAPHENE)
 {
   quota_scope: QuotaScope
+}
+
+"""
+Added in 26.9.0. Input for taking back the mount level one user was given on a virtual folder.
+"""
+input UnsetVFolderMountPolicyInput
+  @join__type(graph: STRAWBERRY)
+{
+  """User whose mount level is taken back."""
+  userId: UUID!
+}
+
+"""Added in 26.9.0. Payload returned after unsetting a mount policy."""
+type UnsetVFolderMountPolicyPayload
+  @join__type(graph: STRAWBERRY)
+{
+  """ID of the virtual folder."""
+  vfolderId: UUID!
+
+  """User whose mount level was taken back."""
+  userId: UUID!
+
+  """Whether a row was removed."""
+  removed: Boolean!
 }
 
 """
@@ -24882,6 +24944,39 @@ enum VFolderMountPermission
   READ_ONLY @join__enumValue(graph: STRAWBERRY)
   READ_WRITE @join__enumValue(graph: STRAWBERRY)
   RW_DELETE @join__enumValue(graph: STRAWBERRY)
+}
+
+"""
+Added in 26.9.0. The mount levels set on a virtual folder, one row per user.
+"""
+type VFolderMountPoliciesPayload
+  @join__type(graph: STRAWBERRY)
+{
+  """One row per user."""
+  items: [VFolderMountPolicy!]!
+}
+
+"""Added in 26.9.0. The mount level one user gets on a virtual folder."""
+type VFolderMountPolicy
+  @join__type(graph: STRAWBERRY)
+{
+  """Mount policy row ID."""
+  id: UUID!
+
+  """ID of the virtual folder."""
+  vfolderId: UUID!
+
+  """User the mount level is set for."""
+  userId: UUID!
+
+  """Mount level: NONE, RO or RW."""
+  permission: VFolderMountPermission!
+
+  """When the row was first set."""
+  createdAt: DateTime!
+
+  """When the level was last replaced."""
+  updatedAt: DateTime!
 }
 
 """Added in 26.4.2. Operation status of a virtual folder."""
