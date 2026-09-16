@@ -1468,36 +1468,6 @@ Then
   - has_next_page = False
   - has_previous_page = False
 
-#### [a-cursor-alone-answers-the-first-page-and-says-there-is-more](/tests/scenario/bai_scenario/manager/image/test_searching.py) — FAIL
-
-슈퍼관리자가 크기와 오프셋 없이 커서만 지정해 검색하면 지정한 개수만 반환되고 다음 페이지가 있다고 알린다
-
-Given
-
-- 레지스트리 1개와 그 안의 이미지 3개, superadmin 1명
-  - 도메인 home-1
-  - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
-  - 이미지 image-0-1: x86_64 이미지
-  - 이미지 image-1-1: x86_64 이미지
-  - 이미지 image-2-1: x86_64 이미지
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-
-When
-
-- ImageAdapter.admin_search — user-1이 커서로 앞에서부터 검색함
-
-Then
-
-- 지정한 개수만 반환되고 다음 페이지가 있다고 알린다
-  - length = 2
-  - total_count = 3
-  - has_next_page = True
-  - has_previous_page = False
-
 #### [a-cursor-search-answers-the-first-page-and-says-there-is-more](/tests/scenario/bai_scenario/manager/image/test_searching.py) — pass
 
 슈퍼관리자가 커서로 앞에서부터 조회하면 지정한 개수만 반환되고 다음 페이지가 있다고 알린다
