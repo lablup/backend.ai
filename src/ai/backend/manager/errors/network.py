@@ -6,6 +6,7 @@ from typing import override
 
 from aiohttp import web
 
+from ai.backend.common.data.entity.network import NetworkEntityType
 from ai.backend.common.exception import (
     BackendAIError,
     ErrorCode,
@@ -13,7 +14,6 @@ from ai.backend.common.exception import (
     ErrorDomain,
     ErrorOperation,
 )
-from ai.backend.common.data.entity.network import NetworkEntityType
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.errors.base.entity import EntityNotFoundError
 
