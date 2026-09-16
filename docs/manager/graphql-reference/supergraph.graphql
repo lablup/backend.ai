@@ -7730,6 +7730,43 @@ type EntityActionInfo
   actions: [OperationInfo!]!
 }
 
+"""
+Added in 26.3.0. Entity connection. Deprecated since 26.9.0. Use `Role.scope`.
+"""
+type EntityConnection
+  @join__type(graph: STRAWBERRY)
+{
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
+  edges: [EntityRefEdge!]!
+  count: Int!
+}
+
+"""
+Added in 26.3.0. Filter for entity associations Deprecated since 26.9.0. Use `Role.scope`.
+"""
+input EntityFilter
+  @join__type(graph: STRAWBERRY)
+{
+  entityType: StringFilter = null
+  entityId: StringFilter = null
+
+  """
+  Added in 26.8.0. Filter by the type of scope the entity is registered in.
+  """
+  scopeType: StringFilter = null
+
+  """
+  Added in 26.8.0. Filter by the id of scope the entity is registered in.
+  """
+  scopeId: StringFilter = null
+  AND: [EntityFilter!] = null
+  OR: [EntityFilter!] = null
+  NOT: [EntityFilter!] = null
+}
+
 """Added in 26.9.0. One `key=value` label and the entity carrying it."""
 type EntityLabel implements Node
   @join__implements(graph: STRAWBERRY, interface: "Node")
@@ -7868,6 +7905,61 @@ type EntityOperationCombination
 
   """Valid operations for this entity"""
   operations: [OperationInfo!]!
+}
+
+"""
+Added in 26.3.0. Order by specification for entity associations Deprecated since 26.9.0. Use `Role.scope`.
+"""
+input EntityOrderBy
+  @join__type(graph: STRAWBERRY)
+{
+  field: EntityOrderField!
+  direction: OrderDirection! = DESC
+}
+
+"""
+Added in 26.3.0. Entity ordering field Deprecated since 26.9.0. Use `Role.scope`.
+"""
+enum EntityOrderField
+  @join__type(graph: STRAWBERRY)
+{
+  ENTITY_TYPE @join__enumValue(graph: STRAWBERRY)
+  REGISTERED_AT @join__enumValue(graph: STRAWBERRY)
+}
+
+"""
+Added in 26.3.0. A role and the scope it belongs to. Deprecated since 26.9.0. Use `Role.scope`.
+"""
+type EntityRef implements Node
+  @join__implements(graph: STRAWBERRY, interface: "Node")
+  @join__type(graph: STRAWBERRY)
+{
+  """The Globally Unique ID of this object"""
+  id: ID!
+  scopeType: String!
+  scopeId: String!
+  entityType: String!
+  entityId: String!
+  registeredAt: DateTime!
+
+  """The resolved entity object."""
+  entity: EntityNode
+
+  """
+  Added in 26.4.3. The resolved scope object in which the entity is registered.
+  """
+  scope: EntityNode
+}
+
+"""An edge in a connection."""
+type EntityRefEdge
+  @join__type(graph: STRAWBERRY)
+{
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: EntityRef!
 }
 
 """
@@ -18932,6 +19024,11 @@ type Role implements Node
 
   """Added in 26.9.0. Users holding this role."""
   usersV2(filter: UserV2Filter = null, orderBy: [UserV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): UserV2Connection
+
+  """
+  Added in 26.4.2. Scopes this role is registered in. Deprecated since 26.9.0. Use `scope`.
+  """
+  scopes(filter: EntityFilter = null, orderBy: [EntityOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): EntityConnection @deprecated(reason: "Deprecated since 26.9.0. Use `scope`. A role belongs to one scope, so this connection holds that one scope and ignores `filter` and `order_by`.")
 }
 
 """Added in 26.3.0. RBAC role assignment (user-role association)."""
