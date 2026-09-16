@@ -104,7 +104,6 @@ from ai.backend.manager.models.vfolder import (
     VFolderRow,
     VFolderStatusSet,
     VFolderUserMountPolicyRow,
-    delete_vfolder_relation_rows,
     ensure_host_permission_allowed,
     ensure_quota_scope_accessible_by_user,
     get_allowed_vfolder_hosts_by_group,
@@ -758,7 +757,6 @@ class VfolderRepository:
                     await w.batch_purge_entities_in_global(
                         VFolderInvitationBatchPurger(vfolder_ids=succeeded_ids)
                     )
-                await delete_vfolder_relation_rows(db_conn, self._db.begin_session, succeeded_ids)
 
             result.succeeded = succeeded_data
             return result

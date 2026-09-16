@@ -15,7 +15,6 @@ from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.data.entity.vfolder_invitation import VFolderInvitationID
-from ai.backend.common.data.entity.vfolder_permission import VFolderPermissionID
 from ai.backend.common.types import QuotaScopeID, VFolderMountPolicy, VFolderUsageMode
 from ai.backend.manager.data.vfolder.types import (
     VFolderData,
@@ -23,16 +22,13 @@ from ai.backend.manager.data.vfolder.types import (
     VFolderMountPermission,
     VFolderOperationStatus,
     VFolderOwnershipType,
-    VFolderPermissionData,
 )
 from ai.backend.manager.errors.repository import (
-    ForeignKeyViolationError,
     UniqueConstraintViolationError,
 )
 from ai.backend.manager.errors.storage import (
     VFolderAlreadyExists,
     VFolderInvalidParameter,
-    VFolderNotFound,
     VFolderOwnerNotFound,
 )
 from ai.backend.manager.models.base import StrEnumType
@@ -43,7 +39,6 @@ from ai.backend.manager.models.resource_policy import (
 )
 from ai.backend.manager.models.specs.creator import (
     EntityCreator,
-    FieldCreator,
     GuardedEntityCreator,
 )
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck, PreconditionCheck
@@ -52,7 +47,6 @@ from ai.backend.manager.models.vfolder.row import (
     HARD_DELETED_VFOLDER_STATUSES,
     VFOLDER_NAME_IN_PROJECT_INDEX,
     VFolderInvitationRow,
-    VFolderPermissionRow,
     VFolderRow,
 )
 
@@ -377,50 +371,6 @@ class UnmanagedProjectVFolderCreator(UnmanagedVFolderMixin, ProjectVFolderCreato
     @override
     def build_row(self) -> VFolderRow:
         return self._with_unmanaged_path(super().build_row())
-
-
-@dataclass
-class VFolderPermissionCreator(
-    FieldCreator[VFolderUUID, VFolderPermissionRow, VFolderPermissionData]
-):
-    """Records one user's mount permission on a vfolder.
-
-    The legacy row the mount path reads. Access itself is the grant recorded beside it;
-    this says nothing about the RBAC graph.
-    """
-
-    user_id: uuid.UUID
-    permission: VFolderMountPermission
-
-    @override
-    def field_id(self, row: VFolderPermissionRow) -> VFolderPermissionID:
-        return VFolderPermissionID(row.id)
-
-    @override
-    def integrity_error_checks(self) -> Sequence[IntegrityErrorCheck]:
-        return (
-            IntegrityErrorCheck(
-                violation_type=ForeignKeyViolationError,
-                error=VFolderNotFound(),
-            ),
-        )
-
-    @override
-    def build_row(self, owner_id: VFolderUUID) -> VFolderPermissionRow:
-        return VFolderPermissionRow(
-            vfolder=owner_id,
-            user=self.user_id,
-            permission=self.permission,
-        )
-
-    @override
-    def to_data(self, row: VFolderPermissionRow) -> VFolderPermissionData:
-        return VFolderPermissionData(
-            id=VFolderPermissionID(row.id),
-            vfolder=row.vfolder,
-            user=row.user,
-            permission=row.permission or VFolderMountPermission.READ_WRITE,
-        )
 
 
 @dataclass(kw_only=True)

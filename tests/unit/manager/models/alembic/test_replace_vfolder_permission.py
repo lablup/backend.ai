@@ -13,6 +13,7 @@ from collections.abc import AsyncGenerator
 import pytest
 import sqlalchemy as sa
 from sqlalchemy import Table
+from sqlalchemy.dialects import postgresql
 
 from ai.backend.common.data.entity.domain import DomainID, DomainName
 from ai.backend.common.types import (
@@ -30,6 +31,7 @@ from ai.backend.manager.models.alembic.versions.d4a7c2e9f018_replace_vfolder_per
     FILL_DEFAULT_MOUNT_PERMISSION,
     RESTORE_PERMISSION,
 )
+from ai.backend.manager.models.base import GUID
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.keypair import KeyPairRow
@@ -41,8 +43,18 @@ from ai.backend.manager.models.resource_policy import (
 )
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.models.vfolder.row import VFolderPermissionRow, VFolderRow
+from ai.backend.manager.models.vfolder.row import VFolderRow
 from ai.backend.testutils.db import HasTable, with_tables
+
+# The table the migration copies from, gone from the models after it ran.
+legacy_permissions = sa.Table(
+    "vfolder_permissions",
+    sa.MetaData(),
+    sa.Column("id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v7()")),
+    sa.Column("permission", postgresql.ENUM("ro", "rw", "wd", name="vfoldermountpermission")),
+    sa.Column("vfolder", GUID, nullable=False),
+    sa.Column("user", GUID, nullable=False),
+)
 
 _TABLES: list[Table | type[HasTable]] = [
     DomainRow,
@@ -54,7 +66,7 @@ _TABLES: list[Table | type[HasTable]] = [
     ProjectRow,
     VFolderRow,
     # Creating this table creates the legacy enum type the restored column uses.
-    VFolderPermissionRow,
+    legacy_permissions,
 ]
 
 

@@ -78,7 +78,6 @@ from ai.backend.manager.models.runtime_variant import RuntimeVariantRow
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.vfolder import (
-    VFolderPermissionRow,
     VFolderRow,
     VFolderUserMountPolicyRow,
 )
@@ -140,7 +139,6 @@ class TestAutoMountVFolderResolution:
                 ProjectRow,
                 AgentRow,
                 VFolderRow,
-                VFolderPermissionRow,
                 VFolderUserMountPolicyRow,
                 ContainerRegistryRow,
                 ImageRow,

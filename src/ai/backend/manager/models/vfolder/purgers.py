@@ -13,7 +13,6 @@ from sqlalchemy.orm import InstrumentedAttribute
 from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.data.entity.vfolder_invitation import VFolderInvitationID
 from ai.backend.common.data.entity.vfolder_mount_policy import VFolderMountPolicyID
-from ai.backend.common.data.entity.vfolder_permission import VFolderPermissionID
 from ai.backend.manager.data.vfolder.types import VFolderData
 from ai.backend.manager.models.specs.purger import (
     EntityBatchPurger,
@@ -23,7 +22,6 @@ from ai.backend.manager.models.specs.purger import (
 from ai.backend.manager.models.specs.types import ConflictCheck
 from ai.backend.manager.models.vfolder.row import (
     VFolderInvitationRow,
-    VFolderPermissionRow,
     VFolderRow,
     VFolderUserMountPolicyRow,
 )
@@ -56,51 +54,6 @@ class VFolderInvitationBatchPurger(EntityBatchPurger[VFolderInvitationRow, VFold
     @override
     def to_data(self, row: VFolderInvitationRow) -> VFolderInvitationID:
         return VFolderInvitationID(row.id)
-
-
-@dataclass
-class VFolderPermissionBatchPurger(
-    FieldBatchPurger[VFolderUUID, VFolderPermissionRow, VFolderPermissionID]
-):
-    """Clears the per-user permission rows of the vfolders going away.
-
-    Permission rows stand outside the RBAC graph, so nothing is torn down with them.
-    """
-
-    @override
-    def build_subquery(self, owner_id: VFolderUUID) -> sa.sql.Select[tuple[VFolderPermissionRow]]:
-        return sa.select(VFolderPermissionRow).where(VFolderPermissionRow.vfolder == owner_id)
-
-    @override
-    def conflict_checks(self) -> Sequence[ConflictCheck]:
-        return ()
-
-    @override
-    def to_data(self, row: VFolderPermissionRow) -> VFolderPermissionID:
-        return VFolderPermissionID(row.id)
-
-
-@dataclass
-class VFolderUserPermissionBatchPurger(
-    FieldBatchPurger[VFolderUUID, VFolderPermissionRow, VFolderPermissionID]
-):
-    """Clears one user's mount permission on one vfolder."""
-
-    user_id: UUID
-
-    @override
-    def build_subquery(self, owner_id: VFolderUUID) -> sa.sql.Select[tuple[VFolderPermissionRow]]:
-        return sa.select(VFolderPermissionRow).where(
-            (VFolderPermissionRow.vfolder == owner_id) & (VFolderPermissionRow.user == self.user_id)
-        )
-
-    @override
-    def conflict_checks(self) -> Sequence[ConflictCheck]:
-        return ()
-
-    @override
-    def to_data(self, row: VFolderPermissionRow) -> VFolderPermissionID:
-        return VFolderPermissionID(row.id)
 
 
 @dataclass

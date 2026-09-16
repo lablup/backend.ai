@@ -70,7 +70,6 @@ from ai.backend.manager.models.resource_policy import keypair_resource_policies
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import (
     vfolder_invitations,
-    vfolder_permissions,
     vfolders,
 )
 from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
@@ -466,9 +465,6 @@ async def vfolder_factory(
             )
             await conn.execute(
                 vfolder_invitations.delete().where(vfolder_invitations.c.vfolder == vid)
-            )
-            await conn.execute(
-                vfolder_permissions.delete().where(vfolder_permissions.c.vfolder == vid)
             )
             await conn.execute(vfolders.delete().where(vfolders.c.id == vid))
 

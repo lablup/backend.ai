@@ -60,7 +60,6 @@ from ai.backend.manager.models.user import (
 )
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import (
-    VFolderPermissionRow,
     VFolderRow,
     VFolderUserMountPolicyRow,
 )
@@ -155,7 +154,6 @@ class TestVFolderOwnershipTransferRBACCleanup:
                 ProjectRow,
                 AssocGroupUserRow,
                 VFolderRow,
-                VFolderPermissionRow,
                 VFolderUserMountPolicyRow,
                 PermissionRow,
                 VirtualEntityRow,

@@ -12,7 +12,6 @@ from typing import TYPE_CHECKING
 import pytest
 import sqlalchemy as sa
 
-from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.types import (
     QuotaScopeID,
     QuotaScopeType,
@@ -38,11 +37,9 @@ from ai.backend.manager.models.resource_policy import (
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.vfolder.purgers import (
     VFolderInvitationBatchPurger,
-    VFolderPermissionBatchPurger,
 )
 from ai.backend.manager.models.vfolder.row import (
     VFolderInvitationRow,
-    VFolderPermissionRow,
     VFolderRow,
     VFolderUserMountPolicyRow,
 )
@@ -82,7 +79,6 @@ class TestVFolderPurgersIntegration:
                 KeyPairRow,
                 VFolderRow,
                 VFolderInvitationRow,
-                VFolderPermissionRow,
                 VFolderUserMountPolicyRow,
                 # An entity batch purge tears the graph down with each row.
                 VirtualEntityRow,
@@ -209,54 +205,6 @@ class TestVFolderPurgersIntegration:
                 await session.refresh(inv)
         return invitations
 
-    @pytest.fixture
-    async def sample_permissions(
-        self,
-        db_with_cleanup: ExtendedAsyncSAEngine,
-        sample_vfolder: VFolderRow,
-        sample_domain: DomainFixtureData,
-        sample_user: UserRow,
-    ) -> list[VFolderPermissionRow]:
-        """Create test vfolder permissions."""
-        permissions: list[VFolderPermissionRow] = []
-        async with db_with_cleanup.begin_session() as session:
-            for _ in range(3):
-                # Create additional users for permissions
-                perm_user_uuid = uuid.uuid4()
-                perm_user = UserRow(
-                    uuid=perm_user_uuid,
-                    username=f"permuser-{uuid.uuid4().hex[:8]}",
-                    email=f"perm-{uuid.uuid4().hex[:8]}@example.com",
-                    password=PasswordInfo(
-                        password="test_password",
-                        algorithm=PasswordHashAlgorithm.PBKDF2_SHA256,
-                        rounds=100_000,
-                        salt_size=32,
-                    ),
-                    need_password_change=False,
-                    full_name="Permission User",
-                    status=UserStatus.ACTIVE,
-                    status_info="",
-                    domain_name=sample_domain.domain_name,
-                    role=UserRole.USER,
-                    resource_policy=sample_user.resource_policy,
-                    domain_id=sample_domain.domain_id,
-                )
-                session.add(perm_user)
-                await session.flush()
-
-                permission = VFolderPermissionRow(
-                    vfolder=sample_vfolder.id,
-                    user=perm_user_uuid,
-                    permission=VFolderMountPermission.READ_ONLY,
-                )
-                session.add(permission)
-                permissions.append(permission)
-            await session.flush()
-            for perm in permissions:
-                await session.refresh(perm)
-        return permissions
-
     async def test_purge_vfolder_invitations(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
@@ -279,30 +227,5 @@ class TestVFolderPurgersIntegration:
                 sa.select(sa.func.count())
                 .select_from(VFolderInvitationRow)
                 .where(VFolderInvitationRow.vfolder.in_(vfolder_ids))
-            )
-            assert count == 0
-
-    async def test_purge_vfolder_permissions(
-        self,
-        db_with_cleanup: ExtendedAsyncSAEngine,
-        sample_vfolder: VFolderRow,
-        sample_permissions: list[VFolderPermissionRow],
-    ) -> None:
-        """Test purging vfolder permissions."""
-        vfolder_ids = [sample_vfolder.id]
-
-        # Purge permissions
-        async with V2DBOpsProvider(db_with_cleanup).write_ops() as w:
-            removed = await w.batch_purge_field_entities(
-                VFolderUUID(sample_vfolder.id), VFolderPermissionBatchPurger()
-            )
-            assert len(removed) == len(sample_permissions)
-
-        # Verify permissions are deleted
-        async with db_with_cleanup.begin_session() as session:
-            count = await session.scalar(
-                sa.select(sa.func.count())
-                .select_from(VFolderPermissionRow)
-                .where(VFolderPermissionRow.vfolder.in_(vfolder_ids))
             )
             assert count == 0

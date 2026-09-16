@@ -39,7 +39,6 @@ from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import (
-    VFolderPermissionRow,
     VFolderRow,
     VFolderUserMountPolicyRow,
 )
@@ -90,7 +89,6 @@ class TestVfolderSearchFilter:
                 ContainerRegistryRow,
                 ImageRow,
                 VFolderRow,
-                VFolderPermissionRow,
                 VFolderUserMountPolicyRow,
                 VirtualEntityRow,
                 EntityMembershipRow,

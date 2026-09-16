@@ -12,7 +12,6 @@ from aiohttp import web
 from ai.backend.common.data.entity.vfolder import VFolderEntityType
 from ai.backend.common.data.entity.vfolder_invitation import VFolderInvitationEntityType
 from ai.backend.common.data.entity.vfolder_mount_policy import VFolderMountPolicyFieldType
-from ai.backend.common.data.entity.vfolder_permission import VFolderPermissionFieldType
 from ai.backend.common.exception import (
     BackendAIError,
     ErrorCode,
@@ -207,14 +206,14 @@ class VFolderCreationFailure(BackendAIError, web.HTTPBadRequest):
         )
 
 
-class VFolderGrantAlreadyExists(FieldError, web.HTTPConflict):
+class VFolderGrantAlreadyExists(EntityError, web.HTTPConflict):
     error_type = "https://api.backend.ai/probs/vfolder-grant-already-exists"
     error_title = "Virtual folder grant already exists."
 
     @override
-    def field_error_code(self) -> FieldErrorCode:
-        return FieldErrorCode(
-            VFolderPermissionFieldType(), ActionOperationType.CREATE, ErrorDetail.ALREADY_EXISTS
+    def entity_error_code(self) -> EntityErrorCode:
+        return EntityErrorCode(
+            VFolderEntityType(), ActionOperationType.UPDATE, ErrorDetail.ALREADY_EXISTS
         )
 
 

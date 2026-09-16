@@ -10,7 +10,6 @@ from typing import Any, override
 from ai.backend.common.data.entity.types import EntityData, EntityIdentifier, FieldData
 from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.data.entity.vfolder_mount_policy import VFolderMountPolicyID
-from ai.backend.common.data.entity.vfolder_permission import VFolderPermissionID
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.field import (
     VFolderOperationStatusField,
@@ -25,7 +24,6 @@ from ai.backend.common.types import (
     VFolderMountPolicy,
     VFolderUsageMode,
 )
-from ai.backend.manager.data.permission.types import Permission
 from ai.backend.manager.errors.resource import DataTransformationFailed
 
 
@@ -75,35 +73,6 @@ class VFolderMountPermission(enum.StrEnum):
                 return cls.OWNER_PERM
         return None
 
-    def to_permission_cap(self) -> Permission:
-        """The ceiling a mount permission puts on what its holder may do inside a session.
-
-        Two answers: reading, and reading with writing. ``wd`` answers as ``rw``
-        (BEP-1077 5.7) — it stays a value the legacy read paths gate on, but it buys
-        nothing the graph does not already give ``rw``.
-        """
-        match self:
-            case VFolderMountPermission.READ_ONLY:
-                return Permission.READ
-            case (
-                VFolderMountPermission.READ_WRITE
-                | VFolderMountPermission.RW_DELETE
-                | VFolderMountPermission.OWNER_PERM
-            ):
-                return Permission.READ | Permission.UPDATE | Permission.SOFT_DELETE
-
-    @classmethod
-    def from_rbac(cls, permission: Permission) -> VFolderMountPermission:
-        """The mount permission the RBAC bits held on a folder answer as.
-
-        Callers pass bits that cover ``READ``; a folder held without it is not mounted.
-        """
-        if permission.covers(Permission.HARD_DELETE):
-            return cls.RW_DELETE
-        if permission.covers(Permission.UPDATE):
-            return cls.READ_WRITE
-        return cls.READ_ONLY
-
 
 class VFolderInvitationState(enum.StrEnum):
     """
@@ -120,8 +89,7 @@ class VFolderInvitationState(enum.StrEnum):
     def declined_states(cls) -> frozenset[VFolderInvitationState]:
         """Terminal states that did not grant access (rejected / canceled).
 
-        ACCEPTED is excluded: acceptance writes a durable ``vfolder_permissions``
-        row, but the invitation record is kept rather than purged as history.
+        ACCEPTED is excluded: an accepted invitation is kept as history.
         """
         return frozenset((cls.REJECTED, cls.CANCELED))
 
@@ -252,18 +220,6 @@ class VFolderUsageData:
 
     num_files: int
     used_bytes: int
-
-
-@dataclass
-class VFolderPermissionData(FieldData):
-    """
-    VFolder permission data representing user-specific permissions on a VFolder.
-    """
-
-    id: VFolderPermissionID
-    vfolder: uuid.UUID
-    user: uuid.UUID
-    permission: VFolderMountPermission
 
 
 @dataclass

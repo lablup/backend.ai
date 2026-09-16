@@ -3,8 +3,7 @@ from __future__ import annotations
 import enum
 import logging
 import uuid
-from collections.abc import Callable, Iterable, Mapping, Sequence
-from contextlib import AbstractAsyncContextManager as AbstractAsyncCtxMgr
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import PurePosixPath
@@ -97,7 +96,6 @@ from ai.backend.manager.models.user import UserRole, UserRow
 from ai.backend.manager.models.utils import (
     ExtendedAsyncSAEngine,
     execute_with_retry,
-    execute_with_txn_retry,
     sql_json_merge,
 )
 from ai.backend.manager.models.virtual_entity.queries import (
@@ -127,7 +125,6 @@ __all__: Sequence[str] = (
     "update_vfolder_status",
     "verify_vfolder_name",
     "vfolder_invitations",
-    "vfolder_permissions",
     "vfolder_status_map",
     "vfolders",
 )
@@ -526,31 +523,6 @@ class VFolderInvitationRow(LifecycleTimestampsMixin, Base):
 vfolder_invitations = VFolderInvitationRow.__table__
 
 
-class VFolderPermissionRow(Base):
-    __tablename__ = "vfolder_permissions"
-
-    id: Mapped[VFolderUUID] = mapped_column(
-        "id", GUID(VFolderUUID), primary_key=True, server_default=sa.text("uuid_generate_v7()")
-    )
-    permission: Mapped[VFolderPermission | None] = mapped_column(
-        "permission", EnumValueType(VFolderPermission), default=VFolderPermission.READ_WRITE
-    )
-    vfolder: Mapped[VFolderUUID] = mapped_column(
-        "vfolder",
-        GUID(VFolderUUID),
-        sa.ForeignKey("vfolders.id", onupdate="CASCADE", ondelete="CASCADE"),
-        nullable=False,
-    )
-    user: Mapped[UserID] = mapped_column(
-        "user", GUID(UserID), sa.ForeignKey("users.uuid"), nullable=False
-    )
-
-
-# NOTE: Deprecated legacy table reference for backward compatibility.
-# Use VFolderPermissionRow class directly for new code.
-vfolder_permissions = VFolderPermissionRow.__table__
-
-
 class VFolderUserMountPolicyRow(LifecycleTimestampsMixin, Base):
     """The mount level one user gets on a vfolder, set by whoever may update the folder.
 
@@ -824,30 +796,6 @@ async def filter_host_allowed_permission(
         )
         allowed_hosts = VFolderHostPermissionMap(allowed_hosts | allowed_hosts_by_group)
     return allowed_hosts
-
-
-async def _delete_vfolder_permission_rows(
-    db_session: SASession,
-    vfolder_row_ids: Iterable[uuid.UUID],
-) -> None:
-    stmt = sa.delete(VFolderPermissionRow).where(VFolderPermissionRow.vfolder.in_(vfolder_row_ids))
-    await db_session.execute(stmt)
-
-
-async def delete_vfolder_relation_rows(
-    db_conn: SAConnection,
-    begin_session: Callable[..., AbstractAsyncCtxMgr[SASession]],
-    vfolder_row_ids: Iterable[uuid.UUID],
-) -> None:
-    """Clears the mount rows the named vfolders leave behind.
-
-    Their invitations are entities of their own and go through the write path.
-    """
-
-    async def _delete(db_session: SASession) -> None:
-        await _delete_vfolder_permission_rows(db_session, vfolder_row_ids)
-
-    await execute_with_txn_retry(_delete, begin_session, db_conn)
 
 
 async def ensure_quota_scope_accessible_by_user(

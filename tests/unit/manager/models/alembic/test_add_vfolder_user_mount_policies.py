@@ -13,6 +13,7 @@ from dataclasses import dataclass
 import pytest
 import sqlalchemy as sa
 from sqlalchemy import Table
+from sqlalchemy.dialects import postgresql
 
 from ai.backend.common.data.entity.domain import DomainID, DomainName
 from ai.backend.common.data.permission.types import Permission
@@ -25,13 +26,13 @@ from ai.backend.common.types import (
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.entity_share.types import EntityShareStatus
 from ai.backend.manager.data.vfolder.types import (
-    VFolderMountPermission,
     VFolderOperationStatus,
     VFolderOwnershipType,
 )
 from ai.backend.manager.models.alembic.versions.e5b8d3f0a129_add_vfolder_user_mount_policies import (
     copy_legacy_mount_rows,
 )
+from ai.backend.manager.models.base import GUID
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.entity_share.row import EntityShareRow
 from ai.backend.manager.models.hasher.types import PasswordInfo
@@ -44,11 +45,7 @@ from ai.backend.manager.models.resource_policy import (
 )
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.models.vfolder.row import (
-    VFolderPermissionRow,
-    VFolderRow,
-    VFolderUserMountPolicyRow,
-)
+from ai.backend.manager.models.vfolder.row import VFolderRow, VFolderUserMountPolicyRow
 from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
 from ai.backend.manager.models.virtual_entity.entity_membership_cap import (
     EntityMembershipCapRow,
@@ -60,6 +57,16 @@ from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingR
 from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
 from ai.backend.testutils.db import HasTable, with_tables
 
+# The table the migration copies from, gone from the models after it ran.
+legacy_permissions = sa.Table(
+    "vfolder_permissions",
+    sa.MetaData(),
+    sa.Column("id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v7()")),
+    sa.Column("permission", postgresql.ENUM("ro", "rw", "wd", name="vfoldermountpermission")),
+    sa.Column("vfolder", GUID, nullable=False),
+    sa.Column("user", GUID, nullable=False),
+)
+
 _TABLES: list[Table | type[HasTable]] = [
     DomainRow,
     UserResourcePolicyRow,
@@ -69,7 +76,7 @@ _TABLES: list[Table | type[HasTable]] = [
     KeyPairRow,
     ProjectRow,
     VFolderRow,
-    VFolderPermissionRow,
+    legacy_permissions,
     VFolderUserMountPolicyRow,
     VirtualEntityRow,
     ScopeBindingRow,
@@ -232,11 +239,14 @@ async def _add_legacy_row(
     db: ExtendedAsyncSAEngine,
     vfolder_id: uuid.UUID,
     user_id: uuid.UUID,
-    permission: VFolderMountPermission,
+    permission: str,
 ) -> None:
-    async with db.begin_session() as session:
-        session.add(VFolderPermissionRow(vfolder=vfolder_id, user=user_id, permission=permission))
-        await session.commit()
+    async with db.begin() as conn:
+        await conn.execute(
+            legacy_permissions.insert().values(
+                vfolder=vfolder_id, user=user_id, permission=permission
+            )
+        )
 
 
 async def _run(db: ExtendedAsyncSAEngine) -> None:
@@ -268,9 +278,7 @@ class TestCopyLegacyMountRows:
     async def test_a_legacy_row_becomes_a_policy_with_wd_folded(
         self, db: ExtendedAsyncSAEngine, fixture: Fixture
     ) -> None:
-        await _add_legacy_row(
-            db, fixture.personal_folder_id, fixture.guest_id, VFolderMountPermission.RW_DELETE
-        )
+        await _add_legacy_row(db, fixture.personal_folder_id, fixture.guest_id, "wd")
 
         await _run(db)
 
@@ -281,12 +289,8 @@ class TestCopyLegacyMountRows:
     async def test_the_widest_of_duplicate_rows_wins(
         self, db: ExtendedAsyncSAEngine, fixture: Fixture
     ) -> None:
-        await _add_legacy_row(
-            db, fixture.personal_folder_id, fixture.guest_id, VFolderMountPermission.READ_ONLY
-        )
-        await _add_legacy_row(
-            db, fixture.personal_folder_id, fixture.guest_id, VFolderMountPermission.READ_WRITE
-        )
+        await _add_legacy_row(db, fixture.personal_folder_id, fixture.guest_id, "ro")
+        await _add_legacy_row(db, fixture.personal_folder_id, fixture.guest_id, "rw")
 
         await _run(db)
 
@@ -297,9 +301,7 @@ class TestCopyLegacyMountRows:
     async def test_the_owners_own_row_is_dropped(
         self, db: ExtendedAsyncSAEngine, fixture: Fixture
     ) -> None:
-        await _add_legacy_row(
-            db, fixture.personal_folder_id, fixture.owner_id, VFolderMountPermission.READ_WRITE
-        )
+        await _add_legacy_row(db, fixture.personal_folder_id, fixture.owner_id, "rw")
 
         await _run(db)
 
@@ -309,9 +311,7 @@ class TestCopyLegacyMountRows:
     async def test_a_model_store_maker_keeps_read_write(
         self, db: ExtendedAsyncSAEngine, fixture: Fixture
     ) -> None:
-        await _add_legacy_row(
-            db, fixture.model_store_folder_id, fixture.owner_id, VFolderMountPermission.READ_ONLY
-        )
+        await _add_legacy_row(db, fixture.model_store_folder_id, fixture.owner_id, "ro")
 
         await _run(db)
 
@@ -322,9 +322,7 @@ class TestCopyLegacyMountRows:
     async def test_a_legacy_row_records_an_accepted_share(
         self, db: ExtendedAsyncSAEngine, fixture: Fixture
     ) -> None:
-        await _add_legacy_row(
-            db, fixture.personal_folder_id, fixture.guest_id, VFolderMountPermission.READ_ONLY
-        )
+        await _add_legacy_row(db, fixture.personal_folder_id, fixture.guest_id, "ro")
 
         await _run(db)
 
@@ -339,9 +337,7 @@ class TestCopyLegacyMountRows:
     async def test_a_writable_row_lends_update(
         self, db: ExtendedAsyncSAEngine, fixture: Fixture
     ) -> None:
-        await _add_legacy_row(
-            db, fixture.personal_folder_id, fixture.guest_id, VFolderMountPermission.READ_WRITE
-        )
+        await _add_legacy_row(db, fixture.personal_folder_id, fixture.guest_id, "rw")
 
         await _run(db)
 
@@ -352,9 +348,7 @@ class TestCopyLegacyMountRows:
     async def test_running_twice_writes_nothing_more(
         self, db: ExtendedAsyncSAEngine, fixture: Fixture
     ) -> None:
-        await _add_legacy_row(
-            db, fixture.personal_folder_id, fixture.guest_id, VFolderMountPermission.READ_ONLY
-        )
+        await _add_legacy_row(db, fixture.personal_folder_id, fixture.guest_id, "ro")
 
         await _run(db)
         await _run(db)

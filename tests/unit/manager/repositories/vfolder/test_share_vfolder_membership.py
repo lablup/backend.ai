@@ -50,7 +50,6 @@ from ai.backend.manager.models.vfolder import (
     VFolderOperationStatus,
     VFolderOwnershipType,
     VFolderPermission,
-    VFolderPermissionRow,
     VFolderRow,
     VFolderUserMountPolicyRow,
 )
@@ -117,7 +116,6 @@ class TestShareVfolderWithUsersMembership:
                 KeyPairRow,
                 ProjectRow,
                 VFolderRow,
-                VFolderPermissionRow,
                 VFolderUserMountPolicyRow,
                 VirtualEntityRow,
                 EntityMembershipRow,

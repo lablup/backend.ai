@@ -95,7 +95,6 @@ from ai.backend.manager.models.user import (
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import (
     VFolderInvitationRow,
-    VFolderPermissionRow,
     VFolderRow,
     VFolderUserMountPolicyRow,
 )
@@ -178,7 +177,6 @@ class TestVfolderRepository:
                 ReplicaGroupRow,
                 RoutingRow,
                 ResourcePresetRow,
-                VFolderPermissionRow,
                 VFolderUserMountPolicyRow,
                 VirtualEntityRow,
                 EntityMembershipRow,
@@ -1381,7 +1379,6 @@ class TestVfolderRepositoryDeleteForever:
                 ImageRow,
                 VFolderRow,
                 VFolderInvitationRow,
-                VFolderPermissionRow,
                 ResourceSlotTypeRow,
                 # Endpoint / session tables — required by the purge in-use guards
                 # (get_sessions_by_mounted_folder + active-endpoint reference check).
