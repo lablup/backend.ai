@@ -341,9 +341,9 @@ Then
 - 거부된다
   - 거부: InsufficientPrivilege
 
-#### [a-user-without-the-role-editing-an-unknown-slot-name-hears-not-found](/tests/scenario/bai_scenario/manager/resource_slot/test_editing.py) — pass
+#### [a-user-without-the-role-editing-an-unknown-slot-name-is-refused-by-role](/tests/scenario/bai_scenario/manager/resource_slot/test_editing.py) — FAIL
 
-슈퍼관리자가 아닌 사용자가 존재하지 않는 이름을 수정하면 역할 부족이 아니라 대상 없음으로 거부된다. 이름을 풀어내는 단계가 권한을 검사하지 않고 먼저 실행되기 때문이다
+슈퍼관리자가 아닌 사용자가 존재하지 않는 이름을 수정하면 대상 없음이 아니라 역할 부족으로 거부된다. 호출한 사용자가 쓸 수 있는지를 이름을 풀어내기 전에 검사하기 때문이다
 
 Given
 
@@ -363,7 +363,7 @@ When
 Then
 
 - 거부된다
-  - 거부: EntityNotFoundError
+  - 거부: InsufficientPrivilege
 
 #### [disabling-a-slot-type-answers-it-disabled](/tests/scenario/bai_scenario/manager/resource_slot/test_editing.py) — pass
 
@@ -570,9 +570,9 @@ Then
 - 거부된다
   - 거부: NotEnoughPermission
 
-#### [a-user-granted-nothing-purging-an-unknown-slot-name-hears-not-found](/tests/scenario/bai_scenario/manager/resource_slot/test_retiring.py) — pass
+#### [a-user-granted-nothing-purging-an-unknown-slot-name-is-refused-by-permission](/tests/scenario/bai_scenario/manager/resource_slot/test_retiring.py) — FAIL
 
-아무 권한도 없는 사용자가 존재하지 않는 이름을 삭제하면 권한 부족이 아니라 대상 없음으로 거부된다. 이름을 풀어내는 단계가 권한을 검사하지 않고 먼저 실행되기 때문이다
+아무 권한도 없는 사용자가 존재하지 않는 이름을 삭제하면 대상 없음이 아니라 권한 부족으로 거부된다. 호출한 사용자가 쓸 수 있는지를 이름을 풀어내기 전에 검사하기 때문이다
 
 Given
 
@@ -592,7 +592,7 @@ When
 Then
 
 - 거부된다
-  - 거부: EntityNotFoundError
+  - 거부: NotEnoughPermission
 
 #### [purging-a-slot-name-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/resource_slot/test_retiring.py) — pass
 
@@ -668,6 +668,64 @@ Then
 
 ### searching
 
+#### [a-display-name-filter-narrows-the-answer-to-the-slot-types-so-displayed](/tests/scenario/bai_scenario/manager/resource_slot/test_searching.py) — FAIL
+
+표시 이름이 다른 슬롯 종류 하나와 같은 표시 이름 여럿이 있을 때 그 표시 이름을 필터로 조회하면, 응답에는 그 표시 이름의 슬롯 종류만 남는다
+
+Given
+
+- 자원 슬롯 종류 3개와, 일반 사용자 한 명
+  - 자원 슬롯 종류 wanted-1: count 종류
+  - 자원 슬롯 종류 other-1: count 종류
+  - 자원 슬롯 종류 other-2: count 종류
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+
+When
+
+- ResourceSlotAdapter.search_slot_types — user-1이 눈에 띄는 슬롯 표시 이름 필터로 조회
+
+Then
+
+- 필터에 맞는 슬롯 종류 하나만 반환된다
+  - items = ['wanted-1']
+  - total_count = 1
+  - has_next_page = False
+  - has_previous_page = False
+
+#### [a-kind-filter-narrows-the-answer-to-the-slot-types-of-that-kind](/tests/scenario/bai_scenario/manager/resource_slot/test_searching.py) — FAIL
+
+종류가 다른 슬롯 종류 하나와 같은 종류 여럿이 있을 때 그 종류를 필터로 조회하면, 응답에는 그 종류의 슬롯 종류만 남는다
+
+Given
+
+- 자원 슬롯 종류 3개와, 일반 사용자 한 명
+  - 자원 슬롯 종류 wanted-1: bytes 종류
+  - 자원 슬롯 종류 other-1: count 종류
+  - 자원 슬롯 종류 other-2: count 종류
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+
+When
+
+- ResourceSlotAdapter.search_slot_types — user-1이 bytes 종류 필터로 조회
+
+Then
+
+- 필터에 맞는 슬롯 종류 하나만 반환된다
+  - items = ['wanted-1']
+  - total_count = 1
+  - has_next_page = False
+  - has_previous_page = False
+
 #### [a-name-filter-narrows-the-answer-to-the-slot-type-it-names](/tests/scenario/bai_scenario/manager/resource_slot/test_searching.py) — pass
 
 슬롯 종류 여럿 중 하나의 이름을 필터로 조회하면, 응답에는 그 이름의 슬롯 종류만 남는다
@@ -723,6 +781,35 @@ Then
   - items = ['other-1', 'wanted-1']
   - total_count = 2
   - has_next_page = False
+  - has_previous_page = False
+
+#### [asking-for-the-first-slot-type-answers-one-and-a-next-page](/tests/scenario/bai_scenario/manager/resource_slot/test_searching.py) — FAIL
+
+슬롯 종류 셋이 있을 때 앞에서 한 건만 청해 조회하면 한 건이 반환되고 다음 페이지가 있다고 응답한다
+
+Given
+
+- 자원 슬롯 종류 3개와, 일반 사용자 한 명
+  - 자원 슬롯 종류 wanted-1: count 종류
+  - 자원 슬롯 종류 other-1: count 종류
+  - 자원 슬롯 종류 other-2: count 종류
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+
+When
+
+- ResourceSlotAdapter.search_slot_types — user-1이 앞에서 1건만 청해 조회
+
+Then
+
+- 기본 크기의 첫 페이지가 반환된다
+  - len(items) = 1
+  - total_count = 3
+  - has_next_page = True
   - has_previous_page = False
 
 #### [omitting-the-page-size-answers-ten-slot-types-and-a-next-page](/tests/scenario/bai_scenario/manager/resource_slot/test_searching.py) — pass

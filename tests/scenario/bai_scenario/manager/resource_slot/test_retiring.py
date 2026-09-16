@@ -141,18 +141,18 @@ class AUserGrantedNothingMayNotPurge(
 
 
 @dataclass(frozen=True)
-class AUserGrantedNothingStillHearsNotFound(
+class AUserGrantedNothingPurgingAnUnknownNameIsRefusedByPermission(
     Scenario[SeedingSession, ASlotTypeAndACaller, ResourceSlotAdapter, Purged]
 ):
     @override
     def summary(self) -> str:
-        return "a-user-granted-nothing-purging-an-unknown-slot-name-hears-not-found"
+        return "a-user-granted-nothing-purging-an-unknown-slot-name-is-refused-by-permission"
 
     @override
     def describe(self) -> str:
         return (
-            "아무 권한도 없는 사용자가 존재하지 않는 이름을 삭제하면 권한 부족이 아니라 대상 없음으로 거부된다. "
-            "이름을 풀어내는 단계가 권한을 검사하지 않고 먼저 실행되기 때문이다"
+            "아무 권한도 없는 사용자가 존재하지 않는 이름을 삭제하면 대상 없음이 아니라 권한 부족으로 거부된다. "
+            "호출한 사용자가 쓸 수 있는지를 이름을 풀어내기 전에 검사하기 때문이다"
         )
 
     @override
@@ -165,7 +165,7 @@ class AUserGrantedNothingStillHearsNotFound(
 
     @override
     def then(self) -> Then[ASlotTypeAndACaller, Purged]:
-        return TheCallIsRefused(EntityNotFoundError)
+        return TheCallIsRefused(NotEnoughPermission)
 
 
 @dataclass(frozen=True)
@@ -204,7 +204,7 @@ SCENARIOS: list[RetiringStep] = [
     TheSuperadminPurgesASlotType(),
     ANameNothingAnswersToIsNotFound(),
     AUserGrantedNothingMayNotPurge(),
-    AUserGrantedNothingStillHearsNotFound(),
+    AUserGrantedNothingPurgingAnUnknownNameIsRefusedByPermission(),
     EnforcementOffLetsAnyonePurge(),
 ]
 

@@ -50,7 +50,7 @@ class ASlotTypeAndACaller:
 
 @dataclass(frozen=True)
 class ManySlotTypesAndACaller:
-    """검색 대상 슬롯 종류 여럿과, 검색을 호출할 사용자. ``named``는 그중 이름 필터로 골라낼 하나다."""
+    """검색 대상 슬롯 종류 여럿과, 검색을 호출할 사용자. ``named``는 그중 필터로 골라낼 하나다."""
 
     laid: tuple[ResourceSlotTypeData, ...]
     named: ResourceSlotTypeData
@@ -81,6 +81,8 @@ class ManySlotTypesAndSomeone(Given[Any, ManySlotTypesAndACaller]):
 
     role: UserRole = UserRole.USER
     besides: int = 1
+    named_kind: SlotTypes = SlotTypes.COUNT
+    named_display_name: str = DISPLAYED
 
     @override
     def describe(self) -> str:
@@ -88,7 +90,13 @@ class ManySlotTypesAndSomeone(Given[Any, ManySlotTypesAndACaller]):
 
     @override
     async def lay(self, seeding: Any) -> ManySlotTypesAndACaller:
-        wanted = await seeding.creating(SeedResourceSlotType(name_hint="wanted"))
+        wanted = await seeding.creating(
+            SeedResourceSlotType(
+                name_hint="wanted",
+                slot_type=self.named_kind,
+                display_name=self.named_display_name,
+            )
+        )
         others = [
             await seeding.creating(SeedResourceSlotType(name_hint="other"))
             for _ in range(self.besides)

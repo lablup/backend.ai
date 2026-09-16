@@ -201,18 +201,18 @@ class AUserWhoIsNotTheSuperadminMayNotEdit(
 
 
 @dataclass(frozen=True)
-class AUserWithoutTheRoleStillHearsNotFound(
+class AUserWithoutTheRoleEditingAnUnknownNameIsRefusedByRole(
     Scenario[SeedingSession, ASlotTypeAndACaller, ResourceSlotAdapter, ResourceSlotTypeNode]
 ):
     @override
     def summary(self) -> str:
-        return "a-user-without-the-role-editing-an-unknown-slot-name-hears-not-found"
+        return "a-user-without-the-role-editing-an-unknown-slot-name-is-refused-by-role"
 
     @override
     def describe(self) -> str:
         return (
-            "슈퍼관리자가 아닌 사용자가 존재하지 않는 이름을 수정하면 역할 부족이 아니라 대상 없음으로 거부된다. "
-            "이름을 풀어내는 단계가 권한을 검사하지 않고 먼저 실행되기 때문이다"
+            "슈퍼관리자가 아닌 사용자가 존재하지 않는 이름을 수정하면 대상 없음이 아니라 역할 부족으로 거부된다. "
+            "호출한 사용자가 쓸 수 있는지를 이름을 풀어내기 전에 검사하기 때문이다"
         )
 
     @override
@@ -225,7 +225,7 @@ class AUserWithoutTheRoleStillHearsNotFound(
 
     @override
     def then(self) -> Then[ASlotTypeAndACaller, ResourceSlotTypeNode]:
-        return TheCallIsRefused(EntityNotFoundError)
+        return TheCallIsRefused(InsufficientPrivilege)
 
 
 @dataclass(frozen=True)
@@ -267,7 +267,7 @@ SCENARIOS: list[EditingStep] = [
     AnEmptyEditChangesNothing(),
     TheSuperadminEditingAnUnknownNameIsNotFound(),
     AUserWhoIsNotTheSuperadminMayNotEdit(),
-    AUserWithoutTheRoleStillHearsNotFound(),
+    AUserWithoutTheRoleEditingAnUnknownNameIsRefusedByRole(),
     EnforcementOffStillNeedsTheSuperadmin(),
 ]
 
