@@ -35,7 +35,7 @@ from ai.backend.testutils.scenario_steps import (
     Then,
     When,
 )
-from bai_scenario.components.answers import NothingIsFound, TheCallIsRefused
+from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.audit_log import (
     ActorRecords,
     ARecordScopedToAProject,
@@ -381,18 +381,18 @@ class NamingAnUnknownEntityIsRefused(
 
 
 @dataclass(frozen=True)
-class TheSuperadminNamingAnUnknownEntitySeesNothing(
+class TheSuperadminNamingAnUnknownEntityIsRefused(
     Scenario[SeedingSession, ScopedEntities, AuditLogAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
-        return "the-superadmin-naming-an-entity-nothing-answers-to-sees-an-empty-page"
+        return "the-superadmin-naming-an-entity-nothing-answers-to-is-refused-as-permission"
 
     @override
     def describe(self) -> str:
         return (
-            "슈퍼관리자가 어느 엔티티도 아닌 id를 지정해 검색하면, 권한 검사를 통과해 빈 응답을 받는다. "
-            "대상 없음으로 거부하는 경우가 아니다"
+            "슈퍼관리자가 어느 엔티티도 아닌 id를 지정해 검색하면, 없는 엔티티에는 슈퍼관리자도 권한이 "
+            "없으므로 권한 부족으로 거부된다. 대상 없음으로 거부하는 경우가 아니다"
         )
 
     @override
@@ -405,7 +405,7 @@ class TheSuperadminNamingAnUnknownEntitySeesNothing(
 
     @override
     def then(self) -> Then[ScopedEntities, Searched]:
-        return NothingIsFound()
+        return TheCallIsRefused(NotEnoughPermission)
 
 
 @dataclass(frozen=True)
@@ -554,7 +554,7 @@ ENTITY_SCENARIOS: list[EntityStep] = [
     AUserGrantedNothingMayNotScopeSearch(),
     TheMonitorRoleGetsNoScopeForFree(),
     NamingAnUnknownEntityIsRefused(),
-    TheSuperadminNamingAnUnknownEntitySeesNothing(),
+    TheSuperadminNamingAnUnknownEntityIsRefused(),
     EnforcementOffReadsWithoutAGrant(),
     ANonEntityIdIsRefused(),
 ]

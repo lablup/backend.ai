@@ -14,8 +14,6 @@ from datetime import datetime
 from typing import Any, override
 from uuid import UUID, uuid4
 
-from bai_scenario.seeds.seeder import SeedField, SeedFieldWithNestedRows
-
 from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.manager.actions.types import OperationStatus
@@ -26,6 +24,7 @@ from ai.backend.manager.models.audit_log.creators import (
     SingleEntityAuditLogCreator,
 )
 from ai.backend.manager.models.specs.creator import NestedFieldCreator
+from bai_scenario.seeds.seeder import SeedField, SeedFieldWithNestedRows
 
 
 @dataclass(frozen=True)

@@ -14,15 +14,6 @@ from datetime import UTC, datetime
 from typing import Any, override
 from uuid import UUID, uuid4
 
-from bai_scenario.components.domain import WAS_HERE, SomeoneOf
-from bai_scenario.runner.planting import SeedingSession
-from bai_scenario.seeds.audit_log.audit_log import SeedAuditRecord, SeedScopedAuditRecord
-from bai_scenario.seeds.domain.domain import SeedDomain
-from bai_scenario.seeds.project.project import SeedProject
-from bai_scenario.seeds.rbac.role import SeedPermission, SeedRole
-from bai_scenario.seeds.resource_policy.project import SeedProjectPolicy
-from bai_scenario.seeds.seeder import Laid
-
 from ai.backend.common.data.entity.project import ProjectEntityType, ProjectID
 from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
 from ai.backend.common.data.entity.user import UserEntityType, UserID
@@ -33,16 +24,26 @@ from ai.backend.manager.actions.types import OperationStatus
 from ai.backend.manager.data.domain.types import DomainData
 from ai.backend.manager.data.permission.types import Permission
 from ai.backend.manager.data.user.types import UserData
+from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.testutils.scenario_steps import (
     Answered,
     Given,
     Held,
+    Refused,
     Same,
     SameAs,
     Skipped,
     Then,
     Verdict,
 )
+from bai_scenario.components.domain import WAS_HERE, SomeoneOf
+from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.seeds.audit_log.audit_log import SeedAuditRecord, SeedScopedAuditRecord
+from bai_scenario.seeds.domain.domain import SeedDomain
+from bai_scenario.seeds.project.project import SeedProject
+from bai_scenario.seeds.rbac.role import SeedPermission, SeedRole
+from bai_scenario.seeds.resource_policy.project import SeedProjectPolicy
+from bai_scenario.seeds.seeder import Laid
 
 # Two clearly ordered timestamps, so a "newest first" answer is a fixed order rather than
 # whatever the clock did during the run.
@@ -76,33 +77,33 @@ class ExpectedRecord:
     triggered_by: UUID | None = None
 
 
-def look_node(node: AuditLogNode, expected: ExpectedRecord) -> list[Verdict]:
+def look_node(node: AuditLogNode, expected: ExpectedRecord, *, at: str = "") -> list[Verdict]:
     """The whole node, checked. The ids the database and the run make are skipped; the
     owner and actor are read as coming from the rows earlier steps laid."""
     verdicts: list[Verdict] = [
-        Skipped("id", "데이터베이스가 만든다"),
-        Skipped("action_id", "실행마다 새로 생성된다"),
-        Same("operation", node.operation, expected.operation),
-        Same("entity_type", node.entity_type, expected.entity_type),
+        Skipped(f"{at}id", "데이터베이스가 만든다"),
+        Skipped(f"{at}action_id", "실행마다 새로 생성된다"),
+        Same(f"{at}operation", node.operation, expected.operation),
+        Same(f"{at}entity_type", node.entity_type, expected.entity_type),
         Held(
-            "entity_id",
+            f"{at}entity_id",
             node.entity_id,
             SameAs[str | None](str(expected.entity_id), "기록의 대상 엔티티"),
         ),
-        Same("status", node.status, expected.status),
-        Same("description", node.description, f"{expected.operation} was recorded"),
-        Same("created_at", node.created_at, expected.created_at),
-        Same("request_id", node.request_id, None),
-        Same("acted_as", node.acted_as, None),
-        Same("duration", node.duration, None),
-        Same("client_ip", node.client_ip, None),
+        Same(f"{at}status", node.status, expected.status),
+        Same(f"{at}description", node.description, f"{expected.operation} was recorded"),
+        Same(f"{at}created_at", node.created_at, expected.created_at),
+        Same(f"{at}request_id", node.request_id, None),
+        Same(f"{at}acted_as", node.acted_as, None),
+        Same(f"{at}duration", node.duration, None),
+        Same(f"{at}client_ip", node.client_ip, None),
     ]
     if expected.triggered_by is None:
-        verdicts.append(Same("triggered_by", node.triggered_by, None))
+        verdicts.append(Same(f"{at}triggered_by", node.triggered_by, None))
     else:
         verdicts.append(
             Held(
-                "triggered_by",
+                f"{at}triggered_by",
                 node.triggered_by,
                 SameAs[str | None](str(expected.triggered_by), "실행한 사용자"),
             )
@@ -163,26 +164,38 @@ async def grant_reading(
     await seeding.granting(role, to, role_id=lambda r: r.id, user_id=lambda u: UserID(u.id))
 
 
+@dataclass(frozen=True)
+class TwoProjectsLaid:
+    """Two projects with a record each, and the caller. The first project's record is
+    the newer one."""
+
+    caller: UserData
+    first_project: UUID
+    second_project: UUID
+    first_record: UUID
+    second_record: UUID
+
+
 async def lay_two_projects(
     seeding: SeedingSession,
     *,
     grant_first: bool = False,
     grant_second: bool = False,
     role: UserRole = UserRole.USER,
-) -> tuple[UserData, UUID, UUID]:
+) -> TwoProjectsLaid:
     """A domain with two projects, one record on each, and a caller granted READ on the
-    projects asked for. The first project's record is the newer one."""
+    projects asked for."""
     domain: Laid[DomainData] = await seeding.creating(
         SeedDomain(name_hint="home", description=WAS_HERE)
     )
     policy = await seeding.once(SeedProjectPolicy())
     first = await seeding.creating_from_two(SeedProject(name_hint="team"), domain, policy)
     second = await seeding.creating_from_two(SeedProject(name_hint="other"), domain, policy)
-    await seeding.adding(
+    first_record = await seeding.adding(
         SeedAuditRecord(owner_of=lambda p: ProjectID(p.id), operation=OP_LATE, created_at=LATE),
         first,
     )
-    await seeding.adding(
+    second_record = await seeding.adding(
         SeedAuditRecord(owner_of=lambda p: ProjectID(p.id), operation=OP_EARLY, created_at=EARLY),
         second,
     )
@@ -203,7 +216,13 @@ async def lay_two_projects(
             entity_type=ProjectEntityType(),
             scope_of=lambda p: ProjectID(p.id),
         )
-    return seeding.made(caller), seeding.made(first).id, seeding.made(second).id
+    return TwoProjectsLaid(
+        seeding.made(caller),
+        seeding.made(first).id,
+        seeding.made(second).id,
+        seeding.made(first_record).id,
+        seeding.made(second_record).id,
+    )
 
 
 async def lay_two_actors(
@@ -381,7 +400,7 @@ class TwoRecordsToRead(Given[Any, RecordsToLoad]):
 
     @override
     def describe(self) -> str:
-        return f"id로 조회할 기록 둘과, {self.role.value} 한 명"
+        return f"id로 조회할 자기에 대한 기록 둘과, {self.role.value} 한 명"
 
     @override
     async def lay(self, seeding: SeedingSession) -> RecordsToLoad:
@@ -424,16 +443,17 @@ class ProjectRecords(Given[Any, ScopedEntities]):
 
     @override
     async def lay(self, seeding: SeedingSession) -> ScopedEntities:
-        caller, first, second = await lay_two_projects(
+        laid = await lay_two_projects(
             seeding,
             grant_first=self.grant_first,
             grant_second=self.grant_second,
             role=self.role,
         )
+        first, second = laid.first_project, laid.second_project
         match self.name:
             case "both":
                 return ScopedEntities(
-                    caller,
+                    laid.caller,
                     (first, second),
                     (
                         ExpectedRecord(OP_LATE, "project", first, LATE),
@@ -441,11 +461,30 @@ class ProjectRecords(Given[Any, ScopedEntities]):
                     ),
                 )
             case "unknown":
-                return ScopedEntities(caller, (uuid4(),), ())
+                return ScopedEntities(laid.caller, (uuid4(),), ())
             case _:
                 return ScopedEntities(
-                    caller, (first,), (ExpectedRecord(OP_LATE, "project", first, LATE),)
+                    laid.caller, (first,), (ExpectedRecord(OP_LATE, "project", first, LATE),)
                 )
+
+
+@dataclass(frozen=True)
+class ProjectRecordsToLoad(Given[Any, RecordsToLoad]):
+    """Two projects with a record each, and a caller granted READ on the first project
+    only. The first record is the one the caller may read."""
+
+    @override
+    def describe(self) -> str:
+        return "서로 다른 프로젝트의 기록 둘과, 첫째 프로젝트에만 읽기 권한을 받은 사용자 한 명"
+
+    @override
+    async def lay(self, seeding: SeedingSession) -> RecordsToLoad:
+        laid = await lay_two_projects(seeding, grant_first=True)
+        return RecordsToLoad(
+            laid.caller,
+            (laid.first_record, ExpectedRecord(OP_LATE, "project", laid.first_project, LATE)),
+            (laid.second_record, ExpectedRecord(OP_EARLY, "project", laid.second_project, EARLY)),
+        )
 
 
 @dataclass(frozen=True)
@@ -647,34 +686,39 @@ class ThePageIsCapped(Then[Any, SearchAuditLogsPayload]):
         ]
 
 
+type Loaded = list[AuditLogNode | Exception | None]
+
+
 @dataclass(frozen=True)
-class TheNodesInOrder(Then[RecordsToLoad, list[AuditLogNode | None]]):
-    """Each id gets its node whole and in the order named; an id nothing answers to gets
-    a gap. ``slots`` reads the expected nodes off what was laid."""
+class TheSlotsInOrder(Then[RecordsToLoad, Loaded]):
+    """Each id is answered in the order named: its node whole, a refusal, or a gap for an
+    id nothing answers to. A slot names which — ``first``, ``second``, ``refused``, ``gap``."""
 
     slots: tuple[str, ...]
 
     @override
     def says(self) -> str:
-        return "요청한 순서대로 노드가 반환되고, 없는 id 자리는 비어 있다"
+        return "요청한 순서대로 자리마다 노드, 거부, 또는 빈 자리가 온다"
 
     @override
-    def look(
-        self, laid: RecordsToLoad, answered: Answered[list[AuditLogNode | None]]
-    ) -> list[Verdict]:
-        nodes = answered.response
-        if nodes is None:
+    def look(self, laid: RecordsToLoad, answered: Answered[Loaded]) -> list[Verdict]:
+        loaded = answered.response
+        if loaded is None:
             return [Same("answer", repr(answered.raised), "a list of nodes")]
         by = {"first": laid.first[1], "second": laid.second[1]}
-        expected = [None if slot == "gap" else by[slot] for slot in self.slots]
-        verdicts: list[Verdict] = [Same("length", len(nodes), len(expected))]
-        for index, (node, exp) in enumerate(zip(nodes, expected, strict=False)):
-            if exp is None:
-                verdicts.append(Same(f"slot[{index}]", node, None))
-            else:
-                verdicts.extend(
-                    look_node(node, exp)
-                    if node is not None
-                    else [Same(f"slot[{index}]", node, "a node")]
-                )
+        verdicts: list[Verdict] = [Same("length", len(loaded), len(self.slots))]
+        for index, (got, slot) in enumerate(zip(loaded, self.slots, strict=False)):
+            match slot:
+                case "gap":
+                    verdicts.append(Same(f"[{index}]", got, None))
+                case "refused":
+                    verdicts.append(
+                        Refused(NotEnoughPermission, got if isinstance(got, Exception) else None)
+                    )
+                case _:
+                    verdicts.extend(
+                        look_node(got, by[slot], at=f"[{index}].")
+                        if isinstance(got, AuditLogNode)
+                        else [Same(f"[{index}]", type(got).__name__, "AuditLogNode")]
+                    )
         return verdicts

@@ -6,13 +6,58 @@ Not exercised by any scenario: batch_load_fields.
 
 ### batch_loading
 
-#### [a-user-who-is-not-the-superadmin-may-not-read-by-id](/tests/scenario/bai_scenario/manager/audit_log/test_batch_loading.py) — pass
+#### [a-granted-reader-gets-a-node-a-refusal-and-a-gap-in-order](/tests/scenario/bai_scenario/manager/audit_log/test_batch_loading.py) — pass
 
-슈퍼관리자도 모니터도 아닌 사용자가 id 둘을 조회하면, 요청 전체가 역할 부족으로 거부된다
+한쪽 프로젝트에만 읽기 권한을 받은 사용자가 읽을 수 있는 기록, 읽을 수 없는 기록, 없는 id를 한 번에 조회하면, 요청한 순서대로 기록 전체, 권한 부족, 빈 자리가 온다
 
 Given
 
-- id로 조회할 기록 둘과, user 한 명
+- 서로 다른 프로젝트의 기록 둘과, 첫째 프로젝트에만 읽기 권한을 받은 사용자 한 명
+  - 도메인 home-1
+  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+  - 프로젝트 team-1
+  - 프로젝트 other-1
+  - 프로젝트 team-1: 'edited' 기록
+  - 프로젝트 other-1: 'created' 기록
+  - 도메인에 속한 사용자 한 명 준비
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+  - 역할 record-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
+  - 역할 record-reader-1: project 전체에 READ 허용
+  - 일반 사용자 user-1: 역할 record-reader-1 보유
+
+When
+
+- AuditLogAdapter.batch_load_by_ids — user-1이 읽을 수 있는 기록, 읽을 수 없는 기록, 없는 id 순으로 조회
+
+Then
+
+- 요청한 순서대로 자리마다 노드, 거부, 또는 빈 자리가 온다
+  - length = 3
+  - [0].id: 무시함 — 데이터베이스가 만든다
+  - [0].action_id: 무시함 — 실행마다 새로 생성된다
+  - [0].operation = 'edited'
+  - [0].entity_type = 'project'
+  - [0].entity_id: 기록의 대상 엔티티와 같다
+  - [0].status = <AuditLogStatus.SUCCESS: 'success'>
+  - [0].description = 'edited was recorded'
+  - [0].created_at = datetime.datetime(2026, 1, 2, 0, 0, tzinfo=datetime.timezone.utc)
+  - [0].request_id = None
+  - [0].acted_as = None
+  - [0].duration = None
+  - [0].client_ip = None
+  - [0].triggered_by = None
+  - 거부: NotEnoughPermission
+  - [2] = None
+
+#### [a-user-granted-nothing-is-refused-in-every-slot-even-for-records-about-themselves](/tests/scenario/bai_scenario/manager/audit_log/test_batch_loading.py) — pass
+
+읽기 권한이 없는 사용자가 자기에 대한 기록 둘을 id로 조회하면, 자리마다 권한 부족으로 답한다
+
+Given
+
+- id로 조회할 자기에 대한 기록 둘과, user 한 명
   - 도메인 home-1
   - 도메인에 속한 사용자 한 명 준비
     - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
@@ -28,8 +73,10 @@ When
 
 Then
 
-- 거부된다
-  - 거부: InsufficientPrivilege
+- 요청한 순서대로 자리마다 노드, 거부, 또는 빈 자리가 온다
+  - length = 2
+  - 거부: NotEnoughPermission
+  - 거부: NotEnoughPermission
 
 #### [reading-an-empty-list-answers-empty-without-passing-the-gate](/tests/scenario/bai_scenario/manager/audit_log/test_batch_loading.py) — pass
 
@@ -37,15 +84,15 @@ Then
 
 Given
 
-- id로 조회할 기록 둘과, superadmin 한 명
+- id로 조회할 자기에 대한 기록 둘과, user 한 명
   - 도메인 home-1
   - 도메인에 속한 사용자 한 명 준비
     - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
     - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
     - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - 슈퍼관리자 user-1: 'edited' 기록
-  - 슈퍼관리자 user-1: 'created' 기록
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+  - 일반 사용자 user-1: 'edited' 기록
+  - 일반 사용자 user-1: 'created' 기록
 
 When
 
@@ -53,68 +100,16 @@ When
 
 Then
 
-- 요청한 순서대로 노드가 반환되고, 없는 id 자리는 비어 있다
+- 요청한 순서대로 자리마다 노드, 거부, 또는 빈 자리가 온다
   - length = 0
 
-#### [reading-present-and-absent-ids-answers-each-in-order-with-a-gap](/tests/scenario/bai_scenario/manager/audit_log/test_batch_loading.py) — pass
+#### [the-monitor-role-without-a-grant-is-refused-in-every-slot](/tests/scenario/bai_scenario/manager/audit_log/test_batch_loading.py) — pass
 
-있는 id 둘과 없는 id 하나를 한 번에 조회하면, 요청한 순서대로 반환되고 없는 id 자리는 비어 있다
-
-Given
-
-- id로 조회할 기록 둘과, superadmin 한 명
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - 슈퍼관리자 user-1: 'edited' 기록
-  - 슈퍼관리자 user-1: 'created' 기록
-
-When
-
-- AuditLogAdapter.batch_load_by_ids — user-1이 있는 id 둘과 없는 id 하나를 한 번에 조회
-
-Then
-
-- 요청한 순서대로 노드가 반환되고, 없는 id 자리는 비어 있다
-  - length = 3
-  - id: 무시함 — 데이터베이스가 만든다
-  - action_id: 무시함 — 실행마다 새로 생성된다
-  - operation = 'edited'
-  - entity_type = 'user'
-  - entity_id: 기록의 대상 엔티티와 같다
-  - status = <AuditLogStatus.SUCCESS: 'success'>
-  - description = 'edited was recorded'
-  - created_at = datetime.datetime(2026, 1, 2, 0, 0, tzinfo=datetime.timezone.utc)
-  - request_id = None
-  - acted_as = None
-  - duration = None
-  - client_ip = None
-  - triggered_by = None
-  - slot[1] = None
-  - id: 무시함 — 데이터베이스가 만든다
-  - action_id: 무시함 — 실행마다 새로 생성된다
-  - operation = 'created'
-  - entity_type = 'user'
-  - entity_id: 기록의 대상 엔티티와 같다
-  - status = <AuditLogStatus.SUCCESS: 'success'>
-  - description = 'created was recorded'
-  - created_at = datetime.datetime(2026, 1, 1, 0, 0, tzinfo=datetime.timezone.utc)
-  - request_id = None
-  - acted_as = None
-  - duration = None
-  - client_ip = None
-  - triggered_by = None
-
-#### [the-monitor-role-reading-by-id-sees-the-same-nodes-as-the-superadmin](/tests/scenario/bai_scenario/manager/audit_log/test_batch_loading.py) — pass
-
-이 조회도 읽기 연산이므로 모니터 역할 사용자가 id 둘을 조회하면, 슈퍼관리자와 같은 응답을 받는다
+아무 권한도 받지 않은 모니터 역할 사용자가 id 둘을 조회하면, 자리마다 권한 부족으로 답한다
 
 Given
 
-- id로 조회할 기록 둘과, monitor 한 명
+- id로 조회할 자기에 대한 기록 둘과, monitor 한 명
   - 도메인 home-1
   - 도메인에 속한 사용자 한 명 준비
     - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
@@ -130,34 +125,62 @@ When
 
 Then
 
-- 요청한 순서대로 노드가 반환되고, 없는 id 자리는 비어 있다
+- 요청한 순서대로 자리마다 노드, 거부, 또는 빈 자리가 온다
   - length = 2
-  - id: 무시함 — 데이터베이스가 만든다
-  - action_id: 무시함 — 실행마다 새로 생성된다
-  - operation = 'edited'
-  - entity_type = 'user'
-  - entity_id: 기록의 대상 엔티티와 같다
-  - status = <AuditLogStatus.SUCCESS: 'success'>
-  - description = 'edited was recorded'
-  - created_at = datetime.datetime(2026, 1, 2, 0, 0, tzinfo=datetime.timezone.utc)
-  - request_id = None
-  - acted_as = None
-  - duration = None
-  - client_ip = None
-  - triggered_by = None
-  - id: 무시함 — 데이터베이스가 만든다
-  - action_id: 무시함 — 실행마다 새로 생성된다
-  - operation = 'created'
-  - entity_type = 'user'
-  - entity_id: 기록의 대상 엔티티와 같다
-  - status = <AuditLogStatus.SUCCESS: 'success'>
-  - description = 'created was recorded'
-  - created_at = datetime.datetime(2026, 1, 1, 0, 0, tzinfo=datetime.timezone.utc)
-  - request_id = None
-  - acted_as = None
-  - duration = None
-  - client_ip = None
-  - triggered_by = None
+  - 거부: NotEnoughPermission
+  - 거부: NotEnoughPermission
+
+#### [the-superadmin-reading-present-and-absent-ids-is-answered-in-order-with-a-gap](/tests/scenario/bai_scenario/manager/audit_log/test_batch_loading.py) — pass
+
+슈퍼관리자가 있는 id 둘과 없는 id 하나를 한 번에 조회하면, 요청한 순서대로 반환되고 없는 id 자리는 비어 있다
+
+Given
+
+- id로 조회할 자기에 대한 기록 둘과, superadmin 한 명
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+  - 슈퍼관리자 user-1: 'edited' 기록
+  - 슈퍼관리자 user-1: 'created' 기록
+
+When
+
+- AuditLogAdapter.batch_load_by_ids — user-1이 있는 id 둘과 없는 id 하나를 한 번에 조회
+
+Then
+
+- 요청한 순서대로 자리마다 노드, 거부, 또는 빈 자리가 온다
+  - length = 3
+  - [0].id: 무시함 — 데이터베이스가 만든다
+  - [0].action_id: 무시함 — 실행마다 새로 생성된다
+  - [0].operation = 'edited'
+  - [0].entity_type = 'user'
+  - [0].entity_id: 기록의 대상 엔티티와 같다
+  - [0].status = <AuditLogStatus.SUCCESS: 'success'>
+  - [0].description = 'edited was recorded'
+  - [0].created_at = datetime.datetime(2026, 1, 2, 0, 0, tzinfo=datetime.timezone.utc)
+  - [0].request_id = None
+  - [0].acted_as = None
+  - [0].duration = None
+  - [0].client_ip = None
+  - [0].triggered_by = None
+  - [1] = None
+  - [2].id: 무시함 — 데이터베이스가 만든다
+  - [2].action_id: 무시함 — 실행마다 새로 생성된다
+  - [2].operation = 'created'
+  - [2].entity_type = 'user'
+  - [2].entity_id: 기록의 대상 엔티티와 같다
+  - [2].status = <AuditLogStatus.SUCCESS: 'success'>
+  - [2].description = 'created was recorded'
+  - [2].created_at = datetime.datetime(2026, 1, 1, 0, 0, tzinfo=datetime.timezone.utc)
+  - [2].request_id = None
+  - [2].acted_as = None
+  - [2].duration = None
+  - [2].client_ip = None
+  - [2].triggered_by = None
 
 ### scoped_searching
 
@@ -624,9 +647,9 @@ Then
 - 거부된다
   - 거부: NotEnoughPermission
 
-#### [the-superadmin-naming-an-entity-nothing-answers-to-sees-an-empty-page](/tests/scenario/bai_scenario/manager/audit_log/test_scoped_searching.py) — pass
+#### [the-superadmin-naming-an-entity-nothing-answers-to-is-refused-as-permission](/tests/scenario/bai_scenario/manager/audit_log/test_scoped_searching.py) — pass
 
-슈퍼관리자가 어느 엔티티도 아닌 id를 지정해 검색하면, 권한 검사를 통과해 빈 응답을 받는다. 대상 없음으로 거부하는 경우가 아니다
+슈퍼관리자가 어느 엔티티도 아닌 id를 지정해 검색하면, 없는 엔티티에는 슈퍼관리자도 권한이 없으므로 권한 부족으로 거부된다. 대상 없음으로 거부하는 경우가 아니다
 
 Given
 
@@ -648,11 +671,8 @@ When
 
 Then
 
-- 답이 비어 있다
-  - items = []
-  - total_count = 0
-  - has_next_page = False
-  - has_previous_page = False
+- 거부된다
+  - 거부: NotEnoughPermission
 
 #### [turning-enforcement-off-reads-a-named-entitys-records-without-a-grant](/tests/scenario/bai_scenario/manager/audit_log/test_scoped_searching.py) — pass
 

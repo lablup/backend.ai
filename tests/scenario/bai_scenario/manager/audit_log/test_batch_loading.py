@@ -1,7 +1,7 @@
-"""여러 id로 조회 — id마다 응답하는 형태이지만 전역 검색을 호출한다.
+"""여러 id로 조회 — id마다 그 기록이 가리키는 엔티티의 읽기 권한을 검사하고, 자리마다 따로 답한다.
 
-그래서 권한이 없으면 id별로 갈리지 않고 요청 전체가 거부된다. 빈 목록은 권한 검사도 거치지
-않는다.
+볼 수 없는 기록은 그 자리만 거부되고 나머지는 반환된다. 없는 id는 누가 조회하든 빈 자리다. 빈
+목록은 권한 검사도 거치지 않는다.
 """
 
 from __future__ import annotations
@@ -11,25 +11,23 @@ from typing import override
 from uuid import uuid4
 
 import pytest
-from bai_scenario.components.answers import TheCallIsRefused
+
+from ai.backend.common.data.entity.audit_log import AuditLogID
+from ai.backend.common.data.user.types import UserRole
+from ai.backend.manager.api.adapters.audit_log.adapter import AuditLogAdapter
+from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.testutils.scenario_steps import Given, Scenario, Then, When
 from bai_scenario.components.audit_log import (
+    Loaded,
+    ProjectRecordsToLoad,
     RecordsToLoad,
-    TheNodesInOrder,
+    TheSlotsInOrder,
     TwoRecordsToRead,
 )
 from bai_scenario.runner.acting import ActingAs
 from bai_scenario.runner.planting import SeedingSession
 from bai_scenario.runner.steps import run_scenario
 
-from ai.backend.common.data.entity.audit_log import AuditLogID
-from ai.backend.common.data.user.types import UserRole
-from ai.backend.common.dto.manager.v2.audit_log.response import AuditLogNode
-from ai.backend.manager.api.adapters.audit_log.adapter import AuditLogAdapter
-from ai.backend.manager.errors.auth import InsufficientPrivilege
-from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.scenario_steps import Given, Scenario, Then, When
-
-type Loaded = list[AuditLogNode | None]
 type LoadingStep = Scenario[SeedingSession, RecordsToLoad, AuditLogAdapter, Loaded]
 
 
@@ -52,6 +50,28 @@ class LoadingWithAGap(When[RecordsToLoad, AuditLogAdapter, Loaded]):
                 AuditLogID(laid.first[0]),
                 AuditLogID(uuid4()),
                 AuditLogID(laid.second[0]),
+            ])
+
+
+@dataclass(frozen=True)
+class LoadingReadableUnreadableAndMissing(When[RecordsToLoad, AuditLogAdapter, Loaded]):
+    """읽을 수 있는 기록, 읽을 수 없는 기록, 없는 id 순으로 한 번에 조회한다."""
+
+    @override
+    def operation(self) -> str:
+        return "batch_load_by_ids"
+
+    @override
+    def describe(self, laid: RecordsToLoad) -> str:
+        return f"{laid.caller.username}이 읽을 수 있는 기록, 읽을 수 없는 기록, 없는 id 순으로 조회"
+
+    @override
+    async def call(self, adapter: AuditLogAdapter, laid: RecordsToLoad) -> Loaded:
+        with ActingAs(laid.caller):
+            return await adapter.batch_load_by_ids([
+                AuditLogID(laid.first[0]),
+                AuditLogID(laid.second[0]),
+                AuditLogID(uuid4()),
             ])
 
 
@@ -95,14 +115,42 @@ class LoadingBoth(When[RecordsToLoad, AuditLogAdapter, Loaded]):
 
 
 @dataclass(frozen=True)
-class TheNodesComeBackWithAGap(Scenario[SeedingSession, RecordsToLoad, AuditLogAdapter, Loaded]):
+class AGrantedReaderIsAnsweredPerSlot(
+    Scenario[SeedingSession, RecordsToLoad, AuditLogAdapter, Loaded]
+):
     @override
     def summary(self) -> str:
-        return "reading-present-and-absent-ids-answers-each-in-order-with-a-gap"
+        return "a-granted-reader-gets-a-node-a-refusal-and-a-gap-in-order"
 
     @override
     def describe(self) -> str:
-        return "있는 id 둘과 없는 id 하나를 한 번에 조회하면, 요청한 순서대로 반환되고 없는 id 자리는 비어 있다"
+        return (
+            "한쪽 프로젝트에만 읽기 권한을 받은 사용자가 읽을 수 있는 기록, 읽을 수 없는 기록, "
+            "없는 id를 한 번에 조회하면, 요청한 순서대로 기록 전체, 권한 부족, 빈 자리가 온다"
+        )
+
+    @override
+    def given(self) -> Given[SeedingSession, RecordsToLoad]:
+        return ProjectRecordsToLoad()
+
+    @override
+    def when(self) -> When[RecordsToLoad, AuditLogAdapter, Loaded]:
+        return LoadingReadableUnreadableAndMissing()
+
+    @override
+    def then(self) -> Then[RecordsToLoad, Loaded]:
+        return TheSlotsInOrder(("first", "refused", "gap"))
+
+
+@dataclass(frozen=True)
+class TheNodesComeBackWithAGap(Scenario[SeedingSession, RecordsToLoad, AuditLogAdapter, Loaded]):
+    @override
+    def summary(self) -> str:
+        return "the-superadmin-reading-present-and-absent-ids-is-answered-in-order-with-a-gap"
+
+    @override
+    def describe(self) -> str:
+        return "슈퍼관리자가 있는 id 둘과 없는 id 하나를 한 번에 조회하면, 요청한 순서대로 반환되고 없는 id 자리는 비어 있다"
 
     @override
     def given(self) -> Given[SeedingSession, RecordsToLoad]:
@@ -114,7 +162,7 @@ class TheNodesComeBackWithAGap(Scenario[SeedingSession, RecordsToLoad, AuditLogA
 
     @override
     def then(self) -> Then[RecordsToLoad, Loaded]:
-        return TheNodesInOrder(("first", "gap", "second"))
+        return TheSlotsInOrder(("first", "gap", "second"))
 
 
 @dataclass(frozen=True)
@@ -129,7 +177,7 @@ class AnEmptyListReadsNothing(Scenario[SeedingSession, RecordsToLoad, AuditLogAd
 
     @override
     def given(self) -> Given[SeedingSession, RecordsToLoad]:
-        return TwoRecordsToRead(role=UserRole.SUPERADMIN)
+        return TwoRecordsToRead(role=UserRole.USER)
 
     @override
     def when(self) -> When[RecordsToLoad, AuditLogAdapter, Loaded]:
@@ -137,18 +185,20 @@ class AnEmptyListReadsNothing(Scenario[SeedingSession, RecordsToLoad, AuditLogAd
 
     @override
     def then(self) -> Then[RecordsToLoad, Loaded]:
-        return TheNodesInOrder(())
+        return TheSlotsInOrder(())
 
 
 @dataclass(frozen=True)
-class TheMonitorRoleReadsById(Scenario[SeedingSession, RecordsToLoad, AuditLogAdapter, Loaded]):
+class TheMonitorRoleWithoutAGrantIsRefusedPerSlot(
+    Scenario[SeedingSession, RecordsToLoad, AuditLogAdapter, Loaded]
+):
     @override
     def summary(self) -> str:
-        return "the-monitor-role-reading-by-id-sees-the-same-nodes-as-the-superadmin"
+        return "the-monitor-role-without-a-grant-is-refused-in-every-slot"
 
     @override
     def describe(self) -> str:
-        return "이 조회도 읽기 연산이므로 모니터 역할 사용자가 id 둘을 조회하면, 슈퍼관리자와 같은 응답을 받는다"
+        return "아무 권한도 받지 않은 모니터 역할 사용자가 id 둘을 조회하면, 자리마다 권한 부족으로 답한다"
 
     @override
     def given(self) -> Given[SeedingSession, RecordsToLoad]:
@@ -160,18 +210,20 @@ class TheMonitorRoleReadsById(Scenario[SeedingSession, RecordsToLoad, AuditLogAd
 
     @override
     def then(self) -> Then[RecordsToLoad, Loaded]:
-        return TheNodesInOrder(("first", "second"))
+        return TheSlotsInOrder(("refused", "refused"))
 
 
 @dataclass(frozen=True)
-class APlainUserMayNotReadById(Scenario[SeedingSession, RecordsToLoad, AuditLogAdapter, Loaded]):
+class AUserGrantedNothingIsRefusedPerSlot(
+    Scenario[SeedingSession, RecordsToLoad, AuditLogAdapter, Loaded]
+):
     @override
     def summary(self) -> str:
-        return "a-user-who-is-not-the-superadmin-may-not-read-by-id"
+        return "a-user-granted-nothing-is-refused-in-every-slot-even-for-records-about-themselves"
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자도 모니터도 아닌 사용자가 id 둘을 조회하면, 요청 전체가 역할 부족으로 거부된다"
+        return "읽기 권한이 없는 사용자가 자기에 대한 기록 둘을 id로 조회하면, 자리마다 권한 부족으로 답한다"
 
     @override
     def given(self) -> Given[SeedingSession, RecordsToLoad]:
@@ -183,14 +235,15 @@ class APlainUserMayNotReadById(Scenario[SeedingSession, RecordsToLoad, AuditLogA
 
     @override
     def then(self) -> Then[RecordsToLoad, Loaded]:
-        return TheCallIsRefused(InsufficientPrivilege)
+        return TheSlotsInOrder(("refused", "refused"))
 
 
 SCENARIOS: list[LoadingStep] = [
+    AGrantedReaderIsAnsweredPerSlot(),
     TheNodesComeBackWithAGap(),
     AnEmptyListReadsNothing(),
-    TheMonitorRoleReadsById(),
-    APlainUserMayNotReadById(),
+    TheMonitorRoleWithoutAGrantIsRefusedPerSlot(),
+    AUserGrantedNothingIsRefusedPerSlot(),
 ]
 
 
